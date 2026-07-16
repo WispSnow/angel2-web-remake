@@ -105,6 +105,13 @@ reverse/tools/angel2-lha-frame.mjs --extract-resource \
   reverse/extracted/A reverse/decoded/A
 reverse/tools/angel2-planar.mjs --render-resource \
   reverse/decoded/A reverse/renders/planar/A gameplay
+reverse/tools/angel2-planar.mjs --render-resource \
+  reverse/decoded/C reverse/renders/planar/C_password password
+reverse/tools/angel2-plane-order.mjs --extract \
+  reverse/unpacked/lzexe-modules/raw/0021-unpacked.bin \
+  reverse/unpacked/lzexe-modules/raw/0025-unpacked.bin \
+  reverse/unpacked/lzexe-modules/raw/0029-unpacked.bin \
+  reverse/parsed/native/plane-order.json
 reverse/tools/angel2-audio.mjs --convert-root \
   reverse/extracted reverse/converted/audio
 reverse/tools/angel2-tables.mjs --export \

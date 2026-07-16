@@ -23,6 +23,7 @@ const VERIFIED_RANGES = [
   { source: "module21", address: "0000:0928-0975", start: 0x0928, end: 0x0976, role: "draw six colored answer buttons in native left-to-right order", sha256: "98fbf5b1d573f9ef953b25de4348fa9f4024ca7312a55dd29550e7f5489fb1ea" },
   { source: "module21", address: "0000:0B4B-0C04", start: 0x0b4b, end: 0x0c05, role: "draw the selected image coordinate and choose a PIT-derived challenge modulo 28", sha256: "684155d3031913d8c01146c461b98143f578232f16238c94cd72c7ed24295e2e" },
   { source: "module21", address: "DS:02C6-036D", start: 0x8b76, end: 0x8c1e, role: "28 records of image x/y coordinates and expected answers", sha256: "057695d0075a946d27e46351146272a63df1a807b1a0dc43c887d2c16b047778" },
+  { source: "module21", address: "DS:03AC-03DB", start: 0x8c5c, end: 0x8c8c, role: "password-screen 16-color VGA DAC palette", sha256: "1b9a1582803415475ab5f2b73c00f6c0ffb4caf1d8a8385a7aafee747df6ffa4" },
   { source: "module21", address: "DS:0426-052A", start: 0x8cd6, end: 0x8ddb, role: "password strings, drawing structures, choice permutations, and failure text", sha256: "9989f5a188e7281a4339a9129f8abfe5ce539e664c2da9c33da50e1ae46c64b1" },
   { source: "play", address: "0100:0118-0138", start: 0x18, end: 0x39, role: "single PLAY.COM search-and-replace rule targeting module21 CS:0BEB", sha256: "c0b70c6b23d4582d49087a1a5de1211dcf553cf5f87e083a87d07e745cda8331" },
   { source: "play", address: "0100:013C-01A4", start: 0x3c, end: 0xa5, role: "INT 21h hook that matches and replaces bytes in the interrupted CS", sha256: "e66366439df69a8af4c6542a49493ebb55228d72a8afff67e2afea291d042281" },
@@ -120,15 +121,15 @@ function parseChoiceTables(module21, c32Planes) {
   assert(answerCodeLeftToRight.join(",") === "2,1,0,3,4,5", "password selection-to-answer order changed");
   assert(buttonImageRecords.every((value, index) => value === answerCodeLeftToRight[index] + 2), "choice image and semantic answer tables disagree");
   const expectedAppearanceByRecord = new Map([
-    [2, { colorName: "orange", centerRgb: [255, 190, 105] }],
-    [3, { colorName: "green", centerRgb: [40, 130, 0] }],
-    [4, { colorName: "blue", centerRgb: [0, 0, 166] }],
-    [5, { colorName: "brown", centerRgb: [162, 117, 81] }],
+    [2, { colorName: "blue", centerRgb: [77, 138, 255] }],
+    [3, { colorName: "yellow", centerRgb: [255, 223, 16] }],
+    [4, { colorName: "red", centerRgb: [255, 49, 0] }],
+    [5, { colorName: "green", centerRgb: [138, 219, 40] }],
     [6, { colorName: "purple", centerRgb: [186, 97, 255] }],
     [7, { colorName: "white", centerRgb: [255, 255, 255] }],
   ]);
   const buttonVisualsLeftToRight = buttonImageRecords.map((record, index) => {
-    const image = composePlanarImage(c32Planes, record, null, PALETTES.gameplay.colors);
+    const image = composePlanarImage(c32Planes, record, null, PALETTES.password.colors);
     assert(image.width === 80 && image.height === 38, `C/0032 image ${record} is not an 80x38 answer button`);
     const centerOffset = (19 * image.width + 40) * 4;
     const centerRgb = Array.from(image.pixels.subarray(centerOffset, centerOffset + 3));
@@ -138,7 +139,7 @@ function parseChoiceTables(module21, c32Planes) {
       selectionIndex: index,
       answerCode: answerCodeLeftToRight[index],
       imageRecord: record,
-      preview: `reverse/renders/planar/C/0032/${String(record).padStart(2, "0")}.png`,
+      preview: `reverse/renders/planar/C_password/0032/${String(record).padStart(2, "0")}.png`,
       colorName: expectedAppearance.colorName,
       centerRgb,
     };
@@ -272,15 +273,15 @@ async function extract(goPath, playPath, module21Path, module29Path, extractedRo
     return parseBitmapBundle(await readFile(planePath), planePath);
   }));
   const choices = parseChoiceTables(module21, c32Planes);
-  const referenceImage = composePlanarImage(c32Planes, 1, null, PALETTES.gameplay.colors);
+  const referenceImage = composePlanarImage(c32Planes, 1, null, PALETTES.password.colors);
   assert(referenceImage.width === 432 && referenceImage.height === 340, "C/0032 image 1 is no longer the 432x340 reference illustration");
   const challengeMarkerFrames = [20, 21, 22, 23].map((record) => {
-    const image = composePlanarImage(c32Planes, record, null, PALETTES.gameplay.colors);
+    const image = composePlanarImage(c32Planes, record, null, PALETTES.password.colors);
     assert(image.width === 24 && (image.height === 15 || image.height === 16), `C/0032 image ${record} is not a native challenge-marker frame`);
     return {
       imageRecord: record,
       dimensions: { width: image.width, height: image.height },
-      preview: `reverse/renders/planar/C/0032/${record}.png`,
+      preview: `reverse/renders/planar/C_password/0032/${record}.png`,
     };
   });
   const playPatch = parsePlayPatch(play, module21);
@@ -379,13 +380,15 @@ async function extract(goPath, playPath, module21Path, module29Path, extractedRo
     },
     challengeReference: {
       resource: { container: "C.SWF", record: 32 },
-      confirmedPlanarRender: "reverse/renders/planar/C/0032/01.png",
+      confirmedPlanarRender: "reverse/renders/planar/C_password/0032/01.png",
       dimensions: { width: 432, height: 340 },
       resourceImageRoles: {
         referenceIllustration: 1,
         colorAnswerButtons: choices.buttonVisualsLeftToRight,
         challengeMarkerFrames,
-        gameplayPaletteEvidence: PALETTES.gameplay.evidence,
+        paletteName: "password",
+        passwordPalette: PALETTES.password.colors,
+        passwordPaletteEvidence: PALETTES.password.evidence,
       },
       coordinateCount: challenges.length,
       challenges,
@@ -399,7 +402,7 @@ async function extract(goPath, playPath, module21Path, module29Path, extractedRo
       ...playPatch,
       fixedChallenge,
       defaultChoiceMatchesFixedAnswer: fixedChallenge.expectedAnswer === choices.defaultAnswerCode,
-      resultingUserPath: "when launched through PLAY.COM, choosing the default leftmost blue button three times satisfies the table (its internal answer code is 2)",
+      resultingUserPath: "when launched through PLAY.COM, choosing the default leftmost red button three times satisfies the table (its internal answer code is 2)",
       directGoExeDifference: "launching GO.EXE directly leaves the PIT-derived challenge selector intact",
     },
     passwordGlyphResource: passwordGlyphs,

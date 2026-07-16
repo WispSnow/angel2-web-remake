@@ -1,0 +1,67 @@
+# 《天使帝国 II》Web 复刻版设计文档
+
+版本：Draft 0.1
+
+日期：2026-07-15
+
+阶段：纸面垂直切片
+
+开发状态：`implementationFrozen=true`
+
+## 文档目的
+
+本目录定义 Web 复刻版要提供的玩法、剧情节奏、数值规则、UI 体验和 Mod 边界。它不复述 DOS 程序的实现方式，也不包含 Phaser 架构或代码任务。
+
+原版事实仍以 [`reverse/gdd/original-gdd.md`](../../reverse/gdd/original-gdd.md) 为唯一取证基线；本目录只回答“玩家在复刻版中会经历什么”以及“原版怪癖在默认规则中如何处理”。
+
+## 证据与决策标签
+
+所有具有约束力的条目应使用以下标签之一：
+
+| 标签 | 含义 | 是否可直接作为默认玩法 |
+| --- | --- | --- |
+| `[OF]` | 已由原程序、资源或实机确认的原版事实 | 需再经过规则集政策判断 |
+| `[SR]` | 已确认的 `stableRemake` 默认规则 | 是 |
+| `[DD]` | 为 Web 复刻新增的产品/体验决策 | 是，但必须有验收标准 |
+| `[H]` | 待试玩验证的设计假设 | 否，验证后转为 `[DD]` 或废弃 |
+| `[TBD]` | 证据或产品选择尚未完成 | 否，不得让实现者自行猜测 |
+
+如果 `[OF]` 与 `[SR]` 不同，必须同时保留两者并链接规则决策记录，不能改写原版事实来“消除”差异。
+
+## 当前文档地图
+
+| 文档 | 回答的问题 | 当前状态 |
+| --- | --- | --- |
+| [`00-product-vision.md`](00-product-vision.md) | 复刻为何存在、核心体验是什么 | Draft 0.1 |
+| [`01-ruleset-policy.md`](01-ruleset-policy.md) | 忠实、修复与 Mod 如何分层 | Draft 0.1 |
+| [`02-game-flow.md`](02-game-flow.md) | 从标题到战后、从回合到行动的完整循环 | Draft 0.1 |
+| [`03-battle-rules.md`](03-battle-rules.md) | 战斗规则的产品级合同 | Draft 0.1 |
+| [`04-units-progression-balance.md`](04-units-progression-balance.md) | 兵种、成长、转职与平衡边界 | Draft 0.1 |
+| [`05-ai-and-difficulty.md`](05-ai-and-difficulty.md) | 敌方意图、AI 修复与难度 | Draft 0.1 |
+| [`06-campaign-and-narrative.md`](06-campaign-and-narrative.md) | 关卡与剧情如何编排 | Draft 0.1 |
+| [`07-ui-ux-and-presentation.md`](07-ui-ux-and-presentation.md) | 原版 UI 如何复现并适配浏览器 | Draft 0.1 |
+| [`08-mod-policy.md`](08-mod-policy.md) | 哪些内容可改、如何保持可追溯 | Draft 0.1 |
+| [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.1 |
+| [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的完整纸面垂直切片 | Draft 0.1 |
+
+## 写作规范
+
+每个系统规格至少要说明：
+
+1. 玩家目的与可感知结果；
+2. 触发条件、合法输入和目标；
+3. 规则顺序与整数取整方式；
+4. 消耗、状态变化、失败与边界情况；
+5. AI 如何使用同一规则；
+6. UI 必须反馈什么；
+7. `stableRemake`、`legacyStrict` 与 Mod 的差异；
+8. 可重复的验收场景；
+9. 原版证据链接。
+
+数值表、地图、对白和资源清单应链接机器生成文件，不在这里手抄第二份“真值”。新关卡可使用 [`templates/stage-spec-template.md`](templates/stage-spec-template.md)；新系统可使用 [`templates/system-spec-template.md`](templates/system-spec-template.md)。
+
+## 设计阶段边界
+
+- 可以：复核原版证据、制定玩家体验、定义规则顺序、设计 UI 流程、建立验收场景、提出并记录现代化便利功能。
+- 不可以：开始 Phaser 工程、把 DOS 内存结构当成 Web 领域模型、为了方便编码而改玩法、在 `[TBD]` 上自行补规则。
+- 只有 [`09-design-acceptance.md`](09-design-acceptance.md) 的门槛通过并由用户明确解除冻结后，才建立实现计划。

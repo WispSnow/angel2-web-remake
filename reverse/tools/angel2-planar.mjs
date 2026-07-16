@@ -55,11 +55,29 @@ const PALETTES = {
     ]),
     evidence: "runtime main-module offset 9A10h; written by routine 31E0h",
   },
+  password: {
+    colors: dacPalette([
+      0x00, 0x00, 0x00, 0x3f, 0x0c, 0x00,
+      0x13, 0x22, 0x3f, 0x3f, 0x37, 0x04,
+      0x22, 0x36, 0x0a, 0x2e, 0x18, 0x3f,
+      0x3f, 0x22, 0x22, 0x37, 0x0e, 0x00,
+      0x2a, 0x28, 0x24, 0x31, 0x0d, 0x00,
+      0x39, 0x22, 0x11, 0x28, 0x1d, 0x02,
+      0x00, 0x00, 0x32, 0x31, 0x24, 0x14,
+      0x3f, 0x36, 0x0e, 0x3f, 0x3f, 0x3f,
+    ]),
+    evidence: "module21 DS:03ACh; written by 0000:22C4 and faded in from 0000:05A8",
+  },
   ega: {
     colors: EGA_PALETTE,
     evidence: "standard EGA fallback; not the native ANGEL2 gameplay palette",
   },
 };
+
+// ANGEL2 stores the four source streams in the opposite order from the VGA
+// color-index bits. Native renderers pair descriptor slots +0/+4/+8/+0Ch with
+// Sequencer Map Masks 08h/04h/02h/01h, so streams 0..3 are bits 3..0.
+const STREAM_TO_COLOR_BIT = [3, 2, 1, 0];
 
 function parseBitmapBundle(buffer, fileName = "bitmap bundle") {
   if (buffer.length < 4) {
@@ -229,7 +247,7 @@ function composePlanarImage(planes, imageIndex, mask = null, palette = PALETTES.
       let paletteIndex = 0;
       for (let plane = 0; plane < 4; plane += 1) {
         if ((planes[plane].images[imageIndex].pixels[byteOffset] & bit) !== 0) {
-          paletteIndex |= 1 << plane;
+          paletteIndex |= 1 << STREAM_TO_COLOR_BIT[plane];
         }
       }
       const target = (y * image.width + x) * 4;
@@ -371,7 +389,7 @@ async function renderResource(decodedDirectory, outputDirectory, paletteName = "
     paletteColors: palette.colors,
     paletteEvidence: palette.evidence,
     bitOrder: "MSB first",
-    planeOrder: "streams 0..3 -> color bits 0..3",
+    planeOrder: "streams 0..3 -> VGA color bits 3..0",
     maskRule: "matching stream 4, set bit means transparent",
     sourceDirectory: decodedDirectory,
     renderedRecords: outputRecords.filter((record) => record.rendered).length,
@@ -389,7 +407,7 @@ async function renderResource(decodedDirectory, outputDirectory, paletteName = "
 }
 
 function usage() {
-  return "usage: angel2-planar.mjs --render-resource DECODED_DIR OUTPUT_DIR [gameplay|intro|ega]";
+  return `usage: angel2-planar.mjs --render-resource DECODED_DIR OUTPUT_DIR [${Object.keys(PALETTES).join("|")}]`;
 }
 
 async function main() {
@@ -409,6 +427,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
 
 export {
   PALETTES,
+  STREAM_TO_COLOR_BIT,
   composePlanarImage,
   encodeRgbaPng,
   parseBitmapBundle,

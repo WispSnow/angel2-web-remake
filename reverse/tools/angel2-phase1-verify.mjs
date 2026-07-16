@@ -102,6 +102,10 @@ async function verifyPhase1Artifacts(root) {
   const timing = await readJson(path.join(native, "native-timing.json"));
   const feedback = await readJson(path.join(native, "feedback-presentations.json"));
   const ending = await readJson(path.join(native, "ending-presentations.json"));
+  const planeOrder = await readJson(path.join(native, "plane-order.json"));
+  const password = await readJson(path.join(native, "password-flow.json"));
+  const portraitManifest = await readJson(path.join(root, "reverse/renders/planar/D/manifest.json"));
+  const passwordManifest = await readJson(path.join(root, "reverse/renders/planar/C_password/manifest.json"));
   const audit = await readJson(path.join(native, "phase1-residual-audit.json"));
   const gdd = await readFile(path.join(root, "reverse/gdd/original-gdd.md"), "utf8");
 
@@ -149,6 +153,25 @@ async function verifyPhase1Artifacts(root) {
     "module 27 key-sound visible binding is not closed");
   assert(ending.module46CreditsAndTerminalScreen.nameFrames[2].text === "蘇泓漳",
     "credit frame 2 transcription changed");
+  assert(planeOrder.streamToColorBit.join(",") === "3,2,1,0" &&
+    planeOrder.modules.length === 3,
+  "native planar stream-to-color order is not closed across modules 21/25/29");
+  assert(portraitManifest.planeOrder === "streams 0..3 -> VGA color bits 3..0",
+    "gameplay planar manifest uses the wrong color-bit order");
+  assert(passwordManifest.palette === "password" &&
+    passwordManifest.planeOrder === "streams 0..3 -> VGA color bits 3..0",
+  "password planar manifest lacks its native palette or plane order");
+  assert(password.passwordUi.answerChoices.buttonVisualsLeftToRight
+    .map((entry) => entry.colorName).join(",") === "red,yellow,blue,green,purple,white",
+  "password button colors no longer match the native module21 palette");
+  assert(sha256(await readFile(path.join(root,
+    "reverse/renders/story-presentations/frames/D/0045/00.png"))) ===
+    "fc9b1da463aa030a07902a3df1c9741e1e8093849910667574b609778a3d163f",
+  "Ximi portrait render changed");
+  assert(sha256(await readFile(path.join(root,
+    "reverse/renders/story-presentations/frames/D/0046/00.png"))) ===
+    "3c3afabf1a910f46152b5b95245e1c048185fa28749e5f2b93b5c75c58ef285b",
+  "Niya portrait render changed");
 
   const evidence = audit.evidenceRegister;
   assert(evidence.rows === 138 && evidence.confirmedRows === 120 && evidence.mixedRows === 18,
@@ -162,7 +185,7 @@ async function verifyPhase1Artifacts(root) {
     summary.phase1MixedRows === evidence.mixedRows &&
     summary.phase1ImplementationRequiredUnknowns === 0,
   "inventory and phase-1 audit counts disagree");
-  assert(gdd.includes("版本：Draft 0.45"), "GDD is not Draft 0.45");
+  assert(gdd.includes("版本：Draft 0.46"), "GDD is not Draft 0.46");
   assert(gdd.includes("138 项：120 项纯 C、18 项混合边界、实现必需未知 0"),
     "GDD evidence summary is stale");
 
@@ -202,4 +225,3 @@ main().catch((error) => {
   console.error(error.message);
   process.exitCode = 1;
 });
-

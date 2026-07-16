@@ -158,7 +158,7 @@
     "nativeBattleOutcomePrompts": 4,
     "nativeFeedbackCreativeVoiceRecords": 16,
     "nativeFeedbackPresentationClosed": true,
-    "verifiedPasswordFlowRanges": 16,
+    "verifiedPasswordFlowRanges": 17,
     "nativePasswordChallenges": 28,
     "nativePasswordVisibleColorButtons": 6,
     "nativePasswordDirectResources": 8,
@@ -1243,7 +1243,7 @@
       },
       "nativePasswordGate": {
         "module": 21,
-        "verifiedRanges": 16,
+        "verifiedRanges": 17,
         "attemptsPerSet": 3,
         "challengeCoordinates": 28,
         "visibleColorButtons": 6,
