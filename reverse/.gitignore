@@ -1,0 +1,12 @@
+# Generated reverse-engineering artifacts
+work/
+unpacked/
+ghidra/
+logs/
+captures/
+dumps/
+extracted/
+decoded/
+converted/
+parsed/
+renders/

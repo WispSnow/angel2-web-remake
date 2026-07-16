@@ -1,0 +1,1543 @@
+{
+  "format": "ANGEL2 resource extraction coverage",
+  "phase": "asset_and_gdd_reconstruction_only",
+  "implementationFrozen": true,
+  "summary": {
+    "referenceFiles": 28,
+    "indexedContainers": 14,
+    "indexedPresentRecords": 1282,
+    "extractedIndexedRecords": 1282,
+    "decodedEmbeddedStreams": 2249,
+    "decodedEmbeddedBytes": 17445630,
+    "planarPreviewImages": 8725,
+    "mappedBig5Glyphs": 9399,
+    "mappedBig5GlyphAtlases": 176,
+    "additionalRawGlyphs": 1769,
+    "additionalRawGlyphAtlases": 9,
+    "reconstructedRuntimeModules": 10,
+    "reconstructedRuntimeModuleBlocks": 12,
+    "reconstructedRuntimeImageBytes": 256983,
+    "lzexeUnpackedRuntimeModules": 10,
+    "lzexeUnpackedRuntimeImageBytes": 628256,
+    "recoveredRuntimeRelocations": 2651,
+    "nativeUnitDisplayNames": 39,
+    "verifiedUnitDescriptorCodeSignatures": 4,
+    "nativePromotionEdges": 31,
+    "verifiedPromotionCodeSignatures": 3,
+    "consolidatedNativeUnitCatalogRecords": 39,
+    "unitCatalogGuideExperienceValuesValidated": 195,
+    "unitCatalogGuideOtherValuesValidated": 1170,
+    "unitCatalogAiClassDispatchRecords": 39,
+    "parsedNormalBattleTemplates": 39,
+    "mappedBattleStageEntries": 44,
+    "specialOrAlternateBattleStageEntries": 5,
+    "defeatObjectiveEntries": 42,
+    "victoryObjectiveEntries": 42,
+    "classifiedObjectiveEntries": 84,
+    "verifiedStageEventCodeAndDataRanges": 41,
+    "nativePerStageBattleEventHandlers": 38,
+    "structurallyClosedPerStageBattleEventHandlers": 38,
+    "handlerDialogueRecordCount": 72,
+    "module25StageStoryTableEntries": 50,
+    "closedDynamicStageEvents": [
+      0,
+      1,
+      6,
+      11,
+      20,
+      21,
+      22,
+      42
+    ],
+    "closedPerStageBattleEvents": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      26,
+      27,
+      28,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      42
+    ],
+    "closedOtherRuntimeStateStageEvents": [
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      30
+    ],
+    "verifiedStagePresentationCodeSignatures": 21,
+    "verifiedStagePresentationDataSignatures": 2,
+    "closedSpecialStagePresentationTimelines": [
+      0,
+      1,
+      6,
+      11,
+      20,
+      21,
+      22,
+      30,
+      42
+    ],
+    "nativeSpecialStagePresentationsClosed": true,
+    "verifiedEndingPresentationRanges": 22,
+    "verifiedEndingPresentationResources": 12,
+    "reachablePostgameRosterCards": 22,
+    "conditionalEpilogueTextBlocks": 8,
+    "terminalCreditRoleFrames": 20,
+    "terminalCreditNameFrames": 22,
+    "module46NormalReturnReachable": false,
+    "verifiedTitleFlowRanges": 26,
+    "nativeTitleMenuOptions": 2,
+    "nativeDifficultyOptions": 4,
+    "nativeContinueSlots": 5,
+    "titleNewContinueFlowClosed": true,
+    "verifiedTitlePresentationCodeSignatures": 31,
+    "verifiedTitlePresentationDataSignatures": 5,
+    "nativeTitlePresentationGraphicRecords": 19,
+    "nativeTitlePresentationAudioRecords": 2,
+    "paletteCorrectTitlePresentationRenders": 97,
+    "nativeTitlePresentationContactSheets": 4,
+    "nativeIntroNarrativeLines": 17,
+    "nativeIntroBackgroundTransitions": 6,
+    "nativeIntroFixedWaitTicks": 7092,
+    "nativeTitlePresentationTimelineClosed": true,
+    "verifiedStoryPresentationCodeSignatures": 31,
+    "verifiedStoryPresentationDataSignatures": 10,
+    "nativeStoryCommandScriptRecords": 93,
+    "nativeStoryTextOrLabelOnlyRecords": 83,
+    "nativeClosedRouteStoryCommandScripts": 89,
+    "paletteCorrectStoryPresentationRenders": 97,
+    "nativeStoryPresentationContactSheets": 4,
+    "nativeStoryPresentationTimelineClosed": true,
+    "verifiedFeedbackPresentationCodeSignatures": 26,
+    "verifiedFeedbackPresentationDataSignatures": 6,
+    "nativeReachableDeploymentErrorMessages": 3,
+    "nativeBattleOutcomePrompts": 4,
+    "nativeFeedbackCreativeVoiceRecords": 16,
+    "nativeFeedbackPresentationClosed": true,
+    "verifiedPasswordFlowRanges": 16,
+    "nativePasswordChallenges": 28,
+    "nativePasswordVisibleColorButtons": 6,
+    "nativePasswordDirectResources": 8,
+    "passwordGateStateMachineClosed": true,
+    "verifiedBattleLifecycleCodeSignatures": 15,
+    "mappedBattleDeploymentStages": 44,
+    "interactiveBattleDeploymentStages": 33,
+    "mappedBattleDeploymentCells": 423,
+    "ordinaryBattleLifecycleClosed": true,
+    "verifiedInputUiCodeSignatures": 33,
+    "mappedDeploymentInputHitboxes": 19,
+    "parsedBattleActionMenus": 7,
+    "mappedBattleSidePanelHitboxes": 12,
+    "parsedBattleSidePanelActions": 17,
+    "parsedBattleSettingsRows": 14,
+    "parsedPhysicalKeyboardBindingsPerModule": 14,
+    "physicalKeyboardTablesIdentical": true,
+    "releaseDeveloperShortcutGateDisabled": true,
+    "battleInputUiRuleLayerClosed": true,
+    "verifiedUnitDetailHudCodeSignatures": 18,
+    "verifiedUnitDetailHudDataSignatures": 4,
+    "nativeUnitDetailHudRectangles": 23,
+    "nativeUnitDetailHudStatRows": 5,
+    "nativeUnitDetailHudStatusSlots": 8,
+    "nativeUnitDetailHudStatusResources": 8,
+    "nativeUnitDetailHudClosed": true,
+    "verifiedBattleRangePresentationCodeSignatures": 34,
+    "verifiedBattleRangePresentationDataSignatures": 1,
+    "nativeBattleRangeScratchBytes": 2500,
+    "nativeVisibleMapEffectCells": 70,
+    "nativeBattleRangeDitherRetainedPixels": 440,
+    "nativeBattleRangePresentationClosed": true,
+    "verifiedCombatCodeSignatures": 41,
+    "verifiedCombatPresentationCodeSignatures": 24,
+    "verifiedCombatPresentationDataSignatures": 3,
+    "nativeCombatPresentationClassRecords": 39,
+    "nativeCombatPresentationGraphicRecords": 158,
+    "nativeCombatPresentationAudioRecords": 37,
+    "nativeMapHitGraphicDraws": 9,
+    "nativeMapDeathDescriptors": 15,
+    "nativeFullScreenVoiceSlotAgreementRecords": 34,
+    "verifiedShootingPresentationCodeSignatures": 19,
+    "verifiedShootingPresentationDataSignatures": 3,
+    "nativeShootingPresentationGraphicRecords": 2,
+    "nativeShootingPresentationAudioRecords": 2,
+    "nativeCommonShotGraphicDraws": 10,
+    "nativeCommonShotFixedGraphicWaitTicks": 60,
+    "nativeShootingPlayerAiEvasionPresentationVariants": 2,
+    "nativeLineEffectDescriptorStages": 9,
+    "nativeLineEffectFinishSteps": 8,
+    "verifiedTechniquePresentationCodeSignatures": 46,
+    "verifiedTechniquePresentationDataSignatures": 9,
+    "nativeTechniquePresentationFamilies": 5,
+    "nativeTechniquePresentationActions": 18,
+    "nativeTechniquePresentationGraphicRecords": 25,
+    "nativeTechniquePresentationAudioRecords": 8,
+    "nativeTechniquePresentationContactSheets": 10,
+    "verifiedRemainingTechniquePresentationCodeSignatures": 50,
+    "verifiedRemainingTechniquePresentationDataSignatures": 7,
+    "nativeRemainingTechniquePresentationActions": 15,
+    "nativeRemainingTechniquePresentationGraphicRecords": 15,
+    "nativeRemainingTechniquePresentationAudioRecords": 5,
+    "nativeRemainingTechniquePresentationContactSheets": 10,
+    "nativePlayerTechniquePresentationsClosed": true,
+    "nativeStatusSlots": 8,
+    "nativeStatusPointerRecordsPerSide": 58,
+    "nativePoisonFormula": "currentLife = floor(currentLife / 2)",
+    "nativeKillRewardEntries": 35,
+    "nativePostThirdRowGrowthEntries": 23,
+    "verifiedTurnActionCodeSignatures": 23,
+    "nativeAiClassPriorityEntries": 39,
+    "confirmedStage37ActionsPerEnemyPhase": 3,
+    "nativeTechniqueMenuClasses": 13,
+    "nativeTechniqueDispatchEntries": 36,
+    "confirmedShootingClasses": 3,
+    "verifiedTechniqueCodeSignatures": 36,
+    "linkedTechniquePresentationGroups": 17,
+    "nativeAiTechniquePoolClasses": 14,
+    "nativeAiTechniqueActionEntries": 33,
+    "nativeAiTechniqueOrphanPoolCodes": [
+      "FM",
+      "SM"
+    ],
+    "verifiedAiRuleCodeSignatures": 54,
+    "nativeAiBehaviorActiveInstances": 672,
+    "nativeAiBehaviorStaticDomain": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      11,
+      12
+    ],
+    "logicalTerrainSlots": 23,
+    "verifiedMapRuleCodeSignatures": 47,
+    "nativeMovementProfileGroups": 13,
+    "nativeTerrainDefenseProfileGroups": 9,
+    "mappedStageTerrainEntries": 44,
+    "mappedRawTerrainTokens": 128,
+    "mappedUsedLogicalTerrainSlots": 21,
+    "confirmedBattleMapRenders": 44,
+    "confirmedTerrainMinimapRenders": 44,
+    "confirmedOccupancyMinimapRenders": 44,
+    "confirmedNumberedSaveMinimapRenders": 5,
+    "verifiedMinimapCodeSignatures": 17,
+    "verifiedMinimapDataSignatures": 3,
+    "auditedTerrainDescriptorReadSites": 6,
+    "nativeTerrainVisibleNameBindingFound": false,
+    "decodedSaveStates": 6,
+    "decodedSaveStateBytes": 68218,
+    "decodedWarDynamicStateRecordsPerSide": 60,
+    "nativeWarDynamicStatePointerTablesVerified": true,
+    "verifiedSaveStateSemanticCodeSignatures": 16,
+    "verifiedSaveStateSemanticDataSignatures": 1,
+    "auditedRangeModeProducerWrites": 43,
+    "scriptedFmRangeModeProducers": 10,
+    "decodedWarTailStates": 5,
+    "warTailSide2SerializerCopiesVerified": true,
+    "creativeVoiceWav": 71,
+    "softstarRixRaw": 59,
+    "softstarRixWav": 59,
+    "parsedJoymouseConfigurations": 1,
+    "verifiedJoymouseNativeSignatures": 8,
+    "nativeJoymouseKeyTableEntries": 128,
+    "shippedJoymouseActionsVerified": 12,
+    "shippedJoymouseSemanticPipelineClosed": true,
+    "sayScriptsParsed": 176,
+    "dataRecordsParsed": 39,
+    "mapRuleRecordsParsed": 39,
+    "unresolvedFiles": []
+  },
+  "files": [
+    {
+      "fileName": "A.SWF",
+      "bytes": 202026,
+      "sha256": "4dad425c6f3605341314c363b7deac8e089e5089c8265521c51150bf3acf2db3",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 80,
+        "presentRecords": 60,
+        "missingRecords": 19,
+        "extractedRecords": 60,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 60,
+        "decodedStreams": 81,
+        "unpackedBytes": 287530,
+        "kinds": {
+          "five_stream_package": 16,
+          "opaque": 10,
+          "placeholder": 30,
+          "raw_16x15_glyph_array": 3,
+          "single_stream": 1
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 15,
+        "renderedImages": 230,
+        "palette": "gameplay"
+      },
+      "audio": {
+        "creativeVoice": 1,
+        "softstarRix": 5
+      },
+      "rawGlyphArrays": {
+        "records": 3,
+        "glyphs": 703
+      },
+      "nativeTitleFlow": {
+        "titleGlyphs": 228,
+        "directResourceRecords": 23,
+        "titleOptions": 2,
+        "difficultyOptions": 4,
+        "continueSlots": 5,
+        "status": "native_title_new_continue_state_machine_closed"
+      },
+      "nativeTitlePresentation": {
+        "linkedGraphicRecords": [
+          6,
+          25
+        ],
+        "paletteCorrectRenders": 5,
+        "inheritedGlyphRecords": [
+          "A/23",
+          "A/24"
+        ],
+        "roles": [
+          "continue selector construction",
+          "intro scrolling-text glyph strip"
+        ],
+        "status": "title, intro, difficulty, and continue presentation timeline closed"
+      },
+      "nativeStoryPresentation": {
+        "windowGraphicsRecord": 18,
+        "windowGraphicFrames": 12,
+        "portraitClearTextureRecord": 20,
+        "portraitClearTextureFrames": 1,
+        "status": "native window and portrait-clear graphics recovered"
+      },
+      "nativeFeedbackPresentation": {
+        "windowGraphicRecord": 18,
+        "renderedWindowFrames": 12,
+        "roles": [
+          "victory",
+          "retreat",
+          "defeat",
+          "quit",
+          "contextual battle line"
+        ],
+        "machineData": "reverse/parsed/native/feedback-presentations.json"
+      },
+      "nativeUnitDetailHud": {
+        "statusGraphicRecord": 17,
+        "statusFrames": 8,
+        "frameDimensions": {
+          "width": 40,
+          "height": 31
+        },
+        "transparentMask": true,
+        "slotOrder": [
+          "attackUp",
+          "defenseUp",
+          "defenseMagic",
+          "confusion",
+          "attackDown",
+          "defenseDown",
+          "poison",
+          "spellSeal"
+        ],
+        "machineData": "reverse/parsed/native/hud-presentations.json"
+      }
+    },
+    {
+      "fileName": "AG2.JS3",
+      "bytes": 78,
+      "sha256": "e9a8335d2a745a35e81e9fa6e74c3f4f07af48ccc657487f4ae19825996db214",
+      "category": "data_or_configuration",
+      "status": "joymouse_input_configuration_and_shipped_device_translation_verified",
+      "joymouseConfiguration": {
+        "bytes": 78,
+        "configVersionWord": 256,
+        "emulationMode": {
+          "offset": 3,
+          "id": 4,
+          "name": "keyboard_4_way",
+          "nativeDispatch": "JS3.UNPACKED.EXE 1000:4B2D compares IDs 0..5 in this order"
+        },
+        "trailingLengthMarkerValid": true,
+        "nativeKeyTableEntries": 128,
+        "verifiedNativeSignatures": 8,
+        "shippedActionsVerified": 12,
+        "shippedDeviceToSemanticPipelineClosed": true,
+        "role": "input_device_configuration_not_game_progress"
+      }
+    },
+    {
+      "fileName": "B.SWF",
+      "bytes": 1054372,
+      "sha256": "d271d2b35110724d4de7b620f2f17fcdbad96eca1f800518f8d95c01d88651c8",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 100,
+        "presentRecords": 94,
+        "missingRecords": 5,
+        "extractedRecords": 94,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 94,
+        "decodedStreams": 240,
+        "unpackedBytes": 5747484,
+        "kinds": {
+          "five_stream_package": 48,
+          "opaque": 1,
+          "raw_16x15_glyph_array": 1,
+          "single_stream": 44
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 48,
+        "renderedImages": 5703,
+        "palette": "gameplay"
+      },
+      "rawGlyphArrays": {
+        "records": 1,
+        "glyphs": 136
+      },
+      "parsedBattleTemplates": {
+        "normalStages": 39,
+        "mappedStageEntries": 44,
+        "specialOrAlternateStageEntries": 5,
+        "templateBytes": 8506,
+        "defeatObjectiveEntries": 42,
+        "victoryObjectiveEntries": 42,
+        "classifiedObjectiveEntries": 84,
+        "allObjectiveEntriesClassified": true,
+        "interactiveDeploymentStages": 33,
+        "directWriteDeploymentStages": 11,
+        "mappedDeploymentCells": 423,
+        "verifiedLifecycleCodeSignatures": 15,
+        "ordinaryBattleLifecycleClosed": true,
+        "stage37Objective": {
+          "stage": 37,
+          "defeat": {
+            "kind": "required_side1_slot_absent",
+            "side": 1,
+            "unitSlot": 0,
+            "resultWhenTrue": "defeat",
+            "evidence": "handler scans all 2500 cells for sideMap=1 and (unitSlotMap & 0x7f)=DL; returns Y only when none remains"
+          },
+          "victory": {
+            "kind": "all_side2_units_absent",
+            "side": 2,
+            "resultWhenTrue": "victory",
+            "evidence": "handler scans all 2500 sideMap cells and returns Y only when no value 2 remains"
+          },
+          "interpretation": "protect side-1 slot 0 and eliminate all side-2 units; the head and both hands must all be removed"
+        },
+        "perStageBattleEvents": {
+          "dispatcherHandlers": 38,
+          "verifiedCodeAndDataRanges": 41,
+          "structurallyClosedHandlers": 38,
+          "handlerDialogueRecords": 72,
+          "closedStages": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            26,
+            27,
+            28,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            42
+          ],
+          "closedDynamicBoardStages": [
+            0,
+            1,
+            6,
+            11,
+            20,
+            21,
+            22,
+            42
+          ],
+          "closedOtherRuntimeStateStages": [
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            30
+          ],
+          "stage21Role": "scripted four-scout interlude that resolves immediately and enters stage-22 deployment",
+          "stage22Role": "round-1 ambush that adds six side-2 units; slot 28 is the only required victory target",
+          "stage37Role": "three-part final boss; round-1 SAY 81 and victory route through stage 49/modules 33/35",
+          "stage38Role": "postgame otherworld rematch; SAY 164/165 followed by module-46 terminal credits and a non-returning The-end loop",
+          "stage42Role": "immediate-victory portal presentation followed by the deployment-story-battle stage-6 bridge",
+          "presentation": {
+            "verifiedCodeSignatures": 21,
+            "verifiedDataSignatures": 2,
+            "closedTimelineStages": [
+              0,
+              1,
+              6,
+              11,
+              20,
+              21,
+              22,
+              30,
+              42
+            ],
+            "movementVocClosed": true,
+            "stage30ContextualTextClosed": true,
+            "machineData": "reverse/parsed/native/stage-presentations.json"
+          },
+          "machineData": "reverse/parsed/native/stage-events.json"
+        },
+        "postgamePresentation": {
+          "verifiedCodeAndDataRanges": 22,
+          "verifiedDirectResources": 12,
+          "reachableRosterCards": 22,
+          "conditionalEpilogueTexts": 8,
+          "creditRoleFrames": 20,
+          "creditNameFrames": 22,
+          "module46NormalReturnReachable": false,
+          "machineData": "reverse/parsed/native/ending-presentations.json"
+        },
+        "confirmedFullMapRenders": 44,
+        "confirmedTerrainMinimapRenders": 44,
+        "confirmedOccupancyMinimapRenders": 44,
+        "verifiedMinimapCodeSignatures": 17,
+        "confirmedTerrainTileGeometry": "128 tokens x 40x44 pixels; 220 bytes per VGA plane per tile",
+        "status": "all_39_normal_and_5_special_or_alternate_stage_entries parsed/rendered; all objective entries classified; all 38 native per-stage handlers, routes, and nine special-stage presentation timelines closed"
+      }
+    },
+    {
+      "fileName": "BK.SWF",
+      "bytes": 1002922,
+      "sha256": "094131920b949e7e4e1cdfef4c999f4596f59a975b70db621234ea72783c8251",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 60,
+        "presentRecords": 59,
+        "missingRecords": 0,
+        "extractedRecords": 59,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 59,
+        "decodedStreams": 245,
+        "unpackedBytes": 2227178,
+        "kinds": {
+          "five_stream_package": 49,
+          "placeholder": 10
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 48,
+        "renderedImages": 123,
+        "palette": "gameplay"
+      },
+      "nativeTitlePresentation": {
+        "linkedGraphicRecords": [
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57
+        ],
+        "reachableGraphicRecords": [
+          40,
+          41,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57
+        ],
+        "handlerSupportedUnreachableGraphicRecords": [
+          42
+        ],
+        "paletteCorrectRenders": 91,
+        "nonMonotonicNativeIndexRecords": [
+          53
+        ],
+        "status": "intro backgrounds, both title variants, static layers, and idle sprites closed"
+      },
+      "nativeStoryPresentation": {
+        "directlyReferencedBackgroundRecords": 16,
+        "drawAt": [
+          160,
+          80
+        ],
+        "dimensions": [
+          320,
+          200
+        ],
+        "status": "all corpus-referenced story backgrounds palette-correct rendered"
+      }
+    },
+    {
+      "fileName": "C.SWF",
+      "bytes": 415795,
+      "sha256": "b8efe17983ef14f0998844de4e284509cda66c1395e71f0a44179fc44fba6e79",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 60,
+        "presentRecords": 34,
+        "missingRecords": 25,
+        "extractedRecords": 34,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 34,
+        "decodedStreams": 170,
+        "unpackedBytes": 1252861,
+        "kinds": {
+          "five_stream_package": 34
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 34,
+        "renderedImages": 81,
+        "palette": "gameplay"
+      }
+    },
+    {
+      "fileName": "CHA.SWF",
+      "bytes": 283170,
+      "sha256": "254c3bb5878ea529e629fb1354b7da0ce3fb0166a4e1a5e973f86b631425d649",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 200,
+        "presentRecords": 176,
+        "missingRecords": 23,
+        "extractedRecords": 176,
+        "extractionComplete": true
+      },
+      "mappedBig5Glyphs": {
+        "records": 176,
+        "glyphs": 9399,
+        "glyphSize": "16x15",
+        "atlasExtractionComplete": true
+      }
+    },
+    {
+      "fileName": "D.SWF",
+      "bytes": 369047,
+      "sha256": "929b5a04948497bba07cabaf6af585e461cf2a774497cd5222dc22e19e01c57a",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 100,
+        "presentRecords": 68,
+        "missingRecords": 31,
+        "extractedRecords": 68,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 68,
+        "decodedStreams": 340,
+        "unpackedBytes": 526772,
+        "kinds": {
+          "five_stream_package": 68
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 67,
+        "renderedImages": 473,
+        "palette": "gameplay"
+      },
+      "nativeStoryPresentation": {
+        "recordsPresent": 68,
+        "directlyReferencedPortraitIds": 50,
+        "paletteCorrectRenderedRecords": 68,
+        "genericRendererMissingRecordRecovered": 63,
+        "metadataMissingIds": [
+          63,
+          67
+        ],
+        "status": "all portrait records recovered with native per-plane pointer semantics"
+      },
+      "nativeFeedbackPresentation": {
+        "portraitRecords": [
+          45,
+          46
+        ],
+        "victoryPortraitSelection": "PIT channel-0 bit 0 selects D/45 or D/46",
+        "fixedNiaPromptTypes": [
+          "retreat",
+          "defeat",
+          "quit"
+        ],
+        "paletteCorrectRendersPresent": true
+      },
+      "nativeUnitDetailHud": {
+        "dynamicRequestField": "DS:3192",
+        "frame": 0,
+        "origin": {
+          "x": 488,
+          "y": 8
+        },
+        "frameDimensions": {
+          "width": 112,
+          "height": 112
+        },
+        "mappingBoundary": "DS:3192 is passed dynamically to the indexed loader; the complete logical-value to extracted D record mapping is not asserted here",
+        "representativeLayoutSample": "D/46",
+        "machineData": "reverse/parsed/native/hud-presentations.json"
+      }
+    },
+    {
+      "fileName": "DATA.SWF",
+      "bytes": 2730,
+      "sha256": "3b0a1430b423a9c1d7c5f91dddb2928992c170df39698e71da78df940e8b05b9",
+      "category": "resource",
+      "parsedTable": {
+        "records": 39,
+        "recordBytes": 70,
+        "confirmedFields": 6,
+        "unknownFields": [
+          "field5_original_designer_intent"
+        ],
+        "nativeDisplayNames": 39,
+        "nativePromotionEdges": 31,
+        "consolidatedCatalogRecords": 39,
+        "guideExperienceTransformValues": 195,
+        "guideUnchangedFieldValues": 1170,
+        "consolidatedCatalogValidated": true,
+        "status": "all_runtime_field_consumption_confirmed; field5 is preserved but ignored by gameplay row appliers; consolidated native unit catalog generated"
+      }
+    },
+    {
+      "fileName": "E.SWF",
+      "bytes": 216009,
+      "sha256": "165db01e17f9c241a8d7176ec6ce8c61cde0d488095799d061b1a43e66c96bac",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 100,
+        "presentRecords": 65,
+        "missingRecords": 34,
+        "extractedRecords": 65,
+        "extractionComplete": true
+      },
+      "audio": {
+        "creativeVoice": 47,
+        "softstarRix": 0
+      },
+      "nativeOrdinaryCombatPresentation": {
+        "linkedDistinctRecords": 37,
+        "mapHitRecord": 38,
+        "fullScreenDeathRecord": 11,
+        "perClassVoiceSlots": 5,
+        "classRecords": 39,
+        "status": "map hit requests and full-screen V1..V5/death synchronization confirmed"
+      },
+      "nativeShootingPresentation": {
+        "swiftDragonAiEvasionRecord": 38,
+        "soundRequests": 2,
+        "fixedWaitNativeTicks": 90,
+        "status": "AI swift-dragon evasion reuses ordinary map-hit audio while player evasion is silent"
+      },
+      "nativeTechniquePresentation": {
+        "linkedRecords": [
+          8,
+          9,
+          36,
+          41,
+          43,
+          51,
+          58,
+          63
+        ],
+        "mainFamilies": [
+          "lightning",
+          "fire",
+          "heal",
+          "recovery"
+        ],
+        "remainingRoles": [
+          "defense-down",
+          "attack-down",
+          "poison"
+        ],
+        "status": "VOC request points and presentation-before-settlement boundaries confirmed"
+      }
+    },
+    {
+      "fileName": "GO.EXE",
+      "bytes": 29603,
+      "sha256": "dfb566b84f56832f7d923925d20abeb8313cca488f4f1a14636d47456e96ce16",
+      "category": "program"
+    },
+    {
+      "fileName": "JS3.EXE",
+      "bytes": 26097,
+      "sha256": "f23645b8ae5b007dd8a2211d9f43b9427a2d330ece361cc8f18ceee8907750be",
+      "category": "program"
+    },
+    {
+      "fileName": "JUST.TST",
+      "bytes": 1174,
+      "sha256": "f69a2838d97dbc470620fe9a6d6c85ccba718e88241bd07721c829efa6e96ec8",
+      "category": "data_or_configuration",
+      "status": "next_battle_state_template_decoded",
+      "saveState": {
+        "role": "confirmed_next_battle_state_template_regenerated_by_module27",
+        "nativeLoader": "module29 1000:5386",
+        "decodedBytes": 8358,
+        "activeUnitInstances": 16,
+        "freshBattleSelector": "N",
+        "unfilledDeploymentMarker": 255,
+        "remainingDeploymentMarkersBecomeEmptyAtBattleLoad": true,
+        "fullLayout": "confirmed template-specific layout"
+      }
+    },
+    {
+      "fileName": "MAGIC.SWF",
+      "bytes": 446937,
+      "sha256": "490efd182e4ab84d8ef3a466562e98527669b8f8195b07dafeb5d232f88fb728",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 90,
+        "presentRecords": 86,
+        "missingRecords": 3,
+        "extractedRecords": 86,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 86,
+        "decodedStreams": 285,
+        "unpackedBytes": 1511429,
+        "kinds": {
+          "five_stream_package": 57,
+          "opaque": 29
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 57,
+        "renderedImages": 1169,
+        "palette": "gameplay"
+      },
+      "audio": {
+        "creativeVoice": 20,
+        "softstarRix": 9
+      },
+      "nativeStoryPresentation": {
+        "stageRixRecords": [
+          "MAGIC/72",
+          "MAGIC/73",
+          "MAGIC/74",
+          "MAGIC/75",
+          "MAGIC/76",
+          "MAGIC/77",
+          "MAGIC/78",
+          "MAGIC/79"
+        ],
+        "status": "module-25 stage-story RIX selection and start/stop boundary closed"
+      },
+      "nativeFeedbackPresentation": {
+        "perBig5CharacterSpeechRecords": [
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71
+        ],
+        "keyAndDeploymentDismissalRecord": 81,
+        "speechSelectionRule": "for each non-punctuation Big5 glyph: speechIndex = numeric Big5 code modulo 15; request MAGIC/(57 + speechIndex)",
+        "status": "speech VOC bank and key/dismissal sound request points closed"
+      },
+      "nativeTechniqueAssociations": {
+        "linkedActionGroups": 17,
+        "playerTechniqueMenuClasses": 13,
+        "nativeTechniqueDispatchEntries": 36,
+        "status": "all_player_technique_resource_timing_and_settlement_links_confirmed"
+      },
+      "nativeOrdinaryCombatPresentation": {
+        "mapDeathRecord": 12,
+        "renderedFrames": 38,
+        "descriptorDraws": 15,
+        "fixedWaitNativeTicks": 150,
+        "status": "six pre-erase and nine post-erase descriptors confirmed"
+      },
+      "nativeShootingPresentation": {
+        "magicArcherLineAudioRecord": 83,
+        "durationSeconds": 0.8824,
+        "sampleRate": 5000,
+        "status": "line-effect audio request before growth pass confirmed"
+      },
+      "nativeTechniquePresentation": {
+        "mainFamilies": 5,
+        "mainActions": 18,
+        "remainingActions": 15,
+        "linkedGraphicRecords": 38,
+        "linkedAudioRecords": [
+          82,
+          83
+        ],
+        "verifiedCodeSignatures": 96,
+        "verifiedDataSignatures": 16,
+        "contactSheets": 20,
+        "status": "all player-accessible technique presentations closed"
+      }
+    },
+    {
+      "fileName": "MAP.SWF",
+      "bytes": 3744,
+      "sha256": "aa424c4dd018756b7f1aa95935ab05484843eb0b1b5deab29d4e8c5f4e4b844a",
+      "category": "resource",
+      "parsedTable": {
+        "records": 39,
+        "recordBytes": 96,
+        "logicalTerrainSlots": 23,
+        "serializedWordsPerWindow": 24,
+        "movementProfileGroups": 13,
+        "terrainDefenseProfileGroups": 9,
+        "verifiedCodeSignatures": 47,
+        "mappedStageTerrainEntries": 44,
+        "mappedRawTerrainTokens": 128,
+        "mappedUsedLogicalTerrainSlots": 21,
+        "confirmedTerrainMinimapRenders": 44,
+        "confirmedOccupancyMinimapRenders": 44,
+        "terrainVisibleNameReadSitesAudited": 6,
+        "nativeVisibleNameBindingFound": false,
+        "rangeModeWritesAudited": 43,
+        "reachableMode1Producers": 0,
+        "scriptedFmProducers": 10,
+        "status": "movement_terrain_defense_exact_player_and_ai_range_stage_token_to_logical_slot_40x44_visual_tile_minimap_color_and_overlay_mapping_confirmed; all reachable range modes bound; mode 1 confirmed producerless; only editor-friendly terrain labels remain non-native"
+      }
+    },
+    {
+      "fileName": "MUSIC.SWF",
+      "bytes": 208261,
+      "sha256": "72b94d7151c678c7141b0f78e144f20b87cea79b7f34ed689fcc573ddc898f8c",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 60,
+        "presentRecords": 50,
+        "missingRecords": 9,
+        "extractedRecords": 50,
+        "extractionComplete": true
+      },
+      "audio": {
+        "creativeVoice": 0,
+        "softstarRix": 41
+      },
+      "nativeTitlePresentation": {
+        "linkedRixRecords": [
+          1,
+          14
+        ],
+        "decodedDurationsSeconds": {
+          "1": 13.374694,
+          "14": 78.947846
+        },
+        "correctedFromPriorNumMisidentification": true,
+        "status": "MUSIC/1 title and MUSIC/14 scrolling-intro start/stop points closed"
+      }
+    },
+    {
+      "fileName": "M_00.SWF",
+      "bytes": 759700,
+      "sha256": "d413cd6834fe55d63977112909ca6ff27ea692ae7ae3d494af2444c28251d2af",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 90,
+        "presentRecords": 85,
+        "missingRecords": 4,
+        "extractedRecords": 85,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 85,
+        "decodedStreams": 350,
+        "unpackedBytes": 1845200,
+        "kinds": {
+          "five_stream_package": 70,
+          "placeholder": 15
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 70,
+        "renderedImages": 369,
+        "palette": "gameplay"
+      },
+      "nativeOrdinaryCombatPresentation": {
+        "distinctReferencedRecords": 76,
+        "ordinaryClassDirectAndPlus50RecordsRendered": true,
+        "magicSwordRequestedRecordsRemapped": [
+          1,
+          51
+        ],
+        "specialUnreachableOrNonordinaryPlaceholdersPreserved": true
+      }
+    },
+    {
+      "fileName": "NUM.SWF",
+      "bytes": 20350,
+      "sha256": "dd792f97eda22d9a1f0e86811703bfd58768658b2574e4d84bcc5d5ebc12338b",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 200,
+        "presentRecords": 176,
+        "missingRecords": 23,
+        "extractedRecords": 176,
+        "extractionComplete": true
+      }
+    },
+    {
+      "fileName": "PLAY.COM",
+      "bytes": 268,
+      "sha256": "6e423049483424be4d9f8ba36f9f794c5d533a47da9c0ae95fe16df16dbdd03d",
+      "category": "program",
+      "status": "go_launcher_and_password_fixed_challenge_patch_parsed",
+      "passwordPatch": {
+        "hookedInterrupt": "0x21",
+        "targetAddress": "interrupted CS:0BEB",
+        "fixedChallengeIndex": 16,
+        "fixedAnswer": 2,
+        "defaultChoiceMatchesFixedAnswer": true
+      }
+    },
+    {
+      "fileName": "SAY.SWF",
+      "bytes": 69867,
+      "sha256": "f6d6c9c583c7565548377d0174d4c163c66c79f100ffb239f8f6eb72a175ef76",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 200,
+        "presentRecords": 176,
+        "missingRecords": 23,
+        "extractedRecords": 176,
+        "extractionComplete": true
+      },
+      "parsedScripts": {
+        "records": 176,
+        "commandCodesInCorpus": 17,
+        "nativeCommandsInModule25": 15,
+        "nativeCommandsInModule29": 16,
+        "commandScriptRecords": 93,
+        "textOrLabelOnlyRecords": 83,
+        "closedRouteCommandScripts": 89,
+        "globallyUnresolvedCommandScriptRecords": [
+          69,
+          116,
+          117,
+          118
+        ],
+        "semanticVersion": 2,
+        "status": "complete_structural_parse_and_native_interpreter_semantics_closed"
+      },
+      "nativeStoryPresentation": {
+        "verifiedCodeSignatures": 31,
+        "verifiedDataSignatures": 10,
+        "paletteCorrectRenders": 97,
+        "contactSheets": 4,
+        "effectivePortraitMetadataEntries": 66,
+        "metadataMissingPortraitIds": [
+          63,
+          67
+        ],
+        "commandDispatchClosed": true,
+        "module25TimelineClosed": true,
+        "module29TimelineClosed": true,
+        "machineData": "reverse/parsed/native/story-presentations.json"
+      }
+    },
+    {
+      "fileName": "SET.TXT",
+      "bytes": 8,
+      "sha256": "ef90f2dc69eb0c44a6cef3675b5a5c63efe6c4f13c59a05a047a26b3e416c66d",
+      "category": "data_or_configuration"
+    },
+    {
+      "fileName": "SETUP.EXE",
+      "bytes": 64870,
+      "sha256": "cc9b0c908c6408e871b696261b03dff6ad80c12b2c3ba38cd3a9579c8e4cace7",
+      "category": "program"
+    },
+    {
+      "fileName": "UN.SWF",
+      "bytes": 1030787,
+      "sha256": "c3f747f0d0db40c073ec2906dfff4171902376f788f56447ab88b91b3bba85cc",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 80,
+        "presentRecords": 63,
+        "missingRecords": 16,
+        "extractedRecords": 63,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 63,
+        "decodedStreams": 128,
+        "unpackedBytes": 1702651,
+        "kinds": {
+          "five_stream_package": 23,
+          "opaque": 22,
+          "raw_16x15_glyph_array": 5,
+          "single_stream": 13
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 23,
+        "renderedImages": 151,
+        "palette": "gameplay"
+      },
+      "audio": {
+        "creativeVoice": 3,
+        "softstarRix": 4
+      },
+      "rawGlyphArrays": {
+        "records": 5,
+        "glyphs": 930
+      },
+      "runtimeModules": {
+        "modules": 10,
+        "blocks": 12,
+        "reconstructedImageBytes": 256983,
+        "lzexePackedModules": 10,
+        "lzexeUnpackedImageBytes": 628256,
+        "recoveredMzRelocations": 2651,
+        "reconstructionComplete": true
+      },
+      "nativePasswordGate": {
+        "module": 21,
+        "verifiedRanges": 16,
+        "attemptsPerSet": 3,
+        "challengeCoordinates": 28,
+        "visibleColorButtons": 6,
+        "answerCodeOrder": [
+          2,
+          1,
+          0,
+          3,
+          4,
+          5
+        ],
+        "directResourceRecords": 8,
+        "gateHandoffClosed": true,
+        "status": "native_first_battle_exit_password_gate, six visible color buttons, and 28-entry answer-code table closed; exact frame/audio timeline and DOS-vector compatibility precheck remain pending"
+      },
+      "nativeTitlePresentation": {
+        "linkedGraphicRecords": [
+          53
+        ],
+        "paletteCorrectRenders": 1,
+        "role": "pretitle Softstar logo",
+        "status": "pretitle draw, palette fade, skippable hold, and fade-out closed"
+      },
+      "nativeFeedbackPresentation": {
+        "deploymentErrorFontCodeRecord": 39,
+        "deploymentErrorFontGlyphRecord": 40,
+        "deploymentErrorFontGlyphs": 95,
+        "reachableDeploymentMessages": 3,
+        "allReachableMessageGlyphsResolved": true
+      },
+      "nativeOrdinaryCombatPresentation": {
+        "mapHitRecord": 62,
+        "renderedFrames": 8,
+        "graphicDrawsIncludingReturnFrame": 9,
+        "fixedWaitNativeTicks": 90,
+        "status": "exact map-hit frame order confirmed"
+      },
+      "nativeShootingPresentation": {
+        "commonAndLineGraphicRecord": 60,
+        "renderedFrames": 8,
+        "commonImpactDraws": 10,
+        "commonImpactFixedWaitNativeTicks": 60,
+        "lineDescriptorStages": 9,
+        "lineFinishSteps": 8,
+        "swiftDragonAiEvasionGraphicRecord": 62,
+        "status": "UN/60 common impact and line trail plus UN/62 AI evasion reuse confirmed"
+      },
+      "nativeTechniquePresentation": {
+        "linkedGraphicRecords": [
+          57,
+          61
+        ],
+        "linkedAudioRecords": [
+          50,
+          51,
+          52
+        ],
+        "roles": [
+          "single-heal",
+          "ice-cycle",
+          "attack-up",
+          "magic-defense",
+          "dispel"
+        ],
+        "status": "graphic frames, VOC requests, waits and settlement ordering confirmed"
+      }
+    },
+    {
+      "fileName": "WAR0.TST",
+      "bytes": 2086,
+      "sha256": "30b4c5f968eb7f6d5bd24736a57fb9e7ad19931c7da1b78fc73f040c34d5d4ad",
+      "category": "data_or_configuration",
+      "status": "save_slot_decoded",
+      "saveState": {
+        "role": "confirmed_numbered_save_slot",
+        "initialHeaderScanBytes": 50,
+        "slotListMetadataOffsets": [
+          18,
+          20,
+          22,
+          24,
+          30
+        ],
+        "decodedBytes": 11972,
+        "activeUnitInstances": 15,
+        "specialRecord35To38Instances": 0,
+        "viewportState": {
+          "viewportOriginX": 19,
+          "viewportOriginY": 31,
+          "cursorFocusX": 24,
+          "cursorFocusY": 32,
+          "nativeSource": {
+            "viewportOriginX": "DS:5390",
+            "viewportOriginY": "DS:5392",
+            "cursorFocusX": "DS:538C",
+            "cursorFocusY": "DS:538E"
+          }
+        },
+        "nativeMinimapReconstruction": true,
+        "victoryOutcomeSentinels": {
+          "liveMemory": 999,
+          "serializedCompletedVictory": 1000,
+          "loadedCompletedVictorySkipsRepeatedSavePrompt": true
+        },
+        "compatibilityStateAudit": {
+          "verifiedCodeSignatures": 16,
+          "dynamicWord04BehaviorClosed": true,
+          "dynamicWord06BehaviorClosed": true,
+          "nativeTimerWaitFlagBound": true,
+          "genericMenuStateBound": true
+        },
+        "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
+      }
+    },
+    {
+      "fileName": "WAR1.TST",
+      "bytes": 2093,
+      "sha256": "d0cbe3020eec3743164a14a76b6584f5de7c0bf192d503f9d2bd6e8bc23088ef",
+      "category": "data_or_configuration",
+      "status": "save_slot_decoded",
+      "saveState": {
+        "role": "confirmed_numbered_save_slot",
+        "initialHeaderScanBytes": 50,
+        "slotListMetadataOffsets": [
+          18,
+          20,
+          22,
+          24,
+          30
+        ],
+        "decodedBytes": 11972,
+        "activeUnitInstances": 15,
+        "specialRecord35To38Instances": 0,
+        "viewportState": {
+          "viewportOriginX": 21,
+          "viewportOriginY": 23,
+          "cursorFocusX": 27,
+          "cursorFocusY": 28,
+          "nativeSource": {
+            "viewportOriginX": "DS:5390",
+            "viewportOriginY": "DS:5392",
+            "cursorFocusX": "DS:538C",
+            "cursorFocusY": "DS:538E"
+          }
+        },
+        "nativeMinimapReconstruction": true,
+        "victoryOutcomeSentinels": {
+          "liveMemory": 999,
+          "serializedCompletedVictory": 1000,
+          "loadedCompletedVictorySkipsRepeatedSavePrompt": true
+        },
+        "compatibilityStateAudit": {
+          "verifiedCodeSignatures": 16,
+          "dynamicWord04BehaviorClosed": true,
+          "dynamicWord06BehaviorClosed": true,
+          "nativeTimerWaitFlagBound": true,
+          "genericMenuStateBound": true
+        },
+        "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
+      }
+    },
+    {
+      "fileName": "WAR2.TST",
+      "bytes": 2306,
+      "sha256": "667d8ee128c87a3d42c0aa0bd9b2668431fc19cf57da6898cbe8e49468ef2cdf",
+      "category": "data_or_configuration",
+      "status": "save_slot_decoded",
+      "saveState": {
+        "role": "confirmed_numbered_save_slot",
+        "initialHeaderScanBytes": 50,
+        "slotListMetadataOffsets": [
+          18,
+          20,
+          22,
+          24,
+          30
+        ],
+        "decodedBytes": 11972,
+        "activeUnitInstances": 13,
+        "specialRecord35To38Instances": 0,
+        "viewportState": {
+          "viewportOriginX": 22,
+          "viewportOriginY": 25,
+          "cursorFocusX": 27,
+          "cursorFocusY": 29,
+          "nativeSource": {
+            "viewportOriginX": "DS:5390",
+            "viewportOriginY": "DS:5392",
+            "cursorFocusX": "DS:538C",
+            "cursorFocusY": "DS:538E"
+          }
+        },
+        "nativeMinimapReconstruction": true,
+        "victoryOutcomeSentinels": {
+          "liveMemory": 999,
+          "serializedCompletedVictory": 1000,
+          "loadedCompletedVictorySkipsRepeatedSavePrompt": true
+        },
+        "compatibilityStateAudit": {
+          "verifiedCodeSignatures": 16,
+          "dynamicWord04BehaviorClosed": true,
+          "dynamicWord06BehaviorClosed": true,
+          "nativeTimerWaitFlagBound": true,
+          "genericMenuStateBound": true
+        },
+        "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
+      }
+    },
+    {
+      "fileName": "WAR3.TST",
+      "bytes": 2288,
+      "sha256": "617b3f4ec87dfa5ba314ca6aa8109b120f0211e2c77ed9d4327c4eaebedc4c24",
+      "category": "data_or_configuration",
+      "status": "save_slot_decoded",
+      "saveState": {
+        "role": "confirmed_numbered_save_slot",
+        "initialHeaderScanBytes": 50,
+        "slotListMetadataOffsets": [
+          18,
+          20,
+          22,
+          24,
+          30
+        ],
+        "decodedBytes": 11972,
+        "activeUnitInstances": 7,
+        "specialRecord35To38Instances": 0,
+        "viewportState": {
+          "viewportOriginX": 22,
+          "viewportOriginY": 30,
+          "cursorFocusX": 26,
+          "cursorFocusY": 34,
+          "nativeSource": {
+            "viewportOriginX": "DS:5390",
+            "viewportOriginY": "DS:5392",
+            "cursorFocusX": "DS:538C",
+            "cursorFocusY": "DS:538E"
+          }
+        },
+        "nativeMinimapReconstruction": true,
+        "victoryOutcomeSentinels": {
+          "liveMemory": 999,
+          "serializedCompletedVictory": 1000,
+          "loadedCompletedVictorySkipsRepeatedSavePrompt": true
+        },
+        "compatibilityStateAudit": {
+          "verifiedCodeSignatures": 16,
+          "dynamicWord04BehaviorClosed": true,
+          "dynamicWord06BehaviorClosed": true,
+          "nativeTimerWaitFlagBound": true,
+          "genericMenuStateBound": true
+        },
+        "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
+      }
+    },
+    {
+      "fileName": "WAR4.TST",
+      "bytes": 2289,
+      "sha256": "f1f98c76e1efa366cd12568f14d47c01a7f2fa6e6b96a8b2203a1d3d49dd6c1d",
+      "category": "data_or_configuration",
+      "status": "save_slot_decoded",
+      "saveState": {
+        "role": "confirmed_numbered_save_slot",
+        "initialHeaderScanBytes": 50,
+        "slotListMetadataOffsets": [
+          18,
+          20,
+          22,
+          24,
+          30
+        ],
+        "decodedBytes": 11972,
+        "activeUnitInstances": 6,
+        "specialRecord35To38Instances": 0,
+        "viewportState": {
+          "viewportOriginX": 23,
+          "viewportOriginY": 31,
+          "cursorFocusX": 27,
+          "cursorFocusY": 34,
+          "nativeSource": {
+            "viewportOriginX": "DS:5390",
+            "viewportOriginY": "DS:5392",
+            "cursorFocusX": "DS:538C",
+            "cursorFocusY": "DS:538E"
+          }
+        },
+        "nativeMinimapReconstruction": true,
+        "victoryOutcomeSentinels": {
+          "liveMemory": 999,
+          "serializedCompletedVictory": 1000,
+          "loadedCompletedVictorySkipsRepeatedSavePrompt": true
+        },
+        "compatibilityStateAudit": {
+          "verifiedCodeSignatures": 16,
+          "dynamicWord04BehaviorClosed": true,
+          "dynamicWord06BehaviorClosed": true,
+          "nativeTimerWaitFlagBound": true,
+          "genericMenuStateBound": true
+        },
+        "fullLayout": "confirmed_byte_layout_and_runtime_compatibility_behavior; a few original source-level names are unrecoverable"
+      }
+    },
+    {
+      "fileName": "Y_00.SWF",
+      "bytes": 928072,
+      "sha256": "292eeeb7e7bd7a1ee6adccf73db3751e066819f40e32eafc03c3f2a7df916c15",
+      "category": "resource",
+      "indexedContainer": {
+        "recordCount": 100,
+        "presentRecords": 90,
+        "missingRecords": 9,
+        "extractedRecords": 90,
+        "extractionComplete": true
+      },
+      "embeddedStreams": {
+        "records": 90,
+        "decodedStreams": 410,
+        "unpackedBytes": 2344525,
+        "kinds": {
+          "five_stream_package": 82,
+          "placeholder": 8
+        }
+      },
+      "planarPreview": {
+        "renderedRecords": 82,
+        "renderedImages": 426,
+        "palette": "gameplay"
+      },
+      "nativeOrdinaryCombatPresentation": {
+        "distinctReferencedRecords": 80,
+        "ordinaryClassDirectAndPlus50RecordsRendered": true,
+        "magicSwordRemapRecords": [
+          41,
+          42
+        ],
+        "status": "direct, plus50, and two explicit remap roles confirmed"
+      }
+    }
+  ]
+}
