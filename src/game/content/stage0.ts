@@ -1,0 +1,141 @@
+import { STAGE0_SPEECH_RECORD_BY_CHARACTER, STAGE0_TERRAIN_TOKENS_BASE64, STAGE0_TOKEN_TO_SLOT_BASE64 } from "./stage0-runtime.generated";
+import type { BattleUnit, Position, UnitClassId, UnitStats } from "../types";
+
+const decode = (encoded: string): Uint8Array => {
+  const binary = globalThis.atob(encoded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+export const STAGE0 = {
+  id: 0,
+  name: "瓦爾克麗宮",
+  width: 50,
+  height: 50,
+  viewport: { width: 10, height: 7, initialOrigin: { x: 25, y: 23 } },
+  opening: { from: { x: 10, y: 23 }, to: { x: 29, y: 26 }, budget: 50 },
+  enemyRouteTarget: { x: 25, y: 47 },
+  enemyExitCells: [{ x: 24, y: 47 }, { x: 25, y: 47 }, { x: 26, y: 47 }],
+  objective: "清除瓦爾克麗宮內的敵人；擊倒或撤離均計入。",
+  defeat: "妮雅戰敗。",
+} as const;
+
+export function isStage0Exit(position: Position): boolean {
+  return STAGE0.enemyExitCells.some(({ x, y }) => position.x === x && position.y === y);
+}
+
+export const TERRAIN_TOKENS = decode(STAGE0_TERRAIN_TOKENS_BASE64);
+export const TOKEN_TO_TERRAIN_SLOT = decode(STAGE0_TOKEN_TO_SLOT_BASE64);
+export const SPEECH_RECORD_BY_CHARACTER = STAGE0_SPEECH_RECORD_BY_CHARACTER;
+
+export const CLASS_ROWS: Record<UnitClassId, UnitStats[]> = {
+  0: [
+    { attack: 39, defense: 21, maxLife: 160, movement: 4, level: 1 },
+    { attack: 42, defense: 24, maxLife: 170, movement: 4, level: 2 },
+    { attack: 45, defense: 27, maxLife: 180, movement: 4, level: 3 },
+  ],
+  22: [
+    { attack: 55, defense: 30, maxLife: 200, movement: 8, level: 4 },
+    { attack: 60, defense: 33, maxLife: 230, movement: 8, level: 5 },
+    { attack: 65, defense: 36, maxLife: 260, movement: 8, level: 6 },
+  ],
+};
+
+export const CLASS_THRESHOLDS: Record<UnitClassId, number[]> = {
+  0: [0, 100, 200],
+  22: [0, 180, 360],
+};
+
+export const MOVEMENT_RULES: Record<UnitClassId, number[]> = {
+  0: [99, 2, 1, 3, 4, 5, 2, 99, 3, 4, 1, 4, 99, 1, 2, 3, 1, 99, 1, 2, 2, 1, 1],
+  22: [99, 1, 1, 3, 3, 5, 2, 99, 3, 4, 1, 99, 99, 1, 2, 3, 1, 99, 2, 2, 1, 1, 1],
+};
+
+export const TERRAIN_DEFENSE_PERCENT = [99, 10, 5, 20, 30, 40, 10, 15, 10, 10, 5, 40, 15, 15, 10, 20, 5, 15, 10, 15, 10, 10, 1];
+
+const UNIT_DEFINITIONS: Array<Pick<BattleUnit, "side" | "slot" | "classId" | "className" | "name" | "portrait" | "x" | "y">> = [
+  { side: 1, slot: 0, classId: 0, className: "士兵", name: "妮雅", portrait: 46, x: 10, y: 23 },
+  { side: 1, slot: 43, classId: 0, className: "士兵", name: "士兵", portrait: 47, x: 27, y: 25 },
+  { side: 1, slot: 42, classId: 0, className: "士兵", name: "士兵", portrait: 47, x: 21, y: 27 },
+  { side: 1, slot: 1, classId: 0, className: "士兵", name: "希蜜", portrait: 45, x: 28, y: 29 },
+  { side: 1, slot: 40, classId: 0, className: "士兵", name: "士兵", portrait: 47, x: 27, y: 32 },
+  { side: 1, slot: 41, classId: 0, className: "士兵", name: "士兵", portrait: 47, x: 22, y: 37 },
+  { side: 2, slot: 48, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 25, y: 25 },
+  { side: 2, slot: 46, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 23, y: 26 },
+  { side: 2, slot: 47, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 25, y: 26 },
+  { side: 2, slot: 45, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 27, y: 26 },
+  { side: 2, slot: 44, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 25, y: 29 },
+  { side: 2, slot: 15, classId: 22, className: "騎兵", name: "哈釘", portrait: 15, x: 23, y: 32 },
+  { side: 2, slot: 43, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 28, y: 33 },
+  { side: 2, slot: 40, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 25, y: 35 },
+  { side: 2, slot: 41, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 22, y: 39 },
+  { side: 2, slot: 42, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 27, y: 39 },
+];
+
+export function statsFor(unit: Pick<BattleUnit, "classId" | "experience">): UnitStats {
+  const thresholds = CLASS_THRESHOLDS[unit.classId];
+  const index = thresholds.reduce((selected, threshold, row) => unit.experience >= threshold ? row : selected, 0);
+  return CLASS_ROWS[unit.classId][index];
+}
+
+export function nextExperienceThresholdFor(unit: Pick<BattleUnit, "classId" | "experience">): number {
+  const thresholds = CLASS_THRESHOLDS[unit.classId];
+  return thresholds.find((threshold) => threshold > unit.experience) ?? thresholds.at(-1) ?? 1;
+}
+
+export function createStage0Units(): BattleUnit[] {
+  return UNIT_DEFINITIONS.map((definition) => ({
+    ...definition,
+    id: `${definition.side}:${definition.slot}`,
+    life: CLASS_ROWS[definition.classId][0].maxLife,
+    experience: 0,
+    acted: false,
+  }));
+}
+
+export function terrainSlotAt(position: Position): number {
+  if (position.x < 0 || position.y < 0 || position.x >= STAGE0.width || position.y >= STAGE0.height) return 0;
+  const token = TERRAIN_TOKENS[position.y * STAGE0.width + position.x];
+  return TOKEN_TO_TERRAIN_SLOT[token] ?? 0;
+}
+
+export const ASSETS = {
+  map: "/assets/original/stage0-map.png",
+  minimap: "/assets/original/stage0-minimap.png",
+  tacticalPanel: "/assets/original/tactical-panel.png",
+  battleChrome: {
+    top: "/assets/original/battle-chrome-top.png",
+    cornerLeft: "/assets/original/battle-chrome-corner-left.png",
+    cornerRight: "/assets/original/battle-chrome-corner-right.png",
+    glass: "/assets/original/battle-chrome-glass.png",
+    sideLeft: "/assets/original/battle-chrome-side-left.png",
+    sideRight: "/assets/original/battle-chrome-side-right.png",
+    statueForegroundLeft: "/assets/original/battle-statue-left-foreground.png",
+    statueForegroundRight: "/assets/original/battle-statue-right-foreground.png",
+    bottomLeft: "/assets/original/battle-chrome-bottom-left.png",
+    bottomRight: "/assets/original/battle-chrome-bottom-right.png",
+  },
+  storyBackground: "/assets/original/story-palace.png",
+  allySoldier: "/assets/original/unit-ally-soldier.png",
+  enemySoldier: "/assets/original/unit-enemy-soldier.png",
+  enemyCavalry: "/assets/original/unit-enemy-cavalry.png",
+  portraits: {
+    15: "/assets/original/portrait-hading.png",
+    45: "/assets/original/portrait-ximi.png",
+    46: "/assets/original/portrait-nia.png",
+    47: "/assets/original/portrait-ally-soldier.png",
+    48: "/assets/original/portrait-enemy-soldier.png",
+  },
+  fullBattle: {
+    allySoldier: [0, 1, 2, 3].map((frame) => `/assets/original/full-ally-soldier-0${frame}.png`),
+    enemySoldier: [0, 1, 2, 3].map((frame) => `/assets/original/full-enemy-soldier-0${frame}.png`),
+    enemyCavalry: [0, 1, 2, 3].map((frame) => `/assets/original/full-enemy-cavalry-0${frame}.png`),
+  },
+  audio: {
+    story: "/assets/original/story-stage0.wav",
+    soldierAttack: "/assets/original/combat-soldier.wav",
+    hit: "/assets/original/combat-hit.wav",
+    death: "/assets/original/combat-death.wav",
+    confirm: "/assets/original/ui-confirm.wav",
+    speech: Array.from({ length: 15 }, (_, index) => `/assets/original/speech-${String(index + 57).padStart(2, "0")}.wav`),
+  },
+} as const;

@@ -1,12 +1,12 @@
 # 《天使帝国 II》Web 复刻版设计文档
 
-版本：Draft 0.1
+版本：Draft 0.2
 
-日期：2026-07-15
+日期：2026-07-16
 
-阶段：纸面垂直切片
+阶段：第 0 关实现候选，等待人工验收
 
-开发状态：`implementationFrozen=true`
+开发状态：全战役设计仍为 `implementationFrozen=true`；用户已明确解除第 0 关垂直切片冻结，当前切片为 `implementationCandidate=true`
 
 ## 文档目的
 
@@ -39,10 +39,11 @@
 | [`04-units-progression-balance.md`](04-units-progression-balance.md) | 兵种、成长、转职与平衡边界 | Draft 0.1 |
 | [`05-ai-and-difficulty.md`](05-ai-and-difficulty.md) | 敌方意图、AI 修复与难度 | Draft 0.1 |
 | [`06-campaign-and-narrative.md`](06-campaign-and-narrative.md) | 关卡与剧情如何编排 | Draft 0.1 |
-| [`07-ui-ux-and-presentation.md`](07-ui-ux-and-presentation.md) | 原版 UI 如何复现并适配浏览器 | Draft 0.1 |
+| [`07-ui-ux-and-presentation.md`](07-ui-ux-and-presentation.md) | 原版 UI 如何复现并适配浏览器 | Draft 0.2 |
 | [`08-mod-policy.md`](08-mod-policy.md) | 哪些内容可改、如何保持可追溯 | Draft 0.1 |
-| [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.1 |
-| [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的完整纸面垂直切片 | Draft 0.1 |
+| [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.2 |
+| [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的玩法合同与实现验收 | Draft 0.3 / 自动验收通过 |
+| [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.2 / 已实现 |
 
 ## 写作规范
 
@@ -63,5 +64,6 @@
 ## 设计阶段边界
 
 - 可以：复核原版证据、制定玩家体验、定义规则顺序、设计 UI 流程、建立验收场景、提出并记录现代化便利功能。
-- 不可以：开始 Phaser 工程、把 DOS 内存结构当成 Web 领域模型、为了方便编码而改玩法、在 `[TBD]` 上自行补规则。
-- 只有 [`09-design-acceptance.md`](09-design-acceptance.md) 的门槛通过并由用户明确解除冻结后，才建立实现计划。
+- 不可以：把 DOS 内存结构当成 Web 领域模型、为了方便编码而改玩法、在 `[TBD]` 上自行补规则。
+- 第 0 关已由用户明确授权作为首个实现例外；其 Phaser 工程、独立模拟与自动验收见仓库根目录 [`README.md`](../../README.md)。这不自动解除第 1 关以后或未闭合系统的冻结。
+- 其余战役仍须通过 [`09-design-acceptance.md`](09-design-acceptance.md) 的对应门槛并得到用户明确授权后再进入实现。

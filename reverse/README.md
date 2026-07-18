@@ -377,6 +377,9 @@ loader symbols, and reconstructed executable modules. The validation of the
 external modification guide, unit-record map, and promotion graph is in
 `notes/unit-data-and-promotions.md`; native `DATA/MAP` consumers and the 35/39
 record boundary are documented in `notes/native-unit-table-access.md`; the
+campaign actor descriptors, class-visual fallback, new-game class/EXP arrays,
+and exact stage-0 side-1 roster are documented in
+`notes/campaign-roster-and-stage0.md`; the
 decoded save-state layout is in `notes/save-slot-format.md`; the corrected
 23-slot movement/terrain profile layout and remaining range-propagation unknowns
 are in `notes/movement-terrain-rules.md`. See

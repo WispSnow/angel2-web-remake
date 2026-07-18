@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="800" viewBox="0 0 1500 800" role="img" aria-labelledby="title desc">
+  <title id="title">第 0 关战场布局与保护区</title>
+  <desc id="desc">标注原版 640×350 逻辑画布的战场、十乘七图块区、地点底栏、右栏战术图/小地图与单位详情切换，以及非战斗态资料页。</desc>
+  <defs>
+    <style>
+      .bg{fill:#120e12}.gold{stroke:#d5a82d;stroke-width:3;fill:none}.screen{fill:#08090b;stroke:#e7c14b;stroke-width:4}.frame{fill:#7c1f2a;stroke:#d5a82d;stroke-width:2}.grid{fill:#9b5b3a;stroke:#f0cf68;stroke-width:2}.hud{fill:#171313;stroke:#d5a82d;stroke-width:2}.drawer{fill:#17252b;stroke:#72d7e9;stroke-width:2}.call{fill:#21181c;stroke:#6f5834;stroke-width:2}.line{fill:none;stroke:#f0cf68;stroke-width:2}.cyan-line{fill:none;stroke:#72d7e9;stroke-width:2;stroke-dasharray:7 6}.title{font:700 30px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#f1d988}.head{font:700 21px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#f1d988}.body{font:16px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#ece2ca}.small{font:14px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#ece2ca}.pixel{font:700 16px "PingFang TC","Noto Sans CJK TC",sans-serif;fill:#fff}.tiny{font:12px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#fff}.zone{font:700 18px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#fff}.num{font:700 20px ui-monospace,monospace;fill:#fff}.dim{fill:#0a0808;opacity:.28}
+    </style>
+    <pattern id="tiles" width="64" height="70.4" patternUnits="userSpaceOnUse"><rect width="64" height="70.4" fill="#9b5b3a"/><path d="M64 0H0V70.4" fill="none" stroke="#d4a372" stroke-width="1.5"/></pattern>
+  </defs>
+  <rect width="1500" height="800" class="bg"/>
+  <text x="45" y="48" class="title">第 0 关 · 640×350 战场布局合同</text>
+  <text x="45" y="78" class="body">图中逻辑画布放大 1.6 倍。右栏在空地焦点的战术图/小地图与单位焦点的详情之间切换。</text>
+
+  <g transform="translate(65 115)">
+    <rect width="1024" height="560" class="screen"/>
+    <rect x="0" y="0" width="768" height="560" class="frame"/>
+    <path d="M12 12H756V548H12z M34 28H734V532H34z" class="gold"/>
+    <rect x="64" y="36.8" width="640" height="492.8" fill="url(#tiles)" stroke="#f0cf68" stroke-width="4"/>
+    <rect x="0" y="531.2" width="768" height="28.8" fill="#4d3025" stroke="#d5a82d" stroke-width="2"/>
+    <text x="384" y="553" text-anchor="middle" class="pixel" font-size="20">瓦爾克麗宮</text>
+    <text x="384" y="285" text-anchor="middle" class="zone">受保护的 10×7 战场</text>
+    <text x="384" y="311" text-anchor="middle" class="small">原点 (40,23) · 单格 40×44 · 开场视口 (25,23)</text>
+    <rect x="768" y="0" width="256" height="560" class="hud"/>
+    <rect x="780.8" y="12.8" width="179.2" height="179.2" fill="#405a4b" stroke="#f0cf68" stroke-width="4"/>
+    <path d="M820 168Q871 72 922 168M841 79Q870 37 901 79" fill="none" stroke="#f6eed6" stroke-width="13"/>
+    <rect x="969.6" y="12.8" width="17.6" height="160" fill="#aa2632" stroke="#d5a82d"/>
+    <rect x="990.4" y="12.8" width="17.6" height="160" fill="#313eb3" stroke="#d5a82d"/>
+    <text x="774.4" y="229" class="pixel" font-size="18">士兵／妮雅</text>
+    <line x1="768" y1="240" x2="1024" y2="240" class="line"/>
+    <text x="781" y="276" class="pixel">生命 238 / 270</text>
+    <text x="781" y="310" class="pixel">攻擊  54 /  54</text>
+    <text x="781" y="344" class="pixel">防禦  34 /  34</text>
+    <text x="781" y="378" class="pixel">等級   1</text>
+    <text x="781" y="412" class="pixel">經驗  32 / 150</text>
+    <rect x="781" y="425" width="230" height="76" fill="#060606" stroke="#6f5834" stroke-width="2"/>
+    <text x="896" y="541" text-anchor="middle" class="pixel" font-size="19">第 1 回合</text>
+    <rect x="774" y="5" width="240" height="214" class="gold" stroke-dasharray="8 6"/>
+    <rect x="774" y="236" width="240" height="274" class="gold" stroke-dasharray="8 6"/>
+  </g>
+
+  <g transform="translate(1130 115)">
+    <rect width="320" height="560" rx="10" class="drawer"/>
+    <text x="24" y="42" class="head" fill="#9fe6f2">系统／暂停资料页</text>
+    <line x1="22" y1="58" x2="298" y2="58" class="cyan-line"/>
+    <text x="24" y="92" class="body">默认关闭；不在战斗画面旁常驻。</text>
+    <text x="24" y="128" class="body">可容纳：</text>
+    <text x="38" y="160" class="body">• 键位提示</text>
+    <text x="38" y="190" class="body">• 规则集 / Mod 来源</text>
+    <text x="38" y="220" class="body">• 地形与状态解释</text>
+    <text x="38" y="250" class="body">• 可选公式详情</text>
+    <rect x="24" y="292" width="272" height="92" rx="6" fill="#193844" stroke="#72d7e9"/>
+    <text x="39" y="322" class="small">第 0 关一次性提示</text>
+    <text x="39" y="350" class="body">查看勝利條件：</text>
+    <text x="39" y="375" class="body">保護妮雅，清除宮內敵人。</text>
+    <text x="24" y="430" class="body">显示策略：</text>
+    <text x="38" y="462" class="body">只由玩家显式打开，</text>
+    <text x="38" y="490" class="body">不压缩或重排原版 HUD。</text>
+    <text x="24" y="535" class="small" fill="#9fe6f2">开关不得改变模拟或命中坐标。</text>
+  </g>
+
+  <rect x="64" y="698" width="1026" height="70" rx="8" class="call"/>
+  <text x="84" y="725" class="head">画布内不可侵占区</text>
+  <text x="84" y="752" class="body">正常战斗时，现代提示不得覆盖 X=40..439、Y=23..330 的十乘七图块区；阻断目标/胜负面板除外。</text>
+  <path d="M1090 733H1112V397H1130" class="cyan-line"/>
+  <text x="1110" y="724" class="small" fill="#9fe6f2">资料页不与战斗并列</text>
+
+  <g>
+    <rect x="790" y="85" width="290" height="28" rx="5" class="call"/><text x="802" y="105" class="small">右栏 480..639：战术图/小地图 ↔ 单位详情</text>
+    <path d="M955 113V134" class="line"/>
+    <rect x="330" y="85" width="300" height="28" rx="5" class="call"/><text x="342" y="105" class="small">战场格原点 (40,23)，不是画面左上角</text>
+    <path d="M480 113L250 152" class="line"/>
+  </g>
+</svg>

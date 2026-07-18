@@ -67,4 +67,5 @@
 - `../notes/shooting-and-technique-system.md`：3 种射击、13 职业三阶段菜单、36 项分发及玩家技术核心公式。
 - `../notes/ai-decision-system.md`：AI 职业分派、生命阈值、目标选择、敌我射击差异、14 组技能池、33 项参数表及原生异常。
 - `../notes/unit-data-and-promotions.md`：外部修改表的逐值验证、39 个原生兵种记录、合并兵种目录与完整转职图。
+- `../notes/campaign-roster-and-stage0.md`：战役角色显示描述符、职业视觉回退、新游戏初值、第 0 关六名我方与具名敌骑兵身份/职业/开场镜头。
 - `../manifests/resource-coverage.json`：机器可读覆盖表。

@@ -15,6 +15,23 @@ ref/
 .agents/
 .claude/
 *.png
+!public/
+!public/assets/
+!public/assets/original/
+!public/assets/original/*.png
+artifacts/
+test-results/
+playwright-report/
+dist/
+node_modules/
+.playwright-mcp/
+*.tsbuildinfo
+/playwright.config.js
+/playwright.config.d.ts
+/vite.config.js
+/vite.config.d.ts
+/vitest.config.js
+/vitest.config.d.ts
 
 # Files and directories that might appear in the root of a volume
 .DocumentRevisions-V100

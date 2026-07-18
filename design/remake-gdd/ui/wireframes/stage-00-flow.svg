@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="930" viewBox="0 0 1500 930" role="img" aria-labelledby="title desc">
+  <title id="title">第 0 关 UI 状态图</title>
+  <desc id="desc">关前剧情、脚本移动、玩家战斗、胜利条件、胜负反馈与保存选择六个低保真状态。</desc>
+  <defs>
+    <style>
+      .bg{fill:#120e12}.panel{fill:#21181c;stroke:#6f5834;stroke-width:2}.screen{fill:#08090b;stroke:#e2b83f;stroke-width:3}.gold{fill:#d5a82d}.gold-stroke{fill:none;stroke:#d5a82d;stroke-width:3}.red{fill:#7c1f2a}.red2{fill:#aa2632}.brown{fill:#4d3025}.play{fill:#8a5435}.tile{stroke:#d6a978;stroke-width:1;opacity:.5}.hud{fill:#1a1514;stroke:#d5a82d;stroke-width:2}.paper{fill:#eadcae;stroke:#d5a82d;stroke-width:3}.ink{fill:#2b1d17}.white{fill:#f6eed6}.muted{fill:#b9aa8a}.cyan{fill:#72d7e9}.green{fill:#78bc58}.focus{fill:none;stroke:#f7f1d0;stroke-width:4}.modal{fill:#241714;stroke:#f0c849;stroke-width:4}.label{font:700 24px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#f1d988}.body{font:17px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#e9dfca}.small{font:14px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#e9dfca}.pixel{font:700 18px "PingFang TC","Noto Sans CJK TC",sans-serif;fill:#fff}.tiny{font:12px "PingFang SC","Noto Sans CJK SC",sans-serif;fill:#f5ecd7}.num{font:700 22px ui-monospace,monospace;fill:#fff}.badge{fill:#7c1f2a;stroke:#d5a82d;stroke-width:1}.divider{stroke:#d5a82d;stroke-width:2}.dim{fill:#080608;opacity:.62}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#fff1a8"/></marker>
+    <pattern id="grid" width="40" height="44" patternUnits="userSpaceOnUse"><rect width="40" height="44" fill="#a65d39"/><path d="M40 0H0V44" class="tile" fill="none"/></pattern>
+    <symbol id="battle" viewBox="0 0 640 350">
+      <rect width="640" height="350" class="screen"/>
+      <rect x="0" y="0" width="480" height="350" class="red"/>
+      <path d="M8 8H472V342H8z M24 18H456V332H24z" class="gold-stroke"/>
+      <rect x="40" y="23" width="400" height="308" fill="url(#grid)" stroke="#f0cf68" stroke-width="3"/>
+      <rect x="0" y="332" width="480" height="18" class="brown"/>
+      <text x="240" y="347" text-anchor="middle" class="pixel">瓦爾克麗宮</text>
+      <rect x="480" y="0" width="160" height="350" class="hud"/>
+      <rect x="488" y="8" width="112" height="112" fill="#4b6b57" stroke="#f0cf68" stroke-width="3"/>
+      <path d="M512 99Q544 45 576 99M526 52Q544 25 563 52" fill="none" stroke="#f6eed6" stroke-width="9"/>
+      <rect x="606" y="8" width="11" height="100" fill="#32241e" stroke="#d5a82d"/>
+      <rect x="606" y="32" width="11" height="76" class="red2"/>
+      <rect x="619" y="8" width="11" height="100" fill="#32241e" stroke="#d5a82d"/>
+      <rect x="619" y="78" width="11" height="30" fill="#313eb3"/>
+      <text x="484" y="143" class="pixel">士兵／妮雅</text>
+      <line x1="480" y1="150" x2="640" y2="150" class="divider"/>
+      <text x="488" y="170" class="tiny">生命 238 / 270</text>
+      <text x="488" y="191" class="tiny">攻擊  54 /  54</text>
+      <text x="488" y="212" class="tiny">防禦  34 /  34</text>
+      <text x="488" y="233" class="tiny">等級   1</text>
+      <text x="488" y="254" class="tiny">經驗  32 / 150</text>
+      <rect x="488" y="265" width="144" height="52" fill="#090909" stroke="#6f5834"/>
+      <text x="558" y="342" text-anchor="middle" class="pixel">第 1 回合</text>
+    </symbol>
+  </defs>
+
+  <rect width="1500" height="930" class="bg"/>
+  <text x="40" y="48" class="label" font-size="30">第 0 关 · 从剧情到保存的低保真状态图</text>
+  <text x="40" y="78" class="body">原版 640×350 构图优先；空地焦点在右栏显示战术图/小地图，单位焦点切换为详情。</text>
+
+  <g transform="translate(30 105)">
+    <rect width="460" height="360" rx="10" class="panel"/>
+    <circle cx="28" cy="30" r="16" class="badge"/><text x="28" y="36" text-anchor="middle" class="body">1</text>
+    <text x="55" y="37" class="label">关前剧情 · SAY/0000</text>
+    <g transform="translate(20 64) scale(.65625)">
+      <rect width="640" height="350" class="screen"/>
+      <rect x="0" y="0" width="640" height="350" fill="#35505a"/>
+      <path d="M0 285L145 130L250 245L370 92L640 310V350H0Z" fill="#213b46"/>
+      <rect x="18" y="12" width="604" height="92" rx="6" class="modal"/>
+      <rect x="18" y="246" width="604" height="92" rx="6" class="modal"/>
+      <rect x="34" y="26" width="88" height="66" fill="#496c91" stroke="#e2b83f" stroke-width="3"/>
+      <rect x="518" y="258" width="88" height="66" fill="#7c5f47" stroke="#e2b83f" stroke-width="3"/>
+      <text x="145" y="52" class="pixel">妮雅</text><text x="145" y="82" class="pixel">發生什麼事了？</text>
+      <text x="35" y="222" class="tiny">背景、上下窗、肖像与发言顺序保持原版</text>
+      <text x="38" y="278" class="pixel">士兵</text><text x="38" y="310" class="pixel">女帝已被騎士團帶走！</text>
+    </g>
+    <text x="20" y="333" class="small">主操作推进；跳过已看剧情只缩短表现，不改变战斗初态。</text>
+  </g>
+
+  <g transform="translate(520 105)">
+    <rect width="460" height="360" rx="10" class="panel"/>
+    <circle cx="28" cy="30" r="16" class="badge"/><text x="28" y="36" text-anchor="middle" class="body">2</text>
+    <text x="55" y="37" class="label">开场脚本 · 无标题卡</text>
+    <g transform="translate(20 64) scale(.65625)">
+      <use href="#battle" width="640" height="350"/>
+      <circle cx="92" cy="148" r="15" fill="#56a4ea" stroke="#fff" stroke-width="3"/>
+      <path d="M110 150C210 92 310 170 395 154" fill="none" stroke="#fff1a8" stroke-width="6" stroke-dasharray="12 8" marker-end="url(#arrow)"/>
+      <circle cx="395" cy="154" r="18" fill="#56a4ea" stroke="#fff" stroke-width="4"/>
+      <text x="210" y="76" class="pixel">镜头逐格跟随妮雅</text>
+      <text x="210" y="105" class="tiny">终点 (29,26) · 视口原点 (25,23)</text>
+    </g>
+    <text x="20" y="333" class="small">地点名直接出现在底栏；普通战斗输入暂时锁定。</text>
+  </g>
+
+  <g transform="translate(1010 105)">
+    <rect width="460" height="360" rx="10" class="panel"/>
+    <circle cx="28" cy="30" r="16" class="badge"/><text x="28" y="36" text-anchor="middle" class="body">3</text>
+    <text x="55" y="37" class="label">玩家阶段 · 正常战场</text>
+    <g transform="translate(20 64) scale(.65625)">
+      <use href="#battle" width="640" height="350"/>
+      <circle cx="200" cy="155" r="17" fill="#56a4ea" stroke="#fff" stroke-width="4"/>
+      <rect x="179" y="130" width="42" height="49" class="focus"/>
+      <circle cx="280" cy="198" r="17" fill="#cc4b52" stroke="#f8d681" stroke-width="4"/>
+      <rect x="484" y="270" width="150" height="42" rx="4" fill="#193844" stroke="#72d7e9" stroke-width="2"/>
+      <text x="493" y="287" class="tiny">首次提示（不夺焦点）</text>
+      <text x="493" y="304" class="tiny">查看勝利條件</text>
+    </g>
+    <text x="20" y="333" class="small">提示只在右栏出现一次；玩家可立即选择、移动、攻击或取消。</text>
+  </g>
+
+  <g transform="translate(30 500)">
+    <rect width="460" height="360" rx="10" class="panel"/>
+    <circle cx="28" cy="30" r="16" class="badge"/><text x="28" y="36" text-anchor="middle" class="body">4</text>
+    <text x="55" y="37" class="label">按需目标 · 暂停指令</text>
+    <g transform="translate(20 64) scale(.65625)">
+      <use href="#battle" width="640" height="350"/>
+      <rect x="0" y="0" width="640" height="350" class="dim"/>
+      <rect x="105" y="72" width="430" height="205" rx="8" class="modal"/>
+      <text x="320" y="112" text-anchor="middle" class="pixel">勝 利 條 件</text>
+      <line x1="135" y1="128" x2="505" y2="128" class="divider"/>
+      <text x="145" y="170" class="pixel">勝利：清除宮內所有敵人</text>
+      <text x="145" y="210" class="pixel">失敗：妮雅戰敗</text>
+      <text x="320" y="252" text-anchor="middle" class="tiny">主操作／副操作：返回战场</text>
+    </g>
+    <text x="20" y="333" class="small">目标面板可暂时覆盖战场，因为此时战斗指令暂停且可一键返回。</text>
+  </g>
+
+  <g transform="translate(520 500)">
+    <rect width="460" height="360" rx="10" class="panel"/>
+    <circle cx="28" cy="30" r="16" class="badge"/><text x="28" y="36" text-anchor="middle" class="body">5</text>
+    <text x="55" y="37" class="label">胜负反馈 · 明确原因</text>
+    <g transform="translate(20 64) scale(.65625)">
+      <use href="#battle" width="640" height="350"/>
+      <rect x="0" y="0" width="640" height="350" class="dim"/>
+      <rect x="115" y="92" width="410" height="160" rx="8" class="modal"/>
+      <text x="320" y="142" text-anchor="middle" class="pixel">戰 鬥 勝 利</text>
+      <text x="320" y="184" text-anchor="middle" class="tiny">现场 SAY/0003 已完成</text>
+      <rect x="250" y="205" width="140" height="30" class="badge"/>
+      <text x="320" y="226" text-anchor="middle" class="tiny">確 認</text>
+      <text x="320" y="286" text-anchor="middle" class="tiny">失败分支必须显示“妮雅戰敗”</text>
+    </g>
+    <text x="20" y="333" class="small">胜利进入保存；失败确认后重建本关，不进入五槽保存。</text>
+  </g>
+
+  <g transform="translate(1010 500)">
+    <rect width="460" height="360" rx="10" class="panel"/>
+    <circle cx="28" cy="30" r="16" class="badge"/><text x="28" y="36" text-anchor="middle" class="body">6</text>
+    <text x="55" y="37" class="label">保存选择 · 五槽信息</text>
+    <g transform="translate(20 64) scale(.65625)">
+      <rect width="640" height="350" class="screen"/>
+      <rect x="22" y="18" width="596" height="314" class="brown" stroke="#d5a82d" stroke-width="4"/>
+      <text x="320" y="54" text-anchor="middle" class="pixel">記 錄 本 次 戰 役</text>
+      <g class="tiny">
+        <rect x="62" y="73" width="516" height="42" class="hud"/><text x="80" y="99">1　瓦爾克麗宮　士兵　等級 1　stableRemake</text>
+        <rect x="62" y="119" width="516" height="42" class="hud"/><text x="80" y="145">2　— 空白記錄 —</text>
+        <rect x="62" y="165" width="516" height="42" class="hud"/><text x="80" y="191">3　— 空白記錄 —</text>
+        <rect x="62" y="211" width="516" height="42" class="hud"/><text x="80" y="237">4　— 空白記錄 —</text>
+        <rect x="62" y="257" width="516" height="42" class="hud"/><text x="80" y="283">5　— 空白記錄 —</text>
+      </g>
+      <rect x="55" y="68" width="530" height="52" class="focus"/>
+      <text x="320" y="321" text-anchor="middle" class="tiny">覆盖已有槽时再确认 · 成功后进入 stage 1</text>
+    </g>
+    <text x="20" y="333" class="small">复刻新增规则集/Mod 兼容信息，但仍保留原版五槽结构。</text>
+  </g>
+
+  <text x="750" y="900" text-anchor="middle" class="muted" font-family="PingFang SC,Noto Sans CJK SC,sans-serif" font-size="15">低保真设计稿：几何层级具有约束力；装饰细节与成品像素资产以原版提取资源为准。</text>
+</svg>
