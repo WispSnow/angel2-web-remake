@@ -5,6 +5,9 @@ interface DebugState {
   phase: string;
   dialogueIndex: number;
   actionMode: string;
+  commandMenuKind: "initial" | "postMove";
+  commandIndex: number;
+  commands: Array<{ id: string; label: string }>;
   systemMenuOpen: boolean;
   round: number;
   cursor: { x: number; y: number };
@@ -17,7 +20,7 @@ interface DebugState {
     stepIndex: number;
   };
   reachable: Array<{ x: number; y: number }>;
-  units: Array<{ id: string; side: number; x: number; y: number; life: number; experience: number; name: string; portrait: number }>;
+  units: Array<{ id: string; side: number; x: number; y: number; life: number; experience: number; name: string; portrait: number; acted: boolean }>;
 }
 
 const debugState = (page: Page) => page.evaluate(() => window.__ANGEL2__?.getState() as DebugState);
@@ -136,13 +139,41 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-system-menu.png" });
   await page.locator("[data-action=close-system-menu]").click();
 
-  // Main verb: select Nia, move one cell, choose ordinary attack and hit an adjacent enemy.
+  // Main verb: selecting Nia opens the profession menu before any movement
+  // range is shown, then Move enters range selection.
   await clickCanvas(page, 220, 177);
   await expect(page.getByTestId("unit-portrait")).toBeVisible();
   await expect(page.getByTestId("tactical-hud")).toHaveClass(/under-unit/);
   await expect(page.locator(".minimap-unit")).toHaveCount(0);
   await expect(page.getByTestId("exp-bar")).toBeVisible();
   await expect(page.getByTestId("system-menu")).toBeHidden();
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "actionMenu",
+    commandMenuKind: "initial",
+    commandIndex: 0,
+    reachable: [],
+    commands: [
+      { id: "move", label: "移動" },
+      { id: "attack", label: "攻擊" },
+      { id: "rest", label: "休息" },
+    ],
+  });
+  await expect(page.getByTestId("action-menu")).toBeVisible();
+  await expect(page.getByTestId("unit-command-move")).toHaveAttribute("aria-current", "true");
+  const commandMenuPlacement = await page.getByTestId("action-menu").evaluate((menu) => {
+    const bounds = menu.getBoundingClientRect();
+    const screen = menu.closest("[data-testid=game-screen]")!.getBoundingClientRect();
+    const scale = screen.width / 640;
+    return {
+      leftInsideBattlefield: bounds.left >= screen.left + 40 * scale,
+      rightInsideBattlefield: bounds.right <= screen.left + 440 * scale,
+      topInsideBattlefield: bounds.top >= screen.top + 23 * scale,
+      bottomInsideBattlefield: bounds.bottom <= screen.top + 331 * scale,
+    };
+  });
+  expect(Object.values(commandMenuPlacement).every(Boolean)).toBe(true);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-unit-command-menu.png" });
+  await page.getByTestId("unit-command-move").click();
   expect((await debugState(page)).actionMode).toBe("move");
   const movementRange = (await debugState(page)).reachable;
   expect(movementRange.length).toBeGreaterThan(1);
@@ -150,6 +181,16 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-selected-unit.png" });
   await clickCanvas(page, 180, 177);
   await expect(page.getByTestId("action-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "actionMenu",
+    commandMenuKind: "postMove",
+    commands: [
+      { id: "attack", label: "攻擊" },
+      { id: "end", label: "結束" },
+      { id: "undo", label: "返悔" },
+    ],
+  });
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-post-move-command-menu.png" });
   await page.locator("[data-action=attack]").click();
   await clickCanvas(page, 140, 177);
   await expect(page.getByTestId("combat-presentation")).toBeHidden();
@@ -159,7 +200,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(state.units.find((unit) => unit.id === "2:45")!.life).toBeLessThan(160);
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-unit-life-label-count")).toBe("16");
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-acted-badge-count")).toBe("1");
-  await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-acted-badge-geometry")).toBe("-27,-15,16,14");
+  await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-acted-badge-geometry")).toBe("-22,-15,16,14");
   await clickCanvas(page, 180, 177);
   await expect(page.getByTestId("exp-bar").locator("i")).not.toHaveAttribute("style", "height:0%" );
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-experience-hud.png" });
@@ -185,9 +226,28 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   state = await debugState(page);
   expect(state.round).toBe(2);
   expect(state.units.find((unit) => unit.id === "2:41")!.y).toBeGreaterThan(39);
+  expect(state.units.filter((unit) => unit.side === 1).every((unit) => !unit.acted)).toBe(true);
+
+  // Units that begin round 2 inside an enemy control zone may leave their
+  // origin; only control-zone cells entered during the move stop expansion.
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await clickCanvas(page, 220, 177);
+  expect((await debugState(page)).actionMode).toBe("actionMenu");
+  await page.getByTestId("unit-command-move").click();
+  expect((await debugState(page)).actionMode).toBe("move");
+  expect((await debugState(page)).reachable.length).toBeGreaterThan(1);
+  await page.keyboard.press("Escape");
+  expect((await debugState(page)).actionMode).toBe("actionMenu");
+  await page.keyboard.press("Escape");
+  await clickCanvas(page, 180, 133);
+  expect((await debugState(page)).actionMode).toBe("actionMenu");
+  await page.getByTestId("unit-command-move").click();
+  expect((await debugState(page)).actionMode).toBe("move");
+  expect((await debugState(page)).reachable.length).toBeGreaterThan(1);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-round2-zoc-origin.png" });
 
   // S00-C: exact defeat wording and fixed-roster retry.
-  await page.getByTestId("skip-dialogue").click();
   await page.evaluate(() => window.__ANGEL2__?.forceDefeat());
   await expect(page.getByText("妮雅戰敗", { exact: true })).toBeVisible();
   await page.getByTestId("retry-button").click();
@@ -245,6 +305,15 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await expect(page.getByTestId("objective-panel")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("objective-panel")).toBeHidden();
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("action-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({ actionMode: "actionMenu", commandIndex: 0 });
+  await page.keyboard.press("ArrowDown");
+  expect((await debugState(page)).commandIndex).toBe(1);
+  await expect(page.getByTestId("unit-command-attack")).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("action-menu")).toBeHidden();
 
   const dimensions = await page.getByTestId("battle-canvas").evaluate((canvas) => ({
     logicalWidth: (canvas as HTMLCanvasElement).width,

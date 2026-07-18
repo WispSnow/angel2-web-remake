@@ -114,9 +114,61 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .system-menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .system-menu .system-menu-grid > button { width: 100%; min-width: 0; padding: 5px 2px; font-size: 10px; }
 .system-menu-grid button:last-child { grid-column: 1 / -1; }
-.action-menu { position: absolute; z-index: 9; left: 322px; top: 195px; width: 101px; padding: 6px; border: 3px ridge #e3bd3f; color: #ffeaae; background: #1c1012ee; box-shadow: 6px 8px 0 #0008; }
-.action-menu strong { display: block; margin-bottom: 4px; text-align: center; font-size: 12px; }
-.action-menu button { display: block; width: 100%; margin-top: 3px; padding: 5px; font-size: 12px; }
+.action-menu {
+  position: absolute;
+  z-index: 9;
+  width: 147px;
+  height: 99px;
+  padding: 8px 5px;
+  border: 2px solid #f3c323;
+  color: #eee3d5;
+  background-color: #2a140f;
+  background-image:
+    radial-gradient(circle, #7b3e20 0 28%, transparent 31%),
+    linear-gradient(#351912e8, #1c0d0ae8);
+  background-position: 0 0, 0 0;
+  background-size: 2px 2px, 100% 100%;
+  box-shadow:
+    inset 0 0 0 1px #201006,
+    inset 0 0 0 3px #a96c05,
+    3px 4px 0 #0009;
+}
+.action-menu::before,
+.action-menu::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #ffdf31;
+  transform: rotate(45deg);
+  box-shadow: 1px 1px 0 #120800;
+}
+.action-menu::before { left: -4px; background: #1744c8; }
+.action-menu::after { right: -4px; background: #e42929; }
+.action-menu button {
+  position: relative;
+  display: block;
+  width: 136px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #d9d0c8;
+  background: transparent;
+  font: 18px/24px "PMingLiU", "Noto Serif TC", serif;
+  letter-spacing: 1.5em;
+  text-align: center;
+  text-indent: 1.5em;
+  text-shadow: 1px 1px #000;
+}
+.action-menu button:hover,
+.action-menu button.is-selected {
+  color: #fff5dd;
+  background: linear-gradient(90deg, transparent 4%, #9c581e99 28%, #9c581e99 72%, transparent 96%);
+}
+.action-menu button:focus-visible { outline: 1px solid #ffdc48; outline-offset: -2px; }
 .status-strip { position: absolute; z-index: 7; left: 45px; top: 306px; width: 386px; min-height: 20px; padding: 3px 8px; overflow: hidden; color: #fff6c8; background: #120b0bcc; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
 .hint-toast { position: absolute; z-index: 9; left: 58px; top: 36px; max-width: 360px; padding: 7px 10px; border: 1px solid #f5d665; border-radius: 3px; color: #fff6c8; background: #351b1dea; font: 11px/1.3 system-ui, sans-serif; cursor: pointer; }
 

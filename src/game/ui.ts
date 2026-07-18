@@ -49,12 +49,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="close-system-menu">返回戰場</button>
               </div>
             </section>
-            <div class="action-menu" id="action-menu" data-testid="action-menu" hidden>
-              <strong>行動</strong>
-              <button data-action="attack">攻擊</button>
-              <button data-action="wait">待機</button>
-              <button data-action="cancel">取消</button>
-            </div>
+            <div class="action-menu" id="action-menu" data-testid="action-menu" role="menu" aria-label="單位行動" hidden></div>
             <div class="status-strip" id="status-strip" aria-live="polite"></div>
             <section class="combat-presentation" id="combat-presentation" data-testid="combat-presentation" hidden></section>
             <button class="hint-toast" id="hint-toast" data-action="objectives" hidden></button>
@@ -151,9 +146,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "music") controller.toggleMusic();
     else if (action === "sound") controller.toggleSound();
     else if (action === "speech") controller.toggleSpeech();
+    else if (action === "move") controller.chooseMove();
     else if (action === "attack") controller.chooseAttack();
-    else if (action === "wait") controller.chooseWait();
-    else if (action === "cancel") controller.cancelAction();
+    else if (action === "rest") controller.chooseRest();
+    else if (action === "end-unit") controller.chooseEnd();
+    else if (action === "undo-move") controller.chooseUndo();
     else if (action === "retry") controller.retry();
     else if (action === "victory-continue") controller.continueAfterVictory();
     else if (action === "save-yes") controller.showSaveSlots();
@@ -161,6 +158,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "save-slot") controller.selectSaveSlot(Number(button.dataset.slot));
     else if (action === "overwrite-confirm") controller.confirmOverwrite();
     else if (action === "overwrite-cancel") controller.cancelOverwrite();
+  });
+
+  root.addEventListener("pointerover", (event) => {
+    const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
+    if (command) controller.selectCommand(Number(command.dataset.commandIndex));
   });
 
   window.addEventListener("keydown", (event) => {
@@ -183,6 +185,18 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     round.textContent = `第 ${controller.battle.round} 回合`;
     status.textContent = controller.statusMessage;
     actionMenu.hidden = controller.phase !== "player" || controller.actionMode !== "actionMenu";
+    if (!actionMenu.hidden) {
+      const position = controller.commandMenuPosition;
+      actionMenu.style.left = `${position.x}px`;
+      actionMenu.style.top = `${position.y}px`;
+      actionMenu.dataset.kind = controller.commandMenuKind;
+      actionMenu.setAttribute("aria-label", controller.commandMenuKind === "initial" ? "選擇單位行動" : "選擇移動後行動");
+      actionMenu.innerHTML = controller.unitCommands.map((command, index) => {
+        const action = command.id === "end" ? "end-unit" : command.id === "undo" ? "undo-move" : command.id;
+        const selected = index === controller.commandIndex;
+        return `<button type="button" role="menuitem" data-action="${action}" data-command-index="${index}" data-testid="unit-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${command.label}</button>`;
+      }).join("");
+    }
     hint.hidden = !controller.hintVisible || controller.phase !== "player";
     hint.textContent = `查看勝利條件：保護妮雅；敵軍被擊倒或撤離均計入清除。`;
     objectivePanel.hidden = !controller.objectiveOpen;

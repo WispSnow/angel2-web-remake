@@ -104,6 +104,17 @@ export class Stage0Battle {
     return true;
   }
 
+  rest(id: string): number {
+    const unit = this.unit(id);
+    if (!unit || unit.side !== 1 || unit.acted) return 0;
+    const maximumLife = statsFor(unit).maxLife;
+    const recovered = Math.max(0, Math.min(Math.floor(maximumLife * 15 / 100), maximumLife - unit.life));
+    unit.life += recovered;
+    unit.acted = true;
+    this.focusId = id;
+    return recovered;
+  }
+
   planRouteEnemy(id: string): RouteMoveResult | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2) return undefined;

@@ -265,7 +265,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (controller.isTestMode) {
         this.game.canvas.dataset.unitLifeLabelCount = String(active.size);
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);
-        this.game.canvas.dataset.actedBadgeGeometry = "-27,-15,16,14";
+        this.game.canvas.dataset.actedBadgeGeometry = "-22,-15,16,14";
       }
     }
 

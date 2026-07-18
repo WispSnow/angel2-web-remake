@@ -106,7 +106,7 @@ describe("stage 0 battle simulation", () => {
     expect(battle.moveUnit(nia.id, { x: 21, y: 21 })).toBe(false);
   });
 
-  it("does not let an enemy route escape when it starts inside allied zone of control", () => {
+  it("lets an enemy leave a control zone it starts in", () => {
     const battle = battleAtPlayableOpening();
     const enemy = battle.unit("2:45");
     const adjacentAlly = battle.unit("1:43");
@@ -118,8 +118,9 @@ describe("stage 0 battle simulation", () => {
     const movement = battle.planRouteEnemy(enemy!.id);
 
     expect(movement).toBeDefined();
-    expect(movement!.destination).toEqual({ x: enemy!.x, y: enemy!.y });
-    expect(movement!.path).toEqual([{ x: enemy!.x, y: enemy!.y }]);
+    expect(movement!.path.length).toBeGreaterThan(1);
+    expect(movement!.path[0]).toEqual({ x: enemy!.x, y: enemy!.y });
+    expect(movement!.destination).not.toEqual({ x: enemy!.x, y: enemy!.y });
   });
 
   it("resolves ordinary damage, counterattack, experience and action consumption", () => {
@@ -132,6 +133,18 @@ describe("stage 0 battle simulation", () => {
     expect(battle.unit("2:45")!.life).toBe(defenderLife - result.damage);
     expect(battle.unit("1:0")!.acted).toBe(true);
     expect(battle.unit("1:0")!.experience).toBe(result.experienceGained);
+  });
+
+  it("restores fifteen percent of maximum life before consuming the unit action", () => {
+    const battle = battleAtPlayableOpening();
+    const nia = battle.unit("1:0")!;
+    nia.life = 100;
+
+    expect(battle.rest(nia.id)).toBe(24);
+    expect(nia.life).toBe(124);
+    expect(nia.acted).toBe(true);
+    expect(battle.rest(nia.id)).toBe(0);
+    expect(nia.life).toBe(124);
   });
 
   it("runs behavior 12 toward the hidden palace exit without attacking", () => {
@@ -184,6 +197,23 @@ describe("stage 0 battle simulation", () => {
     expect(battle.round).toBe(2);
     expect(battle.units.every((unit) => unit.acted === false)).toBe(true);
     expect(battle.focusId).toBe("1:0");
+  });
+
+  it("keeps every surviving ally mobile after the first enemy route phase", () => {
+    const battle = battleAtPlayableOpening();
+    expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    battle.attack("1:0", "2:45");
+
+    const enemyIds = battle.units.filter((unit) => unit.side === 2).map((unit) => unit.id);
+    for (const enemyId of enemyIds) battle.moveRouteEnemy(enemyId);
+    battle.startNextRound();
+
+    const stalledAllies = battle.units
+      .filter((unit) => unit.side === 1)
+      .filter((unit) => reachableCells(unit, battle.units).length <= 1)
+      .map((unit) => unit.id);
+
+    expect(stalledAllies).toEqual([]);
   });
 
   it("implements the exact stage defeat and victory predicates", () => {

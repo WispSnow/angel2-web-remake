@@ -32,6 +32,7 @@ function search(
   const costs = new Map<string, number>([[positionKey(start), 0]]);
   const previous = new Map<string, string>();
   const pending: Array<{ position: Position; cost: number }> = [{ position: start, cost: 0 }];
+  const startKey = positionKey(start);
 
   while (pending.length > 0) {
     pending.sort((a, b) => a.cost - b.cost);
@@ -39,7 +40,10 @@ function search(
     if (!current) continue;
     const currentKey = positionKey(current.position);
     if (current.cost !== costs.get(currentKey)) continue;
-    if (stopAfterEntering.has(currentKey)) continue;
+    // A unit that begins its move inside an opposing control zone may leave
+    // that origin. Any controlled cell entered during this move is still a
+    // terminal cell and cannot be used to reach cells beyond it.
+    if (currentKey !== startKey && stopAfterEntering.has(currentKey)) continue;
 
     for (const next of neighbors(current.position)) {
       const key = positionKey(next);

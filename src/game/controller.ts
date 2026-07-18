@@ -7,6 +7,24 @@ import type { ActionMode, AttackResult, BattleUnit, DialoguePage, GamePhase, Pos
 type Listener = () => void;
 type StoryPhase = keyof typeof STORY_BY_PHASE;
 type MovementKind = "scripted" | "player" | "enemy" | "rollback";
+export type UnitCommandId = "move" | "attack" | "rest" | "end" | "undo";
+
+export interface UnitCommand {
+  id: UnitCommandId;
+  label: string;
+}
+
+const BASIC_COMMANDS: readonly UnitCommand[] = [
+  { id: "move", label: "移動" },
+  { id: "attack", label: "攻擊" },
+  { id: "rest", label: "休息" },
+];
+
+const POST_MOVE_COMMANDS: readonly UnitCommand[] = [
+  { id: "attack", label: "攻擊" },
+  { id: "end", label: "結束" },
+  { id: "undo", label: "返悔" },
+];
 
 export interface MovementPresentation {
   unitId: string;
@@ -24,6 +42,7 @@ export class GameController {
   actionMode: ActionMode = "idle";
   dialogueIndex = 0;
   selectedId?: string;
+  commandIndex = 0;
   cursor: Position = { x: 29, y: 26 };
   cameraOrigin: Position = { x: 25, y: 23 };
   reachable: Position[] = [];
@@ -69,6 +88,29 @@ export class GameController {
 
   get selectedUnit(): BattleUnit | undefined {
     return this.selectedId ? this.battle.unit(this.selectedId) : undefined;
+  }
+
+  get commandMenuKind(): "initial" | "postMove" {
+    return this.pendingPath ? "postMove" : "initial";
+  }
+
+  get unitCommands(): readonly UnitCommand[] {
+    if (this.commandMenuKind === "postMove") return POST_MOVE_COMMANDS;
+    // The current vertical slice only exposes the basic soldier command set.
+    // This is the extension point for ranged and technique profession menus.
+    return BASIC_COMMANDS;
+  }
+
+  get commandMenuPosition(): Position {
+    const unit = this.selectedUnit;
+    if (!unit) return { x: 166, y: 120 };
+    const unitLeft = 40 + (unit.x - this.cameraOrigin.x) * 40;
+    const unitTop = 23 + (unit.y - this.cameraOrigin.y) * 44;
+    const preferredLeft = unitLeft + 42;
+    return {
+      x: Math.max(42, Math.min(291, preferredLeft > 291 ? unitLeft - 149 : preferredLeft)),
+      y: Math.max(25, Math.min(230, unitTop - 28)),
+    };
   }
 
   get isTestMode(): boolean {
@@ -171,9 +213,11 @@ export class GameController {
     if (unit.side === 1 && !unit.acted) {
       this.selectedId = unit.id;
       this.pendingOrigin = { x: unit.x, y: unit.y };
-      this.reachable = reachableCells(unit, this.battle.units);
-      this.actionMode = "move";
-      this.statusMessage = "藍色格為可移動範圍；可選原格直接行動。";
+      this.pendingPath = undefined;
+      this.reachable = [];
+      this.commandIndex = 0;
+      this.actionMode = "actionMenu";
+      this.statusMessage = `選擇${unit.className}的行動。`;
     } else {
       this.statusMessage = unit.side === 2 ? "敵軍正向宮殿出口撤離。" : "此單位本回合已行動。";
     }
@@ -187,6 +231,20 @@ export class GameController {
     this.emit();
   }
 
+  chooseMove(): void {
+    const unit = this.selectedUnit;
+    if (
+      this.phase !== "player"
+      || this.actionMode !== "actionMenu"
+      || this.commandMenuKind !== "initial"
+      || !unit
+    ) return;
+    this.reachable = reachableCells(unit, this.battle.units);
+    this.actionMode = "move";
+    this.statusMessage = "藍色格為可移動範圍；可選原格保留位置。";
+    this.emit();
+  }
+
   chooseAttack(): void {
     const unit = this.selectedUnit;
     if (this.phase !== "player" || this.actionMode !== "actionMenu" || !unit) return;
@@ -194,7 +252,9 @@ export class GameController {
       .filter((candidate) => candidate.side !== unit.side && manhattan(unit, candidate) === 1)
       .map(({ x, y }) => ({ x, y }));
     if (this.targets.length === 0) {
-      this.statusMessage = "攻擊範圍內沒有敵人。請待機或取消移動。";
+      this.statusMessage = this.commandMenuKind === "postMove"
+        ? "攻擊範圍內沒有敵人。請結束行動或返悔。"
+        : "攻擊範圍內沒有敵人。請選擇移動或休息。";
       this.emit();
       return;
     }
@@ -203,11 +263,58 @@ export class GameController {
     this.emit();
   }
 
-  chooseWait(): void {
+  chooseRest(): void {
     const unit = this.selectedUnit;
-    if (!unit || this.phase !== "player" || this.actionMode !== "actionMenu") return;
+    if (
+      !unit
+      || this.phase !== "player"
+      || this.actionMode !== "actionMenu"
+      || this.commandMenuKind !== "initial"
+    ) return;
+    const recovered = this.battle.rest(unit.id);
+    this.finishUnitAction(recovered > 0 ? `休息恢復 ${recovered} 點生命。` : "休息完成；生命已滿。", true);
+  }
+
+  chooseEnd(): void {
+    const unit = this.selectedUnit;
+    if (
+      !unit
+      || this.phase !== "player"
+      || this.actionMode !== "actionMenu"
+      || this.commandMenuKind !== "postMove"
+    ) return;
     this.battle.wait(unit.id);
-    this.finishUnitAction("單位待機。", true);
+    this.finishUnitAction("單位行動結束。", true);
+  }
+
+  chooseUndo(): void {
+    if (this.actionMode === "actionMenu" && this.commandMenuKind === "postMove") {
+      void this.rollbackSelectedMovement();
+    }
+  }
+
+  moveCommandSelection(delta: number): void {
+    if (this.actionMode !== "actionMenu" || this.unitCommands.length === 0) return;
+    this.commandIndex = (this.commandIndex + delta + this.unitCommands.length) % this.unitCommands.length;
+    this.emit();
+  }
+
+  selectCommand(index: number): void {
+    if (this.actionMode !== "actionMenu" || index < 0 || index >= this.unitCommands.length) return;
+    if (this.commandIndex === index) return;
+    this.commandIndex = index;
+    this.emit();
+  }
+
+  activateCommandSelection(): void {
+    if (this.actionMode !== "actionMenu") return;
+    const command = this.unitCommands[this.commandIndex];
+    if (!command) return;
+    if (command.id === "move") this.chooseMove();
+    else if (command.id === "attack") this.chooseAttack();
+    else if (command.id === "rest") this.chooseRest();
+    else if (command.id === "end") this.chooseEnd();
+    else if (command.id === "undo") this.chooseUndo();
   }
 
   cancelAction(): void {
@@ -215,10 +322,15 @@ export class GameController {
       this.actionMode = "actionMenu";
       this.targets = [];
     } else if (this.actionMode === "actionMenu") {
-      void this.rollbackSelectedMovement();
-      return;
-    } else if (this.actionMode === "move") {
+      if (this.commandMenuKind === "postMove") {
+        void this.rollbackSelectedMovement();
+        return;
+      }
       this.resetAction();
+    } else if (this.actionMode === "move") {
+      this.reachable = [];
+      this.commandIndex = 0;
+      this.actionMode = "actionMenu";
     }
     this.statusMessage = "已返回上一層。";
     this.emit();
@@ -271,6 +383,7 @@ export class GameController {
   private resetAction(): void {
     this.actionMode = "idle";
     this.selectedId = undefined;
+    this.commandIndex = 0;
     this.pendingOrigin = undefined;
     this.pendingPath = undefined;
     this.reachable = [];
@@ -465,6 +578,10 @@ export class GameController {
 
   moveCursor(delta: Position): void {
     if (this.phase !== "player" || this.systemMenuOpen || this.objectiveOpen || this.busy) return;
+    if (this.actionMode === "actionMenu") {
+      if (delta.y !== 0) this.moveCommandSelection(delta.y);
+      return;
+    }
     this.cursor = {
       x: Math.max(0, Math.min(STAGE0.width - 1, this.cursor.x + delta.x)),
       y: Math.max(0, Math.min(STAGE0.height - 1, this.cursor.y + delta.y)),
@@ -476,6 +593,7 @@ export class GameController {
   primaryAtCursor(): void {
     if (isStoryPhase(this.phase)) this.advanceDialogue();
     else if (this.systemMenuOpen || this.objectiveOpen) return;
+    else if (this.actionMode === "actionMenu") this.activateCommandSelection();
     else this.selectCell(this.cursor);
   }
 
@@ -532,6 +650,9 @@ export class GameController {
       phase: this.phase,
       dialogueIndex: this.dialogueIndex,
       actionMode: this.actionMode,
+      commandMenuKind: this.commandMenuKind,
+      commandIndex: this.commandIndex,
+      commands: this.unitCommands.map((command) => ({ ...command })),
       cursor: { ...this.cursor },
       cameraOrigin: this.cameraOrigin,
       objectiveOpen: this.objectiveOpen,
@@ -589,7 +710,8 @@ export class GameController {
     const completed = await this.animateUnitPath(unit.id, path, "player");
     this.busy = false;
     this.actionMode = completed ? "actionMenu" : "move";
-    this.statusMessage = completed ? "選擇攻擊或待機；取消可沿原路返回。" : "移動路徑已失效。";
+    this.commandIndex = 0;
+    this.statusMessage = completed ? "選擇攻擊、結束或返悔。" : "移動路徑已失效。";
     this.emit();
   }
 
@@ -602,9 +724,10 @@ export class GameController {
     const completed = await this.animateUnitPath(unit.id, path, "rollback");
     this.busy = false;
     this.pendingPath = undefined;
-    this.actionMode = "move";
-    this.reachable = reachableCells(unit, this.battle.units);
-    this.statusMessage = completed ? "已沿原路返回；請重新選擇移動位置。" : "無法返回原位置。";
+    this.commandIndex = 0;
+    this.actionMode = "actionMenu";
+    this.reachable = [];
+    this.statusMessage = completed ? "已沿原路返回；請重新選擇行動。" : "無法返回原位置。";
     this.emit();
   }
 
