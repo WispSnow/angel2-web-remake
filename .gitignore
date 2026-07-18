@@ -19,6 +19,8 @@ ref/
 !public/assets/
 !public/assets/original/
 !public/assets/original/*.png
+!public/assets/original/portrait-animation/
+!public/assets/original/portrait-animation/*.png
 artifacts/
 test-results/
 playwright-report/

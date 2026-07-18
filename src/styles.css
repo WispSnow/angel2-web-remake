@@ -72,12 +72,32 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .bottom-location { position: absolute; z-index: 6; left: 80px; top: 331px; width: 320px; height: 19px; border-block: 1px solid #d8aa2c; color: #fff; background: #5d3b2b; text-align: center; font-size: 17px; line-height: 16px; text-shadow: 1px 1px #000; }
 .bottom-round { position: absolute; z-index: 7; left: 486px; top: 327px; width: 148px; height: 20px; color: #fff; text-align: center; font-size: 16px; }
 
+.animated-portrait { position: relative; display: block; overflow: hidden; image-rendering: pixelated; }
+.animated-portrait > img { position: absolute; display: block; image-rendering: pixelated; pointer-events: none; }
+.animated-portrait .portrait-base { z-index: 0; inset: 0; width: 100%; height: 100%; }
+.animated-portrait .portrait-eye { z-index: 1; opacity: 0; }
+.animated-portrait[data-blink-frame="1"] .portrait-eye-1,
+.animated-portrait[data-blink-frame="2"] .portrait-eye-2,
+.animated-portrait[data-blink-frame="3"] .portrait-eye-3 { opacity: 1; }
+.animated-portrait[data-force-blink-frame] .portrait-eye { opacity: 0; }
+.animated-portrait[data-force-blink-frame="1"] .portrait-eye-1,
+.animated-portrait[data-force-blink-frame="2"] .portrait-eye-2,
+.animated-portrait[data-force-blink-frame="3"] .portrait-eye-3 { opacity: 1; }
+
 .unit-hud { position: absolute; z-index: 7; left: 484px; top: 4px; width: 152px; height: 315px; pointer-events: none; }
 .hud-tactical { z-index: 0; }
 .hud-tactical.under-unit .tactical-minimap { filter: brightness(.38); }
 .unit-detail { position: absolute; z-index: 1; inset: 0; width: 152px; height: 315px; }
 .unit-detail-shade { position: absolute; z-index: 0; left: -4px; top: -4px; width: 160px; height: 321px; border: 4px ridge #d7aa2d; background: linear-gradient(#654431 0 146px, rgba(3, 2, 3, .72) 146px); }
-.hud-portrait { position: absolute; z-index: 1; left: 4px; top: 4px; width: 112px; height: 112px; border: 3px ridge #e7be2c; image-rendering: pixelated; }
+.hud-portrait { position: absolute; z-index: 1; left: 4px; top: 4px; width: 112px; height: 112px; }
+.hud-portrait::after, .dialogue-portrait::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 3px ridge #e7be2c;
+  pointer-events: none;
+}
 .hud-identity { position: absolute; z-index: 1; left: 0; top: 119px; width: 152px; height: 28px; color: #fff; text-align: center; }
 .hud-identity b { display: block; overflow: hidden; font-size: 16px; line-height: 25px; white-space: nowrap; text-shadow: 1px 1px #000; }
 .meter-bar { position: absolute; z-index: 1; top: 2px; width: 15px; height: 104px; border: 2px solid #c99b27; background: #170e0e; box-sizing: border-box; display: flex; align-items: end; }
@@ -193,7 +213,8 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .dialogue-layer { position: absolute; z-index: 12; inset: 0; background: #08030630; }
 .dialogue-box { position: absolute; left: 18px; width: 604px; min-height: 112px; padding: 12px 18px; border: 5px ridge #e9bf3a; color: #fff; background: linear-gradient(90deg, #1f0f13f2, #3f2228f2); box-shadow: inset 0 0 0 2px #6e2932; }
 .dialogue-box.upper { top: 14px; } .dialogue-box.lower { bottom: 19px; }
-.dialogue-box img { float: left; width: 88px; height: 88px; margin-right: 14px; border: 2px solid #d7aa32; object-fit: cover; object-position: top; image-rendering: pixelated; }
+.dialogue-portrait { float: left; width: 88px; height: 88px; margin-right: 14px; }
+.dialogue-portrait::after { border-width: 2px; border-color: #d7aa32; }
 .dialogue-copy { position: relative; min-height: 84px; }
 .dialogue-copy b { display: block; color: #f7d86a; font-size: 13px; }
 .dialogue-copy p { margin: 6px 0 0; white-space: pre-line; font-size: 16px; line-height: 1.65; text-shadow: 1px 1px #000; }

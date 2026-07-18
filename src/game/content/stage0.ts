@@ -126,6 +126,33 @@ export const ASSETS = {
     47: "/assets/original/portrait-ally-soldier.png",
     48: "/assets/original/portrait-enemy-soldier.png",
   },
+  portraitAnimations: {
+    15: {
+      eyeOrigin: { x: 40, y: 16 },
+      eyeSize: { width: 32, height: 24 },
+      eyes: ["open", "half", "closed"].map((frame) => `/assets/original/portrait-animation/portrait-15-eye-${frame}.png`),
+    },
+    45: {
+      eyeOrigin: { x: 32, y: 24 },
+      eyeSize: { width: 40, height: 16 },
+      eyes: ["open", "half", "closed"].map((frame) => `/assets/original/portrait-animation/portrait-45-eye-${frame}.png`),
+    },
+    46: {
+      eyeOrigin: { x: 40, y: 24 },
+      eyeSize: { width: 40, height: 16 },
+      eyes: ["open", "half", "closed"].map((frame) => `/assets/original/portrait-animation/portrait-46-eye-${frame}.png`),
+    },
+    47: {
+      eyeOrigin: { x: 64, y: 24 },
+      eyeSize: { width: 24, height: 16 },
+      eyes: ["open", "half", "closed"].map((frame) => `/assets/original/portrait-animation/portrait-47-eye-${frame}.png`),
+    },
+    48: {
+      eyeOrigin: { x: 24, y: 24 },
+      eyeSize: { width: 24, height: 16 },
+      eyes: ["open", "half", "closed"].map((frame) => `/assets/original/portrait-animation/portrait-48-eye-${frame}.png`),
+    },
+  },
   fullBattle: {
     allySoldier: [0, 1, 2, 3].map((frame) => `/assets/original/full-ally-soldier-0${frame}.png`),
     enemySoldier: [0, 1, 2, 3].map((frame) => `/assets/original/full-enemy-soldier-0${frame}.png`),

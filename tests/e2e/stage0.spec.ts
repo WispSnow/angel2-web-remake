@@ -84,6 +84,15 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   )).toBe(true);
   expect((await debugState(page)).phase).toBe("prebattleStory");
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  for (let action = 0; action < 4; action += 1) await page.getByTestId("advance-dialogue").click();
+  expect((await debugState(page)).dialogueIndex).toBe(2);
+  const dialoguePortrait = page.getByTestId("dialogue-portrait-composite");
+  await expect(dialoguePortrait).toBeVisible();
+  await expect(dialoguePortrait.locator(".portrait-eye")).toHaveCount(3);
+  await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-blink-count"))).toBeGreaterThan(0);
+  await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-blink.png" });
+  await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
 
   await page.getByTestId("skip-dialogue").click();
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "scripted");
@@ -158,6 +167,12 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("unit-portrait")).toBeVisible();
   await expect(page.getByTestId("tactical-hud")).toHaveClass(/under-unit/);
   await expect(page.locator(".minimap-unit")).toHaveCount(0);
+  const hudPortrait = page.getByTestId("unit-portrait-composite");
+  await expect(hudPortrait.locator(".portrait-eye")).toHaveCount(3);
+  await expect.poll(async () => Number(await hudPortrait.getAttribute("data-blink-count"))).toBeGreaterThan(0);
+  await hudPortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-portrait-blink.png" });
+  await hudPortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await expect(page.getByTestId("unit-portrait")).toHaveCount(0);
   await expect(page.locator(".minimap-unit")).toHaveCount(16);
@@ -351,6 +366,13 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await waitForPhase(page, "openingStory");
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "player");
+
+  const reducedMotionPortrait = page.getByTestId("unit-portrait-composite");
+  await expect(reducedMotionPortrait).toBeVisible();
+  await expect.poll(async () => Number(await reducedMotionPortrait.getAttribute("data-blink-count"))).toBeGreaterThan(0);
+  await reducedMotionPortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-reduced-motion-portrait-blink.png" });
+  await reducedMotionPortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
 
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toBeVisible();

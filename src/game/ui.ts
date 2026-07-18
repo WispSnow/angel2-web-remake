@@ -2,6 +2,7 @@ import { ASSETS, STAGE0, nextExperienceThresholdFor } from "./content/stage0";
 import type { GameController } from "./controller";
 import type { GamePhase, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
+import { animatedPortraitMarkup, configureAnimatedPortrait, startPortraitBlinking } from "./portrait";
 
 const storyPhases = new Set<GamePhase>(["prebattleStory", "openingStory", "round2Story", "victoryStory"]);
 
@@ -55,7 +56,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <button class="hint-toast" id="hint-toast" data-action="objectives" hidden></button>
             <section class="dialogue-layer" id="dialogue-layer" data-testid="dialogue-layer" hidden>
               <div class="dialogue-box" id="dialogue-box">
-                <img id="dialogue-portrait" alt="" hidden />
+                <span class="animated-portrait dialogue-portrait" id="dialogue-portrait"
+                  data-testid="dialogue-portrait-composite" data-blink-frame="1" data-blink-count="0" hidden></span>
                 <div class="dialogue-copy"><b id="dialogue-speaker"></b><p id="dialogue-text"></p><span class="continue-mark">▼</span></div>
               </div>
               <div class="dialogue-controls">
@@ -84,7 +86,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const hint = required(root, "#hint-toast");
   const dialogueLayer = required(root, "#dialogue-layer");
   const dialogueBox = required(root, "#dialogue-box");
-  const dialoguePortrait = required<HTMLImageElement>(root, "#dialogue-portrait");
+  const dialoguePortrait = required(root, "#dialogue-portrait");
   const dialogueSpeaker = required(root, "#dialogue-speaker");
   const dialogueText = required(root, "#dialogue-text");
   const storyBackground = required(root, "#story-background");
@@ -95,6 +97,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let activeDialogueKey = "";
   let dialogueFullText = "";
   let revealedCharacters = 0;
+  startPortraitBlinking(root, controller.isTestMode);
 
   const stopDialogueTimer = () => {
     if (dialogueTimer !== undefined) globalThis.clearTimeout(dialogueTimer);
@@ -218,7 +221,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
 
     const focus = controller.describeFocus();
     screen.dataset.hudMode = focus ? "unit" : "tactical";
-    hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${focus ? renderHud(controller, focus.unit, focus.stats) : ""}`;
+    hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${focus ? renderHud(focus.unit, focus.stats) : ""}`;
 
     const page = controller.currentDialogue;
     const dialogueVisible = storyPhases.has(controller.phase) && page !== undefined;
@@ -230,8 +233,13 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       dialogueSpeaker.textContent = page.speaker ?? "";
       dialogueSpeaker.hidden = !page.speaker;
       if (page.portrait) {
-        dialoguePortrait.src = controller.portraitUrl(page.portrait);
-        dialoguePortrait.alt = `${page.speaker ?? "角色"}肖像`;
+        configureAnimatedPortrait(
+          dialoguePortrait,
+          page.portrait,
+          `${page.speaker ?? "角色"}肖像`,
+          "dialogue",
+          "dialogue-portrait",
+        );
         dialoguePortrait.hidden = false;
       } else {
         dialoguePortrait.hidden = true;
@@ -278,7 +286,7 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
     <div class="combatant defender"><img src="${enemyFrames[frame]}" alt="${defender.name}受擊動作" /><span>HP ${Math.max(0, defender.life - result.damage)}</span></div>`;
 }
 
-function renderHud(controller: GameController, unit: NonNullable<GameController["focusedUnit"]>, stats: UnitStats): string {
+function renderHud(unit: NonNullable<GameController["focusedUnit"]>, stats: UnitStats): string {
   const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
   const nextExperience = nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
@@ -287,7 +295,13 @@ function renderHud(controller: GameController, unit: NonNullable<GameController[
   return `
     <div class="unit-detail" data-testid="unit-detail" aria-label="${side}${acted}，${unit.className}${unit.name}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
-      <img class="hud-portrait" data-testid="unit-portrait" src="${controller.portraitUrl(unit.portrait)}" alt="${unit.name}肖像" />
+      ${animatedPortraitMarkup(unit.portrait, {
+        alt: `${unit.name}肖像`,
+        channel: "hud",
+        className: "hud-portrait",
+        wrapperTestId: "unit-portrait-composite",
+        baseTestId: "unit-portrait",
+      })}
       <div class="hud-identity"><b>${unit.className}／${unit.name}</b></div>
       <div class="meter-bar hp-bar" data-testid="hp-bar" aria-label="生命 ${unit.life}／${stats.maxLife}"><i style="height:${hpPercent}%"></i></div>
       <div class="meter-bar exp-bar" data-testid="exp-bar" aria-label="經驗 ${unit.experience}／${nextExperience}"><i style="height:${expPercent}%"></i></div>
