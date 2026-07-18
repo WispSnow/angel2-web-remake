@@ -1,7 +1,7 @@
 import { STAGE0, TERRAIN_DEFENSE_PERCENT, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import type { AttackResult, BattleOutcome, BattleUnit, Position } from "../types";
 import { DeterministicRng } from "./rng";
-import { manhattan, movementCost, movementPath as findMovementPath, routePath } from "./grid";
+import { manhattan, movementCost, movementPath as findMovementPath, reachableCells, routePath } from "./grid";
 
 export interface RouteMoveResult {
   path: Position[];
@@ -115,10 +115,16 @@ export class Stage0Battle {
     return recovered;
   }
 
+  enemyMovementRange(id: string): Position[] {
+    const unit = this.unit(id);
+    if (!unit || unit.side !== 2) return [];
+    return reachableCells(unit, this.units, STAGE0.enemyRouteMovement);
+  }
+
   planRouteEnemy(id: string): RouteMoveResult | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2) return undefined;
-    const path = routePath(unit, STAGE0.enemyExitCells, this.units, 5);
+    const path = routePath(unit, STAGE0.enemyExitCells, this.units, STAGE0.enemyRouteMovement);
     const destination = path.at(-1) ?? { x: unit.x, y: unit.y };
     return {
       path,

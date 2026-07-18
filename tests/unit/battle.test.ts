@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STAGE0 } from "../../src/game/content/stage0";
 import { Stage0Battle } from "../../src/game/simulation/battle";
-import { manhattan, movementCost, reachableCells } from "../../src/game/simulation/grid";
+import { manhattan, movementCost, positionKey, reachableCells, zoneOfControl } from "../../src/game/simulation/grid";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 
 function battleAtPlayableOpening(seed = 0x1234): Stage0Battle {
@@ -160,6 +160,40 @@ describe("stage 0 battle simulation", () => {
     expect(enemy).toMatchObject(movement.destination);
     expect(manhattan(enemy, STAGE0.enemyRouteTarget)).toBeLessThan(before);
     expect(battle.units.filter((unit) => unit.side === 1).map((unit) => unit.life)).toEqual(alliedLives);
+  });
+
+  it("plans every enemy route with the current allied zone of control", () => {
+    const battle = battleAtPlayableOpening();
+    const enemyIds = battle.units.filter((unit) => unit.side === 2).map((unit) => unit.id);
+
+    for (const enemyId of enemyIds) {
+      const enemy = battle.unit(enemyId);
+      if (!enemy) continue;
+      const controlled = zoneOfControl(enemy, battle.units);
+      const movement = battle.planRouteEnemy(enemyId);
+      expect(movement).toBeDefined();
+
+      // Starting inside ZOC is allowed, and entering ZOC may be the endpoint;
+      // no intermediate step may pass through a cell controlled by side 1.
+      for (const step of movement!.path.slice(1, -1)) {
+        expect(controlled.has(positionKey(step))).toBe(false);
+      }
+      battle.moveRouteEnemy(enemyId);
+    }
+  });
+
+  it("previews the same stage-specific movement budget used by enemy routing", () => {
+    const battle = battleAtPlayableOpening();
+    const enemy = battle.unit("2:41")!;
+    enemy.x = 21;
+    enemy.y = 19;
+    battle.units = [enemy];
+
+    const nativeClassRange = reachableCells(enemy, battle.units);
+    const stageRouteRange = battle.enemyMovementRange(enemy.id);
+
+    expect(stageRouteRange).toEqual(reachableCells(enemy, battle.units, STAGE0.enemyRouteMovement));
+    expect(stageRouteRange.length).toBeGreaterThan(nativeClassRange.length);
   });
 
   it("accepts all three staircase cells and evacuates during the route action", () => {

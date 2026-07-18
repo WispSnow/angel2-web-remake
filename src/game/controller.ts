@@ -205,12 +205,18 @@ export class GameController {
     }
 
     if (this.actionMode === "actionMenu") return;
+    if (this.actionMode === "enemyPreview") this.resetAction();
     if (!unit) {
       this.emit();
       return;
     }
     this.battle.focusId = unit.id;
-    if (unit.side === 1 && !unit.acted) {
+    if (unit.side === 2) {
+      this.selectedId = unit.id;
+      this.reachable = this.battle.enemyMovementRange(unit.id);
+      this.actionMode = "enemyPreview";
+      this.statusMessage = "紅色格為敵軍本次行動的可移動範圍；預覽不會改變戰鬥狀態。";
+    } else if (!unit.acted) {
       this.selectedId = unit.id;
       this.pendingOrigin = { x: unit.x, y: unit.y };
       this.pendingPath = undefined;
@@ -219,7 +225,7 @@ export class GameController {
       this.actionMode = "actionMenu";
       this.statusMessage = `選擇${unit.className}的行動。`;
     } else {
-      this.statusMessage = unit.side === 2 ? "敵軍正向宮殿出口撤離。" : "此單位本回合已行動。";
+      this.statusMessage = "此單位本回合已行動。";
     }
     this.emit();
   }
@@ -331,6 +337,8 @@ export class GameController {
       this.reachable = [];
       this.commandIndex = 0;
       this.actionMode = "actionMenu";
+    } else if (this.actionMode === "enemyPreview") {
+      this.resetAction();
     }
     this.statusMessage = "已返回上一層。";
     this.emit();
@@ -650,6 +658,7 @@ export class GameController {
       phase: this.phase,
       dialogueIndex: this.dialogueIndex,
       actionMode: this.actionMode,
+      selectedId: this.selectedId,
       commandMenuKind: this.commandMenuKind,
       commandIndex: this.commandIndex,
       commands: this.unitCommands.map((command) => ({ ...command })),

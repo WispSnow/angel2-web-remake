@@ -14,6 +14,7 @@ export const STAGE0 = {
   viewport: { width: 10, height: 7, initialOrigin: { x: 25, y: 23 } },
   opening: { from: { x: 10, y: 23 }, to: { x: 29, y: 26 }, budget: 50 },
   enemyRouteTarget: { x: 25, y: 47 },
+  enemyRouteMovement: 5,
   enemyExitCells: [{ x: 24, y: 47 }, { x: 25, y: 47 }, { x: 26, y: 47 }],
   objective: "清除瓦爾克麗宮內的敵人；擊倒或撤離均計入。",
   defeat: "妮雅戰敗。",

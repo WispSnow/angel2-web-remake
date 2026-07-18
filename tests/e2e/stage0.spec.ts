@@ -5,6 +5,7 @@ interface DebugState {
   phase: string;
   dialogueIndex: number;
   actionMode: string;
+  selectedId?: string;
   commandMenuKind: "initial" | "postMove";
   commandIndex: number;
   commands: Array<{ id: string; label: string }>;
@@ -123,6 +124,19 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await expect(page.getByTestId("unit-portrait")).toHaveCount(0);
   await expect(page.locator(".minimap-unit")).toHaveCount(16);
+
+  // Remake information assist: clicking an enemy previews the movement range
+  // used by its current stage behavior without opening a command menu.
+  await clickCanvas(page, 140, 177);
+  const enemyPreview = await debugState(page);
+  expect(enemyPreview).toMatchObject({ actionMode: "enemyPreview", selectedId: "2:45" });
+  expect(enemyPreview.reachable.length).toBeGreaterThan(1);
+  await expect(page.getByTestId("action-menu")).toBeHidden();
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-mode", "enemyPreview");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-cell-count", String(enemyPreview.reachable.length));
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-enemy-movement-preview.png" });
+  await clickCanvas(page, 420, 45);
+  expect((await debugState(page))).toMatchObject({ actionMode: "idle", reachable: [] });
 
   // Persistent text buttons are replaced by the native-style callable menu surface.
   await page.getByTestId("system-menu-button").click();

@@ -62,7 +62,11 @@ function search(
   return { costs, previous };
 }
 
-export function reachableCells(unit: BattleUnit, units: readonly BattleUnit[]): Position[] {
+export function reachableCells(
+  unit: BattleUnit,
+  units: readonly BattleUnit[],
+  movementBudget = unitStatsMovement(unit),
+): Position[] {
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
   const blocked = new Set(
     units
@@ -72,7 +76,7 @@ export function reachableCells(unit: BattleUnit, units: readonly BattleUnit[]): 
   const result = search(
     unit,
     unit.classId,
-    unitStatsMovement(unit),
+    movementBudget,
     blocked,
     zoneOfControl(unit, units),
   );

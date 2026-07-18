@@ -43,7 +43,7 @@ export type GamePhase =
   | "saveSlots"
   | "nextStage";
 
-export type ActionMode = "idle" | "move" | "moving" | "actionMenu" | "target";
+export type ActionMode = "idle" | "move" | "moving" | "actionMenu" | "target" | "enemyPreview";
 
 export interface AttackResult {
   attackerId: string;

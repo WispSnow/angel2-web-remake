@@ -132,6 +132,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           this.rangeGraphics.strokeRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
         }
       }
+      if (controller.actionMode === "enemyPreview") {
+        this.rangeGraphics.fillStyle(0xc92332, 0.34);
+        this.rangeGraphics.lineStyle(2, 0xffa08f, 0.9);
+        for (const cell of controller.reachable) {
+          this.rangeGraphics.fillRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
+          this.rangeGraphics.strokeRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
+        }
+      }
       if (controller.actionMode === "target") {
         this.rangeGraphics.fillStyle(0xe3212d, 0.46);
         this.rangeGraphics.lineStyle(3, 0xffef8a, 1);
@@ -266,6 +274,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.game.canvas.dataset.unitLifeLabelCount = String(active.size);
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);
         this.game.canvas.dataset.actedBadgeGeometry = "-22,-15,16,14";
+        this.game.canvas.dataset.rangeMode = controller.actionMode;
+        this.game.canvas.dataset.rangeCellCount = String(controller.reachable.length);
       }
     }
 
