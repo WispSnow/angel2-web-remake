@@ -1,6 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
+const EDGE_PAN_SETTLE_MS = 180;
+
 interface DebugState {
   phase: string;
   dialogueIndex: number;
@@ -115,6 +117,41 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-acted-badge-count")).toBe("0");
   await expect(page.getByTestId("unit-portrait")).toHaveCount(0);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-player.png" });
+
+  // Native mouse habit: entering a battle-frame edge pans immediately and
+  // staying there repeats, while the logical cursor and simulation stay put.
+  const battleCanvas = page.getByTestId("battle-canvas");
+  await battleCanvas.hover({ position: { x: 220, y: 177 } });
+  const edgePanBaseline = await debugState(page);
+  expect(edgePanBaseline).toMatchObject({
+    actionMode: "idle",
+    cursor: { x: 29, y: 26 },
+    cameraOrigin: { x: 25, y: 23 },
+  });
+  await battleCanvas.hover({ position: { x: 5, y: 177 } });
+  await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "-1,0");
+  await expect.poll(async () => (await debugState(page)).cameraOrigin.x).toBeLessThanOrEqual(23);
+  const edgePanned = await debugState(page);
+  expect(edgePanned.cursor).toEqual(edgePanBaseline.cursor);
+  expect(edgePanned.cameraOrigin.y).toBe(edgePanBaseline.cameraOrigin.y);
+  expect(edgePanned.selectedId).toBe(edgePanBaseline.selectedId);
+  expect(edgePanned.actionMode).toBe(edgePanBaseline.actionMode);
+  expect(edgePanned.units).toEqual(edgePanBaseline.units);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-mouse-edge-pan.png" });
+
+  const canvasBounds = await battleCanvas.boundingBox();
+  expect(canvasBounds).not.toBeNull();
+  await page.mouse.move(canvasBounds!.x + canvasBounds!.width + 8, canvasBounds!.y + 40);
+  await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "0,0");
+  const cameraAfterLeavingEdge = (await debugState(page)).cameraOrigin;
+  await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
+  expect((await debugState(page)).cameraOrigin).toEqual(cameraAfterLeavingEdge);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowRight");
+  expect((await debugState(page))).toMatchObject({
+    cursor: edgePanBaseline.cursor,
+    cameraOrigin: edgePanBaseline.cameraOrigin,
+  });
 
   // Hover alone replaces the live markers with the dimmed, overlaid unit detail.
   await page.getByTestId("battle-canvas").hover({ position: { x: 220, y: 177 } });

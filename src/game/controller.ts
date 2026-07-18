@@ -598,6 +598,23 @@ export class GameController {
     this.emit();
   }
 
+  panCamera(delta: Position): void {
+    if (
+      this.phase !== "player"
+      || this.systemMenuOpen
+      || this.objectiveOpen
+      || this.busy
+      || this.actionMode === "actionMenu"
+    ) return;
+    const next = {
+      x: Math.max(0, Math.min(STAGE0.width - STAGE0.viewport.width, this.cameraOrigin.x + delta.x)),
+      y: Math.max(0, Math.min(STAGE0.height - STAGE0.viewport.height, this.cameraOrigin.y + delta.y)),
+    };
+    if (positionKey(next) === positionKey(this.cameraOrigin)) return;
+    this.cameraOrigin = next;
+    this.emit();
+  }
+
   primaryAtCursor(): void {
     if (isStoryPhase(this.phase)) this.advanceDialogue();
     else if (this.systemMenuOpen || this.objectiveOpen) return;

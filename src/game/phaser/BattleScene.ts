@@ -5,6 +5,13 @@ import type { BattleUnit } from "../types";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
+const BATTLE_SURFACE_RIGHT = 480;
+const BATTLE_SURFACE_BOTTOM = 350;
+const BATTLE_INPUT_LEFT = 40;
+const BATTLE_INPUT_RIGHT = 433;
+const BATTLE_INPUT_TOP = 26;
+const BATTLE_INPUT_BOTTOM = 326;
+const EDGE_PAN_INTERVAL_MS = 110;
 
 const DIGIT_PATTERNS: Record<string, readonly string[]> = {
   "0": ["11111", "10001", "10011", "10101", "11001", "10001", "11111"],
@@ -32,6 +39,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private unitViews = new Map<string, UnitView>();
     private unsubscribe?: () => void;
+    private edgePan?: { x: number; y: number };
+    private nextEdgePanAt = 0;
+    private readonly handleCanvasPointerLeave = () => this.clearEdgePan();
 
     constructor() {
       super("battle");
@@ -52,26 +62,93 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.rangeGraphics = this.add.graphics().setDepth(2);
       this.cursorGraphics = this.add.graphics().setDepth(10);
       this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-        if (pointer.x < 40 || pointer.x >= 440 || pointer.y < 23 || pointer.y >= 331) return;
+        if (
+          pointer.x < BATTLE_INPUT_LEFT
+          || pointer.x >= BATTLE_INPUT_RIGHT
+          || pointer.y < BATTLE_INPUT_TOP
+          || pointer.y >= BATTLE_INPUT_BOTTOM
+        ) return;
         const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
         controller.selectCell({ x: Math.floor(world.x / TILE_WIDTH), y: Math.floor(world.y / TILE_HEIGHT) });
       });
-      this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
-        if (pointer.x < 40 || pointer.x >= 440 || pointer.y < 23 || pointer.y >= 331) return;
-        const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-        controller.focusCell({ x: Math.floor(world.x / TILE_WIDTH), y: Math.floor(world.y / TILE_HEIGHT) });
-      });
+      this.input.on("pointermove", this.handlePointerMove, this);
       this.unsubscribe = controller.onChange(() => this.sync());
       this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.publishMovementFrame, this);
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
         this.unsubscribe?.();
+        this.input.off("pointermove", this.handlePointerMove, this);
         this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.publishMovementFrame, this);
+        this.game.canvas.removeEventListener("pointerleave", this.handleCanvasPointerLeave);
+        this.clearEdgePan();
       });
       this.sync();
       const canvas = this.game.canvas;
+      canvas.addEventListener("pointerleave", this.handleCanvasPointerLeave);
       canvas.setAttribute("aria-label", "瓦爾克麗宮戰術地圖，使用滑鼠或方向鍵操作");
       canvas.setAttribute("role", "application");
       canvas.dataset.testid = "battle-canvas";
+      canvas.dataset.edgePanDirection = "0,0";
+    }
+
+    update(time: number): void {
+      if (!this.edgePan || time < this.nextEdgePanAt) return;
+      controller.panCamera(this.edgePan);
+      this.nextEdgePanAt = time + EDGE_PAN_INTERVAL_MS;
+    }
+
+    private handlePointerMove(pointer: Phaser.Input.Pointer): void {
+      const edgePan = this.edgePanFor(pointer);
+      if (edgePan) {
+        const changed = !this.edgePan || this.edgePan.x !== edgePan.x || this.edgePan.y !== edgePan.y;
+        this.edgePan = edgePan;
+        this.game.canvas.style.cursor = this.edgeCursor(edgePan);
+        this.game.canvas.dataset.edgePanDirection = `${edgePan.x},${edgePan.y}`;
+        if (changed) {
+          controller.panCamera(edgePan);
+          this.nextEdgePanAt = this.time.now + EDGE_PAN_INTERVAL_MS;
+        }
+        return;
+      }
+
+      this.clearEdgePan();
+      if (
+        pointer.x < BATTLE_INPUT_LEFT
+        || pointer.x >= BATTLE_INPUT_RIGHT
+        || pointer.y < BATTLE_INPUT_TOP
+        || pointer.y >= BATTLE_INPUT_BOTTOM
+      ) return;
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      controller.focusCell({ x: Math.floor(world.x / TILE_WIDTH), y: Math.floor(world.y / TILE_HEIGHT) });
+    }
+
+    private edgePanFor(pointer: Phaser.Input.Pointer): { x: number; y: number } | undefined {
+      if (
+        pointer.x < 0
+        || pointer.x >= BATTLE_SURFACE_RIGHT
+        || pointer.y < 0
+        || pointer.y >= BATTLE_SURFACE_BOTTOM
+      ) return undefined;
+      const x = pointer.x < BATTLE_INPUT_LEFT ? -1 : pointer.x >= BATTLE_INPUT_RIGHT ? 1 : 0;
+      const y = pointer.y < BATTLE_INPUT_TOP ? -1 : pointer.y >= BATTLE_INPUT_BOTTOM ? 1 : 0;
+      return x === 0 && y === 0 ? undefined : { x, y };
+    }
+
+    private edgeCursor(edgePan: { x: number; y: number }): string {
+      if (edgePan.x < 0 && edgePan.y < 0) return "nw-resize";
+      if (edgePan.x > 0 && edgePan.y < 0) return "ne-resize";
+      if (edgePan.x < 0 && edgePan.y > 0) return "sw-resize";
+      if (edgePan.x > 0 && edgePan.y > 0) return "se-resize";
+      if (edgePan.x < 0) return "w-resize";
+      if (edgePan.x > 0) return "e-resize";
+      return edgePan.y < 0 ? "n-resize" : "s-resize";
+    }
+
+    private clearEdgePan(): void {
+      this.edgePan = undefined;
+      this.nextEdgePanAt = 0;
+      const canvas = this.game.canvas;
+      canvas.style.cursor = "";
+      canvas.dataset.edgePanDirection = "0,0";
     }
 
     private publishMovementFrame(): void {
