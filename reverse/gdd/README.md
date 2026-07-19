@@ -40,6 +40,7 @@
 - `../notes/go-debug-symbols.md`：`GO.EXE` 的原始 Borland 符号。
 - `../notes/title-new-continue-flow.md`：标题、四项难度、五槽继续、共享状态与直接演出资源。
 - `../notes/title-presentations.md`：标题前 Logo、滚动开场、标题两套素材、空闲重播、难度/继续界面的逐帧与 RIX 时间轴。
+- `../notes/music-catalog.md`：`MUSIC/0..40` 功能目录、奇数入场/偶数循环协议、玩家/敌方逐关表及待实机曲目。
 - `../notes/say-command-semantics.md`：模块 25/29 剧情解释器、完整命令语义、窗口/肖像/文字/等待/RIX 时间轴及语料覆盖。
 - `../notes/error-and-outcome-presentations.md`：部署错误条、普通胜利/撤退/失败/退出窗口、逐字声、确认菜单和五槽胜利存档。
 - `../notes/native-timing.md`：九个发布运行模块的 PIT0、INT 08h、本地计数器与 10 ms Web 逻辑 tick 契约。

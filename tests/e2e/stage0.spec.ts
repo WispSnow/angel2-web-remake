@@ -840,7 +840,10 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
 
   await enterPlayableBattle();
   await attackFirstForcedTarget();
-  await page.waitForFunction(() => !window.__ANGEL2__?.getState().combatPresentation);
+  // The attack submits the last manual ally and asynchronously starts the
+  // enemy route phase. Compare both presentation modes at the same stable
+  // round boundary instead of racing different animation durations.
+  await waitForPhase(page, "round2Story");
   const mapResolved = await debugState(page);
 
   await enterPlayableBattle();
@@ -860,7 +863,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-damage-number")).toBeVisible();
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-damage.png" });
 
-  await page.waitForFunction(() => !window.__ANGEL2__?.getState().combatPresentation);
+  await waitForPhase(page, "round2Story");
   const fullResolved = await debugState(page);
   expect(fullResolved.lastCombat).toEqual(mapResolved.lastCombat);
   expect(fullResolved.rngState).toBe(mapResolved.rngState);
@@ -1080,11 +1083,12 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await expect(page.getByTestId("save-yes")).toHaveText("確 定");
 });
 
-test("S00-P: stage zero switches from prebattle RIX to looping battle music and honors the music toggle", async ({ page }) => {
+test("S00-P: stage zero uses native entry-to-loop music pairs and honors the music toggle", async ({ page }) => {
   const app = page.locator("#app");
-  const battleRequests: string[] = [];
+  const battleRequests = new Set<string>();
   page.on("request", (request) => {
-    if (request.url().endsWith("/assets/original/battle-stage0.wav")) battleRequests.push(request.url());
+    const match = request.url().match(/\/assets\/original\/(battle-stage0-[^?]+\.wav)/);
+    if (match) battleRequests.add(match[1]);
   });
 
   await page.goto("/?test=1");
@@ -1098,14 +1102,32 @@ test("S00-P: stage zero switches from prebattle RIX to looping battle music and 
 
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
-  await expect(app).toHaveAttribute("data-music-track", "MUSIC/29");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/7");
   await expect(app).toHaveAttribute("data-music-playing", "true");
-  await expect(app).toHaveAttribute("data-music-loop", "true");
-  expect(battleRequests.length).toBeGreaterThan(0);
+  await expect(app).toHaveAttribute("data-music-loop", "false");
+  expect(battleRequests.has("battle-stage0-player-entry.wav")).toBe(true);
 
   await page.keyboard.press("m");
-  await expect(app).toHaveAttribute("data-music-track", "MUSIC/29");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/7");
   await expect(app).toHaveAttribute("data-music-playing", "false");
   await page.keyboard.press("m");
   await expect(app).toHaveAttribute("data-music-playing", "true");
+
+  // MUSIC/7 is a 7.85 second non-looping entry. Its ended event must hand
+  // playback to the 62.7 second MUSIC/6 loop without advancing game state.
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/6", { timeout: 10_000 });
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+  await expect(app).toHaveAttribute("data-music-loop", "true");
+  expect(battleRequests.has("battle-stage0-player-loop.wav")).toBe(true);
+  expect((await debugState(page)).phase).toBe("openingStory");
+
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await page.keyboard.press("Tab");
+  await page.getByTestId("group-command-allRest").click();
+  await waitForPhase(page, "enemy");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/5");
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+  await expect(app).toHaveAttribute("data-music-loop", "false");
+  expect(battleRequests.has("battle-stage0-enemy-entry.wav")).toBe(true);
 });

@@ -3,18 +3,34 @@ import type { GameController } from "./controller";
 import type { GamePhase } from "./types";
 
 interface MusicTrack {
-  key: "MAGIC/73" | "MUSIC/29";
+  key: "MAGIC/73" | "MUSIC/4" | "MUSIC/5" | "MUSIC/6" | "MUSIC/7";
   audio: HTMLAudioElement;
 }
 
-const isBattleMusicPhase = (phase: GamePhase): boolean => phase !== "prebattleStory"
-  && phase !== "quit"
-  && phase !== "nextStage";
+type BattleMusicSide = "player" | "enemy";
+type BattleMusicPart = "entry" | "loop";
+
+const playerMusicPhases = new Set<GamePhase>([
+  "scriptedMove",
+  "openingStory",
+  "player",
+  "allyAuto",
+  "round2Story",
+]);
+
+const battleMusicSide = (phase: GamePhase): BattleMusicSide | undefined => {
+  if (playerMusicPhases.has(phase)) return "player";
+  if (phase === "enemy") return "enemy";
+  return undefined;
+};
 
 export class AudioManager {
   private unlocked = false;
+  private previousPhase: GamePhase;
   private previousCueSequence = 0;
   private activeMusic?: MusicTrack;
+  private activeBattleSide?: BattleMusicSide;
+  private activeBattlePart: BattleMusicPart = "entry";
   private musicPlaying = false;
   private musicPlayPending = false;
   private musicRequestSequence = 0;
@@ -22,18 +38,35 @@ export class AudioManager {
     key: "MAGIC/73",
     audio: new Audio(ASSETS.audio.story),
   };
-  private readonly battleMusic: MusicTrack = {
-    key: "MUSIC/29",
-    audio: new Audio(ASSETS.audio.battle),
+  private readonly playerBattleEntry: MusicTrack = {
+    key: "MUSIC/7",
+    audio: new Audio(ASSETS.audio.playerBattleEntry),
+  };
+  private readonly playerBattleLoop: MusicTrack = {
+    key: "MUSIC/6",
+    audio: new Audio(ASSETS.audio.playerBattleLoop),
+  };
+  private readonly enemyBattleEntry: MusicTrack = {
+    key: "MUSIC/5",
+    audio: new Audio(ASSETS.audio.enemyBattleEntry),
+  };
+  private readonly enemyBattleLoop: MusicTrack = {
+    key: "MUSIC/4",
+    audio: new Audio(ASSETS.audio.enemyBattleLoop),
   };
 
   constructor(private readonly controller: GameController, private readonly root: HTMLElement) {
-    for (const track of [this.storyMusic, this.battleMusic]) {
-      track.audio.loop = true;
+    this.previousPhase = controller.phase;
+    const loopingTracks = [this.storyMusic, this.playerBattleLoop, this.enemyBattleLoop];
+    const entryTracks = [this.playerBattleEntry, this.enemyBattleEntry];
+    for (const track of [...loopingTracks, ...entryTracks]) {
+      track.audio.loop = loopingTracks.includes(track);
       track.audio.volume = 0.32;
       track.audio.preload = "auto";
     }
-    this.updateMusicDebugState(this.musicForPhase());
+    this.playerBattleEntry.audio.addEventListener("ended", () => this.completeBattleEntry("player"));
+    this.enemyBattleEntry.audio.addEventListener("ended", () => this.completeBattleEntry("enemy"));
+    this.updateMusicDebugState(this.musicForPhase(undefined));
     root.addEventListener("pointerdown", () => this.unlock(), { capture: true });
     root.addEventListener("click", (event) => {
       if ((event.target as Element).closest("button,[data-testid=tactical-minimap]")) {
@@ -67,7 +100,18 @@ export class AudioManager {
   }
 
   private syncMusic(): void {
-    const desired = this.musicForPhase();
+    const side = battleMusicSide(this.controller.phase);
+    const previousSide = battleMusicSide(this.previousPhase);
+    if (side && side !== previousSide) {
+      this.activeBattleSide = side;
+      this.activeBattlePart = "entry";
+    }
+    else if (this.controller.phase === "prebattleStory") {
+      this.activeBattleSide = undefined;
+      this.activeBattlePart = "entry";
+    }
+
+    const desired = this.musicForPhase(side);
     if (desired !== this.activeMusic) {
       this.stopActiveMusic(true);
       this.activeMusic = desired;
@@ -76,11 +120,13 @@ export class AudioManager {
     if (!desired || !this.unlocked || !this.controller.musicEnabled) {
       this.stopActiveMusic(false);
       this.updateMusicDebugState(desired);
+      this.previousPhase = this.controller.phase;
       return;
     }
 
     if (this.musicPlaying || this.musicPlayPending) {
       this.updateMusicDebugState(desired);
+      this.previousPhase = this.controller.phase;
       return;
     }
 
@@ -102,12 +148,31 @@ export class AudioManager {
       this.musicPlaying = false;
       this.updateMusicDebugState(desired);
     });
+    this.previousPhase = this.controller.phase;
   }
 
-  private musicForPhase(): MusicTrack | undefined {
+  private musicForPhase(side: BattleMusicSide | undefined): MusicTrack | undefined {
     if (this.controller.phase === "prebattleStory") return this.storyMusic;
-    if (isBattleMusicPhase(this.controller.phase)) return this.battleMusic;
-    return undefined;
+    if (side === "player") {
+      return this.activeBattlePart === "entry" ? this.playerBattleEntry : this.playerBattleLoop;
+    }
+    if (side === "enemy") {
+      return this.activeBattlePart === "entry" ? this.enemyBattleEntry : this.enemyBattleLoop;
+    }
+    if (this.controller.phase === "quit" || this.controller.phase === "nextStage") return undefined;
+    return this.activeMusic;
+  }
+
+  private completeBattleEntry(side: BattleMusicSide): void {
+    if (
+      this.activeBattleSide !== side
+      || this.activeBattlePart !== "entry"
+      || battleMusicSide(this.controller.phase) !== side
+    ) return;
+    this.activeBattlePart = "loop";
+    this.musicPlaying = false;
+    this.musicPlayPending = false;
+    this.syncMusic();
   }
 
   private stopActiveMusic(reset: boolean): void {
