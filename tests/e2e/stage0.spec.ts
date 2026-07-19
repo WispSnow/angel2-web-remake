@@ -18,6 +18,11 @@ interface DebugState {
   groupLeaderId?: string;
   retreatConfirmOpen: boolean;
   retreatConfirmIndex: number;
+  musicEnabled: boolean;
+  soundEnabled: boolean;
+  speechEnabled: boolean;
+  rngState: number;
+  minimapPreviewOrigin?: { x: number; y: number };
   round: number;
   cursor: { x: number; y: number };
   cameraOrigin: { x: number; y: number };
@@ -350,9 +355,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("unit-command-move").click();
   expect((await debugState(page)).actionMode).toBe("move");
   expect((await debugState(page)).reachable.length).toBeGreaterThan(1);
-  await page.keyboard.press("Escape");
+  await page.keyboard.press("Enter");
   expect((await debugState(page)).actionMode).toBe("actionMenu");
-  await page.keyboard.press("Escape");
+  await page.keyboard.press("Enter");
   await clickCanvas(page, 180, 133);
   expect((await debugState(page)).actionMode).toBe("actionMenu");
   await page.getByTestId("unit-command-move").click();
@@ -404,10 +409,10 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?test=1");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press(" ");
   expect((await debugState(page)).dialogueIndex).toBe(0);
   await expect(page.locator("#dialogue-text")).toContainText("寬廣走廊");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press(" ");
   expect((await debugState(page)).dialogueIndex).toBe(1);
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
@@ -423,16 +428,40 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
 
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toBeVisible();
-  await page.keyboard.press("Escape");
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("objective-panel")).toBeHidden();
 
+  const inputBaseline = await debugState(page);
+  await page.keyboard.press("w");
+  await page.keyboard.press("z");
+  await page.keyboard.press("a");
+  await page.keyboard.press("s");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("PageDown");
+  expect((await debugState(page)).cursor).toEqual(inputBaseline.cursor);
+
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("group-command-menu")).toBeHidden();
+
+  await page.keyboard.press("F4");
+  await expect(page.getByTestId("retreat-confirm")).toBeVisible();
   await page.keyboard.press("Enter");
+  await expect(page.getByTestId("retreat-confirm")).toBeHidden();
+
+  await page.keyboard.press("e");
+  expect((await debugState(page)).soundEnabled).toBe(!inputBaseline.soundEnabled);
+  await page.keyboard.press("m");
+  expect((await debugState(page)).musicEnabled).toBe(!inputBaseline.musicEnabled);
+
+  await page.keyboard.press(" ");
   await expect(page.getByTestId("action-menu")).toBeVisible();
   expect((await debugState(page))).toMatchObject({ actionMode: "actionMenu", commandIndex: 0 });
   await page.keyboard.press("ArrowDown");
   expect((await debugState(page)).commandIndex).toBe(1);
   await expect(page.getByTestId("unit-command-attack")).toHaveAttribute("aria-current", "true");
-  await page.keyboard.press("Escape");
+  await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 220, y: 177 } });
   await expect(page.getByTestId("action-menu")).toBeHidden();
 
   const dimensions = await page.getByTestId("battle-canvas").evaluate((canvas) => ({
@@ -462,7 +491,7 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
 
   await page.evaluate(() => window.__ANGEL2__?.forceEvacuationSetup());
   expect((await debugState(page)).units.filter((unit) => unit.side === 2)).toHaveLength(1);
-  await page.getByTestId("all-rest-hotspot").click();
+  await page.keyboard.press("F1");
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "enemy");
   const enemyMovement = (await debugState(page)).movementPresentation!;
   expect(enemyMovement.path.length).toBeGreaterThan(1);
@@ -517,7 +546,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await waitForPhase(page, "player");
   await openSystemMenu(page);
   await page.getByTestId("group-commands-button").click();
-  await page.getByTestId("group-command-freeAction").click();
+  await page.keyboard.press("F3");
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.some((unit) => unit.side === 1 && unit.acted)).toBe(true);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-free-action.png" });
@@ -525,7 +554,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await enterPlayerPhase();
   await openSystemMenu(page);
   await page.getByTestId("group-commands-button").click();
-  await page.getByTestId("group-command-followLeader").click();
+  await page.keyboard.press("F2");
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "allyAuto");
@@ -536,4 +565,40 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
       + Math.abs(alliedMovement.path[index - 1].y - alliedMovement.path[index].y)).toBe(1);
   }
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-follow-leader.png" });
+});
+
+test("S00-H: minimap hover previews and primary click relocates the native viewport", async ({ page }) => {
+  await page.goto("/?test=1");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await clickCanvas(page, 420, 45);
+  await expect(page.getByTestId("tactical-minimap")).toBeVisible();
+
+  const baseline = await debugState(page);
+  const minimap = page.getByTestId("tactical-minimap");
+  await minimap.hover({ position: { x: 121, y: 121 } });
+  await expect(page.getByTestId("minimap-preview")).toBeVisible();
+  expect((await debugState(page)).minimapPreviewOrigin).toEqual({ x: 36, y: 37 });
+  await expect(page.getByTestId("minimap-preview")).toHaveAttribute("style", /left: 108px; top: 111px/);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-minimap-hover-preview.png" });
+
+  await minimap.click({ position: { x: 121, y: 121 } });
+  const relocated = await debugState(page);
+  expect(relocated.cameraOrigin).toEqual({ x: 36, y: 37 });
+  expect(relocated.cursor).toEqual({ x: 40, y: 40 });
+  expect(relocated.minimapPreviewOrigin).toBeUndefined();
+  expect(relocated.units).toEqual(baseline.units);
+  expect(relocated.rngState).toBe(baseline.rngState);
+
+  await page.getByTestId("tactical-minimap").hover({ position: { x: 2, y: 2 } });
+  expect((await debugState(page)).minimapPreviewOrigin).toEqual({ x: 0, y: 0 });
+  await page.getByTestId("tactical-minimap").click({ position: { x: 2, y: 2 } });
+  expect((await debugState(page))).toMatchObject({
+    cameraOrigin: { x: 0, y: 0 },
+    cursor: { x: 4, y: 3 },
+    units: baseline.units,
+    rngState: baseline.rngState,
+  });
 });

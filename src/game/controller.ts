@@ -58,6 +58,7 @@ export class GameController {
   commandIndex = 0;
   cursor: Position = { x: 29, y: 26 };
   cameraOrigin: Position = { x: 25, y: 23 };
+  minimapPreviewOrigin?: Position;
   reachable: Position[] = [];
   targets: Position[] = [];
   objectiveOpen = false;
@@ -445,6 +446,7 @@ export class GameController {
     this.pendingPath = undefined;
     this.reachable = [];
     this.targets = [];
+    this.minimapPreviewOrigin = undefined;
   }
 
   openGroupCommands(): void {
@@ -456,6 +458,7 @@ export class GameController {
       || this.actionMode !== "idle"
     ) return;
     this.systemMenuOpen = false;
+    this.minimapPreviewOrigin = undefined;
     this.groupCommandIndex = 0;
     this.groupCommandOpen = true;
     this.statusMessage = "選擇集體命令。";
@@ -690,6 +693,7 @@ export class GameController {
     if (this.busy || !["player", "enemy"].includes(this.phase)) return;
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
+    this.minimapPreviewOrigin = undefined;
     this.objectiveOpen = true;
     this.markHintSeen();
     this.emit();
@@ -709,6 +713,7 @@ export class GameController {
       || this.retreatConfirmOpen
       || this.actionMode !== "idle"
     ) return;
+    this.minimapPreviewOrigin = undefined;
     this.systemMenuOpen = true;
     this.emit();
   }
@@ -717,6 +722,13 @@ export class GameController {
     if (!this.systemMenuOpen) return;
     this.systemMenuOpen = false;
     this.emit();
+  }
+
+  systemAction(): void {
+    if (this.systemMenuOpen) this.closeSystemMenu();
+    else if (this.phase === "player" && !this.busy && !this.objectiveOpen && !this.groupCommandOpen && !this.retreatConfirmOpen) {
+      this.openSystemMenu();
+    }
   }
 
   secondaryAction(): void {
@@ -858,6 +870,7 @@ export class GameController {
       if (delta.y !== 0) this.moveCommandSelection(delta.y);
       return;
     }
+    this.minimapPreviewOrigin = undefined;
     this.cursor = {
       x: Math.max(0, Math.min(STAGE0.width - 1, this.cursor.x + delta.x)),
       y: Math.max(0, Math.min(STAGE0.height - 1, this.cursor.y + delta.y)),
@@ -881,7 +894,39 @@ export class GameController {
       y: Math.max(0, Math.min(STAGE0.height - STAGE0.viewport.height, this.cameraOrigin.y + delta.y)),
     };
     if (positionKey(next) === positionKey(this.cameraOrigin)) return;
+    this.minimapPreviewOrigin = undefined;
     this.cameraOrigin = next;
+    this.emit();
+  }
+
+  previewMinimapCell(position: Position): Position | undefined {
+    if (
+      this.phase !== "player"
+      || this.actionMode !== "idle"
+      || this.busy
+      || this.systemMenuOpen
+      || this.objectiveOpen
+      || this.groupCommandOpen
+      || this.retreatConfirmOpen
+    ) return undefined;
+    this.minimapPreviewOrigin = {
+      x: Math.max(0, Math.min(STAGE0.width - STAGE0.viewport.width, position.x - 4)),
+      y: Math.max(0, Math.min(STAGE0.height - STAGE0.viewport.height, position.y - 3)),
+    };
+    return { ...this.minimapPreviewOrigin };
+  }
+
+  clearMinimapPreview(): void {
+    this.minimapPreviewOrigin = undefined;
+  }
+
+  commitMinimapPreview(): void {
+    if (!this.minimapPreviewOrigin) return;
+    const origin = { ...this.minimapPreviewOrigin };
+    this.cameraOrigin = origin;
+    this.cursor = { x: origin.x + 4, y: origin.y + 3 };
+    this.battle.focusId = this.battle.unitAt(this.cursor)?.id ?? this.battle.focusId;
+    this.minimapPreviewOrigin = undefined;
     this.emit();
   }
 
@@ -953,8 +998,12 @@ export class GameController {
       commands: this.unitCommands.map((command) => ({ ...command })),
       cursor: { ...this.cursor },
       cameraOrigin: this.cameraOrigin,
+      minimapPreviewOrigin: this.minimapPreviewOrigin ? { ...this.minimapPreviewOrigin } : undefined,
       objectiveOpen: this.objectiveOpen,
       systemMenuOpen: this.systemMenuOpen,
+      musicEnabled: this.musicEnabled,
+      soundEnabled: this.soundEnabled,
+      speechEnabled: this.speechEnabled,
       groupCommandOpen: this.groupCommandOpen,
       groupCommandIndex: this.groupCommandIndex,
       groupCommands: GROUP_COMMANDS.map((command) => ({ ...command })),

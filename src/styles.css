@@ -115,11 +115,13 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .hud-tactical { position: absolute; left: -4px; top: -4px; width: 160px; height: 315px; overflow: hidden; }
 .tactical-panel-art { position: absolute; left: 0; top: 0; width: 160px; height: 149px; image-rendering: pixelated; }
 .tactical-minimap { position: absolute; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: pixelated; }
+.hud-tactical:not(.under-unit) .tactical-minimap { pointer-events: auto; cursor: crosshair; }
 .tactical-minimap > img { position: absolute; inset: 0; width: 150px; height: 150px; }
 .minimap-viewport { position: absolute; z-index: 1; width: 30px; height: 21px; border: 1px solid #000; box-shadow: 0 0 0 1px #b99b73; }
 .minimap-unit { position: absolute; z-index: 2; width: 4px; height: 4px; border: 1px solid #000; background: #fff; }
 .minimap-unit.side-1 { background: #ba61ff; }
 .minimap-unit.side-2 { background: #ef2024; }
+.minimap-preview { position: absolute; z-index: 3; width: 30px; height: 21px; border: 1px solid #fff; box-shadow: 0 0 0 1px #222, inset 0 0 0 1px #cfcfcf; pointer-events: none; }
 
 .system-menu button, .action-menu button, .modal-panel button, .dialogue-controls button {
   border: 1px solid #d4a62d;

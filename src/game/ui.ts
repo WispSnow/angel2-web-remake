@@ -1,6 +1,6 @@
 import { ASSETS, STAGE0, nextExperienceThresholdFor } from "./content/stage0";
 import type { GameController } from "./controller";
-import type { GamePhase, UnitStats } from "./types";
+import type { GamePhase, Position, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
 import { animatedPortraitMarkup, configureAnimatedPortrait, startPortraitBlinking } from "./portrait";
 
@@ -145,6 +145,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   };
 
   root.addEventListener("click", (event) => {
+    const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
+    if (minimap) {
+      controller.commitMinimapPreview();
+      return;
+    }
     const button = (event.target as Element).closest<HTMLElement>("[data-action]");
     if (!button) return;
     const action = button.dataset.action;
@@ -192,17 +197,78 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (retreatChoice) controller.selectRetreatChoice(Number(retreatChoice.dataset.retreatIndex));
   });
 
+  root.addEventListener("pointermove", (event) => {
+    const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
+    if (!minimap) {
+      if (controller.minimapPreviewOrigin) controller.clearMinimapPreview();
+      return;
+    }
+    const bounds = minimap.getBoundingClientRect();
+    const cell = {
+      x: Math.max(0, Math.min(STAGE0.width - 1, Math.floor((event.clientX - bounds.left) * STAGE0.width / bounds.width))),
+      y: Math.max(0, Math.min(STAGE0.height - 1, Math.floor((event.clientY - bounds.top) * STAGE0.height / bounds.height))),
+    };
+    const origin = controller.previewMinimapCell(cell);
+    const preview = minimap.querySelector<HTMLElement>("[data-testid=minimap-preview]");
+    if (!preview || !origin) return;
+    preview.hidden = false;
+    preview.style.left = `${origin.x * 3}px`;
+    preview.style.top = `${origin.y * 3}px`;
+  });
+
+  root.addEventListener("pointerout", (event) => {
+    const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
+    if (!minimap || (event.relatedTarget instanceof Node && minimap.contains(event.relatedTarget))) return;
+    controller.clearMinimapPreview();
+    const preview = minimap.querySelector<HTMLElement>("[data-testid=minimap-preview]");
+    if (preview) preview.hidden = true;
+  });
+
+  root.addEventListener("contextmenu", (event) => {
+    if (!(event.target as Element).closest("#logical-screen")) return;
+    event.preventDefault();
+    if (!(event.target instanceof HTMLCanvasElement)) controller.secondaryAction();
+  });
+
   window.addEventListener("keydown", (event) => {
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", " ", "Escape"].includes(event.key)) event.preventDefault();
-    if (event.key === "ArrowLeft") controller.moveCursor({ x: -1, y: 0 });
-    else if (event.key === "ArrowRight") controller.moveCursor({ x: 1, y: 0 });
-    else if (event.key === "ArrowUp") controller.moveCursor({ x: 0, y: -1 });
-    else if (event.key === "ArrowDown") controller.moveCursor({ x: 0, y: 1 });
-    else if (event.key === "Enter" || event.key === " ") {
+    const key = event.key;
+    const lower = key.toLowerCase();
+    const navigation: Record<string, Position> = {
+      ArrowUp: { x: 0, y: -1 },
+      w: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+      z: { x: 0, y: 1 },
+      ArrowLeft: { x: -1, y: 0 },
+      a: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+      s: { x: 1, y: 0 },
+      Home: { x: -1, y: -1 },
+      PageUp: { x: 1, y: -1 },
+      End: { x: -1, y: 1 },
+      PageDown: { x: 1, y: 1 },
+    };
+    const delta = navigation[key] ?? navigation[lower];
+    const handled = Boolean(delta)
+      || ["Control", "Insert", " ", "Alt", "Delete", "Enter", "Escape", "Tab", "F1", "F2", "F3", "F4"].includes(key)
+      || lower === "e"
+      || lower === "m"
+      || lower === "o";
+    if (handled) event.preventDefault();
+    if (delta) controller.moveCursor(delta);
+    else if (event.repeat) return;
+    else if (key === "Control" || key === "Insert" || key === " ") {
       if (!finishDialogueTyping()) controller.primaryAtCursor();
     }
-    else if (event.key === "Escape") controller.secondaryAction();
-    else if (event.key.toLowerCase() === "o") controller.objectiveOpen ? controller.closeObjectives() : controller.openObjectives();
+    else if (key === "Alt" || key === "Delete" || key === "Enter") controller.secondaryAction();
+    else if (key === "Escape") controller.systemAction();
+    else if (key === "Tab") controller.groupCommandOpen ? controller.closeGroupCommands() : controller.openGroupCommands();
+    else if (key === "F1") void controller.allRest();
+    else if (key === "F2") void controller.followLeader();
+    else if (key === "F3") void controller.freeAction();
+    else if (key === "F4") controller.requestRetreat();
+    else if (lower === "e") controller.toggleSound();
+    else if (lower === "m") controller.toggleMusic();
+    else if (lower === "o") controller.objectiveOpen ? controller.closeObjectives() : controller.openObjectives();
   });
 
   const render = () => {
@@ -370,9 +436,10 @@ function renderTactical(controller: GameController, underUnit = false): string {
   return `
     <div class="hud-tactical${underUnit ? " under-unit" : ""}" data-testid="tactical-hud" aria-label="戰術輔助與即時小地圖">
       <img class="tactical-panel-art" src="${ASSETS.tacticalPanel}" alt="戰術桌、卷軸與照明器具" />
-      <div class="tactical-minimap" aria-label="第 0 關即時小地圖">
+      <div class="tactical-minimap" data-testid="tactical-minimap" aria-label="第 0 關即時小地圖">
         <img src="${ASSETS.minimap}" alt="" />
         ${underUnit ? "" : `<span class="minimap-viewport" style="left:${viewport.x * 3}px;top:${viewport.y * 3}px" aria-hidden="true"></span>`}
+        ${underUnit ? "" : `<span class="minimap-preview" data-testid="minimap-preview" aria-hidden="true" hidden></span>`}
         ${markers}
       </div>
     </div>`;

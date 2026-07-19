@@ -62,6 +62,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.rangeGraphics = this.add.graphics().setDepth(2);
       this.cursorGraphics = this.add.graphics().setDepth(10);
       this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+        if (pointer.button === 2) {
+          controller.secondaryAction();
+          return;
+        }
+        if (pointer.button !== 0) return;
         if (
           pointer.x < BATTLE_INPUT_LEFT
           || pointer.x >= BATTLE_INPUT_RIGHT
