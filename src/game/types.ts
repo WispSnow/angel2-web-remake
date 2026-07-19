@@ -57,11 +57,24 @@ export interface AttackResult {
   experienceGained: number;
 }
 
-export interface DialoguePage {
-  slot: "upper" | "lower";
+export interface DialogueWindowState {
   portrait?: PortraitRecord;
   speaker?: string;
   text: string;
+}
+
+export interface DialoguePage {
+  /** The native KY checkpoint that is currently accepting primary input. */
+  activeSlot?: "upper" | "lower";
+  /** Both native windows are independent and may remain open together. */
+  upper?: DialogueWindowState;
+  lower?: DialogueWindowState;
+  /** Characters already present before an appended line starts typing. */
+  revealStart?: number;
+  source: {
+    record: 0 | 1 | 2 | 3;
+    wait: number;
+  };
 }
 
 export interface SaveData {

@@ -66,10 +66,21 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <section class="combat-presentation" id="combat-presentation" data-testid="combat-presentation" hidden></section>
             <button class="hint-toast" id="hint-toast" data-action="objectives" hidden></button>
             <section class="dialogue-layer" id="dialogue-layer" data-testid="dialogue-layer" hidden>
-              <div class="dialogue-box" id="dialogue-box">
-                <span class="animated-portrait dialogue-portrait" id="dialogue-portrait"
-                  data-testid="dialogue-portrait-composite" data-blink-frame="1" data-blink-count="0" hidden></span>
-                <div class="dialogue-copy"><b id="dialogue-speaker"></b><p id="dialogue-text"></p><span class="continue-mark">▼</span></div>
+              <div class="dialogue-box upper" id="dialogue-box-upper" data-testid="dialogue-window-upper" hidden>
+                <span class="animated-portrait dialogue-portrait" id="dialogue-portrait-upper"
+                  data-portrait-channel="dialogue-upper" data-blink-frame="1" data-blink-count="0" hidden></span>
+                <div class="dialogue-copy">
+                  <b class="dialogue-speaker" id="dialogue-speaker-upper"></b>
+                  <p id="dialogue-text-upper"></p><span class="continue-mark">▼</span>
+                </div>
+              </div>
+              <div class="dialogue-box lower" id="dialogue-box-lower" data-testid="dialogue-window-lower" hidden>
+                <span class="animated-portrait dialogue-portrait" id="dialogue-portrait-lower"
+                  data-portrait-channel="dialogue-lower" data-blink-frame="1" data-blink-count="0" hidden></span>
+                <div class="dialogue-copy">
+                  <b class="dialogue-speaker" id="dialogue-speaker-lower"></b>
+                  <p id="dialogue-text-lower"></p><span class="continue-mark">▼</span>
+                </div>
               </div>
               <div class="dialogue-controls">
                 <button data-action="advance-dialogue" data-testid="advance-dialogue">繼續</button>
@@ -96,10 +107,20 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const combatPresentation = required(root, "#combat-presentation");
   const hint = required(root, "#hint-toast");
   const dialogueLayer = required(root, "#dialogue-layer");
-  const dialogueBox = required(root, "#dialogue-box");
-  const dialoguePortrait = required(root, "#dialogue-portrait");
-  const dialogueSpeaker = required(root, "#dialogue-speaker");
-  const dialogueText = required(root, "#dialogue-text");
+  const dialogueWindows = {
+    upper: {
+      box: required(root, "#dialogue-box-upper"),
+      portrait: required(root, "#dialogue-portrait-upper"),
+      speaker: required(root, "#dialogue-speaker-upper"),
+      text: required(root, "#dialogue-text-upper"),
+    },
+    lower: {
+      box: required(root, "#dialogue-box-lower"),
+      portrait: required(root, "#dialogue-portrait-lower"),
+      speaker: required(root, "#dialogue-speaker-lower"),
+      text: required(root, "#dialogue-text-lower"),
+    },
+  };
   const storyBackground = required(root, "#story-background");
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
@@ -110,37 +131,39 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let activeDialogueKey = "";
   let dialogueFullText = "";
   let revealedCharacters = 0;
+  let activeDialogueText: HTMLElement | undefined;
   startPortraitBlinking(root, controller.isTestMode);
 
   const stopDialogueTimer = () => {
     if (dialogueTimer !== undefined) globalThis.clearTimeout(dialogueTimer);
     dialogueTimer = undefined;
   };
-  const revealDialogue = (fullText: string, key: string) => {
+  const revealDialogue = (fullText: string, key: string, target: HTMLElement, revealStart = 0) => {
     stopDialogueTimer();
     activeDialogueKey = key;
     dialogueFullText = fullText;
-    revealedCharacters = 0;
-    dialogueText.textContent = "";
+    activeDialogueText = target;
+    revealedCharacters = Math.max(0, Math.min(fullText.length, revealStart));
+    target.textContent = fullText.slice(0, revealedCharacters);
     const tick = () => {
-      if (activeDialogueKey !== key || revealedCharacters >= dialogueFullText.length) {
+      if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
         dialogueTimer = undefined;
         return;
       }
       const character = dialogueFullText[revealedCharacters];
       revealedCharacters += 1;
-      dialogueText.textContent = dialogueFullText.slice(0, revealedCharacters);
+      target.textContent = dialogueFullText.slice(0, revealedCharacters);
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
-      const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      dialogueTimer = globalThis.setTimeout(tick, controller.presentationFast || reducedMotion ? 12 : 80);
+      const delay = controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80;
+      dialogueTimer = globalThis.setTimeout(tick, delay);
     };
     tick();
   };
   const finishDialogueTyping = (): boolean => {
-    if (!dialogueFullText || revealedCharacters >= dialogueFullText.length) return false;
+    if (!dialogueFullText || !activeDialogueText || revealedCharacters >= dialogueFullText.length) return false;
     stopDialogueTimer();
     revealedCharacters = dialogueFullText.length;
-    dialogueText.textContent = dialogueFullText;
+    activeDialogueText.textContent = dialogueFullText;
     return true;
   };
 
@@ -151,7 +174,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       return;
     }
     const button = (event.target as Element).closest<HTMLElement>("[data-action]");
-    if (!button) return;
+    if (!button) {
+      if ((event.target as Element).closest("#dialogue-layer")) {
+        if (!finishDialogueTyping()) controller.advanceDialogue();
+      }
+      return;
+    }
     const action = button.dataset.action;
     if (action === "advance-dialogue") {
       if (!finishDialogueTyping()) controller.advanceDialogue();
@@ -341,25 +369,57 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     storyBackground.hidden = controller.phase !== "prebattleStory";
     if (page) {
       const pageKey = `${controller.phase}:${controller.dialogueIndex}`;
-      dialogueBox.className = `dialogue-box ${page.slot}`;
-      dialogueSpeaker.textContent = page.speaker ?? "";
-      dialogueSpeaker.hidden = !page.speaker;
-      if (page.portrait) {
-        configureAnimatedPortrait(
-          dialoguePortrait,
-          page.portrait,
-          `${page.speaker ?? "角色"}肖像`,
-          "dialogue",
-          "dialogue-portrait",
-        );
-        dialoguePortrait.hidden = false;
-      } else {
-        dialoguePortrait.hidden = true;
+      const pageChanged = activeDialogueKey !== pageKey;
+      dialogueLayer.dataset.sourceRecord = String(page.source.record);
+      dialogueLayer.dataset.sourceWait = String(page.source.wait);
+      dialogueLayer.dataset.activeSlot = page.activeSlot ?? "none";
+      dialogueLayer.dataset.revealStart = String(page.revealStart ?? 0);
+      dialogueLayer.classList.toggle("prebattle", controller.phase === "prebattleStory");
+      for (const slot of ["upper", "lower"] as const) {
+        const elements = dialogueWindows[slot];
+        const state = page[slot];
+        const active = page.activeSlot === slot;
+        elements.box.hidden = state === undefined;
+        elements.box.classList.toggle("is-active", active);
+        elements.box.dataset.openSteps = "11";
+        elements.text.removeAttribute("id");
+        elements.portrait.removeAttribute("data-testid");
+        if (!state) continue;
+        elements.speaker.textContent = state.speaker ?? "";
+        elements.box.setAttribute("aria-label", state.speaker ? `${state.speaker}對話` : "旁白");
+        if (!active || pageChanged) elements.text.textContent = state.text;
+        if (state.portrait) {
+          configureAnimatedPortrait(
+            elements.portrait,
+            state.portrait,
+            `${state.speaker ?? "角色"}肖像`,
+            `dialogue-${slot}`,
+            `dialogue-portrait-${slot}`,
+          );
+          elements.portrait.hidden = false;
+          elements.portrait.dataset.testid = active
+            ? "dialogue-portrait-composite"
+            : `dialogue-portrait-composite-${slot}`;
+        } else {
+          elements.portrait.hidden = true;
+        }
       }
-      if (activeDialogueKey !== pageKey) revealDialogue(page.text, pageKey);
+      if (page.activeSlot) {
+        const activeState = page[page.activeSlot];
+        const target = dialogueWindows[page.activeSlot].text;
+        target.id = "dialogue-text";
+        if (pageChanged && activeState) revealDialogue(activeState.text, pageKey, target, page.revealStart);
+      } else if (pageChanged) {
+        stopDialogueTimer();
+        activeDialogueKey = pageKey;
+        activeDialogueText = undefined;
+        dialogueFullText = "";
+        revealedCharacters = 0;
+      }
     } else {
       stopDialogueTimer();
       activeDialogueKey = "";
+      activeDialogueText = undefined;
       dialogueFullText = "";
       revealedCharacters = 0;
     }

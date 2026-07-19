@@ -264,18 +264,65 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .full-damage-number.left { left: 76px; }
 .full-damage-number.right { right: 76px; }
 
-.dialogue-layer { position: absolute; z-index: 12; inset: 0; background: #08030630; }
-.dialogue-box { position: absolute; left: 18px; width: 604px; min-height: 112px; padding: 12px 18px; border: 5px ridge #e9bf3a; color: #fff; background: linear-gradient(90deg, #1f0f13f2, #3f2228f2); box-shadow: inset 0 0 0 2px #6e2932; }
-.dialogue-box.upper { top: 14px; } .dialogue-box.lower { bottom: 19px; }
-.dialogue-portrait { float: left; width: 88px; height: 88px; margin-right: 14px; }
+.dialogue-layer { position: absolute; z-index: 12; inset: 0; background: transparent; }
+.dialogue-box {
+  position: absolute;
+  left: 0;
+  width: 640px;
+  height: 120px;
+  color: #fff;
+  pointer-events: none;
+  animation: dialogue-window-open 110ms steps(11);
+}
+.dialogue-box.upper { top: 20px; }
+.dialogue-box.lower { top: 194px; }
+.dialogue-layer.prebattle .dialogue-box.upper { top: 12px; }
+.dialogue-layer.prebattle .dialogue-box.lower { top: 204px; }
+.dialogue-portrait { position: absolute; width: 112px; height: 112px; }
+.dialogue-box.upper .dialogue-portrait { left: 32px; top: 6px; }
+.dialogue-box.lower .dialogue-portrait { left: 504px; top: 6px; }
+.dialogue-layer.prebattle .dialogue-box.upper .dialogue-portrait { left: 8px; }
+.dialogue-layer.prebattle .dialogue-box.lower .dialogue-portrait { left: 512px; }
 .dialogue-portrait::after { border-width: 2px; border-color: #d7aa32; }
-.dialogue-copy { position: relative; min-height: 84px; }
-.dialogue-copy b { display: block; color: #f7d86a; font-size: 13px; }
-.dialogue-copy p { margin: 6px 0 0; white-space: pre-line; font-size: 16px; line-height: 1.65; text-shadow: 1px 1px #000; }
-.continue-mark { position: absolute; right: 0; bottom: 0; color: #ffd94a; animation: bob .8s steps(2) infinite; }
-.dialogue-controls { position: absolute; z-index: 2; right: 24px; bottom: 25px; display: flex; gap: 6px; }
+.dialogue-copy {
+  position: absolute;
+  height: 84px;
+  padding: 2px 12px 5px 15px;
+  border: 5px ridge #e9bf3a;
+  background:
+    repeating-linear-gradient(0deg, #231316f2 0 2px, #1a0c10f2 2px 4px);
+  box-shadow: inset 0 0 0 2px #6e2932, 3px 3px #0008;
+}
+.dialogue-box.upper .dialogue-copy { left: 145px; top: 0; width: 479px; }
+.dialogue-box.lower .dialogue-copy { left: 89px; top: 57px; width: 407px; }
+.dialogue-speaker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.dialogue-copy p {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 16px;
+  line-height: 20px;
+  text-shadow: 1px 1px #000;
+}
+.continue-mark { position: absolute; right: 5px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
+.dialogue-box:not(.is-active) .continue-mark { display: none; }
+.dialogue-controls { position: absolute; z-index: 2; right: 8px; top: 154px; display: flex; gap: 6px; opacity: 0; transition: opacity 100ms linear; }
+.dialogue-controls:has(button:focus-visible) { opacity: 1; }
 .dialogue-controls button { padding: 5px 9px; font: 10px system-ui, sans-serif; }
 @keyframes bob { 50% { transform: translateY(3px); } }
+@keyframes dialogue-window-open {
+  from { clip-path: inset(50% 49%); }
+  to { clip-path: inset(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialogue-box { animation: none; }
+}
 
 .modal-panel { border: 5px ridge #e2b633; color: #fff4d1; background: radial-gradient(circle at top, #52242a, #170d10 72%); box-shadow: 0 15px 40px #000c, inset 0 0 0 2px #6d3c26; text-align: center; }
 .objective-panel { position: absolute; z-index: 14; left: 126px; top: 61px; width: 388px; padding: 22px 30px; }

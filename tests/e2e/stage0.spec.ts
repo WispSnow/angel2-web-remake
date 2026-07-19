@@ -832,3 +832,65 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   expect(deathTrace.map(({ frame }) => frame)).toEqual([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]);
   expect(deathResolved.combatPresentationTrace.some(({ phase }) => phase.startsWith("fullCounter"))).toBe(false);
 });
+
+test("S00-L: native KY checkpoints preserve dual windows, appended text and the blank victory pause", async ({ page }) => {
+  await page.goto("/?test=1");
+  const layer = page.getByTestId("dialogue-layer");
+  await expect(layer).toHaveAttribute("data-source-record", "0");
+  await expect(layer).toHaveAttribute("data-source-wait", "1");
+
+  // Primary input first fast-forwards the current typewriter, then advances on
+  // the following press, matching the native input-clear behavior after KY.
+  await page.getByTestId("advance-dialogue").click();
+  expect((await debugState(page)).dialogueIndex).toBe(0);
+  await expect(page.locator("#dialogue-text")).toContainText("寬廣走廊");
+  await page.getByTestId("advance-dialogue").click();
+  expect((await debugState(page)).dialogueIndex).toBe(1);
+
+  // Reach SAY0/KY5, where the prior upper window remains open while the
+  // wounded soldier starts speaking in the lower window.
+  for (let checkpoint = 1; checkpoint < 4; checkpoint += 1) {
+    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("advance-dialogue").click();
+  }
+  expect((await debugState(page)).dialogueIndex).toBe(4);
+  await expect(layer).toHaveAttribute("data-source-wait", "5");
+  await expect(page.getByTestId("dialogue-window-upper")).toBeVisible();
+  await expect(page.getByTestId("dialogue-window-lower")).toBeVisible();
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("怎麼會傷成這樣");
+  await expect(page.getByTestId("dialogue-window-lower")).toContainText("不好了");
+  await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute("data-portrait-record", "47");
+
+  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("advance-dialogue").click();
+  expect((await debugState(page)).dialogueIndex).toBe(5);
+  await expect(layer).toHaveAttribute("data-source-wait", "6");
+  await expect(layer).toHaveAttribute("data-reveal-start", /^[1-9][0-9]*$/);
+  await expect(page.locator("#dialogue-text")).toContainText("不好了");
+  await page.getByTestId("advance-dialogue").click();
+  await expect(page.locator("#dialogue-text")).toContainText("騎士團的軍隊");
+  await page.waitForTimeout(130);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-dual-dialogue.png" });
+
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-attack").click();
+  await waitForPhase(page, "victoryStory");
+
+  for (let checkpoint = 0; checkpoint < 2; checkpoint += 1) {
+    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("advance-dialogue").click();
+  }
+  expect((await debugState(page)).dialogueIndex).toBe(2);
+  await expect(layer).toHaveAttribute("data-source-record", "3");
+  await expect(layer).toHaveAttribute("data-source-wait", "3");
+  await expect(layer).toHaveAttribute("data-active-slot", "none");
+  await expect(page.getByTestId("dialogue-window-upper")).toBeHidden();
+  await expect(page.getByTestId("dialogue-window-lower")).toBeHidden();
+  await page.getByTestId("advance-dialogue").click();
+  expect((await debugState(page)).dialogueIndex).toBe(3);
+});
