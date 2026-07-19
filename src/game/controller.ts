@@ -1,16 +1,22 @@
 import { ASSETS, STAGE0, statsFor } from "./content/stage0";
 import { STORY_BY_PHASE } from "./content/dialogue";
-import { Stage0Battle } from "./simulation/battle";
+import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
 import type { ActionMode, AttackResult, BattleUnit, DialoguePage, GamePhase, Position, SaveData } from "./types";
 
 type Listener = () => void;
 type StoryPhase = keyof typeof STORY_BY_PHASE;
-type MovementKind = "scripted" | "player" | "enemy" | "rollback";
+type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
 export type UnitCommandId = "move" | "attack" | "rest" | "end" | "undo";
+export type GroupCommandId = "allRest" | "followLeader" | "freeAction" | "retreat";
 
 export interface UnitCommand {
   id: UnitCommandId;
+  label: string;
+}
+
+export interface GroupCommand {
+  id: GroupCommandId;
   label: string;
 }
 
@@ -24,6 +30,13 @@ const POST_MOVE_COMMANDS: readonly UnitCommand[] = [
   { id: "attack", label: "攻擊" },
   { id: "end", label: "結束" },
   { id: "undo", label: "返悔" },
+];
+
+const GROUP_COMMANDS: readonly GroupCommand[] = [
+  { id: "allRest", label: "全部休息" },
+  { id: "followLeader", label: "跟隨主將" },
+  { id: "freeAction", label: "自由行動" },
+  { id: "retreat", label: "全面徹退" },
 ];
 
 export interface MovementPresentation {
@@ -49,6 +62,10 @@ export class GameController {
   targets: Position[] = [];
   objectiveOpen = false;
   systemMenuOpen = false;
+  groupCommandOpen = false;
+  groupCommandIndex = 0;
+  retreatConfirmOpen = false;
+  retreatConfirmIndex = 1;
   hintVisible = localStorage.getItem("angel2.stage0.hintSeen") !== "yes";
   presentationFast = false;
   battlePresentation: "map" | "full" = "map";
@@ -88,6 +105,19 @@ export class GameController {
 
   get selectedUnit(): BattleUnit | undefined {
     return this.selectedId ? this.battle.unit(this.selectedId) : undefined;
+  }
+
+  get groupCommands(): readonly GroupCommand[] {
+    return GROUP_COMMANDS;
+  }
+
+  get groupLeader(): BattleUnit | undefined {
+    const unit = this.battle.unitAt(this.cursor);
+    return unit?.side === 1 && !unit.acted ? unit : undefined;
+  }
+
+  get followLeaderAvailable(): boolean {
+    return this.groupLeader !== undefined;
   }
 
   get commandMenuKind(): "initial" | "postMove" {
@@ -184,7 +214,14 @@ export class GameController {
   }
 
   selectCell(position: Position): void {
-    if (this.phase !== "player" || this.objectiveOpen || this.systemMenuOpen || this.busy) return;
+    if (
+      this.phase !== "player"
+      || this.objectiveOpen
+      || this.systemMenuOpen
+      || this.groupCommandOpen
+      || this.retreatConfirmOpen
+      || this.busy
+    ) return;
     this.cursor = { ...position };
     const unit = this.battle.unitAt(position);
 
@@ -231,7 +268,15 @@ export class GameController {
   }
 
   focusCell(position: Position): void {
-    if (this.phase !== "player" || this.actionMode !== "idle" || this.objectiveOpen || this.systemMenuOpen || this.busy) return;
+    if (
+      this.phase !== "player"
+      || this.actionMode !== "idle"
+      || this.objectiveOpen
+      || this.systemMenuOpen
+      || this.groupCommandOpen
+      || this.retreatConfirmOpen
+      || this.busy
+    ) return;
     if (positionKey(position) === positionKey(this.cursor)) return;
     this.cursor = { ...position };
     this.emit();
@@ -367,7 +412,9 @@ export class GameController {
       this.busy = false;
       const ended = this.resolveOutcome();
       this.emit();
-      if (!ended && this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) void this.endPlayerPhase();
+      if (!ended && this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) {
+        void this.runTurnPhases("autonomous");
+      }
     } catch (error) {
       this.busy = false;
       this.combatPresentation = undefined;
@@ -385,7 +432,9 @@ export class GameController {
       return;
     }
     this.emit();
-    if (this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) void this.endPlayerPhase();
+    if (this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) {
+      void this.runTurnPhases("autonomous");
+    }
   }
 
   private resetAction(): void {
@@ -398,11 +447,158 @@ export class GameController {
     this.targets = [];
   }
 
-  async endPlayerPhase(): Promise<void> {
+  openGroupCommands(): void {
+    if (
+      this.phase !== "player"
+      || this.busy
+      || this.objectiveOpen
+      || this.retreatConfirmOpen
+      || this.actionMode !== "idle"
+    ) return;
+    this.systemMenuOpen = false;
+    this.groupCommandIndex = 0;
+    this.groupCommandOpen = true;
+    this.statusMessage = "選擇集體命令。";
+    this.emit();
+  }
+
+  closeGroupCommands(): void {
+    if (!this.groupCommandOpen) return;
+    this.groupCommandOpen = false;
+    this.groupCommandIndex = 0;
+    this.statusMessage = "已返回戰場。";
+    this.emit();
+  }
+
+  moveGroupCommandSelection(delta: number): void {
+    if (!this.groupCommandOpen || GROUP_COMMANDS.length === 0) return;
+    this.groupCommandIndex = (this.groupCommandIndex + delta + GROUP_COMMANDS.length) % GROUP_COMMANDS.length;
+    this.emit();
+  }
+
+  selectGroupCommand(index: number): void {
+    if (!this.groupCommandOpen || index < 0 || index >= GROUP_COMMANDS.length || this.groupCommandIndex === index) return;
+    this.groupCommandIndex = index;
+    this.emit();
+  }
+
+  activateGroupCommandSelection(): void {
+    const command = this.groupCommandOpen ? GROUP_COMMANDS[this.groupCommandIndex] : undefined;
+    if (!command) return;
+    if (command.id === "allRest") void this.allRest();
+    else if (command.id === "followLeader") void this.followLeader();
+    else if (command.id === "freeAction") void this.freeAction();
+    else this.requestRetreat();
+  }
+
+  async allRest(): Promise<void> {
+    if (this.phase !== "player" || this.busy) return;
+    this.systemMenuOpen = false;
+    this.groupCommandOpen = false;
+    this.resetAction();
+    const result = this.battle.restAllUnspentAllies();
+    this.statusMessage = `全部休息：${result.count} 名單位提交行動，共恢復 ${result.recovered} 點生命。`;
+    this.emit();
+    await this.runTurnPhases("autonomous");
+  }
+
+  async followLeader(): Promise<void> {
+    if (this.phase !== "player" || this.busy || !this.groupLeader) {
+      this.statusMessage = "請先把焦點移到一名尚未行動的我方單位，再選擇跟隨主將。";
+      this.emit();
+      return;
+    }
+    const leader = this.groupLeader;
+    this.battle.wait(leader.id);
+    this.systemMenuOpen = false;
+    this.groupCommandOpen = false;
+    this.resetAction();
+    this.statusMessage = `${leader.name}成為臨時主將；其餘單位交由我方 AI 行動。`;
+    this.emit();
+    await this.runTurnPhases("follow", leader.id);
+  }
+
+  async freeAction(): Promise<void> {
+    if (this.phase !== "player" || this.busy) return;
+    this.systemMenuOpen = false;
+    this.groupCommandOpen = false;
+    this.resetAction();
+    this.statusMessage = "其餘我方單位進入自由行動。";
+    this.emit();
+    await this.runTurnPhases("free");
+  }
+
+  requestRetreat(): void {
+    if (this.phase !== "player" || this.busy) return;
+    this.systemMenuOpen = false;
+    this.groupCommandOpen = false;
+    this.retreatConfirmOpen = true;
+    this.retreatConfirmIndex = 1;
+    this.statusMessage = "確認是否全面撤退。";
+    this.emit();
+  }
+
+  moveRetreatSelection(delta: number): void {
+    if (!this.retreatConfirmOpen || delta === 0) return;
+    this.retreatConfirmIndex = this.retreatConfirmIndex === 0 ? 1 : 0;
+    this.emit();
+  }
+
+  selectRetreatChoice(index: number): void {
+    if (!this.retreatConfirmOpen || index < 0 || index > 1 || this.retreatConfirmIndex === index) return;
+    this.retreatConfirmIndex = index;
+    this.emit();
+  }
+
+  activateRetreatSelection(): void {
+    if (!this.retreatConfirmOpen) return;
+    if (this.retreatConfirmIndex === 0) this.confirmRetreat();
+    else this.cancelRetreat();
+  }
+
+  confirmRetreat(): void {
+    if (!this.retreatConfirmOpen || this.busy) return;
+    this.retreatConfirmOpen = false;
+    this.restartBattle("全面撤退：重新建立第 0 關固定編隊。");
+  }
+
+  cancelRetreat(): void {
+    if (!this.retreatConfirmOpen) return;
+    this.retreatConfirmOpen = false;
+    this.retreatConfirmIndex = 1;
+    this.statusMessage = "取消撤退；返回戰場。";
+    this.emit();
+  }
+
+  private async runTurnPhases(mode: "autonomous" | "follow" | "free", leaderId?: string): Promise<void> {
     if (this.phase !== "player" || this.busy) return;
     this.busy = true;
     this.systemMenuOpen = false;
+    this.groupCommandOpen = false;
+    this.retreatConfirmOpen = false;
     this.resetAction();
+    this.phase = "allyAuto";
+    this.statusMessage = mode === "autonomous"
+      ? "我方自動／特殊單位階段。"
+      : mode === "follow"
+        ? "我方自動階段：其餘單位跟隨主將。"
+        : "我方自動階段：其餘單位自由行動。";
+    this.emit();
+
+    if (mode !== "autonomous") {
+      const allyIds = this.battle.units.filter((unit) => unit.side === 1 && !unit.acted).map((unit) => unit.id);
+      for (const id of allyIds) {
+        const action = this.battle.planAlliedAiAction(id, mode === "follow" ? leaderId : undefined);
+        if (!action) continue;
+        if (await this.runAlliedAiAction(action)) {
+          this.busy = false;
+          this.emit();
+          return;
+        }
+      }
+    }
+
+    this.battle.clearActionState(1);
     this.phase = "enemy";
     this.statusMessage = "敵方階段：騎士團部隊向出口撤離。";
     this.emit();
@@ -444,9 +640,56 @@ export class GameController {
     this.emit();
   }
 
+  private async runAlliedAiAction(action: AlliedAiAction): Promise<boolean> {
+    let unit = this.battle.unit(action.unitId);
+    if (!unit) return this.resolveOutcome();
+    this.battle.focusId = unit.id;
+    this.cursor = { x: unit.x, y: unit.y };
+    this.centerCamera(unit);
+    this.statusMessage = `${unit.name}正在自動行動。`;
+    this.emit();
+
+    if ((action.kind === "move" || action.kind === "attack") && action.path.length > 1) {
+      await this.animateUnitPath(unit.id, action.path, "allyAuto");
+      unit = this.battle.unit(action.unitId);
+      if (!unit) return this.resolveOutcome();
+    }
+
+    if (action.kind === "attack" && action.targetId) {
+      const defender = this.battle.unit(action.targetId);
+      if (defender && manhattan(unit, defender) === 1) {
+        const attackerPresentation = { ...unit };
+        const defenderPresentation = { ...defender };
+        this.lastCombat = this.battle.attack(unit.id, defender.id);
+        const result = this.lastCombat;
+        this.statusMessage = `${unit.name}造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}。`;
+        this.combatPresentation = { attacker: attackerPresentation, defender: defenderPresentation, result, frame: 0 };
+        for (let frame = 0; frame < 4; frame += 1) {
+          if (this.combatPresentation) this.combatPresentation.frame = frame;
+          this.emit();
+          await pause(this.testMode ? 60 : this.presentationFast ? 45 : 120);
+        }
+        this.combatPresentation = undefined;
+      } else {
+        this.battle.spendAction(unit.id);
+      }
+    } else if (action.kind === "rest") {
+      const recovered = this.battle.rest(unit.id);
+      this.statusMessage = `${unit.name}休息，恢復 ${recovered} 點生命。`;
+    } else {
+      this.battle.spendAction(unit.id);
+      this.statusMessage = action.kind === "move" ? `${unit.name}移動完畢。` : `${unit.name}原地待命。`;
+    }
+
+    const ended = this.resolveOutcome();
+    this.emit();
+    return ended;
+  }
+
   openObjectives(): void {
     if (this.busy || !["player", "enemy"].includes(this.phase)) return;
     this.systemMenuOpen = false;
+    this.groupCommandOpen = false;
     this.objectiveOpen = true;
     this.markHintSeen();
     this.emit();
@@ -458,7 +701,14 @@ export class GameController {
   }
 
   openSystemMenu(): void {
-    if (this.phase !== "player" || this.busy || this.objectiveOpen || this.actionMode !== "idle") return;
+    if (
+      this.phase !== "player"
+      || this.busy
+      || this.objectiveOpen
+      || this.groupCommandOpen
+      || this.retreatConfirmOpen
+      || this.actionMode !== "idle"
+    ) return;
     this.systemMenuOpen = true;
     this.emit();
   }
@@ -470,7 +720,9 @@ export class GameController {
   }
 
   secondaryAction(): void {
-    if (this.objectiveOpen) this.closeObjectives();
+    if (this.retreatConfirmOpen) this.cancelRetreat();
+    else if (this.groupCommandOpen) this.closeGroupCommands();
+    else if (this.objectiveOpen) this.closeObjectives();
     else if (this.systemMenuOpen) this.closeSystemMenu();
     else if (this.phase === "player" && this.actionMode === "idle") this.openSystemMenu();
     else this.cancelAction();
@@ -507,14 +759,22 @@ export class GameController {
   }
 
   retry(): void {
+    this.restartBattle("重新建立第 0 關固定編隊。");
+  }
+
+  private restartBattle(message: string): void {
     this.battle = new Stage0Battle();
     this.movementPresentation = undefined;
     this.systemMenuOpen = false;
+    this.groupCommandOpen = false;
+    this.groupCommandIndex = 0;
+    this.retreatConfirmOpen = false;
+    this.retreatConfirmIndex = 1;
     this.objectiveOpen = false;
     this.resetAction();
     this.cameraOrigin = { x: 6, y: 20 };
     this.cursor = { ...STAGE0.opening.from };
-    this.statusMessage = "重新建立第 0 關固定編隊。";
+    this.statusMessage = message;
     this.phase = "prebattleStory";
     this.dialogueIndex = STORY_BY_PHASE.prebattleStory.length - 1;
     this.busy = false;
@@ -586,6 +846,14 @@ export class GameController {
 
   moveCursor(delta: Position): void {
     if (this.phase !== "player" || this.systemMenuOpen || this.objectiveOpen || this.busy) return;
+    if (this.retreatConfirmOpen) {
+      if (delta.x !== 0 || delta.y !== 0) this.moveRetreatSelection(delta.x || delta.y);
+      return;
+    }
+    if (this.groupCommandOpen) {
+      if (delta.y !== 0) this.moveGroupCommandSelection(delta.y);
+      return;
+    }
     if (this.actionMode === "actionMenu") {
       if (delta.y !== 0) this.moveCommandSelection(delta.y);
       return;
@@ -603,6 +871,8 @@ export class GameController {
       this.phase !== "player"
       || this.systemMenuOpen
       || this.objectiveOpen
+      || this.groupCommandOpen
+      || this.retreatConfirmOpen
       || this.busy
       || this.actionMode === "actionMenu"
     ) return;
@@ -617,6 +887,8 @@ export class GameController {
 
   primaryAtCursor(): void {
     if (isStoryPhase(this.phase)) this.advanceDialogue();
+    else if (this.retreatConfirmOpen) this.activateRetreatSelection();
+    else if (this.groupCommandOpen) this.activateGroupCommandSelection();
     else if (this.systemMenuOpen || this.objectiveOpen) return;
     else if (this.actionMode === "actionMenu") this.activateCommandSelection();
     else this.selectCell(this.cursor);
@@ -683,6 +955,12 @@ export class GameController {
       cameraOrigin: this.cameraOrigin,
       objectiveOpen: this.objectiveOpen,
       systemMenuOpen: this.systemMenuOpen,
+      groupCommandOpen: this.groupCommandOpen,
+      groupCommandIndex: this.groupCommandIndex,
+      groupCommands: GROUP_COMMANDS.map((command) => ({ ...command })),
+      groupLeaderId: this.groupLeader?.id,
+      retreatConfirmOpen: this.retreatConfirmOpen,
+      retreatConfirmIndex: this.retreatConfirmIndex,
       battlePresentation: this.battlePresentation,
       movementPresentation: this.movementPresentation ? {
         ...this.movementPresentation,
@@ -697,6 +975,8 @@ export class GameController {
     const outcome = this.battle.outcome();
     if (outcome === "defeat") {
       this.systemMenuOpen = false;
+      this.groupCommandOpen = false;
+      this.retreatConfirmOpen = false;
       this.objectiveOpen = false;
       this.movementPresentation = undefined;
       this.phase = "defeat";
@@ -706,6 +986,8 @@ export class GameController {
     }
     if (outcome === "victory") {
       this.systemMenuOpen = false;
+      this.groupCommandOpen = false;
+      this.retreatConfirmOpen = false;
       this.objectiveOpen = false;
       this.movementPresentation = undefined;
       this.phase = "victoryStory";
@@ -776,7 +1058,7 @@ export class GameController {
         return false;
       }
       this.movementPresentation.stepIndex = index;
-      if (kind === "scripted" || kind === "enemy") this.centerCamera(step);
+      if (kind === "scripted" || kind === "allyAuto" || kind === "enemy") this.centerCamera(step);
       this.emit();
       await pause(this.movementStepDuration);
     }

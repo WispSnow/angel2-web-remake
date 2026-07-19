@@ -37,17 +37,28 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <div class="bottom-location">瓦爾克麗宮</div>
             <div class="bottom-round" id="bottom-round"></div>
             <button class="system-menu-hotspot" data-action="open-system-menu" data-testid="system-menu-button" aria-label="開啟遊戲功能" title="遊戲功能"></button>
+            <button class="group-command-hotspot" data-action="open-group-commands" data-testid="group-command-hotspot" aria-label="開啟集體命令" title="集體命令"></button>
+            <button class="all-rest-hotspot" data-action="all-rest" data-testid="all-rest-hotspot" aria-label="全部休息" title="全部休息"></button>
             <section class="system-menu modal-panel" id="system-menu" data-testid="system-menu" role="dialog" aria-label="遊戲功能" hidden>
               <span class="panel-kicker">SYSTEM</span><h2>遊戲功能</h2>
               <div class="system-menu-grid">
                 <button data-action="objectives" data-testid="objectives-button">勝利條件</button>
-                <button data-action="end-turn" data-testid="end-turn-button">回合終了</button>
+                <button data-action="open-group-commands" data-testid="group-commands-button">集體命令</button>
                 <button data-action="speed" data-testid="speed-button">動畫 ×1</button>
                 <button data-action="battle-presentation" data-testid="presentation-button">戰鬥 地圖</button>
                 <button data-action="music" data-testid="music-button">音樂 開</button>
                 <button data-action="sound" data-testid="sound-button">音效 開</button>
                 <button data-action="speech" data-testid="speech-button">逐字音 開</button>
                 <button data-action="close-system-menu">返回戰場</button>
+              </div>
+            </section>
+            <section class="group-command-menu action-menu" id="group-command-menu" data-testid="group-command-menu" role="menu" aria-label="集體命令" hidden></section>
+            <section class="retreat-confirm modal-panel" id="retreat-confirm" data-testid="retreat-confirm" role="dialog" aria-label="全面撤退確認" hidden>
+              <span class="panel-kicker">全面徹退</span>
+              <p>哦！．．．要撤退嗎？<br />必竟是沒辦法的事，雙方的實力差太多了．</p>
+              <div class="button-row">
+                <button data-action="retreat-confirm" data-retreat-index="0">確 定</button>
+                <button data-action="retreat-cancel" data-retreat-index="1">取 消</button>
               </div>
             </section>
             <div class="action-menu" id="action-menu" data-testid="action-menu" role="menu" aria-label="單位行動" hidden></div>
@@ -92,6 +103,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const storyBackground = required(root, "#story-background");
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
+  const groupCommandMenu = required(root, "#group-command-menu");
+  const retreatConfirm = required(root, "#retreat-confirm");
   const resultLayer = required(root, "#result-layer");
   let dialogueTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let activeDialogueKey = "";
@@ -141,9 +154,16 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "skip-dialogue") controller.skipDialogue();
     else if (action === "open-system-menu") controller.openSystemMenu();
     else if (action === "close-system-menu") controller.closeSystemMenu();
+    else if (action === "open-group-commands") controller.openGroupCommands();
+    else if (action === "close-group-commands") controller.closeGroupCommands();
+    else if (action === "all-rest") void controller.allRest();
+    else if (action === "follow-leader") void controller.followLeader();
+    else if (action === "free-action") void controller.freeAction();
+    else if (action === "request-retreat") controller.requestRetreat();
+    else if (action === "retreat-confirm") controller.confirmRetreat();
+    else if (action === "retreat-cancel") controller.cancelRetreat();
     else if (action === "objectives") controller.openObjectives();
     else if (action === "close-objectives") controller.closeObjectives();
-    else if (action === "end-turn") void controller.endPlayerPhase();
     else if (action === "speed") controller.toggleSpeed();
     else if (action === "battle-presentation") controller.toggleBattlePresentation();
     else if (action === "music") controller.toggleMusic();
@@ -166,6 +186,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   root.addEventListener("pointerover", (event) => {
     const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
     if (command) controller.selectCommand(Number(command.dataset.commandIndex));
+    const groupCommand = (event.target as Element).closest<HTMLElement>("[data-group-command-index]");
+    if (groupCommand) controller.selectGroupCommand(Number(groupCommand.dataset.groupCommandIndex));
+    const retreatChoice = (event.target as Element).closest<HTMLElement>("[data-retreat-index]");
+    if (retreatChoice) controller.selectRetreatChoice(Number(retreatChoice.dataset.retreatIndex));
   });
 
   window.addEventListener("keydown", (event) => {
@@ -179,7 +203,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     else if (event.key === "Escape") controller.secondaryAction();
     else if (event.key.toLowerCase() === "o") controller.objectiveOpen ? controller.closeObjectives() : controller.openObjectives();
-    else if (event.key.toLowerCase() === "e") void controller.endPlayerPhase();
   });
 
   const render = () => {
@@ -204,6 +227,29 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     hint.textContent = `查看勝利條件：保護妮雅；敵軍被擊倒或撤離均計入清除。`;
     objectivePanel.hidden = !controller.objectiveOpen;
     systemMenu.hidden = !controller.systemMenuOpen;
+    groupCommandMenu.hidden = !controller.groupCommandOpen;
+    if (!groupCommandMenu.hidden) {
+      groupCommandMenu.innerHTML = controller.groupCommands.map((command, index) => {
+        const action = command.id === "allRest"
+          ? "all-rest"
+          : command.id === "followLeader"
+            ? "follow-leader"
+            : command.id === "freeAction"
+              ? "free-action"
+              : "request-retreat";
+        const selected = index === controller.groupCommandIndex;
+        const disabled = command.id === "followLeader" && !controller.followLeaderAvailable;
+        return `<button type="button" role="menuitem" data-action="${action}" data-group-command-index="${index}" data-testid="group-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}" ${disabled ? "disabled" : ""}>${command.label}</button>`;
+      }).join("");
+    }
+    retreatConfirm.hidden = !controller.retreatConfirmOpen;
+    if (!retreatConfirm.hidden) {
+      for (const button of retreatConfirm.querySelectorAll<HTMLButtonElement>("[data-retreat-index]")) {
+        const selected = Number(button.dataset.retreatIndex) === controller.retreatConfirmIndex;
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-current", String(selected));
+      }
+    }
     const speed = root.querySelector<HTMLElement>("[data-action=speed]");
     if (speed) speed.textContent = controller.presentationFast ? "動畫 ×4" : "動畫 ×1";
     const presentation = root.querySelector<HTMLElement>("[data-action=battle-presentation]");
@@ -214,7 +260,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (sound) sound.textContent = controller.soundEnabled ? "音效 開" : "音效 關";
     const speech = root.querySelector<HTMLElement>("[data-action=speech]");
     if (speech) speech.textContent = controller.speechEnabled ? "逐字音 開" : "逐字音 關";
-    for (const action of ["objectives", "end-turn", "battle-presentation"]) {
+    for (const action of ["objectives", "open-group-commands", "battle-presentation", "all-rest"]) {
       const button = root.querySelector<HTMLButtonElement>(`[data-action=${action}]`);
       if (button) button.disabled = controller.inputLocked;
     }
@@ -381,7 +427,7 @@ function bindGamepad(controller: GameController): void {
       if (pressed[0] && !priorButtons[0]) controller.primaryAtCursor();
       if (pressed[1] && !priorButtons[1]) controller.secondaryAction();
       if (pressed[4] && !priorButtons[4]) controller.openObjectives();
-      if (pressed[9] && !priorButtons[9]) void controller.endPlayerPhase();
+      if (pressed[9] && !priorButtons[9]) controller.openGroupCommands();
       const x = pad.axes[0] ?? 0;
       const y = pad.axes[1] ?? 0;
       if (time - lastNavigation > 150) {

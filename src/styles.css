@@ -64,6 +64,8 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .story-background { position: absolute; z-index: 8; inset: 0; background: #000 url("/assets/original/story-palace.png") center / 320px 200px no-repeat; }
 .logical-screen[data-phase="prebattleStory"] .unit-hud,
 .logical-screen[data-phase="prebattleStory"] .system-menu-hotspot,
+.logical-screen[data-phase="prebattleStory"] .group-command-hotspot,
+.logical-screen[data-phase="prebattleStory"] .all-rest-hotspot,
 .logical-screen[data-phase="prebattleStory"] .system-menu,
 .logical-screen[data-phase="prebattleStory"] .bottom-location,
 .logical-screen[data-phase="prebattleStory"] .bottom-round,
@@ -126,9 +128,18 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   background: linear-gradient(#74313a, #3f151c);
   cursor: pointer;
 }
-.system-menu-hotspot { position: absolute; z-index: 8; left: 545px; top: 6px; width: 16px; height: 37px; display: none; padding: 0; border: 1px solid transparent; color: transparent; background: transparent; cursor: pointer; }
-.logical-screen[data-hud-mode="tactical"][data-phase="player"] .system-menu-hotspot { display: block; }
-.system-menu-hotspot:hover, .system-menu-hotspot:focus-visible { border-color: #ffe56b; background: #ffe56b25; outline: 1px solid #fff2a1; outline-offset: 0; }
+.system-menu-hotspot,
+.group-command-hotspot,
+.all-rest-hotspot { position: absolute; z-index: 8; display: none; padding: 0; border: 1px solid transparent; color: transparent; background: transparent; cursor: pointer; }
+.system-menu-hotspot { left: 545px; top: 6px; width: 16px; height: 37px; }
+.group-command-hotspot { left: 490px; top: 36px; width: 24px; height: 25px; }
+.all-rest-hotspot { left: 490px; top: 61px; width: 26px; height: 24px; }
+.logical-screen[data-phase="player"] .system-menu-hotspot,
+.logical-screen[data-phase="player"] .group-command-hotspot,
+.logical-screen[data-phase="player"] .all-rest-hotspot { display: block; }
+.system-menu-hotspot:hover, .system-menu-hotspot:focus-visible,
+.group-command-hotspot:hover, .group-command-hotspot:focus-visible,
+.all-rest-hotspot:hover, .all-rest-hotspot:focus-visible { border-color: #ffe56b; background: #ffe56b25; outline: 1px solid #fff2a1; outline-offset: 0; }
 .system-menu { position: absolute; z-index: 14; left: 304px; top: 47px; width: 166px; padding: 12px 14px 14px; }
 .system-menu h2 { margin: 3px 0 8px; color: #f3d466; font-size: 17px; }
 .system-menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
@@ -189,6 +200,27 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   background: linear-gradient(90deg, transparent 4%, #9c581e99 28%, #9c581e99 72%, transparent 96%);
 }
 .action-menu button:focus-visible { outline: 1px solid #ffdc48; outline-offset: -2px; }
+.group-command-menu {
+  left: 276px;
+  top: 92px;
+  width: 190px;
+  height: 120px;
+  padding: 9px 5px;
+}
+.group-command-menu button {
+  width: 179px;
+  height: 24px;
+  font-size: 17px;
+  letter-spacing: .24em;
+  text-indent: .24em;
+}
+.group-command-menu button:disabled {
+  color: #81766d;
+  background: transparent;
+}
+.retreat-confirm { position: absolute; z-index: 15; left: 91px; top: 88px; width: 390px; padding: 20px 26px 18px; }
+.retreat-confirm p { margin: 8px 0 16px; font-size: 15px; line-height: 1.65; }
+.retreat-confirm button.is-selected { color: #fff; box-shadow: inset 0 0 0 2px #ffdf68; }
 .status-strip { position: absolute; z-index: 7; left: 45px; top: 306px; width: 386px; min-height: 20px; padding: 3px 8px; overflow: hidden; color: #fff6c8; background: #120b0bcc; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
 .hint-toast { position: absolute; z-index: 9; left: 58px; top: 36px; max-width: 360px; padding: 7px 10px; border: 1px solid #f5d665; border-radius: 3px; color: #fff6c8; background: #351b1dea; font: 11px/1.3 system-ui, sans-serif; cursor: pointer; }
 

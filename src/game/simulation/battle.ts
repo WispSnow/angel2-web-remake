@@ -1,12 +1,19 @@
 import { STAGE0, TERRAIN_DEFENSE_PERCENT, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import type { AttackResult, BattleOutcome, BattleUnit, Position } from "../types";
 import { DeterministicRng } from "./rng";
-import { manhattan, movementCost, movementPath as findMovementPath, reachableCells, routePath } from "./grid";
+import { manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath } from "./grid";
 
 export interface RouteMoveResult {
   path: Position[];
   destination: Position;
   reachedExit: boolean;
+}
+
+export interface AlliedAiAction {
+  unitId: string;
+  kind: "attack" | "move" | "rest" | "wait";
+  path: Position[];
+  targetId?: string;
 }
 
 export class Stage0Battle {
@@ -113,6 +120,101 @@ export class Stage0Battle {
     unit.acted = true;
     this.focusId = id;
     return recovered;
+  }
+
+  restAllUnspentAllies(): { count: number; recovered: number } {
+    let count = 0;
+    let recovered = 0;
+    for (const unit of this.units) {
+      if (unit.side !== 1 || unit.acted) continue;
+      recovered += this.rest(unit.id);
+      count += 1;
+    }
+    return { count, recovered };
+  }
+
+  planAlliedAiAction(id: string, leaderId?: string): AlliedAiAction | undefined {
+    const unit = this.unit(id);
+    if (!unit || unit.side !== 1 || unit.acted) return undefined;
+
+    const leader = leaderId ? this.unit(leaderId) : undefined;
+    if (leader && leader.id !== unit.id && leader.side === unit.side) {
+      const leaderPath = shortestPath(
+        unit,
+        leader,
+        unit.classId,
+        statsFor(unit).movement,
+        this.units.filter((candidate) => candidate.id !== unit.id),
+      );
+      if (leaderPath.length === 0) {
+        const path = routePath(unit, neighbors(leader), this.units, statsFor(unit).movement);
+        if (path.length > 1) return { unitId: id, kind: "move", path };
+      }
+    }
+
+    const stats = statsFor(unit);
+    const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
+    if (lifePercent < 20) return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+
+    const reachable = reachableCells(unit, this.units);
+    const reachableKeys = new Set(reachable.map(positionKey));
+    const occupied = new Set(this.units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
+    const enemies = this.units
+      .filter((candidate) => candidate.side === 2)
+      .sort((left, right) => left.y * STAGE0.width + left.x - (right.y * STAGE0.width + right.x));
+    const nativeCandidateOffsets = [
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: -1 },
+    ];
+    let attackTarget: BattleUnit | undefined;
+    let attackPosition: Position | undefined;
+    let attackPositionDefense = -1;
+
+    for (const enemy of enemies) {
+      for (const offset of nativeCandidateOffsets) {
+        const candidate = { x: enemy.x + offset.x, y: enemy.y + offset.y };
+        const candidateKey = positionKey(candidate);
+        if (!reachableKeys.has(candidateKey) || occupied.has(candidateKey)) continue;
+        const defense = TERRAIN_DEFENSE_PERCENT[terrainSlotAt(candidate)] ?? 0;
+        if (defense >= attackPositionDefense) {
+          attackTarget = enemy;
+          attackPosition = candidate;
+          attackPositionDefense = defense;
+        }
+      }
+    }
+
+    if (attackTarget && attackPosition) {
+      const path = positionKey(attackPosition) === positionKey(unit)
+        ? [{ x: unit.x, y: unit.y }]
+        : this.movementPath(unit.id, attackPosition);
+      if (path.length > 0) return { unitId: id, kind: "attack", path, targetId: attackTarget.id };
+    }
+
+    if (unit.life < stats.maxLife) return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+
+    const pursuitTargets = enemies
+      .map((enemy) => ({ x: enemy.x, y: enemy.y + 1 }))
+      .filter(({ x, y }) => x >= 0 && y >= 0 && x < STAGE0.width && y < STAGE0.height);
+    const pursuitPath = routePath(unit, pursuitTargets, this.units, stats.movement);
+    if (pursuitPath.length > 1) return { unitId: id, kind: "move", path: pursuitPath };
+    return { unitId: id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+  }
+
+  spendAction(id: string): boolean {
+    const unit = this.unit(id);
+    if (!unit || unit.acted) return false;
+    unit.acted = true;
+    this.focusId = id;
+    return true;
+  }
+
+  clearActionState(side: BattleUnit["side"]): void {
+    for (const unit of this.units) {
+      if (unit.side === side) unit.acted = false;
+    }
   }
 
   enemyMovementRange(id: string): Position[] {

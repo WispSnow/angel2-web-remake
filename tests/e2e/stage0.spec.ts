@@ -12,13 +12,19 @@ interface DebugState {
   commandIndex: number;
   commands: Array<{ id: string; label: string }>;
   systemMenuOpen: boolean;
+  groupCommandOpen: boolean;
+  groupCommandIndex: number;
+  groupCommands: Array<{ id: string; label: string }>;
+  groupLeaderId?: string;
+  retreatConfirmOpen: boolean;
+  retreatConfirmIndex: number;
   round: number;
   cursor: { x: number; y: number };
   cameraOrigin: { x: number; y: number };
   battlePresentation: "map" | "full";
   movementPresentation?: {
     unitId: string;
-    kind: "scripted" | "player" | "enemy" | "rollback";
+    kind: "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
     path: Array<{ x: number; y: number }>;
     stepIndex: number;
   };
@@ -217,6 +223,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   // Persistent text buttons are replaced by the native-style callable menu surface.
   await page.getByTestId("system-menu-button").click();
   await expect(page.getByTestId("system-menu")).toBeVisible();
+  await expect(page.getByTestId("group-commands-button")).toBeVisible();
+  await expect(page.getByTestId("end-turn-button")).toHaveCount(0);
   const systemMenuContained = await page.getByTestId("system-menu").evaluate((menu) => {
     const panel = menu.getBoundingClientRect();
     return [...menu.querySelectorAll("button")].every((button) => {
@@ -304,9 +312,24 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect((await debugState(page)).phase).toBe("player");
   await page.locator("[data-action=close-objectives]").click();
 
-  // S00-B: behavior 12 moves all enemies, then round 2 dialogue fires.
+  // S00-B: the native all-rest group command replaces a side-effect-free
+  // generic end turn, then behavior 12 moves every enemy.
   await openSystemMenu(page);
-  await page.getByTestId("end-turn-button").click();
+  await page.getByTestId("group-commands-button").click();
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({
+    groupCommandOpen: true,
+    groupCommandIndex: 0,
+    groupCommands: [
+      { id: "allRest", label: "全部休息" },
+      { id: "followLeader", label: "跟隨主將" },
+      { id: "freeAction", label: "自由行動" },
+      { id: "retreat", label: "全面徹退" },
+    ],
+  });
+  await expect(page.getByTestId("group-command-followLeader")).toBeDisabled();
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-group-command-menu.png" });
+  await page.getByTestId("group-command-allRest").click();
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "enemy");
   const enemyMovement = (await debugState(page)).movementPresentation!;
   const enemySamples = await sampleTrackedUnitPosition(page);
@@ -439,8 +462,7 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
 
   await page.evaluate(() => window.__ANGEL2__?.forceEvacuationSetup());
   expect((await debugState(page)).units.filter((unit) => unit.side === 2)).toHaveLength(1);
-  await openSystemMenu(page);
-  await page.getByTestId("end-turn-button").click();
+  await page.getByTestId("all-rest-hotspot").click();
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "enemy");
   const enemyMovement = (await debugState(page)).movementPresentation!;
   expect(enemyMovement.path.length).toBeGreaterThan(1);
@@ -451,4 +473,67 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
   expect(evacuated.units.filter((unit) => unit.side === 2)).toHaveLength(0);
   expect(evacuated.round).toBe(1);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-evacuation-victory.png" });
+});
+
+test("S00-G: group commands provide allied AI handoff and confirmed retreat", async ({ page }) => {
+  const enterPlayerPhase = async () => {
+    await page.goto("/?test=1");
+    await page.getByTestId("skip-dialogue").click();
+    await waitForPhase(page, "openingStory");
+    await page.getByTestId("skip-dialogue").click();
+    await waitForPhase(page, "player");
+  };
+
+  await enterPlayerPhase();
+  const initial = await debugState(page);
+  await openSystemMenu(page);
+  await page.getByTestId("group-commands-button").click();
+  await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
+  expect((await debugState(page)).groupLeaderId).toBe("1:0");
+  await page.getByTestId("group-command-retreat").click();
+  await expect(page.getByTestId("retreat-confirm")).toBeVisible();
+  await expect(page.getByTestId("retreat-confirm")).toContainText("哦！．．．要撤退嗎？");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-retreat-confirm.png" });
+  await page.locator("[data-action=retreat-cancel]").click();
+  expect((await debugState(page))).toMatchObject({
+    phase: "player",
+    round: initial.round,
+    units: initial.units,
+    retreatConfirmOpen: false,
+  });
+
+  await openSystemMenu(page);
+  await page.getByTestId("group-commands-button").click();
+  await page.getByTestId("group-command-retreat").click();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await waitForPhase(page, "openingStory");
+  const retreated = await debugState(page);
+  expect(retreated.round).toBe(1);
+  expect(retreated.units.filter((unit) => unit.side === 1)).toHaveLength(6);
+  expect(retreated.units.filter((unit) => unit.side === 2)).toHaveLength(10);
+  expect(retreated.units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 29, y: 26 });
+
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await openSystemMenu(page);
+  await page.getByTestId("group-commands-button").click();
+  await page.getByTestId("group-command-freeAction").click();
+  await waitForPhase(page, "allyAuto");
+  await expect.poll(async () => (await debugState(page)).units.some((unit) => unit.side === 1 && unit.acted)).toBe(true);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-free-action.png" });
+
+  await enterPlayerPhase();
+  await openSystemMenu(page);
+  await page.getByTestId("group-commands-button").click();
+  await page.getByTestId("group-command-followLeader").click();
+  await waitForPhase(page, "allyAuto");
+  await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
+  await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "allyAuto");
+  const alliedMovement = (await debugState(page)).movementPresentation!;
+  expect(alliedMovement.path.length).toBeGreaterThan(1);
+  for (let index = 1; index < alliedMovement.path.length; index += 1) {
+    expect(Math.abs(alliedMovement.path[index - 1].x - alliedMovement.path[index].x)
+      + Math.abs(alliedMovement.path[index - 1].y - alliedMovement.path[index].y)).toBe(1);
+  }
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-follow-leader.png" });
 });

@@ -34,6 +34,7 @@ export type GamePhase =
   | "scriptedMove"
   | "openingStory"
   | "player"
+  | "allyAuto"
   | "enemy"
   | "round2Story"
   | "defeat"

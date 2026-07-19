@@ -147,6 +147,42 @@ describe("stage 0 battle simulation", () => {
     expect(nia.life).toBe(124);
   });
 
+  it("applies the native all-rest command only to remaining unspent allies", () => {
+    const battle = battleAtPlayableOpening();
+    const nia = battle.unit("1:0")!;
+    const ximi = battle.unit("1:1")!;
+    const alreadySpent = battle.unit("1:43")!;
+    nia.life = 100;
+    ximi.life = 150;
+    alreadySpent.life = 100;
+    alreadySpent.acted = true;
+
+    expect(battle.restAllUnspentAllies()).toEqual({ count: 5, recovered: 34 });
+    expect(nia).toMatchObject({ life: 124, acted: true });
+    expect(ximi).toMatchObject({ life: 160, acted: true });
+    expect(alreadySpent).toMatchObject({ life: 100, acted: true });
+    expect(battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)).toBe(true);
+  });
+
+  it("plans ordinary allied AI attacks and leader-cohesion movement", () => {
+    const battle = battleAtPlayableOpening();
+    const adjacentAlly = battle.unit("1:43")!;
+    const freeAction = battle.planAlliedAiAction(adjacentAlly.id);
+
+    expect(freeAction).toMatchObject({ unitId: adjacentAlly.id, kind: "attack" });
+    expect(freeAction?.targetId).toBeDefined();
+    expect(freeAction?.path.length).toBeGreaterThan(0);
+
+    const distantAlly = battle.unit("1:41")!;
+    const followAction = battle.planAlliedAiAction(distantAlly.id, "1:0");
+    expect(followAction).toMatchObject({ unitId: distantAlly.id, kind: "move" });
+    expect(followAction?.path.length).toBeGreaterThan(1);
+    expect(manhattan(followAction!.path[0], distantAlly)).toBe(0);
+    for (let index = 1; index < followAction!.path.length; index += 1) {
+      expect(manhattan(followAction!.path[index - 1], followAction!.path[index])).toBe(1);
+    }
+  });
+
   it("runs behavior 12 toward the hidden palace exit without attacking", () => {
     const battle = battleAtPlayableOpening();
     const enemy = battle.unit("2:41")!;
