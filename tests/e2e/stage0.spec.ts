@@ -161,7 +161,29 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   const dialoguePortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(dialoguePortrait).toBeVisible();
   await expect(dialoguePortrait.locator(".portrait-eye")).toHaveCount(3);
+  await expect(dialoguePortrait.locator(".portrait-mouth")).toHaveCount(3);
+  await expect.poll(() => dialoguePortrait.locator(".portrait-mouth").evaluateAll((images) =>
+    images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
+  )).toBe(true);
+  await expect(dialoguePortrait).toHaveAttribute("data-speaking", "true");
+  await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-talk-count"))).toBeGreaterThan(0);
+  await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-mouth-frame", "3"); });
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-talk.png" });
+  if (await dialoguePortrait.getAttribute("data-speaking") === "true") {
+    await page.getByTestId("advance-dialogue").click();
+  }
+  await expect(dialoguePortrait).toHaveAttribute("data-speaking", "false");
+  await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-mouth-frame"); });
+  await expect(dialoguePortrait).toHaveAttribute("data-mouth-frame", "1");
   await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-blink-count"))).toBeGreaterThan(0);
+  const firstBlinkDelay = Number(await dialoguePortrait.getAttribute("data-blink-delay-ms"));
+  expect(firstBlinkDelay).toBeGreaterThanOrEqual(220);
+  expect(firstBlinkDelay).toBeLessThanOrEqual(520);
+  await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-blink-count"))).toBeGreaterThan(1);
+  const secondBlinkDelay = Number(await dialoguePortrait.getAttribute("data-blink-delay-ms"));
+  expect(secondBlinkDelay).toBeGreaterThanOrEqual(220);
+  expect(secondBlinkDelay).toBeLessThanOrEqual(520);
+  expect(secondBlinkDelay).not.toBe(firstBlinkDelay);
   await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-blink.png" });
   await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
@@ -265,6 +287,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.locator(".minimap-unit")).toHaveCount(0);
   const hudPortrait = page.getByTestId("unit-portrait-composite");
   await expect(hudPortrait.locator(".portrait-eye")).toHaveCount(3);
+  await expect(hudPortrait.locator(".portrait-mouth")).toHaveCount(3);
+  await expect(hudPortrait).toHaveAttribute("data-speaking", "false");
   await expect.poll(async () => Number(await hudPortrait.getAttribute("data-blink-count"))).toBeGreaterThan(0);
   await hudPortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-portrait-blink.png" });

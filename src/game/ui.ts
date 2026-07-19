@@ -2,7 +2,7 @@ import { ASSETS, STAGE0, nextExperienceThresholdFor, statsFor } from "./content/
 import type { GameController } from "./controller";
 import type { GamePhase, Position, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
-import { animatedPortraitMarkup, configureAnimatedPortrait, startPortraitBlinking } from "./portrait";
+import { animatedPortraitMarkup, configureAnimatedPortrait, startPortraitAnimations } from "./portrait";
 
 const storyPhases = new Set<GamePhase>(["prebattleStory", "openingStory", "round2Story", "victoryStory"]);
 
@@ -154,26 +154,41 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let dialogueFullText = "";
   let revealedCharacters = 0;
   let activeDialogueText: HTMLElement | undefined;
+  let activeDialoguePortrait: HTMLElement | undefined;
   let feedbackTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let activeFeedbackKey = "";
   let feedbackFullText = "";
   let feedbackRevealedCharacters = 0;
   let activeFeedbackText: HTMLElement | undefined;
-  startPortraitBlinking(root, controller.isTestMode);
+  let activeFeedbackPortrait: HTMLElement | undefined;
+  startPortraitAnimations(root, controller.isTestMode);
 
+  const stopSpeaking = (portrait: HTMLElement | undefined) => {
+    if (portrait) portrait.dataset.speaking = "false";
+  };
   const stopDialogueTimer = () => {
     if (dialogueTimer !== undefined) globalThis.clearTimeout(dialogueTimer);
     dialogueTimer = undefined;
   };
-  const revealDialogue = (fullText: string, key: string, target: HTMLElement, revealStart = 0) => {
+  const revealDialogue = (
+    fullText: string,
+    key: string,
+    target: HTMLElement,
+    revealStart = 0,
+    portrait?: HTMLElement,
+  ) => {
     stopDialogueTimer();
+    stopSpeaking(activeDialoguePortrait);
     activeDialogueKey = key;
     dialogueFullText = fullText;
     activeDialogueText = target;
+    activeDialoguePortrait = portrait;
     revealedCharacters = Math.max(0, Math.min(fullText.length, revealStart));
     target.textContent = fullText.slice(0, revealedCharacters);
+    if (activeDialoguePortrait) activeDialoguePortrait.dataset.speaking = String(revealedCharacters < dialogueFullText.length);
     const tick = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
+        stopSpeaking(activeDialoguePortrait);
         dialogueTimer = undefined;
         return;
       }
@@ -191,21 +206,26 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     stopDialogueTimer();
     revealedCharacters = dialogueFullText.length;
     activeDialogueText.textContent = dialogueFullText;
+    stopSpeaking(activeDialoguePortrait);
     return true;
   };
   const stopFeedbackTimer = () => {
     if (feedbackTimer !== undefined) globalThis.clearTimeout(feedbackTimer);
     feedbackTimer = undefined;
   };
-  const revealFeedback = (fullText: string, key: string, target: HTMLElement) => {
+  const revealFeedback = (fullText: string, key: string, target: HTMLElement, portrait?: HTMLElement) => {
     stopFeedbackTimer();
+    stopSpeaking(activeFeedbackPortrait);
     activeFeedbackKey = key;
     feedbackFullText = fullText;
     feedbackRevealedCharacters = 0;
     activeFeedbackText = target;
+    activeFeedbackPortrait = portrait;
     target.textContent = "";
+    if (activeFeedbackPortrait) activeFeedbackPortrait.dataset.speaking = String(fullText.length > 0);
     const tick = () => {
       if (activeFeedbackKey !== key || activeFeedbackText !== target || feedbackRevealedCharacters >= fullText.length) {
+        stopSpeaking(activeFeedbackPortrait);
         feedbackTimer = undefined;
         return;
       }
@@ -222,6 +242,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     stopFeedbackTimer();
     feedbackRevealedCharacters = feedbackFullText.length;
     activeFeedbackText.textContent = feedbackFullText;
+    stopSpeaking(activeFeedbackPortrait);
     return true;
   };
 
@@ -506,7 +527,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         elements.box.dataset.openSteps = "11";
         elements.text.removeAttribute("id");
         elements.portrait.removeAttribute("data-testid");
-        if (!state) continue;
+        if (!state) {
+          stopSpeaking(elements.portrait);
+          continue;
+        }
         elements.speaker.textContent = state.speaker ?? "";
         elements.box.setAttribute("aria-label", state.speaker ? `${state.speaker}對話` : "旁白");
         if (!active || pageChanged) elements.text.textContent = state.text;
@@ -522,26 +546,33 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           elements.portrait.dataset.testid = active
             ? "dialogue-portrait-composite"
             : `dialogue-portrait-composite-${slot}`;
+          if (!active) stopSpeaking(elements.portrait);
         } else {
+          stopSpeaking(elements.portrait);
           elements.portrait.hidden = true;
         }
       }
       if (page.activeSlot) {
         const activeState = page[page.activeSlot];
         const target = dialogueWindows[page.activeSlot].text;
+        const portrait = activeState?.portrait ? dialogueWindows[page.activeSlot].portrait : undefined;
         target.id = "dialogue-text";
-        if (pageChanged && activeState) revealDialogue(activeState.text, pageKey, target, page.revealStart);
+        if (pageChanged && activeState) revealDialogue(activeState.text, pageKey, target, page.revealStart, portrait);
       } else if (pageChanged) {
         stopDialogueTimer();
+        stopSpeaking(activeDialoguePortrait);
         activeDialogueKey = pageKey;
         activeDialogueText = undefined;
+        activeDialoguePortrait = undefined;
         dialogueFullText = "";
         revealedCharacters = 0;
       }
     } else {
       stopDialogueTimer();
+      stopSpeaking(activeDialoguePortrait);
       activeDialogueKey = "";
       activeDialogueText = undefined;
+      activeDialoguePortrait = undefined;
       dialogueFullText = "";
       revealedCharacters = 0;
     }
@@ -554,6 +585,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         ? retreatConfirm.querySelector<HTMLElement>("[data-testid=retreat-feedback-text]")
         : undefined;
     const feedbackText = resultFeedbackText ?? modalFeedbackText;
+    const feedbackPortrait = feedbackText
+      ?.closest<HTMLElement>(".native-feedback, .native-feedback-confirm")
+      ?.querySelector<HTMLElement>(".animated-portrait") ?? undefined;
     const feedbackKey = controller.phase === "defeat"
       ? "defeat"
       : controller.phase === "victoryFeedback" || controller.phase === "savePrompt"
@@ -567,20 +601,24 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       const fullText = feedbackText.dataset.fullText ?? "";
       if (controller.phase === "savePrompt") {
         stopFeedbackTimer();
+        stopSpeaking(activeFeedbackPortrait);
         activeFeedbackKey = feedbackKey;
         feedbackFullText = fullText;
         feedbackRevealedCharacters = fullText.length;
         activeFeedbackText = feedbackText;
+        activeFeedbackPortrait = feedbackPortrait;
         feedbackText.textContent = fullText;
       } else if (activeFeedbackKey !== feedbackKey || activeFeedbackText !== feedbackText) {
-        revealFeedback(fullText, feedbackKey, feedbackText);
+        revealFeedback(fullText, feedbackKey, feedbackText, feedbackPortrait);
       }
     } else {
       stopFeedbackTimer();
+      stopSpeaking(activeFeedbackPortrait);
       activeFeedbackKey = "";
       feedbackFullText = "";
       feedbackRevealedCharacters = 0;
       activeFeedbackText = undefined;
+      activeFeedbackPortrait = undefined;
     }
     renderCombat(combatPresentation, controller);
   };

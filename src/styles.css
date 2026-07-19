@@ -77,7 +77,8 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .animated-portrait { position: relative; display: block; overflow: hidden; image-rendering: pixelated; }
 .animated-portrait > img { position: absolute; display: block; image-rendering: pixelated; pointer-events: none; }
 .animated-portrait .portrait-base { z-index: 0; inset: 0; width: 100%; height: 100%; }
-.animated-portrait .portrait-eye { z-index: 1; opacity: 0; }
+.animated-portrait .portrait-eye,
+.animated-portrait .portrait-mouth { z-index: 1; opacity: 0; }
 .animated-portrait[data-blink-frame="1"] .portrait-eye-1,
 .animated-portrait[data-blink-frame="2"] .portrait-eye-2,
 .animated-portrait[data-blink-frame="3"] .portrait-eye-3 { opacity: 1; }
@@ -85,6 +86,13 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .animated-portrait[data-force-blink-frame="1"] .portrait-eye-1,
 .animated-portrait[data-force-blink-frame="2"] .portrait-eye-2,
 .animated-portrait[data-force-blink-frame="3"] .portrait-eye-3 { opacity: 1; }
+.animated-portrait[data-mouth-frame="1"] .portrait-mouth-1,
+.animated-portrait[data-mouth-frame="2"] .portrait-mouth-2,
+.animated-portrait[data-mouth-frame="3"] .portrait-mouth-3 { opacity: 1; }
+.animated-portrait[data-force-mouth-frame] .portrait-mouth { opacity: 0; }
+.animated-portrait[data-force-mouth-frame="1"] .portrait-mouth-1,
+.animated-portrait[data-force-mouth-frame="2"] .portrait-mouth-2,
+.animated-portrait[data-force-mouth-frame="3"] .portrait-mouth-3 { opacity: 1; }
 
 .unit-hud { position: absolute; z-index: 7; left: 484px; top: 4px; width: 152px; height: 315px; pointer-events: none; }
 .hud-tactical { z-index: 0; }
