@@ -34,6 +34,7 @@ interface DebugState {
     stepIndex: number;
   };
   reachable: Array<{ x: number; y: number }>;
+  targets: Array<{ x: number; y: number }>;
   units: Array<{ id: string; side: number; x: number; y: number; life: number; experience: number; name: string; portrait: number; acted: boolean }>;
 }
 
@@ -221,6 +222,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("action-menu")).toBeHidden();
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-mode", "enemyPreview");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-cell-count", String(enemyPreview.reachable.length));
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-enemy-movement-preview.png" });
   await clickCanvas(page, 420, 45);
   expect((await debugState(page))).toMatchObject({ actionMode: "idle", reachable: [] });
@@ -281,6 +283,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   const movementRange = (await debugState(page)).reachable;
   expect(movementRange.length).toBeGreaterThan(1);
   expect(movementRange.every((cell) => Math.abs(cell.x - 29) + Math.abs(cell.y - 26) <= 3)).toBe(true);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-retained-fraction", "0.25");
+  expect(Number(await page.getByTestId("battle-canvas").getAttribute("data-native-dither-cell-count"))).toBeGreaterThan(0);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-selected-unit.png" });
   await clickCanvas(page, 180, 177);
   await expect(page.getByTestId("action-menu")).toBeVisible();
@@ -295,7 +299,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-post-move-command-menu.png" });
   await page.locator("[data-action=attack]").click();
-  await clickCanvas(page, 140, 177);
+  await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   await expect(page.getByTestId("combat-presentation")).toBeHidden();
   state = await debugState(page);
   expect(state.units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 28, y: 26 });
@@ -385,7 +389,6 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await clickCanvas(page, 220, 177);
   await clickCanvas(page, 220, 177);
   await page.locator("[data-action=attack]").click();
-  await clickCanvas(page, 260, 177);
   await expect(page.getByTestId("combat-presentation")).toBeVisible();
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-combat.png" });
   await waitForPhase(page, "victoryStory");
@@ -601,4 +604,41 @@ test("S00-H: minimap hover previews and primary click relocates the native viewp
     units: baseline.units,
     rngState: baseline.rngState,
   });
+});
+
+test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {
+  await page.goto("/?test=1");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+
+  // Nia has no adjacent target at the untouched opening: remain in the
+  // profession menu and restore the neutral fully bright map.
+  await page.keyboard.press(" ");
+  await page.getByTestId("unit-command-attack").click();
+  expect((await debugState(page))).toMatchObject({ actionMode: "actionMenu", targets: [] });
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
+  await page.keyboard.press("Enter");
+
+  // Two legal targets enter manual target selection. Only those two cells
+  // remain bright; every other visible cell uses the exact 1/4 dither mask.
+  await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
+  await page.keyboard.press(" ");
+  await page.getByTestId("unit-command-attack").click();
+  const multiTarget = await debugState(page);
+  expect(multiTarget.actionMode).toBe("target");
+  expect(multiTarget.targets).toHaveLength(2);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "68");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-retained-fraction", "0.25");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-target-dither.png" });
+  const target = multiTarget.targets[0];
+  await clickCanvas(
+    page,
+    40 + (target.x - multiTarget.cameraOrigin.x) * 40 + 20,
+    23 + (target.y - multiTarget.cameraOrigin.y) * 44 + 22,
+  );
+  await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
+  expect((await debugState(page)).actionMode).toBe("idle");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
 });

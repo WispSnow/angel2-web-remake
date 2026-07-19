@@ -310,6 +310,16 @@ export class GameController {
       this.emit();
       return;
     }
+    if (this.targets.length === 1) {
+      const target = this.battle.unitAt(this.targets[0]);
+      if (target) {
+        this.cursor = { x: target.x, y: target.y };
+        this.statusMessage = "唯一合法目標已自動鎖定。";
+        this.emit();
+        void this.commitAttack(target.id);
+      }
+      return;
+    }
     this.actionMode = "target";
     this.statusMessage = "選擇紅色標記的敵人。";
     this.emit();
@@ -987,6 +997,30 @@ export class GameController {
     this.emit();
   }
 
+  forceMultipleTargetsForTest(): void {
+    if (!this.testMode) return;
+    const nia = this.battle.unit("1:0");
+    const enemies = this.battle.units.filter((unit) => unit.side === 2).slice(0, 2);
+    if (!nia || enemies.length < 2) return;
+    nia.x = 29;
+    nia.y = 26;
+    nia.acted = false;
+    enemies[0].x = 28;
+    enemies[0].y = 26;
+    enemies[1].x = 30;
+    enemies[1].y = 26;
+    this.battle.units = this.battle.units.filter((unit) => unit.side === 1 || enemies.some((enemy) => enemy.id === unit.id));
+    for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) unit.acted = true;
+    this.battle.focusId = nia.id;
+    this.phase = "player";
+    this.cameraOrigin = { ...STAGE0.viewport.initialOrigin };
+    this.cursor = { x: nia.x, y: nia.y };
+    this.resetAction();
+    this.statusMessage = "自動驗收：妮雅已有兩個合法普通攻擊目標。";
+    this.busy = false;
+    this.emit();
+  }
+
   debugState(): object {
     return {
       phase: this.phase,
@@ -1016,6 +1050,7 @@ export class GameController {
         path: this.movementPresentation.path.map((step) => ({ ...step })),
       } : undefined,
       reachable: this.reachable.map((cell) => ({ ...cell })),
+      targets: this.targets.map((cell) => ({ ...cell })),
       ...this.battle.snapshot(),
     };
   }
@@ -1138,6 +1173,7 @@ export interface Angel2DebugApi {
   forceDefeat: () => void;
   forceVictorySetup: () => void;
   forceEvacuationSetup: () => void;
+  forceMultipleTargets: () => void;
   clearSaves: () => void;
 }
 
@@ -1155,6 +1191,7 @@ export function exposeDebugApi(controller: GameController): void {
     forceDefeat: () => controller.forceDefeatForTest(),
     forceVictorySetup: () => controller.forceVictorySetupForTest(),
     forceEvacuationSetup: () => controller.forceEvacuationSetupForTest(),
+    forceMultipleTargets: () => controller.forceMultipleTargetsForTest(),
     clearSaves: () => {
       for (let slot = 1; slot <= 5; slot += 1) localStorage.removeItem(`angel2.save.${slot}`);
     },

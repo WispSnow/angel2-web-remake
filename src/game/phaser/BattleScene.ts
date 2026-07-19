@@ -37,6 +37,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
   return class BattleScene extends Phaser.Scene {
     private rangeGraphics!: Phaser.GameObjects.Graphics;
     private cursorGraphics!: Phaser.GameObjects.Graphics;
+    private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
     private unitViews = new Map<string, UnitView>();
     private unsubscribe?: () => void;
     private edgePan?: { x: number; y: number };
@@ -61,6 +62,21 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.add.image(0, 0, "stage0-map").setOrigin(0).setDepth(0);
       this.rangeGraphics = this.add.graphics().setDepth(2);
       this.cursorGraphics = this.add.graphics().setDepth(10);
+      if (!this.textures.exists("native-range-dither")) {
+        const texture = this.textures.createCanvas("native-range-dither", 8, 2);
+        const context = texture?.getContext();
+        if (texture && context) {
+          context.clearRect(0, 0, 8, 2);
+          context.fillStyle = "#000";
+          for (let row = 0; row < 2; row += 1) {
+            const retained = row === 0 ? new Set([3, 7]) : new Set([1, 5]);
+            for (let column = 0; column < 8; column += 1) {
+              if (!retained.has(column)) context.fillRect(column, row, 1, 1);
+            }
+          }
+          texture.refresh();
+        }
+      }
       this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
         if (pointer.button === 2) {
           controller.secondaryAction();
@@ -84,6 +100,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.input.off("pointermove", this.handlePointerMove, this);
         this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.publishMovementFrame, this);
         this.game.canvas.removeEventListener("pointerleave", this.handleCanvasPointerLeave);
+        for (const tile of this.rangeMaskTiles) tile.destroy();
+        this.rangeMaskTiles = [];
         this.clearEdgePan();
       });
       this.sync();
@@ -206,12 +224,27 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private drawRanges(): void {
       this.rangeGraphics.clear();
-      if (controller.actionMode === "move") {
-        this.rangeGraphics.fillStyle(0x2d72ff, 0.38);
-        this.rangeGraphics.lineStyle(2, 0xc8e8ff, 0.85);
-        for (const cell of controller.reachable) {
-          this.rangeGraphics.fillRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
-          this.rangeGraphics.strokeRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
+      for (const tile of this.rangeMaskTiles) tile.destroy();
+      this.rangeMaskTiles = [];
+
+      const nativeLegalCells = controller.actionMode === "move"
+        ? controller.reachable
+        : controller.actionMode === "target"
+          ? controller.targets
+          : undefined;
+      if (nativeLegalCells) {
+        const legal = new Set(nativeLegalCells.map(({ x, y }) => `${x},${y}`));
+        for (let row = 0; row < 7; row += 1) {
+          for (let column = 0; column < 10; column += 1) {
+            const x = controller.cameraOrigin.x + column;
+            const y = controller.cameraOrigin.y + row;
+            if (legal.has(`${x},${y}`)) continue;
+            this.rangeMaskTiles.push(
+              this.add.tileSprite(x * TILE_WIDTH, y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT, "native-range-dither")
+                .setOrigin(0)
+                .setDepth(2),
+            );
+          }
         }
       }
       if (controller.actionMode === "enemyPreview") {
@@ -222,13 +255,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           this.rangeGraphics.strokeRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
         }
       }
-      if (controller.actionMode === "target") {
-        this.rangeGraphics.fillStyle(0xe3212d, 0.46);
-        this.rangeGraphics.lineStyle(3, 0xffef8a, 1);
-        for (const cell of controller.targets) {
-          this.rangeGraphics.fillRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
-          this.rangeGraphics.strokeRect(cell.x * TILE_WIDTH + 3, cell.y * TILE_HEIGHT + 3, TILE_WIDTH - 6, TILE_HEIGHT - 6);
-        }
+      if (controller.isTestMode) {
+        this.game.canvas.dataset.nativeDitherCellCount = String(this.rangeMaskTiles.length);
+        this.game.canvas.dataset.nativeDitherRetainedFraction = this.rangeMaskTiles.length > 0 ? "0.25" : "1";
       }
     }
 
