@@ -542,8 +542,39 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await page.keyboard.press("ArrowDown");
   expect((await debugState(page)).commandIndex).toBe(1);
   await expect(page.getByTestId("unit-command-attack")).toHaveAttribute("aria-current", "true");
-  await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 220, y: 177 } });
-  await expect(page.getByTestId("action-menu")).toBeHidden();
+  const beforeRightCycle = await debugState(page);
+  const rightClickFocusOrder = [
+    { x: 27, y: 25 },
+    { x: 21, y: 27 },
+    { x: 28, y: 29 },
+    { x: 27, y: 32 },
+    { x: 22, y: 37 },
+    { x: 29, y: 26 },
+  ];
+  for (const [index, expectedCursor] of rightClickFocusOrder.entries()) {
+    await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 220, y: 177 } });
+    await expect.poll(async () => (await debugState(page)).cursor).toEqual(expectedCursor);
+    expect((await debugState(page))).toMatchObject({
+      actionMode: "idle",
+      systemMenuOpen: false,
+    });
+    if (index === 0) {
+      await expect(page.getByTestId("action-menu")).toBeHidden();
+      await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-right-click-next-ally.png" });
+    }
+  }
+  const afterRightCycle = await debugState(page);
+  expect(afterRightCycle.units).toEqual(beforeRightCycle.units);
+  expect(afterRightCycle.rngState).toBe(beforeRightCycle.rngState);
+
+  // Only Esc opens the battle system menu. The keyboard secondary action does
+  // not reuse that shortcut, and mouse right-click remains the ally-cycle verb.
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeHidden();
 
   const dimensions = await page.getByTestId("battle-canvas").evaluate((canvas) => ({
     logicalWidth: (canvas as HTMLCanvasElement).width,

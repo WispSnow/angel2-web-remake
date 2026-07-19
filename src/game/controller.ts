@@ -1296,8 +1296,39 @@ export class GameController {
     else if (this.groupCommandOpen) this.closeGroupCommands();
     else if (this.objectiveOpen) this.closeObjectives();
     else if (this.systemMenuOpen) this.closeSystemMenu();
-    else if (this.phase === "player" && this.actionMode === "idle") this.openSystemMenu();
+    else if (this.phase === "player" && this.actionMode === "idle") return;
     else this.cancelAction();
+  }
+
+  async focusNextUnactedAlly(): Promise<void> {
+    if (this.phase !== "player" || this.busy || this.hasBlockingOverlay) return;
+    const cursorUnit = this.battle.unitAt(this.cursor);
+    const anchorId = this.selectedUnit?.id ?? (cursorUnit?.side === 1 ? cursorUnit.id : this.battle.focusId);
+    if (this.actionMode === "actionMenu" && this.commandMenuKind === "postMove") {
+      await this.rollbackSelectedMovement();
+      if (this.phase !== "player" || this.busy) return;
+    }
+    this.resetAction();
+    const allies = this.battle.units.filter((unit) => unit.side === 1);
+    const anchorIndex = allies.findIndex((unit) => unit.id === anchorId);
+    let next = allies.find((unit) => !unit.acted);
+    for (let offset = 1; offset <= allies.length; offset += 1) {
+      const candidate = allies[(anchorIndex + offset + allies.length) % allies.length];
+      if (candidate && !candidate.acted) {
+        next = candidate;
+        break;
+      }
+    }
+    if (!next) {
+      this.statusMessage = "目前沒有尚未行動的我方單位。";
+      this.emit();
+      return;
+    }
+    this.battle.focusId = next.id;
+    this.cursor = { x: next.x, y: next.y };
+    this.centerCamera(next);
+    this.statusMessage = `已對焦下一名可行動友軍：${next.name}。`;
+    this.emit();
   }
 
   markHintSeen(): void {

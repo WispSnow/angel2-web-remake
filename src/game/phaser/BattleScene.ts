@@ -108,7 +108,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
       this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
         if (pointer.button === 2) {
-          controller.secondaryAction();
+          void controller.focusNextUnactedAlly();
           return;
         }
         if (pointer.button !== 0) return;
