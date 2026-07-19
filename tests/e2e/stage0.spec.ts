@@ -167,8 +167,10 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   )).toBe(true);
   await expect(dialoguePortrait).toHaveAttribute("data-speaking", "true");
   await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-talk-count"))).toBeGreaterThan(0);
-  await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-mouth-frame", "3"); });
+  await expect(dialoguePortrait).toHaveAttribute("data-mouth-frame", /^[12]$/);
+  await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-mouth-frame", "2"); });
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-talk.png" });
+  await dialoguePortrait.screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-talk-detail.png" });
   if (await dialoguePortrait.getAttribute("data-speaking") === "true") {
     await page.getByTestId("advance-dialogue").click();
   }

@@ -11,14 +11,6 @@ interface BlinkState {
   count: number;
 }
 
-interface TalkState {
-  portrait: PortraitRecord;
-  active: boolean;
-  sequenceIndex: number;
-  transitionAt: number;
-  count: number;
-}
-
 interface PortraitMarkupOptions {
   alt: string;
   channel: string;
@@ -29,18 +21,35 @@ interface PortraitMarkupOptions {
 
 const HALF_FRAME_MS = 85;
 const CLOSED_FRAME_MS = 135;
-const BLINK_IDLE_MIN_MS = 1_800;
-const BLINK_IDLE_MAX_MS = 5_400;
+const BLINK_IDLE_MIN_MS = 600;
+const BLINK_IDLE_MAX_MS = 2_400;
 const TEST_BLINK_IDLE_MIN_MS = 220;
 const TEST_BLINK_IDLE_MAX_MS = 520;
-const TALK_FRAME_MIN_MS = 75;
-const TALK_FRAME_MAX_MS = 140;
-const TALK_SEQUENCE = ["1", "2", "3", "2"] as const;
 const PORTRAIT_SIZE = 112;
 
 const percentage = (value: number) => `${(value / PORTRAIT_SIZE * 100).toFixed(6)}%`;
 const randomInteger = (minimum: number, maximum: number) =>
   minimum + Math.floor(Math.random() * (maximum - minimum + 1));
+
+export type NativeMouthFrame = "1" | "2";
+
+/**
+ * Both native story renderers toggle the mouth only after drawing a Big5
+ * double-byte glyph (AL > 7Fh). The decoded story corpus represents those
+ * glyphs as non-ASCII Unicode code points.
+ */
+export function nativeStoryGlyphMovesMouth(character: string): boolean {
+  return (character.codePointAt(0) ?? 0) > 0x7f;
+}
+
+export function nativeMouthFrameAfterGlyph(
+  currentFrame: string | undefined,
+  character: string,
+): NativeMouthFrame {
+  const normalizedFrame: NativeMouthFrame = currentFrame === "2" ? "2" : "1";
+  if (!nativeStoryGlyphMovesMouth(character)) return normalizedFrame;
+  return normalizedFrame === "1" ? "2" : "1";
+}
 
 function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string): string {
   const animation = ASSETS.portraitAnimations[portrait];
@@ -105,7 +114,6 @@ export function configureAnimatedPortrait(
 
 export function startPortraitAnimations(root: HTMLElement, testMode: boolean): () => void {
   const blinkStates = new Map<string, BlinkState>();
-  const talkStates = new Map<string, TalkState>();
   let animationFrame = 0;
 
   const idleDelay = (previous?: number) => {
@@ -151,34 +159,6 @@ export function startPortraitAnimations(root: HTMLElement, testMode: boolean): (
     return "1";
   };
 
-  const resetTalkState = (portrait: PortraitRecord, now: number): TalkState => ({
-    portrait,
-    active: false,
-    sequenceIndex: 0,
-    transitionAt: now,
-    count: 0,
-  });
-
-  const advanceTalk = (state: TalkState, speaking: boolean, now: number): "1" | "2" | "3" => {
-    if (!speaking) {
-      state.active = false;
-      state.sequenceIndex = 0;
-      state.transitionAt = now;
-      return "1";
-    }
-    if (!state.active) {
-      state.active = true;
-      state.sequenceIndex = 1;
-      state.transitionAt = now + randomInteger(TALK_FRAME_MIN_MS, TALK_FRAME_MAX_MS);
-      state.count += 1;
-    } else if (now >= state.transitionAt) {
-      state.sequenceIndex = (state.sequenceIndex + 1) % TALK_SEQUENCE.length;
-      state.transitionAt = now + randomInteger(TALK_FRAME_MIN_MS, TALK_FRAME_MAX_MS);
-      state.count += 1;
-    }
-    return TALK_SEQUENCE[state.sequenceIndex];
-  };
-
   const tick = (now: number) => {
     for (const element of root.querySelectorAll<HTMLElement>("[data-portrait-channel]")) {
       const channel = element.dataset.portraitChannel;
@@ -189,17 +169,10 @@ export function startPortraitAnimations(root: HTMLElement, testMode: boolean): (
         blinkState = resetBlinkState(portrait, now);
         blinkStates.set(channel, blinkState);
       }
-      let talkState = talkStates.get(channel);
-      if (!talkState || talkState.portrait !== portrait) {
-        talkState = resetTalkState(portrait, now);
-        talkStates.set(channel, talkState);
-      }
       advanceBlink(blinkState, now);
       element.dataset.blinkFrame = blinkFrameFor(blinkState.stage);
       element.dataset.blinkCount = String(blinkState.count);
       element.dataset.blinkDelayMs = String(blinkState.idleDelayMs);
-      element.dataset.mouthFrame = advanceTalk(talkState, element.dataset.speaking === "true", now);
-      element.dataset.talkCount = String(talkState.count);
     }
     animationFrame = requestAnimationFrame(tick);
   };

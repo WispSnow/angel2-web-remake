@@ -2,7 +2,13 @@ import { ASSETS, STAGE0, nextExperienceThresholdFor, statsFor } from "./content/
 import type { GameController } from "./controller";
 import type { GamePhase, Position, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
-import { animatedPortraitMarkup, configureAnimatedPortrait, startPortraitAnimations } from "./portrait";
+import {
+  animatedPortraitMarkup,
+  configureAnimatedPortrait,
+  nativeMouthFrameAfterGlyph,
+  nativeStoryGlyphMovesMouth,
+  startPortraitAnimations,
+} from "./portrait";
 
 const storyPhases = new Set<GamePhase>(["prebattleStory", "openingStory", "round2Story", "victoryStory"]);
 
@@ -164,7 +170,19 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   startPortraitAnimations(root, controller.isTestMode);
 
   const stopSpeaking = (portrait: HTMLElement | undefined) => {
-    if (portrait) portrait.dataset.speaking = "false";
+    if (!portrait) return;
+    portrait.dataset.speaking = "false";
+    portrait.dataset.mouthFrame = "1";
+  };
+  const startSpeaking = (portrait: HTMLElement | undefined, speaking: boolean) => {
+    if (!portrait) return;
+    portrait.dataset.speaking = String(speaking);
+    portrait.dataset.mouthFrame = "1";
+  };
+  const drawSpeechGlyph = (portrait: HTMLElement | undefined, character: string) => {
+    if (!portrait || !nativeStoryGlyphMovesMouth(character)) return;
+    portrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(portrait.dataset.mouthFrame, character);
+    portrait.dataset.talkCount = String(Number(portrait.dataset.talkCount ?? "0") + 1);
   };
   const stopDialogueTimer = () => {
     if (dialogueTimer !== undefined) globalThis.clearTimeout(dialogueTimer);
@@ -185,7 +203,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     activeDialoguePortrait = portrait;
     revealedCharacters = Math.max(0, Math.min(fullText.length, revealStart));
     target.textContent = fullText.slice(0, revealedCharacters);
-    if (activeDialoguePortrait) activeDialoguePortrait.dataset.speaking = String(revealedCharacters < dialogueFullText.length);
+    startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length);
     const tick = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
         stopSpeaking(activeDialoguePortrait);
@@ -196,6 +214,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       revealedCharacters += 1;
       target.textContent = dialogueFullText.slice(0, revealedCharacters);
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
+      drawSpeechGlyph(activeDialoguePortrait, character);
       const delay = controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80;
       dialogueTimer = globalThis.setTimeout(tick, delay);
     };
@@ -222,7 +241,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     activeFeedbackText = target;
     activeFeedbackPortrait = portrait;
     target.textContent = "";
-    if (activeFeedbackPortrait) activeFeedbackPortrait.dataset.speaking = String(fullText.length > 0);
+    startSpeaking(activeFeedbackPortrait, fullText.length > 0);
     const tick = () => {
       if (activeFeedbackKey !== key || activeFeedbackText !== target || feedbackRevealedCharacters >= fullText.length) {
         stopSpeaking(activeFeedbackPortrait);
@@ -233,6 +252,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       feedbackRevealedCharacters += 1;
       target.textContent = fullText.slice(0, feedbackRevealedCharacters);
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
+      drawSpeechGlyph(activeFeedbackPortrait, character);
       feedbackTimer = globalThis.setTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
     };
     tick();
