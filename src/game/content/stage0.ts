@@ -179,6 +179,7 @@ export const ASSETS = {
   },
   audio: {
     story: "/assets/original/story-stage0.wav",
+    battle: "/assets/original/battle-stage0.wav",
     confirm: "/assets/original/ui-confirm.wav",
     effects: {
       2: "/assets/original/audio/e/02.wav",

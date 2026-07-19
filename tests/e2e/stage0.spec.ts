@@ -1079,3 +1079,33 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await expect(page.getByRole("menu", { name: "是否儲存" })).toBeVisible();
   await expect(page.getByTestId("save-yes")).toHaveText("確 定");
 });
+
+test("S00-P: stage zero switches from prebattle RIX to looping battle music and honors the music toggle", async ({ page }) => {
+  const app = page.locator("#app");
+  const battleRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/assets/original/battle-stage0.wav")) battleRequests.push(request.url());
+  });
+
+  await page.goto("/?test=1");
+  await expect(app).toHaveAttribute("data-music-track", "MAGIC/73");
+  await expect(app).toHaveAttribute("data-music-playing", "false");
+
+  // A neutral click supplies the browser user gesture without advancing SAY/0000.
+  await page.getByTestId("game-screen").click({ position: { x: 620, y: 340 } });
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+  await expect(app).toHaveAttribute("data-music-loop", "true");
+
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/29");
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+  await expect(app).toHaveAttribute("data-music-loop", "true");
+  expect(battleRequests.length).toBeGreaterThan(0);
+
+  await page.keyboard.press("m");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/29");
+  await expect(app).toHaveAttribute("data-music-playing", "false");
+  await page.keyboard.press("m");
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+});
