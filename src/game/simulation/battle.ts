@@ -1,4 +1,4 @@
-import { STAGE0, TERRAIN_DEFENSE_PERCENT, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
+import { STAGE0, STAGE0_AI_CLASS_PRIORITY, TERRAIN_DEFENSE_PERCENT, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import type { AttackResult, BattleOutcome, BattleUnit, Position } from "../types";
 import { DeterministicRng } from "./rng";
 import { manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath } from "./grid";
@@ -223,10 +223,23 @@ export class Stage0Battle {
     return reachableCells(unit, this.units, STAGE0.enemyRouteMovement);
   }
 
+  enemyActionOrder(): string[] {
+    return this.units
+      .filter((unit) => unit.side === 2 && !unit.acted)
+      .sort((left, right) => {
+        const priority = STAGE0_AI_CLASS_PRIORITY[left.classId] - STAGE0_AI_CLASS_PRIORITY[right.classId];
+        if (priority !== 0) return priority;
+        return (left.y * STAGE0.width + left.x) - (right.y * STAGE0.width + right.x);
+      })
+      .map((unit) => unit.id);
+  }
+
   planRouteEnemy(id: string): RouteMoveResult | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2) return undefined;
-    const path = routePath(unit, STAGE0.enemyExitCells, this.units, STAGE0.enemyRouteMovement);
+    const route = routePath(unit, [STAGE0.enemyRouteTarget], this.units, STAGE0.enemyRouteMovement);
+    const exitIndex = route.findIndex((position, index) => index > 0 && isStage0Exit(position));
+    const path = exitIndex >= 0 ? route.slice(0, exitIndex + 1) : route;
     const destination = path.at(-1) ?? { x: unit.x, y: unit.y };
     return {
       path,

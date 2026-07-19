@@ -22,12 +22,32 @@ interface SearchResult {
   previous: Map<string, string>;
 }
 
+type Direction = Readonly<Position>;
+
+// Behavior 12's native path builder rotates between three PIT-selected
+// direction tables. Stable-remake uses residue 0 so equal-cost routes remain
+// deterministic and preserve one of the original tables (-50,-1,+50,+1).
+const STABLE_NATIVE_ROUTE_DIRECTIONS: readonly Direction[] = [
+  { x: 0, y: -1 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 1, y: 0 },
+];
+
+function directedNeighbors(position: Position, directions?: readonly Direction[]): Position[] {
+  if (!directions) return neighbors(position);
+  return directions
+    .map(({ x, y }) => ({ x: position.x + x, y: position.y + y }))
+    .filter(({ x, y }) => x >= 0 && y >= 0 && x < STAGE0.width && y < STAGE0.height);
+}
+
 function search(
   start: Position,
   classId: UnitClassId,
   budget: number,
   blocked: ReadonlySet<string>,
   stopAfterEntering: ReadonlySet<string> = new Set(),
+  directions?: readonly Direction[],
 ): SearchResult {
   const costs = new Map<string, number>([[positionKey(start), 0]]);
   const previous = new Map<string, string>();
@@ -45,7 +65,7 @@ function search(
     // terminal cell and cannot be used to reach cells beyond it.
     if (currentKey !== startKey && stopAfterEntering.has(currentKey)) continue;
 
-    for (const next of neighbors(current.position)) {
+    for (const next of directedNeighbors(current.position, directions)) {
       const key = positionKey(next);
       const step = movementCost(classId, next);
       if (step >= 98 || (blocked.has(key) && key !== positionKey(start))) continue;
@@ -141,16 +161,23 @@ export function routePath(
       .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
       .map(positionKey),
   );
-  const result = search(unit, unit.classId, movementBudget, blocked, zoneOfControl(unit, units));
+  const routeResult = search(
+    unit,
+    unit.classId,
+    movementBudget,
+    blocked,
+    zoneOfControl(unit, units),
+    STABLE_NATIVE_ROUTE_DIRECTIONS,
+  );
   const reachableExits = targets
-    .filter((target) => result.costs.has(positionKey(target)) && !occupied.has(positionKey(target)))
-    .sort((left, right) => (result.costs.get(positionKey(left)) ?? 0) - (result.costs.get(positionKey(right)) ?? 0));
-  if (reachableExits[0]) return reconstructPath(unit, reachableExits[0], result);
+    .filter((target) => routeResult.costs.has(positionKey(target)) && !occupied.has(positionKey(target)))
+    .sort((left, right) => (routeResult.costs.get(positionKey(left)) ?? 0) - (routeResult.costs.get(positionKey(right)) ?? 0));
+  if (reachableExits[0]) return reconstructPath(unit, reachableExits[0], routeResult);
 
   let best: Position = { x: unit.x, y: unit.y };
   let bestDistance = distanceToNearest(best, targets);
   let bestCost = 0;
-  for (const [key, cost] of result.costs) {
+  for (const [key, cost] of routeResult.costs) {
     if (occupied.has(key)) continue;
     const position = parsePositionKey(key);
     const distance = distanceToNearest(position, targets);
@@ -160,7 +187,7 @@ export function routePath(
       bestCost = cost;
     }
   }
-  return reconstructPath(unit, best, result);
+  return reconstructPath(unit, best, routeResult);
 }
 
 export function routeStep(

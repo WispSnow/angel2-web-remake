@@ -341,6 +341,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("group-command-allRest").click();
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "enemy");
   const enemyMovement = (await debugState(page)).movementPresentation!;
+  expect(enemyMovement.unitId).toBe("2:15");
   const enemySamples = await sampleTrackedUnitPosition(page);
   expectStableTracking(enemySamples);
   expectCursorLocked(enemySamples, enemyMovement.path.at(-1)!);

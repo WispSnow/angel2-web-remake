@@ -615,7 +615,7 @@ export class GameController {
     this.phase = "enemy";
     this.statusMessage = "敵方階段：騎士團部隊向出口撤離。";
     this.emit();
-    const enemyIds = this.battle.units.filter((unit) => unit.side === 2).map((unit) => unit.id);
+    const enemyIds = this.battle.enemyActionOrder();
     for (const id of enemyIds) {
       if (!this.battle.unit(id)) continue;
       const movement = this.battle.planRouteEnemy(id);

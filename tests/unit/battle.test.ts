@@ -198,6 +198,27 @@ describe("stage 0 battle simulation", () => {
     expect(battle.units.filter((unit) => unit.side === 1).map((unit) => unit.life)).toEqual(alliedLives);
   });
 
+  it("uses native class priority followed by stable row-major scanning", () => {
+    const battle = battleAtPlayableOpening();
+
+    expect(battle.enemyActionOrder()).toEqual([
+      "2:15",
+      "2:48",
+      "2:46",
+      "2:47",
+      "2:45",
+      "2:44",
+      "2:43",
+      "2:40",
+      "2:41",
+      "2:42",
+    ]);
+
+    battle.unit("2:15")!.acted = true;
+    expect(battle.enemyActionOrder()[0]).toBe("2:48");
+    expect(battle.enemyActionOrder()).not.toContain("2:15");
+  });
+
   it("plans every enemy route with the current allied zone of control", () => {
     const battle = battleAtPlayableOpening();
     const enemyIds = battle.units.filter((unit) => unit.side === 2).map((unit) => unit.id);
@@ -254,10 +275,23 @@ describe("stage 0 battle simulation", () => {
     hading.y = leftExit.y - 1;
     const movement = battle.moveRouteEnemy(hading.id)!;
     expect(movement.reachedExit).toBe(true);
-    expect(STAGE0.enemyExitCells).toContainEqual(movement.destination);
+    expect(movement.destination).toEqual(STAGE0.enemyRouteTarget);
     expect(movement.path.at(-1)).toEqual(movement.destination);
+    expect(movement.path.filter((step) => STAGE0.enemyExitCells.some((exit) => positionKey(exit) === positionKey(step)))).toHaveLength(1);
     expect(battle.unit(hading.id)).toBeUndefined();
     expect(battle.outcome()).toBe("victory");
+
+    const crossingBattle = battleAtPlayableOpening();
+    const crossingNia = crossingBattle.unit("1:0")!;
+    const crossingHading = crossingBattle.unit("2:15")!;
+    crossingBattle.units = [crossingNia, crossingHading];
+    crossingHading.x = leftExit.x - 1;
+    crossingHading.y = leftExit.y;
+    const crossingMovement = crossingBattle.moveRouteEnemy(crossingHading.id)!;
+    expect(crossingMovement.destination).toEqual(leftExit);
+    expect(crossingMovement.path.at(-1)).toEqual(leftExit);
+    expect(crossingMovement.path).not.toContainEqual(STAGE0.enemyRouteTarget);
+    expect(crossingBattle.unit(crossingHading.id)).toBeUndefined();
   });
 
   it("advances rounds and refreshes action state", () => {

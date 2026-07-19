@@ -20,6 +20,14 @@ export const STAGE0 = {
   defeat: "妮雅戰敗。",
 } as const;
 
+// Module 29 schedules AI by the native 39-entry class-code priority table.
+// Only the two classes present in stage 0 are part of this vertical slice:
+// 1A/騎兵 is priority 16 and 0A/士兵 is priority 36.
+export const STAGE0_AI_CLASS_PRIORITY: Record<UnitClassId, number> = {
+  0: 36,
+  22: 16,
+};
+
 export function isStage0Exit(position: Position): boolean {
   return STAGE0.enemyExitCells.some(({ x, y }) => position.x === x && position.y === y);
 }
