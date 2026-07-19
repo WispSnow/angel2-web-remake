@@ -345,7 +345,15 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(movementRange.every((cell) => Math.abs(cell.x - 29) + Math.abs(cell.y - 26) <= 3)).toBe(true);
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-retained-fraction", "0.25");
   expect(Number(await page.getByTestId("battle-canvas").getAttribute("data-native-dither-cell-count"))).toBeGreaterThan(0);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-selected-unit.png" });
+  // Candidate selection follows pointer hover without committing movement:
+  // the yellow cursor moves to the candidate while the unit stays at origin.
+  await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "move",
+    cursor: { x: 28, y: 26 },
+  });
+  expect((await debugState(page)).units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 29, y: 26 });
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-move-candidate-hover.png" });
   await clickCanvas(page, 180, 177);
   await expect(page.getByTestId("action-menu")).toBeVisible();
   expect((await debugState(page))).toMatchObject({

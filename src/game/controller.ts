@@ -377,7 +377,7 @@ export class GameController {
   focusCell(position: Position): void {
     if (
       this.phase !== "player"
-      || this.actionMode !== "idle"
+      || !["idle", "move", "target"].includes(this.actionMode)
       || this.hasBlockingOverlay
       || this.busy
     ) return;
