@@ -161,6 +161,10 @@ export const ASSETS = {
       eyes: ["open", "half", "closed"].map((frame) => `/assets/original/portrait-animation/portrait-48-eye-${frame}.png`),
     },
   },
+  mapCombat: {
+    hit: Array.from({ length: 8 }, (_, frame) => `/assets/original/map-combat/hit/${String(frame).padStart(2, "0")}.png`),
+    death: Array.from({ length: 38 }, (_, frame) => `/assets/original/map-combat/death/${String(frame).padStart(2, "0")}.png`),
+  },
   fullBattle: {
     allySoldier: [0, 1, 2, 3].map((frame) => `/assets/original/full-ally-soldier-0${frame}.png`),
     enemySoldier: [0, 1, 2, 3].map((frame) => `/assets/original/full-enemy-soldier-0${frame}.png`),

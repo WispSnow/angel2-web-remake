@@ -51,6 +51,7 @@ export interface AttackResult {
   defenderId: string;
   damage: number;
   counterDamage: number;
+  counterOccurred: boolean;
   defenderDied: boolean;
   attackerDied: boolean;
   experienceGained: number;

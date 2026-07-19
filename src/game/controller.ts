@@ -7,6 +7,32 @@ import type { ActionMode, AttackResult, BattleUnit, DialoguePage, GamePhase, Pos
 type Listener = () => void;
 type StoryPhase = keyof typeof STORY_BY_PHASE;
 type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
+export type CombatPresentationPhase =
+  | "primaryHit"
+  | "primaryDamage"
+  | "defenderDeath"
+  | "counterHit"
+  | "counterDamage"
+  | "attackerDeath"
+  | "full";
+
+export interface CombatPresentation {
+  attacker: BattleUnit;
+  defender: BattleUnit;
+  result: AttackResult;
+  phase: CombatPresentationPhase;
+  frame: number;
+  displayedAttackerLife: number;
+  displayedDefenderLife: number;
+}
+
+export interface CombatPresentationTraceEntry {
+  phase: CombatPresentationPhase;
+  frame: number;
+  displayedAttackerLife: number;
+  displayedDefenderLife: number;
+}
+
 export type UnitCommandId = "move" | "attack" | "rest" | "end" | "undo";
 export type GroupCommandId = "allRest" | "followLeader" | "freeAction" | "retreat";
 
@@ -74,12 +100,8 @@ export class GameController {
   soundEnabled = true;
   speechEnabled = true;
   lastCombat?: AttackResult;
-  combatPresentation?: {
-    attacker: BattleUnit;
-    defender: BattleUnit;
-    result: AttackResult;
-    frame: number;
-  };
+  combatPresentation?: CombatPresentation;
+  combatPresentationTrace: CombatPresentationTraceEntry[] = [];
   movementPresentation?: MovementPresentation;
   statusMessage = "";
   pendingSaveSlot?: number;
@@ -413,13 +435,7 @@ export class GameController {
       this.statusMessage = `造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}。`;
       this.resetAction();
       this.markHintSeen();
-      this.combatPresentation = { attacker: attackerPresentation, defender: defenderPresentation, result, frame: 0 };
-      for (let frame = 0; frame < 4; frame += 1) {
-        if (this.combatPresentation) this.combatPresentation.frame = frame;
-        this.emit();
-        await pause(this.testMode ? 60 : this.presentationFast ? 45 : 120);
-      }
-      this.combatPresentation = undefined;
+      await this.presentOrdinaryCombat(attackerPresentation, defenderPresentation, result);
       this.busy = false;
       const ended = this.resolveOutcome();
       this.emit();
@@ -676,13 +692,7 @@ export class GameController {
         this.lastCombat = this.battle.attack(unit.id, defender.id);
         const result = this.lastCombat;
         this.statusMessage = `${unit.name}造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}。`;
-        this.combatPresentation = { attacker: attackerPresentation, defender: defenderPresentation, result, frame: 0 };
-        for (let frame = 0; frame < 4; frame += 1) {
-          if (this.combatPresentation) this.combatPresentation.frame = frame;
-          this.emit();
-          await pause(this.testMode ? 60 : this.presentationFast ? 45 : 120);
-        }
-        this.combatPresentation = undefined;
+        await this.presentOrdinaryCombat(attackerPresentation, defenderPresentation, result);
       } else {
         this.battle.spendAction(unit.id);
       }
@@ -697,6 +707,148 @@ export class GameController {
     const ended = this.resolveOutcome();
     this.emit();
     return ended;
+  }
+
+  private async presentOrdinaryCombat(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    result: AttackResult,
+  ): Promise<void> {
+    this.combatPresentationTrace = [];
+    if (this.battlePresentation === "full") {
+      for (let frame = 0; frame < 4; frame += 1) {
+        this.setCombatPresentation(
+          attacker,
+          defender,
+          result,
+          "full",
+          frame,
+          Math.max(0, attacker.life - result.counterDamage),
+          Math.max(0, defender.life - result.damage),
+        );
+        await pause(this.testMode ? 60 : this.presentationFast ? 45 : 120);
+      }
+      this.combatPresentation = undefined;
+      return;
+    }
+
+    let displayedAttackerLife = attacker.life;
+    let displayedDefenderLife = defender.life;
+    const finalDefenderLife = Math.max(0, defender.life - result.damage);
+    const finalAttackerLife = Math.max(0, attacker.life - result.counterDamage);
+
+    // Native UN/62 timeline: frames 0..7, followed by frame 0 once more.
+    const hitFrames = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
+    for (let frame = 0; frame < hitFrames.length; frame += 1) {
+      this.setCombatPresentation(
+        attacker,
+        defender,
+        result,
+        "primaryHit",
+        frame,
+        displayedAttackerLife,
+        displayedDefenderLife,
+      );
+      await pause(this.mapCombatDelay(10));
+    }
+    for (let applied = 1; displayedDefenderLife > finalDefenderLife; applied += 1) {
+      displayedDefenderLife -= 1;
+      this.setCombatPresentation(
+        attacker,
+        defender,
+        result,
+        "primaryDamage",
+        applied,
+        displayedAttackerLife,
+        displayedDefenderLife,
+      );
+      await pause(this.mapCombatDelay(1));
+    }
+
+    if (result.defenderDied) {
+      for (let frame = 0; frame < 15; frame += 1) {
+        this.setCombatPresentation(
+          attacker,
+          defender,
+          result,
+          "defenderDeath",
+          frame,
+          displayedAttackerLife,
+          displayedDefenderLife,
+        );
+        await pause(this.mapCombatDelay(10));
+      }
+    } else if (result.counterOccurred) {
+      for (let frame = 0; frame < hitFrames.length; frame += 1) {
+        this.setCombatPresentation(
+          attacker,
+          defender,
+          result,
+          "counterHit",
+          frame,
+          displayedAttackerLife,
+          displayedDefenderLife,
+        );
+        await pause(this.mapCombatDelay(10));
+      }
+      for (let applied = 1; displayedAttackerLife > finalAttackerLife; applied += 1) {
+        displayedAttackerLife -= 1;
+        this.setCombatPresentation(
+          attacker,
+          defender,
+          result,
+          "counterDamage",
+          applied,
+          displayedAttackerLife,
+          displayedDefenderLife,
+        );
+        await pause(this.mapCombatDelay(1));
+      }
+      if (result.attackerDied) {
+        for (let frame = 0; frame < 15; frame += 1) {
+          this.setCombatPresentation(
+            attacker,
+            defender,
+            result,
+            "attackerDeath",
+            frame,
+            displayedAttackerLife,
+            displayedDefenderLife,
+          );
+          await pause(this.mapCombatDelay(10));
+        }
+      }
+    }
+
+    this.combatPresentation = undefined;
+  }
+
+  private setCombatPresentation(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    result: AttackResult,
+    phase: CombatPresentationPhase,
+    frame: number,
+    displayedAttackerLife: number,
+    displayedDefenderLife: number,
+  ): void {
+    this.combatPresentation = {
+      attacker,
+      defender,
+      result,
+      phase,
+      frame,
+      displayedAttackerLife,
+      displayedDefenderLife,
+    };
+    this.combatPresentationTrace.push({ phase, frame, displayedAttackerLife, displayedDefenderLife });
+    this.emit();
+  }
+
+  private mapCombatDelay(nativeTicks: number): number {
+    if (this.testMode) return Math.max(4, nativeTicks * 4);
+    if (this.presentationFast) return Math.max(3, Math.round(nativeTicks * 2.5));
+    return nativeTicks * 10;
   }
 
   openObjectives(): void {
@@ -1045,6 +1197,14 @@ export class GameController {
       retreatConfirmOpen: this.retreatConfirmOpen,
       retreatConfirmIndex: this.retreatConfirmIndex,
       battlePresentation: this.battlePresentation,
+      lastCombat: this.lastCombat ? { ...this.lastCombat } : undefined,
+      combatPresentation: this.combatPresentation ? {
+        ...this.combatPresentation,
+        attacker: { ...this.combatPresentation.attacker },
+        defender: { ...this.combatPresentation.defender },
+        result: { ...this.combatPresentation.result },
+      } : undefined,
+      combatPresentationTrace: this.combatPresentationTrace.map((entry) => ({ ...entry })),
       movementPresentation: this.movementPresentation ? {
         ...this.movementPresentation,
         path: this.movementPresentation.path.map((step) => ({ ...step })),

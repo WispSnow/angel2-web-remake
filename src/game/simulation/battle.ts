@@ -82,8 +82,9 @@ export class Stage0Battle {
     const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense) + this.rng.between(4, 7) + this.rng.between(4, 7);
     defender.life = Math.max(0, defender.life - damage);
 
+    const counterOccurred = defender.life > 0;
     let counterDamage = 0;
-    if (defender.life > 0) {
+    if (counterOccurred) {
       const attackerTerrainDefense = Math.floor(attackerStats.defense * TERRAIN_DEFENSE_PERCENT[terrainSlotAt(attacker)] / 100);
       counterDamage = Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
       attacker.life = Math.max(0, attacker.life - counterDamage);
@@ -100,7 +101,7 @@ export class Stage0Battle {
     if (attackerDied) this.units = this.units.filter((unit) => unit.id !== attacker.id);
     this.focusId = this.unit(attackerId) ? attackerId : defenderId;
 
-    return { attackerId, defenderId, damage, counterDamage, defenderDied, attackerDied, experienceGained };
+    return { attackerId, defenderId, damage, counterDamage, counterOccurred, defenderDied, attackerDied, experienceGained };
   }
 
   wait(id: string): boolean {

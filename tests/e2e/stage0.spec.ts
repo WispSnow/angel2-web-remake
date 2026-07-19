@@ -27,6 +27,27 @@ interface DebugState {
   cursor: { x: number; y: number };
   cameraOrigin: { x: number; y: number };
   battlePresentation: "map" | "full";
+  lastCombat?: {
+    attackerId: string;
+    defenderId: string;
+    damage: number;
+    counterDamage: number;
+    counterOccurred: boolean;
+    defenderDied: boolean;
+    attackerDied: boolean;
+  };
+  combatPresentation?: {
+    phase: "primaryHit" | "primaryDamage" | "defenderDeath" | "counterHit" | "counterDamage" | "attackerDeath" | "full";
+    frame: number;
+    displayedAttackerLife: number;
+    displayedDefenderLife: number;
+  };
+  combatPresentationTrace: Array<{
+    phase: "primaryHit" | "primaryDamage" | "defenderDeath" | "counterHit" | "counterDamage" | "attackerDeath" | "full";
+    frame: number;
+    displayedAttackerLife: number;
+    displayedDefenderLife: number;
+  }>;
   movementPresentation?: {
     unitId: string;
     kind: "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
@@ -301,7 +322,14 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.locator("[data-action=attack]").click();
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   await expect(page.getByTestId("combat-presentation")).toBeHidden();
+  await page.waitForFunction(() => !window.__ANGEL2__?.getState().combatPresentation);
   state = await debugState(page);
+  expect(state.lastCombat?.counterOccurred).toBe(true);
+  expect(state.combatPresentationTrace.filter(({ phase }) => phase === "primaryHit").map(({ frame }) => frame)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  expect(state.combatPresentationTrace.filter(({ phase }) => phase === "counterHit").map(({ frame }) => frame)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  expect(state.combatPresentationTrace.filter(({ phase }) => phase === "primaryDamage")).toHaveLength(state.lastCombat!.damage);
+  expect(state.combatPresentationTrace.filter(({ phase }) => phase === "counterDamage")).toHaveLength(state.lastCombat!.counterDamage);
+  expect(state.combatPresentationTrace.some(({ phase }) => phase === "defenderDeath")).toBe(false);
   expect(state.units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 28, y: 26 });
   expect(state.units.find((unit) => unit.id === "1:0")!.experience).toBeGreaterThan(0);
   expect(state.units.find((unit) => unit.id === "2:45")!.life).toBeLessThan(160);
@@ -642,4 +670,71 @@ test("S00-I: native range dither and ordinary attack target-count branches", asy
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   expect((await debugState(page)).actionMode).toBe("idle");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
+});
+
+test("S00-J: native map hit, point-drain and death descriptors preserve the board erase boundary", async ({ page }) => {
+  await page.goto("/?test=1");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
+
+  const setup = await debugState(page);
+  const finalEnemy = setup.units.find((unit) => unit.side === 2)!;
+  expect(finalEnemy.life).toBe(1);
+  expect(setup.battlePresentation).toBe("map");
+
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-attack").click();
+  const canvas = page.getByTestId("battle-canvas");
+
+  await expect(canvas).toHaveAttribute("data-map-combat-phase", "primaryHit");
+  await expect(canvas).toHaveAttribute("data-map-combat-target", finalEnemy.id);
+  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "1");
+  await expect(canvas).toHaveAttribute("data-combat-shadow-unit-count", "1");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-map-hit-native-frame.png" });
+
+  await page.waitForFunction(() => {
+    const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
+    return canvasElement?.dataset.mapCombatPhase === "defenderDeath"
+      && canvasElement.dataset.mapCombatFrame === "3";
+  });
+  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "6");
+  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "7");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-map-death-before-erase.png" });
+
+  await page.waitForFunction(() => {
+    const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
+    return canvasElement?.dataset.mapCombatPhase === "defenderDeath"
+      && Number(canvasElement.dataset.mapCombatFrame) >= 6
+      && Number(canvasElement.dataset.mapCombatFrame) < 14
+      && Number(canvasElement.dataset.mapCombatEffectTileCount) > 0;
+  });
+  const afterErase = await canvas.evaluate((canvasElement) => ({
+    phase: canvasElement.dataset.mapCombatPhase,
+    frame: Number(canvasElement.dataset.mapCombatFrame),
+    effectTiles: Number(canvasElement.dataset.mapCombatEffectTileCount),
+    visibleUnits: Number(canvasElement.dataset.unitLifeLabelCount),
+  }));
+  expect(afterErase.phase).toBe("defenderDeath");
+  expect(afterErase.frame).toBeGreaterThanOrEqual(6);
+  expect(afterErase.frame).toBeLessThan(14);
+  expect(afterErase.effectTiles).toBeGreaterThan(0);
+  expect(afterErase.visibleUnits).toBe(6);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-map-death-after-erase.png" });
+
+  await waitForPhase(page, "victoryStory");
+  const resolved = await debugState(page);
+  expect(resolved.lastCombat).toMatchObject({
+    defenderId: finalEnemy.id,
+    counterOccurred: false,
+    defenderDied: true,
+  });
+  expect(resolved.combatPresentationTrace.filter(({ phase }) => phase === "primaryHit").map(({ frame }) => frame)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  expect(resolved.combatPresentationTrace.filter(({ phase }) => phase === "primaryDamage")).toHaveLength(1);
+  expect(resolved.combatPresentationTrace.filter(({ phase }) => phase === "defenderDeath").map(({ frame }) => frame)).toEqual(
+    Array.from({ length: 15 }, (_, frame) => frame),
+  );
+  expect(resolved.combatPresentationTrace.some(({ phase }) => phase.startsWith("counter"))).toBe(false);
 });

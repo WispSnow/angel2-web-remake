@@ -379,12 +379,10 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   if (!presentation) return;
   const { attacker, defender, result, frame } = presentation;
   if (controller.battlePresentation === "map") {
-    const left = 40 + (defender.x - controller.cameraOrigin.x) * 40;
-    const top = 23 + (defender.y - controller.cameraOrigin.y) * 44;
-    layer.className = "combat-presentation map-combat";
-    layer.style.left = `${left}px`;
-    layer.style.top = `${top}px`;
-    layer.innerHTML = `<span class="slash-mark">╱</span><b>−${result.damage}</b>`;
+    // Native map hit/death frames are rendered inside the Phaser world so
+    // they obey the battle camera, clipping and board-erase boundary.
+    layer.hidden = true;
+    layer.innerHTML = "";
     return;
   }
   const allyFrames = ASSETS.fullBattle.allySoldier;

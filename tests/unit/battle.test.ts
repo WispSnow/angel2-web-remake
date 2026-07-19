@@ -130,6 +130,7 @@ describe("stage 0 battle simulation", () => {
     const result = battle.attack("1:0", "2:45");
     expect(result.damage).toBeGreaterThanOrEqual(8);
     expect(result.counterDamage).toBeGreaterThanOrEqual(0);
+    expect(result.counterOccurred).toBe(true);
     expect(battle.unit("2:45")!.life).toBe(defenderLife - result.damage);
     expect(battle.unit("1:0")!.acted).toBe(true);
     expect(battle.unit("1:0")!.experience).toBe(result.experienceGained);
@@ -338,6 +339,7 @@ describe("stage 0 battle simulation", () => {
     const result = battle.attack("1:0", "2:45");
     expect(result.defenderDied).toBe(true);
     expect(result.counterDamage).toBe(0);
+    expect(result.counterOccurred).toBe(false);
     expect(battle.unit("2:45")).toBeUndefined();
     expect(battle.unit("1:0")!.life).toBe(niaLife);
   });

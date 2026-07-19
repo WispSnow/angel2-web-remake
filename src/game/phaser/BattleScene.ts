@@ -12,6 +12,32 @@ const BATTLE_INPUT_RIGHT = 433;
 const BATTLE_INPUT_TOP = 26;
 const BATTLE_INPUT_BOTTOM = 326;
 const EDGE_PAN_INTERVAL_MS = 110;
+const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
+
+interface DeathDescriptor {
+  xOffset: number;
+  yOffset: number;
+  width: number;
+  frames: readonly (number | null)[];
+}
+
+const MAP_DEATH_DESCRIPTORS: readonly DeathDescriptor[] = [
+  { xOffset: 0, yOffset: 0, width: 1, frames: [0] },
+  { xOffset: 0, yOffset: 0, width: 1, frames: [1] },
+  { xOffset: -1, yOffset: -1, width: 3, frames: [2, 3, 4, 5, 6, 7] },
+  { xOffset: -1, yOffset: -1, width: 3, frames: [8, 9, 10, 11, 12, 13] },
+  { xOffset: -1, yOffset: -1, width: 3, frames: [14, 15, 16, 17, 18, 19] },
+  { xOffset: -1, yOffset: -1, width: 3, frames: [20, 21, 22, 23, 24, 25] },
+  { xOffset: 0, yOffset: 0, width: 1, frames: [26] },
+  { xOffset: 0, yOffset: -1, width: 1, frames: [27, 28] },
+  { xOffset: 0, yOffset: -3, width: 1, frames: [29, 30, 31, 32] },
+  { xOffset: 0, yOffset: -5, width: 1, frames: [33, 33, 33, 33, 33, 34] },
+  { xOffset: 0, yOffset: -7, width: 1, frames: [35, 35, 35, 35, 35, 35, 35, 36] },
+  { xOffset: 0, yOffset: -7, width: 1, frames: [37, 37, 37, 37, 37, 37, 37, null] },
+  { xOffset: 0, yOffset: -7, width: 1, frames: [37, 37, 37, 37, 37, null, null, null] },
+  { xOffset: 0, yOffset: -7, width: 1, frames: [37, 37, 37, null, null, null, null, null] },
+  { xOffset: 0, yOffset: -7, width: 1, frames: [null, null, null, null, null, null, null, null] },
+];
 
 const DIGIT_PATTERNS: Record<string, readonly string[]> = {
   "0": ["11111", "10001", "10011", "10101", "11001", "10001", "11111"],
@@ -38,6 +64,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private rangeGraphics!: Phaser.GameObjects.Graphics;
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
+    private combatEffects: Phaser.GameObjects.Image[] = [];
     private unitViews = new Map<string, UnitView>();
     private unsubscribe?: () => void;
     private edgePan?: { x: number; y: number };
@@ -53,6 +80,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.load.image("ally-soldier", ASSETS.allySoldier);
       this.load.image("enemy-soldier", ASSETS.enemySoldier);
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
+      ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
+      ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
     }
 
     create(): void {
@@ -102,6 +131,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.game.canvas.removeEventListener("pointerleave", this.handleCanvasPointerLeave);
         for (const tile of this.rangeMaskTiles) tile.destroy();
         this.rangeMaskTiles = [];
+        for (const effect of this.combatEffects) effect.destroy();
+        this.combatEffects = [];
         this.clearEdgePan();
       });
       this.sync();
@@ -192,6 +223,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.syncCamera();
       this.drawRanges();
       this.drawUnits();
+      this.drawCombatEffects();
       this.drawCursor();
     }
 
@@ -346,8 +378,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     private drawUnits(): void {
+      const presentation = controller.combatPresentation;
+      const mapPresentation = presentation?.phase !== "full" ? presentation : undefined;
+      const displayedUnits = new Map(controller.battle.units.map((unit) => [unit.id, unit]));
+      if (mapPresentation) {
+        if (!displayedUnits.has(mapPresentation.attacker.id)) displayedUnits.set(mapPresentation.attacker.id, mapPresentation.attacker);
+        if (!displayedUnits.has(mapPresentation.defender.id)) displayedUnits.set(mapPresentation.defender.id, mapPresentation.defender);
+      }
       const active = new Set<string>();
-      for (const unit of controller.battle.units) {
+      let visibleCount = 0;
+      for (const unit of displayedUnits.values()) {
         active.add(unit.id);
         let view = this.unitViews.get(unit.id);
         if (!view) {
@@ -373,8 +413,21 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         view.sprite.setX(this.unitVisualOffset(unit));
         view.sprite.setAlpha(1);
         view.sprite.clearTint();
-        this.drawLifeDigits(view, unit);
-        view.actedBadge.setVisible(unit.acted);
+        const displayedLife = mapPresentation?.attacker.id === unit.id
+          ? mapPresentation.displayedAttackerLife
+          : mapPresentation?.defender.id === unit.id
+            ? mapPresentation.displayedDefenderLife
+            : unit.life;
+        const erasedByDeath = mapPresentation
+          && (
+            (mapPresentation.phase === "defenderDeath" && mapPresentation.defender.id === unit.id)
+            || (mapPresentation.phase === "attackerDeath" && mapPresentation.attacker.id === unit.id)
+          )
+          && mapPresentation.frame >= 6;
+        view.container.setVisible(!erasedByDeath);
+        if (!erasedByDeath) visibleCount += 1;
+        this.drawLifeDigits(view, { ...unit, life: displayedLife });
+        view.actedBadge.setVisible(unit.acted && !mapPresentation);
       }
       for (const [id, view] of this.unitViews) {
         if (active.has(id)) continue;
@@ -382,16 +435,78 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.unitViews.delete(id);
       }
       if (controller.isTestMode) {
-        this.game.canvas.dataset.unitLifeLabelCount = String(active.size);
+        this.game.canvas.dataset.unitLifeLabelCount = String(visibleCount);
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);
         this.game.canvas.dataset.actedBadgeGeometry = "-22,-15,16,14";
         this.game.canvas.dataset.rangeMode = controller.actionMode;
         this.game.canvas.dataset.rangeCellCount = String(controller.reachable.length);
+        this.game.canvas.dataset.combatShadowUnitCount = String(
+          mapPresentation
+            ? [mapPresentation.attacker, mapPresentation.defender]
+              .filter((unit) => !controller.battle.unit(unit.id))
+              .length
+            : 0,
+        );
+      }
+    }
+
+    private drawCombatEffects(): void {
+      for (const effect of this.combatEffects) effect.destroy();
+      this.combatEffects = [];
+      const presentation = controller.combatPresentation;
+      const canvas = this.game.canvas;
+      if (!presentation || presentation.phase === "full") {
+        if (controller.isTestMode) {
+          delete canvas.dataset.mapCombatPhase;
+          delete canvas.dataset.mapCombatFrame;
+          delete canvas.dataset.mapCombatTarget;
+          canvas.dataset.mapCombatEffectTileCount = "0";
+        }
+        return;
+      }
+
+      const target = presentation.phase === "counterHit"
+        || presentation.phase === "counterDamage"
+        || presentation.phase === "attackerDeath"
+        ? presentation.attacker
+        : presentation.defender;
+
+      if (presentation.phase === "primaryHit" || presentation.phase === "counterHit") {
+        const sourceFrame = MAP_HIT_FRAME_TIMELINE[presentation.frame] ?? 0;
+        this.combatEffects.push(
+          this.add.image(target.x * TILE_WIDTH, target.y * TILE_HEIGHT, `map-hit-${sourceFrame}`)
+            .setOrigin(0)
+            .setDepth(8),
+        );
+      } else if (presentation.phase === "defenderDeath" || presentation.phase === "attackerDeath") {
+        const descriptor = MAP_DEATH_DESCRIPTORS[presentation.frame];
+        descriptor?.frames.forEach((sourceFrame, index) => {
+          if (sourceFrame === null) return;
+          const column = index % descriptor.width;
+          const row = Math.floor(index / descriptor.width);
+          this.combatEffects.push(
+            this.add.image(
+              (target.x + descriptor.xOffset + column) * TILE_WIDTH,
+              (target.y + descriptor.yOffset + row) * TILE_HEIGHT,
+              `map-death-${sourceFrame}`,
+            ).setOrigin(0).setDepth(8),
+          );
+        });
+      }
+
+      if (controller.isTestMode) {
+        canvas.dataset.mapCombatPhase = presentation.phase;
+        canvas.dataset.mapCombatFrame = String(presentation.frame);
+        canvas.dataset.mapCombatTarget = target.id;
+        canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
+        canvas.dataset.mapCombatAttackerLife = String(presentation.displayedAttackerLife);
+        canvas.dataset.mapCombatDefenderLife = String(presentation.displayedDefenderLife);
       }
     }
 
     private drawCursor(): void {
       this.cursorGraphics.clear();
+      if (controller.combatPresentation) return;
       const focus = controller.cursor;
       this.cursorGraphics.lineStyle(3, 0xffea42, 1);
       this.cursorGraphics.strokeRect(focus.x * TILE_WIDTH + 2, focus.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
