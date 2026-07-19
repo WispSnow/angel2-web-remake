@@ -12,6 +12,13 @@ interface DebugState {
   commandIndex: number;
   commands: Array<{ id: string; label: string }>;
   systemMenuOpen: boolean;
+  systemMenuIndex: number;
+  systemCommands: Array<{ id: string; label: string }>;
+  settingsOpen: boolean;
+  recordMenuMode?: "load" | "save";
+  recordMenuIndex: number;
+  quitConfirmOpen: boolean;
+  quitConfirmIndex: number;
   groupCommandOpen: boolean;
   groupCommandIndex: number;
   groupCommands: Array<{ id: string; label: string }>;
@@ -21,6 +28,7 @@ interface DebugState {
   musicEnabled: boolean;
   soundEnabled: boolean;
   speechEnabled: boolean;
+  audioCueLog: Array<{ sequence: number; record: number; reason: string }>;
   rngState: number;
   minimapPreviewOrigin?: { x: number; y: number };
   round: number;
@@ -85,6 +93,17 @@ const clickCanvas = (page: Page, x: number, y: number) => page.getByTestId("batt
 const openSystemMenu = async (page: Page) => {
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("system-menu")).toBeVisible();
+};
+const openSettingsMenu = async (page: Page) => {
+  await openSystemMenu(page);
+  await page.getByTestId("system-command-settings").click();
+  await expect(page.getByTestId("settings-menu")).toBeVisible();
+};
+const closeSettingsMenu = async (page: Page) => {
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("settings-menu")).toBeHidden();
+  await expect(page.getByTestId("system-menu")).toBeHidden();
 };
 const sampleTrackedUnitPosition = (page: Page) => page.evaluate(async () => {
   const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
@@ -271,7 +290,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   // Persistent text buttons are replaced by the native-style callable menu surface.
   await page.getByTestId("system-menu-button").click();
   await expect(page.getByTestId("system-menu")).toBeVisible();
-  await expect(page.getByTestId("group-commands-button")).toBeVisible();
+  await expect(page.locator("[data-system-index]")).toHaveCount(5);
   await expect(page.getByTestId("end-turn-button")).toHaveCount(0);
   const systemMenuContained = await page.getByTestId("system-menu").evaluate((menu) => {
     const panel = menu.getBoundingClientRect();
@@ -283,7 +302,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   expect(systemMenuContained).toBe(true);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-system-menu.png" });
-  await page.locator("[data-action=close-system-menu]").click();
+  await page.keyboard.press("Escape");
 
   // Main verb: selecting Nia opens the profession menu before any movement
   // range is shown, then Move enters range selection.
@@ -364,15 +383,14 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
 
   // On-demand objective layer preserves the battle phase.
   await openSystemMenu(page);
-  await page.getByTestId("objectives-button").click();
+  await page.getByTestId("system-command-objectives").click();
   await expect(page.getByTestId("objective-panel")).toBeVisible();
   expect((await debugState(page)).phase).toBe("player");
   await page.locator("[data-action=close-objectives]").click();
 
   // S00-B: the native all-rest group command replaces a side-effect-free
   // generic end turn, then behavior 12 moves every enemy.
-  await openSystemMenu(page);
-  await page.getByTestId("group-commands-button").click();
+  await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   expect((await debugState(page))).toMatchObject({
     groupCommandOpen: true,
@@ -420,7 +438,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
 
   // S00-C: exact defeat wording and fixed-roster retry.
   await page.evaluate(() => window.__ANGEL2__?.forceDefeat());
-  await expect(page.getByText("妮雅戰敗", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("native-feedback")).toBeVisible();
+  await page.getByTestId("retry-button").click();
+  await expect(page.getByTestId("feedback-text")).toContainText("我太低辜敵人的實力");
   await page.getByTestId("retry-button").click();
   await waitForPhase(page, "openingStory");
   state = await debugState(page);
@@ -431,9 +451,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   // S00-D: leave one legal target, finish it through the real attack UI, then save.
   await page.getByTestId("skip-dialogue").click();
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
-  await openSystemMenu(page);
+  await openSettingsMenu(page);
   await page.getByTestId("presentation-button").click();
-  await page.keyboard.press("Escape");
+  await closeSettingsMenu(page);
   expect((await debugState(page)).battlePresentation).toBe("full");
   await clickCanvas(page, 220, 177);
   await clickCanvas(page, 220, 177);
@@ -443,13 +463,14 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await waitForPhase(page, "victoryStory");
   await page.getByTestId("skip-dialogue").click();
   await page.getByTestId("victory-continue").click();
+  await page.getByTestId("victory-continue").click();
   await page.getByTestId("save-yes").click();
   await expect(page.locator("[data-action=save-slot]")).toHaveCount(5);
   await page.getByTestId("save-slot-1").click();
   await waitForPhase(page, "nextStage");
   await expect(page.getByText("垂直切片完成", { exact: true })).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
-  expect(saved).toMatchObject({ format: "ANGEL2-web-save", version: 1, stage: 1, ruleset: "stableRemake" });
+  expect(saved).toMatchObject({ format: "ANGEL2-web-save", version: 2, kind: "completed", stage: 1, ruleset: "stableRemake" });
   expect(saved.roster).toHaveLength(6);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-complete.png" });
 
@@ -567,12 +588,12 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
 
   await enterPlayerPhase();
   const initial = await debugState(page);
-  await openSystemMenu(page);
-  await page.getByTestId("group-commands-button").click();
+  await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
   expect((await debugState(page)).groupLeaderId).toBe("1:0");
   await page.getByTestId("group-command-retreat").click();
   await expect(page.getByTestId("retreat-confirm")).toBeVisible();
+  await page.locator("[data-action=retreat-confirm]").click();
   await expect(page.getByTestId("retreat-confirm")).toContainText("哦！．．．要撤退嗎？");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-retreat-confirm.png" });
   await page.locator("[data-action=retreat-cancel]").click();
@@ -583,9 +604,9 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
     retreatConfirmOpen: false,
   });
 
-  await openSystemMenu(page);
-  await page.getByTestId("group-commands-button").click();
+  await page.keyboard.press("Tab");
   await page.getByTestId("group-command-retreat").click();
+  await page.locator("[data-action=retreat-confirm]").click();
   await page.locator("[data-action=retreat-confirm]").click();
   await waitForPhase(page, "openingStory");
   const retreated = await debugState(page);
@@ -596,16 +617,14 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
 
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "player");
-  await openSystemMenu(page);
-  await page.getByTestId("group-commands-button").click();
+  await page.keyboard.press("Tab");
   await page.keyboard.press("F3");
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.some((unit) => unit.side === 1 && unit.acted)).toBe(true);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-free-action.png" });
 
   await enterPlayerPhase();
-  await openSystemMenu(page);
-  await page.getByTestId("group-commands-button").click();
+  await page.keyboard.press("Tab");
   await page.keyboard.press("F2");
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
@@ -786,9 +805,9 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   const mapResolved = await debugState(page);
 
   await enterPlayableBattle();
-  await openSystemMenu(page);
+  await openSettingsMenu(page);
   await page.getByTestId("presentation-button").click();
-  await page.keyboard.press("Escape");
+  await closeSettingsMenu(page);
   await attackFirstForcedTarget();
 
   const fullLayer = page.getByTestId("combat-presentation");
@@ -816,9 +835,9 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
 
   await enterPlayableBattle();
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
-  await openSystemMenu(page);
+  await openSettingsMenu(page);
   await page.getByTestId("presentation-button").click();
-  await page.keyboard.press("Escape");
+  await closeSettingsMenu(page);
   await clickCanvas(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();
   await page.waitForFunction(() =>
@@ -831,6 +850,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   expect(deathTrace).toHaveLength(24);
   expect(deathTrace.map(({ frame }) => frame)).toEqual([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]);
   expect(deathResolved.combatPresentationTrace.some(({ phase }) => phase.startsWith("fullCounter"))).toBe(false);
+  expect(deathResolved.audioCueLog.some(({ record, reason }) => record === 11 && reason === "fullDefenderDeath-death")).toBe(true);
 });
 
 test("S00-L: native KY checkpoints preserve dual windows, appended text and the blank victory pause", async ({ page }) => {
@@ -893,4 +913,130 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   await expect(page.getByTestId("dialogue-window-lower")).toBeHidden();
   await page.getByTestId("advance-dialogue").click();
   expect((await debugState(page)).dialogueIndex).toBe(3);
+});
+
+test("S00-M: native system records restore battle state and combat cues follow presentation events", async ({ page }) => {
+  await page.goto("/?test=1");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+
+  const initial = await debugState(page);
+  expect(initial.audioCueLog.some(({ record, reason }) => record === 14 && reason === "stage-event-scripted-movement")).toBe(true);
+
+  await openSystemMenu(page);
+  expect((await debugState(page)).systemCommands).toEqual([
+    { id: "settings", label: "遊戲功能" },
+    { id: "objectives", label: "勝利條件" },
+    { id: "load", label: "讀取記錄" },
+    { id: "save", label: "儲存記錄" },
+    { id: "quit", label: "離開遊戲" },
+  ]);
+  await page.getByTestId("system-command-quit").click();
+  await expect(page.getByTestId("quit-confirm")).toBeVisible();
+  await page.locator("[data-action=quit-confirm]").click();
+  await expect(page.getByTestId("quit-feedback-text")).toHaveText("唉啊！．．．要休息了嗎？\n請再考慮一下吧！");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-quit-confirm.png" });
+  await page.locator("[data-action=quit-cancel]").click();
+  expect((await debugState(page))).toMatchObject({ phase: "player", quitConfirmOpen: false });
+
+  await openSystemMenu(page);
+  await page.getByTestId("system-command-save").click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await expect(page.getByTestId("record-slot-1")).toContainText("此處沒有記錄");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-save-selector.png" });
+  await page.getByTestId("record-slot-1").click();
+
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
+  expect(saved).toMatchObject({
+    format: "ANGEL2-web-save",
+    version: 2,
+    kind: "battle",
+    stage: 0,
+    stageLabel: "瓦爾克麗宮",
+    rngState: initial.rngState,
+    battle: {
+      phase: "player",
+      round: initial.round,
+      focusId: initial.units.find((unit) => unit.id === "1:0")?.id,
+      cursor: initial.cursor,
+      cameraOrigin: initial.cameraOrigin,
+    },
+  });
+  expect(saved.battle.units).toEqual(initial.units);
+
+  // Change both simulation and view state, then reload the exact checkpoint.
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-move").click();
+  await clickCanvas(page, 180, 177);
+  await page.getByTestId("unit-command-end").click();
+  let changed = await debugState(page);
+  expect(changed.units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 28, y: 26, acted: true });
+
+  await openSystemMenu(page);
+  await page.getByTestId("system-command-load").click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await page.getByTestId("record-slot-1").click();
+  const restored = await debugState(page);
+  expect(restored.phase).toBe("player");
+  expect(restored.round).toBe(initial.round);
+  expect(restored.units).toEqual(initial.units);
+  expect(restored.cursor).toEqual(initial.cursor);
+  expect(restored.cameraOrigin).toEqual(initial.cameraOrigin);
+  expect(restored.rngState).toBe(initial.rngState);
+
+  await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
+  await page.keyboard.press(" ");
+  await page.getByTestId("unit-command-attack").click();
+  const targeting = await debugState(page);
+  const target = targeting.targets[0];
+  await clickCanvas(
+    page,
+    40 + (target.x - targeting.cameraOrigin.x) * 40 + 20,
+    23 + (target.y - targeting.cameraOrigin.y) * 44 + 22,
+  );
+  await page.waitForFunction(() => !window.__ANGEL2__?.getState().combatPresentation);
+  const afterCombat = await debugState(page);
+  const mapHitCues = afterCombat.audioCueLog.filter(({ record, reason }) => record === 38 && reason.startsWith("map-"));
+  expect(mapHitCues.map(({ reason }) => reason)).toEqual([
+    "map-primary-hit-first",
+    "map-primary-hit-second",
+    "map-counter-hit-first",
+    "map-counter-hit-second",
+  ]);
+});
+
+test("S00-N: defeat and victory use native feedback text, portrait and two-step input", async ({ page }) => {
+  const enterPlayerPhase = async () => {
+    await page.goto("/?test=1");
+    await page.getByTestId("skip-dialogue").click();
+    await waitForPhase(page, "openingStory");
+    await page.getByTestId("skip-dialogue").click();
+    await waitForPhase(page, "player");
+  };
+
+  await enterPlayerPhase();
+  await page.evaluate(() => window.__ANGEL2__?.forceDefeat());
+  await page.getByTestId("retry-button").click();
+  expect((await debugState(page)).phase).toBe("defeat");
+  await expect(page.getByTestId("feedback-text")).toHaveText("啊！．．．竟然失敗了？\n我太低辜敵人的實力，再給我一次機會吧！");
+  await expect(page.getByTestId("feedback-portrait")).toHaveAttribute("data-portrait-record", "46");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-defeat-feedback.png" });
+
+  await enterPlayerPhase();
+  await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-attack").click();
+  await waitForPhase(page, "victoryStory");
+  await page.getByTestId("skip-dialogue").click();
+  await page.getByTestId("victory-continue").click();
+  expect((await debugState(page)).phase).toBe("victoryFeedback");
+  await expect(page.getByTestId("feedback-text")).toHaveText("哦！．．\n這次的戰役結束了，是否要記錄下來．");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-victory-feedback.png" });
+  await page.getByTestId("victory-continue").click();
+  expect((await debugState(page)).phase).toBe("savePrompt");
+  await expect(page.getByRole("menu", { name: "是否儲存" })).toBeVisible();
+  await expect(page.getByTestId("save-yes")).toHaveText("確 定");
 });

@@ -2,6 +2,7 @@ import { ASSETS, STAGE0, statsFor } from "./content/stage0";
 import { STORY_BY_PHASE } from "./content/dialogue";
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
+import { DeterministicRng } from "./simulation/rng";
 import type { ActionMode, AttackResult, BattleUnit, DialoguePage, GamePhase, Position, SaveData } from "./types";
 
 type Listener = () => void;
@@ -55,6 +56,8 @@ export interface CombatPresentationTraceEntry {
 
 export type UnitCommandId = "move" | "attack" | "rest" | "end" | "undo";
 export type GroupCommandId = "allRest" | "followLeader" | "freeAction" | "retreat";
+export type SystemCommandId = "settings" | "objectives" | "load" | "save" | "quit";
+export type RecordMenuMode = "load" | "save";
 
 export interface UnitCommand {
   id: UnitCommandId;
@@ -83,6 +86,14 @@ const GROUP_COMMANDS: readonly GroupCommand[] = [
   { id: "followLeader", label: "跟隨主將" },
   { id: "freeAction", label: "自由行動" },
   { id: "retreat", label: "全面徹退" },
+];
+
+const SYSTEM_COMMANDS: ReadonlyArray<{ id: SystemCommandId; label: string }> = [
+  { id: "settings", label: "遊戲功能" },
+  { id: "objectives", label: "勝利條件" },
+  { id: "load", label: "讀取記錄" },
+  { id: "save", label: "儲存記錄" },
+  { id: "quit", label: "離開遊戲" },
 ];
 
 export interface MovementPresentation {
@@ -140,6 +151,12 @@ export class GameController {
   targets: Position[] = [];
   objectiveOpen = false;
   systemMenuOpen = false;
+  systemMenuIndex = 0;
+  settingsOpen = false;
+  recordMenuMode?: RecordMenuMode;
+  recordMenuIndex = 0;
+  quitConfirmOpen = false;
+  quitConfirmIndex = 1;
   groupCommandOpen = false;
   groupCommandIndex = 0;
   retreatConfirmOpen = false;
@@ -156,6 +173,11 @@ export class GameController {
   movementPresentation?: MovementPresentation;
   statusMessage = "";
   pendingSaveSlot?: number;
+  savePromptIndex = 0;
+  postSaveSlotIndex = 0;
+  audioCue?: { sequence: number; record: number; reason: string };
+  audioCueLog: Array<{ sequence: number; record: number; reason: string }> = [];
+  private audioCueSequence = 0;
   private pendingOrigin?: Position;
   private pendingPath?: Position[];
   private busy = false;
@@ -183,6 +205,20 @@ export class GameController {
 
   get groupCommands(): readonly GroupCommand[] {
     return GROUP_COMMANDS;
+  }
+
+  get systemCommands(): typeof SYSTEM_COMMANDS {
+    return SYSTEM_COMMANDS;
+  }
+
+  get hasBlockingOverlay(): boolean {
+    return this.systemMenuOpen
+      || this.settingsOpen
+      || this.recordMenuMode !== undefined
+      || this.quitConfirmOpen
+      || this.objectiveOpen
+      || this.groupCommandOpen
+      || this.retreatConfirmOpen;
   }
 
   get groupLeader(): BattleUnit | undefined {
@@ -290,10 +326,7 @@ export class GameController {
   selectCell(position: Position): void {
     if (
       this.phase !== "player"
-      || this.objectiveOpen
-      || this.systemMenuOpen
-      || this.groupCommandOpen
-      || this.retreatConfirmOpen
+      || this.hasBlockingOverlay
       || this.busy
     ) return;
     this.cursor = { ...position };
@@ -345,10 +378,7 @@ export class GameController {
     if (
       this.phase !== "player"
       || this.actionMode !== "idle"
-      || this.objectiveOpen
-      || this.systemMenuOpen
-      || this.groupCommandOpen
-      || this.retreatConfirmOpen
+      || this.hasBlockingOverlay
       || this.busy
     ) return;
     if (positionKey(position) === positionKey(this.cursor)) return;
@@ -531,10 +561,13 @@ export class GameController {
       this.phase !== "player"
       || this.busy
       || this.objectiveOpen
+      || this.recordMenuMode !== undefined
+      || this.quitConfirmOpen
       || this.retreatConfirmOpen
       || this.actionMode !== "idle"
     ) return;
     this.systemMenuOpen = false;
+    this.settingsOpen = false;
     this.minimapPreviewOrigin = undefined;
     this.groupCommandIndex = 0;
     this.groupCommandOpen = true;
@@ -780,6 +813,7 @@ export class GameController {
     // Native UN/62 timeline: frames 0..7, followed by frame 0 once more.
     const hitFrames = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
     for (let frame = 0; frame < hitFrames.length; frame += 1) {
+      if (frame === 0 || frame === 4) this.queueAudioCue(38, `map-primary-hit-${frame === 0 ? "first" : "second"}`);
       this.setCombatPresentation(
         attacker,
         defender,
@@ -820,6 +854,7 @@ export class GameController {
       }
     } else if (result.counterOccurred) {
       for (let frame = 0; frame < hitFrames.length; frame += 1) {
+        if (frame === 0 || frame === 4) this.queueAudioCue(38, `map-counter-hit-${frame === 0 ? "first" : "second"}`);
         this.setCombatPresentation(
           attacker,
           defender,
@@ -1007,10 +1042,14 @@ export class GameController {
     const actorFrameCount = actor === "left" ? leftFrameCount : rightFrameCount;
     const timeline = FULL_CLASS_TIMELINES[actorUnit.classId];
     const strikeFrames = actorFrameCount >= 6 ? timeline.sixFrameStrike : timeline.fourFrameStrike;
+    const nativePrimaryCuePose = actor === "left" ? actorUnit.classId === 22 ? 5 : 0 : -1;
 
     for (let poseIndex = 0; poseIndex < timeline.strikeSteps.length; poseIndex += 1) {
       const victimFrame = timeline.victimFrames[poseIndex] ?? 0;
       for (let substep = 0; substep < timeline.strikeSteps[poseIndex]; substep += 1) {
+        if (substep === 0 && poseIndex === nativePrimaryCuePose) {
+          this.queueAudioCue(actorUnit.classId === 22 ? 51 : 38, `full-${phase}-class-${actorUnit.classId}`);
+        }
         const lunge = this.fullStrikeLunge(poseIndex, timeline.strikeSteps.length, substep, timeline.strikeSteps[poseIndex]);
         this.setCombatPresentation(
           attacker,
@@ -1080,6 +1119,7 @@ export class GameController {
   ): Promise<void> {
     // Native DS:7D4C is six poses × four renderer substeps, all on pose 2.
     for (let substep = 0; substep < 24; substep += 1) {
+      if (substep === 0) this.queueAudioCue(11, `${phase}-death`);
       const opacity = Math.max(0, 1 - substep / 21);
       this.setCombatPresentation(
         attacker,
@@ -1144,6 +1184,12 @@ export class GameController {
     this.emit();
   }
 
+  private queueAudioCue(record: number, reason: string): void {
+    const cue = { sequence: ++this.audioCueSequence, record, reason };
+    this.audioCue = cue;
+    this.audioCueLog.push(cue);
+  }
+
   private mapCombatDelay(nativeTicks: number): number {
     if (this.testMode) return Math.max(4, nativeTicks * 4);
     if (this.presentationFast) return Math.max(3, Math.round(nativeTicks * 2.5));
@@ -1162,6 +1208,7 @@ export class GameController {
   openObjectives(): void {
     if (this.busy || !["player", "enemy"].includes(this.phase)) return;
     this.systemMenuOpen = false;
+    this.settingsOpen = false;
     this.groupCommandOpen = false;
     this.minimapPreviewOrigin = undefined;
     this.objectiveOpen = true;
@@ -1178,31 +1225,74 @@ export class GameController {
     if (
       this.phase !== "player"
       || this.busy
-      || this.objectiveOpen
-      || this.groupCommandOpen
-      || this.retreatConfirmOpen
+      || this.hasBlockingOverlay
       || this.actionMode !== "idle"
     ) return;
     this.minimapPreviewOrigin = undefined;
     this.systemMenuOpen = true;
+    this.systemMenuIndex = 0;
     this.emit();
   }
 
   closeSystemMenu(): void {
+    if (!this.systemMenuOpen && !this.settingsOpen) return;
+    this.systemMenuOpen = false;
+    this.settingsOpen = false;
+    this.emit();
+  }
+
+  moveSystemMenuSelection(delta: number): void {
+    if (!this.systemMenuOpen || delta === 0) return;
+    this.systemMenuIndex = (this.systemMenuIndex + delta + SYSTEM_COMMANDS.length) % SYSTEM_COMMANDS.length;
+    this.emit();
+  }
+
+  selectSystemMenuCommand(index: number): void {
+    if (!this.systemMenuOpen || index < 0 || index >= SYSTEM_COMMANDS.length || index === this.systemMenuIndex) return;
+    this.systemMenuIndex = index;
+    this.emit();
+  }
+
+  activateSystemMenuSelection(): void {
+    const command = this.systemMenuOpen ? SYSTEM_COMMANDS[this.systemMenuIndex] : undefined;
+    if (!command) return;
+    if (command.id === "settings") this.openSettings();
+    else if (command.id === "objectives") this.openObjectives();
+    else if (command.id === "load") this.openRecordMenu("load");
+    else if (command.id === "save") this.openRecordMenu("save");
+    else this.requestQuit();
+  }
+
+  openSettings(): void {
     if (!this.systemMenuOpen) return;
     this.systemMenuOpen = false;
+    this.settingsOpen = true;
+    this.emit();
+  }
+
+  closeSettings(): void {
+    if (!this.settingsOpen) return;
+    this.settingsOpen = false;
+    this.systemMenuOpen = true;
     this.emit();
   }
 
   systemAction(): void {
-    if (this.systemMenuOpen) this.closeSystemMenu();
+    if (this.recordMenuMode) this.closeRecordMenu();
+    else if (this.quitConfirmOpen) this.cancelQuit();
+    else if (this.settingsOpen) this.closeSettings();
+    else if (this.systemMenuOpen) this.closeSystemMenu();
     else if (this.phase === "player" && !this.busy && !this.objectiveOpen && !this.groupCommandOpen && !this.retreatConfirmOpen) {
       this.openSystemMenu();
     }
   }
 
   secondaryAction(): void {
-    if (this.retreatConfirmOpen) this.cancelRetreat();
+    if (this.phase === "saveSlots") this.cancelPostSaveSlots();
+    else if (this.recordMenuMode) this.closeRecordMenu();
+    else if (this.quitConfirmOpen) this.cancelQuit();
+    else if (this.settingsOpen) this.closeSettings();
+    else if (this.retreatConfirmOpen) this.cancelRetreat();
     else if (this.groupCommandOpen) this.closeGroupCommands();
     else if (this.objectiveOpen) this.closeObjectives();
     else if (this.systemMenuOpen) this.closeSystemMenu();
@@ -1248,6 +1338,12 @@ export class GameController {
     this.battle = new Stage0Battle();
     this.movementPresentation = undefined;
     this.systemMenuOpen = false;
+    this.systemMenuIndex = 0;
+    this.settingsOpen = false;
+    this.recordMenuMode = undefined;
+    this.recordMenuIndex = 0;
+    this.quitConfirmOpen = false;
+    this.quitConfirmIndex = 1;
     this.groupCommandOpen = false;
     this.groupCommandIndex = 0;
     this.retreatConfirmOpen = false;
@@ -1266,12 +1362,14 @@ export class GameController {
   continueAfterVictory(): void {
     if (this.phase !== "victoryFeedback") return;
     this.phase = "savePrompt";
+    this.savePromptIndex = 0;
     this.emit();
   }
 
   showSaveSlots(): void {
     if (this.phase !== "savePrompt") return;
     this.phase = "saveSlots";
+    this.postSaveSlotIndex = 0;
     this.emit();
   }
 
@@ -1281,16 +1379,21 @@ export class GameController {
 
   selectSaveSlot(slot: number): void {
     if (this.phase !== "saveSlots" || slot < 1 || slot > 5) return;
-    if (this.readSave(slot)) {
-      this.pendingSaveSlot = slot;
-      this.emit();
-      return;
-    }
-    this.writeSave(slot);
+    this.writeCompletedSave(slot);
+  }
+
+  selectPostSaveSlot(index: number): void {
+    if (this.phase !== "saveSlots" || index < 0 || index > 4 || index === this.postSaveSlotIndex) return;
+    this.postSaveSlotIndex = index;
+    this.emit();
+  }
+
+  cancelPostSaveSlots(): void {
+    if (this.phase === "saveSlots") this.goToNextStage();
   }
 
   confirmOverwrite(): void {
-    if (this.pendingSaveSlot) this.writeSave(this.pendingSaveSlot);
+    if (this.pendingSaveSlot) this.writeCompletedSave(this.pendingSaveSlot);
   }
 
   cancelOverwrite(): void {
@@ -1302,17 +1405,24 @@ export class GameController {
     const raw = localStorage.getItem(`angel2.save.${slot}`);
     if (!raw) return undefined;
     try {
-      return JSON.parse(raw) as SaveData;
+      const parsed = JSON.parse(raw) as Partial<SaveData>;
+      if (
+        parsed.format !== "ANGEL2-web-save"
+        || parsed.version !== 2
+        || (parsed.kind !== "battle" && parsed.kind !== "completed")
+      ) return undefined;
+      return parsed as SaveData;
     } catch {
       return undefined;
     }
   }
 
-  private writeSave(slot: number): void {
+  private writeCompletedSave(slot: number): void {
     const prior = this.readSave(slot);
     const save: SaveData = {
       format: "ANGEL2-web-save",
-      version: 1,
+      version: 2,
+      kind: "completed",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
       stage: 1,
@@ -1326,8 +1436,178 @@ export class GameController {
     this.goToNextStage();
   }
 
+  openRecordMenu(mode: RecordMenuMode): void {
+    if (this.phase !== "player" || this.busy || (!this.systemMenuOpen && !this.settingsOpen)) return;
+    this.systemMenuOpen = false;
+    this.settingsOpen = false;
+    this.recordMenuMode = mode;
+    this.recordMenuIndex = 0;
+    this.statusMessage = mode === "save" ? "選擇儲存記錄位置。" : "選擇要讀取的戰役記錄。";
+    this.emit();
+  }
+
+  closeRecordMenu(): void {
+    if (!this.recordMenuMode) return;
+    this.recordMenuMode = undefined;
+    this.recordMenuIndex = 0;
+    this.systemMenuOpen = true;
+    this.emit();
+  }
+
+  moveRecordMenuSelection(delta: number): void {
+    if (!this.recordMenuMode || delta === 0) return;
+    this.recordMenuIndex = (this.recordMenuIndex + delta + 5) % 5;
+    this.emit();
+  }
+
+  selectRecordMenuSlot(index: number): void {
+    if (!this.recordMenuMode || index < 0 || index > 4 || index === this.recordMenuIndex) return;
+    this.recordMenuIndex = index;
+    this.emit();
+  }
+
+  activateRecordMenuSelection(): void {
+    if (!this.recordMenuMode) return;
+    const slot = this.recordMenuIndex + 1;
+    if (this.recordMenuMode === "save") this.writeBattleSave(slot);
+    else this.loadSave(slot);
+  }
+
+  private writeBattleSave(slot: number): void {
+    const prior = this.readSave(slot);
+    const snapshot = this.battle.serializableSnapshot();
+    const save: SaveData = {
+      format: "ANGEL2-web-save",
+      version: 2,
+      kind: "battle",
+      savedAt: new Date().toISOString(),
+      saveCount: (prior?.saveCount ?? 0) + 1,
+      stage: 0,
+      stageLabel: "瓦爾克麗宮",
+      ruleset: "stableRemake",
+      rngState: this.battle.rng.state,
+      roster: snapshot.units
+        .filter((unit) => unit.side === 1)
+        .map(({ slot: unitSlot, classId, experience, life }) => ({ slot: unitSlot, classId, experience, life })),
+      battle: {
+        phase: "player",
+        ...snapshot,
+        cursor: { ...this.cursor },
+        cameraOrigin: { ...this.cameraOrigin },
+      },
+    };
+    localStorage.setItem(`angel2.save.${slot}`, JSON.stringify(save));
+    this.recordMenuMode = undefined;
+    this.recordMenuIndex = 0;
+    this.statusMessage = `已儲存至記錄 ${slot}。`;
+    this.emit();
+  }
+
+  private loadSave(slot: number): void {
+    const save = this.readSave(slot);
+    if (!save) {
+      this.statusMessage = "此記錄位置沒有可讀取的資料。";
+      this.emit();
+      return;
+    }
+    if (save.kind === "completed") {
+      this.recordMenuMode = undefined;
+      this.goToNextStage();
+      return;
+    }
+    if (!save.battle) {
+      this.statusMessage = "此記錄缺少戰場狀態。";
+      this.emit();
+      return;
+    }
+    const battle = new Stage0Battle(new DeterministicRng(save.rngState));
+    battle.restore(save.battle);
+    this.battle = battle;
+    this.phase = "player";
+    this.cursor = { ...save.battle.cursor };
+    this.cameraOrigin = { ...save.battle.cameraOrigin };
+    this.recordMenuMode = undefined;
+    this.recordMenuIndex = 0;
+    this.systemMenuOpen = false;
+    this.settingsOpen = false;
+    this.quitConfirmOpen = false;
+    this.movementPresentation = undefined;
+    this.combatPresentation = undefined;
+    this.resetAction();
+    this.statusMessage = `已讀取記錄 ${slot}。`;
+    this.emit();
+  }
+
+  requestQuit(): void {
+    if (this.phase !== "player" || this.busy || !this.systemMenuOpen) return;
+    this.systemMenuOpen = false;
+    this.quitConfirmOpen = true;
+    this.quitConfirmIndex = 1;
+    this.emit();
+  }
+
+  moveQuitSelection(delta: number): void {
+    if (!this.quitConfirmOpen || delta === 0) return;
+    this.quitConfirmIndex = this.quitConfirmIndex === 0 ? 1 : 0;
+    this.emit();
+  }
+
+  selectQuitChoice(index: number): void {
+    if (!this.quitConfirmOpen || index < 0 || index > 1 || index === this.quitConfirmIndex) return;
+    this.quitConfirmIndex = index;
+    this.emit();
+  }
+
+  activateQuitSelection(): void {
+    if (!this.quitConfirmOpen) return;
+    if (this.quitConfirmIndex === 0) this.confirmQuit();
+    else this.cancelQuit();
+  }
+
+  confirmQuit(): void {
+    if (!this.quitConfirmOpen) return;
+    this.quitConfirmOpen = false;
+    this.phase = "quit";
+    this.statusMessage = "已離開第一關戰鬥。";
+    this.emit();
+  }
+
+  cancelQuit(): void {
+    if (!this.quitConfirmOpen) return;
+    this.quitConfirmOpen = false;
+    this.quitConfirmIndex = 1;
+    this.emit();
+  }
+
   moveCursor(delta: Position): void {
-    if (this.phase !== "player" || this.systemMenuOpen || this.objectiveOpen || this.busy) return;
+    if (this.phase === "savePrompt") {
+      if (delta.x !== 0 || delta.y !== 0) {
+        this.savePromptIndex = this.savePromptIndex === 0 ? 1 : 0;
+        this.emit();
+      }
+      return;
+    }
+    if (this.phase === "saveSlots") {
+      if (delta.y !== 0) {
+        this.postSaveSlotIndex = (this.postSaveSlotIndex + delta.y + 5) % 5;
+        this.emit();
+      }
+      return;
+    }
+    if (this.phase !== "player" || this.objectiveOpen || this.busy) return;
+    if (this.recordMenuMode) {
+      if (delta.y !== 0) this.moveRecordMenuSelection(delta.y);
+      return;
+    }
+    if (this.quitConfirmOpen) {
+      if (delta.x !== 0 || delta.y !== 0) this.moveQuitSelection(delta.x || delta.y);
+      return;
+    }
+    if (this.settingsOpen) return;
+    if (this.systemMenuOpen) {
+      if (delta.y !== 0) this.moveSystemMenuSelection(delta.y);
+      return;
+    }
     if (this.retreatConfirmOpen) {
       if (delta.x !== 0 || delta.y !== 0) this.moveRetreatSelection(delta.x || delta.y);
       return;
@@ -1352,10 +1632,7 @@ export class GameController {
   panCamera(delta: Position): void {
     if (
       this.phase !== "player"
-      || this.systemMenuOpen
-      || this.objectiveOpen
-      || this.groupCommandOpen
-      || this.retreatConfirmOpen
+      || this.hasBlockingOverlay
       || this.busy
       || this.actionMode === "actionMenu"
     ) return;
@@ -1374,10 +1651,7 @@ export class GameController {
       this.phase !== "player"
       || this.actionMode !== "idle"
       || this.busy
-      || this.systemMenuOpen
-      || this.objectiveOpen
-      || this.groupCommandOpen
-      || this.retreatConfirmOpen
+      || this.hasBlockingOverlay
     ) return undefined;
     this.minimapPreviewOrigin = {
       x: Math.max(0, Math.min(STAGE0.width - STAGE0.viewport.width, position.x - 4)),
@@ -1402,9 +1676,20 @@ export class GameController {
 
   primaryAtCursor(): void {
     if (isStoryPhase(this.phase)) this.advanceDialogue();
+    else if (this.phase === "defeat") this.retry();
+    else if (this.phase === "victoryFeedback") this.continueAfterVictory();
+    else if (this.phase === "savePrompt") {
+      if (this.savePromptIndex === 0) this.showSaveSlots();
+      else this.skipSave();
+    }
+    else if (this.phase === "saveSlots") this.selectSaveSlot(this.postSaveSlotIndex + 1);
+    else if (this.recordMenuMode) this.activateRecordMenuSelection();
+    else if (this.quitConfirmOpen) this.activateQuitSelection();
+    else if (this.settingsOpen) return;
     else if (this.retreatConfirmOpen) this.activateRetreatSelection();
     else if (this.groupCommandOpen) this.activateGroupCommandSelection();
-    else if (this.systemMenuOpen || this.objectiveOpen) return;
+    else if (this.systemMenuOpen) this.activateSystemMenuSelection();
+    else if (this.objectiveOpen) return;
     else if (this.actionMode === "actionMenu") this.activateCommandSelection();
     else this.selectCell(this.cursor);
   }
@@ -1495,6 +1780,15 @@ export class GameController {
       minimapPreviewOrigin: this.minimapPreviewOrigin ? { ...this.minimapPreviewOrigin } : undefined,
       objectiveOpen: this.objectiveOpen,
       systemMenuOpen: this.systemMenuOpen,
+      systemMenuIndex: this.systemMenuIndex,
+      systemCommands: SYSTEM_COMMANDS.map((command) => ({ ...command })),
+      settingsOpen: this.settingsOpen,
+      recordMenuMode: this.recordMenuMode,
+      recordMenuIndex: this.recordMenuIndex,
+      quitConfirmOpen: this.quitConfirmOpen,
+      quitConfirmIndex: this.quitConfirmIndex,
+      savePromptIndex: this.savePromptIndex,
+      postSaveSlotIndex: this.postSaveSlotIndex,
       musicEnabled: this.musicEnabled,
       soundEnabled: this.soundEnabled,
       speechEnabled: this.speechEnabled,
@@ -1504,6 +1798,8 @@ export class GameController {
       groupLeaderId: this.groupLeader?.id,
       retreatConfirmOpen: this.retreatConfirmOpen,
       retreatConfirmIndex: this.retreatConfirmIndex,
+      audioCue: this.audioCue ? { ...this.audioCue } : undefined,
+      audioCueLog: this.audioCueLog.map((cue) => ({ ...cue })),
       battlePresentation: this.battlePresentation,
       lastCombat: this.lastCombat ? { ...this.lastCombat } : undefined,
       combatPresentation: this.combatPresentation ? {
@@ -1528,6 +1824,9 @@ export class GameController {
     const outcome = this.battle.outcome();
     if (outcome === "defeat") {
       this.systemMenuOpen = false;
+      this.settingsOpen = false;
+      this.recordMenuMode = undefined;
+      this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
       this.retreatConfirmOpen = false;
       this.objectiveOpen = false;
@@ -1539,6 +1838,9 @@ export class GameController {
     }
     if (outcome === "victory") {
       this.systemMenuOpen = false;
+      this.settingsOpen = false;
+      this.recordMenuMode = undefined;
+      this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
       this.retreatConfirmOpen = false;
       this.objectiveOpen = false;
@@ -1600,6 +1902,7 @@ export class GameController {
       path: path.map((step) => ({ ...step })),
       stepIndex: 0,
     };
+    if (kind === "scripted") this.queueAudioCue(14, "stage-event-scripted-movement");
     this.cursor = { ...path[path.length - 1] };
     this.emit();
     for (let index = 1; index < path.length; index += 1) {

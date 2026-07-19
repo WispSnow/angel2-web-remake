@@ -179,10 +179,14 @@ export const ASSETS = {
   },
   audio: {
     story: "/assets/original/story-stage0.wav",
-    soldierAttack: "/assets/original/combat-soldier.wav",
-    hit: "/assets/original/combat-hit.wav",
-    death: "/assets/original/combat-death.wav",
     confirm: "/assets/original/ui-confirm.wav",
+    effects: {
+      2: "/assets/original/audio/e/02.wav",
+      11: "/assets/original/audio/e/11.wav",
+      14: "/assets/original/audio/e/14.wav",
+      38: "/assets/original/audio/e/38.wav",
+      51: "/assets/original/audio/e/51.wav",
+    },
     speech: Array.from({ length: 15 }, (_, index) => `/assets/original/speech-${String(index + 57).padStart(2, "0")}.wav`),
   },
 } as const;

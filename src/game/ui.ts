@@ -39,23 +39,42 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <button class="system-menu-hotspot" data-action="open-system-menu" data-testid="system-menu-button" aria-label="開啟遊戲功能" title="遊戲功能"></button>
             <button class="group-command-hotspot" data-action="open-group-commands" data-testid="group-command-hotspot" aria-label="開啟集體命令" title="集體命令"></button>
             <button class="all-rest-hotspot" data-action="all-rest" data-testid="all-rest-hotspot" aria-label="全部休息" title="全部休息"></button>
-            <section class="system-menu modal-panel" id="system-menu" data-testid="system-menu" role="dialog" aria-label="遊戲功能" hidden>
+            <section class="system-menu action-menu" id="system-menu" data-testid="system-menu" role="menu" aria-label="戰鬥系統選單" hidden></section>
+            <section class="settings-menu modal-panel" id="settings-menu" data-testid="settings-menu" role="dialog" aria-label="遊戲功能" hidden>
               <span class="panel-kicker">SYSTEM</span><h2>遊戲功能</h2>
               <div class="system-menu-grid">
-                <button data-action="objectives" data-testid="objectives-button">勝利條件</button>
                 <button data-action="open-group-commands" data-testid="group-commands-button">集體命令</button>
                 <button data-action="speed" data-testid="speed-button">動畫 ×1</button>
                 <button data-action="battle-presentation" data-testid="presentation-button">戰鬥 地圖</button>
                 <button data-action="music" data-testid="music-button">音樂 開</button>
                 <button data-action="sound" data-testid="sound-button">音效 開</button>
                 <button data-action="speech" data-testid="speech-button">逐字音 開</button>
-                <button data-action="close-system-menu">返回戰場</button>
+                <button data-action="close-settings">返回</button>
+              </div>
+            </section>
+            <section class="record-menu action-menu" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
+            <section class="quit-confirm modal-panel native-feedback-confirm" id="quit-confirm" data-testid="quit-confirm" role="dialog" aria-label="離開遊戲確認" hidden>
+              ${animatedPortraitMarkup(46, {
+                alt: "妮雅肖像",
+                channel: "quit-feedback",
+                className: "feedback-portrait",
+              })}
+              <p data-testid="quit-feedback-text" data-full-text="唉啊！．．．要休息了嗎？&#10;請再考慮一下吧！">唉啊！．．．要休息了嗎？
+請再考慮一下吧！</p>
+              <div class="button-row">
+                <button data-action="quit-confirm" data-quit-index="0">確 定</button>
+                <button data-action="quit-cancel" data-quit-index="1">取 消</button>
               </div>
             </section>
             <section class="group-command-menu action-menu" id="group-command-menu" data-testid="group-command-menu" role="menu" aria-label="集體命令" hidden></section>
-            <section class="retreat-confirm modal-panel" id="retreat-confirm" data-testid="retreat-confirm" role="dialog" aria-label="全面撤退確認" hidden>
-              <span class="panel-kicker">全面徹退</span>
-              <p>哦！．．．要撤退嗎？<br />必竟是沒辦法的事，雙方的實力差太多了．</p>
+            <section class="retreat-confirm modal-panel native-feedback-confirm" id="retreat-confirm" data-testid="retreat-confirm" role="dialog" aria-label="全面撤退確認" hidden>
+              ${animatedPortraitMarkup(46, {
+                alt: "妮雅肖像",
+                channel: "retreat-feedback",
+                className: "feedback-portrait",
+              })}
+              <p data-testid="retreat-feedback-text" data-full-text="哦！．．．要撤退嗎？&#10;必竟是沒辦法的事，雙方的實力差太多了．">哦！．．．要撤退嗎？
+必竟是沒辦法的事，雙方的實力差太多了．</p>
               <div class="button-row">
                 <button data-action="retreat-confirm" data-retreat-index="0">確 定</button>
                 <button data-action="retreat-cancel" data-retreat-index="1">取 消</button>
@@ -124,6 +143,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const storyBackground = required(root, "#story-background");
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
+  const settingsMenu = required(root, "#settings-menu");
+  const recordMenu = required(root, "#record-menu");
+  const quitConfirm = required(root, "#quit-confirm");
   const groupCommandMenu = required(root, "#group-command-menu");
   const retreatConfirm = required(root, "#retreat-confirm");
   const resultLayer = required(root, "#result-layer");
@@ -132,6 +154,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let dialogueFullText = "";
   let revealedCharacters = 0;
   let activeDialogueText: HTMLElement | undefined;
+  let feedbackTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  let activeFeedbackKey = "";
+  let feedbackFullText = "";
+  let feedbackRevealedCharacters = 0;
+  let activeFeedbackText: HTMLElement | undefined;
   startPortraitBlinking(root, controller.isTestMode);
 
   const stopDialogueTimer = () => {
@@ -166,6 +193,37 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     activeDialogueText.textContent = dialogueFullText;
     return true;
   };
+  const stopFeedbackTimer = () => {
+    if (feedbackTimer !== undefined) globalThis.clearTimeout(feedbackTimer);
+    feedbackTimer = undefined;
+  };
+  const revealFeedback = (fullText: string, key: string, target: HTMLElement) => {
+    stopFeedbackTimer();
+    activeFeedbackKey = key;
+    feedbackFullText = fullText;
+    feedbackRevealedCharacters = 0;
+    activeFeedbackText = target;
+    target.textContent = "";
+    const tick = () => {
+      if (activeFeedbackKey !== key || activeFeedbackText !== target || feedbackRevealedCharacters >= fullText.length) {
+        feedbackTimer = undefined;
+        return;
+      }
+      const character = fullText[feedbackRevealedCharacters];
+      feedbackRevealedCharacters += 1;
+      target.textContent = fullText.slice(0, feedbackRevealedCharacters);
+      if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
+      feedbackTimer = globalThis.setTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
+    };
+    tick();
+  };
+  const finishFeedbackTyping = (): boolean => {
+    if (!feedbackFullText || !activeFeedbackText || feedbackRevealedCharacters >= feedbackFullText.length) return false;
+    stopFeedbackTimer();
+    feedbackRevealedCharacters = feedbackFullText.length;
+    activeFeedbackText.textContent = feedbackFullText;
+    return true;
+  };
 
   root.addEventListener("click", (event) => {
     const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
@@ -177,6 +235,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (!button) {
       if ((event.target as Element).closest("#dialogue-layer")) {
         if (!finishDialogueTyping()) controller.advanceDialogue();
+      } else if ((event.target as Element).closest("#result-layer")) {
+        if (!finishFeedbackTyping()) controller.primaryAtCursor();
       }
       return;
     }
@@ -187,13 +247,29 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "skip-dialogue") controller.skipDialogue();
     else if (action === "open-system-menu") controller.openSystemMenu();
     else if (action === "close-system-menu") controller.closeSystemMenu();
+    else if (action === "system-settings") controller.openSettings();
+    else if (action === "system-load") controller.openRecordMenu("load");
+    else if (action === "system-save") controller.openRecordMenu("save");
+    else if (action === "system-quit") controller.requestQuit();
+    else if (action === "close-settings") controller.closeSettings();
+    else if (action === "record-slot") {
+      controller.selectRecordMenuSlot(Number(button.dataset.recordIndex));
+      controller.activateRecordMenuSelection();
+    }
+    else if (action === "close-record-menu") controller.closeRecordMenu();
+    else if (action === "quit-confirm") {
+      if (!finishFeedbackTyping()) controller.confirmQuit();
+    }
+    else if (action === "quit-cancel") controller.cancelQuit();
     else if (action === "open-group-commands") controller.openGroupCommands();
     else if (action === "close-group-commands") controller.closeGroupCommands();
     else if (action === "all-rest") void controller.allRest();
     else if (action === "follow-leader") void controller.followLeader();
     else if (action === "free-action") void controller.freeAction();
     else if (action === "request-retreat") controller.requestRetreat();
-    else if (action === "retreat-confirm") controller.confirmRetreat();
+    else if (action === "retreat-confirm") {
+      if (!finishFeedbackTyping()) controller.confirmRetreat();
+    }
     else if (action === "retreat-cancel") controller.cancelRetreat();
     else if (action === "objectives") controller.openObjectives();
     else if (action === "close-objectives") controller.closeObjectives();
@@ -207,8 +283,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "rest") controller.chooseRest();
     else if (action === "end-unit") controller.chooseEnd();
     else if (action === "undo-move") controller.chooseUndo();
-    else if (action === "retry") controller.retry();
-    else if (action === "victory-continue") controller.continueAfterVictory();
+    else if (action === "retry") {
+      if (!finishFeedbackTyping()) controller.retry();
+    }
+    else if (action === "victory-continue") {
+      if (!finishFeedbackTyping()) controller.continueAfterVictory();
+    }
     else if (action === "save-yes") controller.showSaveSlots();
     else if (action === "save-no") controller.skipSave();
     else if (action === "save-slot") controller.selectSaveSlot(Number(button.dataset.slot));
@@ -223,6 +303,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (groupCommand) controller.selectGroupCommand(Number(groupCommand.dataset.groupCommandIndex));
     const retreatChoice = (event.target as Element).closest<HTMLElement>("[data-retreat-index]");
     if (retreatChoice) controller.selectRetreatChoice(Number(retreatChoice.dataset.retreatIndex));
+    const systemCommand = (event.target as Element).closest<HTMLElement>("[data-system-index]");
+    if (systemCommand) controller.selectSystemMenuCommand(Number(systemCommand.dataset.systemIndex));
+    const recordSlot = (event.target as Element).closest<HTMLElement>("[data-record-index]");
+    if (recordSlot) controller.selectRecordMenuSlot(Number(recordSlot.dataset.recordIndex));
+    const quitChoice = (event.target as Element).closest<HTMLElement>("[data-quit-index]");
+    if (quitChoice) controller.selectQuitChoice(Number(quitChoice.dataset.quitIndex));
+    const postSaveSlot = (event.target as Element).closest<HTMLElement>("[data-post-save-index]");
+    if (postSaveSlot) controller.selectPostSaveSlot(Number(postSaveSlot.dataset.postSaveIndex));
   });
 
   root.addEventListener("pointermove", (event) => {
@@ -285,7 +373,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (delta) controller.moveCursor(delta);
     else if (event.repeat) return;
     else if (key === "Control" || key === "Insert" || key === " ") {
-      if (!finishDialogueTyping()) controller.primaryAtCursor();
+      if (!finishDialogueTyping() && !finishFeedbackTyping()) controller.primaryAtCursor();
     }
     else if (key === "Alt" || key === "Delete" || key === "Enter") controller.secondaryAction();
     else if (key === "Escape") controller.systemAction();
@@ -321,6 +409,40 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     hint.textContent = `查看勝利條件：保護妮雅；敵軍被擊倒或撤離均計入清除。`;
     objectivePanel.hidden = !controller.objectiveOpen;
     systemMenu.hidden = !controller.systemMenuOpen;
+    if (!systemMenu.hidden) {
+      systemMenu.innerHTML = controller.systemCommands.map((command, index) => {
+        const action = command.id === "settings"
+          ? "system-settings"
+          : command.id === "objectives"
+            ? "objectives"
+            : `system-${command.id}`;
+        const selected = index === controller.systemMenuIndex;
+        return `<button type="button" role="menuitem" data-action="${action}" data-system-index="${index}" data-testid="system-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${command.label}</button>`;
+      }).join("");
+    }
+    settingsMenu.hidden = !controller.settingsOpen;
+    recordMenu.hidden = controller.recordMenuMode === undefined;
+    if (!recordMenu.hidden) {
+      const mode = controller.recordMenuMode;
+      const slots = Array.from({ length: 5 }, (_, index) => {
+        const slot = index + 1;
+        const save = controller.readSave(slot);
+        const selected = index === controller.recordMenuIndex;
+        const label = save
+          ? `${save.stageLabel}　第 ${save.kind === "battle" ? save.battle?.round ?? 1 : "完"} 回合`
+          : "此處沒有記錄";
+        return `<button type="button" role="menuitem" data-action="record-slot" data-record-index="${index}" data-testid="record-slot-${slot}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}" ${mode === "load" && !save ? "disabled" : ""}><b>${slot}</b><span>${label}</span></button>`;
+      }).join("");
+      recordMenu.innerHTML = `<strong>${mode === "save" ? "儲存遊戲進度" : "讀取遊戲進度"}</strong>${slots}<button type="button" data-action="close-record-menu">取 消</button>`;
+    }
+    quitConfirm.hidden = !controller.quitConfirmOpen;
+    if (!quitConfirm.hidden) {
+      for (const button of quitConfirm.querySelectorAll<HTMLButtonElement>("[data-quit-index]")) {
+        const selected = Number(button.dataset.quitIndex) === controller.quitConfirmIndex;
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-current", String(selected));
+      }
+    }
     groupCommandMenu.hidden = !controller.groupCommandOpen;
     if (!groupCommandMenu.hidden) {
       groupCommandMenu.innerHTML = controller.groupCommands.map((command, index) => {
@@ -425,6 +547,41 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
 
     renderResult(resultLayer, controller);
+    const resultFeedbackText = resultLayer.querySelector<HTMLElement>("[data-testid=feedback-text]");
+    const modalFeedbackText = !quitConfirm.hidden
+      ? quitConfirm.querySelector<HTMLElement>("[data-testid=quit-feedback-text]")
+      : !retreatConfirm.hidden
+        ? retreatConfirm.querySelector<HTMLElement>("[data-testid=retreat-feedback-text]")
+        : undefined;
+    const feedbackText = resultFeedbackText ?? modalFeedbackText;
+    const feedbackKey = controller.phase === "defeat"
+      ? "defeat"
+      : controller.phase === "victoryFeedback" || controller.phase === "savePrompt"
+        ? "victory"
+        : controller.quitConfirmOpen
+          ? "quit-confirm"
+          : controller.retreatConfirmOpen
+            ? "retreat-confirm"
+            : "";
+    if (feedbackText && feedbackKey) {
+      const fullText = feedbackText.dataset.fullText ?? "";
+      if (controller.phase === "savePrompt") {
+        stopFeedbackTimer();
+        activeFeedbackKey = feedbackKey;
+        feedbackFullText = fullText;
+        feedbackRevealedCharacters = fullText.length;
+        activeFeedbackText = feedbackText;
+        feedbackText.textContent = fullText;
+      } else if (activeFeedbackKey !== feedbackKey || activeFeedbackText !== feedbackText) {
+        revealFeedback(fullText, feedbackKey, feedbackText);
+      }
+    } else {
+      stopFeedbackTimer();
+      activeFeedbackKey = "";
+      feedbackFullText = "";
+      feedbackRevealedCharacters = 0;
+      activeFeedbackText = undefined;
+    }
     renderCombat(combatPresentation, controller);
   };
   controller.onChange(render);
@@ -552,25 +709,48 @@ function renderTactical(controller: GameController, underUnit = false): string {
 
 function renderResult(layer: HTMLElement, controller: GameController): void {
   const phase = controller.phase;
-  layer.hidden = !["defeat", "victoryFeedback", "savePrompt", "saveSlots", "nextStage"].includes(phase);
+  layer.hidden = !["defeat", "victoryFeedback", "savePrompt", "saveSlots", "quit", "nextStage"].includes(phase);
   if (layer.hidden) return;
   if (phase === "defeat") {
-    layer.innerHTML = `<div class="modal-panel result-card defeat-card"><span class="panel-kicker">戰鬥失敗</span><h2>妮雅戰敗</h2><p>妮雅已從棋盤移除。本關將重新建立固定六人編隊。</p><button data-action="retry" data-testid="retry-button">重新挑戰</button></div>`;
+    const text = "啊！．．．竟然失敗了？\n我太低辜敵人的實力，再給我一次機會吧！";
+    layer.innerHTML = nativeFeedbackMarkup(text, "retry", "retry-button");
   } else if (phase === "victoryFeedback") {
-    layer.innerHTML = `<div class="modal-panel result-card victory-card"><span class="panel-kicker">VICTORY</span><h2>瓦爾克麗宮解放</h2><p>宮內敵人均已被擊倒或撤離。</p><button data-action="victory-continue" data-testid="victory-continue">繼續</button></div>`;
+    const text = "哦！．．\n這次的戰役結束了，是否要記錄下來．";
+    layer.innerHTML = nativeFeedbackMarkup(text, "victory-continue", "victory-continue");
   } else if (phase === "savePrompt") {
-    layer.innerHTML = `<div class="modal-panel result-card"><span class="panel-kicker">戰役記錄</span><h2>是否記錄本次戰役？</h2><div class="button-row"><button data-action="save-yes" data-testid="save-yes">記錄</button><button data-action="save-no">不記錄</button></div></div>`;
+    const text = "哦！．．\n這次的戰役結束了，是否要記錄下來．";
+    layer.innerHTML = `${nativeFeedbackMarkup(text)}
+      <div class="native-confirm-menu" role="menu" aria-label="是否儲存">
+        <button data-action="save-yes" data-testid="save-yes" class="${controller.savePromptIndex === 0 ? "is-selected" : ""}">確 定</button>
+        <button data-action="save-no" class="${controller.savePromptIndex === 1 ? "is-selected" : ""}">取 消</button>
+      </div>`;
   } else if (phase === "saveSlots") {
     const slots = Array.from({ length: 5 }, (_, index) => {
       const slot = index + 1;
       const save = controller.readSave(slot);
-      return `<button class="save-slot" data-action="save-slot" data-slot="${slot}" data-testid="save-slot-${slot}"><b>記錄 ${slot}</b><span>${save ? `第 ${save.stage} 關 · ${new Date(save.savedAt).toLocaleString("zh-Hant")}` : "空白"}</span></button>`;
+      const selected = index === controller.postSaveSlotIndex;
+      return `<button class="save-slot ${selected ? "is-selected" : ""}" data-action="save-slot" data-slot="${slot}" data-post-save-index="${index}" data-testid="save-slot-${slot}" aria-current="${selected ? "true" : "false"}"><b>${slot}</b><span>${save ? save.stageLabel : "此處沒有記錄"}</span></button>`;
     }).join("");
-    const overwrite = controller.pendingSaveSlot ? `<div class="overwrite"><p>記錄 ${controller.pendingSaveSlot} 已存在。確定覆蓋？</p><div class="button-row"><button data-action="overwrite-confirm">覆蓋</button><button data-action="overwrite-cancel">取消</button></div></div>` : "";
-    layer.innerHTML = `<div class="modal-panel save-card"><span class="panel-kicker">選擇記錄位置</span><h2>五個戰役記錄</h2><div class="save-grid">${slots}</div>${overwrite}</div>`;
+    layer.innerHTML = `<div class="native-save-selector"><strong>儲存遊戲進度</strong>${slots}</div>`;
+  } else if (phase === "quit") {
+    layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2>天使帝國 II</h2><p>已離開遊戲</p></div>`;
   } else if (phase === "nextStage") {
     layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE 01</span><h2>下一關路由已建立</h2><p>第 0 關垂直切片到此完成；存檔已指向第 1 關關前流程。後續關卡不屬於本切片的實作範圍。</p><div class="completion-seal">垂直切片完成</div></div>`;
   }
+}
+
+function nativeFeedbackMarkup(text: string, action?: string, testId?: string): string {
+  const escapedText = text.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+  return `<div class="native-feedback" data-testid="native-feedback">
+    ${animatedPortraitMarkup(46, {
+      alt: "妮雅肖像",
+      channel: "outcome-feedback",
+      className: "feedback-portrait",
+      wrapperTestId: "feedback-portrait",
+    })}
+    <div class="native-feedback-copy"><p data-testid="feedback-text" data-full-text="${escapedText}"></p><span>▼</span></div>
+    ${action ? `<button class="feedback-primary" data-action="${action}" ${testId ? `data-testid="${testId}"` : ""} aria-label="繼續"></button>` : ""}
+  </div>`;
 }
 
 function required<T extends HTMLElement = HTMLElement>(root: ParentNode, selector: string): T {

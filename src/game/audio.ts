@@ -1,11 +1,11 @@
 import { ASSETS, SPEECH_RECORD_BY_CHARACTER } from "./content/stage0";
 import type { GameController } from "./controller";
-import type { AttackResult, GamePhase } from "./types";
+import type { GamePhase } from "./types";
 
 export class AudioManager {
   private unlocked = false;
   private previousPhase: GamePhase;
-  private previousCombat?: AttackResult;
+  private previousCueSequence = 0;
   private readonly storyMusic = new Audio(ASSETS.audio.story);
 
   constructor(private readonly controller: GameController, root: HTMLElement) {
@@ -13,7 +13,11 @@ export class AudioManager {
     this.storyMusic.loop = true;
     this.storyMusic.volume = 0.32;
     root.addEventListener("pointerdown", () => this.unlock(), { capture: true });
-    root.addEventListener("click", () => this.playEffect(ASSETS.audio.confirm, 0.22), { capture: true });
+    root.addEventListener("click", (event) => {
+      if ((event.target as Element).closest("button,[data-testid=tactical-minimap]")) {
+        this.playEffect(ASSETS.audio.confirm, 0.22);
+      }
+    }, { capture: true });
     controller.onChange(() => this.sync());
   }
 
@@ -31,13 +35,11 @@ export class AudioManager {
 
   private sync(): void {
     if (this.previousPhase !== this.controller.phase || this.controller.phase === "prebattleStory") this.syncMusic();
-    if (this.controller.lastCombat && this.controller.lastCombat !== this.previousCombat) {
-      this.previousCombat = this.controller.lastCombat;
-      this.playEffect(ASSETS.audio.soldierAttack, 0.5);
-      globalThis.setTimeout(() => this.playEffect(ASSETS.audio.hit, 0.55), this.controller.presentationFast ? 30 : 170);
-      if (this.controller.lastCombat.defenderDied || this.controller.lastCombat.attackerDied) {
-        globalThis.setTimeout(() => this.playEffect(ASSETS.audio.death, 0.5), this.controller.presentationFast ? 80 : 360);
-      }
+    const cue = this.controller.audioCue;
+    if (cue && cue.sequence !== this.previousCueSequence) {
+      this.previousCueSequence = cue.sequence;
+      const source = ASSETS.audio.effects[cue.record as keyof typeof ASSETS.audio.effects];
+      if (source) this.playEffect(source, cue.record === 11 ? 0.5 : 0.55);
     }
     this.previousPhase = this.controller.phase;
   }

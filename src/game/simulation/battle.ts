@@ -25,6 +25,12 @@ export class Stage0Battle {
     this.units = createStage0Units();
   }
 
+  restore(snapshot: Pick<ReturnType<Stage0Battle["serializableSnapshot"]>, "round" | "focusId" | "units">): void {
+    this.round = snapshot.round;
+    this.focusId = snapshot.focusId;
+    this.units = snapshot.units.map((unit) => ({ ...unit }));
+  }
+
   get focus(): BattleUnit | undefined {
     return this.unit(this.focusId);
   }
@@ -287,6 +293,14 @@ export class Stage0Battle {
       rngState: this.rng.state,
       units: this.units.map((unit) => ({ ...unit })),
       outcome: this.outcome(),
+    };
+  }
+
+  serializableSnapshot(): { round: number; focusId: string; units: BattleUnit[] } {
+    return {
+      round: this.round,
+      focusId: this.focusId,
+      units: this.units.map((unit) => ({ ...unit })),
     };
   }
 }

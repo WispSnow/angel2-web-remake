@@ -42,6 +42,7 @@ export type GamePhase =
   | "victoryFeedback"
   | "savePrompt"
   | "saveSlots"
+  | "quit"
   | "nextStage";
 
 export type ActionMode = "idle" | "move" | "moving" | "actionMenu" | "target" | "enemyPreview";
@@ -79,12 +80,21 @@ export interface DialoguePage {
 
 export interface SaveData {
   format: "ANGEL2-web-save";
-  version: 1;
+  version: 2;
+  kind: "battle" | "completed";
   savedAt: string;
   saveCount: number;
-  stage: 1;
-  stageLabel: "下一關";
+  stage: 0 | 1;
+  stageLabel: "瓦爾克麗宮" | "下一關";
   ruleset: "stableRemake";
   rngState: number;
   roster: Array<Pick<BattleUnit, "slot" | "classId" | "experience" | "life">>;
+  battle?: {
+    phase: "player";
+    round: number;
+    focusId: string;
+    units: BattleUnit[];
+    cursor: Position;
+    cameraOrigin: Position;
+  };
 }
