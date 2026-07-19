@@ -37,13 +37,33 @@ interface DebugState {
     attackerDied: boolean;
   };
   combatPresentation?: {
-    phase: "primaryHit" | "primaryDamage" | "defenderDeath" | "counterHit" | "counterDamage" | "attackerDeath" | "full";
+    phase:
+      | "primaryHit"
+      | "primaryDamage"
+      | "defenderDeath"
+      | "counterHit"
+      | "counterDamage"
+      | "attackerDeath"
+      | "fullPrimaryStrike"
+      | "fullPrimaryDamage"
+      | "fullPrimaryRecover"
+      | "fullDefenderDeath"
+      | "fullCounterStrike"
+      | "fullCounterDamage"
+      | "fullCounterRecover"
+      | "fullAttackerDeath";
     frame: number;
     displayedAttackerLife: number;
     displayedDefenderLife: number;
+    fullPose?: {
+      leftFrame: number;
+      rightFrame: number;
+      leftOpacity: number;
+      rightOpacity: number;
+    };
   };
   combatPresentationTrace: Array<{
-    phase: "primaryHit" | "primaryDamage" | "defenderDeath" | "counterHit" | "counterDamage" | "attackerDeath" | "full";
+    phase: NonNullable<DebugState["combatPresentation"]>["phase"];
     frame: number;
     displayedAttackerLife: number;
     displayedDefenderLife: number;
@@ -737,4 +757,78 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
     Array.from({ length: 15 }, (_, frame) => frame),
   );
   expect(resolved.combatPresentationTrace.some(({ phase }) => phase.startsWith("counter"))).toBe(false);
+});
+
+test("S00-K: native full-screen records, step tables and death sequence preserve map-mode results", async ({ page }) => {
+  const enterPlayableBattle = async () => {
+    await page.goto("/?test=1");
+    await page.getByTestId("skip-dialogue").click();
+    await waitForPhase(page, "openingStory");
+    await page.getByTestId("skip-dialogue").click();
+    await waitForPhase(page, "player");
+  };
+  const attackFirstForcedTarget = async () => {
+    await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
+    await page.keyboard.press(" ");
+    await page.getByTestId("unit-command-attack").click();
+    const targeting = await debugState(page);
+    const target = targeting.targets[0];
+    await clickCanvas(
+      page,
+      40 + (target.x - targeting.cameraOrigin.x) * 40 + 20,
+      23 + (target.y - targeting.cameraOrigin.y) * 44 + 22,
+    );
+  };
+
+  await enterPlayableBattle();
+  await attackFirstForcedTarget();
+  await page.waitForFunction(() => !window.__ANGEL2__?.getState().combatPresentation);
+  const mapResolved = await debugState(page);
+
+  await enterPlayableBattle();
+  await openSystemMenu(page);
+  await page.getByTestId("presentation-button").click();
+  await page.keyboard.press("Escape");
+  await attackFirstForcedTarget();
+
+  const fullLayer = page.getByTestId("combat-presentation");
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullPrimaryDamage");
+  await expect(fullLayer).toHaveAttribute("data-full-left-record", "M_00/50");
+  await expect(fullLayer).toHaveAttribute("data-full-right-record", "Y_00/0");
+  await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullPrimaryDamage");
+  await expect(page.getByTestId("full-left-sprite")).toHaveAttribute("src", /left-soldier-plus50/);
+  await expect(page.getByTestId("full-right-sprite")).toHaveAttribute("src", /right-soldier-direct/);
+  await expect(page.getByTestId("full-damage-number")).toBeVisible();
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-damage.png" });
+
+  await page.waitForFunction(() => !window.__ANGEL2__?.getState().combatPresentation);
+  const fullResolved = await debugState(page);
+  expect(fullResolved.lastCombat).toEqual(mapResolved.lastCombat);
+  expect(fullResolved.rngState).toBe(mapResolved.rngState);
+  expect(fullResolved.units).toEqual(mapResolved.units);
+  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullPrimaryStrike")).toHaveLength(26);
+  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullPrimaryDamage")).toHaveLength(1);
+  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullPrimaryRecover")).toHaveLength(8);
+  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterStrike")).toHaveLength(26);
+  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterDamage")).toHaveLength(1);
+  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterRecover")).toHaveLength(8);
+
+  await enterPlayableBattle();
+  await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
+  await openSystemMenu(page);
+  await page.getByTestId("presentation-button").click();
+  await page.keyboard.press("Escape");
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-attack").click();
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullDefenderDeath");
+  await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullDefenderDeath");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-native-death.png" });
+  await waitForPhase(page, "victoryStory");
+  const deathResolved = await debugState(page);
+  const deathTrace = deathResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullDefenderDeath");
+  expect(deathTrace).toHaveLength(24);
+  expect(deathTrace.map(({ frame }) => frame)).toEqual([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]);
+  expect(deathResolved.combatPresentationTrace.some(({ phase }) => phase.startsWith("fullCounter"))).toBe(false);
 });

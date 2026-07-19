@@ -1,4 +1,4 @@
-import { ASSETS, STAGE0, nextExperienceThresholdFor } from "./content/stage0";
+import { ASSETS, STAGE0, nextExperienceThresholdFor, statsFor } from "./content/stage0";
 import type { GameController } from "./controller";
 import type { GamePhase, Position, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
@@ -377,7 +377,7 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   const presentation = controller.combatPresentation;
   layer.hidden = !presentation;
   if (!presentation) return;
-  const { attacker, defender, result, frame } = presentation;
+  const { attacker, defender } = presentation;
   if (controller.battlePresentation === "map") {
     // Native map hit/death frames are rendered inside the Phaser world so
     // they obey the battle camera, clipping and board-erase boundary.
@@ -385,15 +385,62 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
     layer.innerHTML = "";
     return;
   }
-  const allyFrames = ASSETS.fullBattle.allySoldier;
-  const enemyFrames = defender.classId === 22 ? ASSETS.fullBattle.enemyCavalry : ASSETS.fullBattle.enemySoldier;
-  layer.className = `combat-presentation full-combat frame-${frame}`;
+  const leftFrames = attacker.side === 1
+    ? ASSETS.fullBattle.left.soldierPlus50
+    : attacker.classId === 22
+      ? ASSETS.fullBattle.left.cavalryDirect
+      : ASSETS.fullBattle.left.soldierDirect;
+  const rightFrames = attacker.side === 1
+    ? defender.classId === 22
+      ? ASSETS.fullBattle.right.cavalryDirect
+      : ASSETS.fullBattle.right.soldierDirect
+    : ASSETS.fullBattle.right.soldierPlus50;
+  const pose = presentation.fullPose ?? {
+    leftFrame: 0,
+    rightFrame: 0,
+    leftOffsetX: 0,
+    rightOffsetX: 0,
+    leftOpacity: 1,
+    rightOpacity: 1,
+  };
+  const leftFrame = Math.max(0, Math.min(leftFrames.length - 1, pose.leftFrame));
+  const rightFrame = Math.max(0, Math.min(rightFrames.length - 1, pose.rightFrame));
+  const leftRecord = attacker.side === 1 ? "M_00/50" : attacker.classId === 22 ? "M_00/22" : "M_00/0";
+  const rightRecord = attacker.side === 1
+    ? defender.classId === 22 ? "Y_00/22" : "Y_00/0"
+    : "Y_00/50";
+  const damageNumber = pose.damageSide && pose.damage !== undefined
+    ? `<b class="full-damage-number ${pose.damageSide}" data-testid="full-damage-number">-${pose.damage}</b>`
+    : "";
+  layer.className = `combat-presentation full-combat ${presentation.phase}`;
   layer.removeAttribute("style");
+  layer.dataset.fullCombatPhase = presentation.phase;
+  layer.dataset.fullLeftRecord = leftRecord;
+  layer.dataset.fullRightRecord = rightRecord;
+  layer.dataset.fullLeftFrame = String(leftFrame);
+  layer.dataset.fullRightFrame = String(rightFrame);
   layer.innerHTML = `
-    <div class="combat-title">${attacker.name}　對　${defender.name}</div>
-    <div class="combatant attacker"><img src="${allyFrames[frame]}" alt="${attacker.name}攻擊動作" /><span>HP ${attacker.life}</span></div>
-    <div class="impact-flash"><i>−${result.damage}</i>${result.counterDamage ? `<small>反擊 −${result.counterDamage}</small>` : ""}</div>
-    <div class="combatant defender"><img src="${enemyFrames[frame]}" alt="${defender.name}受擊動作" /><span>HP ${Math.max(0, defender.life - result.damage)}</span></div>`;
+    <div class="full-combat-frame" aria-hidden="true">
+      <i class="full-combat-horizon"></i>
+      <i class="full-combat-sigil">II</i>
+    </div>
+    <div class="full-combatant left" style="--offset-x:${pose.leftOffsetX}px;opacity:${pose.leftOpacity}">
+      <img src="${leftFrames[leftFrame]}" alt="${attacker.name}全景戰鬥動作" data-testid="full-left-sprite" />
+    </div>
+    <div class="full-combatant right" style="--offset-x:${pose.rightOffsetX}px;opacity:${pose.rightOpacity}">
+      <img src="${rightFrames[rightFrame]}" alt="${defender.name}全景戰鬥動作" data-testid="full-right-sprite" />
+    </div>
+    ${damageNumber}
+    <div class="full-status left">
+      <span>${attacker.name}</span>
+      <i><b style="width:${Math.max(0, Math.min(100, presentation.displayedAttackerLife / statsFor(attacker).maxLife * 100))}%"></b></i>
+      <em>${presentation.displayedAttackerLife}</em>
+    </div>
+    <div class="full-status right">
+      <span>${defender.name}</span>
+      <i><b style="width:${Math.max(0, Math.min(100, presentation.displayedDefenderLife / statsFor(defender).maxLife * 100))}%"></b></i>
+      <em>${presentation.displayedDefenderLife}</em>
+    </div>`;
 }
 
 function renderHud(unit: NonNullable<GameController["focusedUnit"]>, stats: UnitStats): string {

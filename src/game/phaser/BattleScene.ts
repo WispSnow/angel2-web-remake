@@ -379,7 +379,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private drawUnits(): void {
       const presentation = controller.combatPresentation;
-      const mapPresentation = presentation?.phase !== "full" ? presentation : undefined;
+      const mapPresentation = presentation && !presentation.phase.startsWith("full") ? presentation : undefined;
       const displayedUnits = new Map(controller.battle.units.map((unit) => [unit.id, unit]));
       if (mapPresentation) {
         if (!displayedUnits.has(mapPresentation.attacker.id)) displayedUnits.set(mapPresentation.attacker.id, mapPresentation.attacker);
@@ -455,7 +455,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.combatEffects = [];
       const presentation = controller.combatPresentation;
       const canvas = this.game.canvas;
-      if (!presentation || presentation.phase === "full") {
+      if (!presentation || presentation.phase.startsWith("full")) {
         if (controller.isTestMode) {
           delete canvas.dataset.mapCombatPhase;
           delete canvas.dataset.mapCombatFrame;

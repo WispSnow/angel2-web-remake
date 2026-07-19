@@ -230,19 +230,39 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .map-combat { width: 40px; height: 44px; color: #fff; text-align: center; text-shadow: 2px 2px #000; }
 .map-combat .slash-mark { display: block; color: #fff3a4; font: 800 48px/36px system-ui, sans-serif; transform: rotate(16deg); filter: drop-shadow(0 0 5px #ff2d2d); }
 .map-combat b { position: absolute; left: 5px; top: 26px; color: #fff; font: 800 15px system-ui, sans-serif; -webkit-text-stroke: 1px #8d0707; }
-.full-combat { left: 0; top: 0; width: 480px; height: 350px; overflow: hidden; border: 5px ridge #e2b93c; background: linear-gradient(#251117b8, #0b0809d9), url("/assets/original/story-palace.png") center / cover; }
-.combat-title { position: absolute; left: 40px; right: 40px; top: 15px; padding: 5px; border-bottom: 1px solid #d9ae38; color: #ffe991; text-align: center; font-size: 15px; }
-.combatant { position: absolute; bottom: 46px; width: 170px; height: 210px; display: flex; flex-direction: column; align-items: center; justify-content: end; }
-.combatant.attacker { left: 42px; } .combatant.defender { right: 42px; }
-.combatant img { max-width: 150px; max-height: 160px; transform: scale(1.6); transform-origin: bottom; image-rendering: pixelated; filter: drop-shadow(5px 7px 0 #0008); }
-.combatant.defender img { transform: scale(1.6) scaleX(-1); }
-.combatant span { z-index: 2; width: 130px; margin-top: 10px; border: 1px solid #d7a827; color: #fff; background: #180b0dcc; text-align: center; font: 12px system-ui, sans-serif; }
-.impact-flash { position: absolute; left: 200px; top: 130px; width: 80px; color: #fff; text-align: center; }
-.impact-flash::before, .impact-flash::after { content: ""; position: absolute; left: 35px; top: -30px; width: 8px; height: 130px; background: #fff9b9; box-shadow: 0 0 18px #ff3c2f; transform: rotate(45deg); }
-.impact-flash::after { transform: rotate(-45deg); }
-.impact-flash i, .impact-flash small { position: relative; z-index: 2; display: block; color: #fff; font: 800 22px system-ui, sans-serif; text-shadow: 2px 2px #a90000; }
-.impact-flash small { margin-top: 35px; color: #ffcb72; font-size: 11px; }
-.frame-0 .impact-flash { opacity: .3; } .frame-1 .impact-flash { opacity: .7; } .frame-2 .impact-flash { opacity: 1; } .frame-3 .impact-flash { opacity: .55; }
+.full-combat {
+  inset: 0;
+  width: 640px;
+  height: 350px;
+  overflow: hidden;
+  color: #fff;
+  background:
+    repeating-linear-gradient(0deg, #0000 0 3px, #2a071033 3px 4px),
+    radial-gradient(ellipse at 50% 45%, #461321 0, #18070d 40%, #020102 75%);
+  image-rendering: pixelated;
+}
+.full-combat-frame { position: absolute; inset: 8px; border: 2px solid #dfad28; box-shadow: inset 0 0 0 2px #6e1a25, inset 0 0 0 4px #10080b; }
+.full-combat-frame::before,
+.full-combat-frame::after { content: "◆"; position: absolute; top: -8px; color: #f5d445; background: #050204; font: 16px/16px serif; }
+.full-combat-frame::before { left: -4px; }
+.full-combat-frame::after { right: -4px; }
+.full-combat-horizon { position: absolute; left: 20px; right: 20px; top: 219px; height: 2px; background: #a15d27; box-shadow: 0 4px #35111a, 0 -4px #35111a; }
+.full-combat-sigil { position: absolute; left: 298px; top: 18px; width: 28px; color: #8e5a27; text-align: center; font: italic 18px Georgia, serif; opacity: .7; }
+.full-combatant { --offset-x: 0px; position: absolute; top: 56px; width: 264px; height: 170px; transition: opacity 16ms linear; }
+.full-combatant.left { left: calc(24px + var(--offset-x)); }
+.full-combatant.right { right: calc(24px - var(--offset-x)); }
+.full-combatant img { position: absolute; left: 50%; bottom: 0; display: block; transform: translateX(-50%); image-rendering: pixelated; filter: drop-shadow(4px 6px 0 #000b); }
+.full-status { position: absolute; bottom: 23px; width: 254px; height: 57px; padding: 7px 12px; border: 2px solid #b97b25; background: #0b0407e8; box-shadow: inset 0 0 0 1px #571723; font: 15px/18px "PMingLiU", "Noto Serif TC", serif; }
+.full-status.left { left: 24px; }
+.full-status.right { right: 24px; text-align: right; }
+.full-status span { display: inline-block; min-width: 116px; color: #f5dc8a; }
+.full-status em { position: absolute; top: 6px; right: 12px; color: #fff; font-style: normal; font-weight: 700; }
+.full-status.right em { right: auto; left: 12px; }
+.full-status i { position: absolute; left: 12px; right: 12px; bottom: 8px; height: 12px; border: 1px solid #f2bd36; background: #26070c; }
+.full-status i b { display: block; height: 100%; background: #e52b32; box-shadow: inset 0 3px #ff6c57; transition: width 30ms steps(8); }
+.full-damage-number { position: absolute; z-index: 2; top: 102px; width: 160px; color: #fff; text-align: center; font: 800 34px/1 "Arial Black", system-ui, sans-serif; letter-spacing: 2px; -webkit-text-stroke: 1px #72090d; text-shadow: 3px 3px #000, 0 0 8px #ff5a30; }
+.full-damage-number.left { left: 76px; }
+.full-damage-number.right { right: 76px; }
 
 .dialogue-layer { position: absolute; z-index: 12; inset: 0; background: #08030630; }
 .dialogue-box { position: absolute; left: 18px; width: 604px; min-height: 112px; padding: 12px 18px; border: 5px ridge #e9bf3a; color: #fff; background: linear-gradient(90deg, #1f0f13f2, #3f2228f2); box-shadow: inset 0 0 0 2px #6e2932; }

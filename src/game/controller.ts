@@ -14,7 +14,25 @@ export type CombatPresentationPhase =
   | "counterHit"
   | "counterDamage"
   | "attackerDeath"
-  | "full";
+  | "fullPrimaryStrike"
+  | "fullPrimaryDamage"
+  | "fullPrimaryRecover"
+  | "fullDefenderDeath"
+  | "fullCounterStrike"
+  | "fullCounterDamage"
+  | "fullCounterRecover"
+  | "fullAttackerDeath";
+
+export interface FullCombatPose {
+  leftFrame: number;
+  rightFrame: number;
+  leftOffsetX: number;
+  rightOffsetX: number;
+  leftOpacity: number;
+  rightOpacity: number;
+  damageSide?: "left" | "right";
+  damage?: number;
+}
 
 export interface CombatPresentation {
   attacker: BattleUnit;
@@ -24,6 +42,7 @@ export interface CombatPresentation {
   frame: number;
   displayedAttackerLife: number;
   displayedDefenderLife: number;
+  fullPose?: FullCombatPose;
 }
 
 export interface CombatPresentationTraceEntry {
@@ -31,6 +50,7 @@ export interface CombatPresentationTraceEntry {
   frame: number;
   displayedAttackerLife: number;
   displayedDefenderLife: number;
+  fullPose?: FullCombatPose;
 }
 
 export type UnitCommandId = "move" | "attack" | "rest" | "end" | "undo";
@@ -74,6 +94,37 @@ export interface MovementPresentation {
 
 const isStoryPhase = (phase: GamePhase): phase is StoryPhase => phase in STORY_BY_PHASE;
 const pause = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
+
+interface FullClassTimeline {
+  strikeSteps: readonly number[];
+  fourFrameStrike: readonly number[];
+  sixFrameStrike: readonly number[];
+  victimFrames: readonly number[];
+  recoverSteps: readonly number[];
+  recoverFrames: readonly number[];
+}
+
+// Module 29 class records 0 and 22. The step-count tables are exact native
+// data. Frame progressions select only images present in the loaded direct or
+// +50 bundle; renderer-substep wall time remains a documented host calibration.
+const FULL_CLASS_TIMELINES: Record<BattleUnit["classId"], FullClassTimeline> = {
+  0: {
+    strikeSteps: [2, 2, 2, 2, 9, 9],
+    fourFrameStrike: [0, 1, 2, 3, 2, 0],
+    sixFrameStrike: [0, 1, 2, 3, 4, 5],
+    victimFrames: [0, 0, 0, 0, 2, 3],
+    recoverSteps: [3, 2, 3],
+    recoverFrames: [2, 3, 0],
+  },
+  22: {
+    strikeSteps: [2, 2, 2, 2, 2, 6, 9, 6],
+    fourFrameStrike: [0, 1, 2, 3, 2, 1, 0, 0],
+    sixFrameStrike: [0, 1, 2, 3, 2, 1, 0, 0],
+    victimFrames: [0, 0, 0, 0, 0, 2, 3, 0],
+    recoverSteps: [4, 4, 3, 3],
+    recoverFrames: [2, 3, 2, 0],
+  },
+};
 
 export class GameController {
   battle = new Stage0Battle();
@@ -716,18 +767,7 @@ export class GameController {
   ): Promise<void> {
     this.combatPresentationTrace = [];
     if (this.battlePresentation === "full") {
-      for (let frame = 0; frame < 4; frame += 1) {
-        this.setCombatPresentation(
-          attacker,
-          defender,
-          result,
-          "full",
-          frame,
-          Math.max(0, attacker.life - result.counterDamage),
-          Math.max(0, defender.life - result.damage),
-        );
-        await pause(this.testMode ? 60 : this.presentationFast ? 45 : 120);
-      }
+      await this.presentFullScreenCombat(attacker, defender, result);
       this.combatPresentation = undefined;
       return;
     }
@@ -823,6 +863,257 @@ export class GameController {
     this.combatPresentation = undefined;
   }
 
+  private async presentFullScreenCombat(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    result: AttackResult,
+  ): Promise<void> {
+    let displayedAttackerLife = attacker.life;
+    let displayedDefenderLife = defender.life;
+    const finalDefenderLife = Math.max(0, defender.life - result.damage);
+    const finalAttackerLife = Math.max(0, attacker.life - result.counterDamage);
+    const leftFrameCount = attacker.classId === 0 && attacker.side === 1 ? 6 : 4;
+    const rightFrameCount = defender.classId === 0 && attacker.side === 2 ? 6 : 4;
+
+    await this.presentFullStrike(
+      attacker,
+      defender,
+      result,
+      "left",
+      "fullPrimaryStrike",
+      displayedAttackerLife,
+      displayedDefenderLife,
+      leftFrameCount,
+      rightFrameCount,
+    );
+
+    displayedDefenderLife = finalDefenderLife;
+    this.setCombatPresentation(
+      attacker,
+      defender,
+      result,
+      "fullPrimaryDamage",
+      0,
+      displayedAttackerLife,
+      displayedDefenderLife,
+      {
+        leftFrame: this.lastStrikeFrame(attacker.classId, leftFrameCount),
+        rightFrame: 2,
+        leftOffsetX: 0,
+        rightOffsetX: 0,
+        leftOpacity: 1,
+        rightOpacity: 1,
+        damageSide: "right",
+        damage: result.damage,
+      },
+    );
+    await pause(this.fullDamageHold());
+
+    if (result.defenderDied) {
+      await this.presentFullDeath(
+        attacker,
+        defender,
+        result,
+        "right",
+        "fullDefenderDeath",
+        displayedAttackerLife,
+        displayedDefenderLife,
+      );
+      return;
+    }
+
+    await this.presentFullRecovery(
+      attacker,
+      defender,
+      result,
+      "right",
+      "fullPrimaryRecover",
+      displayedAttackerLife,
+      displayedDefenderLife,
+    );
+
+    if (!result.counterOccurred) return;
+
+    await this.presentFullStrike(
+      attacker,
+      defender,
+      result,
+      "right",
+      "fullCounterStrike",
+      displayedAttackerLife,
+      displayedDefenderLife,
+      leftFrameCount,
+      rightFrameCount,
+    );
+
+    displayedAttackerLife = finalAttackerLife;
+    this.setCombatPresentation(
+      attacker,
+      defender,
+      result,
+      "fullCounterDamage",
+      0,
+      displayedAttackerLife,
+      displayedDefenderLife,
+      {
+        leftFrame: 2,
+        rightFrame: this.lastStrikeFrame(defender.classId, rightFrameCount),
+        leftOffsetX: 0,
+        rightOffsetX: 0,
+        leftOpacity: 1,
+        rightOpacity: 1,
+        damageSide: "left",
+        damage: result.counterDamage,
+      },
+    );
+    await pause(this.fullDamageHold());
+
+    if (result.attackerDied) {
+      await this.presentFullDeath(
+        attacker,
+        defender,
+        result,
+        "left",
+        "fullAttackerDeath",
+        displayedAttackerLife,
+        displayedDefenderLife,
+      );
+      return;
+    }
+
+    await this.presentFullRecovery(
+      attacker,
+      defender,
+      result,
+      "left",
+      "fullCounterRecover",
+      displayedAttackerLife,
+      displayedDefenderLife,
+    );
+  }
+
+  private async presentFullStrike(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    result: AttackResult,
+    actor: "left" | "right",
+    phase: "fullPrimaryStrike" | "fullCounterStrike",
+    displayedAttackerLife: number,
+    displayedDefenderLife: number,
+    leftFrameCount: number,
+    rightFrameCount: number,
+  ): Promise<void> {
+    const actorUnit = actor === "left" ? attacker : defender;
+    const actorFrameCount = actor === "left" ? leftFrameCount : rightFrameCount;
+    const timeline = FULL_CLASS_TIMELINES[actorUnit.classId];
+    const strikeFrames = actorFrameCount >= 6 ? timeline.sixFrameStrike : timeline.fourFrameStrike;
+
+    for (let poseIndex = 0; poseIndex < timeline.strikeSteps.length; poseIndex += 1) {
+      const victimFrame = timeline.victimFrames[poseIndex] ?? 0;
+      for (let substep = 0; substep < timeline.strikeSteps[poseIndex]; substep += 1) {
+        const lunge = this.fullStrikeLunge(poseIndex, timeline.strikeSteps.length, substep, timeline.strikeSteps[poseIndex]);
+        this.setCombatPresentation(
+          attacker,
+          defender,
+          result,
+          phase,
+          poseIndex,
+          displayedAttackerLife,
+          displayedDefenderLife,
+          {
+            leftFrame: actor === "left" ? strikeFrames[poseIndex] ?? 0 : victimFrame,
+            rightFrame: actor === "right" ? strikeFrames[poseIndex] ?? 0 : victimFrame,
+            leftOffsetX: actor === "left" ? lunge : 0,
+            rightOffsetX: actor === "right" ? -lunge : 0,
+            leftOpacity: 1,
+            rightOpacity: 1,
+          },
+        );
+        await pause(this.fullCombatDelay(1));
+      }
+    }
+  }
+
+  private async presentFullRecovery(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    result: AttackResult,
+    recovering: "left" | "right",
+    phase: "fullPrimaryRecover" | "fullCounterRecover",
+    displayedAttackerLife: number,
+    displayedDefenderLife: number,
+  ): Promise<void> {
+    const unit = recovering === "left" ? attacker : defender;
+    const timeline = FULL_CLASS_TIMELINES[unit.classId];
+    for (let poseIndex = 0; poseIndex < timeline.recoverSteps.length; poseIndex += 1) {
+      for (let substep = 0; substep < timeline.recoverSteps[poseIndex]; substep += 1) {
+        this.setCombatPresentation(
+          attacker,
+          defender,
+          result,
+          phase,
+          poseIndex,
+          displayedAttackerLife,
+          displayedDefenderLife,
+          {
+            leftFrame: recovering === "left" ? timeline.recoverFrames[poseIndex] ?? 0 : 0,
+            rightFrame: recovering === "right" ? timeline.recoverFrames[poseIndex] ?? 0 : 0,
+            leftOffsetX: 0,
+            rightOffsetX: 0,
+            leftOpacity: 1,
+            rightOpacity: 1,
+          },
+        );
+        await pause(this.fullCombatDelay(1));
+      }
+    }
+  }
+
+  private async presentFullDeath(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    result: AttackResult,
+    dying: "left" | "right",
+    phase: "fullDefenderDeath" | "fullAttackerDeath",
+    displayedAttackerLife: number,
+    displayedDefenderLife: number,
+  ): Promise<void> {
+    // Native DS:7D4C is six poses × four renderer substeps, all on pose 2.
+    for (let substep = 0; substep < 24; substep += 1) {
+      const opacity = Math.max(0, 1 - substep / 21);
+      this.setCombatPresentation(
+        attacker,
+        defender,
+        result,
+        phase,
+        Math.floor(substep / 4),
+        displayedAttackerLife,
+        displayedDefenderLife,
+        {
+          leftFrame: dying === "left" ? 2 : 0,
+          rightFrame: dying === "right" ? 2 : 0,
+          leftOffsetX: 0,
+          rightOffsetX: 0,
+          leftOpacity: dying === "left" ? opacity : 1,
+          rightOpacity: dying === "right" ? opacity : 1,
+        },
+      );
+      await pause(this.fullCombatDelay(1));
+    }
+  }
+
+  private lastStrikeFrame(classId: BattleUnit["classId"], frameCount: number): number {
+    const timeline = FULL_CLASS_TIMELINES[classId];
+    const frames = frameCount >= 6 ? timeline.sixFrameStrike : timeline.fourFrameStrike;
+    return frames.at(-1) ?? 0;
+  }
+
+  private fullStrikeLunge(poseIndex: number, poseCount: number, substep: number, substepCount: number): number {
+    if (poseIndex < poseCount - 2) return 0;
+    const phase = (poseIndex - (poseCount - 2) + substep / Math.max(1, substepCount)) / 2;
+    return Math.round(Math.sin(Math.min(1, phase) * Math.PI) * 16);
+  }
+
   private setCombatPresentation(
     attacker: BattleUnit,
     defender: BattleUnit,
@@ -831,6 +1122,7 @@ export class GameController {
     frame: number,
     displayedAttackerLife: number,
     displayedDefenderLife: number,
+    fullPose?: FullCombatPose,
   ): void {
     this.combatPresentation = {
       attacker,
@@ -840,8 +1132,15 @@ export class GameController {
       frame,
       displayedAttackerLife,
       displayedDefenderLife,
+      fullPose,
     };
-    this.combatPresentationTrace.push({ phase, frame, displayedAttackerLife, displayedDefenderLife });
+    this.combatPresentationTrace.push({
+      phase,
+      frame,
+      displayedAttackerLife,
+      displayedDefenderLife,
+      fullPose: fullPose ? { ...fullPose } : undefined,
+    });
     this.emit();
   }
 
@@ -849,6 +1148,15 @@ export class GameController {
     if (this.testMode) return Math.max(4, nativeTicks * 4);
     if (this.presentationFast) return Math.max(3, Math.round(nativeTicks * 2.5));
     return nativeTicks * 10;
+  }
+
+  private fullCombatDelay(rendererSubsteps: number): number {
+    const millisecondsPerSubstep = this.testMode ? 8 : this.presentationFast ? 10 : 20;
+    return Math.max(4, rendererSubsteps * millisecondsPerSubstep);
+  }
+
+  private fullDamageHold(): number {
+    return this.testMode ? 420 : this.presentationFast ? 300 : 650;
   }
 
   openObjectives(): void {
@@ -1203,6 +1511,7 @@ export class GameController {
         attacker: { ...this.combatPresentation.attacker },
         defender: { ...this.combatPresentation.defender },
         result: { ...this.combatPresentation.result },
+        fullPose: this.combatPresentation.fullPose ? { ...this.combatPresentation.fullPose } : undefined,
       } : undefined,
       combatPresentationTrace: this.combatPresentationTrace.map((entry) => ({ ...entry })),
       movementPresentation: this.movementPresentation ? {
