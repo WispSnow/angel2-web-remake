@@ -137,6 +137,34 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     cursor: { x: 29, y: 26 },
     cameraOrigin: { x: 25, y: 23 },
   });
+  const canvasBounds = await battleCanvas.boundingBox();
+  expect(canvasBounds).not.toBeNull();
+
+  // The complete visible location banner is part of the native lower-edge
+  // hotspot, rather than leaving only its uncovered border pixels usable.
+  await battleCanvas.hover({ position: { x: 240, y: 340 } });
+  await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "0,1");
+  await expect.poll(async () => (await debugState(page)).cameraOrigin.y).toBeGreaterThan(edgePanBaseline.cameraOrigin.y);
+  const bottomPanned = await debugState(page);
+  expect(bottomPanned.cameraOrigin.x).toBe(edgePanBaseline.cameraOrigin.x);
+  expect(bottomPanned.cursor).toEqual(edgePanBaseline.cursor);
+  expect(bottomPanned.selectedId).toBe(edgePanBaseline.selectedId);
+  expect(bottomPanned.actionMode).toBe(edgePanBaseline.actionMode);
+  expect(bottomPanned.units).toEqual(edgePanBaseline.units);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-bottom-banner-edge-pan.png" });
+
+  await page.mouse.move(canvasBounds!.x + canvasBounds!.width + 8, canvasBounds!.y + 40);
+  await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "0,0");
+  const cameraAfterLeavingEdge = (await debugState(page)).cameraOrigin;
+  await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
+  expect((await debugState(page)).cameraOrigin).toEqual(cameraAfterLeavingEdge);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowRight");
+  expect((await debugState(page))).toMatchObject({
+    cursor: edgePanBaseline.cursor,
+    cameraOrigin: edgePanBaseline.cameraOrigin,
+  });
+
   await battleCanvas.hover({ position: { x: 5, y: 177 } });
   await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "-1,0");
   await expect.poll(async () => (await debugState(page)).cameraOrigin.x).toBeLessThanOrEqual(23);
@@ -148,13 +176,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(edgePanned.units).toEqual(edgePanBaseline.units);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-mouse-edge-pan.png" });
 
-  const canvasBounds = await battleCanvas.boundingBox();
-  expect(canvasBounds).not.toBeNull();
   await page.mouse.move(canvasBounds!.x + canvasBounds!.width + 8, canvasBounds!.y + 40);
   await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "0,0");
-  const cameraAfterLeavingEdge = (await debugState(page)).cameraOrigin;
   await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
-  expect((await debugState(page)).cameraOrigin).toEqual(cameraAfterLeavingEdge);
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowRight");
   expect((await debugState(page))).toMatchObject({

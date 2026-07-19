@@ -69,7 +69,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .logical-screen[data-phase="prebattleStory"] .bottom-round,
 .logical-screen[data-phase="prebattleStory"] .status-strip { display: none; }
 
-.bottom-location { position: absolute; z-index: 6; left: 80px; top: 331px; width: 320px; height: 19px; border-block: 1px solid #d8aa2c; color: #fff; background: #5d3b2b; text-align: center; font-size: 17px; line-height: 16px; text-shadow: 1px 1px #000; }
+.bottom-location { position: absolute; z-index: 6; left: 80px; top: 331px; width: 320px; height: 19px; border-block: 1px solid #d8aa2c; color: #fff; background: #5d3b2b; text-align: center; font-size: 17px; line-height: 16px; text-shadow: 1px 1px #000; pointer-events: none; }
 .bottom-round { position: absolute; z-index: 7; left: 486px; top: 327px; width: 148px; height: 20px; color: #fff; text-align: center; font-size: 16px; }
 
 .animated-portrait { position: relative; display: block; overflow: hidden; image-rendering: pixelated; }
