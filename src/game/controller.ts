@@ -3,7 +3,7 @@ import { STORY_BY_PHASE } from "./content/dialogue";
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
 import { DeterministicRng } from "./simulation/rng";
-import type { ActionMode, AttackResult, BattleUnit, DialoguePage, GamePhase, Position, SaveData } from "./types";
+import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData } from "./types";
 
 type Listener = () => void;
 type StoryPhase = keyof typeof STORY_BY_PHASE;
@@ -139,6 +139,7 @@ const FULL_CLASS_TIMELINES: Record<BattleUnit["classId"], FullClassTimeline> = {
 
 export class GameController {
   battle = new Stage0Battle();
+  difficulty: Difficulty;
   phase: GamePhase = "prebattleStory";
   actionMode: ActionMode = "idle";
   dialogueIndex = 0;
@@ -183,6 +184,10 @@ export class GameController {
   private busy = false;
   private listeners = new Set<Listener>();
   private readonly testMode = new URLSearchParams(location.search).has("test");
+
+  constructor(difficulty: Difficulty = 0) {
+    this.difficulty = difficulty;
+  }
 
   onChange(listener: Listener): () => void {
     this.listeners.add(listener);
@@ -1442,7 +1447,11 @@ export class GameController {
         || parsed.version !== 2
         || (parsed.kind !== "battle" && parsed.kind !== "completed")
       ) return undefined;
-      return parsed as SaveData;
+      const difficulty = parsed.difficulty;
+      return {
+        ...parsed,
+        difficulty: difficulty === 1 || difficulty === 2 || difficulty === 3 ? difficulty : 0,
+      } as SaveData;
     } catch {
       return undefined;
     }
@@ -1459,6 +1468,7 @@ export class GameController {
       stage: 1,
       stageLabel: "下一關",
       ruleset: "stableRemake",
+      difficulty: this.difficulty,
       rngState: this.battle.rng.state,
       roster: this.battle.units.filter((unit) => unit.side === 1).map(({ slot: unitSlot, classId, experience, life }) => ({ slot: unitSlot, classId, experience, life })),
     };
@@ -1516,6 +1526,7 @@ export class GameController {
       stage: 0,
       stageLabel: "瓦爾克麗宮",
       ruleset: "stableRemake",
+      difficulty: this.difficulty,
       rngState: this.battle.rng.state,
       roster: snapshot.units
         .filter((unit) => unit.side === 1)
@@ -1554,6 +1565,7 @@ export class GameController {
     const battle = new Stage0Battle(new DeterministicRng(save.rngState));
     battle.restore(save.battle);
     this.battle = battle;
+    this.difficulty = save.difficulty;
     this.phase = "player";
     this.cursor = { ...save.battle.cursor };
     this.cameraOrigin = { ...save.battle.cameraOrigin };
@@ -1800,6 +1812,7 @@ export class GameController {
   debugState(): object {
     return {
       phase: this.phase,
+      difficulty: this.difficulty,
       dialogueIndex: this.dialogueIndex,
       actionMode: this.actionMode,
       selectedId: this.selectedId,

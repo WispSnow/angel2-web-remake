@@ -23,7 +23,7 @@ test("S00-O: a normal build clears stage zero through player-visible controls on
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("/");
+  await page.goto("/?skipStartup=1");
   expect(new URL(page.url()).search).toBe("");
   expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
 

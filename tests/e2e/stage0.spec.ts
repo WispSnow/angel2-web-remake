@@ -142,7 +142,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => window.__ANGEL2__?.clearSaves());
   const chromeImages = page.getByTestId("battle-chrome").locator("img");
   await expect(chromeImages).toHaveCount(9);
@@ -515,7 +515,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
 test("S00-E: keyboard objectives and responsive reduced-motion layout preserve the 640×350 simulation surface", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   await page.keyboard.press(" ");
   expect((await debugState(page)).dialogueIndex).toBe(0);
   await expect(page.locator("#dialogue-text")).toContainText("寬廣走廊");
@@ -615,7 +615,7 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
 });
 
 test("S00-F: named cavalry identity and route evacuation are visible end to end", async ({ page }) => {
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
   await page.getByTestId("skip-dialogue").click();
@@ -644,7 +644,7 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
 
 test("S00-G: group commands provide allied AI handoff and confirmed retreat", async ({ page }) => {
   const enterPlayerPhase = async () => {
-    await page.goto("/?test=1");
+    await page.goto("/?test=1&skipStartup=1");
     await page.getByTestId("skip-dialogue").click();
     await waitForPhase(page, "openingStory");
     await page.getByTestId("skip-dialogue").click();
@@ -704,7 +704,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
 });
 
 test("S00-H: minimap hover previews and primary click relocates the native viewport", async ({ page }) => {
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
   await page.getByTestId("skip-dialogue").click();
@@ -740,7 +740,7 @@ test("S00-H: minimap hover previews and primary click relocates the native viewp
 });
 
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
   await page.getByTestId("skip-dialogue").click();
@@ -777,7 +777,7 @@ test("S00-I: native range dither and ordinary attack target-count branches", asy
 });
 
 test("S00-J: native map hit, point-drain and death descriptors preserve the board erase boundary", async ({ page }) => {
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
   await page.getByTestId("skip-dialogue").click();
@@ -845,7 +845,7 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
 
 test("S00-K: native full-screen records, step tables and death sequence preserve map-mode results", async ({ page }) => {
   const enterPlayableBattle = async () => {
-    await page.goto("/?test=1");
+    await page.goto("/?test=1&skipStartup=1");
     await page.getByTestId("skip-dialogue").click();
     await waitForPhase(page, "openingStory");
     await page.getByTestId("skip-dialogue").click();
@@ -922,7 +922,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
 });
 
 test("S00-L: native KY checkpoints preserve dual windows, appended text and the blank victory pause", async ({ page }) => {
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   const layer = page.getByTestId("dialogue-layer");
   await expect(layer).toHaveAttribute("data-source-record", "0");
   await expect(layer).toHaveAttribute("data-source-wait", "1");
@@ -984,7 +984,7 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
 });
 
 test("S00-M: native system records restore battle state and combat cues follow presentation events", async ({ page }) => {
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => window.__ANGEL2__?.clearSaves());
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
@@ -1078,7 +1078,7 @@ test("S00-M: native system records restore battle state and combat cues follow p
 
 test("S00-N: defeat and victory use native feedback text, portrait and two-step input", async ({ page }) => {
   const enterPlayerPhase = async () => {
-    await page.goto("/?test=1");
+    await page.goto("/?test=1&skipStartup=1");
     await page.getByTestId("skip-dialogue").click();
     await waitForPhase(page, "openingStory");
     await page.getByTestId("skip-dialogue").click();
@@ -1117,7 +1117,7 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and honors the mus
     if (match) battleRequests.add(match[1]);
   });
 
-  await page.goto("/?test=1");
+  await page.goto("/?test=1&skipStartup=1");
   await expect(app).toHaveAttribute("data-music-track", "MAGIC/73");
   await expect(app).toHaveAttribute("data-music-playing", "false");
 

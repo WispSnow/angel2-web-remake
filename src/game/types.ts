@@ -1,4 +1,5 @@
 export type Side = 1 | 2;
+export type Difficulty = 0 | 1 | 2 | 3;
 export type UnitClassId = 0 | 22;
 export type PortraitRecord = 15 | 45 | 46 | 47 | 48;
 
@@ -87,6 +88,7 @@ export interface SaveData {
   stage: 0 | 1;
   stageLabel: "瓦爾克麗宮" | "下一關";
   ruleset: "stableRemake";
+  difficulty: Difficulty;
   rngState: number;
   roster: Array<Pick<BattleUnit, "slot" | "classId" | "experience" | "life">>;
   battle?: {

@@ -9,6 +9,7 @@ import {
   nativeStoryGlyphMovesMouth,
   startPortraitAnimations,
 } from "./portrait";
+import { configureGameScaling } from "./scaling";
 
 const storyPhases = new Set<GamePhase>(["prebattleStory", "openingStory", "round2Story", "victoryStory"]);
 
@@ -644,7 +645,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   };
   controller.onChange(render);
   render();
-  configureScaling(required(root, "#game-viewport"), screen);
+  configureGameScaling(required(root, "#game-viewport"), screen);
   bindGamepad(controller);
 }
 
@@ -815,16 +816,6 @@ function required<T extends HTMLElement = HTMLElement>(root: ParentNode, selecto
   const element = root.querySelector<T>(selector);
   if (!element) throw new Error(`missing UI element ${selector}`);
   return element;
-}
-
-function configureScaling(viewport: HTMLElement, screen: HTMLElement): void {
-  const resize = () => {
-    const scale = Math.min(1, viewport.clientWidth / 640);
-    viewport.style.height = `${350 * scale}px`;
-    screen.style.setProperty("--game-scale", String(scale));
-  };
-  new ResizeObserver(resize).observe(viewport);
-  resize();
 }
 
 function bindGamepad(controller: GameController): void {
