@@ -13,6 +13,7 @@ type StartupPhase = "intro" | "title" | "difficulty";
 
 export interface NewGameSelection {
   difficulty: Difficulty;
+  userActivated: boolean;
 }
 
 const TITLE_OPTIONS = ["遊戲開始", "繼續遊戲"] as const;
@@ -188,7 +189,7 @@ export function mountStartup(
   const finishStartup = () => {
     const difficulty = DIFFICULTY_OPTIONS[difficultyIndex].value;
     cleanup();
-    startGame({ difficulty });
+    startGame({ difficulty, userActivated: true });
   };
 
   const activateTitleOption = () => {

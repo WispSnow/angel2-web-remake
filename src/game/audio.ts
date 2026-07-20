@@ -55,7 +55,12 @@ export class AudioManager {
     audio: new Audio(ASSETS.audio.enemyBattleLoop),
   };
 
-  constructor(private readonly controller: GameController, private readonly root: HTMLElement) {
+  constructor(
+    private readonly controller: GameController,
+    private readonly root: HTMLElement,
+    initiallyUnlocked = false,
+  ) {
+    this.unlocked = initiallyUnlocked;
     this.previousPhase = controller.phase;
     const loopingTracks = [this.storyMusic, this.playerBattleLoop, this.enemyBattleLoop];
     const entryTracks = [this.playerBattleEntry, this.enemyBattleEntry];
@@ -74,6 +79,7 @@ export class AudioManager {
       }
     }, { capture: true });
     controller.onChange(() => this.sync());
+    if (this.unlocked) this.syncMusic();
   }
 
   playSpeechCharacter(character: string): void {

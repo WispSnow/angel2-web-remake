@@ -25,6 +25,18 @@ test("title artwork uses staged palette fades before the menu appears", async ({
   await expect(page.getByTestId("title-menu")).toBeVisible();
 });
 
+test("pointer difficulty confirmation carries audio activation into stage zero", async ({ page }) => {
+  await page.goto("/?test=1");
+  await page.getByTestId("opening-intro").click();
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.getByTestId("new-game").click();
+  await page.getByTestId("difficulty-0").click();
+
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MAGIC/73");
+  await expect(page.locator("#app")).toHaveAttribute("data-music-playing", "true");
+});
+
 test("BOOT-A: opening story, title and difficulty selection enter stage zero", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
@@ -80,6 +92,8 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await page.keyboard.press("Enter");
 
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MAGIC/73");
+  await expect(page.locator("#app")).toHaveAttribute("data-music-playing", "true");
   const debugState = await page.evaluate(() => window.__ANGEL2__?.getState() as { phase: string; difficulty: number });
   expect(debugState).toMatchObject({ phase: "prebattleStory", difficulty: 2 });
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/startup-stage0-entry.png" });
