@@ -385,7 +385,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   root.addEventListener("contextmenu", (event) => {
     if (!(event.target as Element).closest("#logical-screen")) return;
     event.preventDefault();
-    if (!(event.target instanceof HTMLCanvasElement)) void controller.focusNextUnactedAlly();
+    if (!(event.target instanceof HTMLCanvasElement)) void controller.rightClickAction();
   });
 
   window.addEventListener("keydown", (event) => {

@@ -310,8 +310,13 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-cell-count", String(enemyPreview.reachable.length));
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-enemy-movement-preview.png" });
-  await clickCanvas(page, 420, 45);
-  expect((await debugState(page))).toMatchObject({ actionMode: "idle", reachable: [] });
+  await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 420, y: 45 } });
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "idle",
+    selectedId: undefined,
+    cursor: enemyPreview.cursor,
+    reachable: [],
+  });
 
   // Persistent text buttons are replaced by the native-style callable menu surface.
   await page.getByTestId("system-menu-button").click();
@@ -328,7 +333,10 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   expect(systemMenuContained).toBe(true);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-system-menu.png" });
-  await page.keyboard.press("Escape");
+  const cursorBeforeSystemCancel = (await debugState(page)).cursor;
+  await page.getByTestId("system-menu").click({ button: "right" });
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+  expect((await debugState(page)).cursor).toEqual(cursorBeforeSystemCancel);
 
   // Main verb: selecting Nia opens the profession menu before any movement
   // range is shown, then Move enters range selection.
@@ -380,6 +388,17 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   expect((await debugState(page)).units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 29, y: 26 });
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-move-candidate-hover.png" });
+  const beforeMoveCancel = await debugState(page);
+  await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 180, y: 177 } });
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "actionMenu",
+    commandMenuKind: "initial",
+    selectedId: beforeMoveCancel.selectedId,
+    cursor: beforeMoveCancel.cursor,
+    reachable: [],
+  });
+  await page.getByTestId("unit-command-move").click();
+  await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
   await clickCanvas(page, 180, 177);
   await expect(page.getByTestId("action-menu")).toBeVisible();
   expect((await debugState(page))).toMatchObject({
@@ -392,6 +411,27 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     ],
   });
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-post-move-command-menu.png" });
+  const movedBeforeRollback = await debugState(page);
+  await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 180, y: 177 } });
+  await expect.poll(async () => {
+    const unit = (await debugState(page)).units.find(({ id }) => id === "1:0");
+    return unit ? { x: unit.x, y: unit.y } : undefined;
+  }).toEqual({ x: 29, y: 26 });
+  await expect.poll(async () => (await debugState(page)).actionMode).toBe("actionMenu");
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "actionMenu",
+    commandMenuKind: "initial",
+    selectedId: movedBeforeRollback.selectedId,
+    cursor: { x: 29, y: 26 },
+  });
+  await page.getByTestId("unit-command-move").click();
+  await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
+  await clickCanvas(page, 180, 177);
+  await expect(page.getByTestId("action-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "actionMenu",
+    commandMenuKind: "postMove",
+  });
   await page.locator("[data-action=attack]").click();
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   await expect(page.getByTestId("combat-presentation")).toBeHidden();
@@ -420,7 +460,10 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("system-command-objectives").click();
   await expect(page.getByTestId("objective-panel")).toBeVisible();
   expect((await debugState(page)).phase).toBe("player");
-  await page.locator("[data-action=close-objectives]").click();
+  const cursorBeforeObjectiveCancel = (await debugState(page)).cursor;
+  await page.getByTestId("objective-panel").click({ button: "right" });
+  await expect(page.getByTestId("objective-panel")).toBeHidden();
+  expect((await debugState(page)).cursor).toEqual(cursorBeforeObjectiveCancel);
 
   // S00-B: the native all-rest group command replaces a side-effect-free
   // generic end turn, then behavior 12 moves every enemy.
@@ -569,6 +612,13 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   expect((await debugState(page)).commandIndex).toBe(1);
   await expect(page.getByTestId("unit-command-attack")).toHaveAttribute("aria-current", "true");
   const beforeRightCycle = await debugState(page);
+  await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 220, y: 177 } });
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "idle",
+    cursor: beforeRightCycle.cursor,
+  });
+  await expect(page.getByTestId("action-menu")).toBeHidden();
+
   const rightClickFocusOrder = [
     { x: 27, y: 25 },
     { x: 21, y: 27 },
@@ -585,7 +635,6 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
       systemMenuOpen: false,
     });
     if (index === 0) {
-      await expect(page.getByTestId("action-menu")).toBeHidden();
       await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-right-click-next-ally.png" });
     }
   }
@@ -594,7 +643,8 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   expect(afterRightCycle.rngState).toBe(beforeRightCycle.rngState);
 
   // Only Esc opens the battle system menu. The keyboard secondary action does
-  // not reuse that shortcut, and mouse right-click remains the ally-cycle verb.
+  // not reuse that shortcut; mouse right-click cycles allies only after the
+  // currently open action layer has consumed its own cancel.
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("system-menu")).toBeHidden();
   await page.keyboard.press("Escape");
@@ -765,11 +815,22 @@ test("S00-I: native range dither and ordinary attack target-count branches", asy
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "68");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-retained-fraction", "0.25");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-target-dither.png" });
-  const target = multiTarget.targets[0];
+  await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 220, y: 177 } });
+  expect((await debugState(page))).toMatchObject({
+    actionMode: "actionMenu",
+    selectedId: multiTarget.selectedId,
+    cursor: multiTarget.cursor,
+    targets: [],
+  });
+  await page.getByTestId("unit-command-attack").click();
+  const restoredTargeting = await debugState(page);
+  expect(restoredTargeting.actionMode).toBe("target");
+  expect(restoredTargeting.targets).toHaveLength(2);
+  const target = restoredTargeting.targets[0];
   await clickCanvas(
     page,
-    40 + (target.x - multiTarget.cameraOrigin.x) * 40 + 20,
-    23 + (target.y - multiTarget.cameraOrigin.y) * 44 + 22,
+    40 + (target.x - restoredTargeting.cameraOrigin.x) * 40 + 20,
+    23 + (target.y - restoredTargeting.cameraOrigin.y) * 44 + 22,
   );
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   expect((await debugState(page)).actionMode).toBe("idle");

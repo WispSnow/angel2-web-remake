@@ -1292,7 +1292,7 @@ export class GameController {
     }
   }
 
-  secondaryAction(): void {
+  secondaryAction(): boolean {
     if (this.phase === "saveSlots") this.cancelPostSaveSlots();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
@@ -1301,19 +1301,26 @@ export class GameController {
     else if (this.groupCommandOpen) this.closeGroupCommands();
     else if (this.objectiveOpen) this.closeObjectives();
     else if (this.systemMenuOpen) this.closeSystemMenu();
-    else if (this.phase === "player" && this.actionMode === "idle") return;
-    else this.cancelAction();
+    else if (this.phase === "player" && this.actionMode !== "idle") {
+      if (!this.busy) this.cancelAction();
+    } else return false;
+    return true;
+  }
+
+  async rightClickAction(): Promise<void> {
+    if (this.secondaryAction()) return;
+    await this.focusNextUnactedAlly();
   }
 
   async focusNextUnactedAlly(): Promise<void> {
-    if (this.phase !== "player" || this.busy || this.hasBlockingOverlay) return;
+    if (
+      this.phase !== "player"
+      || this.busy
+      || this.hasBlockingOverlay
+      || this.actionMode !== "idle"
+    ) return;
     const cursorUnit = this.battle.unitAt(this.cursor);
     const anchorId = this.selectedUnit?.id ?? (cursorUnit?.side === 1 ? cursorUnit.id : this.battle.focusId);
-    if (this.actionMode === "actionMenu" && this.commandMenuKind === "postMove") {
-      await this.rollbackSelectedMovement();
-      if (this.phase !== "player" || this.busy) return;
-    }
-    this.resetAction();
     const allies = this.battle.units.filter((unit) => unit.side === 1);
     const anchorIndex = allies.findIndex((unit) => unit.id === anchorId);
     let next = allies.find((unit) => !unit.acted);
