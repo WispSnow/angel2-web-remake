@@ -66,8 +66,14 @@ interface DebugState {
     fullPose?: {
       leftFrame: number;
       rightFrame: number;
+      leftOffsetX: number;
+      rightOffsetX: number;
       leftOpacity: number;
       rightOpacity: number;
+      leftEffectFrame?: number;
+      rightEffectFrame?: number;
+      leftEffectOffsetX?: number;
+      rightEffectOffsetX?: number;
     };
   };
   combatPresentationTrace: Array<{
@@ -75,6 +81,7 @@ interface DebugState {
     frame: number;
     displayedAttackerLife: number;
     displayedDefenderLife: number;
+    fullPose?: NonNullable<DebugState["combatPresentation"]>["fullPose"];
   }>;
   movementPresentation?: {
     unitId: string;
@@ -945,9 +952,16 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(fullLayer).toHaveAttribute("data-full-left-record", "M_00/50");
   await expect(fullLayer).toHaveAttribute("data-full-right-record", "Y_00/0");
   await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullPrimaryDamage");
+  await expect(page.getByTestId("full-combat-background")).toHaveAttribute("src", /stage0-background/);
+  await expect(page.getByTestId("full-left-status")).toBeVisible();
+  await expect(page.getByTestId("full-right-status")).toBeVisible();
   await expect(page.getByTestId("full-left-sprite")).toHaveAttribute("src", /left-soldier-plus50/);
   await expect(page.getByTestId("full-right-sprite")).toHaveAttribute("src", /right-soldier-direct/);
   await expect(page.getByTestId("full-damage-number")).toBeVisible();
+  const primaryDamagePresentation = (await debugState(page)).combatPresentation;
+  expect(primaryDamagePresentation?.fullPose?.leftOpacity).toBe(0);
+  expect(primaryDamagePresentation?.fullPose?.rightOpacity).toBe(1);
+  expect(primaryDamagePresentation?.fullPose?.rightOffsetX).toBeGreaterThanOrEqual(40);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-damage.png" });
 
   await waitForPhase(page, "round2Story");
@@ -961,6 +975,48 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterStrike")).toHaveLength(26);
   expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterDamage")).toHaveLength(1);
   expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterRecover")).toHaveLength(8);
+  const soldierApproach = fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullPrimaryStrike");
+  expect(soldierApproach[0].fullPose?.leftOffsetX).toBe(0);
+  expect(soldierApproach.at(-1)?.fullPose?.leftOffsetX).toBeGreaterThanOrEqual(45);
+  expect(soldierApproach.some(({ fullPose }) => fullPose?.rightOpacity === 0)).toBe(true);
+  expect(soldierApproach.at(-1)?.fullPose?.rightOpacity).toBe(1);
+
+  await enterPlayableBattle();
+  await page.evaluate(() => window.__ANGEL2__?.forceCavalryCounterSetup());
+  await openSettingsMenu(page);
+  await page.getByTestId("presentation-button").click();
+  await closeSettingsMenu(page);
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-attack").click();
+  await clickCanvas(page, 260, 177);
+  await page.waitForFunction(() => {
+    const presentation = window.__ANGEL2__?.getState().combatPresentation;
+    return presentation?.phase === "fullCounterStrike"
+      && (presentation.fullPose?.rightEffectOffsetX ?? 0) <= -120;
+  });
+  await expect(fullLayer).toHaveAttribute("data-full-right-record", "Y_00/72");
+  await expect(page.getByTestId("full-right-sprite")).toHaveAttribute("src", /right-cavalry-plus50/);
+  await expect(page.getByTestId("full-right-effect")).toHaveAttribute("src", /right-cavalry-plus50\/0[678]\.png/);
+  const cavalryFlightPresentation = (await debugState(page)).combatPresentation;
+  expect(cavalryFlightPresentation?.fullPose?.leftOpacity).toBe(0);
+  expect(cavalryFlightPresentation?.fullPose?.rightEffectOffsetX).toBeLessThanOrEqual(-120);
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullCounterDamage");
+  const cavalryHitPresentation = (await debugState(page)).combatPresentation;
+  expect(cavalryHitPresentation?.fullPose?.leftOpacity).toBe(1);
+  expect(cavalryHitPresentation?.fullPose?.rightOpacity).toBe(0);
+  expect(cavalryHitPresentation?.fullPose?.leftOffsetX).toBeLessThanOrEqual(-25);
+  const cavalryCounterTrace = (await debugState(page)).combatPresentationTrace
+    .filter(({ phase }) => phase === "fullCounterStrike");
+  const cavalryWeaponOffsets = cavalryCounterTrace
+    .map(({ fullPose }) => fullPose?.rightEffectOffsetX)
+    .filter((offset): offset is number => offset !== undefined);
+  expect(Math.min(...cavalryWeaponOffsets)).toBeLessThanOrEqual(-200);
+  expect(cavalryCounterTrace.some(({ fullPose }) =>
+    fullPose?.rightEffectFrame !== undefined && fullPose.leftOpacity === 0)).toBe(true);
+  expect(cavalryCounterTrace.at(-1)?.fullPose?.leftOpacity).toBe(1);
+  expect(cavalryCounterTrace.at(-1)?.fullPose?.leftOffsetX).toBeLessThanOrEqual(-25);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-cavalry-counter.png" });
 
   await enterPlayableBattle();
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());

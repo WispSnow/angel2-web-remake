@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { STAGE0, TERRAIN_TOKENS, TOKEN_TO_TERRAIN_SLOT, createStage0Units, nextExperienceThresholdFor, statsFor, terrainSlotAt } from "../../src/game/content/stage0";
+import { ASSETS, STAGE0, TERRAIN_TOKENS, TOKEN_TO_TERRAIN_SLOT, createStage0Units, nextExperienceThresholdFor, statsFor, terrainSlotAt } from "../../src/game/content/stage0";
 import { shortestPath } from "../../src/game/simulation/grid";
 
 describe("stage 0 evidence-backed content", () => {
+  it("binds the native full-combat background and complete cavalry attack records", () => {
+    expect(ASSETS.fullBattle.stageBackground).toContain("stage0-background.png");
+    expect(ASSETS.fullBattle.left.cavalryPlus50).toHaveLength(9);
+    expect(ASSETS.fullBattle.right.cavalryPlus50).toHaveLength(9);
+  });
+
   it("decodes the complete 50×50 terrain model", () => {
     expect(TERRAIN_TOKENS).toHaveLength(2500);
     expect(TOKEN_TO_TERRAIN_SLOT).toHaveLength(128);

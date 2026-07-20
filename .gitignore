@@ -21,6 +21,8 @@ ref/
 !public/assets/original/*.png
 !public/assets/original/portrait-animation/
 !public/assets/original/portrait-animation/*.png
+!public/assets/original/full-combat/
+!public/assets/original/full-combat/**/*.png
 artifacts/
 test-results/
 playwright-report/

@@ -181,15 +181,18 @@ export const ASSETS = {
     death: Array.from({ length: 38 }, (_, frame) => `/assets/original/map-combat/death/${String(frame).padStart(2, "0")}.png`),
   },
   fullBattle: {
+    stageBackground: "/assets/original/full-combat/stage0-background.png",
     left: {
       soldierDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/left-soldier-direct/${String(frame).padStart(2, "0")}.png`),
       soldierPlus50: [0, 1, 2, 3, 4, 5].map((frame) => `/assets/original/full-combat/left-soldier-plus50/${String(frame).padStart(2, "0")}.png`),
       cavalryDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/left-cavalry-direct/${String(frame).padStart(2, "0")}.png`),
+      cavalryPlus50: Array.from({ length: 9 }, (_, frame) => `/assets/original/full-combat/left-cavalry-plus50/${String(frame).padStart(2, "0")}.png`),
     },
     right: {
       soldierDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/right-soldier-direct/${String(frame).padStart(2, "0")}.png`),
       soldierPlus50: [0, 1, 2, 3, 4, 5].map((frame) => `/assets/original/full-combat/right-soldier-plus50/${String(frame).padStart(2, "0")}.png`),
       cavalryDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/right-cavalry-direct/${String(frame).padStart(2, "0")}.png`),
+      cavalryPlus50: Array.from({ length: 9 }, (_, frame) => `/assets/original/full-combat/right-cavalry-plus50/${String(frame).padStart(2, "0")}.png`),
     },
   },
   audio: {

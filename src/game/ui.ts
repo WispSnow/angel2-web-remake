@@ -649,6 +649,17 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   bindGamepad(controller);
 }
 
+const FULL_COMBAT_ANCHOR_X = {
+  left: {
+    0: [21, 82, 38, 37, 0, 0],
+    22: [43, 39, 41, 45, 65, 39, 48, 50, 52],
+  },
+  right: {
+    0: [58, 22, 27, 40, 150, 145],
+    22: [49, 62, 62, 53, 51, 53, 56, 66, 59],
+  },
+} as const;
+
 function renderCombat(layer: HTMLElement, controller: GameController): void {
   const presentation = controller.combatPresentation;
   layer.hidden = !presentation;
@@ -661,16 +672,21 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
     layer.innerHTML = "";
     return;
   }
-  const leftFrames = attacker.side === 1
-    ? ASSETS.fullBattle.left.soldierPlus50
-    : attacker.classId === 22
-      ? ASSETS.fullBattle.left.cavalryDirect
-      : ASSETS.fullBattle.left.soldierDirect;
-  const rightFrames = attacker.side === 1
-    ? defender.classId === 22
-      ? ASSETS.fullBattle.right.cavalryDirect
-      : ASSETS.fullBattle.right.soldierDirect
-    : ASSETS.fullBattle.right.soldierPlus50;
+  const leftUnit = attacker.side === 1 ? attacker : defender;
+  const rightUnit = attacker.side === 2 ? attacker : defender;
+  const isCounterPresentation = presentation.phase === "fullCounterStrike"
+    || presentation.phase === "fullCounterDamage"
+    || presentation.phase === "fullCounterRecover"
+    || presentation.phase === "fullAttackerDeath";
+  const activeActor = isCounterPresentation ? defender : attacker;
+  const leftIsActor = leftUnit.id === activeActor.id;
+  const rightIsActor = rightUnit.id === activeActor.id;
+  const leftFrames = leftUnit.classId === 22
+    ? leftIsActor ? ASSETS.fullBattle.left.cavalryPlus50 : ASSETS.fullBattle.left.cavalryDirect
+    : leftIsActor ? ASSETS.fullBattle.left.soldierPlus50 : ASSETS.fullBattle.left.soldierDirect;
+  const rightFrames = rightUnit.classId === 22
+    ? rightIsActor ? ASSETS.fullBattle.right.cavalryPlus50 : ASSETS.fullBattle.right.cavalryDirect
+    : rightIsActor ? ASSETS.fullBattle.right.soldierPlus50 : ASSETS.fullBattle.right.soldierDirect;
   const pose = presentation.fullPose ?? {
     leftFrame: 0,
     rightFrame: 0,
@@ -681,13 +697,45 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   };
   const leftFrame = Math.max(0, Math.min(leftFrames.length - 1, pose.leftFrame));
   const rightFrame = Math.max(0, Math.min(rightFrames.length - 1, pose.rightFrame));
-  const leftRecord = attacker.side === 1 ? "M_00/50" : attacker.classId === 22 ? "M_00/22" : "M_00/0";
-  const rightRecord = attacker.side === 1
-    ? defender.classId === 22 ? "Y_00/22" : "Y_00/0"
-    : "Y_00/50";
+  const leftRecord = `M_00/${leftUnit.classId + (leftIsActor ? 50 : 0)}`;
+  const rightRecord = `Y_00/${rightUnit.classId + (rightIsActor ? 50 : 0)}`;
+  const leftAnchorX = FULL_COMBAT_ANCHOR_X.left[leftUnit.classId][leftFrame] ?? 0;
+  const rightAnchorX = FULL_COMBAT_ANCHOR_X.right[rightUnit.classId][rightFrame] ?? 0;
+  const leftEffectFrame = pose.leftEffectFrame === undefined
+    ? undefined
+    : Math.max(0, Math.min(leftFrames.length - 1, pose.leftEffectFrame));
+  const rightEffectFrame = pose.rightEffectFrame === undefined
+    ? undefined
+    : Math.max(0, Math.min(rightFrames.length - 1, pose.rightEffectFrame));
   const damageNumber = pose.damageSide && pose.damage !== undefined
     ? `<b class="full-damage-number ${pose.damageSide}" data-testid="full-damage-number">-${pose.damage}</b>`
     : "";
+  const displayedLife = (unit: typeof attacker) =>
+    unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
+  const statusPanel = (side: "left" | "right", unit: typeof attacker) => {
+    const stats = statsFor(unit);
+    return `
+      <div class="full-status ${side}" data-testid="full-${side}-status">
+        <img src="${ASSETS.portraits[unit.portrait as keyof typeof ASSETS.portraits]}" alt="${unit.name}肖像" />
+        <dl>
+          <div><dt>經驗</dt><dd>${unit.experience}</dd></div>
+          <div><dt>生命</dt><dd>${displayedLife(unit)}</dd></div>
+          <div><dt>攻擊</dt><dd>${stats.attack}</dd></div>
+          <div><dt>防禦</dt><dd>${stats.defense}</dd></div>
+        </dl>
+        <strong>${unit.className}／${unit.name}</strong>
+      </div>`;
+  };
+  const effectMarkup = [
+    leftEffectFrame === undefined ? "" : `
+      <div class="full-combat-effect left" style="--offset-x:${pose.leftEffectOffsetX ?? 0}px;--offset-y:${pose.leftEffectOffsetY ?? 0}px">
+        <img src="${leftFrames[leftEffectFrame]}" alt="" data-testid="full-left-effect" />
+      </div>`,
+    rightEffectFrame === undefined ? "" : `
+      <div class="full-combat-effect right" style="--offset-x:${pose.rightEffectOffsetX ?? 0}px;--offset-y:${pose.rightEffectOffsetY ?? 0}px">
+        <img src="${rightFrames[rightEffectFrame]}" alt="" data-testid="full-right-effect" />
+      </div>`,
+  ].join("");
   layer.className = `combat-presentation full-combat ${presentation.phase}`;
   layer.removeAttribute("style");
   layer.dataset.fullCombatPhase = presentation.phase;
@@ -696,27 +744,22 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   layer.dataset.fullLeftFrame = String(leftFrame);
   layer.dataset.fullRightFrame = String(rightFrame);
   layer.innerHTML = `
-    <div class="full-combat-frame" aria-hidden="true">
-      <i class="full-combat-horizon"></i>
-      <i class="full-combat-sigil">II</i>
+    <div class="full-combat-stage" aria-hidden="true">
+      <img src="${ASSETS.fullBattle.stageBackground}" alt="" data-testid="full-combat-background" />
     </div>
-    <div class="full-combatant left" style="--offset-x:${pose.leftOffsetX}px;opacity:${pose.leftOpacity}">
-      <img src="${leftFrames[leftFrame]}" alt="${attacker.name}全景戰鬥動作" data-testid="full-left-sprite" />
+    ${statusPanel("left", leftUnit)}
+    ${statusPanel("right", rightUnit)}
+    <div class="full-combat-actors">
+      <div class="full-combatant left" style="--offset-x:${pose.leftOffsetX}px;--offset-y:${pose.leftOffsetY ?? 0}px;--anchor-x:${leftAnchorX}px;opacity:${pose.leftOpacity}">
+        <img src="${leftFrames[leftFrame]}" alt="${leftUnit.name}全景戰鬥動作" data-testid="full-left-sprite" />
+      </div>
+      <div class="full-combatant right" style="--offset-x:${pose.rightOffsetX}px;--offset-y:${pose.rightOffsetY ?? 0}px;--anchor-x:${rightAnchorX}px;opacity:${pose.rightOpacity}">
+        <img src="${rightFrames[rightFrame]}" alt="${rightUnit.name}全景戰鬥動作" data-testid="full-right-sprite" />
+      </div>
+      ${effectMarkup}
+      ${damageNumber}
     </div>
-    <div class="full-combatant right" style="--offset-x:${pose.rightOffsetX}px;opacity:${pose.rightOpacity}">
-      <img src="${rightFrames[rightFrame]}" alt="${defender.name}全景戰鬥動作" data-testid="full-right-sprite" />
-    </div>
-    ${damageNumber}
-    <div class="full-status left">
-      <span>${attacker.name}</span>
-      <i><b style="width:${Math.max(0, Math.min(100, presentation.displayedAttackerLife / statsFor(attacker).maxLife * 100))}%"></b></i>
-      <em>${presentation.displayedAttackerLife}</em>
-    </div>
-    <div class="full-status right">
-      <span>${defender.name}</span>
-      <i><b style="width:${Math.max(0, Math.min(100, presentation.displayedDefenderLife / statsFor(defender).maxLife * 100))}%"></b></i>
-      <em>${presentation.displayedDefenderLife}</em>
-    </div>`;
+    `;
 }
 
 function renderHud(unit: NonNullable<GameController["focusedUnit"]>, stats: UnitStats): string {
