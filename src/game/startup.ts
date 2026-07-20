@@ -17,6 +17,20 @@ export interface NewGameSelection {
 
 const TITLE_OPTIONS = ["遊戲開始", "繼續遊戲"] as const;
 const INTRO_TRANSITION_HALF_UPDATES = 21;
+const TITLE_ASSEMBLY_DURATION_MS = {
+  native: {
+    background: 640,
+    upper: 400,
+    hold: 400,
+    lower: 800,
+  },
+  test: {
+    background: 8,
+    upper: 8,
+    hold: 8,
+    lower: 16,
+  },
+} as const;
 
 const required = <T extends HTMLElement>(root: ParentNode, selector: string): T => {
   const element = root.querySelector<T>(selector);
@@ -36,6 +50,11 @@ export function mountStartup(
   let introFrame = 0;
   let titleReadyTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let disposed = false;
+  const titleTiming = testMode
+    ? TITLE_ASSEMBLY_DURATION_MS.test
+    : TITLE_ASSEMBLY_DURATION_MS.native;
+  const titleAssemblyDuration = Object.values(titleTiming)
+    .reduce((total, duration) => total + duration, 0);
 
   root.innerHTML = `
     <div class="page-shell startup-shell">
@@ -45,7 +64,7 @@ export function mountStartup(
       <div class="game-stage">
         <div class="game-viewport" id="startup-viewport">
           <section class="logical-screen startup-screen" id="startup-screen" data-testid="startup-screen"
-            style="--title-upper-duration:${testMode ? 8 : 400}ms;--title-hold-duration:${testMode ? 8 : 400}ms;--title-lower-duration:${testMode ? 16 : 800}ms"
+            style="--title-background-duration:${titleTiming.background}ms;--title-upper-duration:${titleTiming.upper}ms;--title-hold-duration:${titleTiming.hold}ms;--title-lower-duration:${titleTiming.lower}ms"
             data-startup-phase="intro" aria-label="天使帝國 II 啟動畫面">
             <section class="startup-intro" data-testid="opening-intro" aria-label="開場劇情動畫">
               <img class="startup-intro-background" alt="" />
@@ -60,7 +79,11 @@ export function mountStartup(
               <img class="startup-title-background" src="${STARTUP_ASSETS.title.background}" alt="" />
               <img class="startup-title-upper" src="${STARTUP_ASSETS.title.upper}" alt="" />
               <img class="startup-title-lower" src="${STARTUP_ASSETS.title.lower}" alt="天使帝國 II" />
-              <img class="startup-menu-frame" src="${STARTUP_ASSETS.title.menuFrame}" alt="" />
+              <img class="startup-menu-frame startup-title-menu-frame" data-testid="startup-title-menu-frame"
+                src="${STARTUP_ASSETS.title.titleMenuFrame}" alt="" />
+              <img class="startup-menu-frame startup-difficulty-menu-frame"
+                data-testid="startup-difficulty-menu-frame"
+                src="${STARTUP_ASSETS.title.difficultyMenuFrame}" alt="" hidden />
               <div class="startup-menu title-menu" data-testid="title-menu" role="menu" aria-label="標題選單" hidden>
                 ${TITLE_OPTIONS.map((label, index) => `
                   <button type="button" role="menuitem" data-startup-action="title" data-menu-index="${index}"
@@ -88,6 +111,8 @@ export function mountStartup(
   const introLines = [0, 1, 2].map((slot) =>
     required<HTMLParagraphElement>(root, `[data-intro-slot="${slot}"]`));
   const title = required(root, ".startup-title");
+  const titleMenuFrame = required<HTMLImageElement>(root, ".startup-title-menu-frame");
+  const difficultyMenuFrame = required<HTMLImageElement>(root, ".startup-difficulty-menu-frame");
   const titleMenu = required(root, ".title-menu");
   const difficultyMenu = required(root, ".difficulty-menu");
   const titleStatus = required<HTMLParagraphElement>(root, ".startup-menu-status");
@@ -125,6 +150,8 @@ export function mountStartup(
   const showTitleMenu = () => {
     phase = "title";
     screen.dataset.startupPhase = phase;
+    titleMenuFrame.hidden = false;
+    difficultyMenuFrame.hidden = true;
     titleMenu.hidden = false;
     difficultyMenu.hidden = true;
     titleStatus.textContent = "";
@@ -142,7 +169,7 @@ export function mountStartup(
     play(titleAudio);
     titleReadyTimer = globalThis.setTimeout(
       showTitleMenu,
-      testMode ? 40 : 1_600,
+      titleAssemblyDuration,
     );
   };
 
@@ -150,6 +177,8 @@ export function mountStartup(
     phase = "difficulty";
     difficultyIndex = 0;
     screen.dataset.startupPhase = phase;
+    titleMenuFrame.hidden = true;
+    difficultyMenuFrame.hidden = false;
     titleMenu.hidden = true;
     difficultyMenu.hidden = false;
     titleStatus.textContent = "";

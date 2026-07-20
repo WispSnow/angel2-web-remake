@@ -14,7 +14,8 @@ export const STARTUP_ASSETS = {
     background: "/assets/original/startup/title/background.png",
     upper: "/assets/original/startup/title/upper.png",
     lower: "/assets/original/startup/title/lower.png",
-    menuFrame: "/assets/original/startup/title/menu-frame.png",
+    titleMenuFrame: "/assets/original/startup/title/menu-frame.png",
+    difficultyMenuFrame: "/assets/original/startup/title/menu-frame-difficulty.png",
   },
   audio: {
     intro: "/assets/original/startup/audio/intro.wav",

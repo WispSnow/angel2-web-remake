@@ -3,6 +3,28 @@ import { expect, test } from "@playwright/test";
 
 test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
 
+test("title artwork uses staged palette fades before the menu appears", async ({ page }) => {
+  await page.goto("/");
+  await page.keyboard.press("x");
+
+  const title = page.getByTestId("title-screen");
+  const opacityOf = (selector: string) => title.locator(selector).evaluate((element) =>
+    Number(getComputedStyle(element).opacity));
+
+  await expect(page.getByTestId("title-menu")).toBeHidden();
+  await expect.poll(() => opacityOf(".startup-title-background")).toBeGreaterThan(0);
+  expect(await opacityOf(".startup-title-upper")).toBe(0);
+  expect(await opacityOf(".startup-title-lower")).toBe(0);
+
+  await expect.poll(() => opacityOf(".startup-title-upper")).toBeGreaterThan(0);
+  expect(await opacityOf(".startup-title-lower")).toBe(0);
+  await expect(page.getByTestId("title-menu")).toBeHidden();
+
+  await expect.poll(() => opacityOf(".startup-title-lower")).toBeGreaterThan(0);
+  await expect(page.getByTestId("title-menu")).toBeHidden();
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+});
+
 test("BOOT-A: opening story, title and difficulty selection enter stage zero", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
@@ -25,8 +47,14 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
 
   await page.keyboard.press("x");
   await expect(page.getByTestId("title-screen")).toBeVisible();
+  await expect.poll(() => page.getByTestId("title-screen").locator(".startup-title-upper").evaluate((image) =>
+    getComputedStyle(image).animationName,
+  )).toContain("startup-palette-fade");
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await expect(page.getByTestId("new-game")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("startup-title-menu-frame")).toBeVisible();
+  await expect(page.getByTestId("startup-difficulty-menu-frame")).toBeHidden();
+  await expect(page.getByTestId("startup-title-menu-frame")).toHaveCSS("top", "50px");
   await expect.poll(() => page.getByTestId("title-screen").locator("img").evaluateAll((images) =>
     images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
   )).toBe(true);
@@ -37,6 +65,13 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await expect(difficultyMenu).toBeVisible();
   await expect(difficultyMenu.getByRole("menuitem")).toHaveCount(4);
   await expect(page.getByTestId("difficulty-0")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("startup-title-menu-frame")).toBeHidden();
+  await expect(page.getByTestId("startup-difficulty-menu-frame")).toBeVisible();
+  await expect(page.getByTestId("startup-difficulty-menu-frame")).toHaveCSS("top", "21px");
+  await expect.poll(() => page.getByTestId("startup-difficulty-menu-frame").evaluate((image) => {
+    const element = image as HTMLImageElement;
+    return element.complete && element.naturalWidth === 144 && element.naturalHeight === 150;
+  })).toBe(true);
   await startup.screenshot({ path: "artifacts/playwright/startup-difficulty-menu.png" });
 
   await page.keyboard.press("ArrowDown");

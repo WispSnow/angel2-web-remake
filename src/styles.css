@@ -91,20 +91,27 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .startup-title-background { z-index: 0; left: 0; top: 0; width: 640px; height: 349px; }
 .startup-title-upper { z-index: 1; left: 32px; top: 0; width: 472px; height: 349px; }
 .startup-title-lower { z-index: 2; left: 0; top: 216px; width: 640px; height: 123px; }
-.startup-menu-frame { z-index: 3; left: 480px; top: 50px; width: 144px; height: 101px; }
+.startup-menu-frame { z-index: 3; left: 480px; width: 144px; height: auto; }
+.startup-title-menu-frame { top: 50px; }
+.startup-difficulty-menu-frame { top: 21px; }
+.startup-title.is-assembling .startup-title-background {
+  opacity: 0;
+  animation: startup-palette-fade var(--title-background-duration) steps(16, end) forwards;
+}
 .startup-title.is-assembling .startup-title-upper {
-  clip-path: inset(0 100% 0 0);
-  animation: startup-title-reveal var(--title-upper-duration) steps(8) forwards;
+  opacity: 0;
+  animation: startup-palette-fade var(--title-upper-duration) steps(8, end)
+    var(--title-background-duration) forwards;
 }
 .startup-title.is-assembling .startup-title-lower {
-  clip-path: inset(0 100% 0 0);
-  animation: startup-title-reveal var(--title-lower-duration) steps(16)
-    calc(var(--title-upper-duration) + var(--title-hold-duration)) forwards;
+  opacity: 0;
+  animation: startup-palette-fade var(--title-lower-duration) steps(16, end)
+    calc(var(--title-background-duration) + var(--title-upper-duration) + var(--title-hold-duration)) forwards;
 }
-.startup-title.is-assembling .startup-menu-frame {
+.startup-title.is-assembling .startup-title-menu-frame {
   opacity: 0;
   animation: startup-menu-appear 1ms linear
-    calc(var(--title-upper-duration) + var(--title-hold-duration) + var(--title-lower-duration)) forwards;
+    calc(var(--title-background-duration) + var(--title-upper-duration) + var(--title-hold-duration) + var(--title-lower-duration)) forwards;
 }
 .startup-menu {
   position: absolute;
@@ -149,7 +156,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   text-align: center;
   text-shadow: 1px 1px #000;
 }
-@keyframes startup-title-reveal { to { clip-path: inset(0 0 0 0); } }
+@keyframes startup-palette-fade { to { opacity: 1; } }
 @keyframes startup-menu-appear { to { opacity: 1; } }
 
 .battle-chrome { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #0a0708; }

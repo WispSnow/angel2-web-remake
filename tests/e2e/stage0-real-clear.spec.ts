@@ -23,9 +23,16 @@ test("S00-O: a normal build clears stage zero through player-visible controls on
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("/?skipStartup=1");
+  await page.goto("/");
   expect(new URL(page.url()).search).toBe("");
   expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
+
+  await expect(page.getByTestId("opening-intro")).toBeVisible();
+  await page.keyboard.press("x");
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("difficulty-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
 
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toBeVisible();
