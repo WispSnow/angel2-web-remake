@@ -362,101 +362,136 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .map-combat { width: 40px; height: 44px; color: #fff; text-align: center; text-shadow: 2px 2px #000; }
 .map-combat .slash-mark { display: block; color: #fff3a4; font: 800 48px/36px system-ui, sans-serif; transform: rotate(16deg); filter: drop-shadow(0 0 5px #ff2d2d); }
 .map-combat b { position: absolute; left: 5px; top: 26px; color: #fff; font: 800 15px system-ui, sans-serif; -webkit-text-stroke: 1px #8d0707; }
+/* Native full-screen battle: the live map stays visible under a checkerboard
+   dim, twin status panels pop in at the top, and the yellow-framed 448×148
+   battle window opens at (96,158) with a two-layer parallax backdrop. */
 .full-combat {
   inset: 0;
   width: 640px;
   height: 350px;
   overflow: hidden;
   color: #fff;
-  background-color: #000;
-  background-image:
-    radial-gradient(circle, #38281f 0 1px, transparent 1px),
-    radial-gradient(circle, #211510 0 1px, transparent 1px);
-  background-position: 0 0, 3px 3px;
-  background-size: 6px 6px;
   image-rendering: pixelated;
 }
-.full-combat-stage {
+.full-combat::before {
   position: absolute;
-  z-index: 0;
-  left: 96px;
-  top: 152px;
-  width: 448px;
-  height: 164px;
-  padding: 5px 0 7px;
-  overflow: hidden;
-  border: 3px ridge #f1c432;
-  background: #130a07;
-  box-shadow: 0 0 0 2px #5c2509, 3px 4px #000;
+  inset: 0;
+  content: "";
+  background-image: conic-gradient(#000c 25%, #0006 0 50%, #000c 0 75%, #0006 0);
+  background-size: 2px 2px;
 }
-.full-combat-stage img { display: block; width: 448px; height: 148px; image-rendering: pixelated; }
-.full-combat-actors {
+.full-combat-window {
+  position: absolute;
+  z-index: 2;
+  left: 93px;
+  top: 155px;
+  width: 448px;
+  height: 148px;
+  border: 3px solid #f5d64a;
+  background: rgba(6, 3, 2, .82);
+  box-shadow: 0 0 0 1px #7a3c0e, 4px 4px 0 rgba(0, 0, 0, .65);
+}
+.full-combat-scene {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 448px;
+  height: 134px;
+  overflow: hidden;
+  background: #130a07;
+}
+.full-combat-backdrop { position: absolute; inset: 0; --far-scroll: 0px; --near-scroll: 0px; }
+.full-combat-backdrop img {
+  position: absolute;
+  top: 0;
+  display: block;
+  width: 448px;
+  height: 148px;
+  max-width: none;
+  image-rendering: pixelated;
+}
+/* Far layer (wall + walkway) pans at 1×, near floor rows at 2×; each is the
+   same cyclic 448 px image shown twice for seamless wrap. */
+.full-combat-backdrop img.far { left: 0; transform: translateX(var(--far-scroll)); }
+.full-combat-backdrop img.far.copy { transform: translateX(calc(var(--far-scroll) + 448px)); }
+.full-combat-backdrop img.near { left: 0; transform: translateX(var(--near-scroll)); clip-path: inset(110px 0 0 0); }
+.full-combat-backdrop img.near.copy { transform: translateX(calc(var(--near-scroll) + 448px)); clip-path: inset(110px 0 0 0); }
+.full-combat-sprite {
   position: absolute;
   z-index: 3;
-  inset: 0;
-  overflow: hidden;
-  clip-path: polygon(96px 152px, 544px 152px, 544px 316px, 96px 316px);
-}
-.full-combatant {
-  --offset-x: 0px;
-  --offset-y: 0px;
-  --anchor-x: 0px;
-  position: absolute;
-  z-index: 0;
-  bottom: calc(43px + var(--offset-y));
+  left: 0;
+  bottom: 7px;
   width: 0;
   height: 0;
-  transition: opacity 16ms steps(2);
 }
-.full-combatant.left { left: calc(245px + var(--offset-x)); }
-.full-combatant.right { left: calc(470px + var(--offset-x)); }
-.full-combatant img {
+.full-combat-sprite img {
   position: absolute;
-  left: calc(-1 * var(--anchor-x));
+  left: 0;
   bottom: 0;
   display: block;
   max-width: none;
   image-rendering: pixelated;
 }
-.full-combat-effect {
+.full-combat-lance { position: absolute; z-index: 2; left: 0; top: 0; max-width: none; image-rendering: pixelated; }
+.full-combat-dust { position: absolute; z-index: 2; inset: 0; }
+.full-combat-dust i {
   position: absolute;
-  z-index: 1;
-  bottom: calc(120px + var(--offset-y));
-  width: 0;
-  height: 0;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 12px;
+  background:
+    radial-gradient(circle at 30% 60%, #f5efe4 0 4px, transparent 5px),
+    radial-gradient(circle at 60% 40%, #e8dfd0 0 5px, transparent 6px),
+    radial-gradient(circle at 82% 68%, #d9cfc0 0 3px, transparent 4px);
 }
-.full-combat-effect.left { left: calc(272px + var(--offset-x)); }
-.full-combat-effect.right { left: calc(412px + var(--offset-x)); }
-.full-combat-effect img { position: absolute; left: 0; bottom: 0; max-width: none; image-rendering: pixelated; }
+.full-combat-strip {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 448px;
+  height: 14px;
+  border-top: 1px solid #241408;
+  background: #050302;
+}
+.full-combat-strip i {
+  position: absolute;
+  left: 212px;
+  bottom: 3px;
+  width: 24px;
+  height: 5px;
+  background: #f5d64a;
+  box-shadow: 0 1px 0 #7a3c0e;
+}
 .full-status {
   position: absolute;
-  z-index: 2;
-  top: 0;
-  width: 200px;
-  height: 148px;
+  z-index: 3;
+  top: 2px;
+  width: 178px;
+  height: 142px;
   border: 3px ridge #e7b827;
   color: #fff;
-  background: #0a0604;
-  box-shadow: inset 0 0 0 2px #7d481e;
-  font: 14px/20px "PMingLiU", "Noto Serif TC", serif;
+  background: #16090a;
+  box-shadow: inset 0 0 0 2px #7d481e, 3px 3px 0 rgba(0, 0, 0, .5);
+  font: 13px/18px "PMingLiU", "Noto Serif TC", serif;
 }
-.full-status.left { left: 0; }
-.full-status.right { right: 0; }
+.full-status.left { left: 2px; }
+.full-status.right { right: 2px; }
 .full-status > img {
   position: absolute;
-  top: 8px;
-  width: 112px;
-  height: 112px;
+  top: 7px;
+  width: 92px;
+  height: 104px;
   border: 2px ridge #e7b827;
   object-fit: cover;
   image-rendering: pixelated;
 }
-.full-status.left > img { left: 7px; }
-.full-status.right > img { right: 7px; }
-.full-status dl { position: absolute; top: 7px; width: 72px; margin: 0; }
+.full-status.left > img { left: 6px; }
+.full-status.right > img { right: 6px; }
+.full-status dl { position: absolute; top: 6px; width: 68px; margin: 0; }
 .full-status.left dl { right: 4px; }
 .full-status.right dl { left: 4px; }
-.full-status dl div { display: flex; height: 25px; align-items: center; justify-content: space-between; border-bottom: 1px solid #76511e; }
+.full-status dl div { display: flex; height: 24px; align-items: center; justify-content: space-between; border-bottom: 1px solid #76511e; }
 .full-status dt, .full-status dd { margin: 0; }
 .full-status dd { font-family: "Arial Narrow", system-ui, sans-serif; font-weight: 800; }
 .full-status strong {
@@ -466,23 +501,25 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   bottom: 1px;
   overflow: hidden;
   text-align: center;
-  font-size: 16px;
-  line-height: 21px;
+  font-size: 15px;
+  line-height: 20px;
   white-space: nowrap;
 }
+/* Sits on the floor beside the victim and overhangs the scene's bottom edge
+   into the black strip, so it lives in the window rather than the clipped
+   scene. */
 .full-damage-number {
   position: absolute;
-  z-index: 2;
-  top: 263px;
+  z-index: 4;
+  left: 0;
+  bottom: 9px;
   width: 96px;
-  color: #f2494b;
+  color: #ef3f41;
   text-align: center;
-  font: 800 17px/1 "Arial Black", system-ui, sans-serif;
-  -webkit-text-stroke: 1px #5a0808;
+  font: 800 14px/1 "Arial Black", system-ui, sans-serif;
+  -webkit-text-stroke: 1px #4d0505;
   text-shadow: 1px 1px #000;
 }
-.full-damage-number.left { left: 188px; }
-.full-damage-number.right { right: 188px; }
 
 .dialogue-layer { position: absolute; z-index: 12; inset: 0; background: transparent; }
 .dialogue-box {

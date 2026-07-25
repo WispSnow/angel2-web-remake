@@ -1,5 +1,6 @@
 import { ASSETS, STAGE0, nextExperienceThresholdFor, statsFor } from "./content/stage0";
 import type { GameController } from "./controller";
+import { FULL_COMBAT_FRAME_META, type FullCombatSpriteState } from "./full-combat";
 import type { GamePhase, Position, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
 import {
@@ -649,117 +650,176 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   bindGamepad(controller);
 }
 
-const FULL_COMBAT_ANCHOR_X = {
-  left: {
-    0: [21, 82, 38, 37, 0, 0],
-    22: [43, 39, 41, 45, 65, 39, 48, 50, 52],
-  },
-  right: {
-    0: [58, 22, 27, 40, 150, 145],
-    22: [49, 62, 62, 53, 51, 53, 56, 66, 59],
-  },
-} as const;
+function fullSpriteAsset(sprite: FullCombatSpriteState): { src: string; meta: { w: number; anchor: number } } {
+  const sideAssets = ASSETS.fullBattle[sprite.side];
+  const frames = sprite.classId === 22
+    ? sprite.set === "plus50" ? sideAssets.cavalryPlus50 : sideAssets.cavalryDirect
+    : sprite.set === "plus50" ? sideAssets.soldierPlus50 : sideAssets.soldierDirect;
+  const frame = Math.max(0, Math.min(frames.length - 1, sprite.frame));
+  const meta = FULL_COMBAT_FRAME_META[sprite.side][sprite.classId === 22 ? 22 : 0][sprite.set][frame]
+    ?? { w: 64, anchor: 32 };
+  return { src: frames[frame], meta };
+}
 
-function renderCombat(layer: HTMLElement, controller: GameController): void {
-  const presentation = controller.combatPresentation;
-  layer.hidden = !presentation;
-  if (!presentation) return;
+function buildFullCombatSkeleton(
+  layer: HTMLElement,
+  presentation: NonNullable<GameController["combatPresentation"]>,
+): void {
   const { attacker, defender } = presentation;
-  if (controller.battlePresentation === "map") {
-    // Native map hit/death frames are rendered inside the Phaser world so
-    // they obey the battle camera, clipping and board-erase boundary.
-    layer.hidden = true;
-    layer.innerHTML = "";
-    return;
-  }
   const leftUnit = attacker.side === 1 ? attacker : defender;
   const rightUnit = attacker.side === 2 ? attacker : defender;
-  const isCounterPresentation = presentation.phase === "fullCounterStrike"
-    || presentation.phase === "fullCounterDamage"
-    || presentation.phase === "fullCounterRecover"
-    || presentation.phase === "fullAttackerDeath";
-  const activeActor = isCounterPresentation ? defender : attacker;
-  const leftIsActor = leftUnit.id === activeActor.id;
-  const rightIsActor = rightUnit.id === activeActor.id;
-  const leftFrames = leftUnit.classId === 22
-    ? leftIsActor ? ASSETS.fullBattle.left.cavalryPlus50 : ASSETS.fullBattle.left.cavalryDirect
-    : leftIsActor ? ASSETS.fullBattle.left.soldierPlus50 : ASSETS.fullBattle.left.soldierDirect;
-  const rightFrames = rightUnit.classId === 22
-    ? rightIsActor ? ASSETS.fullBattle.right.cavalryPlus50 : ASSETS.fullBattle.right.cavalryDirect
-    : rightIsActor ? ASSETS.fullBattle.right.soldierPlus50 : ASSETS.fullBattle.right.soldierDirect;
-  const pose = presentation.fullPose ?? {
-    leftFrame: 0,
-    rightFrame: 0,
-    leftOffsetX: 0,
-    rightOffsetX: 0,
-    leftOpacity: 1,
-    rightOpacity: 1,
-  };
-  const leftFrame = Math.max(0, Math.min(leftFrames.length - 1, pose.leftFrame));
-  const rightFrame = Math.max(0, Math.min(rightFrames.length - 1, pose.rightFrame));
-  const leftRecord = `M_00/${leftUnit.classId + (leftIsActor ? 50 : 0)}`;
-  const rightRecord = `Y_00/${rightUnit.classId + (rightIsActor ? 50 : 0)}`;
-  const leftAnchorX = FULL_COMBAT_ANCHOR_X.left[leftUnit.classId][leftFrame] ?? 0;
-  const rightAnchorX = FULL_COMBAT_ANCHOR_X.right[rightUnit.classId][rightFrame] ?? 0;
-  const leftEffectFrame = pose.leftEffectFrame === undefined
-    ? undefined
-    : Math.max(0, Math.min(leftFrames.length - 1, pose.leftEffectFrame));
-  const rightEffectFrame = pose.rightEffectFrame === undefined
-    ? undefined
-    : Math.max(0, Math.min(rightFrames.length - 1, pose.rightEffectFrame));
-  const damageNumber = pose.damageSide && pose.damage !== undefined
-    ? `<b class="full-damage-number ${pose.damageSide}" data-testid="full-damage-number">-${pose.damage}</b>`
-    : "";
-  const displayedLife = (unit: typeof attacker) =>
-    unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
   const statusPanel = (side: "left" | "right", unit: typeof attacker) => {
     const stats = statsFor(unit);
+    const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
     return `
-      <div class="full-status ${side}" data-testid="full-${side}-status">
+      <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
         <img src="${ASSETS.portraits[unit.portrait as keyof typeof ASSETS.portraits]}" alt="${unit.name}肖像" />
         <dl>
           <div><dt>經驗</dt><dd>${unit.experience}</dd></div>
-          <div><dt>生命</dt><dd>${displayedLife(unit)}</dd></div>
+          <div><dt>生命</dt><dd>${life}</dd></div>
           <div><dt>攻擊</dt><dd>${stats.attack}</dd></div>
           <div><dt>防禦</dt><dd>${stats.defense}</dd></div>
         </dl>
         <strong>${unit.className}／${unit.name}</strong>
       </div>`;
   };
-  const effectMarkup = [
-    leftEffectFrame === undefined ? "" : `
-      <div class="full-combat-effect left" style="--offset-x:${pose.leftEffectOffsetX ?? 0}px;--offset-y:${pose.leftEffectOffsetY ?? 0}px">
-        <img src="${leftFrames[leftEffectFrame]}" alt="" data-testid="full-left-effect" />
-      </div>`,
-    rightEffectFrame === undefined ? "" : `
-      <div class="full-combat-effect right" style="--offset-x:${pose.rightEffectOffsetX ?? 0}px;--offset-y:${pose.rightEffectOffsetY ?? 0}px">
-        <img src="${rightFrames[rightEffectFrame]}" alt="" data-testid="full-right-effect" />
-      </div>`,
-  ].join("");
-  layer.className = `combat-presentation full-combat ${presentation.phase}`;
-  layer.removeAttribute("style");
-  layer.dataset.fullCombatPhase = presentation.phase;
-  layer.dataset.fullLeftRecord = leftRecord;
-  layer.dataset.fullRightRecord = rightRecord;
-  layer.dataset.fullLeftFrame = String(leftFrame);
-  layer.dataset.fullRightFrame = String(rightFrame);
   layer.innerHTML = `
-    <div class="full-combat-stage" aria-hidden="true">
-      <img src="${ASSETS.fullBattle.stageBackground}" alt="" data-testid="full-combat-background" />
-    </div>
     ${statusPanel("left", leftUnit)}
     ${statusPanel("right", rightUnit)}
-    <div class="full-combat-actors">
-      <div class="full-combatant left" style="--offset-x:${pose.leftOffsetX}px;--offset-y:${pose.leftOffsetY ?? 0}px;--anchor-x:${leftAnchorX}px;opacity:${pose.leftOpacity}">
-        <img src="${leftFrames[leftFrame]}" alt="${leftUnit.name}全景戰鬥動作" data-testid="full-left-sprite" />
+    <div class="full-combat-window" data-testid="full-combat-window" hidden>
+      <div class="full-combat-scene" data-testid="full-combat-scene" hidden>
+        <div class="full-combat-backdrop">
+          <img class="far" src="${ASSETS.fullBattle.stageBackground}" alt="" data-testid="full-combat-background" />
+          <img class="far copy" src="${ASSETS.fullBattle.stageBackground}" alt="" />
+          <img class="near" src="${ASSETS.fullBattle.stageBackground}" alt="" />
+          <img class="near copy" src="${ASSETS.fullBattle.stageBackground}" alt="" />
+        </div>
+        <div class="full-combat-dust" aria-hidden="true"></div>
+        <img class="full-combat-lance" alt="" hidden />
+        <div class="full-combat-sprite slot-victim" hidden><img alt="" data-testid="full-victim-sprite" /></div>
+        <div class="full-combat-sprite slot-actor" hidden><img alt="" data-testid="full-actor-sprite" /></div>
       </div>
-      <div class="full-combatant right" style="--offset-x:${pose.rightOffsetX}px;--offset-y:${pose.rightOffsetY ?? 0}px;--anchor-x:${rightAnchorX}px;opacity:${pose.rightOpacity}">
-        <img src="${rightFrames[rightFrame]}" alt="${rightUnit.name}全景戰鬥動作" data-testid="full-right-sprite" />
-      </div>
-      ${effectMarkup}
-      ${damageNumber}
-    </div>
-    `;
+      <div class="full-combat-strip" aria-hidden="true"><i></i></div>
+      <b class="full-damage-number" data-testid="full-damage-number" hidden></b>
+    </div>`;
+}
+
+function renderCombat(layer: HTMLElement, controller: GameController): void {
+  const presentation = controller.combatPresentation;
+  layer.hidden = !presentation;
+  if (!presentation) {
+    if (layer.dataset.fullBattleKey) {
+      delete layer.dataset.fullBattleKey;
+      layer.innerHTML = "";
+      layer.className = "combat-presentation";
+    }
+    return;
+  }
+  const { attacker, defender } = presentation;
+  if (controller.battlePresentation === "map" || !presentation.fullScene) {
+    // Native map hit/death frames are rendered inside the Phaser world so
+    // they obey the battle camera, clipping and board-erase boundary.
+    layer.hidden = true;
+    layer.innerHTML = "";
+    delete layer.dataset.fullBattleKey;
+    return;
+  }
+  const scene = presentation.fullScene;
+  const battleKey = String(scene.battleKey);
+  if (layer.dataset.fullBattleKey !== battleKey) {
+    layer.className = "combat-presentation full-combat";
+    layer.removeAttribute("style");
+    buildFullCombatSkeleton(layer, presentation);
+    layer.dataset.fullBattleKey = battleKey;
+  }
+  layer.dataset.fullCombatPhase = presentation.phase;
+  const actorUnit = ["fullCounterWindup", "fullCounterCharge", "fullCounterImpact", "fullCounterHold", "fullAttackerDeath"]
+    .includes(presentation.phase) ? defender : attacker;
+  const leftUnit = attacker.side === 1 ? attacker : defender;
+  const rightUnit = attacker.side === 2 ? attacker : defender;
+  layer.dataset.fullLeftRecord = `M_00/${leftUnit.classId + (leftUnit.id === actorUnit.id ? 50 : 0)}`;
+  layer.dataset.fullRightRecord = `Y_00/${rightUnit.classId + (rightUnit.id === actorUnit.id ? 50 : 0)}`;
+
+  const query = <T extends HTMLElement>(selector: string): T => layer.querySelector(selector) as T;
+  query<HTMLElement>(".full-status.left").hidden = !scene.showLeftPanel;
+  query<HTMLElement>(".full-status.right").hidden = !scene.showRightPanel;
+  const windowElement = query<HTMLElement>(".full-combat-window");
+  windowElement.hidden = !scene.showWindow;
+  const sceneElement = query<HTMLElement>(".full-combat-scene");
+  sceneElement.hidden = !scene.showScene;
+  if (!scene.showScene) return;
+
+  const farOffset = ((scene.camera % 448) + 448) % 448;
+  const nearOffset = ((scene.camera * 2 % 448) + 448) % 448;
+  const backdrop = query<HTMLElement>(".full-combat-backdrop");
+  backdrop.style.setProperty("--far-scroll", `${-farOffset}px`);
+  backdrop.style.setProperty("--near-scroll", `${-nearOffset}px`);
+
+  const slots: Array<{ selector: string; sprite?: FullCombatSpriteState }> = [
+    { selector: ".full-combat-sprite.slot-victim", sprite: scene.sprites.find((entry) => entry.set === "direct") },
+    { selector: ".full-combat-sprite.slot-actor", sprite: scene.sprites.find((entry) => entry.set === "plus50") },
+  ];
+  for (const { selector, sprite } of slots) {
+    const holder = query<HTMLElement>(selector);
+    const image = holder.querySelector("img") as HTMLImageElement;
+    if (!sprite) {
+      holder.hidden = true;
+      continue;
+    }
+    const { src, meta } = fullSpriteAsset(sprite);
+    holder.hidden = false;
+    image.dataset.side = sprite.side;
+    image.dataset.set = sprite.set;
+    image.dataset.frame = String(sprite.frame);
+    if (image.getAttribute("src") !== src) image.setAttribute("src", src);
+    const anchor = sprite.mirror ? meta.w - meta.anchor : meta.anchor;
+    holder.style.transform = `translateX(${Math.round(sprite.x - anchor)}px)`;
+    holder.style.opacity = String(sprite.opacity);
+    image.style.transform = sprite.mirror ? "scaleX(-1)" : "";
+  }
+
+  const lance = query<HTMLImageElement>(".full-combat-lance");
+  if (scene.lance) {
+    const frames = ASSETS.fullBattle[scene.lance.side].cavalryPlus50;
+    const frame = Math.max(6, Math.min(8, scene.lance.frame));
+    const meta = FULL_COMBAT_FRAME_META[scene.lance.side][22].plus50[frame];
+    const src = frames[frame];
+    lance.hidden = false;
+    if (lance.getAttribute("src") !== src) lance.setAttribute("src", src);
+    lance.style.transform = `translate(${Math.round(scene.lance.x - meta.anchor)}px, ${Math.round(scene.lance.y - 8)}px)`;
+    lance.dataset.frame = String(frame);
+  } else {
+    lance.hidden = true;
+    lance.removeAttribute("data-frame");
+  }
+
+  const dustLayer = query<HTMLElement>(".full-combat-dust");
+  const needed = scene.dust.length;
+  while (dustLayer.children.length < needed) {
+    const puff = document.createElement("i");
+    dustLayer.appendChild(puff);
+  }
+  for (let index = 0; index < dustLayer.children.length; index += 1) {
+    const puff = dustLayer.children[index] as HTMLElement;
+    const data = scene.dust[index];
+    if (!data) {
+      puff.hidden = true;
+      continue;
+    }
+    puff.hidden = false;
+    const scale = 0.5 + data.phase * 0.9;
+    puff.style.transform = `translate(${Math.round(data.x)}px, ${Math.round(data.y - 8)}px) scale(${scale.toFixed(2)})`;
+    puff.style.opacity = (0.85 * (1 - data.phase)).toFixed(2);
+  }
+
+  const damage = query<HTMLElement>(".full-damage-number");
+  if (scene.damage) {
+    damage.hidden = false;
+    damage.textContent = `-${scene.damage.amount}`;
+    damage.style.transform = `translateX(${Math.round(scene.damage.x - 48)}px)`;
+  } else {
+    damage.hidden = true;
+  }
 }
 
 function renderHud(unit: NonNullable<GameController["focusedUnit"]>, stats: UnitStats): string {

@@ -52,28 +52,40 @@ interface DebugState {
       | "counterHit"
       | "counterDamage"
       | "attackerDeath"
-      | "fullPrimaryStrike"
-      | "fullPrimaryDamage"
-      | "fullPrimaryRecover"
+      | "fullOpen"
+      | "fullWindup"
+      | "fullCharge"
+      | "fullImpact"
+      | "fullHold"
       | "fullDefenderDeath"
-      | "fullCounterStrike"
-      | "fullCounterDamage"
-      | "fullCounterRecover"
+      | "fullCounterWindup"
+      | "fullCounterCharge"
+      | "fullCounterImpact"
+      | "fullCounterHold"
       | "fullAttackerDeath";
     frame: number;
     displayedAttackerLife: number;
     displayedDefenderLife: number;
-    fullPose?: {
-      leftFrame: number;
-      rightFrame: number;
-      leftOffsetX: number;
-      rightOffsetX: number;
-      leftOpacity: number;
-      rightOpacity: number;
-      leftEffectFrame?: number;
-      rightEffectFrame?: number;
-      leftEffectOffsetX?: number;
-      rightEffectOffsetX?: number;
+    fullScene?: {
+      battleKey: number;
+      t: number;
+      showLeftPanel: boolean;
+      showRightPanel: boolean;
+      showWindow: boolean;
+      showScene: boolean;
+      camera: number;
+      sprites: Array<{
+        side: "left" | "right";
+        classId: number;
+        set: "direct" | "plus50";
+        frame: number;
+        x: number;
+        mirror: boolean;
+        opacity: number;
+      }>;
+      lance?: { x: number; y: number; frame: number; side: "left" | "right" };
+      dust: Array<{ x: number; y: number; phase: number }>;
+      damage?: { amount: number; x: number };
     };
   };
   combatPresentationTrace: Array<{
@@ -81,7 +93,7 @@ interface DebugState {
     frame: number;
     displayedAttackerLife: number;
     displayedDefenderLife: number;
-    fullPose?: NonNullable<DebugState["combatPresentation"]>["fullPose"];
+    fullScene?: NonNullable<DebugState["combatPresentation"]>["fullScene"];
   }>;
   movementPresentation?: {
     unitId: string;
@@ -912,8 +924,11 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
 });
 
 test("S00-K: native full-screen records, step tables and death sequence preserve map-mode results", async ({ page }) => {
-  const enterPlayableBattle = async () => {
-    await page.goto("/?test=1&skipStartup=1");
+  // The full-screen presentation is a measured wall-clock timeline, so the
+  // runs that inspect its individual beats use `slowFull` to play it at native
+  // speed instead of the compressed test-mode rate.
+  const enterPlayableBattle = async ({ nativeSpeed = false } = {}) => {
+    await page.goto(`/?test=1&skipStartup=1${nativeSpeed ? "&slowFull=1" : ""}`);
     await page.getByTestId("skip-dialogue").click();
     await waitForPhase(page, "openingStory");
     await page.getByTestId("skip-dialogue").click();
@@ -940,28 +955,29 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await waitForPhase(page, "round2Story");
   const mapResolved = await debugState(page);
 
-  await enterPlayableBattle();
+  await enterPlayableBattle({ nativeSpeed: true });
   await openSettingsMenu(page);
   await page.getByTestId("presentation-button").click();
   await closeSettingsMenu(page);
   await attackFirstForcedTarget();
 
   const fullLayer = page.getByTestId("combat-presentation");
+  // The window opens before the scene: panels first, then the framed stage.
   await page.waitForFunction(() =>
-    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullPrimaryDamage");
+    window.__ANGEL2__?.getState().combatPresentation?.fullScene?.showScene === true);
   await expect(fullLayer).toHaveAttribute("data-full-left-record", "M_00/50");
   await expect(fullLayer).toHaveAttribute("data-full-right-record", "Y_00/0");
-  await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullPrimaryDamage");
   await expect(page.getByTestId("full-combat-background")).toHaveAttribute("src", /stage0-background/);
   await expect(page.getByTestId("full-left-status")).toBeVisible();
   await expect(page.getByTestId("full-right-status")).toBeVisible();
-  await expect(page.getByTestId("full-left-sprite")).toHaveAttribute("src", /left-soldier-plus50/);
-  await expect(page.getByTestId("full-right-sprite")).toHaveAttribute("src", /right-soldier-direct/);
+  await expect(page.getByTestId("full-combat-window")).toBeVisible();
+
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullImpact");
+  await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullImpact");
+  await expect(page.getByTestId("full-actor-sprite")).toBeVisible();
+  await expect(page.getByTestId("full-victim-sprite")).toBeVisible();
   await expect(page.getByTestId("full-damage-number")).toBeVisible();
-  const primaryDamagePresentation = (await debugState(page)).combatPresentation;
-  expect(primaryDamagePresentation?.fullPose?.leftOpacity).toBe(0);
-  expect(primaryDamagePresentation?.fullPose?.rightOpacity).toBe(1);
-  expect(primaryDamagePresentation?.fullPose?.rightOffsetX).toBeGreaterThanOrEqual(40);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-damage.png" });
 
   await waitForPhase(page, "round2Story");
@@ -969,19 +985,37 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   expect(fullResolved.lastCombat).toEqual(mapResolved.lastCombat);
   expect(fullResolved.rngState).toBe(mapResolved.rngState);
   expect(fullResolved.units).toEqual(mapResolved.units);
-  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullPrimaryStrike")).toHaveLength(26);
-  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullPrimaryDamage")).toHaveLength(1);
-  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullPrimaryRecover")).toHaveLength(8);
-  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterStrike")).toHaveLength(26);
-  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterDamage")).toHaveLength(1);
-  expect(fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullCounterRecover")).toHaveLength(8);
-  const soldierApproach = fullResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullPrimaryStrike");
-  expect(soldierApproach[0].fullPose?.leftOffsetX).toBe(0);
-  expect(soldierApproach.at(-1)?.fullPose?.leftOffsetX).toBeGreaterThanOrEqual(45);
-  expect(soldierApproach.some(({ fullPose }) => fullPose?.rightOpacity === 0)).toBe(true);
-  expect(soldierApproach.at(-1)?.fullPose?.rightOpacity).toBe(1);
+  // One mark per choreography beat, in native order, for both exchanges.
+  expect(fullResolved.combatPresentationTrace.map(({ phase }) => phase)).toEqual([
+    "fullOpen",
+    "fullWindup",
+    "fullCharge",
+    "fullImpact",
+    "fullHold",
+    "fullCounterWindup",
+    "fullCounterCharge",
+    "fullCounterImpact",
+    "fullCounterHold",
+  ]);
+  const beat = (phase: string) =>
+    fullResolved.combatPresentationTrace.find((entry) => entry.phase === phase)?.fullScene;
+  // The camera pans away from the attacker's edge during the charge and the
+  // counter pans it back; the status panels freeze their pre-strike life.
+  expect(beat("fullWindup")?.camera).toBe(0);
+  expect(Math.abs(beat("fullImpact")?.camera ?? 0)).toBeGreaterThan(100);
+  // The counter pans back to where the exchange started; the last few pixels
+  // land after the hold mark, so compare against the pan, not an exact zero.
+  expect(Math.abs(beat("fullCounterHold")?.camera ?? 0)).toBeLessThan(10);
+  expect(beat("fullImpact")?.damage?.amount).toBe(fullResolved.lastCombat?.damage);
+  expect(beat("fullCounterImpact")?.damage?.amount).toBe(fullResolved.lastCombat?.counterDamage);
+  // The victim only appears shortly before contact, and the attacker uses the
+  // class+50 bundle while the victim uses the direct one.
+  expect(beat("fullWindup")?.sprites.map(({ set }) => set)).toEqual(["plus50"]);
+  expect(beat("fullImpact")?.sprites.map(({ set }) => set).sort()).toEqual(["direct", "plus50"]);
+  expect(beat("fullImpact")?.sprites.find(({ set }) => set === "plus50")?.side).toBe("left");
+  expect(beat("fullCounterImpact")?.sprites.find(({ set }) => set === "plus50")?.side).toBe("right");
 
-  await enterPlayableBattle();
+  await enterPlayableBattle({ nativeSpeed: true });
   await page.evaluate(() => window.__ANGEL2__?.forceCavalryCounterSetup());
   await openSettingsMenu(page);
   await page.getByTestId("presentation-button").click();
@@ -989,36 +1023,32 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await clickCanvas(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();
   await clickCanvas(page, 260, 177);
-  await page.waitForFunction(() => {
-    const presentation = window.__ANGEL2__?.getState().combatPresentation;
-    return presentation?.phase === "fullCounterStrike"
-      && (presentation.fullPose?.rightEffectOffsetX ?? 0) <= -120;
-  });
-  await expect(fullLayer).toHaveAttribute("data-full-right-record", "Y_00/72");
-  await expect(page.getByTestId("full-right-sprite")).toHaveAttribute("src", /right-cavalry-plus50/);
-  await expect(page.getByTestId("full-right-effect")).toHaveAttribute("src", /right-cavalry-plus50\/0[678]\.png/);
-  const cavalryFlightPresentation = (await debugState(page)).combatPresentation;
-  expect(cavalryFlightPresentation?.fullPose?.leftOpacity).toBe(0);
-  expect(cavalryFlightPresentation?.fullPose?.rightEffectOffsetX).toBeLessThanOrEqual(-120);
+  // The cavalry counter throws its lance as a separate travelling channel:
+  // the rider launches it, then leaves while the lance crosses the window.
+  const lanceX = () => page.evaluate(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.fullScene?.lance?.x ?? Number.NaN);
   await page.waitForFunction(() =>
-    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullCounterDamage");
-  const cavalryHitPresentation = (await debugState(page)).combatPresentation;
-  expect(cavalryHitPresentation?.fullPose?.leftOpacity).toBe(1);
-  expect(cavalryHitPresentation?.fullPose?.rightOpacity).toBe(0);
-  expect(cavalryHitPresentation?.fullPose?.leftOffsetX).toBeLessThanOrEqual(-25);
-  const cavalryCounterTrace = (await debugState(page)).combatPresentationTrace
-    .filter(({ phase }) => phase === "fullCounterStrike");
-  const cavalryWeaponOffsets = cavalryCounterTrace
-    .map(({ fullPose }) => fullPose?.rightEffectOffsetX)
-    .filter((offset): offset is number => offset !== undefined);
-  expect(Math.min(...cavalryWeaponOffsets)).toBeLessThanOrEqual(-200);
-  expect(cavalryCounterTrace.some(({ fullPose }) =>
-    fullPose?.rightEffectFrame !== undefined && fullPose.leftOpacity === 0)).toBe(true);
-  expect(cavalryCounterTrace.at(-1)?.fullPose?.leftOpacity).toBe(1);
-  expect(cavalryCounterTrace.at(-1)?.fullPose?.leftOffsetX).toBeLessThanOrEqual(-25);
+    window.__ANGEL2__?.getState().combatPresentation?.fullScene?.lance !== undefined);
+  await expect(fullLayer).toHaveAttribute("data-full-right-record", "Y_00/72");
+  await expect(page.getByTestId("full-actor-sprite")).toHaveAttribute("data-set", "plus50");
+  const lanceLaunchX = await lanceX();
+  expect(lanceLaunchX).toBeGreaterThan(250);
+  // A right-side thrower sends the lance leftwards across the scene.
+  await page.waitForFunction((launch) => {
+    const lance = window.__ANGEL2__?.getState().combatPresentation?.fullScene?.lance;
+    return lance !== undefined && lance.x < launch - 120;
+  }, lanceLaunchX);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-cavalry-counter.png" });
 
-  await enterPlayableBattle();
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullCounterImpact");
+  const cavalryHit = (await debugState(page)).combatPresentation?.fullScene;
+  // The lance is consumed on contact and the victim takes the direct bundle.
+  expect(cavalryHit?.lance).toBeUndefined();
+  expect(cavalryHit?.sprites.find(({ set }) => set === "direct")?.side).toBe("left");
+  expect(cavalryHit?.damage?.amount).toBeGreaterThan(0);
+
+  await enterPlayableBattle({ nativeSpeed: true });
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await openSettingsMenu(page);
   await page.getByTestId("presentation-button").click();
@@ -1031,11 +1061,17 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-native-death.png" });
   await waitForPhase(page, "victoryStory");
   const deathResolved = await debugState(page);
-  const deathTrace = deathResolved.combatPresentationTrace.filter(({ phase }) => phase === "fullDefenderDeath");
-  expect(deathTrace).toHaveLength(24);
-  expect(deathTrace.map(({ frame }) => frame)).toEqual([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]);
-  expect(deathResolved.combatPresentationTrace.some(({ phase }) => phase.startsWith("fullCounter"))).toBe(false);
-  expect(deathResolved.audioCueLog.some(({ record, reason }) => record === 11 && reason === "fullDefenderDeath-death")).toBe(true);
+  // A fatal strike ends the presentation: no counter beats follow, and the
+  // native full-screen death sound E/11 fires once.
+  expect(deathResolved.combatPresentationTrace.map(({ phase }) => phase)).toEqual([
+    "fullOpen",
+    "fullWindup",
+    "fullCharge",
+    "fullImpact",
+    "fullDefenderDeath",
+  ]);
+  expect(deathResolved.audioCueLog.filter(({ record }) => record === 11)).toHaveLength(1);
+  expect(deathResolved.audioCueLog.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
 });
 
 test("S00-L: native KY checkpoints preserve dual windows, appended text and the blank victory pause", async ({ page }) => {
