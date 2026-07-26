@@ -125,6 +125,10 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(script.marks.some(({ phase }) => phase.startsWith("fullCounter"))).toBe(false);
     expect(script.cues.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
     expect(script.sample(holdAt + 100).sprites.find(({ set }) => set === "direct")?.frame).toBe(1);
+    expect(script.sample(holdAt + 300).sprites.find(({ set }) => set === "direct")).toMatchObject({
+      frame: 2,
+      reaction: "death",
+    });
     expect(script.sample(holdAt + 300).sprites.find(({ set }) => set === "direct")?.opacity).toBe(1);
     expect(script.sample(holdAt + 500).sprites.find(({ set }) => set === "direct")?.opacity).toBe(.45);
     expect(script.sample(holdAt + 1_330).sprites.find(({ set }) => set === "direct")?.opacity).toBeLessThan(1);
@@ -157,7 +161,10 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(middleLance.dust).toEqual([]);
     expect(script.sample(throwAt + 300).sprites.find(({ set }) => set === "plus50")?.mirror).toBe(true);
     expect(script.sample(impactAt).lance).toBeUndefined();
-    expect(script.sample(impactAt + 241).sprites.find(({ set }) => set === "direct")?.frame).toBe(2);
+    expect(script.sample(impactAt + 241).sprites.find(({ set }) => set === "direct")).toMatchObject({
+      frame: 1,
+      reaction: "hurt",
+    });
     expect(script.sample(holdAt).sprites.find(({ set }) => set === "plus50")).toBeUndefined();
     expect(script.cues.some(({ reason }) => reason === "full-primary-lance-throw")).toBe(true);
 
@@ -174,5 +181,19 @@ describe("Full-screen ordinary combat choreography", () => {
     const mirroredImpact = mirrored.sample(markTime(mirrored, "fullImpact"));
     expect(mirroredImpact.camera).toBeLessThan(0);
     expect(mirroredImpact.sprites.find(({ set }) => set === "direct")?.side).toBe("left");
+  });
+
+  it.each([
+    { damage: 10, expectedFrame: 3, expectedReaction: "guard", label: "standing guard" },
+    { damage: 11, expectedFrame: 1, expectedReaction: "hurt", label: "ordinary hit" },
+  ] as const)("uses the $label reaction for $damage damage", ({ damage, expectedFrame, expectedReaction }) => {
+    const script = buildFullCombatScript(
+      unit(1, 0, "妮雅"),
+      unit(2, 48, "騎士團士兵"),
+      result({ damage, counterOccurred: false, counterDamage: 0 }),
+    );
+
+    expect(script.sample(markTime(script, "fullHold")).sprites.find(({ set }) => set === "direct"))
+      .toMatchObject({ frame: expectedFrame, reaction: expectedReaction });
   });
 });

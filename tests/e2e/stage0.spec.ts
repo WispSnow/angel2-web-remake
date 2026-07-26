@@ -79,6 +79,7 @@ interface DebugState {
         classId: number;
         set: "direct" | "plus50";
         frame: number;
+        reaction?: "guard" | "hurt" | "death";
         x: number;
         mirror: boolean;
         opacity: number;
@@ -977,6 +978,8 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullImpact");
   await expect(page.getByTestId("full-actor-sprite")).toBeVisible();
   await expect(page.getByTestId("full-victim-sprite")).toBeVisible();
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "1");
   await expect(page.getByTestId("full-damage-number")).toBeVisible();
   const primaryImpact = (await debugState(page)).combatPresentation?.fullScene;
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-damage.png" });
@@ -991,6 +994,15 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   const holdVictimX = primaryHold?.sprites.find(({ set }) => set === "direct")?.x;
   expect((holdVictimX ?? 0) - (impactVictimX ?? 0)).toBeGreaterThanOrEqual(12);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-hold.png" });
+
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullCounterHold");
+  const counterReaction = await debugState(page);
+  expect(counterReaction.lastCombat?.counterDamage).toBeLessThanOrEqual(10);
+  await expect(page.getByTestId("full-actor-sprite")).toBeHidden();
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "3");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-counter-guard.png" });
 
   await waitForPhase(page, "round2Story");
   const fullResolved = await debugState(page);
@@ -1070,6 +1082,8 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await page.waitForFunction(() =>
     window.__ANGEL2__?.getState().combatPresentation?.phase === "fullDefenderDeath");
   await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullDefenderDeath");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "2");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-native-death.png" });
   await waitForPhase(page, "victoryStory");
   const deathResolved = await debugState(page);

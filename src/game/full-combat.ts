@@ -38,6 +38,7 @@ export interface FullCombatSpriteState {
   classId: number;
   set: "direct" | "plus50";
   frame: number;
+  reaction?: "guard" | "hurt" | "death";
   /** Scene x of the sprite's ground anchor (body bottom-center). */
   x: number;
   mirror: boolean;
@@ -141,7 +142,6 @@ const HOLD_FINAL = 1900;
 const DEATH_DELAY = 250; // hold start → death blink start
 const DEATH_BLINK = 160;
 const DEATH_CYCLES = 6;
-const CAVALRY_FALL_DELAY = 240; // rider recoil → fallen pose
 
 const ATTACKER_ANCHOR = 253; // left-side primary attacker windup mark
 const PRIMARY_VICTIM_MARK = 302; // victim mark when attacked from the left
@@ -287,10 +287,10 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
   // Hit: recoil pose with the baked star burst. The target keeps moving along
   // the attack while the camera advances in the same direction.
   const nudge = attackDir * VICTIM_KNOCKBACK * clamp01((t - times.impact) / IMPACT_SETTLE);
-  const cavalry = isRanged(spec.victimClass);
-  let frame = cavalry && t >= times.impact + CAVALRY_FALL_DELAY ? 2 : 1;
+  const reaction = spec.victimDies ? "death" : spec.damage <= 10 ? "guard" : "hurt";
+  let frame = reaction === "guard" ? 3 : 1;
   let opacity = 1;
-  if (spec.victimDies) {
+  if (reaction === "death") {
     const deathStart = times.holdStart + DEATH_DELAY;
     if (t >= deathStart) {
       frame = 2;
@@ -301,7 +301,7 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
       else opacity = Math.floor(age / DEATH_BLINK) % 2 === 0 ? 1 : 0.45;
     }
   }
-  return { ...base, frame, x: spec.victimX + nudge, opacity };
+  return { ...base, frame, reaction, x: spec.victimX + nudge, opacity };
 }
 
 function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {
