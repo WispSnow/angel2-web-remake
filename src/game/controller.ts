@@ -4,6 +4,7 @@ import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneSt
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
 import { DeterministicRng } from "./simulation/rng";
+import { loadPresentationPreferences, savePresentationPreferences } from "./preferences";
 import { parseSaveData } from "./save";
 import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData } from "./types";
 
@@ -118,7 +119,10 @@ export class GameController {
   retreatConfirmIndex = 1;
   hintVisible = localStorage.getItem("angel2.stage0.hintSeen") !== "yes";
   presentationFast = false;
-  battlePresentation: "map" | "full" = "full";
+  battlePresentation: "map" | "full";
+  gridEnabled: boolean;
+  edgeScrollEnabled: boolean;
+  portraitsEnabled: boolean;
   musicEnabled = true;
   soundEnabled = true;
   speechEnabled = true;
@@ -143,6 +147,11 @@ export class GameController {
 
   constructor(difficulty: Difficulty = 0) {
     this.difficulty = difficulty;
+    const preferences = loadPresentationPreferences(localStorage);
+    this.battlePresentation = preferences.battlePresentation;
+    this.gridEnabled = preferences.gridEnabled;
+    this.edgeScrollEnabled = preferences.edgeScrollEnabled;
+    this.portraitsEnabled = preferences.portraitsEnabled;
   }
 
   onChange(listener: Listener): () => void {
@@ -1100,6 +1109,25 @@ export class GameController {
 
   toggleBattlePresentation(): void {
     this.battlePresentation = this.battlePresentation === "map" ? "full" : "map";
+    this.persistPresentationPreferences();
+    this.emit();
+  }
+
+  toggleGrid(): void {
+    this.gridEnabled = !this.gridEnabled;
+    this.persistPresentationPreferences();
+    this.emit();
+  }
+
+  toggleEdgeScroll(): void {
+    this.edgeScrollEnabled = !this.edgeScrollEnabled;
+    this.persistPresentationPreferences();
+    this.emit();
+  }
+
+  togglePortraits(): void {
+    this.portraitsEnabled = !this.portraitsEnabled;
+    this.persistPresentationPreferences();
     this.emit();
   }
 
@@ -1614,6 +1642,9 @@ export class GameController {
       audioCue: this.audioCue ? { ...this.audioCue } : undefined,
       audioCueLog: this.audioCueLog.map((cue) => ({ ...cue })),
       battlePresentation: this.battlePresentation,
+      gridEnabled: this.gridEnabled,
+      edgeScrollEnabled: this.edgeScrollEnabled,
+      portraitsEnabled: this.portraitsEnabled,
       lastCombat: this.lastCombat ? { ...this.lastCombat } : undefined,
       combatPresentation: this.combatPresentation ? {
         ...this.combatPresentation,
@@ -1673,6 +1704,15 @@ export class GameController {
   private goToNextStage(): void {
     this.phase = "nextStage";
     this.emit();
+  }
+
+  private persistPresentationPreferences(): void {
+    savePresentationPreferences(localStorage, {
+      battlePresentation: this.battlePresentation,
+      gridEnabled: this.gridEnabled,
+      edgeScrollEnabled: this.edgeScrollEnabled,
+      portraitsEnabled: this.portraitsEnabled,
+    });
   }
 
   private async moveSelectedUnit(destination: Position): Promise<void> {

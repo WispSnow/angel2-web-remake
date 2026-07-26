@@ -19,7 +19,10 @@ export type ImplementedSidePanelAction =
   | "objectives"
   | "battle-presentation"
   | "system-save"
-  | "system-load";
+  | "system-load"
+  | "toggle-grid"
+  | "toggle-edge-scroll"
+  | "toggle-portraits";
 
 export interface SidePanelHotspot {
   id: SidePanelHotspotId;
@@ -49,10 +52,28 @@ export const SIDE_PANEL_HOTSPOTS: readonly SidePanelHotspot[] = [
     action: "system-load",
     testId: "load-hotspot",
   },
-  { id: "grid", label: "地圖方格", bounds: { minX: 602, maxX: 626, minY: 65, maxY: 84 } },
+  {
+    id: "grid",
+    label: "地圖方格",
+    bounds: { minX: 602, maxX: 626, minY: 65, maxY: 84 },
+    action: "toggle-grid",
+    testId: "grid-hotspot",
+  },
   { id: "sound", label: "音效開關", bounds: { minX: 587, maxX: 612, minY: 33, maxY: 53 } },
-  { id: "edgeScroll", label: "地圖捲動", bounds: { minX: 580, maxX: 607, minY: 107, maxY: 137 } },
-  { id: "portraits", label: "人物圖像", bounds: { minX: 611, maxX: 627, minY: 108, maxY: 132 } },
+  {
+    id: "edgeScroll",
+    label: "地圖捲動",
+    bounds: { minX: 580, maxX: 607, minY: 107, maxY: 137 },
+    action: "toggle-edge-scroll",
+    testId: "edge-scroll-hotspot",
+  },
+  {
+    id: "portraits",
+    label: "人物圖像",
+    bounds: { minX: 611, maxX: 627, minY: 108, maxY: 132 },
+    action: "toggle-portraits",
+    testId: "portraits-hotspot",
+  },
   {
     id: "battleAnimation",
     label: "戰鬥動畫",

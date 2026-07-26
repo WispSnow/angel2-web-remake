@@ -36,6 +36,9 @@ interface DebugState {
   cursor: { x: number; y: number };
   cameraOrigin: { x: number; y: number };
   battlePresentation: "map" | "full";
+  gridEnabled: boolean;
+  edgeScrollEnabled: boolean;
+  portraitsEnabled: boolean;
   lastCombat?: {
     attackerId: string;
     defenderId: string;
@@ -1005,6 +1008,88 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   await saveHotspot.hover();
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-side-panel-record-hotspots.png",
+  });
+});
+
+test("RHP-04: grid, edge-scroll and portrait objects control persistent presentation only", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => localStorage.removeItem("angel2.preferences.presentation.v1"));
+  await page.reload();
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  const canvas = page.getByTestId("battle-canvas");
+  await canvas.hover({ position: { x: 420, y: 45 } });
+
+  const baseline = await debugState(page);
+  expect(baseline).toMatchObject({
+    battlePresentation: "full",
+    gridEnabled: false,
+    edgeScrollEnabled: true,
+    portraitsEnabled: true,
+  });
+  await expect(canvas).toHaveAttribute("data-grid-enabled", "false");
+  await expect(canvas).toHaveAttribute("data-grid-line-count", "0");
+
+  const grid = page.getByTestId("grid-hotspot");
+  const edgeScroll = page.getByTestId("edge-scroll-hotspot");
+  const portraits = page.getByTestId("portraits-hotspot");
+  await grid.click();
+  expect((await debugState(page)).gridEnabled).toBe(true);
+  await expect(canvas).toHaveAttribute("data-grid-enabled", "true");
+  await expect(canvas).toHaveAttribute("data-grid-line-count", "102");
+  await grid.hover();
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-side-panel-grid-enabled.png",
+  });
+
+  await edgeScroll.click();
+  expect((await debugState(page)).edgeScrollEnabled).toBe(false);
+  await expect(canvas).toHaveAttribute("data-edge-scroll-enabled", "false");
+  const cameraBeforeDisabledEdge = (await debugState(page)).cameraOrigin;
+  await canvas.hover({ position: { x: 5, y: 177 } });
+  await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");
+  await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
+  expect((await debugState(page)).cameraOrigin).toEqual(cameraBeforeDisabledEdge);
+  await edgeScroll.click();
+  await expect(canvas).toHaveAttribute("data-edge-scroll-enabled", "true");
+  await edgeScroll.click();
+  await expect(canvas).toHaveAttribute("data-edge-scroll-enabled", "false");
+
+  await portraits.click();
+  expect((await debugState(page)).portraitsEnabled).toBe(false);
+  await canvas.hover({ position: { x: 220, y: 177 } });
+  await expect(page.getByTestId("game-screen")).toHaveAttribute("data-hud-mode", "tactical");
+  await expect(page.getByTestId("unit-detail")).toHaveCount(0);
+  await expect(portraits).toBeVisible();
+  await portraits.click();
+  await expect(page.getByTestId("game-screen")).toHaveAttribute("data-hud-mode", "unit");
+  await expect(page.getByTestId("unit-detail")).toBeVisible();
+  await canvas.hover({ position: { x: 420, y: 45 } });
+  await portraits.click();
+  expect((await debugState(page)).portraitsEnabled).toBe(false);
+
+  await page.getByTestId("battle-presentation-hotspot").click();
+  expect((await debugState(page)).battlePresentation).toBe("map");
+  const afterToggles = await debugState(page);
+  expect(afterToggles.units).toEqual(baseline.units);
+  expect(afterToggles.rngState).toBe(baseline.rngState);
+  expect(afterToggles.cameraOrigin).toEqual(baseline.cameraOrigin);
+
+  await page.getByTestId("system-menu-button").click();
+  await page.getByTestId("system-command-settings").click();
+  await expect(page.getByTestId("presentation-button")).toHaveText("戰鬥 地圖");
+  await expect(page.getByTestId("grid-button")).toHaveText("方格 開");
+  await expect(page.getByTestId("edge-scroll-button")).toHaveText("捲動 關");
+  await expect(page.getByTestId("portraits-button")).toHaveText("圖像 關");
+
+  await page.reload();
+  expect(await debugState(page)).toMatchObject({
+    battlePresentation: "map",
+    gridEnabled: true,
+    edgeScrollEnabled: false,
+    portraitsEnabled: false,
   });
 });
 

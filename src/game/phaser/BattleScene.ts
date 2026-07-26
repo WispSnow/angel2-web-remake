@@ -61,6 +61,7 @@ interface UnitView {
 
 export function createBattleScene(controller: GameController): typeof Phaser.Scene {
   return class BattleScene extends Phaser.Scene {
+    private gridGraphics!: Phaser.GameObjects.Graphics;
     private rangeGraphics!: Phaser.GameObjects.Graphics;
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
@@ -89,6 +90,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.cameras.main.setBackgroundColor("#050405");
       this.cameras.main.setBounds(0, 0, 2000, 2200);
       this.add.image(0, 0, "stage0-map").setOrigin(0).setDepth(0);
+      this.gridGraphics = this.add.graphics().setDepth(1);
       this.rangeGraphics = this.add.graphics().setDepth(2);
       this.cursorGraphics = this.add.graphics().setDepth(10);
       if (!this.textures.exists("native-range-dither")) {
@@ -145,6 +147,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     update(time: number): void {
+      if (!controller.edgeScrollEnabled) {
+        if (this.edgePan) this.clearEdgePan();
+        return;
+      }
       if (!this.edgePan || time < this.nextEdgePanAt) return;
       controller.panCamera(this.edgePan);
       this.nextEdgePanAt = time + EDGE_PAN_INTERVAL_MS;
@@ -177,7 +183,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private edgePanFor(pointer: Phaser.Input.Pointer): { x: number; y: number } | undefined {
       if (
-        pointer.x < 0
+        !controller.edgeScrollEnabled
+        || pointer.x < 0
         || pointer.x >= BATTLE_SURFACE_RIGHT
         || pointer.y < 0
         || pointer.y >= BATTLE_SURFACE_BOTTOM
@@ -220,11 +227,35 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     private sync(): void {
+      if (!controller.edgeScrollEnabled && this.edgePan) this.clearEdgePan();
       this.syncCamera();
+      this.drawGrid();
       this.drawRanges();
       this.drawUnits();
       this.drawCombatEffects();
       this.drawCursor();
+    }
+
+    private drawGrid(): void {
+      this.gridGraphics.clear();
+      let lineCount = 0;
+      if (controller.gridEnabled) {
+        this.gridGraphics.lineStyle(1, 0x3b211a, 0.72);
+        for (let column = 0; column <= 50; column += 1) {
+          const x = column * TILE_WIDTH;
+          this.gridGraphics.lineBetween(x, 0, x, 50 * TILE_HEIGHT);
+          lineCount += 1;
+        }
+        for (let row = 0; row <= 50; row += 1) {
+          const y = row * TILE_HEIGHT;
+          this.gridGraphics.lineBetween(0, y, 50 * TILE_WIDTH, y);
+          lineCount += 1;
+        }
+      }
+      const canvas = this.game.canvas;
+      canvas.dataset.gridEnabled = String(controller.gridEnabled);
+      canvas.dataset.gridLineCount = String(lineCount);
+      canvas.dataset.edgeScrollEnabled = String(controller.edgeScrollEnabled);
     }
 
     private movementTweenDuration(): number {

@@ -53,6 +53,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="open-group-commands" data-testid="group-commands-button">集體命令</button>
                 <button data-action="speed" data-testid="speed-button">動畫 ×1</button>
                 <button data-action="battle-presentation" data-testid="presentation-button">戰鬥 全景</button>
+                <button data-action="toggle-grid" data-testid="grid-button">方格 關</button>
+                <button data-action="toggle-edge-scroll" data-testid="edge-scroll-button">捲動 開</button>
+                <button data-action="toggle-portraits" data-testid="portraits-button">圖像 開</button>
                 <button data-action="music" data-testid="music-button">音樂 開</button>
                 <button data-action="sound" data-testid="sound-button">音效 開</button>
                 <button data-action="speech" data-testid="speech-button">逐字音 開</button>
@@ -325,6 +328,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "close-objectives") controller.closeObjectives();
     else if (action === "speed") controller.toggleSpeed();
     else if (action === "battle-presentation") controller.toggleBattlePresentation();
+    else if (action === "toggle-grid") controller.toggleGrid();
+    else if (action === "toggle-edge-scroll") controller.toggleEdgeScroll();
+    else if (action === "toggle-portraits") controller.togglePortraits();
     else if (action === "music") controller.toggleMusic();
     else if (action === "sound") controller.toggleSound();
     else if (action === "speech") controller.toggleSpeech();
@@ -513,23 +519,30 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         button.setAttribute("aria-current", String(selected));
       }
     }
-    const speed = root.querySelector<HTMLElement>("[data-action=speed]");
+    const speed = root.querySelector<HTMLElement>("[data-testid=speed-button]");
     if (speed) speed.textContent = controller.presentationFast ? "動畫 ×4" : "動畫 ×1";
-    const presentation = root.querySelector<HTMLElement>("[data-action=battle-presentation]");
+    const presentation = root.querySelector<HTMLElement>("[data-testid=presentation-button]");
     if (presentation) presentation.textContent = controller.battlePresentation === "full" ? "戰鬥 全景" : "戰鬥 地圖";
-    const music = root.querySelector<HTMLElement>("[data-action=music]");
+    const grid = root.querySelector<HTMLElement>("[data-testid=grid-button]");
+    if (grid) grid.textContent = controller.gridEnabled ? "方格 開" : "方格 關";
+    const edgeScroll = root.querySelector<HTMLElement>("[data-testid=edge-scroll-button]");
+    if (edgeScroll) edgeScroll.textContent = controller.edgeScrollEnabled ? "捲動 開" : "捲動 關";
+    const portraits = root.querySelector<HTMLElement>("[data-testid=portraits-button]");
+    if (portraits) portraits.textContent = controller.portraitsEnabled ? "圖像 開" : "圖像 關";
+    const music = root.querySelector<HTMLElement>("[data-testid=music-button]");
     if (music) music.textContent = controller.musicEnabled ? "音樂 開" : "音樂 關";
-    const sound = root.querySelector<HTMLElement>("[data-action=sound]");
+    const sound = root.querySelector<HTMLElement>("[data-testid=sound-button]");
     if (sound) sound.textContent = controller.soundEnabled ? "音效 開" : "音效 關";
-    const speech = root.querySelector<HTMLElement>("[data-action=speech]");
+    const speech = root.querySelector<HTMLElement>("[data-testid=speech-button]");
     if (speech) speech.textContent = controller.speechEnabled ? "逐字音 開" : "逐字音 關";
     for (const action of ["objectives", "open-group-commands", "battle-presentation", "all-rest"]) {
       const button = root.querySelector<HTMLButtonElement>(`[data-action=${action}]`);
       if (button) button.disabled = controller.inputLocked;
     }
 
-    const focus = controller.describeFocus();
+    const focus = controller.portraitsEnabled ? controller.describeFocus() : undefined;
     screen.dataset.hudMode = focus ? "unit" : "tactical";
+    screen.dataset.portraitsEnabled = String(controller.portraitsEnabled);
     screen.dataset.sidePanelHotspots = controller.phase === "player"
       && controller.actionMode === "idle"
       && !controller.hasBlockingOverlay

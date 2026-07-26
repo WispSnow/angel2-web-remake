@@ -18,10 +18,28 @@ describe("native battle side-panel hotspots", () => {
         action: "system-load",
         testId: "load-hotspot",
       },
-      { id: "grid", label: "地圖方格", bounds: { minX: 602, maxX: 626, minY: 65, maxY: 84 } },
+      {
+        id: "grid",
+        label: "地圖方格",
+        bounds: { minX: 602, maxX: 626, minY: 65, maxY: 84 },
+        action: "toggle-grid",
+        testId: "grid-hotspot",
+      },
       { id: "sound", label: "音效開關", bounds: { minX: 587, maxX: 612, minY: 33, maxY: 53 } },
-      { id: "edgeScroll", label: "地圖捲動", bounds: { minX: 580, maxX: 607, minY: 107, maxY: 137 } },
-      { id: "portraits", label: "人物圖像", bounds: { minX: 611, maxX: 627, minY: 108, maxY: 132 } },
+      {
+        id: "edgeScroll",
+        label: "地圖捲動",
+        bounds: { minX: 580, maxX: 607, minY: 107, maxY: 137 },
+        action: "toggle-edge-scroll",
+        testId: "edge-scroll-hotspot",
+      },
+      {
+        id: "portraits",
+        label: "人物圖像",
+        bounds: { minX: 611, maxX: 627, minY: 108, maxY: 132 },
+        action: "toggle-portraits",
+        testId: "portraits-hotspot",
+      },
       {
         id: "battleAnimation",
         label: "戰鬥動畫",
@@ -61,10 +79,13 @@ describe("native battle side-panel hotspots", () => {
     ]);
   });
 
-  test("only exposes the seven implemented direct actions", () => {
+  test("only leaves the two audio actions unimplemented", () => {
     expect(implementedSidePanelHotspots().map(({ id, action }) => ({ id, action }))).toEqual([
       { id: "save", action: "system-save" },
       { id: "load", action: "system-load" },
+      { id: "grid", action: "toggle-grid" },
+      { id: "edgeScroll", action: "toggle-edge-scroll" },
+      { id: "portraits", action: "toggle-portraits" },
       { id: "battleAnimation", action: "battle-presentation" },
       { id: "groupCommands", action: "open-group-commands" },
       { id: "objectives", action: "objectives" },
