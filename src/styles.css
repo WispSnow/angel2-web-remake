@@ -270,10 +270,9 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 }
 .logical-screen[data-side-panel-hotspots="active"] .side-panel-hotspot { display: block; }
 .side-panel-hotspot:hover, .side-panel-hotspot:focus-visible {
-  border-color: #ffe56b;
-  background: #ffe56b25;
-  outline: 1px solid #fff2a1;
-  outline-offset: 0;
+  border-color: rgba(255, 229, 107, .38);
+  background: rgba(255, 229, 107, .04);
+  outline: none;
 }
 .side-panel-tooltip {
   position: absolute;

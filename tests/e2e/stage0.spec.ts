@@ -455,7 +455,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-retained-fraction", "0.25");
   expect(Number(await page.getByTestId("battle-canvas").getAttribute("data-native-dither-cell-count"))).toBeGreaterThan(0);
   // Candidate selection follows pointer hover without committing movement:
-  // the yellow cursor moves to the candidate while the unit stays at origin.
+  // the native black/white cursor frame moves while the unit stays at origin.
   await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
   expect((await debugState(page))).toMatchObject({
     actionMode: "move",
@@ -1396,8 +1396,31 @@ test("RHP-07: all twelve desk objects are discoverable, accessible and coordinat
   await expect(page.getByTestId("sound-hotspot")).toHaveAttribute("aria-haspopup", "dialog");
   await expect(page.getByTestId("music-hotspot")).toHaveAttribute("aria-haspopup", "dialog");
   await expect(page.getByTestId("system-menu-button")).toHaveAttribute("aria-haspopup", "menu");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-cursor-frame-style", "native-bevel");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-cursor-frame-shadow",
+    "palette-0:40x44:2px",
+  );
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-cursor-frame-highlight",
+    "palette-15:39x43:1px",
+  );
 
   await page.getByTestId("system-menu-button").hover();
+  expect(await page.getByTestId("system-menu-button").evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      borderWidth: style.borderTopWidth,
+      borderColor: style.borderTopColor,
+      backgroundColor: style.backgroundColor,
+      outlineStyle: style.outlineStyle,
+    };
+  })).toEqual({
+    borderWidth: "1px",
+    borderColor: "rgba(255, 229, 107, 0.38)",
+    backgroundColor: "rgba(255, 229, 107, 0.04)",
+    outlineStyle: "none",
+  });
   await page.waitForTimeout(250);
   await expect(tooltip).toBeHidden();
   await expect(tooltip).toHaveText("遊戲功能", { timeout: 1_000 });

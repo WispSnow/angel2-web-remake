@@ -13,6 +13,8 @@ const BATTLE_INPUT_TOP = 26;
 const BATTLE_INPUT_BOTTOM = 326;
 const EDGE_PAN_INTERVAL_MS = 110;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
+const NATIVE_CURSOR_SHADOW = 0x000000;
+const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
 
 interface DeathDescriptor {
   xOffset: number;
@@ -537,16 +539,37 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private drawCursor(): void {
       this.cursorGraphics.clear();
+      if (controller.isTestMode) {
+        const canvas = this.game.canvas;
+        canvas.dataset.cursorFrameStyle = "native-bevel";
+        canvas.dataset.cursorFrameShadow = "palette-0:40x44:2px";
+        canvas.dataset.cursorFrameHighlight = "palette-15:39x43:1px";
+      }
       if (controller.combatPresentation) return;
       const focus = controller.cursor;
-      this.cursorGraphics.lineStyle(3, 0xffea42, 1);
-      this.cursorGraphics.strokeRect(focus.x * TILE_WIDTH + 2, focus.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
+      this.drawNativeCursorFrame(focus.x * TILE_WIDTH, focus.y * TILE_HEIGHT);
       const unit = controller.focusedUnit;
       if (unit) {
         const marker = controller.movementPresentation ? focus : unit;
         this.cursorGraphics.lineStyle(2, unit.side === 1 ? 0x59b9ff : 0xff5252, 1);
         this.cursorGraphics.strokeCircle(marker.x * TILE_WIDTH + 20, marker.y * TILE_HEIGHT + 23, 17);
       }
+    }
+
+    private drawNativeCursorFrame(x: number, y: number): void {
+      // Module 29 draws DS:5B29 in palette 0, then overlays DS:5C35
+      // in palette 15. Explicit pixel rectangles preserve that 40x44 bevel.
+      this.cursorGraphics.fillStyle(NATIVE_CURSOR_SHADOW, 1);
+      this.cursorGraphics.fillRect(x, y, TILE_WIDTH, 2);
+      this.cursorGraphics.fillRect(x, y + TILE_HEIGHT - 2, TILE_WIDTH, 2);
+      this.cursorGraphics.fillRect(x, y + 2, 2, TILE_HEIGHT - 4);
+      this.cursorGraphics.fillRect(x + TILE_WIDTH - 2, y + 2, 2, TILE_HEIGHT - 4);
+
+      this.cursorGraphics.fillStyle(NATIVE_CURSOR_HIGHLIGHT, 1);
+      this.cursorGraphics.fillRect(x, y, TILE_WIDTH - 1, 1);
+      this.cursorGraphics.fillRect(x, y + 1, 1, TILE_HEIGHT - 3);
+      this.cursorGraphics.fillRect(x + TILE_WIDTH - 2, y + 1, 1, TILE_HEIGHT - 3);
+      this.cursorGraphics.fillRect(x, y + TILE_HEIGHT - 2, TILE_WIDTH - 1, 1);
     }
   };
 }
