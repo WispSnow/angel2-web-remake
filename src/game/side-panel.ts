@@ -17,7 +17,9 @@ export type ImplementedSidePanelAction =
   | "open-group-commands"
   | "all-rest"
   | "objectives"
-  | "battle-presentation";
+  | "battle-presentation"
+  | "system-save"
+  | "system-load";
 
 export interface SidePanelHotspot {
   id: SidePanelHotspotId;
@@ -33,8 +35,20 @@ export interface SidePanelHotspot {
 }
 
 export const SIDE_PANEL_HOTSPOTS: readonly SidePanelHotspot[] = [
-  { id: "save", label: "儲存記錄", bounds: { minX: 489, maxX: 520, minY: 88, maxY: 122 } },
-  { id: "load", label: "讀取記錄", bounds: { minX: 526, maxX: 570, minY: 110, maxY: 136 } },
+  {
+    id: "save",
+    label: "儲存記錄",
+    bounds: { minX: 489, maxX: 520, minY: 88, maxY: 122 },
+    action: "system-save",
+    testId: "save-hotspot",
+  },
+  {
+    id: "load",
+    label: "讀取記錄",
+    bounds: { minX: 526, maxX: 570, minY: 110, maxY: 136 },
+    action: "system-load",
+    testId: "load-hotspot",
+  },
   { id: "grid", label: "地圖方格", bounds: { minX: 602, maxX: 626, minY: 65, maxY: 84 } },
   { id: "sound", label: "音效開關", bounds: { minX: 587, maxX: 612, minY: 33, maxY: 53 } },
   { id: "edgeScroll", label: "地圖捲動", bounds: { minX: 580, maxX: 607, minY: 107, maxY: 137 } },

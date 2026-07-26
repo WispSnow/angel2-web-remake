@@ -16,6 +16,7 @@ interface DebugState {
   systemCommands: Array<{ id: string; label: string }>;
   settingsOpen: boolean;
   recordMenuMode?: "load" | "save";
+  recordMenuReturn?: "battle" | "system";
   recordMenuIndex: number;
   quitConfirmOpen: boolean;
   quitConfirmIndex: number;
@@ -942,6 +943,69 @@ test("RHP-02: objective and battle-animation objects reuse canonical presentatio
   expect(toggled.battlePresentation).toBe("full");
   expect(toggled.units).toEqual(before.units);
   expect(toggled.rngState).toBe(before.rngState);
+});
+
+test("RHP-03: desk save and load objects preserve record data and return origin", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+
+  const initial = await debugState(page);
+  const saveHotspot = page.getByTestId("save-hotspot");
+  const loadHotspot = page.getByTestId("load-hotspot");
+  await expect(saveHotspot).toBeVisible();
+  await expect(loadHotspot).toBeVisible();
+
+  await saveHotspot.click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({ recordMenuMode: "save", recordMenuReturn: "battle" });
+  await expect(page.getByTestId("record-slot-1")).toContainText("此處沒有記錄");
+  await page.getByTestId("record-slot-1").click();
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
+  expect(saved).toMatchObject({
+    format: "ANGEL2-web-save",
+    version: 2,
+    kind: "battle",
+    stage: 0,
+    rngState: initial.rngState,
+    battle: {
+      round: initial.round,
+      cursor: initial.cursor,
+      cameraOrigin: initial.cameraOrigin,
+      units: initial.units,
+    },
+  });
+
+  await loadHotspot.click();
+  expect((await debugState(page))).toMatchObject({ recordMenuMode: "load", recordMenuReturn: "battle" });
+  await page.locator("[data-action=close-record-menu]").click();
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-move").click();
+  await clickCanvas(page, 180, 177);
+  await page.getByTestId("unit-command-end").click();
+  expect((await debugState(page)).units).not.toEqual(initial.units);
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await loadHotspot.click();
+  await page.getByTestId("record-slot-1").click();
+  const restored = await debugState(page);
+  expect(restored.round).toBe(initial.round);
+  expect(restored.units).toEqual(initial.units);
+  expect(restored.rngState).toBe(initial.rngState);
+  expect(restored.cursor).toEqual(initial.cursor);
+  expect(restored.cameraOrigin).toEqual(initial.cameraOrigin);
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await saveHotspot.hover();
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-side-panel-record-hotspots.png",
+  });
 });
 
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {

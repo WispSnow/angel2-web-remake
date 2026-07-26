@@ -108,6 +108,7 @@ export class GameController {
   systemMenuIndex = 0;
   settingsOpen = false;
   recordMenuMode?: RecordMenuMode;
+  recordMenuReturn?: "battle" | "system";
   recordMenuIndex = 0;
   quitConfirmOpen = false;
   quitConfirmIndex = 1;
@@ -1215,10 +1216,16 @@ export class GameController {
   }
 
   openRecordMenu(mode: RecordMenuMode): void {
-    if (this.phase !== "player" || this.busy || (!this.systemMenuOpen && !this.settingsOpen)) return;
+    const fromSystem = this.systemMenuOpen || this.settingsOpen;
+    const fromBattle = this.phase === "player"
+      && !this.busy
+      && !this.hasBlockingOverlay
+      && this.actionMode === "idle";
+    if (!fromSystem && !fromBattle) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
     this.recordMenuMode = mode;
+    this.recordMenuReturn = fromSystem ? "system" : "battle";
     this.recordMenuIndex = 0;
     this.statusMessage = mode === "save" ? "選擇儲存記錄位置。" : "選擇要讀取的戰役記錄。";
     this.emit();
@@ -1226,9 +1233,11 @@ export class GameController {
 
   closeRecordMenu(): void {
     if (!this.recordMenuMode) return;
+    const returnToSystem = this.recordMenuReturn === "system";
     this.recordMenuMode = undefined;
+    this.recordMenuReturn = undefined;
     this.recordMenuIndex = 0;
-    this.systemMenuOpen = true;
+    this.systemMenuOpen = returnToSystem;
     this.emit();
   }
 
@@ -1277,6 +1286,7 @@ export class GameController {
     };
     localStorage.setItem(`angel2.save.${slot}`, JSON.stringify(save));
     this.recordMenuMode = undefined;
+    this.recordMenuReturn = undefined;
     this.recordMenuIndex = 0;
     this.statusMessage = `已儲存至記錄 ${slot}。`;
     this.emit();
@@ -1291,6 +1301,7 @@ export class GameController {
     }
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
+      this.recordMenuReturn = undefined;
       this.goToNextStage();
       return;
     }
@@ -1302,6 +1313,7 @@ export class GameController {
     this.cursor = { ...save.battle.cursor };
     this.cameraOrigin = { ...save.battle.cameraOrigin };
     this.recordMenuMode = undefined;
+    this.recordMenuReturn = undefined;
     this.recordMenuIndex = 0;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
@@ -1584,6 +1596,7 @@ export class GameController {
       systemCommands: SYSTEM_COMMANDS.map((command) => ({ ...command })),
       settingsOpen: this.settingsOpen,
       recordMenuMode: this.recordMenuMode,
+      recordMenuReturn: this.recordMenuReturn,
       recordMenuIndex: this.recordMenuIndex,
       quitConfirmOpen: this.quitConfirmOpen,
       quitConfirmIndex: this.quitConfirmIndex,
