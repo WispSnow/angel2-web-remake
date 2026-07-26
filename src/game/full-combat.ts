@@ -108,8 +108,7 @@ const MELEE = {
   impactAtScroll: 0.88,
   flameAlternate: 53,
   whooshEvery: 160,
-  exitDelay: 130, // after impact, before the attacker turns
-  exitSpeed: 1.1, // px/ms
+  exitSpeed: 1.35, // px/ms, combined with the impact camera handoff
 } as const;
 
 const RANGED = {
@@ -136,6 +135,7 @@ const RANGED = {
 const VICTIM_DASH = 330; // victim pops at the edge this long before impact
 const VICTIM_ARRIVE = 80; // ...and reaches his mark this long before impact
 const IMPACT_SETTLE = 150; // impact → hold bookkeeping boundary
+const VICTIM_KNOCKBACK = 18; // visible screen recoil while the camera follows
 const HOLD_MID = 950;
 const HOLD_FINAL = 1900;
 const DEATH_DELAY = 250; // hold start → death blink start
@@ -226,13 +226,19 @@ function meleeActorSprite(spec: StrikeSpec, times: StrikeTimes, t: number): Full
     const pose = Math.min(3, Math.floor((t - spec.start) / MELEE.poseLength));
     return { ...base, frame: pose, x: spec.actorX };
   }
-  const turnAt = times.impact + MELEE.exitDelay;
-  if (t < turnAt) {
+  if (t < times.impact) {
     const alternate = Math.floor((t - times.windupEnd) / MELEE.flameAlternate) % 2;
     return { ...base, frame: 4 + alternate, x: spec.actorX - dir * 12 };
   }
-  // Turn and dash off the attacker's own edge.
-  const x = spec.actorX - dir * 12 - dir * MELEE.exitSpeed * (t - turnAt);
+  // Native footage hands the view to the recoiling victim on contact. The
+  // attacker turns at once, and the continuing camera pan carries it toward
+  // its own edge before the victim-only hold begins.
+  if (t >= times.holdStart) return undefined;
+  const cameraFollow = cameraAt(spec, times, t) - cameraAt(spec, times, times.impact);
+  const x = spec.actorX
+    - dir * 12
+    - dir * MELEE.exitSpeed * (t - times.impact)
+    - cameraFollow;
   if (dir > 0 ? x < -EDGE_MARGIN : x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
   return { ...base, frame: 0, x, mirror: true };
 }
@@ -278,8 +284,9 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
     return { ...base, frame: 0, x: edge + (spec.victimX - edge) * progress };
   }
   if (t < times.impact) return { ...base, frame: 0, x: spec.victimX };
-  // Hit: recoil pose with the baked star burst, nudged along the attack.
-  const nudge = attackDir * 6 * clamp01((t - times.impact) / 80);
+  // Hit: recoil pose with the baked star burst. The target keeps moving along
+  // the attack while the camera advances in the same direction.
+  const nudge = attackDir * VICTIM_KNOCKBACK * clamp01((t - times.impact) / IMPACT_SETTLE);
   const cavalry = isRanged(spec.victimClass);
   let frame = cavalry && t >= times.impact + CAVALRY_FALL_DELAY ? 2 : 1;
   let opacity = 1;
@@ -338,7 +345,8 @@ function dustAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatScen
 function damageAt(spec: StrikeSpec, times: StrikeTimes, t: number, holdEnd: number): FullCombatSceneState["damage"] {
   if (t < times.impact || t > holdEnd) return undefined;
   const attackDir = spec.actorSide === "left" ? 1 : -1;
-  return { amount: spec.damage, x: spec.victimX + attackDir * DAMAGE_OFFSET };
+  const victimRecoil = attackDir * VICTIM_KNOCKBACK * clamp01((t - times.impact) / IMPACT_SETTLE);
+  return { amount: spec.damage, x: spec.victimX + victimRecoil + attackDir * DAMAGE_OFFSET };
 }
 
 function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {

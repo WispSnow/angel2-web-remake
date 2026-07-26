@@ -978,7 +978,19 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-actor-sprite")).toBeVisible();
   await expect(page.getByTestId("full-victim-sprite")).toBeVisible();
   await expect(page.getByTestId("full-damage-number")).toBeVisible();
+  const primaryImpact = (await debugState(page)).combatPresentation?.fullScene;
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-damage.png" });
+
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullHold");
+  await expect(page.getByTestId("full-actor-sprite")).toBeHidden();
+  await expect(page.getByTestId("full-victim-sprite")).toBeVisible();
+  const primaryHold = (await debugState(page)).combatPresentation?.fullScene;
+  expect(primaryHold?.camera).toBeGreaterThan(primaryImpact?.camera ?? Number.POSITIVE_INFINITY);
+  const impactVictimX = primaryImpact?.sprites.find(({ set }) => set === "direct")?.x;
+  const holdVictimX = primaryHold?.sprites.find(({ set }) => set === "direct")?.x;
+  expect((holdVictimX ?? 0) - (impactVictimX ?? 0)).toBeGreaterThanOrEqual(12);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-hold.png" });
 
   await waitForPhase(page, "round2Story");
   const fullResolved = await debugState(page);
