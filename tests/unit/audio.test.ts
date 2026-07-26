@@ -4,7 +4,7 @@ import {
   MUSIC_GAIN_BY_VOLUME,
   soundEffectChannelForCue,
   type SoundEffectChannel,
-} from "../../src/game/audio";
+} from "../../src/game/audio-settings";
 
 describe("native sound-effect request gates", () => {
   test("routes scripted movement separately from map and full combat cues", () => {

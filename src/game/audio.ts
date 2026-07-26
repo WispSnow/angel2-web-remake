@@ -1,6 +1,11 @@
 import { ASSETS, SPEECH_RECORD_BY_CHARACTER } from "./content/stage0";
 import type { GameController } from "./controller";
-import type { MusicVolume } from "./preferences";
+import {
+  isSoundEffectChannelEnabled,
+  MUSIC_GAIN_BY_VOLUME,
+  soundEffectChannelForCue,
+  type SoundEffectChannel,
+} from "./audio-settings";
 import type { GamePhase } from "./types";
 
 interface MusicTrack {
@@ -10,32 +15,6 @@ interface MusicTrack {
 
 type BattleMusicSide = "player" | "enemy";
 type BattleMusicPart = "entry" | "loop";
-export type SoundEffectChannel = "speech" | "movement" | "combat" | "key";
-export const MUSIC_GAIN_BY_VOLUME: Readonly<Record<MusicVolume, number>> = {
-  0: 0,
-  1: 0.08,
-  2: 0.16,
-  3: 0.24,
-  4: 0.32,
-};
-
-type SoundChannelState = Pick<
-  GameController,
-  "speechEnabled" | "movementSoundEnabled" | "combatSoundEnabled" | "keySoundEnabled"
->;
-
-export const soundEffectChannelForCue = (reason: string): SoundEffectChannel =>
-  reason.includes("movement") ? "movement" : "combat";
-
-export const isSoundEffectChannelEnabled = (
-  state: SoundChannelState,
-  channel: SoundEffectChannel,
-): boolean => {
-  if (channel === "speech") return state.speechEnabled;
-  if (channel === "movement") return state.movementSoundEnabled;
-  if (channel === "combat") return state.combatSoundEnabled;
-  return state.keySoundEnabled;
-};
 
 const playerMusicPhases = new Set<GamePhase>([
   "scriptedMove",
