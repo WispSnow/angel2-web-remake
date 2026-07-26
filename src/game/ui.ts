@@ -772,11 +772,12 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
     image.dataset.side = sprite.side;
     image.dataset.set = sprite.set;
     image.dataset.frame = String(sprite.frame);
+    image.dataset.lift = String(sprite.lift);
     if (sprite.reaction) image.dataset.reaction = sprite.reaction;
     else delete image.dataset.reaction;
     if (image.getAttribute("src") !== src) image.setAttribute("src", src);
     const anchor = sprite.mirror ? meta.w - meta.anchor : meta.anchor;
-    holder.style.transform = `translateX(${Math.round(sprite.x - anchor)}px)`;
+    holder.style.transform = `translate(${Math.round(sprite.x - anchor)}px, ${-Math.round(sprite.lift)}px)`;
     holder.style.opacity = String(sprite.opacity);
     image.style.transform = sprite.mirror ? "scaleX(-1)" : "";
   }

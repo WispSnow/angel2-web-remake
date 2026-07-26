@@ -41,29 +41,38 @@ function markTime(script: FullCombatScript, phase: FullCombatPhaseName): number 
 }
 
 describe("Full-screen ordinary combat choreography", () => {
-  it("hands the camera to the recoiling defender before the primary hold", () => {
+  it("keeps the struck unit fixed on screen while the native camera recoil completes", () => {
     const script = buildFullCombatScript(
       unit(1, 0, "妮雅"),
       unit(2, 48, "騎士團士兵"),
       result(),
     );
-    const impact = script.sample(markTime(script, "fullImpact"));
-    const hold = script.sample(markTime(script, "fullHold"));
+    const impactAt = markTime(script, "fullImpact");
+    const holdAt = markTime(script, "fullHold");
+    const impact = script.sample(impactAt);
+    const apex = script.sample(impactAt + 180);
+    const hold = script.sample(holdAt);
     const impactVictim = impact.sprites.find(({ set }) => set === "direct");
+    const apexVictim = apex.sprites.find(({ set }) => set === "direct");
     const holdVictim = hold.sprites.find(({ set }) => set === "direct");
 
-    expect(hold.camera).toBeGreaterThan(impact.camera);
-    expect((holdVictim?.x ?? 0) - (impactVictim?.x ?? 0)).toBeGreaterThanOrEqual(12);
-    expect((hold.damage?.x ?? 0) - (impact.damage?.x ?? 0)).toBeGreaterThanOrEqual(12);
+    expect(hold.camera - impact.camera).toBe(64);
+    expect(apexVictim).toMatchObject({ x: impactVictim?.x, lift: 12 });
+    expect(holdVictim).toMatchObject({ x: impactVictim?.x, lift: 0 });
+    expect(hold.damage?.x).toBe(impact.damage?.x);
     expect(hold.sprites.find(({ set }) => set === "plus50")).toBeUndefined();
 
-    const counterImpact = script.sample(markTime(script, "fullCounterImpact"));
+    const counterImpactAt = markTime(script, "fullCounterImpact");
+    const counterImpact = script.sample(counterImpactAt);
+    const counterApex = script.sample(counterImpactAt + 180);
     const counterHold = script.sample(markTime(script, "fullCounterHold"));
     const counterImpactVictim = counterImpact.sprites.find(({ set }) => set === "direct");
+    const counterApexVictim = counterApex.sprites.find(({ set }) => set === "direct");
     const counterHoldVictim = counterHold.sprites.find(({ set }) => set === "direct");
 
-    expect(counterHold.camera).toBeLessThan(counterImpact.camera);
-    expect((counterHoldVictim?.x ?? 0) - (counterImpactVictim?.x ?? 0)).toBeLessThanOrEqual(-12);
+    expect(counterHold.camera - counterImpact.camera).toBe(-64);
+    expect(counterApexVictim).toMatchObject({ x: counterImpactVictim?.x, lift: 0 });
+    expect(counterHoldVictim).toMatchObject({ x: counterImpactVictim?.x, lift: 0 });
     expect(counterHold.sprites.find(({ set }) => set === "plus50")).toBeUndefined();
   });
 
@@ -125,18 +134,20 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(script.marks.some(({ phase }) => phase.startsWith("fullCounter"))).toBe(false);
     expect(script.cues.some(({ record, reason }) => record === 2 && reason === "full-primary-hurt")).toBe(true);
     expect(script.cues.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
-    expect(script.sample(holdAt + 100).sprites.find(({ set }) => set === "direct")).toMatchObject({
+    expect(script.sample(holdAt - 40).sprites.find(({ set }) => set === "direct")).toMatchObject({
       frame: 1,
       reaction: "hurt",
+      lift: 4,
     });
-    expect(script.sample(holdAt + 300).sprites.find(({ set }) => set === "direct")).toMatchObject({
+    expect(script.sample(holdAt).sprites.find(({ set }) => set === "direct")).toMatchObject({
       frame: 2,
       reaction: "death",
+      lift: 0,
     });
-    expect(script.sample(holdAt + 300).sprites.find(({ set }) => set === "direct")?.opacity).toBe(1);
-    expect(script.sample(holdAt + 500).sprites.find(({ set }) => set === "direct")?.opacity).toBe(.45);
-    expect(script.sample(holdAt + 1_330).sprites.find(({ set }) => set === "direct")?.opacity).toBeLessThan(1);
-    expect(script.sample(holdAt + 1_460).sprites.find(({ set }) => set === "direct")).toBeUndefined();
+    expect(script.sample(holdAt + 100).sprites.find(({ set }) => set === "direct")?.opacity).toBe(1);
+    expect(script.sample(holdAt + 200).sprites.find(({ set }) => set === "direct")?.opacity).toBe(.45);
+    expect(script.sample(holdAt + 1_100).sprites.find(({ set }) => set === "direct")?.opacity).toBeLessThan(1);
+    expect(script.sample(holdAt + 1_210).sprites.find(({ set }) => set === "direct")).toBeUndefined();
     expect(script.sample(script.duration + 100).camera).toBe(208);
 
     const lowDamageDeath = buildFullCombatScript(
@@ -152,13 +163,15 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(lowDamageDeath.cues.some(({ record, reason }) => record === 0 && reason === "full-primary-guard")).toBe(true);
     expect(lowDamageDeath.cues.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
     const lowDamageDeathAt = markTime(lowDamageDeath, "fullDefenderDeath");
-    expect(lowDamageDeath.sample(lowDamageDeathAt + 100).sprites.find(({ set }) => set === "direct")).toMatchObject({
+    expect(lowDamageDeath.sample(lowDamageDeathAt - 40).sprites.find(({ set }) => set === "direct")).toMatchObject({
       frame: 3,
       reaction: "guard",
+      lift: 0,
     });
-    expect(lowDamageDeath.sample(lowDamageDeathAt + 300).sprites.find(({ set }) => set === "direct")).toMatchObject({
+    expect(lowDamageDeath.sample(lowDamageDeathAt).sprites.find(({ set }) => set === "direct")).toMatchObject({
       frame: 2,
       reaction: "death",
+      lift: 0,
     });
   });
 
@@ -187,11 +200,27 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(middleLance.dust).toEqual([]);
     expect(script.sample(throwAt + 300).sprites.find(({ set }) => set === "plus50")?.mirror).toBe(true);
     expect(script.sample(impactAt).lance).toBeUndefined();
-    expect(script.sample(impactAt + 241).sprites.find(({ set }) => set === "direct")).toMatchObject({
+    const impact = script.sample(impactAt);
+    const firstApex = script.sample(impactAt + 100);
+    const reboundApex = script.sample(impactAt + 550);
+    const hold = script.sample(holdAt);
+    const impactVictim = impact.sprites.find(({ set }) => set === "direct");
+    expect(firstApex.sprites.find(({ set }) => set === "direct")).toMatchObject({
       frame: 1,
       reaction: "hurt",
+      x: impactVictim?.x,
+      lift: 36,
     });
-    expect(script.sample(holdAt).sprites.find(({ set }) => set === "plus50")).toBeUndefined();
+    expect(reboundApex.sprites.find(({ set }) => set === "direct")).toMatchObject({
+      x: impactVictim?.x,
+      lift: 24,
+    });
+    expect(hold.camera - impact.camera).toBe(112);
+    expect(hold.sprites.find(({ set }) => set === "direct")).toMatchObject({
+      x: impactVictim?.x,
+      lift: 0,
+    });
+    expect(hold.sprites.find(({ set }) => set === "plus50")).toBeUndefined();
     expect(script.cues.some(({ reason }) => reason === "full-primary-lance-throw")).toBe(true);
     expect(script.cues.some(({ record, reason }) => record === 38 && reason.startsWith("full-primary"))).toBe(false);
 

@@ -7,21 +7,25 @@
 //
 // Measured structure of one strike (times at 75 fps, converted to ms):
 //   windup   ~450 ms  four poses in place, sword-draw sound
-//   charge   ~1440 ms camera pans 208 px at ~145 px/s while the attacker
-//                     lunges in place with the flame frames 4/5 alternating
-//                     and dust puffs trail behind at world speed
+//   charge   ~960 ms  camera advances 144 px while the attacker lunges in
+//                     place with flame frames 4/5 alternating and dust puffs
+//                     trail behind at world speed
 //   reveal   ~260 ms before impact the victim pops at the window edge and
 //                     dashes to his mark, arriving as the flames land
-//   impact   at ~88 % of the pan: hit pose with the baked star burst, red
-//                     damage number on the victim's far side, threshold hit
-//                     sound (E/0 at <=10, E/2 above 10)
+//   impact   hit pose with the baked star burst, red damage number on the
+//                     victim's far side, threshold hit sound (E/0 at <=10,
+//                     E/2 above 10)
+//   recoil   target remains fixed horizontally on screen while the camera
+//                     completes another 64 px in native 8 px steps; >10
+//                     damage adds the measured 0/4/8/12/8/4/0 px hop
 //   exit     attacker turns and dashes off his own edge at ~1100 px/s
-//   hold     victim alone with star + number: ~950 ms mid-battle, ~1900 ms
-//                     when the battle ends after this strike
+//   hold     victim alone after the 400 ms recoil script; a fatal target then
+//                     switches from threshold reaction to its death frame
 //   counter  the same block mirrored, camera panning back
 // The cavalry (class 22) strike replaces the melee lunge with a couched-lance
 // windup, a thrown-lance projectile (frames 6/7/8), an early attacker exit,
-// and a 360 px camera pan.
+// and a 360 px camera pan. Its post-impact 112 px camera script accompanies
+// two measured hops: 36 px, then 24 px.
 import type { AttackResult, BattleUnit } from "./types";
 
 export const FULL_SCENE = {
@@ -42,6 +46,8 @@ export interface FullCombatSpriteState {
   reaction?: "guard" | "hurt" | "death";
   /** Scene x of the sprite's ground anchor (body bottom-center). */
   x: number;
+  /** Native-pixel lift above the ground anchor. */
+  lift: number;
   mirror: boolean;
   opacity: number;
 }
@@ -106,8 +112,7 @@ const MELEE = {
   poseLength: 112,
   scrollDelay: 50, // charge anim runs this long before the camera moves
   scrollDistance: 208,
-  scrollDuration: 1440,
-  impactAtScroll: 0.88,
+  approachDuration: 960,
   flameAlternate: 53,
   exitSpeed: 1.35, // px/ms, combined with the impact camera handoff
 } as const;
@@ -116,7 +121,6 @@ const RANGED = {
   windup: 480,
   poseLength: 160,
   scrollDistance: 360,
-  scrollDuration: 2240,
   throwPose: 100,
   lanceFlight: 950,
   // The javelin leaves from behind the rider's shoulder, arcs up, and drops
@@ -135,11 +139,8 @@ const RANGED = {
 // frame 172, i.e. a little under half a second of approach.
 const VICTIM_DASH = 330; // victim pops at the edge this long before impact
 const VICTIM_ARRIVE = 80; // ...and reaches his mark this long before impact
-const IMPACT_SETTLE = 150; // impact → hold bookkeeping boundary
-const VICTIM_KNOCKBACK = 18; // visible screen recoil while the camera follows
-const HOLD_MID = 950;
-const HOLD_FINAL = 1900;
-const DEATH_DELAY = 250; // hold start → death blink start
+const POST_IMPACT_MID = 1200;
+const POST_IMPACT_FINAL = 2050;
 const DEATH_BLINK = 160;
 const DEATH_CYCLES = 6;
 
@@ -182,35 +183,113 @@ interface StrikeTimes {
   lanceTo?: number;
 }
 
+interface RecoilKeyframe {
+  at: number;
+  lift: number;
+}
+
+interface RecoilProfile {
+  duration: number;
+  cameraDistance: number;
+  liftFrames: readonly RecoilKeyframe[];
+}
+
+// These are command-stream steps, not interpolated curves. The original
+// renderer holds each native-pixel position until the following command.
+const SOLDIER_RECOIL: RecoilProfile = {
+  duration: 400,
+  cameraDistance: 64,
+  liftFrames: [
+    { at: 0, lift: 0 },
+    { at: 60, lift: 4 },
+    { at: 120, lift: 8 },
+    { at: 180, lift: 12 },
+    { at: 300, lift: 8 },
+    { at: 360, lift: 4 },
+    { at: 400, lift: 0 },
+  ],
+};
+
+const CAVALRY_RECOIL: RecoilProfile = {
+  duration: 700,
+  cameraDistance: 112,
+  liftFrames: [
+    { at: 0, lift: 0 },
+    { at: 50, lift: 18 },
+    { at: 100, lift: 36 },
+    { at: 360, lift: 18 },
+    { at: 400, lift: 0 },
+    { at: 450, lift: 8 },
+    { at: 500, lift: 16 },
+    { at: 550, lift: 24 },
+    { at: 600, lift: 16 },
+    { at: 650, lift: 8 },
+    { at: 700, lift: 0 },
+  ],
+};
+
 const isRanged = (classId: number): boolean => classId === 22;
+const recoilProfile = (actorClass: number): RecoilProfile =>
+  isRanged(actorClass) ? CAVALRY_RECOIL : SOLDIER_RECOIL;
 
 function strikeTimes(spec: StrikeSpec): StrikeTimes {
   const t0 = spec.start;
+  const recoil = recoilProfile(spec.actorClass);
+  const afterImpact = spec.final ? POST_IMPACT_FINAL : POST_IMPACT_MID;
   if (isRanged(spec.actorClass)) {
     const scrollStart = t0;
-    const scrollEnd = scrollStart + RANGED.scrollDuration;
     const throwAt = t0 + RANGED.windup;
     const lanceFrom = throwAt + RANGED.throwPose;
     const lanceTo = lanceFrom + RANGED.lanceFlight;
     const impact = lanceTo;
-    const holdStart = impact + IMPACT_SETTLE;
-    const hold = spec.final ? HOLD_FINAL : HOLD_MID;
-    return { windupEnd: throwAt, scrollStart, scrollEnd, impact, holdStart, end: holdStart + hold, throwAt, lanceFrom, lanceTo };
+    const scrollEnd = impact + recoil.duration;
+    const holdStart = scrollEnd;
+    return {
+      windupEnd: throwAt,
+      scrollStart,
+      scrollEnd,
+      impact,
+      holdStart,
+      end: impact + afterImpact,
+      throwAt,
+      lanceFrom,
+      lanceTo,
+    };
   }
   const windupEnd = t0 + MELEE.windup;
   const scrollStart = windupEnd + MELEE.scrollDelay;
-  const scrollEnd = scrollStart + MELEE.scrollDuration;
-  const impact = scrollStart + MELEE.scrollDuration * MELEE.impactAtScroll;
-  const holdStart = impact + IMPACT_SETTLE;
-  const hold = spec.final ? HOLD_FINAL : HOLD_MID;
-  return { windupEnd, scrollStart, scrollEnd, impact, holdStart, end: holdStart + hold };
+  const impact = scrollStart + MELEE.approachDuration;
+  const scrollEnd = impact + recoil.duration;
+  const holdStart = scrollEnd;
+  return { windupEnd, scrollStart, scrollEnd, impact, holdStart, end: impact + afterImpact };
 }
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
+function steppedCameraDistance(profile: RecoilProfile, age: number): number {
+  const steps = profile.cameraDistance / 8;
+  const completed = Math.min(steps, Math.floor(Math.max(0, age) / (profile.duration / steps)));
+  return completed * 8;
+}
+
+function recoilLift(profile: RecoilProfile, age: number): number {
+  let lift = profile.liftFrames[0]?.lift ?? 0;
+  for (const keyframe of profile.liftFrames) {
+    if (age < keyframe.at) break;
+    lift = keyframe.lift;
+  }
+  return lift;
+}
+
 function cameraAt(spec: StrikeSpec, times: StrikeTimes, t: number): number {
-  const progress = clamp01((t - times.scrollStart) / (times.scrollEnd - times.scrollStart));
-  return spec.cameraFrom + (spec.cameraTo - spec.cameraFrom) * progress;
+  const dir = spec.actorSide === "left" ? 1 : -1;
+  const recoil = recoilProfile(spec.actorClass);
+  const impactCamera = spec.cameraTo - dir * recoil.cameraDistance;
+  if (t < times.impact) {
+    const progress = clamp01((t - times.scrollStart) / (times.impact - times.scrollStart));
+    return spec.cameraFrom + (impactCamera - spec.cameraFrom) * progress;
+  }
+  return impactCamera + dir * steppedCameraDistance(recoil, t - times.impact);
 }
 
 function meleeActorSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSpriteState | undefined {
@@ -219,6 +298,7 @@ function meleeActorSprite(spec: StrikeSpec, times: StrikeTimes, t: number): Full
     side: spec.actorSide,
     classId: spec.actorClass,
     set: "plus50",
+    lift: 0,
     mirror: false,
     opacity: 1,
   };
@@ -249,6 +329,7 @@ function rangedActorSprite(spec: StrikeSpec, times: StrikeTimes, t: number): Ful
     side: spec.actorSide,
     classId: spec.actorClass,
     set: "plus50",
+    lift: 0,
     mirror: false,
     opacity: 1,
   };
@@ -267,11 +348,11 @@ function rangedActorSprite(spec: StrikeSpec, times: StrikeTimes, t: number): Ful
 
 function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSpriteState | undefined {
   const victimSide = spec.actorSide === "left" ? "right" : "left";
-  const attackDir = spec.actorSide === "left" ? 1 : -1;
   const base: Omit<FullCombatSpriteState, "frame" | "x"> = {
     side: victimSide,
     classId: spec.victimClass,
     set: "direct",
+    lift: 0,
     mirror: false,
     opacity: 1,
   };
@@ -284,18 +365,21 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
     return { ...base, frame: 0, x: edge + (spec.victimX - edge) * progress };
   }
   if (t < times.impact) return { ...base, frame: 0, x: spec.victimX };
-  // Hit: recoil pose with the baked star burst. The target keeps moving along
-  // the attack while the camera advances in the same direction.
-  const nudge = attackDir * VICTIM_KNOCKBACK * clamp01((t - times.impact) / IMPACT_SETTLE);
+  // Hit: the target stays on its screen mark while the world scroll carries
+  // the knockback. Only the >10 branch runs the attacker's vertical script.
   const thresholdReaction = spec.damage <= 10 ? "guard" : "hurt";
   let reaction: NonNullable<FullCombatSpriteState["reaction"]> = thresholdReaction;
   let frame = thresholdReaction === "guard" ? 3 : 1;
+  let lift = thresholdReaction === "hurt"
+    ? recoilLift(recoilProfile(spec.actorClass), t - times.impact)
+    : 0;
   let opacity = 1;
   if (spec.victimDies) {
-    const deathStart = times.holdStart + DEATH_DELAY;
+    const deathStart = times.holdStart;
     if (t >= deathStart) {
       reaction = "death";
       frame = 2;
+      lift = 0;
       const age = t - deathStart;
       const blinkEnd = DEATH_BLINK * DEATH_CYCLES;
       if (age >= blinkEnd + 240) return undefined;
@@ -303,7 +387,7 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
       else opacity = Math.floor(age / DEATH_BLINK) % 2 === 0 ? 1 : 0.45;
     }
   }
-  return { ...base, frame, reaction, x: spec.victimX + nudge, opacity };
+  return { ...base, frame, reaction, x: spec.victimX, lift, opacity };
 }
 
 function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {
@@ -331,14 +415,14 @@ function dustAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatScen
   const puffs: FullCombatSceneState["dust"] = [];
   const firstSpawn = times.scrollStart + 60;
   const lastSpawn = times.impact;
-  const scrollSpeed = (spec.cameraTo - spec.cameraFrom) / (times.scrollEnd - times.scrollStart);
   for (let spawn = firstSpawn; spawn <= lastSpawn; spawn += DUST_EVERY) {
     const age = t - spawn;
     if (age < 0 || age > DUST_LIFE) continue;
     const phase = age / DUST_LIFE;
     // World-anchored: the puff stays where it was kicked up while the camera
     // keeps panning, so on screen it drifts behind the attacker.
-    const x = spec.actorX - dir * DUST_BEHIND - scrollSpeed * age;
+    const cameraTravel = cameraAt(spec, times, t) - cameraAt(spec, times, spawn);
+    const x = spec.actorX - dir * DUST_BEHIND - cameraTravel;
     puffs.push({ x, y: FULL_SCENE.groundY - 3 - phase * 6, phase });
   }
   return puffs;
@@ -347,8 +431,7 @@ function dustAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatScen
 function damageAt(spec: StrikeSpec, times: StrikeTimes, t: number, holdEnd: number): FullCombatSceneState["damage"] {
   if (t < times.impact || t > holdEnd) return undefined;
   const attackDir = spec.actorSide === "left" ? 1 : -1;
-  const victimRecoil = attackDir * VICTIM_KNOCKBACK * clamp01((t - times.impact) / IMPACT_SETTLE);
-  return { amount: spec.damage, x: spec.victimX + victimRecoil + attackDir * DAMAGE_OFFSET };
+  return { amount: spec.damage, x: spec.victimX + attackDir * DAMAGE_OFFSET };
 }
 
 function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
@@ -367,7 +450,7 @@ function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
     reason: `${label}-${reaction}`,
   });
   if (spec.victimDies) {
-    cues.push({ t: times.holdStart + DEATH_DELAY, record: 11, reason: `${label}-death` });
+    cues.push({ t: times.holdStart, record: 11, reason: `${label}-death` });
   }
   return cues;
 }
