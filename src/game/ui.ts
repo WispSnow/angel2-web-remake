@@ -56,7 +56,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="toggle-grid" data-testid="grid-button">方格 關</button>
                 <button data-action="toggle-edge-scroll" data-testid="edge-scroll-button">捲動 開</button>
                 <button data-action="toggle-portraits" data-testid="portraits-button">圖像 開</button>
-                <button data-action="music" data-testid="music-button">音樂 開</button>
+                <button data-action="open-music-settings" data-testid="music-button">音樂 最大</button>
                 <button data-action="open-sound-settings" data-testid="sound-button">音效設定</button>
                 <button data-action="close-settings">返回</button>
               </div>
@@ -70,6 +70,16 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="toggle-sound-combat" data-testid="sound-combat-button">戰鬥 開</button>
                 <button data-action="toggle-sound-key" data-testid="sound-key-button">按鍵 開</button>
                 <button data-action="close-sound-settings" data-testid="close-sound-settings">返回</button>
+              </div>
+            </section>
+            <section class="music-settings-menu modal-panel" id="music-settings-menu"
+              data-testid="music-settings-menu" role="dialog" aria-label="音樂開關" hidden>
+              <span class="panel-kicker">MUSIC</span><h2>音樂開關</h2>
+              <div class="music-settings-list" role="radiogroup" aria-label="音樂音量">
+                ${["無聲", "1", "2", "3", "最大"].map((label, level) =>
+                  `<button role="radio" data-action="music-volume" data-music-level="${level}"
+                    data-testid="music-volume-${level}">${label}</button>`).join("")}
+                <button data-action="close-music-settings" data-testid="close-music-settings">返回</button>
               </div>
             </section>
             <section class="record-menu action-menu" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
@@ -169,6 +179,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const systemMenu = required(root, "#system-menu");
   const settingsMenu = required(root, "#settings-menu");
   const soundSettingsMenu = required(root, "#sound-settings-menu");
+  const musicSettingsMenu = required(root, "#music-settings-menu");
   const recordMenu = required(root, "#record-menu");
   const quitConfirm = required(root, "#quit-confirm");
   const groupCommandMenu = required(root, "#group-command-menu");
@@ -322,6 +333,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "toggle-sound-movement") controller.toggleMovementSound();
     else if (action === "toggle-sound-combat") controller.toggleCombatSound();
     else if (action === "toggle-sound-key") controller.toggleKeySound();
+    else if (action === "open-music-settings") controller.openMusicSettings();
+    else if (action === "close-music-settings") controller.closeMusicSettings();
+    else if (action === "music-volume") controller.setMusicVolume(Number(button.dataset.musicLevel));
     else if (action === "record-slot") {
       controller.selectRecordMenuSlot(Number(button.dataset.recordIndex));
       controller.activateRecordMenuSelection();
@@ -348,7 +362,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "toggle-grid") controller.toggleGrid();
     else if (action === "toggle-edge-scroll") controller.toggleEdgeScroll();
     else if (action === "toggle-portraits") controller.togglePortraits();
-    else if (action === "music") controller.toggleMusic();
     else if (action === "move") controller.chooseMove();
     else if (action === "attack") controller.chooseAttack();
     else if (action === "rest") controller.chooseRest();
@@ -451,7 +464,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (key === "F3") void controller.freeAction();
     else if (key === "F4") controller.requestRetreat();
     else if (lower === "e") controller.openSoundSettings();
-    else if (lower === "m") controller.toggleMusic();
+    else if (lower === "m") controller.openMusicSettings();
     else if (lower === "o") controller.objectiveOpen ? controller.closeObjectives() : controller.openObjectives();
   });
 
@@ -490,6 +503,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     settingsMenu.hidden = !controller.settingsOpen;
     soundSettingsMenu.hidden = !controller.soundSettingsOpen;
+    musicSettingsMenu.hidden = !controller.musicSettingsOpen;
     recordMenu.hidden = controller.recordMenuMode === undefined;
     if (!recordMenu.hidden) {
       const mode = controller.recordMenuMode;
@@ -546,7 +560,13 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const portraits = root.querySelector<HTMLElement>("[data-testid=portraits-button]");
     if (portraits) portraits.textContent = controller.portraitsEnabled ? "圖像 開" : "圖像 關";
     const music = root.querySelector<HTMLElement>("[data-testid=music-button]");
-    if (music) music.textContent = controller.musicEnabled ? "音樂 開" : "音樂 關";
+    const musicVolumeLabels = ["無聲", "1", "2", "3", "最大"] as const;
+    if (music) music.textContent = `音樂 ${musicVolumeLabels[controller.musicVolume]}`;
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-music-level]")) {
+      const selected = Number(button.dataset.musicLevel) === controller.musicVolume;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-checked", String(selected));
+    }
     const soundButtons = [
       ["sound-speech-button", "說話", controller.speechEnabled],
       ["sound-movement-button", "移動", controller.movementSoundEnabled],

@@ -53,7 +53,13 @@ describe("native battle side-panel hotspots", () => {
         action: "battle-presentation",
         testId: "battle-presentation-hotspot",
       },
-      { id: "music", label: "音樂開關", bounds: { minX: 524, maxX: 565, minY: 77, maxY: 104 } },
+      {
+        id: "music",
+        label: "音樂開關",
+        bounds: { minX: 524, maxX: 565, minY: 77, maxY: 104 },
+        action: "open-music-settings",
+        testId: "music-hotspot",
+      },
       {
         id: "groupCommands",
         label: "集體命令",
@@ -85,7 +91,7 @@ describe("native battle side-panel hotspots", () => {
     ]);
   });
 
-  test("only leaves the music action unimplemented", () => {
+  test("implements all twelve native side-panel actions", () => {
     expect(implementedSidePanelHotspots().map(({ id, action }) => ({ id, action }))).toEqual([
       { id: "save", action: "system-save" },
       { id: "load", action: "system-load" },
@@ -94,6 +100,7 @@ describe("native battle side-panel hotspots", () => {
       { id: "edgeScroll", action: "toggle-edge-scroll" },
       { id: "portraits", action: "toggle-portraits" },
       { id: "battleAnimation", action: "battle-presentation" },
+      { id: "music", action: "open-music-settings" },
       { id: "groupCommands", action: "open-group-commands" },
       { id: "objectives", action: "objectives" },
       { id: "allRest", action: "all-rest" },

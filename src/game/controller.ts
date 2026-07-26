@@ -5,10 +5,14 @@ import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
 import { DeterministicRng } from "./simulation/rng";
 import {
+  isMusicVolume,
+  loadMusicPreferences,
   loadPresentationPreferences,
   loadSoundPreferences,
+  saveMusicPreferences,
   savePresentationPreferences,
   saveSoundPreferences,
+  type MusicVolume,
 } from "./preferences";
 import { parseSaveData } from "./save";
 import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData } from "./types";
@@ -115,6 +119,8 @@ export class GameController {
   settingsOpen = false;
   soundSettingsOpen = false;
   soundSettingsReturn?: "battle" | "settings";
+  musicSettingsOpen = false;
+  musicSettingsReturn?: "battle" | "settings";
   recordMenuMode?: RecordMenuMode;
   recordMenuReturn?: "battle" | "system";
   recordMenuIndex = 0;
@@ -130,7 +136,7 @@ export class GameController {
   gridEnabled: boolean;
   edgeScrollEnabled: boolean;
   portraitsEnabled: boolean;
-  musicEnabled = true;
+  musicVolume: MusicVolume;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
   combatSoundEnabled: boolean;
@@ -161,6 +167,7 @@ export class GameController {
     this.gridEnabled = preferences.gridEnabled;
     this.edgeScrollEnabled = preferences.edgeScrollEnabled;
     this.portraitsEnabled = preferences.portraitsEnabled;
+    this.musicVolume = loadMusicPreferences(localStorage).musicVolume;
     const soundPreferences = loadSoundPreferences(localStorage);
     this.speechEnabled = soundPreferences.speechEnabled;
     this.movementSoundEnabled = soundPreferences.movementSoundEnabled;
@@ -199,6 +206,7 @@ export class GameController {
     return this.systemMenuOpen
       || this.settingsOpen
       || this.soundSettingsOpen
+      || this.musicSettingsOpen
       || this.recordMenuMode !== undefined
       || this.quitConfirmOpen
       || this.objectiveOpen
@@ -550,12 +558,15 @@ export class GameController {
       || this.quitConfirmOpen
       || this.retreatConfirmOpen
       || this.soundSettingsOpen
+      || this.musicSettingsOpen
       || this.actionMode !== "idle"
     ) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
     this.soundSettingsOpen = false;
     this.soundSettingsReturn = undefined;
+    this.musicSettingsOpen = false;
+    this.musicSettingsReturn = undefined;
     this.minimapPreviewOrigin = undefined;
     this.groupCommandIndex = 0;
     this.groupCommandOpen = true;
@@ -983,11 +994,18 @@ export class GameController {
   }
 
   openObjectives(): void {
-    if (this.busy || this.soundSettingsOpen || !["player", "enemy"].includes(this.phase)) return;
+    if (
+      this.busy
+      || this.soundSettingsOpen
+      || this.musicSettingsOpen
+      || !["player", "enemy"].includes(this.phase)
+    ) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
     this.soundSettingsOpen = false;
     this.soundSettingsReturn = undefined;
+    this.musicSettingsOpen = false;
+    this.musicSettingsReturn = undefined;
     this.groupCommandOpen = false;
     this.minimapPreviewOrigin = undefined;
     this.objectiveOpen = true;
@@ -1014,11 +1032,18 @@ export class GameController {
   }
 
   closeSystemMenu(): void {
-    if (!this.systemMenuOpen && !this.settingsOpen && !this.soundSettingsOpen) return;
+    if (
+      !this.systemMenuOpen
+      && !this.settingsOpen
+      && !this.soundSettingsOpen
+      && !this.musicSettingsOpen
+    ) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
     this.soundSettingsOpen = false;
     this.soundSettingsReturn = undefined;
+    this.musicSettingsOpen = false;
+    this.musicSettingsReturn = undefined;
     this.emit();
   }
 
@@ -1082,10 +1107,35 @@ export class GameController {
     this.emit();
   }
 
+  openMusicSettings(): void {
+    const fromSettings = this.settingsOpen;
+    const fromBattle = this.phase === "player"
+      && !this.busy
+      && !this.hasBlockingOverlay
+      && this.actionMode === "idle";
+    if (!fromSettings && !fromBattle) return;
+    this.systemMenuOpen = false;
+    this.settingsOpen = false;
+    this.musicSettingsOpen = true;
+    this.musicSettingsReturn = fromSettings ? "settings" : "battle";
+    this.minimapPreviewOrigin = undefined;
+    this.emit();
+  }
+
+  closeMusicSettings(): void {
+    if (!this.musicSettingsOpen) return;
+    const returnToSettings = this.musicSettingsReturn === "settings";
+    this.musicSettingsOpen = false;
+    this.musicSettingsReturn = undefined;
+    this.settingsOpen = returnToSettings;
+    this.emit();
+  }
+
   systemAction(): void {
     if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
+    else if (this.musicSettingsOpen) this.closeMusicSettings();
     else if (this.settingsOpen) this.closeSettings();
     else if (this.systemMenuOpen) this.closeSystemMenu();
     else if (this.phase === "player" && !this.busy && !this.objectiveOpen && !this.groupCommandOpen && !this.retreatConfirmOpen) {
@@ -1098,6 +1148,7 @@ export class GameController {
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
+    else if (this.musicSettingsOpen) this.closeMusicSettings();
     else if (this.settingsOpen) this.closeSettings();
     else if (this.retreatConfirmOpen) this.cancelRetreat();
     else if (this.groupCommandOpen) this.closeGroupCommands();
@@ -1179,9 +1230,10 @@ export class GameController {
     this.emit();
   }
 
-  toggleMusic(): void {
-    if (this.soundSettingsOpen) return;
-    this.musicEnabled = !this.musicEnabled;
+  setMusicVolume(volume: number): void {
+    if (!isMusicVolume(volume) || volume === this.musicVolume) return;
+    this.musicVolume = volume;
+    this.persistMusicPreferences();
     this.emit();
   }
 
@@ -1221,6 +1273,8 @@ export class GameController {
     this.settingsOpen = false;
     this.soundSettingsOpen = false;
     this.soundSettingsReturn = undefined;
+    this.musicSettingsOpen = false;
+    this.musicSettingsReturn = undefined;
     this.recordMenuMode = undefined;
     this.recordMenuIndex = 0;
     this.quitConfirmOpen = false;
@@ -1412,6 +1466,8 @@ export class GameController {
     this.settingsOpen = false;
     this.soundSettingsOpen = false;
     this.soundSettingsReturn = undefined;
+    this.musicSettingsOpen = false;
+    this.musicSettingsReturn = undefined;
     this.quitConfirmOpen = false;
     this.movementPresentation = undefined;
     this.combatPresentation = undefined;
@@ -1692,6 +1748,8 @@ export class GameController {
       settingsOpen: this.settingsOpen,
       soundSettingsOpen: this.soundSettingsOpen,
       soundSettingsReturn: this.soundSettingsReturn,
+      musicSettingsOpen: this.musicSettingsOpen,
+      musicSettingsReturn: this.musicSettingsReturn,
       recordMenuMode: this.recordMenuMode,
       recordMenuReturn: this.recordMenuReturn,
       recordMenuIndex: this.recordMenuIndex,
@@ -1699,7 +1757,7 @@ export class GameController {
       quitConfirmIndex: this.quitConfirmIndex,
       savePromptIndex: this.savePromptIndex,
       postSaveSlotIndex: this.postSaveSlotIndex,
-      musicEnabled: this.musicEnabled,
+      musicVolume: this.musicVolume,
       speechEnabled: this.speechEnabled,
       movementSoundEnabled: this.movementSoundEnabled,
       combatSoundEnabled: this.combatSoundEnabled,
@@ -1742,6 +1800,8 @@ export class GameController {
       this.settingsOpen = false;
       this.soundSettingsOpen = false;
       this.soundSettingsReturn = undefined;
+      this.musicSettingsOpen = false;
+      this.musicSettingsReturn = undefined;
       this.recordMenuMode = undefined;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
@@ -1758,6 +1818,8 @@ export class GameController {
       this.settingsOpen = false;
       this.soundSettingsOpen = false;
       this.soundSettingsReturn = undefined;
+      this.musicSettingsOpen = false;
+      this.musicSettingsReturn = undefined;
       this.recordMenuMode = undefined;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
@@ -1797,6 +1859,10 @@ export class GameController {
       combatSoundEnabled: this.combatSoundEnabled,
       keySoundEnabled: this.keySoundEnabled,
     });
+  }
+
+  private persistMusicPreferences(): void {
+    saveMusicPreferences(localStorage, { musicVolume: this.musicVolume });
   }
 
   private async moveSelectedUnit(destination: Position): Promise<void> {

@@ -17,6 +17,8 @@ interface DebugState {
   settingsOpen: boolean;
   soundSettingsOpen: boolean;
   soundSettingsReturn?: "battle" | "settings";
+  musicSettingsOpen: boolean;
+  musicSettingsReturn?: "battle" | "settings";
   recordMenuMode?: "load" | "save";
   recordMenuReturn?: "battle" | "system";
   recordMenuIndex: number;
@@ -28,7 +30,7 @@ interface DebugState {
   groupLeaderId?: string;
   retreatConfirmOpen: boolean;
   retreatConfirmIndex: number;
-  musicEnabled: boolean;
+  musicVolume: 0 | 1 | 2 | 3 | 4;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
   combatSoundEnabled: boolean;
@@ -683,7 +685,10 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("sound-settings-menu")).toBeHidden();
   await page.keyboard.press("m");
-  expect((await debugState(page)).musicEnabled).toBe(!inputBaseline.musicEnabled);
+  await expect(page.getByTestId("music-settings-menu")).toBeVisible();
+  expect((await debugState(page)).musicVolume).toBe(inputBaseline.musicVolume);
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("music-settings-menu")).toBeHidden();
 
   await page.keyboard.press(" ");
   await expect(page.getByTestId("action-menu")).toBeVisible();
@@ -1148,7 +1153,7 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   await page.keyboard.press("o");
   await expect(page.getByTestId("sound-settings-menu")).toBeVisible();
   expect((await debugState(page))).toMatchObject({
-    musicEnabled: baseline.musicEnabled,
+    musicVolume: baseline.musicVolume,
     groupCommandOpen: false,
     objectiveOpen: false,
   });
@@ -1231,6 +1236,88 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   expect((await debugState(page)).audioCueLog.some(({ reason }) => reason.startsWith("full-"))).toBe(true);
   expect(Number(await app.getAttribute("data-combat-effect-request-count"))).toBeGreaterThan(0);
   await expect(app).toHaveAttribute("data-combat-effect-count", "0");
+});
+
+test("RHP-06: music desk object selects five persistent levels without restarting transport", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => localStorage.removeItem("angel2.preferences.music.v1"));
+  await page.reload();
+  const app = page.locator("#app");
+  await expect(app).toHaveAttribute("data-music-volume-level", "4");
+  await expect(app).toHaveAttribute("data-music-volume", "0.32");
+
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/6", { timeout: 10_000 });
+  await expect(app).toHaveAttribute("data-music-part", "loop");
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+
+  const baseline = await debugState(page);
+  expect(baseline.musicVolume).toBe(4);
+  const musicHotspot = page.getByTestId("music-hotspot");
+  await expect(musicHotspot).toBeVisible();
+  await musicHotspot.click();
+  await expect(page.getByTestId("music-settings-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({
+    musicSettingsOpen: true,
+    musicSettingsReturn: "battle",
+  });
+  await expect(page.getByTestId("music-volume-4")).toHaveAttribute("aria-checked", "true");
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-side-panel-music-settings.png",
+  });
+
+  const trackBeforeLevels = await app.getAttribute("data-music-track");
+  const partBeforeLevels = await app.getAttribute("data-music-part");
+  const playRequestsBeforeLevels = await app.getAttribute("data-music-play-request-count");
+  const expectStableTransport = async (level: 0 | 2 | 3, gain: string) => {
+    await page.getByTestId(`music-volume-${level}`).click();
+    expect((await debugState(page)).musicVolume).toBe(level);
+    await expect(app).toHaveAttribute("data-music-volume-level", String(level));
+    await expect(app).toHaveAttribute("data-music-volume", gain);
+    await expect(app).toHaveAttribute("data-music-playing", "true");
+    await expect(app).toHaveAttribute("data-music-track", trackBeforeLevels ?? "");
+    await expect(app).toHaveAttribute("data-music-part", partBeforeLevels ?? "");
+    await expect(app).toHaveAttribute("data-music-play-request-count", playRequestsBeforeLevels ?? "");
+  };
+  await expectStableTransport(2, "0.16");
+  await expectStableTransport(0, "0");
+  await expectStableTransport(3, "0.24");
+
+  const afterLevels = await debugState(page);
+  expect(afterLevels.units).toEqual(baseline.units);
+  expect(afterLevels.rngState).toBe(baseline.rngState);
+  expect(afterLevels.cursor).toEqual(baseline.cursor);
+  expect(afterLevels.cameraOrigin).toEqual(baseline.cameraOrigin);
+  await page.getByTestId("close-music-settings").click();
+  await expect(page.getByTestId("music-settings-menu")).toBeHidden();
+
+  await page.getByTestId("system-menu-button").click();
+  await page.getByTestId("system-command-settings").click();
+  await expect(page.getByTestId("music-button")).toHaveText("音樂 3");
+  await page.getByTestId("music-button").click();
+  expect((await debugState(page)).musicSettingsReturn).toBe("settings");
+  await page.getByTestId("close-music-settings").click();
+  await expect(page.getByTestId("settings-menu")).toBeVisible();
+  await closeSettingsMenu(page);
+
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.music.v1") ?? "null"))).toEqual({
+    musicVolume: 3,
+  });
+  await page.reload();
+  expect((await debugState(page)).musicVolume).toBe(3);
+  await expect(app).toHaveAttribute("data-music-volume-level", "3");
+  await expect(app).toHaveAttribute("data-music-volume", "0.24");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await page.keyboard.press("m");
+  await expect(page.getByTestId("music-settings-menu")).toBeVisible();
+  await expect(page.getByTestId("music-volume-3")).toHaveAttribute("aria-checked", "true");
 });
 
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {
@@ -1741,7 +1828,7 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await expect(page.getByTestId("save-yes")).toHaveText("確 定");
 });
 
-test("S00-P: stage zero uses native entry-to-loop music pairs and honors the music toggle", async ({ page }) => {
+test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them across volume changes", async ({ page }) => {
   const app = page.locator("#app");
   const battleRequests = new Set<string>();
   page.on("request", (request) => {
@@ -1752,6 +1839,8 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and honors the mus
   await page.goto("/?test=1&skipStartup=1");
   await expect(app).toHaveAttribute("data-music-track", "MAGIC/73");
   await expect(app).toHaveAttribute("data-music-playing", "false");
+  await expect(app).toHaveAttribute("data-music-volume-level", "4");
+  await expect(app).toHaveAttribute("data-music-volume", "0.32");
 
   // A neutral click supplies the browser user gesture without advancing SAY/0000.
   await page.getByTestId("game-screen").click({ position: { x: 620, y: 340 } });
@@ -1765,12 +1854,6 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and honors the mus
   await expect(app).toHaveAttribute("data-music-loop", "false");
   expect(battleRequests.has("battle-stage0-player-entry.wav")).toBe(true);
 
-  await page.keyboard.press("m");
-  await expect(app).toHaveAttribute("data-music-track", "MUSIC/7");
-  await expect(app).toHaveAttribute("data-music-playing", "false");
-  await page.keyboard.press("m");
-  await expect(app).toHaveAttribute("data-music-playing", "true");
-
   // MUSIC/7 is a 7.85 second non-looping entry. Its ended event must hand
   // playback to the 62.7 second MUSIC/6 loop without advancing game state.
   await expect(app).toHaveAttribute("data-music-track", "MUSIC/6", { timeout: 10_000 });
@@ -1781,6 +1864,20 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and honors the mus
 
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "player");
+  const loopPlayRequests = await app.getAttribute("data-music-play-request-count");
+  await page.keyboard.press("m");
+  await expect(page.getByTestId("music-settings-menu")).toBeVisible();
+  await page.getByTestId("music-volume-0").click();
+  await expect(app).toHaveAttribute("data-music-volume", "0");
+  await expect(app).toHaveAttribute("data-music-playing", "true");
+  await expect(app).toHaveAttribute("data-music-track", "MUSIC/6");
+  await expect(app).toHaveAttribute("data-music-play-request-count", loopPlayRequests ?? "");
+  await page.getByTestId("music-volume-4").click();
+  await expect(app).toHaveAttribute("data-music-volume", "0.32");
+  await expect(app).toHaveAttribute("data-music-play-request-count", loopPlayRequests ?? "");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("music-settings-menu")).toBeHidden();
+
   await page.keyboard.press("Tab");
   await page.getByTestId("group-command-allRest").click();
   await waitForPhase(page, "enemy");

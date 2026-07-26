@@ -1,10 +1,14 @@
 import { describe, expect, test } from "vitest";
 import {
+  DEFAULT_MUSIC_PREFERENCES,
   DEFAULT_PRESENTATION_PREFERENCES,
   DEFAULT_SOUND_PREFERENCES,
+  loadMusicPreferences,
   loadPresentationPreferences,
   loadSoundPreferences,
+  MUSIC_PREFERENCES_KEY,
   PRESENTATION_PREFERENCES_KEY,
+  saveMusicPreferences,
   savePresentationPreferences,
   saveSoundPreferences,
   SOUND_PREFERENCES_KEY,
@@ -86,5 +90,26 @@ describe("sound preferences", () => {
     };
     saveSoundPreferences(storage, preferences);
     expect(loadSoundPreferences(storage)).toEqual(preferences);
+  });
+});
+
+describe("music preferences", () => {
+  test("defaults to the native maximum selection and rejects invalid levels", () => {
+    const storage = new MemoryStorage();
+    expect(loadMusicPreferences(storage)).toEqual(DEFAULT_MUSIC_PREFERENCES);
+    for (const invalid of [-1, 5, 2.5, "3", null]) {
+      storage.setItem(MUSIC_PREFERENCES_KEY, JSON.stringify({ musicVolume: invalid }));
+      expect(loadMusicPreferences(storage)).toEqual(DEFAULT_MUSIC_PREFERENCES);
+    }
+    storage.setItem(MUSIC_PREFERENCES_KEY, "{");
+    expect(loadMusicPreferences(storage)).toEqual(DEFAULT_MUSIC_PREFERENCES);
+  });
+
+  test("round-trips each one-of-five music selection", () => {
+    const storage = new MemoryStorage();
+    for (const musicVolume of [0, 1, 2, 3, 4] as const) {
+      saveMusicPreferences(storage, { musicVolume });
+      expect(loadMusicPreferences(storage)).toEqual({ musicVolume });
+    }
   });
 });

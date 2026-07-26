@@ -1,5 +1,6 @@
 import { ASSETS, SPEECH_RECORD_BY_CHARACTER } from "./content/stage0";
 import type { GameController } from "./controller";
+import type { MusicVolume } from "./preferences";
 import type { GamePhase } from "./types";
 
 interface MusicTrack {
@@ -10,6 +11,13 @@ interface MusicTrack {
 type BattleMusicSide = "player" | "enemy";
 type BattleMusicPart = "entry" | "loop";
 export type SoundEffectChannel = "speech" | "movement" | "combat" | "key";
+export const MUSIC_GAIN_BY_VOLUME: Readonly<Record<MusicVolume, number>> = {
+  0: 0,
+  1: 0.08,
+  2: 0.16,
+  3: 0.24,
+  4: 0.32,
+};
 
 type SoundChannelState = Pick<
   GameController,
@@ -53,6 +61,7 @@ export class AudioManager {
   private musicPlaying = false;
   private musicPlayPending = false;
   private musicRequestSequence = 0;
+  private musicPlayRequestCount = 0;
   private readonly effectRequestCounts: Record<SoundEffectChannel, number> = {
     speech: 0,
     movement: 0,
@@ -97,7 +106,7 @@ export class AudioManager {
     const entryTracks = [this.playerBattleEntry, this.enemyBattleEntry];
     for (const track of [...loopingTracks, ...entryTracks]) {
       track.audio.loop = loopingTracks.includes(track);
-      track.audio.volume = 0.32;
+      track.audio.volume = MUSIC_GAIN_BY_VOLUME[controller.musicVolume];
       track.audio.preload = "auto";
     }
     this.playerBattleEntry.audio.addEventListener("ended", () => this.completeBattleEntry("player"));
@@ -144,6 +153,7 @@ export class AudioManager {
   }
 
   private syncMusic(): void {
+    this.applyMusicVolume();
     const side = battleMusicSide(this.controller.phase);
     const previousSide = battleMusicSide(this.previousPhase);
     if (side && side !== previousSide) {
@@ -161,7 +171,7 @@ export class AudioManager {
       this.activeMusic = desired;
     }
 
-    if (!desired || !this.unlocked || !this.controller.musicEnabled) {
+    if (!desired || !this.unlocked) {
       this.stopActiveMusic(false);
       this.updateMusicDebugState(desired);
       this.previousPhase = this.controller.phase;
@@ -175,13 +185,13 @@ export class AudioManager {
     }
 
     const request = ++this.musicRequestSequence;
+    this.musicPlayRequestCount += 1;
     this.musicPlayPending = true;
     this.updateMusicDebugState(desired);
     void desired.audio.play().then(() => {
       if (
         request !== this.musicRequestSequence
         || this.activeMusic !== desired
-        || !this.controller.musicEnabled
       ) return;
       this.musicPlayPending = false;
       this.musicPlaying = true;
@@ -228,11 +238,26 @@ export class AudioManager {
     this.musicPlayPending = false;
   }
 
+  private applyMusicVolume(): void {
+    const gain = MUSIC_GAIN_BY_VOLUME[this.controller.musicVolume];
+    for (const track of [
+      this.storyMusic,
+      this.playerBattleEntry,
+      this.playerBattleLoop,
+      this.enemyBattleEntry,
+      this.enemyBattleLoop,
+    ]) track.audio.volume = gain;
+  }
+
   private updateMusicDebugState(track: MusicTrack | undefined): void {
     if (!this.controller.isTestMode) return;
     this.root.dataset.musicTrack = track?.key ?? "none";
     this.root.dataset.musicPlaying = String(this.musicPlaying);
     this.root.dataset.musicLoop = String(track?.audio.loop ?? false);
+    this.root.dataset.musicPart = this.activeBattlePart;
+    this.root.dataset.musicVolumeLevel = String(this.controller.musicVolume);
+    this.root.dataset.musicVolume = String(MUSIC_GAIN_BY_VOLUME[this.controller.musicVolume]);
+    this.root.dataset.musicPlayRequestCount = String(this.musicPlayRequestCount);
   }
 
   private updateEffectDebugState(channel?: SoundEffectChannel): void {

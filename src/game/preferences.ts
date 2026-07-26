@@ -12,6 +12,12 @@ export interface SoundPreferences {
   keySoundEnabled: boolean;
 }
 
+export type MusicVolume = 0 | 1 | 2 | 3 | 4;
+
+export interface MusicPreferences {
+  musicVolume: MusicVolume;
+}
+
 export interface PreferenceStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -19,6 +25,7 @@ export interface PreferenceStorage {
 
 export const PRESENTATION_PREFERENCES_KEY = "angel2.preferences.presentation.v1";
 export const SOUND_PREFERENCES_KEY = "angel2.preferences.sound.v1";
+export const MUSIC_PREFERENCES_KEY = "angel2.preferences.music.v1";
 
 export const DEFAULT_PRESENTATION_PREFERENCES: Readonly<PresentationPreferences> = {
   battlePresentation: "full",
@@ -33,6 +40,13 @@ export const DEFAULT_SOUND_PREFERENCES: Readonly<SoundPreferences> = {
   combatSoundEnabled: true,
   keySoundEnabled: true,
 };
+
+export const DEFAULT_MUSIC_PREFERENCES: Readonly<MusicPreferences> = {
+  musicVolume: 4,
+};
+
+export const isMusicVolume = (value: unknown): value is MusicVolume =>
+  Number.isInteger(value) && typeof value === "number" && value >= 0 && value <= 4;
 
 export function loadPresentationPreferences(storage: PreferenceStorage): PresentationPreferences {
   const raw = storage.getItem(PRESENTATION_PREFERENCES_KEY);
@@ -94,4 +108,26 @@ export function saveSoundPreferences(
   preferences: SoundPreferences,
 ): void {
   storage.setItem(SOUND_PREFERENCES_KEY, JSON.stringify(preferences));
+}
+
+export function loadMusicPreferences(storage: PreferenceStorage): MusicPreferences {
+  const raw = storage.getItem(MUSIC_PREFERENCES_KEY);
+  if (!raw) return { ...DEFAULT_MUSIC_PREFERENCES };
+  try {
+    const candidate = JSON.parse(raw) as Partial<MusicPreferences>;
+    return {
+      musicVolume: isMusicVolume(candidate.musicVolume)
+        ? candidate.musicVolume
+        : DEFAULT_MUSIC_PREFERENCES.musicVolume,
+    };
+  } catch {
+    return { ...DEFAULT_MUSIC_PREFERENCES };
+  }
+}
+
+export function saveMusicPreferences(
+  storage: PreferenceStorage,
+  preferences: MusicPreferences,
+): void {
+  storage.setItem(MUSIC_PREFERENCES_KEY, JSON.stringify(preferences));
 }

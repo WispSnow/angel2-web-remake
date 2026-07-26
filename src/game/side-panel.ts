@@ -21,6 +21,7 @@ export type ImplementedSidePanelAction =
   | "system-save"
   | "system-load"
   | "open-sound-settings"
+  | "open-music-settings"
   | "toggle-grid"
   | "toggle-edge-scroll"
   | "toggle-portraits";
@@ -88,7 +89,13 @@ export const SIDE_PANEL_HOTSPOTS: readonly SidePanelHotspot[] = [
     action: "battle-presentation",
     testId: "battle-presentation-hotspot",
   },
-  { id: "music", label: "音樂開關", bounds: { minX: 524, maxX: 565, minY: 77, maxY: 104 } },
+  {
+    id: "music",
+    label: "音樂開關",
+    bounds: { minX: 524, maxX: 565, minY: 77, maxY: 104 },
+    action: "open-music-settings",
+    testId: "music-hotspot",
+  },
   {
     id: "groupCommands",
     label: "集體命令",
