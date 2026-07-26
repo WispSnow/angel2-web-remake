@@ -13,7 +13,8 @@
 //   reveal   ~260 ms before impact the victim pops at the window edge and
 //                     dashes to his mark, arriving as the flames land
 //   impact   at ~88 % of the pan: hit pose with the baked star burst, red
-//                     damage number on the victim's far side, hit sound
+//                     damage number on the victim's far side, threshold hit
+//                     sound (E/0 at <=10, E/2 above 10)
 //   exit     attacker turns and dashes off his own edge at ~1100 px/s
 //   hold     victim alone with star + number: ~950 ms mid-battle, ~1900 ms
 //                     when the battle ends after this strike
@@ -108,7 +109,6 @@ const MELEE = {
   scrollDuration: 1440,
   impactAtScroll: 0.88,
   flameAlternate: 53,
-  whooshEvery: 160,
   exitSpeed: 1.35, // px/ms, combined with the impact camera handoff
 } as const;
 
@@ -353,17 +353,17 @@ function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
   const label = spec.counter ? "full-counter" : "full-primary";
   const cues: FullCombatCue[] = [];
   if (isRanged(spec.actorClass)) {
-    cues.push({ t: spec.start + 60, record: 38, reason: `${label}-windup` });
     cues.push({ t: times.throwAt ?? spec.start, record: 51, reason: `${label}-lance-throw` });
   } else {
     cues.push({ t: spec.start + 60, record: 38, reason: `${label}-windup` });
-    for (let index = 0; index < 6; index += 1) {
-      const at = times.windupEnd + index * MELEE.whooshEvery;
-      if (at >= times.impact) break;
-      cues.push({ t: at, record: 14, reason: `${label}-charge-${index}` });
-    }
+    cues.push({ t: times.windupEnd, record: 14, reason: `${label}-charge` });
   }
-  cues.push({ t: times.impact, record: 2, reason: `${label}-impact` });
+  const reaction = spec.damage <= 10 ? "guard" : "hurt";
+  cues.push({
+    t: times.impact,
+    record: reaction === "guard" ? 0 : 2,
+    reason: `${label}-${reaction}`,
+  });
   if (spec.victimDies) {
     cues.push({ t: times.holdStart + DEATH_DELAY, record: 11, reason: `${label}-death` });
   }

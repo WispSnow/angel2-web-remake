@@ -203,6 +203,7 @@ export const ASSETS = {
     enemyBattleLoop: "/assets/original/battle-stage0-enemy-loop.wav",
     confirm: "/assets/original/ui-confirm.wav",
     effects: {
+      0: "/assets/original/audio/e/00.wav",
       2: "/assets/original/audio/e/02.wav",
       11: "/assets/original/audio/e/11.wav",
       14: "/assets/original/audio/e/14.wav",

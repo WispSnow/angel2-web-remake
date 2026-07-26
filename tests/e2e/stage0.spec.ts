@@ -1038,6 +1038,12 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   expect(beat("fullImpact")?.sprites.map(({ set }) => set).sort()).toEqual(["direct", "plus50"]);
   expect(beat("fullImpact")?.sprites.find(({ set }) => set === "plus50")?.side).toBe("left");
   expect(beat("fullCounterImpact")?.sprites.find(({ set }) => set === "plus50")?.side).toBe("right");
+  expect(fullResolved.audioCueLog.some(({ record, reason }) =>
+    record === 2 && reason === "full-primary-hurt")).toBe(true);
+  expect(fullResolved.audioCueLog.some(({ record, reason }) =>
+    record === 0 && reason === "full-counter-guard")).toBe(true);
+  expect(fullResolved.audioCueLog.filter(({ record, reason }) =>
+    record === 14 && reason.startsWith("full-"))).toHaveLength(2);
 
   await enterPlayableBattle({ nativeSpeed: true });
   await page.evaluate(() => window.__ANGEL2__?.forceCavalryCounterSetup());
@@ -1097,6 +1103,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
     "fullDefenderDeath",
   ]);
   expect(deathResolved.audioCueLog.filter(({ record }) => record === 11)).toHaveLength(1);
+  expect(deathResolved.audioCueLog.some(({ record, reason }) => record === 2 && reason === "full-primary-hurt")).toBe(true);
   expect(deathResolved.audioCueLog.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
 });
 

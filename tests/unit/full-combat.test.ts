@@ -123,6 +123,7 @@ describe("Full-screen ordinary combat choreography", () => {
     const holdAt = markTime(script, "fullDefenderDeath");
 
     expect(script.marks.some(({ phase }) => phase.startsWith("fullCounter"))).toBe(false);
+    expect(script.cues.some(({ record, reason }) => record === 2 && reason === "full-primary-hurt")).toBe(true);
     expect(script.cues.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
     expect(script.sample(holdAt + 100).sprites.find(({ set }) => set === "direct")?.frame).toBe(1);
     expect(script.sample(holdAt + 300).sprites.find(({ set }) => set === "direct")).toMatchObject({
@@ -134,6 +135,19 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(script.sample(holdAt + 1_330).sprites.find(({ set }) => set === "direct")?.opacity).toBeLessThan(1);
     expect(script.sample(holdAt + 1_460).sprites.find(({ set }) => set === "direct")).toBeUndefined();
     expect(script.sample(script.duration + 100).camera).toBe(208);
+
+    const lowDamageDeath = buildFullCombatScript(
+      unit(1, 0, "妮雅"),
+      unit(2, 48, "騎士團士兵"),
+      result({
+        damage: 10,
+        counterOccurred: false,
+        counterDamage: 0,
+        defenderDied: true,
+      }),
+    );
+    expect(lowDamageDeath.cues.some(({ record, reason }) => record === 0 && reason === "full-primary-guard")).toBe(true);
+    expect(lowDamageDeath.cues.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
   });
 
   it("uses the cavalry throw channel without melee dust", () => {
@@ -167,6 +181,7 @@ describe("Full-screen ordinary combat choreography", () => {
     });
     expect(script.sample(holdAt).sprites.find(({ set }) => set === "plus50")).toBeUndefined();
     expect(script.cues.some(({ reason }) => reason === "full-primary-lance-throw")).toBe(true);
+    expect(script.cues.some(({ record, reason }) => record === 38 && reason.startsWith("full-primary"))).toBe(false);
 
     const mirrored = buildFullCombatScript(
       unit(2, 15, "哈釘", 22),
@@ -184,9 +199,14 @@ describe("Full-screen ordinary combat choreography", () => {
   });
 
   it.each([
-    { damage: 10, expectedFrame: 3, expectedReaction: "guard", label: "standing guard" },
-    { damage: 11, expectedFrame: 1, expectedReaction: "hurt", label: "ordinary hit" },
-  ] as const)("uses the $label reaction for $damage damage", ({ damage, expectedFrame, expectedReaction }) => {
+    { damage: 10, expectedFrame: 3, expectedReaction: "guard", expectedRecord: 0, label: "standing guard" },
+    { damage: 11, expectedFrame: 1, expectedReaction: "hurt", expectedRecord: 2, label: "ordinary hit" },
+  ] as const)("uses the $label reaction for $damage damage", ({
+    damage,
+    expectedFrame,
+    expectedReaction,
+    expectedRecord,
+  }) => {
     const script = buildFullCombatScript(
       unit(1, 0, "妮雅"),
       unit(2, 48, "騎士團士兵"),
@@ -195,5 +215,8 @@ describe("Full-screen ordinary combat choreography", () => {
 
     expect(script.sample(markTime(script, "fullHold")).sprites.find(({ set }) => set === "direct"))
       .toMatchObject({ frame: expectedFrame, reaction: expectedReaction });
+    expect(script.cues.some(({ record, reason }) =>
+      record === expectedRecord && reason === `full-primary-${expectedReaction}`)).toBe(true);
+    expect(script.cues.filter(({ record }) => record === 14)).toHaveLength(1);
   });
 });

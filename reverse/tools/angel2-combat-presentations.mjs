@@ -21,6 +21,7 @@ const CODE_SIGNATURES = [
   ["0000:A01B", "copy-side2-unit-presentation-block", "a19231a3e07aa19031a3e27aa18e31a3e67aa1bd31a3e87aa1bf31a3ee7aa1c131a3f07aa1bb31a3e47aa19f31a3ea7a"],
   ["0000:A17B", "full-screen-primary-counter-sequence", "e86601e8420dc7062d7d96a0c7062f7d1fa7e85800e8f014e82715833e647a007437833eea7a007430e82e00813ebb77"],
   ["0000:A1E8", "run-one-full-screen-strike", "c606327c4ee88f05a12f7dffd0c606327c59a12d7dffd08b0ed77cbe3d7ce84d4de8c300e819fcc7063cf90b00a11a7c"],
+  ["0000:A23E", "select-full-screen-hit-reaction", "833ed77c0a7704e84600c3e80100c3"],
   ["0000:A2E4", "prepare-full-screen-primary", "8b3ebf77e81f013c0174053c027448c3bafa00bb8700e8640dba8a02bb8700e8f70ee89401e81914a180f8be41029a0a"],
   ["0000:A377", "prepare-full-screen-counter", "8b3ebf77e88c003c0274053c017448c3bafa00bb8700e8d10cba8a02bb8700e8640ee87700e88613a180f8be41029a0a"],
   ["0000:A77F", "execute-full-screen-command-stream", "8b1e187c8b073dffff7419a3167c8306187c02e85f00e86202e85f04e8c104e82305ebdcc3"],
@@ -96,6 +97,13 @@ function readTerminatedWords(buffer, dsOffset, terminator = 0xffff, maxWords = 2
     values.push(value);
   }
   throw new Error(`DS:${hex(dsOffset)}: missing ${hex(terminator)} terminator`);
+}
+
+function verifiedWord(buffer, dsOffset, expected, label) {
+  const actual = readWord(buffer, dsOffset);
+  assert(actual === expected,
+    `DS:${hex(dsOffset)}: ${label} expected ${hex(expected)}, got ${hex(actual)}`);
+  return { address: `DS:${hex(dsOffset)}`, value: actual };
 }
 
 function validateCodeSignatures(buffer) {
@@ -344,6 +352,78 @@ async function extract(
       },
     };
   });
+  const stage0ReactionCommands = [
+    {
+      classRecord: 0,
+      className: "士兵",
+      side: "side1",
+      hurtVoice: 0x939d,
+      hurtPose: 0x8812,
+      guardVoice: 0x93b5,
+      guardPose: 0x8824,
+    },
+    {
+      classRecord: 0,
+      className: "士兵",
+      side: "side2",
+      hurtVoice: 0xbed5,
+      hurtPose: 0x8812,
+      guardVoice: 0xbeed,
+      guardPose: 0x8824,
+    },
+    {
+      classRecord: 22,
+      className: "騎兵",
+      side: "side1",
+      hurtVoice: 0xaf97,
+      hurtPose: 0xafb1,
+      guardVoice: 0xafc9,
+      guardPose: 0xafe5,
+    },
+    {
+      classRecord: 22,
+      className: "騎兵",
+      side: "side2",
+      hurtVoice: 0xdaf1,
+      hurtPose: 0xdb0b,
+      guardVoice: 0xdb23,
+      guardPose: 0xdb3f,
+    },
+  ].map((entry) => {
+    const classRecord = classRecords.find((record) => record.record === entry.classRecord);
+    assert(classRecord !== undefined, `missing stage-0 class record ${entry.classRecord}`);
+    assert(classRecord[entry.side].voiceSlots.V1 === 2,
+      `${entry.className} ${entry.side}: V1 must resolve to E/2`);
+    assert(classRecord[entry.side].voiceSlots.V2 === 0,
+      `${entry.className} ${entry.side}: V2 must resolve to E/0`);
+    return {
+      classRecord: entry.classRecord,
+      className: entry.className,
+      side: entry.side,
+      hurt: {
+        voiceCommand: {
+          ...verifiedWord(moduleBuffer, entry.hurtVoice, 0x5631, `${entry.className} hurt voice command`),
+          token: "V1",
+          soundResource: "E/2",
+        },
+        pose: {
+          ...verifiedWord(moduleBuffer, entry.hurtPose, 1, `${entry.className} hurt pose`),
+          directFrame: 1,
+        },
+      },
+      guard: {
+        voiceCommand: {
+          ...verifiedWord(moduleBuffer, entry.guardVoice, 0x5632, `${entry.className} guard voice command`),
+          token: "V2",
+          soundResource: "E/0",
+        },
+        pose: {
+          ...verifiedWord(moduleBuffer, entry.guardPose, 3, `${entry.className} guard pose`),
+          directFrame: 3,
+        },
+      },
+    };
+  });
 
   const resourceRefs = [
     { group: "UN", record: 62 },
@@ -485,6 +565,33 @@ async function extract(
         },
         semanticBoundary: "V1..V5 are positional command slots, not globally fixed meanings; each class command stream decides when a slot fires",
       },
+      hitReaction: {
+        selector: "0000:A23E",
+        damageSource: "DS:7CD7 (the already-resolved primary or counter damage)",
+        guard: {
+          condition: "unsigned damage <= 10",
+          setupEntry: "0000:A28E",
+          stage0CommandPair: "auxiliaryC/auxiliaryD",
+          voiceCommand: "V2",
+          soundResource: "E/0",
+          directFrame: 3,
+        },
+        hurt: {
+          condition: "unsigned damage > 10",
+          setupEntry: "0000:A24D",
+          stage0CommandPair: "auxiliaryA/auxiliaryB",
+          voiceCommand: "V1",
+          soundResource: "E/2",
+          directFrame: 1,
+        },
+        death: {
+          ordering: "A1E8 always executes the threshold-selected post-hit stream before A17B calls the zero-life handlers B683/B6BD",
+          soundResource: "E/11",
+          directFrame: 2,
+          composition: "threshold hit sound first, then the independent death sound and pose",
+        },
+        stage0CommandEvidence: stage0ReactionCommands,
+      },
       strikeTimeline: [
         "prepare primary command/resource state at A2E4",
         "draw the composed battle background at AEC3",
@@ -525,7 +632,7 @@ async function extract(
       ],
     },
     evidenceBoundary: {
-      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, high-level primary/counter/death ordering",
+      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
       preservedUnknown: "the original design names of many embedded full-screen command fields and the host/VGA duration of one full-screen renderer substep; the released nominal native timer tick is 10.000151 ms",
       implementation: "none; this export is phase-1 evidence only",
     },
