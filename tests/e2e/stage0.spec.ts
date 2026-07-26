@@ -1086,6 +1086,11 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await clickCanvas(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();
   await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullImpact");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "1");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-fatal-hurt.png" });
+  await page.waitForFunction(() =>
     window.__ANGEL2__?.getState().combatPresentation?.phase === "fullDefenderDeath");
   await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullDefenderDeath");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");

@@ -125,7 +125,10 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(script.marks.some(({ phase }) => phase.startsWith("fullCounter"))).toBe(false);
     expect(script.cues.some(({ record, reason }) => record === 2 && reason === "full-primary-hurt")).toBe(true);
     expect(script.cues.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
-    expect(script.sample(holdAt + 100).sprites.find(({ set }) => set === "direct")?.frame).toBe(1);
+    expect(script.sample(holdAt + 100).sprites.find(({ set }) => set === "direct")).toMatchObject({
+      frame: 1,
+      reaction: "hurt",
+    });
     expect(script.sample(holdAt + 300).sprites.find(({ set }) => set === "direct")).toMatchObject({
       frame: 2,
       reaction: "death",
@@ -148,6 +151,15 @@ describe("Full-screen ordinary combat choreography", () => {
     );
     expect(lowDamageDeath.cues.some(({ record, reason }) => record === 0 && reason === "full-primary-guard")).toBe(true);
     expect(lowDamageDeath.cues.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
+    const lowDamageDeathAt = markTime(lowDamageDeath, "fullDefenderDeath");
+    expect(lowDamageDeath.sample(lowDamageDeathAt + 100).sprites.find(({ set }) => set === "direct")).toMatchObject({
+      frame: 3,
+      reaction: "guard",
+    });
+    expect(lowDamageDeath.sample(lowDamageDeathAt + 300).sprites.find(({ set }) => set === "direct")).toMatchObject({
+      frame: 2,
+      reaction: "death",
+    });
   });
 
   it("uses the cavalry throw channel without melee dust", () => {

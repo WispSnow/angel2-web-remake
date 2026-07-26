@@ -287,12 +287,14 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
   // Hit: recoil pose with the baked star burst. The target keeps moving along
   // the attack while the camera advances in the same direction.
   const nudge = attackDir * VICTIM_KNOCKBACK * clamp01((t - times.impact) / IMPACT_SETTLE);
-  const reaction = spec.victimDies ? "death" : spec.damage <= 10 ? "guard" : "hurt";
-  let frame = reaction === "guard" ? 3 : 1;
+  const thresholdReaction = spec.damage <= 10 ? "guard" : "hurt";
+  let reaction: NonNullable<FullCombatSpriteState["reaction"]> = thresholdReaction;
+  let frame = thresholdReaction === "guard" ? 3 : 1;
   let opacity = 1;
-  if (reaction === "death") {
+  if (spec.victimDies) {
     const deathStart = times.holdStart + DEATH_DELAY;
     if (t >= deathStart) {
+      reaction = "death";
       frame = 2;
       const age = t - deathStart;
       const blinkEnd = DEATH_BLINK * DEATH_CYCLES;
