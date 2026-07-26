@@ -4,7 +4,12 @@ import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneSt
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
 import { DeterministicRng } from "./simulation/rng";
-import { loadPresentationPreferences, savePresentationPreferences } from "./preferences";
+import {
+  loadPresentationPreferences,
+  loadSoundPreferences,
+  savePresentationPreferences,
+  saveSoundPreferences,
+} from "./preferences";
 import { parseSaveData } from "./save";
 import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData } from "./types";
 
@@ -108,6 +113,8 @@ export class GameController {
   systemMenuOpen = false;
   systemMenuIndex = 0;
   settingsOpen = false;
+  soundSettingsOpen = false;
+  soundSettingsReturn?: "battle" | "settings";
   recordMenuMode?: RecordMenuMode;
   recordMenuReturn?: "battle" | "system";
   recordMenuIndex = 0;
@@ -124,8 +131,10 @@ export class GameController {
   edgeScrollEnabled: boolean;
   portraitsEnabled: boolean;
   musicEnabled = true;
-  soundEnabled = true;
-  speechEnabled = true;
+  speechEnabled: boolean;
+  movementSoundEnabled: boolean;
+  combatSoundEnabled: boolean;
+  keySoundEnabled: boolean;
   lastCombat?: AttackResult;
   combatPresentation?: CombatPresentation;
   combatPresentationTrace: CombatPresentationTraceEntry[] = [];
@@ -152,6 +161,11 @@ export class GameController {
     this.gridEnabled = preferences.gridEnabled;
     this.edgeScrollEnabled = preferences.edgeScrollEnabled;
     this.portraitsEnabled = preferences.portraitsEnabled;
+    const soundPreferences = loadSoundPreferences(localStorage);
+    this.speechEnabled = soundPreferences.speechEnabled;
+    this.movementSoundEnabled = soundPreferences.movementSoundEnabled;
+    this.combatSoundEnabled = soundPreferences.combatSoundEnabled;
+    this.keySoundEnabled = soundPreferences.keySoundEnabled;
   }
 
   onChange(listener: Listener): () => void {
@@ -184,6 +198,7 @@ export class GameController {
   get hasBlockingOverlay(): boolean {
     return this.systemMenuOpen
       || this.settingsOpen
+      || this.soundSettingsOpen
       || this.recordMenuMode !== undefined
       || this.quitConfirmOpen
       || this.objectiveOpen
@@ -534,10 +549,13 @@ export class GameController {
       || this.recordMenuMode !== undefined
       || this.quitConfirmOpen
       || this.retreatConfirmOpen
+      || this.soundSettingsOpen
       || this.actionMode !== "idle"
     ) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
+    this.soundSettingsOpen = false;
+    this.soundSettingsReturn = undefined;
     this.minimapPreviewOrigin = undefined;
     this.groupCommandIndex = 0;
     this.groupCommandOpen = true;
@@ -965,9 +983,11 @@ export class GameController {
   }
 
   openObjectives(): void {
-    if (this.busy || !["player", "enemy"].includes(this.phase)) return;
+    if (this.busy || this.soundSettingsOpen || !["player", "enemy"].includes(this.phase)) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
+    this.soundSettingsOpen = false;
+    this.soundSettingsReturn = undefined;
     this.groupCommandOpen = false;
     this.minimapPreviewOrigin = undefined;
     this.objectiveOpen = true;
@@ -994,9 +1014,11 @@ export class GameController {
   }
 
   closeSystemMenu(): void {
-    if (!this.systemMenuOpen && !this.settingsOpen) return;
+    if (!this.systemMenuOpen && !this.settingsOpen && !this.soundSettingsOpen) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
+    this.soundSettingsOpen = false;
+    this.soundSettingsReturn = undefined;
     this.emit();
   }
 
@@ -1036,9 +1058,34 @@ export class GameController {
     this.emit();
   }
 
+  openSoundSettings(): void {
+    const fromSettings = this.settingsOpen;
+    const fromBattle = this.phase === "player"
+      && !this.busy
+      && !this.hasBlockingOverlay
+      && this.actionMode === "idle";
+    if (!fromSettings && !fromBattle) return;
+    this.systemMenuOpen = false;
+    this.settingsOpen = false;
+    this.soundSettingsOpen = true;
+    this.soundSettingsReturn = fromSettings ? "settings" : "battle";
+    this.minimapPreviewOrigin = undefined;
+    this.emit();
+  }
+
+  closeSoundSettings(): void {
+    if (!this.soundSettingsOpen) return;
+    const returnToSettings = this.soundSettingsReturn === "settings";
+    this.soundSettingsOpen = false;
+    this.soundSettingsReturn = undefined;
+    this.settingsOpen = returnToSettings;
+    this.emit();
+  }
+
   systemAction(): void {
     if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
+    else if (this.soundSettingsOpen) this.closeSoundSettings();
     else if (this.settingsOpen) this.closeSettings();
     else if (this.systemMenuOpen) this.closeSystemMenu();
     else if (this.phase === "player" && !this.busy && !this.objectiveOpen && !this.groupCommandOpen && !this.retreatConfirmOpen) {
@@ -1050,6 +1097,7 @@ export class GameController {
     if (this.phase === "saveSlots") this.cancelPostSaveSlots();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
+    else if (this.soundSettingsOpen) this.closeSoundSettings();
     else if (this.settingsOpen) this.closeSettings();
     else if (this.retreatConfirmOpen) this.cancelRetreat();
     else if (this.groupCommandOpen) this.closeGroupCommands();
@@ -1132,17 +1180,32 @@ export class GameController {
   }
 
   toggleMusic(): void {
+    if (this.soundSettingsOpen) return;
     this.musicEnabled = !this.musicEnabled;
     this.emit();
   }
 
-  toggleSound(): void {
-    this.soundEnabled = !this.soundEnabled;
+  toggleSpeechSound(): void {
+    this.speechEnabled = !this.speechEnabled;
+    this.persistSoundPreferences();
     this.emit();
   }
 
-  toggleSpeech(): void {
-    this.speechEnabled = !this.speechEnabled;
+  toggleMovementSound(): void {
+    this.movementSoundEnabled = !this.movementSoundEnabled;
+    this.persistSoundPreferences();
+    this.emit();
+  }
+
+  toggleCombatSound(): void {
+    this.combatSoundEnabled = !this.combatSoundEnabled;
+    this.persistSoundPreferences();
+    this.emit();
+  }
+
+  toggleKeySound(): void {
+    this.keySoundEnabled = !this.keySoundEnabled;
+    this.persistSoundPreferences();
     this.emit();
   }
 
@@ -1156,6 +1219,8 @@ export class GameController {
     this.systemMenuOpen = false;
     this.systemMenuIndex = 0;
     this.settingsOpen = false;
+    this.soundSettingsOpen = false;
+    this.soundSettingsReturn = undefined;
     this.recordMenuMode = undefined;
     this.recordMenuIndex = 0;
     this.quitConfirmOpen = false;
@@ -1345,6 +1410,8 @@ export class GameController {
     this.recordMenuIndex = 0;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
+    this.soundSettingsOpen = false;
+    this.soundSettingsReturn = undefined;
     this.quitConfirmOpen = false;
     this.movementPresentation = undefined;
     this.combatPresentation = undefined;
@@ -1623,6 +1690,8 @@ export class GameController {
       systemMenuIndex: this.systemMenuIndex,
       systemCommands: SYSTEM_COMMANDS.map((command) => ({ ...command })),
       settingsOpen: this.settingsOpen,
+      soundSettingsOpen: this.soundSettingsOpen,
+      soundSettingsReturn: this.soundSettingsReturn,
       recordMenuMode: this.recordMenuMode,
       recordMenuReturn: this.recordMenuReturn,
       recordMenuIndex: this.recordMenuIndex,
@@ -1631,8 +1700,10 @@ export class GameController {
       savePromptIndex: this.savePromptIndex,
       postSaveSlotIndex: this.postSaveSlotIndex,
       musicEnabled: this.musicEnabled,
-      soundEnabled: this.soundEnabled,
       speechEnabled: this.speechEnabled,
+      movementSoundEnabled: this.movementSoundEnabled,
+      combatSoundEnabled: this.combatSoundEnabled,
+      keySoundEnabled: this.keySoundEnabled,
       groupCommandOpen: this.groupCommandOpen,
       groupCommandIndex: this.groupCommandIndex,
       groupCommands: GROUP_COMMANDS.map((command) => ({ ...command })),
@@ -1669,6 +1740,8 @@ export class GameController {
     if (outcome === "defeat") {
       this.systemMenuOpen = false;
       this.settingsOpen = false;
+      this.soundSettingsOpen = false;
+      this.soundSettingsReturn = undefined;
       this.recordMenuMode = undefined;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
@@ -1683,6 +1756,8 @@ export class GameController {
     if (outcome === "victory") {
       this.systemMenuOpen = false;
       this.settingsOpen = false;
+      this.soundSettingsOpen = false;
+      this.soundSettingsReturn = undefined;
       this.recordMenuMode = undefined;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
@@ -1712,6 +1787,15 @@ export class GameController {
       gridEnabled: this.gridEnabled,
       edgeScrollEnabled: this.edgeScrollEnabled,
       portraitsEnabled: this.portraitsEnabled,
+    });
+  }
+
+  private persistSoundPreferences(): void {
+    saveSoundPreferences(localStorage, {
+      speechEnabled: this.speechEnabled,
+      movementSoundEnabled: this.movementSoundEnabled,
+      combatSoundEnabled: this.combatSoundEnabled,
+      keySoundEnabled: this.keySoundEnabled,
     });
   }
 

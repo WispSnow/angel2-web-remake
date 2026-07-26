@@ -57,9 +57,19 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="toggle-edge-scroll" data-testid="edge-scroll-button">捲動 開</button>
                 <button data-action="toggle-portraits" data-testid="portraits-button">圖像 開</button>
                 <button data-action="music" data-testid="music-button">音樂 開</button>
-                <button data-action="sound" data-testid="sound-button">音效 開</button>
-                <button data-action="speech" data-testid="speech-button">逐字音 開</button>
+                <button data-action="open-sound-settings" data-testid="sound-button">音效設定</button>
                 <button data-action="close-settings">返回</button>
+              </div>
+            </section>
+            <section class="sound-settings-menu modal-panel" id="sound-settings-menu"
+              data-testid="sound-settings-menu" role="dialog" aria-label="音效開關" hidden>
+              <span class="panel-kicker">SOUND</span><h2>音效開關</h2>
+              <div class="sound-settings-grid" role="group" aria-label="音效分類">
+                <button data-action="toggle-sound-speech" data-testid="sound-speech-button">說話 開</button>
+                <button data-action="toggle-sound-movement" data-testid="sound-movement-button">移動 開</button>
+                <button data-action="toggle-sound-combat" data-testid="sound-combat-button">戰鬥 開</button>
+                <button data-action="toggle-sound-key" data-testid="sound-key-button">按鍵 開</button>
+                <button data-action="close-sound-settings" data-testid="close-sound-settings">返回</button>
               </div>
             </section>
             <section class="record-menu action-menu" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
@@ -158,6 +168,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
   const settingsMenu = required(root, "#settings-menu");
+  const soundSettingsMenu = required(root, "#sound-settings-menu");
   const recordMenu = required(root, "#record-menu");
   const quitConfirm = required(root, "#quit-confirm");
   const groupCommandMenu = required(root, "#group-command-menu");
@@ -305,6 +316,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "system-save") controller.openRecordMenu("save");
     else if (action === "system-quit") controller.requestQuit();
     else if (action === "close-settings") controller.closeSettings();
+    else if (action === "open-sound-settings") controller.openSoundSettings();
+    else if (action === "close-sound-settings") controller.closeSoundSettings();
+    else if (action === "toggle-sound-speech") controller.toggleSpeechSound();
+    else if (action === "toggle-sound-movement") controller.toggleMovementSound();
+    else if (action === "toggle-sound-combat") controller.toggleCombatSound();
+    else if (action === "toggle-sound-key") controller.toggleKeySound();
     else if (action === "record-slot") {
       controller.selectRecordMenuSlot(Number(button.dataset.recordIndex));
       controller.activateRecordMenuSelection();
@@ -332,8 +349,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "toggle-edge-scroll") controller.toggleEdgeScroll();
     else if (action === "toggle-portraits") controller.togglePortraits();
     else if (action === "music") controller.toggleMusic();
-    else if (action === "sound") controller.toggleSound();
-    else if (action === "speech") controller.toggleSpeech();
     else if (action === "move") controller.chooseMove();
     else if (action === "attack") controller.chooseAttack();
     else if (action === "rest") controller.chooseRest();
@@ -435,7 +450,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (key === "F2") void controller.followLeader();
     else if (key === "F3") void controller.freeAction();
     else if (key === "F4") controller.requestRetreat();
-    else if (lower === "e") controller.toggleSound();
+    else if (lower === "e") controller.openSoundSettings();
     else if (lower === "m") controller.toggleMusic();
     else if (lower === "o") controller.objectiveOpen ? controller.closeObjectives() : controller.openObjectives();
   });
@@ -474,6 +489,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }).join("");
     }
     settingsMenu.hidden = !controller.settingsOpen;
+    soundSettingsMenu.hidden = !controller.soundSettingsOpen;
     recordMenu.hidden = controller.recordMenuMode === undefined;
     if (!recordMenu.hidden) {
       const mode = controller.recordMenuMode;
@@ -531,10 +547,18 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (portraits) portraits.textContent = controller.portraitsEnabled ? "圖像 開" : "圖像 關";
     const music = root.querySelector<HTMLElement>("[data-testid=music-button]");
     if (music) music.textContent = controller.musicEnabled ? "音樂 開" : "音樂 關";
-    const sound = root.querySelector<HTMLElement>("[data-testid=sound-button]");
-    if (sound) sound.textContent = controller.soundEnabled ? "音效 開" : "音效 關";
-    const speech = root.querySelector<HTMLElement>("[data-testid=speech-button]");
-    if (speech) speech.textContent = controller.speechEnabled ? "逐字音 開" : "逐字音 關";
+    const soundButtons = [
+      ["sound-speech-button", "說話", controller.speechEnabled],
+      ["sound-movement-button", "移動", controller.movementSoundEnabled],
+      ["sound-combat-button", "戰鬥", controller.combatSoundEnabled],
+      ["sound-key-button", "按鍵", controller.keySoundEnabled],
+    ] as const;
+    for (const [testId, label, enabled] of soundButtons) {
+      const button = root.querySelector<HTMLButtonElement>(`[data-testid=${testId}]`);
+      if (!button) continue;
+      button.textContent = `${label} ${enabled ? "開" : "關"}`;
+      button.setAttribute("aria-pressed", String(enabled));
+    }
     for (const action of ["objectives", "open-group-commands", "battle-presentation", "all-rest"]) {
       const button = root.querySelector<HTMLButtonElement>(`[data-action=${action}]`);
       if (button) button.disabled = controller.inputLocked;

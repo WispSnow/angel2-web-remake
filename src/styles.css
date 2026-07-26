@@ -246,7 +246,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .minimap-unit.side-2 { background: #ef2024; }
 .minimap-preview { position: absolute; z-index: 3; width: 30px; height: 21px; border: 1px solid #fff; box-shadow: 0 0 0 1px #222, inset 0 0 0 1px #cfcfcf; pointer-events: none; }
 
-.system-menu button, .settings-menu button, .action-menu button, .modal-panel button, .dialogue-controls button {
+.system-menu button, .settings-menu button, .sound-settings-menu button, .action-menu button, .modal-panel button, .dialogue-controls button {
   border: 1px solid #d4a62d;
   border-radius: 2px;
   color: #fff8d3;
@@ -281,6 +281,12 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .system-menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .settings-menu .system-menu-grid > button { width: 100%; min-width: 0; padding: 5px 2px; font-size: 10px; }
 .system-menu-grid button:last-child { grid-column: 1 / -1; }
+.sound-settings-menu { position: absolute; z-index: 15; left: 304px; top: 70px; width: 176px; padding: 14px 16px 16px; }
+.sound-settings-menu h2 { margin: 3px 0 10px; color: #f3d466; font-size: 18px; }
+.sound-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sound-settings-grid > button { min-width: 0; padding: 7px 5px; font-size: 12px; }
+.sound-settings-grid > button[aria-pressed="false"] { color: #bcae9b; background: linear-gradient(#43272b, #241519); }
+.sound-settings-grid > button:last-child { grid-column: 1 / -1; }
 .action-menu.record-menu { z-index: 15; left: 384px; top: 110px; width: 146px; height: 177px; padding-top: 27px; }
 .record-menu > strong { position: absolute; left: 0; top: 4px; width: 100%; color: #f5d86c; text-align: center; font-size: 13px; }
 .action-menu.record-menu > button { display: grid; grid-template-columns: 20px 1fr; align-items: center; width: 136px; height: 24px; padding: 0 4px; border: 0; color: #eee3d5; background: transparent; text-align: left; text-indent: 0; letter-spacing: 0; font-size: 11px; }

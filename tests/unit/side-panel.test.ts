@@ -25,7 +25,13 @@ describe("native battle side-panel hotspots", () => {
         action: "toggle-grid",
         testId: "grid-hotspot",
       },
-      { id: "sound", label: "音效開關", bounds: { minX: 587, maxX: 612, minY: 33, maxY: 53 } },
+      {
+        id: "sound",
+        label: "音效開關",
+        bounds: { minX: 587, maxX: 612, minY: 33, maxY: 53 },
+        action: "open-sound-settings",
+        testId: "sound-hotspot",
+      },
       {
         id: "edgeScroll",
         label: "地圖捲動",
@@ -79,11 +85,12 @@ describe("native battle side-panel hotspots", () => {
     ]);
   });
 
-  test("only leaves the two audio actions unimplemented", () => {
+  test("only leaves the music action unimplemented", () => {
     expect(implementedSidePanelHotspots().map(({ id, action }) => ({ id, action }))).toEqual([
       { id: "save", action: "system-save" },
       { id: "load", action: "system-load" },
       { id: "grid", action: "toggle-grid" },
+      { id: "sound", action: "open-sound-settings" },
       { id: "edgeScroll", action: "toggle-edge-scroll" },
       { id: "portraits", action: "toggle-portraits" },
       { id: "battleAnimation", action: "battle-presentation" },

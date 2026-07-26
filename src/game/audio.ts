@@ -9,6 +9,25 @@ interface MusicTrack {
 
 type BattleMusicSide = "player" | "enemy";
 type BattleMusicPart = "entry" | "loop";
+export type SoundEffectChannel = "speech" | "movement" | "combat" | "key";
+
+type SoundChannelState = Pick<
+  GameController,
+  "speechEnabled" | "movementSoundEnabled" | "combatSoundEnabled" | "keySoundEnabled"
+>;
+
+export const soundEffectChannelForCue = (reason: string): SoundEffectChannel =>
+  reason.includes("movement") ? "movement" : "combat";
+
+export const isSoundEffectChannelEnabled = (
+  state: SoundChannelState,
+  channel: SoundEffectChannel,
+): boolean => {
+  if (channel === "speech") return state.speechEnabled;
+  if (channel === "movement") return state.movementSoundEnabled;
+  if (channel === "combat") return state.combatSoundEnabled;
+  return state.keySoundEnabled;
+};
 
 const playerMusicPhases = new Set<GamePhase>([
   "scriptedMove",
@@ -34,6 +53,18 @@ export class AudioManager {
   private musicPlaying = false;
   private musicPlayPending = false;
   private musicRequestSequence = 0;
+  private readonly effectRequestCounts: Record<SoundEffectChannel, number> = {
+    speech: 0,
+    movement: 0,
+    combat: 0,
+    key: 0,
+  };
+  private readonly effectPlaybackCounts: Record<SoundEffectChannel, number> = {
+    speech: 0,
+    movement: 0,
+    combat: 0,
+    key: 0,
+  };
   private readonly storyMusic: MusicTrack = {
     key: "MAGIC/73",
     audio: new Audio(ASSETS.audio.story),
@@ -72,10 +103,11 @@ export class AudioManager {
     this.playerBattleEntry.audio.addEventListener("ended", () => this.completeBattleEntry("player"));
     this.enemyBattleEntry.audio.addEventListener("ended", () => this.completeBattleEntry("enemy"));
     this.updateMusicDebugState(this.musicForPhase(undefined));
+    this.updateEffectDebugState();
     root.addEventListener("pointerdown", () => this.unlock(), { capture: true });
     root.addEventListener("click", (event) => {
       if ((event.target as Element).closest("button,[data-testid=tactical-minimap]")) {
-        this.playEffect(ASSETS.audio.confirm, 0.22);
+        this.playEffect(ASSETS.audio.confirm, 0.22, "key");
       }
     }, { capture: true });
     controller.onChange(() => this.sync());
@@ -83,10 +115,10 @@ export class AudioManager {
   }
 
   playSpeechCharacter(character: string): void {
-    if (!this.controller.speechEnabled || /[，．？！「」\s]/u.test(character)) return;
+    if (/[，．？！「」\s]/u.test(character)) return;
     const record = SPEECH_RECORD_BY_CHARACTER[character];
     if (record === undefined) return;
-    this.playEffect(ASSETS.audio.speech[record - 57], 0.24);
+    this.playEffect(ASSETS.audio.speech[record - 57], 0.24, "speech");
   }
 
   private unlock(): void {
@@ -101,7 +133,13 @@ export class AudioManager {
     if (cue && cue.sequence !== this.previousCueSequence) {
       this.previousCueSequence = cue.sequence;
       const source = ASSETS.audio.effects[cue.record as keyof typeof ASSETS.audio.effects];
-      if (source) this.playEffect(source, cue.record === 11 ? 0.5 : 0.55);
+      if (source) {
+        this.playEffect(
+          source,
+          cue.record === 11 ? 0.5 : 0.55,
+          soundEffectChannelForCue(cue.reason),
+        );
+      }
     }
   }
 
@@ -197,8 +235,22 @@ export class AudioManager {
     this.root.dataset.musicLoop = String(track?.audio.loop ?? false);
   }
 
-  private playEffect(source: string, volume: number): void {
-    if (!this.unlocked || !this.controller.soundEnabled) return;
+  private updateEffectDebugState(channel?: SoundEffectChannel): void {
+    if (!this.controller.isTestMode) return;
+    for (const name of Object.keys(this.effectPlaybackCounts) as SoundEffectChannel[]) {
+      this.root.dataset[`${name}EffectRequestCount`] = String(this.effectRequestCounts[name]);
+      this.root.dataset[`${name}EffectCount`] = String(this.effectPlaybackCounts[name]);
+    }
+    if (channel) this.root.dataset.lastEffectChannel = channel;
+  }
+
+  private playEffect(source: string, volume: number, channel: SoundEffectChannel): void {
+    this.effectRequestCounts[channel] += 1;
+    if (this.controller.isTestMode) this.root.dataset.lastEffectRequestChannel = channel;
+    this.updateEffectDebugState();
+    if (!this.unlocked || !isSoundEffectChannelEnabled(this.controller, channel)) return;
+    this.effectPlaybackCounts[channel] += 1;
+    this.updateEffectDebugState(channel);
     const effect = new Audio(source);
     effect.volume = volume;
     void effect.play().catch(() => undefined);

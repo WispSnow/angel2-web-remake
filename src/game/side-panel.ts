@@ -20,6 +20,7 @@ export type ImplementedSidePanelAction =
   | "battle-presentation"
   | "system-save"
   | "system-load"
+  | "open-sound-settings"
   | "toggle-grid"
   | "toggle-edge-scroll"
   | "toggle-portraits";
@@ -59,7 +60,13 @@ export const SIDE_PANEL_HOTSPOTS: readonly SidePanelHotspot[] = [
     action: "toggle-grid",
     testId: "grid-hotspot",
   },
-  { id: "sound", label: "音效開關", bounds: { minX: 587, maxX: 612, minY: 33, maxY: 53 } },
+  {
+    id: "sound",
+    label: "音效開關",
+    bounds: { minX: 587, maxX: 612, minY: 33, maxY: 53 },
+    action: "open-sound-settings",
+    testId: "sound-hotspot",
+  },
   {
     id: "edgeScroll",
     label: "地圖捲動",

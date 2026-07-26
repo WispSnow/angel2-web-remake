@@ -15,6 +15,8 @@ interface DebugState {
   systemMenuIndex: number;
   systemCommands: Array<{ id: string; label: string }>;
   settingsOpen: boolean;
+  soundSettingsOpen: boolean;
+  soundSettingsReturn?: "battle" | "settings";
   recordMenuMode?: "load" | "save";
   recordMenuReturn?: "battle" | "system";
   recordMenuIndex: number;
@@ -27,8 +29,10 @@ interface DebugState {
   retreatConfirmOpen: boolean;
   retreatConfirmIndex: number;
   musicEnabled: boolean;
-  soundEnabled: boolean;
   speechEnabled: boolean;
+  movementSoundEnabled: boolean;
+  combatSoundEnabled: boolean;
+  keySoundEnabled: boolean;
   audioCueLog: Array<{ sequence: number; record: number; reason: string }>;
   rngState: number;
   minimapPreviewOrigin?: { x: number; y: number };
@@ -668,7 +672,16 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await expect(page.getByTestId("retreat-confirm")).toBeHidden();
 
   await page.keyboard.press("e");
-  expect((await debugState(page)).soundEnabled).toBe(!inputBaseline.soundEnabled);
+  await expect(page.getByTestId("sound-settings-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({
+    soundSettingsOpen: true,
+    speechEnabled: inputBaseline.speechEnabled,
+    movementSoundEnabled: inputBaseline.movementSoundEnabled,
+    combatSoundEnabled: inputBaseline.combatSoundEnabled,
+    keySoundEnabled: inputBaseline.keySoundEnabled,
+  });
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("sound-settings-menu")).toBeHidden();
   await page.keyboard.press("m");
   expect((await debugState(page)).musicEnabled).toBe(!inputBaseline.musicEnabled);
 
@@ -1091,6 +1104,133 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
     edgeScrollEnabled: false,
     portraitsEnabled: false,
   });
+});
+
+test("RHP-05: sound desk object exposes four persistent request gates", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => localStorage.removeItem("angel2.preferences.sound.v1"));
+  await page.reload();
+  const app = page.locator("#app");
+  await expect(app).toHaveAttribute("data-speech-effect-count", "0");
+  await expect(app).toHaveAttribute("data-movement-effect-count", "0");
+  await expect(app).toHaveAttribute("data-combat-effect-count", "0");
+  await expect(app).toHaveAttribute("data-key-effect-count", "0");
+
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+
+  const baseline = await debugState(page);
+  expect(baseline).toMatchObject({
+    speechEnabled: true,
+    movementSoundEnabled: true,
+    combatSoundEnabled: true,
+    keySoundEnabled: true,
+  });
+  expect(Number(await app.getAttribute("data-movement-effect-count"))).toBeGreaterThan(0);
+
+  const soundHotspot = page.getByTestId("sound-hotspot");
+  await expect(soundHotspot).toBeVisible();
+  await soundHotspot.click();
+  await expect(page.getByTestId("sound-settings-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({
+    soundSettingsOpen: true,
+    soundSettingsReturn: "battle",
+  });
+  await expect(page.getByTestId("sound-speech-button")).toHaveText("說話 開");
+  await expect(page.getByTestId("sound-movement-button")).toHaveText("移動 開");
+  await expect(page.getByTestId("sound-combat-button")).toHaveText("戰鬥 開");
+  await expect(page.getByTestId("sound-key-button")).toHaveText("按鍵 開");
+  await page.keyboard.press("m");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("o");
+  await expect(page.getByTestId("sound-settings-menu")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({
+    musicEnabled: baseline.musicEnabled,
+    groupCommandOpen: false,
+    objectiveOpen: false,
+  });
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-side-panel-sound-settings.png",
+  });
+
+  await page.getByTestId("sound-speech-button").click();
+  await page.getByTestId("sound-combat-button").click();
+  await page.getByTestId("sound-key-button").click();
+  const keyCountAfterDisable = Number(await app.getAttribute("data-key-effect-count"));
+  await page.getByTestId("sound-movement-button").click();
+  await page.getByTestId("sound-movement-button").click();
+  expect(Number(await app.getAttribute("data-key-effect-count"))).toBe(keyCountAfterDisable);
+
+  const afterToggles = await debugState(page);
+  expect(afterToggles).toMatchObject({
+    speechEnabled: false,
+    movementSoundEnabled: true,
+    combatSoundEnabled: false,
+    keySoundEnabled: false,
+  });
+  expect(afterToggles.units).toEqual(baseline.units);
+  expect(afterToggles.rngState).toBe(baseline.rngState);
+  expect(afterToggles.cursor).toEqual(baseline.cursor);
+  expect(afterToggles.cameraOrigin).toEqual(baseline.cameraOrigin);
+
+  await page.getByTestId("close-sound-settings").click();
+  await expect(page.getByTestId("sound-settings-menu")).toBeHidden();
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+  await page.getByTestId("system-menu-button").click();
+  await page.getByTestId("system-command-settings").click();
+  await page.getByTestId("sound-button").click();
+  expect((await debugState(page)).soundSettingsReturn).toBe("settings");
+  await page.getByTestId("close-sound-settings").click();
+  await expect(page.getByTestId("settings-menu")).toBeVisible();
+  await closeSettingsMenu(page);
+
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.sound.v1") ?? "null"))).toEqual({
+    speechEnabled: false,
+    movementSoundEnabled: true,
+    combatSoundEnabled: false,
+    keySoundEnabled: false,
+  });
+
+  await page.reload();
+  expect(await debugState(page)).toMatchObject({
+    speechEnabled: false,
+    movementSoundEnabled: true,
+    combatSoundEnabled: false,
+    keySoundEnabled: false,
+  });
+  await expect(app).toHaveAttribute("data-speech-effect-count", "0");
+  await expect(app).toHaveAttribute("data-key-effect-count", "0");
+  await expect.poll(async () => Number(await app.getAttribute("data-speech-effect-request-count"))).toBeGreaterThan(0);
+  await expect(app).toHaveAttribute("data-speech-effect-count", "0");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  expect(Number(await app.getAttribute("data-key-effect-request-count"))).toBeGreaterThan(0);
+  expect(Number(await app.getAttribute("data-movement-effect-count"))).toBeGreaterThan(0);
+  expect(Number(await app.getAttribute("data-movement-effect-request-count"))).toBeGreaterThan(0);
+  await expect(app).toHaveAttribute("data-speech-effect-count", "0");
+  await expect(app).toHaveAttribute("data-key-effect-count", "0");
+
+  await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
+  await page.keyboard.press(" ");
+  await page.getByTestId("unit-command-attack").click();
+  const targeting = await debugState(page);
+  const target = targeting.targets[0];
+  await clickCanvas(
+    page,
+    40 + (target.x - targeting.cameraOrigin.x) * 40 + 20,
+    23 + (target.y - targeting.cameraOrigin.y) * 44 + 22,
+  );
+  await page.waitForFunction(() => window.__ANGEL2__?.getState().audioCueLog.some(
+    ({ reason }: { reason: string }) => reason.startsWith("full-"),
+  ));
+  expect((await debugState(page)).audioCueLog.some(({ reason }) => reason.startsWith("full-"))).toBe(true);
+  expect(Number(await app.getAttribute("data-combat-effect-request-count"))).toBeGreaterThan(0);
+  await expect(app).toHaveAttribute("data-combat-effect-count", "0");
 });
 
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {
