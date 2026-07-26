@@ -26,6 +26,7 @@ ref/
 artifacts/
 test-results/
 playwright-report/
+coverage/
 dist/
 node_modules/
 .playwright-mcp/

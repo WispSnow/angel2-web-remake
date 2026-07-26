@@ -112,7 +112,11 @@ export function configureAnimatedPortrait(
   if (base) base.alt = alt;
 }
 
-export function startPortraitAnimations(root: HTMLElement, testMode: boolean): () => void {
+export function startPortraitAnimations(
+  root: HTMLElement,
+  testMode: boolean,
+  shouldPause: () => boolean = () => false,
+): () => void {
   const blinkStates = new Map<string, BlinkState>();
   let animationFrame = 0;
 
@@ -160,6 +164,7 @@ export function startPortraitAnimations(root: HTMLElement, testMode: boolean): (
   };
 
   const tick = (now: number) => {
+    const paused = shouldPause();
     for (const element of root.querySelectorAll<HTMLElement>("[data-portrait-channel]")) {
       const channel = element.dataset.portraitChannel;
       const portrait = Number(element.dataset.portraitRecord) as PortraitRecord;
@@ -168,6 +173,12 @@ export function startPortraitAnimations(root: HTMLElement, testMode: boolean): (
       if (!blinkState || blinkState.portrait !== portrait) {
         blinkState = resetBlinkState(portrait, now);
         blinkStates.set(channel, blinkState);
+      }
+      if (paused) {
+        blinkState.stage = "idle";
+        blinkState.transitionAt = now + blinkState.idleDelayMs;
+        element.dataset.blinkFrame = "1";
+        continue;
       }
       advanceBlink(blinkState, now);
       element.dataset.blinkFrame = blinkFrameFor(blinkState.stage);

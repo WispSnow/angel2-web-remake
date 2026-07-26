@@ -169,7 +169,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let feedbackRevealedCharacters = 0;
   let activeFeedbackText: HTMLElement | undefined;
   let activeFeedbackPortrait: HTMLElement | undefined;
-  startPortraitAnimations(root, controller.isTestMode);
+  startPortraitAnimations(
+    root,
+    controller.isTestMode,
+    () => controller.phase === "nextStage" || controller.phase === "quit",
+  );
 
   const stopSpeaking = (portrait: HTMLElement | undefined) => {
     if (!portrait) return;
@@ -339,7 +343,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "overwrite-cancel") controller.cancelOverwrite();
   });
 
-  root.addEventListener("pointerover", (event) => {
+  root.addEventListener("pointermove", (event) => {
     const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
     if (command) controller.selectCommand(Number(command.dataset.commandIndex));
     const groupCommand = (event.target as Element).closest<HTMLElement>("[data-group-command-index]");
@@ -354,9 +358,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (quitChoice) controller.selectQuitChoice(Number(quitChoice.dataset.quitIndex));
     const postSaveSlot = (event.target as Element).closest<HTMLElement>("[data-post-save-index]");
     if (postSaveSlot) controller.selectPostSaveSlot(Number(postSaveSlot.dataset.postSaveIndex));
-  });
-
-  root.addEventListener("pointermove", (event) => {
     const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
     if (!minimap) {
       if (controller.minimapPreviewOrigin) controller.clearMinimapPreview();

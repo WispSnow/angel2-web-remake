@@ -1,12 +1,12 @@
 # 《天使帝国 II》Web 复刻版设计文档
 
-版本：Draft 0.2
+版本：Draft 0.3
 
-日期：2026-07-16
+日期：2026-07-25
 
-阶段：第 0 关实现候选，等待人工验收
+阶段：第 0 关实现候选；第 1 关纸面切片已建立
 
-开发状态：全战役设计仍为 `implementationFrozen=true`；用户已明确解除第 0 关垂直切片冻结，当前切片为 `implementationCandidate=true`
+开发状态：全战役设计仍为 `implementationFrozen=true`；用户已明确解除第 0 关垂直切片冻结，当前切片为 `implementationCandidate=true`。第 1 关已完成纸面合同，但尚未解除代码实现冻结
 
 ## 文档目的
 
@@ -42,7 +42,8 @@
 | [`07-ui-ux-and-presentation.md`](07-ui-ux-and-presentation.md) | 原版 UI 如何复现并适配浏览器 | Draft 0.2 |
 | [`08-mod-policy.md`](08-mod-policy.md) | 哪些内容可改、如何保持可追溯 | Draft 0.1 |
 | [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.2 |
-| [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的玩法合同与实现验收 | Draft 0.3 / 自动验收通过 |
+| [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的玩法合同与实现验收 | Draft 0.6 / 自动验收通过 |
+| [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术与首领目标关 | Draft 0.1 / 纸面合同完成 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.2 / 已实现 |
 
 ## 写作规范
@@ -65,5 +66,6 @@
 
 - 可以：复核原版证据、制定玩家体验、定义规则顺序、设计 UI 流程、建立验收场景、提出并记录现代化便利功能。
 - 不可以：把 DOS 内存结构当成 Web 领域模型、为了方便编码而改玩法、在 `[TBD]` 上自行补规则。
-- 第 0 关已由用户明确授权作为首个实现例外；其 Phaser 工程、独立模拟与自动验收见仓库根目录 [`README.md`](../../README.md)。这不自动解除第 1 关以后或未闭合系统的冻结。
+- 第 0 关已由用户明确授权作为首个实现例外；其 Phaser 工程、独立模拟与自动验收见仓库根目录 [`README.md`](../../README.md)。
+- 第 1 关纸面合同已经建立；这不自动解除第 1 关代码或后续关卡、系统的实现冻结。
 - 其余战役仍须通过 [`09-design-acceptance.md`](09-design-acceptance.md) 的对应门槛并得到用户明确授权后再进入实现。

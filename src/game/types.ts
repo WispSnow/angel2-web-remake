@@ -79,24 +79,44 @@ export interface DialoguePage {
   };
 }
 
-export interface SaveData {
+export interface SaveRosterEntry {
+  slot: number;
+  classId: UnitClassId;
+  experience: number;
+  life: number;
+}
+
+export interface SavedBattleState {
+  phase: "player";
+  round: number;
+  focusId: string;
+  units: BattleUnit[];
+  cursor: Position;
+  cameraOrigin: Position;
+}
+
+interface SaveDataBase {
   format: "ANGEL2-web-save";
   version: 2;
-  kind: "battle" | "completed";
   savedAt: string;
   saveCount: number;
-  stage: 0 | 1;
-  stageLabel: "瓦爾克麗宮" | "下一關";
   ruleset: "stableRemake";
   difficulty: Difficulty;
   rngState: number;
-  roster: Array<Pick<BattleUnit, "slot" | "classId" | "experience" | "life">>;
-  battle?: {
-    phase: "player";
-    round: number;
-    focusId: string;
-    units: BattleUnit[];
-    cursor: Position;
-    cameraOrigin: Position;
-  };
+  roster: SaveRosterEntry[];
 }
+
+export interface BattleSaveData extends SaveDataBase {
+  kind: "battle";
+  stage: 0;
+  stageLabel: "瓦爾克麗宮";
+  battle: SavedBattleState;
+}
+
+export interface CompletedSaveData extends SaveDataBase {
+  kind: "completed";
+  stage: 1;
+  stageLabel: "下一關";
+}
+
+export type SaveData = BattleSaveData | CompletedSaveData;

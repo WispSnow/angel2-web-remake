@@ -58,11 +58,11 @@
 
 ## 技术栈与运行
 
-- Node.js：20.19 或更高版本；
+- Node.js：使用 `.node-version` 固定的 24 LTS；
 - 包管理器：`pnpm`，版本以 `package.json#packageManager` 为准；
 - 运行时：Phaser 4、TypeScript、Vite；
 - 单元测试：Vitest；
-- 浏览器验收：Playwright + Google Chrome；
+- 浏览器验收：Playwright 版本绑定的 Chromium；
 - 默认开发地址：`http://127.0.0.1:4173/`。
 
 常用命令：
@@ -71,6 +71,7 @@
 pnpm install
 pnpm dev
 pnpm test
+pnpm test:coverage
 pnpm build
 pnpm test:e2e
 pnpm check
@@ -174,6 +175,7 @@ pnpm exec playwright install ffmpeg
 - 修复 bug 时优先添加能在修复前失败的回归测试。
 - 不要因截图变化直接更新黄金图；先判断是预期设计变化、字体/平台差异、动态表现还是实际回归。
 - JavaScript 驱动的眨眼和口型不会被 Playwright 的 `animations: "disabled"` 自动冻结。黄金截图应使用稳定表现时点或只屏蔽已经由独立测试覆盖的动态局部。
+- DOM 字形光栅化仍可能随宿主系统变化；CI 运行无夹具语义验收，Darwin 黄金图由固定 Chromium 在本地视觉审计。
 - `tests/e2e/stage0-real-clear.spec.ts` 的真实通关路径不得调用 `window.__ANGEL2__` 或添加测试查询参数。
 - DOM 断言不能代替 Canvas/WebGL 视觉检查；Canvas 测试必须保留截图证据。
 

@@ -4,6 +4,7 @@ import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneSt
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
 import { DeterministicRng } from "./simulation/rng";
+import { parseSaveData } from "./save";
 import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData } from "./types";
 
 type Listener = () => void;
@@ -1190,21 +1191,7 @@ export class GameController {
   readSave(slot: number): SaveData | undefined {
     const raw = localStorage.getItem(`angel2.save.${slot}`);
     if (!raw) return undefined;
-    try {
-      const parsed = JSON.parse(raw) as Partial<SaveData>;
-      if (
-        parsed.format !== "ANGEL2-web-save"
-        || parsed.version !== 2
-        || (parsed.kind !== "battle" && parsed.kind !== "completed")
-      ) return undefined;
-      const difficulty = parsed.difficulty;
-      return {
-        ...parsed,
-        difficulty: difficulty === 1 || difficulty === 2 || difficulty === 3 ? difficulty : 0,
-      } as SaveData;
-    } catch {
-      return undefined;
-    }
+    return parseSaveData(raw);
   }
 
   private writeCompletedSave(slot: number): void {
@@ -1305,11 +1292,6 @@ export class GameController {
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
       this.goToNextStage();
-      return;
-    }
-    if (!save.battle) {
-      this.statusMessage = "此記錄缺少戰場狀態。";
-      this.emit();
       return;
     }
     const battle = new Stage0Battle(new DeterministicRng(save.rngState));

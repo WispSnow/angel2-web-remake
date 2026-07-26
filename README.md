@@ -6,7 +6,7 @@
 
 ## 运行
 
-环境要求：Node.js 20.19 或更高版本、pnpm。仅在重新生成第 0 关原版素材时需要 ImageMagick 的 `magick` 命令。
+环境要求：以 `.node-version` 固定的 Node.js 24 LTS、pnpm。仅在重新生成第 0 关原版素材时需要 ImageMagick 的 `magick` 命令。
 
 ```bash
 pnpm install
@@ -28,13 +28,14 @@ pnpm dev
 ## 自动检查
 
 ```bash
-pnpm test          # 27 项内容/模拟/剧情测试
+pnpm test          # 内容、模拟、剧情与存档单元测试
+pnpm test:coverage # 单元测试与核心覆盖率门槛
 pnpm build         # TypeScript 与生产构建
-pnpm test:e2e      # 13 条 Chrome 端到端验收
+pnpm test:e2e      # 固定版本 Chromium 端到端验收
 pnpm check         # 顺序执行以上全部检查
 ```
 
-端到端测试覆盖 `S00-A` 到 `S00-P`，包括真实鼠标攻击、目标/系统/集体命令、AI 与 ZOC、地图/全景战斗、第二回合剧情、失败重试、战中存读档、胜利保存、关前音乐与玩家/敌方战斗曲对、原版音效事件、键盘输入、减少动画和窄屏。`S00-O` 从普通 `/` 启动，不带 `?test=1`、不读取调试状态，只用玩家可见控件让第一关完整通关；最终下一关画面另有 Playwright 黄金截图比对。过程截图生成到 `artifacts/playwright/`。
+端到端测试覆盖 `S00-A` 到 `S00-P`，包括真实鼠标攻击、目标/系统/集体命令、AI 与 ZOC、地图/全景战斗、第二回合剧情、失败重试、战中存读档、胜利保存、关前音乐与玩家/敌方战斗曲对、原版音效事件、键盘输入、减少动画和窄屏。`S00-O` 从普通 `/` 启动，不带 `?test=1`、不读取调试状态，只用玩家可见控件让第一关完整通关；固定版本 Chromium 在 Darwin 本地另对最终下一关画面执行黄金截图比对，CI 保留同一流程的语义断言以避开跨系统字形光栅差异。过程截图生成到 `artifacts/playwright/`。
 
 ## 结构
 
