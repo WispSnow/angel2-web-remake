@@ -53,7 +53,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               <div class="system-menu-grid">
                 <button data-action="open-group-commands" data-testid="group-commands-button">集體命令</button>
                 <button data-action="speed" data-testid="speed-button">動畫 ×1</button>
-                <button data-action="battle-presentation" data-testid="presentation-button">戰鬥 地圖</button>
+                <button data-action="battle-presentation" data-testid="presentation-button">戰鬥 全景</button>
                 <button data-action="music" data-testid="music-button">音樂 開</button>
                 <button data-action="sound" data-testid="sound-button">音效 開</button>
                 <button data-action="speech" data-testid="speech-button">逐字音 開</button>

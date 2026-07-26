@@ -126,6 +126,14 @@ const closeSettingsMenu = async (page: Page) => {
   await expect(page.getByTestId("settings-menu")).toBeHidden();
   await expect(page.getByTestId("system-menu")).toBeHidden();
 };
+const setBattlePresentation = async (page: Page, desired: "map" | "full") => {
+  if ((await debugState(page)).battlePresentation !== desired) {
+    await openSettingsMenu(page);
+    await page.getByTestId("presentation-button").click();
+    await closeSettingsMenu(page);
+  }
+  expect((await debugState(page)).battlePresentation).toBe(desired);
+};
 const sampleTrackedUnitPosition = (page: Page) => page.evaluate(async () => {
   const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
   const samples: Array<{ x: number; y: number; cursorX: number; cursorY: number }> = [];
@@ -389,6 +397,12 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("system-menu")).toBeHidden();
   expect((await debugState(page)).cursor).toEqual(cursorBeforeSystemCancel);
 
+  // Full-screen combat is the native and Web default. This portion of the
+  // scenario explicitly selects map mode because it audits the nine-frame
+  // board hit and point-drain trace.
+  expect((await debugState(page)).battlePresentation).toBe("full");
+  await setBattlePresentation(page, "map");
+
   // Main verb: selecting Nia opens the profession menu before any movement
   // range is shown, then Move enters range selection.
   await clickCanvas(page, 220, 177);
@@ -579,10 +593,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   // S00-D: leave one legal target, finish it through the real attack UI, then save.
   await page.getByTestId("skip-dialogue").click();
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
-  await openSettingsMenu(page);
-  await page.getByTestId("presentation-button").click();
-  await closeSettingsMenu(page);
-  expect((await debugState(page)).battlePresentation).toBe("full");
+  await setBattlePresentation(page, "full");
+  await expect(page.getByTestId("presentation-button")).toHaveText("戰鬥 全景");
   await clickCanvas(page, 220, 177);
   await clickCanvas(page, 220, 177);
   await page.locator("[data-action=attack]").click();
@@ -895,6 +907,7 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "player");
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
+  await setBattlePresentation(page, "map");
 
   const setup = await debugState(page);
   const finalEnemy = setup.units.find((unit) => unit.side === 2)!;
@@ -980,6 +993,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   };
 
   await enterPlayableBattle();
+  await setBattlePresentation(page, "map");
   await attackFirstForcedTarget();
   // The attack submits the last manual ally and asynchronously starts the
   // enemy route phase. Compare both presentation modes at the same stable
@@ -988,9 +1002,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   const mapResolved = await debugState(page);
 
   await enterPlayableBattle({ nativeSpeed: true });
-  await openSettingsMenu(page);
-  await page.getByTestId("presentation-button").click();
-  await closeSettingsMenu(page);
+  await setBattlePresentation(page, "full");
   await attackFirstForcedTarget();
 
   const fullLayer = page.getByTestId("combat-presentation");
@@ -1084,9 +1096,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
 
   await enterPlayableBattle({ nativeSpeed: true });
   await page.evaluate(() => window.__ANGEL2__?.forceCavalryCounterSetup());
-  await openSettingsMenu(page);
-  await page.getByTestId("presentation-button").click();
-  await closeSettingsMenu(page);
+  await setBattlePresentation(page, "full");
   await clickCanvas(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();
   await clickCanvas(page, 260, 177);
@@ -1122,9 +1132,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
 
   await enterPlayableBattle({ nativeSpeed: true });
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
-  await openSettingsMenu(page);
-  await page.getByTestId("presentation-button").click();
-  await closeSettingsMenu(page);
+  await setBattlePresentation(page, "full");
   await clickCanvas(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();
   await page.waitForFunction(() =>
@@ -1295,6 +1303,9 @@ test("S00-M: native system records restore battle state and combat cues follow p
   expect(restored.cameraOrigin).toEqual(initial.cameraOrigin);
   expect(restored.rngState).toBe(initial.rngState);
 
+  // This assertion audits the native map-hit cue sequence, so select that
+  // presentation explicitly instead of depending on the product default.
+  await setBattlePresentation(page, "map");
   await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
   await page.keyboard.press(" ");
   await page.getByTestId("unit-command-attack").click();

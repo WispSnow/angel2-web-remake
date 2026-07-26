@@ -31,6 +31,7 @@
 - [`RISKS.md`](RISKS.md)：跨里程碑风险和缓解动作；
 - [`milestones/M00-stage-00-acceptance.md`](milestones/M00-stage-00-acceptance.md)：第 0 关人工接受；
 - [`milestones/M01-stage-01-enablement.md`](milestones/M01-stage-01-enablement.md)：第 1 关实施准备。
+- [`work-items/M00-native-side-panel-hotspots.md`](work-items/M00-native-side-panel-hotspots.md)：原版右栏战术桌 12 个鼠标热点的实现顺序与验收边界。
 
 ## 维护规则
 

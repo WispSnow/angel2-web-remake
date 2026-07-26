@@ -117,7 +117,7 @@ export class GameController {
   retreatConfirmIndex = 1;
   hintVisible = localStorage.getItem("angel2.stage0.hintSeen") !== "yes";
   presentationFast = false;
-  battlePresentation: "map" | "full" = "map";
+  battlePresentation: "map" | "full" = "full";
   musicEnabled = true;
   soundEnabled = true;
   speechEnabled = true;
