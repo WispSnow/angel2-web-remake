@@ -25,6 +25,16 @@ const battleChromeAssets = {
   "battle-chrome-bottom-left.png": "06.png",
   "battle-chrome-bottom-right.png": "07.png",
 };
+const tacticalPanelToggleAssets = {
+  "tactical-panel-battle-animation-off.png": "20.png",
+  "tactical-panel-battle-animation-on.png": "21.png",
+  "tactical-panel-grid-off.png": "24.png",
+  "tactical-panel-grid-on.png": "25.png",
+  "tactical-panel-edge-scroll-off.png": "26.png",
+  "tactical-panel-edge-scroll-on.png": "27.png",
+  "tactical-panel-portraits-off.png": "30.png",
+  "tactical-panel-portraits-on.png": "31.png",
+};
 
 const [template, mappingDocument, ...dialogueDocuments] = await Promise.all([
   readFile(templatePath),
@@ -71,7 +81,6 @@ await mkdir(publicAssetPath, { recursive: true });
 await mkdir(publicEffectPath, { recursive: true });
 await Promise.all([
   copyFile(path.join(planarAssetPath, "0002/00.png"), path.join(publicAssetPath, "unit-ally-soldier.png")),
-  copyFile(path.join(planarAssetPath, "0006/19.png"), path.join(publicAssetPath, "tactical-panel.png")),
   copyFile(path.join(portraitAssetPath, "0015/00.png"), path.join(publicAssetPath, "portrait-hading.png")),
   ...stage0EffectRecords.map((record) => copyFile(
     path.join(convertedEffectPath, `${String(record).padStart(4, "0")}.wav`),
@@ -79,6 +88,8 @@ await Promise.all([
   )),
   ...Object.entries(battleChromeAssets).map(([output, source]) =>
     copyFile(path.join(planarAssetPath, "0000", source), path.join(publicAssetPath, output))),
+  ...Object.entries(tacticalPanelToggleAssets).map(([output, source]) =>
+    copyFile(path.join(planarAssetPath, "0006", source), path.join(publicAssetPath, output))),
 ]);
 
 function copyAlphaMask(colorFrame, maskFrame, output) {
@@ -113,6 +124,24 @@ function composeStatueForeground(output, firstFrame, xOffsets) {
   execFileSync("magick", args);
 }
 
+function composeTacticalPanelFoundation(output) {
+  // B7C6 draws frame 19, followed by release-initial frame 29 at (584,39)
+  // and frame 22 at (528,77). The four player setting patches stay separate
+  // because the browser must replace them whenever their live state changes.
+  execFileSync("magick", [
+    path.join(planarAssetPath, "0006/19.png"),
+    path.join(planarAssetPath, "0006/29.png"),
+    "-geometry", "+104+39",
+    "-composite",
+    path.join(planarAssetPath, "0006/22.png"),
+    "-geometry", "+48+77",
+    "-composite",
+    output,
+  ]);
+}
+
+composeTacticalPanelFoundation(path.join(publicAssetPath, "tactical-panel.png"));
+
 // A/0003 carries the enemy colors but no stored mask. The same-pose A/0002
 // frames provide the exact map-sprite alpha used by the native compositor.
 copyAlphaMask(
@@ -141,4 +170,4 @@ composeStatueForeground(
 );
 
 console.log(`wrote ${path.relative(root, outputPath)} (${terrain.length} terrain cells)`);
-console.log("wrote stage 0 battle chrome/statue foreground, tactical panel, map sprites and ordinary-combat VOC assets");
+console.log("wrote stage 0 battle chrome/statue foreground, stateful tactical panel, map sprites and ordinary-combat VOC assets");

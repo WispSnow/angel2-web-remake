@@ -11,7 +11,11 @@ import {
   startPortraitAnimations,
 } from "./portrait";
 import { configureGameScaling } from "./scaling";
-import { implementedSidePanelHotspots } from "./side-panel";
+import {
+  implementedSidePanelHotspots,
+  SIDE_PANEL_TOGGLE_VISUALS,
+  type SidePanelToggleVisualId,
+} from "./side-panel";
 
 const storyPhases = new Set<GamePhase>(["prebattleStory", "openingStory", "round2Story", "victoryStory"]);
 
@@ -1027,9 +1031,30 @@ function renderTactical(controller: GameController, underUnit = false): string {
     `<i class="minimap-unit side-${unit.side}" style="left:${unit.x * 3}px;top:${unit.y * 3}px" aria-hidden="true"></i>`,
   ).join("");
   const viewport = controller.cameraOrigin;
+  const toggleState: Record<SidePanelToggleVisualId, boolean> = {
+    battleAnimation: controller.battlePresentation === "full",
+    grid: controller.gridEnabled,
+    edgeScroll: controller.edgeScrollEnabled,
+    portraits: controller.portraitsEnabled,
+  };
+  const statePatches = SIDE_PANEL_TOGGLE_VISUALS.map((visual) => {
+    const state = toggleState[visual.id] ? "on" : "off";
+    const frame = visual.nativeFrames[state];
+    return `<img
+      class="tactical-panel-state"
+      src="${ASSETS.tacticalPanel.states[visual.id][state]}"
+      style="left:${visual.origin.x}px;top:${visual.origin.y}px;width:${visual.size.width}px;height:${visual.size.height}px"
+      data-testid="tactical-panel-${visual.id}-state"
+      data-state="${state}"
+      data-native-frame="${frame}"
+      alt=""
+      aria-hidden="true"
+    />`;
+  }).join("");
   return `
     <div class="hud-tactical${underUnit ? " under-unit" : ""}" data-testid="tactical-hud" aria-label="戰術輔助與即時小地圖">
-      <img class="tactical-panel-art" src="${ASSETS.tacticalPanel}" alt="戰術桌、卷軸與照明器具" />
+      <img class="tactical-panel-art" src="${ASSETS.tacticalPanel.foundation}" alt="戰術桌、卷軸與照明器具" />
+      ${statePatches}
       <div class="tactical-minimap" data-testid="tactical-minimap" aria-label="第 0 關即時小地圖">
         <img src="${ASSETS.minimap}" alt="" />
         ${underUnit ? "" : `<span class="minimap-viewport" style="left:${viewport.x * 3}px;top:${viewport.y * 3}px" aria-hidden="true"></span>`}

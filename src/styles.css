@@ -236,7 +236,8 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .stat-list div { display: grid; grid-template-columns: 47px 1fr; height: 21px; align-items: center; border-top: 1px dotted #c49a26; }
 .stat-list dt { color: #f4efcf; } .stat-list dd { margin: 0; text-align: right; font-size: 15px; font-weight: 700; }
 .hud-tactical { position: absolute; left: -4px; top: -4px; width: 160px; height: 315px; overflow: hidden; }
-.tactical-panel-art { position: absolute; left: 0; top: 0; width: 160px; height: 149px; image-rendering: pixelated; }
+.tactical-panel-art { position: absolute; z-index: 0; left: 0; top: 0; width: 160px; height: 149px; image-rendering: pixelated; pointer-events: none; }
+.tactical-panel-state { position: absolute; z-index: 1; display: block; image-rendering: pixelated; pointer-events: none; }
 .tactical-minimap { position: absolute; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: pixelated; }
 .hud-tactical:not(.under-unit) .tactical-minimap { pointer-events: auto; cursor: crosshair; }
 .tactical-minimap > img { position: absolute; inset: 0; width: 150px; height: 150px; }

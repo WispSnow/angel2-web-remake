@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { implementedSidePanelHotspots, SIDE_PANEL_HOTSPOTS } from "../../src/game/side-panel";
+import {
+  implementedSidePanelHotspots,
+  SIDE_PANEL_HOTSPOTS,
+  SIDE_PANEL_TOGGLE_VISUALS,
+} from "../../src/game/side-panel";
 
 describe("native battle side-panel hotspots", () => {
   test("preserves all twelve inclusive release hitboxes", () => {
@@ -105,6 +109,35 @@ describe("native battle side-panel hotspots", () => {
       { id: "objectives", action: "objectives" },
       { id: "allRest", action: "all-rest" },
       { id: "systemMenu", action: "open-system-menu" },
+    ]);
+  });
+
+  test("preserves the four native setting-driven A/0006 frame pairs", () => {
+    expect(SIDE_PANEL_TOGGLE_VISUALS).toEqual([
+      {
+        id: "battleAnimation",
+        origin: { x: 24, y: 11 },
+        size: { width: 32, height: 33 },
+        nativeFrames: { off: 20, on: 21 },
+      },
+      {
+        id: "grid",
+        origin: { x: 120, y: 65 },
+        size: { width: 32, height: 11 },
+        nativeFrames: { off: 24, on: 25 },
+      },
+      {
+        id: "edgeScroll",
+        origin: { x: 88, y: 106 },
+        size: { width: 40, height: 31 },
+        nativeFrames: { off: 26, on: 27 },
+      },
+      {
+        id: "portraits",
+        origin: { x: 128, y: 111 },
+        size: { width: 16, height: 3 },
+        nativeFrames: { off: 30, on: 31 },
+      },
     ]);
   });
 });

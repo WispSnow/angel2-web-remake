@@ -110,7 +110,27 @@ export function terrainSlotAt(position: Position): number {
 export const ASSETS = {
   map: "/assets/original/stage0-map.png",
   minimap: "/assets/original/stage0-minimap.png",
-  tacticalPanel: "/assets/original/tactical-panel.png",
+  tacticalPanel: {
+    foundation: "/assets/original/tactical-panel.png",
+    states: {
+      battleAnimation: {
+        off: "/assets/original/tactical-panel-battle-animation-off.png",
+        on: "/assets/original/tactical-panel-battle-animation-on.png",
+      },
+      grid: {
+        off: "/assets/original/tactical-panel-grid-off.png",
+        on: "/assets/original/tactical-panel-grid-on.png",
+      },
+      edgeScroll: {
+        off: "/assets/original/tactical-panel-edge-scroll-off.png",
+        on: "/assets/original/tactical-panel-edge-scroll-on.png",
+      },
+      portraits: {
+        off: "/assets/original/tactical-panel-portraits-off.png",
+        on: "/assets/original/tactical-panel-portraits-on.png",
+      },
+    },
+  },
   battleChrome: {
     top: "/assets/original/battle-chrome-top.png",
     cornerLeft: "/assets/original/battle-chrome-corner-left.png",

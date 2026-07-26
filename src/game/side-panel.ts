@@ -39,6 +39,46 @@ export interface SidePanelHotspot {
   testId?: string;
 }
 
+export type SidePanelToggleVisualId = "battleAnimation" | "grid" | "edgeScroll" | "portraits";
+
+export interface SidePanelToggleVisual {
+  id: SidePanelToggleVisualId;
+  origin: { x: number; y: number };
+  size: { width: number; height: number };
+  nativeFrames: { off: number; on: number };
+}
+
+// Module 29 0000:B7C6 draws A/0006/19 at global (480,0), then replaces
+// these opaque local rectangles from the same record using the live setting
+// bytes. Origins are panel-local so the DOM projection does not own native
+// screen coordinates or infer them from the clickable bounds.
+export const SIDE_PANEL_TOGGLE_VISUALS: readonly SidePanelToggleVisual[] = [
+  {
+    id: "battleAnimation",
+    origin: { x: 24, y: 11 },
+    size: { width: 32, height: 33 },
+    nativeFrames: { off: 20, on: 21 },
+  },
+  {
+    id: "grid",
+    origin: { x: 120, y: 65 },
+    size: { width: 32, height: 11 },
+    nativeFrames: { off: 24, on: 25 },
+  },
+  {
+    id: "edgeScroll",
+    origin: { x: 88, y: 106 },
+    size: { width: 40, height: 31 },
+    nativeFrames: { off: 26, on: 27 },
+  },
+  {
+    id: "portraits",
+    origin: { x: 128, y: 111 },
+    size: { width: 16, height: 3 },
+    nativeFrames: { off: 30, on: 31 },
+  },
+];
+
 export const SIDE_PANEL_HOTSPOTS: readonly SidePanelHotspot[] = [
   {
     id: "save",

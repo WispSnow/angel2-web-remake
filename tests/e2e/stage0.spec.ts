@@ -935,8 +935,11 @@ test("RHP-02: objective and battle-animation objects reuse canonical presentatio
   const before = await debugState(page);
   const objective = page.getByTestId("objectives-hotspot");
   const battleAnimation = page.getByTestId("battle-presentation-hotspot");
+  const battleAnimationArt = page.getByTestId("tactical-panel-battleAnimation-state");
   await expect(objective).toBeVisible();
   await expect(battleAnimation).toBeVisible();
+  await expect(battleAnimationArt).toHaveAttribute("data-state", "on");
+  await expect(battleAnimationArt).toHaveAttribute("data-native-frame", "21");
 
   await objective.hover();
   await page.getByTestId("game-screen").screenshot({
@@ -959,11 +962,15 @@ test("RHP-02: objective and battle-animation objects reuse canonical presentatio
   expect(toggled.rngState).toBe(before.rngState);
   expect(toggled.cursor).toEqual(before.cursor);
   expect(toggled.cameraOrigin).toEqual(before.cameraOrigin);
+  await expect(battleAnimationArt).toHaveAttribute("data-state", "off");
+  await expect(battleAnimationArt).toHaveAttribute("data-native-frame", "20");
   await battleAnimation.click();
   toggled = await debugState(page);
   expect(toggled.battlePresentation).toBe("full");
   expect(toggled.units).toEqual(before.units);
   expect(toggled.rngState).toBe(before.rngState);
+  await expect(battleAnimationArt).toHaveAttribute("data-state", "on");
+  await expect(battleAnimationArt).toHaveAttribute("data-native-frame", "21");
 });
 
 test("RHP-03: desk save and load objects preserve record data and return origin", async ({ page }) => {
@@ -1053,10 +1060,20 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   const grid = page.getByTestId("grid-hotspot");
   const edgeScroll = page.getByTestId("edge-scroll-hotspot");
   const portraits = page.getByTestId("portraits-hotspot");
+  const gridArt = page.getByTestId("tactical-panel-grid-state");
+  const edgeScrollArt = page.getByTestId("tactical-panel-edgeScroll-state");
+  const portraitsArt = page.getByTestId("tactical-panel-portraits-state");
+  const battleAnimationArt = page.getByTestId("tactical-panel-battleAnimation-state");
+  await expect(gridArt).toHaveAttribute("data-native-frame", "24");
+  await expect(edgeScrollArt).toHaveAttribute("data-native-frame", "27");
+  await expect(portraitsArt).toHaveAttribute("data-native-frame", "31");
+  await expect(battleAnimationArt).toHaveAttribute("data-native-frame", "21");
   await grid.click();
   expect((await debugState(page)).gridEnabled).toBe(true);
   await expect(canvas).toHaveAttribute("data-grid-enabled", "true");
   await expect(canvas).toHaveAttribute("data-grid-line-count", "102");
+  await expect(gridArt).toHaveAttribute("data-state", "on");
+  await expect(gridArt).toHaveAttribute("data-native-frame", "25");
   await grid.hover();
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-side-panel-grid-enabled.png",
@@ -1065,6 +1082,8 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await edgeScroll.click();
   expect((await debugState(page)).edgeScrollEnabled).toBe(false);
   await expect(canvas).toHaveAttribute("data-edge-scroll-enabled", "false");
+  await expect(edgeScrollArt).toHaveAttribute("data-state", "off");
+  await expect(edgeScrollArt).toHaveAttribute("data-native-frame", "26");
   const cameraBeforeDisabledEdge = (await debugState(page)).cameraOrigin;
   await canvas.hover({ position: { x: 5, y: 177 } });
   await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");
@@ -1074,9 +1093,12 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expect(canvas).toHaveAttribute("data-edge-scroll-enabled", "true");
   await edgeScroll.click();
   await expect(canvas).toHaveAttribute("data-edge-scroll-enabled", "false");
+  await expect(edgeScrollArt).toHaveAttribute("data-native-frame", "26");
 
   await portraits.click();
   expect((await debugState(page)).portraitsEnabled).toBe(false);
+  await expect(portraitsArt).toHaveAttribute("data-state", "off");
+  await expect(portraitsArt).toHaveAttribute("data-native-frame", "30");
   await canvas.hover({ position: { x: 220, y: 177 } });
   await expect(page.getByTestId("game-screen")).toHaveAttribute("data-hud-mode", "tactical");
   await expect(page.getByTestId("unit-detail")).toHaveCount(0);
@@ -1090,10 +1112,15 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
 
   await page.getByTestId("battle-presentation-hotspot").click();
   expect((await debugState(page)).battlePresentation).toBe("map");
+  await expect(battleAnimationArt).toHaveAttribute("data-state", "off");
+  await expect(battleAnimationArt).toHaveAttribute("data-native-frame", "20");
   const afterToggles = await debugState(page);
   expect(afterToggles.units).toEqual(baseline.units);
   expect(afterToggles.rngState).toBe(baseline.rngState);
   expect(afterToggles.cameraOrigin).toEqual(baseline.cameraOrigin);
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-side-panel-toggle-visuals.png",
+  });
 
   await page.getByTestId("system-menu-button").click();
   await page.getByTestId("system-command-settings").click();

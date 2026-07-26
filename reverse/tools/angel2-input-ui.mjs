@@ -36,6 +36,13 @@ const CODE_SIGNATURES = [
   { module: 29, address: "0000:6A55", offset: 0x06a55, role: "ranged move then attack/shoot/end/undo flow", hex: "a1161f2ea32674833e4a3d4d7403e9d700e8a708813e4a3d" },
   { module: 29, address: "0000:7C27", offset: 0x07c27, role: "battle viewport, unit HUD, and minimap refresh", hex: "e8c700e89301e87601bae801bb0800b81503e81609803eec" },
   { module: 29, address: "0000:8492", offset: 0x08492, role: "delayed hovered-unit detail-panel controller", hex: "803e485d597401c3833e046059756d803e1afb4e7408a121" },
+  { module: 29, address: "0000:B7C6", offset: 0x0b7c6, role: "battle side-panel foundation and state-overlay draw order", hex: "c70684f8a502bae001bb0000b91300e8f71dbed47fe87218e83100e84f00e86d00e80700e88800e8a600c3" },
+  { module: 29, address: "0000:B7F1", offset: 0x0b7f1, role: "grid-setting side-panel frame selector", hex: "f6061a1101740dba5802bb4100b91900e8cb1dc3ba5802bb4100b91800e8be1dc3" },
+  { module: 29, address: "0000:B812", offset: 0x0b812, role: "release-fixed window side-panel frame selector", hex: "803eac7f01740dba4802bb2700b91c00e8aa1dc3ba4802bb2700b91d00e89d1dc3" },
+  { module: 29, address: "0000:B833", offset: 0x0b833, role: "release-fixed desk side-panel frame selector", hex: "803eb07f01740dba1002bb4d00b91600e8891dc3ba1002bb4d00b91700e87c1dc3" },
+  { module: 29, address: "0000:B854", offset: 0x0b854, role: "edge-scroll-setting side-panel frame selector", hex: "f6061b1101740dba3802bb6a00b91b00e8681dc3ba3802bb6a00b91a00e85b1dc3" },
+  { module: 29, address: "0000:B875", offset: 0x0b875, role: "portrait-setting side-panel frame selector", hex: "f606181101750dba6002bb6f00b91e00e8471dc3ba6002bb6f00b91f00e83a1dc3" },
+  { module: 29, address: "0000:B896", offset: 0x0b896, role: "battle-animation-setting side-panel frame selector", hex: "f606191101750dbaf801bb0b00b91400e8261dc3baf801bb0b00b91500e8191dc3" },
   { module: 29, address: "0000:B78C", offset: 0x0b78c, role: "battle side-panel click/key dispatcher", hex: "803ee3f6017504e83879c3e85c01e84202e8f64ac3a180f8" },
   { module: 29, address: "0000:B8F6", offset: 0x0b8f6, role: "side-panel hitbox to abstract flag mapping", hex: "803e90f5017401c3bbf07f8b1783faff74358b4f028b7704" },
   { module: 29, address: "0000:B9DF", offset: 0x0b9df, role: "abstract side-panel flag to handler mapping", hex: "33db8bb76a8083feff742d8a043c01740683c304ebecc3b0" },
@@ -117,6 +124,69 @@ const SIDE_PANEL_HANDLERS = {
   "0000:BAA0": { id: "systemMenu", effect: "open 遊戲功能/勝利條件/讀取記錄/儲存記錄/離開遊戲" },
   "0000:BAA4": { id: "victoryConditions", effect: "show the current stage victory-condition panel until either primary or secondary is pressed" },
   "0000:BAAE": { id: "quit", effect: "ask for confirmation; confirmation sets DS:2E72='Q' and returns to the parent with nextModule=0" },
+};
+
+const SIDE_PANEL_VISUAL_COMPOSITION = {
+  resource: { container: "A.SWF", record: 6 },
+  foundation: {
+    frame: 19,
+    origin: { x: 480, y: 0 },
+    size: { width: 160, height: 149 },
+  },
+  releaseFixedOverlays: [
+    {
+      id: "windowDetail",
+      valueOffset: 0x7fac,
+      expectedInitialValue: 1,
+      origin: { x: 584, y: 39 },
+      framesByValue: { 0: 28, 1: 29 },
+    },
+    {
+      id: "deskDetail",
+      valueOffset: 0x7fb0,
+      expectedInitialValue: 0,
+      origin: { x: 528, y: 77 },
+      framesByValue: { 0: 22, 1: 23 },
+    },
+  ],
+  settingOverlays: [
+    {
+      id: "grid",
+      label: "地圖方格",
+      valueOffset: 0x111a,
+      expectedInitialValue: 0,
+      origin: { x: 600, y: 65 },
+      size: { width: 32, height: 11 },
+      framesByValue: { 0: 24, 1: 25 },
+    },
+    {
+      id: "edgeScroll",
+      label: "地圖捲動",
+      valueOffset: 0x111b,
+      expectedInitialValue: 1,
+      origin: { x: 568, y: 106 },
+      size: { width: 40, height: 31 },
+      framesByValue: { 0: 26, 1: 27 },
+    },
+    {
+      id: "portraits",
+      label: "人物圖像",
+      valueOffset: 0x1118,
+      expectedInitialValue: 1,
+      origin: { x: 608, y: 111 },
+      size: { width: 16, height: 3 },
+      framesByValue: { 0: 30, 1: 31 },
+    },
+    {
+      id: "battleAnimation",
+      label: "戰鬥動畫",
+      valueOffset: 0x1119,
+      expectedInitialValue: 1,
+      origin: { x: 504, y: 11 },
+      size: { width: 32, height: 33 },
+      framesByValue: { 0: 20, 1: 21 },
+    },
+  ],
 };
 
 function sha256(buffer) {
@@ -341,6 +411,40 @@ function joinSidePanelHitboxes(hitboxes, dispatch) {
   });
 }
 
+function parseSidePanelVisualComposition(buffer) {
+  const withInitialValue = (entry) => {
+    const initialValue = buffer[dataOffset(29, entry.valueOffset, 1, buffer)];
+    if (initialValue !== entry.expectedInitialValue) {
+      throw new Error(
+        `side-panel visual ${entry.id}: expected release value ${entry.expectedInitialValue}, got ${initialValue}`,
+      );
+    }
+    const { valueOffset, expectedInitialValue, ...output } = entry;
+    return {
+      ...output,
+      valueAddress: `${hex(MODULE29_DATA_SEGMENT)}:${hex(valueOffset)}`,
+      initialValue,
+      initialFrame: entry.framesByValue[initialValue],
+    };
+  };
+  return {
+    resource: SIDE_PANEL_VISUAL_COMPOSITION.resource,
+    foundation: SIDE_PANEL_VISUAL_COMPOSITION.foundation,
+    releaseFixedOverlays: SIDE_PANEL_VISUAL_COMPOSITION.releaseFixedOverlays.map(withInitialValue),
+    settingOverlays: SIDE_PANEL_VISUAL_COMPOSITION.settingOverlays.map(withInitialValue),
+    drawOrder: [
+      "foundation",
+      "windowDetail",
+      "deskDetail",
+      "edgeScroll",
+      "grid",
+      "portraits",
+      "battleAnimation",
+    ],
+    behavior: "0000:B7C6 redraws A/6 frame 19, then replaces local rectangles with the selected opaque frames; the four setting overlays read the same release bytes toggled by the side-panel and game-function handlers",
+  };
+}
+
 async function extract(module27Path, module29Path, outputPath) {
   const [module27, module29] = await Promise.all([readFile(module27Path), readFile(module29Path)]);
   const verifiedCodeSignatures = verifyCodeSignatures(module27, module29);
@@ -370,6 +474,7 @@ async function extract(module27Path, module29Path, outputPath) {
   if (sidePanelHitboxes.entries.length !== 12) throw new Error(`expected 12 side-panel hitboxes, got ${sidePanelHitboxes.entries.length}`);
   const sidePanelDispatch = parseSidePanelDispatch(module29);
   const joinedSidePanelHitboxes = joinSidePanelHitboxes(sidePanelHitboxes, sidePanelDispatch);
+  const sidePanelVisualComposition = parseSidePanelVisualComposition(module29);
 
   const settingsPanels = [
     parsePointerLabelPanel(module29, { id: "soundEffects", count: 4, title: 0x1103, labels: 0x10e1, values: 0x10eb, hitboxes: 0x119a, selectionModel: "four independent binary switches" }),
@@ -392,7 +497,7 @@ async function extract(module27Path, module29Path, outputPath) {
 
   const output = {
     format: "ANGEL2 native input and battle UI",
-    semanticVersion: 3,
+    semanticVersion: 4,
     sources: [
       { module: 27, path: module27Path, bytes: module27.length, sha256: sha256(module27) },
       { module: 29, path: module29Path, bytes: module29.length, sha256: sha256(module29) },
@@ -530,6 +635,7 @@ async function extract(module27Path, module29Path, outputPath) {
       dispatchTable: sidePanelDispatch,
       dispatchWithoutMouseHitbox: sidePanelDispatch.entries.filter((entry) => !sidePanelHitboxes.entries.some((hitbox) => hitbox.flagAddress === entry.flagAddress)),
       settingsPanels,
+      visualComposition: sidePanelVisualComposition,
     },
     unitHud: {
       exactPresentationSpec: "reverse/parsed/native/hud-presentations.json",
@@ -568,6 +674,7 @@ async function extract(module27Path, module29Path, outputPath) {
       parsedActionMenus: actionMenus.length,
       parsedSidePanelHitboxes: sidePanelHitboxes.entries.length,
       parsedSidePanelDispatches: sidePanelDispatch.entries.length,
+      parsedSidePanelSettingVisuals: sidePanelVisualComposition.settingOverlays.length,
       parsedSettingsRows: settingsPanels.reduce((sum, panel) => sum + panel.entries.length, 0),
       parsedPhysicalKeyboardBindingsPerModule: KEYBOARD_BINDINGS.length,
       physicalKeyboardTablesIdentical,
