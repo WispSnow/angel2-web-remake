@@ -18,6 +18,7 @@
 1. 先阅读用户当前请求以及本文件。
 2. 运行 `git status --short --branch`，保留用户已有改动，不覆盖无关文件。
 3. 根据任务范围阅读对应真值文档：
+   - 当前开发状态：`planning/STATUS.md`
    - 原版事实：`reverse/gdd/original-gdd.md`
    - 证据登记：`reverse/gdd/evidence-register.md`
    - 规则修复决策：`reverse/gdd/web-remake-rule-decisions.md`
@@ -97,6 +98,7 @@ pnpm exec playwright install ffmpeg
 - `scripts/`：从逆向产物生成稳定运行时内容的脚本；
 - `tests/unit/`：与渲染器无关的规则和内容测试；
 - `tests/e2e/`：玩家可见流程、输入、音画事件和黄金截图；
+- `planning/`：当前进度、路线、里程碑和跨阶段风险，不保存玩法真值；
 - `reverse/`：取证工具、机器规格、笔记与渲染核验产物；
 - `ref/ANGEL2/`：原始参考文件，只读。
 

@@ -46,5 +46,6 @@ pnpm check         # 顺序执行以上全部检查
 - `scripts/generate-stage0-runtime.mjs`：从 `B/0001` 固化 50×50 地形内容；
 - `public/assets/original/`：切片使用的调色板修正素材与已转换原版音频；
 - `tests/`：模拟与浏览器验收。
+- `planning/`：当前进度、路线、里程碑和跨阶段风险。
 
-玩法合同见 [`design/remake-gdd/vertical-slices/stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 1 关目前只有正确路由占位，不属于本切片实现范围。
+当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`design/remake-gdd/vertical-slices/stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 1 关已有纸面合同，但运行时仍只有正确路由占位，不属于当前实现范围。
