@@ -46,6 +46,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <div class="bottom-location">瓦爾克麗宮</div>
             <div class="bottom-round" id="bottom-round"></div>
             ${renderSidePanelHotspots()}
+            <div class="side-panel-tooltip" id="side-panel-tooltip" data-testid="side-panel-tooltip"
+              role="tooltip" aria-live="polite" hidden></div>
             <section class="system-menu action-menu" id="system-menu" data-testid="system-menu" role="menu" aria-label="戰鬥系統選單" hidden></section>
             <section class="settings-menu modal-panel" id="settings-menu" data-testid="settings-menu" role="dialog" aria-label="遊戲功能" hidden>
               <span class="panel-kicker">SYSTEM</span><h2>遊戲功能</h2>
@@ -180,6 +182,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const settingsMenu = required(root, "#settings-menu");
   const soundSettingsMenu = required(root, "#sound-settings-menu");
   const musicSettingsMenu = required(root, "#music-settings-menu");
+  const sidePanelTooltip = required(root, "#side-panel-tooltip");
   const recordMenu = required(root, "#record-menu");
   const quitConfirm = required(root, "#quit-confirm");
   const groupCommandMenu = required(root, "#group-command-menu");
@@ -197,6 +200,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let feedbackRevealedCharacters = 0;
   let activeFeedbackText: HTMLElement | undefined;
   let activeFeedbackPortrait: HTMLElement | undefined;
+  let sidePanelHintTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  let sidePanelHintTarget: HTMLElement | undefined;
   startPortraitAnimations(
     root,
     controller.isTestMode,
@@ -300,6 +305,49 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     return true;
   };
 
+  const hideSidePanelHint = () => {
+    if (sidePanelHintTimer !== undefined) globalThis.clearTimeout(sidePanelHintTimer);
+    sidePanelHintTimer = undefined;
+    sidePanelHintTarget = undefined;
+    sidePanelTooltip.hidden = true;
+    sidePanelTooltip.textContent = "";
+    screen.dataset.sidePanelHint = "hidden";
+  };
+  const showSidePanelHint = (button: HTMLElement) => {
+    if (screen.dataset.sidePanelHotspots !== "active" || button.offsetParent === null) return;
+    sidePanelHintTarget = button;
+    sidePanelTooltip.textContent = button.getAttribute("aria-label") ?? "";
+    sidePanelTooltip.hidden = false;
+    screen.dataset.sidePanelHint = "visible";
+  };
+  const scheduleSidePanelHint = (button: HTMLElement) => {
+    hideSidePanelHint();
+    sidePanelHintTarget = button;
+    sidePanelHintTimer = globalThis.setTimeout(() => {
+      sidePanelHintTimer = undefined;
+      if (sidePanelHintTarget === button) showSidePanelHint(button);
+    }, 450);
+  };
+
+  root.addEventListener("pointerover", (event) => {
+    const button = (event.target as Element).closest<HTMLElement>("[data-side-panel-hotspot]");
+    if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return;
+    scheduleSidePanelHint(button);
+  });
+  root.addEventListener("pointerout", (event) => {
+    const button = (event.target as Element).closest<HTMLElement>("[data-side-panel-hotspot]");
+    if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return;
+    if (sidePanelHintTarget === button) hideSidePanelHint();
+  });
+  root.addEventListener("focusin", (event) => {
+    const button = (event.target as Element).closest<HTMLElement>("[data-side-panel-hotspot]");
+    if (button) showSidePanelHint(button);
+  });
+  root.addEventListener("focusout", (event) => {
+    const button = (event.target as Element).closest<HTMLElement>("[data-side-panel-hotspot]");
+    if (button && sidePanelHintTarget === button) hideSidePanelHint();
+  });
+
   root.addEventListener("click", (event) => {
     const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
     if (minimap) {
@@ -315,6 +363,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }
       return;
     }
+    if (button.matches("[data-side-panel-hotspot]")) hideSidePanelHint();
     const action = button.dataset.action;
     if (action === "advance-dialogue") {
       if (!finishDialogueTyping()) controller.advanceDialogue();
@@ -430,6 +479,16 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   window.addEventListener("keydown", (event) => {
     const key = event.key;
     const lower = key.toLowerCase();
+    const focusedHotspot = document.activeElement instanceof HTMLButtonElement
+      && document.activeElement.matches("[data-side-panel-hotspot]")
+      ? document.activeElement
+      : undefined;
+    if (focusedHotspot && focusedHotspot.offsetParent !== null && (key === "Enter" || key === " ")) {
+      event.preventDefault();
+      if (!event.repeat) focusedHotspot.click();
+      return;
+    }
+    if (focusedHotspot && key === "Tab") return;
     const navigation: Record<string, Position> = {
       ArrowUp: { x: 0, y: -1 },
       w: { x: 0, y: -1 },
@@ -587,13 +646,28 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const focus = controller.portraitsEnabled ? controller.describeFocus() : undefined;
     screen.dataset.hudMode = focus ? "unit" : "tactical";
     screen.dataset.portraitsEnabled = String(controller.portraitsEnabled);
-    screen.dataset.sidePanelHotspots = controller.phase === "player"
+    const sidePanelHotspotsActive = controller.phase === "player"
       && controller.actionMode === "idle"
       && !controller.hasBlockingOverlay
       && !controller.inputLocked
-      && !focus
-      ? "active"
-      : "inactive";
+      && !focus;
+    screen.dataset.sidePanelHotspots = sidePanelHotspotsActive ? "active" : "inactive";
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-side-panel-hotspot]")) {
+      button.tabIndex = sidePanelHotspotsActive ? 0 : -1;
+      const id = button.dataset.sidePanelHotspot;
+      const pressed = id === "grid"
+        ? controller.gridEnabled
+        : id === "edgeScroll"
+          ? controller.edgeScrollEnabled
+          : id === "portraits"
+            ? controller.portraitsEnabled
+            : id === "battleAnimation"
+              ? controller.battlePresentation === "full"
+              : undefined;
+      if (pressed === undefined) button.removeAttribute("aria-pressed");
+      else button.setAttribute("aria-pressed", String(pressed));
+    }
+    if (!sidePanelHotspotsActive) hideSidePanelHint();
     hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${focus ? renderHud(focus.unit, focus.stats) : ""}`;
 
     const page = controller.currentDialogue;
@@ -900,6 +974,11 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
 function renderSidePanelHotspots(): string {
   return implementedSidePanelHotspots().map((hotspot) => {
     const { minX, maxX, minY, maxY } = hotspot.bounds;
+    const popup = ["save", "load", "groupCommands", "systemMenu"].includes(hotspot.id)
+      ? "menu"
+      : ["sound", "music", "objectives"].includes(hotspot.id)
+        ? "dialog"
+        : undefined;
     return `<button
       class="side-panel-hotspot"
       style="--hotspot-left:${minX}px;--hotspot-top:${minY}px;--hotspot-width:${maxX - minX + 1}px;--hotspot-height:${maxY - minY + 1}px"
@@ -907,7 +986,8 @@ function renderSidePanelHotspots(): string {
       data-action="${hotspot.action}"
       data-testid="${hotspot.testId}"
       aria-label="${hotspot.label}"
-      title="${hotspot.label}"
+      aria-describedby="side-panel-tooltip"
+      ${popup ? `aria-haspopup="${popup}"` : ""}
     ></button>`;
   }).join("");
 }

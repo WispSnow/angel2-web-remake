@@ -274,6 +274,21 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   outline: 1px solid #fff2a1;
   outline-offset: 0;
 }
+.side-panel-tooltip {
+  position: absolute;
+  z-index: 9;
+  left: 486px;
+  top: 143px;
+  width: 148px;
+  height: 16px;
+  border: 1px solid #d4a62d;
+  color: #fff4c7;
+  background: #160d0eef;
+  text-align: center;
+  font: 10px/14px "PMingLiU", serif;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
 .action-menu.system-menu { left: 304px; top: 47px; width: 147px; height: 139px; }
 .action-menu.system-menu > button { display: block; width: 136px; height: 24px; padding: 1px 8px; border: 0; color: #eee3d5; background: transparent; text-align: center; text-indent: 0; letter-spacing: .18em; font-size: 14px; }
 .settings-menu { position: absolute; z-index: 14; left: 304px; top: 47px; width: 166px; padding: 12px 14px 14px; }

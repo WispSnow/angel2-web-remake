@@ -1320,6 +1320,149 @@ test("RHP-06: music desk object selects five persistent levels without restartin
   await expect(page.getByTestId("music-volume-3")).toHaveAttribute("aria-checked", "true");
 });
 
+test("RHP-07: all twelve desk objects are discoverable, accessible and coordinate-operable", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+
+  const screen = page.getByTestId("game-screen");
+  const tooltip = page.getByTestId("side-panel-tooltip");
+  const hotspots = [
+    { id: "save", testId: "save-hotspot", label: "儲存記錄", bounds: [489, 88, 32, 35] },
+    { id: "load", testId: "load-hotspot", label: "讀取記錄", bounds: [526, 110, 45, 27] },
+    { id: "grid", testId: "grid-hotspot", label: "地圖方格", bounds: [602, 65, 25, 20] },
+    { id: "sound", testId: "sound-hotspot", label: "音效開關", bounds: [587, 33, 26, 21] },
+    { id: "edgeScroll", testId: "edge-scroll-hotspot", label: "地圖捲動", bounds: [580, 107, 28, 31] },
+    { id: "portraits", testId: "portraits-hotspot", label: "人物圖像", bounds: [611, 108, 17, 25] },
+    { id: "battleAnimation", testId: "battle-presentation-hotspot", label: "戰鬥動畫", bounds: [504, 8, 36, 39] },
+    { id: "music", testId: "music-hotspot", label: "音樂開關", bounds: [524, 77, 42, 28] },
+    { id: "groupCommands", testId: "group-command-hotspot", label: "集體命令", bounds: [490, 36, 24, 25] },
+    { id: "objectives", testId: "objectives-hotspot", label: "勝利條件", bounds: [571, 75, 30, 12] },
+    { id: "allRest", testId: "all-rest-hotspot", label: "全部休息", bounds: [490, 61, 26, 24] },
+    { id: "systemMenu", testId: "system-menu-button", label: "遊戲功能", bounds: [545, 6, 16, 37] },
+  ] as const;
+
+  await expect(screen).toHaveAttribute("data-side-panel-hotspots", "active");
+  await expect(tooltip).toBeHidden();
+  for (const hotspot of hotspots) {
+    const button = page.getByTestId(hotspot.testId);
+    await expect(button).toBeVisible();
+    await expect(button).toHaveAttribute("aria-label", hotspot.label);
+    expect(await button.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [
+        Math.round(Number.parseFloat(style.left)),
+        Math.round(Number.parseFloat(style.top)),
+        Math.round(Number.parseFloat(style.width)),
+        Math.round(Number.parseFloat(style.height)),
+      ];
+    })).toEqual(hotspot.bounds);
+  }
+  await expect(page.getByTestId("grid-hotspot")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("edge-scroll-hotspot")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("portraits-hotspot")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("battle-presentation-hotspot")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("sound-hotspot")).toHaveAttribute("aria-haspopup", "dialog");
+  await expect(page.getByTestId("music-hotspot")).toHaveAttribute("aria-haspopup", "dialog");
+  await expect(page.getByTestId("system-menu-button")).toHaveAttribute("aria-haspopup", "menu");
+
+  await page.getByTestId("system-menu-button").hover();
+  await page.waitForTimeout(250);
+  await expect(tooltip).toBeHidden();
+  await expect(tooltip).toHaveText("遊戲功能", { timeout: 1_000 });
+  await expect(tooltip).toBeVisible();
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-side-panel-discovery-hint.png",
+  });
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await expect(tooltip).toBeHidden();
+
+  await page.getByTestId("save-hotspot").focus();
+  await expect(tooltip).toHaveText("儲存記錄");
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("load-hotspot")).toBeFocused();
+  await expect(tooltip).toHaveText("讀取記錄");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+
+  const logicalClick = async (x: number, y: number) => {
+    const box = await screen.boundingBox();
+    if (!box) throw new Error("logical screen is not visible");
+    await page.mouse.click(
+      box.x + x * box.width / 640,
+      box.y + y * box.height / 350,
+    );
+  };
+  const center = (id: (typeof hotspots)[number]["id"]) => {
+    const hotspot = hotspots.find((entry) => entry.id === id);
+    if (!hotspot) throw new Error(`unknown hotspot ${id}`);
+    const [left, top, width, height] = hotspot.bounds;
+    return [left + width / 2, top + height / 2] as const;
+  };
+  const clickHotspot = async (id: (typeof hotspots)[number]["id"]) => {
+    const [x, y] = center(id);
+    await logicalClick(x, y);
+  };
+
+  const baseline = await debugState(page);
+  await clickHotspot("save");
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await clickHotspot("load");
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+
+  await clickHotspot("grid");
+  expect((await debugState(page)).gridEnabled).toBe(true);
+  await clickHotspot("grid");
+  await clickHotspot("sound");
+  await expect(page.getByTestId("sound-settings-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await clickHotspot("edgeScroll");
+  expect((await debugState(page)).edgeScrollEnabled).toBe(false);
+  await clickHotspot("edgeScroll");
+  await clickHotspot("portraits");
+  expect((await debugState(page)).portraitsEnabled).toBe(false);
+  await clickHotspot("portraits");
+  await clickHotspot("battleAnimation");
+  expect((await debugState(page)).battlePresentation).toBe("map");
+  await clickHotspot("battleAnimation");
+  await clickHotspot("music");
+  await expect(page.getByTestId("music-settings-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await clickHotspot("groupCommands");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await clickHotspot("objectives");
+  await expect(page.getByTestId("objective-panel")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await clickHotspot("systemMenu");
+  await expect(page.getByTestId("system-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+
+  const afterNonRuleActions = await debugState(page);
+  expect(afterNonRuleActions.units).toEqual(baseline.units);
+  expect(afterNonRuleActions.rngState).toBe(baseline.rngState);
+  expect(afterNonRuleActions.cursor).toEqual(baseline.cursor);
+  expect(afterNonRuleActions.cameraOrigin).toEqual(baseline.cameraOrigin);
+  expect(afterNonRuleActions).toMatchObject({
+    gridEnabled: false,
+    edgeScrollEnabled: true,
+    portraitsEnabled: true,
+    battlePresentation: "full",
+  });
+
+  await clickHotspot("allRest");
+  await expect.poll(async () => (await debugState(page)).phase).not.toBe("player");
+});
+
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await page.getByTestId("skip-dialogue").click();
