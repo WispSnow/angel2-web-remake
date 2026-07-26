@@ -7,8 +7,8 @@ async function waitForPlayerOrStory(page: Page): Promise<"player" | "story"> {
   return page.waitForFunction(() => {
     const dialogue = document.querySelector<HTMLElement>("[data-testid=dialogue-layer]");
     if (dialogue && !dialogue.hidden) return "story";
-    const system = document.querySelector<HTMLElement>("[data-testid=system-menu-button]");
-    if (system && getComputedStyle(system).display !== "none") return "player";
+    const screen = document.querySelector<HTMLElement>("[data-testid=game-screen]");
+    if (screen?.dataset.phase === "player") return "player";
     return false;
   }, undefined, { timeout: 90_000 }).then((handle) => handle.jsonValue() as Promise<"player" | "story">);
 }
@@ -42,7 +42,6 @@ test("S00-O: a normal build clears stage zero through player-visible controls on
   await expect(dialogue).toBeVisible({ timeout: 10_000 });
   await expect(dialogue).toHaveAttribute("data-source-record", "1");
   await page.getByTestId("skip-dialogue").click();
-  await expect(page.getByTestId("system-menu-button")).toBeVisible();
 
   // Use the shipping settings surface to speed up presentation. This changes
   // only timing; the simulation and enemy route are the normal production path.
@@ -62,9 +61,7 @@ test("S00-O: a normal build clears stage zero through player-visible controls on
   let reachedVictoryStory = false;
   let capturedRoundTwo = false;
   for (let round = 1; round <= 18; round += 1) {
-    await expect(page.getByTestId("all-rest-hotspot")).toBeVisible();
-    await page.getByTestId("all-rest-hotspot").click();
-    await expect(page.getByTestId("system-menu-button")).toBeHidden();
+    await page.keyboard.press("F1");
 
     const state = await waitForPlayerOrStory(page);
     if (state === "player") continue;
@@ -83,7 +80,6 @@ test("S00-O: a normal build clears stage zero through player-visible controls on
       capturedRoundTwo = true;
     }
     await page.getByTestId("skip-dialogue").click();
-    await expect(page.getByTestId("system-menu-button")).toBeVisible();
   }
 
   expect(reachedVictoryStory).toBe(true);

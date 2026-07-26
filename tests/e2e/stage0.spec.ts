@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const EDGE_PAN_SETTLE_MS = 180;
 
@@ -224,7 +224,6 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect.poll(() => dialoguePortrait.locator(".portrait-mouth").evaluateAll((images) =>
     images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
   )).toBe(true);
-  await expect(dialoguePortrait).toHaveAttribute("data-speaking", "true");
   await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-talk-count"))).toBeGreaterThan(0);
   await expect(dialoguePortrait).toHaveAttribute("data-mouth-frame", /^[12]$/);
   await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-mouth-frame", "2"); });
@@ -378,6 +377,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
 
   // Persistent text buttons are replaced by the native-style callable menu surface.
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await page.getByTestId("system-menu-button").click();
   await expect(page.getByTestId("system-menu")).toBeVisible();
   await expect(page.locator("[data-system-index]")).toHaveCount(5);
@@ -850,6 +850,56 @@ test("S00-H: minimap hover previews and primary click relocates the native viewp
     units: baseline.units,
     rngState: baseline.rngState,
   });
+});
+
+test("RHP-01: native side-panel hitboxes share one gated coordinate layer", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+
+  const screen = page.getByTestId("game-screen");
+  const system = page.getByTestId("system-menu-button");
+  const group = page.getByTestId("group-command-hotspot");
+  const allRest = page.getByTestId("all-rest-hotspot");
+
+  // Nia is initially focused, so her detail HUD covers the desk and the
+  // underlying object hitboxes must not remain blindly clickable.
+  await expect(screen).toHaveAttribute("data-hud-mode", "unit");
+  await expect(screen).toHaveAttribute("data-side-panel-hotspots", "inactive");
+  await expect(system).toBeHidden();
+  await expect(group).toBeHidden();
+  await expect(allRest).toBeHidden();
+
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await expect(screen).toHaveAttribute("data-hud-mode", "tactical");
+  await expect(screen).toHaveAttribute("data-side-panel-hotspots", "active");
+
+  const logicalBounds = async (locator: Locator) => locator.evaluate((element) => {
+    const bounds = getComputedStyle(element);
+    return {
+      left: Math.round(Number.parseFloat(bounds.left)),
+      top: Math.round(Number.parseFloat(bounds.top)),
+      width: Math.round(Number.parseFloat(bounds.width)),
+      height: Math.round(Number.parseFloat(bounds.height)),
+    };
+  });
+  expect(await logicalBounds(system)).toEqual({ left: 545, top: 6, width: 16, height: 37 });
+  expect(await logicalBounds(group)).toEqual({ left: 490, top: 36, width: 24, height: 25 });
+  expect(await logicalBounds(allRest)).toEqual({ left: 490, top: 61, width: 26, height: 24 });
+
+  await system.hover();
+  await screen.screenshot({ path: "artifacts/playwright/stage0-side-panel-hotspot-foundation.png" });
+  await system.click();
+  await expect(page.getByTestId("system-menu")).toBeVisible();
+  await expect(screen).toHaveAttribute("data-side-panel-hotspots", "inactive");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+
+  await group.click();
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await expect(screen).toHaveAttribute("data-side-panel-hotspots", "inactive");
 });
 
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {

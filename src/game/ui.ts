@@ -11,6 +11,7 @@ import {
   startPortraitAnimations,
 } from "./portrait";
 import { configureGameScaling } from "./scaling";
+import { implementedSidePanelHotspots } from "./side-panel";
 
 const storyPhases = new Set<GamePhase>(["prebattleStory", "openingStory", "round2Story", "victoryStory"]);
 
@@ -44,9 +45,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <section class="unit-hud" id="unit-hud" data-testid="unit-hud" aria-live="polite"></section>
             <div class="bottom-location">瓦爾克麗宮</div>
             <div class="bottom-round" id="bottom-round"></div>
-            <button class="system-menu-hotspot" data-action="open-system-menu" data-testid="system-menu-button" aria-label="開啟遊戲功能" title="遊戲功能"></button>
-            <button class="group-command-hotspot" data-action="open-group-commands" data-testid="group-command-hotspot" aria-label="開啟集體命令" title="集體命令"></button>
-            <button class="all-rest-hotspot" data-action="all-rest" data-testid="all-rest-hotspot" aria-label="全部休息" title="全部休息"></button>
+            ${renderSidePanelHotspots()}
             <section class="system-menu action-menu" id="system-menu" data-testid="system-menu" role="menu" aria-label="戰鬥系統選單" hidden></section>
             <section class="settings-menu modal-panel" id="settings-menu" data-testid="settings-menu" role="dialog" aria-label="遊戲功能" hidden>
               <span class="panel-kicker">SYSTEM</span><h2>遊戲功能</h2>
@@ -531,6 +530,13 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
 
     const focus = controller.describeFocus();
     screen.dataset.hudMode = focus ? "unit" : "tactical";
+    screen.dataset.sidePanelHotspots = controller.phase === "player"
+      && controller.actionMode === "idle"
+      && !controller.hasBlockingOverlay
+      && !controller.inputLocked
+      && !focus
+      ? "active"
+      : "inactive";
     hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${focus ? renderHud(focus.unit, focus.stats) : ""}`;
 
     const page = controller.currentDialogue;
@@ -832,6 +838,21 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   } else {
     damage.hidden = true;
   }
+}
+
+function renderSidePanelHotspots(): string {
+  return implementedSidePanelHotspots().map((hotspot) => {
+    const { minX, maxX, minY, maxY } = hotspot.bounds;
+    return `<button
+      class="side-panel-hotspot"
+      style="--hotspot-left:${minX}px;--hotspot-top:${minY}px;--hotspot-width:${maxX - minX + 1}px;--hotspot-height:${maxY - minY + 1}px"
+      data-side-panel-hotspot="${hotspot.id}"
+      data-action="${hotspot.action}"
+      data-testid="${hotspot.testId}"
+      aria-label="${hotspot.label}"
+      title="${hotspot.label}"
+    ></button>`;
+  }).join("");
 }
 
 function renderHud(unit: NonNullable<GameController["focusedUnit"]>, stats: UnitStats): string {

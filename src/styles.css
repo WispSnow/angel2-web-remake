@@ -180,9 +180,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .statue-foreground-right { left: 408px; }
 .story-background { position: absolute; z-index: 8; inset: 0; background: #000 url("/assets/original/story-palace.png") center / 320px 200px no-repeat; }
 .logical-screen[data-phase="prebattleStory"] .unit-hud,
-.logical-screen[data-phase="prebattleStory"] .system-menu-hotspot,
-.logical-screen[data-phase="prebattleStory"] .group-command-hotspot,
-.logical-screen[data-phase="prebattleStory"] .all-rest-hotspot,
+.logical-screen[data-phase="prebattleStory"] .side-panel-hotspot,
 .logical-screen[data-phase="prebattleStory"] .system-menu,
 .logical-screen[data-phase="prebattleStory"] .bottom-location,
 .logical-screen[data-phase="prebattleStory"] .bottom-round,
@@ -255,18 +253,27 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   background: linear-gradient(#74313a, #3f151c);
   cursor: pointer;
 }
-.system-menu-hotspot,
-.group-command-hotspot,
-.all-rest-hotspot { position: absolute; z-index: 8; display: none; padding: 0; border: 1px solid transparent; color: transparent; background: transparent; cursor: pointer; }
-.system-menu-hotspot { left: 545px; top: 6px; width: 16px; height: 37px; }
-.group-command-hotspot { left: 490px; top: 36px; width: 24px; height: 25px; }
-.all-rest-hotspot { left: 490px; top: 61px; width: 26px; height: 24px; }
-.logical-screen[data-phase="player"] .system-menu-hotspot,
-.logical-screen[data-phase="player"] .group-command-hotspot,
-.logical-screen[data-phase="player"] .all-rest-hotspot { display: block; }
-.system-menu-hotspot:hover, .system-menu-hotspot:focus-visible,
-.group-command-hotspot:hover, .group-command-hotspot:focus-visible,
-.all-rest-hotspot:hover, .all-rest-hotspot:focus-visible { border-color: #ffe56b; background: #ffe56b25; outline: 1px solid #fff2a1; outline-offset: 0; }
+.side-panel-hotspot {
+  position: absolute;
+  z-index: 8;
+  display: none;
+  left: var(--hotspot-left);
+  top: var(--hotspot-top);
+  width: var(--hotspot-width);
+  height: var(--hotspot-height);
+  padding: 0;
+  border: 1px solid transparent;
+  color: transparent;
+  background: transparent;
+  cursor: pointer;
+}
+.logical-screen[data-side-panel-hotspots="active"] .side-panel-hotspot { display: block; }
+.side-panel-hotspot:hover, .side-panel-hotspot:focus-visible {
+  border-color: #ffe56b;
+  background: #ffe56b25;
+  outline: 1px solid #fff2a1;
+  outline-offset: 0;
+}
 .action-menu.system-menu { left: 304px; top: 47px; width: 147px; height: 139px; }
 .action-menu.system-menu > button { display: block; width: 136px; height: 24px; padding: 1px 8px; border: 0; color: #eee3d5; background: transparent; text-align: center; text-indent: 0; letter-spacing: .18em; font-size: 14px; }
 .settings-menu { position: absolute; z-index: 14; left: 304px; top: 47px; width: 166px; padding: 12px 14px 14px; }
