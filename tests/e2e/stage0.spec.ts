@@ -902,6 +902,48 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   await expect(screen).toHaveAttribute("data-side-panel-hotspots", "inactive");
 });
 
+test("RHP-02: objective and battle-animation objects reuse canonical presentation actions", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+
+  const before = await debugState(page);
+  const objective = page.getByTestId("objectives-hotspot");
+  const battleAnimation = page.getByTestId("battle-presentation-hotspot");
+  await expect(objective).toBeVisible();
+  await expect(battleAnimation).toBeVisible();
+
+  await objective.hover();
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-side-panel-objective-hotspot.png",
+  });
+  await objective.click();
+  await expect(page.getByTestId("objective-panel")).toBeVisible();
+  const objectiveState = await debugState(page);
+  expect(objectiveState.units).toEqual(before.units);
+  expect(objectiveState.rngState).toBe(before.rngState);
+  expect(objectiveState.cursor).toEqual(before.cursor);
+  expect(objectiveState.cameraOrigin).toEqual(before.cameraOrigin);
+  await page.getByTestId("objective-panel").click({ button: "right" });
+  await expect(page.getByTestId("objective-panel")).toBeHidden();
+
+  await battleAnimation.click();
+  let toggled = await debugState(page);
+  expect(toggled.battlePresentation).toBe("map");
+  expect(toggled.units).toEqual(before.units);
+  expect(toggled.rngState).toBe(before.rngState);
+  expect(toggled.cursor).toEqual(before.cursor);
+  expect(toggled.cameraOrigin).toEqual(before.cameraOrigin);
+  await battleAnimation.click();
+  toggled = await debugState(page);
+  expect(toggled.battlePresentation).toBe("full");
+  expect(toggled.units).toEqual(before.units);
+  expect(toggled.rngState).toBe(before.rngState);
+});
+
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await page.getByTestId("skip-dialogue").click();

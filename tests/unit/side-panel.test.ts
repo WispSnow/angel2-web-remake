@@ -10,7 +10,13 @@ describe("native battle side-panel hotspots", () => {
       { id: "sound", label: "音效開關", bounds: { minX: 587, maxX: 612, minY: 33, maxY: 53 } },
       { id: "edgeScroll", label: "地圖捲動", bounds: { minX: 580, maxX: 607, minY: 107, maxY: 137 } },
       { id: "portraits", label: "人物圖像", bounds: { minX: 611, maxX: 627, minY: 108, maxY: 132 } },
-      { id: "battleAnimation", label: "戰鬥動畫", bounds: { minX: 504, maxX: 539, minY: 8, maxY: 46 } },
+      {
+        id: "battleAnimation",
+        label: "戰鬥動畫",
+        bounds: { minX: 504, maxX: 539, minY: 8, maxY: 46 },
+        action: "battle-presentation",
+        testId: "battle-presentation-hotspot",
+      },
       { id: "music", label: "音樂開關", bounds: { minX: 524, maxX: 565, minY: 77, maxY: 104 } },
       {
         id: "groupCommands",
@@ -19,7 +25,13 @@ describe("native battle side-panel hotspots", () => {
         action: "open-group-commands",
         testId: "group-command-hotspot",
       },
-      { id: "objectives", label: "勝利條件", bounds: { minX: 571, maxX: 600, minY: 75, maxY: 86 } },
+      {
+        id: "objectives",
+        label: "勝利條件",
+        bounds: { minX: 571, maxX: 600, minY: 75, maxY: 86 },
+        action: "objectives",
+        testId: "objectives-hotspot",
+      },
       {
         id: "allRest",
         label: "全部休息",
@@ -37,9 +49,11 @@ describe("native battle side-panel hotspots", () => {
     ]);
   });
 
-  test("only exposes the three already implemented direct actions", () => {
+  test("only exposes the five implemented direct actions", () => {
     expect(implementedSidePanelHotspots().map(({ id, action }) => ({ id, action }))).toEqual([
+      { id: "battleAnimation", action: "battle-presentation" },
       { id: "groupCommands", action: "open-group-commands" },
+      { id: "objectives", action: "objectives" },
       { id: "allRest", action: "all-rest" },
       { id: "systemMenu", action: "open-system-menu" },
     ]);
