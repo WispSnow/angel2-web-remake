@@ -177,8 +177,38 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   )).toBe(true);
   expect((await debugState(page)).phase).toBe("prebattleStory");
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  const skipDialogue = page.getByTestId("skip-dialogue");
+  await expect(skipDialogue).toBeVisible();
+  await expect(skipDialogue).toHaveText("跳過");
+  const activeDialogueCopy = page.getByTestId("dialogue-window-lower").locator(".dialogue-copy");
+  const [copyBounds, skipBounds] = await Promise.all([
+    activeDialogueCopy.boundingBox(),
+    skipDialogue.boundingBox(),
+  ]);
+  expect(copyBounds).not.toBeNull();
+  expect(skipBounds).not.toBeNull();
+  expect(skipBounds!.x).toBeGreaterThan(copyBounds!.x + copyBounds!.width / 2);
+  expect(skipBounds!.x + skipBounds!.width).toBeLessThanOrEqual(copyBounds!.x + copyBounds!.width);
+  expect(skipBounds!.y).toBeGreaterThan(copyBounds!.y + copyBounds!.height / 2);
+  expect(skipBounds!.y + skipBounds!.height).toBeLessThanOrEqual(copyBounds!.y + copyBounds!.height);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-skip.png" });
   for (let action = 0; action < 4; action += 1) await page.getByTestId("advance-dialogue").click();
   expect((await debugState(page)).dialogueIndex).toBe(2);
+  await expect(skipDialogue).toBeVisible();
+  expect(await skipDialogue.evaluate((button) =>
+    button.parentElement?.parentElement?.id)).toBe("dialogue-copy-upper");
+  await page.waitForTimeout(130);
+  const [upperCopyBounds, upperSkipBounds] = await Promise.all([
+    page.getByTestId("dialogue-window-upper").locator(".dialogue-copy").boundingBox(),
+    skipDialogue.boundingBox(),
+  ]);
+  expect(upperCopyBounds).not.toBeNull();
+  expect(upperSkipBounds).not.toBeNull();
+  expect(upperSkipBounds!.x + upperSkipBounds!.width)
+    .toBeLessThanOrEqual(upperCopyBounds!.x + upperCopyBounds!.width);
+  expect(upperSkipBounds!.y + upperSkipBounds!.height)
+    .toBeLessThanOrEqual(upperCopyBounds!.y + upperCopyBounds!.height);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-skip-upper.png" });
   const dialoguePortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(dialoguePortrait).toBeVisible();
   await expect(dialoguePortrait.locator(".portrait-eye")).toHaveCount(3);
@@ -1174,10 +1204,15 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   await page.getByTestId("unit-command-attack").click();
   await waitForPhase(page, "victoryStory");
 
-  for (let checkpoint = 0; checkpoint < 2; checkpoint += 1) {
+  const advanceOneCheckpoint = async () => {
+    const before = (await debugState(page)).dialogueIndex;
     await page.getByTestId("advance-dialogue").click();
-    await page.getByTestId("advance-dialogue").click();
-  }
+    if ((await debugState(page)).dialogueIndex === before) {
+      await page.getByTestId("advance-dialogue").click();
+    }
+    expect((await debugState(page)).dialogueIndex).toBe(before + 1);
+  };
+  for (let checkpoint = 0; checkpoint < 2; checkpoint += 1) await advanceOneCheckpoint();
   expect((await debugState(page)).dialogueIndex).toBe(2);
   await expect(layer).toHaveAttribute("data-source-record", "3");
   await expect(layer).toHaveAttribute("data-source-wait", "3");

@@ -96,7 +96,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               <div class="dialogue-box upper" id="dialogue-box-upper" data-testid="dialogue-window-upper" hidden>
                 <span class="animated-portrait dialogue-portrait" id="dialogue-portrait-upper"
                   data-portrait-channel="dialogue-upper" data-blink-frame="1" data-blink-count="0" hidden></span>
-                <div class="dialogue-copy">
+                <div class="dialogue-copy" id="dialogue-copy-upper">
                   <b class="dialogue-speaker" id="dialogue-speaker-upper"></b>
                   <p id="dialogue-text-upper"></p><span class="continue-mark">▼</span>
                 </div>
@@ -104,14 +104,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               <div class="dialogue-box lower" id="dialogue-box-lower" data-testid="dialogue-window-lower" hidden>
                 <span class="animated-portrait dialogue-portrait" id="dialogue-portrait-lower"
                   data-portrait-channel="dialogue-lower" data-blink-frame="1" data-blink-count="0" hidden></span>
-                <div class="dialogue-copy">
+                <div class="dialogue-copy" id="dialogue-copy-lower">
                   <b class="dialogue-speaker" id="dialogue-speaker-lower"></b>
                   <p id="dialogue-text-lower"></p><span class="continue-mark">▼</span>
                 </div>
               </div>
-              <div class="dialogue-controls">
-                <button data-action="advance-dialogue" data-testid="advance-dialogue">繼續</button>
-                <button data-action="skip-dialogue" data-testid="skip-dialogue">跳過本段</button>
+              <div class="dialogue-controls" id="dialogue-controls" role="group" aria-label="劇情對話控制">
+                <button type="button" data-action="advance-dialogue" data-testid="advance-dialogue">繼續</button>
+                <button type="button" data-action="skip-dialogue" data-testid="skip-dialogue"
+                  aria-label="跳過本輪劇情對話">跳過</button>
               </div>
             </section>
             <section class="objective-panel modal-panel" id="objective-panel" data-testid="objective-panel" hidden>
@@ -137,17 +138,20 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const dialogueWindows = {
     upper: {
       box: required(root, "#dialogue-box-upper"),
+      copy: required(root, "#dialogue-copy-upper"),
       portrait: required(root, "#dialogue-portrait-upper"),
       speaker: required(root, "#dialogue-speaker-upper"),
       text: required(root, "#dialogue-text-upper"),
     },
     lower: {
       box: required(root, "#dialogue-box-lower"),
+      copy: required(root, "#dialogue-copy-lower"),
       portrait: required(root, "#dialogue-portrait-lower"),
       speaker: required(root, "#dialogue-speaker-lower"),
       text: required(root, "#dialogue-text-lower"),
     },
   };
+  const dialogueControls = required(root, "#dialogue-controls");
   const storyBackground = required(root, "#story-background");
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
@@ -575,6 +579,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           elements.portrait.hidden = true;
         }
       }
+      const controlsParent = page.activeSlot
+        ? dialogueWindows[page.activeSlot].copy
+        : dialogueLayer;
+      if (dialogueControls.parentElement !== controlsParent) controlsParent.append(dialogueControls);
       if (page.activeSlot) {
         const activeState = page[page.activeSlot];
         const target = dialogueWindows[page.activeSlot].text;

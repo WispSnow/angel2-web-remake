@@ -567,11 +567,33 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   line-height: 20px;
   text-shadow: 1px 1px #000;
 }
-.continue-mark { position: absolute; right: 5px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
+.continue-mark { position: absolute; right: 108px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
 .dialogue-box:not(.is-active) .continue-mark { display: none; }
-.dialogue-controls { position: absolute; z-index: 2; right: 8px; top: 154px; display: flex; gap: 6px; opacity: 0; transition: opacity 100ms linear; }
-.dialogue-controls:has(button:focus-visible) { opacity: 1; }
-.dialogue-controls button { padding: 5px 9px; font: 10px system-ui, sans-serif; }
+.dialogue-controls {
+  position: absolute;
+  z-index: 3;
+  right: 6px;
+  bottom: 5px;
+  display: flex;
+  gap: 4px;
+  pointer-events: auto;
+}
+.dialogue-controls button {
+  min-width: 46px;
+  height: 22px;
+  padding: 1px 7px;
+  border-color: #e4b934;
+  color: #fff4c7;
+  background: linear-gradient(#75323b, #40151c);
+  box-shadow: inset 0 0 0 1px #9d4d45, 1px 1px #000a;
+  font: 700 11px/18px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+  text-shadow: 1px 1px #000;
+}
+.dialogue-controls button:hover,
+.dialogue-controls button:focus-visible {
+  color: #fff;
+  background: linear-gradient(#9a4948, #5a2025);
+}
 @keyframes bob { 50% { transform: translateY(3px); } }
 @keyframes dialogue-window-open {
   from { clip-path: inset(50% 49%); }
