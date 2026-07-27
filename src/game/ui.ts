@@ -1,4 +1,4 @@
-import { ASSETS, STAGE0, nextExperienceThresholdFor, statsFor } from "./content/stage0";
+import { ASSETS, STAGE0, nextExperienceThresholdFor } from "./content/stage0";
 import type { GameController } from "./controller";
 import { FULL_COMBAT_FRAME_META, type FullCombatSpriteState } from "./full-combat";
 import type { GamePhase, Position, UnitStats } from "./types";
@@ -837,12 +837,13 @@ function fullSpriteAsset(sprite: FullCombatSpriteState): { src: string; meta: { 
 function buildFullCombatSkeleton(
   layer: HTMLElement,
   presentation: NonNullable<GameController["combatPresentation"]>,
+  controller: GameController,
 ): void {
   const { attacker, defender } = presentation;
   const leftUnit = attacker.side === 1 ? attacker : defender;
   const rightUnit = attacker.side === 2 ? attacker : defender;
   const statusPanel = (side: "left" | "right", unit: typeof attacker) => {
-    const stats = statsFor(unit);
+    const stats = controller.unitStats(unit);
     const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
     return `
       <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
@@ -902,7 +903,7 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   if (layer.dataset.fullBattleKey !== battleKey) {
     layer.className = "combat-presentation full-combat";
     layer.removeAttribute("style");
-    buildFullCombatSkeleton(layer, presentation);
+    buildFullCombatSkeleton(layer, presentation, controller);
     layer.dataset.fullBattleKey = battleKey;
   }
   layer.dataset.fullCombatPhase = presentation.phase;

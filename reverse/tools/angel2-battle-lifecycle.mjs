@@ -85,10 +85,52 @@ const CODE_SIGNATURES = [
   },
   {
     module: 29,
+    address: "0000:4ABE",
+    offset: 0x04abe,
+    role: "advance fresh-battle side-2 experience once per difficulty step except on stages 3, 8, and 11",
+    hex: "833e772e03741b833e772e087414833e772e0b740d8b0e00004151e8af0859e2f9c3",
+  },
+  {
+    module: 29,
     address: "0000:4DCD",
     offset: 0x04dcd,
     role: "begin a full round, increment the round, tick statuses, and run stage events",
     hex: "9a9b005d139aac009d13c6067cfa4ec6067dfa4ee81c2e9a9d006813ff06832fe8f43a9a0c005d139a08002a14b82e00",
+  },
+  {
+    module: 29,
+    address: "0000:536B",
+    offset: 0x0536b,
+    role: "select side 1, rebuild every live unit, and refill current life",
+    hex: "c7068a3175542ec606345401e89300cb",
+  },
+  {
+    module: 29,
+    address: "0000:537B",
+    offset: 0x0537b,
+    role: "select side 2, rebuild every live unit, and refill current life",
+    hex: "c7068a3175542ec606345402e88300cb",
+  },
+  {
+    module: 29,
+    address: "0000:538B",
+    offset: 0x0538b,
+    role: "select side 2 and rebuild 57 dynamic unit slots with the fresh-experience callback",
+    hex: "c7068a319b532ec606345402e87300c3",
+  },
+  {
+    module: 29,
+    address: "0000:539B",
+    offset: 0x0539b,
+    role: "write next cumulative experience threshold plus one to the current unit",
+    hex: "8b36b931a1a13140894402c3",
+  },
+  {
+    module: 29,
+    address: "0000:540D",
+    offset: 0x0540d,
+    role: "rebuild all live unit stats from class, cumulative experience, stage overrides, and difficulty",
+    hex: "b93900bb000051532ea03454e86bfce8cdfd9a0000b6189a7100b618a18a31ffd05b4359e2e0c3",
   },
   {
     module: 29,
@@ -103,6 +145,13 @@ const CODE_SIGNATURES = [
     offset: 0x142a8,
     role: "seed the default transition and invoke all per-stage round/outcome event handlers",
     hex: "c70606001900a1772e40a30800e87000e8e800e88501e8d601e81302e86402e8b502e89e03e83804e8a904e86405e881",
+  },
+  {
+    module: 29,
+    address: "1000:8BD1",
+    offset: 0x18bd1,
+    role: "add floor one-half to side-2 attack, defense, and maximum life only at difficulty 3",
+    hex: "833e0000037401cb833ec931027401cba1bf31d1e80106bf31a1cf31d1e80106cf31a1c131d1e80106c131a1d131d1e80106d131a1c331d1e80106c331cb",
   },
   {
     module: 29,
@@ -200,7 +249,7 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
 
   const output = {
     format: "ANGEL2 native battle lifecycle",
-    semanticVersion: 1,
+    semanticVersion: 2,
     sources: [
       { module: 27, path: module27Path, bytes: module27.length, sha256: sha256(module27) },
       { module: 29, path: module29Path, bytes: module29.length, sha256: sha256(module29) },
@@ -238,6 +287,39 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
         selectedFlags: { address: "DS:05A2", records: 75 },
         fixedAtTemplateLoadFlags: { address: "DS:0638", records: 75 },
       },
+    },
+    freshBattleInitialization: {
+      entryCondition: "CONTINU == 'N'; numbered WAR resumes do not reseed experience",
+      sequence: [
+        "0000:4ABE repeats 0000:538B exactly LV_HARD + 1 times unless the stage is 3, 8, or 11",
+        "0000:538B rebuilds side 2 with callback 0000:539B, which writes next cumulative experience threshold + 1",
+        "0000:536B rebuilds side 1 and refills current life to the resulting maximum",
+        "0000:537B rebuilds side 2 and refills current life after all difficulty growth and stage overrides",
+      ],
+      enemyExperienceSeeding: {
+        skippedStages: [3, 8, 11],
+        repetitions: "LV_HARD + 1",
+        perRepetition: "experience = next cumulative experience threshold + 1",
+        affects: ["cumulative experience", "visible growth-row level", "attack", "defense", "maximum life"],
+        doesNotAffect: ["class movement"],
+      },
+      unitRebuildOrder: [
+        "select the first, second, or third fixed class row from cumulative experience",
+        "apply post-third-row threshold/attack/max-life growth",
+        "apply stage 37 fixed boss overrides when applicable",
+        "if LV_HARD == 3 and side == 2, add floor(value / 2) to current/base attack, current/base defense, and maximum life",
+      ],
+      stage0Side1: {
+        campaignClassRecord: 0,
+        cumulativeExperience: 0,
+        visibleLevel: 1,
+        attack: 39,
+        defense: 21,
+        maximumAndCurrentLife: 160,
+        movement: 4,
+        rule: "all six playable slots share these final player-visible combat stats; pre-rebuild per-slot current-life initializers are overwritten before first control",
+      },
+      resumeRule: "a numbered save restores serialized experience/life and then derives effective stats; it must not repeat fresh-battle seeding",
     },
     deployment: {
       ...deployment,
@@ -289,7 +371,7 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
           N: "load JUST.TST and clear every unused FF marker to empty",
           numberedSlot: "load the selected WAR save including its round/outcome value",
         },
-        freshBattle: "initialize presentation and call 0000:4DCD, making the opening playable round round 1",
+        freshBattle: "seed side-2 experience from LV_HARD, rebuild/refill both sides, initialize presentation, and call 0000:4DCD, making the opening playable round round 1",
         resumedBattle: "restore the saved side phase/presentation state through 1000:3788 instead of starting a new round",
       },
       {
@@ -351,6 +433,7 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
       interactiveDeploymentStages: deployment.interactiveStageCount,
       totalDeploymentCells: deployment.totalOpenCells,
       fullOrdinaryBattleLifecycleClosed: true,
+      freshBattleDifficultyInitializationClosed: true,
       remainingScope: "stage-events.json structurally closes all 38 native per-stage handlers, including eight dynamic-board and seven other runtime-state stages, plus the module-25/27/29 stage-6 bridge and module-33/35/46 postgame route; remaining frame/audio presentation work does not reopen the ordinary deployment/battle/victory/defeat lifecycle",
     },
   };

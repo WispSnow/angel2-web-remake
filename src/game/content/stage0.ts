@@ -1,5 +1,5 @@
 import { STAGE0_SPEECH_RECORD_BY_CHARACTER, STAGE0_TERRAIN_TOKENS_BASE64, STAGE0_TOKEN_TO_SLOT_BASE64 } from "./stage0-runtime.generated";
-import type { BattleUnit, Position, UnitClassId, UnitStats } from "../types";
+import type { BattleUnit, Difficulty, Position, UnitClassId, UnitStats } from "../types";
 
 const decode = (encoded: string): Uint8Array => {
   const binary = globalThis.atob(encoded);
@@ -43,15 +43,25 @@ export const CLASS_ROWS: Record<UnitClassId, UnitStats[]> = {
     { attack: 45, defense: 27, maxLife: 180, movement: 4, level: 3 },
   ],
   22: [
-    { attack: 55, defense: 30, maxLife: 200, movement: 8, level: 4 },
-    { attack: 60, defense: 33, maxLife: 230, movement: 8, level: 5 },
-    { attack: 65, defense: 36, maxLife: 260, movement: 8, level: 6 },
+    { attack: 55, defense: 30, maxLife: 200, movement: 8, level: 1 },
+    { attack: 60, defense: 33, maxLife: 230, movement: 8, level: 2 },
+    { attack: 65, defense: 36, maxLife: 260, movement: 8, level: 3 },
   ],
 };
 
 export const CLASS_THRESHOLDS: Record<UnitClassId, number[]> = {
   0: [0, 100, 200],
   22: [0, 180, 360],
+};
+
+const POST_THIRD_ROW_GROWTH: Record<UnitClassId, {
+  threshold: number;
+  attack: number;
+  defense: number;
+  maxLife: number;
+}> = {
+  0: { threshold: 100, attack: 1, defense: 0, maxLife: 10 },
+  22: { threshold: 100, attack: 1, defense: 0, maxLife: 10 },
 };
 
 export const MOVEMENT_RULES: Record<UnitClassId, number[]> = {
@@ -80,25 +90,73 @@ const UNIT_DEFINITIONS: Array<Pick<BattleUnit, "side" | "slot" | "classId" | "cl
   { side: 2, slot: 42, classId: 0, className: "士兵", name: "騎士團士兵", portrait: 48, x: 27, y: 39 },
 ];
 
-export function statsFor(unit: Pick<BattleUnit, "classId" | "experience">): UnitStats {
+export function classStatsFor(unit: Pick<BattleUnit, "classId" | "experience">): UnitStats {
   const thresholds = CLASS_THRESHOLDS[unit.classId];
   const index = thresholds.reduce((selected, threshold, row) => unit.experience >= threshold ? row : selected, 0);
-  return CLASS_ROWS[unit.classId][index];
+  const row = CLASS_ROWS[unit.classId][index];
+  if (index < CLASS_ROWS[unit.classId].length - 1) return row;
+
+  const growth = POST_THIRD_ROW_GROWTH[unit.classId];
+  const thirdThreshold = thresholds[2];
+  const postThirdRows = Math.floor(
+    Math.max(0, unit.experience - thirdThreshold) / growth.threshold,
+  );
+  return {
+    attack: row.attack + postThirdRows * growth.attack,
+    defense: row.defense + postThirdRows * growth.defense,
+    maxLife: row.maxLife + postThirdRows * growth.maxLife,
+    movement: row.movement,
+    level: row.level + postThirdRows,
+  };
+}
+
+export function statsFor(
+  unit: Pick<BattleUnit, "classId" | "experience" | "side">,
+  difficulty: Difficulty,
+): UnitStats {
+  const base = classStatsFor(unit);
+  if (unit.side !== 2 || difficulty !== 3) return base;
+  return {
+    ...base,
+    attack: base.attack + Math.floor(base.attack / 2),
+    defense: base.defense + Math.floor(base.defense / 2),
+    maxLife: base.maxLife + Math.floor(base.maxLife / 2),
+  };
 }
 
 export function nextExperienceThresholdFor(unit: Pick<BattleUnit, "classId" | "experience">): number {
   const thresholds = CLASS_THRESHOLDS[unit.classId];
-  return thresholds.find((threshold) => threshold > unit.experience) ?? thresholds.at(-1) ?? 1;
+  const fixedThreshold = thresholds.find((threshold) => threshold > unit.experience);
+  if (fixedThreshold !== undefined) return fixedThreshold;
+  const thirdThreshold = thresholds[2];
+  const growthThreshold = POST_THIRD_ROW_GROWTH[unit.classId].threshold;
+  return thirdThreshold
+    + (Math.floor((unit.experience - thirdThreshold) / growthThreshold) + 1) * growthThreshold;
 }
 
-export function createStage0Units(): BattleUnit[] {
-  return UNIT_DEFINITIONS.map((definition) => ({
-    ...definition,
-    id: `${definition.side}:${definition.slot}`,
-    life: CLASS_ROWS[definition.classId][0].maxLife,
-    experience: 0,
-    acted: false,
-  }));
+export function initialEnemyExperience(classId: UnitClassId, difficulty: Difficulty): number {
+  let experience = 0;
+  for (let step = 0; step <= difficulty; step += 1) {
+    experience = nextExperienceThresholdFor({ classId, experience }) + 1;
+  }
+  return experience;
+}
+
+export function createStage0Units(difficulty: Difficulty = 0): BattleUnit[] {
+  return UNIT_DEFINITIONS.map((definition) => {
+    const experience = definition.side === 2
+      ? initialEnemyExperience(definition.classId, difficulty)
+      : 0;
+    const unit: BattleUnit = {
+      ...definition,
+      id: `${definition.side}:${definition.slot}`,
+      life: 0,
+      experience,
+      acted: false,
+    };
+    unit.life = statsFor(unit, difficulty).maxLife;
+    return unit;
+  });
 }
 
 export function terrainSlotAt(position: Position): number {

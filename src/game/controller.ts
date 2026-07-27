@@ -1,4 +1,4 @@
-import { ASSETS, STAGE0, statsFor } from "./content/stage0";
+import { ASSETS, STAGE0 } from "./content/stage0";
 import { STORY_BY_PHASE } from "./content/dialogue";
 import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneState } from "./full-combat";
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
@@ -19,9 +19,10 @@ import {
   moveSaveSlotPage,
   readSaveSlot,
   SAVE_SLOT_COUNT,
+  SAVE_VERSION,
   saveSlotKey,
 } from "./save";
-import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData } from "./types";
+import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData, UnitStats } from "./types";
 
 type Listener = () => void;
 type StoryPhase = keyof typeof STORY_BY_PHASE;
@@ -107,7 +108,7 @@ const isStoryPhase = (phase: GamePhase): phase is StoryPhase => phase in STORY_B
 const pause = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
 
 export class GameController {
-  battle = new Stage0Battle();
+  battle: Stage0Battle;
   difficulty: Difficulty;
   phase: GamePhase = "prebattleStory";
   actionMode: ActionMode = "idle";
@@ -168,6 +169,7 @@ export class GameController {
 
   constructor(difficulty: Difficulty = 0) {
     this.difficulty = difficulty;
+    this.battle = new Stage0Battle(difficulty);
     const preferences = loadPresentationPreferences(localStorage);
     this.battlePresentation = preferences.battlePresentation;
     this.gridEnabled = preferences.gridEnabled;
@@ -1278,7 +1280,7 @@ export class GameController {
   }
 
   private restartBattle(message: string): void {
-    this.battle = new Stage0Battle();
+    this.battle = new Stage0Battle(this.difficulty);
     this.movementPresentation = undefined;
     this.systemMenuOpen = false;
     this.systemMenuIndex = 0;
@@ -1368,7 +1370,7 @@ export class GameController {
     const prior = this.readSave(slot);
     const save: SaveData = {
       format: "ANGEL2-web-save",
-      version: 2,
+      version: SAVE_VERSION,
       kind: "completed",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
@@ -1445,7 +1447,7 @@ export class GameController {
     const snapshot = this.battle.serializableSnapshot();
     const save: SaveData = {
       format: "ANGEL2-web-save",
-      version: 2,
+      version: SAVE_VERSION,
       kind: "battle",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
@@ -1491,7 +1493,7 @@ export class GameController {
       this.statusMessage = message;
       return;
     }
-    const battle = new Stage0Battle(new DeterministicRng(save.rngState));
+    const battle = new Stage0Battle(save.difficulty, new DeterministicRng(save.rngState));
     battle.restore(save.battle);
     this.battle = battle;
     this.difficulty = save.difficulty;
@@ -1760,7 +1762,7 @@ export class GameController {
     nia.acted = false;
     cavalry.x = 30;
     cavalry.y = 26;
-    cavalry.life = statsFor(cavalry).maxLife;
+    cavalry.life = this.battle.statsFor(cavalry).maxLife;
     cavalry.acted = false;
     this.battle.units = this.battle.units.filter((unit) => unit.side === 1 || unit.id === cavalry.id);
     for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) unit.acted = true;
@@ -1978,9 +1980,13 @@ export class GameController {
     };
   }
 
-  describeFocus(): { stats: ReturnType<typeof statsFor>; unit: BattleUnit } | undefined {
+  unitStats(unit: Pick<BattleUnit, "classId" | "experience" | "side">): UnitStats {
+    return this.battle.statsFor(unit);
+  }
+
+  describeFocus(): { stats: UnitStats; unit: BattleUnit } | undefined {
     const unit = this.focusedUnit;
-    return unit ? { unit, stats: statsFor(unit) } : undefined;
+    return unit ? { unit, stats: this.unitStats(unit) } : undefined;
   }
 
   portraitUrl(portrait: BattleUnit["portrait"]): string {

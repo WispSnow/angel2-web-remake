@@ -6,7 +6,7 @@ import {
   NATIVE_INTRO_SCROLL_UPDATES,
   STARTUP_ASSETS,
 } from "./content/startup";
-import { statsFor } from "./content/stage0";
+import { classStatsFor } from "./content/stage0";
 import { configureGameScaling } from "./scaling";
 import {
   moveSaveSlotIndex,
@@ -194,7 +194,7 @@ export function mountStartup(
     const representative = result.save.roster[0];
     return [
       representative ? (representative.classId === 22 ? "騎兵" : "士兵") : "—",
-      representative ? String(statsFor(representative).level) : "—",
+      representative ? String(classStatsFor(representative).level) : "—",
       representative ? String(representative.experience) : "—",
       String(result.save.saveCount),
       DIFFICULTY_OPTIONS[result.save.difficulty].label,

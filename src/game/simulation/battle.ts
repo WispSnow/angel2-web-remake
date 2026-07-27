@@ -1,5 +1,5 @@
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, TERRAIN_DEFENSE_PERCENT, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
-import type { AttackResult, BattleOutcome, BattleUnit, Position } from "../types";
+import type { AttackResult, BattleOutcome, BattleUnit, Difficulty, Position, UnitStats } from "../types";
 import { DeterministicRng } from "./rng";
 import { manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath } from "./grid";
 
@@ -21,8 +21,11 @@ export class Stage0Battle {
   round = 1;
   focusId = "1:0";
 
-  constructor(public readonly rng = new DeterministicRng()) {
-    this.units = createStage0Units();
+  constructor(
+    public readonly difficulty: Difficulty = 0,
+    public readonly rng = new DeterministicRng(),
+  ) {
+    this.units = createStage0Units(difficulty);
   }
 
   restore(snapshot: Pick<ReturnType<Stage0Battle["serializableSnapshot"]>, "round" | "focusId" | "units">): void {
@@ -41,6 +44,10 @@ export class Stage0Battle {
 
   unitAt(position: Position): BattleUnit | undefined {
     return this.units.find((unit) => unit.x === position.x && unit.y === position.y);
+  }
+
+  statsFor(unit: Pick<BattleUnit, "classId" | "experience" | "side">): UnitStats {
+    return statsFor(unit, this.difficulty);
   }
 
   moveUnit(id: string, destination: Position): boolean {
@@ -82,8 +89,8 @@ export class Stage0Battle {
       throw new Error("illegal ordinary attack");
     }
 
-    const attackerStats = statsFor(attacker);
-    const defenderStats = statsFor(defender);
+    const attackerStats = this.statsFor(attacker);
+    const defenderStats = this.statsFor(defender);
     const terrainDefense = Math.floor(defenderStats.defense * TERRAIN_DEFENSE_PERCENT[terrainSlotAt(defender)] / 100);
     const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense) + this.rng.between(4, 7) + this.rng.between(4, 7);
     defender.life = Math.max(0, defender.life - damage);
@@ -121,7 +128,7 @@ export class Stage0Battle {
   rest(id: string): number {
     const unit = this.unit(id);
     if (!unit || unit.side !== 1 || unit.acted) return 0;
-    const maximumLife = statsFor(unit).maxLife;
+    const maximumLife = this.statsFor(unit).maxLife;
     const recovered = Math.max(0, Math.min(Math.floor(maximumLife * 15 / 100), maximumLife - unit.life));
     unit.life += recovered;
     unit.acted = true;
@@ -150,16 +157,16 @@ export class Stage0Battle {
         unit,
         leader,
         unit.classId,
-        statsFor(unit).movement,
+        this.statsFor(unit).movement,
         this.units.filter((candidate) => candidate.id !== unit.id),
       );
       if (leaderPath.length === 0) {
-        const path = routePath(unit, neighbors(leader), this.units, statsFor(unit).movement);
+        const path = routePath(unit, neighbors(leader), this.units, this.statsFor(unit).movement);
         if (path.length > 1) return { unitId: id, kind: "move", path };
       }
     }
 
-    const stats = statsFor(unit);
+    const stats = this.statsFor(unit);
     const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
     if (lifePercent < 20) return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
 

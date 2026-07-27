@@ -1,5 +1,12 @@
+import {
+  classStatsFor,
+  initialEnemyExperience,
+  statsFor,
+} from "./content/stage0";
 import type {
+  BattleSaveData,
   BattleUnit,
+  CompletedSaveData,
   Difficulty,
   PortraitRecord,
   Position,
@@ -10,6 +17,7 @@ import type {
   UnitClassId,
 } from "./types";
 
+export const SAVE_VERSION = 3 as const;
 export const SAVE_SLOT_COUNT = 20;
 export const SAVE_SLOTS_PER_PAGE = 5;
 export const SAVE_SLOT_PAGE_COUNT = SAVE_SLOT_COUNT / SAVE_SLOTS_PER_PAGE;
@@ -111,7 +119,11 @@ function hasUniqueValues<T>(values: readonly T[]): boolean {
   return new Set(values).size === values.length;
 }
 
-function isSavedBattleState(value: unknown, roster: readonly SaveRosterEntry[]): value is SavedBattleState {
+function isSavedBattleState(
+  value: unknown,
+  roster: readonly SaveRosterEntry[],
+  difficulty?: Difficulty,
+): value is SavedBattleState {
   if (
     !isRecord(value)
     || value.phase !== "player"
@@ -131,6 +143,12 @@ function isSavedBattleState(value: unknown, roster: readonly SaveRosterEntry[]):
     || !hasUniqueValues(units.map((unit) => `${unit.x},${unit.y}`))
     || !units.some((unit) => unit.id === value.focusId)
   ) return false;
+  if (
+    difficulty !== undefined
+    && units.some((unit) => unit.life > statsFor(unit, difficulty).maxLife
+      || (unit.side === 2
+        && unit.experience !== initialEnemyExperience(unit.classId, difficulty)))
+  ) return false;
 
   const allies = units.filter((unit) => unit.side === 1);
   if (allies.length !== roster.length) return false;
@@ -144,10 +162,10 @@ function isSavedBattleState(value: unknown, roster: readonly SaveRosterEntry[]):
   });
 }
 
-function hasValidBase(value: Record<string, unknown>): boolean {
+function hasValidBase(value: Record<string, unknown>, version: 2 | typeof SAVE_VERSION): boolean {
   if (
     value.format !== "ANGEL2-web-save"
-    || value.version !== 2
+    || value.version !== version
     || value.ruleset !== "stableRemake"
     || typeof value.savedAt !== "string"
     || Number.isNaN(Date.parse(value.savedAt))
@@ -169,22 +187,71 @@ function isCompletedSave(value: Record<string, unknown>): boolean {
     && value.battle === undefined;
 }
 
-function isBattleSave(value: Record<string, unknown>): boolean {
+function isBattleSave(value: Record<string, unknown>, enforceDifficultyStats: boolean): boolean {
+  const difficulty = isDifficulty(value.difficulty) ? value.difficulty : undefined;
   return value.kind === "battle"
     && value.stage === 0
     && value.stageLabel === "瓦爾克麗宮"
-    && isSavedBattleState(value.battle, value.roster as SaveRosterEntry[]);
+    && difficulty !== undefined
+    && isSavedBattleState(
+      value.battle,
+      value.roster as SaveRosterEntry[],
+      enforceDifficultyStats ? difficulty : undefined,
+    );
 }
 
 export function isSaveData(value: unknown): value is SaveData {
-  if (!isRecord(value) || !hasValidBase(value)) return false;
-  return isCompletedSave(value) || isBattleSave(value);
+  if (!isRecord(value) || !hasValidBase(value, SAVE_VERSION)) return false;
+  return isCompletedSave(value) || isBattleSave(value, true);
+}
+
+type LegacyBattleSaveData = Omit<BattleSaveData, "version"> & { version: 2 };
+type LegacyCompletedSaveData = Omit<CompletedSaveData, "version"> & { version: 2 };
+type LegacySaveData = LegacyBattleSaveData | LegacyCompletedSaveData;
+
+function isLegacySaveData(value: unknown): value is LegacySaveData {
+  if (!isRecord(value) || !hasValidBase(value, 2)) return false;
+  return isCompletedSave(value) || isBattleSave(value, false);
+}
+
+function migrateLegacySave(save: LegacySaveData): SaveData {
+  if (save.kind === "completed") {
+    return {
+      ...save,
+      version: SAVE_VERSION,
+    };
+  }
+
+  const units = save.battle.units.map((unit) => {
+    if (unit.side === 1) return { ...unit };
+    const oldMaximumLife = classStatsFor(unit).maxLife;
+    const experience = initialEnemyExperience(unit.classId, save.difficulty);
+    const migrated = { ...unit, experience };
+    const maximumLife = statsFor(migrated, save.difficulty).maxLife;
+    const missingLife = Math.max(0, oldMaximumLife - unit.life);
+    return {
+      ...migrated,
+      life: Math.max(0, maximumLife - missingLife),
+    };
+  });
+
+  return {
+    ...save,
+    version: SAVE_VERSION,
+    battle: {
+      ...save.battle,
+      units,
+    },
+  };
 }
 
 export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
-    return isSaveData(value) ? value : undefined;
+    if (isSaveData(value)) return value;
+    if (!isLegacySaveData(value)) return undefined;
+    const migrated = migrateLegacySave(value);
+    return isSaveData(migrated) ? migrated : undefined;
   } catch {
     return undefined;
   }

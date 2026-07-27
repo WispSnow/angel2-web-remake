@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { ASSETS, STAGE0, TERRAIN_TOKENS, TOKEN_TO_TERRAIN_SLOT, createStage0Units, nextExperienceThresholdFor, statsFor, terrainSlotAt } from "../../src/game/content/stage0";
+import {
+  ASSETS,
+  STAGE0,
+  TERRAIN_TOKENS,
+  TOKEN_TO_TERRAIN_SLOT,
+  classStatsFor,
+  createStage0Units,
+  initialEnemyExperience,
+  nextExperienceThresholdFor,
+  statsFor,
+  terrainSlotAt,
+} from "../../src/game/content/stage0";
+import type { Difficulty } from "../../src/game/types";
 import { shortestPath } from "../../src/game/simulation/grid";
 
 describe("stage 0 evidence-backed content", () => {
@@ -26,7 +38,8 @@ describe("stage 0 evidence-backed content", () => {
       className: "騎兵",
       name: "哈釘",
       portrait: 15,
-      life: 200,
+      experience: 181,
+      life: 230,
     });
   });
 
@@ -40,10 +53,71 @@ describe("stage 0 evidence-backed content", () => {
     expect(route.length - 1).toBeLessThanOrEqual(STAGE0.opening.budget);
   });
 
-  it("selects original class rows from cumulative experience", () => {
-    expect(statsFor({ classId: 0, experience: 0 })).toMatchObject({ attack: 39, defense: 21, maxLife: 160, movement: 4, level: 1 });
-    expect(statsFor({ classId: 0, experience: 100 })).toMatchObject({ attack: 42, defense: 24, maxLife: 170, level: 2 });
-    expect(statsFor({ classId: 22, experience: 180 })).toMatchObject({ attack: 60, defense: 33, maxLife: 230, level: 5 });
+  it("selects native visible growth rows from cumulative experience", () => {
+    expect(classStatsFor({ classId: 0, experience: 0 })).toMatchObject({ attack: 39, defense: 21, maxLife: 160, movement: 4, level: 1 });
+    expect(classStatsFor({ classId: 0, experience: 100 })).toMatchObject({ attack: 42, defense: 24, maxLife: 170, level: 2 });
+    expect(classStatsFor({ classId: 22, experience: 180 })).toMatchObject({ attack: 60, defense: 33, maxLife: 230, level: 2 });
+    expect(classStatsFor({ classId: 0, experience: 301 })).toMatchObject({ attack: 46, defense: 27, maxLife: 190, level: 4 });
+    expect(classStatsFor({ classId: 22, experience: 461 })).toMatchObject({ attack: 66, defense: 36, maxLife: 270, level: 4 });
     expect(nextExperienceThresholdFor({ classId: 0, experience: 32 })).toBe(100);
+    expect(nextExperienceThresholdFor({ classId: 0, experience: 301 })).toBe(400);
+    expect(nextExperienceThresholdFor({ classId: 22, experience: 461 })).toBe(560);
+  });
+
+  it("reproduces the native stage-0 enemy stats for all four difficulties", () => {
+    const expected = [
+      {
+        soldier: { experience: 101, attack: 42, defense: 24, maxLife: 170, level: 2 },
+        hading: { experience: 181, attack: 60, defense: 33, maxLife: 230, level: 2 },
+      },
+      {
+        soldier: { experience: 201, attack: 45, defense: 27, maxLife: 180, level: 3 },
+        hading: { experience: 361, attack: 65, defense: 36, maxLife: 260, level: 3 },
+      },
+      {
+        soldier: { experience: 301, attack: 46, defense: 27, maxLife: 190, level: 4 },
+        hading: { experience: 461, attack: 66, defense: 36, maxLife: 270, level: 4 },
+      },
+      {
+        soldier: { experience: 401, attack: 70, defense: 40, maxLife: 300, level: 5 },
+        hading: { experience: 561, attack: 100, defense: 54, maxLife: 420, level: 5 },
+      },
+    ] as const;
+
+    for (const difficulty of [0, 1, 2, 3] satisfies Difficulty[]) {
+      const units = createStage0Units(difficulty);
+      const soldier = units.find((unit) => unit.id === "2:48");
+      const hading = units.find((unit) => unit.id === "2:15");
+      if (!soldier || !hading) throw new Error("stage 0 enemy fixture is incomplete");
+      expect(initialEnemyExperience(0, difficulty)).toBe(expected[difficulty].soldier.experience);
+      expect(initialEnemyExperience(22, difficulty)).toBe(expected[difficulty].hading.experience);
+      expect({
+        experience: soldier.experience,
+        ...statsFor(soldier, difficulty),
+      }).toMatchObject(expected[difficulty].soldier);
+      expect({
+        experience: hading.experience,
+        ...statsFor(hading, difficulty),
+      }).toMatchObject(expected[difficulty].hading);
+    }
+  });
+
+  it("keeps all six playable allies at the same verified fresh-battle stats", () => {
+    for (const difficulty of [0, 1, 2, 3] satisfies Difficulty[]) {
+      const allies = createStage0Units(difficulty).filter((unit) => unit.side === 1);
+      expect(allies.map((unit) => ({
+        experience: unit.experience,
+        life: unit.life,
+        ...statsFor(unit, difficulty),
+      }))).toEqual(Array.from({ length: 6 }, () => ({
+        experience: 0,
+        life: 160,
+        attack: 39,
+        defense: 21,
+        maxLife: 160,
+        movement: 4,
+        level: 1,
+      })));
+    }
   });
 });

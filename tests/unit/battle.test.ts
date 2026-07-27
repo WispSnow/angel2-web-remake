@@ -4,8 +4,8 @@ import { Stage0Battle } from "../../src/game/simulation/battle";
 import { manhattan, movementCost, positionKey, reachableCells, zoneOfControl } from "../../src/game/simulation/grid";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 
-function battleAtPlayableOpening(seed = 0x1234): Stage0Battle {
-  const battle = new Stage0Battle(new DeterministicRng(seed));
+function battleAtPlayableOpening(seed = 0x1234, difficulty: 0 | 1 | 2 | 3 = 0): Stage0Battle {
+  const battle = new Stage0Battle(difficulty, new DeterministicRng(seed));
   const nia = battle.unit("1:0")!;
   nia.x = STAGE0.opening.to.x;
   nia.y = STAGE0.opening.to.y;
@@ -13,6 +13,22 @@ function battleAtPlayableOpening(seed = 0x1234): Stage0Battle {
 }
 
 describe("stage 0 battle simulation", () => {
+  it("uses difficulty-derived enemies in deterministic combat", () => {
+    const easy = battleAtPlayableOpening(42, 0);
+    const hardest = battleAtPlayableOpening(42, 3);
+    expect(easy.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    expect(hardest.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+
+    const easyResult = easy.attack("1:0", "2:45");
+    const hardestResult = hardest.attack("1:0", "2:45");
+
+    expect(hardestResult.damage).toBeLessThan(easyResult.damage);
+    expect(hardestResult.counterDamage).toBeGreaterThan(easyResult.counterDamage);
+    expect(hardestResult.experienceGained).toBeGreaterThan(easyResult.experienceGained);
+    expect(easy.unit("2:45")).toMatchObject({ experience: 101 });
+    expect(hardest.unit("2:45")).toMatchObject({ experience: 401 });
+  });
+
   it("keeps simulation deterministic for equal seed and commands", () => {
     const left = battleAtPlayableOpening(42);
     const right = battleAtPlayableOpening(42);
@@ -240,18 +256,21 @@ describe("stage 0 battle simulation", () => {
     }
   });
 
-  it("previews the same stage-specific movement budget used by enemy routing", () => {
-    const battle = battleAtPlayableOpening();
-    const enemy = battle.unit("2:41")!;
-    enemy.x = 21;
-    enemy.y = 19;
-    battle.units = [enemy];
+  it("previews the same stage-specific movement budget at every difficulty", () => {
+    for (const difficulty of [0, 1, 2, 3] as const) {
+      const battle = battleAtPlayableOpening(0x1234, difficulty);
+      const enemy = battle.unit("2:41");
+      if (!enemy) throw new Error("missing stage 0 route enemy");
+      enemy.x = 21;
+      enemy.y = 19;
+      battle.units = [enemy];
 
-    const nativeClassRange = reachableCells(enemy, battle.units);
-    const stageRouteRange = battle.enemyMovementRange(enemy.id);
+      const nativeClassRange = reachableCells(enemy, battle.units);
+      const stageRouteRange = battle.enemyMovementRange(enemy.id);
 
-    expect(stageRouteRange).toEqual(reachableCells(enemy, battle.units, STAGE0.enemyRouteMovement));
-    expect(stageRouteRange.length).toBeGreaterThan(nativeClassRange.length);
+      expect(stageRouteRange).toEqual(reachableCells(enemy, battle.units, STAGE0.enemyRouteMovement));
+      expect(stageRouteRange.length).toBeGreaterThan(nativeClassRange.length);
+    }
   });
 
   it("accepts all three staircase cells and evacuates during the route action", () => {

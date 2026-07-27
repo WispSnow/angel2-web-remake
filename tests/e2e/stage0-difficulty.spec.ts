@@ -1,0 +1,76 @@
+import { mkdirSync } from "node:fs";
+import { expect, test, type Page } from "@playwright/test";
+
+test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
+
+async function enterStage0FromOrdinaryStartup(page: Page, difficulty: 0 | 3): Promise<void> {
+  await page.goto("/");
+  await page.keyboard.press("x");
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.getByTestId("new-game").click();
+  await expect(page.getByTestId("difficulty-menu")).toBeVisible();
+  await page.getByTestId(`difficulty-${difficulty}`).click();
+
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await page.getByTestId("skip-dialogue").click();
+  await expect(page.getByTestId("dialogue-layer")).toBeHidden();
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await page.getByTestId("skip-dialogue").click();
+  await expect(page.getByText("士兵／妮雅", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__ANGEL2__)).toBeUndefined();
+}
+
+async function expectHudValues(page: Page, identity: string, values: readonly string[]): Promise<void> {
+  await expect(page.getByText(identity, { exact: true })).toBeVisible();
+  await expect(page.getByTestId("unit-hud").locator(".stat-list dd")).toHaveText([...values]);
+}
+
+test("S00-Q: ordinary startup exposes the native lowest and highest difficulty stats", async ({ page }) => {
+  const cases = [
+    {
+      difficulty: 0 as const,
+      soldier: ["170／170", "42／42", "24／24", "2", "101／200"],
+      hading: ["230／230", "60／60", "33／33", "2", "181／360"],
+      screenshot: "artifacts/playwright/stage0-difficulty-0-hading.png",
+    },
+    {
+      difficulty: 3 as const,
+      soldier: ["300／300", "70／70", "40／40", "5", "401／500"],
+      hading: ["420／420", "100／100", "54／54", "5", "561／660"],
+      screenshot: "artifacts/playwright/stage0-difficulty-3-hading.png",
+    },
+  ] as const;
+
+  for (const scenario of cases) {
+    await enterStage0FromOrdinaryStartup(page, scenario.difficulty);
+    await expectHudValues(page, "士兵／妮雅", [
+      "160／160",
+      "39／39",
+      "21／21",
+      "1",
+      "0／100",
+    ]);
+
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowLeft");
+    await expectHudValues(page, "士兵／騎士團士兵", scenario.soldier);
+
+    for (let step = 0; step < 4; step += 1) await page.keyboard.press("ArrowLeft");
+    for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
+    await expectHudValues(page, "騎兵／哈釘", scenario.hading);
+    await page.getByTestId("game-screen").screenshot({ path: scenario.screenshot });
+
+    if (scenario.difficulty === 3) {
+      await page.keyboard.press("Tab");
+      await page.getByTestId("group-command-retreat").click();
+      await page.locator("[data-action=retreat-confirm]").click();
+      await page.locator("[data-action=retreat-confirm]").click();
+      await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+      await page.getByTestId("skip-dialogue").click();
+      await expect(page.getByText("士兵／妮雅", { exact: true })).toBeVisible();
+      for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowLeft");
+      for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
+      await expectHudValues(page, "騎兵／哈釘", scenario.hading);
+    }
+  }
+});

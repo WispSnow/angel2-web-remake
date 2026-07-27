@@ -8,6 +8,7 @@ import {
   SAVE_SLOT_COUNT,
   SAVE_SLOT_PAGE_COUNT,
   SAVE_SLOTS_PER_PAGE,
+  SAVE_VERSION,
   saveSlotPageIndex,
   saveSlotPageStart,
   saveSlotKey,
@@ -16,7 +17,7 @@ import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
   format: "ANGEL2-web-save",
-  version: 2,
+  version: SAVE_VERSION,
   kind: "completed",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 1,
@@ -32,7 +33,7 @@ const completedSave = (): CompletedSaveData => ({
 
 const battleSave = (): BattleSaveData => ({
   format: "ANGEL2-web-save",
-  version: 2,
+  version: SAVE_VERSION,
   kind: "battle",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 2,
@@ -73,8 +74,8 @@ const battleSave = (): BattleSaveData => ({
         portrait: 15,
         x: 23,
         y: 32,
-        life: 180,
-        experience: 0,
+        life: 250,
+        experience: 461,
         acted: true,
       },
     ],
@@ -100,16 +101,35 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-2 battle and completed saves", () => {
+  it("accepts complete version-3 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
+  });
+
+  it("migrates version-2 stage-0 enemy stats while preserving missing life", () => {
+    const current = battleSave();
+    const legacy = {
+      ...current,
+      version: 2,
+      battle: {
+        ...current.battle,
+        units: current.battle.units.map((unit) => unit.side === 2
+          ? { ...unit, experience: 0, life: 180 }
+          : { ...unit }),
+      },
+    };
+
+    expect(isSaveData(legacy)).toBe(false);
+    const migrated = parseSaveData(JSON.stringify(legacy));
+    expect(migrated).toEqual(current);
+    expect(parseSaveData(JSON.stringify(migrated))).toEqual(current);
   });
 
   it("rejects malformed JSON and shallow lookalikes", () => {
     expect(parseSaveData("{")).toBeUndefined();
     expect(isSaveData({
       format: "ANGEL2-web-save",
-      version: 2,
+      version: SAVE_VERSION,
       kind: "battle",
       difficulty: 0,
       battle: { phase: "player" },
@@ -128,6 +148,14 @@ describe("Web save validation", () => {
     const mismatchedId = battleSave();
     mismatchedId.battle.units[0].id = "1:7";
     expect(isSaveData(mismatchedId)).toBe(false);
+
+    const unseededEnemy = battleSave();
+    unseededEnemy.battle.units[1].experience = 0;
+    expect(isSaveData(unseededEnemy)).toBe(false);
+
+    const overfullEnemy = battleSave();
+    overfullEnemy.battle.units[1].life = 271;
+    expect(isSaveData(overfullEnemy)).toBe(false);
   });
 
   it("rejects duplicate occupancy and roster snapshots that disagree with battle state", () => {

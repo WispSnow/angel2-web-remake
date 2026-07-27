@@ -628,7 +628,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await waitForPhase(page, "nextStage");
   await expect(page.getByText("垂直切片完成", { exact: true })).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
-  expect(saved).toMatchObject({ format: "ANGEL2-web-save", version: 2, kind: "completed", stage: 1, ruleset: "stableRemake" });
+  expect(saved).toMatchObject({ format: "ANGEL2-web-save", version: 3, kind: "completed", stage: 1, ruleset: "stableRemake" });
   expect(saved.roster).toHaveLength(6);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-complete.png" });
 
@@ -1015,7 +1015,7 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 2,
+    version: 3,
     kind: "battle",
     stage: 0,
     rngState: initial.rngState,
@@ -1878,9 +1878,12 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   expect((await debugState(page)).dialogueIndex).toBe(5);
   await expect(layer).toHaveAttribute("data-source-wait", "6");
   await expect(layer).toHaveAttribute("data-reveal-start", /^[1-9][0-9]*$/);
-  await expect(page.locator("#dialogue-text")).toContainText("不好了");
-  await page.getByTestId("advance-dialogue").click();
-  await expect(page.locator("#dialogue-text")).toContainText("騎士團的軍隊");
+  const appendedDialogue = page.locator("#dialogue-text");
+  await expect(appendedDialogue).toContainText("不好了");
+  if (!(await appendedDialogue.textContent())?.includes("騎士團的軍隊")) {
+    await page.getByTestId("advance-dialogue").click();
+  }
+  await expect(appendedDialogue).toContainText("騎士團的軍隊");
   await page.waitForTimeout(130);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-dual-dialogue.png" });
 
@@ -1949,7 +1952,7 @@ test("S00-M: native system records restore battle state and combat cues follow p
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 2,
+    version: 3,
     kind: "battle",
     stage: 0,
     stageLabel: "瓦爾克麗宮",

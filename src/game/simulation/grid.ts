@@ -1,4 +1,4 @@
-import { MOVEMENT_RULES, STAGE0, statsFor, terrainSlotAt } from "../content/stage0";
+import { CLASS_ROWS, MOVEMENT_RULES, STAGE0, terrainSlotAt } from "../content/stage0";
 import type { BattleUnit, Position, UnitClassId } from "../types";
 
 export const positionKey = ({ x, y }: Position): string => `${x},${y}`;
@@ -116,7 +116,7 @@ export function zoneOfControl(unit: BattleUnit, units: readonly BattleUnit[]): R
 }
 
 function unitStatsMovement(unit: BattleUnit): number {
-  return statsFor(unit).movement;
+  return CLASS_ROWS[unit.classId][0].movement;
 }
 
 export function shortestPath(

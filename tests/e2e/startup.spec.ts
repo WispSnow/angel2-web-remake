@@ -6,7 +6,7 @@ import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
 
 const battleSave = (): BattleSaveData => {
-  const units = createStage0Units();
+  const units = createStage0Units(2);
   const nia = units.find((unit) => unit.id === "1:0");
   if (!nia) throw new Error("missing Nia fixture");
   nia.x = 29;
@@ -19,7 +19,7 @@ const battleSave = (): BattleSaveData => {
 
   return {
     format: "ANGEL2-web-save",
-    version: 2,
+    version: 3,
     kind: "battle",
     savedAt: "2026-07-25T12:00:00.000Z",
     saveCount: 4,
@@ -59,10 +59,28 @@ const completedSave = (): CompletedSaveData => {
   };
 };
 
+const legacyBattleSave = () => {
+  const source = battleSave();
+  return {
+    ...source,
+    version: 2 as const,
+    battle: {
+      ...source.battle,
+      units: source.battle.units.map((unit) => unit.side === 2
+        ? {
+            ...unit,
+            experience: 0,
+            life: unit.classId === 22 ? 200 : 160,
+          }
+        : { ...unit }),
+    },
+  };
+};
+
 const writeLocalSave = (
   page: Page,
   slot: number,
-  value: BattleSaveData | CompletedSaveData | string,
+  value: BattleSaveData | CompletedSaveData | ReturnType<typeof legacyBattleSave> | string,
 ) => page.evaluate(({ key, serialized }) => {
   localStorage.setItem(key, serialized);
 }, {
@@ -169,8 +187,8 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   expect(pageErrors).toEqual([]);
 });
 
-test("BOOT-B: persisted battle slots survive reload and restore exact state from the title", async ({ page }) => {
-  const save = battleSave();
+test("BOOT-B: persisted battle slots survive reload and migrate version 2 from the title", async ({ page }) => {
+  const save = legacyBattleSave();
   await page.goto("/?test=1");
   await writeLocalSave(page, 1, save);
   await writeLocalSave(page, 2, "{");
@@ -242,6 +260,10 @@ test("BOOT-B: persisted battle slots survive reload and restore exact state from
     y: 26,
     life: 140,
     experience: 100,
+  });
+  expect(state.units.find((unit) => unit.id === "2:15")).toMatchObject({
+    life: 270,
+    experience: 461,
   });
   await expect(page.locator("#status-strip")).toHaveText("已讀取記錄 1。");
   await page.getByTestId("game-screen").screenshot({
