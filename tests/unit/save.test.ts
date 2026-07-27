@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { isSaveData, parseSaveData } from "../../src/game/save";
+import {
+  isSaveData,
+  moveSaveSlotIndex,
+  moveSaveSlotPage,
+  parseSaveData,
+  readSaveSlot,
+  SAVE_SLOT_COUNT,
+  SAVE_SLOT_PAGE_COUNT,
+  SAVE_SLOTS_PER_PAGE,
+  saveSlotPageIndex,
+  saveSlotPageStart,
+  saveSlotKey,
+} from "../../src/game/save";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -72,6 +84,22 @@ const battleSave = (): BattleSaveData => ({
 });
 
 describe("Web save validation", () => {
+  it("exposes twenty manual slots as four pages without changing legacy keys", () => {
+    expect(SAVE_SLOT_COUNT).toBe(20);
+    expect(SAVE_SLOTS_PER_PAGE).toBe(5);
+    expect(SAVE_SLOT_PAGE_COUNT).toBe(4);
+    expect(saveSlotKey(1)).toBe("angel2.save.1");
+    expect(saveSlotKey(5)).toBe("angel2.save.5");
+    expect(saveSlotKey(20)).toBe("angel2.save.20");
+    expect(saveSlotPageIndex(0)).toBe(0);
+    expect(saveSlotPageIndex(19)).toBe(3);
+    expect(saveSlotPageStart(17)).toBe(15);
+    expect(moveSaveSlotIndex(4, 1)).toBe(5);
+    expect(moveSaveSlotIndex(19, 1)).toBe(0);
+    expect(moveSaveSlotPage(2, -1)).toBe(17);
+    expect(moveSaveSlotPage(17, 1)).toBe(2);
+  });
+
   it("accepts complete version-2 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
@@ -117,5 +145,21 @@ describe("Web save validation", () => {
     expect(isSaveData({ ...completedSave(), stage: 0 })).toBe(false);
     expect(isSaveData({ ...completedSave(), battle: battleSave().battle })).toBe(false);
     expect(isSaveData({ ...battleSave(), stageLabel: "下一關" })).toBe(false);
+  });
+
+  it("distinguishes empty, invalid and readable persistent slots", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+    };
+
+    expect(readSaveSlot(storage, 1)).toEqual({ kind: "empty" });
+
+    values.set(saveSlotKey(1), "{");
+    expect(readSaveSlot(storage, 1)).toEqual({ kind: "invalid" });
+
+    const save = battleSave();
+    values.set(saveSlotKey(1), JSON.stringify(save));
+    expect(readSaveSlot(storage, 1)).toEqual({ kind: "valid", save });
   });
 });

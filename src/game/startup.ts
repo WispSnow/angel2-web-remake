@@ -6,15 +6,37 @@ import {
   NATIVE_INTRO_SCROLL_UPDATES,
   STARTUP_ASSETS,
 } from "./content/startup";
+import { statsFor } from "./content/stage0";
 import { configureGameScaling } from "./scaling";
-import type { Difficulty } from "./types";
+import {
+  moveSaveSlotIndex,
+  moveSaveSlotPage,
+  readSaveSlot,
+  SAVE_SLOT_COUNT,
+  SAVE_SLOT_PAGE_COUNT,
+  SAVE_SLOTS_PER_PAGE,
+  saveSlotPageIndex,
+  saveSlotPageStart,
+  type SaveSlotReadResult,
+} from "./save";
+import type { Difficulty, SaveData } from "./types";
 
-type StartupPhase = "intro" | "title" | "difficulty";
+type StartupPhase = "intro" | "title" | "difficulty" | "records";
 
 export interface NewGameSelection {
+  kind: "new";
   difficulty: Difficulty;
   userActivated: boolean;
 }
+
+export interface ContinueGameSelection {
+  kind: "continue";
+  save: SaveData;
+  slot: number;
+  userActivated: boolean;
+}
+
+export type StartupSelection = NewGameSelection | ContinueGameSelection;
 
 const TITLE_OPTIONS = ["遊戲開始", "繼續遊戲"] as const;
 const INTRO_TRANSITION_HALF_UPDATES = 21;
@@ -41,13 +63,15 @@ const required = <T extends HTMLElement>(root: ParentNode, selector: string): T 
 
 export function mountStartup(
   root: HTMLElement,
-  startGame: (selection: NewGameSelection) => void,
+  startGame: (selection: StartupSelection) => void,
 ): () => void {
   const testMode = new URLSearchParams(location.search).has("test");
   const introDuration = testMode ? 8_000 : NATIVE_INTRO_DURATION_MS;
   let phase: StartupPhase = "intro";
   let titleIndex = 0;
   let difficultyIndex = 0;
+  let recordIndex = 0;
+  let recordSlots: SaveSlotReadResult[] = [];
   let introFrame = 0;
   let titleReadyTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let disposed = false;
@@ -98,6 +122,24 @@ export function mountStartup(
                     data-difficulty="${option.value}" data-testid="difficulty-${option.value}">${option.label}</button>
                 `).join("")}
               </div>
+              <section class="startup-record-selector" data-testid="title-record-menu"
+                aria-label="讀取遊戲進度" hidden>
+                <h2>讀取遊戲進度</h2>
+                <div class="startup-record-header" aria-hidden="true">
+                  <span>槽</span><span>職業</span><span>等級</span><span>經驗值</span><span>儲存次數</span><span>難度</span>
+                </div>
+                <div class="startup-record-slots" role="menu"
+                  aria-label="二十個手動遊戲進度槽，每頁五個"></div>
+                <div class="startup-record-pagination" aria-label="記錄槽分頁">
+                  <button type="button" data-startup-action="record-page" data-page-delta="-1"
+                    data-testid="title-record-previous-page" aria-label="上一頁">◀</button>
+                  <span data-testid="title-record-page"></span>
+                  <button type="button" data-startup-action="record-page" data-page-delta="1"
+                    data-testid="title-record-next-page" aria-label="下一頁">▶</button>
+                </div>
+                <p class="startup-record-detail" data-testid="title-record-detail" aria-live="polite"></p>
+                <p class="startup-record-help">↑↓ 選擇　←→ 翻頁　確認讀取　Esc 返回</p>
+              </section>
               <p class="startup-menu-status" data-testid="title-status" aria-live="polite"></p>
             </section>
           </section>
@@ -116,6 +158,10 @@ export function mountStartup(
   const difficultyMenuFrame = required<HTMLImageElement>(root, ".startup-difficulty-menu-frame");
   const titleMenu = required(root, ".title-menu");
   const difficultyMenu = required(root, ".difficulty-menu");
+  const recordSelector = required(root, ".startup-record-selector");
+  const recordSlotList = required(root, ".startup-record-slots");
+  const recordPage = required(root, "[data-testid=title-record-page]");
+  const recordDetail = required<HTMLParagraphElement>(root, ".startup-record-detail");
   const titleStatus = required<HTMLParagraphElement>(root, ".startup-menu-status");
   const stopScaling = configureGameScaling(viewport, screen);
   const introAudio = new Audio(STARTUP_ASSETS.audio.intro);
@@ -133,6 +179,60 @@ export function mountStartup(
     audio.currentTime = 0;
   };
 
+  const recordDescription = (result: SaveSlotReadResult, slot: number): string => {
+    if (result.kind === "empty") return `記錄 ${slot}：此處沒有記錄。`;
+    if (result.kind === "invalid") return `記錄 ${slot}：資料損壞或版本不相容，無法讀取。`;
+    const { save } = result;
+    const progress = save.kind === "battle" ? `第 ${save.battle.round} 回合` : "戰役完成";
+    const savedAt = `${save.savedAt.slice(0, 16).replace("T", " ")} UTC`;
+    return `記錄 ${slot}：${save.stageLabel}・${progress}・stableRemake・${savedAt}`;
+  };
+
+  const recordCells = (result: SaveSlotReadResult): readonly string[] => {
+    if (result.kind === "empty") return ["XX", "XX", "XX", "XX", "XX"];
+    if (result.kind === "invalid") return ["損壞", "—", "—", "—", "—"];
+    const representative = result.save.roster[0];
+    return [
+      representative ? (representative.classId === 22 ? "騎兵" : "士兵") : "—",
+      representative ? String(statsFor(representative).level) : "—",
+      representative ? String(representative.experience) : "—",
+      String(result.save.saveCount),
+      DIFFICULTY_OPTIONS[result.save.difficulty].label,
+    ];
+  };
+
+  const escapeAttribute = (value: string): string => value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+  const renderRecordSlots = () => {
+    const start = saveSlotPageStart(recordIndex);
+    const visibleSlots = recordSlots.slice(start, start + SAVE_SLOTS_PER_PAGE);
+    recordSlotList.innerHTML = visibleSlots.map((result, localIndex) => {
+      const index = start + localIndex;
+      const slot = index + 1;
+      const cells = recordCells(result);
+      return `
+        <button type="button" role="menuitem" class="startup-record-slot"
+          data-startup-action="record" data-menu-index="${index}" data-slot-state="${result.kind}"
+          data-testid="title-record-slot-${slot}" aria-label="${escapeAttribute(recordDescription(result, slot))}">
+          <span>${slot}</span>${cells.map((cell) => `<span>${cell}</span>`).join("")}
+        </button>`;
+    }).join("");
+    const page = saveSlotPageIndex(recordIndex);
+    recordPage.textContent = `第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁`;
+    recordSlotList.setAttribute("aria-label", `手動遊戲進度槽，第 ${page + 1} 頁，共 ${SAVE_SLOT_PAGE_COUNT} 頁`);
+  };
+
+  const setRecordIndex = (nextIndex: number) => {
+    const pageChanged = saveSlotPageIndex(nextIndex) !== saveSlotPageIndex(recordIndex);
+    recordIndex = nextIndex;
+    if (pageChanged) renderRecordSlots();
+    updateMenuSelection();
+  };
+
   const updateMenuSelection = () => {
     for (const button of titleMenu.querySelectorAll<HTMLButtonElement>("button")) {
       const selected = Number(button.dataset.menuIndex) === titleIndex;
@@ -144,8 +244,17 @@ export function mountStartup(
       button.classList.toggle("is-selected", selected);
       button.setAttribute("aria-current", String(selected));
     }
+    for (const button of recordSlotList.querySelectorAll<HTMLButtonElement>("button")) {
+      const selected = Number(button.dataset.menuIndex) === recordIndex;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-current", String(selected));
+    }
     screen.dataset.titleIndex = String(titleIndex);
     screen.dataset.difficultyIndex = String(difficultyIndex);
+    screen.dataset.recordIndex = String(recordIndex);
+    if (phase === "records" && recordSlots[recordIndex]) {
+      recordDetail.textContent = recordDescription(recordSlots[recordIndex], recordIndex + 1);
+    }
   };
 
   const showTitleMenu = () => {
@@ -155,6 +264,7 @@ export function mountStartup(
     difficultyMenuFrame.hidden = true;
     titleMenu.hidden = false;
     difficultyMenu.hidden = true;
+    recordSelector.hidden = true;
     titleStatus.textContent = "";
     updateMenuSelection();
   };
@@ -182,14 +292,31 @@ export function mountStartup(
     difficultyMenuFrame.hidden = false;
     titleMenu.hidden = true;
     difficultyMenu.hidden = false;
+    recordSelector.hidden = true;
     titleStatus.textContent = "";
+    updateMenuSelection();
+  };
+
+  const showRecordMenu = () => {
+    phase = "records";
+    recordIndex = 0;
+    recordSlots = Array.from({ length: SAVE_SLOT_COUNT }, (_, index) =>
+      readSaveSlot(localStorage, index + 1));
+    screen.dataset.startupPhase = phase;
+    titleMenuFrame.hidden = true;
+    difficultyMenuFrame.hidden = true;
+    titleMenu.hidden = true;
+    difficultyMenu.hidden = true;
+    recordSelector.hidden = false;
+    titleStatus.textContent = "";
+    renderRecordSlots();
     updateMenuSelection();
   };
 
   const finishStartup = () => {
     const difficulty = DIFFICULTY_OPTIONS[difficultyIndex].value;
     cleanup();
-    startGame({ difficulty, userActivated: true });
+    startGame({ kind: "new", difficulty, userActivated: true });
   };
 
   const activateTitleOption = () => {
@@ -197,11 +324,18 @@ export function mountStartup(
       showDifficultyMenu();
       return;
     }
-    const hasReadableRecord = Array.from({ length: 5 }, (_, index) =>
-      localStorage.getItem(`angel2.save.${index + 1}`)).some(Boolean);
-    titleStatus.textContent = hasReadableRecord
-      ? "讀取遊戲進度介面將在後續切片接續。"
-      : "目前沒有可讀取的遊戲進度。";
+    showRecordMenu();
+  };
+
+  const activateRecordOption = () => {
+    const result = recordSlots[recordIndex];
+    if (!result || result.kind !== "valid") {
+      recordDetail.textContent = recordDescription(result ?? { kind: "empty" }, recordIndex + 1);
+      return;
+    }
+    const slot = recordIndex + 1;
+    cleanup();
+    startGame({ kind: "continue", save: result.save, slot, userActivated: true });
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -225,6 +359,24 @@ export function mountStartup(
       }
       return;
     }
+    if (phase === "records") {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        showTitleMenu();
+      } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault();
+        const delta = event.key === "ArrowUp" ? -1 : 1;
+        setRecordIndex(moveSaveSlotIndex(recordIndex, delta));
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        const delta = event.key === "ArrowLeft" ? -1 : 1;
+        setRecordIndex(moveSaveSlotPage(recordIndex, delta));
+      } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        activateRecordOption();
+      }
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       stopAudio(titleAudio);
@@ -243,9 +395,14 @@ export function mountStartup(
   const onPointerOver = (event: PointerEvent) => {
     const button = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action]");
     if (!button) return;
+    if (button.dataset.startupAction === "record-page") return;
     const index = Number(button.dataset.menuIndex);
     if (button.dataset.startupAction === "title") titleIndex = index;
-    else difficultyIndex = index;
+    else if (button.dataset.startupAction === "difficulty") difficultyIndex = index;
+    else {
+      setRecordIndex(index);
+      return;
+    }
     titleStatus.textContent = "";
     updateMenuSelection();
   };
@@ -254,15 +411,22 @@ export function mountStartup(
     const button = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action]");
     if (!button) return;
     if (titleAudio.paused) play(titleAudio);
+    if (button.dataset.startupAction === "record-page") {
+      setRecordIndex(moveSaveSlotPage(recordIndex, Number(button.dataset.pageDelta)));
+      return;
+    }
     const index = Number(button.dataset.menuIndex);
     if (button.dataset.startupAction === "title") {
       titleIndex = index;
       updateMenuSelection();
       activateTitleOption();
-    } else {
+    } else if (button.dataset.startupAction === "difficulty") {
       difficultyIndex = index;
       updateMenuSelection();
       finishStartup();
+    } else {
+      setRecordIndex(index);
+      activateRecordOption();
     }
   };
 

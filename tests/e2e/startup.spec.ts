@@ -1,7 +1,74 @@
 import { mkdirSync } from "node:fs";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { createStage0Units } from "../../src/game/content/stage0";
+import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
+
+const battleSave = (): BattleSaveData => {
+  const units = createStage0Units();
+  const nia = units.find((unit) => unit.id === "1:0");
+  if (!nia) throw new Error("missing Nia fixture");
+  nia.x = 29;
+  nia.y = 26;
+  nia.experience = 100;
+  nia.life = 140;
+  const actedAlly = units.find((unit) => unit.id === "1:43");
+  if (!actedAlly) throw new Error("missing allied fixture");
+  actedAlly.acted = true;
+
+  return {
+    format: "ANGEL2-web-save",
+    version: 2,
+    kind: "battle",
+    savedAt: "2026-07-25T12:00:00.000Z",
+    saveCount: 4,
+    stage: 0,
+    stageLabel: "瓦爾克麗宮",
+    ruleset: "stableRemake",
+    difficulty: 2,
+    rngState: 0x1020_3040,
+    roster: units
+      .filter((unit) => unit.side === 1)
+      .map(({ slot, classId, experience, life }) => ({ slot, classId, experience, life })),
+    battle: {
+      phase: "player",
+      round: 3,
+      focusId: nia.id,
+      units,
+      cursor: { x: 29, y: 26 },
+      cameraOrigin: { x: 25, y: 23 },
+    },
+  };
+};
+
+const completedSave = (): CompletedSaveData => {
+  const source = battleSave();
+  return {
+    format: source.format,
+    version: source.version,
+    kind: "completed",
+    savedAt: source.savedAt,
+    saveCount: source.saveCount,
+    stage: 1,
+    stageLabel: "下一關",
+    ruleset: source.ruleset,
+    difficulty: source.difficulty,
+    rngState: source.rngState,
+    roster: source.roster,
+  };
+};
+
+const writeLocalSave = (
+  page: Page,
+  slot: number,
+  value: BattleSaveData | CompletedSaveData | string,
+) => page.evaluate(({ key, serialized }) => {
+  localStorage.setItem(key, serialized);
+}, {
+  key: `angel2.save.${slot}`,
+  serialized: typeof value === "string" ? value : JSON.stringify(value),
+});
 
 test("title artwork uses staged palette fades before the menu appears", async ({ page }) => {
   await page.goto("/");
@@ -100,4 +167,102 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
+});
+
+test("BOOT-B: persisted battle slots survive reload and restore exact state from the title", async ({ page }) => {
+  const save = battleSave();
+  await page.goto("/?test=1");
+  await writeLocalSave(page, 1, save);
+  await writeLocalSave(page, 2, "{");
+  await writeLocalSave(page, 20, save);
+  await page.reload();
+
+  await page.keyboard.press("x");
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.getByTestId("continue-game").click();
+
+  const recordMenu = page.getByTestId("title-record-menu");
+  await expect(recordMenu).toBeVisible();
+  await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "records");
+  await expect(recordMenu.getByRole("menuitem")).toHaveCount(5);
+  await expect(page.getByTestId("title-record-page")).toHaveText("第 1／4 頁");
+  await expect(page.getByTestId("title-record-slot-1")).toHaveAttribute("data-slot-state", "valid");
+  await expect(page.getByTestId("title-record-slot-1")).toContainText("士兵");
+  await expect(page.getByTestId("title-record-slot-1")).toContainText("困難重重");
+  await expect(page.getByTestId("title-record-slot-2")).toHaveAttribute("data-slot-state", "invalid");
+  await expect(page.getByTestId("title-record-slot-3")).toHaveAttribute("data-slot-state", "empty");
+  await recordMenu.screenshot({ path: "artifacts/playwright/startup-title-record-menu.png" });
+
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("title-record-detail")).toContainText("資料損壞");
+  await expect(recordMenu).toBeVisible();
+
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("title-record-detail")).toContainText("沒有記錄");
+  await expect(recordMenu).toBeVisible();
+
+  await page.mouse.move(0, 0);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("title-record-page")).toHaveText("第 4／4 頁");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("title-record-slot-20")).toHaveAttribute("data-slot-state", "valid");
+  await expect(page.getByTestId("title-record-slot-20")).toHaveAttribute("aria-current", "true");
+  await recordMenu.screenshot({
+    path: "artifacts/playwright/startup-title-record-page-4.png",
+  });
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.getByTestId("continue-game").click();
+  await page.getByTestId("title-record-slot-1").click();
+
+  await page.waitForFunction(() => window.__ANGEL2__?.getState().phase === "player");
+  const state = await page.evaluate(() => window.__ANGEL2__?.getState() as {
+    phase: string;
+    difficulty: number;
+    round: number;
+    rngState: number;
+    cursor: { x: number; y: number };
+    cameraOrigin: { x: number; y: number };
+    units: Array<{ id: string; x: number; y: number; life: number; experience: number }>;
+  });
+  expect(state).toMatchObject({
+    phase: "player",
+    difficulty: save.difficulty,
+    round: save.battle.round,
+    rngState: save.rngState,
+    cursor: save.battle.cursor,
+    cameraOrigin: save.battle.cameraOrigin,
+  });
+  expect(state.units.find((unit) => unit.id === "1:0")).toMatchObject({
+    x: 29,
+    y: 26,
+    life: 140,
+    experience: 100,
+  });
+  await expect(page.locator("#status-strip")).toHaveText("已讀取記錄 1。");
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/startup-title-record-restored-battle.png",
+  });
+});
+
+test("BOOT-C: a normal reconnect loads a completed slot into the next-stage route", async ({ page }) => {
+  const save = completedSave();
+  await page.goto("/");
+  await writeLocalSave(page, 1, save);
+  await page.reload();
+  expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
+
+  await page.keyboard.press("x");
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.getByTestId("continue-game").click();
+  await expect(page.getByTestId("title-record-detail")).toContainText("下一關");
+  await page.getByTestId("title-record-slot-1").click();
+
+  await expect(page.getByText("下一關路由已建立", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBe(JSON.stringify(save));
 });

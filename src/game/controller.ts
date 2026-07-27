@@ -14,7 +14,13 @@ import {
   saveSoundPreferences,
   type MusicVolume,
 } from "./preferences";
-import { parseSaveData } from "./save";
+import {
+  moveSaveSlotIndex,
+  moveSaveSlotPage,
+  readSaveSlot,
+  SAVE_SLOT_COUNT,
+  saveSlotKey,
+} from "./save";
 import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData } from "./types";
 
 type Listener = () => void;
@@ -173,6 +179,12 @@ export class GameController {
     this.movementSoundEnabled = soundPreferences.movementSoundEnabled;
     this.combatSoundEnabled = soundPreferences.combatSoundEnabled;
     this.keySoundEnabled = soundPreferences.keySoundEnabled;
+  }
+
+  static fromSave(save: SaveData, slot: number): GameController {
+    const controller = new GameController(save.difficulty);
+    controller.restoreSave(save, `已讀取記錄 ${slot}。`);
+    return controller;
   }
 
   onChange(listener: Listener): () => void {
@@ -1313,13 +1325,24 @@ export class GameController {
   }
 
   selectSaveSlot(slot: number): void {
-    if (this.phase !== "saveSlots" || slot < 1 || slot > 5) return;
+    if (this.phase !== "saveSlots" || slot < 1 || slot > SAVE_SLOT_COUNT) return;
     this.writeCompletedSave(slot);
   }
 
   selectPostSaveSlot(index: number): void {
-    if (this.phase !== "saveSlots" || index < 0 || index > 4 || index === this.postSaveSlotIndex) return;
+    if (
+      this.phase !== "saveSlots"
+      || index < 0
+      || index >= SAVE_SLOT_COUNT
+      || index === this.postSaveSlotIndex
+    ) return;
     this.postSaveSlotIndex = index;
+    this.emit();
+  }
+
+  movePostSaveSlotPage(delta: number): void {
+    if (this.phase !== "saveSlots" || delta === 0) return;
+    this.postSaveSlotIndex = moveSaveSlotPage(this.postSaveSlotIndex, delta);
     this.emit();
   }
 
@@ -1337,9 +1360,8 @@ export class GameController {
   }
 
   readSave(slot: number): SaveData | undefined {
-    const raw = localStorage.getItem(`angel2.save.${slot}`);
-    if (!raw) return undefined;
-    return parseSaveData(raw);
+    const result = readSaveSlot(localStorage, slot);
+    return result.kind === "valid" ? result.save : undefined;
   }
 
   private writeCompletedSave(slot: number): void {
@@ -1357,7 +1379,7 @@ export class GameController {
       rngState: this.battle.rng.state,
       roster: this.battle.units.filter((unit) => unit.side === 1).map(({ slot: unitSlot, classId, experience, life }) => ({ slot: unitSlot, classId, experience, life })),
     };
-    localStorage.setItem(`angel2.save.${slot}`, JSON.stringify(save));
+    localStorage.setItem(saveSlotKey(slot), JSON.stringify(save));
     this.pendingSaveSlot = undefined;
     this.goToNextStage();
   }
@@ -1390,12 +1412,23 @@ export class GameController {
 
   moveRecordMenuSelection(delta: number): void {
     if (!this.recordMenuMode || delta === 0) return;
-    this.recordMenuIndex = (this.recordMenuIndex + delta + 5) % 5;
+    this.recordMenuIndex = moveSaveSlotIndex(this.recordMenuIndex, delta);
+    this.emit();
+  }
+
+  moveRecordMenuPage(delta: number): void {
+    if (!this.recordMenuMode || delta === 0) return;
+    this.recordMenuIndex = moveSaveSlotPage(this.recordMenuIndex, delta);
     this.emit();
   }
 
   selectRecordMenuSlot(index: number): void {
-    if (!this.recordMenuMode || index < 0 || index > 4 || index === this.recordMenuIndex) return;
+    if (
+      !this.recordMenuMode
+      || index < 0
+      || index >= SAVE_SLOT_COUNT
+      || index === this.recordMenuIndex
+    ) return;
     this.recordMenuIndex = index;
     this.emit();
   }
@@ -1431,7 +1464,7 @@ export class GameController {
         cameraOrigin: { ...this.cameraOrigin },
       },
     };
-    localStorage.setItem(`angel2.save.${slot}`, JSON.stringify(save));
+    localStorage.setItem(saveSlotKey(slot), JSON.stringify(save));
     this.recordMenuMode = undefined;
     this.recordMenuReturn = undefined;
     this.recordMenuIndex = 0;
@@ -1440,16 +1473,22 @@ export class GameController {
   }
 
   private loadSave(slot: number): void {
-    const save = this.readSave(slot);
-    if (!save) {
+    const result = readSaveSlot(localStorage, slot);
+    if (result.kind !== "valid") {
       this.statusMessage = "此記錄位置沒有可讀取的資料。";
       this.emit();
       return;
     }
+    this.restoreSave(result.save, `已讀取記錄 ${slot}。`);
+    this.emit();
+  }
+
+  private restoreSave(save: SaveData, message: string): void {
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
       this.recordMenuReturn = undefined;
-      this.goToNextStage();
+      this.phase = "nextStage";
+      this.statusMessage = message;
       return;
     }
     const battle = new Stage0Battle(new DeterministicRng(save.rngState));
@@ -1469,11 +1508,14 @@ export class GameController {
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
     this.quitConfirmOpen = false;
+    this.groupCommandOpen = false;
+    this.retreatConfirmOpen = false;
+    this.objectiveOpen = false;
     this.movementPresentation = undefined;
     this.combatPresentation = undefined;
+    this.busy = false;
     this.resetAction();
-    this.statusMessage = `已讀取記錄 ${slot}。`;
-    this.emit();
+    this.statusMessage = message;
   }
 
   requestQuit(): void {
@@ -1527,7 +1569,10 @@ export class GameController {
     }
     if (this.phase === "saveSlots") {
       if (delta.y !== 0) {
-        this.postSaveSlotIndex = (this.postSaveSlotIndex + delta.y + 5) % 5;
+        this.postSaveSlotIndex = moveSaveSlotIndex(this.postSaveSlotIndex, delta.y);
+        this.emit();
+      } else if (delta.x !== 0) {
+        this.postSaveSlotIndex = moveSaveSlotPage(this.postSaveSlotIndex, delta.x);
         this.emit();
       }
       return;
@@ -1535,6 +1580,7 @@ export class GameController {
     if (this.phase !== "player" || this.objectiveOpen || this.busy) return;
     if (this.recordMenuMode) {
       if (delta.y !== 0) this.moveRecordMenuSelection(delta.y);
+      else if (delta.x !== 0) this.moveRecordMenuPage(delta.x);
       return;
     }
     if (this.quitConfirmOpen) {
@@ -1970,7 +2016,9 @@ export function exposeDebugApi(controller: GameController): void {
     forceMultipleTargets: () => controller.forceMultipleTargetsForTest(),
     forceCavalryCounterSetup: () => controller.forceCavalryCounterSetupForTest(),
     clearSaves: () => {
-      for (let slot = 1; slot <= 5; slot += 1) localStorage.removeItem(`angel2.save.${slot}`);
+      for (let slot = 1; slot <= SAVE_SLOT_COUNT; slot += 1) {
+        localStorage.removeItem(saveSlotKey(slot));
+      }
     },
   };
 }

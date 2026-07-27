@@ -616,10 +616,18 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("save-yes").click();
   await expect(page.locator("[data-action=save-slot]")).toHaveCount(5);
-  await page.getByTestId("save-slot-1").click();
+  await expect(page.getByTestId("post-save-page")).toHaveText("第 1／4 頁");
+  await page.getByTestId("post-save-next-page").click();
+  await page.getByTestId("post-save-next-page").click();
+  await page.getByTestId("post-save-next-page").click();
+  await expect(page.getByTestId("post-save-page")).toHaveText("第 4／4 頁");
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-post-save-page-4.png",
+  });
+  await page.getByTestId("save-slot-20").click();
   await waitForPhase(page, "nextStage");
   await expect(page.getByText("垂直切片完成", { exact: true })).toBeVisible();
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({ format: "ANGEL2-web-save", version: 2, kind: "completed", stage: 1, ruleset: "stableRemake" });
   expect(saved.roster).toHaveLength(6);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-complete.png" });
@@ -991,10 +999,20 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   await saveHotspot.click();
   await expect(page.getByTestId("record-menu")).toBeVisible();
   expect((await debugState(page))).toMatchObject({ recordMenuMode: "save", recordMenuReturn: "battle" });
+  await expect(page.locator("[data-action=record-slot]")).toHaveCount(5);
+  await expect(page.getByTestId("record-page")).toHaveText("第 1／4 頁");
   await expect(page.getByTestId("record-slot-1")).toContainText("此處沒有記錄");
-  await page.getByTestId("record-slot-1").click();
+  await page.getByTestId("record-next-page").click();
+  await page.getByTestId("record-next-page").click();
+  await page.getByTestId("record-next-page").click();
+  await expect(page.getByTestId("record-page")).toHaveText("第 4／4 頁");
+  await expect(page.getByTestId("record-slot-20")).toContainText("此處沒有記錄");
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-record-page-4.png",
+  });
+  await page.getByTestId("record-slot-20").click();
   await expect(page.getByTestId("record-menu")).toBeHidden();
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
     version: 2,
@@ -1022,7 +1040,9 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   expect((await debugState(page)).units).not.toEqual(initial.units);
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await loadHotspot.click();
-  await page.getByTestId("record-slot-1").click();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("record-page")).toHaveText("第 4／4 頁");
+  await page.getByTestId("record-slot-20").click();
   const restored = await debugState(page);
   expect(restored.round).toBe(initial.round);
   expect(restored.units).toEqual(initial.units);

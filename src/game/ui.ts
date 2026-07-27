@@ -16,6 +16,12 @@ import {
   SIDE_PANEL_TOGGLE_VISUALS,
   type SidePanelToggleVisualId,
 } from "./side-panel";
+import {
+  SAVE_SLOT_PAGE_COUNT,
+  SAVE_SLOTS_PER_PAGE,
+  saveSlotPageIndex,
+  saveSlotPageStart,
+} from "./save";
 
 const storyPhases = new Set<GamePhase>(["prebattleStory", "openingStory", "round2Story", "victoryStory"]);
 
@@ -393,6 +399,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       controller.selectRecordMenuSlot(Number(button.dataset.recordIndex));
       controller.activateRecordMenuSelection();
     }
+    else if (action === "record-page") {
+      controller.moveRecordMenuPage(Number(button.dataset.recordPageDelta));
+    }
     else if (action === "close-record-menu") controller.closeRecordMenu();
     else if (action === "quit-confirm") {
       if (!finishFeedbackTyping()) controller.confirmQuit();
@@ -429,6 +438,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "save-yes") controller.showSaveSlots();
     else if (action === "save-no") controller.skipSave();
     else if (action === "save-slot") controller.selectSaveSlot(Number(button.dataset.slot));
+    else if (action === "post-save-page") {
+      controller.movePostSaveSlotPage(Number(button.dataset.postSavePageDelta));
+    }
     else if (action === "overwrite-confirm") controller.confirmOverwrite();
     else if (action === "overwrite-cancel") controller.cancelOverwrite();
   });
@@ -570,7 +582,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     recordMenu.hidden = controller.recordMenuMode === undefined;
     if (!recordMenu.hidden) {
       const mode = controller.recordMenuMode;
-      const slots = Array.from({ length: 5 }, (_, index) => {
+      const page = saveSlotPageIndex(controller.recordMenuIndex);
+      const start = saveSlotPageStart(controller.recordMenuIndex);
+      const slots = Array.from({ length: SAVE_SLOTS_PER_PAGE }, (_, localIndex) => {
+        const index = start + localIndex;
         const slot = index + 1;
         const save = controller.readSave(slot);
         const selected = index === controller.recordMenuIndex;
@@ -579,7 +594,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           : "此處沒有記錄";
         return `<button type="button" role="menuitem" data-action="record-slot" data-record-index="${index}" data-testid="record-slot-${slot}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}" ${mode === "load" && !save ? "disabled" : ""}><b>${slot}</b><span>${label}</span></button>`;
       }).join("");
-      recordMenu.innerHTML = `<strong>${mode === "save" ? "儲存遊戲進度" : "讀取遊戲進度"}</strong>${slots}<button type="button" data-action="close-record-menu">取 消</button>`;
+      recordMenu.innerHTML = `<strong>${mode === "save" ? "儲存遊戲進度" : "讀取遊戲進度"}</strong>${slots}
+        <div class="record-menu-pagination">
+          <button type="button" data-action="record-page" data-record-page-delta="-1"
+            data-testid="record-previous-page" aria-label="上一頁">◀</button>
+          <span data-testid="record-page">第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁</span>
+          <button type="button" data-action="record-page" data-record-page-delta="1"
+            data-testid="record-next-page" aria-label="下一頁">▶</button>
+        </div>
+        <button type="button" data-action="close-record-menu">取 消</button>`;
     }
     quitConfirm.hidden = !controller.quitConfirmOpen;
     if (!quitConfirm.hidden) {
@@ -1082,13 +1105,24 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
         <button data-action="save-no" class="${controller.savePromptIndex === 1 ? "is-selected" : ""}">取 消</button>
       </div>`;
   } else if (phase === "saveSlots") {
-    const slots = Array.from({ length: 5 }, (_, index) => {
+    const page = saveSlotPageIndex(controller.postSaveSlotIndex);
+    const start = saveSlotPageStart(controller.postSaveSlotIndex);
+    const slots = Array.from({ length: SAVE_SLOTS_PER_PAGE }, (_, localIndex) => {
+      const index = start + localIndex;
       const slot = index + 1;
       const save = controller.readSave(slot);
       const selected = index === controller.postSaveSlotIndex;
       return `<button class="save-slot ${selected ? "is-selected" : ""}" data-action="save-slot" data-slot="${slot}" data-post-save-index="${index}" data-testid="save-slot-${slot}" aria-current="${selected ? "true" : "false"}"><b>${slot}</b><span>${save ? save.stageLabel : "此處沒有記錄"}</span></button>`;
     }).join("");
-    layer.innerHTML = `<div class="native-save-selector"><strong>儲存遊戲進度</strong>${slots}</div>`;
+    layer.innerHTML = `<div class="native-save-selector"><strong>儲存遊戲進度</strong>${slots}
+      <div class="native-save-pagination">
+        <button type="button" data-action="post-save-page" data-post-save-page-delta="-1"
+          data-testid="post-save-previous-page" aria-label="上一頁">◀</button>
+        <span data-testid="post-save-page">第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁</span>
+        <button type="button" data-action="post-save-page" data-post-save-page-delta="1"
+          data-testid="post-save-next-page" aria-label="下一頁">▶</button>
+      </div>
+    </div>`;
   } else if (phase === "quit") {
     layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2>天使帝國 II</h2><p>已離開遊戲</p></div>`;
   } else if (phase === "nextStage") {
