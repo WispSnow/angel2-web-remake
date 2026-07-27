@@ -11,15 +11,15 @@ const battleSave = (): BattleSaveData => {
   if (!nia) throw new Error("missing Nia fixture");
   nia.x = 29;
   nia.y = 26;
-  nia.experience = 100;
-  nia.life = 140;
+  nia.experience = 399;
+  nia.life = 160;
   const actedAlly = units.find((unit) => unit.id === "1:43");
   if (!actedAlly) throw new Error("missing allied fixture");
   actedAlly.acted = true;
 
   return {
     format: "ANGEL2-web-save",
-    version: 3,
+    version: 4,
     kind: "battle",
     savedAt: "2026-07-25T12:00:00.000Z",
     saveCount: 4,
@@ -64,15 +64,25 @@ const legacyBattleSave = () => {
   return {
     ...source,
     version: 2 as const,
+    roster: source.roster.map((entry) => {
+      if (entry.slot === 0) return { ...entry, experience: 100, life: 140 };
+      if (entry.slot === 1) return { ...entry, experience: 0, life: 160 };
+      return { ...entry };
+    }),
     battle: {
       ...source.battle,
-      units: source.battle.units.map((unit) => unit.side === 2
-        ? {
+      units: source.battle.units.map((unit) => {
+        if (unit.side === 2) {
+          return {
             ...unit,
             experience: 0,
             life: unit.classId === 22 ? 200 : 160,
-          }
-        : { ...unit }),
+          };
+        }
+        if (unit.slot === 0) return { ...unit, experience: 100, life: 140 };
+        if (unit.slot === 1) return { ...unit, experience: 0, life: 160 };
+        return { ...unit };
+      }),
     },
   };
 };
@@ -258,8 +268,8 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
   expect(state.units.find((unit) => unit.id === "1:0")).toMatchObject({
     x: 29,
     y: 26,
-    life: 140,
-    experience: 100,
+    life: 160,
+    experience: 399,
   });
   expect(state.units.find((unit) => unit.id === "2:15")).toMatchObject({
     life: 270,

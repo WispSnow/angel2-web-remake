@@ -97,7 +97,7 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 3;
+  version: 4;
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

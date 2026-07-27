@@ -1,4 +1,5 @@
 import {
+  STAGE0_ALLY_INITIAL_EXPERIENCE,
   classStatsFor,
   initialEnemyExperience,
   statsFor,
@@ -17,7 +18,7 @@ import type {
   UnitClassId,
 } from "./types";
 
-export const SAVE_VERSION = 3 as const;
+export const SAVE_VERSION = 4 as const;
 export const SAVE_SLOT_COUNT = 20;
 export const SAVE_SLOTS_PER_PAGE = 5;
 export const SAVE_SLOT_PAGE_COUNT = SAVE_SLOT_COUNT / SAVE_SLOTS_PER_PAGE;
@@ -146,6 +147,8 @@ function isSavedBattleState(
   if (
     difficulty !== undefined
     && units.some((unit) => unit.life > statsFor(unit, difficulty).maxLife
+      || (unit.side === 1
+        && unit.experience < (STAGE0_ALLY_INITIAL_EXPERIENCE[unit.slot] ?? 0))
       || (unit.side === 2
         && unit.experience !== initialEnemyExperience(unit.classId, difficulty)))
   ) return false;
@@ -162,7 +165,12 @@ function isSavedBattleState(
   });
 }
 
-function hasValidBase(value: Record<string, unknown>, version: 2 | typeof SAVE_VERSION): boolean {
+type LegacySaveVersion = 2 | 3;
+
+function hasValidBase(
+  value: Record<string, unknown>,
+  version: LegacySaveVersion | typeof SAVE_VERSION,
+): boolean {
   if (
     value.format !== "ANGEL2-web-save"
     || value.version !== version
@@ -177,7 +185,10 @@ function hasValidBase(value: Record<string, unknown>, version: 2 | typeof SAVE_V
     || !value.roster.every(isRosterEntry)
   ) return false;
 
-  return hasUniqueValues(value.roster.map((entry) => entry.slot));
+  return hasUniqueValues(value.roster.map((entry) => entry.slot))
+    && (version !== SAVE_VERSION
+      || value.roster.every((entry) =>
+        entry.experience >= (STAGE0_ALLY_INITIAL_EXPERIENCE[entry.slot] ?? 0)));
 }
 
 function isCompletedSave(value: Record<string, unknown>): boolean {
@@ -205,25 +216,57 @@ export function isSaveData(value: unknown): value is SaveData {
   return isCompletedSave(value) || isBattleSave(value, true);
 }
 
-type LegacyBattleSaveData = Omit<BattleSaveData, "version"> & { version: 2 };
-type LegacyCompletedSaveData = Omit<CompletedSaveData, "version"> & { version: 2 };
+type LegacyBattleSaveData = Omit<BattleSaveData, "version"> & { version: LegacySaveVersion };
+type LegacyCompletedSaveData = Omit<CompletedSaveData, "version"> & { version: LegacySaveVersion };
 type LegacySaveData = LegacyBattleSaveData | LegacyCompletedSaveData;
 
 function isLegacySaveData(value: unknown): value is LegacySaveData {
-  if (!isRecord(value) || !hasValidBase(value, 2)) return false;
+  if (
+    !isRecord(value)
+    || (!hasValidBase(value, 2) && !hasValidBase(value, 3))
+  ) return false;
   return isCompletedSave(value) || isBattleSave(value, false);
 }
 
+function migrateLegacyAllyValues(
+  state: Pick<SaveRosterEntry, "slot" | "classId" | "experience" | "life">,
+): Pick<SaveRosterEntry, "experience" | "life"> {
+  const experienceFloor = STAGE0_ALLY_INITIAL_EXPERIENCE[state.slot] ?? 0;
+  if (experienceFloor === 0) {
+    return { experience: state.experience, life: state.life };
+  }
+  const oldMaximumLife = classStatsFor(state).maxLife;
+  const experience = state.experience + experienceFloor;
+  const maximumLife = classStatsFor({ ...state, experience }).maxLife;
+  const missingLife = Math.max(0, oldMaximumLife - state.life);
+  return {
+    experience,
+    life: Math.max(0, maximumLife - missingLife),
+  };
+}
+
 function migrateLegacySave(save: LegacySaveData): SaveData {
+  const roster = save.roster.map((entry) => ({
+    ...entry,
+    ...migrateLegacyAllyValues(entry),
+  }));
+
   if (save.kind === "completed") {
     return {
       ...save,
       version: SAVE_VERSION,
+      roster,
     };
   }
 
   const units = save.battle.units.map((unit) => {
-    if (unit.side === 1) return { ...unit };
+    if (unit.side === 1) {
+      return {
+        ...unit,
+        ...migrateLegacyAllyValues(unit),
+      };
+    }
+    if (save.version === 3) return { ...unit };
     const oldMaximumLife = classStatsFor(unit).maxLife;
     const experience = initialEnemyExperience(unit.classId, save.difficulty);
     const migrated = { ...unit, experience };
@@ -238,6 +281,7 @@ function migrateLegacySave(save: LegacySaveData): SaveData {
   return {
     ...save,
     version: SAVE_VERSION,
+    roster,
     battle: {
       ...save.battle,
       units,

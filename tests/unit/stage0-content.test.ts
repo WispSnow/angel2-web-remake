@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ASSETS,
   STAGE0,
+  STAGE0_ALLY_INITIAL_EXPERIENCE,
   TERRAIN_TOKENS,
   TOKEN_TO_TERRAIN_SLOT,
   classStatsFor,
@@ -31,8 +32,20 @@ describe("stage 0 evidence-backed content", () => {
     const units = createStage0Units();
     expect(units.filter((unit) => unit.side === 1)).toHaveLength(6);
     expect(units.filter((unit) => unit.side === 2)).toHaveLength(10);
-    expect(units.find((unit) => unit.id === "1:0")).toMatchObject({ name: "妮雅", x: 10, y: 23, life: 160 });
-    expect(units.find((unit) => unit.id === "1:1")).toMatchObject({ name: "希蜜", x: 28, y: 29 });
+    expect(units.find((unit) => unit.id === "1:0")).toMatchObject({
+      name: "妮雅",
+      x: 10,
+      y: 23,
+      experience: 299,
+      life: 180,
+    });
+    expect(units.find((unit) => unit.id === "1:1")).toMatchObject({
+      name: "希蜜",
+      x: 28,
+      y: 29,
+      experience: 299,
+      life: 180,
+    });
     expect(units.find((unit) => unit.id === "2:15")).toMatchObject({
       classId: 22,
       className: "騎兵",
@@ -102,22 +115,34 @@ describe("stage 0 evidence-backed content", () => {
     }
   });
 
-  it("keeps all six playable allies at the same verified fresh-battle stats", () => {
+  it("reproduces the named and generic allied fresh-battle groups on every difficulty", () => {
+    const expectedBySlot = {
+      0: { experience: 299, life: 180, attack: 45, defense: 27, maxLife: 180, movement: 4, level: 3 },
+      1: { experience: 299, life: 180, attack: 45, defense: 27, maxLife: 180, movement: 4, level: 3 },
+      40: { experience: 0, life: 160, attack: 39, defense: 21, maxLife: 160, movement: 4, level: 1 },
+      41: { experience: 0, life: 160, attack: 39, defense: 21, maxLife: 160, movement: 4, level: 1 },
+      42: { experience: 0, life: 160, attack: 39, defense: 21, maxLife: 160, movement: 4, level: 1 },
+      43: { experience: 0, life: 160, attack: 39, defense: 21, maxLife: 160, movement: 4, level: 1 },
+    } as const;
+    expect(STAGE0_ALLY_INITIAL_EXPERIENCE).toEqual({
+      0: 299,
+      1: 299,
+      40: 0,
+      41: 0,
+      42: 0,
+      43: 0,
+    });
+
     for (const difficulty of [0, 1, 2, 3] satisfies Difficulty[]) {
       const allies = createStage0Units(difficulty).filter((unit) => unit.side === 1);
-      expect(allies.map((unit) => ({
-        experience: unit.experience,
-        life: unit.life,
-        ...statsFor(unit, difficulty),
-      }))).toEqual(Array.from({ length: 6 }, () => ({
-        experience: 0,
-        life: 160,
-        attack: 39,
-        defense: 21,
-        maxLife: 160,
-        movement: 4,
-        level: 1,
-      })));
+      expect(Object.fromEntries(allies.map((unit) => [
+        unit.slot,
+        {
+          experience: unit.experience,
+          life: unit.life,
+          ...statsFor(unit, difficulty),
+        },
+      ]))).toEqual(expectedBySlot);
     }
   });
 });

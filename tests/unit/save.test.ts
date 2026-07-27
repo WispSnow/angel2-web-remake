@@ -27,7 +27,7 @@ const completedSave = (): CompletedSaveData => ({
   difficulty: 0,
   rngState: 0x0a11ce02,
   roster: [
-    { slot: 0, classId: 0, experience: 20, life: 140 },
+    { slot: 0, classId: 0, experience: 319, life: 170 },
   ],
 });
 
@@ -43,7 +43,7 @@ const battleSave = (): BattleSaveData => ({
   difficulty: 2,
   rngState: 0x1020_3040,
   roster: [
-    { slot: 0, classId: 0, experience: 20, life: 140 },
+    { slot: 0, classId: 0, experience: 399, life: 160 },
   ],
   battle: {
     phase: "player",
@@ -60,8 +60,8 @@ const battleSave = (): BattleSaveData => ({
         portrait: 46,
         x: 29,
         y: 26,
-        life: 140,
-        experience: 20,
+        life: 160,
+        experience: 399,
         acted: false,
       },
       {
@@ -101,21 +101,26 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-3 battle and completed saves", () => {
+  it("accepts complete version-4 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
   });
 
-  it("migrates version-2 stage-0 enemy stats while preserving missing life", () => {
+  it("migrates version-2 stage-0 ally and enemy stats while preserving missing life", () => {
     const current = battleSave();
     const legacy = {
       ...current,
       version: 2,
+      roster: current.roster.map((entry) => entry.slot === 0
+        ? { ...entry, experience: 100, life: 140 }
+        : { ...entry }),
       battle: {
         ...current.battle,
-        units: current.battle.units.map((unit) => unit.side === 2
-          ? { ...unit, experience: 0, life: 180 }
-          : { ...unit }),
+        units: current.battle.units.map((unit) => {
+          if (unit.side === 2) return { ...unit, experience: 0, life: 180 };
+          if (unit.slot === 0) return { ...unit, experience: 100, life: 140 };
+          return { ...unit };
+        }),
       },
     };
 
@@ -123,6 +128,34 @@ describe("Web save validation", () => {
     const migrated = parseSaveData(JSON.stringify(legacy));
     expect(migrated).toEqual(current);
     expect(parseSaveData(JSON.stringify(migrated))).toEqual(current);
+  });
+
+  it("migrates version-3 named allies without reseeding already-correct enemies", () => {
+    const current = battleSave();
+    const legacy = {
+      ...current,
+      version: 3,
+      roster: [{ ...current.roster[0], experience: 100, life: 140 }],
+      battle: {
+        ...current.battle,
+        units: current.battle.units.map((unit) => unit.side === 1
+          ? { ...unit, experience: 100, life: 140 }
+          : { ...unit }),
+      },
+    };
+
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
+  it("migrates version-3 completed rosters to the named-ally experience floor", () => {
+    const current = completedSave();
+    const legacy = {
+      ...current,
+      version: 3,
+      roster: [{ ...current.roster[0], experience: 20, life: 140 }],
+    };
+
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
 
   it("rejects malformed JSON and shallow lookalikes", () => {
@@ -152,6 +185,11 @@ describe("Web save validation", () => {
     const unseededEnemy = battleSave();
     unseededEnemy.battle.units[1].experience = 0;
     expect(isSaveData(unseededEnemy)).toBe(false);
+
+    const underseededNia = battleSave();
+    underseededNia.roster[0].experience = 100;
+    underseededNia.battle.units[0].experience = 100;
+    expect(isSaveData(underseededNia)).toBe(false);
 
     const overfullEnemy = battleSave();
     overfullEnemy.battle.units[1].life = 271;

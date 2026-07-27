@@ -71,6 +71,18 @@ export const MOVEMENT_RULES: Record<UnitClassId, number[]> = {
 
 export const TERRAIN_DEFENSE_PERCENT = [99, 10, 5, 20, 30, 40, 10, 15, 10, 10, 5, 40, 15, 15, 10, 20, 5, 15, 10, 15, 10, 10, 1];
 
+// Module 27 0000:0493 applies a 299-experience floor to class-0 actors
+// whose native character descriptor has a real portrait. Stage 0's four
+// generic soldiers have FF descriptors and keep the GO file's zero value.
+export const STAGE0_ALLY_INITIAL_EXPERIENCE: Readonly<Partial<Record<number, number>>> = {
+  0: 299,
+  1: 299,
+  40: 0,
+  41: 0,
+  42: 0,
+  43: 0,
+};
+
 const UNIT_DEFINITIONS: Array<Pick<BattleUnit, "side" | "slot" | "classId" | "className" | "name" | "portrait" | "x" | "y">> = [
   { side: 1, slot: 0, classId: 0, className: "士兵", name: "妮雅", portrait: 46, x: 10, y: 23 },
   { side: 1, slot: 43, classId: 0, className: "士兵", name: "士兵", portrait: 47, x: 27, y: 25 },
@@ -146,7 +158,7 @@ export function createStage0Units(difficulty: Difficulty = 0): BattleUnit[] {
   return UNIT_DEFINITIONS.map((definition) => {
     const experience = definition.side === 2
       ? initialEnemyExperience(definition.classId, difficulty)
-      : 0;
+      : STAGE0_ALLY_INITIAL_EXPERIENCE[definition.slot] ?? 0;
     const unit: BattleUnit = {
       ...definition,
       id: `${definition.side}:${definition.slot}`,

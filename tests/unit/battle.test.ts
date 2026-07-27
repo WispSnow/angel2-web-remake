@@ -149,7 +149,7 @@ describe("stage 0 battle simulation", () => {
     expect(result.counterOccurred).toBe(true);
     expect(battle.unit("2:45")!.life).toBe(defenderLife - result.damage);
     expect(battle.unit("1:0")!.acted).toBe(true);
-    expect(battle.unit("1:0")!.experience).toBe(result.experienceGained);
+    expect(battle.unit("1:0")!.experience).toBe(299 + result.experienceGained);
   });
 
   it("restores fifteen percent of maximum life before consuming the unit action", () => {
@@ -157,11 +157,11 @@ describe("stage 0 battle simulation", () => {
     const nia = battle.unit("1:0")!;
     nia.life = 100;
 
-    expect(battle.rest(nia.id)).toBe(24);
-    expect(nia.life).toBe(124);
+    expect(battle.rest(nia.id)).toBe(27);
+    expect(nia.life).toBe(127);
     expect(nia.acted).toBe(true);
     expect(battle.rest(nia.id)).toBe(0);
-    expect(nia.life).toBe(124);
+    expect(nia.life).toBe(127);
   });
 
   it("applies the native all-rest command only to remaining unspent allies", () => {
@@ -174,9 +174,9 @@ describe("stage 0 battle simulation", () => {
     alreadySpent.life = 100;
     alreadySpent.acted = true;
 
-    expect(battle.restAllUnspentAllies()).toEqual({ count: 5, recovered: 34 });
-    expect(nia).toMatchObject({ life: 124, acted: true });
-    expect(ximi).toMatchObject({ life: 160, acted: true });
+    expect(battle.restAllUnspentAllies()).toEqual({ count: 5, recovered: 54 });
+    expect(nia).toMatchObject({ life: 127, acted: true });
+    expect(ximi).toMatchObject({ life: 177, acted: true });
     expect(alreadySpent).toMatchObject({ life: 100, acted: true });
     expect(battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)).toBe(true);
   });

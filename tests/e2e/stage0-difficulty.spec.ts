@@ -44,12 +44,33 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
   for (const scenario of cases) {
     await enterStage0FromOrdinaryStartup(page, scenario.difficulty);
     await expectHudValues(page, "士兵／妮雅", [
-      "160／160",
-      "39／39",
-      "21／21",
-      "1",
-      "0／100",
+      "180／180",
+      "45／45",
+      "27／27",
+      "3",
+      "299／300",
     ]);
+
+    const canvas = page.getByTestId("battle-canvas");
+    const namedAlly = ["180／180", "45／45", "27／27", "3", "299／300"] as const;
+    const genericAlly = ["160／160", "39／39", "21／21", "1", "0／100"] as const;
+    const allyCycle = [
+      { identity: "士兵／士兵", values: genericAlly },
+      { identity: "士兵／士兵", values: genericAlly },
+      { identity: "士兵／希蜜", values: namedAlly },
+      { identity: "士兵／士兵", values: genericAlly },
+      { identity: "士兵／士兵", values: genericAlly },
+      { identity: "士兵／妮雅", values: namedAlly },
+    ] as const;
+    for (const [index, ally] of allyCycle.entries()) {
+      await canvas.click({ button: "right", position: { x: 220, y: 177 } });
+      await expectHudValues(page, ally.identity, ally.values);
+      if (scenario.difficulty === 0 && index === 2) {
+        await page.getByTestId("game-screen").screenshot({
+          path: "artifacts/playwright/stage0-allies-ximi.png",
+        });
+      }
+    }
 
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("ArrowLeft");

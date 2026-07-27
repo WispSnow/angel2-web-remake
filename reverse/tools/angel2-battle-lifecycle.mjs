@@ -8,6 +8,13 @@ import process from "node:process";
 const CODE_SIGNATURES = [
   {
     module: 27,
+    address: "0000:0493",
+    offset: 0x00493,
+    role: "raise class-record-0 named actors to cumulative experience 299 when the parent campaign interface is present",
+    hex: "b85a098ed8833e28004e7501c38b362c0083c60ea12a008ec0268b34b93a0033ff518b850c053d000075188b9d820a8a073cff740e268b043d2b017703b82b012689045983c70283c602e2d5c3",
+  },
+  {
+    module: 27,
     address: "0000:056E",
     offset: 0x0056e,
     role: "prepare battle template and choose direct-write or deployment path",
@@ -249,7 +256,7 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
 
   const output = {
     format: "ANGEL2 native battle lifecycle",
-    semanticVersion: 2,
+    semanticVersion: 3,
     sources: [
       { module: 27, path: module27Path, bytes: module27.length, sha256: sha256(module27) },
       { module: 29, path: module29Path, bytes: module29.length, sha256: sha256(module29) },
@@ -280,6 +287,14 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
         },
       },
       module27: {
+        parentInterfaceSentinel: {
+          address: "DS:0028",
+          standaloneValue: 0x4e,
+          mutationCondition: "value is not 4Eh",
+        },
+        importedSide1Experience: { address: "parent interface + 0Eh", records: 58 },
+        importedSide1Classes: { address: "DS:050C", records: 58 },
+        side1ActorDescriptorPointers: { address: "DS:0A82", records: 58 },
         currentStage: { address: "DS:02B6" },
         currentDeploymentCell: { address: "DS:0FF6", empty: 0 },
         eligibleRosterFlags: { address: "DS:079E", records: 75, activeValue: 1 },
@@ -289,8 +304,9 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
       },
     },
     freshBattleInitialization: {
-      entryCondition: "CONTINU == 'N'; numbered WAR resumes do not reseed experience",
+      entryCondition: "normal module-27 template preparation followed by module-29 CONTINU == 'N'; direct numbered WAR resumes do not run this chain",
       sequence: [
+        "with the parent campaign interface present, module 27 0000:0493 raises each class-record-0 side-1 actor with a non-FF portrait to cumulative experience 299 when its imported value is 299 or lower",
         "0000:4ABE repeats 0000:538B exactly LV_HARD + 1 times unless the stage is 3, 8, or 11",
         "0000:538B rebuilds side 2 with callback 0000:539B, which writes next cumulative experience threshold + 1",
         "0000:536B rebuilds side 1 and refills current life to the resulting maximum",
@@ -303,6 +319,16 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
         affects: ["cumulative experience", "visible growth-row level", "attack", "defense", "maximum life"],
         doesNotAffect: ["class movement"],
       },
+      namedSide1ExperienceFloor: {
+        module: 27,
+        address: "0000:0493",
+        entryCondition: "module 27 DS:0028 is not the 4Eh standalone/no-parent sentinel",
+        classRecord: 0,
+        actorPortraitCondition: "side-1 actor descriptor portrait byte is not FF",
+        importedExperienceCondition: "experience <= 299",
+        resultingExperience: 299,
+        scope: "all 58 imported side-1 slots; stage-0 named actors slots 0 and 1 match, while generic slots 40..43 have FF portraits and are skipped",
+      },
       unitRebuildOrder: [
         "select the first, second, or third fixed class row from cumulative experience",
         "apply post-third-row threshold/attack/max-life growth",
@@ -311,13 +337,28 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
       ],
       stage0Side1: {
         campaignClassRecord: 0,
-        cumulativeExperience: 0,
-        visibleLevel: 1,
-        attack: 39,
-        defense: 21,
-        maximumAndCurrentLife: 160,
-        movement: 4,
-        rule: "all six playable slots share these final player-visible combat stats; pre-rebuild per-slot current-life initializers are overwritten before first control",
+        namedActors: {
+          slots: [0, 1],
+          names: ["妮雅", "希蜜"],
+          cumulativeExperience: 299,
+          visibleLevel: 3,
+          attack: 45,
+          defense: 27,
+          maximumAndCurrentLife: 180,
+          movement: 4,
+          nextExperienceThreshold: 300,
+        },
+        genericActors: {
+          slots: [40, 41, 42, 43],
+          cumulativeExperience: 0,
+          visibleLevel: 1,
+          attack: 39,
+          defense: 21,
+          maximumAndCurrentLife: 160,
+          movement: 4,
+          nextExperienceThreshold: 100,
+        },
+        rule: "module 27 first applies the named class-0 experience floor, then module 29 rebuilds and refills all six units; pre-rebuild per-slot current-life initializers are overwritten before first control",
       },
       resumeRule: "a numbered save restores serialized experience/life and then derives effective stats; it must not repeat fresh-battle seeding",
     },
@@ -371,7 +412,7 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
           N: "load JUST.TST and clear every unused FF marker to empty",
           numberedSlot: "load the selected WAR save including its round/outcome value",
         },
-        freshBattle: "seed side-2 experience from LV_HARD, rebuild/refill both sides, initialize presentation, and call 0000:4DCD, making the opening playable round round 1",
+        freshBattle: "after module 27 applies the named side-1 experience floor, seed side-2 experience from LV_HARD, rebuild/refill both sides, initialize presentation, and call 0000:4DCD, making the opening playable round round 1",
         resumedBattle: "restore the saved side phase/presentation state through 1000:3788 instead of starting a new round",
       },
       {
@@ -434,6 +475,7 @@ async function extract(module27Path, module29Path, templatesPath, outputPath) {
       totalDeploymentCells: deployment.totalOpenCells,
       fullOrdinaryBattleLifecycleClosed: true,
       freshBattleDifficultyInitializationClosed: true,
+      freshBattleNamedSide1InitializationClosed: true,
       remainingScope: "stage-events.json structurally closes all 38 native per-stage handlers, including eight dynamic-board and seven other runtime-state stages, plus the module-25/27/29 stage-6 bridge and module-33/35/46 postgame route; remaining frame/audio presentation work does not reopen the ordinary deployment/battle/victory/defeat lifecycle",
     },
   };

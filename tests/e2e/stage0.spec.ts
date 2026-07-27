@@ -628,7 +628,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await waitForPhase(page, "nextStage");
   await expect(page.getByText("垂直切片完成", { exact: true })).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
-  expect(saved).toMatchObject({ format: "ANGEL2-web-save", version: 3, kind: "completed", stage: 1, ruleset: "stableRemake" });
+  expect(saved).toMatchObject({ format: "ANGEL2-web-save", version: 4, kind: "completed", stage: 1, ruleset: "stableRemake" });
   expect(saved.roster).toHaveLength(6);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-complete.png" });
 
@@ -1015,7 +1015,7 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 3,
+    version: 4,
     kind: "battle",
     stage: 0,
     rngState: initial.rngState,
@@ -1952,7 +1952,7 @@ test("S00-M: native system records restore battle state and combat cues follow p
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 3,
+    version: 4,
     kind: "battle",
     stage: 0,
     stageLabel: "瓦爾克麗宮",

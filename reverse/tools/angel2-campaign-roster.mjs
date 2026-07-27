@@ -195,7 +195,7 @@ async function extract(
       classRecord: unit.classRecord,
       classCode,
       occupation: className,
-      campaignExperience: meExp.values[unit.unitSlot],
+      goFileInitialExperience: meExp.values[unit.unitSlot],
       actorDescriptor: {
         portraitRecord: actor.portraitRecord,
         normalizedName: actor.normalizedName,
@@ -217,7 +217,7 @@ async function extract(
 
   const result = {
     format: "ANGEL2 campaign actor identities and stage-0 playable roster",
-    semanticVersion: 1,
+    semanticVersion: 2,
     phase: "asset_and_gdd_reconstruction_only",
     implementationFrozen: true,
     sources: {
@@ -231,7 +231,7 @@ async function extract(
     newCampaignInitialArrays: {
       side1Classes: meData,
       side1Experience: meExp,
-      consequence: "all 75 campaign slots begin at class record 0 and zero cumulative experience",
+      consequence: "all 75 campaign slots are stored in GO.EXE at class record 0 and zero cumulative experience; this is the file initial state, before module 27 applies its named class-0 experience floor while preparing a new battle",
     },
     displayResolution: {
       actorTable: "module 29 DS:362C, 60 side-1 actor descriptor pointers",
@@ -247,7 +247,7 @@ async function extract(
       mapOrderSlots: STAGE0_SIDE1_SLOTS_IN_MAP_ORDER,
       allClassRecord0: true,
       roster,
-      conclusion: "stage 0 displays 妮雅 and 希蜜 as named soldiers; slots 40..43 display as four generic 士兵 units",
+      conclusion: "stage 0 displays 妮雅 and 希蜜 as named soldiers; slots 40..43 display as four generic 士兵 units. Final first-control experience and stats are derived separately in battle-lifecycle.json because module 27 mutates imported experience after these GO.EXE file initial values.",
     },
   };
 
