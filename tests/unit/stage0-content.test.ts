@@ -30,6 +30,12 @@ describe("stage 0 evidence-backed content", () => {
     expect(ASSETS.fullBattle.stageBackground).toContain("stage0-background.png");
     expect(ASSETS.fullBattle.left.cavalryPlus50).toHaveLength(9);
     expect(ASSETS.fullBattle.right.cavalryPlus50).toHaveLength(9);
+    expect(ASSETS.allyPromotionTargets).toEqual({
+      archer: "/assets/original/unit-ally-archer.png",
+      cavalry: "/assets/original/unit-ally-cavalry.png",
+      sister: "/assets/original/unit-ally-sister.png",
+      warrior: "/assets/original/unit-ally-warrior.png",
+    });
   });
 
   it("decodes the complete 50×50 terrain model", () => {

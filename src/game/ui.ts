@@ -2,7 +2,7 @@ import { ASSETS, STAGE0, nextExperienceThresholdFor } from "./content/stage0";
 import { classDefinition, classStatsFor } from "./content/classes";
 import type { GameController } from "./controller";
 import { FULL_COMBAT_FRAME_META, type FullCombatSpriteState } from "./full-combat";
-import type { Position, UnitStats } from "./types";
+import type { Position, UnitClassId, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
 import {
   animatedPortraitMarkup,
@@ -23,6 +23,9 @@ import {
   saveSlotPageIndex,
   saveSlotPageStart,
 } from "./save";
+
+const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
+  ASSETS.allyPromotionTargets;
 
 export function mountUi(root: HTMLElement, controller: GameController, audio: AudioManager): void {
   root.innerHTML = `
@@ -600,14 +603,32 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const definition = classDefinition(target.id);
         const stats = classStatsFor({ classId: target.id, experience: 0 });
         const selected = index === controller.promotionSelectionIndex;
+        const imageUrl = promotionImageByClass[target.id];
+        const optionLabel = [
+          `${index + 1}．${definition.nativeName}`,
+          actionLabels[definition.actionCategory],
+          `等級 ${stats.level}`,
+          `攻擊 ${stats.attack}（${delta(stats.attack, currentStats.attack)}）`,
+          `防禦 ${stats.defense}（${delta(stats.defense, currentStats.defense)}）`,
+          `生命上限 ${stats.maxLife}（${delta(stats.maxLife, currentStats.maxLife)}）`,
+          `移動 ${stats.movement}（${delta(stats.movement, currentStats.movement)}）`,
+        ].join("，");
         return `<button type="button" class="promotion-option ${selected ? "is-selected" : ""}"
           data-action="promotion-target" data-promotion-index="${index}"
-          data-testid="promotion-target-${target.id}" aria-current="${selected}">
-          <strong>${index + 1}．${definition.nativeName}</strong>
-          <span>${actionLabels[definition.actionCategory]}</span>
-          <span>等級 ${stats.level}　攻 ${stats.attack}（${delta(stats.attack, currentStats.attack)}）</span>
-          <span>防 ${stats.defense}（${delta(stats.defense, currentStats.defense)}）　生命上限 ${stats.maxLife}（${delta(stats.maxLife, currentStats.maxLife)}）</span>
-          <span>移動 ${stats.movement}（${delta(stats.movement, currentStats.movement)}）</span>
+          data-testid="promotion-target-${target.id}" role="menuitem"
+          aria-label="${optionLabel}" aria-current="${selected}">
+          <span class="promotion-art" aria-hidden="true">
+            ${imageUrl
+              ? `<img src="${imageUrl}" alt="" data-testid="promotion-image-${target.id}" />`
+              : `<span class="promotion-art-missing">${definition.nativeName}</span>`}
+          </span>
+          <span class="promotion-option-copy">
+            <strong>${index + 1}．${definition.nativeName}</strong>
+            <span class="promotion-action">${actionLabels[definition.actionCategory]}</span>
+            <span>等級 ${stats.level}　攻 ${stats.attack}（${delta(stats.attack, currentStats.attack)}）</span>
+            <span>防 ${stats.defense}（${delta(stats.defense, currentStats.defense)}）　生命上限 ${stats.maxLife}（${delta(stats.maxLife, currentStats.maxLife)}）</span>
+            <span>移動 ${stats.movement}（${delta(stats.movement, currentStats.movement)}）</span>
+          </span>
         </button>`;
       }).join("");
       promotionLayer.innerHTML = `<div class="promotion-panel">

@@ -575,6 +575,31 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       { id: "sister", optionIndex: 3 },
     ],
   });
+  for (const classId of ["cavalry", "warrior", "archer", "sister"] as const) {
+    const image = page.getByTestId(`promotion-image-${classId}`);
+    await expect(image).toBeVisible();
+    await expect(image).toHaveAttribute("src", new RegExp(`unit-ally-${classId}\\.png$`));
+    expect(await image.evaluate((element: HTMLImageElement) => ({
+      naturalWidth: element.naturalWidth,
+      naturalHeight: element.naturalHeight,
+      imageRendering: getComputedStyle(element).imageRendering,
+    }))).toEqual({
+      naturalWidth: 40,
+      naturalHeight: 43,
+      imageRendering: "pixelated",
+    });
+  }
+  await expect(page.getByTestId("promotion-target-cavalry")).toHaveAccessibleName(
+    /騎兵.*攻擊 55（\+9）.*生命上限 200（\+10）/,
+  );
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("promotion-target-warrior")).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("promotion-target-sister")).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByTestId("promotion-target-warrior")).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("promotion-target-cavalry")).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("Alt");
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-promotion-choice.png" });

@@ -1724,7 +1724,7 @@ export class GameController {
     if (this.promotionUnitIds.length > 0) {
       if (this.promotionDialogueActive) return;
       if (delta.x !== 0 || delta.y !== 0) {
-        this.movePromotionSelection(delta.y || delta.x);
+        this.movePromotionSelection(delta.x !== 0 ? delta.x : delta.y * 2);
       }
       return;
     }
