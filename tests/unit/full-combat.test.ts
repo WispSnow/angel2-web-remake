@@ -6,15 +6,15 @@ const unit = (
   side: 1 | 2,
   slot: number,
   name: string,
-  classId: UnitClassId = 0,
+  classId: UnitClassId = "soldier",
 ): BattleUnit => ({
   id: `${side}:${slot}`,
   side,
   slot,
   classId,
-  className: classId === 22 ? "騎兵" : "士兵",
+  className: classId === "cavalry" ? "騎兵" : "士兵",
   name,
-  portrait: classId === 22 ? 15 : side === 1 ? 46 : 47,
+  portrait: classId === "cavalry" ? 15 : side === 1 ? 46 : 47,
   x: side === 1 ? 24 : 25,
   y: 26,
   life: side === 1 ? 160 : 180,
@@ -177,8 +177,8 @@ describe("Full-screen ordinary combat choreography", () => {
 
   it("uses the cavalry throw channel without melee dust", () => {
     const script = buildFullCombatScript(
-      unit(1, 0, "哈釘", 22),
-      unit(2, 48, "騎士團騎兵", 22),
+      unit(1, 0, "哈釘", "cavalry"),
+      unit(2, 48, "騎士團騎兵", "cavalry"),
       result({ counterOccurred: false, counterDamage: 0 }),
     );
     const windupAt = markTime(script, "fullWindup");
@@ -225,7 +225,7 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(script.cues.some(({ record, reason }) => record === 38 && reason.startsWith("full-primary"))).toBe(false);
 
     const mirrored = buildFullCombatScript(
-      unit(2, 15, "哈釘", 22),
+      unit(2, 15, "哈釘", "cavalry"),
       unit(1, 0, "妮雅"),
       result({
         attackerId: "2:15",

@@ -19,11 +19,12 @@ const battleSave = (): BattleSaveData => {
 
   return {
     format: "ANGEL2-web-save",
-    version: 4,
+    version: 5,
+    contentVersion: "native-classes-1",
     kind: "battle",
     savedAt: "2026-07-25T12:00:00.000Z",
     saveCount: 4,
-    stage: 0,
+    stageId: "stage-00",
     stageLabel: "瓦爾克麗宮",
     ruleset: "stableRemake",
     difficulty: 2,
@@ -47,10 +48,11 @@ const completedSave = (): CompletedSaveData => {
   return {
     format: source.format,
     version: source.version,
+    contentVersion: source.contentVersion,
     kind: "completed",
     savedAt: source.savedAt,
     saveCount: source.saveCount,
-    stage: 1,
+    stageId: "stage-01",
     stageLabel: "下一關",
     ruleset: source.ruleset,
     difficulty: source.difficulty,
@@ -62,26 +64,37 @@ const completedSave = (): CompletedSaveData => {
 const legacyBattleSave = () => {
   const source = battleSave();
   return {
-    ...source,
+    format: source.format,
     version: 2 as const,
+    kind: source.kind,
+    savedAt: source.savedAt,
+    saveCount: source.saveCount,
+    stage: 0 as const,
+    stageLabel: source.stageLabel,
+    ruleset: source.ruleset,
+    difficulty: source.difficulty,
+    rngState: source.rngState,
     roster: source.roster.map((entry) => {
-      if (entry.slot === 0) return { ...entry, experience: 100, life: 140 };
-      if (entry.slot === 1) return { ...entry, experience: 0, life: 160 };
-      return { ...entry };
+      const classId = entry.classId === "cavalry" ? 22 as const : 0 as const;
+      if (entry.slot === 0) return { ...entry, classId, experience: 100, life: 140 };
+      if (entry.slot === 1) return { ...entry, classId, experience: 0, life: 160 };
+      return { ...entry, classId };
     }),
     battle: {
       ...source.battle,
       units: source.battle.units.map((unit) => {
+        const classId = unit.classId === "cavalry" ? 22 as const : 0 as const;
         if (unit.side === 2) {
           return {
             ...unit,
+            classId,
             experience: 0,
-            life: unit.classId === 22 ? 200 : 160,
+            life: classId === 22 ? 200 : 160,
           };
         }
-        if (unit.slot === 0) return { ...unit, experience: 100, life: 140 };
-        if (unit.slot === 1) return { ...unit, experience: 0, life: 160 };
-        return { ...unit };
+        if (unit.slot === 0) return { ...unit, classId, experience: 100, life: 140 };
+        if (unit.slot === 1) return { ...unit, classId, experience: 0, life: 160 };
+        return { ...unit, classId };
       }),
     },
   };

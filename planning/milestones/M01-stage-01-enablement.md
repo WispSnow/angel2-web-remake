@@ -2,9 +2,11 @@
 
 状态：`specified`
 
-更新日期：2026-07-25
+更新日期：2026-07-27
 
 授权：尚未获得第 1 关代码实施授权
+
+前置说明：M00.5 已获得职业目录、通用状态边界、存档 v5 与第 0 关内转职授权；这些产出可作为本里程碑输入，但不构成第 1 关部署或内容授权。
 
 ## 目标
 
@@ -18,6 +20,7 @@
 - 证据登记：[`reverse/gdd/evidence-register.md`](../../reverse/gdd/evidence-register.md)；
 - 规则决策：[`reverse/gdd/web-remake-rule-decisions.md`](../../reverse/gdd/web-remake-rule-decisions.md)；
 - 第 0 关体验基线：[`M00-stage-00-acceptance.md`](M00-stage-00-acceptance.md)。
+- M00.5 边界：[`M00.5-promotion-and-architecture.md`](M00.5-promotion-and-architecture.md)。
 
 ## 进入条件
 
@@ -56,9 +59,9 @@
 
 - 编写第 1 关运行时代码或生成内容；
 - 实现 `stage 2` 战斗；
-- 实现射击、状态、转职选择或未在第 1 关可达的技术；
+- 实现射击、状态或未在第 1 关可达的技术；转职选择只可使用已经过 M00.5 验收的通用系统，不在本里程碑扩展；
 - 为全战役一次性建立未经代表性切片验证的抽象；
-- 原地改变当前存档版本 4 的含义；既有 v2/v3→v4 第 0 关迁移语义也不得静默改写。
+- 原地改变当前存档版本 5 的含义；既有 v2/v3/v4→v5 第 0 关迁移语义也不得静默改写。
 
 ## 验证
 

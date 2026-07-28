@@ -1,5 +1,10 @@
 import { ASSETS, STAGE0 } from "./content/stage0";
+import {
+  promotionTargetsFor,
+  type PromotionTarget,
+} from "./content/classes";
 import { STORY_BY_PHASE } from "./content/dialogue";
+import { promotionDialogueFor } from "./content/promotion-dialogue";
 import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneState } from "./full-combat";
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
@@ -156,12 +161,16 @@ export class GameController {
   pendingSaveSlot?: number;
   savePromptIndex = 0;
   postSaveSlotIndex = 0;
+  promotionUnitIds: string[] = [];
+  promotionDialogueIndex?: number;
+  promotionSelectionIndex = 0;
   audioCue?: { sequence: number; record: number; reason: string };
   audioCueLog: Array<{ sequence: number; record: number; reason: string }> = [];
   private audioCueSequence = 0;
   private pendingOrigin?: Position;
   private pendingPath?: Position[];
   private busy = false;
+  private promotionResume?: () => void;
   private listeners = new Set<Listener>();
   private readonly testMode = new URLSearchParams(location.search).has("test");
   // Keeps the measured full-screen timing under ?test=1 for visual review.
@@ -195,6 +204,10 @@ export class GameController {
   }
 
   get currentDialogue(): DialoguePage | undefined {
+    const promotionUnit = this.promotionUnit;
+    if (promotionUnit && this.promotionDialogueIndex !== undefined) {
+      return promotionDialogueFor(promotionUnit)[this.promotionDialogueIndex];
+    }
     if (!isStoryPhase(this.phase)) return undefined;
     return STORY_BY_PHASE[this.phase][this.dialogueIndex];
   }
@@ -206,6 +219,29 @@ export class GameController {
 
   get selectedUnit(): BattleUnit | undefined {
     return this.selectedId ? this.battle.unit(this.selectedId) : undefined;
+  }
+
+  get promotionUnit(): BattleUnit | undefined {
+    const id = this.promotionUnitIds[0];
+    return id ? this.battle.unit(id) : undefined;
+  }
+
+  get promotionDialogueActive(): boolean {
+    return this.promotionUnit !== undefined && this.promotionDialogueIndex !== undefined;
+  }
+
+  get promotionChoiceVisible(): boolean {
+    return this.promotionUnit !== undefined && !this.promotionDialogueActive;
+  }
+
+  get promotionTargets(): readonly PromotionTarget[] {
+    return this.promotionUnit
+      ? promotionTargetsFor(this.promotionUnit.classId)
+      : [];
+  }
+
+  get selectedPromotionTarget(): PromotionTarget | undefined {
+    return this.promotionTargets[this.promotionSelectionIndex];
   }
 
   get groupCommands(): readonly GroupCommand[] {
@@ -225,7 +261,8 @@ export class GameController {
       || this.quitConfirmOpen
       || this.objectiveOpen
       || this.groupCommandOpen
-      || this.retreatConfirmOpen;
+      || this.retreatConfirmOpen
+      || this.promotionUnitIds.length > 0;
   }
 
   get groupLeader(): BattleUnit | undefined {
@@ -277,6 +314,18 @@ export class GameController {
   }
 
   advanceDialogue(): void {
+    const promotionUnit = this.promotionUnit;
+    if (promotionUnit && this.promotionDialogueIndex !== undefined) {
+      const pages = promotionDialogueFor(promotionUnit);
+      if (this.promotionDialogueIndex < pages.length - 1) {
+        this.promotionDialogueIndex += 1;
+      } else {
+        this.promotionDialogueIndex = undefined;
+        this.statusMessage = `${promotionUnit.name}達到轉職條件；必須選擇下一職業。`;
+      }
+      this.emit();
+      return;
+    }
     if (!isStoryPhase(this.phase)) return;
     const pages = STORY_BY_PHASE[this.phase];
     if (this.dialogueIndex < pages.length - 1) {
@@ -322,7 +371,7 @@ export class GameController {
     await this.animateUnitPath(nia.id, path, "scripted");
     nia.x = STAGE0.opening.to.x;
     nia.y = STAGE0.opening.to.y;
-    this.cameraOrigin = { ...STAGE0.viewport.initialOrigin };
+    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
     this.cursor = { ...STAGE0.opening.to };
     this.phase = "openingStory";
     this.dialogueIndex = 0;
@@ -489,6 +538,57 @@ export class GameController {
     else if (command.id === "undo") this.chooseUndo();
   }
 
+  movePromotionSelection(delta: number): void {
+    if (this.promotionDialogueActive) return;
+    const targets = this.promotionTargets;
+    if (targets.length === 0 || delta === 0) return;
+    this.promotionSelectionIndex = (
+      this.promotionSelectionIndex + delta + targets.length
+    ) % targets.length;
+    this.emit();
+  }
+
+  selectPromotionTarget(index: number): void {
+    if (
+      this.promotionUnitIds.length === 0
+      || this.promotionDialogueActive
+      || index < 0
+      || index >= this.promotionTargets.length
+      || index === this.promotionSelectionIndex
+    ) return;
+    this.promotionSelectionIndex = index;
+    this.emit();
+  }
+
+  confirmPromotion(): void {
+    if (this.promotionDialogueActive) return;
+    const unit = this.promotionUnit;
+    const target = this.selectedPromotionTarget;
+    if (!unit || !target) return;
+    const previousClassName = unit.className;
+    const result = this.battle.promote(unit.id, target.id);
+    this.promotionUnitIds.shift();
+    this.promotionSelectionIndex = 0;
+    this.statusMessage = `${unit.name}已由${previousClassName}轉職為${unit.className}；經驗歸零，生命保持 ${result.life}。`;
+
+    const next = this.promotionUnit;
+    if (next) {
+      this.promotionDialogueIndex = 0;
+      this.battle.focusId = next.id;
+      this.cursor = { x: next.x, y: next.y };
+      this.centerCamera(next);
+      this.statusMessage = `${next.name}也達到轉職條件；必須選擇下一職業。`;
+      this.emit();
+      return;
+    }
+
+    const resume = this.promotionResume;
+    this.promotionDialogueIndex = undefined;
+    this.promotionResume = undefined;
+    this.emit();
+    resume?.();
+  }
+
   cancelAction(): void {
     if (this.actionMode === "target") {
       this.actionMode = "actionMenu";
@@ -524,6 +624,8 @@ export class GameController {
       this.resetAction();
       this.markHintSeen();
       await this.presentOrdinaryCombat(attackerPresentation, defenderPresentation, result);
+      const promotionPause = this.pauseForPromotions();
+      if (promotionPause) await promotionPause;
       this.busy = false;
       const ended = this.resolveOutcome();
       this.emit();
@@ -541,6 +643,15 @@ export class GameController {
   private finishUnitAction(message: string, allowAutomaticEnd: boolean): void {
     this.resetAction();
     this.statusMessage = message;
+    const promotionPause = this.pauseForPromotions();
+    if (promotionPause) {
+      void promotionPause.then(() => this.completeFinishedUnitAction(allowAutomaticEnd));
+      return;
+    }
+    this.completeFinishedUnitAction(allowAutomaticEnd);
+  }
+
+  private completeFinishedUnitAction(allowAutomaticEnd: boolean): void {
     const outcome = this.resolveOutcome();
     if (outcome || !allowAutomaticEnd) {
       this.emit();
@@ -550,6 +661,34 @@ export class GameController {
     if (this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) {
       void this.runTurnPhases("autonomous");
     }
+  }
+
+  private pauseForPromotions(): Promise<void> | undefined {
+    const unitIds = this.battle.promotionQueue();
+    if (unitIds.length === 0) return undefined;
+    this.promotionUnitIds = unitIds;
+    this.promotionDialogueIndex = 0;
+    this.promotionSelectionIndex = 0;
+    this.resetAction();
+    const unit = this.promotionUnit;
+    if (!unit) {
+      this.promotionUnitIds = [];
+      this.promotionDialogueIndex = undefined;
+      return undefined;
+    }
+    this.battle.focusId = unit.id;
+    this.cursor = { x: unit.x, y: unit.y };
+    this.centerCamera(unit);
+    this.statusMessage = `${unit.name}達到轉職條件；必須選擇下一職業。`;
+    const resumeBusy = this.busy;
+    this.busy = false;
+    this.emit();
+    return new Promise<void>((resolve) => {
+      this.promotionResume = () => {
+        this.busy = resumeBusy;
+        resolve();
+      };
+    });
   }
 
   private resetAction(): void {
@@ -567,6 +706,7 @@ export class GameController {
     if (
       this.phase !== "player"
       || this.busy
+      || this.hasBlockingOverlay
       || this.objectiveOpen
       || this.recordMenuMode !== undefined
       || this.quitConfirmOpen
@@ -618,18 +758,20 @@ export class GameController {
   }
 
   async allRest(): Promise<void> {
-    if (this.phase !== "player" || this.busy) return;
+    if (this.phase !== "player" || this.busy || this.promotionUnitIds.length > 0) return;
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
     this.resetAction();
     const result = this.battle.restAllUnspentAllies();
     this.statusMessage = `全部休息：${result.count} 名單位提交行動，共恢復 ${result.recovered} 點生命。`;
     this.emit();
+    const promotionPause = this.pauseForPromotions();
+    if (promotionPause) await promotionPause;
     await this.runTurnPhases("autonomous");
   }
 
   async followLeader(): Promise<void> {
-    if (this.phase !== "player" || this.busy || !this.groupLeader) {
+    if (this.phase !== "player" || this.busy || this.promotionUnitIds.length > 0 || !this.groupLeader) {
       this.statusMessage = "請先把焦點移到一名尚未行動的我方單位，再選擇跟隨主將。";
       this.emit();
       return;
@@ -641,11 +783,13 @@ export class GameController {
     this.resetAction();
     this.statusMessage = `${leader.name}成為臨時主將；其餘單位交由我方 AI 行動。`;
     this.emit();
+    const promotionPause = this.pauseForPromotions();
+    if (promotionPause) await promotionPause;
     await this.runTurnPhases("follow", leader.id);
   }
 
   async freeAction(): Promise<void> {
-    if (this.phase !== "player" || this.busy) return;
+    if (this.phase !== "player" || this.busy || this.promotionUnitIds.length > 0) return;
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
     this.resetAction();
@@ -655,7 +799,7 @@ export class GameController {
   }
 
   requestRetreat(): void {
-    if (this.phase !== "player" || this.busy) return;
+    if (this.phase !== "player" || this.busy || this.promotionUnitIds.length > 0) return;
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
     this.retreatConfirmOpen = true;
@@ -801,6 +945,8 @@ export class GameController {
       this.statusMessage = action.kind === "move" ? `${unit.name}移動完畢。` : `${unit.name}原地待命。`;
     }
 
+    const promotionPause = this.pauseForPromotions();
+    if (promotionPause) await promotionPause;
     const ended = this.resolveOutcome();
     this.emit();
     return ended;
@@ -1010,6 +1156,7 @@ export class GameController {
   openObjectives(): void {
     if (
       this.busy
+      || this.promotionUnitIds.length > 0
       || this.soundSettingsOpen
       || this.musicSettingsOpen
       || !["player", "enemy"].includes(this.phase)
@@ -1146,6 +1293,7 @@ export class GameController {
   }
 
   systemAction(): void {
+    if (this.promotionUnitIds.length > 0) return;
     if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
@@ -1158,6 +1306,7 @@ export class GameController {
   }
 
   secondaryAction(): boolean {
+    if (this.promotionUnitIds.length > 0) return true;
     if (this.phase === "saveSlots") this.cancelPostSaveSlots();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
@@ -1298,6 +1447,10 @@ export class GameController {
     this.retreatConfirmOpen = false;
     this.retreatConfirmIndex = 1;
     this.objectiveOpen = false;
+    this.promotionUnitIds = [];
+    this.promotionDialogueIndex = undefined;
+    this.promotionSelectionIndex = 0;
+    this.promotionResume = undefined;
     this.resetAction();
     this.cameraOrigin = { x: 6, y: 20 };
     this.cursor = { ...STAGE0.opening.from };
@@ -1368,18 +1521,20 @@ export class GameController {
 
   private writeCompletedSave(slot: number): void {
     const prior = this.readSave(slot);
+    const campaign = this.battle.campaignSnapshot();
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
+      contentVersion: "native-classes-1",
       kind: "completed",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
-      stage: 1,
+      stageId: "stage-01",
       stageLabel: "下一關",
-      ruleset: "stableRemake",
-      difficulty: this.difficulty,
-      rngState: this.battle.rng.state,
-      roster: this.battle.units.filter((unit) => unit.side === 1).map(({ slot: unitSlot, classId, experience, life }) => ({ slot: unitSlot, classId, experience, life })),
+      ruleset: campaign.ruleset,
+      difficulty: campaign.difficulty,
+      rngState: campaign.rngState,
+      roster: campaign.roster,
     };
     localStorage.setItem(saveSlotKey(slot), JSON.stringify(save));
     this.pendingSaveSlot = undefined;
@@ -1444,21 +1599,21 @@ export class GameController {
 
   private writeBattleSave(slot: number): void {
     const prior = this.readSave(slot);
+    const campaign = this.battle.campaignSnapshot();
     const snapshot = this.battle.serializableSnapshot();
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
+      contentVersion: "native-classes-1",
       kind: "battle",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
-      stage: 0,
-      stageLabel: "瓦爾克麗宮",
-      ruleset: "stableRemake",
-      difficulty: this.difficulty,
-      rngState: this.battle.rng.state,
-      roster: snapshot.units
-        .filter((unit) => unit.side === 1)
-        .map(({ slot: unitSlot, classId, experience, life }) => ({ slot: unitSlot, classId, experience, life })),
+      stageId: this.battle.stage.id,
+      stageLabel: this.battle.stage.name,
+      ruleset: campaign.ruleset,
+      difficulty: campaign.difficulty,
+      rngState: campaign.rngState,
+      roster: campaign.roster,
       battle: {
         phase: "player",
         ...snapshot,
@@ -1513,6 +1668,10 @@ export class GameController {
     this.groupCommandOpen = false;
     this.retreatConfirmOpen = false;
     this.objectiveOpen = false;
+    this.promotionUnitIds = [];
+    this.promotionDialogueIndex = undefined;
+    this.promotionSelectionIndex = 0;
+    this.promotionResume = undefined;
     this.movementPresentation = undefined;
     this.combatPresentation = undefined;
     this.busy = false;
@@ -1562,6 +1721,13 @@ export class GameController {
   }
 
   moveCursor(delta: Position): void {
+    if (this.promotionUnitIds.length > 0) {
+      if (this.promotionDialogueActive) return;
+      if (delta.x !== 0 || delta.y !== 0) {
+        this.movePromotionSelection(delta.y || delta.x);
+      }
+      return;
+    }
     if (this.phase === "savePrompt") {
       if (delta.x !== 0 || delta.y !== 0) {
         this.savePromptIndex = this.savePromptIndex === 0 ? 1 : 0;
@@ -1608,8 +1774,8 @@ export class GameController {
     }
     this.minimapPreviewOrigin = undefined;
     this.cursor = {
-      x: Math.max(0, Math.min(STAGE0.width - 1, this.cursor.x + delta.x)),
-      y: Math.max(0, Math.min(STAGE0.height - 1, this.cursor.y + delta.y)),
+      x: Math.max(0, Math.min(this.battle.stage.width - 1, this.cursor.x + delta.x)),
+      y: Math.max(0, Math.min(this.battle.stage.height - 1, this.cursor.y + delta.y)),
     };
     this.centerCamera(this.cursor);
     this.emit();
@@ -1623,8 +1789,8 @@ export class GameController {
       || this.actionMode === "actionMenu"
     ) return;
     const next = {
-      x: Math.max(0, Math.min(STAGE0.width - STAGE0.viewport.width, this.cameraOrigin.x + delta.x)),
-      y: Math.max(0, Math.min(STAGE0.height - STAGE0.viewport.height, this.cameraOrigin.y + delta.y)),
+      x: Math.max(0, Math.min(this.battle.stage.width - this.battle.stage.viewport.width, this.cameraOrigin.x + delta.x)),
+      y: Math.max(0, Math.min(this.battle.stage.height - this.battle.stage.viewport.height, this.cameraOrigin.y + delta.y)),
     };
     if (positionKey(next) === positionKey(this.cameraOrigin)) return;
     this.minimapPreviewOrigin = undefined;
@@ -1640,8 +1806,8 @@ export class GameController {
       || this.hasBlockingOverlay
     ) return undefined;
     this.minimapPreviewOrigin = {
-      x: Math.max(0, Math.min(STAGE0.width - STAGE0.viewport.width, position.x - 4)),
-      y: Math.max(0, Math.min(STAGE0.height - STAGE0.viewport.height, position.y - 3)),
+      x: Math.max(0, Math.min(this.battle.stage.width - this.battle.stage.viewport.width, position.x - 4)),
+      y: Math.max(0, Math.min(this.battle.stage.height - this.battle.stage.viewport.height, position.y - 3)),
     };
     return { ...this.minimapPreviewOrigin };
   }
@@ -1661,7 +1827,9 @@ export class GameController {
   }
 
   primaryAtCursor(): void {
-    if (isStoryPhase(this.phase)) this.advanceDialogue();
+    if (this.promotionDialogueActive) this.advanceDialogue();
+    else if (this.promotionUnitIds.length > 0) this.confirmPromotion();
+    else if (isStoryPhase(this.phase)) this.advanceDialogue();
     else if (this.phase === "defeat") this.retry();
     else if (this.phase === "victoryFeedback") this.continueAfterVictory();
     else if (this.phase === "savePrompt") {
@@ -1702,7 +1870,7 @@ export class GameController {
     for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) unit.acted = true;
     this.battle.focusId = nia.id;
     this.phase = "player";
-    this.cameraOrigin = { ...STAGE0.viewport.initialOrigin };
+    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
     this.cursor = { x: nia.x, y: nia.y };
     this.resetAction();
     this.statusMessage = "自動驗收：最後一名敵人已置於合法攻擊位。";
@@ -1744,7 +1912,7 @@ export class GameController {
     for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) unit.acted = true;
     this.battle.focusId = nia.id;
     this.phase = "player";
-    this.cameraOrigin = { ...STAGE0.viewport.initialOrigin };
+    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
     this.cursor = { x: nia.x, y: nia.y };
     this.resetAction();
     this.statusMessage = "自動驗收：妮雅已有兩個合法普通攻擊目標。";
@@ -1768,7 +1936,7 @@ export class GameController {
     for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) unit.acted = true;
     this.battle.focusId = nia.id;
     this.phase = "player";
-    this.cameraOrigin = { ...STAGE0.viewport.initialOrigin };
+    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
     this.cursor = { x: nia.x, y: nia.y };
     this.resetAction();
     this.statusMessage = "自動驗收：哈釘已置於可反擊位置。";
@@ -1805,6 +1973,10 @@ export class GameController {
       quitConfirmIndex: this.quitConfirmIndex,
       savePromptIndex: this.savePromptIndex,
       postSaveSlotIndex: this.postSaveSlotIndex,
+      promotionUnitIds: [...this.promotionUnitIds],
+      promotionDialogueIndex: this.promotionDialogueIndex,
+      promotionSelectionIndex: this.promotionSelectionIndex,
+      promotionTargets: this.promotionTargets.map((target) => ({ ...target })),
       musicVolume: this.musicVolume,
       speechEnabled: this.speechEnabled,
       movementSoundEnabled: this.movementSoundEnabled,
@@ -1975,8 +2147,8 @@ export class GameController {
 
   private centerCamera(position: Position): void {
     this.cameraOrigin = {
-      x: Math.max(0, Math.min(STAGE0.width - STAGE0.viewport.width, position.x - 4)),
-      y: Math.max(0, Math.min(STAGE0.height - STAGE0.viewport.height, position.y - 3)),
+      x: Math.max(0, Math.min(this.battle.stage.width - this.battle.stage.viewport.width, position.x - 4)),
+      y: Math.max(0, Math.min(this.battle.stage.height - this.battle.stage.viewport.height, position.y - 3)),
     };
   }
 

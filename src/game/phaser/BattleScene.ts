@@ -81,6 +81,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     preload(): void {
       this.load.image("stage0-map", ASSETS.map);
       this.load.image("ally-soldier", ASSETS.allySoldier);
+      Object.entries(ASSETS.allyPromotionTargets).forEach(([classId, source]) =>
+        this.load.image(`ally-${classId}`, source));
       this.load.image("enemy-soldier", ASSETS.enemySoldier);
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
@@ -327,8 +329,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     private textureFor(unit: BattleUnit): string {
-      if (unit.side === 1) return "ally-soldier";
-      return unit.classId === 22 ? "enemy-cavalry" : "enemy-soldier";
+      if (unit.side === 1) {
+        if (
+          unit.classId === "archer"
+          || unit.classId === "cavalry"
+          || unit.classId === "sister"
+          || unit.classId === "warrior"
+        ) return `ally-${unit.classId}`;
+        return "ally-soldier";
+      }
+      return unit.classId === "cavalry" ? "enemy-cavalry" : "enemy-soldier";
     }
 
     private unitVisualOffset(unit: BattleUnit): number {
@@ -336,7 +346,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       // the 32px soldier frames lean 2px right and the 40px cavalry frame 2px
       // left. This offset belongs only to the character image; numeric HUD
       // elements remain centered on the logical 40px cell.
-      return unit.classId === 22 ? 2 : -2;
+      if (unit.classId === "cavalry") return 2;
+      return unit.classId === "soldier" ? -2 : 0;
     }
 
     private unitWorldX(unit: BattleUnit): number {

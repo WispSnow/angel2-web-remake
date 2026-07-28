@@ -26,7 +26,12 @@
 // windup, a thrown-lance projectile (frames 6/7/8), an early attacker exit,
 // and a 360 px camera pan. Its post-impact 112 px camera script accompanies
 // two measured hops: 36 px, then 24 px.
-import type { AttackResult, BattleUnit } from "./types";
+import type { AttackResult, BattleUnit, UnitClassId } from "./types";
+
+type FullCombatClass = 0 | 22;
+
+const fullCombatClass = (classId: UnitClassId): FullCombatClass =>
+  classId === "cavalry" ? 22 : 0;
 
 export const FULL_SCENE = {
   left: 96,
@@ -40,7 +45,7 @@ export const FULL_SCENE = {
 
 export interface FullCombatSpriteState {
   side: "left" | "right";
-  classId: number;
+  classId: FullCombatClass;
   set: "direct" | "plus50";
   frame: number;
   reaction?: "guard" | "hurt" | "death";
@@ -159,8 +164,8 @@ const DUST_BEHIND = 55;
 interface StrikeSpec {
   start: number;
   actorSide: "left" | "right";
-  actorClass: number;
-  victimClass: number;
+  actorClass: FullCombatClass;
+  victimClass: FullCombatClass;
   actorX: number;
   victimX: number;
   cameraFrom: number;
@@ -228,8 +233,8 @@ const CAVALRY_RECOIL: RecoilProfile = {
   ],
 };
 
-const isRanged = (classId: number): boolean => classId === 22;
-const recoilProfile = (actorClass: number): RecoilProfile =>
+const isRanged = (classId: FullCombatClass): boolean => classId === 22;
+const recoilProfile = (actorClass: FullCombatClass): RecoilProfile =>
   isRanged(actorClass) ? CAVALRY_RECOIL : SOLDIER_RECOIL;
 
 function strikeTimes(spec: StrikeSpec): StrikeTimes {
@@ -495,7 +500,7 @@ let battleKeyCounter = 0;
  * measured contact mark; a thrower keeps the whole javelin flight between
  * them, so the target waits far across the window.
  */
-function victimMark(actorClass: number, actorX: number, dir: 1 | -1, meleeMark: number): number {
+function victimMark(actorClass: FullCombatClass, actorX: number, dir: 1 | -1, meleeMark: number): number {
   if (!isRanged(actorClass)) return meleeMark;
   const ranged = actorX + dir * RANGED.separation;
   return Math.max(70, Math.min(FULL_SCENE.width - 70, ranged));
@@ -513,17 +518,17 @@ export function buildFullCombatScript(
   const primary: StrikeSpec = {
     start: OPEN.sceneAt,
     actorSide: attackerLeft ? "left" : "right",
-    actorClass: attacker.classId,
-    victimClass: defender.classId,
+    actorClass: fullCombatClass(attacker.classId),
+    victimClass: fullCombatClass(defender.classId),
     actorX: primaryActorX,
     victimX: victimMark(
-      attacker.classId,
+      fullCombatClass(attacker.classId),
       primaryActorX,
       primaryDir,
       attackerLeft ? PRIMARY_VICTIM_MARK : FULL_SCENE.width - PRIMARY_VICTIM_MARK,
     ),
     cameraFrom: 0,
-    cameraTo: primaryDir * (isRanged(attacker.classId) ? RANGED.scrollDistance : MELEE.scrollDistance),
+    cameraTo: primaryDir * (isRanged(fullCombatClass(attacker.classId)) ? RANGED.scrollDistance : MELEE.scrollDistance),
     damage: result.damage,
     victimDies: result.defenderDied,
     final: result.defenderDied || !result.counterOccurred,
@@ -538,17 +543,17 @@ export function buildFullCombatScript(
     counter = {
       start: primaryTimes.end,
       actorSide: attackerLeft ? "right" : "left",
-      actorClass: defender.classId,
-      victimClass: attacker.classId,
+      actorClass: fullCombatClass(defender.classId),
+      victimClass: fullCombatClass(attacker.classId),
       actorX: primary.victimX,
       victimX: victimMark(
-        defender.classId,
+        fullCombatClass(defender.classId),
         primary.victimX,
         counterDir,
         attackerLeft ? COUNTER_VICTIM_MARK : FULL_SCENE.width - COUNTER_VICTIM_MARK,
       ),
       cameraFrom: primary.cameraTo,
-      cameraTo: primary.cameraTo - primaryDir * (isRanged(defender.classId) ? RANGED.scrollDistance : MELEE.scrollDistance),
+      cameraTo: primary.cameraTo - primaryDir * (isRanged(fullCombatClass(defender.classId)) ? RANGED.scrollDistance : MELEE.scrollDistance),
       damage: result.counterDamage,
       victimDies: result.attackerDied,
       final: true,

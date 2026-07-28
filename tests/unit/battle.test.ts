@@ -61,10 +61,10 @@ describe("stage 0 battle simulation", () => {
   });
 
   it("charges the verified stage-0 terrain costs and stops after expensive cells", () => {
-    expect(movementCost(0, { x: 21, y: 20 })).toBe(1);
-    expect(movementCost(0, { x: 22, y: 24 })).toBe(2);
-    expect(movementCost(0, { x: 25, y: 19 })).toBe(3);
-    expect(movementCost(0, { x: 0, y: 0 })).toBe(99);
+    expect(movementCost("soldier", { x: 21, y: 20 })).toBe(1);
+    expect(movementCost("soldier", { x: 22, y: 24 })).toBe(2);
+    expect(movementCost("soldier", { x: 25, y: 19 })).toBe(3);
+    expect(movementCost("soldier", { x: 0, y: 0 })).toBe(99);
 
     const battle = battleAtPlayableOpening();
     const nia = battle.unit("1:0")!;

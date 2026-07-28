@@ -7,6 +7,7 @@ import {
   STARTUP_ASSETS,
 } from "./content/startup";
 import { classStatsFor } from "./content/stage0";
+import { className } from "./content/classes";
 import { configureGameScaling } from "./scaling";
 import {
   moveSaveSlotIndex,
@@ -193,7 +194,7 @@ export function mountStartup(
     if (result.kind === "invalid") return ["損壞", "—", "—", "—", "—"];
     const representative = result.save.roster[0];
     return [
-      representative ? (representative.classId === 22 ? "騎兵" : "士兵") : "—",
+      representative ? className(representative.classId) : "—",
       representative ? String(classStatsFor(representative).level) : "—",
       representative ? String(representative.experience) : "—",
       String(result.save.saveCount),

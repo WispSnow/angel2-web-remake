@@ -81,6 +81,10 @@ await mkdir(publicAssetPath, { recursive: true });
 await mkdir(publicEffectPath, { recursive: true });
 await Promise.all([
   copyFile(path.join(planarAssetPath, "0002/00.png"), path.join(publicAssetPath, "unit-ally-soldier.png")),
+  copyFile(path.join(planarAssetPath, "0002/20.png"), path.join(publicAssetPath, "unit-ally-archer.png")),
+  copyFile(path.join(planarAssetPath, "0002/22.png"), path.join(publicAssetPath, "unit-ally-cavalry.png")),
+  copyFile(path.join(planarAssetPath, "0002/24.png"), path.join(publicAssetPath, "unit-ally-sister.png")),
+  copyFile(path.join(planarAssetPath, "0002/28.png"), path.join(publicAssetPath, "unit-ally-warrior.png")),
   copyFile(path.join(portraitAssetPath, "0015/00.png"), path.join(publicAssetPath, "portrait-hading.png")),
   ...stage0EffectRecords.map((record) => copyFile(
     path.join(convertedEffectPath, `${String(record).padStart(4, "0")}.wav`),

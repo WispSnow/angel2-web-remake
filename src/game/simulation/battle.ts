@@ -1,7 +1,18 @@
-import { STAGE0, STAGE0_AI_CLASS_PRIORITY, TERRAIN_DEFENSE_PERCENT, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
-import type { AttackResult, BattleOutcome, BattleUnit, Difficulty, Position, UnitStats } from "../types";
+import {
+  killRewardFor,
+  terrainDefensePercentFor,
+} from "../content/classes";
+import { STAGE0, STAGE0_AI_CLASS_PRIORITY, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
+import { STAGE0_DEFINITION } from "../content/stages";
+import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, Position, UnitStats } from "../types";
 import { DeterministicRng } from "./rng";
 import { manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath } from "./grid";
+import {
+  promoteUnit,
+  promotionQueue,
+  type PromotionCommitResult,
+} from "./promotion";
+import type { ClassId } from "../content/classes";
 
 export interface RouteMoveResult {
   path: Position[];
@@ -17,6 +28,7 @@ export interface AlliedAiAction {
 }
 
 export class Stage0Battle {
+  readonly stage = STAGE0_DEFINITION;
   units: BattleUnit[];
   round = 1;
   focusId = "1:0";
@@ -44,6 +56,17 @@ export class Stage0Battle {
 
   unitAt(position: Position): BattleUnit | undefined {
     return this.units.find((unit) => unit.x === position.x && unit.y === position.y);
+  }
+
+  promotionQueue(): string[] {
+    return promotionQueue(this.units, this.stage.width);
+  }
+
+  promote(id: string, targetClassId: ClassId): PromotionCommitResult {
+    const unit = this.unit(id);
+    if (!unit) throw new Error("轉職單位已不在戰場");
+    this.focusId = id;
+    return promoteUnit(unit, targetClassId);
   }
 
   statsFor(unit: Pick<BattleUnit, "classId" | "experience" | "side">): UnitStats {
@@ -91,21 +114,29 @@ export class Stage0Battle {
 
     const attackerStats = this.statsFor(attacker);
     const defenderStats = this.statsFor(defender);
-    const terrainDefense = Math.floor(defenderStats.defense * TERRAIN_DEFENSE_PERCENT[terrainSlotAt(defender)] / 100);
+    const terrainDefense = Math.floor(
+      defenderStats.defense
+      * terrainDefensePercentFor(defender.classId, terrainSlotAt(defender))
+      / 100,
+    );
     const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense) + this.rng.between(4, 7) + this.rng.between(4, 7);
     defender.life = Math.max(0, defender.life - damage);
 
     const counterOccurred = defender.life > 0;
     let counterDamage = 0;
     if (counterOccurred) {
-      const attackerTerrainDefense = Math.floor(attackerStats.defense * TERRAIN_DEFENSE_PERCENT[terrainSlotAt(attacker)] / 100);
+      const attackerTerrainDefense = Math.floor(
+        attackerStats.defense
+        * terrainDefensePercentFor(attacker.classId, terrainSlotAt(attacker))
+        / 100,
+      );
       counterDamage = Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
       attacker.life = Math.max(0, attacker.life - counterDamage);
     }
 
     const defenderDied = defender.life === 0;
     const attackerDied = attacker.life === 0;
-    const reward = defender.classId === 22 ? 20 : 10;
+    const reward = killRewardFor(defender.classId, defender.side);
     const experienceGained = defenderDied ? reward + this.rng.between(4, 7) : defenderStats.level + this.rng.between(4, 7);
     attacker.experience += experienceGained;
     attacker.acted = true;
@@ -175,7 +206,7 @@ export class Stage0Battle {
     const occupied = new Set(this.units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
     const enemies = this.units
       .filter((candidate) => candidate.side === 2)
-      .sort((left, right) => left.y * STAGE0.width + left.x - (right.y * STAGE0.width + right.x));
+      .sort((left, right) => left.y * this.stage.width + left.x - (right.y * this.stage.width + right.x));
     const nativeCandidateOffsets = [
       { x: 0, y: 1 },
       { x: -1, y: 0 },
@@ -191,7 +222,7 @@ export class Stage0Battle {
         const candidate = { x: enemy.x + offset.x, y: enemy.y + offset.y };
         const candidateKey = positionKey(candidate);
         if (!reachableKeys.has(candidateKey) || occupied.has(candidateKey)) continue;
-        const defense = TERRAIN_DEFENSE_PERCENT[terrainSlotAt(candidate)] ?? 0;
+        const defense = terrainDefensePercentFor(unit.classId, terrainSlotAt(candidate));
         if (defense >= attackPositionDefense) {
           attackTarget = enemy;
           attackPosition = candidate;
@@ -211,7 +242,7 @@ export class Stage0Battle {
 
     const pursuitTargets = enemies
       .map((enemy) => ({ x: enemy.x, y: enemy.y + 1 }))
-      .filter(({ x, y }) => x >= 0 && y >= 0 && x < STAGE0.width && y < STAGE0.height);
+      .filter(({ x, y }) => x >= 0 && y >= 0 && x < this.stage.width && y < this.stage.height);
     const pursuitPath = routePath(unit, pursuitTargets, this.units, stats.movement);
     if (pursuitPath.length > 1) return { unitId: id, kind: "move", path: pursuitPath };
     return { unitId: id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
@@ -241,9 +272,10 @@ export class Stage0Battle {
     return this.units
       .filter((unit) => unit.side === 2 && !unit.acted)
       .sort((left, right) => {
-        const priority = STAGE0_AI_CLASS_PRIORITY[left.classId] - STAGE0_AI_CLASS_PRIORITY[right.classId];
+        const priority = (STAGE0_AI_CLASS_PRIORITY[left.classId] ?? Number.MAX_SAFE_INTEGER)
+          - (STAGE0_AI_CLASS_PRIORITY[right.classId] ?? Number.MAX_SAFE_INTEGER);
         if (priority !== 0) return priority;
-        return (left.y * STAGE0.width + left.x) - (right.y * STAGE0.width + right.x);
+        return (left.y * this.stage.width + left.x) - (right.y * this.stage.width + right.x);
       })
       .map((unit) => unit.id);
   }
@@ -308,6 +340,18 @@ export class Stage0Battle {
       round: this.round,
       focusId: this.focusId,
       units: this.units.map((unit) => ({ ...unit })),
+    };
+  }
+
+  campaignSnapshot(): CampaignState {
+    return {
+      stageId: this.stage.id,
+      ruleset: "stableRemake",
+      difficulty: this.difficulty,
+      roster: this.units
+        .filter((unit) => unit.side === 1)
+        .map(({ slot, classId, experience, life }) => ({ slot, classId, experience, life })),
+      rngState: this.rng.state,
     };
   }
 }

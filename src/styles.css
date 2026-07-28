@@ -730,6 +730,9 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 }
 .dialogue-box.upper { top: 20px; }
 .dialogue-box.lower { top: 194px; }
+.dialogue-layer.promotion-dialogue .dialogue-box.upper .dialogue-copy { left: 165px; width: 459px; }
+.dialogue-layer.promotion-dialogue .dialogue-box.lower { top: 206px; }
+.dialogue-layer.promotion-dialogue .dialogue-box.lower .dialogue-copy { left: 125px; width: 371px; }
 .dialogue-layer.prebattle .dialogue-box.upper { top: 12px; }
 .dialogue-layer.prebattle .dialogue-box.lower { top: 204px; }
 .dialogue-portrait { position: absolute; width: 112px; height: 112px; }
@@ -801,6 +804,46 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 }
 
 .modal-panel { border: 5px ridge #e2b633; color: #fff4d1; background: radial-gradient(circle at top, #52242a, #170d10 72%); box-shadow: 0 15px 40px #000c, inset 0 0 0 2px #6d3c26; text-align: center; }
+.promotion-layer {
+  position: absolute;
+  z-index: 18;
+  inset: 0;
+  padding: 24px 46px;
+  color: #fff4d1;
+  background: rgba(4, 2, 5, .86);
+}
+.promotion-panel {
+  height: 302px;
+  padding: 10px 16px 8px;
+  border: 5px ridge #e2b633;
+  background: radial-gradient(circle at top, #52242a, #170d10 72%);
+  box-shadow: 0 15px 40px #000c, inset 0 0 0 2px #6d3c26;
+  text-align: center;
+}
+.promotion-panel h2 { margin: 2px 0 3px; color: #ffe37b; font-size: 20px; }
+.promotion-current { margin: 0 0 6px; color: #e9dec2; font: 11px/1.35 system-ui, sans-serif; }
+.promotion-options { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.promotion-option {
+  display: grid;
+  min-height: 88px;
+  padding: 5px 8px;
+  border: 1px solid #966d27;
+  color: #f7ecd2;
+  background: linear-gradient(#3d1e24, #170d10);
+  font: 10px/1.28 system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.promotion-option strong { color: #ffe37b; font: 700 14px/1.15 "PMingLiU", "MingLiU", serif; }
+.promotion-option > span:first-of-type { color: #cfb974; }
+.promotion-option:hover,
+.promotion-option.is-selected,
+.promotion-option:focus-visible {
+  border-color: #ffe26b;
+  outline: 1px solid #9d342f;
+  background: linear-gradient(#783139, #35151b);
+}
+.promotion-warning { margin: 6px 0 0; color: #ffcf72; font: 700 11px/1.25 system-ui, sans-serif; }
 .objective-panel { position: absolute; z-index: 14; left: 126px; top: 61px; width: 388px; padding: 22px 30px; }
 .objective-panel h2 { margin: 10px 0 3px; color: #f3d466; font-size: 18px; }
 .objective-panel p { margin: 0 0 11px; font-size: 14px; }

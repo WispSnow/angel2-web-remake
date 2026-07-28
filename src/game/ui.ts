@@ -1,7 +1,8 @@
 import { ASSETS, STAGE0, nextExperienceThresholdFor } from "./content/stage0";
+import { classDefinition, classStatsFor } from "./content/classes";
 import type { GameController } from "./controller";
 import { FULL_COMBAT_FRAME_META, type FullCombatSpriteState } from "./full-combat";
-import type { GamePhase, Position, UnitStats } from "./types";
+import type { Position, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
 import {
   animatedPortraitMarkup,
@@ -22,8 +23,6 @@ import {
   saveSlotPageIndex,
   saveSlotPageStart,
 } from "./save";
-
-const storyPhases = new Set<GamePhase>(["prebattleStory", "openingStory", "round2Story", "victoryStory"]);
 
 export function mountUi(root: HTMLElement, controller: GameController, audio: AudioManager): void {
   root.innerHTML = `
@@ -125,6 +124,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <div class="action-menu" id="action-menu" data-testid="action-menu" role="menu" aria-label="單位行動" hidden></div>
             <div class="status-strip" id="status-strip" aria-live="polite"></div>
             <section class="combat-presentation" id="combat-presentation" data-testid="combat-presentation" hidden></section>
+            <section class="promotion-layer" id="promotion-layer" data-testid="promotion-layer"
+              role="dialog" aria-modal="true" aria-label="選擇轉職" hidden></section>
             <button class="hint-toast" id="hint-toast" data-action="objectives" hidden></button>
             <section class="dialogue-layer" id="dialogue-layer" data-testid="dialogue-layer" hidden>
               <div class="dialogue-box upper" id="dialogue-box-upper" data-testid="dialogue-window-upper" hidden>
@@ -167,6 +168,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const actionMenu = required(root, "#action-menu");
   const status = required(root, "#status-strip");
   const combatPresentation = required(root, "#combat-presentation");
+  const promotionLayer = required(root, "#promotion-layer");
   const hint = required(root, "#hint-toast");
   const dialogueLayer = required(root, "#dialogue-layer");
   const dialogueWindows = {
@@ -186,6 +188,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     },
   };
   const dialogueControls = required(root, "#dialogue-controls");
+  const skipDialogueButton = required<HTMLButtonElement>(root, "[data-action=skip-dialogue]");
   const storyBackground = required(root, "#story-background");
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
@@ -199,6 +202,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const retreatConfirm = required(root, "#retreat-confirm");
   const resultLayer = required(root, "#result-layer");
   let dialogueTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  let dialogueAdvanceTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let activeDialogueKey = "";
   let dialogueFullText = "";
   let revealedCharacters = 0;
@@ -235,7 +239,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   };
   const stopDialogueTimer = () => {
     if (dialogueTimer !== undefined) globalThis.clearTimeout(dialogueTimer);
+    if (dialogueAdvanceTimer !== undefined) globalThis.clearTimeout(dialogueAdvanceTimer);
     dialogueTimer = undefined;
+    dialogueAdvanceTimer = undefined;
   };
   const revealDialogue = (
     fullText: string,
@@ -257,6 +263,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
         stopSpeaking(activeDialoguePortrait);
         dialogueTimer = undefined;
+        if (activeDialogueKey === key && controller.promotionDialogueActive) {
+          const delay = controller.isTestMode ? 100 : controller.presentationFast ? 80 : 160;
+          dialogueAdvanceTimer = globalThis.setTimeout(() => {
+            dialogueAdvanceTimer = undefined;
+            if (activeDialogueKey === key && controller.promotionDialogueActive) {
+              controller.advanceDialogue();
+            }
+          }, delay);
+        }
         return;
       }
       const character = dialogueFullText[revealedCharacters];
@@ -429,6 +444,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "rest") controller.chooseRest();
     else if (action === "end-unit") controller.chooseEnd();
     else if (action === "undo-move") controller.chooseUndo();
+    else if (action === "promotion-target") {
+      controller.selectPromotionTarget(Number(button.dataset.promotionIndex));
+      controller.confirmPromotion();
+    }
     else if (action === "retry") {
       if (!finishFeedbackTyping()) controller.retry();
     }
@@ -460,6 +479,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (quitChoice) controller.selectQuitChoice(Number(quitChoice.dataset.quitIndex));
     const postSaveSlot = (event.target as Element).closest<HTMLElement>("[data-post-save-index]");
     if (postSaveSlot) controller.selectPostSaveSlot(Number(postSaveSlot.dataset.postSaveIndex));
+    const promotionTarget = (event.target as Element).closest<HTMLElement>("[data-promotion-index]");
+    if (promotionTarget) controller.selectPromotionTarget(Number(promotionTarget.dataset.promotionIndex));
     const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
     if (!minimap) {
       if (controller.minimapPreviewOrigin) controller.clearMinimapPreview();
@@ -560,6 +581,44 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const selected = index === controller.commandIndex;
         return `<button type="button" role="menuitem" data-action="${action}" data-command-index="${index}" data-testid="unit-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${command.label}</button>`;
       }).join("");
+    }
+    const promotionUnit = controller.promotionChoiceVisible ? controller.promotionUnit : undefined;
+    promotionLayer.hidden = !promotionUnit;
+    if (promotionUnit) {
+      const currentStats = controller.battle.statsFor(promotionUnit);
+      const actionLabels = {
+        ordinary: "普通攻擊",
+        shooting: "普通攻擊／射擊方向",
+        technique: "普通攻擊／技術方向",
+        special_runtime: "特殊行動",
+      } as const;
+      const delta = (next: number, current: number) => {
+        const change = next - current;
+        return change === 0 ? "±0" : change > 0 ? `+${change}` : String(change);
+      };
+      const options = controller.promotionTargets.map((target, index) => {
+        const definition = classDefinition(target.id);
+        const stats = classStatsFor({ classId: target.id, experience: 0 });
+        const selected = index === controller.promotionSelectionIndex;
+        return `<button type="button" class="promotion-option ${selected ? "is-selected" : ""}"
+          data-action="promotion-target" data-promotion-index="${index}"
+          data-testid="promotion-target-${target.id}" aria-current="${selected}">
+          <strong>${index + 1}．${definition.nativeName}</strong>
+          <span>${actionLabels[definition.actionCategory]}</span>
+          <span>等級 ${stats.level}　攻 ${stats.attack}（${delta(stats.attack, currentStats.attack)}）</span>
+          <span>防 ${stats.defense}（${delta(stats.defense, currentStats.defense)}）　生命上限 ${stats.maxLife}（${delta(stats.maxLife, currentStats.maxLife)}）</span>
+          <span>移動 ${stats.movement}（${delta(stats.movement, currentStats.movement)}）</span>
+        </button>`;
+      }).join("");
+      promotionLayer.innerHTML = `<div class="promotion-panel">
+        <span class="panel-kicker">CLASS CHANGE</span>
+        <h2>${promotionUnit.name}・${promotionUnit.className}轉職</h2>
+        <p class="promotion-current">目前：等級 ${currentStats.level}　攻 ${currentStats.attack}　防 ${currentStats.defense}　生命 ${promotionUnit.life}/${currentStats.maxLife}　移動 ${currentStats.movement}</p>
+        <div class="promotion-options" role="menu" aria-label="${promotionUnit.name}的轉職候選">${options}</div>
+        <p class="promotion-warning">選擇後經驗歸零；目前生命不恢復。此選擇不能取消。</p>
+      </div>`;
+    } else {
+      promotionLayer.replaceChildren();
     }
     hint.hidden = !controller.hintVisible || controller.phase !== "player";
     hint.textContent = `查看勝利條件：保護妮雅；敵軍被擊倒或撤離均計入清除。`;
@@ -698,17 +757,27 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${focus ? renderHud(focus.unit, focus.stats) : ""}`;
 
     const page = controller.currentDialogue;
-    const dialogueVisible = storyPhases.has(controller.phase) && page !== undefined;
+    const dialogueVisible = page !== undefined;
     dialogueLayer.hidden = !dialogueVisible;
     storyBackground.hidden = controller.phase !== "prebattleStory";
     if (page) {
-      const pageKey = `${controller.phase}:${controller.dialogueIndex}`;
+      const pageKey = controller.promotionDialogueActive
+        ? `promotion:${controller.promotionUnit?.id}:${controller.promotionDialogueIndex}`
+        : `${controller.phase}:${controller.dialogueIndex}`;
       const pageChanged = activeDialogueKey !== pageKey;
       dialogueLayer.dataset.sourceRecord = String(page.source.record);
       dialogueLayer.dataset.sourceWait = String(page.source.wait);
+      if (page.source.address) dialogueLayer.dataset.sourceAddress = page.source.address;
+      else delete dialogueLayer.dataset.sourceAddress;
       dialogueLayer.dataset.activeSlot = page.activeSlot ?? "none";
       dialogueLayer.dataset.revealStart = String(page.revealStart ?? 0);
       dialogueLayer.classList.toggle("prebattle", controller.phase === "prebattleStory");
+      dialogueLayer.classList.toggle("promotion-dialogue", controller.promotionDialogueActive);
+      skipDialogueButton.hidden = controller.promotionDialogueActive;
+      dialogueControls.setAttribute(
+        "aria-label",
+        controller.promotionDialogueActive ? "轉職對話控制" : "劇情對話控制",
+      );
       for (const slot of ["upper", "lower"] as const) {
         const elements = dialogueWindows[slot];
         const state = page[slot];
@@ -763,6 +832,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         revealedCharacters = 0;
       }
     } else {
+      dialogueLayer.classList.remove("promotion-dialogue");
+      skipDialogueButton.hidden = false;
       stopDialogueTimer();
       stopSpeaking(activeDialoguePortrait);
       activeDialogueKey = "";
@@ -911,8 +982,8 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
     .includes(presentation.phase) ? defender : attacker;
   const leftUnit = attacker.side === 1 ? attacker : defender;
   const rightUnit = attacker.side === 2 ? attacker : defender;
-  layer.dataset.fullLeftRecord = `M_00/${leftUnit.classId + (leftUnit.id === actorUnit.id ? 50 : 0)}`;
-  layer.dataset.fullRightRecord = `Y_00/${rightUnit.classId + (rightUnit.id === actorUnit.id ? 50 : 0)}`;
+  layer.dataset.fullLeftRecord = `M_00/${classDefinition(leftUnit.classId).nativeRecord + (leftUnit.id === actorUnit.id ? 50 : 0)}`;
+  layer.dataset.fullRightRecord = `Y_00/${classDefinition(rightUnit.classId).nativeRecord + (rightUnit.id === actorUnit.id ? 50 : 0)}`;
 
   const query = <T extends HTMLElement>(selector: string): T => layer.querySelector(selector) as T;
   query<HTMLElement>(".full-status.left").hidden = !scene.showLeftPanel;

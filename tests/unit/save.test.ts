@@ -18,32 +18,34 @@ import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 const completedSave = (): CompletedSaveData => ({
   format: "ANGEL2-web-save",
   version: SAVE_VERSION,
+  contentVersion: "native-classes-1",
   kind: "completed",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 1,
-  stage: 1,
+  stageId: "stage-01",
   stageLabel: "下一關",
   ruleset: "stableRemake",
   difficulty: 0,
   rngState: 0x0a11ce02,
   roster: [
-    { slot: 0, classId: 0, experience: 319, life: 170 },
+    { slot: 0, classId: "soldier", experience: 319, life: 170 },
   ],
 });
 
 const battleSave = (): BattleSaveData => ({
   format: "ANGEL2-web-save",
   version: SAVE_VERSION,
+  contentVersion: "native-classes-1",
   kind: "battle",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 2,
-  stage: 0,
+  stageId: "stage-00",
   stageLabel: "瓦爾克麗宮",
   ruleset: "stableRemake",
   difficulty: 2,
   rngState: 0x1020_3040,
   roster: [
-    { slot: 0, classId: 0, experience: 399, life: 160 },
+    { slot: 0, classId: "soldier", experience: 399, life: 160 },
   ],
   battle: {
     phase: "player",
@@ -54,7 +56,7 @@ const battleSave = (): BattleSaveData => ({
         id: "1:0",
         side: 1,
         slot: 0,
-        classId: 0,
+        classId: "soldier",
         className: "士兵",
         name: "妮雅",
         portrait: 46,
@@ -68,7 +70,7 @@ const battleSave = (): BattleSaveData => ({
         id: "2:15",
         side: 2,
         slot: 15,
-        classId: 22,
+        classId: "cavalry",
         className: "騎兵",
         name: "哈釘",
         portrait: 15,
@@ -83,6 +85,57 @@ const battleSave = (): BattleSaveData => ({
     cameraOrigin: { x: 25, y: 23 },
   },
 });
+
+function legacyCompletedSave(
+  save: CompletedSaveData,
+  version: 2 | 3 | 4,
+) {
+  return {
+    format: save.format,
+    version,
+    kind: save.kind,
+    savedAt: save.savedAt,
+    saveCount: save.saveCount,
+    stage: 1,
+    stageLabel: save.stageLabel,
+    ruleset: save.ruleset,
+    difficulty: save.difficulty,
+    rngState: save.rngState,
+    roster: save.roster.map((entry) => ({
+      ...entry,
+      classId: entry.classId === "cavalry" ? 22 : 0,
+    })),
+  } as const;
+}
+
+function legacyBattleSave(
+  save: BattleSaveData,
+  version: 2 | 3 | 4,
+) {
+  return {
+    format: save.format,
+    version,
+    kind: save.kind,
+    savedAt: save.savedAt,
+    saveCount: save.saveCount,
+    stage: 0,
+    stageLabel: save.stageLabel,
+    ruleset: save.ruleset,
+    difficulty: save.difficulty,
+    rngState: save.rngState,
+    roster: save.roster.map((entry) => ({
+      ...entry,
+      classId: entry.classId === "cavalry" ? 22 : 0,
+    })),
+    battle: {
+      ...save.battle,
+      units: save.battle.units.map((unit) => ({
+        ...unit,
+        classId: unit.classId === "cavalry" ? 22 : 0,
+      })),
+    },
+  } as const;
+}
 
 describe("Web save validation", () => {
   it("exposes twenty manual slots as four pages without changing legacy keys", () => {
@@ -101,22 +154,34 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-4 battle and completed saves", () => {
+  it("accepts complete version-5 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
+  });
+
+  it("round-trips promoted semantic classes with reset experience and retained life", () => {
+    const promoted = battleSave();
+    promoted.roster[0] = { ...promoted.roster[0], classId: "sister", experience: 0 };
+    promoted.battle.units[0] = {
+      ...promoted.battle.units[0],
+      classId: "sister",
+      className: "修女",
+      experience: 0,
+    };
+
+    expect(parseSaveData(JSON.stringify(promoted))).toEqual(promoted);
   });
 
   it("migrates version-2 stage-0 ally and enemy stats while preserving missing life", () => {
     const current = battleSave();
     const legacy = {
-      ...current,
-      version: 2,
-      roster: current.roster.map((entry) => entry.slot === 0
+      ...legacyBattleSave(current, 2),
+      roster: legacyBattleSave(current, 2).roster.map((entry) => entry.slot === 0
         ? { ...entry, experience: 100, life: 140 }
         : { ...entry }),
       battle: {
-        ...current.battle,
-        units: current.battle.units.map((unit) => {
+        ...legacyBattleSave(current, 2).battle,
+        units: legacyBattleSave(current, 2).battle.units.map((unit) => {
           if (unit.side === 2) return { ...unit, experience: 0, life: 180 };
           if (unit.slot === 0) return { ...unit, experience: 100, life: 140 };
           return { ...unit };
@@ -132,13 +197,13 @@ describe("Web save validation", () => {
 
   it("migrates version-3 named allies without reseeding already-correct enemies", () => {
     const current = battleSave();
+    const version3 = legacyBattleSave(current, 3);
     const legacy = {
-      ...current,
-      version: 3,
-      roster: [{ ...current.roster[0], experience: 100, life: 140 }],
+      ...version3,
+      roster: [{ ...version3.roster[0], experience: 100, life: 140 }],
       battle: {
-        ...current.battle,
-        units: current.battle.units.map((unit) => unit.side === 1
+        ...version3.battle,
+        units: version3.battle.units.map((unit) => unit.side === 1
           ? { ...unit, experience: 100, life: 140 }
           : { ...unit }),
       },
@@ -149,13 +214,18 @@ describe("Web save validation", () => {
 
   it("migrates version-3 completed rosters to the named-ally experience floor", () => {
     const current = completedSave();
+    const version3 = legacyCompletedSave(current, 3);
     const legacy = {
-      ...current,
-      version: 3,
-      roster: [{ ...current.roster[0], experience: 20, life: 140 }],
+      ...version3,
+      roster: [{ ...version3.roster[0], experience: 20, life: 140 }],
     };
 
     expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
+  it("maps version-4 native class records to stable semantic IDs", () => {
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify(legacyBattleSave(current, 4)))).toEqual(current);
   });
 
   it("rejects malformed JSON and shallow lookalikes", () => {
@@ -208,7 +278,7 @@ describe("Web save validation", () => {
   });
 
   it("keeps completed and battle stage metadata correlated", () => {
-    expect(isSaveData({ ...completedSave(), stage: 0 })).toBe(false);
+    expect(isSaveData({ ...completedSave(), stageId: "stage-00" })).toBe(false);
     expect(isSaveData({ ...completedSave(), battle: battleSave().battle })).toBe(false);
     expect(isSaveData({ ...battleSave(), stageLabel: "下一關" })).toBe(false);
   });

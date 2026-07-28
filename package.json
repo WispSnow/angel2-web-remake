@@ -17,6 +17,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "pnpm run test:coverage && pnpm run build && pnpm run test:e2e",
+    "content": "pnpm run content:classes && pnpm run content:stage0",
+    "content:classes": "node scripts/generate-class-catalog.mjs",
     "content:stage0": "node scripts/generate-stage0-runtime.mjs"
   },
   "dependencies": {

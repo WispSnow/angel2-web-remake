@@ -1,4 +1,5 @@
-import { CLASS_ROWS, MOVEMENT_RULES, STAGE0, terrainSlotAt } from "../content/stage0";
+import { classStatsFor, movementRulesFor } from "../content/classes";
+import { STAGE0, terrainSlotAt } from "../content/stage0";
 import type { BattleUnit, Position, UnitClassId } from "../types";
 
 export const positionKey = ({ x, y }: Position): string => `${x},${y}`;
@@ -14,7 +15,7 @@ export function neighbors(position: Position): Position[] {
 }
 
 export function movementCost(classId: UnitClassId, position: Position): number {
-  return MOVEMENT_RULES[classId][terrainSlotAt(position)] ?? 99;
+  return movementRulesFor(classId)[terrainSlotAt(position)] ?? 99;
 }
 
 interface SearchResult {
@@ -116,7 +117,7 @@ export function zoneOfControl(unit: BattleUnit, units: readonly BattleUnit[]): R
 }
 
 function unitStatsMovement(unit: BattleUnit): number {
-  return CLASS_ROWS[unit.classId][0].movement;
+  return classStatsFor(unit).movement;
 }
 
 export function shortestPath(

@@ -1,6 +1,9 @@
+import type { ClassId } from "./content/class-catalog.generated";
+
 export type Side = 1 | 2;
 export type Difficulty = 0 | 1 | 2 | 3;
-export type UnitClassId = 0 | 22;
+export type UnitClassId = ClassId;
+export type StageId = "stage-00" | "stage-01";
 export type PortraitRecord = 15 | 45 | 46 | 47 | 48;
 
 export interface Position {
@@ -21,7 +24,7 @@ export interface BattleUnit extends Position {
   side: Side;
   slot: number;
   classId: UnitClassId;
-  className: "士兵" | "騎兵";
+  className: string;
   name: string;
   portrait: PortraitRecord;
   life: number;
@@ -74,8 +77,9 @@ export interface DialoguePage {
   /** Characters already present before an appended line starts typing. */
   revealStart?: number;
   source: {
-    record: 0 | 1 | 2 | 3;
+    record: 0 | 1 | 2 | 3 | "promotion";
     wait: number;
+    address?: string;
   };
 }
 
@@ -97,7 +101,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 4;
+  version: 5;
+  contentVersion: "native-classes-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
@@ -108,15 +113,23 @@ interface SaveDataBase {
 
 export interface BattleSaveData extends SaveDataBase {
   kind: "battle";
-  stage: 0;
+  stageId: "stage-00";
   stageLabel: "瓦爾克麗宮";
   battle: SavedBattleState;
 }
 
 export interface CompletedSaveData extends SaveDataBase {
   kind: "completed";
-  stage: 1;
+  stageId: "stage-01";
   stageLabel: "下一關";
 }
 
 export type SaveData = BattleSaveData | CompletedSaveData;
+
+export interface CampaignState {
+  stageId: StageId;
+  ruleset: "stableRemake";
+  difficulty: Difficulty;
+  roster: SaveRosterEntry[];
+  rngState: number;
+}

@@ -115,12 +115,47 @@ interface DebugState {
   };
   reachable: Array<{ x: number; y: number }>;
   targets: Array<{ x: number; y: number }>;
-  units: Array<{ id: string; side: number; x: number; y: number; life: number; experience: number; name: string; portrait: number; acted: boolean }>;
+  promotionUnitIds: string[];
+  promotionDialogueIndex?: number;
+  promotionSelectionIndex: number;
+  promotionTargets: Array<{ id: string; optionIndex: number }>;
+  units: Array<{ id: string; side: number; classId: string; className: string; x: number; y: number; life: number; experience: number; name: string; portrait: number; acted: boolean }>;
 }
 
 const debugState = (page: Page) => page.evaluate(() => window.__ANGEL2__?.getState() as DebugState);
 const waitForPhase = (page: Page, phase: string) => page.waitForFunction((expected) => window.__ANGEL2__?.getState().phase === expected, phase);
 const clickCanvas = (page: Page, x: number, y: number) => page.getByTestId("battle-canvas").click({ position: { x, y } });
+const finishPromotionDialogue = async (page: Page) => {
+  const layer = page.getByTestId("dialogue-layer");
+  while (await layer.isVisible() && await layer.getAttribute("data-source-record") === "promotion") {
+    const before = await layer.getAttribute("data-source-wait");
+    await page.getByTestId("advance-dialogue").click();
+    if (
+      await layer.isVisible()
+      && await layer.getAttribute("data-source-record") === "promotion"
+      && await layer.getAttribute("data-source-wait") === before
+    ) {
+      await page.getByTestId("advance-dialogue").click();
+    }
+    await expect.poll(async () =>
+      !await layer.isVisible() || await layer.getAttribute("data-source-wait") !== before,
+    ).toBe(true);
+  }
+  await expect(layer).toBeHidden();
+  await expect(page.getByTestId("promotion-layer")).toBeVisible();
+};
+const confirmPromotion = async (page: Page, classId = "cavalry") => {
+  const dialogueLayer = page.getByTestId("dialogue-layer");
+  if (
+    await dialogueLayer.isVisible()
+    && await dialogueLayer.getAttribute("data-source-record") === "promotion"
+  ) {
+    await finishPromotionDialogue(page);
+  }
+  await expect(page.getByTestId("promotion-layer")).toBeVisible();
+  await page.getByTestId(`promotion-target-${classId}`).click();
+  await expect(page.getByTestId("promotion-layer")).toBeHidden();
+};
 const openSystemMenu = async (page: Page) => {
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("system-menu")).toBeVisible();
@@ -511,6 +546,39 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   await expect(page.getByTestId("combat-presentation")).toBeHidden();
   await page.waitForFunction(() => !window.__ANGEL2__?.getState().combatPresentation);
+  const promotionDialogue = page.getByTestId("dialogue-layer");
+  await expect(promotionDialogue).toBeVisible();
+  await expect(promotionDialogue).toHaveAttribute("data-source-record", "promotion");
+  await expect(promotionDialogue).toHaveAttribute("data-source-address", "0000:0487");
+  await expect(promotionDialogue).toHaveAttribute("data-source-wait", "1");
+  await expect(page.getByTestId("promotion-layer")).toBeHidden();
+  await page.getByTestId("advance-dialogue").click();
+  await expect(page.locator("#dialogue-text")).toHaveText(
+    "我的經驗值已達到轉職的目標，\n應該選擇甚麼職業？",
+  );
+  await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute(
+    "data-portrait-record",
+    "46",
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-nia-promotion-dialogue.png",
+  });
+  await page.getByTestId("advance-dialogue").click();
+  await expect(page.getByTestId("promotion-layer")).toBeVisible();
+  expect((await debugState(page))).toMatchObject({
+    phase: "player",
+    promotionUnitIds: ["1:0"],
+    promotionTargets: [
+      { id: "cavalry", optionIndex: 0 },
+      { id: "warrior", optionIndex: 1 },
+      { id: "archer", optionIndex: 2 },
+      { id: "sister", optionIndex: 3 },
+    ],
+  });
+  await page.keyboard.press("Alt");
+  await expect(page.getByTestId("promotion-layer")).toBeVisible();
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-promotion-choice.png" });
+  await confirmPromotion(page);
   state = await debugState(page);
   expect(state.lastCombat?.counterOccurred).toBe(true);
   expect(state.combatPresentationTrace.filter(({ phase }) => phase === "primaryHit").map(({ frame }) => frame)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
@@ -519,7 +587,12 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(state.combatPresentationTrace.filter(({ phase }) => phase === "counterDamage")).toHaveLength(state.lastCombat!.counterDamage);
   expect(state.combatPresentationTrace.some(({ phase }) => phase === "defenderDeath")).toBe(false);
   expect(state.units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 28, y: 26 });
-  expect(state.units.find((unit) => unit.id === "1:0")!.experience).toBeGreaterThan(0);
+  expect(state.units.find((unit) => unit.id === "1:0")).toMatchObject({
+    classId: "cavalry",
+    className: "騎兵",
+    experience: 0,
+    acted: true,
+  });
   expect(state.units.find((unit) => unit.id === "2:45")!.life).toBeLessThan(160);
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-unit-life-label-count")).toBe("16");
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-acted-badge-count")).toBe("1");
@@ -610,6 +683,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.locator("[data-action=attack]").click();
   await expect(page.getByTestId("combat-presentation")).toBeVisible();
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-combat.png" });
+  await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
   await page.getByTestId("skip-dialogue").click();
   await page.getByTestId("victory-continue").click();
@@ -628,7 +702,14 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await waitForPhase(page, "nextStage");
   await expect(page.getByText("垂直切片完成", { exact: true })).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
-  expect(saved).toMatchObject({ format: "ANGEL2-web-save", version: 4, kind: "completed", stage: 1, ruleset: "stableRemake" });
+  expect(saved).toMatchObject({
+    format: "ANGEL2-web-save",
+    version: 5,
+    contentVersion: "native-classes-1",
+    kind: "completed",
+    stageId: "stage-01",
+    ruleset: "stableRemake",
+  });
   expect(saved.roster).toHaveLength(6);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-complete.png" });
 
@@ -1015,9 +1096,10 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 4,
+    version: 5,
+    contentVersion: "native-classes-1",
     kind: "battle",
-    stage: 0,
+    stageId: "stage-00",
     rngState: initial.rngState,
     battle: {
       round: initial.round,
@@ -1634,6 +1716,10 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
   expect(afterErase.visibleUnits).toBe(6);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-map-death-after-erase.png" });
 
+  await finishPromotionDialogue(page);
+  expect((await debugState(page)).phase).toBe("player");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-promotion-before-victory.png" });
+  await confirmPromotion(page, "warrior");
   await waitForPhase(page, "victoryStory");
   const resolved = await debugState(page);
   expect(resolved.lastCombat).toMatchObject({
@@ -1676,6 +1762,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await enterPlayableBattle();
   await setBattlePresentation(page, "map");
   await attackFirstForcedTarget();
+  await confirmPromotion(page);
   // The attack submits the last manual ally and asynchronously starts the
   // enemy route phase. Compare both presentation modes at the same stable
   // round boundary instead of racing different animation durations.
@@ -1734,6 +1821,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "0");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-counter-guard.png" });
 
+  await confirmPromotion(page);
   await waitForPhase(page, "round2Story");
   const fullResolved = await debugState(page);
   expect(fullResolved.lastCombat).toEqual(mapResolved.lastCombat);
@@ -1829,6 +1917,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "2");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "0");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-native-death.png" });
+  await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
   const deathResolved = await debugState(page);
   // A fatal strike ends the presentation: no counter beats follow, and the
@@ -1894,6 +1983,7 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await clickCanvas(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();
+  await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
 
   const advanceOneCheckpoint = async () => {
@@ -1952,9 +2042,10 @@ test("S00-M: native system records restore battle state and combat cues follow p
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 4,
+    version: 5,
+    contentVersion: "native-classes-1",
     kind: "battle",
-    stage: 0,
+    stageId: "stage-00",
     stageLabel: "瓦爾克麗宮",
     rngState: initial.rngState,
     battle: {
@@ -2032,6 +2123,7 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await clickCanvas(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();
+  await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
   await page.getByTestId("skip-dialogue").click();
   await page.getByTestId("victory-continue").click();
@@ -2042,6 +2134,83 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   expect((await debugState(page)).phase).toBe("savePrompt");
   await expect(page.getByRole("menu", { name: "是否儲存" })).toBeVisible();
   await expect(page.getByTestId("save-yes")).toHaveText("確 定");
+});
+
+test("S00-R: Ximi independently enters the shared promotion tree and commits a semantic class", async ({ page }) => {
+  await page.goto("/");
+  expect(new URL(page.url()).search).toBe("");
+  expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
+  await page.keyboard.press("x");
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("difficulty-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await page.getByTestId("skip-dialogue").click();
+  await expect(page.getByTestId("dialogue-layer")).toBeHidden();
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible({ timeout: 10_000 });
+  await page.getByTestId("skip-dialogue").click();
+  await expect(page.getByTestId("game-screen")).toHaveAttribute("data-phase", "player");
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-settings").click();
+  await page.getByTestId("presentation-button").click();
+  await page.locator("[data-action=close-settings]").click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+
+  await clickCanvas(page, 180, 309);
+  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", "我方可行動，士兵希蜜");
+  await page.getByTestId("unit-command-move").click();
+  await clickCanvas(page, 100, 309);
+  await expect(page.getByTestId("action-menu")).toHaveAttribute("data-kind", "postMove");
+  await page.getByTestId("unit-command-attack").click();
+  const promotionDialogue = page.getByTestId("dialogue-layer");
+  await expect(promotionDialogue).toBeVisible();
+  await expect(promotionDialogue).toHaveAttribute("data-source-record", "promotion");
+  await expect(promotionDialogue).toHaveAttribute("data-source-wait", "1");
+  await expect(page.getByTestId("promotion-layer")).toBeHidden();
+  await page.getByTestId("advance-dialogue").click();
+  await expect(page.locator("#dialogue-text")).toHaveText(
+    "我的經驗值已達到轉職的目標，\n請主將授我新的職業．",
+  );
+  await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute(
+    "data-portrait-record",
+    "45",
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-ximi-promotion-request.png",
+  });
+  await page.getByTestId("advance-dialogue").click();
+  await expect(promotionDialogue).toHaveAttribute("data-source-wait", "2");
+  await page.getByTestId("advance-dialogue").click();
+  await expect(page.locator("#dialogue-text")).toHaveText(
+    "現在我在水神「愛西斯」的面前，\n授予妳新的職業．",
+  );
+  await expect(page.getByTestId("dialogue-window-lower")).toContainText("請主將授我新的職業");
+  await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute(
+    "data-portrait-record",
+    "46",
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-ximi-promotion-grant.png",
+  });
+  await page.getByTestId("advance-dialogue").click();
+  await expect(page.getByTestId("promotion-layer")).toBeVisible();
+  await expect(page.getByTestId("promotion-layer").locator("h2")).toContainText("希蜜・士兵轉職");
+  await expect(page.getByTestId("promotion-layer").locator(".promotion-option")).toHaveCount(4);
+  const currentPromotionText = await page.getByTestId("promotion-layer").locator(".promotion-current").innerText();
+  const lifeMatch = currentPromotionText.match(/生命 (\d+)\//);
+  expect(lifeMatch).not.toBeNull();
+  const ximiLifeAtPromotion = lifeMatch![1];
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-ximi-promotion-choice.png" });
+  await confirmPromotion(page, "sister");
+
+  // The mandatory promotion overlay recenters its queued unit before it opens.
+  await page.getByTestId("battle-canvas").hover({ position: { x: 220, y: 177 } });
+  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", "我方已行動，修女希蜜");
+  await expect(page.getByTestId("hp-bar")).toHaveAttribute("aria-label", new RegExp(`生命 ${ximiLifeAtPromotion}／`));
+  await expect(page.getByTestId("exp-bar")).toHaveAttribute("aria-label", /^經驗 0／/);
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-ximi-promoted-map.png" });
 });
 
 test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them across volume changes", async ({ page }) => {

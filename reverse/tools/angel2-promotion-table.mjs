@@ -16,10 +16,29 @@ const DATA_TIERS = 5;
 const DATA_FIELDS = 7;
 const DATA_ROW_BYTES = DATA_FIELDS * 2;
 const DATA_RECORD_BYTES = DATA_TIERS * DATA_ROW_BYTES;
+const BIG5 = new TextDecoder("big5", { fatal: true });
+const PROMOTION_DIALOGUE = [
+  {
+    role: "nia-self-question",
+    address: 0x050d,
+    expected: "我的經驗值已達到轉職的目標，|應該選擇甚麼職業？",
+  },
+  {
+    role: "nia-grants-teammate-class",
+    address: 0x053d,
+    expected: "現在我在水神「愛西斯」的面前，|授予妳新的職業．",
+  },
+  {
+    role: "teammate-requests-class",
+    address: 0x056d,
+    expected: "我的經驗值已達到轉職的目標，|請主將授我新的職業．",
+  },
+];
 const CODE_SIGNATURES = [
   { address: "0000:029A", offset: 0x029a, hex: "b9c409bb00005153a124008ec0268a073c017503e806005b5943e2eac3" },
   { address: "0000:02B7", offset: 0x02b7, hex: "e8704da1bd31833ebd31037701c3833ec931017401c3e80807a1b706833eb706637409c706c3075b04e8f500c3c7060b" },
   { address: "0000:045B", offset: 0x045b, hex: "e82900813682f80008e82d03e82902b9e000bab300e8c5f6813682f80008c60690f500c60691f500e8be02c3" },
+  { address: "0000:0487", offset: 0x0487, hex: "8b0e923183f92e743ee8f2b6e8f6bfc7060b056d052ec70695098c002ec70697090e01e83004b92e00e86bb6e809bfc7060b053d052ec7069509b4002ec70697091e00e81004c3b92e00e84ab6e8e8bec7060b050d052ec7069509b4002ec70697091e00e8ef03c3" },
   { address: "0000:0693", offset: 0x0693, hex: "c706b3060100c7069506b800c706c1070000c706b5068d078b1ec10703db8b87b7063d6300744be864008b1ec10703db" },
   { address: "0000:0744", offset: 0x0744, hex: "813682f80008a180f8bbde01e806f1e8ebfb813682f80008e84ac1833e4a3dff7505e86529ebd98b1e4a3d03db8b8fb706498b1ed00403db898fda56b800008b1ed204894702a180f8e86af0e8dfb9c3" },
   { address: "0000:09D8", offset: 0x09d8, hex: "a1b931a3d204a18c31a3ce04a1cb31a3d0048cd88ec08b1ece0403db8bb7c306bfb706b90600f3a5c3" },
@@ -50,6 +69,43 @@ function linearOffset(buffer, dsOffset, bytes, label) {
     throw new Error(`${label}: DS:${hex(dsOffset)} is outside the runtime image`);
   }
   return linear;
+}
+
+function dollarString(buffer, address, label) {
+  const start = linearOffset(buffer, address, 1, label);
+  let end = start;
+  while (end < buffer.length && buffer[end] !== 0x24) end += 1;
+  if (end >= buffer.length) throw new Error(`${label}: missing '$' terminator`);
+  return BIG5.decode(buffer.subarray(start, end));
+}
+
+function extractPromotionDialogue(buffer) {
+  const strings = PROMOTION_DIALOGUE.map(({ role, address, expected }) => {
+    const text = dollarString(buffer, address, role);
+    if (text !== expected) {
+      throw new Error(`${role}: expected ${JSON.stringify(expected)}, found ${JSON.stringify(text)}`);
+    }
+    return {
+      role,
+      address: `${hex(DATA_SEGMENT)}:${hex(address)}`,
+      delimiter: "|",
+      text,
+      lines: text.split("|"),
+    };
+  });
+  const byRole = Object.fromEntries(strings.map((entry) => [entry.role, entry]));
+  return {
+    sourceFunction: "0000:0487",
+    niaCharacterRecord: 0x2e,
+    branchPredicate: "DS:3192h == 002Eh",
+    renderer: "0000:08DD",
+    inputWait: "none; each renderer call returns after its timed glyph loop",
+    niaSequence: [byRole["nia-self-question"]],
+    teammateSequence: [
+      byRole["teammate-requests-class"],
+      byRole["nia-grants-teammate-class"],
+    ],
+  };
 }
 
 function validateCodeSignatures(buffer) {
@@ -366,6 +422,7 @@ async function extract(
     },
     runtimeEvidence: {
       callGraphAudit,
+      promotionDialogue: extractPromotionDialogue(buffer),
       copyOptions: "0000:09D8 copies six words from the class-indexed pointer table",
       buildMenu: "0000:0693 stops at sentinel 99 and builds one menu item per preceding word",
       commitSelection: "0000:0744 decrements the selected word and writes the target class record",
