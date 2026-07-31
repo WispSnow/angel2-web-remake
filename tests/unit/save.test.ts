@@ -13,12 +13,13 @@ import {
   saveSlotPageStart,
   saveSlotKey,
 } from "../../src/game/save";
+import { emptyUnitStatuses } from "../../src/game/simulation/status";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
   format: "ANGEL2-web-save",
   version: SAVE_VERSION,
-  contentVersion: "native-classes-1",
+  contentVersion: "native-actions-1",
   kind: "completed",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 1,
@@ -35,7 +36,7 @@ const completedSave = (): CompletedSaveData => ({
 const battleSave = (): BattleSaveData => ({
   format: "ANGEL2-web-save",
   version: SAVE_VERSION,
-  contentVersion: "native-classes-1",
+  contentVersion: "native-actions-1",
   kind: "battle",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 2,
@@ -65,6 +66,7 @@ const battleSave = (): BattleSaveData => ({
         life: 160,
         experience: 399,
         acted: false,
+        statuses: emptyUnitStatuses(),
       },
       {
         id: "2:15",
@@ -79,6 +81,7 @@ const battleSave = (): BattleSaveData => ({
         life: 250,
         experience: 461,
         acted: true,
+        statuses: emptyUnitStatuses(),
       },
     ],
     cursor: { x: 29, y: 26 },
@@ -154,9 +157,24 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-5 battle and completed saves", () => {
+  it("accepts complete version-6 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
+  });
+
+  it("migrates version-5 semantic saves by adding empty status state", () => {
+    const current = battleSave();
+    const legacy = {
+      ...current,
+      version: 5,
+      contentVersion: "native-classes-1",
+      battle: {
+        ...current.battle,
+        units: current.battle.units.map(({ statuses: _statuses, ...unit }) => unit),
+      },
+    };
+
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
 
   it("round-trips promoted semantic classes with reset experience and retained life", () => {
@@ -264,6 +282,10 @@ describe("Web save validation", () => {
     const overfullEnemy = battleSave();
     overfullEnemy.battle.units[1].life = 271;
     expect(isSaveData(overfullEnemy)).toBe(false);
+
+    const invalidStatus = battleSave();
+    invalidStatus.battle.units[0].statuses.magicGuard = -1;
+    expect(isSaveData(invalidStatus)).toBe(false);
   });
 
   it("rejects duplicate occupancy and roster snapshots that disagree with battle state", () => {

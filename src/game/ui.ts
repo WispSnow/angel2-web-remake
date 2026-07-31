@@ -1,8 +1,20 @@
 import { ASSETS, STAGE0, nextExperienceThresholdFor } from "./content/stage0";
-import { classDefinition, classStatsFor } from "./content/classes";
-import type { GameController } from "./controller";
-import { FULL_COMBAT_FRAME_META, type FullCombatSpriteState } from "./full-combat";
-import type { Position, UnitClassId, UnitStats } from "./types";
+import {
+  STAGE0_ACTION_DEFINITIONS,
+  STAGE0_FULL_COMBAT_ASSETS,
+  STAGE0_FULL_COMBAT_COMMON_EFFECTS,
+} from "./content/stage0-actions.generated";
+import {
+  classDefinition,
+  classIdFromNativeRecord,
+  classStatsFor,
+} from "./content/classes";
+import type { CombatPresentation, GameController } from "./controller";
+import {
+  FULL_COMBAT_FRAME_META,
+  type FullCombatSpriteState,
+} from "./full-combat";
+import type { BattleUnit, Position, UnitClassId, UnitStats } from "./types";
 import type { AudioManager } from "./audio";
 import {
   animatedPortraitMarkup,
@@ -26,6 +38,12 @@ import {
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
   ASSETS.allyPromotionTargets;
+
+export interface CombatPresentationRenderSource {
+  battlePresentation: "map" | "full";
+  combatPresentation?: CombatPresentation;
+  unitStats: (unit: BattleUnit) => UnitStats;
+}
 
 export function mountUi(root: HTMLElement, controller: GameController, audio: AudioManager): void {
   root.innerHTML = `
@@ -444,6 +462,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "toggle-portraits") controller.togglePortraits();
     else if (action === "move") controller.chooseMove();
     else if (action === "attack") controller.chooseAttack();
+    else if (action === "shoot") controller.chooseShoot();
+    else if (action === "technique") controller.chooseTechnique();
+    else if (action === "technique-action") {
+      controller.selectTechnique(Number(button.dataset.techniqueIndex));
+      controller.activateTechniqueSelection();
+    }
     else if (action === "rest") controller.chooseRest();
     else if (action === "end-unit") controller.chooseEnd();
     else if (action === "undo-move") controller.chooseUndo();
@@ -470,6 +494,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   root.addEventListener("pointermove", (event) => {
     const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
     if (command) controller.selectCommand(Number(command.dataset.commandIndex));
+    const technique = (event.target as Element).closest<HTMLElement>("[data-technique-index]");
+    if (technique) controller.selectTechnique(Number(technique.dataset.techniqueIndex));
     const groupCommand = (event.target as Element).closest<HTMLElement>("[data-group-command-index]");
     if (groupCommand) controller.selectGroupCommand(Number(groupCommand.dataset.groupCommandIndex));
     const retreatChoice = (event.target as Element).closest<HTMLElement>("[data-retreat-index]");
@@ -572,18 +598,33 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     screen.dataset.actionMode = controller.actionMode;
     round.textContent = `第 ${controller.battle.round} 回合`;
     status.textContent = controller.statusMessage;
-    actionMenu.hidden = controller.phase !== "player" || controller.actionMode !== "actionMenu";
+    const actionMenuVisible = controller.phase === "player"
+      && (controller.actionMode === "actionMenu" || controller.actionMode === "techniqueMenu");
+    actionMenu.hidden = !actionMenuVisible;
     if (!actionMenu.hidden) {
       const position = controller.commandMenuPosition;
       actionMenu.style.left = `${position.x}px`;
       actionMenu.style.top = `${position.y}px`;
-      actionMenu.dataset.kind = controller.commandMenuKind;
-      actionMenu.setAttribute("aria-label", controller.commandMenuKind === "initial" ? "選擇單位行動" : "選擇移動後行動");
-      actionMenu.innerHTML = controller.unitCommands.map((command, index) => {
-        const action = command.id === "end" ? "end-unit" : command.id === "undo" ? "undo-move" : command.id;
-        const selected = index === controller.commandIndex;
-        return `<button type="button" role="menuitem" data-action="${action}" data-command-index="${index}" data-testid="unit-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${command.label}</button>`;
-      }).join("");
+      if (controller.actionMode === "techniqueMenu") {
+        actionMenu.dataset.kind = "technique";
+        actionMenu.style.height = `${controller.techniqueActions.length * 24 + 20}px`;
+        actionMenu.setAttribute("aria-label", "選擇修女技術");
+        actionMenu.innerHTML = controller.techniqueActions.map((actionId, index) => {
+          const selected = index === controller.techniqueIndex;
+          return `<button type="button" role="menuitem" data-action="technique-action"
+            data-technique-index="${index}" data-testid="technique-${actionId}"
+            class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${STAGE0_ACTION_DEFINITIONS[actionId].label}</button>`;
+        }).join("");
+      } else {
+        actionMenu.dataset.kind = controller.commandMenuKind;
+        actionMenu.style.height = `${controller.unitCommands.length * 24 + 20}px`;
+        actionMenu.setAttribute("aria-label", controller.commandMenuKind === "initial" ? "選擇單位行動" : "選擇移動後行動");
+        actionMenu.innerHTML = controller.unitCommands.map((command, index) => {
+          const action = command.id === "end" ? "end-unit" : command.id === "undo" ? "undo-move" : command.id;
+          const selected = index === controller.commandIndex;
+          return `<button type="button" role="menuitem" data-action="${action}" data-command-index="${index}" data-testid="unit-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${command.label}</button>`;
+        }).join("");
+      }
     }
     const promotionUnit = controller.promotionChoiceVisible ? controller.promotionUnit : undefined;
     promotionLayer.hidden = !promotionUnit;
@@ -915,27 +956,47 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   bindGamepad(controller);
 }
 
-function fullSpriteAsset(sprite: FullCombatSpriteState): { src: string; meta: { w: number; anchor: number } } {
-  const sideAssets = ASSETS.fullBattle[sprite.side];
-  const frames = sprite.classId === 22
-    ? sprite.set === "plus50" ? sideAssets.cavalryPlus50 : sideAssets.cavalryDirect
-    : sprite.set === "plus50" ? sideAssets.soldierPlus50 : sideAssets.soldierDirect;
-  const frame = Math.max(0, Math.min(frames.length - 1, sprite.frame));
-  const meta = FULL_COMBAT_FRAME_META[sprite.side][sprite.classId === 22 ? 22 : 0][sprite.set][frame]
-    ?? { w: 64, anchor: 32 };
-  return { src: frames[frame], meta };
+function fullSpriteAsset(sprite: FullCombatSpriteState): {
+  src: string;
+  meta: { w: number; anchor: number; h?: number; yOffset?: number };
+} {
+  const classId = classIdFromNativeRecord(sprite.classId);
+  if (!classId || classDefinition(classId).nativeRecord > 35) {
+    throw new Error(`No ordinary full-combat assets for native class ${sprite.classId}`);
+  }
+  const sideAssets = STAGE0_FULL_COMBAT_ASSETS[sprite.side];
+  if (!(classId in sideAssets)) {
+    throw new Error(`No generated full-combat assets for native class ${sprite.classId}`);
+  }
+  const assetClassId = classId as keyof typeof sideAssets;
+  const frames = sideAssets[assetClassId][sprite.set];
+  if (frames.length === 0) {
+    throw new Error(`Native class ${sprite.classId} has no ${sprite.side} ${sprite.set} frames`);
+  }
+  if (!Number.isInteger(sprite.frame) || sprite.frame < 0 || sprite.frame >= frames.length) {
+    throw new Error(
+      `Native class ${sprite.classId} ${sprite.side} ${sprite.set} frame ${sprite.frame} is outside 0..${frames.length - 1}`,
+    );
+  }
+  const meta = FULL_COMBAT_FRAME_META[sprite.side][sprite.classId][sprite.set][sprite.frame];
+  if (!meta) {
+    throw new Error(
+      `Missing frame metadata for native class ${sprite.classId} ${sprite.side} ${sprite.set} frame ${sprite.frame}`,
+    );
+  }
+  return { src: frames[sprite.frame], meta };
 }
 
 function buildFullCombatSkeleton(
   layer: HTMLElement,
-  presentation: NonNullable<GameController["combatPresentation"]>,
-  controller: GameController,
+  presentation: CombatPresentation,
+  source: CombatPresentationRenderSource,
 ): void {
   const { attacker, defender } = presentation;
   const leftUnit = attacker.side === 1 ? attacker : defender;
   const rightUnit = attacker.side === 2 ? attacker : defender;
   const statusPanel = (side: "left" | "right", unit: typeof attacker) => {
-    const stats = controller.unitStats(unit);
+    const stats = source.unitStats(unit);
     const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
     return `
       <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
@@ -953,25 +1014,36 @@ function buildFullCombatSkeleton(
     ${statusPanel("left", leftUnit)}
     ${statusPanel("right", rightUnit)}
     <div class="full-combat-window" data-testid="full-combat-window" hidden>
-      <div class="full-combat-scene" data-testid="full-combat-scene" hidden>
-        <div class="full-combat-backdrop">
-          <img class="far" src="${ASSETS.fullBattle.stageBackground}" alt="" data-testid="full-combat-background" />
-          <img class="far copy" src="${ASSETS.fullBattle.stageBackground}" alt="" />
-          <img class="near" src="${ASSETS.fullBattle.stageBackground}" alt="" />
-          <img class="near copy" src="${ASSETS.fullBattle.stageBackground}" alt="" />
+      <div class="full-combat-viewport-content" data-testid="full-combat-viewport-content">
+        <div class="full-combat-scene" data-testid="full-combat-scene" hidden>
+          <div class="full-combat-backdrop">
+            <img class="far" src="${ASSETS.fullBattle.stageBackground}" alt="" data-testid="full-combat-background" />
+            <img class="far copy" src="${ASSETS.fullBattle.stageBackground}" alt="" />
+            <img class="near" src="${ASSETS.fullBattle.stageBackground}" alt="" />
+            <img class="near copy" src="${ASSETS.fullBattle.stageBackground}" alt="" />
+          </div>
+          <div class="full-combat-particles" aria-hidden="true"></div>
+          <img class="full-combat-lance" alt="" hidden />
+          <img class="full-combat-projectile" data-testid="full-combat-projectile" alt="" hidden />
+          <div class="full-combat-sprite slot-victim" hidden><img alt="" data-testid="full-victim-sprite" /></div>
+          <div class="full-combat-sprite slot-actor" hidden><img alt="" data-testid="full-actor-sprite" /></div>
+          <div class="full-combat-sprite slot-effect-G1" hidden><img alt="" data-testid="full-effect-G1-sprite" /></div>
+          <div class="full-combat-sprite slot-effect-G2" hidden><img alt="" data-testid="full-effect-G2-sprite" /></div>
+          <div class="full-combat-sprite slot-effect-G3" hidden><img alt="" data-testid="full-effect-G3-sprite" /></div>
+          <div class="full-combat-sprite slot-effect-G4" hidden><img alt="" data-testid="full-effect-G4-sprite" /></div>
+          <div class="full-combat-sprite slot-effect-G5" hidden><img alt="" data-testid="full-effect-G5-sprite" /></div>
         </div>
-        <div class="full-combat-dust" aria-hidden="true"></div>
-        <img class="full-combat-lance" alt="" hidden />
-        <div class="full-combat-sprite slot-victim" hidden><img alt="" data-testid="full-victim-sprite" /></div>
-        <div class="full-combat-sprite slot-actor" hidden><img alt="" data-testid="full-actor-sprite" /></div>
+        <div class="full-combat-strip" aria-hidden="true"><i></i></div>
+        <b class="full-damage-number" data-testid="full-damage-number" hidden></b>
       </div>
-      <div class="full-combat-strip" aria-hidden="true"><i></i></div>
-      <b class="full-damage-number" data-testid="full-damage-number" hidden></b>
     </div>`;
 }
 
-function renderCombat(layer: HTMLElement, controller: GameController): void {
-  const presentation = controller.combatPresentation;
+export function renderCombat(
+  layer: HTMLElement,
+  source: CombatPresentationRenderSource,
+): void {
+  const presentation = source.combatPresentation;
   layer.hidden = !presentation;
   if (!presentation) {
     if (layer.dataset.fullBattleKey) {
@@ -982,7 +1054,7 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
     return;
   }
   const { attacker, defender } = presentation;
-  if (controller.battlePresentation === "map" || !presentation.fullScene) {
+  if (source.battlePresentation === "map" || !presentation.fullScene) {
     // Native map hit/death frames are rendered inside the Phaser world so
     // they obey the battle camera, clipping and board-erase boundary.
     layer.hidden = true;
@@ -995,7 +1067,7 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   if (layer.dataset.fullBattleKey !== battleKey) {
     layer.className = "combat-presentation full-combat";
     layer.removeAttribute("style");
-    buildFullCombatSkeleton(layer, presentation, controller);
+    buildFullCombatSkeleton(layer, presentation, source);
     layer.dataset.fullBattleKey = battleKey;
   }
   layer.dataset.fullCombatPhase = presentation.phase;
@@ -1014,6 +1086,9 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   const sceneElement = query<HTMLElement>(".full-combat-scene");
   sceneElement.hidden = !scene.showScene;
   if (!scene.showScene) return;
+  const viewportContent = query<HTMLElement>(".full-combat-viewport-content");
+  viewportContent.style.transform = `translateY(${scene.viewportYOffset}px)`;
+  viewportContent.dataset.yOffset = String(scene.viewportYOffset);
 
   const farOffset = ((scene.camera % 448) + 448) % 448;
   const nearOffset = ((scene.camera * 2 % 448) + 448) % 448;
@@ -1022,8 +1097,20 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
   backdrop.style.setProperty("--near-scroll", `${-nearOffset}px`);
 
   const slots: Array<{ selector: string; sprite?: FullCombatSpriteState }> = [
-    { selector: ".full-combat-sprite.slot-victim", sprite: scene.sprites.find((entry) => entry.set === "direct") },
-    { selector: ".full-combat-sprite.slot-actor", sprite: scene.sprites.find((entry) => entry.set === "plus50") },
+    {
+      selector: ".full-combat-sprite.slot-victim",
+      sprite: scene.sprites.find((entry) => entry.channel === "victim")
+        ?? scene.sprites.find((entry) => entry.set === "direct"),
+    },
+    {
+      selector: ".full-combat-sprite.slot-actor",
+      sprite: scene.sprites.find((entry) => entry.channel === "actor")
+        ?? scene.sprites.find((entry) => entry.set === "plus50" && !entry.channel),
+    },
+    ...(["G1", "G2", "G3", "G4", "G5"] as const).map((channel) => ({
+      selector: `.full-combat-sprite.slot-effect-${channel}`,
+      sprite: scene.sprites.find((entry) => entry.channel === channel),
+    })),
   ];
   for (const { selector, sprite } of slots) {
     const holder = query<HTMLElement>(selector);
@@ -1038,19 +1125,26 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
     image.dataset.set = sprite.set;
     image.dataset.frame = String(sprite.frame);
     image.dataset.lift = String(sprite.lift);
+    image.dataset.yOffset = String(meta.yOffset ?? 0);
+    if (sprite.channel) image.dataset.channel = sprite.channel;
+    else delete image.dataset.channel;
     if (sprite.reaction) image.dataset.reaction = sprite.reaction;
     else delete image.dataset.reaction;
     if (image.getAttribute("src") !== src) image.setAttribute("src", src);
     const anchor = sprite.mirror ? meta.w - meta.anchor : meta.anchor;
-    holder.style.transform = `translate(${Math.round(sprite.x - anchor)}px, ${-Math.round(sprite.lift)}px)`;
+    const topOffset = -sprite.lift + (meta.yOffset ?? 0);
+    holder.style.transform = `translate(${Math.round(sprite.x - anchor)}px, ${Math.round(topOffset)}px)`;
     holder.style.opacity = String(sprite.opacity);
     image.style.transform = sprite.mirror ? "scaleX(-1)" : "";
   }
 
   const lance = query<HTMLImageElement>(".full-combat-lance");
   if (scene.lance) {
-    const frames = ASSETS.fullBattle[scene.lance.side].cavalryPlus50;
-    const frame = Math.max(6, Math.min(8, scene.lance.frame));
+    const frames = STAGE0_FULL_COMBAT_ASSETS[scene.lance.side].cavalry.plus50;
+    const frame = scene.lance.frame;
+    if (!Number.isInteger(frame) || frame < 6 || frame > 8 || frame >= frames.length) {
+      throw new Error(`Cavalry lance frame ${frame} is outside the native 6..8 range`);
+    }
     const meta = FULL_COMBAT_FRAME_META[scene.lance.side][22].plus50[frame];
     const src = frames[frame];
     lance.hidden = false;
@@ -1062,23 +1156,49 @@ function renderCombat(layer: HTMLElement, controller: GameController): void {
     lance.removeAttribute("data-frame");
   }
 
-  const dustLayer = query<HTMLElement>(".full-combat-dust");
-  const needed = scene.dust.length;
-  while (dustLayer.children.length < needed) {
-    const puff = document.createElement("i");
-    dustLayer.appendChild(puff);
+  const projectile = query<HTMLImageElement>(".full-combat-projectile");
+  if (scene.projectile) {
+    const frames = STAGE0_FULL_COMBAT_ASSETS[scene.projectile.side].archer.plus50;
+    const frame = scene.projectile.frame;
+    if (!Number.isInteger(frame) || frame < 5 || frame > 8 || frame >= frames.length) {
+      throw new Error(`Archer projectile frame ${frame} is outside the native 5..8 range`);
+    }
+    const meta = FULL_COMBAT_FRAME_META[scene.projectile.side][20].plus50[frame];
+    const src = frames[frame];
+    projectile.hidden = false;
+    if (projectile.getAttribute("src") !== src) projectile.setAttribute("src", src);
+    // Module 29's full-screen renderer treats y as the bitmap's bottom
+    // anchor (B0FF/B29B): subtract height, then add the per-frame y offset.
+    const top = scene.projectile.y - (meta.h ?? 0) + (meta.yOffset ?? 0);
+    projectile.style.transform = `translate(${Math.round(scene.projectile.x - meta.anchor)}px, ${Math.round(top)}px)`;
+    projectile.dataset.frame = String(frame);
+    projectile.dataset.top = String(Math.round(top));
+  } else {
+    projectile.hidden = true;
+    projectile.removeAttribute("data-frame");
+    projectile.removeAttribute("data-top");
   }
-  for (let index = 0; index < dustLayer.children.length; index += 1) {
-    const puff = dustLayer.children[index] as HTMLElement;
-    const data = scene.dust[index];
+
+  const particleLayer = query<HTMLElement>(".full-combat-particles");
+  const needed = scene.particles.length;
+  while (particleLayer.children.length < needed) {
+    const particle = document.createElement("img");
+    particle.setAttribute("alt", "");
+    particleLayer.appendChild(particle);
+  }
+  for (let index = 0; index < particleLayer.children.length; index += 1) {
+    const particle = particleLayer.children[index] as HTMLImageElement;
+    const data = scene.particles[index];
     if (!data) {
-      puff.hidden = true;
+      particle.hidden = true;
       continue;
     }
-    puff.hidden = false;
-    const scale = 0.5 + data.phase * 0.9;
-    puff.style.transform = `translate(${Math.round(data.x)}px, ${Math.round(data.y - 8)}px) scale(${scale.toFixed(2)})`;
-    puff.style.opacity = (0.85 * (1 - data.phase)).toFixed(2);
+    const src = STAGE0_FULL_COMBAT_COMMON_EFFECTS.trail[data.frame];
+    if (!src) throw new Error(`Native common trail frame ${data.frame} is outside 0..5`);
+    particle.hidden = false;
+    if (particle.getAttribute("src") !== src) particle.setAttribute("src", src);
+    particle.dataset.frame = String(data.frame);
+    particle.style.transform = `translate(${Math.round(data.x)}px, ${Math.round(data.y)}px)`;
   }
 
   const damage = query<HTMLElement>(".full-damage-number");

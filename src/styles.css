@@ -534,6 +534,11 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   background: linear-gradient(90deg, transparent 4%, #9c581e99 28%, #9c581e99 72%, transparent 96%);
 }
 .action-menu button:focus-visible { outline: 1px solid #ffdc48; outline-offset: -2px; }
+.action-menu[data-kind="technique"] button {
+  font-size: 16px;
+  letter-spacing: .18em;
+  text-indent: .18em;
+}
 .group-command-menu {
   left: 276px;
   top: 92px;
@@ -584,9 +589,16 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   top: 155px;
   width: 448px;
   height: 148px;
+  overflow: hidden;
   border: 3px solid #f5d64a;
   background: rgba(6, 3, 2, .82);
   box-shadow: 0 0 0 1px #7a3c0e, 4px 4px 0 rgba(0, 0, 0, .65);
+}
+.full-combat-viewport-content {
+  position: absolute;
+  inset: 0;
+  width: 448px;
+  height: 148px;
 }
 .full-combat-scene {
   position: absolute;
@@ -629,18 +641,16 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   max-width: none;
   image-rendering: pixelated;
 }
-.full-combat-lance { position: absolute; z-index: 2; left: 0; top: 0; max-width: none; image-rendering: pixelated; }
-.full-combat-dust { position: absolute; z-index: 2; inset: 0; }
-.full-combat-dust i {
+.full-combat-lance,
+.full-combat-projectile { position: absolute; z-index: 4; left: 0; top: 0; max-width: none; image-rendering: pixelated; }
+.full-combat-particles { position: absolute; z-index: 2; inset: 0; }
+.full-combat-particles img {
   position: absolute;
   left: 0;
   top: 0;
-  width: 22px;
-  height: 12px;
-  background:
-    radial-gradient(circle at 30% 60%, #f5efe4 0 4px, transparent 5px),
-    radial-gradient(circle at 60% 40%, #e8dfd0 0 5px, transparent 6px),
-    radial-gradient(circle at 82% 68%, #d9cfc0 0 3px, transparent 4px);
+  display: block;
+  max-width: none;
+  image-rendering: pixelated;
 }
 .full-combat-strip {
   position: absolute;

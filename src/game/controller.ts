@@ -1,5 +1,7 @@
 import { ASSETS, STAGE0 } from "./content/stage0";
+import { STAGE0_ACTION_DEFINITIONS } from "./content/stage0-actions.generated";
 import {
+  className,
   promotionTargetsFor,
   type PromotionTarget,
 } from "./content/classes";
@@ -9,6 +11,10 @@ import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneSt
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
 import { DeterministicRng } from "./simulation/rng";
+import type {
+  BattleActionId,
+  SpecialActionResult,
+} from "./simulation/actions/types";
 import {
   isMusicVolume,
   loadMusicPreferences,
@@ -23,6 +29,7 @@ import {
   moveSaveSlotIndex,
   moveSaveSlotPage,
   readSaveSlot,
+  SAVE_CONTENT_VERSION,
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
   saveSlotKey,
@@ -60,7 +67,26 @@ export interface CombatPresentationTraceEntry {
   fullScene?: FullCombatSceneState;
 }
 
-export type UnitCommandId = "move" | "attack" | "rest" | "end" | "undo";
+export type SpecialActionPresentationPhase =
+  | "shootBlank"
+  | "shootHit"
+  | "fireEffect"
+  | "healPrimary"
+  | "healBlank"
+  | "healTail"
+  | "specialDeath";
+
+export interface SpecialActionPresentation {
+  actor: BattleUnit;
+  target: BattleUnit;
+  result: SpecialActionResult;
+  phase: SpecialActionPresentationPhase;
+  frame: number;
+}
+
+export type AudioCueGroup = "e" | "magic";
+
+export type UnitCommandId = "move" | "attack" | "shoot" | "technique" | "rest" | "end" | "undo";
 export type GroupCommandId = "allRest" | "followLeader" | "freeAction" | "retreat";
 export type SystemCommandId = "settings" | "objectives" | "load" | "save" | "quit";
 export type RecordMenuMode = "load" | "save";
@@ -86,6 +112,13 @@ const POST_MOVE_COMMANDS: readonly UnitCommand[] = [
   { id: "end", label: "結束" },
   { id: "undo", label: "返悔" },
 ];
+
+const CLASS_COMMANDS: Readonly<Partial<Record<BattleUnit["classId"], UnitCommand>>> = {
+  archer: { id: "shoot", label: "射擊" },
+  sister: { id: "technique", label: "技術" },
+};
+
+const SISTER_TECHNIQUES = ["fire-1", "heal-1"] as const satisfies readonly BattleActionId[];
 
 const GROUP_COMMANDS: readonly GroupCommand[] = [
   { id: "allRest", label: "全部休息" },
@@ -125,6 +158,9 @@ export class GameController {
   minimapPreviewOrigin?: Position;
   reachable: Position[] = [];
   targets: Position[] = [];
+  actionRange: Position[] = [];
+  selectedActionId?: BattleActionId;
+  techniqueIndex = 0;
   objectiveOpen = false;
   systemMenuOpen = false;
   systemMenuIndex = 0;
@@ -154,8 +190,11 @@ export class GameController {
   combatSoundEnabled: boolean;
   keySoundEnabled: boolean;
   lastCombat?: AttackResult;
+  lastSpecialAction?: SpecialActionResult;
   combatPresentation?: CombatPresentation;
   combatPresentationTrace: CombatPresentationTraceEntry[] = [];
+  specialActionPresentation?: SpecialActionPresentation;
+  specialActionPresentationTrace: Array<{ phase: SpecialActionPresentationPhase; frame: number }> = [];
   movementPresentation?: MovementPresentation;
   statusMessage = "";
   pendingSaveSlot?: number;
@@ -164,8 +203,8 @@ export class GameController {
   promotionUnitIds: string[] = [];
   promotionDialogueIndex?: number;
   promotionSelectionIndex = 0;
-  audioCue?: { sequence: number; record: number; reason: string };
-  audioCueLog: Array<{ sequence: number; record: number; reason: string }> = [];
+  audioCue?: { sequence: number; group: AudioCueGroup; record: number; reason: string };
+  audioCueLog: Array<{ sequence: number; group: AudioCueGroup; record: number; reason: string }> = [];
   private audioCueSequence = 0;
   private pendingOrigin?: Position;
   private pendingPath?: Position[];
@@ -279,10 +318,22 @@ export class GameController {
   }
 
   get unitCommands(): readonly UnitCommand[] {
-    if (this.commandMenuKind === "postMove") return POST_MOVE_COMMANDS;
-    // The current vertical slice only exposes the basic soldier command set.
-    // This is the extension point for ranged and technique profession menus.
-    return BASIC_COMMANDS;
+    const classCommand = this.selectedUnit
+      && !(this.selectedUnit.classId === "sister" && this.selectedUnit.statuses.techniqueSeal > 0)
+      ? CLASS_COMMANDS[this.selectedUnit.classId]
+      : undefined;
+    if (this.commandMenuKind === "postMove") {
+      return classCommand
+        ? [POST_MOVE_COMMANDS[0], classCommand, ...POST_MOVE_COMMANDS.slice(1)]
+        : POST_MOVE_COMMANDS;
+    }
+    return classCommand
+      ? [BASIC_COMMANDS[0], BASIC_COMMANDS[1], classCommand, BASIC_COMMANDS[2]]
+      : BASIC_COMMANDS;
+  }
+
+  get techniqueActions(): readonly BattleActionId[] {
+    return this.selectedUnit?.classId === "sister" ? SISTER_TECHNIQUES : [];
   }
 
   get commandMenuPosition(): Position {
@@ -395,6 +446,17 @@ export class GameController {
       return;
     }
 
+    if (this.actionMode === "specialTarget") {
+      if (
+        unit
+        && this.selectedActionId
+        && this.targets.some((target) => positionKey(target) === positionKey(position))
+      ) {
+        void this.commitSpecialAction(unit.id);
+      }
+      return;
+    }
+
     if (this.actionMode === "move") {
       const selected = this.selectedUnit;
       if (!selected || !this.reachable.some((cell) => positionKey(cell) === positionKey(position))) return;
@@ -404,7 +466,7 @@ export class GameController {
       return;
     }
 
-    if (this.actionMode === "actionMenu") return;
+    if (this.actionMode === "actionMenu" || this.actionMode === "techniqueMenu") return;
     if (this.actionMode === "enemyPreview") this.resetAction();
     if (!unit) {
       this.emit();
@@ -433,7 +495,7 @@ export class GameController {
   focusCell(position: Position): void {
     if (
       this.phase !== "player"
-      || !["idle", "move", "target"].includes(this.actionMode)
+      || !["idle", "move", "target", "specialTarget"].includes(this.actionMode)
       || this.hasBlockingOverlay
       || this.busy
     ) return;
@@ -481,6 +543,73 @@ export class GameController {
     }
     this.actionMode = "target";
     this.statusMessage = "選擇紅色標記的敵人。";
+    this.emit();
+  }
+
+  chooseShoot(): void {
+    if (this.selectedUnit?.classId !== "archer") return;
+    this.chooseSpecialAction("archer-shot");
+  }
+
+  chooseTechnique(): void {
+    if (
+      this.phase !== "player"
+      || this.actionMode !== "actionMenu"
+      || this.selectedUnit?.classId !== "sister"
+      || this.selectedUnit.statuses.techniqueSeal > 0
+    ) return;
+    this.techniqueIndex = 0;
+    this.actionMode = "techniqueMenu";
+    this.statusMessage = "選擇修女要施展的技術。";
+    this.emit();
+  }
+
+  moveTechniqueSelection(delta: number): void {
+    if (this.actionMode !== "techniqueMenu" || this.techniqueActions.length === 0) return;
+    this.techniqueIndex = (
+      this.techniqueIndex + delta + this.techniqueActions.length
+    ) % this.techniqueActions.length;
+    this.emit();
+  }
+
+  selectTechnique(index: number): void {
+    if (
+      this.actionMode !== "techniqueMenu"
+      || index < 0
+      || index >= this.techniqueActions.length
+      || index === this.techniqueIndex
+    ) return;
+    this.techniqueIndex = index;
+    this.emit();
+  }
+
+  activateTechniqueSelection(): void {
+    if (this.actionMode !== "techniqueMenu") return;
+    const actionId = this.techniqueActions[this.techniqueIndex];
+    if (actionId) this.chooseSpecialAction(actionId);
+  }
+
+  private chooseSpecialAction(actionId: BattleActionId): void {
+    const unit = this.selectedUnit;
+    if (
+      this.phase !== "player"
+      || (this.actionMode !== "actionMenu" && this.actionMode !== "techniqueMenu")
+      || !unit
+    ) return;
+    this.selectedActionId = actionId;
+    this.actionRange = this.battle.actionRange(unit.id, actionId).cells();
+    this.targets = this.battle.actionTargets(unit.id, actionId)
+      .map(({ x, y }) => ({ x, y }));
+    const definition = STAGE0_ACTION_DEFINITIONS[actionId];
+    if (this.targets.length === 0) {
+      this.actionRange = [];
+      this.selectedActionId = undefined;
+      this.statusMessage = `「${definition.label}」範圍內沒有合法目標。`;
+      this.emit();
+      return;
+    }
+    this.actionMode = "specialTarget";
+    this.statusMessage = `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
   }
 
@@ -533,6 +662,8 @@ export class GameController {
     if (!command) return;
     if (command.id === "move") this.chooseMove();
     else if (command.id === "attack") this.chooseAttack();
+    else if (command.id === "shoot") this.chooseShoot();
+    else if (command.id === "technique") this.chooseTechnique();
     else if (command.id === "rest") this.chooseRest();
     else if (command.id === "end") this.chooseEnd();
     else if (command.id === "undo") this.chooseUndo();
@@ -593,6 +724,16 @@ export class GameController {
     if (this.actionMode === "target") {
       this.actionMode = "actionMenu";
       this.targets = [];
+    } else if (this.actionMode === "specialTarget") {
+      const returnToTechnique = this.selectedActionId === "fire-1"
+        || this.selectedActionId === "heal-1";
+      this.actionRange = [];
+      this.targets = [];
+      this.selectedActionId = undefined;
+      this.actionMode = returnToTechnique ? "techniqueMenu" : "actionMenu";
+    } else if (this.actionMode === "techniqueMenu") {
+      this.techniqueIndex = 0;
+      this.actionMode = "actionMenu";
     } else if (this.actionMode === "actionMenu") {
       if (this.commandMenuKind === "postMove") {
         void this.rollbackSelectedMovement();
@@ -608,6 +749,114 @@ export class GameController {
     }
     this.statusMessage = "已返回上一層。";
     this.emit();
+  }
+
+  private async commitSpecialAction(targetId: string): Promise<void> {
+    const actor = this.selectedUnit;
+    const target = this.battle.unit(targetId);
+    const actionId = this.selectedActionId;
+    if (!actor || !target || !actionId || this.busy) return;
+    try {
+      const prepared = this.battle.prepareSpecialAction({
+        actionId,
+        actorId: actor.id,
+        targetId,
+      });
+      const actorPresentation = { ...actor, statuses: { ...actor.statuses } };
+      const targetPresentation = { ...target, statuses: { ...target.statuses } };
+      this.busy = true;
+      this.statusMessage = `${actor.name}施展${STAGE0_ACTION_DEFINITIONS[actionId].label}……`;
+      this.resetAction();
+      this.markHintSeen();
+      this.emit();
+
+      await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
+      this.lastSpecialAction = this.battle.commitPreparedAction(prepared);
+      const result = this.lastSpecialAction;
+      if (result.targetDied) {
+        await this.presentSpecialDeath(actorPresentation, targetPresentation, result);
+      }
+      this.statusMessage = result.blocked
+        ? `${targetPresentation.name}的魔法防禦抵消了攻擊。`
+        : result.healing > 0
+          ? `${targetPresentation.name}恢復 ${result.healing} 點生命。`
+          : `${targetPresentation.name}受到 ${result.damage} 點傷害。`;
+
+      const promotionPause = this.pauseForPromotions();
+      if (promotionPause) await promotionPause;
+      this.busy = false;
+      const ended = this.resolveOutcome();
+      this.emit();
+      if (!ended && this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) {
+        void this.runTurnPhases("autonomous");
+      }
+    } catch (error) {
+      this.busy = false;
+      this.specialActionPresentation = undefined;
+      this.statusMessage = error instanceof Error ? error.message : "特殊行動無效。";
+      this.emit();
+    }
+  }
+
+  private async presentSpecialAction(
+    actor: BattleUnit,
+    target: BattleUnit,
+    result: SpecialActionResult,
+  ): Promise<void> {
+    this.specialActionPresentationTrace = [];
+    const present = async (
+      phase: SpecialActionPresentationPhase,
+      frame: number,
+      nativeTicks: number,
+    ): Promise<void> => {
+      this.specialActionPresentation = { actor, target, result, phase, frame };
+      this.specialActionPresentationTrace.push({ phase, frame });
+      this.emit();
+      await pause(this.mapCombatDelay(nativeTicks));
+    };
+
+    if (result.actionId === "archer-shot") {
+      await present("shootBlank", -1, 6);
+      for (let frame = 0; frame < 8; frame += 1) {
+        await present("shootHit", frame, 6);
+      }
+      await present("shootBlank", -1, 6);
+    } else if (result.actionId === "fire-1") {
+      this.queueAudioCue(83, "fire-1-start", "magic");
+      for (let frame = 0; frame < 7; frame += 1) {
+        await present("fireEffect", frame, 10);
+      }
+    } else {
+      this.queueAudioCue(36, "heal-1-start", "e");
+      for (let frame = 0; frame < 39; frame += 1) {
+        await present("healPrimary", frame, 5);
+      }
+      await present("healBlank", -1, 5);
+      for (let frame = 0; frame < 5; frame += 1) {
+        await present("healTail", frame, 15);
+      }
+    }
+    this.specialActionPresentation = undefined;
+  }
+
+  private async presentSpecialDeath(
+    actor: BattleUnit,
+    target: BattleUnit,
+    result: SpecialActionResult,
+  ): Promise<void> {
+    for (let frame = 0; frame < 15; frame += 1) {
+      this.specialActionPresentation = {
+        actor,
+        target,
+        result,
+        phase: "specialDeath",
+        frame,
+      };
+      this.specialActionPresentationTrace.push({ phase: "specialDeath", frame });
+      this.emit();
+      await pause(this.mapCombatDelay(10));
+    }
+    this.specialActionPresentation = undefined;
   }
 
   private async commitAttack(defenderId: string): Promise<void> {
@@ -699,6 +948,9 @@ export class GameController {
     this.pendingPath = undefined;
     this.reachable = [];
     this.targets = [];
+    this.actionRange = [];
+    this.selectedActionId = undefined;
+    this.techniqueIndex = 0;
     this.minimapPreviewOrigin = undefined;
   }
 
@@ -919,13 +1171,46 @@ export class GameController {
     this.statusMessage = `${unit.name}正在自動行動。`;
     this.emit();
 
-    if ((action.kind === "move" || action.kind === "attack") && action.path.length > 1) {
+    if (
+      (action.kind === "move" || action.kind === "attack" || action.kind === "special")
+      && action.path.length > 1
+    ) {
       await this.animateUnitPath(unit.id, action.path, "allyAuto");
       unit = this.battle.unit(action.unitId);
       if (!unit) return this.resolveOutcome();
     }
 
-    if (action.kind === "attack" && action.targetId) {
+    if (action.kind === "special" && action.targetId && action.actionId) {
+      const target = this.battle.unit(action.targetId);
+      if (target) {
+        try {
+          const prepared = this.battle.prepareSpecialAction({
+            actionId: action.actionId,
+            actorId: unit.id,
+            targetId: target.id,
+          });
+          const actorPresentation = { ...unit, statuses: { ...unit.statuses } };
+          const targetPresentation = { ...target, statuses: { ...target.statuses } };
+          this.statusMessage = `${unit.name}施展${STAGE0_ACTION_DEFINITIONS[action.actionId].label}。`;
+          await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
+          const result = this.battle.commitPreparedAction(prepared);
+          this.lastSpecialAction = result;
+          if (result.targetDied) {
+            await this.presentSpecialDeath(actorPresentation, targetPresentation, result);
+          }
+          this.statusMessage = result.blocked
+            ? `${target.name}的魔法防禦抵消了攻擊。`
+            : result.healing > 0
+              ? `${unit.name}使${target.name}恢復 ${result.healing} 點生命。`
+              : `${unit.name}造成 ${result.damage} 點傷害。`;
+        } catch {
+          this.battle.spendAction(unit.id);
+          this.statusMessage = `${unit.name}的特殊行動已失效，改為待命。`;
+        }
+      } else {
+        this.battle.spendAction(unit.id);
+      }
+    } else if (action.kind === "attack" && action.targetId) {
       const defender = this.battle.unit(action.targetId);
       if (defender && manhattan(unit, defender) === 1) {
         const attackerPresentation = { ...unit };
@@ -1064,9 +1349,9 @@ export class GameController {
   ): Promise<void> {
     // The native full-screen battle freezes the status-bar values at their
     // pre-strike numbers; life only changes back on the map. The whole
-    // presentation is a single measured timeline sampled against a clock, so
-    // the camera pan, the dash-ins and the projectile all move smoothly
-    // instead of stepping per renderer substep.
+    // presentation is a single measured timeline sampled against a clock.
+    // Camera and panel timing remain wall-clock driven, while profession poses
+    // and projectile positions preserve the original discrete renderer steps.
     const script = buildFullCombatScript(attacker, defender, result);
     const fastTest = this.testMode && !this.fullCombatRealTime;
     const timeScale = fastTest ? 24 : this.presentationFast ? 3.2 : 1;
@@ -1141,8 +1426,12 @@ export class GameController {
     this.emit();
   }
 
-  private queueAudioCue(record: number, reason: string): void {
-    const cue = { sequence: ++this.audioCueSequence, record, reason };
+  private queueAudioCue(
+    record: number,
+    reason: string,
+    group: AudioCueGroup = "e",
+  ): void {
+    const cue = { sequence: ++this.audioCueSequence, group, record, reason };
     this.audioCue = cue;
     this.audioCueLog.push(cue);
   }
@@ -1525,7 +1814,7 @@ export class GameController {
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
-      contentVersion: "native-classes-1",
+      contentVersion: SAVE_CONTENT_VERSION,
       kind: "completed",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
@@ -1604,7 +1893,7 @@ export class GameController {
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
-      contentVersion: "native-classes-1",
+      contentVersion: SAVE_CONTENT_VERSION,
       kind: "battle",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
@@ -1674,6 +1963,8 @@ export class GameController {
     this.promotionResume = undefined;
     this.movementPresentation = undefined;
     this.combatPresentation = undefined;
+    this.specialActionPresentation = undefined;
+    this.specialActionPresentationTrace = [];
     this.busy = false;
     this.resetAction();
     this.statusMessage = message;
@@ -1772,6 +2063,10 @@ export class GameController {
       if (delta.y !== 0) this.moveCommandSelection(delta.y);
       return;
     }
+    if (this.actionMode === "techniqueMenu") {
+      if (delta.y !== 0) this.moveTechniqueSelection(delta.y);
+      return;
+    }
     this.minimapPreviewOrigin = undefined;
     this.cursor = {
       x: Math.max(0, Math.min(this.battle.stage.width - 1, this.cursor.x + delta.x)),
@@ -1787,6 +2082,7 @@ export class GameController {
       || this.hasBlockingOverlay
       || this.busy
       || this.actionMode === "actionMenu"
+      || this.actionMode === "techniqueMenu"
     ) return;
     const next = {
       x: Math.max(0, Math.min(this.battle.stage.width - this.battle.stage.viewport.width, this.cameraOrigin.x + delta.x)),
@@ -1845,6 +2141,7 @@ export class GameController {
     else if (this.systemMenuOpen) this.activateSystemMenuSelection();
     else if (this.objectiveOpen) return;
     else if (this.actionMode === "actionMenu") this.activateCommandSelection();
+    else if (this.actionMode === "techniqueMenu") this.activateTechniqueSelection();
     else this.selectCell(this.cursor);
   }
 
@@ -1944,6 +2241,52 @@ export class GameController {
     this.emit();
   }
 
+  forceClassActionSetupForTest(
+    classId: "archer" | "cavalry" | "sister" | "warrior",
+    ordinaryCombat = false,
+  ): void {
+    if (!this.testMode) return;
+    const actor = this.battle.unit("1:0");
+    const ally = this.battle.unit("1:1");
+    const enemy = this.battle.units.find((unit) => unit.side === 2 && unit.id !== "2:15");
+    if (!actor || !ally || !enemy) return;
+    actor.classId = classId;
+    actor.className = className(classId);
+    actor.experience = 0;
+    actor.acted = false;
+    actor.x = 29;
+    actor.y = 26;
+    actor.life = this.battle.statsFor(actor).maxLife;
+    ally.acted = false;
+
+    enemy.x = ordinaryCombat ? 30 : classId === "archer" ? 33 : 30;
+    enemy.y = 26;
+    enemy.life = ordinaryCombat ? 1 : this.battle.statsFor(enemy).maxLife;
+    enemy.acted = false;
+
+    if (classId === "sister" && !ordinaryCombat) {
+      ally.x = 31;
+      ally.y = 26;
+      ally.life = Math.max(1, this.battle.statsFor(ally).maxLife - 60);
+      enemy.x = 33;
+    }
+
+    this.battle.units = this.battle.units.filter((unit) =>
+      unit.side === 1 || unit.id === enemy.id);
+    for (const unit of this.battle.units.filter((unit) =>
+      unit.side === 1 && unit.id !== actor.id && unit.id !== ally.id)) {
+      unit.acted = true;
+    }
+    this.battle.focusId = actor.id;
+    this.phase = "player";
+    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
+    this.cursor = { x: actor.x, y: actor.y };
+    this.resetAction();
+    this.statusMessage = `自動驗收：${actor.className}職業行動場景。`;
+    this.busy = false;
+    this.emit();
+  }
+
   debugState(): object {
     return {
       phase: this.phase,
@@ -1954,6 +2297,12 @@ export class GameController {
       commandMenuKind: this.commandMenuKind,
       commandIndex: this.commandIndex,
       commands: this.unitCommands.map((command) => ({ ...command })),
+      selectedActionId: this.selectedActionId,
+      techniqueIndex: this.techniqueIndex,
+      techniques: this.techniqueActions.map((actionId) => ({
+        actionId,
+        label: STAGE0_ACTION_DEFINITIONS[actionId].label,
+      })),
       cursor: { ...this.cursor },
       cameraOrigin: this.cameraOrigin,
       minimapPreviewOrigin: this.minimapPreviewOrigin ? { ...this.minimapPreviewOrigin } : undefined,
@@ -1995,6 +2344,7 @@ export class GameController {
       edgeScrollEnabled: this.edgeScrollEnabled,
       portraitsEnabled: this.portraitsEnabled,
       lastCombat: this.lastCombat ? { ...this.lastCombat } : undefined,
+      lastSpecialAction: this.lastSpecialAction ? { ...this.lastSpecialAction } : undefined,
       combatPresentation: this.combatPresentation ? {
         ...this.combatPresentation,
         attacker: { ...this.combatPresentation.attacker },
@@ -2003,12 +2353,26 @@ export class GameController {
         fullScene: this.combatPresentation.fullScene ? { ...this.combatPresentation.fullScene } : undefined,
       } : undefined,
       combatPresentationTrace: this.combatPresentationTrace.map((entry) => ({ ...entry })),
+      specialActionPresentation: this.specialActionPresentation ? {
+        ...this.specialActionPresentation,
+        actor: {
+          ...this.specialActionPresentation.actor,
+          statuses: { ...this.specialActionPresentation.actor.statuses },
+        },
+        target: {
+          ...this.specialActionPresentation.target,
+          statuses: { ...this.specialActionPresentation.target.statuses },
+        },
+        result: { ...this.specialActionPresentation.result },
+      } : undefined,
+      specialActionPresentationTrace: this.specialActionPresentationTrace.map((entry) => ({ ...entry })),
       movementPresentation: this.movementPresentation ? {
         ...this.movementPresentation,
         path: this.movementPresentation.path.map((step) => ({ ...step })),
       } : undefined,
       reachable: this.reachable.map((cell) => ({ ...cell })),
       targets: this.targets.map((cell) => ({ ...cell })),
+      actionRange: this.actionRange.map((cell) => ({ ...cell })),
       ...this.battle.snapshot(),
     };
   }
@@ -2174,6 +2538,10 @@ export interface Angel2DebugApi {
   forceEvacuationSetup: () => void;
   forceMultipleTargets: () => void;
   forceCavalryCounterSetup: () => void;
+  forceClassActionSetup: (
+    classId: "archer" | "cavalry" | "sister" | "warrior",
+    ordinaryCombat?: boolean,
+  ) => void;
   clearSaves: () => void;
 }
 
@@ -2193,6 +2561,8 @@ export function exposeDebugApi(controller: GameController): void {
     forceEvacuationSetup: () => controller.forceEvacuationSetupForTest(),
     forceMultipleTargets: () => controller.forceMultipleTargetsForTest(),
     forceCavalryCounterSetup: () => controller.forceCavalryCounterSetupForTest(),
+    forceClassActionSetup: (classId, ordinaryCombat) =>
+      controller.forceClassActionSetupForTest(classId, ordinaryCombat),
     clearSaves: () => {
       for (let slot = 1; slot <= SAVE_SLOT_COUNT; slot += 1) {
         localStorage.removeItem(saveSlotKey(slot));

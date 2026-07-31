@@ -19,6 +19,17 @@ export interface UnitStats {
   level: number;
 }
 
+export interface UnitStatuses {
+  attackUp: number;
+  defenseUp: number;
+  magicGuard: number;
+  confusion: number;
+  attackDown: number;
+  defenseDown: number;
+  poison: number;
+  techniqueSeal: number;
+}
+
 export interface BattleUnit extends Position {
   id: string;
   side: Side;
@@ -30,6 +41,7 @@ export interface BattleUnit extends Position {
   life: number;
   experience: number;
   acted: boolean;
+  statuses: UnitStatuses;
 }
 
 export type BattleOutcome = "ongoing" | "victory" | "defeat";
@@ -49,7 +61,15 @@ export type GamePhase =
   | "quit"
   | "nextStage";
 
-export type ActionMode = "idle" | "move" | "moving" | "actionMenu" | "target" | "enemyPreview";
+export type ActionMode =
+  | "idle"
+  | "move"
+  | "moving"
+  | "actionMenu"
+  | "techniqueMenu"
+  | "target"
+  | "specialTarget"
+  | "enemyPreview";
 
 export interface AttackResult {
   attackerId: string;
@@ -101,8 +121,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 5;
-  contentVersion: "native-classes-1";
+  version: 6;
+  contentVersion: "native-actions-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

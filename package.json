@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:combat": "vite --host 127.0.0.1 --open /combat-lab.html",
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
@@ -17,9 +18,10 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "pnpm run test:coverage && pnpm run build && pnpm run test:e2e",
-    "content": "pnpm run content:classes && pnpm run content:stage0",
+    "content": "pnpm run content:classes && pnpm run content:stage0 && pnpm run content:actions",
     "content:classes": "node scripts/generate-class-catalog.mjs",
-    "content:stage0": "node scripts/generate-stage0-runtime.mjs"
+    "content:stage0": "node scripts/generate-stage0-runtime.mjs",
+    "content:actions": "node scripts/generate-stage0-actions.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

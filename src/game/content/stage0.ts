@@ -5,6 +5,7 @@ import {
   classStatsFor,
   nextExperienceThresholdFor,
 } from "./classes";
+import { emptyUnitStatuses } from "../simulation/status";
 
 export { classStatsFor, nextExperienceThresholdFor };
 
@@ -108,6 +109,7 @@ export function createStage0Units(difficulty: Difficulty = 0): BattleUnit[] {
       life: 0,
       experience,
       acted: false,
+      statuses: emptyUnitStatuses(),
     };
     unit.className = className(unit.classId);
     unit.life = statsFor(unit, difficulty).maxLife;

@@ -1,6 +1,10 @@
 export class DeterministicRng {
   constructor(public state = 0x0a11ce02) {}
 
+  clone(): DeterministicRng {
+    return new DeterministicRng(this.state);
+  }
+
   nextUint(): number {
     let value = this.state >>> 0;
     value ^= value << 13;

@@ -18,7 +18,9 @@
 //   recoil   target remains fixed horizontally on screen while the camera
 //                     completes another 64 px in native 8 px steps; >10
 //                     damage adds the measured 0/4/8/12/8/4/0 px hop
-//   exit     attacker turns and dashes off his own edge at ~1100 px/s
+//   settle   the post-hit attacker stream keeps its native facing, switches
+//                     to the class-specific settle frame where commanded,
+//                     and carries the actor out as the camera keeps moving
 //   hold     victim alone after the 400 ms recoil script; a fatal target then
 //                     switches from threshold reaction to its death frame
 //   counter  the same block mirrored, camera panning back
@@ -26,12 +28,20 @@
 // windup, a thrown-lance projectile (frames 6/7/8), an early attacker exit,
 // and a 360 px camera pan. Its post-impact 112 px camera script accompanies
 // two measured hops: 36 px, then 24 px.
+import {
+  STAGE0_FULL_COMBAT_DEATH,
+  STAGE0_FULL_COMBAT_FRAME_META,
+  STAGE0_FULL_COMBAT_PROFILES,
+} from "./content/stage0-actions.generated";
+import { classDefinition } from "./content/classes";
 import type { AttackResult, BattleUnit, UnitClassId } from "./types";
 
-type FullCombatClass = 0 | 22;
+export type FullCombatClass = number;
 
-const fullCombatClass = (classId: UnitClassId): FullCombatClass =>
-  classId === "cavalry" ? 22 : 0;
+const fullCombatClass = (classId: UnitClassId): FullCombatClass => {
+  const nativeRecord = classDefinition(classId).nativeRecord;
+  return nativeRecord <= 35 ? nativeRecord : 0;
+};
 
 export const FULL_SCENE = {
   left: 96,
@@ -47,6 +57,7 @@ export interface FullCombatSpriteState {
   side: "left" | "right";
   classId: FullCombatClass;
   set: "direct" | "plus50";
+  channel?: "actor" | "victim" | "G1" | "G2" | "G3" | "G4" | "G5";
   frame: number;
   reaction?: "guard" | "hurt" | "death";
   /** Scene x of the sprite's ground anchor (body bottom-center). */
@@ -67,9 +78,18 @@ export interface FullCombatSceneState {
   showScene: boolean;
   /** Camera world offset; far layer scrolls 1×, near floor 2×. */
   camera: number;
+  /** Native YD/ND viewport-source alternation: 0 or -4 pixels. */
+  viewportYOffset: number;
   sprites: FullCombatSpriteState[];
   lance?: { x: number; y: number; frame: number; side: "left" | "right" };
-  dust: Array<{ x: number; y: number; phase: number }>;
+  projectile?: {
+    x: number;
+    y: number;
+    frame: number;
+    side: "left" | "right";
+    classId: 20;
+  };
+  particles: Array<{ x: number; y: number; frame: number }>;
   damage?: { amount: number; x: number };
 }
 
@@ -112,42 +132,17 @@ const OPEN = {
   sceneAt: 600,
 } as const;
 
-const MELEE = {
-  windup: 450,
-  poseLength: 112,
-  scrollDelay: 50, // charge anim runs this long before the camera moves
-  scrollDistance: 208,
-  approachDuration: 960,
-  flameAlternate: 53,
-  exitSpeed: 1.35, // px/ms, combined with the impact camera handoff
-} as const;
-
 const RANGED = {
-  windup: 480,
-  poseLength: 160,
-  scrollDistance: 360,
-  throwPose: 100,
-  lanceFlight: 950,
-  // The javelin leaves from behind the rider's shoulder, arcs up, and drops
-  // onto the target: ~220 px of travel measured across the capture.
-  lanceBehind: 38,
-  lanceLaunchY: 58,
-  lancePeakY: 34,
-  lanceImpactY: 62,
   /** Screen gap between a thrower and its target when the strike is ranged. */
   separation: 182,
-  exitAt: 700,
-  exitSpeed: 1.1,
 } as const;
 
-// The capture first shows the target around frame 145 against a contact near
-// frame 172, i.e. a little under half a second of approach.
-const VICTIM_DASH = 330; // victim pops at the edge this long before impact
-const VICTIM_ARRIVE = 80; // ...and reaches his mark this long before impact
-const POST_IMPACT_MID = 1200;
-const POST_IMPACT_FINAL = 2050;
-const DEATH_BLINK = 160;
-const DEATH_CYCLES = 6;
+// Module 29 drives class scripts with discrete renderer substeps. The stage-0
+// capture calibrates the strike stream to about 40 ms per substep; post-hit
+// streams include the renderer's hit-feedback overhead and land at about
+// 50 ms per substep (8 → 400 ms for the soldier, 14 → 700 ms for cavalry).
+const NATIVE_STRIKE_SUBSTEP = 40;
+const NATIVE_POST_HIT_SUBSTEP = 50;
 
 const ATTACKER_ANCHOR = 253; // left-side primary attacker windup mark
 const PRIMARY_VICTIM_MARK = 302; // victim mark when attacked from the left
@@ -157,10 +152,6 @@ const EDGE_MARGIN = 40; // sprites are fully hidden this far past the edge
 // victim's far side, its baseline just under the scene's bottom edge.
 const DAMAGE_OFFSET = 60;
 
-const DUST_EVERY = 150;
-const DUST_LIFE = 500;
-const DUST_BEHIND = 55;
-
 interface StrikeSpec {
   start: number;
   actorSide: "left" | "right";
@@ -169,7 +160,6 @@ interface StrikeSpec {
   actorX: number;
   victimX: number;
   cameraFrom: number;
-  cameraTo: number;
   damage: number;
   victimDies: boolean;
   final: boolean;
@@ -188,167 +178,462 @@ interface StrikeTimes {
   lanceTo?: number;
 }
 
-interface RecoilKeyframe {
-  at: number;
-  lift: number;
+const isRanged = (classId: FullCombatClass): boolean =>
+  classId === 20 || classId === 22;
+
+interface NativeCommandStep {
+  rendererSubsteps: number;
+  commands: readonly {
+    token: string;
+    parameters: readonly (number | string)[];
+    linkedStream?: { steps: readonly NativeCommandStep[] };
+  }[];
+  pose: {
+    frame: number;
+    deltaX: number;
+    deltaY: number;
+  };
 }
 
-interface RecoilProfile {
-  duration: number;
-  cameraDistance: number;
-  liftFrames: readonly RecoilKeyframe[];
+interface NativeCombatProfile {
+  nativeRecord: number;
+  voiceSlots: Readonly<Record<
+    "left" | "right",
+    Readonly<Record<string, number>>
+  >>;
+  commandStreams: Readonly<Record<
+    "left" | "right",
+    Readonly<Record<string, { steps: readonly NativeCommandStep[] }>>
+  >>;
 }
 
-// These are command-stream steps, not interpolated curves. The original
-// renderer holds each native-pixel position until the following command.
-const SOLDIER_RECOIL: RecoilProfile = {
-  duration: 400,
-  cameraDistance: 64,
-  liftFrames: [
-    { at: 0, lift: 0 },
-    { at: 60, lift: 4 },
-    { at: 120, lift: 8 },
-    { at: 180, lift: 12 },
-    { at: 300, lift: 8 },
-    { at: 360, lift: 4 },
-    { at: 400, lift: 0 },
-  ],
-};
+const NATIVE_PROFILE_BY_RECORD = new Map<number, NativeCombatProfile>(
+  Object.values(STAGE0_FULL_COMBAT_PROFILES).map((profile) => [
+    profile.nativeRecord,
+    profile as unknown as NativeCombatProfile,
+  ]),
+);
 
-const CAVALRY_RECOIL: RecoilProfile = {
-  duration: 700,
-  cameraDistance: 112,
-  liftFrames: [
-    { at: 0, lift: 0 },
-    { at: 50, lift: 18 },
-    { at: 100, lift: 36 },
-    { at: 360, lift: 18 },
-    { at: 400, lift: 0 },
-    { at: 450, lift: 8 },
-    { at: 500, lift: 16 },
-    { at: 550, lift: 24 },
-    { at: 600, lift: 16 },
-    { at: 650, lift: 8 },
-    { at: 700, lift: 0 },
-  ],
-};
+function nativeMainStream(
+  classRecord: number,
+  side: "left" | "right",
+  role: "mainLeftOrAttacker" | "mainRightOrDefender",
+): readonly NativeCommandStep[] {
+  const profile = NATIVE_PROFILE_BY_RECORD.get(classRecord);
+  if (!profile) throw new Error(`Missing native full-combat profile ${classRecord}`);
+  return profile.commandStreams[side][role].steps;
+}
 
-const isRanged = (classId: FullCombatClass): boolean => classId === 22;
-const recoilProfile = (actorClass: FullCombatClass): RecoilProfile =>
-  isRanged(actorClass) ? CAVALRY_RECOIL : SOLDIER_RECOIL;
+function nativeReactionStream(
+  classRecord: number,
+  side: "left" | "right",
+  reaction: "guard" | "hurt",
+  role: "actor" | "victim",
+): readonly NativeCommandStep[] {
+  const profile = NATIVE_PROFILE_BY_RECORD.get(classRecord);
+  if (!profile) throw new Error(`Missing native full-combat profile ${classRecord}`);
+  const key = reaction === "hurt"
+    ? role === "actor" ? "auxiliaryA" : "auxiliaryB"
+    : role === "actor" ? "auxiliaryC" : "auxiliaryD";
+  return profile.commandStreams[side][key].steps;
+}
+
+const NATIVE_G1_EFFECT_STREAMS = {
+  1: {
+    left: {
+      strike: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
+        .commandStreams.left.mainLeftOrAttacker.steps[0].commands[0].linkedStream.steps,
+      hurt: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
+        .commandStreams.left.auxiliaryA.steps[0].commands[1].linkedStream.steps,
+      guard: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
+        .commandStreams.left.auxiliaryC.steps[0].commands[1].linkedStream.steps,
+    },
+    right: {
+      strike: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
+        .commandStreams.right.mainLeftOrAttacker.steps[0].commands[0].linkedStream.steps,
+      hurt: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
+        .commandStreams.right.auxiliaryA.steps[0].commands[1].linkedStream.steps,
+      guard: STAGE0_FULL_COMBAT_PROFILES["magic-sword-warrior"]
+        .commandStreams.right.auxiliaryC.steps[0].commands[1].linkedStream.steps,
+    },
+  },
+  3: {
+    left: {
+      strike: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
+        .commandStreams.left.mainLeftOrAttacker.steps[0].commands[0].linkedStream.steps,
+      hurt: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
+        .commandStreams.left.auxiliaryA.steps[0].commands[1].linkedStream.steps,
+      guard: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
+        .commandStreams.left.auxiliaryC.steps[0].commands[1].linkedStream.steps,
+    },
+    right: {
+      strike: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
+        .commandStreams.right.mainLeftOrAttacker.steps[0].commands[0].linkedStream.steps,
+      hurt: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
+        .commandStreams.right.auxiliaryA.steps[0].commands[1].linkedStream.steps,
+      guard: STAGE0_FULL_COMBAT_PROFILES["magic-priest"]
+        .commandStreams.right.auxiliaryC.steps[0].commands[1].linkedStream.steps,
+    },
+  },
+} as const;
+
+const ARCHER_FLIGHT_STREAMS = {
+  left: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.left
+    .mainLeftOrAttacker.steps[3].commands[1].linkedStream.steps,
+  right: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.right
+    .mainLeftOrAttacker.steps[3].commands[1].linkedStream.steps,
+} as const;
+
+const ARCHER_HURT_PROJECTILE_STREAMS = {
+  left: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.left
+    .auxiliaryA.steps[0].commands[0].linkedStream.steps,
+  right: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.right
+    .auxiliaryA.steps[0].commands[0].linkedStream.steps,
+} as const;
+
+const ARCHER_GUARD_PROJECTILE_STREAMS = {
+  left: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.left
+    .auxiliaryC.steps[0].commands[0].linkedStream.steps,
+  right: STAGE0_FULL_COMBAT_PROFILES.archer.commandStreams.right
+    .auxiliaryC.steps[0].commands[0].linkedStream.steps,
+} as const;
+
+function nativeStreamDuration(
+  steps: readonly NativeCommandStep[],
+  substepDuration: number,
+): number {
+  return steps.reduce(
+    (duration, step) => duration + step.rendererSubsteps * substepDuration,
+    0,
+  );
+}
+
+function nativeCommandOffset(
+  steps: readonly NativeCommandStep[],
+  token: string,
+  substepDuration: number,
+): number | undefined {
+  let elapsed = 0;
+  for (const step of steps) {
+    if (step.commands.some((command) => command.token === token)) return elapsed;
+    elapsed += step.rendererSubsteps * substepDuration;
+  }
+  return undefined;
+}
+
+function nativeLinkedCommand(
+  steps: readonly NativeCommandStep[],
+  token: "G1" | "G2" | "G3" | "G4" | "G5",
+  substepDuration: number,
+): { offset: number; steps: readonly NativeCommandStep[] } | undefined {
+  let offset = 0;
+  for (const step of steps) {
+    const command = step.commands.find((candidate) =>
+      candidate.token === token && candidate.linkedStream);
+    if (command?.linkedStream) return { offset, steps: command.linkedStream.steps };
+    offset += step.rendererSubsteps * substepDuration;
+  }
+  return undefined;
+}
+
+interface NativeStreamSample {
+  frame: number;
+  x: number;
+  y: number;
+}
+
+type NativeAnimationMode = "none" | "alternate" | "cycle4" | "cycle6";
+
+function applyNativeAnimationCommand(
+  mode: NativeAnimationMode,
+  token: string,
+): NativeAnimationMode {
+  if (token === ":X") return "alternate";
+  if (token === "X4") return "cycle4";
+  if (token === "X6") return "cycle6";
+  if (token === "XN") return "none";
+  return mode;
+}
+
+function nextNativeFrame(
+  baseFrame: number,
+  mode: NativeAnimationMode,
+  counter: number,
+): { frame: number; counter: number } {
+  if (mode === "alternate") {
+    const nextCounter = counter ^ 1;
+    return { frame: baseFrame + nextCounter, counter: nextCounter };
+  }
+  if (mode === "cycle4" || mode === "cycle6") {
+    const modulus = mode === "cycle4" ? 4 : 6;
+    const nextCounter = (counter + 1) % modulus;
+    return { frame: baseFrame + nextCounter, counter: nextCounter };
+  }
+  return { frame: baseFrame, counter: 0 };
+}
+
+function sampleNativeStream(
+  steps: readonly NativeCommandStep[],
+  age: number,
+  substepDuration: number,
+  initialX: number,
+  initialY: number,
+): NativeStreamSample {
+  let x = initialX;
+  let y = initialY;
+  let elapsed = 0;
+  let animationMode: NativeAnimationMode = "none";
+  let animationCounter = 0;
+  let lastFrame = steps[0]?.pose.frame ?? 0;
+
+  for (const step of steps) {
+    for (const command of step.commands) {
+      animationMode = applyNativeAnimationCommand(animationMode, command.token);
+      if (command.token === ":S") {
+        const [nextX, nextY] = command.parameters;
+        if (typeof nextX === "number") x = nextX;
+        if (typeof nextY === "number") y = nextY;
+      }
+    }
+
+    const duration = step.rendererSubsteps * substepDuration;
+    if (age < elapsed + duration) {
+      const completed = Math.max(
+        0,
+        Math.min(
+          step.rendererSubsteps - 1,
+          Math.floor((age - elapsed) / substepDuration),
+        ),
+      );
+      for (let index = 0; index < completed; index += 1) {
+        const next = nextNativeFrame(step.pose.frame, animationMode, animationCounter);
+        animationCounter = next.counter;
+      }
+      x += step.pose.deltaX * completed;
+      y += step.pose.deltaY * completed;
+      const visible = nextNativeFrame(step.pose.frame, animationMode, animationCounter);
+      return { frame: visible.frame, x, y };
+    }
+    for (let index = 0; index < step.rendererSubsteps; index += 1) {
+      const next = nextNativeFrame(step.pose.frame, animationMode, animationCounter);
+      animationCounter = next.counter;
+      lastFrame = next.frame;
+    }
+    x += step.pose.deltaX * step.rendererSubsteps;
+    y += step.pose.deltaY * step.rendererSubsteps;
+    elapsed += duration;
+  }
+  return { frame: lastFrame, x, y };
+}
+
+type NativeScrollDirection = -1 | 0 | 1;
+
+interface NativeScrollSample {
+  distance: number;
+  direction: NativeScrollDirection;
+}
+
+function nativeScrollDirection(
+  current: NativeScrollDirection,
+  token: string,
+): NativeScrollDirection {
+  if (token === ":R") return 1;
+  if (token === ":L") return -1;
+  if (token === ":J") return 0;
+  return current;
+}
+
+/**
+ * Replays AEEF's background state exactly: commands change direction at step
+ * entry, while the 8-pixel phase update happens after the currently presented
+ * substep and is therefore visible from the following substep onward.
+ */
+function sampleNativeScroll(
+  steps: readonly NativeCommandStep[],
+  age: number,
+  substepDuration: number,
+  initialDirection: NativeScrollDirection = 0,
+): NativeScrollSample {
+  let distance = 0;
+  let direction = initialDirection;
+  let elapsed = 0;
+  for (const step of steps) {
+    for (const command of step.commands) {
+      direction = nativeScrollDirection(direction, command.token);
+    }
+    const duration = step.rendererSubsteps * substepDuration;
+    const completed = Math.max(
+      0,
+      Math.min(step.rendererSubsteps, Math.floor((age - elapsed) / substepDuration)),
+    );
+    distance += direction * 8 * completed;
+    if (age < elapsed + duration) return { distance, direction };
+    elapsed += duration;
+  }
+  return { distance, direction };
+}
 
 function strikeTimes(spec: StrikeSpec): StrikeTimes {
   const t0 = spec.start;
-  const recoil = recoilProfile(spec.actorClass);
-  const afterImpact = spec.final ? POST_IMPACT_FINAL : POST_IMPACT_MID;
-  if (isRanged(spec.actorClass)) {
-    const scrollStart = t0;
-    const throwAt = t0 + RANGED.windup;
-    const lanceFrom = throwAt + RANGED.throwPose;
-    const lanceTo = lanceFrom + RANGED.lanceFlight;
-    const impact = lanceTo;
-    const scrollEnd = impact + recoil.duration;
-    const holdStart = scrollEnd;
-    return {
-      windupEnd: throwAt,
-      scrollStart,
-      scrollEnd,
-      impact,
-      holdStart,
-      end: impact + afterImpact,
-      throwAt,
-      lanceFrom,
-      lanceTo,
-    };
-  }
-  const windupEnd = t0 + MELEE.windup;
-  const scrollStart = windupEnd + MELEE.scrollDelay;
-  const impact = scrollStart + MELEE.approachDuration;
-  const scrollEnd = impact + recoil.duration;
-  const holdStart = scrollEnd;
-  return { windupEnd, scrollStart, scrollEnd, impact, holdStart, end: impact + afterImpact };
-}
-
-const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
-
-function steppedCameraDistance(profile: RecoilProfile, age: number): number {
-  const steps = profile.cameraDistance / 8;
-  const completed = Math.min(steps, Math.floor(Math.max(0, age) / (profile.duration / steps)));
-  return completed * 8;
-}
-
-function recoilLift(profile: RecoilProfile, age: number): number {
-  let lift = profile.liftFrames[0]?.lift ?? 0;
-  for (const keyframe of profile.liftFrames) {
-    if (age < keyframe.at) break;
-    lift = keyframe.lift;
-  }
-  return lift;
+  const stream = nativeMainStream(
+    spec.actorClass,
+    spec.actorSide,
+    "mainLeftOrAttacker",
+  );
+  const impact = t0 + nativeStreamDuration(stream, NATIVE_STRIKE_SUBSTEP);
+  const reaction = spec.damage <= 10 ? "guard" : "hurt";
+  const post = nativeReactionStream(
+    spec.actorClass,
+    spec.actorSide,
+    reaction,
+    "actor",
+  );
+  const holdStart = impact + nativeStreamDuration(post, NATIVE_POST_HIT_SUBSTEP);
+  const directionOffset = nativeCommandOffset(stream, ":R", NATIVE_STRIKE_SUBSTEP)
+    ?? nativeCommandOffset(stream, ":L", NATIVE_STRIKE_SUBSTEP)
+    ?? 0;
+  const linked = nativeLinkedCommand(stream, "G1", NATIVE_STRIKE_SUBSTEP);
+  const releaseOffset = spec.actorClass === 20 || spec.actorClass === 22
+    ? linked?.offset ?? directionOffset
+    : directionOffset;
+  const deathDuration = nativeStreamDuration(
+    STAGE0_FULL_COMBAT_DEATH[spec.actorSide === "left" ? "right" : "left"].steps,
+    NATIVE_POST_HIT_SUBSTEP,
+  );
+  return {
+    windupEnd: t0 + releaseOffset,
+    scrollStart: t0,
+    scrollEnd: holdStart,
+    impact,
+    holdStart,
+    end: holdStart + (spec.victimDies ? deathDuration : 0),
+    ...(linked && isRanged(spec.actorClass) ? {
+      throwAt: t0 + linked.offset,
+      lanceFrom: t0 + linked.offset,
+      lanceTo: impact,
+    } : {}),
+  };
 }
 
 function cameraAt(spec: StrikeSpec, times: StrikeTimes, t: number): number {
-  const dir = spec.actorSide === "left" ? 1 : -1;
-  const recoil = recoilProfile(spec.actorClass);
-  const impactCamera = spec.cameraTo - dir * recoil.cameraDistance;
-  if (t < times.impact) {
-    const progress = clamp01((t - times.scrollStart) / (times.impact - times.scrollStart));
-    return spec.cameraFrom + (impactCamera - spec.cameraFrom) * progress;
+  const main = nativeMainStream(
+    spec.actorClass,
+    spec.actorSide,
+    "mainLeftOrAttacker",
+  );
+  const mainAge = Math.max(0, Math.min(t - spec.start, times.impact - spec.start));
+  const mainScroll = sampleNativeScroll(main, mainAge, NATIVE_STRIKE_SUBSTEP);
+  if (t < times.impact) return spec.cameraFrom + mainScroll.distance;
+
+  const reaction = spec.damage <= 10 ? "guard" : "hurt";
+  const post = nativeReactionStream(
+    spec.actorClass,
+    spec.actorSide,
+    reaction,
+    "actor",
+  );
+  const postAge = Math.max(0, Math.min(t - times.impact, times.holdStart - times.impact));
+  const postScroll = sampleNativeScroll(
+    post,
+    postAge,
+    NATIVE_POST_HIT_SUBSTEP,
+    mainScroll.direction,
+  );
+  let distance = mainScroll.distance + postScroll.distance;
+  if (spec.victimDies && t >= times.holdStart) {
+    const victimSide = spec.actorSide === "left" ? "right" : "left";
+    const death = STAGE0_FULL_COMBAT_DEATH[victimSide].steps;
+    const deathScroll = sampleNativeScroll(
+      death,
+      Math.min(t - times.holdStart, times.end - times.holdStart),
+      NATIVE_POST_HIT_SUBSTEP,
+      0,
+    );
+    distance += deathScroll.distance;
   }
-  return impactCamera + dir * steppedCameraDistance(recoil, t - times.impact);
+  return spec.cameraFrom + distance;
 }
 
-function meleeActorSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSpriteState | undefined {
-  const dir = spec.actorSide === "left" ? 1 : -1;
+function nativePostHitActorSprite(
+  spec: StrikeSpec,
+  actorClass: number,
+  t: number,
+  impactX: number,
+  base: Omit<FullCombatSpriteState, "frame" | "x">,
+): FullCombatSpriteState | undefined {
+  const reaction = spec.damage <= 10 ? "guard" : "hurt";
+  const stream = nativeReactionStream(
+    actorClass,
+    spec.actorSide,
+    reaction,
+    "actor",
+  );
+  const pose = sampleNativeStream(
+    stream,
+    t,
+    NATIVE_POST_HIT_SUBSTEP,
+    impactX,
+    0,
+  );
+  if (pose.x < -EDGE_MARGIN || pose.x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
+  return {
+    ...base,
+    frame: pose.frame,
+    x: pose.x,
+    lift: Math.max(0, -pose.y),
+  };
+}
+
+function nativeClassActorSprite(
+  spec: StrikeSpec,
+  times: StrikeTimes,
+  t: number,
+): FullCombatSpriteState | undefined {
+  const stream = nativeMainStream(
+    spec.actorClass,
+    spec.actorSide,
+    "mainLeftOrAttacker",
+  );
   const base: Omit<FullCombatSpriteState, "frame" | "x"> = {
     side: spec.actorSide,
     classId: spec.actorClass,
     set: "plus50",
+    channel: "actor",
     lift: 0,
     mirror: false,
     opacity: 1,
   };
-  if (t < times.windupEnd) {
-    const pose = Math.min(3, Math.floor((t - spec.start) / MELEE.poseLength));
-    return { ...base, frame: pose, x: spec.actorX };
-  }
   if (t < times.impact) {
-    const alternate = Math.floor((t - times.windupEnd) / MELEE.flameAlternate) % 2;
-    return { ...base, frame: 4 + alternate, x: spec.actorX - dir * 12 };
+    const pose = sampleNativeStream(
+      stream,
+      t - spec.start,
+      NATIVE_STRIKE_SUBSTEP,
+      spec.actorX,
+      0,
+    );
+    if (pose.x < -EDGE_MARGIN || pose.x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
+    return {
+      ...base,
+      frame: pose.frame,
+      x: pose.x,
+      lift: Math.max(0, -pose.y),
+    };
   }
-  // Native footage hands the view to the recoiling victim on contact. The
-  // attacker turns at once, and the continuing camera pan carries it toward
-  // its own edge before the victim-only hold begins.
   if (t >= times.holdStart) return undefined;
-  const cameraFollow = cameraAt(spec, times, t) - cameraAt(spec, times, times.impact);
-  const x = spec.actorX
-    - dir * 12
-    - dir * MELEE.exitSpeed * (t - times.impact)
-    - cameraFollow;
-  if (dir > 0 ? x < -EDGE_MARGIN : x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
-  return { ...base, frame: 0, x, mirror: true };
-}
-
-function rangedActorSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSpriteState | undefined {
-  const dir = spec.actorSide === "left" ? 1 : -1;
-  const base: Omit<FullCombatSpriteState, "frame" | "x"> = {
-    side: spec.actorSide,
-    classId: spec.actorClass,
-    set: "plus50",
-    lift: 0,
-    mirror: false,
-    opacity: 1,
-  };
-  const throwAt = times.throwAt ?? spec.start;
-  if (t < throwAt) {
-    const pose = 1 + Math.min(2, Math.floor((t - spec.start) / RANGED.poseLength));
-    return { ...base, frame: pose, x: spec.actorX };
-  }
-  if (t < throwAt + RANGED.throwPose) return { ...base, frame: 4, x: spec.actorX };
-  const exitAt = spec.start + RANGED.exitAt;
-  if (t < exitAt) return { ...base, frame: 5, x: spec.actorX };
-  const x = spec.actorX - dir * RANGED.exitSpeed * (t - exitAt);
-  if (dir > 0 ? x < -EDGE_MARGIN : x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
-  return { ...base, frame: 5, x, mirror: true };
+  const impactPose = sampleNativeStream(
+    stream,
+    times.impact - spec.start,
+    NATIVE_STRIKE_SUBSTEP,
+    spec.actorX,
+    0,
+  );
+  return nativePostHitActorSprite(
+    spec,
+    spec.actorClass,
+    t - times.impact,
+    impactPose.x,
+    base,
+  );
 }
 
 function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSpriteState | undefined {
@@ -357,80 +642,462 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
     side: victimSide,
     classId: spec.victimClass,
     set: "direct",
+    channel: "victim",
     lift: 0,
     mirror: false,
     opacity: 1,
   };
-  const revealAt = times.impact - VICTIM_DASH;
-  if (t < revealAt) return undefined;
-  const edge = victimSide === "right" ? FULL_SCENE.width + EDGE_MARGIN : -EDGE_MARGIN;
-  const arriveAt = times.impact - VICTIM_ARRIVE;
-  if (t < arriveAt) {
-    const progress = clamp01((t - revealAt) / (arriveAt - revealAt));
-    return { ...base, frame: 0, x: edge + (spec.victimX - edge) * progress };
+  if (t < times.impact) {
+    const stream = nativeMainStream(
+      spec.actorClass,
+      spec.actorSide,
+      "mainRightOrDefender",
+    );
+    const duration = nativeStreamDuration(stream, NATIVE_STRIKE_SUBSTEP);
+    const endPose = sampleNativeStream(
+      stream,
+      duration,
+      NATIVE_STRIKE_SUBSTEP,
+      0,
+      0,
+    );
+    const pose = sampleNativeStream(
+      stream,
+      t - spec.start,
+      NATIVE_STRIKE_SUBSTEP,
+      0,
+      0,
+    );
+    const x = spec.victimX + pose.x - endPose.x;
+    if (x < -EDGE_MARGIN || x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
+    return {
+      ...base,
+      frame: pose.frame,
+      x,
+      lift: Math.max(0, -pose.y),
+    };
   }
-  if (t < times.impact) return { ...base, frame: 0, x: spec.victimX };
-  // Hit: the target stays on its screen mark while the world scroll carries
-  // the knockback. Only the >10 branch runs the attacker's vertical script.
   const thresholdReaction = spec.damage <= 10 ? "guard" : "hurt";
   let reaction: NonNullable<FullCombatSpriteState["reaction"]> = thresholdReaction;
-  let frame = thresholdReaction === "guard" ? 3 : 1;
-  let lift = thresholdReaction === "hurt"
-    ? recoilLift(recoilProfile(spec.actorClass), t - times.impact)
-    : 0;
-  let opacity = 1;
+  const reactionStream = nativeReactionStream(
+    spec.actorClass,
+    spec.actorSide,
+    thresholdReaction,
+    "victim",
+  );
+  const pose = sampleNativeStream(
+    reactionStream,
+    t - times.impact,
+    NATIVE_POST_HIT_SUBSTEP,
+    spec.victimX,
+    0,
+  );
+  let frame = pose.frame;
+  let lift = Math.max(0, -pose.y);
   if (spec.victimDies) {
     const deathStart = times.holdStart;
     if (t >= deathStart) {
       reaction = "death";
       frame = 2;
       lift = 0;
-      const age = t - deathStart;
-      const blinkEnd = DEATH_BLINK * DEATH_CYCLES;
-      if (age >= blinkEnd + 240) return undefined;
-      if (age >= blinkEnd) opacity = Math.max(0, 1 - (age - blinkEnd) / 240);
-      else opacity = Math.floor(age / DEATH_BLINK) % 2 === 0 ? 1 : 0.45;
     }
   }
-  return { ...base, frame, reaction, x: spec.victimX, lift, opacity };
+  return { ...base, frame, reaction, x: spec.victimX, lift, opacity: 1 };
 }
 
 function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {
-  if (!isRanged(spec.actorClass) || times.lanceFrom === undefined || times.lanceTo === undefined) return undefined;
+  if (spec.actorClass !== 22 || times.lanceFrom === undefined || times.lanceTo === undefined) return undefined;
   if (t < times.lanceFrom || t >= times.lanceTo) return undefined;
-  const dir = spec.actorSide === "left" ? 1 : -1;
-  const progress = clamp01((t - times.lanceFrom) / (times.lanceTo - times.lanceFrom));
-  const fromX = spec.actorX - dir * RANGED.lanceBehind;
-  const toX = spec.victimX + dir * 6;
-  // Quadratic through launch → peak → impact heights.
-  const rise = (1 - progress) * (1 - progress) * RANGED.lanceLaunchY
-    + 2 * (1 - progress) * progress * RANGED.lancePeakY
-    + progress * progress * RANGED.lanceImpactY;
+  const main = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
+  const linked = nativeLinkedCommand(main, "G1", NATIVE_STRIKE_SUBSTEP);
+  if (!linked) return undefined;
+  const startPose = sampleNativeStream(
+    linked.steps,
+    0,
+    NATIVE_STRIKE_SUBSTEP,
+    0,
+    0,
+  );
+  const pose = sampleNativeStream(
+    linked.steps,
+    t - times.lanceFrom,
+    NATIVE_STRIKE_SUBSTEP,
+    0,
+    0,
+  );
   return {
-    x: fromX + (toX - fromX) * progress,
-    y: rise,
-    frame: 6 + Math.min(2, Math.floor(progress * 3)),
+    // The G1 weapon channel advances in four-unit script increments; the
+    // original VGA projection spans 10 pixels per increment in the capture.
+    x: startPose.x + (pose.x - startPose.x) * 2.5,
+    y: pose.y,
+    frame: pose.frame,
     side: spec.actorSide,
   };
 }
 
-function dustAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["dust"] {
-  if (isRanged(spec.actorClass)) return [];
-  const dir = spec.actorSide === "left" ? 1 : -1;
-  const puffs: FullCombatSceneState["dust"] = [];
-  const firstSpawn = times.scrollStart + 60;
-  const lastSpawn = times.impact;
-  for (let spawn = firstSpawn; spawn <= lastSpawn; spawn += DUST_EVERY) {
-    const age = t - spawn;
-    if (age < 0 || age > DUST_LIFE) continue;
-    const phase = age / DUST_LIFE;
-    // World-anchored: the puff stays where it was kicked up while the camera
-    // keeps panning, so on screen it drifts behind the attacker.
-    const cameraTravel = cameraAt(spec, times, t) - cameraAt(spec, times, spawn);
-    const x = spec.actorX - dir * DUST_BEHIND - cameraTravel;
-    puffs.push({ x, y: FULL_SCENE.groundY - 3 - phase * 6, phase });
+function archerProjectileAt(
+  spec: StrikeSpec,
+  times: StrikeTimes,
+  t: number,
+): FullCombatSceneState["projectile"] {
+  if (spec.actorClass !== 20 || times.lanceFrom === undefined || times.lanceTo === undefined) return undefined;
+  if (t < times.lanceFrom || t >= times.holdStart) return undefined;
+  const flightStream = ARCHER_FLIGHT_STREAMS[spec.actorSide];
+  const flightDuration = nativeStreamDuration(flightStream, NATIVE_STRIKE_SUBSTEP);
+  const flightEnd = sampleNativeStream(
+    flightStream,
+    flightDuration,
+    NATIVE_STRIKE_SUBSTEP,
+    0,
+    0,
+  );
+  const pose = t < times.lanceTo
+    ? sampleNativeStream(
+      flightStream,
+      t - times.lanceFrom,
+      NATIVE_STRIKE_SUBSTEP,
+      0,
+      0,
+    )
+    : sampleNativeStream(
+      spec.damage <= 10
+        ? ARCHER_GUARD_PROJECTILE_STREAMS[spec.actorSide]
+        : ARCHER_HURT_PROJECTILE_STREAMS[spec.actorSide],
+      t - times.lanceTo,
+      NATIVE_POST_HIT_SUBSTEP,
+      flightEnd.x,
+      flightEnd.y,
+    );
+  return {
+    x: pose.x,
+    y: pose.y,
+    frame: pose.frame,
+    side: spec.actorSide,
+    classId: 20,
+  };
+}
+
+function nativeG1EffectSprite(
+  spec: StrikeSpec,
+  times: StrikeTimes,
+  t: number,
+): FullCombatSpriteState | undefined {
+  if (
+    (spec.actorClass !== 1 && spec.actorClass !== 3)
+    || t < spec.start
+    || t >= times.holdStart
+  ) {
+    return undefined;
   }
-  return puffs;
+  const streams = NATIVE_G1_EFFECT_STREAMS[spec.actorClass][spec.actorSide];
+  const strikeDuration = nativeStreamDuration(streams.strike, NATIVE_STRIKE_SUBSTEP);
+  const strikeEnd = sampleNativeStream(
+    streams.strike,
+    strikeDuration,
+    NATIVE_STRIKE_SUBSTEP,
+    0,
+    0,
+  );
+  const pose = t < times.impact
+    ? sampleNativeStream(
+      streams.strike,
+      t - spec.start,
+      NATIVE_STRIKE_SUBSTEP,
+      0,
+      0,
+    )
+    : sampleNativeStream(
+      spec.damage <= 10 ? streams.guard : streams.hurt,
+      t - times.impact,
+      NATIVE_POST_HIT_SUBSTEP,
+      strikeEnd.x,
+      strikeEnd.y,
+    );
+  if (pose.x < -EDGE_MARGIN || pose.x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
+  return {
+    side: spec.actorSide,
+    classId: spec.actorClass,
+    set: "plus50",
+    channel: "G1",
+    frame: pose.frame,
+    x: pose.x,
+    lift: FULL_SCENE.groundY - pose.y,
+    mirror: false,
+    opacity: 1,
+  };
+}
+
+function genericNativeLinkedEffectSprites(
+  spec: StrikeSpec,
+  times: StrikeTimes,
+  t: number,
+): FullCombatSpriteState[] {
+  if (
+    spec.actorClass === 1
+    || spec.actorClass === 3
+    || spec.actorClass === 20
+    || spec.actorClass === 22
+    || t < spec.start
+    || t >= times.holdStart
+  ) {
+    return [];
+  }
+  const reaction = spec.damage <= 10 ? "guard" : "hurt";
+  const main = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
+  const post = nativeReactionStream(spec.actorClass, spec.actorSide, reaction, "actor");
+  const result: FullCombatSpriteState[] = [];
+  for (const token of ["G1", "G2", "G3", "G4", "G5"] as const) {
+    const strikeLinked = nativeLinkedCommand(main, token, NATIVE_STRIKE_SUBSTEP);
+    const postLinked = nativeLinkedCommand(post, token, NATIVE_POST_HIT_SUBSTEP);
+    let pose: NativeStreamSample | undefined;
+    if (t < times.impact) {
+      const age = t - spec.start - (strikeLinked?.offset ?? 0);
+      if (strikeLinked && age >= 0) {
+        pose = sampleNativeStream(
+          strikeLinked.steps,
+          age,
+          NATIVE_STRIKE_SUBSTEP,
+          0,
+          0,
+        );
+      }
+    } else if (postLinked && t - times.impact >= postLinked.offset) {
+      const strikeEnd = strikeLinked
+        ? sampleNativeStream(
+          strikeLinked.steps,
+          nativeStreamDuration(strikeLinked.steps, NATIVE_STRIKE_SUBSTEP),
+          NATIVE_STRIKE_SUBSTEP,
+          0,
+          0,
+        )
+        : { frame: 0, x: 0, y: 0 };
+      pose = sampleNativeStream(
+        postLinked.steps,
+        t - times.impact - postLinked.offset,
+        NATIVE_POST_HIT_SUBSTEP,
+        strikeEnd.x,
+        strikeEnd.y,
+      );
+    }
+    if (!pose || pose.x < -EDGE_MARGIN || pose.x > FULL_SCENE.width + EDGE_MARGIN) continue;
+    result.push({
+      side: spec.actorSide,
+      classId: spec.actorClass,
+      set: "plus50",
+      channel: token,
+      frame: pose.frame,
+      x: pose.x,
+      lift: FULL_SCENE.groundY - pose.y,
+      mirror: false,
+      opacity: 1,
+    });
+  }
+  return result;
+}
+
+type NativeEffectMode = "N" | "Y" | "U";
+type NativeDisplayMode = "ND" | "YD";
+
+interface NativePresentationRuntime {
+  actorEffect: NativeEffectMode;
+  victimEffect: NativeEffectMode;
+  displayMode: NativeDisplayMode;
+  displayToggle: 0 | 4;
+  viewportYOffset: number;
+  trailOffset: number;
+  trailX: number[];
+  trailFrame: number[];
+  particles: FullCombatSceneState["particles"];
+}
+
+function nativeCommandsAtSubstep(
+  steps: readonly NativeCommandStep[],
+  target: number,
+): NativeCommandStep["commands"] {
+  let substep = 0;
+  for (const step of steps) {
+    if (substep === target) return step.commands;
+    substep += step.rendererSubsteps;
+    if (substep > target) return [];
+  }
+  return [];
+}
+
+function applyNativePresentationCommands(
+  state: NativePresentationRuntime,
+  role: "actor" | "victim",
+  commands: NativeCommandStep["commands"],
+): void {
+  for (const command of commands) {
+    if (command.token === "YD") state.displayMode = "YD";
+    if (command.token === "ND") state.displayMode = "ND";
+    const nextEffect = command.token === "EY"
+      ? "Y"
+      : command.token === "NE"
+        ? "N"
+        : command.token === "UE"
+          ? "U"
+          : undefined;
+    if (nextEffect && role === "actor") state.actorEffect = nextEffect;
+    if (nextEffect && role === "victim") state.victimEffect = nextEffect;
+  }
+}
+
+function advanceNativePresentationPhase(
+  state: NativePresentationRuntime,
+  actorSteps: readonly NativeCommandStep[],
+  victimSteps: readonly NativeCommandStep[],
+  renderedSubsteps: number,
+  coordinates: (substep: number) => { actorX: number; victimX: number },
+): void {
+  for (let substep = 0; substep < renderedSubsteps; substep += 1) {
+    // A7F4 parses actor/linked channels before A9FA parses the victim side.
+    applyNativePresentationCommands(
+      state,
+      "actor",
+      nativeCommandsAtSubstep(actorSteps, substep),
+    );
+    applyNativePresentationCommands(
+      state,
+      "victim",
+      nativeCommandsAtSubstep(victimSteps, substep),
+    );
+
+    if (state.displayMode === "YD") {
+      state.displayToggle = state.displayToggle === 0 ? 4 : 0;
+      state.viewportYOffset = -state.displayToggle;
+    } else {
+      state.displayToggle = 0;
+      state.viewportYOffset = 0;
+    }
+
+    const effectRole = state.actorEffect !== "N"
+      ? "actor"
+      : state.victimEffect !== "N"
+        ? "victim"
+        : undefined;
+    if (!effectRole) {
+      state.particles = [];
+      continue;
+    }
+    const effect = effectRole === "actor" ? state.actorEffect : state.victimEffect;
+    const { actorX, victimX } = coordinates(substep);
+    const subjectX = effectRole === "actor" ? actorX : victimX;
+    const towardRight = (effectRole === "actor" && effect === "U")
+      || (effectRole === "victim" && effect === "Y");
+    const direction = towardRight ? 24 : -24;
+    state.trailX[0] = subjectX + (towardRight ? 40 + state.trailOffset : -40 - state.trailOffset);
+    state.trailFrame[0] ^= 1;
+    state.trailOffset += 4;
+    if (state.trailOffset > 24) state.trailOffset = 0;
+    for (let index = 0; index < 5; index += 1) {
+      state.trailX[index + 1] = state.trailX[index] + direction;
+      state.trailFrame[index + 1] = state.trailFrame[index] + 2;
+    }
+    state.particles = [124, 120, 115].map((y, index) => ({
+      x: state.trailX[index],
+      y,
+      frame: state.trailFrame[index],
+    }));
+  }
+}
+
+function renderedNativeSubsteps(
+  steps: readonly NativeCommandStep[],
+  age: number,
+  substepDuration: number,
+): number {
+  const total = steps.reduce((sum, step) => sum + step.rendererSubsteps, 0);
+  if (age < 0) return 0;
+  return Math.min(total, Math.floor(age / substepDuration) + 1);
+}
+
+function nativePresentationAt(
+  spec: StrikeSpec,
+  times: StrikeTimes,
+  t: number,
+): Pick<FullCombatSceneState, "viewportYOffset" | "particles"> {
+  const state: NativePresentationRuntime = {
+    actorEffect: "N",
+    victimEffect: "N",
+    displayMode: "ND",
+    displayToggle: 0,
+    viewportYOffset: 0,
+    trailOffset: 0,
+    trailX: Array<number>(6).fill(0),
+    trailFrame: Array<number>(6).fill(0),
+    particles: [],
+  };
+  const mainActor = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
+  const mainVictim = nativeMainStream(spec.actorClass, spec.actorSide, "mainRightOrDefender");
+  const mainVictimEnd = sampleNativeStream(
+    mainVictim,
+    nativeStreamDuration(mainVictim, NATIVE_STRIKE_SUBSTEP),
+    NATIVE_STRIKE_SUBSTEP,
+    0,
+    0,
+  );
+  const mainAge = Math.min(t - spec.start, times.impact - spec.start);
+  advanceNativePresentationPhase(
+    state,
+    mainActor,
+    mainVictim,
+    renderedNativeSubsteps(mainActor, mainAge, NATIVE_STRIKE_SUBSTEP),
+    (substep) => {
+      const age = substep * NATIVE_STRIKE_SUBSTEP;
+      const actor = sampleNativeStream(mainActor, age, NATIVE_STRIKE_SUBSTEP, spec.actorX, 0);
+      const victim = sampleNativeStream(mainVictim, age, NATIVE_STRIKE_SUBSTEP, 0, 0);
+      return {
+        actorX: actor.x,
+        victimX: spec.victimX + victim.x - mainVictimEnd.x,
+      };
+    },
+  );
+
+  if (t >= times.impact) {
+    const reaction = spec.damage <= 10 ? "guard" : "hurt";
+    const postActor = nativeReactionStream(spec.actorClass, spec.actorSide, reaction, "actor");
+    const postVictim = nativeReactionStream(spec.actorClass, spec.actorSide, reaction, "victim");
+    const mainActorEnd = sampleNativeStream(
+      mainActor,
+      nativeStreamDuration(mainActor, NATIVE_STRIKE_SUBSTEP),
+      NATIVE_STRIKE_SUBSTEP,
+      spec.actorX,
+      0,
+    );
+    const postAge = Math.min(t - times.impact, times.holdStart - times.impact);
+    advanceNativePresentationPhase(
+      state,
+      postActor,
+      postVictim,
+      renderedNativeSubsteps(postActor, postAge, NATIVE_POST_HIT_SUBSTEP),
+      (substep) => ({
+        actorX: sampleNativeStream(
+          postActor,
+          substep * NATIVE_POST_HIT_SUBSTEP,
+          NATIVE_POST_HIT_SUBSTEP,
+          mainActorEnd.x,
+          0,
+        ).x,
+        victimX: spec.victimX,
+      }),
+    );
+  }
+
+  if (spec.victimDies && t >= times.holdStart) {
+    state.actorEffect = "N";
+    state.victimEffect = "N";
+    const victimSide = spec.actorSide === "left" ? "right" : "left";
+    const death = STAGE0_FULL_COMBAT_DEATH[victimSide].steps;
+    advanceNativePresentationPhase(
+      state,
+      [],
+      death,
+      renderedNativeSubsteps(death, t - times.holdStart, NATIVE_POST_HIT_SUBSTEP),
+      () => ({ actorX: spec.victimX, victimX: spec.victimX }),
+    );
+  }
+  return { viewportYOffset: state.viewportYOffset, particles: state.particles };
 }
 
 function damageAt(spec: StrikeSpec, times: StrikeTimes, t: number, holdEnd: number): FullCombatSceneState["damage"] {
@@ -442,20 +1109,70 @@ function damageAt(spec: StrikeSpec, times: StrikeTimes, t: number, holdEnd: numb
 function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
   const label = spec.counter ? "full-counter" : "full-primary";
   const cues: FullCombatCue[] = [];
-  if (isRanged(spec.actorClass)) {
-    cues.push({ t: times.throwAt ?? spec.start, record: 51, reason: `${label}-lance-throw` });
-  } else {
-    cues.push({ t: spec.start + 60, record: 38, reason: `${label}-windup` });
-    cues.push({ t: times.windupEnd, record: 14, reason: `${label}-charge` });
+  const profile = NATIVE_PROFILE_BY_RECORD.get(spec.actorClass)!;
+  const streams = [
+    nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker"),
+    profile.commandStreams[spec.actorSide].mainRightOrDefender.steps,
+  ];
+  for (const stream of streams) {
+    let offset = 0;
+    for (const step of stream) {
+      for (const command of step.commands) {
+        if (/^V[1-5]$/u.test(command.token)) {
+          cues.push({
+            t: spec.start + offset,
+            record: profile.voiceSlots[spec.actorSide][command.token],
+            reason: `${label}-native-${spec.actorClass}-${command.token.toLowerCase()}`,
+          });
+        }
+      }
+      offset += step.rendererSubsteps * NATIVE_STRIKE_SUBSTEP;
+    }
   }
   const reaction = spec.damage <= 10 ? "guard" : "hurt";
-  cues.push({
-    t: times.impact,
-    record: reaction === "guard" ? 0 : 2,
-    reason: `${label}-${reaction}`,
-  });
+  const reactionVoiceCues: Array<{ offset: number; token: string }> = [];
+  for (const role of ["actor", "victim"] as const) {
+    const stream = nativeReactionStream(
+      spec.actorClass,
+      spec.actorSide,
+      reaction,
+      role,
+    );
+    let offset = 0;
+    for (const step of stream) {
+      for (const command of step.commands) {
+        if (/^V[1-5]$/u.test(command.token)) {
+          reactionVoiceCues.push({ offset, token: command.token });
+        }
+      }
+      offset += step.rendererSubsteps * NATIVE_POST_HIT_SUBSTEP;
+    }
+  }
+  if (reactionVoiceCues.length === 0) {
+    cues.push({
+      t: times.impact,
+      record: reaction === "guard" ? 0 : 2,
+      reason: `${label}-${reaction}`,
+    });
+  } else {
+    reactionVoiceCues
+      .sort((left, right) => left.offset - right.offset)
+      .forEach((voice, index) => {
+        cues.push({
+          t: times.impact + voice.offset,
+          record: profile.voiceSlots[spec.actorSide][voice.token],
+          reason: index === 0
+            ? `${label}-${reaction}`
+            : `${label}-${reaction}-${voice.token.toLowerCase()}`,
+        });
+      });
+  }
   if (spec.victimDies) {
-    cues.push({ t: times.holdStart, record: 11, reason: `${label}-death` });
+    cues.push({
+      t: times.holdStart,
+      record: STAGE0_FULL_COMBAT_DEATH.soundRecord,
+      reason: `${label}-death`,
+    });
   }
   return cues;
 }
@@ -476,19 +1193,27 @@ function strikeMarks(spec: StrikeSpec, times: StrikeTimes): FullCombatMark[] {
   return marks;
 }
 
-function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<FullCombatSceneState, "camera" | "sprites" | "lance" | "dust" | "damage"> {
+function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
+  FullCombatSceneState,
+  "camera" | "viewportYOffset" | "sprites" | "lance" | "projectile" | "particles" | "damage"
+> {
   const sprites: FullCombatSpriteState[] = [];
-  const actor = isRanged(spec.actorClass)
-    ? rangedActorSprite(spec, times, t)
-    : meleeActorSprite(spec, times, t);
+  const actor = nativeClassActorSprite(spec, times, t);
   const victim = victimSprite(spec, times, t);
+  const nativeG1Effect = nativeG1EffectSprite(spec, times, t);
+  const nativeLinkedEffects = genericNativeLinkedEffectSprites(spec, times, t);
+  const nativePresentation = nativePresentationAt(spec, times, t);
   if (victim) sprites.push(victim);
   if (actor) sprites.push(actor);
+  if (nativeG1Effect) sprites.push(nativeG1Effect);
+  sprites.push(...nativeLinkedEffects);
   return {
     camera: cameraAt(spec, times, t),
+    viewportYOffset: nativePresentation.viewportYOffset,
     sprites,
     lance: lanceAt(spec, times, t),
-    dust: dustAt(spec, times, t),
+    projectile: archerProjectileAt(spec, times, t),
+    particles: nativePresentation.particles,
     damage: damageAt(spec, times, t, times.end),
   };
 }
@@ -501,6 +1226,12 @@ let battleKeyCounter = 0;
  * them, so the target waits far across the window.
  */
 function victimMark(actorClass: FullCombatClass, actorX: number, dir: 1 | -1, meleeMark: number): number {
+  if (actorClass === 20) {
+    // Archer G1 travels 21 native substeps from x=146/336 to x=272/210.
+    // The direct target stream enters to the corresponding x=290/158 mark,
+    // leaving the frame-5 arrow head at the target body on contact.
+    return actorX + dir * 37;
+  }
   if (!isRanged(actorClass)) return meleeMark;
   const ranged = actorX + dir * RANGED.separation;
   return Math.max(70, Math.min(FULL_SCENE.width - 70, ranged));
@@ -528,7 +1259,6 @@ export function buildFullCombatScript(
       attackerLeft ? PRIMARY_VICTIM_MARK : FULL_SCENE.width - PRIMARY_VICTIM_MARK,
     ),
     cameraFrom: 0,
-    cameraTo: primaryDir * (isRanged(fullCombatClass(attacker.classId)) ? RANGED.scrollDistance : MELEE.scrollDistance),
     damage: result.damage,
     victimDies: result.defenderDied,
     final: result.defenderDied || !result.counterOccurred,
@@ -540,6 +1270,7 @@ export function buildFullCombatScript(
   let counterTimes: StrikeTimes | undefined;
   if (!primary.final) {
     const counterDir: 1 | -1 = attackerLeft ? -1 : 1;
+    const primaryCameraEnd = cameraAt(primary, primaryTimes, primaryTimes.end);
     counter = {
       start: primaryTimes.end,
       actorSide: attackerLeft ? "right" : "left",
@@ -552,8 +1283,7 @@ export function buildFullCombatScript(
         counterDir,
         attackerLeft ? COUNTER_VICTIM_MARK : FULL_SCENE.width - COUNTER_VICTIM_MARK,
       ),
-      cameraFrom: primary.cameraTo,
-      cameraTo: primary.cameraTo - primaryDir * (isRanged(fullCombatClass(defender.classId)) ? RANGED.scrollDistance : MELEE.scrollDistance),
+      cameraFrom: primaryCameraEnd,
       damage: result.counterDamage,
       victimDies: result.attackerDied,
       final: true,
@@ -582,7 +1312,15 @@ export function buildFullCombatScript(
       showScene: t >= OPEN.sceneAt,
     };
     if (!stage.showScene) {
-      return { battleKey, t, ...stage, camera: 0, sprites: [], dust: [] };
+      return {
+        battleKey,
+        t,
+        ...stage,
+        camera: 0,
+        viewportYOffset: 0,
+        sprites: [],
+        particles: [],
+      };
     }
     const inCounter = counter && counterTimes && t >= counter.start;
     const spec = inCounter ? counter! : primary;
@@ -595,9 +1333,12 @@ export function buildFullCombatScript(
 }
 
 /** Per-frame sprite metadata: image width and the ground-anchor x within it. */
-export const FULL_COMBAT_FRAME_META: Record<
+const FULL_COMBAT_FRAME_META_LEGACY: Record<
   "left" | "right",
-  Record<number, Record<"direct" | "plus50", ReadonlyArray<{ w: number; anchor: number }>>>
+  Record<number, Record<
+    "direct" | "plus50",
+    ReadonlyArray<{ w: number; anchor: number; h?: number; yOffset?: number }>
+  >>
 > = {
   left: {
     0: {
@@ -614,6 +1355,25 @@ export const FULL_COMBAT_FRAME_META: Record<
         { w: 80, anchor: 34 },
         { w: 152, anchor: 30 },
         { w: 152, anchor: 30 },
+      ],
+    },
+    20: {
+      direct: [
+        { w: 80, anchor: 40 },
+        { w: 96, anchor: 48 },
+        { w: 96, anchor: 48 },
+        { w: 80, anchor: 40 },
+      ],
+      plus50: [
+        { w: 80, anchor: 40 },
+        { w: 96, anchor: 48 },
+        { w: 88, anchor: 44 },
+        { w: 80, anchor: 40 },
+        { w: 80, anchor: 40 },
+        { w: 56, anchor: 28, h: 19, yOffset: 0 },
+        { w: 56, anchor: 28, h: 27, yOffset: 8 },
+        { w: 56, anchor: 28, h: 19, yOffset: 0 },
+        { w: 56, anchor: 28, h: 27, yOffset: 0 },
       ],
     },
     22: {
@@ -635,6 +1395,38 @@ export const FULL_COMBAT_FRAME_META: Record<
         { w: 104, anchor: 52 },
       ],
     },
+    24: {
+      direct: [
+        { w: 72, anchor: 36 },
+        { w: 80, anchor: 40 },
+        { w: 96, anchor: 48 },
+        { w: 96, anchor: 48 },
+      ],
+      plus50: [
+        { w: 72, anchor: 36 },
+        { w: 88, anchor: 44 },
+        { w: 88, anchor: 44 },
+        { w: 88, anchor: 44 },
+        { w: 120, anchor: 60 },
+        { w: 88, anchor: 44 },
+        { w: 88, anchor: 44 },
+      ],
+    },
+    28: {
+      direct: [
+        { w: 88, anchor: 44 },
+        { w: 104, anchor: 52 },
+        { w: 112, anchor: 56 },
+        { w: 88, anchor: 44 },
+      ],
+      plus50: [
+        { w: 96, anchor: 48 },
+        { w: 104, anchor: 52 },
+        { w: 88, anchor: 44 },
+        { w: 56, anchor: 28 },
+        { w: 128, anchor: 64 },
+      ],
+    },
   },
   right: {
     0: {
@@ -651,6 +1443,25 @@ export const FULL_COMBAT_FRAME_META: Record<
         { w: 80, anchor: 46 },
         { w: 152, anchor: 122 },
         { w: 152, anchor: 122 },
+      ],
+    },
+    20: {
+      direct: [
+        { w: 80, anchor: 40 },
+        { w: 96, anchor: 48 },
+        { w: 96, anchor: 48 },
+        { w: 80, anchor: 40 },
+      ],
+      plus50: [
+        { w: 80, anchor: 40 },
+        { w: 96, anchor: 48 },
+        { w: 88, anchor: 44 },
+        { w: 72, anchor: 36 },
+        { w: 80, anchor: 40 },
+        { w: 56, anchor: 28, h: 19, yOffset: 0 },
+        { w: 56, anchor: 28, h: 27, yOffset: 8 },
+        { w: 56, anchor: 28, h: 19, yOffset: 0 },
+        { w: 56, anchor: 28, h: 27, yOffset: 0 },
       ],
     },
     22: {
@@ -672,5 +1483,48 @@ export const FULL_COMBAT_FRAME_META: Record<
         { w: 112, anchor: 56 },
       ],
     },
+    24: {
+      direct: [
+        { w: 72, anchor: 36 },
+        { w: 80, anchor: 40 },
+        { w: 96, anchor: 48 },
+        { w: 96, anchor: 48 },
+      ],
+      plus50: [
+        { w: 72, anchor: 36 },
+        { w: 88, anchor: 44 },
+        { w: 88, anchor: 44 },
+        { w: 80, anchor: 40 },
+        { w: 120, anchor: 60 },
+        { w: 88, anchor: 44 },
+        { w: 88, anchor: 44 },
+      ],
+    },
+    28: {
+      direct: [
+        { w: 88, anchor: 44 },
+        { w: 104, anchor: 52 },
+        { w: 112, anchor: 56 },
+        { w: 88, anchor: 44 },
+      ],
+      plus50: [
+        { w: 104, anchor: 52 },
+        { w: 104, anchor: 52 },
+        { w: 88, anchor: 44 },
+        { w: 56, anchor: 28 },
+        { w: 128, anchor: 64 },
+      ],
+    },
   },
 };
+
+export const FULL_COMBAT_FRAME_META = Object.assign(
+  FULL_COMBAT_FRAME_META_LEGACY,
+  STAGE0_FULL_COMBAT_FRAME_META,
+) as Record<
+  "left" | "right",
+  Record<number, Record<
+    "direct" | "plus50",
+    ReadonlyArray<{ w: number; anchor: number; h?: number; yOffset?: number }>
+  >>
+>;

@@ -7,6 +7,7 @@ import process from "node:process";
 
 const DATA_LINEAR_BASE = 0x1eba0;
 const RECORD_COUNT = 39;
+const FULL_SCREEN_CLASS_RECORD_COUNT = 36;
 
 const CODE_SIGNATURES = [
   ["0000:0220", "play-loaded-voc-far-entry", "e83100cbe80100cbf606ed10017403e82200c3f606ee10017403e81700c3f606"],
@@ -185,6 +186,81 @@ function parseSimpleDeathScript(buffer, dsOffset, poseCount) {
   };
 }
 
+const FULL_SCREEN_COMMANDS = new Map([
+  [0x533a, { token: ":S", argumentKinds: ["signed", "signed"] }],
+  [0x523a, { token: ":R", argumentKinds: [] }],
+  [0x4c3a, { token: ":L", argumentKinds: [] }],
+  [0x4a3a, { token: ":J", argumentKinds: [] }],
+  [0x583a, { token: ":X", argumentKinds: [] }],
+  [0x5834, { token: "X4", argumentKinds: [] }],
+  [0x5836, { token: "X6", argumentKinds: [] }],
+  [0x4e58, { token: "XN", argumentKinds: [] }],
+  [0x5944, { token: "YD", argumentKinds: [] }],
+  [0x4e44, { token: "ND", argumentKinds: [] }],
+  [0x4731, { token: "G1", argumentKinds: ["pointer"] }],
+  [0x4732, { token: "G2", argumentKinds: ["pointer"] }],
+  [0x4733, { token: "G3", argumentKinds: ["pointer"] }],
+  [0x4734, { token: "G4", argumentKinds: ["pointer"] }],
+  [0x4735, { token: "G5", argumentKinds: ["pointer"] }],
+  [0x5631, { token: "V1", argumentKinds: [] }],
+  [0x5632, { token: "V2", argumentKinds: [] }],
+  [0x5633, { token: "V3", argumentKinds: [] }],
+  [0x5634, { token: "V4", argumentKinds: [] }],
+  [0x5635, { token: "V5", argumentKinds: [] }],
+  [0x4559, { token: "EY", argumentKinds: [] }],
+  [0x454e, { token: "NE", argumentKinds: [] }],
+  [0x4555, { token: "UE", argumentKinds: [] }],
+]);
+
+function parseFullScreenCommandStream(buffer, dsOffset, stepCounts, followLinkedStreams = true) {
+  let cursor = dsOffset;
+  const steps = stepCounts.map((rendererSubsteps, index) => {
+    const commands = [];
+    while (FULL_SCREEN_COMMANDS.has(readWord(buffer, cursor))) {
+      const opcode = readWord(buffer, cursor);
+      const definition = FULL_SCREEN_COMMANDS.get(opcode);
+      cursor += 2;
+      const parameters = definition.argumentKinds.map((kind) => {
+        const value = kind === "pointer"
+          ? `DS:${hex(readWord(buffer, cursor))}`
+          : readSignedWord(buffer, cursor);
+        cursor += 2;
+        return value;
+      });
+      commands.push({ opcode, token: definition.token, parameters });
+    }
+    const pose = {
+      frame: readSignedWord(buffer, cursor),
+      deltaX: readSignedWord(buffer, cursor + 2),
+      deltaY: readSignedWord(buffer, cursor + 4),
+    };
+    cursor += 6;
+    return { index, rendererSubsteps, commands, pose };
+  });
+  if (followLinkedStreams) {
+    for (const step of steps) {
+      for (const command of step.commands) {
+        const pointer = command.token.startsWith("G")
+          ? command.parameters.find((parameter) => typeof parameter === "string")
+          : undefined;
+        if (pointer) {
+          command.linkedStream = parseFullScreenCommandStream(
+            buffer,
+            Number.parseInt(pointer.slice(3), 16),
+            stepCounts.slice(step.index),
+            false,
+          );
+        }
+      }
+    }
+  }
+  return {
+    address: `DS:${hex(dsOffset)}`,
+    bytesConsumed: cursor - dsOffset,
+    steps,
+  };
+}
+
 function sideDescriptor(record, role) {
   const result = record.descriptors.find((entry) => entry.role === role)
     ?? record.descriptors.find((entry) => entry.set === (role === "side1" ? "set1" : "set2"));
@@ -192,29 +268,63 @@ function sideDescriptor(record, role) {
   return result;
 }
 
-function presentationBlock(buffer, descriptor) {
+function presentationBlock(buffer, descriptor, includeCommandStreams) {
   const words = readWords(buffer, descriptor.unknownPointer10, 12);
+  const hasFullScreenPresentation = words[4] !== 0
+    && words[5] !== 0
+    && readWord(buffer, words[4]) > 0
+    && readWord(buffer, words[5]) > 0;
+  if (!hasFullScreenPresentation) {
+    return {
+      descriptorSet: descriptor.set,
+      classCode: descriptor.code,
+      blockAddress: `DS:${hex(descriptor.unknownPointer10)}`,
+      leftGraphicFrameRecord: words[0],
+      available: false,
+      unavailableReason: "native descriptor contains no full-screen presentation pointers",
+    };
+  }
   const soundTablePointer = words[3];
+  const strikeStepCounts = readTerminatedWords(buffer, words[4]);
+  const postHitStepCounts = readTerminatedWords(buffer, words[5]);
+  const commandPointers = {
+    mainLeftOrAttacker: words[6],
+    mainRightOrDefender: words[7],
+    auxiliaryA: words[8],
+    auxiliaryB: words[9],
+    auxiliaryC: words[10],
+    auxiliaryD: words[11],
+  };
   return {
     descriptorSet: descriptor.set,
     classCode: descriptor.code,
     blockAddress: `DS:${hex(descriptor.unknownPointer10)}`,
+    available: true,
     leftGraphicFrameRecord: words[0],
     anchorOrOffsetTablePointers: words.slice(1, 3).map((value) => `DS:${hex(value)}`),
     soundTableAddress: `DS:${hex(soundTablePointer)}`,
     voiceSlots: Object.fromEntries(
       readWords(buffer, soundTablePointer, 5).map((record, index) => [`V${index + 1}`, record]),
     ),
-    strikeStepCounts: readTerminatedWords(buffer, words[4]),
-    postHitStepCounts: readTerminatedWords(buffer, words[5]),
-    commandPointers: {
-      mainLeftOrAttacker: `DS:${hex(words[6])}`,
-      mainRightOrDefender: `DS:${hex(words[7])}`,
-      auxiliaryA: `DS:${hex(words[8])}`,
-      auxiliaryB: `DS:${hex(words[9])}`,
-      auxiliaryC: `DS:${hex(words[10])}`,
-      auxiliaryD: `DS:${hex(words[11])}`,
-    },
+    strikeStepCounts,
+    postHitStepCounts,
+    commandPointers: Object.fromEntries(
+      Object.entries(commandPointers).map(([key, value]) => [key, `DS:${hex(value)}`]),
+    ),
+    ...(includeCommandStreams ? {
+      commandStreams: Object.fromEntries(
+        Object.entries(commandPointers).map(([key, value]) => [
+          key,
+          parseFullScreenCommandStream(
+            buffer,
+            value,
+            key.startsWith("main")
+              ? strikeStepCounts.values
+              : postHitStepCounts.values,
+          ),
+        ]),
+      ),
+    } : {}),
   };
 }
 
@@ -336,14 +446,25 @@ async function extract(
   assert(mapDeathPhase2Pointers.length === 9, "map death phase 2 must contain nine descriptors");
 
   const classRecords = descriptors.records.map((record) => {
-    const side1 = presentationBlock(moduleBuffer, sideDescriptor(record, "side1"));
-    const side2 = presentationBlock(moduleBuffer, sideDescriptor(record, "side2"));
+    const includeCommandStreams = record.record < FULL_SCREEN_CLASS_RECORD_COUNT;
+    const side1 = presentationBlock(
+      moduleBuffer,
+      sideDescriptor(record, "side1"),
+      includeCommandStreams,
+    );
+    const side2 = presentationBlock(
+      moduleBuffer,
+      sideDescriptor(record, "side2"),
+      includeCommandStreams,
+    );
     return {
       record: record.record,
       name: record.normalizedName,
       side1,
       side2,
-      voiceSlotAgreement: JSON.stringify(side1.voiceSlots) === JSON.stringify(side2.voiceSlots),
+      voiceSlotAgreement: side1.available && side2.available
+        ? JSON.stringify(side1.voiceSlots) === JSON.stringify(side2.voiceSlots)
+        : null,
       fullScreenGraphicVariants: {
         leftDirect: leftGraphicRule(record.record, false),
         leftPlus50: leftGraphicRule(record.record, true),
@@ -352,6 +473,65 @@ async function extract(
       },
     };
   });
+  const soldierCommands = classRecords.find((record) => record.record === 0);
+  const archerCommands = classRecords.find((record) => record.record === 20);
+  const warriorCommands = classRecords.find((record) => record.record === 28);
+  assert(
+    soldierCommands.side1.commandStreams.auxiliaryA.steps
+      .map((step) => `${step.pose.frame}:${step.pose.deltaX}`).join(",") === "4:-40,0:-40,0:-40"
+      && soldierCommands.side2.commandStreams.auxiliaryA.steps
+        .map((step) => `${step.pose.frame}:${step.pose.deltaX}`).join(",") === "4:40,0:40,0:40",
+    "soldier post-hit settle/exit stream changed",
+  );
+  assert(
+    archerCommands.side1.commandStreams.mainLeftOrAttacker.steps
+      .map((step) => step.pose.frame).join(",") === "0,1,2,3,4,4,4",
+    "archer side1 strike frame sequence changed",
+  );
+  assert(
+    archerCommands.side2.commandStreams.mainLeftOrAttacker.steps
+      .map((step) => step.pose.frame).join(",") === "0,1,2,3,4,4,4",
+    "archer side2 strike frame sequence changed",
+  );
+  for (const [side, expectedStartX, expectedDeltaX] of [
+    ["side1", 146, 6],
+    ["side2", 336, -6],
+  ]) {
+    const release = archerCommands[side].commandStreams.mainLeftOrAttacker.steps[3];
+    const projectile = release.commands.find((command) => command.token === "G1")?.linkedStream;
+    assert(
+      release.commands.some((command) => command.token === "V5")
+        && projectile?.steps[0].commands[0].token === ":S"
+        && projectile.steps[0].commands[0].parameters[0] === expectedStartX
+        && projectile.steps.every((step) =>
+          step.pose.frame === 5 && step.pose.deltaX === expectedDeltaX && step.pose.deltaY === 0),
+      `archer ${side} release/projectile stream changed`,
+    );
+  }
+  for (const side of ["side1", "side2"]) {
+    const yOffsetPointer = Number.parseInt(
+      archerCommands[side].anchorOrOffsetTablePointers[1].slice(3),
+      16,
+    );
+    assert(
+      readWords(moduleBuffer, yOffsetPointer, 9).join(",") === "0,0,0,0,0,0,8,0,0",
+      `archer ${side} frame y-offset table changed`,
+    );
+  }
+  assert(
+    warriorCommands.side1.commandStreams.mainLeftOrAttacker.steps
+      .map((step) => step.pose.frame).join(",") === "0,2,3,3"
+      && warriorCommands.side2.commandStreams.mainLeftOrAttacker.steps
+        .map((step) => step.pose.frame).join(",") === "0,2,3,3",
+    "warrior strike frame sequence changed",
+  );
+  assert(
+    warriorCommands.side1.commandStreams.auxiliaryA.steps
+      .every((step) => step.pose.frame === 4 && step.pose.deltaX === -32)
+      && warriorCommands.side2.commandStreams.auxiliaryA.steps
+        .every((step) => step.pose.frame === 4 && step.pose.deltaX === 32),
+    "warrior post-hit contact stream changed",
+  );
   const stage0ReactionCommands = [
     {
       classRecord: 0,
@@ -435,9 +615,38 @@ async function extract(
   const resources = await loadResourceCatalog(
     extractedRoot, decodedRoot, planarRoot, resourceRefs,
   );
+  const renderedFrameCount = (variant) =>
+    resources.find((entry) => entry.key === `${variant.group}/${variant.record}`)
+      ?.renderedFrames ?? 0;
+  for (const record of classRecords) {
+    if (!record.side1.available || !record.side2.available) continue;
+    const leftFrameCount = Math.max(
+      renderedFrameCount(record.fullScreenGraphicVariants.leftDirect),
+      renderedFrameCount(record.fullScreenGraphicVariants.leftPlus50),
+    );
+    const rightFrameCount = Math.max(
+      renderedFrameCount(record.fullScreenGraphicVariants.rightDirect),
+      renderedFrameCount(record.fullScreenGraphicVariants.rightPlus50),
+    );
+    for (const [side, frameCount] of [
+      [record.side1, leftFrameCount],
+      [record.side2, rightFrameCount],
+    ]) {
+      const [xPointer, yPointer] = side.anchorOrOffsetTablePointers.map((address) =>
+        Number.parseInt(address.slice(3), 16));
+      side.framePlacement = {
+        frameCount,
+        xAnchor: Array.from({ length: frameCount }, (_, index) =>
+          readSignedWord(moduleBuffer, xPointer + index * 2)),
+        yOffset: Array.from({ length: frameCount }, (_, index) =>
+          readSignedWord(moduleBuffer, yPointer + index * 2)),
+      };
+    }
+  }
 
   const voiceRecords = classRecords.flatMap((record) =>
-    [record.side1, record.side2].flatMap((side) => Object.values(side.voiceSlots)));
+    [record.side1, record.side2].flatMap((side) =>
+      side.available ? Object.values(side.voiceSlots) : []));
   voiceRecords.push(11, 38);
 
   const mapHitDescriptor = {
@@ -613,8 +822,12 @@ async function extract(
         soundSynchronization: "both scripts begin with V1, so E/11 is requested when the first death pose is advanced; the request still passes the DS:10ED sound-setting gate",
       },
       classRecordCount: classRecords.length,
-      sideVoiceSlotAgreementRecords: classRecords.filter((record) => record.voiceSlotAgreement).length,
-      sideVoiceSlotDifferenceRecords: classRecords.filter((record) => !record.voiceSlotAgreement)
+      sideVoiceSlotAgreementRecords: classRecords.filter(
+        (record) => record.voiceSlotAgreement === true,
+      ).length,
+      sideVoiceSlotDifferenceRecords: classRecords.filter(
+        (record) => record.voiceSlotAgreement === false,
+      )
         .map((record) => record.record),
       classRecords,
     },
@@ -645,8 +858,13 @@ async function extract(
     "UN/62 must render eight frames");
   assert(resources.find((entry) => entry.key === "MAGIC/12")?.renderedFrames === 38,
     "MAGIC/12 must render 38 frames");
-  assert(result.fullScreenPresentation.sideVoiceSlotDifferenceRecords.join(",") === "17,23,36,37,38",
+  assert(result.fullScreenPresentation.sideVoiceSlotDifferenceRecords.join(",") === "17,23",
     "unexpected side voice-slot differences");
+  assert(
+    classRecords.filter((record) => !record.side1.available || !record.side2.available)
+      .map((record) => record.record).join(",") === "36,37,38",
+    "unexpected full-screen presentation availability boundary",
+  );
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`);

@@ -1,4 +1,5 @@
 import { ASSETS, SPEECH_RECORD_BY_CHARACTER } from "./content/stage0";
+import { STAGE0_ACTION_AUDIO_ASSETS } from "./content/stage0-actions.generated";
 import type { GameController } from "./controller";
 import {
   isSoundEffectChannelEnabled,
@@ -120,7 +121,11 @@ export class AudioManager {
     const cue = this.controller.audioCue;
     if (cue && cue.sequence !== this.previousCueSequence) {
       this.previousCueSequence = cue.sequence;
-      const source = ASSETS.audio.effects[cue.record as keyof typeof ASSETS.audio.effects];
+      const actionKey = `${cue.group}-${cue.record}` as keyof typeof STAGE0_ACTION_AUDIO_ASSETS;
+      const source = STAGE0_ACTION_AUDIO_ASSETS[actionKey]
+        ?? (cue.group === "e"
+          ? ASSETS.audio.effects[cue.record as keyof typeof ASSETS.audio.effects]
+          : undefined);
       if (source) {
         this.playEffect(
           source,

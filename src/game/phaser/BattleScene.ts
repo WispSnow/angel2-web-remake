@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { ASSETS } from "../content/stage0";
+import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../content/stage0-actions.generated";
 import type { GameController } from "../controller";
 import type { BattleUnit } from "../types";
 
@@ -87,6 +88,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
       ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
+      STAGE0_ACTION_PRESENTATION_ASSETS.shoot.hit.forEach((source, frame) =>
+        this.load.image(`map-shoot-${frame}`, source));
+      STAGE0_ACTION_PRESENTATION_ASSETS.fire1.effect.forEach((source, frame) =>
+        this.load.image(`map-fire-1-${frame}`, source));
+      STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary.forEach((source, frame) =>
+        this.load.image(`map-heal-1-primary-${frame}`, source));
+      STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.forEach((source, frame) =>
+        this.load.image(`map-heal-1-tail-${frame}`, source));
     }
 
     create(): void {
@@ -298,6 +307,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         ? controller.reachable
         : controller.actionMode === "target"
           ? controller.targets
+          : controller.actionMode === "specialTarget"
+            ? controller.actionRange
           : undefined;
       if (nativeLegalCells) {
         const legal = new Set(nativeLegalCells.map(({ x, y }) => `${x},${y}`));
@@ -483,7 +494,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);
         this.game.canvas.dataset.actedBadgeGeometry = "-22,-15,16,14";
         this.game.canvas.dataset.rangeMode = controller.actionMode;
-        this.game.canvas.dataset.rangeCellCount = String(controller.reachable.length);
+        this.game.canvas.dataset.rangeCellCount = String(
+          controller.actionMode === "specialTarget"
+            ? controller.actionRange.length
+            : controller.actionMode === "target"
+              ? controller.targets.length
+              : controller.reachable.length,
+        );
         this.game.canvas.dataset.combatShadowUnitCount = String(
           mapPresentation
             ? [mapPresentation.attacker, mapPresentation.defender]
@@ -498,7 +515,49 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       for (const effect of this.combatEffects) effect.destroy();
       this.combatEffects = [];
       const presentation = controller.combatPresentation;
+      const special = controller.specialActionPresentation;
       const canvas = this.game.canvas;
+      if (special) {
+        const target = special.target;
+        let texture: string | undefined;
+        if (special.phase === "shootHit") texture = `map-shoot-${special.frame}`;
+        else if (special.phase === "fireEffect") texture = `map-fire-1-${special.frame}`;
+        else if (special.phase === "healPrimary") texture = `map-heal-1-primary-${special.frame}`;
+        else if (special.phase === "healTail") texture = `map-heal-1-tail-${special.frame}`;
+
+        if (texture) {
+          this.combatEffects.push(
+            this.add.image(
+              target.x * TILE_WIDTH + TILE_WIDTH / 2,
+              target.y * TILE_HEIGHT + TILE_HEIGHT,
+              texture,
+            ).setOrigin(.5, 1).setDepth(8),
+          );
+        } else if (special.phase === "specialDeath") {
+          const descriptor = MAP_DEATH_DESCRIPTORS[special.frame];
+          descriptor?.frames.forEach((sourceFrame, index) => {
+            if (sourceFrame === null) return;
+            const column = index % descriptor.width;
+            const row = Math.floor(index / descriptor.width);
+            this.combatEffects.push(
+              this.add.image(
+                (target.x + descriptor.xOffset + column) * TILE_WIDTH,
+                (target.y + descriptor.yOffset + row) * TILE_HEIGHT,
+                `map-death-${sourceFrame}`,
+              ).setOrigin(0).setDepth(8),
+            );
+          });
+        }
+
+        if (controller.isTestMode) {
+          canvas.dataset.mapCombatPhase = special.phase;
+          canvas.dataset.mapCombatFrame = String(special.frame);
+          canvas.dataset.mapCombatTarget = target.id;
+          canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
+        }
+        return;
+      }
+
       if (!presentation || presentation.phase.startsWith("full")) {
         if (controller.isTestMode) {
           delete canvas.dataset.mapCombatPhase;
@@ -556,7 +615,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         canvas.dataset.cursorFrameShadow = "palette-0:40x44:2px";
         canvas.dataset.cursorFrameHighlight = "palette-15:39x43:1px";
       }
-      if (controller.combatPresentation) return;
+      if (controller.combatPresentation || controller.specialActionPresentation) return;
       const focus = controller.cursor;
       this.drawNativeCursorFrame(focus.x * TILE_WIDTH, focus.y * TILE_HEIGHT);
       const unit = controller.focusedUnit;
