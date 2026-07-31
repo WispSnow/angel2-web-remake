@@ -62,7 +62,7 @@ export interface FullCombatSpriteState {
   reaction?: "guard" | "hurt" | "death";
   /** Scene x of the sprite's ground anchor (body bottom-center). */
   x: number;
-  /** Native-pixel lift above the ground anchor. */
+  /** Signed native-pixel lift above the ground anchor; negative sinks below it. */
   lift: number;
   mirror: boolean;
   opacity: number;
@@ -646,7 +646,11 @@ function nativeClassActorSprite(
       ...base,
       frame: pose.frame,
       x: pose.x,
-      lift: Math.max(0, -pose.y),
+      // Crossbow step 5 deliberately continues from y=-105 through y=120.
+      // Clamping the positive half to ground level pins the giant bolt there
+      // for five substeps, so camera scroll makes it look as if it slides
+      // forward before impact. The native compositor lets that frame sink.
+      lift: spec.actorClass === 21 ? -pose.y : Math.max(0, -pose.y),
     };
   }
   if (t >= times.holdStart) return undefined;

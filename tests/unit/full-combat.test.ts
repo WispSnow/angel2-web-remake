@@ -460,7 +460,7 @@ describe("Full-screen ordinary combat choreography", () => {
             side,
             frame: expectedActor.frame,
             x: expectedActor.x,
-            lift: Math.max(0, -expectedActor.y),
+            lift: record === 21 ? -expectedActor.y : Math.max(0, -expectedActor.y),
           });
         }
         const expectedVictim = mainVictimFrames[index];
@@ -1184,6 +1184,37 @@ describe("Full-screen ordinary combat choreography", () => {
       .toMatchObject({ side: "right", classId: 19, x: 545 });
     expect(right.sample(rightHold).sprites.find(({ channel }) => channel === "actor"))
       .toBeUndefined();
+  });
+
+  it("lets the crossbow bolt finish its native descent before the impact frame", () => {
+    const left = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "crossbow"),
+      unit(2, 48, "測試守方"),
+      result({ counterOccurred: false, counterDamage: 0 }),
+    );
+    const leftImpact = markTime(left, "fullImpact");
+    expect(left.sample(leftImpact - 200).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: -20 });
+    expect(left.sample(leftImpact - 40).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: -120 });
+    expect(left.sample(leftImpact).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ side: "left", classId: 21, frame: 5, x: 266, lift: 0 });
+
+    const right = buildFullCombatScript(
+      unit(2, 48, "測試攻方", "crossbow"),
+      unit(1, 0, "測試守方"),
+      result({
+        attackerId: "2:48",
+        defenderId: "1:0",
+        counterOccurred: false,
+        counterDamage: 0,
+      }),
+    );
+    const rightImpact = markTime(right, "fullImpact");
+    expect(right.sample(rightImpact - 40).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ side: "right", classId: 21, frame: 4, x: 216, lift: -120 });
+    expect(right.sample(rightImpact).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ side: "right", classId: 21, frame: 5, x: 216, lift: 0 });
   });
 
   it("keeps engineer's baked arrow frame on the native bottom anchor", () => {
