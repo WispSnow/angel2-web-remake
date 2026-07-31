@@ -332,6 +332,7 @@ function expectedVictimMark(record: number, side: "left" | "right"): number {
   const actorX = side === "left" ? 253 : 195;
   const direction = side === "left" ? 1 : -1;
   if (record === 20) return actorX + direction * 37;
+  if (record === 24) return actorX + direction * 4;
   if (record === 22) return Math.max(70, Math.min(378, actorX + direction * 182));
   return side === "left" ? 302 : 146;
 }
@@ -1215,6 +1216,45 @@ describe("Full-screen ordinary combat choreography", () => {
       .toMatchObject({ side: "right", classId: 21, frame: 4, x: 216, lift: -120 });
     expect(right.sample(rightImpact).sprites.find(({ channel }) => channel === "actor"))
       .toMatchObject({ side: "right", classId: 21, frame: 5, x: 216, lift: 0 });
+  });
+
+  it("lands the sister orb inside the target reaction bitmap on both sides", () => {
+    const left = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "sister"),
+      unit(2, 48, "測試守方"),
+      result({ counterOccurred: false, counterDamage: 0 }),
+    );
+    const leftImpact = left.sample(markTime(left, "fullImpact"));
+    const leftOrb = leftImpact.sprites.find(({ channel }) => channel === "actor");
+    const leftVictim = leftImpact.sprites.find(({ channel }) => channel === "victim");
+    expect(leftOrb).toMatchObject({ side: "left", classId: 24, frame: 6, x: 208 });
+    expect(leftVictim).toMatchObject({ side: "right", frame: 1, x: 257 });
+    const leftOrbMeta = FULL_COMBAT_FRAME_META.left[24].plus50[6];
+    const leftVictimMeta = FULL_COMBAT_FRAME_META.right[0].direct[1];
+    const leftOrbRight = (leftOrb?.x ?? 0) - leftOrbMeta.anchor + leftOrbMeta.w;
+    const leftVictimLeft = (leftVictim?.x ?? 0) - leftVictimMeta.anchor;
+    expect(leftOrbRight - leftVictimLeft).toBe(15);
+
+    const right = buildFullCombatScript(
+      unit(2, 48, "測試攻方", "sister"),
+      unit(1, 0, "測試守方"),
+      result({
+        attackerId: "2:48",
+        defenderId: "1:0",
+        counterOccurred: false,
+        counterDamage: 0,
+      }),
+    );
+    const rightImpact = right.sample(markTime(right, "fullImpact"));
+    const rightOrb = rightImpact.sprites.find(({ channel }) => channel === "actor");
+    const rightVictim = rightImpact.sprites.find(({ channel }) => channel === "victim");
+    expect(rightOrb).toMatchObject({ side: "right", classId: 24, frame: 6, x: 240 });
+    expect(rightVictim).toMatchObject({ side: "left", frame: 1, x: 191 });
+    const rightOrbMeta = FULL_COMBAT_FRAME_META.right[24].plus50[6];
+    const rightVictimMeta = FULL_COMBAT_FRAME_META.left[0].direct[1];
+    const rightOrbLeft = (rightOrb?.x ?? 0) - rightOrbMeta.anchor;
+    const rightVictimRight = (rightVictim?.x ?? 0) - rightVictimMeta.anchor + rightVictimMeta.w;
+    expect(rightVictimRight - rightOrbLeft).toBe(3);
   });
 
   it("keeps engineer's baked arrow frame on the native bottom anchor", () => {

@@ -1287,6 +1287,13 @@ function victimMark(actorClass: FullCombatClass, actorX: number, dir: 1 | -1, me
     // leaving the frame-5 arrow head at the target body on contact.
     return actorX + dir * 37;
   }
+  if (actorClass === 24) {
+    // Native setup starts both sister attacks at x=250 and leaves the target
+    // four pixels toward the attack direction (254/246). The orb itself ends
+    // 45 px behind that anchor; its 88 px frame then overlaps the target's
+    // reaction bitmap instead of landing in the empty space before it.
+    return actorX + dir * 4;
+  }
   if (!isRanged(actorClass)) return meleeMark;
   const ranged = actorX + dir * RANGED.separation;
   return Math.max(70, Math.min(FULL_SCENE.width - 70, ranged));
