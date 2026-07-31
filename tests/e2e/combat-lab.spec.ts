@@ -439,6 +439,11 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   expect(impactAt).toBeDefined();
   expect(holdAt).toBeDefined();
 
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), throwAt!);
+  await expect(page.locator(".full-combat-lance")).toBeVisible();
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-top", "28");
+
   await page.evaluate(
     (time) => window.__ANGEL2_COMBAT_LAB__?.seek(time),
     (throwAt! + impactAt!) / 2,

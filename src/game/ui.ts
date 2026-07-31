@@ -1149,11 +1149,18 @@ export function renderCombat(
     const src = frames[frame];
     lance.hidden = false;
     if (lance.getAttribute("src") !== src) lance.setAttribute("src", src);
-    lance.style.transform = `translate(${Math.round(scene.lance.x - meta.anchor)}px, ${Math.round(scene.lance.y - 8)}px)`;
+    // G1 uses the same native bottom-anchor projection as the archer arrow:
+    // subtract the current bitmap height, then apply its y-offset. A fixed
+    // eight-pixel adjustment puts the 42/43 px diagonal lance frames far
+    // below the cavalry rider's hand.
+    const top = scene.lance.y - (meta.h ?? 0) + (meta.yOffset ?? 0);
+    lance.style.transform = `translate(${Math.round(scene.lance.x - meta.anchor)}px, ${Math.round(top)}px)`;
     lance.dataset.frame = String(frame);
+    lance.dataset.top = String(Math.round(top));
   } else {
     lance.hidden = true;
     lance.removeAttribute("data-frame");
+    lance.removeAttribute("data-top");
   }
 
   const projectile = query<HTMLImageElement>(".full-combat-projectile");
