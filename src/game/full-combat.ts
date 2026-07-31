@@ -147,7 +147,6 @@ const NATIVE_POST_HIT_SUBSTEP = 50;
 const ATTACKER_ANCHOR = 253; // left-side primary attacker windup mark
 const PRIMARY_VICTIM_MARK = 302; // victim mark when attacked from the left
 const COUNTER_VICTIM_MARK = 205; // victim mark when attacked from the right
-const EDGE_MARGIN = 40; // sprites are fully hidden this far past the edge
 // Measured on the capture: the number lands on the floor about 60 px to the
 // victim's far side, its baseline just under the scene's bottom edge.
 const DAMAGE_OFFSET = 60;
@@ -340,6 +339,25 @@ interface NativeStreamSample {
   frame: number;
   x: number;
   y: number;
+}
+
+/**
+ * The native compositor clips the bitmap, not its ground anchor, at the
+ * battle-window edge. This matters for very wide frames such as the great
+ * dragon knight's 168–176 px impact poses: deleting them at a fixed anchor
+ * margin cuts off several still-visible post-hit substeps.
+ */
+function nativeFrameIntersectsViewport(
+  side: "left" | "right",
+  classRecord: number,
+  set: "direct" | "plus50",
+  frame: number,
+  x: number,
+): boolean {
+  const meta = FULL_COMBAT_FRAME_META[side][classRecord]?.[set]?.[frame];
+  if (!meta) return true;
+  const left = x - meta.anchor;
+  return left < FULL_SCENE.width && left + meta.w > 0;
 }
 
 type NativeAnimationMode = "none" | "alternate" | "cycle4" | "cycle6";
@@ -575,7 +593,13 @@ function nativePostHitActorSprite(
     impactX,
     0,
   );
-  if (pose.x < -EDGE_MARGIN || pose.x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
+  if (!nativeFrameIntersectsViewport(
+    base.side,
+    actorClass,
+    base.set,
+    pose.frame,
+    pose.x,
+  )) return undefined;
   return {
     ...base,
     frame: pose.frame,
@@ -611,7 +635,13 @@ function nativeClassActorSprite(
       spec.actorX,
       0,
     );
-    if (pose.x < -EDGE_MARGIN || pose.x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
+    if (!nativeFrameIntersectsViewport(
+      base.side,
+      spec.actorClass,
+      base.set,
+      pose.frame,
+      pose.x,
+    )) return undefined;
     return {
       ...base,
       frame: pose.frame,
@@ -669,7 +699,13 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
       0,
     );
     const x = spec.victimX + pose.x - endPose.x;
-    if (x < -EDGE_MARGIN || x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
+    if (!nativeFrameIntersectsViewport(
+      base.side,
+      spec.victimClass,
+      base.set,
+      pose.frame,
+      x,
+    )) return undefined;
     return {
       ...base,
       frame: pose.frame,
@@ -813,7 +849,13 @@ function nativeG1EffectSprite(
       strikeEnd.x,
       strikeEnd.y,
     );
-  if (pose.x < -EDGE_MARGIN || pose.x > FULL_SCENE.width + EDGE_MARGIN) return undefined;
+  if (!nativeFrameIntersectsViewport(
+    spec.actorSide,
+    spec.actorClass,
+    "plus50",
+    pose.frame,
+    pose.x,
+  )) return undefined;
   return {
     side: spec.actorSide,
     classId: spec.actorClass,
@@ -879,7 +921,16 @@ function genericNativeLinkedEffectSprites(
         strikeEnd.y,
       );
     }
-    if (!pose || pose.x < -EDGE_MARGIN || pose.x > FULL_SCENE.width + EDGE_MARGIN) continue;
+    if (
+      !pose
+      || !nativeFrameIntersectsViewport(
+        spec.actorSide,
+        spec.actorClass,
+        "plus50",
+        pose.frame,
+        pose.x,
+      )
+    ) continue;
     result.push({
       side: spec.actorSide,
       classId: spec.actorClass,

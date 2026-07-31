@@ -116,6 +116,18 @@ function referenceNativeEnd(
   };
 }
 
+function referenceFrameIntersectsViewport(
+  side: "left" | "right",
+  record: number,
+  set: "direct" | "plus50",
+  frame: number,
+  x: number,
+): boolean {
+  const meta = FULL_COMBAT_FRAME_META[side][record][set][frame];
+  const left = x - meta.anchor;
+  return left < 448 && left + meta.w > 0;
+}
+
 function referenceNativeCameraFrames(
   steps: readonly ReferenceCommandStep[],
   initialDirection: -1 | 0 | 1 = 0,
@@ -434,7 +446,13 @@ describe("Full-screen ordinary combat choreography", () => {
         const state = script.sample(start + index * 40 + 1);
         const expectedActor = mainActorFrames[index];
         const actualActor = state.sprites.find(({ channel }) => channel === "actor");
-        if (expectedActor.x < -40 || expectedActor.x > 488) {
+        if (!referenceFrameIntersectsViewport(
+          side,
+          record,
+          "plus50",
+          expectedActor.frame,
+          expectedActor.x,
+        )) {
           expect(actualActor).toBeUndefined();
         } else {
           expect(actualActor).toMatchObject({
@@ -448,7 +466,13 @@ describe("Full-screen ordinary combat choreography", () => {
         const expectedVictim = mainVictimFrames[index];
         const victimX = victimMark + expectedVictim.x - mainVictimEnd.x;
         const actualVictim = state.sprites.find(({ channel }) => channel === "victim");
-        if (victimX < -40 || victimX > 488) {
+        if (!referenceFrameIntersectsViewport(
+          side === "left" ? "right" : "left",
+          0,
+          "direct",
+          expectedVictim.frame,
+          victimX,
+        )) {
           expect(actualVictim).toBeUndefined();
         } else {
           expect(actualVictim).toMatchObject({
@@ -488,7 +512,13 @@ describe("Full-screen ordinary combat choreography", () => {
             });
           } else {
             const actual = state.sprites.find(({ channel }) => channel === link.token);
-            if (expected.x < -40 || expected.x > 488) {
+            if (!referenceFrameIntersectsViewport(
+              side,
+              record,
+              "plus50",
+              expected.frame,
+              expected.x,
+            )) {
               expect(actual).toBeUndefined();
             } else {
               expect(actual).toMatchObject({
@@ -544,7 +574,13 @@ describe("Full-screen ordinary combat choreography", () => {
           const state = reactionScript.sample(reactionImpact + index * 50 + 1);
           const expectedActor = actorFrames[index];
           const actualActor = state.sprites.find(({ channel }) => channel === "actor");
-          if (expectedActor.x < -40 || expectedActor.x > 488) {
+          if (!referenceFrameIntersectsViewport(
+            side,
+            record,
+            "plus50",
+            expectedActor.frame,
+            expectedActor.x,
+          )) {
             expect(actualActor).toBeUndefined();
           } else {
             expect(actualActor).toMatchObject({
@@ -588,7 +624,16 @@ describe("Full-screen ordinary combat choreography", () => {
               });
             } else {
               const actual = state.sprites.find(({ channel }) => channel === link.token);
-              if (expected.x < -40 || expected.x > 488 || record === 22) {
+              if (
+                record === 22
+                || !referenceFrameIntersectsViewport(
+                  side,
+                  record,
+                  "plus50",
+                  expected.frame,
+                  expected.x,
+                )
+              ) {
                 expect(actual).toBeUndefined();
               } else {
                 expect(actual).toMatchObject({
@@ -1110,6 +1155,37 @@ describe("Full-screen ordinary combat choreography", () => {
     },
   );
 
+  it("keeps the great dragon knight visible until its wide post-hit bitmap is clipped", () => {
+    const left = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "great-dragon-knight"),
+      unit(2, 48, "測試守方"),
+      result({ counterOccurred: false, counterDamage: 0 }),
+    );
+    const leftImpact = markTime(left, "fullImpact");
+    const leftHold = markTime(left, "fullHold");
+    expect(left.sample(leftImpact + 500).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ side: "left", classId: 19, x: -97 });
+    expect(left.sample(leftHold).sprites.find(({ channel }) => channel === "actor"))
+      .toBeUndefined();
+
+    const right = buildFullCombatScript(
+      unit(2, 48, "測試攻方", "great-dragon-knight"),
+      unit(1, 0, "測試守方"),
+      result({
+        attackerId: "2:48",
+        defenderId: "1:0",
+        counterOccurred: false,
+        counterDamage: 0,
+      }),
+    );
+    const rightImpact = markTime(right, "fullImpact");
+    const rightHold = markTime(right, "fullHold");
+    expect(right.sample(rightImpact + 500).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ side: "right", classId: 19, x: 545 });
+    expect(right.sample(rightHold).sprites.find(({ channel }) => channel === "actor"))
+      .toBeUndefined();
+  });
+
   it("keeps engineer's baked arrow frame on the native bottom anchor", () => {
     const left = buildFullCombatScript(
       unit(1, 0, "測試攻方", "engineer"),
@@ -1276,6 +1352,8 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(warrior.sample(impactAt + 300).sprites.find(({ set }) => set === "plus50"))
       .toMatchObject({ frame: 4, mirror: false, x: (impactActor?.x ?? 0) - 192 });
     expect(warrior.sample(impactAt + 450).sprites.find(({ set }) => set === "plus50"))
+      .toMatchObject({ frame: 4, mirror: false, x: (impactActor?.x ?? 0) - 288 });
+    expect(warrior.sample(impactAt + 550).sprites.find(({ set }) => set === "plus50"))
       .toBeUndefined();
     expect(warrior.sample(holdAt).sprites.find(({ set }) => set === "plus50")).toBeUndefined();
     expect(warrior.cues).toContainEqual(expect.objectContaining({
