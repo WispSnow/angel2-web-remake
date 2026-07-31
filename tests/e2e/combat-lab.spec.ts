@@ -50,6 +50,35 @@ const waitForVisibleSpriteImages = (page: Page) => page.waitForFunction(() => {
 
 test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
 
+test("record 35 empress exposes only the original right-side soldier fallback", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto(
+    "/combat-lab.html?attacker=empress&defender=soldier&reaction=hurt&side=left&speed=4",
+  );
+
+  await expect(page.getByTestId("combat-lab-attacker")).toHaveValue("empress");
+  await expect(page.getByTestId("combat-lab-side")).toHaveValue("right");
+  await expect(page.locator('[data-testid="combat-lab-side"] option[value="left"]'))
+    .toHaveAttribute("disabled", "");
+  await expect(page.getByTestId("combat-lab-message"))
+    .toContainText("右側資料亦直接重用士兵畫面");
+  expect((await labState(page)).config.side).toBe("right");
+
+  const impactAt = (await labState(page)).marks
+    .find(({ phase }) => phase === "fullImpact")?.t;
+  expect(impactAt).toBeDefined();
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 40);
+  await expect(page.getByTestId("full-actor-sprite"))
+    .toHaveAttribute("src", /right-empress-plus50\/0[45]\.png$/);
+  await waitForVisibleSpriteImages(page);
+  await page.screenshot({
+    path: "artifacts/playwright/combat-lab-record-35-original-boundary.png",
+    fullPage: true,
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test("record 0 soldier passes attack, guard, hurt and death visual gates", async ({ page }) => {
   await page.goto("/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&speed=4");
 

@@ -93,6 +93,9 @@ interface LabPlaybackState {
   marks: readonly { t: number; phase: FullCombatPhaseName }[];
 }
 
+const EMPRESS_PRESENTATION_NOTE =
+  "原版「女帝」沒有左側普通全景圖形；右側資料亦直接重用士兵畫面。實驗室已切換到原版唯一可重放的右側資料。";
+
 declare global {
   interface Window {
     __ANGEL2_COMBAT_LAB__?: {
@@ -124,7 +127,7 @@ function initialConfig(): LabConfig {
   const parameters = new URLSearchParams(location.search);
   const attacker = parameters.get("attacker");
   const defender = parameters.get("defender");
-  return {
+  return normalizeConfig({
     attackerClass: isLabClass(attacker) ? attacker : "warrior",
     defenderClass: isLabClass(defender) ? defender : "archer",
     reaction: parameters.get("reaction") === "guard" ? "guard" : "hurt",
@@ -133,7 +136,13 @@ function initialConfig(): LabConfig {
     speed: numberFrom(parameters.get("speed"), [0.25, 0.5, 1, 2, 4], 1),
     loop: parameters.get("loop") === "1",
     sound: parameters.get("sound") === "1",
-  };
+  });
+}
+
+function normalizeConfig(next: LabConfig): LabConfig {
+  return next.attackerClass === "empress" && next.side !== "right"
+    ? { ...next, side: "right" }
+    : next;
 }
 
 const classOptions = LAB_CLASSES.map((classId) =>
@@ -325,10 +334,18 @@ function setForm(next: LabConfig): void {
   field<HTMLInputElement>("sound").checked = next.sound;
 }
 
+function updateOriginalAvailability(next: LabConfig): void {
+  const sideSelect = field<HTMLSelectElement>("side");
+  const leftOption = sideSelect.querySelector<HTMLOptionElement>('option[value="left"]');
+  if (!leftOption) throw new Error("Missing left-side combat lab option");
+  leftOption.disabled = next.attackerClass === "empress";
+  message.textContent = next.attackerClass === "empress" ? EMPRESS_PRESENTATION_NOTE : "";
+}
+
 function readForm(): LabConfig {
   const attackerClass = field<HTMLSelectElement>("attackerClass").value;
   const defenderClass = field<HTMLSelectElement>("defenderClass").value;
-  return {
+  return normalizeConfig({
     attackerClass: isLabClass(attackerClass) ? attackerClass : "warrior",
     defenderClass: isLabClass(defenderClass) ? defenderClass : "archer",
     reaction: field<HTMLSelectElement>("reaction").value === "guard" ? "guard" : "hurt",
@@ -337,7 +354,7 @@ function readForm(): LabConfig {
     death: field<HTMLInputElement>("death").checked,
     loop: field<HTMLInputElement>("loop").checked,
     sound: field<HTMLInputElement>("sound").checked,
-  };
+  });
 }
 
 function updateUrl(): void {
@@ -465,6 +482,9 @@ function setPlaying(next: boolean): void {
 
 function buildScenario(autoPlay = true): void {
   stopAudio();
+  config = normalizeConfig(config);
+  setForm(config);
+  updateOriginalAvailability(config);
   const damage = config.reaction === "guard" ? 8 : 24;
   const attackerSide: Side = config.side === "left" ? 1 : 2;
   const defenderSide: Side = attackerSide === 1 ? 2 : 1;
@@ -628,7 +648,6 @@ window.__ANGEL2_COMBAT_LAB__ = {
   pause: () => setPlaying(false),
 };
 
-setForm(config);
 buildScenario(playing);
 configureGameScaling(
   required<HTMLElement>("#combat-lab-viewport"),

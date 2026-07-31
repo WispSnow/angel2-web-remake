@@ -301,7 +301,9 @@ export const FULL_COMBAT_ACCEPTANCE: readonly FullCombatAcceptanceEntry[] =
         status: "accepted",
         evidence,
         ...(record === 35
-          ? { note: "原版仅有右侧 direct/class+50 资源；左侧普通攻击不可达。" }
+          ? {
+              note: "原版仅有右侧 direct/class+50 资源，且逐字节复用士兵图形；左侧普通攻击不可达。",
+            }
           : {}),
       };
     }
