@@ -64,13 +64,15 @@
 - 运行时：Phaser 4、TypeScript、Vite；
 - 单元测试：Vitest；
 - 浏览器验收：Playwright 版本绑定的 Chromium；
-- 默认开发地址：`http://127.0.0.1:4173/`。
+- 主游戏开发地址：`http://127.0.0.1:4173/`；
+- 战斗动画实验室：`http://127.0.0.1:4173/combat-lab.html`。
 
 常用命令：
 
 ```bash
 pnpm install
 pnpm dev
+pnpm dev:combat
 pnpm test
 pnpm test:coverage
 pnpm build
@@ -78,6 +80,13 @@ pnpm test:e2e
 pnpm check
 node reverse/tools/angel2-phase1-verify.mjs
 ```
+
+`pnpm dev:combat` 会启动同一个 Vite 开发服务器并直接打开战斗动画实验室；若已经运行
+`pnpm dev`，直接访问 `/combat-lab.html` 即可。实验室用于组合攻守职业、格挡／重伤、
+死亡、方向、速度、循环与声音，并支持时间轴暂停、40 ms 单步和语义节点跳转。它复用
+正式全景战斗脚本和渲染器，但不建立关卡、不提交模拟结果，也不能替代普通 `/` 的真实
+玩家流程验收。女帝原版没有左侧普通全景图形，右侧数据逐字节复用士兵；实验室会锁定
+到唯一可重放的右侧方向并显示说明，不得据此伪造女帝独立动画。
 
 Playwright 失败视频需要匹配版本的 ffmpeg；本机缺失时运行：
 
