@@ -75,6 +75,8 @@ type LabSide = "left" | "right";
 interface LabConfig {
   attackerClass: LabClassId;
   defenderClass: LabClassId;
+  attackerLife: number;
+  defenderLife: number;
   reaction: LabReaction;
   death: boolean;
   side: LabSide;
@@ -122,11 +124,29 @@ declare global {
   }
 }
 
-const root = document.querySelector<HTMLElement>("#app");
-if (!root) throw new Error("#app not found");
+const rootCandidate = document.querySelector<HTMLElement>("#app");
+if (!rootCandidate) throw new Error("#app not found");
+const root: HTMLElement = rootCandidate;
 
 const isLabClass = (value: string | null): value is LabClassId =>
   value !== null && (LAB_CLASSES as readonly string[]).includes(value);
+
+const LIFE_MIN = 1;
+const LIFE_MAX = 839;
+
+const labExperience = (classId: LabClassId): number => classId === "soldier" ? 299 : 300;
+
+const nativeLifeFor = (classId: LabClassId): number => classStatsFor({
+  classId,
+  experience: labExperience(classId),
+}).maxLife;
+
+const lifeFrom = (value: string | null, fallback: number): number => {
+  if (value === null || value.trim() === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return fallback;
+  return Math.max(LIFE_MIN, Math.min(LIFE_MAX, parsed));
+};
 
 const numberFrom = (
   value: string | null,
@@ -139,13 +159,23 @@ const numberFrom = (
 
 function initialConfig(): LabConfig {
   const parameters = new URLSearchParams(location.search);
-  const attacker = parameters.get("attacker");
-  const defender = parameters.get("defender");
+  const attackerParameter = parameters.get("attacker");
+  const defenderParameter = parameters.get("defender");
+  const attackerClass = isLabClass(attackerParameter) ? attackerParameter : "warrior";
+  const defenderClass = isLabClass(defenderParameter) ? defenderParameter : "archer";
+  const reaction = parameters.get("reaction") === "guard" ? "guard" : "hurt";
+  const death = parameters.get("death") === "1";
+  const branchDamage = reaction === "guard" ? 8 : 24;
   return normalizeConfig({
-    attackerClass: isLabClass(attacker) ? attacker : "warrior",
-    defenderClass: isLabClass(defender) ? defender : "archer",
-    reaction: parameters.get("reaction") === "guard" ? "guard" : "hurt",
-    death: parameters.get("death") === "1",
+    attackerClass,
+    defenderClass,
+    attackerLife: lifeFrom(parameters.get("attackerLife"), nativeLifeFor(attackerClass)),
+    defenderLife: lifeFrom(
+      parameters.get("defenderLife"),
+      death ? branchDamage : nativeLifeFor(defenderClass),
+    ),
+    reaction,
+    death,
     side: parameters.get("side") === "right" ? "right" : "left",
     speed: numberFrom(parameters.get("speed"), [0.25, 0.5, 1, 2, 4], 1),
     loop: parameters.get("loop") === "1",
@@ -159,16 +189,33 @@ function initialConfig(): LabConfig {
  * 圖形的左側。攻守同時是右側限定屬於無法構圖的組合，改由守方讓位到士兵。
  */
 function normalizeConfig(next: LabConfig): LabConfig {
-  if (isRightOnly(next.attackerClass) && isRightOnly(next.defenderClass)) {
-    return normalizeConfig({ ...next, defenderClass: "soldier" });
+  const attackerLife = lifeFrom(String(next.attackerLife), nativeLifeFor(next.attackerClass));
+  const defenderLife = lifeFrom(String(next.defenderLife), nativeLifeFor(next.defenderClass));
+  const normalized: LabConfig = {
+    ...next,
+    attackerLife,
+    defenderLife,
+    // A lethal strike deals the defender's current life, so the original
+    // <=10/>10 threshold—not an independent laboratory toggle—selects the
+    // guard or hurt lead-in before the death sequence.
+    reaction: next.death
+      ? (defenderLife <= 10 ? "guard" : "hurt")
+      : next.reaction,
+  };
+  if (isRightOnly(normalized.attackerClass) && isRightOnly(normalized.defenderClass)) {
+    return normalizeConfig({
+      ...normalized,
+      defenderClass: "soldier",
+      defenderLife: nativeLifeFor("soldier"),
+    });
   }
-  if (isRightOnly(next.attackerClass)) {
-    return next.side === "right" ? next : { ...next, side: "right" };
+  if (isRightOnly(normalized.attackerClass)) {
+    return normalized.side === "right" ? normalized : { ...normalized, side: "right" };
   }
-  if (isRightOnly(next.defenderClass)) {
-    return next.side === "left" ? next : { ...next, side: "left" };
+  if (isRightOnly(normalized.defenderClass)) {
+    return normalized.side === "left" ? normalized : { ...normalized, side: "left" };
   }
-  return next;
+  return normalized;
 }
 
 const classOptions = LAB_CLASSES.map((classId) =>
@@ -238,11 +285,10 @@ root.innerHTML = `
         <span class="panel-kicker">CONTROL DECK</span>
         <h2 id="combat-lab-controls-title">測試條件</h2>
 
-        <div class="combat-lab-presets" aria-label="常用驗收預設">
-          <button type="button" data-lab-preset="warrior-hurt">戰士重傷</button>
-          <button type="button" data-lab-preset="warrior-death">戰士死亡</button>
-          <button type="button" data-lab-preset="archer-hurt">弓兵重傷</button>
-          <button type="button" data-lab-preset="archer-death">弓兵死亡</button>
+        <div class="combat-lab-outcomes" aria-label="目前職業組合的受擊結果">
+          <button type="button" data-lab-outcome="guard">格擋（8）</button>
+          <button type="button" data-lab-outcome="hurt">重傷（24）</button>
+          <button type="button" data-lab-outcome="death">死亡（當前生命）</button>
         </div>
 
         <form id="combat-lab-form">
@@ -251,9 +297,36 @@ root.innerHTML = `
             <select name="attackerClass" data-testid="combat-lab-attacker">${classOptions}</select>
           </label>
           <label>
+            <span>攻方生命</span>
+            <input
+              type="number"
+              name="attackerLife"
+              min="${LIFE_MIN}"
+              max="${LIFE_MAX}"
+              step="1"
+              inputmode="numeric"
+              data-testid="combat-lab-attacker-life"
+            />
+          </label>
+          <label>
             <span>守方職業</span>
             <select name="defenderClass" data-testid="combat-lab-defender">${classOptions}</select>
           </label>
+          <label>
+            <span>守方生命</span>
+            <input
+              type="number"
+              name="defenderLife"
+              min="${LIFE_MIN}"
+              max="${LIFE_MAX}"
+              step="1"
+              inputmode="numeric"
+              data-testid="combat-lab-defender-life"
+            />
+          </label>
+          <p class="combat-lab-field-note">
+            原版生命條分層邊界：209／210、419／420、629／630；可輸入 1–839。
+          </p>
           <label>
             <span>受擊分支</span>
             <select name="reaction" data-testid="combat-lab-reaction">
@@ -280,7 +353,7 @@ root.innerHTML = `
           </label>
           <label class="combat-lab-check">
             <input type="checkbox" name="death" data-testid="combat-lab-death" />
-            <span>守方生命歸零，播放死亡段</span>
+            <span>致死：傷害等於守方生命，播放死亡段</span>
           </label>
           <label class="combat-lab-check">
             <input type="checkbox" name="loop" />
@@ -352,12 +425,20 @@ const renderSource: CombatPresentationRenderSource = {
 function setForm(next: LabConfig): void {
   field<HTMLSelectElement>("attackerClass").value = next.attackerClass;
   field<HTMLSelectElement>("defenderClass").value = next.defenderClass;
-  field<HTMLSelectElement>("reaction").value = next.reaction;
+  field<HTMLInputElement>("attackerLife").value = String(next.attackerLife);
+  field<HTMLInputElement>("defenderLife").value = String(next.defenderLife);
+  const reactionField = field<HTMLSelectElement>("reaction");
+  reactionField.value = next.reaction;
+  reactionField.disabled = next.death;
   field<HTMLSelectElement>("side").value = next.side;
   field<HTMLSelectElement>("speed").value = String(next.speed);
   field<HTMLInputElement>("death").checked = next.death;
   field<HTMLInputElement>("loop").checked = next.loop;
   field<HTMLInputElement>("sound").checked = next.sound;
+  const outcome = next.death ? "death" : next.reaction;
+  root.querySelectorAll<HTMLButtonElement>("[data-lab-outcome]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.labOutcome === outcome));
+  });
 }
 
 function updateOriginalAvailability(next: LabConfig): void {
@@ -373,11 +454,21 @@ function updateOriginalAvailability(next: LabConfig): void {
 }
 
 function readForm(): LabConfig {
-  const attackerClass = field<HTMLSelectElement>("attackerClass").value;
-  const defenderClass = field<HTMLSelectElement>("defenderClass").value;
+  const attackerValue = field<HTMLSelectElement>("attackerClass").value;
+  const defenderValue = field<HTMLSelectElement>("defenderClass").value;
+  const attackerClass = isLabClass(attackerValue) ? attackerValue : "warrior";
+  const defenderClass = isLabClass(defenderValue) ? defenderValue : "archer";
   return normalizeConfig({
-    attackerClass: isLabClass(attackerClass) ? attackerClass : "warrior",
-    defenderClass: isLabClass(defenderClass) ? defenderClass : "archer",
+    attackerClass,
+    defenderClass,
+    attackerLife: lifeFrom(
+      field<HTMLInputElement>("attackerLife").value,
+      nativeLifeFor(attackerClass),
+    ),
+    defenderLife: lifeFrom(
+      field<HTMLInputElement>("defenderLife").value,
+      nativeLifeFor(defenderClass),
+    ),
     reaction: field<HTMLSelectElement>("reaction").value === "guard" ? "guard" : "hurt",
     side: field<HTMLSelectElement>("side").value === "right" ? "right" : "left",
     speed: numberFrom(field<HTMLSelectElement>("speed").value, [0.25, 0.5, 1, 2, 4], 1),
@@ -392,6 +483,8 @@ function updateUrl(): void {
   url.search = "";
   url.searchParams.set("attacker", config.attackerClass);
   url.searchParams.set("defender", config.defenderClass);
+  url.searchParams.set("attackerLife", String(config.attackerLife));
+  url.searchParams.set("defenderLife", String(config.defenderLife));
   url.searchParams.set("reaction", config.reaction);
   url.searchParams.set("death", config.death ? "1" : "0");
   url.searchParams.set("side", config.side);
@@ -418,7 +511,7 @@ function makeUnit(
     x: side === 1 ? 24 : 25,
     y: 26,
     life,
-    experience: classId === "soldier" ? 299 : 300,
+    experience: labExperience(classId),
     acted: false,
     statuses: emptyUnitStatuses(),
   };
@@ -515,16 +608,13 @@ function buildScenario(autoPlay = true): void {
   config = normalizeConfig(config);
   setForm(config);
   updateOriginalAvailability(config);
-  const damage = config.reaction === "guard" ? 8 : 24;
+  const damage = config.death
+    ? config.defenderLife
+    : config.reaction === "guard" ? 8 : 24;
   const attackerSide: Side = config.side === "left" ? 1 : 2;
   const defenderSide: Side = attackerSide === 1 ? 2 : 1;
-  attacker = makeUnit("attacker", config.attackerClass, attackerSide, 200);
-  defender = makeUnit(
-    "defender",
-    config.defenderClass,
-    defenderSide,
-    config.death ? damage : 200,
-  );
+  attacker = makeUnit("attacker", config.attackerClass, attackerSide, config.attackerLife);
+  defender = makeUnit("defender", config.defenderClass, defenderSide, config.defenderLife);
   result = {
     attackerId: attacker.id,
     defenderId: defender.id,
@@ -575,7 +665,15 @@ form.addEventListener("submit", (event) => {
   buildScenario();
 });
 
-form.addEventListener("change", () => {
+form.addEventListener("change", (event) => {
+  const changed = event.target;
+  if (changed instanceof HTMLSelectElement && changed.name === "attackerClass") {
+    const classId = isLabClass(changed.value) ? changed.value : "warrior";
+    field<HTMLInputElement>("attackerLife").value = String(nativeLifeFor(classId));
+  } else if (changed instanceof HTMLSelectElement && changed.name === "defenderClass") {
+    const classId = isLabClass(changed.value) ? changed.value : "archer";
+    field<HTMLInputElement>("defenderLife").value = String(nativeLifeFor(classId));
+  }
   config = readForm();
   buildScenario();
 });
@@ -597,17 +695,12 @@ root.addEventListener("click", (event) => {
     });
   }
 
-  const preset = target.closest<HTMLElement>("[data-lab-preset]")?.dataset.labPreset;
-  if (preset) {
-    const [defenderClass, outcome] = preset.split("-");
-    if (isLabClass(defenderClass) && (outcome === "hurt" || outcome === "death")) {
-      field<HTMLSelectElement>("attackerClass").value = "soldier";
-      field<HTMLSelectElement>("defenderClass").value = defenderClass;
-      field<HTMLSelectElement>("reaction").value = "hurt";
-      field<HTMLInputElement>("death").checked = outcome === "death";
-      config = readForm();
-      buildScenario();
-    }
+  const outcome = target.closest<HTMLElement>("[data-lab-outcome]")?.dataset.labOutcome;
+  if (outcome === "guard" || outcome === "hurt" || outcome === "death") {
+    field<HTMLInputElement>("death").checked = outcome === "death";
+    if (outcome !== "death") field<HTMLSelectElement>("reaction").value = outcome;
+    config = readForm();
+    buildScenario();
   }
 });
 

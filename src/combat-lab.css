@@ -89,7 +89,7 @@
 }
 
 .combat-lab-transport button,
-.combat-lab-presets button,
+.combat-lab-outcomes button,
 .combat-lab-apply,
 .combat-lab-copy {
   min-height: 30px;
@@ -105,7 +105,7 @@
 }
 
 .combat-lab-transport button:hover,
-.combat-lab-presets button:hover,
+.combat-lab-outcomes button:hover,
 .combat-lab-apply:hover,
 .combat-lab-copy:hover {
   border-color: #e0b946;
@@ -166,15 +166,22 @@
   font-size: 20px;
 }
 
-.combat-lab-presets {
+.combat-lab-outcomes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   margin-bottom: 14px;
 }
 
-.combat-lab-presets button {
+.combat-lab-outcomes button {
   padding: 6px 5px;
+}
+
+.combat-lab-outcomes button[aria-pressed="true"] {
+  border-color: #f0c34d;
+  color: #fff8d8;
+  background: linear-gradient(#6c3230, #301719);
+  box-shadow: inset 0 0 0 1px #a87827;
 }
 
 #combat-lab-form {
@@ -191,14 +198,27 @@
   font: 12px/1.2 system-ui, sans-serif;
 }
 
-#combat-lab-form select {
+#combat-lab-form select,
+#combat-lab-form input[type="number"] {
   width: 100%;
   min-height: 31px;
+  padding: 4px 7px;
   border: 1px solid #614923;
   border-radius: 0;
   color: #fff2c1;
   background: #180f11;
   font: 13px/1.2 system-ui, sans-serif;
+}
+
+#combat-lab-form select:disabled {
+  color: #a99b80;
+  opacity: .72;
+}
+
+.combat-lab-field-note {
+  margin: -2px 0 1px 86px;
+  color: #9f9279;
+  font: 10px/1.45 system-ui, sans-serif;
 }
 
 .combat-lab-check {

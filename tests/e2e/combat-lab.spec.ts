@@ -5,6 +5,8 @@ interface CombatLabState {
   config: {
     attackerClass: string;
     defenderClass: string;
+    attackerLife: number;
+    defenderLife: number;
     reaction: "guard" | "hurt";
     death: boolean;
     side: "left" | "right";
@@ -80,13 +82,22 @@ test("record 35 empress exposes only the original right-side soldier fallback", 
 });
 
 test("record 0 soldier passes attack, guard, hurt and death visual gates", async ({ page }) => {
-  await page.goto("/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&speed=4");
+  await page.goto(
+    "/combat-lab.html?attacker=soldier&defender=soldier"
+      + "&attackerLife=260&defenderLife=500&reaction=hurt&speed=4",
+  );
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_500));
   await expect(page.getByTestId("full-actor-sprite"))
     .toHaveAttribute("src", /left-soldier-plus50\/0[45]\.png$/);
-  await expect(page.getByTestId("full-left-life-gauge")).toHaveAttribute("data-life", "200");
-  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "200");
+  await expect(page.getByTestId("combat-lab-attacker-life")).toHaveValue("260");
+  await expect(page.getByTestId("combat-lab-defender-life")).toHaveValue("500");
+  await expect(page.getByTestId("full-left-life-gauge")).toHaveAttribute("data-life", "260");
+  await expect(page.getByTestId("full-left-life-gauge")).toHaveAttribute("data-base-color", "11");
+  await expect(page.getByTestId("full-left-life-gauge")).toHaveAttribute("data-fill-width", "50");
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "500");
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-base-color", "9");
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-fill-width", "80");
   await page.screenshot({
     path: "artifacts/playwright/combat-lab-record-00-attack.png",
     fullPage: true,
@@ -94,9 +105,9 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_060));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
-  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "176");
-  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-fill-width", "176");
-  await expect(page.getByTestId("full-right-status")).toContainText("生命200");
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "476");
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-fill-width", "56");
+  await expect(page.getByTestId("full-right-status")).toContainText("生命500");
   await page.screenshot({
     path: "artifacts/playwright/combat-lab-record-00-hurt.png",
     fullPage: true,
@@ -631,20 +642,28 @@ for (const side of ["left", "right"] as const) {
   });
 }
 
-test("combat lab directly covers warrior and archer hurt/death presentations", async ({ page }) => {
+test("combat lab outcome shortcuts preserve the selected classes and editable life", async ({ page }) => {
   await page.goto("/combat-lab.html?speed=4");
   await expect(page.getByRole("heading", { name: "戰鬥動畫實驗室" })).toBeVisible();
   await expect(page.getByTestId("combat-lab-screen")).toBeVisible();
   await expect(page.getByTestId("combat-lab-speed")).toHaveValue("4");
+  await expect(page.getByTestId("combat-lab-attacker-life")).toHaveValue("240");
+  await expect(page.getByTestId("combat-lab-defender-life")).toHaveValue("220");
 
-  await page.getByRole("button", { name: "戰士重傷" }).click();
+  await page.getByTestId("combat-lab-defender").selectOption("warrior");
+  await expect(page.getByTestId("combat-lab-defender-life")).toHaveValue("240");
+  await page.getByRole("button", { name: "重傷（24）" }).click();
   await waitForVictim(page, "warrior", "hurt", 1);
   await expect(page.getByTestId("full-victim-sprite"))
     .toHaveAttribute("src", /right-warrior-direct\/01\.png$/);
   await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullImpact");
+  await expect(page.getByRole("button", { name: "重傷（24）" }))
+    .toHaveAttribute("aria-pressed", "true");
   expect((await labState(page)).config).toMatchObject({
-    attackerClass: "soldier",
+    attackerClass: "warrior",
     defenderClass: "warrior",
+    attackerLife: 240,
+    defenderLife: 240,
     reaction: "hurt",
     death: false,
   });
@@ -653,32 +672,51 @@ test("combat lab directly covers warrior and archer hurt/death presentations", a
     fullPage: true,
   });
 
-  await page.getByRole("button", { name: "戰士死亡" }).click();
+  await page.getByRole("button", { name: "死亡（當前生命）" }).click();
   await waitForVictim(page, "warrior", "death", 2);
   await expect(page.getByTestId("full-victim-sprite"))
     .toHaveAttribute("src", /right-warrior-direct\/02\.png$/);
   await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullDefenderDeath");
+  await expect(page.getByTestId("combat-lab-reaction")).toBeDisabled();
   await page.screenshot({
     path: "artifacts/playwright/combat-lab-warrior-death.png",
     fullPage: true,
   });
 
-  await page.getByRole("button", { name: "弓兵重傷" }).click();
+  await page.getByTestId("combat-lab-defender").selectOption("archer");
+  await page.getByTestId("combat-lab-defender-life").fill("420");
+  await page.getByTestId("combat-lab-defender-life").press("Enter");
+  await page.getByRole("button", { name: "重傷（24）" }).click();
   await waitForVictim(page, "archer", "hurt", 1);
   await expect(page.getByTestId("full-victim-sprite"))
     .toHaveAttribute("src", /right-archer-direct\/01\.png$/);
+  expect((await labState(page)).config).toMatchObject({
+    attackerClass: "warrior",
+    defenderClass: "archer",
+    defenderLife: 420,
+  });
   await page.screenshot({
     path: "artifacts/playwright/combat-lab-archer-hurt.png",
     fullPage: true,
   });
 
-  await page.getByRole("button", { name: "弓兵死亡" }).click();
+  await page.getByRole("button", { name: "死亡（當前生命）" }).click();
   await waitForVictim(page, "archer", "death", 2);
   await expect(page.getByTestId("full-victim-sprite"))
     .toHaveAttribute("src", /right-archer-direct\/02\.png$/);
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "0");
   await expect(page).toHaveURL(/defender=archer.*reaction=hurt.*death=1/);
   await page.screenshot({
     path: "artifacts/playwright/combat-lab-archer-death.png",
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 520, height: 900 });
+  await expect(page.getByTestId("combat-lab-attacker-life")).toBeVisible();
+  await expect(page.getByTestId("combat-lab-defender-life")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: "artifacts/playwright/combat-lab-controls-narrow.png",
     fullPage: true,
   });
 });
