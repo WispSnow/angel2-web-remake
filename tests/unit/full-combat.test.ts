@@ -711,9 +711,10 @@ describe("Full-screen ordinary combat choreography", () => {
       const actualReactionCues = script.cues
         .filter(({ t }) => t >= impact && t < hold)
         .map(({ t, record: voiceRecord }) => ({ t, record: voiceRecord }));
-      expect(actualReactionCues).toEqual(expectedReactionCues.length > 0
-        ? expectedReactionCues
-        : [{ t: impact, record: 2 }]);
+      // The impact sound is exactly what the threshold-selected streams ask
+      // for. `A24D`/`A28E` only repoint stream pointers, so a stream with no
+      // voice record must stay silent rather than fall back to E/2.
+      expect(actualReactionCues).toEqual(expectedReactionCues);
 
       const sideAssets = STAGE0_FULL_COMBAT_ASSETS[side] as Readonly<
         Record<string, { direct: readonly string[]; plus50: readonly string[] }>
@@ -1653,6 +1654,44 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(charge.particles.length).toBeGreaterThan(0);
     expect(beforeReveal.sprites.some(({ set }) => set === "direct")).toBe(false);
     expect(enteringVictim.sprites.some(({ set }) => set === "direct")).toBe(true);
+  });
+
+  it("takes the impact sound from each record's own post-hit voice slots", () => {
+    const impactCues = (classId: UnitClassId, damage: number) => {
+      const script = buildFullCombatScript(
+        unit(1, 0, "測試攻方", classId),
+        unit(2, 48, "測試守方"),
+        result({ damage, counterOccurred: false, counterDamage: 0 }),
+      );
+      const impact = markTime(script, "fullImpact");
+      const hold = markTime(script, "fullHold");
+      return script.cues.filter(({ t }) => t >= impact && t < hold);
+    };
+
+    // Records 0 and 22 are the two stage-0 classes whose streams literally
+    // contain V1/V2, which is why E/2 and E/0 look like engine defaults.
+    expect(impactCues("soldier", 24)).toEqual([
+      expect.objectContaining({ record: 2, reason: "full-primary-hurt" }),
+    ]);
+    expect(impactCues("soldier", 10)).toEqual([
+      expect.objectContaining({ record: 0, reason: "full-primary-guard" }),
+    ]);
+
+    // Record 19's DS:ABD5/DS:AC0F both open with `V5`, so both damage branches
+    // land on its own E/4 instead of the threshold sounds.
+    expect(impactCues("great-dragon-knight", 24)).toEqual([
+      expect.objectContaining({ record: 4, reason: "full-primary-hurt" }),
+    ]);
+    expect(impactCues("great-dragon-knight", 10)).toEqual([
+      expect.objectContaining({ record: 4, reason: "full-primary-guard" }),
+    ]);
+
+    // Record 14 carries its hurt voice on the victim stream (DS:A559 `V1`) and
+    // has no voice record at all in the guard pair, so guard stays silent.
+    expect(impactCues("demon-dragon-knight", 24)).toEqual([
+      expect.objectContaining({ record: 2, reason: "full-primary-hurt" }),
+    ]);
+    expect(impactCues("demon-dragon-knight", 10)).toEqual([]);
   });
 
   it("holds the fatal victim for the native 24-substep death stream", () => {

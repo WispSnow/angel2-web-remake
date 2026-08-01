@@ -1334,25 +1334,24 @@ function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
       offset += step.rendererSubsteps * NATIVE_POST_HIT_SUBSTEP;
     }
   }
-  if (reactionVoiceCues.length === 0) {
-    cues.push({
-      t: times.impact,
-      record: reaction === "guard" ? 0 : 2,
-      reason: `${label}-${reaction}`,
-    });
-  } else {
-    reactionVoiceCues
-      .sort((left, right) => left.offset - right.offset)
-      .forEach((voice, index) => {
-        cues.push({
-          t: times.impact + voice.offset,
-          record: profile.voiceSlots[spec.actorSide][voice.token],
-          reason: index === 0
-            ? `${label}-${reaction}`
-            : `${label}-${reaction}-${voice.token.toLowerCase()}`,
-        });
+  // `A23E` only picks which post-hit stream pair runs; `A24D`/`A28E` are four
+  // pointer copies and a `ret`, with no sound request of their own. The impact
+  // sound is therefore whatever the selected streams ask for: `V1`/`V2` for the
+  // stage-0 classes that made `E/2`/`E/0` look universal, but a different slot
+  // for ten records (great dragon knight is `V5 -> E/4`), and nothing at all for
+  // record 14's guard branch. Substituting a threshold sound when a stream is
+  // silent would invent audio the original never plays.
+  reactionVoiceCues
+    .sort((left, right) => left.offset - right.offset)
+    .forEach((voice, index) => {
+      cues.push({
+        t: times.impact + voice.offset,
+        record: profile.voiceSlots[spec.actorSide][voice.token],
+        reason: index === 0
+          ? `${label}-${reaction}`
+          : `${label}-${reaction}-${voice.token.toLowerCase()}`,
       });
-  }
+    });
   if (spec.victimDies) {
     cues.push({
       t: times.holdStart,
