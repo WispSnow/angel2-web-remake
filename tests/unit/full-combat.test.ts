@@ -12,6 +12,7 @@ import { className } from "../../src/game/content/classes";
 import {
   buildFullCombatScript,
   FULL_COMBAT_FRAME_META,
+  nativeFullCombatLifeGauge,
   type FullCombatPhaseName,
   type FullCombatScript,
 } from "../../src/game/full-combat";
@@ -1702,6 +1703,69 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(charge.particles.length).toBeGreaterThan(0);
     expect(beforeReveal.sprites.some(({ set }) => set === "direct")).toBe(false);
     expect(enteringVictim.sprites.some(({ set }) => set === "direct")).toBe(true);
+  });
+
+  it("uses the native 210-pixel life-gauge tiers and updates them at each impact", () => {
+    expect(nativeFullCombatLifeGauge(0)).toEqual({
+      life: 0,
+      baseColorIndex: 0,
+      fillColorIndex: 11,
+      fillWidth: 0,
+    });
+    expect(nativeFullCombatLifeGauge(160)).toMatchObject({
+      baseColorIndex: 0,
+      fillColorIndex: 11,
+      fillWidth: 160,
+    });
+    expect(nativeFullCombatLifeGauge(260)).toMatchObject({
+      baseColorIndex: 11,
+      fillColorIndex: 9,
+      fillWidth: 50,
+    });
+    expect(nativeFullCombatLifeGauge(500)).toMatchObject({
+      baseColorIndex: 9,
+      fillColorIndex: 13,
+      fillWidth: 80,
+    });
+    expect(nativeFullCombatLifeGauge(630)).toMatchObject({
+      baseColorIndex: 6,
+      fillColorIndex: 6,
+      fillWidth: 0,
+    });
+
+    const script = buildFullCombatScript(
+      unit(1, 0, "妮雅"),
+      unit(2, 48, "騎士團士兵"),
+      result(),
+    );
+    const primaryImpact = markTime(script, "fullImpact");
+    const counterImpact = markTime(script, "fullCounterImpact");
+    expect(script.sample(primaryImpact - 1).lifeGauges).toMatchObject({
+      left: { life: 160, fillWidth: 160 },
+      right: { life: 180, fillWidth: 180 },
+    });
+    expect(script.sample(primaryImpact).lifeGauges).toMatchObject({
+      left: { life: 160, fillWidth: 160 },
+      right: { life: 156, fillWidth: 156 },
+    });
+    expect(script.sample(counterImpact).lifeGauges).toMatchObject({
+      left: { life: 152, fillWidth: 152 },
+      right: { life: 156, fillWidth: 156 },
+    });
+
+    const mirrored = buildFullCombatScript(
+      unit(2, 48, "敵方攻手"),
+      unit(1, 0, "我方守手"),
+      result({ attackerId: "2:48", defenderId: "1:0" }),
+    );
+    expect(mirrored.sample(markTime(mirrored, "fullImpact")).lifeGauges).toMatchObject({
+      left: { life: 136, fillWidth: 136 },
+      right: { life: 180, fillWidth: 180 },
+    });
+    expect(mirrored.sample(markTime(mirrored, "fullCounterImpact")).lifeGauges).toMatchObject({
+      left: { life: 136, fillWidth: 136 },
+      right: { life: 172, fillWidth: 172 },
+    });
   });
 
   it("takes the impact sound from each record's own post-hit voice slots", () => {

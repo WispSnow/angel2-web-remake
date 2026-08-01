@@ -79,6 +79,11 @@ export interface FullCombatSceneState {
   camera: number;
   /** Native YD/ND viewport-source alternation: 0 or -4 pixels. */
   viewportYOffset: number;
+  /** Native 210-pixel tiered life gauges; panel numbers remain pre-strike. */
+  lifeGauges: {
+    left: FullCombatLifeGaugeState;
+    right: FullCombatLifeGaugeState;
+  };
   sprites: FullCombatSpriteState[];
   lance?: { x: number; y: number; frame: number; side: "left" | "right" };
   projectile?: {
@@ -90,6 +95,52 @@ export interface FullCombatSceneState {
   };
   particles: Array<{ x: number; y: number; frame: number }>;
   damage?: { amount: number; x: number };
+}
+
+export interface FullCombatLifeGaugeState {
+  life: number;
+  baseColorIndex: 0 | 6 | 9 | 11;
+  fillColorIndex: 6 | 9 | 11 | 13;
+  fillWidth: number;
+}
+
+const LIFE_GAUGE_TIER_WIDTH = 210;
+
+/**
+ * Module 29's 9E8C/9EED routines layer one 210-pixel color tier over the
+ * previous full tier. Values below 630 therefore progress red -> blue ->
+ * green; the original's final reachable branch uses color 6 for both layers.
+ */
+export function nativeFullCombatLifeGauge(life: number): FullCombatLifeGaugeState {
+  const value = Math.max(0, Math.floor(life));
+  if (value < LIFE_GAUGE_TIER_WIDTH) {
+    return { life: value, baseColorIndex: 0, fillColorIndex: 11, fillWidth: value };
+  }
+  if (value < LIFE_GAUGE_TIER_WIDTH * 2) {
+    return {
+      life: value,
+      baseColorIndex: 11,
+      fillColorIndex: 9,
+      fillWidth: value - LIFE_GAUGE_TIER_WIDTH,
+    };
+  }
+  if (value < LIFE_GAUGE_TIER_WIDTH * 3) {
+    return {
+      life: value,
+      baseColorIndex: 9,
+      fillColorIndex: 13,
+      fillWidth: value - LIFE_GAUGE_TIER_WIDTH * 2,
+    };
+  }
+  // The last native branch assigns color 6 to both layers. Extending the
+  // resulting solid gauge past its documented 839-life input boundary keeps
+  // presentation deterministic for safely imported over-range Web states.
+  return {
+    life: value,
+    baseColorIndex: 6,
+    fillColorIndex: 6,
+    fillWidth: Math.min(LIFE_GAUGE_TIER_WIDTH, value - LIFE_GAUGE_TIER_WIDTH * 3),
+  };
 }
 
 export interface FullCombatCue {
@@ -1547,6 +1598,21 @@ export function buildFullCombatScript(
     ...(counter && counterTimes ? strikeMarks(counter, counterTimes) : []),
   ].sort((a, b) => a.t - b.t);
 
+  const lifeGaugesAt = (t: number): FullCombatSceneState["lifeGauges"] => {
+    const attackerLife = counterTimes && t >= counterTimes.impact
+      ? Math.max(0, attacker.life - result.counterDamage)
+      : attacker.life;
+    const defenderLife = t >= primaryTimes.impact
+      ? Math.max(0, defender.life - result.damage)
+      : defender.life;
+    const leftLife = attacker.side === 1 ? attackerLife : defenderLife;
+    const rightLife = attacker.side === 2 ? attackerLife : defenderLife;
+    return {
+      left: nativeFullCombatLifeGauge(leftLife),
+      right: nativeFullCombatLifeGauge(rightLife),
+    };
+  };
+
   const sample = (t: number): FullCombatSceneState => {
     const stage = {
       showRightPanel: t >= OPEN.rightPanelAt,
@@ -1561,6 +1627,7 @@ export function buildFullCombatScript(
         ...stage,
         camera: 0,
         viewportYOffset: 0,
+        lifeGauges: lifeGaugesAt(t),
         sprites: [],
         particles: [],
       };
@@ -1569,7 +1636,13 @@ export function buildFullCombatScript(
     const spec = inCounter ? counter! : primary;
     const times = inCounter ? counterTimes! : primaryTimes;
     const clamped = Math.min(t, times.end);
-    return { battleKey, t, ...stage, ...sampleStrike(spec, times, clamped) };
+    return {
+      battleKey,
+      t,
+      ...stage,
+      lifeGauges: lifeGaugesAt(t),
+      ...sampleStrike(spec, times, clamped),
+    };
   };
 
   return { duration, cues, marks, sample };

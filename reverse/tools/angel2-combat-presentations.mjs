@@ -22,6 +22,9 @@ const CODE_SIGNATURES = [
   ["0000:9852", "prepare-full-screen-battle", "a3a87f891eaa7fc706317d3a4ae865002ec70621b700009aac009d13e8b6e3e896afe85c00c6067cfa4ec6067dfa4ea1"],
   ["0000:9FC4", "copy-side1-unit-presentation-block", "a19231a35a7aa19031a35c7aa18e31a3607aa1bd31a3627aa1bf31a3687aa1c131a36a7aa1bb31a35e7aa19f31a3647a"],
   ["0000:A01B", "copy-side2-unit-presentation-block", "a19231a3e07aa19031a3e27aa18e31a3e67aa1bd31a3e87aa1bf31a3ee7aa1c131a3f07aa1bb31a3e47aa19f31a3ea7a"],
+  ["0000:9E28", "redraw-full-screen-life-gauges", "e86100be767ee81f32be057de81932833e1d7d007406be197de80c32be8a7ee80632e8a000be807ee8fd31be0f7de8f731833e277d007413b8d2002b06277d054601a3237dbe237de8dd31be947ee8d731a182f8a3fc7e350008a3fa7ebeee7ee86336c3"],
+  ["0000:9E8C", "select-left-life-gauge-tier", "a1647a3dd20072103da401721b3d760272293d48037237c3a31d7dc706217d0b00c7060d7d0000c32dd200a31d7dc706217d0900c7060d7d0b00c32da401a31d7dc706217d0d00c7060d7d0900c32d7602a31d7dc706217d0600c7060d7d0600c3"],
+  ["0000:9EED", "select-right-life-gauge-tier", "a1ea7a3dd20072103da401721b3d760272293d48037237c3a3277dc7062b7d0b00c706177d0000c32dd200a3277dc7062b7d0900c706177d0b00c32da401a3277dc7062b7d0d00c706177d0900c32d7602a3277dc7062b7d0600c706177d0d00c3"],
   ["0000:A17B", "full-screen-primary-counter-sequence", "e86601e8420dc7062d7d96a0c7062f7d1fa7e85800e8f014e82715833e647a007437833eea7a007430e82e00813ebb77"],
   ["0000:A1E8", "run-one-full-screen-strike", "c606327c4ee88f05a12f7dffd0c606327c59a12d7dffd08b0ed77cbe3d7ce84d4de8c300e819fcc7063cf90b00a11a7c"],
   ["0000:A23E", "select-full-screen-hit-reaction", "833ed77c0a7704e84600c3e80100c3"],
@@ -42,7 +45,9 @@ const CODE_SIGNATURES = [
 const DATA_SIGNATURES = [
   [0x6a26, 0x6b58, "map-death-descriptor-tables", "2ddef137ee74a164ef111ba7cc8580572f0b3420c0e41b54b4577420a4717d6b"],
   [0x6b60, 0x6b6b, "map-hit-dynamic-descriptor", "5044744ffe52befc6a86cd38edd308873bed8b4cd078ea0face099d978bf6a9b"],
+  [0x7d05, 0x7d2d, "full-screen-life-gauge-dynamic-rectangles", "fe873daba2dd75c10880b7fc653e272e3b43a0aae88c42c103cff2fec8a779e8"],
   [0x7d42, 0x7dda, "full-screen-death-command-data", "ce0f0aaefb86d66707411b84d93e624f2a5931deffc3f22a680068b9fe5c3b53"],
+  [0x7e76, 0x7e9e, "full-screen-life-gauge-frame-rectangles", "0ade0e865415fb236997da7df8430ce005f03c0528228518320ad89e44f0fa0c"],
 ];
 
 function assert(condition, message) {
@@ -155,6 +160,11 @@ function decodeMapDescriptor(buffer, dsOffset) {
     tileCodes,
     renderedFrames: tileCodes.map((value) => value === 0 ? null : value - 1),
   };
+}
+
+function decodeDrawRectangle(buffer, dsOffset) {
+  const [x, y, width, height, colorIndex] = readWords(buffer, dsOffset, 5);
+  return { address: `DS:${hex(dsOffset)}`, x, y, width, height, colorIndex };
 }
 
 function parseSimpleDeathScript(buffer, dsOffset, poseCount) {
@@ -840,6 +850,42 @@ async function extract(
         },
         stage0CommandEvidence: stage0ReactionCommands,
       },
+      lifeGauges: {
+        redrawEntry: "0000:9E28",
+        leftTierEntry: "0000:9E8C",
+        rightTierEntry: "0000:9EED",
+        damageOrdering: "A1E8 applies the saturated damage callback, formats DS:7CD7, then immediately calls 9E28 before selecting and executing the post-hit streams",
+        panelNumbers: "prepared once before the strike sequence and not redrawn; the two gauge values do change at each impact",
+        tierWidth: 210,
+        gameplayPalette: {
+          0: "#000000",
+          6: "#f79e9e",
+          7: "#baaa9a",
+          9: "#4d8aff",
+          11: "#ef2024",
+          13: "#aee728",
+        },
+        tiers: [
+          { life: "0..209", baseColorIndex: 0, fillColorIndex: 11, fillWidth: "life" },
+          { life: "210..419", baseColorIndex: 11, fillColorIndex: 9, fillWidth: "life-210" },
+          { life: "420..629", baseColorIndex: 9, fillColorIndex: 13, fillWidth: "life-420" },
+          { life: "630..839", baseColorIndex: 6, fillColorIndex: 6, fillWidth: "life-630" },
+        ],
+        left: {
+          outer: decodeDrawRectangle(moduleBuffer, 0x7e76),
+          base: decodeDrawRectangle(moduleBuffer, 0x7d05),
+          fill: decodeDrawRectangle(moduleBuffer, 0x7d19),
+          shine: decodeDrawRectangle(moduleBuffer, 0x7e8a),
+          anchor: "left; the active tier grows from x=104 toward the center",
+        },
+        right: {
+          outer: decodeDrawRectangle(moduleBuffer, 0x7e80),
+          base: decodeDrawRectangle(moduleBuffer, 0x7d0f),
+          fill: decodeDrawRectangle(moduleBuffer, 0x7d23),
+          shine: decodeDrawRectangle(moduleBuffer, 0x7e94),
+          anchor: "right; x=326+(210-remainder) and the active tier grows toward x=535",
+        },
+      },
       strikeTimeline: [
         "prepare primary command/resource state at A2E4",
         "draw the composed battle background at AEC3",
@@ -894,7 +940,7 @@ async function extract(
       ],
     },
     evidenceBoundary: {
-      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
+      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, 210-pixel tiered life-gauge geometry and impact update timing, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
       preservedUnknown: "the original design names of many embedded full-screen command fields and the host/VGA duration of one full-screen renderer substep; the released nominal native timer tick is 10.000151 ms",
       implementation: "none; this export is phase-1 evidence only",
     },

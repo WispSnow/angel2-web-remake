@@ -587,8 +587,8 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   z-index: 2;
   left: 93px;
   top: 155px;
-  width: 448px;
-  height: 148px;
+  width: 454px;
+  height: 163px;
   overflow: hidden;
   border: 3px solid #f5d64a;
   background: rgba(6, 3, 2, .82);
@@ -598,14 +598,14 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   position: absolute;
   inset: 0;
   width: 448px;
-  height: 148px;
+  height: 157px;
 }
 .full-combat-scene {
   position: absolute;
   left: 0;
   top: 0;
   width: 448px;
-  height: 134px;
+  height: 148px;
   overflow: hidden;
   background: #130a07;
 }
@@ -629,7 +629,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   position: absolute;
   z-index: 3;
   left: 0;
-  bottom: 7px;
+  bottom: 21px;
   width: 0;
   height: 0;
 }
@@ -655,21 +655,37 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .full-combat-strip {
   position: absolute;
   left: 0;
-  bottom: 0;
+  top: 148px;
   width: 448px;
-  height: 14px;
-  border-top: 1px solid #241408;
-  background: #050302;
+  height: 9px;
+  border-top: 2px solid #ffdf10;
+  background: #ffdf10;
 }
-.full-combat-strip i {
+.full-life-gauge {
   position: absolute;
-  left: 212px;
-  bottom: 3px;
-  width: 24px;
-  height: 5px;
-  background: #f5d64a;
-  box-shadow: 0 1px 0 #7a3c0e;
+  top: 1px;
+  width: 212px;
+  height: 7px;
+  background: #000;
 }
+.full-life-gauge.left { left: 7px; }
+.full-life-gauge.right { left: 228px; }
+.full-life-gauge i { position: absolute; display: block; height: 5px; }
+.full-life-gauge .base { top: 1px; width: 210px; }
+.full-life-gauge .fill { top: 1px; }
+.full-life-gauge.left .base,
+.full-life-gauge.left .fill { left: 1px; }
+.full-life-gauge.right .base { left: 2px; }
+.full-life-gauge.right .fill { right: 0; }
+.full-life-gauge .shine {
+  z-index: 1;
+  top: 2px;
+  width: 210px;
+  height: 1px;
+  background: #baaa9a;
+}
+.full-life-gauge.left .shine { left: 1px; }
+.full-life-gauge.right .shine { left: 1px; }
 .full-status {
   position: absolute;
   z-index: 3;

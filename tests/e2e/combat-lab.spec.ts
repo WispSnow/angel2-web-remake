@@ -85,6 +85,8 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_500));
   await expect(page.getByTestId("full-actor-sprite"))
     .toHaveAttribute("src", /left-soldier-plus50\/0[45]\.png$/);
+  await expect(page.getByTestId("full-left-life-gauge")).toHaveAttribute("data-life", "200");
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "200");
   await page.screenshot({
     path: "artifacts/playwright/combat-lab-record-00-attack.png",
     fullPage: true,
@@ -92,6 +94,9 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_060));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "176");
+  await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-fill-width", "176");
+  await expect(page.getByTestId("full-right-status")).toContainText("生命200");
   await page.screenshot({
     path: "artifacts/playwright/combat-lab-record-00-hurt.png",
     fullPage: true,

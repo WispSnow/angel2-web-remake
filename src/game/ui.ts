@@ -1037,11 +1037,27 @@ function buildFullCombatSkeleton(
           <div class="full-combat-sprite slot-effect-G4" hidden><img alt="" data-testid="full-effect-G4-sprite" /></div>
           <div class="full-combat-sprite slot-effect-G5" hidden><img alt="" data-testid="full-effect-G5-sprite" /></div>
         </div>
-        <div class="full-combat-strip" aria-hidden="true"><i></i></div>
+        <div class="full-combat-strip" aria-hidden="true">
+          <div class="full-life-gauge left" data-testid="full-left-life-gauge">
+            <i class="base"></i><i class="fill"></i><i class="shine"></i>
+          </div>
+          <div class="full-life-gauge right" data-testid="full-right-life-gauge">
+            <i class="base"></i><i class="fill"></i><i class="shine"></i>
+          </div>
+        </div>
         <b class="full-damage-number" data-testid="full-damage-number" hidden></b>
       </div>
     </div>`;
 }
+
+const FULL_COMBAT_PALETTE: Readonly<Record<number, string>> = {
+  0: "#000000",
+  6: "#f79e9e",
+  7: "#baaa9a",
+  9: "#4d8aff",
+  11: "#ef2024",
+  13: "#aee728",
+};
 
 export function renderCombat(
   layer: HTMLElement,
@@ -1089,6 +1105,20 @@ export function renderCombat(
   windowElement.hidden = !scene.showWindow;
   const sceneElement = query<HTMLElement>(".full-combat-scene");
   sceneElement.hidden = !scene.showScene;
+  for (const side of ["left", "right"] as const) {
+    const gauge = scene.lifeGauges[side];
+    const element = query<HTMLElement>(`.full-life-gauge.${side}`);
+    const base = element.querySelector<HTMLElement>(".base");
+    const fill = element.querySelector<HTMLElement>(".fill");
+    if (!base || !fill) throw new Error(`Missing native ${side} life-gauge layers`);
+    element.dataset.life = String(gauge.life);
+    element.dataset.baseColor = String(gauge.baseColorIndex);
+    element.dataset.fillColor = String(gauge.fillColorIndex);
+    element.dataset.fillWidth = String(gauge.fillWidth);
+    base.style.backgroundColor = FULL_COMBAT_PALETTE[gauge.baseColorIndex];
+    fill.style.backgroundColor = FULL_COMBAT_PALETTE[gauge.fillColorIndex];
+    fill.style.width = `${gauge.fillWidth}px`;
+  }
   if (!scene.showScene) return;
   const viewportContent = query<HTMLElement>(".full-combat-viewport-content");
   viewportContent.style.transform = `translateY(${scene.viewportYOffset}px)`;
