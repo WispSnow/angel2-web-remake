@@ -1621,18 +1621,20 @@ describe("Full-screen ordinary combat choreography", () => {
     );
     const impactAt = markTime(script, "fullImpact");
     const holdAt = markTime(script, "fullHold");
+    const counterWindupAt = markTime(script, "fullCounterWindup");
     const impact = script.sample(impactAt);
     const apex = script.sample(impactAt + 180);
+    const hold = script.sample(holdAt);
+    const holdMidpoint = script.sample(holdAt + 333);
     const impactActor = impact.sprites.find(({ set }) => set === "plus50");
     const strikingActor = script.sample(impactAt + 100).sprites.find(({ set }) => set === "plus50");
     const settlingActor = script.sample(impactAt + 150).sprites.find(({ set }) => set === "plus50");
     const primaryLast = script.sample(holdAt - 1);
-    const counterStart = script.sample(holdAt);
     const impactVictim = impact.sprites.find(({ set }) => set === "direct");
     const apexVictim = apex.sprites.find(({ set }) => set === "direct");
     const holdVictim = primaryLast.sprites.find(({ set }) => set === "direct");
 
-    expect(counterStart.camera - impact.camera).toBe(64);
+    expect(hold.camera - impact.camera).toBe(64);
     expect(apexVictim).toMatchObject({ x: impactVictim?.x, lift: 12 });
     expect(holdVictim).toMatchObject({ x: impactVictim?.x, lift: 4 });
     expect(primaryLast.damage?.x).toBe(impact.damage?.x);
@@ -1647,11 +1649,20 @@ describe("Full-screen ordinary combat choreography", () => {
       mirror: false,
     });
     expect(primaryLast.sprites.find(({ set }) => set === "plus50")).toBeUndefined();
+    expect(counterWindupAt - holdAt).toBe(667);
+    expect(holdMidpoint).toMatchObject({
+      camera: hold.camera,
+      viewportYOffset: hold.viewportYOffset,
+      sprites: hold.sprites,
+      damage: hold.damage,
+    });
 
     const counterImpactAt = markTime(script, "fullCounterImpact");
     const counterImpact = script.sample(counterImpactAt);
     const counterApex = script.sample(counterImpactAt + 180);
-    const counterHold = script.sample(markTime(script, "fullCounterHold"));
+    const counterHoldAt = markTime(script, "fullCounterHold");
+    const counterHold = script.sample(counterHoldAt);
+    const finalHoldMidpoint = script.sample(counterHoldAt + 333);
     const counterImpactVictim = counterImpact.sprites.find(({ set }) => set === "direct");
     const counterApexVictim = counterApex.sprites.find(({ set }) => set === "direct");
     const counterHoldVictim = counterHold.sprites.find(({ set }) => set === "direct");
@@ -1660,6 +1671,13 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(counterApexVictim).toMatchObject({ x: counterImpactVictim?.x, lift: 0 });
     expect(counterHoldVictim).toMatchObject({ x: counterImpactVictim?.x, lift: 0 });
     expect(counterHold.sprites.find(({ set }) => set === "plus50")).toBeUndefined();
+    expect(script.duration - counterHoldAt).toBe(667);
+    expect(finalHoldMidpoint).toMatchObject({
+      camera: counterHold.camera,
+      viewportYOffset: counterHold.viewportYOffset,
+      sprites: counterHold.sprites,
+      damage: counterHold.damage,
+    });
   });
 
   it("opens the native panels and stage in their measured order", () => {
@@ -1698,11 +1716,21 @@ describe("Full-screen ordinary combat choreography", () => {
     const charge = script.sample((chargeAt + impactAt) / 2);
     const beforeReveal = script.sample(impactAt - 331);
     const enteringVictim = script.sample(impactAt - 100);
+    const holdAt = markTime(script, "fullHold");
+    const hold = script.sample(holdAt);
+    const finalHoldMidpoint = script.sample(holdAt + 333);
 
     expect(charge.camera).toBeGreaterThan(0);
     expect(charge.particles.length).toBeGreaterThan(0);
     expect(beforeReveal.sprites.some(({ set }) => set === "direct")).toBe(false);
     expect(enteringVictim.sprites.some(({ set }) => set === "direct")).toBe(true);
+    expect(script.duration - holdAt).toBe(667);
+    expect(finalHoldMidpoint).toMatchObject({
+      camera: hold.camera,
+      viewportYOffset: hold.viewportYOffset,
+      sprites: hold.sprites,
+      damage: hold.damage,
+    });
   });
 
   it("uses the native 210-pixel life-gauge tiers and updates them at each impact", () => {

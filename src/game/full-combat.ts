@@ -21,8 +21,10 @@
 //   settle   the post-hit attacker stream keeps its native facing, switches
 //                     to the class-specific settle frame where commanded,
 //                     and carries the actor out as the camera keeps moving
-//   hold     victim alone after the 400 ms recoil script; a fatal target then
-//                     switches from threshold reaction to its death frame
+//   hold     victim and damage number remain alone after recoil; Web tuning
+//                     uses 667 ms both before a counter and before a nonfatal
+//                     return to the map. A fatal target instead switches to
+//                     its complete native death stream.
 //   counter  the same block mirrored, camera panning back
 // The cavalry (class 22) strike replaces the melee lunge with a couched-lance
 // windup, a thrown-lance projectile (frames 6/7/8), an early attacker exit,
@@ -193,6 +195,10 @@ const RANGED = {
 // 50 ms per substep (8 → 400 ms for the soldier, 14 → 700 ms for cavalry).
 const NATIVE_STRIKE_SUBSTEP = 40;
 const NATIVE_POST_HIT_SUBSTEP = 50;
+// The 75 fps capture establishes the missing hold as a real semantic stage.
+// The remake uses the user-approved two-thirds tuning for both exchange and
+// final nonfatal holds, keeping those two exits perceptually consistent.
+const FULL_COMBAT_HOLD = 667;
 // The captured right-hand G1 bitmap is the calibrated source. Mirroring its
 // frame-8 trimmed bounds into the 448 px viewport places the left anchor 37 px
 // before the raw left-script projection.
@@ -1566,7 +1572,7 @@ export function buildFullCombatScript(
     const counterDir: 1 | -1 = attackerLeft ? -1 : 1;
     const primaryCameraEnd = cameraAt(primary, primaryTimes, primaryTimes.end);
     counter = {
-      start: primaryTimes.end,
+      start: primaryTimes.end + FULL_COMBAT_HOLD,
       actorSide: attackerLeft ? "right" : "left",
       actorClass: fullCombatClass(defender.classId),
       victimClass: fullCombatClass(attacker.classId),
@@ -1586,7 +1592,9 @@ export function buildFullCombatScript(
     counterTimes = strikeTimes(counter);
   }
 
-  const duration = counterTimes ? counterTimes.end : primaryTimes.end;
+  const finalSpec = counter ?? primary;
+  const finalTimes = counterTimes ?? primaryTimes;
+  const duration = finalTimes.end + (finalSpec.victimDies ? 0 : FULL_COMBAT_HOLD);
   const cues: FullCombatCue[] = [
     ...strikeCues(primary, primaryTimes),
     ...(counter && counterTimes ? strikeCues(counter, counterTimes) : []),

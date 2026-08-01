@@ -1921,9 +1921,17 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   expect(primaryExitingActor?.x).toBeLessThan(primaryImpactActor?.x ?? Number.NEGATIVE_INFINITY);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-primary-recoil-apex.png" });
 
-  // The native primary hold mark and counter windup share one exact boundary;
-  // live DOM may advance directly to the counter, while the trace retains the
-  // primary terminal sample for deterministic inspection below.
+  // Keep the settled victim and damage number visible for the tuned 667 ms
+  // before the counter begins; the primary actor has already left.
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullHold");
+  await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullHold");
+  await expect(page.getByTestId("full-actor-sprite")).toBeHidden();
+  await expect(page.getByTestId("full-victim-sprite")).toBeVisible();
+  await expect(page.getByTestId("full-damage-number")).toBeVisible();
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-full-counter-buffer.png",
+  });
   await page.waitForFunction(() =>
     window.__ANGEL2__?.getState().combatPresentation?.phase === "fullCounterWindup");
 
@@ -1935,6 +1943,18 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "3");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "0");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-counter-guard.png" });
+
+  // The final nonfatal reaction uses the same hold instead of immediately
+  // dropping the full-screen layer back to the map.
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.phase === "fullCounterHold");
+  await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullCounterHold");
+  await expect(page.getByTestId("full-actor-sprite")).toBeHidden();
+  await expect(page.getByTestId("full-victim-sprite")).toBeVisible();
+  await expect(page.getByTestId("full-damage-number")).toBeVisible();
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-full-final-hold.png",
+  });
 
   await confirmPromotion(page);
   await waitForPhase(page, "round2Story");
@@ -1961,6 +1981,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   expect(beat("fullWindup")?.camera).toBe(0);
   expect(beat("fullImpact")?.camera).toBe(144);
   expect(beat("fullHold")?.camera).toBe(208);
+  expect((beat("fullCounterWindup")?.t ?? 0) - (beat("fullHold")?.t ?? 0)).toBe(667);
   expect(beat("fullCounterHold")?.sprites.find(({ set }) => set === "plus50")).toBeUndefined();
   expect(beat("fullCounterHold")?.sprites.find(({ set }) => set === "direct"))
     .toMatchObject({ frame: 3, reaction: "guard", lift: 0 });
