@@ -1,12 +1,12 @@
 # 《天使帝国 II》Web 复刻版设计文档
 
-版本：Draft 0.3
+版本：Draft 0.4
 
-日期：2026-07-25
+日期：2026-08-01
 
-阶段：第 0 关实现候选；第 1 关纸面切片已建立
+阶段：第 0 关扩展项已接受；第 1 关纸面与接口方案已建立
 
-开发状态：全战役设计仍为 `implementationFrozen=true`；用户已明确解除第 0 关垂直切片冻结，当前切片为 `implementationCandidate=true`。第 1 关已完成纸面合同，但尚未解除代码实现冻结
+开发状态：全战役设计仍为 `implementationFrozen=true`；第 0 关及 M00.5–M00.7 已获用户接受。第 1 关已完成纸面合同、部署/技术规格与候选接口边界，但尚未解除 M02 代码实现冻结
 
 ## 文档目的
 
@@ -41,14 +41,17 @@
 | [`06-campaign-and-narrative.md`](06-campaign-and-narrative.md) | 关卡与剧情如何编排 | Draft 0.1 |
 | [`07-ui-ux-and-presentation.md`](07-ui-ux-and-presentation.md) | 原版 UI 如何复现并适配浏览器 | Draft 0.2 |
 | [`08-mod-policy.md`](08-mod-policy.md) | 哪些内容可改、如何保持可追溯 | Draft 0.1 |
-| [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.2 |
+| [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.3 |
 | [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的玩法合同与实现验收 | Draft 0.6 / 自动验收通过 |
-| [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术与首领目标关 | Draft 0.1 / 纸面合同完成 |
-| [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.2 / 已实现 |
-| [`systems/action-resolution.md`](systems/action-resolution.md) | 普通、射击、技术共享的预览、准备、表现与提交边界 | M00.6 / 已验证 |
-| [`systems/shooting.md`](systems/shooting.md) | 弓兵射程、伤害、经验、AI 与棋盘表现 | M00.6 / 已验证 |
-| [`systems/techniques-stage0.md`](systems/techniques-stage0.md) | 修女初級炎暴与初級治療 | M00.6 / 已验证 |
-| [`systems/status-foundation.md`](systems/status-foundation.md) | 防魔消费与 v6 最小状态边界 | M00.6 / 已验证 |
+| [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术扩展与首领目标关 | Draft 0.2 / M01 已规格化 |
+| [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
+| [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
+| [`systems/action-resolution.md`](systems/action-resolution.md) | 普通、射击、技术共享的预览、准备、表现与提交边界 | M00.6 / 已接受 |
+| [`systems/shooting.md`](systems/shooting.md) | 弓兵射程、伤害、经验、AI 与棋盘表现 | M00.6 / 已接受 |
+| [`systems/techniques-stage0.md`](systems/techniques-stage0.md) | 修女初級炎暴与初級治療 | M00.6 / 已接受 |
+| [`systems/status-foundation.md`](systems/status-foundation.md) | 防魔消费与 v6 最小状态边界 | M00.6 / 已接受 |
+| [`systems/deployment-stage1.md`](systems/deployment-stage1.md) | 第 1 关固定/可选单位与部署提交 | M01 / 已规格化 |
+| [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M01 / 已规格化 |
 
 ## 写作规范
 

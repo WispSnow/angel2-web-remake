@@ -5,6 +5,7 @@ import {
   ROUND2_STORY,
   VICTORY_STORY,
 } from "../../src/game/content/dialogue";
+import { GROUP_COMMAND_DIALOGUE } from "../../src/game/content/group-command-dialogue";
 
 describe("native stage-zero dialogue checkpoints", () => {
   it("preserves every module 25 and module 29 KY wait", () => {
@@ -41,6 +42,50 @@ describe("native stage-zero dialogue checkpoints", () => {
       upper: undefined,
       lower: undefined,
       source: { record: 3, wait: 3 },
+    });
+  });
+
+  it("preserves the three native group-command lines and selector addresses", () => {
+    expect(GROUP_COMMAND_DIALOGUE).toEqual({
+      allRest: {
+        selector: 0x1f,
+        address: "DS:86E4",
+        page: {
+          activeSlot: "upper",
+          upper: {
+            portrait: 46,
+            speaker: "妮雅",
+            text: "大家聽著！\n所有還未行動的人在原地休息，補充體力．",
+          },
+          source: { record: "battle-command", wait: 0x1f, address: "DS:86E4" },
+        },
+      },
+      followLeader: {
+        selector: 0x21,
+        address: "DS:873C",
+        page: {
+          activeSlot: "upper",
+          upper: {
+            portrait: 46,
+            speaker: "妮雅",
+            text: "大家聽著！\n所有還未行動的人跟著我來．",
+          },
+          source: { record: "battle-command", wait: 0x21, address: "DS:873C" },
+        },
+      },
+      freeAction: {
+        selector: 0x20,
+        address: "DS:8716",
+        page: {
+          activeSlot: "upper",
+          upper: {
+            portrait: 46,
+            speaker: "妮雅",
+            text: "大家聽著！\n所有還未行動的人自由行動．",
+          },
+          source: { record: "battle-command", wait: 0x20, address: "DS:8716" },
+        },
+      },
     });
   });
 });

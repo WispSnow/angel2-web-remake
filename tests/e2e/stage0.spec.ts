@@ -26,6 +26,7 @@ interface DebugState {
   quitConfirmIndex: number;
   groupCommandOpen: boolean;
   groupCommandIndex: number;
+  groupCommandDialogueId?: "allRest" | "followLeader" | "freeAction";
   groupCommands: Array<{ id: string; label: string }>;
   groupLeaderId?: string;
   retreatConfirmOpen: boolean;
@@ -125,6 +126,17 @@ interface DebugState {
 const debugState = (page: Page) => page.evaluate(() => window.__ANGEL2__?.getState() as DebugState);
 const waitForPhase = (page: Page, phase: string) => page.waitForFunction((expected) => window.__ANGEL2__?.getState().phase === expected, phase);
 const clickCanvas = (page: Page, x: number, y: number) => page.getByTestId("battle-canvas").click({ position: { x, y } });
+const finishGroupCommandDialogue = async (page: Page) => {
+  const layer = page.getByTestId("dialogue-layer");
+  await expect(layer).toBeVisible();
+  await expect(layer).toHaveAttribute("data-source-record", "battle-command");
+  const command = (await debugState(page)).groupCommandDialogueId;
+  await page.getByTestId("advance-dialogue").click();
+  if ((await debugState(page)).groupCommandDialogueId === command) {
+    await page.getByTestId("advance-dialogue").click();
+  }
+  await expect.poll(async () => (await debugState(page)).groupCommandDialogueId).toBeUndefined();
+};
 const finishPromotionDialogue = async (page: Page) => {
   const layer = page.getByTestId("dialogue-layer");
   while (await layer.isVisible() && await layer.getAttribute("data-source-record") === "promotion") {
@@ -689,7 +701,24 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   await expect(page.getByTestId("group-command-followLeader")).toBeDisabled();
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-group-command-menu.png" });
-  await page.getByTestId("group-command-allRest").click();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("group-command-menu")).toBeHidden();
+  const beforeAllRest = await debugState(page);
+  await page.getByTestId("all-rest-hotspot").click();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:86E4");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText(
+    "大家聽著！\n所有還未行動的人在原地休息，補充體力．",
+  );
+  await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute("data-portrait-record", "46");
+  expect((await debugState(page))).toMatchObject({
+    phase: "player",
+    round: beforeAllRest.round,
+    units: beforeAllRest.units,
+    rngState: beforeAllRest.rngState,
+    groupCommandDialogueId: "allRest",
+  });
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-all-rest-command-dialogue.png" });
+  await finishGroupCommandDialogue(page);
   await page.waitForFunction(() => {
     const movement = window.__ANGEL2__?.getState().movementPresentation;
     return movement?.kind === "enemy" && movement.unitId === "2:15";
@@ -971,6 +1000,13 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await waitForPhase(page, "player");
   await page.keyboard.press("Tab");
   await page.keyboard.press("F3");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:8716");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText(
+    "大家聽著！\n所有還未行動的人自由行動．",
+  );
+  expect((await debugState(page)).groupCommandDialogueId).toBe("freeAction");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-free-action-dialogue.png" });
+  await finishGroupCommandDialogue(page);
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.some((unit) => unit.side === 1 && unit.acted)).toBe(true);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-free-action.png" });
@@ -978,6 +1014,16 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await enterPlayerPhase();
   await page.keyboard.press("Tab");
   await page.keyboard.press("F2");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:873C");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText(
+    "大家聽著！\n所有還未行動的人跟著我來．",
+  );
+  expect((await debugState(page))).toMatchObject({
+    groupCommandDialogueId: "followLeader",
+    groupLeaderId: "1:0",
+  });
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-follow-leader-dialogue.png" });
+  await finishGroupCommandDialogue(page);
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "allyAuto");

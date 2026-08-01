@@ -264,6 +264,25 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     dialogueTimer = undefined;
     dialogueAdvanceTimer = undefined;
   };
+  const scheduleAutomaticDialogueAdvance = (key: string) => {
+    if (!controller.promotionDialogueActive && !controller.groupCommandDialogueActive) return;
+    const delay = controller.groupCommandDialogueActive && controller.isTestMode
+      ? 1_200
+      : controller.isTestMode
+        ? 100
+        : controller.presentationFast
+          ? 80
+          : 160;
+    dialogueAdvanceTimer = globalThis.setTimeout(() => {
+      dialogueAdvanceTimer = undefined;
+      if (
+        activeDialogueKey === key
+        && (controller.promotionDialogueActive || controller.groupCommandDialogueActive)
+      ) {
+        controller.advanceDialogue();
+      }
+    }, delay);
+  };
   const revealDialogue = (
     fullText: string,
     key: string,
@@ -284,15 +303,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
         stopSpeaking(activeDialoguePortrait);
         dialogueTimer = undefined;
-        if (activeDialogueKey === key && controller.promotionDialogueActive) {
-          const delay = controller.isTestMode ? 100 : controller.presentationFast ? 80 : 160;
-          dialogueAdvanceTimer = globalThis.setTimeout(() => {
-            dialogueAdvanceTimer = undefined;
-            if (activeDialogueKey === key && controller.promotionDialogueActive) {
-              controller.advanceDialogue();
-            }
-          }, delay);
-        }
+        if (activeDialogueKey === key) scheduleAutomaticDialogueAdvance(key);
         return;
       }
       const character = dialogueFullText[revealedCharacters];
@@ -311,6 +322,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     revealedCharacters = dialogueFullText.length;
     activeDialogueText.textContent = dialogueFullText;
     stopSpeaking(activeDialoguePortrait);
+    if (controller.groupCommandDialogueActive) scheduleAutomaticDialogueAdvance(activeDialogueKey);
     return true;
   };
   const stopFeedbackTimer = () => {
@@ -823,9 +835,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     dialogueLayer.hidden = !dialogueVisible;
     storyBackground.hidden = controller.phase !== "prebattleStory";
     if (page) {
-      const pageKey = controller.promotionDialogueActive
-        ? `promotion:${controller.promotionUnit?.id}:${controller.promotionDialogueIndex}`
-        : `${controller.phase}:${controller.dialogueIndex}`;
+      const pageKey = controller.groupCommandDialogueId
+        ? `group-command:${controller.groupCommandDialogueId}`
+        : controller.promotionDialogueActive
+          ? `promotion:${controller.promotionUnit?.id}:${controller.promotionDialogueIndex}`
+          : `${controller.phase}:${controller.dialogueIndex}`;
       const pageChanged = activeDialogueKey !== pageKey;
       dialogueLayer.dataset.sourceRecord = String(page.source.record);
       dialogueLayer.dataset.sourceWait = String(page.source.wait);
@@ -835,10 +849,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       dialogueLayer.dataset.revealStart = String(page.revealStart ?? 0);
       dialogueLayer.classList.toggle("prebattle", controller.phase === "prebattleStory");
       dialogueLayer.classList.toggle("promotion-dialogue", controller.promotionDialogueActive);
-      skipDialogueButton.hidden = controller.promotionDialogueActive;
+      dialogueLayer.classList.toggle("group-command-dialogue", controller.groupCommandDialogueActive);
+      skipDialogueButton.hidden = controller.promotionDialogueActive || controller.groupCommandDialogueActive;
       dialogueControls.setAttribute(
         "aria-label",
-        controller.promotionDialogueActive ? "轉職對話控制" : "劇情對話控制",
+        controller.groupCommandDialogueActive
+          ? "集體命令對話控制"
+          : controller.promotionDialogueActive
+            ? "轉職對話控制"
+            : "劇情對話控制",
       );
       for (const slot of ["upper", "lower"] as const) {
         const elements = dialogueWindows[slot];
@@ -895,6 +914,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }
     } else {
       dialogueLayer.classList.remove("promotion-dialogue");
+      dialogueLayer.classList.remove("group-command-dialogue");
       skipDialogueButton.hidden = false;
       stopDialogueTimer();
       stopSpeaking(activeDialoguePortrait);

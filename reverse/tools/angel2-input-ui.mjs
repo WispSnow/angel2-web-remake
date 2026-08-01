@@ -34,6 +34,9 @@ const CODE_SIGNATURES = [
   { module: 29, address: "0000:693B", offset: 0x0693b, role: "move then attack/end/undo flow", hex: "a1161f2ea32674833e4a3d4d7572e8c409813e4a3d544374" },
   { module: 29, address: "0000:69BC", offset: 0x069bc, role: "class-0F extra move or abandon flow", hex: "813e430d30467401c3a124008ec08b1e5052268a073c0075" },
   { module: 29, address: "0000:6A55", offset: 0x06a55, role: "ranged move then attack/shoot/end/undo flow", hex: "a1161f2ea32674833e4a3d4d7403e9d700e8a708813e4a3d" },
+  { module: 29, address: "0000:6CF1", offset: 0x06cf1, role: "show selector-1Fh all-rest command line before applying all-rest settlement", hex: "c706f41e434dc606f61e012ec70627844e00a180f8e8f18ae8b9008b1e8857b81f00e8685ce8d1002ec70627845900" },
+  { module: 29, address: "0000:6D2A", offset: 0x06d2a, role: "show selector-21h follow-leader command line before committing the leader and running allied AI", hex: "c706f41e434dc606f61e012ec70627844e00a180f8e8b88ac706340d5900e87a008b1e8857b82100e8295c8b1e8857891e360da122008ec0268a070c802688079ae3004711" },
+  { module: 29, address: "0000:6D86", offset: 0x06d86, role: "show selector-20h free-action command line before running allied AI", hex: "c706f41e434dc606f61e012ec70627844e00a180f8e85c8ae824008b1e8857b82000e8d35b9ae30047112ec706278459" },
   { module: 29, address: "0000:7C27", offset: 0x07c27, role: "battle viewport, unit HUD, and minimap refresh", hex: "e8c700e89301e87601bae801bb0800b81503e81609803eec" },
   { module: 29, address: "0000:8492", offset: 0x08492, role: "delayed hovered-unit detail-panel controller", hex: "803e485d597401c3833e046059756d803e1afb4e7408a121" },
   { module: 29, address: "0000:B7C6", offset: 0x0b7c6, role: "battle side-panel foundation and state-overlay draw order", hex: "c70684f8a502bae001bb0000b91300e8f71dbed47fe87218e83100e84f00e86d00e80700e88800e8a600c3" },
@@ -105,6 +108,27 @@ const SYSTEM_MENU_SPEC = {
     ["離開遊戲", "4Y"],
   ],
 };
+
+const GROUP_COMMAND_DIALOGUE_SPECS = [
+  {
+    id: "allRest",
+    selector: 0x1f,
+    expectedPointer: 0x86e4,
+    expectedText: "大家聽著！|所有還未行動的人在原地休息，補充體力．",
+  },
+  {
+    id: "freeAction",
+    selector: 0x20,
+    expectedPointer: 0x8716,
+    expectedText: "大家聽著！|所有還未行動的人自由行動．",
+  },
+  {
+    id: "followLeader",
+    selector: 0x21,
+    expectedPointer: 0x873c,
+    expectedText: "大家聽著！|所有還未行動的人跟著我來．",
+  },
+];
 
 const SIDE_PANEL_HANDLERS = {
   "0000:BA18": { id: "save", effect: "open the numbered WAR save selector and write the selected slot" },
@@ -227,6 +251,28 @@ function readBig5Dollar(module, buffer, dsOffset) {
     text: new TextDecoder("big5", { fatal: true }).decode(raw),
     big5Hex: raw.toString("hex").toUpperCase(),
   };
+}
+
+function parseGroupCommandDialogues(buffer) {
+  const pointerTable = 0x84bb;
+  return Object.fromEntries(GROUP_COMMAND_DIALOGUE_SPECS.map((spec) => {
+    const pointerAddress = pointerTable + spec.selector * 2;
+    const pointer = readWord(29, buffer, pointerAddress);
+    if (pointer !== spec.expectedPointer) {
+      throw new Error(`${spec.id}: expected dialogue pointer DS:${hex(spec.expectedPointer)}, got DS:${hex(pointer)}`);
+    }
+    const line = readBig5Dollar(29, buffer, pointer);
+    if (line.text !== spec.expectedText) {
+      throw new Error(`${spec.id}: native command line differs from recovered text`);
+    }
+    return [spec.id, {
+      selector: `0x${hex(spec.selector, 2)}`,
+      pointerAddress: `${hex(MODULE29_DATA_SEGMENT)}:${hex(pointerAddress)}`,
+      ...line,
+      windowPlacement: "upper for the current side-1 command unit",
+      manualConfirmation: false,
+    }];
+  }));
 }
 
 function verifyCodeSignatures(module27, module29) {
@@ -464,6 +510,7 @@ async function extract(module27Path, module29Path, outputPath) {
     offset: 0x3f3e,
     expected: [["全部休息", "0T"], ["跟隨主將", "1T"], ["自由行動", "2T"], ["全面徹退", "3T"]],
   });
+  const groupCommandDialogues = parseGroupCommandDialogues(module29);
   const confirmationMenu = parseMenu(module29, {
     id: "confirmCancel",
     offset: 0x3f2c,
@@ -497,7 +544,7 @@ async function extract(module27Path, module29Path, outputPath) {
 
   const output = {
     format: "ANGEL2 native input and battle UI",
-    semanticVersion: 4,
+    semanticVersion: 5,
     sources: [
       { module: 27, path: module27Path, bytes: module27.length, sha256: sha256(module27) },
       { module: 29, path: module29Path, bytes: module29.length, sha256: sha256(module29) },
@@ -617,9 +664,19 @@ async function extract(module27Path, module29Path, outputPath) {
       },
       phaseAndBattleCommands: {
         menu: groupCommandMenu,
-        allRest: "the explicit early player-phase completion command: all remaining unspent manual side-1 units rest and become spent, after which normal side-1 autonomous and enemy phases proceed",
-        followLeader: "hand remaining side-1 units to AI with the selected cell as a temporary cohesion leader",
-        freeAction: "hand remaining side-1 units to AI without the temporary leader",
+        presentationOrdering: "all-rest, follow-leader, and free-action first finish their selector-bound contextual battle line without manual confirmation, restore the battlefield, and only then apply the command effect",
+        allRest: {
+          dialogue: groupCommandDialogues.allRest,
+          effect: "all remaining unspent manual side-1 units rest and become spent, after which normal side-1 autonomous and enemy phases proceed",
+        },
+        followLeader: {
+          dialogue: groupCommandDialogues.followLeader,
+          effect: "hand remaining side-1 units to AI with the selected cell as a temporary cohesion leader",
+        },
+        freeAction: {
+          dialogue: groupCommandDialogues.freeAction,
+          effect: "hand remaining side-1 units to AI without the temporary leader",
+        },
         retreat: { prompt: "哦！．．．要撤退嗎？|必竟是沒辦法的事，雙方的實力差太多了．", confirmedTransition: { nextModule: 27, nextStage: "currentStage", exitFlag: "Y" } },
       },
       confirmation: confirmationMenu,
@@ -676,6 +733,7 @@ async function extract(module27Path, module29Path, outputPath) {
       parsedSidePanelDispatches: sidePanelDispatch.entries.length,
       parsedSidePanelSettingVisuals: sidePanelVisualComposition.settingOverlays.length,
       parsedSettingsRows: settingsPanels.reduce((sum, panel) => sum + panel.entries.length, 0),
+      parsedGroupCommandDialogues: Object.keys(groupCommandDialogues).length,
       parsedPhysicalKeyboardBindingsPerModule: KEYBOARD_BINDINGS.length,
       physicalKeyboardTablesIdentical,
       releaseDeveloperGateDisabled: true,

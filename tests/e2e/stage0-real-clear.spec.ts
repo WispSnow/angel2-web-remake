@@ -61,7 +61,31 @@ test("S00-O: a normal build clears stage zero through player-visible controls on
   let reachedVictoryStory = false;
   let capturedRoundTwo = false;
   for (let round = 1; round <= 18; round += 1) {
-    await page.keyboard.press("F1");
+    if (round === 1) {
+      // Move the visible focus to empty ground so the tactical desk returns,
+      // then use the shipping shoe hotspot instead of a debug action.
+      await page.getByTestId("battle-canvas").click({ position: { x: 420, y: 45 } });
+      await expect(page.getByTestId("game-screen")).toHaveAttribute("data-side-panel-hotspots", "active");
+      await page.getByTestId("all-rest-hotspot").click();
+    } else {
+      await page.keyboard.press("F1");
+    }
+
+    await expect(dialogue).toBeVisible();
+    await expect(dialogue).toHaveAttribute("data-source-record", "battle-command");
+    await expect(dialogue).toHaveAttribute("data-source-address", "DS:86E4");
+    await page.getByTestId("advance-dialogue").click();
+    if (round === 1) {
+      await expect(page.getByTestId("dialogue-window-upper")).toContainText(
+        "大家聽著！\n所有還未行動的人在原地休息，補充體力．",
+      );
+      await page.getByTestId("game-screen").screenshot({
+        path: `${ARTIFACT_DIR}/stage0-real-all-rest-command-dialogue.png`,
+      });
+    }
+    if (await dialogue.isVisible() && await dialogue.getAttribute("data-source-record") === "battle-command") {
+      await page.getByTestId("advance-dialogue").click();
+    }
 
     const state = await waitForPlayerOrStory(page);
     if (state === "player") continue;

@@ -6,6 +6,10 @@ import {
   type PromotionTarget,
 } from "./content/classes";
 import { STORY_BY_PHASE } from "./content/dialogue";
+import {
+  groupCommandDialogueFor,
+  type SpokenGroupCommandId,
+} from "./content/group-command-dialogue";
 import { promotionDialogueFor } from "./content/promotion-dialogue";
 import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneState } from "./full-combat";
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
@@ -87,7 +91,7 @@ export interface SpecialActionPresentation {
 export type AudioCueGroup = "e" | "magic";
 
 export type UnitCommandId = "move" | "attack" | "shoot" | "technique" | "rest" | "end" | "undo";
-export type GroupCommandId = "allRest" | "followLeader" | "freeAction" | "retreat";
+export type GroupCommandId = SpokenGroupCommandId | "retreat";
 export type SystemCommandId = "settings" | "objectives" | "load" | "save" | "quit";
 export type RecordMenuMode = "load" | "save";
 
@@ -176,6 +180,7 @@ export class GameController {
   quitConfirmIndex = 1;
   groupCommandOpen = false;
   groupCommandIndex = 0;
+  groupCommandDialogueId?: SpokenGroupCommandId;
   retreatConfirmOpen = false;
   retreatConfirmIndex = 1;
   hintVisible = localStorage.getItem("angel2.stage0.hintSeen") !== "yes";
@@ -210,6 +215,7 @@ export class GameController {
   private pendingPath?: Position[];
   private busy = false;
   private promotionResume?: () => void;
+  private groupCommandLeaderId?: string;
   private listeners = new Set<Listener>();
   private readonly testMode = new URLSearchParams(location.search).has("test");
   // Keeps the measured full-screen timing under ?test=1 for visual review.
@@ -243,6 +249,9 @@ export class GameController {
   }
 
   get currentDialogue(): DialoguePage | undefined {
+    if (this.groupCommandDialogueId) {
+      return groupCommandDialogueFor(this.groupCommandDialogueId);
+    }
     const promotionUnit = this.promotionUnit;
     if (promotionUnit && this.promotionDialogueIndex !== undefined) {
       return promotionDialogueFor(promotionUnit)[this.promotionDialogueIndex];
@@ -267,6 +276,10 @@ export class GameController {
 
   get promotionDialogueActive(): boolean {
     return this.promotionUnit !== undefined && this.promotionDialogueIndex !== undefined;
+  }
+
+  get groupCommandDialogueActive(): boolean {
+    return this.groupCommandDialogueId !== undefined;
   }
 
   get promotionChoiceVisible(): boolean {
@@ -301,6 +314,7 @@ export class GameController {
       || this.objectiveOpen
       || this.groupCommandOpen
       || this.retreatConfirmOpen
+      || this.groupCommandDialogueActive
       || this.promotionUnitIds.length > 0;
   }
 
@@ -365,6 +379,16 @@ export class GameController {
   }
 
   advanceDialogue(): void {
+    if (this.groupCommandDialogueId) {
+      const command = this.groupCommandDialogueId;
+      const leaderId = this.groupCommandLeaderId;
+      this.groupCommandDialogueId = undefined;
+      this.groupCommandLeaderId = undefined;
+      if (command === "allRest") void this.executeAllRest();
+      else if (command === "followLeader" && leaderId) void this.executeFollowLeader(leaderId);
+      else if (command === "freeAction") void this.executeFreeAction();
+      return;
+    }
     const promotionUnit = this.promotionUnit;
     if (promotionUnit && this.promotionDialogueIndex !== undefined) {
       const pages = promotionDialogueFor(promotionUnit);
@@ -388,7 +412,8 @@ export class GameController {
   }
 
   skipDialogue(): void {
-    if (isStoryPhase(this.phase)) this.completeDialogue();
+    if (this.groupCommandDialogueActive) this.advanceDialogue();
+    else if (isStoryPhase(this.phase)) this.completeDialogue();
   }
 
   private completeDialogue(): void {
@@ -1010,10 +1035,22 @@ export class GameController {
   }
 
   async allRest(): Promise<void> {
-    if (this.phase !== "player" || this.busy || this.promotionUnitIds.length > 0) return;
+    if (
+      this.phase !== "player"
+      || this.busy
+      || this.promotionUnitIds.length > 0
+      || this.groupCommandDialogueActive
+    ) return;
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
     this.resetAction();
+    this.groupCommandDialogueId = "allRest";
+    this.statusMessage = "妮雅下令全軍休息。";
+    this.emit();
+  }
+
+  private async executeAllRest(): Promise<void> {
+    if (this.phase !== "player" || this.busy) return;
     const result = this.battle.restAllUnspentAllies();
     this.statusMessage = `全部休息：${result.count} 名單位提交行動，共恢復 ${result.recovered} 點生命。`;
     this.emit();
@@ -1023,16 +1060,32 @@ export class GameController {
   }
 
   async followLeader(): Promise<void> {
-    if (this.phase !== "player" || this.busy || this.promotionUnitIds.length > 0 || !this.groupLeader) {
+    if (
+      this.phase !== "player"
+      || this.busy
+      || this.promotionUnitIds.length > 0
+      || this.groupCommandDialogueActive
+    ) return;
+    if (!this.groupLeader) {
       this.statusMessage = "請先把焦點移到一名尚未行動的我方單位，再選擇跟隨主將。";
       this.emit();
       return;
     }
     const leader = this.groupLeader;
-    this.battle.wait(leader.id);
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
     this.resetAction();
+    this.groupCommandDialogueId = "followLeader";
+    this.groupCommandLeaderId = leader.id;
+    this.statusMessage = "妮雅下令其餘部隊跟隨主將。";
+    this.emit();
+  }
+
+  private async executeFollowLeader(leaderId: string): Promise<void> {
+    if (this.phase !== "player" || this.busy) return;
+    const leader = this.battle.unit(leaderId);
+    if (!leader || leader.side !== 1 || leader.acted) return;
+    this.battle.wait(leader.id);
     this.statusMessage = `${leader.name}成為臨時主將；其餘單位交由我方 AI 行動。`;
     this.emit();
     const promotionPause = this.pauseForPromotions();
@@ -1041,17 +1094,34 @@ export class GameController {
   }
 
   async freeAction(): Promise<void> {
-    if (this.phase !== "player" || this.busy || this.promotionUnitIds.length > 0) return;
+    if (
+      this.phase !== "player"
+      || this.busy
+      || this.promotionUnitIds.length > 0
+      || this.groupCommandDialogueActive
+    ) return;
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
     this.resetAction();
+    this.groupCommandDialogueId = "freeAction";
+    this.statusMessage = "妮雅下令其餘部隊自由行動。";
+    this.emit();
+  }
+
+  private async executeFreeAction(): Promise<void> {
+    if (this.phase !== "player" || this.busy) return;
     this.statusMessage = "其餘我方單位進入自由行動。";
     this.emit();
     await this.runTurnPhases("free");
   }
 
   requestRetreat(): void {
-    if (this.phase !== "player" || this.busy || this.promotionUnitIds.length > 0) return;
+    if (
+      this.phase !== "player"
+      || this.busy
+      || this.promotionUnitIds.length > 0
+      || this.groupCommandDialogueActive
+    ) return;
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
     this.retreatConfirmOpen = true;
@@ -1582,7 +1652,7 @@ export class GameController {
   }
 
   systemAction(): void {
-    if (this.promotionUnitIds.length > 0) return;
+    if (this.promotionUnitIds.length > 0 || this.groupCommandDialogueActive) return;
     if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
@@ -1596,6 +1666,7 @@ export class GameController {
 
   secondaryAction(): boolean {
     if (this.promotionUnitIds.length > 0) return true;
+    if (this.groupCommandDialogueActive) return true;
     if (this.phase === "saveSlots") this.cancelPostSaveSlots();
     else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
@@ -1733,6 +1804,8 @@ export class GameController {
     this.quitConfirmIndex = 1;
     this.groupCommandOpen = false;
     this.groupCommandIndex = 0;
+    this.groupCommandDialogueId = undefined;
+    this.groupCommandLeaderId = undefined;
     this.retreatConfirmOpen = false;
     this.retreatConfirmIndex = 1;
     this.objectiveOpen = false;
@@ -1955,6 +2028,8 @@ export class GameController {
     this.musicSettingsReturn = undefined;
     this.quitConfirmOpen = false;
     this.groupCommandOpen = false;
+    this.groupCommandDialogueId = undefined;
+    this.groupCommandLeaderId = undefined;
     this.retreatConfirmOpen = false;
     this.objectiveOpen = false;
     this.promotionUnitIds = [];
@@ -2019,6 +2094,7 @@ export class GameController {
       }
       return;
     }
+    if (this.groupCommandDialogueActive) return;
     if (this.phase === "savePrompt") {
       if (delta.x !== 0 || delta.y !== 0) {
         this.savePromptIndex = this.savePromptIndex === 0 ? 1 : 0;
@@ -2123,7 +2199,8 @@ export class GameController {
   }
 
   primaryAtCursor(): void {
-    if (this.promotionDialogueActive) this.advanceDialogue();
+    if (this.groupCommandDialogueActive) this.advanceDialogue();
+    else if (this.promotionDialogueActive) this.advanceDialogue();
     else if (this.promotionUnitIds.length > 0) this.confirmPromotion();
     else if (isStoryPhase(this.phase)) this.advanceDialogue();
     else if (this.phase === "defeat") this.retry();
@@ -2333,6 +2410,7 @@ export class GameController {
       keySoundEnabled: this.keySoundEnabled,
       groupCommandOpen: this.groupCommandOpen,
       groupCommandIndex: this.groupCommandIndex,
+      groupCommandDialogueId: this.groupCommandDialogueId,
       groupCommands: GROUP_COMMANDS.map((command) => ({ ...command })),
       groupLeaderId: this.groupLeader?.id,
       retreatConfirmOpen: this.retreatConfirmOpen,
@@ -2389,6 +2467,8 @@ export class GameController {
       this.recordMenuMode = undefined;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
+      this.groupCommandDialogueId = undefined;
+      this.groupCommandLeaderId = undefined;
       this.retreatConfirmOpen = false;
       this.objectiveOpen = false;
       this.movementPresentation = undefined;
@@ -2407,6 +2487,8 @@ export class GameController {
       this.recordMenuMode = undefined;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
+      this.groupCommandDialogueId = undefined;
+      this.groupCommandLeaderId = undefined;
       this.retreatConfirmOpen = false;
       this.objectiveOpen = false;
       this.movementPresentation = undefined;
