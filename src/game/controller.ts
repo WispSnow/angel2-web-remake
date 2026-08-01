@@ -319,8 +319,14 @@ export class GameController {
   }
 
   get groupLeader(): BattleUnit | undefined {
-    const unit = this.battle.unitAt(this.cursor);
-    return unit?.side === 1 && !unit.acted ? unit : undefined;
+    const cursorUnit = this.battle.unitAt(this.cursor);
+    if (cursorUnit?.side === 1 && !cursorUnit.acted) return cursorUnit;
+
+    // The tactical desk is only visible while the pointer cursor is over an
+    // empty cell. Keep that presentation hover separate from the battle's
+    // retained unit focus, as the native side-panel path does.
+    const retainedUnit = this.battle.focus;
+    return retainedUnit?.side === 1 && !retainedUnit.acted ? retainedUnit : undefined;
   }
 
   get followLeaderAvailable(): boolean {

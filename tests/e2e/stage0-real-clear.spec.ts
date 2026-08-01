@@ -63,9 +63,17 @@ test("S00-O: a normal build clears stage zero through player-visible controls on
   for (let round = 1; round <= 18; round += 1) {
     if (round === 1) {
       // Move the visible focus to empty ground so the tactical desk returns,
-      // then use the shipping shoe hotspot instead of a debug action.
+      // verify the shipping map menu retains Nia as the command leader, then
+      // use the shipping shoe hotspot instead of a debug action.
       await page.getByTestId("battle-canvas").click({ position: { x: 420, y: 45 } });
       await expect(page.getByTestId("game-screen")).toHaveAttribute("data-side-panel-hotspots", "active");
+      await page.getByTestId("group-command-hotspot").click();
+      await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
+      await page.getByTestId("game-screen").screenshot({
+        path: `${ARTIFACT_DIR}/stage0-real-follow-leader-hotspot-menu.png`,
+      });
+      await page.keyboard.press("Tab");
+      await expect(page.getByTestId("group-command-menu")).toBeHidden();
       await page.getByTestId("all-rest-hotspot").click();
     } else {
       await page.keyboard.press("F1");

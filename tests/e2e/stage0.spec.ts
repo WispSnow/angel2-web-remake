@@ -969,9 +969,16 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
 
   await enterPlayerPhase();
   const initial = await debugState(page);
-  await page.keyboard.press("Tab");
+  // Reproduce the shipping mouse route: hovering empty ground restores the
+  // tactical desk before the player clicks its map/group-command object.
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await expect(page.getByTestId("game-screen")).toHaveAttribute("data-side-panel-hotspots", "active");
+  await page.getByTestId("group-command-hotspot").click();
   await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
   expect((await debugState(page)).groupLeaderId).toBe("1:0");
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-follow-leader-hotspot-menu.png",
+  });
   await page.getByTestId("group-command-retreat").click();
   await expect(page.getByTestId("retreat-confirm")).toBeVisible();
   await page.locator("[data-action=retreat-confirm]").click();
@@ -1012,8 +1019,9 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-free-action.png" });
 
   await enterPlayerPhase();
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("F2");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await page.getByTestId("group-command-hotspot").click();
+  await page.getByTestId("group-command-followLeader").click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:873C");
   await expect(page.getByTestId("dialogue-window-upper")).toContainText(
     "大家聽著！\n所有還未行動的人跟著我來．",
