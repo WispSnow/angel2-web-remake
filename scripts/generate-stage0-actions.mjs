@@ -40,7 +40,7 @@ if (
 }
 
 const classRecords = combatPresentations.fullScreenPresentation.classRecords;
-const classSpecs = classIds.slice(0, 36).map((id, nativeRecord) => ({ id, nativeRecord }));
+const classSpecs = classIds.map((id, nativeRecord) => ({ id, nativeRecord }));
 const fullCombatProfiles = {};
 const fullCombatAssets = { left: {}, right: {} };
 const fullCombatFrameMeta = { left: {}, right: {} };
@@ -95,21 +95,30 @@ async function copyFrameSet(group, record, publicDirectory, publicPrefix) {
 for (const spec of classSpecs) {
   const native = classRecords.find((entry) => entry.record === spec.nativeRecord);
   if (!native) throw new Error(`missing full-combat profile for native class ${spec.nativeRecord}`);
+  if (!native.side2.available) {
+    throw new Error(`native class ${spec.nativeRecord} has no side-2 presentation block`);
+  }
+  // 记录 36「龍」/37「頭」/38「手」只在 side 2 编队出现，原版没有填 side 1 表现块，
+  // 也没有 `M_00/86..88`。它们的 `left` 分支不是“素材缺失”，而是不可达方向。
+  const rightOnly = !native.side1.available;
+  const sides = rightOnly
+    ? [["right", native.side2]]
+    : [["left", native.side1], ["right", native.side2]];
+  const perSide = (pick) => Object.fromEntries(
+    sides.map(([side, nativeSide]) => [side, pick(nativeSide)]),
+  );
   fullCombatProfiles[spec.id] = {
     nativeRecord: spec.nativeRecord,
-    voiceSlots: {
-      left: native.side1.voiceSlots,
-      right: native.side2.voiceSlots,
-    },
-    strikeStepCounts: native.side1.strikeStepCounts.values,
-    postHitStepCounts: native.side1.postHitStepCounts.values,
-    commandStreams: {
-      left: native.side1.commandStreams,
-      right: native.side2.commandStreams,
-    },
+    reach: rightOnly ? "right-only" : "both-sides",
+    voiceSlots: perSide((nativeSide) => nativeSide.voiceSlots),
+    // 逐侧输出：记录 3「魔祭師」与 16「獸騎士」的两侧 step-count 并不相同。运行时
+    // 实际读取的是命令流内每步的 `rendererSubsteps`，这两个字段只作证据回显。
+    strikeStepCounts: perSide((nativeSide) => nativeSide.strikeStepCounts.values),
+    postHitStepCounts: perSide((nativeSide) => nativeSide.postHitStepCounts.values),
+    commandStreams: perSide((nativeSide) => nativeSide.commandStreams),
   };
 
-  for (const [side, nativeSide] of [["left", native.side1], ["right", native.side2]]) {
+  for (const [side, nativeSide] of sides) {
     fullCombatAssets[side][spec.id] = {};
     fullCombatFrameMeta[side][spec.nativeRecord] = {};
     for (const set of ["direct", "plus50"]) {
@@ -205,10 +214,9 @@ await Promise.all([
 ]);
 const classVoiceRecords = [...new Set([
   11,
-  ...classRecords.slice(0, 36).flatMap((record) => [
-    ...Object.values(record.side1.voiceSlots),
-    ...Object.values(record.side2.voiceSlots),
-  ]),
+  ...classRecords.flatMap((record) => [record.side1, record.side2]
+    .filter((side) => side.available)
+    .flatMap((side) => Object.values(side.voiceSlots))),
 ])];
 await Promise.all([
   copyFile(

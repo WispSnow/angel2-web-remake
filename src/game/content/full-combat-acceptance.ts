@@ -9,7 +9,16 @@ export type FullCombatAcceptanceStatus = "accepted" | "pending";
  */
 export type FullCombatReach = "both-sides" | "right-only";
 
-const RIGHT_ONLY_RECORDS: ReadonlySet<number> = new Set([35, 36, 37, 38]);
+const RIGHT_ONLY_NOTES: Readonly<Record<number, string>> = {
+  35: "原版仅有右侧 direct/class+50 资源，且逐字节复用士兵图形；左侧普通攻击不可达。",
+  36: "原版只填 side 2 表现块与 Y_00 图形；龍只在场景 20/22 以 side 2 登场，左侧不可达。",
+  37: "原版只填 side 2 表现块与 Y_00 图形；頭只在场景 37 以 side 2 登场，左侧不可达。",
+  38: "原版只填 side 2 表现块与 Y_00 图形；手只在场景 37 以 side 2 登场，左侧不可达。",
+};
+
+const RIGHT_ONLY_RECORDS: ReadonlySet<number> = new Set(
+  Object.keys(RIGHT_ONLY_NOTES).map(Number),
+);
 
 interface AcceptedEvidence {
   commandStreams: true;
@@ -296,6 +305,27 @@ const ACCEPTED_EVIDENCE: Readonly<Record<number, AcceptedEvidence>> = {
     hurtScreenshot: "artifacts/playwright/combat-lab-record-35-hurt.png",
     deathScreenshot: "artifacts/playwright/combat-lab-record-35-death.png",
   },
+  36: {
+    commandStreams: true, framePlacement: true, rightOnlyOriginal: true,
+    attackScreenshot: "artifacts/playwright/combat-lab-record-36-attack.png",
+    guardScreenshot: "artifacts/playwright/combat-lab-record-36-guard.png",
+    hurtScreenshot: "artifacts/playwright/combat-lab-record-36-hurt.png",
+    deathScreenshot: "artifacts/playwright/combat-lab-record-36-death.png",
+  },
+  37: {
+    commandStreams: true, framePlacement: true, rightOnlyOriginal: true,
+    attackScreenshot: "artifacts/playwright/combat-lab-record-37-attack.png",
+    guardScreenshot: "artifacts/playwright/combat-lab-record-37-guard.png",
+    hurtScreenshot: "artifacts/playwright/combat-lab-record-37-hurt.png",
+    deathScreenshot: "artifacts/playwright/combat-lab-record-37-death.png",
+  },
+  38: {
+    commandStreams: true, framePlacement: true, rightOnlyOriginal: true,
+    attackScreenshot: "artifacts/playwright/combat-lab-record-38-attack.png",
+    guardScreenshot: "artifacts/playwright/combat-lab-record-38-guard.png",
+    hurtScreenshot: "artifacts/playwright/combat-lab-record-38-hurt.png",
+    deathScreenshot: "artifacts/playwright/combat-lab-record-38-death.png",
+  },
 };
 
 export const FULL_COMBAT_ACCEPTANCE: readonly FullCombatAcceptanceEntry[] =
@@ -311,22 +341,7 @@ export const FULL_COMBAT_ACCEPTANCE: readonly FullCombatAcceptanceEntry[] =
         status: "accepted",
         reach,
         evidence,
-        ...(record === 35
-          ? {
-              note: "原版仅有右侧 direct/class+50 资源，且逐字节复用士兵图形；左侧普通攻击不可达。",
-            }
-          : {}),
-      };
-    }
-    if (reach === "right-only") {
-      return {
-        record,
-        classId,
-        status: "pending",
-        reach,
-        note: "原版只填 side 2 表现块与 Y_00 图形：这三条永远不会作为 side 1 单位出战"
-          + "（龍在场景 20/22，頭与两只手在场景 37）。左侧 M_00 为空占位，"
-          + "不得据此创作左侧画面；验收只能覆盖右侧。",
+        ...(RIGHT_ONLY_NOTES[record] ? { note: RIGHT_ONLY_NOTES[record] } : {}),
       };
     }
     return { record, classId, status: "pending", reach };

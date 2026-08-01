@@ -63,6 +63,9 @@ const LAB_CLASSES = [
   "evil-sword-warrior",
   "engineer",
   "empress",
+  "dragon",
+  "head",
+  "hand",
 ] as const satisfies readonly UnitClassId[];
 
 type LabClassId = (typeof LAB_CLASSES)[number];
@@ -93,8 +96,19 @@ interface LabPlaybackState {
   marks: readonly { t: number; phase: FullCombatPhaseName }[];
 }
 
-const EMPRESS_PRESENTATION_NOTE =
-  "原版「女帝」沒有左側普通全景圖形；右側資料亦直接重用士兵畫面。實驗室已切換到原版唯一可重放的右側資料。";
+/**
+ * 原版只有右側可重放的職業。女帝在場景 30 是 side 2 單位、場景 42 雖為 side 1 但該
+ * 關沒有敵方單位；龍在場景 20/22、頭與雙手在場景 37 都只出現在 side 2。它們的左側
+ * `M_00` 資源為空佔位或缺項，實驗室因此把它們鎖到右側。
+ */
+const RIGHT_ONLY_NOTES: Partial<Record<LabClassId, string>> = {
+  empress: "原版「女帝」沒有左側普通全景圖形；右側資料亦直接重用士兵畫面。實驗室已切換到原版唯一可重放的右側資料。",
+  dragon: "原版「龍」只在場景 20／22 以 side 2 登場，沒有左側表現塊與圖形。實驗室已切換到原版唯一可重放的右側資料。",
+  head: "原版「頭」只在場景 37 以 side 2 登場，沒有左側表現塊與圖形。實驗室已切換到原版唯一可重放的右側資料。",
+  hand: "原版「手」只在場景 37 以 side 2 登場，沒有左側表現塊與圖形。實驗室已切換到原版唯一可重放的右側資料。",
+};
+
+const isRightOnly = (classId: LabClassId): boolean => classId in RIGHT_ONLY_NOTES;
 
 declare global {
   interface Window {
@@ -139,10 +153,22 @@ function initialConfig(): LabConfig {
   });
 }
 
+/**
+ * side 1 單位固定畫在左側、side 2 畫在右側，兩者不會互換。所以只有右側可達的職業
+ * 當攻方時必須 `side="right"`，當守方時必須 `side="left"`，否則它會被擺到原版沒有
+ * 圖形的左側。攻守同時是右側限定屬於無法構圖的組合，改由守方讓位到士兵。
+ */
 function normalizeConfig(next: LabConfig): LabConfig {
-  return next.attackerClass === "empress" && next.side !== "right"
-    ? { ...next, side: "right" }
-    : next;
+  if (isRightOnly(next.attackerClass) && isRightOnly(next.defenderClass)) {
+    return normalizeConfig({ ...next, defenderClass: "soldier" });
+  }
+  if (isRightOnly(next.attackerClass)) {
+    return next.side === "right" ? next : { ...next, side: "right" };
+  }
+  if (isRightOnly(next.defenderClass)) {
+    return next.side === "left" ? next : { ...next, side: "left" };
+  }
+  return next;
 }
 
 const classOptions = LAB_CLASSES.map((classId) =>
@@ -337,9 +363,13 @@ function setForm(next: LabConfig): void {
 function updateOriginalAvailability(next: LabConfig): void {
   const sideSelect = field<HTMLSelectElement>("side");
   const leftOption = sideSelect.querySelector<HTMLOptionElement>('option[value="left"]');
-  if (!leftOption) throw new Error("Missing left-side combat lab option");
-  leftOption.disabled = next.attackerClass === "empress";
-  message.textContent = next.attackerClass === "empress" ? EMPRESS_PRESENTATION_NOTE : "";
+  const rightOption = sideSelect.querySelector<HTMLOptionElement>('option[value="right"]');
+  if (!leftOption || !rightOption) throw new Error("Missing combat lab side option");
+  leftOption.disabled = isRightOnly(next.attackerClass);
+  rightOption.disabled = isRightOnly(next.defenderClass);
+  message.textContent = RIGHT_ONLY_NOTES[next.attackerClass]
+    ?? RIGHT_ONLY_NOTES[next.defenderClass]
+    ?? "";
 }
 
 function readForm(): LabConfig {

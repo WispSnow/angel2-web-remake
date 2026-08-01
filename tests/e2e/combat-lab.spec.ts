@@ -356,6 +356,11 @@ test.describe.serial("native records sequential visual acceptance", () => {
     { record: 33, classId: "evil-sword-warrior" },
     { record: 34, classId: "engineer" },
     { record: 35, classId: "empress", side: "right" },
+    // 36–38 只在 side 2 编队出现（龍：场景 20/22；頭与两只手：场景 37），原版没有
+    // side 1 表现块，也没有 `M_00/86..88`。实验室锁定右侧，验收只覆盖右侧。
+    { record: 36, classId: "dragon", side: "right" },
+    { record: 37, classId: "head", side: "right" },
+    { record: 38, classId: "hand", side: "right" },
   ] as const;
 
   for (const entry of records) {

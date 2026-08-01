@@ -39,10 +39,8 @@ import type { AttackResult, BattleUnit, UnitClassId } from "./types";
 
 export type FullCombatClass = number;
 
-const fullCombatClass = (classId: UnitClassId): FullCombatClass => {
-  const nativeRecord = classDefinition(classId).nativeRecord;
-  return nativeRecord <= 35 ? nativeRecord : 0;
-};
+const fullCombatClass = (classId: UnitClassId): FullCombatClass =>
+  classDefinition(classId).nativeRecord;
 
 export const FULL_SCENE = {
   left: 96,
@@ -215,16 +213,24 @@ interface NativeCommandStep {
   };
 }
 
+/**
+ * `right-only` 记录只在 side 2 编队出现（36「龍」在场景 20/22，37「頭」与 38「手」
+ * 在场景 37），原版没有填 side 1 表现块，也没有对应的 `M_00` 图形。它们的 `left`
+ * 分支因此整体缺席，而不是空数据。
+ */
+type NativeCombatReach = "both-sides" | "right-only";
+
 interface NativeCombatProfile {
   nativeRecord: number;
-  voiceSlots: Readonly<Record<
+  reach: NativeCombatReach;
+  voiceSlots: Partial<Readonly<Record<
     "left" | "right",
     Readonly<Record<string, number>>
-  >>;
-  commandStreams: Readonly<Record<
+  >>>;
+  commandStreams: Partial<Readonly<Record<
     "left" | "right",
     Readonly<Record<string, { steps: readonly NativeCommandStep[] }>>
-  >>;
+  >>>;
 }
 
 const NATIVE_PROFILE_BY_RECORD = new Map<number, NativeCombatProfile>(
@@ -234,14 +240,47 @@ const NATIVE_PROFILE_BY_RECORD = new Map<number, NativeCombatProfile>(
   ]),
 );
 
+export function nativeCombatReach(classRecord: number): NativeCombatReach {
+  return NATIVE_PROFILE_BY_RECORD.get(classRecord)?.reach ?? "both-sides";
+}
+
+function nativeProfile(classRecord: number): NativeCombatProfile {
+  const profile = NATIVE_PROFILE_BY_RECORD.get(classRecord);
+  if (!profile) throw new Error(`Missing native full-combat profile ${classRecord}`);
+  return profile;
+}
+
+function unreachableSide(classRecord: number, side: "left" | "right"): Error {
+  return new Error(
+    `Native full-combat record ${classRecord} has no ${side}-side presentation: `
+    + "the original only deploys it on side 2, so it must stay on the right.",
+  );
+}
+
+function nativeSideStreams(
+  classRecord: number,
+  side: "left" | "right",
+): Readonly<Record<string, { steps: readonly NativeCommandStep[] }>> {
+  const streams = nativeProfile(classRecord).commandStreams[side];
+  if (!streams) throw unreachableSide(classRecord, side);
+  return streams;
+}
+
+function nativeVoiceSlots(
+  classRecord: number,
+  side: "left" | "right",
+): Readonly<Record<string, number>> {
+  const slots = nativeProfile(classRecord).voiceSlots[side];
+  if (!slots) throw unreachableSide(classRecord, side);
+  return slots;
+}
+
 function nativeMainStream(
   classRecord: number,
   side: "left" | "right",
   role: "mainLeftOrAttacker" | "mainRightOrDefender",
 ): readonly NativeCommandStep[] {
-  const profile = NATIVE_PROFILE_BY_RECORD.get(classRecord);
-  if (!profile) throw new Error(`Missing native full-combat profile ${classRecord}`);
-  return profile.commandStreams[side][role].steps;
+  return nativeSideStreams(classRecord, side)[role].steps;
 }
 
 function nativeReactionStream(
@@ -250,12 +289,10 @@ function nativeReactionStream(
   reaction: "guard" | "hurt",
   role: "actor" | "victim",
 ): readonly NativeCommandStep[] {
-  const profile = NATIVE_PROFILE_BY_RECORD.get(classRecord);
-  if (!profile) throw new Error(`Missing native full-combat profile ${classRecord}`);
   const key = reaction === "hurt"
     ? role === "actor" ? "auxiliaryA" : "auxiliaryB"
     : role === "actor" ? "auxiliaryC" : "auxiliaryD";
-  return profile.commandStreams[side][key].steps;
+  return nativeSideStreams(classRecord, side)[key].steps;
 }
 
 const NATIVE_G1_EFFECT_STREAMS = {
@@ -1295,10 +1332,10 @@ function damageAt(spec: StrikeSpec, times: StrikeTimes, t: number, holdEnd: numb
 function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
   const label = spec.counter ? "full-counter" : "full-primary";
   const cues: FullCombatCue[] = [];
-  const profile = NATIVE_PROFILE_BY_RECORD.get(spec.actorClass)!;
+  const actorVoiceSlots = nativeVoiceSlots(spec.actorClass, spec.actorSide);
   const streams = [
     nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker"),
-    profile.commandStreams[spec.actorSide].mainRightOrDefender.steps,
+    nativeMainStream(spec.actorClass, spec.actorSide, "mainRightOrDefender"),
   ];
   for (const stream of streams) {
     let offset = 0;
@@ -1307,7 +1344,7 @@ function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
         if (/^V[1-5]$/u.test(command.token)) {
           cues.push({
             t: spec.start + offset,
-            record: profile.voiceSlots[spec.actorSide][command.token],
+            record: actorVoiceSlots[command.token],
             reason: `${label}-native-${spec.actorClass}-${command.token.toLowerCase()}`,
           });
         }
@@ -1346,7 +1383,7 @@ function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
     .forEach((voice, index) => {
       cues.push({
         t: times.impact + voice.offset,
-        record: profile.voiceSlots[spec.actorSide][voice.token],
+        record: actorVoiceSlots[voice.token],
         reason: index === 0
           ? `${label}-${reaction}`
           : `${label}-${reaction}-${voice.token.toLowerCase()}`,

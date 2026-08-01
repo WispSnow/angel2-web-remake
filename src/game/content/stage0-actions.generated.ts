@@ -75,6 +75,7 @@ export type Stage0ActionId = keyof typeof STAGE0_ACTION_DEFINITIONS;
 export const STAGE0_FULL_COMBAT_PROFILES = {
   "soldier": {
     "nativeRecord": 0,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -91,19 +92,36 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 38
       }
     },
-    "strikeStepCounts": [
-      2,
-      2,
-      2,
-      2,
-      9,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        2,
+        2,
+        2,
+        2,
+        9,
+        9
+      ],
+      "right": [
+        2,
+        2,
+        2,
+        2,
+        9,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -799,6 +817,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "magic-sword-warrior": {
     "nativeRecord": 1,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -815,22 +834,42 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      8,
-      2,
-      2,
-      2,
-      2,
-      3,
-      2,
-      8
-    ],
-    "postHitStepCounts": [
-      4,
-      4,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        8,
+        2,
+        2,
+        2,
+        2,
+        3,
+        2,
+        8
+      ],
+      "right": [
+        8,
+        2,
+        2,
+        2,
+        2,
+        3,
+        2,
+        8
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        4,
+        3,
+        3
+      ],
+      "right": [
+        4,
+        4,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -2096,6 +2135,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "jungle-warrior": {
     "nativeRecord": 2,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -2112,21 +2152,40 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 52
       }
     },
-    "strikeStepCounts": [
-      4,
-      5,
-      10,
-      14,
-      5,
-      2,
-      2,
-      1
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        4,
+        5,
+        10,
+        14,
+        5,
+        2,
+        2,
+        1
+      ],
+      "right": [
+        4,
+        5,
+        10,
+        14,
+        5,
+        2,
+        2,
+        1
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3
+      ],
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -2890,6 +2949,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "magic-priest": {
     "nativeRecord": 3,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -2906,17 +2966,32 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      4,
-      4,
-      4,
-      8
-    ],
-    "postHitStepCounts": [
-      6,
-      4,
-      6
-    ],
+    "strikeStepCounts": {
+      "left": [
+        4,
+        4,
+        4,
+        8
+      ],
+      "right": [
+        4,
+        4,
+        2,
+        8
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        6,
+        4,
+        6
+      ],
+      "right": [
+        6,
+        4,
+        6
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -3796,6 +3871,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "prayer-guide": {
     "nativeRecord": 4,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -3812,18 +3888,34 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 15
       }
     },
-    "strikeStepCounts": [
-      12,
-      4,
-      2,
-      4
-    ],
-    "postHitStepCounts": [
-      4,
-      4,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        12,
+        4,
+        2,
+        4
+      ],
+      "right": [
+        12,
+        4,
+        2,
+        4
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        4,
+        3,
+        3
+      ],
+      "right": [
+        4,
+        4,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -4465,6 +4557,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "curse-master": {
     "nativeRecord": 5,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -4481,18 +4574,34 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 39
       }
     },
-    "strikeStepCounts": [
-      4,
-      14,
-      2,
-      4,
-      4
-    ],
-    "postHitStepCounts": [
-      6,
-      4,
-      6
-    ],
+    "strikeStepCounts": {
+      "left": [
+        4,
+        14,
+        2,
+        4,
+        4
+      ],
+      "right": [
+        4,
+        14,
+        2,
+        4,
+        4
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        6,
+        4,
+        6
+      ],
+      "right": [
+        6,
+        4,
+        6
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -5308,6 +5417,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "magician": {
     "nativeRecord": 6,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -5324,20 +5434,38 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      4,
-      1,
-      1,
-      1,
-      10,
-      10
-    ],
-    "postHitStepCounts": [
-      4,
-      6,
-      4,
-      6
-    ],
+    "strikeStepCounts": {
+      "left": [
+        4,
+        1,
+        1,
+        1,
+        10,
+        10
+      ],
+      "right": [
+        4,
+        1,
+        1,
+        1,
+        10,
+        10
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        6,
+        4,
+        6
+      ],
+      "right": [
+        4,
+        6,
+        4,
+        6
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -6347,6 +6475,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "great-axe-warrior": {
     "nativeRecord": 7,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 15,
@@ -6363,20 +6492,38 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 16
       }
     },
-    "strikeStepCounts": [
-      4,
-      1,
-      1,
-      1,
-      8,
-      10
-    ],
-    "postHitStepCounts": [
-      7,
-      7,
-      4,
-      4
-    ],
+    "strikeStepCounts": {
+      "left": [
+        4,
+        1,
+        1,
+        1,
+        8,
+        10
+      ],
+      "right": [
+        4,
+        1,
+        1,
+        1,
+        8,
+        10
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        7,
+        7,
+        4,
+        4
+      ],
+      "right": [
+        7,
+        7,
+        4,
+        4
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -7440,6 +7587,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "half-dragon-warrior": {
     "nativeRecord": 8,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 27,
@@ -7456,19 +7604,36 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 5
       }
     },
-    "strikeStepCounts": [
-      5,
-      9,
-      8,
-      1
-    ],
-    "postHitStepCounts": [
-      10,
-      10,
-      8,
-      4,
-      8
-    ],
+    "strikeStepCounts": {
+      "left": [
+        5,
+        9,
+        8,
+        1
+      ],
+      "right": [
+        5,
+        9,
+        8,
+        1
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        10,
+        10,
+        8,
+        4,
+        8
+      ],
+      "right": [
+        10,
+        10,
+        8,
+        4,
+        8
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -8226,6 +8391,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "magic-armor-warrior": {
     "nativeRecord": 9,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -8242,20 +8408,38 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 41
       }
     },
-    "strikeStepCounts": [
-      4,
-      1,
-      1,
-      1,
-      1,
-      10
-    ],
-    "postHitStepCounts": [
-      7,
-      7,
-      4,
-      4
-    ],
+    "strikeStepCounts": {
+      "left": [
+        4,
+        1,
+        1,
+        1,
+        1,
+        10
+      ],
+      "right": [
+        4,
+        1,
+        1,
+        1,
+        1,
+        10
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        7,
+        7,
+        4,
+        4
+      ],
+      "right": [
+        7,
+        7,
+        4,
+        4
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -9257,6 +9441,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "magic-guide": {
     "nativeRecord": 10,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -9273,20 +9458,38 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      9,
-      7,
-      1,
-      1,
-      1,
-      1
-    ],
-    "postHitStepCounts": [
-      7,
-      7,
-      4,
-      4
-    ],
+    "strikeStepCounts": {
+      "left": [
+        9,
+        7,
+        1,
+        1,
+        1,
+        1
+      ],
+      "right": [
+        9,
+        7,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        7,
+        7,
+        4,
+        4
+      ],
+      "right": [
+        7,
+        7,
+        4,
+        4
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -10094,6 +10297,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "evil-mage": {
     "nativeRecord": 11,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -10110,18 +10314,34 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      12,
-      9,
-      1,
-      1,
-      1
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        12,
+        9,
+        1,
+        1,
+        1
+      ],
+      "right": [
+        12,
+        9,
+        1,
+        1,
+        1
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3
+      ],
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -10753,6 +10973,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "magic-archer": {
     "nativeRecord": 12,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -10769,17 +10990,32 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      7,
-      8,
-      3,
-      1
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        7,
+        8,
+        3,
+        1
+      ],
+      "right": [
+        7,
+        8,
+        3,
+        1
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -11391,6 +11627,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "land-knight": {
     "nativeRecord": 13,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -11407,22 +11644,42 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 42
       }
     },
-    "strikeStepCounts": [
-      8,
-      3,
-      5,
-      10,
-      10,
-      10,
-      2,
-      2,
-      2
-    ],
-    "postHitStepCounts": [
-      5,
-      2,
-      5
-    ],
+    "strikeStepCounts": {
+      "left": [
+        8,
+        3,
+        5,
+        10,
+        10,
+        10,
+        2,
+        2,
+        2
+      ],
+      "right": [
+        8,
+        3,
+        5,
+        10,
+        10,
+        10,
+        2,
+        2,
+        2
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        5,
+        2,
+        5
+      ],
+      "right": [
+        5,
+        2,
+        5
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -12238,6 +12495,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "demon-dragon-knight": {
     "nativeRecord": 14,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -12254,31 +12512,60 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 45
       }
     },
-    "strikeStepCounts": [
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      1,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        9
+      ],
+      "right": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -14006,6 +14293,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "flying-dragon-knight": {
     "nativeRecord": 15,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 27,
@@ -14022,16 +14310,30 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 5
       }
     },
-    "strikeStepCounts": [
-      8,
-      11,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        8,
+        11,
+        9
+      ],
+      "right": [
+        8,
+        11,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3
+      ],
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -14563,6 +14865,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "beast-knight": {
     "nativeRecord": 16,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -14579,17 +14882,32 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 46
       }
     },
-    "strikeStepCounts": [
-      4,
-      4,
-      9,
-      10
-    ],
-    "postHitStepCounts": [
-      4,
-      4,
-      4
-    ],
+    "strikeStepCounts": {
+      "left": [
+        4,
+        4,
+        9,
+        10
+      ],
+      "right": [
+        4,
+        4,
+        9,
+        10
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        4,
+        4
+      ],
+      "right": [
+        7,
+        7,
+        7
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -15359,6 +15677,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "bone-knight": {
     "nativeRecord": 17,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -15375,19 +15694,36 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 51
       }
     },
-    "strikeStepCounts": [
-      4,
-      4,
-      5,
-      10,
-      10
-    ],
-    "postHitStepCounts": [
-      4,
-      4,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        4,
+        4,
+        5,
+        10,
+        10
+      ],
+      "right": [
+        4,
+        4,
+        5,
+        10,
+        10
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        4,
+        3,
+        3
+      ],
+      "right": [
+        4,
+        4,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -16299,6 +16635,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "swift-dragon-knight": {
     "nativeRecord": 18,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -16315,31 +16652,60 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 49
       }
     },
-    "strikeStepCounts": [
-      5,
-      1,
-      1,
-      1,
-      3,
-      3,
-      1,
-      1,
-      1,
-      3,
-      3,
-      1,
-      1,
-      1,
-      3,
-      3,
-      1,
-      1
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        5,
+        1,
+        1,
+        1,
+        3,
+        3,
+        1,
+        1,
+        1,
+        3,
+        3,
+        1,
+        1,
+        1,
+        3,
+        3,
+        1,
+        1
+      ],
+      "right": [
+        5,
+        1,
+        1,
+        1,
+        3,
+        3,
+        1,
+        1,
+        1,
+        3,
+        3,
+        1,
+        1,
+        1,
+        3,
+        3,
+        1,
+        1
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -17531,6 +17897,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "great-dragon-knight": {
     "nativeRecord": 19,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -17547,18 +17914,34 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 4
       }
     },
-    "strikeStepCounts": [
-      10,
-      5,
-      10,
-      5
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3,
-      2
-    ],
+    "strikeStepCounts": {
+      "left": [
+        10,
+        5,
+        10,
+        5
+      ],
+      "right": [
+        10,
+        5,
+        10,
+        5
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3,
+        2
+      ],
+      "right": [
+        3,
+        3,
+        3,
+        2
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -18290,6 +18673,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "archer": {
     "nativeRecord": 20,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -18306,20 +18690,38 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 50
       }
     },
-    "strikeStepCounts": [
-      2,
-      2,
-      2,
-      2,
-      2,
-      8,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      6,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        8,
+        9
+      ],
+      "right": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        8,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        6,
+        3
+      ],
+      "right": [
+        3,
+        6,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -19301,6 +19703,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "crossbow": {
     "nativeRecord": 21,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 55,
@@ -19317,19 +19720,36 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 50
       }
     },
-    "strikeStepCounts": [
-      2,
-      2,
-      2,
-      2,
-      8,
-      10
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        2,
+        2,
+        2,
+        2,
+        8,
+        10
+      ],
+      "right": [
+        2,
+        2,
+        2,
+        2,
+        8,
+        10
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3
+      ],
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -20197,6 +20617,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "cavalry": {
     "nativeRecord": 22,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -20213,22 +20634,42 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 51
       }
     },
-    "strikeStepCounts": [
-      2,
-      2,
-      2,
-      2,
-      2,
-      6,
-      9,
-      6
-    ],
-    "postHitStepCounts": [
-      4,
-      4,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        6,
+        9,
+        6
+      ],
+      "right": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        6,
+        9,
+        6
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        4,
+        3,
+        3
+      ],
+      "right": [
+        4,
+        4,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -21206,6 +21647,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "pegasus-warrior": {
     "nativeRecord": 23,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -21222,17 +21664,32 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      7,
-      10,
-      9,
-      10
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        7,
+        10,
+        9,
+        10
+      ],
+      "right": [
+        7,
+        10,
+        9,
+        10
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -21842,6 +22299,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "sister": {
     "nativeRecord": 24,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -21858,21 +22316,40 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 52
       }
     },
-    "strikeStepCounts": [
-      3,
-      3,
-      3,
-      3,
-      3,
-      2,
-      10,
-      11
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        2,
+        10,
+        11
+      ],
+      "right": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        2,
+        10,
+        11
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -22586,6 +23063,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "monk": {
     "nativeRecord": 25,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -22602,20 +23080,38 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 16
       }
     },
-    "strikeStepCounts": [
-      8,
-      8,
-      6,
-      4,
-      2,
-      8,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        8,
+        8,
+        6,
+        4,
+        2,
+        8,
+        9
+      ],
+      "right": [
+        8,
+        8,
+        6,
+        4,
+        2,
+        8,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3
+      ],
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -23619,6 +24115,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "water-warrior": {
     "nativeRecord": 26,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -23635,19 +24132,36 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 54
       }
     },
-    "strikeStepCounts": [
-      2,
-      2,
-      2,
-      2,
-      9,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        2,
+        2,
+        2,
+        2,
+        9,
+        9
+      ],
+      "right": [
+        2,
+        2,
+        2,
+        2,
+        9,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -24311,6 +24825,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "divine-sword-warrior": {
     "nativeRecord": 27,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -24327,17 +24842,32 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 15
       }
     },
-    "strikeStepCounts": [
-      12,
-      4,
-      2,
-      4
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        12,
+        4,
+        2,
+        4
+      ],
+      "right": [
+        12,
+        4,
+        2,
+        4
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3
+      ],
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -24941,6 +25471,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "warrior": {
     "nativeRecord": 28,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -24957,18 +25488,34 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 15
       }
     },
-    "strikeStepCounts": [
-      12,
-      4,
-      2,
-      4
-    ],
-    "postHitStepCounts": [
-      4,
-      4,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        12,
+        4,
+        2,
+        4
+      ],
+      "right": [
+        12,
+        4,
+        2,
+        4
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        4,
+        3,
+        3
+      ],
+      "right": [
+        4,
+        4,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -25642,6 +26189,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "steel-armor-warrior": {
     "nativeRecord": 29,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -25658,17 +26206,32 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 55
       }
     },
-    "strikeStepCounts": [
-      15,
-      9,
-      1
-    ],
-    "postHitStepCounts": [
-      4,
-      4,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        15,
+        9,
+        1
+      ],
+      "right": [
+        15,
+        9,
+        1
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        4,
+        3,
+        3
+      ],
+      "right": [
+        4,
+        4,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -26290,6 +26853,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "priest": {
     "nativeRecord": 30,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -26306,21 +26870,40 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 56
       }
     },
-    "strikeStepCounts": [
-      2,
-      2,
-      2,
-      2,
-      2,
-      2,
-      9,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        9,
+        9
+      ],
+      "right": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        9,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -27356,6 +27939,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "wizard": {
     "nativeRecord": 31,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -27372,15 +27956,28 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      9,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        9,
+        9
+      ],
+      "right": [
+        9,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3
+      ],
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -27900,6 +28497,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "magic-master": {
     "nativeRecord": 32,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -27916,15 +28514,28 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      9,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        9,
+        9
+      ],
+      "right": [
+        9,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        3,
+        3
+      ],
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -28444,6 +29055,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "evil-sword-warrior": {
     "nativeRecord": 33,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -28460,18 +29072,34 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 15
       }
     },
-    "strikeStepCounts": [
-      12,
-      4,
-      2,
-      4
-    ],
-    "postHitStepCounts": [
-      4,
-      4,
-      3,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        12,
+        4,
+        2,
+        4
+      ],
+      "right": [
+        12,
+        4,
+        2,
+        4
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        4,
+        4,
+        3,
+        3
+      ],
+      "right": [
+        4,
+        4,
+        3,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -29145,6 +29773,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "engineer": {
     "nativeRecord": 34,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -29161,15 +29790,28 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      9,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        9,
+        9
+      ],
+      "right": [
+        9,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -29689,6 +30331,7 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   },
   "empress": {
     "nativeRecord": 35,
+    "reach": "both-sides",
     "voiceSlots": {
       "left": {
         "V1": 2,
@@ -29705,19 +30348,36 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
         "V5": 0
       }
     },
-    "strikeStepCounts": [
-      2,
-      2,
-      2,
-      2,
-      9,
-      9
-    ],
-    "postHitStepCounts": [
-      3,
-      2,
-      3
-    ],
+    "strikeStepCounts": {
+      "left": [
+        2,
+        2,
+        2,
+        2,
+        9,
+        9
+      ],
+      "right": [
+        2,
+        2,
+        2,
+        2,
+        9,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "left": [
+        3,
+        2,
+        3
+      ],
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
     "commandStreams": {
       "left": {
         "mainLeftOrAttacker": {
@@ -30392,6 +31052,1213 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                 "frame": 3,
                 "deltaX": 0,
                 "deltaY": 0
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "dragon": {
+    "nativeRecord": 36,
+    "reach": "right-only",
+    "voiceSlots": {
+      "right": {
+        "V1": 2,
+        "V2": 0,
+        "V3": 14,
+        "V4": 6,
+        "V5": 0
+      }
+    },
+    "strikeStepCounts": {
+      "right": [
+        5,
+        5,
+        12,
+        9
+      ]
+    },
+    "postHitStepCounts": {
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
+    "commandStreams": {
+      "right": {
+        "mainLeftOrAttacker": {
+          "address": "DS:E8BF",
+          "bytesConsumed": 32,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 5,
+              "commands": [
+                {
+                  "opcode": 21050,
+                  "token": ":R",
+                  "parameters": []
+                },
+                {
+                  "opcode": 22586,
+                  "token": ":X",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 18,
+                "deltaY": -16
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 5,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": -16
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 12,
+              "commands": [
+                {
+                  "opcode": 19514,
+                  "token": ":L",
+                  "parameters": []
+                },
+                {
+                  "opcode": 17753,
+                  "token": "EY",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": -6,
+                "deltaY": 14
+              }
+            },
+            {
+              "index": 3,
+              "rendererSubsteps": 9,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            }
+          ]
+        },
+        "mainRightOrDefender": {
+          "address": "DS:E8DF",
+          "bytesConsumed": 24,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 5,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 5,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 12,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 3,
+              "rendererSubsteps": 9,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 40,
+                "deltaY": 0
+              }
+            }
+          ]
+        },
+        "auxiliaryA": {
+          "address": "DS:E8F7",
+          "bytesConsumed": 24,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 17742,
+                  "token": "NE",
+                  "parameters": []
+                },
+                {
+                  "opcode": 22065,
+                  "token": "V1",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 50,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 2,
+              "commands": [
+                {
+                  "opcode": 20056,
+                  "token": "XN",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 50,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 50,
+                "deltaY": 0
+              }
+            }
+          ]
+        },
+        "auxiliaryB": {
+          "address": "DS:8812",
+          "bytesConsumed": 18,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -4
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 2,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 4
+              }
+            }
+          ]
+        },
+        "auxiliaryC": {
+          "address": "DS:E90F",
+          "bytesConsumed": 24,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 17742,
+                  "token": "NE",
+                  "parameters": []
+                },
+                {
+                  "opcode": 22066,
+                  "token": "V2",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 50,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 2,
+              "commands": [
+                {
+                  "opcode": 20056,
+                  "token": "XN",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 50,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 50,
+                "deltaY": 0
+              }
+            }
+          ]
+        },
+        "auxiliaryD": {
+          "address": "DS:8824",
+          "bytesConsumed": 20,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 3,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 2,
+              "commands": [
+                {
+                  "opcode": 17749,
+                  "token": "UE",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 3,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 3,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "head": {
+    "nativeRecord": 37,
+    "reach": "right-only",
+    "voiceSlots": {
+      "right": {
+        "V1": 2,
+        "V2": 0,
+        "V3": 14,
+        "V4": 57,
+        "V5": 4
+      }
+    },
+    "strikeStepCounts": {
+      "right": [
+        4,
+        9,
+        5,
+        8,
+        6,
+        3,
+        1,
+        1,
+        1
+      ]
+    },
+    "postHitStepCounts": {
+      "right": [
+        3,
+        2,
+        3
+      ]
+    },
+    "commandStreams": {
+      "right": {
+        "mainLeftOrAttacker": {
+          "address": "DS:E9AB",
+          "bytesConsumed": 62,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 4,
+              "commands": [
+                {
+                  "opcode": 22068,
+                  "token": "V4",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 30
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 9,
+              "commands": [
+                {
+                  "opcode": 22586,
+                  "token": ":X",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -15
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 5,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 3,
+              "rendererSubsteps": 8,
+              "commands": [
+                {
+                  "opcode": 19514,
+                  "token": ":L",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 4,
+              "rendererSubsteps": 6,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 5,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 20056,
+                  "token": "XN",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 3,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 6,
+              "rendererSubsteps": 1,
+              "commands": [],
+              "pose": {
+                "frame": 4,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 7,
+              "rendererSubsteps": 1,
+              "commands": [],
+              "pose": {
+                "frame": 5,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 8,
+              "rendererSubsteps": 1,
+              "commands": [],
+              "pose": {
+                "frame": 6,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            }
+          ]
+        },
+        "mainRightOrDefender": {
+          "address": "DS:E9E9",
+          "bytesConsumed": 54,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 9,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 5,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 3,
+              "rendererSubsteps": 8,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 4,
+              "rendererSubsteps": 6,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 40,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 5,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 40,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 6,
+              "rendererSubsteps": 1,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 7,
+              "rendererSubsteps": 1,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 8,
+              "rendererSubsteps": 1,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            }
+          ]
+        },
+        "auxiliaryA": {
+          "address": "DS:EA1F",
+          "bytesConsumed": 22,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 19514,
+                  "token": ":L",
+                  "parameters": []
+                },
+                {
+                  "opcode": 22069,
+                  "token": "V5",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 6,
+                "deltaX": 30,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 2,
+              "commands": [],
+              "pose": {
+                "frame": 6,
+                "deltaX": 30,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 6,
+                "deltaX": 30,
+                "deltaY": 0
+              }
+            }
+          ]
+        },
+        "auxiliaryB": {
+          "address": "DS:EA4B",
+          "bytesConsumed": 18,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -4
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 2,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 4
+              }
+            }
+          ]
+        },
+        "auxiliaryC": {
+          "address": "DS:EA35",
+          "bytesConsumed": 22,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 19514,
+                  "token": ":L",
+                  "parameters": []
+                },
+                {
+                  "opcode": 22069,
+                  "token": "V5",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 6,
+                "deltaX": 30,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 2,
+              "commands": [],
+              "pose": {
+                "frame": 6,
+                "deltaX": 30,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 6,
+                "deltaX": 30,
+                "deltaY": 0
+              }
+            }
+          ]
+        },
+        "auxiliaryD": {
+          "address": "DS:EA4B",
+          "bytesConsumed": 18,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -4
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 2,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 4
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "hand": {
+    "nativeRecord": 38,
+    "reach": "right-only",
+    "voiceSlots": {
+      "right": {
+        "V1": 2,
+        "V2": 0,
+        "V3": 14,
+        "V4": 57,
+        "V5": 4
+      }
+    },
+    "strikeStepCounts": {
+      "right": [
+        6,
+        10,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ]
+    },
+    "postHitStepCounts": {
+      "right": [
+        3,
+        3,
+        3
+      ]
+    },
+    "commandStreams": {
+      "right": {
+        "mainLeftOrAttacker": {
+          "address": "DS:EACD",
+          "bytesConsumed": 72,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 6,
+              "commands": [
+                {
+                  "opcode": 22068,
+                  "token": "V4",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 10,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 10,
+              "commands": [
+                {
+                  "opcode": 19514,
+                  "token": ":L",
+                  "parameters": []
+                },
+                {
+                  "opcode": 17753,
+                  "token": "EY",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": -8,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 4,
+              "commands": [
+                {
+                  "opcode": 22065,
+                  "token": "V1",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 3,
+              "rendererSubsteps": 4,
+              "commands": [
+                {
+                  "opcode": 19002,
+                  "token": ":J",
+                  "parameters": []
+                },
+                {
+                  "opcode": 17742,
+                  "token": "NE",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -40
+              }
+            },
+            {
+              "index": 4,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 40
+              }
+            },
+            {
+              "index": 5,
+              "rendererSubsteps": 4,
+              "commands": [
+                {
+                  "opcode": 22069,
+                  "token": "V5",
+                  "parameters": []
+                },
+                {
+                  "opcode": 22852,
+                  "token": "YD",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -40
+              }
+            },
+            {
+              "index": 6,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 40
+              }
+            },
+            {
+              "index": 7,
+              "rendererSubsteps": 4,
+              "commands": [
+                {
+                  "opcode": 22069,
+                  "token": "V5",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -40
+              }
+            },
+            {
+              "index": 8,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 40
+              }
+            }
+          ]
+        },
+        "mainRightOrDefender": {
+          "address": "DS:EB17",
+          "bytesConsumed": 54,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 6,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 10,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 40,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 3,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -40
+              }
+            },
+            {
+              "index": 4,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 40
+              }
+            },
+            {
+              "index": 5,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -40
+              }
+            },
+            {
+              "index": 6,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 40
+              }
+            },
+            {
+              "index": 7,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -40
+              }
+            },
+            {
+              "index": 8,
+              "rendererSubsteps": 4,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 40
+              }
+            }
+          ]
+        },
+        "auxiliaryA": {
+          "address": "DS:EB4D",
+          "bytesConsumed": 24,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 19514,
+                  "token": ":L",
+                  "parameters": []
+                },
+                {
+                  "opcode": 22069,
+                  "token": "V5",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 16,
+                "deltaY": -16
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 16,
+                "deltaY": -16
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 20036,
+                  "token": "ND",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 16,
+                "deltaY": -16
+              }
+            }
+          ]
+        },
+        "auxiliaryB": {
+          "address": "DS:8812",
+          "bytesConsumed": 18,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -4
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 4
+              }
+            }
+          ]
+        },
+        "auxiliaryC": {
+          "address": "DS:EB65",
+          "bytesConsumed": 24,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 19514,
+                  "token": ":L",
+                  "parameters": []
+                },
+                {
+                  "opcode": 22069,
+                  "token": "V5",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 16,
+                "deltaY": -16
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 0,
+                "deltaX": 16,
+                "deltaY": -16
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [
+                {
+                  "opcode": 20036,
+                  "token": "ND",
+                  "parameters": []
+                }
+              ],
+              "pose": {
+                "frame": 0,
+                "deltaX": 16,
+                "deltaY": -16
+              }
+            }
+          ]
+        },
+        "auxiliaryD": {
+          "address": "DS:8812",
+          "bytesConsumed": 18,
+          "steps": [
+            {
+              "index": 0,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": -4
+              }
+            },
+            {
+              "index": 1,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 0
+              }
+            },
+            {
+              "index": 2,
+              "rendererSubsteps": 3,
+              "commands": [],
+              "pose": {
+                "frame": 1,
+                "deltaX": 0,
+                "deltaY": 4
               }
             }
           ]
@@ -31581,6 +33448,47 @@ export const STAGE0_FULL_COMBAT_ASSETS = {
         "/assets/original/full-combat/right-empress-plus50/03.png",
         "/assets/original/full-combat/right-empress-plus50/04.png",
         "/assets/original/full-combat/right-empress-plus50/05.png"
+      ]
+    },
+    "dragon": {
+      "direct": [
+        "/assets/original/full-combat/right-dragon-direct/00.png",
+        "/assets/original/full-combat/right-dragon-direct/01.png",
+        "/assets/original/full-combat/right-dragon-direct/02.png",
+        "/assets/original/full-combat/right-dragon-direct/03.png"
+      ],
+      "plus50": [
+        "/assets/original/full-combat/right-dragon-plus50/00.png",
+        "/assets/original/full-combat/right-dragon-plus50/01.png"
+      ]
+    },
+    "head": {
+      "direct": [
+        "/assets/original/full-combat/right-head-direct/00.png",
+        "/assets/original/full-combat/right-head-direct/01.png",
+        "/assets/original/full-combat/right-head-direct/02.png",
+        "/assets/original/full-combat/right-head-direct/03.png"
+      ],
+      "plus50": [
+        "/assets/original/full-combat/right-head-plus50/00.png",
+        "/assets/original/full-combat/right-head-plus50/01.png",
+        "/assets/original/full-combat/right-head-plus50/02.png",
+        "/assets/original/full-combat/right-head-plus50/03.png",
+        "/assets/original/full-combat/right-head-plus50/04.png",
+        "/assets/original/full-combat/right-head-plus50/05.png",
+        "/assets/original/full-combat/right-head-plus50/06.png"
+      ]
+    },
+    "hand": {
+      "direct": [
+        "/assets/original/full-combat/right-hand-direct/00.png",
+        "/assets/original/full-combat/right-hand-direct/01.png",
+        "/assets/original/full-combat/right-hand-direct/02.png",
+        "/assets/original/full-combat/right-hand-direct/03.png"
+      ],
+      "plus50": [
+        "/assets/original/full-combat/right-hand-plus50/00.png",
+        "/assets/original/full-combat/right-hand-plus50/01.png"
       ]
     }
   }
@@ -36507,6 +38415,162 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
           "yOffset": 0
         }
       ]
+    },
+    "36": {
+      "direct": [
+        {
+          "w": 200,
+          "h": 136,
+          "anchor": 88,
+          "yOffset": 0
+        },
+        {
+          "w": 200,
+          "h": 142,
+          "anchor": 88,
+          "yOffset": 0
+        },
+        {
+          "w": 200,
+          "h": 130,
+          "anchor": 2,
+          "yOffset": 0
+        },
+        {
+          "w": 208,
+          "h": 142,
+          "anchor": 0,
+          "yOffset": 0
+        }
+      ],
+      "plus50": [
+        {
+          "w": 208,
+          "h": 148,
+          "anchor": 88,
+          "yOffset": 0
+        },
+        {
+          "w": 208,
+          "h": 152,
+          "anchor": 88,
+          "yOffset": 0
+        }
+      ]
+    },
+    "37": {
+      "direct": [
+        {
+          "w": 176,
+          "h": 120,
+          "anchor": 79,
+          "yOffset": 0
+        },
+        {
+          "w": 184,
+          "h": 122,
+          "anchor": 85,
+          "yOffset": 0
+        },
+        {
+          "w": 184,
+          "h": 122,
+          "anchor": 87,
+          "yOffset": 0
+        },
+        {
+          "w": 184,
+          "h": 122,
+          "anchor": 60,
+          "yOffset": -15
+        }
+      ],
+      "plus50": [
+        {
+          "w": 176,
+          "h": 120,
+          "anchor": 79,
+          "yOffset": 0
+        },
+        {
+          "w": 136,
+          "h": 76,
+          "anchor": 85,
+          "yOffset": 0
+        },
+        {
+          "w": 136,
+          "h": 76,
+          "anchor": 87,
+          "yOffset": 0
+        },
+        {
+          "w": 96,
+          "h": 89,
+          "anchor": 60,
+          "yOffset": -15
+        },
+        {
+          "w": 128,
+          "h": 136,
+          "anchor": 73,
+          "yOffset": 45
+        },
+        {
+          "w": 128,
+          "h": 115,
+          "anchor": 72,
+          "yOffset": 45
+        },
+        {
+          "w": 120,
+          "h": 100,
+          "anchor": 64,
+          "yOffset": 45
+        }
+      ]
+    },
+    "38": {
+      "direct": [
+        {
+          "w": 152,
+          "h": 65,
+          "anchor": 74,
+          "yOffset": 0
+        },
+        {
+          "w": 192,
+          "h": 97,
+          "anchor": 31,
+          "yOffset": 0
+        },
+        {
+          "w": 144,
+          "h": 65,
+          "anchor": 0,
+          "yOffset": 2
+        },
+        {
+          "w": 168,
+          "h": 135,
+          "anchor": 0,
+          "yOffset": 0
+        }
+      ],
+      "plus50": [
+        {
+          "w": 200,
+          "h": 97,
+          "anchor": 74,
+          "yOffset": 0
+        },
+        {
+          "w": 152,
+          "h": 65,
+          "anchor": 31,
+          "yOffset": 0
+        }
+      ]
     }
   }
 } as const;
@@ -36799,6 +38863,7 @@ export const STAGE0_ACTION_AUDIO_ASSETS = {
   "e-53": "/assets/original/audio/e/53.wav",
   "e-54": "/assets/original/audio/e/54.wav",
   "e-56": "/assets/original/audio/e/56.wav",
+  "e-57": "/assets/original/audio/e/57.wav",
   "e-36": "/assets/original/audio/e/36.wav",
   "magic-83": "/assets/original/audio/magic/83.wav"
 } as const;

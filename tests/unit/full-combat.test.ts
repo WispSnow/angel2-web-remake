@@ -67,6 +67,46 @@ interface ReferenceCommandStep {
   pose: { frame: number; deltaX: number; deltaY: number };
 }
 
+const STREAM_KEYS = [
+  "mainLeftOrAttacker",
+  "mainRightOrDefender",
+  "auxiliaryA",
+  "auxiliaryB",
+  "auxiliaryC",
+  "auxiliaryD",
+] as const;
+
+type ReferenceSideStreams = Readonly<Record<
+  (typeof STREAM_KEYS)[number],
+  { readonly steps: readonly ReferenceCommandStep[] }
+>>;
+
+type ReferenceProfile = (typeof STAGE0_FULL_COMBAT_PROFILES)[keyof typeof STAGE0_FULL_COMBAT_PROFILES];
+
+/**
+ * 记录 36–38 只有 side 2 表现块，`commandStreams.left` 整体缺席。测试直接按 `reach`
+ * 取侧，缺席时抛错而不是静默 `undefined`。
+ */
+function sideStreams(profile: ReferenceProfile, side: "left" | "right"): ReferenceSideStreams {
+  const streams = (profile.commandStreams as
+    Partial<Record<"left" | "right", ReferenceSideStreams>>)[side];
+  if (!streams) throw new Error(`record ${profile.nativeRecord} has no ${side} command streams`);
+  return streams;
+}
+
+function sideVoiceSlots(
+  profile: ReferenceProfile,
+  side: "left" | "right",
+): Readonly<Record<string, number>> {
+  const slots = (profile.voiceSlots as
+    Partial<Record<"left" | "right", Readonly<Record<string, number>>>>)[side];
+  if (!slots) throw new Error(`record ${profile.nativeRecord} has no ${side} voice slots`);
+  return slots;
+}
+
+const reachableSides = (profile: ReferenceProfile): readonly ("left" | "right")[] =>
+  profile.reach === "right-only" ? ["right"] : ["left", "right"];
+
 interface ReferenceFrame {
   frame: number;
   x: number;
@@ -368,8 +408,8 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(FULL_COMBAT_ACCEPTANCE.map(({ record }) => record))
       .toEqual(Array.from({ length: 39 }, (_, record) => record));
     expect(ACCEPTED_FULL_COMBAT_RECORDS)
-      .toEqual(Array.from({ length: 36 }, (_, record) => record));
-    expect(FULL_COMBAT_ACCEPTANCE.slice(0, 36).every((entry) =>
+      .toEqual(Array.from({ length: 39 }, (_, record) => record));
+    expect(FULL_COMBAT_ACCEPTANCE.every((entry) =>
       entry.evidence?.commandStreams
       && entry.evidence.framePlacement
       && (entry.evidence.leftAndRightSemantics || entry.evidence.rightOnlyOriginal)
@@ -382,8 +422,9 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(FULL_COMBAT_ACCEPTANCE.slice(36))
       .toEqual([36, 37, 38].map((record) => expect.objectContaining({
         record,
-        status: "pending",
+        status: "accepted",
         reach: "right-only",
+        evidence: expect.objectContaining({ rightOnlyOriginal: true }),
       })));
     expect(FULL_COMBAT_ACCEPTANCE[35]).toMatchObject({
       classId: "empress",
@@ -395,39 +436,41 @@ describe("Full-screen ordinary combat choreography", () => {
       .toBe(true);
   });
 
-  it("packages native command and graphic evidence for all 36 applicable records", () => {
+  it("packages native command and graphic evidence for all 39 records", () => {
     const profiles = Object.values(STAGE0_FULL_COMBAT_PROFILES);
-    expect(profiles).toHaveLength(36);
+    expect(profiles).toHaveLength(39);
     expect(profiles.map(({ nativeRecord }) => nativeRecord))
-      .toEqual(Array.from({ length: 36 }, (_, record) => record));
+      .toEqual(Array.from({ length: 39 }, (_, record) => record));
+    // 36–38 只在 side 2 编队出现，原版没有 side 1 表现块，也没有 `M_00/86..88`。
+    expect(profiles.filter(({ reach }) => reach === "right-only")
+      .map(({ nativeRecord }) => nativeRecord)).toEqual([36, 37, 38]);
     for (const profile of profiles) {
-      expect(Object.keys(profile.commandStreams.left)).toEqual([
-        "mainLeftOrAttacker",
-        "mainRightOrDefender",
-        "auxiliaryA",
-        "auxiliaryB",
-        "auxiliaryC",
-        "auxiliaryD",
-      ]);
-      expect(Object.keys(profile.commandStreams.right)).toEqual([
-        "mainLeftOrAttacker",
-        "mainRightOrDefender",
-        "auxiliaryA",
-        "auxiliaryB",
-        "auxiliaryC",
-        "auxiliaryD",
-      ]);
+      for (const side of reachableSides(profile)) {
+        expect(Object.keys(sideStreams(profile, side))).toEqual([...STREAM_KEYS]);
+      }
+      if (profile.reach === "right-only") {
+        expect(() => sideStreams(profile, "left")).toThrow();
+        expect(() => sideVoiceSlots(profile, "left")).toThrow();
+      }
     }
+    // `left` 只覆盖 0–35；女帝（35）保留空数组是既有表示，36–38 则整条缺席。
     expect(Object.keys(STAGE0_FULL_COMBAT_ASSETS.left)).toHaveLength(36);
-    expect(Object.keys(STAGE0_FULL_COMBAT_ASSETS.right)).toHaveLength(36);
+    expect(Object.keys(STAGE0_FULL_COMBAT_ASSETS.right)).toHaveLength(39);
     expect(STAGE0_FULL_COMBAT_ASSETS.left.empress.direct).toHaveLength(0);
     expect(STAGE0_FULL_COMBAT_ASSETS.left.empress.plus50).toHaveLength(0);
     expect(STAGE0_FULL_COMBAT_ASSETS.right.empress.direct.length).toBeGreaterThan(0);
     expect(STAGE0_FULL_COMBAT_ASSETS.right.empress.plus50.length).toBeGreaterThan(0);
+    for (const classId of ["dragon", "head", "hand"] as const) {
+      expect(STAGE0_FULL_COMBAT_ASSETS.left).not.toHaveProperty(classId);
+      expect(STAGE0_FULL_COMBAT_ASSETS.right[classId].direct.length).toBeGreaterThan(0);
+      expect(STAGE0_FULL_COMBAT_ASSETS.right[classId].plus50.length).toBeGreaterThan(0);
+    }
   });
 
   it.each(Object.entries(STAGE0_FULL_COMBAT_PROFILES).flatMap(([classId, profile]) =>
-    (["left", "right"] as const)
+    reachableSides(profile)
+      // 女帝（35）左侧命令流存在，但 `M_00/35` 是 3 字节占位、`M_00/85` 缺失，
+      // 没有可渲染的左侧图形，所以逐子步比对同样只覆盖右侧。
       .filter((side) => !(profile.nativeRecord === 35 && side === "left"))
       .map((side) => ({
         classId: classId as UnitClassId,
@@ -454,7 +497,7 @@ describe("Full-screen ordinary combat choreography", () => {
       const start = markTime(script, "fullWindup");
       const impact = markTime(script, "fullImpact");
       const hold = markTime(script, "fullHold");
-      const streams = profile.commandStreams[side];
+      const streams = sideStreams(profile, side);
       const mainActor = streams.mainLeftOrAttacker.steps as readonly ReferenceCommandStep[];
       const mainVictim = streams.mainRightOrDefender.steps as readonly ReferenceCommandStep[];
       const mainActorFrames = referenceNativeFrames(mainActor, expectedActorMark(record, side), 0);
@@ -689,7 +732,7 @@ describe("Full-screen ordinary combat choreography", () => {
         }
       }
 
-      const voiceSlots = profile.voiceSlots[side];
+      const voiceSlots = sideVoiceSlots(profile, side);
       const expectedMainCues = [mainActor, mainVictim]
         .flatMap((steps) => nativeVoiceEvents(steps, voiceSlots, 40))
         .sort((left, right) => left.offset - right.offset)
@@ -769,7 +812,7 @@ describe("Full-screen ordinary combat choreography", () => {
       const start = markTime(script, "fullWindup");
       const deathStart = markTime(script, "fullDefenderDeath");
       const profile = STAGE0_FULL_COMBAT_PROFILES.soldier;
-      const streams = profile.commandStreams[side];
+      const streams = sideStreams(profile, side);
       const mainActor = streams.mainLeftOrAttacker.steps as readonly ReferenceCommandStep[];
       const mainVictim = streams.mainRightOrDefender.steps as readonly ReferenceCommandStep[];
       const mainActorFrames = referenceNativeFrames(mainActor, side === "left" ? 253 : 195, 0);

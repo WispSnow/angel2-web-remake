@@ -961,12 +961,16 @@ function fullSpriteAsset(sprite: FullCombatSpriteState): {
   meta: { w: number; anchor: number; h?: number; yOffset?: number };
 } {
   const classId = classIdFromNativeRecord(sprite.classId);
-  if (!classId || classDefinition(classId).nativeRecord > 35) {
+  if (!classId) {
     throw new Error(`No ordinary full-combat assets for native class ${sprite.classId}`);
   }
   const sideAssets = STAGE0_FULL_COMBAT_ASSETS[sprite.side];
   if (!(classId in sideAssets)) {
-    throw new Error(`No generated full-combat assets for native class ${sprite.classId}`);
+    // 记录 36–38 只在 side 2 编队出现，原版没有 `M_00/86..88`；出现在这里说明
+    // 调用方把它们摆到了左侧，属于不可达构图，不能用占位图凑合。
+    throw new Error(
+      `Native class ${sprite.classId} has no ${sprite.side}-side full-combat assets`,
+    );
   }
   const assetClassId = classId as keyof typeof sideAssets;
   const frames = sideAssets[assetClassId][sprite.set];
