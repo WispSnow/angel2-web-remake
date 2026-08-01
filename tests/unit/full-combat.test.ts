@@ -377,17 +377,22 @@ describe("Full-screen ordinary combat choreography", () => {
       && entry.evidence.guardScreenshot.endsWith("-guard.png")
       && entry.evidence.hurtScreenshot.endsWith("-hurt.png")
       && entry.evidence.deathScreenshot.endsWith("-death.png"))).toBe(true);
-    expect(FULL_COMBAT_ACCEPTANCE.slice(36).map(({ status }) => status))
-      .toEqual([
-        "not-applicable-original",
-        "not-applicable-original",
-        "not-applicable-original",
-      ]);
+    // 36–38 曾被误标为 not-applicable-original：当时只检查了 side 1 描述符，
+    // 但原版这三条记录的 side 2 表现块与 Y_00 图形都有效，只是左侧不可达。
+    expect(FULL_COMBAT_ACCEPTANCE.slice(36))
+      .toEqual([36, 37, 38].map((record) => expect.objectContaining({
+        record,
+        status: "pending",
+        reach: "right-only",
+      })));
     expect(FULL_COMBAT_ACCEPTANCE[35]).toMatchObject({
       classId: "empress",
       status: "accepted",
+      reach: "right-only",
       evidence: { rightOnlyOriginal: true },
     });
+    expect(FULL_COMBAT_ACCEPTANCE.slice(0, 35).every(({ reach }) => reach === "both-sides"))
+      .toBe(true);
   });
 
   it("packages native command and graphic evidence for all 36 applicable records", () => {

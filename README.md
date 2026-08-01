@@ -6,7 +6,7 @@
 
 ## 运行
 
-环境要求：以 `.node-version` 固定的 Node.js 24 LTS、pnpm。仅在重新生成第 0 关原版素材时需要 ImageMagick 的 `magick` 命令。
+环境要求：Node.js 与 pnpm。`.node-version` 记录主版本 `26`，CI 按它安装最新 26.x；本地直接使用 Homebrew 的 `node`，不引入版本管理器，`package.json#engines` 只声明下限 `>=24.18.0`。仅在重新生成第 0 关原版素材时需要 ImageMagick 的 `magick` 命令；生成器已用 `png:exclude-chunk=date,time` 去掉 PNG 的时间戳块，所以重跑 `pnpm content` 只在像素真的改变时才产生 diff。
 
 ```bash
 pnpm install

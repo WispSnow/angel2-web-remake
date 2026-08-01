@@ -59,7 +59,7 @@
 
 ## 技术栈与运行
 
-- Node.js：使用 `.node-version` 固定的 24 LTS；
+- Node.js：`.node-version` 记录主版本 `26`，CI 按它安装最新 26.x；本地跟随 Homebrew 的 `node`，不使用版本管理器。`package.json#engines` 只声明下限 `>=24.18.0`，不设上限；
 - 包管理器：`pnpm`，版本以 `package.json#packageManager` 为准；
 - 运行时：Phaser 4、TypeScript、Vite；
 - 单元测试：Vitest；

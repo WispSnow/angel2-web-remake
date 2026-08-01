@@ -283,15 +283,47 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(dialoguePortrait).toHaveAttribute("data-speaking", "false");
   await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-mouth-frame"); });
   await expect(dialoguePortrait).toHaveAttribute("data-mouth-frame", "1");
-  await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-blink-count"))).toBeGreaterThan(0);
-  const firstBlinkDelay = Number(await dialoguePortrait.getAttribute("data-blink-delay-ms"));
-  expect(firstBlinkDelay).toBeGreaterThanOrEqual(220);
-  expect(firstBlinkDelay).toBeLessThanOrEqual(520);
-  await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-blink-count"))).toBeGreaterThan(1);
-  const secondBlinkDelay = Number(await dialoguePortrait.getAttribute("data-blink-delay-ms"));
-  expect(secondBlinkDelay).toBeGreaterThanOrEqual(220);
-  expect(secondBlinkDelay).toBeLessThanOrEqual(520);
-  expect(secondBlinkDelay).not.toBe(firstBlinkDelay);
+  // 在页面内按 rAF 采样，把每个眨眼世代的 count 与 delay 成对取出。眨眼间隔至少
+  // 220 ms，远大于一帧，所以不会漏世代。不能用两次独立的 getAttribute 分别读
+  // count 和 delay：机器一忙就可能在两次读之间跨过一个世代，把同一个 delay 读两
+  // 遍；而 `idleDelay` 只保证相邻世代不同，非相邻世代本就可能相等。
+  const blinkGenerations = await dialoguePortrait.evaluate((portrait) =>
+    new Promise<[number, number][]>((resolve) => {
+      const samples = new Map<number, number>();
+      // 采样器必须用 setInterval 而不是 requestAnimationFrame：整套并行时页面可能
+      // 被 Chromium 判为不可见并把 rAF 节流到近乎停止，rAF 驱动的采样会连同它自己
+      // 的超时检查一起挂死，把失败变成一次无信息的整测超时。
+      const record = () => {
+        samples.set(Number(portrait.dataset.blinkCount), Number(portrait.dataset.blinkDelayMs));
+      };
+      const finish = () => {
+        clearInterval(interval);
+        clearTimeout(guard);
+        resolve([...samples].sort(([left], [right]) => left - right));
+      };
+      record();
+      const interval = setInterval(() => {
+        record();
+        if (samples.size >= 3) finish();
+      }, 40);
+      const guard = setTimeout(finish, 10_000);
+    }));
+  // 采样窗口内没看到足够世代，说明眨眼时钟本身没推进；直接报出观察到的世代，
+  // 不要退化成一次没有信息的超时。
+  expect(blinkGenerations.length,
+    `blink clock did not advance; sampled generations ${JSON.stringify(blinkGenerations)}`)
+    .toBeGreaterThanOrEqual(3);
+  for (const [, delayMs] of blinkGenerations) {
+    expect(delayMs).toBeGreaterThanOrEqual(220);
+    expect(delayMs).toBeLessThanOrEqual(520);
+  }
+  for (let index = 1; index < blinkGenerations.length; index += 1) {
+    const [priorGeneration, priorDelay] = blinkGenerations[index - 1];
+    const [generation, delayMs] = blinkGenerations[index];
+    // 世代必须连号，否则下面的“相邻世代延迟不同”就不成立。
+    expect(generation).toBe(priorGeneration + 1);
+    expect(delayMs).not.toBe(priorDelay);
+  }
   await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-blink.png" });
   await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });

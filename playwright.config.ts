@@ -3,6 +3,15 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
+  // Playwright 默认起「CPU 核数一半」个 worker（本机 10 核即 5 个）。本套件的用例
+  // 是长时间真实通关，多个 Chromium 上下文互相抢占后，页面会被判为不可见并把
+  // requestAnimationFrame 节流到近乎停止——而剧情推进、眨眼时钟和战斗表现都由 rAF
+  // 驱动。症状每次落点不同（waitForFunction 超时、locator.click 超时、眨眼延迟取样
+  // 撞车、断言读到过期状态），本质是同一个资源饥饿。实测 5 worker 时
+  // `S00-A through S00-D` 约 3/4 次失败，2 worker 连续两轮全绿，总时长只多约 15%。
+  workers: 2,
+  // 该用例单独跑约 14 s，默认 30 s 余量太窄；留一倍余量，避免机器偶发变慢就误报。
+  timeout: 60_000,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://127.0.0.1:4173",

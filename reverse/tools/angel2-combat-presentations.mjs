@@ -7,7 +7,9 @@ import process from "node:process";
 
 const DATA_LINEAR_BASE = 0x1eba0;
 const RECORD_COUNT = 39;
-const FULL_SCREEN_CLASS_RECORD_COUNT = 36;
+// 记录 36「龍」/37「頭」/38「手」只在 side 2 出现（场景 20/22 与 37），
+// 所以原版只填了 side 2 表现块，side 1 块整体指向零占位。
+const SIDE1_ONLY_UNAVAILABLE_RECORDS = [36, 37, 38];
 
 const CODE_SIGNATURES = [
   ["0000:0220", "play-loaded-voc-far-entry", "e83100cbe80100cbf606ed10017403e82200c3f606ee10017403e81700c3f606"],
@@ -491,17 +493,9 @@ async function extract(
   assert(mapDeathPhase2Pointers.length === 9, "map death phase 2 must contain nine descriptors");
 
   const classRecords = descriptors.records.map((record) => {
-    const includeCommandStreams = record.record < FULL_SCREEN_CLASS_RECORD_COUNT;
-    const side1 = presentationBlock(
-      moduleBuffer,
-      sideDescriptor(record, "side1"),
-      includeCommandStreams,
-    );
-    const side2 = presentationBlock(
-      moduleBuffer,
-      sideDescriptor(record, "side2"),
-      includeCommandStreams,
-    );
+    // 命令流按“该侧表现块是否有效”解码，不按记录号截断：36–38 的 side 2 同样有效。
+    const side1 = presentationBlock(moduleBuffer, sideDescriptor(record, "side1"), true);
+    const side2 = presentationBlock(moduleBuffer, sideDescriptor(record, "side2"), true);
     return {
       record: record.record,
       name: record.normalizedName,
@@ -664,7 +658,6 @@ async function extract(
     resources.find((entry) => entry.key === `${variant.group}/${variant.record}`)
       ?.renderedFrames ?? 0;
   for (const record of classRecords) {
-    if (!record.side1.available || !record.side2.available) continue;
     const leftFrameCount = Math.max(
       renderedFrameCount(record.fullScreenGraphicVariants.leftDirect),
       renderedFrameCount(record.fullScreenGraphicVariants.leftPlus50),
@@ -677,6 +670,7 @@ async function extract(
       [record.side1, leftFrameCount],
       [record.side2, rightFrameCount],
     ]) {
+      if (!side.available) continue;
       const [xPointer, yPointer] = side.anchorOrOffsetTablePointers.map((address) =>
         Number.parseInt(address.slice(3), 16));
       side.framePlacement = {
@@ -867,6 +861,16 @@ async function extract(
         soundSynchronization: "both scripts begin with V1, so E/11 is requested when the first death pose is advanced; the request still passes the DS:10ED sound-setting gate",
       },
       classRecordCount: classRecords.length,
+      bothSidesAvailableRecords: classRecords.filter(
+        (record) => record.side1.available && record.side2.available,
+      ).length,
+      side2OnlyRecords: classRecords.filter(
+        (record) => !record.side1.available && record.side2.available,
+      )
+        .map((record) => record.record),
+      side2OnlyReason: "记录 36/37/38 只在 side 2 编队出现（龍：场景 20/22；頭与两只手：场景 37），"
+        + "所以原版只填了 side 2 表现块与 Y_00 图形；side 1 块整体指向零占位，M_00/36..38 是 3 字节占位、"
+        + "M_00/86..88 缺失。这是“左侧不可达”，不是“没有普通全屏动画”。",
       sideVoiceSlotAgreementRecords: classRecords.filter(
         (record) => record.voiceSlotAgreement === true,
       ).length,
@@ -906,10 +910,22 @@ async function extract(
   assert(result.fullScreenPresentation.sideVoiceSlotDifferenceRecords.join(",") === "17,23",
     "unexpected side voice-slot differences");
   assert(
-    classRecords.filter((record) => !record.side1.available || !record.side2.available)
-      .map((record) => record.record).join(",") === "36,37,38",
-    "unexpected full-screen presentation availability boundary",
+    classRecords.filter((record) => !record.side1.available)
+      .map((record) => record.record).join(",") === SIDE1_ONLY_UNAVAILABLE_RECORDS.join(","),
+    "unexpected side-1 full-screen presentation availability boundary",
   );
+  // 36–38 的 side 2 必须保持有效：这三条是龍/頭/手实际可达的普通全屏表现，
+  // 曾被误判为“原版不适用”。任何回归都必须在这里失败。
+  assert(
+    classRecords.every((record) => record.side2.available),
+    "every class record must keep a valid side-2 full-screen presentation block",
+  );
+  for (const record of SIDE1_ONLY_UNAVAILABLE_RECORDS) {
+    const side2 = classRecords[record].side2;
+    assert(side2.commandStreams?.mainLeftOrAttacker?.steps?.length > 0
+      && side2.commandStreams?.mainRightOrDefender?.steps?.length > 0,
+    `record ${record} must expose decoded side-2 attacker and defender command streams`);
+  }
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`);

@@ -1,9 +1,15 @@
 import { CLASS_IDS, type ClassId } from "./class-catalog.generated";
 
-export type FullCombatAcceptanceStatus =
-  | "accepted"
-  | "pending"
-  | "not-applicable-original";
+export type FullCombatAcceptanceStatus = "accepted" | "pending";
+
+/**
+ * 原版只有右侧（side 2）可达的记录。女帝（35）在场景 30 是 side 2 单位，
+ * 场景 42 虽为 side 1 但该关没有敌方单位；36–38 只出现在 side 2 编队。
+ * 这些记录的左侧 `M_00` 资源为空占位，验收不覆盖左侧。
+ */
+export type FullCombatReach = "both-sides" | "right-only";
+
+const RIGHT_ONLY_RECORDS: ReadonlySet<number> = new Set([35, 36, 37, 38]);
 
 interface AcceptedEvidence {
   commandStreams: true;
@@ -20,6 +26,7 @@ interface FullCombatAcceptanceEntry {
   record: number;
   classId: ClassId;
   status: FullCombatAcceptanceStatus;
+  reach: FullCombatReach;
   evidence?: AcceptedEvidence;
   note?: string;
 }
@@ -294,11 +301,15 @@ const ACCEPTED_EVIDENCE: Readonly<Record<number, AcceptedEvidence>> = {
 export const FULL_COMBAT_ACCEPTANCE: readonly FullCombatAcceptanceEntry[] =
   CLASS_IDS.map((classId, record): FullCombatAcceptanceEntry => {
     const evidence = ACCEPTED_EVIDENCE[record];
+    const reach: FullCombatReach = RIGHT_ONLY_RECORDS.has(record)
+      ? "right-only"
+      : "both-sides";
     if (evidence) {
       return {
         record,
         classId,
         status: "accepted",
+        reach,
         evidence,
         ...(record === 35
           ? {
@@ -307,15 +318,18 @@ export const FULL_COMBAT_ACCEPTANCE: readonly FullCombatAcceptanceEntry[] =
           : {}),
       };
     }
-    if (record >= 36) {
+    if (reach === "right-only") {
       return {
         record,
         classId,
-        status: "not-applicable-original",
-        note: "原版职业块没有普通全屏战斗指针；不得伪造通用动画。",
+        status: "pending",
+        reach,
+        note: "原版只填 side 2 表现块与 Y_00 图形：这三条永远不会作为 side 1 单位出战"
+          + "（龍在场景 20/22，頭与两只手在场景 37）。左侧 M_00 为空占位，"
+          + "不得据此创作左侧画面；验收只能覆盖右侧。",
       };
     }
-    return { record, classId, status: "pending" };
+    return { record, classId, status: "pending", reach };
   });
 
 export const ACCEPTED_FULL_COMBAT_RECORDS = FULL_COMBAT_ACCEPTANCE

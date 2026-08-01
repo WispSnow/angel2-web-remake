@@ -96,8 +96,15 @@ await Promise.all([
     copyFile(path.join(planarAssetPath, "0006", source), path.join(publicAssetPath, output))),
 ]);
 
+// ImageMagick 默认往 PNG 里写 tIME 与 date:create/modify/timestamp 文本块，
+// 那会让同样的像素每次生成都产生不同字节，掩盖真正的素材改动。排除日期块后
+// 重跑生成器只在像素真的变化时才产生 diff。
+function runMagick(args) {
+  execFileSync("magick", ["-define", "png:exclude-chunk=date,time", ...args]);
+}
+
 function copyAlphaMask(colorFrame, maskFrame, output) {
-  execFileSync("magick", [
+  runMagick([
     colorFrame,
     "(", maskFrame, "-alpha", "extract", ")",
     "-alpha", "off",
@@ -125,14 +132,14 @@ function composeStatueForeground(output, firstFrame, xOffsets) {
     throw new Error("invalid A/0005 statue foreground layout");
   }
   args.push(output);
-  execFileSync("magick", args);
+  runMagick(args);
 }
 
 function composeTacticalPanelFoundation(output) {
   // B7C6 draws frame 19, followed by release-initial frame 29 at (584,39)
   // and frame 22 at (528,77). The four player setting patches stay separate
   // because the browser must replace them whenever their live state changes.
-  execFileSync("magick", [
+  runMagick([
     path.join(planarAssetPath, "0006/19.png"),
     path.join(planarAssetPath, "0006/29.png"),
     "-geometry", "+104+39",
