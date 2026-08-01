@@ -1125,6 +1125,7 @@ export function renderCombat(
     image.dataset.set = sprite.set;
     image.dataset.frame = String(sprite.frame);
     image.dataset.lift = String(sprite.lift);
+    image.dataset.x = String(Math.round(sprite.x));
     image.dataset.yOffset = String(meta.yOffset ?? 0);
     if (sprite.channel) image.dataset.channel = sprite.channel;
     else delete image.dataset.channel;
@@ -1157,10 +1158,14 @@ export function renderCombat(
     lance.style.transform = `translate(${Math.round(scene.lance.x - meta.anchor)}px, ${Math.round(top)}px)`;
     lance.dataset.frame = String(frame);
     lance.dataset.top = String(Math.round(top));
+    lance.dataset.x = String(Math.round(scene.lance.x));
+    lance.dataset.y = String(Math.round(scene.lance.y));
   } else {
     lance.hidden = true;
     lance.removeAttribute("data-frame");
     lance.removeAttribute("data-top");
+    lance.removeAttribute("data-x");
+    lance.removeAttribute("data-y");
   }
 
   const projectile = query<HTMLImageElement>(".full-combat-projectile");

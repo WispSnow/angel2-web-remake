@@ -487,10 +487,38 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
 
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt!);
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-x", "328");
+  // Contact returns the surviving G1 channel to the up-canted frame 6 and the
+  // lance deflects out of the window instead of driving frame 8 into the floor.
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "349");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "118");
   await page.screenshot({
     path: "artifacts/playwright/combat-lab-record-22-hurt.png",
     fullPage: true,
   });
+
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 100);
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "409");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "86");
+  await page.screenshot({
+    path: "artifacts/playwright/combat-lab-record-22-contact-follow-through.png",
+    fullPage: true,
+  });
+
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 200);
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "469");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "54");
+  await page.screenshot({
+    path: "artifacts/playwright/combat-lab-record-22-deflection-exit.png",
+    fullPage: true,
+  });
+
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 250);
+  await expect(page.locator(".full-combat-lance")).toBeHidden();
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), holdAt!);
+  await expect(page.locator(".full-combat-lance")).toBeHidden();
 
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 50);
@@ -508,7 +536,90 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
     path: "artifacts/playwright/combat-lab-record-22-death.png",
     fullPage: true,
   });
+
+  await page.getByTestId("combat-lab-death").uncheck();
+  await page.getByTestId("combat-lab-side").selectOption("right");
+  const mirroredImpactAt = (await labState(page)).marks
+    .find(({ phase }) => phase === "fullImpact")?.t;
+  expect(mirroredImpactAt).toBeDefined();
+  await page.evaluate(
+    (time) => window.__ANGEL2_COMBAT_LAB__?.seek(time),
+    mirroredImpactAt!,
+  );
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-x", "120");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "106");
+  await page.screenshot({
+    path: "artifacts/playwright/combat-lab-record-22-mirrored-contact.png",
+    fullPage: true,
+  });
+
+  await page.evaluate(
+    (time) => window.__ANGEL2_COMBAT_LAB__?.seek(time),
+    mirroredImpactAt! + 100,
+  );
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "46");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "86");
 });
+
+for (const side of ["left", "right"] as const) {
+  test(`record 21 crossbow lands its ${side} bolt on the target instead of below the floor`, async ({ page }) => {
+    await page.goto(
+      `/combat-lab.html?attacker=crossbow&defender=soldier&reaction=hurt&side=${side}&speed=4`,
+    );
+    await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+    const impactAt = (await labState(page)).marks.find(({ phase }) => phase === "fullImpact")?.t;
+    expect(impactAt).toBeDefined();
+    const actor = page.getByTestId("full-actor-sprite");
+
+    // Mid-descent the giant bolt is still overhead: its bitmap bottom has not
+    // reached the ground line yet.
+    await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 200);
+    await expect(actor).toHaveAttribute("data-frame", "4");
+    await expect(actor).toHaveAttribute("data-lift", "107");
+
+    // `:S` y=120 is a battle-window bottom anchor, so the last descent substep
+    // and the landed frame 5 both sit 7 px above the y=127 ground line. The
+    // old ground-relative reading buried them 120 px under the floor.
+    await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 40);
+    await expect(actor).toHaveAttribute("data-frame", "4");
+    await expect(actor).toHaveAttribute("data-lift", "7");
+
+    await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt!);
+    await expect(actor).toHaveAttribute("data-frame", "5");
+    await expect(actor).toHaveAttribute("data-lift", "7");
+    await expect(actor).toHaveAttribute("data-x", side === "left" ? "266" : "216");
+    await expect(page.getByTestId("full-victim-sprite"))
+      .toHaveAttribute("data-x", side === "left" ? "250" : "198");
+
+    await waitForVisibleSpriteImages(page);
+    const contact = await page.evaluate(() => {
+      const box = (selector: string) => {
+        const image = document.querySelector<HTMLElement>(`${selector} img`);
+        if (!image) throw new Error(`${selector} is not rendered`);
+        return image.getBoundingClientRect();
+      };
+      const sceneBox = document.querySelector(".full-combat-scene")!.getBoundingClientRect();
+      const bolt = box(".full-combat-sprite.slot-actor");
+      const victim = box(".full-combat-sprite.slot-victim");
+      const scale = sceneBox.width / 448;
+      return {
+        overlap: (Math.min(bolt.right, victim.right) - Math.max(bolt.left, victim.left)) / scale,
+        boltBottom: (bolt.bottom - sceneBox.top) / scale,
+        sceneHeight: sceneBox.height / scale,
+      };
+    });
+    // The bolt has to be inside the window and overlapping the target bitmap.
+    expect(contact.boltBottom).toBeLessThan(contact.sceneHeight);
+    expect(contact.overlap).toBeGreaterThan(0);
+
+    await page.screenshot({
+      path: `artifacts/playwright/combat-lab-record-21-${side}-grounded-impact.png`,
+      fullPage: true,
+    });
+  });
+}
 
 test("combat lab directly covers warrior and archer hurt/death presentations", async ({ page }) => {
   await page.goto("/combat-lab.html?speed=4");

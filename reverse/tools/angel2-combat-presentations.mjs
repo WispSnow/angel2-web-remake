@@ -261,6 +261,47 @@ function parseFullScreenCommandStream(buffer, dsOffset, stepCounts, followLinked
   };
 }
 
+/**
+ * A `G1`..`G5` weapon channel is a persistent sprite slot, not a one-shot
+ * effect: its records sit immediately after the strike block, and the post-hit
+ * command stream only re-points the channel when it issues the same token
+ * again. Classes whose post-hit streams never re-issue the token keep reading
+ * from where the strike block ended, consuming the post-hit step counts.
+ *
+ * Record 22 is the stage-0 case: its thrown lance has no post-hit `G1`, so the
+ * four records after `DS:AFFD`/`DS:DB57` keep running and carry the lance back
+ * to the up-canted frame 6 at `(+-30,-16)` per substep — the capture's
+ * upward deflection out of the battle window after contact.
+ */
+function attachWeaponChannelContinuations(buffer, commandStreams, postHitStepCounts) {
+  const isMain = (key) => key.startsWith("main");
+  const reissuedTokens = new Set(
+    Object.entries(commandStreams)
+      .filter(([key]) => !isMain(key))
+      .flatMap(([, stream]) => stream.steps)
+      .flatMap((step) => step.commands)
+      .filter((command) => command.linkedStream !== undefined)
+      .map((command) => command.token),
+  );
+  for (const [key, stream] of Object.entries(commandStreams)) {
+    if (!isMain(key)) continue;
+    for (const step of stream.steps) {
+      for (const command of step.commands) {
+        if (command.linkedStream === undefined) continue;
+        if (reissuedTokens.has(command.token)) continue;
+        const linkedOffset = parseAddress(`0000:${command.linkedStream.address.slice(3)}`).offset;
+        command.linkedStream.postHitContinuation = parseFullScreenCommandStream(
+          buffer,
+          linkedOffset + command.linkedStream.bytesConsumed,
+          postHitStepCounts,
+          false,
+        );
+      }
+    }
+  }
+  return commandStreams;
+}
+
 function sideDescriptor(record, role) {
   const result = record.descriptors.find((entry) => entry.role === role)
     ?? record.descriptors.find((entry) => entry.set === (role === "side1" ? "set1" : "set2"));
@@ -312,17 +353,21 @@ function presentationBlock(buffer, descriptor, includeCommandStreams) {
       Object.entries(commandPointers).map(([key, value]) => [key, `DS:${hex(value)}`]),
     ),
     ...(includeCommandStreams ? {
-      commandStreams: Object.fromEntries(
-        Object.entries(commandPointers).map(([key, value]) => [
-          key,
-          parseFullScreenCommandStream(
-            buffer,
-            value,
-            key.startsWith("main")
-              ? strikeStepCounts.values
-              : postHitStepCounts.values,
-          ),
-        ]),
+      commandStreams: attachWeaponChannelContinuations(
+        buffer,
+        Object.fromEntries(
+          Object.entries(commandPointers).map(([key, value]) => [
+            key,
+            parseFullScreenCommandStream(
+              buffer,
+              value,
+              key.startsWith("main")
+                ? strikeStepCounts.values
+                : postHitStepCounts.values,
+            ),
+          ]),
+        ),
+        postHitStepCounts.values,
       ),
     } : {}),
   };

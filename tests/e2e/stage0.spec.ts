@@ -1921,15 +1921,27 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await page.waitForFunction(() =>
     window.__ANGEL2__?.getState().combatPresentation?.phase === "fullCounterImpact");
   const cavalryHit = (await debugState(page)).combatPresentation?.fullScene;
-  // The lance is consumed on contact and the victim takes the direct bundle.
-  expect(cavalryHit?.lance).toBeUndefined();
-  expect(cavalryHit?.sprites.find(({ set }) => set === "direct")?.side).toBe("left");
+  // Contact hands the surviving G1 channel back to the up-canted frame 6, which
+  // deflects out of the window along the native (-30,-16) post-hit script
+  // instead of leaving the lance planted at the contact point.
+  expect(cavalryHit?.lance).toMatchObject({ side: "right", frame: 6 });
+  expect(cavalryHit?.lance?.x).toBeGreaterThanOrEqual(-44);
+  expect(cavalryHit?.lance?.x).toBeLessThanOrEqual(106);
+  expect(cavalryHit?.sprites.find(({ set }) => set === "direct"))
+    .toMatchObject({ side: "left", x: 120 });
   expect(cavalryHit?.damage?.amount).toBeGreaterThan(0);
   const cavalryVictimX = cavalryHit?.sprites.find(({ set }) => set === "direct")?.x;
-  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "36");
+  // The 36 px apex occupies a single 50 ms post-hit substep, which the default
+  // attribute-assertion backoff regularly steps over; rAF polling samples every
+  // rendered frame and catches it.
+  await page.waitForFunction(() =>
+    document.querySelector('[data-testid="full-victim-sprite"]')
+      ?.getAttribute("data-lift") === "36");
   const cavalryApex = (await debugState(page)).combatPresentation?.fullScene;
   expect(cavalryApex?.sprites.find(({ set }) => set === "direct")?.x).toBe(cavalryVictimX);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-cavalry-recoil-apex.png" });
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().combatPresentation?.fullScene?.lance === undefined);
 
   await enterPlayableBattle({ nativeSpeed: true });
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());

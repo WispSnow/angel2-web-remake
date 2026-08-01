@@ -67,14 +67,23 @@ interface ReferenceCommandStep {
   pose: { frame: number; deltaX: number; deltaY: number };
 }
 
+interface ReferenceFrame {
+  frame: number;
+  x: number;
+  y: number;
+  anchored: boolean;
+}
+
 function referenceNativeFrames(
   steps: readonly ReferenceCommandStep[],
   initialX = 0,
   initialY = 0,
-): Array<{ frame: number; x: number; y: number }> {
-  const frames: Array<{ frame: number; x: number; y: number }> = [];
+  initialAnchored = false,
+): ReferenceFrame[] {
+  const frames: ReferenceFrame[] = [];
   let x = initialX;
   let y = initialY;
+  let anchored = initialAnchored;
   let mode: "none" | "alternate" | "cycle4" | "cycle6" = "none";
   let counter = 0;
   for (const step of steps) {
@@ -87,6 +96,7 @@ function referenceNativeFrames(
         const [nextX, nextY] = command.parameters;
         if (typeof nextX === "number") x = nextX;
         if (typeof nextY === "number") y = nextY;
+        anchored = true;
       }
     }
     for (let substep = 0; substep < step.rendererSubsteps; substep += 1) {
@@ -94,12 +104,21 @@ function referenceNativeFrames(
       else if (mode === "cycle4") counter = (counter + 1) % 4;
       else if (mode === "cycle6") counter = (counter + 1) % 6;
       else counter = 0;
-      frames.push({ frame: step.pose.frame + counter, x, y });
+      frames.push({ frame: step.pose.frame + counter, x, y, anchored });
       x += step.pose.deltaX;
       y += step.pose.deltaY;
     }
   }
   return frames;
+}
+
+/**
+ * `:S` writes battle-window coordinates whose y is the bitmap bottom anchor;
+ * a stream that has not been repositioned stays in the ground-relative frame
+ * the character channel starts in.
+ */
+function referenceActorLift({ y, anchored }: Pick<ReferenceFrame, "y" | "anchored">): number {
+  return anchored ? 127 - y : Math.max(0, -y);
 }
 
 function referenceNativeEnd(
@@ -329,12 +348,18 @@ function referenceLinkedCommands(
 }
 
 function expectedVictimMark(record: number, side: "left" | "right"): number {
-  const actorX = side === "left" ? 253 : 195;
+  const actorX = expectedActorMark(record, side);
   const direction = side === "left" ? 1 : -1;
   if (record === 20) return actorX + direction * 37;
+  if (record === 21) return side === "left" ? 250 : 198;
   if (record === 24) return actorX + direction * 4;
   if (record === 22) return Math.max(70, Math.min(378, actorX + direction * 182));
   return side === "left" ? 302 : 146;
+}
+
+function expectedActorMark(record: number, side: "left" | "right"): number {
+  if (record === 22) return side === "left" ? 146 : 302;
+  return side === "left" ? 253 : 195;
 }
 
 describe("Full-screen ordinary combat choreography", () => {
@@ -427,7 +452,7 @@ describe("Full-screen ordinary combat choreography", () => {
       const streams = profile.commandStreams[side];
       const mainActor = streams.mainLeftOrAttacker.steps as readonly ReferenceCommandStep[];
       const mainVictim = streams.mainRightOrDefender.steps as readonly ReferenceCommandStep[];
-      const mainActorFrames = referenceNativeFrames(mainActor, side === "left" ? 253 : 195, 0);
+      const mainActorFrames = referenceNativeFrames(mainActor, expectedActorMark(record, side), 0);
       const mainVictimFrames = referenceNativeFrames(mainVictim);
       const mainVictimEnd = referenceNativeEnd(mainVictim);
       const mainCamera = referenceNativeCameraFrames(mainActor);
@@ -461,7 +486,7 @@ describe("Full-screen ordinary combat choreography", () => {
             side,
             frame: expectedActor.frame,
             x: expectedActor.x,
-            lift: record === 21 ? -expectedActor.y : Math.max(0, -expectedActor.y),
+            lift: referenceActorLift(expectedActor),
           });
         }
         const expectedVictim = mainVictimFrames[index];
@@ -508,7 +533,8 @@ describe("Full-screen ordinary combat choreography", () => {
             expect(state.lance).toMatchObject({
               side,
               frame: expected.frame,
-              x: linkedFrames[0].x + (expected.x - linkedFrames[0].x) * 2.5,
+              x: linkedFrames[0].x + (expected.x - linkedFrames[0].x) * 2.5
+                + (side === "left" ? -37 : 0),
               y: expected.y,
             });
           } else {
@@ -550,10 +576,18 @@ describe("Full-screen ordinary combat choreography", () => {
         const victimSteps = streams[victimKey].steps as readonly ReferenceCommandStep[];
         const mainActorEnd = referenceNativeEnd(
           mainActor,
-          side === "left" ? 253 : 195,
+          expectedActorMark(record, side),
           0,
         );
-        const actorFrames = referenceNativeFrames(actorSteps, mainActorEnd.x, 0);
+        // Only an absolute `:S` anchor survives the switch to the post-hit
+        // stream; a ground-relative character channel settles back to its mark.
+        const mainActorLast = mainActorFrames.at(-1);
+        const actorFrames = referenceNativeFrames(
+          actorSteps,
+          mainActorEnd.x,
+          mainActorLast?.anchored ? mainActorLast.y : 0,
+          mainActorLast?.anchored ?? false,
+        );
         const victimFrames = referenceNativeFrames(
           victimSteps,
           victimMark,
@@ -587,7 +621,7 @@ describe("Full-screen ordinary combat choreography", () => {
             expect(actualActor).toMatchObject({
               frame: expectedActor.frame,
               x: expectedActor.x,
-              lift: Math.max(0, -expectedActor.y),
+              lift: referenceActorLift(expectedActor),
             });
           }
           const expectedVictim = victimFrames[index];
@@ -1187,19 +1221,25 @@ describe("Full-screen ordinary combat choreography", () => {
       .toBeUndefined();
   });
 
-  it("lets the crossbow bolt finish its native descent before the impact frame", () => {
+  it("drops the crossbow bolt from above the window onto the native ground anchor", () => {
     const left = buildFullCombatScript(
       unit(1, 0, "測試攻方", "crossbow"),
       unit(2, 48, "測試守方"),
       result({ counterOccurred: false, counterDamage: 0 }),
     );
     const leftImpact = markTime(left, "fullImpact");
+    // `:S (266,-105)` starts the descent 232 px above the ground line and
+    // `dy=+25` walks it down to the y=120 anchor over ten substeps.
+    expect(left.sample(leftImpact - 400).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: 232 });
     expect(left.sample(leftImpact - 200).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: -20 });
+      .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: 107 });
     expect(left.sample(leftImpact - 40).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: -120 });
+      .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: 7 });
+    // The post-hit stream issues no `:S`, so the landed frame 5 inherits the
+    // descent's last presented anchor instead of snapping anywhere else.
     expect(left.sample(leftImpact).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ side: "left", classId: 21, frame: 5, x: 266, lift: 0 });
+      .toMatchObject({ side: "left", classId: 21, frame: 5, x: 266, lift: 7 });
 
     const right = buildFullCombatScript(
       unit(2, 48, "測試攻方", "crossbow"),
@@ -1213,9 +1253,63 @@ describe("Full-screen ordinary combat choreography", () => {
     );
     const rightImpact = markTime(right, "fullImpact");
     expect(right.sample(rightImpact - 40).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ side: "right", classId: 21, frame: 4, x: 216, lift: -120 });
+      .toMatchObject({ side: "right", classId: 21, frame: 4, x: 216, lift: 7 });
     expect(right.sample(rightImpact).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ side: "right", classId: 21, frame: 5, x: 216, lift: 0 });
+      .toMatchObject({ side: "right", classId: 21, frame: 5, x: 216, lift: 7 });
+  });
+
+  it("plants the crossbow bolt inside the target reaction bitmap on both sides", () => {
+    const contact = (side: "left" | "right") => {
+      const attackerSide = side === "left" ? 1 : 2;
+      const defenderSide = attackerSide === 1 ? 2 : 1;
+      const script = buildFullCombatScript(
+        unit(attackerSide, attackerSide === 1 ? 0 : 48, "測試攻方", "crossbow"),
+        unit(defenderSide, defenderSide === 1 ? 0 : 48, "測試守方"),
+        result({
+          attackerId: `${attackerSide}:${attackerSide === 1 ? 0 : 48}`,
+          defenderId: `${defenderSide}:${defenderSide === 1 ? 0 : 48}`,
+          counterOccurred: false,
+          counterDamage: 0,
+        }),
+      );
+      const impact = script.sample(markTime(script, "fullImpact"));
+      const bolt = impact.sprites.find(({ channel }) => channel === "actor");
+      const victim = impact.sprites.find(({ channel }) => channel === "victim");
+      const victimSide = side === "left" ? "right" : "left";
+      const boltMeta = FULL_COMBAT_FRAME_META[side][21].plus50[5];
+      const victimMeta = FULL_COMBAT_FRAME_META[victimSide][0].direct[1];
+      return {
+        bolt,
+        victim,
+        boltSpan: [(bolt?.x ?? 0) - boltMeta.anchor, (bolt?.x ?? 0) - boltMeta.anchor + boltMeta.w],
+        victimSpan: [
+          (victim?.x ?? 0) - victimMeta.anchor,
+          (victim?.x ?? 0) - victimMeta.anchor + victimMeta.w,
+        ],
+      };
+    };
+
+    // The bolt's contact point is the fixed native `:S` x, so the target has to
+    // stand on its own native mark for the two to meet.
+    const leftContact = contact("left");
+    expect(leftContact.bolt).toMatchObject({ side: "left", classId: 21, frame: 5, x: 266 });
+    expect(leftContact.victim).toMatchObject({ side: "right", frame: 1, x: 250 });
+    expect(leftContact.boltSpan).toEqual([112, 296]);
+    expect(leftContact.victimSpan).toEqual([228, 316]);
+
+    const rightContact = contact("right");
+    expect(rightContact.bolt).toMatchObject({ side: "right", classId: 21, frame: 5, x: 216 });
+    expect(rightContact.victim).toMatchObject({ side: "left", frame: 1, x: 198 });
+    expect(rightContact.boltSpan).toEqual([188, 372]);
+    expect(rightContact.victimSpan).toEqual([116, 204]);
+
+    // Both sides land the bolt just past the victim's ground anchor and keep
+    // the two bitmaps overlapping, mirroring the archer's contact geometry.
+    for (const { bolt, victim, boltSpan, victimSpan } of [leftContact, rightContact]) {
+      expect(Math.abs((bolt?.x ?? 0) - (victim?.x ?? 0))).toBeLessThanOrEqual(18);
+      expect(Math.min(boltSpan[1], victimSpan[1]) - Math.max(boltSpan[0], victimSpan[0]))
+        .toBeGreaterThan(0);
+    }
   });
 
   it("lands the sister orb inside the target reaction bitmap on both sides", () => {
@@ -1643,8 +1737,24 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(middleLance.particles).toEqual([]);
     expect(script.sample(throwAt + 300).sprites.find(({ set }) => set === "plus50"))
       .toBeUndefined();
-    expect(script.sample(impactAt).lance).toBeUndefined();
     const impact = script.sample(impactAt);
+    // Contact hands the surviving G1 channel back to the up-canted frame 6: the
+    // lance deflects away at the native (+-30,-16) per post-hit substep instead
+    // of driving frame 8 further into the ground.
+    expect(script.sample(impactAt - 1).lance)
+      .toMatchObject({ side: "left", frame: 8, x: 339, y: 103 });
+    expect(impact.sprites.find(({ channel }) => channel === "victim"))
+      .toMatchObject({ side: "right", x: 328 });
+    expect([0, 50, 100, 150, 200, 250].map((offset) => script.sample(impactAt + offset).lance))
+      .toEqual([
+        { side: "left", frame: 6, x: 349, y: 118 },
+        { side: "left", frame: 6, x: 379, y: 102 },
+        { side: "left", frame: 6, x: 409, y: 86 },
+        { side: "left", frame: 6, x: 439, y: 70 },
+        { side: "left", frame: 6, x: 469, y: 54 },
+        undefined,
+      ]);
+    expect(script.sample(holdAt).lance).toBeUndefined();
     const firstApex = script.sample(impactAt + 100);
     const reboundApex = script.sample(impactAt + 550);
     const hold = script.sample(holdAt);
@@ -1682,9 +1792,21 @@ describe("Full-screen ordinary combat choreography", () => {
         counterDamage: 0,
       }),
     );
-    const mirroredImpact = mirrored.sample(markTime(mirrored, "fullImpact"));
+    const mirroredImpactAt = markTime(mirrored, "fullImpact");
+    const mirroredImpact = mirrored.sample(mirroredImpactAt);
     expect(mirroredImpact.camera).toBeLessThan(0);
-    expect(mirroredImpact.sprites.find(({ set }) => set === "direct")?.side).toBe("left");
+    expect(mirroredImpact.sprites.find(({ set }) => set === "direct"))
+      .toMatchObject({ side: "left", x: 120 });
+    expect(mirrored.sample(mirroredImpactAt - 1).lance)
+      .toMatchObject({ side: "right", frame: 8, x: 116, y: 103 });
+    expect([0, 50, 100, 250, 300].map((offset) => mirrored.sample(mirroredImpactAt + offset).lance))
+      .toEqual([
+        { side: "right", frame: 6, x: 106, y: 118 },
+        { side: "right", frame: 6, x: 76, y: 102 },
+        { side: "right", frame: 6, x: 46, y: 86 },
+        { side: "right", frame: 6, x: -44, y: 38 },
+        undefined,
+      ]);
     const mirroredFlight = mirrored.sample(
       (markTime(mirrored, "fullCharge") + markTime(mirrored, "fullImpact")) / 2,
     );

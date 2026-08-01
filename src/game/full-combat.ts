@@ -27,7 +27,8 @@
 // The cavalry (class 22) strike replaces the melee lunge with a couched-lance
 // windup, a thrown-lance projectile (frames 6/7/8), an early attacker exit,
 // and a 360 px camera pan. Its post-impact 112 px camera script accompanies
-// two measured hops: 36 px, then 24 px.
+// two measured hops: 36 px, then 24 px, while the lance itself deflects back to
+// frame 6 and leaves the window instead of stopping at the contact point.
 import {
   STAGE0_FULL_COMBAT_DEATH,
   STAGE0_FULL_COMBAT_FRAME_META,
@@ -143,10 +144,21 @@ const RANGED = {
 // 50 ms per substep (8 → 400 ms for the soldier, 14 → 700 ms for cavalry).
 const NATIVE_STRIKE_SUBSTEP = 40;
 const NATIVE_POST_HIT_SUBSTEP = 50;
+// The captured right-hand G1 bitmap is the calibrated source. Mirroring its
+// frame-8 trimmed bounds into the 448 px viewport places the left anchor 37 px
+// before the raw left-script projection.
+const CAVALRY_LEFT_LANCE_MIRROR_OFFSET = -37;
 
 const ATTACKER_ANCHOR = 253; // left-side primary attacker windup mark
+// Record 22's absolute G1 coordinates contact x=328/120 in the capture. Its
+// primary rider therefore begins 182 px opposite that mark instead of using
+// the melee-oriented common attacker anchor.
+const CAVALRY_ATTACKER_ANCHOR = 146;
 const PRIMARY_VICTIM_MARK = 302; // victim mark when attacked from the left
 const COUNTER_VICTIM_MARK = 205; // victim mark when attacked from the right
+// Record 21's defender stream runs -400/+400 px from the native 650/-202 entry
+// mark, so the crossbow's target settles at 250/198 no matter which side fires.
+const CROSSBOW_VICTIM_MARK = 250;
 // Measured on the capture: the number lands on the floor about 60 px to the
 // victim's far side, its baseline just under the scene's bottom edge.
 const DAMAGE_OFFSET = 60;
@@ -185,7 +197,16 @@ interface NativeCommandStep {
   commands: readonly {
     token: string;
     parameters: readonly (number | string)[];
-    linkedStream?: { steps: readonly NativeCommandStep[] };
+    linkedStream?: {
+      steps: readonly NativeCommandStep[];
+      /**
+       * Records the weapon channel keeps reading once the strike stream ends.
+       * Present only when no post-hit stream re-issues the same G token, which
+       * is exactly when the native channel survives contact instead of being
+       * re-pointed.
+       */
+      postHitContinuation?: { steps: readonly NativeCommandStep[] };
+    };
   }[];
   pose: {
     frame: number;
@@ -324,12 +345,22 @@ function nativeLinkedCommand(
   steps: readonly NativeCommandStep[],
   token: "G1" | "G2" | "G3" | "G4" | "G5",
   substepDuration: number,
-): { offset: number; steps: readonly NativeCommandStep[] } | undefined {
+): {
+  offset: number;
+  steps: readonly NativeCommandStep[];
+  postHitSteps?: readonly NativeCommandStep[];
+} | undefined {
   let offset = 0;
   for (const step of steps) {
     const command = step.commands.find((candidate) =>
       candidate.token === token && candidate.linkedStream);
-    if (command?.linkedStream) return { offset, steps: command.linkedStream.steps };
+    if (command?.linkedStream) {
+      return {
+        offset,
+        steps: command.linkedStream.steps,
+        postHitSteps: command.linkedStream.postHitContinuation?.steps,
+      };
+    }
     offset += step.rendererSubsteps * substepDuration;
   }
   return undefined;
@@ -339,6 +370,24 @@ interface NativeStreamSample {
   frame: number;
   x: number;
   y: number;
+  /**
+   * True once a `:S` has overwritten the channel position. The character
+   * channel is otherwise driven in a ground-relative frame whose y starts at 0,
+   * while `:S` writes battle-window coordinates in which y is the bitmap's
+   * bottom anchor — the same space the linked `G1..G5` channels always use.
+   */
+  anchored: boolean;
+}
+
+/**
+ * Converts a character-channel sample to the renderer's lift. Ground-relative
+ * poses only ever rise; an anchored pose carries an absolute bottom anchor and
+ * must be measured against the scene's ground line instead.
+ */
+function nativeActorLift(sample: NativeStreamSample): number {
+  return sample.anchored
+    ? FULL_SCENE.groundY - sample.y
+    : Math.max(0, -sample.y);
 }
 
 /**
@@ -396,9 +445,11 @@ function sampleNativeStream(
   substepDuration: number,
   initialX: number,
   initialY: number,
+  initialAnchored = false,
 ): NativeStreamSample {
   let x = initialX;
   let y = initialY;
+  let anchored = initialAnchored;
   let elapsed = 0;
   let animationMode: NativeAnimationMode = "none";
   let animationCounter = 0;
@@ -411,6 +462,7 @@ function sampleNativeStream(
         const [nextX, nextY] = command.parameters;
         if (typeof nextX === "number") x = nextX;
         if (typeof nextY === "number") y = nextY;
+        anchored = true;
       }
     }
 
@@ -430,7 +482,7 @@ function sampleNativeStream(
       x += step.pose.deltaX * completed;
       y += step.pose.deltaY * completed;
       const visible = nextNativeFrame(step.pose.frame, animationMode, animationCounter);
-      return { frame: visible.frame, x, y };
+      return { frame: visible.frame, x, y, anchored };
     }
     for (let index = 0; index < step.rendererSubsteps; index += 1) {
       const next = nextNativeFrame(step.pose.frame, animationMode, animationCounter);
@@ -441,7 +493,29 @@ function sampleNativeStream(
     y += step.pose.deltaY * step.rendererSubsteps;
     elapsed += duration;
   }
-  return { frame: lastFrame, x, y };
+  return { frame: lastFrame, x, y, anchored };
+}
+
+/**
+ * The pose the compositor actually showed last: `A80F` accumulates `dx/dy`
+ * after each presented substep, so the end-of-stream accumulator already sits
+ * one increment past the final visible image. A channel that hands an absolute
+ * anchor to the next stream must hand over that visible position.
+ */
+function lastPresentedNativeSample(
+  steps: readonly NativeCommandStep[],
+  substepDuration: number,
+  initialX: number,
+  initialY: number,
+): NativeStreamSample {
+  const duration = nativeStreamDuration(steps, substepDuration);
+  return sampleNativeStream(
+    steps,
+    Math.max(0, duration - 1),
+    substepDuration,
+    initialX,
+    initialY,
+  );
 }
 
 type NativeScrollDirection = -1 | 0 | 1;
@@ -576,7 +650,7 @@ function nativePostHitActorSprite(
   spec: StrikeSpec,
   actorClass: number,
   t: number,
-  impactX: number,
+  impact: NativeStreamSample,
   base: Omit<FullCombatSpriteState, "frame" | "x">,
 ): FullCombatSpriteState | undefined {
   const reaction = spec.damage <= 10 ? "guard" : "hurt";
@@ -590,8 +664,9 @@ function nativePostHitActorSprite(
     stream,
     t,
     NATIVE_POST_HIT_SUBSTEP,
-    impactX,
-    0,
+    impact.x,
+    impact.y,
+    impact.anchored,
   );
   if (!nativeFrameIntersectsViewport(
     base.side,
@@ -604,7 +679,7 @@ function nativePostHitActorSprite(
     ...base,
     frame: pose.frame,
     x: pose.x,
-    lift: Math.max(0, -pose.y),
+    lift: nativeActorLift(pose),
   };
 }
 
@@ -646,11 +721,11 @@ function nativeClassActorSprite(
       ...base,
       frame: pose.frame,
       x: pose.x,
-      // Crossbow step 5 deliberately continues from y=-105 through y=120.
-      // Clamping the positive half to ground level pins the giant bolt there
-      // for five substeps, so camera scroll makes it look as if it slides
-      // forward before impact. The native compositor lets that frame sink.
-      lift: spec.actorClass === 21 ? -pose.y : Math.max(0, -pose.y),
+      // Crossbow step 5 hands the character channel absolute window
+      // coordinates: the giant bolt falls from y=-105, well above the window,
+      // down to the y=120 ground anchor. Reading that as a ground-relative
+      // lift buries the whole descent 127 px below the floor.
+      lift: nativeActorLift(pose),
     };
   }
   if (t >= times.holdStart) return undefined;
@@ -661,11 +736,26 @@ function nativeClassActorSprite(
     spec.actorX,
     0,
   );
+  const presented = lastPresentedNativeSample(
+    stream,
+    NATIVE_STRIKE_SUBSTEP,
+    spec.actorX,
+    0,
+  );
   return nativePostHitActorSprite(
     spec,
     spec.actorClass,
     t - times.impact,
-    impactPose.x,
+    {
+      ...impactPose,
+      // The post-hit streams of the ground-relative classes are calibrated
+      // against a settled character, so only an absolute anchor is carried
+      // across. Crossbow's post-hit stream issues no `:S`, so its landed
+      // frame 5 has to inherit the descent's last presented y instead of
+      // teleporting back to the top of the combat window.
+      y: impactPose.anchored ? presented.y : 0,
+      anchored: impactPose.anchored,
+    },
     base,
   );
 }
@@ -747,7 +837,7 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
 
 function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {
   if (spec.actorClass !== 22 || times.lanceFrom === undefined || times.lanceTo === undefined) return undefined;
-  if (t < times.lanceFrom || t >= times.lanceTo) return undefined;
+  if (t < times.lanceFrom) return undefined;
   const main = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
   const linked = nativeLinkedCommand(main, "G1", NATIVE_STRIKE_SUBSTEP);
   if (!linked) return undefined;
@@ -758,21 +848,62 @@ function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSce
     0,
     0,
   );
-  const pose = sampleNativeStream(
+  // Flight-only stretch that keeps the four-unit script increments reaching the
+  // current cavalry contact geometry. The capture actually projects G1 at one
+  // pixel per script unit, so this factor stands until the open cavalry-geometry
+  // conflict in reverse/notes/ordinary-combat-presentations.md is decided.
+  const flightX = (scriptX: number): number =>
+    startPose.x + (scriptX - startPose.x) * 2.5
+      + (spec.actorSide === "left" ? CAVALRY_LEFT_LANCE_MIRROR_OFFSET : 0);
+
+  const present = (pose: NativeStreamSample, x: number): FullCombatSceneState["lance"] =>
+    nativeFrameIntersectsViewport(spec.actorSide, spec.actorClass, "plus50", pose.frame, x)
+      ? { x, y: pose.y, frame: pose.frame, side: spec.actorSide }
+      : undefined;
+
+  if (t < times.lanceTo) {
+    const pose = sampleNativeStream(linked.steps, t - times.lanceFrom, NATIVE_STRIKE_SUBSTEP, 0, 0);
+    return present(pose, flightX(pose.x));
+  }
+  const deflection = cavalryLanceDeflection(linked, times, t);
+  if (!deflection) return undefined;
+  // The capture projects the deflection one screen pixel per script unit, so the
+  // exit keeps the native slope measured from the contact point.
+  return present(deflection, flightX(deflection.contactX) + (deflection.x - deflection.contactX));
+}
+
+/**
+ * Record 22's post-hit command stream never re-issues `G1`, so the weapon
+ * channel survives contact and keeps reading its own records: four
+ * `frame 6, (+-30,-16)` substeps that cant the lance back up and carry it out of
+ * the battle window. Clearing the channel at contact left the lance stuck in the
+ * ground instead of deflecting away.
+ */
+function cavalryLanceDeflection(
+  linked: NonNullable<ReturnType<typeof nativeLinkedCommand>>,
+  times: StrikeTimes,
+  t: number,
+): (NativeStreamSample & { contactX: number }) | undefined {
+  const continuation = linked.postHitSteps;
+  if (!continuation || times.lanceTo === undefined) return undefined;
+  if (t >= times.lanceTo + nativeStreamDuration(continuation, NATIVE_POST_HIT_SUBSTEP)) {
+    return undefined;
+  }
+  const contactPose = sampleNativeStream(
     linked.steps,
-    t - times.lanceFrom,
+    nativeStreamDuration(linked.steps, NATIVE_STRIKE_SUBSTEP),
     NATIVE_STRIKE_SUBSTEP,
     0,
     0,
   );
-  return {
-    // The G1 weapon channel advances in four-unit script increments; the
-    // original VGA projection spans 10 pixels per increment in the capture.
-    x: startPose.x + (pose.x - startPose.x) * 2.5,
-    y: pose.y,
-    frame: pose.frame,
-    side: spec.actorSide,
-  };
+  const pose = sampleNativeStream(
+    continuation,
+    t - times.lanceTo,
+    NATIVE_POST_HIT_SUBSTEP,
+    contactPose.x,
+    contactPose.y,
+  );
+  return { ...pose, contactX: contactPose.x };
 }
 
 function archerProjectileAt(
@@ -916,7 +1047,7 @@ function genericNativeLinkedEffectSprites(
           0,
           0,
         )
-        : { frame: 0, x: 0, y: 0 };
+        : { frame: 0, x: 0, y: 0, anchored: false };
       pose = sampleNativeStream(
         postLinked.steps,
         t - times.impact - postLinked.offset,
@@ -1294,9 +1425,22 @@ function victimMark(actorClass: FullCombatClass, actorX: number, dir: 1 | -1, me
     // reaction bitmap instead of landing in the empty space before it.
     return actorX + dir * 4;
   }
+  if (actorClass === 21) {
+    // The crossbow bolt is the only strike whose contact point is written as
+    // an absolute `:S` coordinate (266/216), so it cannot be moved to meet the
+    // target — the target has to stand on its own native mark. Running the
+    // -400/+400 px defender stream from the native 650/-202 entry leaves it at
+    // 250/198, which plants the bolt just past the victim's ground anchor.
+    return dir === 1 ? CROSSBOW_VICTIM_MARK : FULL_SCENE.width - CROSSBOW_VICTIM_MARK;
+  }
   if (!isRanged(actorClass)) return meleeMark;
   const ranged = actorX + dir * RANGED.separation;
   return Math.max(70, Math.min(FULL_SCENE.width - 70, ranged));
+}
+
+function primaryActorMark(actorClass: FullCombatClass, attackerLeft: boolean): number {
+  const leftMark = actorClass === 22 ? CAVALRY_ATTACKER_ANCHOR : ATTACKER_ANCHOR;
+  return attackerLeft ? leftMark : FULL_SCENE.width - leftMark;
 }
 
 export function buildFullCombatScript(
@@ -1307,15 +1451,16 @@ export function buildFullCombatScript(
   const battleKey = ++battleKeyCounter;
   const attackerLeft = attacker.side === 1;
   const primaryDir: 1 | -1 = attackerLeft ? 1 : -1;
-  const primaryActorX = attackerLeft ? ATTACKER_ANCHOR : FULL_SCENE.width - ATTACKER_ANCHOR;
+  const primaryClass = fullCombatClass(attacker.classId);
+  const primaryActorX = primaryActorMark(primaryClass, attackerLeft);
   const primary: StrikeSpec = {
     start: OPEN.sceneAt,
     actorSide: attackerLeft ? "left" : "right",
-    actorClass: fullCombatClass(attacker.classId),
+    actorClass: primaryClass,
     victimClass: fullCombatClass(defender.classId),
     actorX: primaryActorX,
     victimX: victimMark(
-      fullCombatClass(attacker.classId),
+      primaryClass,
       primaryActorX,
       primaryDir,
       attackerLeft ? PRIMARY_VICTIM_MARK : FULL_SCENE.width - PRIMARY_VICTIM_MARK,

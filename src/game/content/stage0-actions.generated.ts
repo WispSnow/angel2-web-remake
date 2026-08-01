@@ -4599,7 +4599,43 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": -4
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:99FD",
+                      "bytesConsumed": 18,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 6,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": -24,
+                            "deltaY": -20
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": -24,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 6,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": -24,
+                            "deltaY": 20
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -4968,7 +5004,43 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": -4
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:C535",
+                      "bytesConsumed": 18,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 6,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": 24,
+                            "deltaY": -20
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": 24,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 6,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": 24,
+                            "deltaY": 20
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -14592,7 +14664,43 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": 0
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:A829",
+                      "bytesConsumed": 18,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 0,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 0,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 0,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -14938,7 +15046,43 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": 0
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:D383",
+                      "bytesConsumed": 18,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 7,
+                          "commands": [],
+                          "pose": {
+                            "frame": 0,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 7,
+                          "commands": [],
+                          "pose": {
+                            "frame": 0,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 7,
+                          "commands": [],
+                          "pose": {
+                            "frame": 0,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -15323,7 +15467,53 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": 0
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:A975",
+                      "bytesConsumed": 24,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 2,
+                            "deltaX": -40,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 2,
+                            "deltaX": -40,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 2,
+                            "deltaX": -40,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 3,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 2,
+                            "deltaX": -40,
+                            "deltaY": 0
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -15730,7 +15920,53 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": 0
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:D4CF",
+                      "bytesConsumed": 24,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 2,
+                            "deltaX": 40,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 2,
+                            "deltaX": 40,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 2,
+                            "deltaX": 40,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 3,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 2,
+                            "deltaX": 40,
+                            "deltaY": 0
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -19194,7 +19430,43 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": -24
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:AEA9",
+                      "bytesConsumed": 18,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 3,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 3,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 3,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -19589,7 +19861,43 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": -24
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:DA03",
+                      "bytesConsumed": 18,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 3,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 3,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 3,
+                            "deltaX": 0,
+                            "deltaY": 0
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -20041,7 +20349,53 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": 15
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:B015",
+                      "bytesConsumed": 24,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": 30,
+                            "deltaY": -16
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": 30,
+                            "deltaY": -16
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": 30,
+                            "deltaY": -16
+                          }
+                        },
+                        {
+                          "index": 3,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": 30,
+                            "deltaY": -16
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
@@ -20481,7 +20835,53 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
                           "deltaY": 15
                         }
                       }
-                    ]
+                    ],
+                    "postHitContinuation": {
+                      "address": "DS:DB6F",
+                      "bytesConsumed": 24,
+                      "steps": [
+                        {
+                          "index": 0,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": -30,
+                            "deltaY": -16
+                          }
+                        },
+                        {
+                          "index": 1,
+                          "rendererSubsteps": 4,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": -30,
+                            "deltaY": -16
+                          }
+                        },
+                        {
+                          "index": 2,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": -30,
+                            "deltaY": -16
+                          }
+                        },
+                        {
+                          "index": 3,
+                          "rendererSubsteps": 3,
+                          "commands": [],
+                          "pose": {
+                            "frame": 6,
+                            "deltaX": -30,
+                            "deltaY": -16
+                          }
+                        }
+                      ]
+                    }
                   }
                 }
               ],
