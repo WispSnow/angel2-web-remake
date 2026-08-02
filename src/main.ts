@@ -47,7 +47,7 @@ const mountController = (controller: GameController, userActivated: boolean) => 
           <div class="game-viewport deployment-viewport" id="deployment-viewport">
             <section class="logical-screen deployment-screen" id="deployment-screen" data-testid="deployment-screen"
               aria-label="騎士城堡前部署畫面">
-              <div id="deployment-phaser-root"></div>
+              <div id="deployment-phaser-root" aria-hidden="true"></div>
               <div id="deployment-ui-root" class="deployment-ui-root"></div>
             </section>
           </div>

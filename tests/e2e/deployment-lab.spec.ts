@@ -15,7 +15,7 @@ const deploymentState = (page: Page) => page.evaluate(() => {
 
 test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
 
-test("deployment projection preserves compact roster, semantic focus and feedback gate", async ({ page }) => {
+test("deployment projection preserves native roster geometry, semantic focus and feedback gate", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/deployment-lab.html");
@@ -28,6 +28,26 @@ test("deployment projection preserves compact roster, semantic focus and feedbac
   await expect(page.getByTestId("deployment-roster-9")).toContainText("空名單");
   await expect(page.getByTestId("deployment-canvas"))
     .toHaveAttribute("data-deployment-current-cell", "21,33");
+  await expect(page.getByTestId("deployment-canvas"))
+    .toHaveAttribute("data-deployment-backdrop", "plain");
+  expect(await page.getByTestId("deployment-roster-0").evaluate((element) => ({
+    left: (element as HTMLElement).offsetLeft,
+    top: (element as HTMLElement).offsetTop,
+    width: (element as HTMLElement).offsetWidth,
+    height: (element as HTMLElement).offsetHeight,
+  }))).toEqual({ left: 57, top: 59, width: 80, height: 24 });
+  expect(await page.getByTestId("deployment-roster-5").evaluate((element) => ({
+    left: (element as HTMLElement).offsetLeft,
+    top: (element as HTMLElement).offsetTop,
+    width: (element as HTMLElement).offsetWidth,
+    height: (element as HTMLElement).offsetHeight,
+  }))).toEqual({ left: 201, top: 59, width: 80, height: 24 });
+  expect(await page.getByTestId("deployment-page-0").evaluate((element) => ({
+    left: (element as HTMLElement).offsetLeft,
+    top: (element as HTMLElement).offsetTop,
+    width: (element as HTMLElement).offsetWidth,
+    height: (element as HTMLElement).offsetHeight,
+  }))).toEqual({ left: 440, top: 35, width: 80, height: 24 });
 
   const ui = page.locator("#deployment-ui-root");
   await ui.focus();
@@ -67,8 +87,7 @@ test("deployment projection preserves compact roster, semantic focus and feedbac
 
 test("pointer chooses a deployment cell without placing and empty pages use native feedback", async ({ page }) => {
   await page.goto("/deployment-lab.html");
-  const canvas = page.getByTestId("deployment-canvas");
-  await canvas.click({ position: { x: 340, y: 45 } });
+  await page.locator('[data-open-cell="25,33"]').click();
   expect((await deploymentState(page))?.currentOpenCell).toEqual({ x: 25, y: 33 });
   expect((await deploymentState(page))?.placements).toHaveLength(5);
 
@@ -151,6 +170,7 @@ test("five-unit finish hides FF projection and narrow reduced-motion layout stay
     .toHaveAttribute("data-deployment-submitted", "true");
   await expect(page.getByTestId("deployment-canvas"))
     .toHaveAttribute("data-deployment-current-cell", "");
+  await expect(page.locator("[data-open-cell]:not(:disabled)")).toHaveCount(0);
   expect((await deploymentState(page))?.placements).toHaveLength(5);
   const viewportBox = await page.locator("#deployment-viewport").boundingBox();
   expect(viewportBox?.width).toBeLessThanOrEqual(370);

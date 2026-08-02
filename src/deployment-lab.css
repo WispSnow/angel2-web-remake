@@ -106,48 +106,82 @@
 }
 
 .deployment-roster-entry {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  grid-template-rows: 1fr;
-  align-items: center;
-  text-align: left;
+  width: 80px;
   overflow: visible;
+  border-color: #71644e;
+  background: rgba(3, 3, 3, .82);
+  box-shadow: inset 1px 1px #a69b82, inset -1px -1px #17120f, 1px 1px #000;
+  text-align: left;
 }
 
-.deployment-roster-entry img {
-  width: 22px;
-  height: 22px;
-  object-fit: cover;
-  object-position: center top;
-  image-rendering: pixelated;
-}
-
-.deployment-entry-copy {
-  min-width: 0;
-  padding: 1px 2px 0 3px;
-  line-height: 9px;
-}
-
-.deployment-entry-copy b,
-.deployment-entry-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deployment-entry-copy b { color: #fff4d7; font-size: 9px; }
-.deployment-entry-copy small { color: #e5cba0; font-size: 7px; }
-.deployment-empty { grid-column: 1 / -1; padding-left: 5px; }
-.deployment-empty small { color: #c6a98f; }
-
-.deployment-entry-state {
+.deployment-entry-figure,
+.deployment-entry-name,
+.deployment-entry-class {
   position: absolute;
-  left: 3px;
-  top: 25px;
-  color: #efddb4;
-  font-size: 7px;
-  line-height: 9px;
-  white-space: nowrap;
   pointer-events: none;
 }
 
-.deployment-roster-entry.is-deployed { border-color: #fff; }
-.deployment-roster-entry.is-fixed .deployment-entry-state { color: #ffe56e; }
+.deployment-entry-figure {
+  left: -47px;
+  bottom: 2px;
+  max-width: 40px;
+  max-height: 44px;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: saturate(.55) brightness(.72);
+  image-rendering: pixelated;
+}
+
+.deployment-entry-name {
+  left: 22px;
+  top: -22px;
+  min-width: 58px;
+  color: #bcb29f;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.deployment-entry-class {
+  left: 6px;
+  top: 2px;
+  width: 70px;
+  overflow: hidden;
+  color: #b9aa91;
+  font-size: 8px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-roster-entry.is-deployed {
+  border-color: #e2c569;
+  background: rgba(38, 21, 10, .88);
+}
+
+.deployment-roster-entry.is-deployed .deployment-entry-figure {
+  filter: none;
+}
+
+.deployment-roster-entry.is-deployed .deployment-entry-name {
+  color: #fff1bd;
+}
+
+.deployment-roster-entry.is-deployed .deployment-entry-class {
+  color: #f5d86c;
+}
+
+.deployment-roster-entry.is-fixed {
+  border-style: double;
+  border-color: #fff0a0;
+}
+
+.deployment-empty {
+  left: 5px;
+  color: #675e51;
+  letter-spacing: .08em;
+}
+
 .deployment-roster-entry.is-focused,
 .deployment-page.is-focused,
 .deployment-finish.is-focused {
@@ -169,7 +203,7 @@
 
 .deployment-page {
   left: 440px;
-  width: 36px;
+  width: 80px;
   font-size: 13px;
   line-height: 22px;
 }
@@ -193,33 +227,64 @@
   position: absolute;
   z-index: 2;
   left: 488px;
-  top: 72px;
+  top: 127px;
   width: 144px;
-  height: 246px;
-  padding: 8px;
+  height: 191px;
+  padding: 7px 8px;
   border-top: 1px solid #9e6d3d;
   background: rgba(16, 8, 11, .52);
-  font-size: 10px;
-  line-height: 1.35;
+  font-size: 9px;
+  line-height: 1.3;
 }
 
-.deployment-summary p { margin: 0 0 4px; }
-.deployment-stage-name { color: #ffe170; font-size: 12px; }
-.deployment-count b { color: #fff; font-size: 15px; }
+.deployment-summary p { margin: 0 0 3px; }
+.deployment-stage-name { color: #ffe170; font-size: 11px; }
+.deployment-count b { color: #fff; font-size: 13px; }
 .deployment-next { color: #fff0a2; }
 
+.deployment-open-cells {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin: 3px 0 0;
+}
+
+.deployment-open-cell {
+  min-width: 0;
+  height: 14px;
+  padding: 0;
+  color: #bcae91;
+  border: 1px solid #675640;
+  background: #090708;
+  font: 6px/12px ui-monospace, monospace;
+  cursor: var(--native-cursor-hand);
+  pointer-events: auto;
+}
+
+.deployment-open-cell.is-current {
+  color: #fff3a7;
+  border-color: #f1d86c;
+}
+
+.deployment-open-cell.is-occupied {
+  color: #665d50;
+  border-color: #3b342d;
+  text-decoration: line-through;
+  cursor: default;
+}
+
 .deployment-unit-detail {
-  min-height: 104px;
-  margin-top: 8px;
-  padding-top: 7px;
+  min-height: 62px;
+  margin-top: 4px;
+  padding-top: 5px;
   border-top: 1px solid #704137;
 }
 
 .deployment-unit-detail > img {
   float: left;
-  width: 48px;
-  height: 48px;
-  margin: 0 6px 5px 0;
+  width: 40px;
+  height: 40px;
+  margin: 0 5px 4px 0;
   object-fit: cover;
   object-position: center top;
   border: 1px solid #d0a752;
@@ -227,10 +292,14 @@
 }
 
 .deployment-unit-detail dl { margin: 0; }
-.deployment-unit-detail dl div { display: grid; grid-template-columns: 26px 1fr; }
+.deployment-unit-detail dl div { display: grid; grid-template-columns: 24px 1fr; }
 .deployment-unit-detail dt { color: #caae82; }
-.deployment-unit-detail dd { margin: 0; color: #fff7dc; }
-.deployment-input-hint { clear: both; color: #cbbda5; font-size: 8px; line-height: 1.45; }
+.deployment-unit-detail dd { margin: 0; color: #fff7dc; white-space: nowrap; }
+.deployment-input-hint { clear: both; color: #cbbda5; font-size: 7px; line-height: 1.35; }
+
+/* The native roster uses five 60 px rows. Its unit figure sits outside the
+   80x24 pointer rectangle; keep overflow visible without enlarging hit areas. */
+.deployment-roster-entry > * { pointer-events: none; }
 
 .deployment-status {
   position: absolute;

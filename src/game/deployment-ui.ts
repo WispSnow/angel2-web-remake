@@ -1,10 +1,14 @@
-import { STAGE1_DEPLOYMENT_UI } from "./content/stage1";
+import { STAGE1_ASSETS, STAGE1_DEPLOYMENT_UI } from "./content/stage1";
 import { classStatsFor } from "./content/classes";
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import type { DeploymentSession } from "./deployment-session";
 import { DEPLOYMENT_FEEDBACK_TEXT } from "./simulation/deployment";
 
 const PAGE_LABELS = ["Ⅰ", "Ⅱ", "Ⅲ"] as const;
+
+const deploymentFigureSourceFor = (classId: string): string => classId === "magician"
+  ? STAGE1_ASSETS.allyMagician
+  : "/assets/original/unit-ally-soldier.png";
 
 const escapeHtml = (value: string): string => value
   .replaceAll("&", "&amp;")
@@ -19,7 +23,7 @@ function pressed(gamepad: Gamepad, button: number): boolean {
 export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession): () => void {
   root.tabIndex = 0;
   root.setAttribute("role", "application");
-  root.setAttribute("aria-label", "第 1 關部署名單；方向鍵移動，Control、Insert 或空白鍵主操作，Alt、Delete 或 Enter 次操作，Tab 切換地圖焦點");
+  root.setAttribute("aria-label", "第 1 關部署名單；方向鍵移動，Control、Insert 或空白鍵主操作，Alt、Delete 或 Enter 次操作，Tab 切換落點焦點");
 
   const render = () => {
     const { state } = session;
@@ -33,7 +37,6 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
         const selected = slot !== undefined && selectedSlots.has(slot);
         const fixed = slot !== undefined && fixedSlots.has(slot);
         const focused = state.focus.kind === "roster" && state.focus.index === index;
-        const width = column.index === 2 ? 84 : 112;
         const status = unit
           ? `${fixed ? "固定" : "可選"} · ${selected ? "已出場" : "未出場"}`
           : "空名單";
@@ -44,11 +47,11 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
         return `<button class="deployment-roster-entry${focused ? " is-focused" : ""}${selected ? " is-deployed" : ""}${fixed ? " is-fixed" : ""}"
           type="button" tabindex="-1" data-roster-index="${index}" data-testid="deployment-roster-${index}"
           aria-label="${escapeHtml(label)}" aria-pressed="${selected}"
-          style="left:${column.pointerX}px;top:${top}px;width:${width}px">
-          ${unit ? `<img src="${portraitSourceFor(unit.portrait)}" alt="" aria-hidden="true" />
-            <span class="deployment-entry-copy"><b>${escapeHtml(unit.name)}</b><small>${escapeHtml(unit.className)} · Lv ${stats?.level}</small></span>`
-            : `<span class="deployment-entry-copy deployment-empty"><b>空名單</b><small>此處沒有人.</small></span>`}
-          <span class="deployment-entry-state">${status}</span>
+          style="left:${column.pointerX}px;top:${top}px">
+          ${unit ? `<img class="deployment-entry-figure" src="${deploymentFigureSourceFor(unit.classId)}" alt="" aria-hidden="true" />
+            <span class="deployment-entry-name">${escapeHtml(unit.name)}</span>
+            <span class="deployment-entry-class">${escapeHtml(unit.className)} · Lv ${stats?.level}</span>`
+            : `<span class="deployment-entry-class deployment-empty">空名單</span>`}
         </button>`;
       }),
     ).join("");
@@ -67,6 +70,7 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
     const focusedUnit = session.rosterUnitFor(focusedSlot);
     const focusedStats = focusedUnit ? classStatsFor(focusedUnit) : undefined;
     const current = state.currentOpenCell;
+    const occupiedCells = new Set(state.placements.map(({ position }) => `${position.x},${position.y}`));
     const remaining = state.definition.openCells.length
       - state.placements.filter(({ fixed }) => !fixed).length;
     const feedback = state.feedback ? DEPLOYMENT_FEEDBACK_TEXT[state.feedback] : undefined;
@@ -81,15 +85,28 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
         <p class="deployment-count">已出場 <b>${state.placements.length}／${state.definition.maximumUnits}</b></p>
         <p>剩餘空位 ${remaining}</p>
         <p class="deployment-next" aria-live="polite">${current ? `下一落點 ${current.x},${current.y}` : "部署格已用完"}</p>
+        <div class="deployment-open-cells" aria-label="可選部署落點">
+          ${state.definition.openCells.map((position) => {
+            const key = `${position.x},${position.y}`;
+            const occupied = occupiedCells.has(key);
+            const selected = current?.x === position.x && current.y === position.y;
+            const disabled = occupied || state.submitted;
+            return `<button type="button" tabindex="-1" data-open-cell="${key}"
+              class="deployment-open-cell${selected ? " is-current" : ""}${occupied ? " is-occupied" : ""}"
+              aria-label="部署落點 ${position.x},${position.y}${occupied ? "，已使用" : selected ? "，目前選擇" : ""}"
+              ${disabled ? "disabled" : ""}>${position.x},${position.y}</button>`;
+          }).join("")}
+        </div>
         <div class="deployment-unit-detail">
           ${focusedUnit ? `<img src="${portraitSourceFor(focusedUnit.portrait)}" alt="" aria-hidden="true" />
             <dl><div><dt>人物</dt><dd>${escapeHtml(focusedUnit.name)}</dd></div>
             <div><dt>職業</dt><dd>${escapeHtml(focusedUnit.className)}</dd></div>
             <div><dt>等級</dt><dd>${focusedStats?.level}</dd></div>
-            <div><dt>生命</dt><dd>${focusedUnit.life}／${focusedStats?.maxLife}</dd></div></dl>`
-            : `<p>${state.focus.kind === "map" ? "地圖焦點：主操作前一格，次操作後一格。" : "空名單位置"}</p>`}
+            <div><dt>生命</dt><dd>${focusedUnit.life}／${focusedStats?.maxLife}</dd></div>
+            <div><dt>狀態</dt><dd>${fixedSlots.has(focusedUnit.slot) ? "固定" : "可選"} · ${selectedSlots.has(focusedUnit.slot) ? "已出場" : "未出場"}</dd></div></dl>`
+            : `<p>${state.focus.kind === "map" ? "落點焦點：主操作前一格，次操作後一格。" : "空名單位置"}</p>`}
         </div>
-        <p class="deployment-input-hint">方向鍵／WZAS 移動<br>Ctrl/Ins/Space 主操作<br>Alt/Del/Enter 次操作 · Tab 地圖焦點</p>
+        <p class="deployment-input-hint">方向鍵／WZAS 移動<br>Ctrl/Ins/Space 主操作<br>Alt/Del/Enter 次操作 · Tab 落點焦點</p>
       </aside>
       <div class="deployment-status${feedback ? " is-error" : ""}" data-testid="deployment-status"
         ${feedback ? 'role="alert"' : 'aria-live="polite"'}>
@@ -110,7 +127,12 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
     if (!target || !root.contains(target)) return;
     const rosterIndex = target.dataset.rosterIndex;
     const page = target.dataset.page;
-    if (rosterIndex !== undefined) session.activateRoster(Number(rosterIndex));
+    const openCell = target.dataset.openCell;
+    if (openCell !== undefined) {
+      const [x, y] = openCell.split(",").map(Number);
+      session.activateOpenCell({ x, y });
+    }
+    else if (rosterIndex !== undefined) session.activateRoster(Number(rosterIndex));
     else if (page !== undefined) session.activatePage(Number(page) as 0 | 1 | 2);
     else if (target.hasAttribute("data-finish")) session.activateFinish();
     root.focus({ preventScroll: true });
