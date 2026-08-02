@@ -52,7 +52,7 @@
 | [`systems/techniques-stage0.md`](systems/techniques-stage0.md) | 修女初級炎暴与初級治療 | M00.6 / 已接受 |
 | [`systems/status-foundation.md`](systems/status-foundation.md) | 防魔消费与 v6 最小状态边界 | M00.6 / 已接受 |
 | [`systems/deployment-stage1.md`](systems/deployment-stage1.md) | 第 1 关固定/可选单位与部署提交 | M02 P2 / 纯模拟与投影已完成 |
-| [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M01 / 已规格化 |
+| [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M02 / `REMAKE-009` 已确认，待实现 |
 
 ## 写作规范
 

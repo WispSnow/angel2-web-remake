@@ -2,7 +2,7 @@
 
 ## 目的
 
-本文件决定原版事实、默认修复、严格兼容和 Mod 的关系。具体八项已确认修复见 [`reverse/gdd/web-remake-rule-decisions.md`](../../reverse/gdd/web-remake-rule-decisions.md)。
+本文件决定原版事实、默认修复、严格兼容和 Mod 的关系。具体九项已确认修复见 [`reverse/gdd/web-remake-rule-decisions.md`](../../reverse/gdd/web-remake-rule-decisions.md)。
 
 ## 四层模型
 
@@ -15,7 +15,7 @@
 
 `originalFacts` 不是运行时可混搭配置，而是所有规则选择的证据来源。一次游玩只选择一个基础规则集；`modProfile` 不能同时要求互斥的 `stableRemake` 与 `legacyStrict` 行为。
 
-## 默认规则的八项已确认决策
+## 默认规则的九项已确认决策
 
 | 编号 | `stableRemake` 结果 | `legacyStrict` 差异 |
 | --- | --- | --- |
@@ -27,6 +27,7 @@
 | REMAKE-006 | 魔弓目标承受两次半伤，保留分段防魔时序 | 同默认规则 |
 | REMAKE-007 | 存档保存版本化 PRNG 完整状态 | 只可近似原版不可恢复的 PIT 未来 |
 | REMAKE-008 | 无消费者兼容字段原样往返、不赋予效果 | 同默认规则 |
+| REMAKE-009 | 同一动作的范围、数值、效果几何和结算规则不因阵营或人工/AI 控制而改变 | 保留原版玩家/AI 分表、AI 冰雪自身中心及射击数值差异 |
 
 ## 便利功能分类
 
