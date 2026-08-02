@@ -52,7 +52,13 @@ export function nativeMouthFrameAfterGlyph(
 }
 
 function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string): string {
-  const animation = ASSETS.portraitAnimations[portrait];
+  const portraitSource = ASSETS.portraits[portrait as keyof typeof ASSETS.portraits]
+    ?? `/assets/original/portrait-${portrait}.png`;
+  const animation = ASSETS.portraitAnimations[
+    portrait as keyof typeof ASSETS.portraitAnimations
+  ];
+  const base = `<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${portraitSource}" alt="${alt}" />`;
+  if (!animation) return base;
   const eyeStyle = [
     `left:${percentage(animation.eyeOrigin.x)}`,
     `top:${percentage(animation.eyeOrigin.y)}`,
@@ -66,7 +72,7 @@ function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: stri
     `height:${percentage(animation.mouthSize.height)}`,
   ].join(";");
   return `
-    <img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${ASSETS.portraits[portrait]}" alt="${alt}" />
+    ${base}
     ${animation.eyes.map((source, index) =>
       `<img class="portrait-eye portrait-eye-${index + 1}" style="${eyeStyle}" src="${source}" alt="" aria-hidden="true" />`,
     ).join("")}
@@ -168,7 +174,9 @@ export function startPortraitAnimations(
     for (const element of root.querySelectorAll<HTMLElement>("[data-portrait-channel]")) {
       const channel = element.dataset.portraitChannel;
       const portrait = Number(element.dataset.portraitRecord) as PortraitRecord;
-      if (!channel || !ASSETS.portraitAnimations[portrait]) continue;
+      if (!channel || !ASSETS.portraitAnimations[
+        portrait as keyof typeof ASSETS.portraitAnimations
+      ]) continue;
       let blinkState = blinkStates.get(channel);
       if (!blinkState || blinkState.portrait !== portrait) {
         blinkState = resetBlinkState(portrait, now);

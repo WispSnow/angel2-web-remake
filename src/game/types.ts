@@ -4,7 +4,7 @@ export type Side = 1 | 2;
 export type Difficulty = 0 | 1 | 2 | 3;
 export type UnitClassId = ClassId;
 export type StageId = "stage-00" | "stage-01";
-export type PortraitRecord = 15 | 45 | 46 | 47 | 48;
+export type PortraitRecord = 0 | 15 | 42 | 43 | 44 | 45 | 46 | 47 | 48;
 
 export interface Position {
   x: number;
@@ -97,7 +97,7 @@ export interface DialoguePage {
   /** Characters already present before an appended line starts typing. */
   revealStart?: number;
   source: {
-    record: 0 | 1 | 2 | 3 | "promotion" | "battle-command";
+    record: 0 | 1 | 2 | 3 | 4 | 5 | 6 | "promotion" | "battle-command";
     wait: number;
     address?: string;
   };

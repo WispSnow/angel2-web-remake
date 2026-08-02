@@ -5,7 +5,9 @@ import {
   ROUND2_STORY,
   STORY_PAGES_BY_ID,
   VICTORY_STORY,
+  storyIdForStagePhase,
   storyPagesForStagePhase,
+  storyPhaseForStageStory,
 } from "../../src/game/content/dialogue";
 import { GROUP_COMMAND_DIALOGUE } from "../../src/game/content/group-command-dialogue";
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
@@ -54,6 +56,10 @@ describe("native stage-zero dialogue checkpoints", () => {
     expect(storyPagesForStagePhase(STAGE0_DEFINITION, "openingStory")).toBe(OPENING_STORY);
     expect(storyPagesForStagePhase(STAGE0_DEFINITION, "round2Story")).toBe(ROUND2_STORY);
     expect(storyPagesForStagePhase(STAGE0_DEFINITION, "victoryStory")).toBe(VICTORY_STORY);
+    expect(storyIdForStagePhase(STAGE0_DEFINITION, "openingStory"))
+      .toBe("stage-00-opening-story");
+    expect(storyPhaseForStageStory(STAGE0_DEFINITION, "stage-00-round-2-story"))
+      .toBe("round2Story");
   });
 
   it("preserves the three native group-command lines and selector addresses", () => {

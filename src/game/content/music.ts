@@ -32,7 +32,21 @@ export const STAGE_MUSIC_PROGRAMS = {
 } as const satisfies Partial<Record<StageMusicId, MusicProgram>>;
 
 const STAGE_MUSIC_REGISTRY: Partial<Record<StageMusicId, MusicProgram>> =
-  STAGE_MUSIC_PROGRAMS;
+  { ...STAGE_MUSIC_PROGRAMS };
+
+export function registerStageMusicPrograms(
+  programs: Partial<Record<StageMusicId, MusicProgram>>,
+): void {
+  for (const [musicId, program] of Object.entries(programs) as Array<
+    [StageMusicId, MusicProgram]
+  >) {
+    const existing = STAGE_MUSIC_REGISTRY[musicId];
+    if (existing && existing !== program) {
+      throw new Error(`Music program already registered with different content: ${musicId}`);
+    }
+    STAGE_MUSIC_REGISTRY[musicId] = program;
+  }
+}
 
 export const PRELOAD_STAGE_MUSIC_PROGRAMS: readonly MusicProgram[] =
   Object.values(STAGE_MUSIC_PROGRAMS);

@@ -92,19 +92,59 @@ export const STORY_PAGES_BY_ID = {
 } as const satisfies Partial<Record<StageStoryId, readonly DialoguePage[]>>;
 
 const STORY_PAGE_REGISTRY: Partial<Record<StageStoryId, readonly DialoguePage[]>> =
-  STORY_PAGES_BY_ID;
+  { ...STORY_PAGES_BY_ID };
+
+export function registerStageStoryPages(
+  stories: Partial<Record<StageStoryId, readonly DialoguePage[]>>,
+): void {
+  for (const [storyId, pages] of Object.entries(stories) as Array<
+    [StageStoryId, readonly DialoguePage[]]
+  >) {
+    const existing = STORY_PAGE_REGISTRY[storyId];
+    if (existing && existing !== pages) {
+      throw new Error(`Story pages already registered with different content: ${storyId}`);
+    }
+    if (pages.length === 0) throw new Error(`Cannot register an empty story: ${storyId}`);
+    STORY_PAGE_REGISTRY[storyId] = pages;
+  }
+}
+
+export function storyIdForStagePhase(
+  stage: StageDefinition,
+  phase: StageStoryPhase,
+): StageStoryId | undefined {
+  if (phase === "prebattleStory") return stage.stories.prebattle;
+  if (phase === "openingStory") return stage.stories.opening;
+  if (phase === "round2Story") {
+    return stage.stories.roundStarts.find(({ round }) => round === 2)?.storyId;
+  }
+  return stage.stories.victory;
+}
+
+export function storyPhaseForStageStory(
+  stage: StageDefinition,
+  storyId: StageStoryId,
+): StageStoryPhase | undefined {
+  if (stage.stories.prebattle === storyId) return "prebattleStory";
+  if (stage.stories.opening === storyId) return "openingStory";
+  if (stage.stories.roundStarts.some((story) => story.storyId === storyId)) {
+    // The current DOM phase name is retained for stage-zero save/debug
+    // compatibility; the semantic round remains in StageStoryDefinition.
+    return "round2Story";
+  }
+  if (stage.stories.victory === storyId) return "victoryStory";
+  return undefined;
+}
+
+export function storyPagesForId(storyId: StageStoryId): readonly DialoguePage[] {
+  return STORY_PAGE_REGISTRY[storyId] ?? [];
+}
 
 export function storyPagesForStagePhase(
   stage: StageDefinition,
   phase: StageStoryPhase,
 ): readonly DialoguePage[] {
-  const storyId = phase === "prebattleStory"
-    ? stage.stories.prebattle
-    : phase === "openingStory"
-      ? stage.stories.opening
-      : phase === "round2Story"
-        ? stage.stories.roundStarts.find(({ round }) => round === 2)?.storyId
-        : stage.stories.victory;
+  const storyId = storyIdForStagePhase(stage, phase);
   if (!storyId) return [];
-  return STORY_PAGE_REGISTRY[storyId] ?? [];
+  return storyPagesForId(storyId);
 }

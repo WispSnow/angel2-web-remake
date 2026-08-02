@@ -5,6 +5,9 @@ const EDGE_PAN_SETTLE_MS = 180;
 
 interface DebugState {
   phase: string;
+  campaignRoute?: "stage-01" | "stage-02";
+  activeStoryId?: string;
+  consumedEventIds: string[];
   dialogueIndex: number;
   actionMode: string;
   selectedId?: string;
@@ -243,7 +246,11 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect.poll(() => statueForegrounds.evaluateAll((images) =>
     images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth === 32),
   )).toBe(true);
-  expect((await debugState(page)).phase).toBe("prebattleStory");
+  expect((await debugState(page))).toMatchObject({
+    phase: "prebattleStory",
+    activeStoryId: "stage-00-prebattle-story",
+    consumedEventIds: ["stage-00-prebattle-story"],
+  });
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
   const skipDialogue = page.getByTestId("skip-dialogue");
   await expect(skipDialogue).toBeVisible();
@@ -343,6 +350,10 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("skip-dialogue").click();
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "scripted");
   const openingMovement = (await debugState(page)).movementPresentation!;
+  expect((await debugState(page)).consumedEventIds).toEqual([
+    "stage-00-prebattle-story",
+    "stage-00-opening-move",
+  ]);
   expect(openingMovement.path.length).toBeGreaterThan(2);
   expect(openingMovement.stepIndex).toBeLessThan(openingMovement.path.length - 1);
   for (let index = 1; index < openingMovement.path.length; index += 1) {
@@ -360,6 +371,14 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(state.units.filter((unit) => unit.side === 1)).toHaveLength(6);
   expect(state.units.filter((unit) => unit.side === 2)).toHaveLength(10);
   expect(state.units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 29, y: 26 });
+  expect(state).toMatchObject({
+    activeStoryId: "stage-00-opening-story",
+    consumedEventIds: [
+      "stage-00-prebattle-story",
+      "stage-00-opening-move",
+      "stage-00-opening-story",
+    ],
+  });
 
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "player");
@@ -770,6 +789,15 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await waitForPhase(page, "round2Story");
   state = await debugState(page);
   expect(state.round).toBe(2);
+  expect(state).toMatchObject({
+    activeStoryId: "stage-00-round-2-story",
+    consumedEventIds: [
+      "stage-00-prebattle-story",
+      "stage-00-opening-move",
+      "stage-00-opening-story",
+      "stage-00-round-2-story",
+    ],
+  });
   expect(state.units.find((unit) => unit.id === "2:41")!.y).toBeGreaterThan(39);
   expect(state.units.filter((unit) => unit.side === 1).every((unit) => !unit.acted)).toBe(true);
 
@@ -816,6 +844,15 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-combat.png" });
   await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
+  expect((await debugState(page))).toMatchObject({
+    activeStoryId: "stage-00-victory-story",
+    consumedEventIds: [
+      "stage-00-prebattle-story",
+      "stage-00-opening-move",
+      "stage-00-opening-story",
+      "stage-00-victory-story",
+    ],
+  });
   await page.getByTestId("skip-dialogue").click();
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("victory-continue").click();
@@ -831,6 +868,10 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   await page.getByTestId("save-slot-20").click();
   await waitForPhase(page, "nextStage");
+  expect((await debugState(page))).toMatchObject({
+    campaignRoute: "stage-01",
+    consumedEventIds: expect.arrayContaining(["stage-00-completed-route"]),
+  });
   await expect(page.getByText("垂直切片完成", { exact: true })).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
@@ -1285,6 +1326,11 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   expect(restored.round).toBe(initial.round);
   expect(restored.units).toEqual(initial.units);
   expect(restored.rngState).toBe(initial.rngState);
+  expect(restored.consumedEventIds).toEqual([
+    "stage-00-prebattle-story",
+    "stage-00-opening-move",
+    "stage-00-opening-story",
+  ]);
   expect(restored.cursor).toEqual(initial.cursor);
   expect(restored.cameraOrigin).toEqual(initial.cameraOrigin);
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });

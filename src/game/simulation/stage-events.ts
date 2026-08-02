@@ -21,6 +21,7 @@ export function stageEventTriggerMatches(
   if (expected.type !== received.type) return false;
   switch (expected.type) {
     case "campaign-entered":
+    case "battle-started":
     case "objective-satisfied":
     case "victory-flow-completed":
       return true;
@@ -31,6 +32,28 @@ export function stageEventTriggerMatches(
     case "round-started":
       return received.type === expected.type && received.round === expected.round;
   }
+}
+
+export function consumedEventIdsForBattleResume(
+  stage: StageDefinition,
+  round: number,
+): StageEventId[] {
+  return stage.events
+    .filter(({ trigger }) => {
+      switch (trigger.type) {
+        case "campaign-entered":
+        case "battle-started":
+        case "story-completed":
+        case "effect-completed":
+          return true;
+        case "round-started":
+          return trigger.round <= round;
+        case "objective-satisfied":
+        case "victory-flow-completed":
+          return false;
+      }
+    })
+    .map(({ id }) => id);
 }
 
 export function createStageEventState(

@@ -6,9 +6,21 @@ import {
   type PromotionTarget,
 } from "./content/classes";
 import {
-  storyPagesForStagePhase,
+  storyPagesForId,
+  storyPhaseForStageStory,
   type StageStoryPhase,
 } from "./content/dialogue";
+import {
+  stageSimulationEffectFor,
+  type CampaignRouteId,
+} from "./content/stage-effects";
+import type {
+  StageEventDefinition,
+  StageEventTrigger,
+  StagePresentationId,
+  StageSimulationEffectId,
+  StageStoryId,
+} from "./content/stages";
 import {
   groupCommandDialogueFor,
   type SpokenGroupCommandId,
@@ -18,6 +30,12 @@ import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneSt
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import { manhattan, positionKey, reachableCells, shortestPath } from "./simulation/grid";
 import { DeterministicRng } from "./simulation/rng";
+import {
+  consumedEventIdsForBattleResume,
+  createStageEventState,
+  dispatchStageEvents,
+  type StageEventState,
+} from "./simulation/stage-events";
 import type {
   BattleActionId,
   SpecialActionResult,
@@ -161,6 +179,7 @@ export class GameController {
   battle: Stage0Battle;
   difficulty: Difficulty;
   phase: GamePhase = "prebattleStory";
+  campaignRoute?: CampaignRouteId;
   actionMode: ActionMode = "idle";
   dialogueIndex = 0;
   selectedId?: string;
@@ -224,6 +243,8 @@ export class GameController {
   private busy = false;
   private promotionResume?: () => void;
   private groupCommandLeaderId?: string;
+  private activeStoryId?: StageStoryId;
+  private stageEventState: StageEventState;
   private listeners = new Set<Listener>();
   private readonly testMode = new URLSearchParams(location.search).has("test");
   // Keeps the measured full-screen timing under ?test=1 for visual review.
@@ -232,6 +253,7 @@ export class GameController {
   constructor(difficulty: Difficulty = 0) {
     this.difficulty = difficulty;
     this.battle = new Stage0Battle(difficulty);
+    this.stageEventState = createStageEventState(this.battle.stage);
     const preferences = loadPresentationPreferences(localStorage);
     this.battlePresentation = preferences.battlePresentation;
     this.gridEnabled = preferences.gridEnabled;
@@ -243,6 +265,7 @@ export class GameController {
     this.movementSoundEnabled = soundPreferences.movementSoundEnabled;
     this.combatSoundEnabled = soundPreferences.combatSoundEnabled;
     this.keySoundEnabled = soundPreferences.keySoundEnabled;
+    this.initializeStageEventProgress();
   }
 
   static fromSave(save: SaveData, slot: number): GameController {
@@ -264,8 +287,8 @@ export class GameController {
     if (promotionUnit && this.promotionDialogueIndex !== undefined) {
       return promotionDialogueFor(promotionUnit)[this.promotionDialogueIndex];
     }
-    if (!isStoryPhase(this.phase)) return undefined;
-    return storyPagesForStagePhase(this.battle.stage, this.phase)[this.dialogueIndex];
+    if (!this.activeStoryId || !isStoryPhase(this.phase)) return undefined;
+    return storyPagesForId(this.activeStoryId)[this.dialogueIndex];
   }
 
   get focusedUnit(): BattleUnit | undefined {
@@ -415,8 +438,8 @@ export class GameController {
       this.emit();
       return;
     }
-    if (!isStoryPhase(this.phase)) return;
-    const pages = storyPagesForStagePhase(this.battle.stage, this.phase);
+    if (!isStoryPhase(this.phase) || !this.activeStoryId) return;
+    const pages = storyPagesForId(this.activeStoryId);
     if (this.dialogueIndex < pages.length - 1) {
       this.dialogueIndex += 1;
       this.emit();
@@ -432,9 +455,13 @@ export class GameController {
 
   private completeDialogue(): void {
     const completed = this.phase;
+    const storyId = this.activeStoryId;
+    if (!storyId || !isStoryPhase(completed)) return;
+    this.activeStoryId = undefined;
     this.dialogueIndex = 0;
-    if (completed === "prebattleStory") {
-      void this.runOpeningMove();
+    const events = this.consumeStageTrigger({ type: "story-completed", storyId });
+    if (events.length > 0) {
+      void this.processStageEvents(events).then(() => this.emit());
     } else if (completed === "openingStory" || completed === "round2Story") {
       this.phase = "player";
       this.statusMessage = completed === "openingStory" ? "我方回合：選擇一名尚未行動的單位。" : "第 2 回合開始。";
@@ -445,28 +472,92 @@ export class GameController {
     }
   }
 
-  private async runOpeningMove(): Promise<void> {
+  private initializeStageEventProgress(): void {
+    this.stageEventState = createStageEventState(this.battle.stage);
+    const events = this.consumeStageTrigger({ type: "campaign-entered" });
+    void this.processStageEvents(events);
+  }
+
+  private consumeStageTrigger(trigger: StageEventTrigger): readonly StageEventDefinition[] {
+    const dispatched = dispatchStageEvents(this.battle.stage, this.stageEventState, trigger);
+    this.stageEventState = dispatched.state;
+    return dispatched.events;
+  }
+
+  private async processStageEvents(events: readonly StageEventDefinition[]): Promise<void> {
+    for (const event of events) {
+      if (event.simulationEffect !== "none") {
+        await this.executeStageSimulationEffect(event.simulationEffect);
+      }
+      this.applyStagePresentation(event.presentation);
+      if (event.simulationEffect !== "none") {
+        const chained = this.consumeStageTrigger({
+          type: "effect-completed",
+          effectId: event.simulationEffect,
+        });
+        await this.processStageEvents(chained);
+      }
+    }
+  }
+
+  private async executeStageSimulationEffect(
+    effectId: Exclude<StageSimulationEffectId, "none">,
+  ): Promise<void> {
+    const definition = stageSimulationEffectFor(effectId);
+    if (!definition) throw new Error(`Missing stage simulation effect: ${effectId}`);
+    if (definition.type === "scripted-unit-move") {
+      await this.runScriptedUnitMove(definition);
+      return;
+    }
+    this.campaignRoute = definition.destination;
+    this.phase = "nextStage";
+  }
+
+  private applyStagePresentation(presentation: StagePresentationId): void {
+    if (presentation === "none" || presentation === "stage-00-opening-move"
+      || presentation === "stage-01-messenger-arrival") return;
+    const phase = storyPhaseForStageStory(this.battle.stage, presentation);
+    if (!phase) throw new Error(`Story presentation does not belong to ${this.battle.stage.id}: ${presentation}`);
+    this.activeStoryId = presentation;
+    this.phase = phase;
+    this.dialogueIndex = 0;
+  }
+
+  private async runScriptedUnitMove(
+    definition: Extract<
+      NonNullable<ReturnType<typeof stageSimulationEffectFor>>,
+      { type: "scripted-unit-move" }
+    >,
+  ): Promise<void> {
     if (this.busy) return;
     this.busy = true;
     this.phase = "scriptedMove";
-    this.statusMessage = "妮雅趕往大殿……";
-    const nia = this.battle.unit("1:0");
-    if (!nia) return;
-    const others = this.battle.units.filter((unit) => unit.id !== nia.id);
-    const path = shortestPath(nia, STAGE0.opening.to, nia.classId, STAGE0.opening.budget, others);
-    this.battle.focusId = nia.id;
-    this.cursor = { x: nia.x, y: nia.y };
-    this.centerCamera(nia);
+    this.statusMessage = definition.statusText;
+    const actor = this.battle.units.find(
+      (unit) => unit.side === definition.actor.side && unit.slot === definition.actor.slot,
+    );
+    if (!actor) {
+      this.busy = false;
+      return;
+    }
+    const others = this.battle.units.filter((unit) => unit.id !== actor.id);
+    const path = shortestPath(
+      actor,
+      definition.destination,
+      actor.classId,
+      definition.movementBudget,
+      others,
+    );
+    this.battle.focusId = actor.id;
+    this.cursor = { x: actor.x, y: actor.y };
+    this.centerCamera(actor);
     this.emit();
-    await this.animateUnitPath(nia.id, path, "scripted");
-    nia.x = STAGE0.opening.to.x;
-    nia.y = STAGE0.opening.to.y;
+    await this.animateUnitPath(actor.id, path, "scripted");
+    actor.x = definition.destination.x;
+    actor.y = definition.destination.y;
     this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
-    this.cursor = { ...STAGE0.opening.to };
-    this.phase = "openingStory";
-    this.dialogueIndex = 0;
+    this.cursor = { ...definition.destination };
     this.busy = false;
-    this.emit();
   }
 
   selectCell(position: Position): void {
@@ -1239,9 +1330,17 @@ export class GameController {
       this.cursor = { x: nia.x, y: nia.y };
       this.centerCamera(nia);
     }
-    this.phase = this.battle.round === 2 ? "round2Story" : "player";
-    this.dialogueIndex = 0;
-    this.statusMessage = this.phase === "round2Story" ? "第 2 回合事件" : `第 ${this.battle.round} 回合開始。`;
+    const roundEvents = this.consumeStageTrigger({
+      type: "round-started",
+      round: this.battle.round,
+    });
+    await this.processStageEvents(roundEvents);
+    if (this.activeStoryId) {
+      this.statusMessage = `第 ${this.battle.round} 回合事件`;
+    } else {
+      this.phase = "player";
+      this.statusMessage = `第 ${this.battle.round} 回合開始。`;
+    }
     this.busy = false;
     this.emit();
   }
@@ -1804,6 +1903,7 @@ export class GameController {
 
   private restartBattle(message: string): void {
     this.battle = new Stage0Battle(this.difficulty);
+    this.campaignRoute = undefined;
     this.movementPresentation = undefined;
     this.systemMenuOpen = false;
     this.systemMenuIndex = 0;
@@ -1829,12 +1929,17 @@ export class GameController {
     this.promotionResume = undefined;
     this.resetAction();
     this.cameraOrigin = { x: 6, y: 20 };
-    this.cursor = { ...STAGE0.opening.from };
+    const focus = this.battle.focus;
+    this.cursor = focus
+      ? { x: focus.x, y: focus.y }
+      : { ...this.battle.stage.viewport.initialOrigin };
     this.statusMessage = message;
-    this.phase = "prebattleStory";
-    this.dialogueIndex = storyPagesForStagePhase(this.battle.stage, "prebattleStory").length - 1;
+    this.initializeStageEventProgress();
+    this.dialogueIndex = this.activeStoryId
+      ? storyPagesForId(this.activeStoryId).length - 1
+      : 0;
     this.busy = false;
-    void this.runOpeningMove();
+    this.completeDialogue();
   }
 
   continueAfterVictory(): void {
@@ -1852,7 +1957,7 @@ export class GameController {
   }
 
   skipSave(): void {
-    if (this.phase === "savePrompt") this.goToNextStage();
+    if (this.phase === "savePrompt") this.completeVictoryFlow();
   }
 
   selectSaveSlot(slot: number): void {
@@ -1878,7 +1983,7 @@ export class GameController {
   }
 
   cancelPostSaveSlots(): void {
-    if (this.phase === "saveSlots") this.goToNextStage();
+    if (this.phase === "saveSlots") this.completeVictoryFlow();
   }
 
   confirmOverwrite(): void {
@@ -1914,7 +2019,7 @@ export class GameController {
     };
     localStorage.setItem(saveSlotKey(slot), JSON.stringify(save));
     this.pendingSaveSlot = undefined;
-    this.goToNextStage();
+    this.completeVictoryFlow();
   }
 
   openRecordMenu(mode: RecordMenuMode): void {
@@ -2020,6 +2125,12 @@ export class GameController {
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
       this.recordMenuReturn = undefined;
+      this.activeStoryId = undefined;
+      this.stageEventState = createStageEventState(
+        this.battle.stage,
+        this.battle.stage.events.map(({ id }) => id),
+      );
+      this.campaignRoute = save.stageId;
       this.phase = "nextStage";
       this.statusMessage = message;
       return;
@@ -2027,8 +2138,14 @@ export class GameController {
     const battle = new Stage0Battle(save.difficulty, new DeterministicRng(save.rngState));
     battle.restore(save.battle);
     this.battle = battle;
+    this.stageEventState = createStageEventState(
+      battle.stage,
+      consumedEventIdsForBattleResume(battle.stage, battle.round),
+    );
+    this.activeStoryId = undefined;
     this.difficulty = save.difficulty;
     this.phase = "player";
+    this.campaignRoute = undefined;
     this.cursor = { ...save.battle.cursor };
     this.cameraOrigin = { ...save.battle.cameraOrigin };
     this.recordMenuMode = undefined;
@@ -2381,8 +2498,11 @@ export class GameController {
   debugState(): object {
     return {
       phase: this.phase,
+      campaignRoute: this.campaignRoute,
       difficulty: this.difficulty,
       dialogueIndex: this.dialogueIndex,
+      activeStoryId: this.activeStoryId,
+      consumedEventIds: [...this.stageEventState.consumedEventIds],
       actionMode: this.actionMode,
       selectedId: this.selectedId,
       commandMenuKind: this.commandMenuKind,
@@ -2487,7 +2607,7 @@ export class GameController {
       this.objectiveOpen = false;
       this.movementPresentation = undefined;
       this.phase = "defeat";
-      this.statusMessage = "妮雅戰敗。";
+      this.statusMessage = this.battle.stage.objective.defeatText;
       this.resetAction();
       return true;
     }
@@ -2506,21 +2626,35 @@ export class GameController {
       this.retreatConfirmOpen = false;
       this.objectiveOpen = false;
       this.movementPresentation = undefined;
-      this.phase = "victoryStory";
       this.dialogueIndex = 0;
-      this.battle.focusId = "1:0";
-      const nia = this.battle.unit("1:0");
-      if (nia) this.centerCamera(nia);
-      this.statusMessage = "瓦爾克麗宮內的敵人均已被擊倒或撤離。";
+      const defeatCondition = this.battle.stage.objective.defeat;
+      if (defeatCondition.type === "unit-removed") {
+        const protectedUnit = this.battle.units.find(
+          (unit) => unit.side === defeatCondition.side && unit.slot === defeatCondition.slot,
+        );
+        if (protectedUnit) {
+          this.battle.focusId = protectedUnit.id;
+          this.centerCamera(protectedUnit);
+        }
+      }
+      const victoryEvents = this.consumeStageTrigger({ type: "objective-satisfied" });
+      void this.processStageEvents(victoryEvents);
+      if (victoryEvents.length === 0) this.phase = "victoryFeedback";
+      this.statusMessage = this.battle.stage.objective.victoryStatusText;
       this.resetAction();
       return true;
     }
     return false;
   }
 
-  private goToNextStage(): void {
-    this.phase = "nextStage";
-    this.emit();
+  private completeVictoryFlow(): void {
+    const routeEvents = this.consumeStageTrigger({ type: "victory-flow-completed" });
+    if (routeEvents.length === 0) {
+      this.phase = "nextStage";
+      this.emit();
+      return;
+    }
+    void this.processStageEvents(routeEvents).then(() => this.emit());
   }
 
   private persistPresentationPreferences(): void {
@@ -2622,7 +2756,8 @@ export class GameController {
   }
 
   portraitUrl(portrait: BattleUnit["portrait"]): string {
-    return ASSETS.portraits[portrait];
+    return ASSETS.portraits[portrait as keyof typeof ASSETS.portraits]
+      ?? `/assets/original/portrait-${portrait}.png`;
   }
 }
 

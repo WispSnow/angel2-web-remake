@@ -26,6 +26,7 @@ export type StageEventId =
   | "stage-00-victory-story"
   | "stage-00-completed-route"
   | "stage-01-prebattle-story"
+  | "stage-01-enter-deployment"
   | "stage-01-opening-story"
   | "stage-01-boss-defeated"
   | "stage-01-messenger-arrival"
@@ -35,6 +36,7 @@ export type StageSimulationEffectId =
   | "none"
   | "stage-00-opening-move"
   | "stage-00-route-to-stage-01"
+  | "stage-01-enter-deployment"
   | "stage-01-create-battle"
   | "stage-01-set-victory-999"
   | "stage-01-messenger-arrival"
@@ -48,6 +50,7 @@ export type StagePresentationId =
 
 export type StageEventTrigger =
   | { type: "campaign-entered" }
+  | { type: "battle-started" }
   | { type: "story-completed"; storyId: StageStoryId }
   | { type: "effect-completed"; effectId: StageSimulationEffectId }
   | { type: "round-started"; round: number }
@@ -70,6 +73,7 @@ export interface StageObjectiveDefinition {
   defeat: StageObjectiveCondition;
   victoryText: string;
   defeatText: string;
+  victoryStatusText: string;
 }
 
 export interface FixedDeploymentDefinition {
@@ -134,6 +138,7 @@ export const STAGE0_DEFINITION = {
     defeat: { type: "unit-removed", side: 1, slot: 0 },
     victoryText: STAGE0.objective,
     defeatText: STAGE0.defeat,
+    victoryStatusText: "瓦爾克麗宮內的敵人均已被擊倒或撤離。",
   },
   deployment: { kind: "fixed" },
   stories: {

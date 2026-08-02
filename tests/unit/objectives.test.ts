@@ -10,6 +10,7 @@ const stage0Objective = {
   defeat: { type: "unit-removed", side: 1, slot: 0 },
   victoryText: "敵軍全滅",
   defeatText: "妮雅死亡",
+  victoryStatusText: "敵軍已全滅。",
 } as const satisfies StageObjectiveDefinition;
 
 describe("stage objective evaluation", () => {
