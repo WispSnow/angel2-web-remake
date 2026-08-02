@@ -6,7 +6,7 @@
 
 ## 运行
 
-环境要求：Node.js 与 pnpm。`.node-version` 记录主版本 `26`，CI 按它安装最新 26.x；本地直接使用 Homebrew 的 `node`，不引入版本管理器，`package.json#engines` 只声明下限 `>=24.18.0`。仅在重新生成第 0 关原版素材时需要 ImageMagick 的 `magick` 命令；生成器已用 `png:exclude-chunk=date,time` 去掉 PNG 的时间戳块，所以重跑 `pnpm content` 只在像素真的改变时才产生 diff。
+环境要求：Node.js 与 pnpm。`.node-version` 记录主版本 `26`，CI 按它安装最新 26.x；本地直接使用 Homebrew 的 `node`，不引入版本管理器，`package.json#engines` 只声明下限 `>=24.18.0`。仅在重新生成第 0 关原版图像素材时需要 ImageMagick 的 `magick` 命令；生成器已用 `png:exclude-chunk=date,time` 去掉 PNG 的时间戳块，所以重跑 `pnpm content` 只在像素真的改变时才产生 diff。音乐子生成器会从已转换的 RIX WAV 确定性重建无缝循环派生文件及哈希清单，不覆盖证据母版。
 
 ```bash
 pnpm install
@@ -55,6 +55,7 @@ pnpm test:coverage # 单元测试与核心覆盖率门槛
 pnpm build         # TypeScript 与生产构建
 pnpm test:e2e      # 固定版本 Chromium 端到端验收
 pnpm check         # 顺序执行以上全部检查
+pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉淡化参数
 ```
 
 端到端测试覆盖 `S00-A` 到 `S00-P`，包括真实鼠标攻击、目标/系统/集体命令、AI 与 ZOC、地图/全景战斗、第二回合剧情、失败重试、战中存读档、胜利保存、关前音乐与玩家/敌方战斗曲对、原版音效事件、键盘输入、减少动画和窄屏。`S00-O` 从普通 `/` 启动，不带 `?test=1`、不读取调试状态，只用玩家可见控件让第一关完整通关；固定版本 Chromium 在 Darwin 本地另对最终下一关画面执行黄金截图比对，CI 保留同一流程的语义断言以避开跨系统字形光栅差异。过程截图生成到 `artifacts/playwright/`。

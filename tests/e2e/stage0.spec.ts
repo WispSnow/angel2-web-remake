@@ -2373,8 +2373,27 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them
   });
 
   await page.goto("/?test=1&skipStartup=1");
+  const decodedLoopBoundaryDbfs = await page.evaluate(async () => {
+    const decoder = new OfflineAudioContext(2, 1, 48_000);
+    const inspect = async (url: string) => {
+      const response = await fetch(url);
+      const buffer = await decoder.decodeAudioData(await response.arrayBuffer());
+      const deltas = Array.from({ length: buffer.numberOfChannels }, (_, channel) => {
+        const samples = buffer.getChannelData(channel);
+        return samples[0] - samples[samples.length - 1];
+      });
+      const rms = Math.sqrt(deltas.reduce((sum, delta) => sum + delta * delta, 0) / deltas.length);
+      return 20 * Math.log10(rms);
+    };
+    return Promise.all([
+      inspect("/assets/original/battle-stage0-player-loop-seamless.wav"),
+      inspect("/assets/original/battle-stage0-enemy-loop-seamless.wav"),
+    ]);
+  });
+  for (const boundaryDbfs of decodedLoopBoundaryDbfs) expect(boundaryDbfs).toBeLessThan(-28);
   await expect(app).toHaveAttribute("data-music-track", "MAGIC/73");
   await expect(app).toHaveAttribute("data-music-playing", "false");
+  await expect(app).toHaveAttribute("data-music-engine", "web-audio");
   await expect(app).toHaveAttribute("data-music-volume-level", "4");
   await expect(app).toHaveAttribute("data-music-volume", "0.32");
 
@@ -2382,20 +2401,28 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them
   await page.getByTestId("game-screen").click({ position: { x: 620, y: 340 } });
   await expect(app).toHaveAttribute("data-music-playing", "true");
   await expect(app).toHaveAttribute("data-music-loop", "true");
+  await expect(app).toHaveAttribute("data-music-seamless-loop", "true");
+  expect(Number(await app.getAttribute("data-music-boundary-dbfs"))).toBeLessThan(-30);
 
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
   await expect(app).toHaveAttribute("data-music-track", "MUSIC/7");
   await expect(app).toHaveAttribute("data-music-playing", "true");
   await expect(app).toHaveAttribute("data-music-loop", "false");
+  await expect(app).toHaveAttribute("data-music-seamless-loop", "true");
+  await expect(app).toHaveAttribute("data-music-crossfade-ms", "23.220");
+  expect(Number(await app.getAttribute("data-music-boundary-dbfs"))).toBeLessThan(-30);
   expect(battleRequests.has("battle-stage0-player-entry.wav")).toBe(true);
+  expect(battleRequests.has("battle-stage0-player-loop-seamless.wav")).toBe(true);
+  expect(battleRequests.has("battle-stage0-player-loop.wav")).toBe(false);
 
-  // MUSIC/7 is a 7.85 second non-looping entry. Its ended event must hand
-  // playback to the 62.7 second MUSIC/6 loop without advancing game state.
+  // MUSIC/7 is a 7.85 second non-looping entry. MUSIC/6 is already scheduled
+  // on the Web Audio timeline before the entry ends; the ended event only
+  // changes debug state and cannot introduce a playback gap or advance play.
   await expect(app).toHaveAttribute("data-music-track", "MUSIC/6", { timeout: 10_000 });
   await expect(app).toHaveAttribute("data-music-playing", "true");
   await expect(app).toHaveAttribute("data-music-loop", "true");
-  expect(battleRequests.has("battle-stage0-player-loop.wav")).toBe(true);
+  expect(battleRequests.has("battle-stage0-player-loop-seamless.wav")).toBe(true);
   expect((await debugState(page)).phase).toBe("openingStory");
 
   await page.getByTestId("skip-dialogue").click();
@@ -2421,4 +2448,6 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them
   await expect(app).toHaveAttribute("data-music-playing", "true");
   await expect(app).toHaveAttribute("data-music-loop", "false");
   expect(battleRequests.has("battle-stage0-enemy-entry.wav")).toBe(true);
+  expect(battleRequests.has("battle-stage0-enemy-loop-seamless.wav")).toBe(true);
+  expect(battleRequests.has("battle-stage0-enemy-loop.wav")).toBe(false);
 });

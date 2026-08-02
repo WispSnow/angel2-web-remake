@@ -239,10 +239,11 @@ export const ASSETS = {
   },
   audio: {
     story: "/assets/original/story-stage0.wav",
+    storySeamlessLoop: "/assets/original/story-stage0-loop-seamless.wav",
     playerBattleEntry: "/assets/original/battle-stage0-player-entry.wav",
-    playerBattleLoop: "/assets/original/battle-stage0-player-loop.wav",
+    playerBattleSeamlessLoop: "/assets/original/battle-stage0-player-loop-seamless.wav",
     enemyBattleEntry: "/assets/original/battle-stage0-enemy-entry.wav",
-    enemyBattleLoop: "/assets/original/battle-stage0-enemy-loop.wav",
+    enemyBattleSeamlessLoop: "/assets/original/battle-stage0-enemy-loop-seamless.wav",
     confirm: "/assets/original/ui-confirm.wav",
     effects: {
       0: "/assets/original/audio/e/00.wav",

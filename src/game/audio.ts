@@ -1,6 +1,14 @@
 import { ASSETS, SPEECH_RECORD_BY_CHARACTER } from "./content/stage0";
 import { STAGE0_ACTION_AUDIO_ASSETS } from "./content/stage0-actions.generated";
+import { STAGE0_MUSIC_SEAM_CROSSFADE_SECONDS } from "./content/stage0-music.generated";
 import type { GameController } from "./controller";
+import {
+  MusicTransport,
+  type IntroLoopMusicProgram,
+  type LoopMusicProgram,
+  type MusicProgram,
+  type MusicTransportState,
+} from "./music-transport";
 import {
   isSoundEffectChannelEnabled,
   MUSIC_GAIN_BY_VOLUME,
@@ -9,13 +17,7 @@ import {
 } from "./audio-settings";
 import type { GamePhase } from "./types";
 
-interface MusicTrack {
-  key: "MAGIC/73" | "MUSIC/4" | "MUSIC/5" | "MUSIC/6" | "MUSIC/7";
-  audio: HTMLAudioElement;
-}
-
 type BattleMusicSide = "player" | "enemy";
-type BattleMusicPart = "entry" | "loop";
 
 const playerMusicPhases = new Set<GamePhase>([
   "scriptedMove",
@@ -31,17 +33,50 @@ const battleMusicSide = (phase: GamePhase): BattleMusicSide | undefined => {
   return undefined;
 };
 
+const storyMusicProgram = {
+  id: "stage0-story",
+  kind: "loop",
+  track: "MAGIC/73",
+  source: ASSETS.audio.story,
+  seamlessLoop: ASSETS.audio.storySeamlessLoop,
+} satisfies LoopMusicProgram;
+
+const playerBattleMusicProgram = {
+  id: "stage0-player-battle",
+  kind: "intro-loop",
+  entryTrack: "MUSIC/7",
+  loopTrack: "MUSIC/6",
+  entry: ASSETS.audio.playerBattleEntry,
+  seamlessLoop: ASSETS.audio.playerBattleSeamlessLoop,
+  crossfadeSeconds: STAGE0_MUSIC_SEAM_CROSSFADE_SECONDS,
+} satisfies IntroLoopMusicProgram;
+
+const enemyBattleMusicProgram = {
+  id: "stage0-enemy-battle",
+  kind: "intro-loop",
+  entryTrack: "MUSIC/5",
+  loopTrack: "MUSIC/4",
+  entry: ASSETS.audio.enemyBattleEntry,
+  seamlessLoop: ASSETS.audio.enemyBattleSeamlessLoop,
+  crossfadeSeconds: STAGE0_MUSIC_SEAM_CROSSFADE_SECONDS,
+} satisfies IntroLoopMusicProgram;
+
+const battleMusicProgram = (side: BattleMusicSide): IntroLoopMusicProgram => side === "player"
+  ? playerBattleMusicProgram
+  : enemyBattleMusicProgram;
+
+const musicPrograms = [
+  storyMusicProgram,
+  playerBattleMusicProgram,
+  enemyBattleMusicProgram,
+] as const;
+
 export class AudioManager {
   private unlocked = false;
   private previousPhase: GamePhase;
   private previousCueSequence = 0;
-  private activeMusic?: MusicTrack;
-  private activeBattleSide?: BattleMusicSide;
-  private activeBattlePart: BattleMusicPart = "entry";
-  private musicPlaying = false;
-  private musicPlayPending = false;
-  private musicRequestSequence = 0;
-  private musicPlayRequestCount = 0;
+  private selectedMusic?: MusicProgram;
+  private readonly music: MusicTransport;
   private readonly effectRequestCounts: Record<SoundEffectChannel, number> = {
     speech: 0,
     movement: 0,
@@ -54,27 +89,6 @@ export class AudioManager {
     combat: 0,
     key: 0,
   };
-  private readonly storyMusic: MusicTrack = {
-    key: "MAGIC/73",
-    audio: new Audio(ASSETS.audio.story),
-  };
-  private readonly playerBattleEntry: MusicTrack = {
-    key: "MUSIC/7",
-    audio: new Audio(ASSETS.audio.playerBattleEntry),
-  };
-  private readonly playerBattleLoop: MusicTrack = {
-    key: "MUSIC/6",
-    audio: new Audio(ASSETS.audio.playerBattleLoop),
-  };
-  private readonly enemyBattleEntry: MusicTrack = {
-    key: "MUSIC/5",
-    audio: new Audio(ASSETS.audio.enemyBattleEntry),
-  };
-  private readonly enemyBattleLoop: MusicTrack = {
-    key: "MUSIC/4",
-    audio: new Audio(ASSETS.audio.enemyBattleLoop),
-  };
-
   constructor(
     private readonly controller: GameController,
     private readonly root: HTMLElement,
@@ -82,16 +96,11 @@ export class AudioManager {
   ) {
     this.unlocked = initiallyUnlocked;
     this.previousPhase = controller.phase;
-    const loopingTracks = [this.storyMusic, this.playerBattleLoop, this.enemyBattleLoop];
-    const entryTracks = [this.playerBattleEntry, this.enemyBattleEntry];
-    for (const track of [...loopingTracks, ...entryTracks]) {
-      track.audio.loop = loopingTracks.includes(track);
-      track.audio.volume = MUSIC_GAIN_BY_VOLUME[controller.musicVolume];
-      track.audio.preload = "auto";
-    }
-    this.playerBattleEntry.audio.addEventListener("ended", () => this.completeBattleEntry("player"));
-    this.enemyBattleEntry.audio.addEventListener("ended", () => this.completeBattleEntry("enemy"));
-    this.updateMusicDebugState(this.musicForPhase(undefined));
+    this.music = new MusicTransport(
+      MUSIC_GAIN_BY_VOLUME[controller.musicVolume],
+      (state) => this.updateMusicDebugState(state),
+    );
+    this.music.preload(musicPrograms);
     this.updateEffectDebugState();
     root.addEventListener("pointerdown", () => this.unlock(), { capture: true });
     root.addEventListener("click", (event) => {
@@ -100,7 +109,8 @@ export class AudioManager {
       }
     }, { capture: true });
     controller.onChange(() => this.sync());
-    if (this.unlocked) this.syncMusic();
+    this.syncMusic();
+    if (this.unlocked) this.music.unlock();
   }
 
   playSpeechCharacter(character: string): void {
@@ -111,9 +121,8 @@ export class AudioManager {
   }
 
   private unlock(): void {
-    if (this.unlocked) return;
     this.unlocked = true;
-    this.syncMusic();
+    this.music.unlock();
   }
 
   private sync(): void {
@@ -140,108 +149,44 @@ export class AudioManager {
     this.applyMusicVolume();
     const side = battleMusicSide(this.controller.phase);
     const previousSide = battleMusicSide(this.previousPhase);
-    if (side && side !== previousSide) {
-      this.activeBattleSide = side;
-      this.activeBattlePart = "entry";
+    let desired = this.selectedMusic;
+    let restart = false;
+    if (this.controller.phase === "prebattleStory") desired = storyMusicProgram;
+    else if (side && (side !== previousSide || !desired)) {
+      desired = battleMusicProgram(side);
+      restart = desired.id === this.selectedMusic?.id;
     }
-    else if (this.controller.phase === "prebattleStory") {
-      this.activeBattleSide = undefined;
-      this.activeBattlePart = "entry";
-    }
-
-    const desired = this.musicForPhase(side);
-    if (desired !== this.activeMusic) {
-      this.stopActiveMusic(true);
-      this.activeMusic = desired;
+    else if (this.controller.phase === "quit" || this.controller.phase === "nextStage") {
+      desired = undefined;
     }
 
-    if (!desired || !this.unlocked) {
-      this.stopActiveMusic(false);
-      this.updateMusicDebugState(desired);
-      this.previousPhase = this.controller.phase;
-      return;
+    if (desired?.id !== this.selectedMusic?.id || restart) {
+      this.selectedMusic = desired;
+      this.music.select(desired, restart);
     }
-
-    if (this.musicPlaying || this.musicPlayPending) {
-      this.updateMusicDebugState(desired);
-      this.previousPhase = this.controller.phase;
-      return;
-    }
-
-    const request = ++this.musicRequestSequence;
-    this.musicPlayRequestCount += 1;
-    this.musicPlayPending = true;
-    this.updateMusicDebugState(desired);
-    void desired.audio.play().then(() => {
-      if (
-        request !== this.musicRequestSequence
-        || this.activeMusic !== desired
-      ) return;
-      this.musicPlayPending = false;
-      this.musicPlaying = true;
-      this.updateMusicDebugState(desired);
-    }).catch(() => {
-      if (request !== this.musicRequestSequence) return;
-      this.musicPlayPending = false;
-      this.musicPlaying = false;
-      this.updateMusicDebugState(desired);
-    });
     this.previousPhase = this.controller.phase;
   }
 
-  private musicForPhase(side: BattleMusicSide | undefined): MusicTrack | undefined {
-    if (this.controller.phase === "prebattleStory") return this.storyMusic;
-    if (side === "player") {
-      return this.activeBattlePart === "entry" ? this.playerBattleEntry : this.playerBattleLoop;
-    }
-    if (side === "enemy") {
-      return this.activeBattlePart === "entry" ? this.enemyBattleEntry : this.enemyBattleLoop;
-    }
-    if (this.controller.phase === "quit" || this.controller.phase === "nextStage") return undefined;
-    return this.activeMusic;
-  }
-
-  private completeBattleEntry(side: BattleMusicSide): void {
-    if (
-      this.activeBattleSide !== side
-      || this.activeBattlePart !== "entry"
-      || battleMusicSide(this.controller.phase) !== side
-    ) return;
-    this.activeBattlePart = "loop";
-    this.musicPlaying = false;
-    this.musicPlayPending = false;
-    this.syncMusic();
-  }
-
-  private stopActiveMusic(reset: boolean): void {
-    if (!this.activeMusic) return;
-    this.musicRequestSequence += 1;
-    this.activeMusic.audio.pause();
-    if (reset) this.activeMusic.audio.currentTime = 0;
-    this.musicPlaying = false;
-    this.musicPlayPending = false;
-  }
-
   private applyMusicVolume(): void {
-    const gain = MUSIC_GAIN_BY_VOLUME[this.controller.musicVolume];
-    for (const track of [
-      this.storyMusic,
-      this.playerBattleEntry,
-      this.playerBattleLoop,
-      this.enemyBattleEntry,
-      this.enemyBattleLoop,
-    ]) track.audio.volume = gain;
+    this.music.setGain(MUSIC_GAIN_BY_VOLUME[this.controller.musicVolume]);
   }
 
-  private updateMusicDebugState(track: MusicTrack | undefined): void {
+  private updateMusicDebugState(state: MusicTransportState): void {
     if (!this.controller.isTestMode) return;
-    this.root.dataset.musicTrack = track?.key ?? "none";
-    this.root.dataset.musicPlaying = String(this.musicPlaying);
-    this.root.dataset.musicLoop = String(track?.audio.loop ?? false);
-    this.root.dataset.musicPart = this.activeBattlePart;
+    this.root.dataset.musicTrack = state.track ?? "none";
+    this.root.dataset.musicPlaying = String(state.playing);
+    this.root.dataset.musicLoop = String(state.loop);
+    this.root.dataset.musicPart = state.part;
     this.root.dataset.musicVolumeLevel = String(this.controller.musicVolume);
     this.root.dataset.musicVolume = String(MUSIC_GAIN_BY_VOLUME[this.controller.musicVolume]);
-    this.root.dataset.musicPlayRequestCount = String(this.musicPlayRequestCount);
+    this.root.dataset.musicPlayRequestCount = String(state.playRequestCount);
+    this.root.dataset.musicEngine = "web-audio";
+    this.root.dataset.musicSeamlessLoop = String(state.seamlessLoop);
+    this.root.dataset.musicCrossfadeMs = state.crossfadeMilliseconds.toFixed(3);
+    if (state.boundaryDbfs === undefined) delete this.root.dataset.musicBoundaryDbfs;
+    else this.root.dataset.musicBoundaryDbfs = state.boundaryDbfs.toFixed(3);
+    if (state.error) this.root.dataset.musicError = state.error;
+    else delete this.root.dataset.musicError;
   }
 
   private updateEffectDebugState(channel?: SoundEffectChannel): void {
