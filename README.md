@@ -1,6 +1,6 @@
 # 《天使帝国 II》Web 复刻
 
-当前可运行内容是首个垂直切片：第 0 关“瓦爾克麗宮”。它从原版关前剧情开始，覆盖固定编队开战、妮雅脚本移动、玩家战术操作、行为 12 敌军、第二回合事件、失败重试、全灭胜利、战后对白、手动存档和第 1 关路由。
+当前普通入口可运行内容是首个垂直切片：第 0 关“瓦爾克麗宮”。它从原版关前剧情开始，覆盖固定编队开战、妮雅脚本移动、玩家战术操作、行为 12 敌军、第二回合事件、失败重试、全灭胜利、战后对白、手动存档和第 1 关路由。第 1 关已完成证据生成内容及部署纯模拟/投影，但尚未接入普通战役入口。
 
 运行时采用 Phaser 4.2.1、TypeScript 和 Vite。战斗规则与内容数据独立于 Phaser，场景层只负责地图、单位、镜头、输入和范围表现。
 
@@ -28,6 +28,18 @@ pnpm dev:combat
 页面可以指定攻方/守方职业与双方生命、`≤10` 格挡或 `>10` 重伤、守方是否死亡、左右攻击方向、播放速度、循环和音效。生命默认取所选职业在实验室经验值下的原生上限，也可在 `1–839` 内任意输入，以检查 `209/210`、`419/420`、`629/630` 等生命条分层边界；切换职业会载入该职业的默认生命。时间轴支持暂停、40 ms 单步与按原生语义节点跳转；“格擋／重傷／死亡”按钮只切换当前职业组合的表现结果，不再硬编码职业。配置会同步到网址参数，便于复制和复现同一场景。
 
 女帝、龍、頭、手只有右侧可重放。女帝没有独立的原版普通全景战斗图形：左侧资源为空，唯一可重放的右侧资料逐字节复用士兵画面。龍（场景 20／22）、頭与两只手（场景 37）在原版只以 side 2 出战，因此没有左侧表现块，也没有对应的 `M_00` 图形。选择这些职业时，实验室会自动锁定方向并显示这一原版边界——当攻方时锁右、当守方时锁左；这不是素材加载失败。
+
+## 第 1 关部署验收表面
+
+第 1 关部署可从独立页面验证，不需要先通关第 0 关：
+
+```bash
+pnpm dev:deployment
+```
+
+也可以在 `pnpm dev` 已运行时打开 `http://127.0.0.1:4173/deployment-lab.html`。该页面
+复用正式部署 reducer、语义输入会话、DOM 名单和 Phaser 地图投影，支持鼠标、键盘和
+标准手柄；提交结果不会建立敌军、推进 PRNG 或进入 `SAY/0005`，正式战役接入留在 M02 P5。
 
 ## 存档与继续游戏
 
@@ -67,9 +79,10 @@ pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉�
 - `src/game/phaser/`：地图、单位、镜头和范围表现；
 - `src/game/ui.ts`：剧情、HUD、目标、胜负和保存界面；
 - `src/combat-lab.ts`：复用正式全景战斗脚本与渲染器的独立动画实验室；
+- `src/deployment-lab.ts`：复用正式部署模拟、DOM 和 Phaser 投影的第 1 关验收表面；
 - `scripts/generate-stage0-runtime.mjs`：从 `B/0001` 固化 50×50 地形内容；
 - `public/assets/original/`：切片使用的调色板修正素材与已转换原版音频；
 - `tests/`：模拟与浏览器验收。
 - `planning/`：当前进度、路线、里程碑和跨阶段风险。
 
-当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`design/remake-gdd/vertical-slices/stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 1 关已有纸面合同，但运行时仍只有正确路由占位，不属于当前实现范围。
+当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`design/remake-gdd/vertical-slices/stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md) 与 [`design/remake-gdd/vertical-slices/stage-01.md`](design/remake-gdd/vertical-slices/stage-01.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 1 关是已授权的有界 M02 实施范围；`stage-02` 战斗和后续关卡仍冻结。

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   STAGE1_ASSETS,
   STAGE1_DEFINITION,
+  STAGE1_DEPLOYMENT_PREVIEW_ROSTER,
   STAGE1_DEPLOYMENT_UI,
   STAGE1_EVENT_PROGRAM,
   STAGE1_MUSIC_PROGRAMS,
@@ -83,6 +84,22 @@ describe("stage 1 generated content", () => {
   });
 
   it("preserves generated roster, UI text, event, and music evidence", () => {
+    expect(STAGE1_DEPLOYMENT_PREVIEW_ROSTER.map(({ slot, name, portrait, classId }) => ({
+      slot,
+      name,
+      portrait,
+      classId,
+    }))).toEqual([
+      { slot: 0, name: "妮雅", portrait: 46, classId: "soldier" },
+      { slot: 1, name: "希蜜", portrait: 45, classId: "soldier" },
+      { slot: 2, name: "蒙欣曼", portrait: 42, classId: "soldier" },
+      { slot: 4, name: "拉朵那", portrait: 44, classId: "soldier" },
+      { slot: 24, name: "葛蒂拉斯", portrait: 0, classId: "magician" },
+      { slot: 40, name: "士兵", portrait: 47, classId: "soldier" },
+      { slot: 41, name: "士兵", portrait: 47, classId: "soldier" },
+      { slot: 42, name: "士兵", portrait: 47, classId: "soldier" },
+      { slot: 43, name: "士兵", portrait: 47, classId: "soldier" },
+    ]);
     expect(STAGE1_SEMANTIC_CLASS_OVERRIDES).toEqual([{ slot: 24, classId: "magician" }]);
     expect(STAGE1_SEMANTIC_ENEMY_UNITS.map(({ slot, classId, aiBehavior, position }) => ({
       slot,

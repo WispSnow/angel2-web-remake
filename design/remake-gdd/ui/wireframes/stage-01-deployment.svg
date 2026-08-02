@@ -38,19 +38,19 @@
       <rect width="112" height="24" class="panel fixed"/><text x="4" y="10" class="label">妮雅 · 士兵</text><text x="4" y="19" class="small">固定 · 已出場</text>
       <rect y="60" width="112" height="24" class="panel"/><text x="4" y="70" class="label">希蜜 · 士兵</text><text x="4" y="79" class="small">可選 · 未出場</text>
       <rect y="120" width="112" height="24" class="panel"/><text x="4" y="130" class="label">蒙欣曼 · 士兵</text><text x="4" y="139" class="small">可選 · 未出場</text>
-      <rect y="180" width="112" height="24" class="panel"/><text x="4" y="190" class="label">空名單</text><text x="4" y="199" class="small">此處沒有人.</text>
-      <rect y="240" width="112" height="24" class="panel"/><text x="4" y="250" class="label">空名單</text>
+      <rect y="180" width="112" height="24" class="panel selected"/><text x="4" y="190" class="label">拉朵那 · 士兵</text><text x="4" y="199" class="small">可選 · 焦點</text>
+      <rect y="240" width="112" height="24" class="panel"/><text x="4" y="250" class="label">葛蒂拉斯 · 魔術士</text><text x="4" y="259" class="small">可選 · 未出場</text>
     </g>
     <g transform="translate(201 59)">
       <rect width="112" height="24" class="panel fixed"/><text x="4" y="10" class="label">士兵 · 槽 40</text><text x="4" y="19" class="small">固定 · 已出場</text>
-      <rect y="60" width="112" height="24" class="panel selected"/><text x="4" y="70" class="label">拉朵那 · 士兵</text><text x="4" y="79" class="small">可選 · 焦點</text>
-      <rect y="120" width="112" height="24" class="panel"/><text x="4" y="130" class="label">葛蒂拉斯 · 魔術士</text><text x="4" y="139" class="small">可選 · 未出場</text>
-      <rect y="180" width="112" height="24" class="panel fixed"/><text x="4" y="190" class="label">士兵 · 槽 41</text><text x="4" y="199" class="small">固定 · 已出場</text>
+      <rect y="60" width="112" height="24" class="panel fixed"/><text x="4" y="70" class="label">士兵 · 槽 41</text><text x="4" y="79" class="small">固定 · 已出場</text>
+      <rect y="120" width="112" height="24" class="panel fixed"/><text x="4" y="130" class="label">士兵 · 槽 42</text><text x="4" y="139" class="small">固定 · 已出場</text>
+      <rect y="180" width="112" height="24" class="panel fixed"/><text x="4" y="190" class="label">士兵 · 槽 43</text><text x="4" y="199" class="small">固定 · 已出場</text>
       <rect y="240" width="112" height="24" class="panel"/><text x="4" y="250" class="label">空名單</text>
     </g>
     <g transform="translate(345 59)">
-      <rect width="84" height="24" class="panel fixed"/><text x="4" y="10" class="label">士兵 42</text><text x="4" y="19" class="small">固定</text>
-      <rect y="60" width="84" height="24" class="panel fixed"/><text x="4" y="70" class="label">士兵 43</text><text x="4" y="79" class="small">固定</text>
+      <rect width="84" height="24" class="panel"/><text x="4" y="10" class="label">空名單</text>
+      <rect y="60" width="84" height="24" class="panel"/><text x="4" y="70" class="label">空名單</text>
       <rect y="120" width="84" height="24" class="panel"/><text x="4" y="130" class="label">空名單</text>
       <rect y="180" width="84" height="24" class="panel"/><text x="4" y="190" class="label">空名單</text>
       <rect y="240" width="84" height="24" class="panel"/><text x="4" y="250" class="label">空名單</text>

@@ -1,11 +1,13 @@
 import type { MusicProgram } from "../music-transport";
-import type { Position, UnitClassId } from "../types";
-import { classIdFromNativeRecord } from "./classes";
+import type { PortraitRecord, Position, UnitClassId } from "../types";
+import type { DeploymentRosterUnit } from "../deployment-session";
+import { classIdFromNativeRecord, className, classStatsFor } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageMusicPrograms } from "./music";
 import {
   STAGE1_CONTENT_IDENTITY,
   STAGE1_DEPLOYMENT,
+  STAGE1_DEPLOYMENT_ACTORS as STAGE1_GENERATED_DEPLOYMENT_ACTORS,
   STAGE1_DEPLOYMENT_UI,
   STAGE1_ENEMY_UNITS,
   STAGE1_EVENT_PROGRAM,
@@ -112,6 +114,29 @@ export const STAGE1_SEMANTIC_CLASS_OVERRIDES = STAGE1_PLAYER_CLASS_OVERRIDES.map
   ({ slot, nativeClassRecord }) => ({ slot, classId: semanticClassId(nativeClassRecord) }),
 );
 
+const stage1ClassForSlot = (slot: number): UnitClassId =>
+  STAGE1_SEMANTIC_CLASS_OVERRIDES.find((override) => override.slot === slot)?.classId
+    ?? "soldier";
+
+/** Evidence-backed stage-1 deployment roster used until the campaign roster adapter lands in P4. */
+export const STAGE1_DEPLOYMENT_PREVIEW_ROSTER: readonly DeploymentRosterUnit[] =
+  STAGE1_GENERATED_DEPLOYMENT_ACTORS.map((actor) => {
+    const classId = stage1ClassForSlot(actor.slot);
+    const portrait = (actor.portraitRecord === 255 ? 47 : actor.portraitRecord) as PortraitRecord;
+    // Module 27 applies the named class-0 experience floor before stage template overrides.
+    const experience = actor.portraitRecord === 255 ? 0 : 299;
+    const stats = classStatsFor({ classId, experience });
+    return {
+      slot: actor.slot,
+      name: actor.portraitRecord === 255 ? "士兵" : actor.normalizedName,
+      portrait,
+      classId,
+      className: className(classId),
+      experience,
+      life: stats.maxLife,
+    };
+  });
+
 export const STAGE1_SEMANTIC_ENEMY_UNITS = STAGE1_ENEMY_UNITS.map((unit) => ({
   ...unit,
   classId: semanticClassId(unit.nativeClassRecord),
@@ -128,6 +153,9 @@ export const STAGE1_ASSETS = {
     42: "/assets/original/portrait-42.png",
     43: "/assets/original/portrait-43.png",
     44: "/assets/original/portrait-44.png",
+    45: "/assets/original/portrait-ximi.png",
+    46: "/assets/original/portrait-nia.png",
+    47: "/assets/original/portrait-ally-soldier.png",
   },
   audio: {
     story: "/assets/original/story-stage1.wav",

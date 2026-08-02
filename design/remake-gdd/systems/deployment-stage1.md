@@ -4,8 +4,10 @@
 
 纸面授权日期：2026-08-01；M02 代码授权日期：2026-08-01
 
-实现状态：纯模拟位于 `src/game/simulation/deployment/`，固定/可选/空位、提交、反馈门、
-焦点与 PRNG 独立性已通过单元验收；DOM/Phaser 投影尚未接入。
+实现状态：纯模拟位于 `src/game/simulation/deployment/`，语义输入会话位于
+`src/game/deployment-session.ts`；固定/可选/空位、提交、反馈门、焦点与 PRNG 独立性
+已通过单元验收。DOM 名单与 Phaser 地图共用该会话，并已在 `/deployment-lab.html`
+通过键盘、鼠标、手柄、桌面、窄屏与减少动态浏览器验收；正式战役接入仍属于 P5。
 
 依赖：第 1 关关卡合同、战役 roster、职业目录、地图模板、语义输入
 
@@ -58,6 +60,9 @@ interface DeploymentState {
 
 type DeploymentAction =
   | { type: "move-focus"; direction: "up" | "down" | "left" | "right" }
+  | { type: "focus-roster"; index: number }
+  | { type: "focus-finish" }
+  | { type: "focus-map" }
   | { type: "toggle-roster-slot"; slot?: number }
   | { type: "select-page"; page: 0 | 1 | 2 }
   | { type: "cycle-open-cell"; direction: "previous" | "next" }

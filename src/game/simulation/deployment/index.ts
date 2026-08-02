@@ -35,6 +35,8 @@ export interface DeploymentState {
 
 export type DeploymentAction =
   | { type: "move-focus"; direction: "up" | "down" | "left" | "right" }
+  | { type: "focus-roster"; index: number }
+  | { type: "focus-finish" }
   | { type: "focus-map" }
   | { type: "toggle-roster-slot"; slot?: number }
   | { type: "select-page"; page: 0 | 1 | 2 }
@@ -272,6 +274,15 @@ export function reduceDeployment(
   }
   if (action.type === "dismiss-feedback") return state;
   if (action.type === "move-focus") return moveFocus(state, action.direction);
+  if (action.type === "focus-roster") {
+    if (!Number.isInteger(action.index) || action.index < 0 || action.index >= 15) return state;
+    return {
+      ...state,
+      focus: { kind: "roster", index: action.index },
+      lastRosterIndex: action.index,
+    };
+  }
+  if (action.type === "focus-finish") return { ...state, focus: { kind: "finish" } };
   if (action.type === "focus-map") return { ...state, focus: { kind: "map" } };
   if (action.type === "toggle-roster-slot") return toggleRosterSlot(state, action.slot);
   if (action.type === "select-page") {

@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         game: "index.html",
         combatLab: "combat-lab.html",
+        deploymentLab: "deployment-lab.html",
       },
     },
   },

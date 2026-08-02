@@ -103,6 +103,16 @@ describe("stage 1 deployment simulation", () => {
     expect(state.focus).toEqual({ kind: "map" });
     state = reduceDeployment(state, { type: "move-focus", direction: "left" });
     expect(state.focus).toEqual({ kind: "roster", index: 10 });
+
+    state = reduceDeployment(state, { type: "focus-roster", index: 8 });
+    expect(state).toMatchObject({ focus: { kind: "roster", index: 8 }, lastRosterIndex: 8 });
+    state = reduceDeployment(state, { type: "focus-finish" });
+    expect(state.focus).toEqual({ kind: "finish" });
+    state = reduceDeployment(state, { type: "select-open-cell", position: { x: 25, y: 33 } });
+    expect(state).toMatchObject({
+      currentOpenCell: { x: 25, y: 33 },
+      focus: { kind: "map" },
+    });
   });
 
   it("does not consume PRNG and validates normalized deployment results", () => {
