@@ -17,6 +17,16 @@ const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 const NATIVE_CURSOR_SHADOW = 0x000000;
 const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
 
+type NativePointerCursor = "hand" | "up" | "down" | "left" | "right";
+
+const NATIVE_POINTER_FRAME: Readonly<Record<NativePointerCursor, number>> = {
+  hand: 0,
+  up: 1,
+  down: 2,
+  left: 3,
+  right: 4,
+};
+
 interface DeathDescriptor {
   xOffset: number;
   yOffset: number;
@@ -73,7 +83,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private unsubscribe?: () => void;
     private edgePan?: { x: number; y: number };
     private nextEdgePanAt = 0;
-    private readonly handleCanvasPointerLeave = () => this.clearEdgePan();
+    private readonly handleCanvasPointerLeave = () => {
+      this.clearEdgePan();
+      this.setNativePointerCursor("hand");
+    };
 
     constructor() {
       super("battle");
@@ -157,6 +170,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       canvas.setAttribute("role", "application");
       canvas.dataset.testid = "battle-canvas";
       canvas.dataset.edgePanDirection = "0,0";
+      this.setNativePointerCursor("hand");
     }
 
     update(time: number): void {
@@ -170,11 +184,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     private handlePointerMove(pointer: Phaser.Input.Pointer): void {
-      const edgePan = this.edgePanFor(pointer);
+      const edgeDirection = this.edgeDirectionFor(pointer);
+      this.setNativePointerCursor(edgeDirection ? this.nativeCursorFor(edgeDirection) : "hand");
+      const edgePan = controller.edgeScrollEnabled ? edgeDirection : undefined;
       if (edgePan) {
         const changed = !this.edgePan || this.edgePan.x !== edgePan.x || this.edgePan.y !== edgePan.y;
         this.edgePan = edgePan;
-        this.game.canvas.style.cursor = this.edgeCursor(edgePan);
         this.game.canvas.dataset.edgePanDirection = `${edgePan.x},${edgePan.y}`;
         if (changed) {
           controller.panCamera(edgePan);
@@ -184,6 +199,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
 
       this.clearEdgePan();
+      if (edgeDirection) return;
       if (
         pointer.x < BATTLE_INPUT_LEFT
         || pointer.x >= BATTLE_INPUT_RIGHT
@@ -194,10 +210,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       controller.focusCell({ x: Math.floor(world.x / TILE_WIDTH), y: Math.floor(world.y / TILE_HEIGHT) });
     }
 
-    private edgePanFor(pointer: Phaser.Input.Pointer): { x: number; y: number } | undefined {
+    private edgeDirectionFor(pointer: Phaser.Input.Pointer): { x: number; y: number } | undefined {
       if (
-        !controller.edgeScrollEnabled
-        || pointer.x < 0
+        pointer.x < 0
         || pointer.x >= BATTLE_SURFACE_RIGHT
         || pointer.y < 0
         || pointer.y >= BATTLE_SURFACE_BOTTOM
@@ -207,21 +222,24 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       return x === 0 && y === 0 ? undefined : { x, y };
     }
 
-    private edgeCursor(edgePan: { x: number; y: number }): string {
-      if (edgePan.x < 0 && edgePan.y < 0) return "nw-resize";
-      if (edgePan.x > 0 && edgePan.y < 0) return "ne-resize";
-      if (edgePan.x < 0 && edgePan.y > 0) return "sw-resize";
-      if (edgePan.x > 0 && edgePan.y > 0) return "se-resize";
-      if (edgePan.x < 0) return "w-resize";
-      if (edgePan.x > 0) return "e-resize";
-      return edgePan.y < 0 ? "n-resize" : "s-resize";
+    private nativeCursorFor(edgeDirection: { x: number; y: number }): NativePointerCursor {
+      // The release evaluates horizontal edges first and vertical edges second.
+      // Its 1/2/3/4 direction slot therefore resolves corners to up/down.
+      if (edgeDirection.y < 0) return "up";
+      if (edgeDirection.y > 0) return "down";
+      return edgeDirection.x < 0 ? "left" : "right";
+    }
+
+    private setNativePointerCursor(cursor: NativePointerCursor): void {
+      const canvas = this.game.canvas;
+      canvas.dataset.nativePointerCursor = cursor;
+      canvas.dataset.nativePointerFrame = String(NATIVE_POINTER_FRAME[cursor]);
     }
 
     private clearEdgePan(): void {
       this.edgePan = undefined;
       this.nextEdgePanAt = 0;
       const canvas = this.game.canvas;
-      canvas.style.cursor = "";
       canvas.dataset.edgePanDirection = "0,0";
     }
 

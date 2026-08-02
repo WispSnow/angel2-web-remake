@@ -55,6 +55,7 @@ const CODE_SIGNATURES = [
   { module: 29, address: "0000:D35D", offset: 0x0d35d, role: "Set-1 scan code to battle semantic-action mapper", hex: "33f68b8452f53dffff740f3bc375068bbc54f5880d83c604ebe8c380" },
   { module: 29, address: "0000:4A24", offset: 0x04a24, role: "release-disabled Caps Lock developer shortcut chords", hex: "e891fe803e2f134e749d803ee3f6017596803ecdf6017432803ee0f6017463eb" },
   { module: 29, address: "1000:33E4", offset: 0x133e4, role: "keyboard/mouse battle cursor and edge-scroll adapter", hex: "c6068e1b59803e1afb4e7419e8be00833eac00007509813e" },
+  { module: 29, address: "1000:34B1", offset: 0x134b1, role: "mouse position to neutral/up/down/left/right edge-direction slot", hex: "813e21fbe001771dc706ac000000e85b00e87600e89100833e" },
 ];
 
 const KEYBOARD_BINDINGS = [
@@ -637,6 +638,25 @@ async function extract(module27Path, module29Path, outputPath) {
         cellX: "floor((pointerX - 40) / 40) + viewportOriginX; effective visible result 0..9",
         cellY: "floor((pointerY - 23) / 44) + viewportOriginY; the routine accepts 0..9, but the interior edge test limits live pointer input to visible rows 0..6",
         edges: { up: "pointerY < 26", down: "pointerY >= 326", left: "pointerX < 40", right: "pointerX >= 433" },
+        directionSlot: {
+          neutral: 0,
+          up: 1,
+          down: 2,
+          left: 3,
+          right: 4,
+          cornerPrecedence: "horizontal is assigned first, then vertical overwrites it; corners therefore use up/down",
+        },
+        pointerArt: {
+          resource: "A/0001",
+          transparentPaletteIndex: 0,
+          frames: [
+            { frame: 0, state: "neutral/menu", width: 24, height: 24, appearance: "orange hand with raised index finger" },
+            { frame: 1, state: "up edge", width: 24, height: 20, appearance: "solid white up arrow" },
+            { frame: 2, state: "down edge", width: 24, height: 19, appearance: "solid white down arrow" },
+            { frame: 3, state: "left edge", width: 24, height: 19, appearance: "solid white left arrow" },
+            { frame: 4, state: "right edge", width: 24, height: 18, appearance: "solid white right arrow" },
+          ],
+        },
         edgeScrollGate: "scroll one cell only when an edge is active and either 地圖捲動 bit 0 is on or primary is held; clamp to map/viewport bounds",
       },
       selection: {

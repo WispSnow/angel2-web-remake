@@ -131,6 +131,12 @@ test("title artwork uses staged palette fades before the menu appears", async ({
   await expect.poll(() => opacityOf(".startup-title-lower")).toBeGreaterThan(0);
   await expect(page.getByTestId("title-menu")).toBeHidden();
   await expect(page.getByTestId("title-menu")).toBeVisible();
+  expect(await title.evaluate((element) => getComputedStyle(element).cursor)).toContain(
+    "command-menu-pointer.png",
+  );
+  expect(await page.getByTestId("new-game").evaluate((element) => getComputedStyle(element).cursor)).toContain(
+    "command-menu-pointer.png",
+  );
 });
 
 test("pointer difficulty confirmation carries audio activation into stage zero", async ({ page }) => {

@@ -1306,6 +1306,19 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expect(canvas).toHaveAttribute("data-grid-enabled", "false");
   await expect(canvas).toHaveAttribute("data-grid-line-count", "0");
 
+  const expectNativePointer = async (
+    position: { x: number; y: number },
+    cursor: "hand" | "up" | "down" | "left" | "right",
+    frame: number,
+    asset: string,
+  ) => {
+    await canvas.hover({ position });
+    await expect(canvas).toHaveAttribute("data-native-pointer-cursor", cursor);
+    await expect(canvas).toHaveAttribute("data-native-pointer-frame", String(frame));
+    expect(await canvas.evaluate((element) => getComputedStyle(element).cursor)).toContain(asset);
+  };
+  await expectNativePointer({ x: 420, y: 45 }, "hand", 0, "command-menu-pointer.png");
+
   const grid = page.getByTestId("grid-hotspot");
   const edgeScroll = page.getByTestId("edge-scroll-hotspot");
   const portraits = page.getByTestId("portraits-hotspot");
@@ -1334,8 +1347,13 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expect(edgeScrollArt).toHaveAttribute("data-state", "off");
   await expect(edgeScrollArt).toHaveAttribute("data-native-frame", "26");
   const cameraBeforeDisabledEdge = (await debugState(page)).cameraOrigin;
-  await canvas.hover({ position: { x: 5, y: 177 } });
+  await expectNativePointer({ x: 220, y: 5 }, "up", 1, "native-cursor-up.png");
+  await expectNativePointer({ x: 5, y: 5 }, "up", 1, "native-cursor-up.png");
+  await expectNativePointer({ x: 220, y: 340 }, "down", 2, "native-cursor-down.png");
+  await expectNativePointer({ x: 5, y: 177 }, "left", 3, "native-cursor-left.png");
   await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");
+  await expectNativePointer({ x: 450, y: 177 }, "right", 4, "native-cursor-right.png");
+  await expectNativePointer({ x: 420, y: 45 }, "hand", 0, "command-menu-pointer.png");
   await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
   expect((await debugState(page)).cameraOrigin).toEqual(cameraBeforeDisabledEdge);
   await edgeScroll.click();

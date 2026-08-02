@@ -25,8 +25,14 @@ const battleChromeAssets = {
   "battle-chrome-bottom-left.png": "06.png",
   "battle-chrome-bottom-right.png": "07.png",
 };
-const commandMenuAssets = {
+const nativeCursorAssets = {
   "command-menu-pointer.png": "00.png",
+  "native-cursor-up.png": "01.png",
+  "native-cursor-down.png": "02.png",
+  "native-cursor-left.png": "03.png",
+  "native-cursor-right.png": "04.png",
+};
+const commandMenuAssets = {
   "command-menu-top.png": "05.png",
   "command-menu-side.png": "06.png",
   "command-menu-bottom.png": "07.png",
@@ -111,9 +117,9 @@ function runMagick(args) {
 }
 
 // A/0001 uses palette index 0 as the native transparent compositing color.
-// The planar audit renders retain that index as opaque black, so every runtime
-// menu part restores that alpha before the texture and battlefield are layered.
-for (const [output, source] of Object.entries(commandMenuAssets)) {
+// The planar audit renders retain that index as opaque black, so the native
+// pointer set and every menu part restore that alpha before browser compositing.
+for (const [output, source] of Object.entries({ ...nativeCursorAssets, ...commandMenuAssets })) {
   runMagick([
     path.join(planarAssetPath, "0001", source),
     "-transparent", "#000000",
@@ -199,4 +205,4 @@ composeStatueForeground(
 );
 
 console.log(`wrote ${path.relative(root, outputPath)} (${terrain.length} terrain cells)`);
-console.log("wrote stage 0 battle chrome/statue foreground, command-menu chrome, stateful tactical panel, map sprites and ordinary-combat VOC assets");
+console.log("wrote stage 0 battle chrome/statue foreground, native cursors/command-menu chrome, stateful tactical panel, map sprites and ordinary-combat VOC assets");

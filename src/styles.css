@@ -20,7 +20,7 @@ body {
 }
 button { font: inherit; }
 button:focus-visible { outline: 3px solid #9fd9ff; outline-offset: 2px; }
-button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
+button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7); opacity: .52; }
 [hidden] { display: none !important; }
 
 .page-shell { width: min(640px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 40px; }
@@ -31,6 +31,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .game-viewport { width: 100%; max-width: 640px; overflow: hidden; box-shadow: 0 22px 70px #000b, 0 0 0 1px #3e2921; }
 .logical-screen {
   --game-scale: 1;
+  --native-cursor-hand: url("/assets/original/command-menu-pointer.png") 3 2, pointer;
   position: relative;
   width: 640px;
   height: 350px;
@@ -40,6 +41,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   background: #050405;
   image-rendering: pixelated;
   user-select: none;
+  cursor: var(--native-cursor-hand);
 }
 
 .visually-hidden {
@@ -135,7 +137,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   letter-spacing: .04em;
   text-align: center;
   text-shadow: 1px 1px #000;
-  cursor: pointer;
+  cursor: var(--native-cursor-hand, pointer);
 }
 .startup-menu button:hover,
 .startup-menu button.is-selected {
@@ -231,7 +233,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   color: #f3f0df;
   background: rgba(23, 18, 33, .88);
   font: 10px/16px serif;
-  cursor: pointer;
+  cursor: var(--native-cursor-hand, pointer);
 }
 .startup-record-pagination button:hover,
 .startup-record-pagination button:focus-visible {
@@ -248,7 +250,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   font: 13px/27px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
   text-align: center;
   text-shadow: 1px 1px #000;
-  cursor: pointer;
+  cursor: var(--native-cursor-hand, pointer);
 }
 .startup-record-slot span {
   overflow: hidden;
@@ -302,7 +304,25 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .right-panel-backdrop { position: absolute; left: 480px; top: 0; width: 160px; height: 350px; border: 4px ridge #e7bd25; background: linear-gradient(#62412f 0 39%, #0c0b0b 39% 91%, #6c4935 91%); }
 
 #phaser-root { position: absolute; inset: 0; z-index: 3; }
-#phaser-root canvas { display: block; width: 640px !important; height: 350px !important; image-rendering: pixelated; }
+#phaser-root canvas {
+  display: block;
+  width: 640px !important;
+  height: 350px !important;
+  image-rendering: pixelated;
+  cursor: var(--native-cursor-hand);
+}
+#phaser-root canvas[data-native-pointer-cursor="up"] {
+  cursor: url("/assets/original/native-cursor-up.png") 12 0, n-resize;
+}
+#phaser-root canvas[data-native-pointer-cursor="down"] {
+  cursor: url("/assets/original/native-cursor-down.png") 12 18, s-resize;
+}
+#phaser-root canvas[data-native-pointer-cursor="left"] {
+  cursor: url("/assets/original/native-cursor-left.png") 0 9, w-resize;
+}
+#phaser-root canvas[data-native-pointer-cursor="right"] {
+  cursor: url("/assets/original/native-cursor-right.png") 23 9, e-resize;
+}
 .battle-foreground { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .battle-foreground > img { position: absolute; top: 140px; width: 32px; height: 191px; image-rendering: pixelated; }
 .statue-foreground-left { left: 40px; }
@@ -368,7 +388,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
 .tactical-panel-art { position: absolute; z-index: 0; left: 0; top: 0; width: 160px; height: 149px; image-rendering: pixelated; pointer-events: none; }
 .tactical-panel-state { position: absolute; z-index: 1; display: block; image-rendering: pixelated; pointer-events: none; }
 .tactical-minimap { position: absolute; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: pixelated; }
-.hud-tactical:not(.under-unit) .tactical-minimap { pointer-events: auto; cursor: crosshair; }
+.hud-tactical:not(.under-unit) .tactical-minimap { pointer-events: auto; cursor: var(--native-cursor-hand); }
 .tactical-minimap > img { position: absolute; inset: 0; width: 150px; height: 150px; }
 .minimap-viewport { position: absolute; z-index: 1; width: 30px; height: 21px; border: 1px solid #000; box-shadow: 0 0 0 1px #b99b73; }
 .minimap-unit { position: absolute; z-index: 2; width: 4px; height: 4px; border: 1px solid #000; background: #fff; }
@@ -381,7 +401,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   border-radius: 2px;
   color: #fff8d3;
   background: linear-gradient(#74313a, #3f151c);
-  cursor: pointer;
+  cursor: var(--native-cursor-hand, pointer);
 }
 .side-panel-hotspot {
   position: absolute;
@@ -395,7 +415,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   border: 1px solid transparent;
   color: transparent;
   background: transparent;
-  cursor: pointer;
+  cursor: var(--native-cursor-hand, pointer);
 }
 .logical-screen[data-side-panel-hotspots="active"] .side-panel-hotspot { display: block; }
 .side-panel-hotspot:hover, .side-panel-hotspot:focus-visible {
@@ -467,7 +487,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   color: #f4d34b;
   background: transparent;
   font-size: 10px;
-  cursor: pointer;
+  cursor: var(--native-cursor-hand, pointer);
 }
 .record-menu-pagination button:hover,
 .record-menu-pagination button:focus-visible,
@@ -572,7 +592,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   font-size: 16px;
   line-height: 24px;
   text-shadow: 2px 2px #000;
-  cursor: url("/assets/original/command-menu-pointer.png") 3 2, pointer;
+  cursor: var(--native-cursor-hand);
 }
 .action-menu.native-command-menu button::before {
   content: "";
@@ -610,7 +630,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   background: transparent;
 }
 .status-strip { position: absolute; z-index: 7; left: 45px; top: 306px; width: 386px; min-height: 20px; padding: 3px 8px; overflow: hidden; color: #fff6c8; background: #120b0bcc; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
-.hint-toast { position: absolute; z-index: 9; left: 58px; top: 36px; max-width: 360px; padding: 7px 10px; border: 1px solid #f5d665; border-radius: 3px; color: #fff6c8; background: #351b1dea; font: 11px/1.3 system-ui, sans-serif; cursor: pointer; }
+.hint-toast { position: absolute; z-index: 9; left: 58px; top: 36px; max-width: 360px; padding: 7px 10px; border: 1px solid #f5d665; border-radius: 3px; color: #fff6c8; background: #351b1dea; font: 11px/1.3 system-ui, sans-serif; cursor: var(--native-cursor-hand, pointer); }
 
 .combat-presentation { position: absolute; z-index: 11; pointer-events: none; }
 .map-combat { width: 40px; height: 44px; color: #fff; text-align: center; text-shadow: 2px 2px #000; }
@@ -918,7 +938,7 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   background: linear-gradient(var(--promotion-card-mid), var(--promotion-card-dark));
   font: 9px/1.22 system-ui, sans-serif;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--native-cursor-hand, pointer);
 }
 .promotion-art {
   position: relative;
