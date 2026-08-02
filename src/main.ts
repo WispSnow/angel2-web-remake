@@ -8,11 +8,7 @@ import { mountStartup, type StartupSelection } from "./game/startup";
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
 
-const startGame = async (selection: StartupSelection) => {
-  const controller = selection.kind === "continue"
-    ? await GameController.fromSave(selection.save, selection.slot)
-    : new GameController(selection.difficulty);
-  const { userActivated } = selection;
+const mountController = (controller: GameController, userActivated: boolean) => {
   const audio = new AudioManager(controller, root, userActivated);
   let surfaceKey = "";
   let surfaceGeneration = 0;
@@ -107,8 +103,49 @@ const startGame = async (selection: StartupSelection) => {
   exposeDebugApi(controller);
 };
 
+const startGame = async (selection: StartupSelection) => {
+  const controller = selection.kind === "continue"
+    ? await GameController.fromSave(selection.save, selection.slot)
+    : new GameController(selection.difficulty);
+  mountController(controller, selection.userActivated);
+};
+
+const renderDebugLoadError = (title: string, message: string) => {
+  const error = document.createElement("main");
+  error.className = "debug-load-error";
+  const heading = document.createElement("h1");
+  heading.textContent = title;
+  const detail = document.createElement("p");
+  detail.textContent = message;
+  const back = document.createElement("a");
+  back.href = "/debug.html";
+  back.textContent = "返回場景選擇";
+  error.append(heading, detail, back);
+  root.replaceChildren(error);
+};
+
 const parameters = new URLSearchParams(location.search);
-if (parameters.has("skipStartup")) {
+const debugScenario = parameters.get("debugScenario");
+if (debugScenario) {
+  void import("./game/debug-scenarios").then(async (debug) => {
+    if (!debug.isDebugScenarioId(debugScenario)) {
+      renderDebugLoadError("未知調試場景", debugScenario);
+      return;
+    }
+    const difficultyValue = Number(parameters.get("difficulty") ?? 0);
+    const difficulty = difficultyValue === 0 || difficultyValue === 1
+      || difficultyValue === 2 || difficultyValue === 3
+      ? difficultyValue
+      : 0;
+    const controller = await debug.createDebugScenarioController(debugScenario, difficulty);
+    mountController(controller, false);
+    debug.mountDebugToolbar(controller, debugScenario, difficulty);
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    renderDebugLoadError("調試場景載入失敗", message);
+  });
+}
+else if (parameters.has("skipStartup")) {
   void startGame({ kind: "new", difficulty: 0, userActivated: false });
 }
 else mountStartup(root, startGame);

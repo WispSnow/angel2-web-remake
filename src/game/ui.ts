@@ -1,4 +1,5 @@
 import { ASSETS, nextExperienceThresholdFor } from "./content/stage0";
+import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import { BATTLE_ACTION_DEFINITIONS } from "./content/actions";
 import {
   STAGE0_FULL_COMBAT_ASSETS,
@@ -1041,7 +1042,7 @@ function buildFullCombatSkeleton(
     const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
     return `
       <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
-        <img src="${ASSETS.portraits[unit.portrait as keyof typeof ASSETS.portraits] ?? `/assets/original/portrait-${unit.portrait}.png`}" alt="${unit.name}肖像" />
+        <img src="${portraitSourceFor(unit.portrait)}" alt="${unit.name}肖像" />
         <dl>
           <div><dt>經驗</dt><dd>${unit.experience}</dd></div>
           <div><dt>生命</dt><dd>${life}</dd></div>

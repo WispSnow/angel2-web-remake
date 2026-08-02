@@ -397,6 +397,10 @@ describe("Web save validation", () => {
     const invalidStatus = battleSave();
     invalidStatus.battle.units[0].statuses.magicGuard = -1;
     expect(isSaveData(invalidStatus)).toBe(false);
+
+    const invalidPortrait = battleSave();
+    invalidPortrait.battle.units[0].portrait = 68 as never;
+    expect(isSaveData(invalidPortrait)).toBe(false);
   });
 
   it("rejects duplicate occupancy and roster snapshots that disagree with battle state", () => {

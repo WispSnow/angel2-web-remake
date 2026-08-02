@@ -66,13 +66,16 @@
 - 浏览器验收：Playwright 版本绑定的 Chromium；
 - 主游戏开发地址：`http://127.0.0.1:4173/`；
 - 战斗动画实验室：`http://127.0.0.1:4173/combat-lab.html`。
+- 肖像动画实验室：`http://127.0.0.1:4173/portrait-lab.html`。
 
 常用命令：
 
 ```bash
 pnpm install
 pnpm dev
+pnpm dev:debug
 pnpm dev:combat
+pnpm dev:portraits
 pnpm test
 pnpm test:coverage
 pnpm build
@@ -89,6 +92,15 @@ node reverse/tools/angel2-phase1-verify.mjs
 数据逐字节复用士兵，龍／頭／手只在 side 2 编队出现、原版没有填 side 1 表现块与
 `M_00/86..88`。实验室按 `reach` 锁定方向并显示说明——它们当攻方时锁右、当守方时锁左，
 不得据此伪造左侧画面或女帝独立动画。
+
+`pnpm dev:debug` 会打开 `/debug.html` 战役调试中心。新增可玩关卡时，必须在
+`src/game/debug-scenarios.ts` 至少登记适用的关前、部署/准备、玩家回合、胜利准备和
+完成路由场景；夹具必须确定、明确标记且只修改当前内存。普通 `/` 不得静态导入调试
+模块或暴露 `window.__ANGEL2_DEBUG__`，调试场景也不得替代无夹具的真实通关验收。
+
+`pnpm dev:portraits` 会打开 `/portrait-lab.html` 全战役肖像动画实验室。新角色只提交
+原版 `portrait` 记录号；主图、三帧眼睛、三帧嘴部、尺寸和原版落点统一来自生成目录，
+不得在关卡资产或 UI 中新增逐角色动画表。
 
 Playwright 失败视频需要匹配版本的 ffmpeg；本机缺失时运行：
 
@@ -157,6 +169,10 @@ pnpm exec playwright install ffmpeg
 - 浏览器运行时不得读取 `ref/`、`reverse/decoded/`、`reverse/extracted/` 或其他工作目录。
 - 运行时所需内容必须经脚本固化到 `src/game/content/` 或 `public/assets/original/`。
 - `src/game/content/stage0-runtime.generated.ts` 是生成文件；修改来源或生成脚本后运行 `pnpm content:stage0`，不要手工编辑生成结果。
+- `src/game/content/portrait-catalog.generated.ts` 与 `public/assets/original/portraits/` 由
+  `scripts/generate-portrait-catalog.mjs` 生成；修改肖像来源或布局证据后运行
+  `pnpm content:portraits`，不要手工登记角色动画。`D/63` 无原版覆盖帧/布局，`D/67`
+  依证据沿用 `D/56` 布局。
 - 保留原版调色板、像素边缘、透明索引、锚点和帧顺序。不要对像素素材启用平滑缩放。
 - 添加或重命名资源后，检查全部运行时引用存在，并确认生产构建实际包含或可访问这些文件。
 

@@ -1034,7 +1034,7 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
   for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowLeft");
   for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
   await expect(page.getByText("騎兵／哈釘", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portrait-hading\.png$/);
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0015\/base\.png$/);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-hading.png" });
 
   await page.evaluate(() => window.__ANGEL2__?.forceEvacuationSetup());

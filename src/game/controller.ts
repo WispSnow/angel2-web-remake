@@ -1,4 +1,5 @@
-import { ASSETS, STAGE0 } from "./content/stage0";
+import { STAGE0 } from "./content/stage0";
+import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import {
   BATTLE_ACTION_DEFINITIONS,
   stage1ActionPresentation,
@@ -267,6 +268,8 @@ export class GameController {
   private stage1RuntimePromise?: Promise<Stage1Runtime>;
   private listeners = new Set<Listener>();
   private readonly testMode = new URLSearchParams(location.search).has("test");
+  private readonly debugMode = this.testMode
+    || new URLSearchParams(location.search).has("debugScenario");
   // Keeps the measured full-screen timing under ?test=1 for visual review.
   private readonly fullCombatRealTime = new URLSearchParams(location.search).has("slowFull");
 
@@ -512,6 +515,10 @@ export class GameController {
 
   get isTestMode(): boolean {
     return this.testMode;
+  }
+
+  get isDebugMode(): boolean {
+    return this.debugMode;
   }
 
   get inputLocked(): boolean {
@@ -2683,15 +2690,39 @@ export class GameController {
     else this.selectCell(this.cursor);
   }
 
+  async completeCurrentStageForDebug(): Promise<void> {
+    if (!this.debugMode) return;
+    this.busy = false;
+    this.resetAction();
+    this.activeStoryId = undefined;
+    this.movementPresentation = undefined;
+    this.combatPresentation = undefined;
+    this.specialActionPresentation = undefined;
+    if (this.battle.stage.id === "stage-00") {
+      await this.enterStage1({
+        ...this.battle.campaignSnapshot(),
+        stageId: "stage-01",
+      });
+      this.statusMessage = "調試：第 0 關已直接完成，進入第 1 關關前劇情。";
+      this.emit();
+      return;
+    }
+    this.campaignRoute = "stage-02";
+    this.stageProgress = 1000;
+    this.phase = "nextStage";
+    this.statusMessage = "調試：第 1 關已直接完成，進入 stage-02 邊界。";
+    this.emit();
+  }
+
   forceDefeatForTest(): void {
-    if (!this.testMode) return;
+    if (!this.debugMode) return;
     this.battle.units = this.battle.units.filter((unit) => unit.id !== "1:0");
     this.resolveOutcome();
     this.emit();
   }
 
   forceVictorySetupForTest(): void {
-    if (!this.testMode) return;
+    if (!this.debugMode) return;
     const nia = this.battle.unit("1:0");
     const victory = this.battle.stage.objective.victory;
     const finalEnemy = victory.type === "unit-removed"
@@ -2716,7 +2747,7 @@ export class GameController {
   }
 
   forceEvacuationSetupForTest(): void {
-    if (!this.testMode) return;
+    if (!this.debugMode) return;
     const finalEnemy = this.battle.unit("2:15");
     if (!finalEnemy) return;
     const leftExit = STAGE0.enemyExitCells[0];
@@ -2735,7 +2766,7 @@ export class GameController {
   }
 
   forceMultipleTargetsForTest(): void {
-    if (!this.testMode) return;
+    if (!this.debugMode) return;
     const nia = this.battle.unit("1:0");
     const enemies = this.battle.units.filter((unit) => unit.side === 2).slice(0, 2);
     if (!nia || enemies.length < 2) return;
@@ -2759,7 +2790,7 @@ export class GameController {
   }
 
   forceCavalryCounterSetupForTest(): void {
-    if (!this.testMode) return;
+    if (!this.debugMode) return;
     const nia = this.battle.unit("1:0");
     const cavalry = this.battle.unit("2:15");
     if (!nia || !cavalry) return;
@@ -2783,7 +2814,7 @@ export class GameController {
   }
 
   forceEnemySisterSetupForTest(): void {
-    if (!this.testMode || this.battle.stage.id !== "stage-01") return;
+    if (!this.debugMode || this.battle.stage.id !== "stage-01") return;
     const nia = this.battle.unit("1:0");
     const sister = this.battle.unit("2:43");
     const boss = this.battle.unit("2:16");
@@ -2815,7 +2846,7 @@ export class GameController {
     classId: "archer" | "cavalry" | "magician" | "sister" | "warrior",
     ordinaryCombat = false,
   ): void {
-    if (!this.testMode) return;
+    if (!this.debugMode) return;
     const actor = this.battle.unit("1:0");
     const ally = this.battle.unit("1:1")
       ?? this.battle.units.find((unit) => unit.side === 1 && unit.id !== actor?.id);
@@ -3123,8 +3154,7 @@ export class GameController {
   }
 
   portraitUrl(portrait: BattleUnit["portrait"]): string {
-    return ASSETS.portraits[portrait as keyof typeof ASSETS.portraits]
-      ?? `/assets/original/portrait-${portrait}.png`;
+    return portraitSourceFor(portrait);
   }
 }
 

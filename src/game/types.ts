@@ -1,10 +1,12 @@
 import type { ClassId } from "./content/class-catalog.generated";
+import type { PortraitRecord } from "./content/portrait-catalog.generated";
+
+export type { PortraitRecord } from "./content/portrait-catalog.generated";
 
 export type Side = 1 | 2;
 export type Difficulty = 0 | 1 | 2 | 3;
 export type UnitClassId = ClassId;
 export type StageId = "stage-00" | "stage-01";
-export type PortraitRecord = 0 | 15 | 42 | 43 | 44 | 45 | 46 | 47 | 48;
 
 export interface Position {
   x: number;

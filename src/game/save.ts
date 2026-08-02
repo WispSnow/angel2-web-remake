@@ -12,6 +12,7 @@ import {
   statsFor,
 } from "./content/stage0";
 import { STAGE0_DEFINITION } from "./content/stages";
+import { isPortraitRecord } from "./content/portrait-catalog.generated";
 import { consumedEventIdsForBattleResume } from "./simulation/stage-events";
 import type {
   BattleUnit,
@@ -121,8 +122,7 @@ const isDifficulty = (value: unknown): value is Difficulty =>
 const isSide = (value: unknown): value is Side => value === 1 || value === 2;
 
 const isPortrait = (value: unknown): value is PortraitRecord =>
-  value === 0 || value === 15 || value === 42 || value === 43 || value === 44
-    || value === 45 || value === 46 || value === 47 || value === 48;
+  isPortraitRecord(value);
 
 function isPosition(
   value: unknown,

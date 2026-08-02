@@ -21,6 +21,8 @@ ref/
 !public/assets/original/*.png
 !public/assets/original/portrait-animation/
 !public/assets/original/portrait-animation/*.png
+!public/assets/original/portraits/
+!public/assets/original/portraits/**/*.png
 !public/assets/original/full-combat/
 !public/assets/original/full-combat/**/*.png
 !public/assets/original/map-actions/

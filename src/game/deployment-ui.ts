@@ -1,5 +1,6 @@
-import { STAGE1_ASSETS, STAGE1_DEPLOYMENT_UI } from "./content/stage1";
+import { STAGE1_DEPLOYMENT_UI } from "./content/stage1";
 import { classStatsFor } from "./content/classes";
+import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import type { DeploymentSession } from "./deployment-session";
 import { DEPLOYMENT_FEEDBACK_TEXT } from "./simulation/deployment";
 
@@ -10,10 +11,6 @@ const escapeHtml = (value: string): string => value
   .replaceAll("<", "&lt;")
   .replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;");
-
-function portraitSource(portrait: keyof typeof STAGE1_ASSETS.portraits): string {
-  return STAGE1_ASSETS.portraits[portrait];
-}
 
 function pressed(gamepad: Gamepad, button: number): boolean {
   return gamepad.buttons[button]?.pressed === true;
@@ -48,7 +45,7 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
           type="button" tabindex="-1" data-roster-index="${index}" data-testid="deployment-roster-${index}"
           aria-label="${escapeHtml(label)}" aria-pressed="${selected}"
           style="left:${column.pointerX}px;top:${top}px;width:${width}px">
-          ${unit ? `<img src="${portraitSource(unit.portrait as keyof typeof STAGE1_ASSETS.portraits)}" alt="" aria-hidden="true" />
+          ${unit ? `<img src="${portraitSourceFor(unit.portrait)}" alt="" aria-hidden="true" />
             <span class="deployment-entry-copy"><b>${escapeHtml(unit.name)}</b><small>${escapeHtml(unit.className)} · Lv ${stats?.level}</small></span>`
             : `<span class="deployment-entry-copy deployment-empty"><b>空名單</b><small>此處沒有人.</small></span>`}
           <span class="deployment-entry-state">${status}</span>
@@ -85,7 +82,7 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
         <p>剩餘空位 ${remaining}</p>
         <p class="deployment-next" aria-live="polite">${current ? `下一落點 ${current.x},${current.y}` : "部署格已用完"}</p>
         <div class="deployment-unit-detail">
-          ${focusedUnit ? `<img src="${portraitSource(focusedUnit.portrait as keyof typeof STAGE1_ASSETS.portraits)}" alt="" aria-hidden="true" />
+          ${focusedUnit ? `<img src="${portraitSourceFor(focusedUnit.portrait)}" alt="" aria-hidden="true" />
             <dl><div><dt>人物</dt><dd>${escapeHtml(focusedUnit.name)}</dd></div>
             <div><dt>職業</dt><dd>${escapeHtml(focusedUnit.className)}</dd></div>
             <div><dt>等級</dt><dd>${focusedStats?.level}</dd></div>

@@ -150,17 +150,20 @@ test("pointer difficulty confirmation carries audio activation into stage zero",
   await expect(page.locator("#app")).toHaveAttribute("data-music-playing", "true");
 });
 
-test("stage-one code and deployment surfaces stay deferred during stage-zero startup", async ({ page }) => {
-  const stage1Requests: string[] = [];
+test("later-stage and debug modules stay deferred during stage-zero startup", async ({ page }) => {
+  const deferredRequests: string[] = [];
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
-    if (/stage1|stage-01|deployment/.test(pathname)) stage1Requests.push(pathname);
+    if (/stage1|stage-01|deployment|debug-scenarios|debug\.css/.test(pathname)) {
+      deferredRequests.push(pathname);
+    }
   });
 
   await page.goto("/?test=1&skipStartup");
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
   await expect(page.getByRole("heading", { name: "天使帝國 II · 瓦爾克麗宮" })).toBeVisible();
-  expect(stage1Requests).toEqual([]);
+  expect(deferredRequests).toEqual([]);
+  expect(await page.evaluate(() => window.__ANGEL2_DEBUG__)).toBeUndefined();
 });
 
 test("BOOT-A: opening story, title and difficulty selection enter stage zero", async ({ page }) => {

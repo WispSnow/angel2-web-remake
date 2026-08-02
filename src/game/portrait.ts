@@ -1,4 +1,8 @@
-import { ASSETS } from "./content/stage0";
+import {
+  isPortraitRecord,
+  PORTRAIT_CATALOG,
+  portraitSourceFor,
+} from "./content/portrait-catalog.generated";
 import type { PortraitRecord } from "./types";
 
 type BlinkStage = "idle" | "closing" | "closed" | "opening";
@@ -52,11 +56,8 @@ export function nativeMouthFrameAfterGlyph(
 }
 
 function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string): string {
-  const portraitSource = ASSETS.portraits[portrait as keyof typeof ASSETS.portraits]
-    ?? `/assets/original/portrait-${portrait}.png`;
-  const animation = ASSETS.portraitAnimations[
-    portrait as keyof typeof ASSETS.portraitAnimations
-  ];
+  const portraitSource = portraitSourceFor(portrait);
+  const animation = PORTRAIT_CATALOG[portrait].animation;
   const base = `<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${portraitSource}" alt="${alt}" />`;
   if (!animation) return base;
   const eyeStyle = [
@@ -173,10 +174,8 @@ export function startPortraitAnimations(
     const paused = shouldPause();
     for (const element of root.querySelectorAll<HTMLElement>("[data-portrait-channel]")) {
       const channel = element.dataset.portraitChannel;
-      const portrait = Number(element.dataset.portraitRecord) as PortraitRecord;
-      if (!channel || !ASSETS.portraitAnimations[
-        portrait as keyof typeof ASSETS.portraitAnimations
-      ]) continue;
+      const portrait = Number(element.dataset.portraitRecord);
+      if (!channel || !isPortraitRecord(portrait) || !PORTRAIT_CATALOG[portrait].animation) continue;
       let blinkState = blinkStates.get(channel);
       if (!blinkState || blinkState.portrait !== portrait) {
         blinkState = resetBlinkState(portrait, now);

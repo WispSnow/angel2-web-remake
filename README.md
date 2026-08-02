@@ -15,6 +15,37 @@ pnpm dev
 
 浏览器打开 `http://127.0.0.1:4173/`。推荐先用鼠标体验：左键选择/确认，右键循环对焦下一名尚未行动的我方单位，指针停留在战场边框或底部地点 banner 可滚动镜头。键盘方向为方向键或 `W/Z/A/S`，主操作为 `Ctrl/Insert/Space`，取消/返回为 `Alt/Delete/Enter`；`Esc` 是系统菜单的唯一键盘快捷键，`Tab` 打开集体命令，`F1–F4` 分别是全部休息、跟随主将、自由行动和全面撤退，`E` 打开四项音效设置，`M` 打开五档音乐音量。
 
+## 战役调试中心
+
+需要直接选择关卡、部署、玩家回合或结算状态时运行：
+
+```bash
+pnpm dev:debug
+```
+
+也可以在开发服务器已经运行时打开 `http://127.0.0.1:4173/debug.html`。调试中心目前提供
+第 0–1 关的关前剧情、部署、玩家回合、魔术士技能、敌方修女、一击胜利和直接通关入口，
+并可选择四档难度。场景内右上角工具栏可随时准备一击胜利、直接通关或触发战败。
+
+调试场景由 `src/game/debug-scenarios.ts` 的注册表统一管理；新增关卡必须至少登记关前、
+部署/准备、玩家回合、胜利准备和完成路由等适用入口。调试会话只修改当前内存，不自动
+写入正式存档；普通 `/` 不加载该模块，也不暴露 `window.__ANGEL2_DEBUG__`。自动测试使用的
+`window.__ANGEL2__` 仍只在 `?test=1` 下存在，两者不得用于普通通关验收。
+
+## 肖像动画实验室
+
+所有原版角色的眨眼、说话口型和覆盖片落点可以从独立页面集中检查：
+
+```bash
+pnpm dev:portraits
+```
+
+也可以打开 `http://127.0.0.1:4173/portrait-lab.html`。实验室默认显示第 0–1 关角色，
+可切换为 `D/0..67` 全目录，并可强制查看半闭、闭眼、闭嘴、小幅张嘴和完整口部素材。
+正式运行时与实验室共用 `portrait-catalog.generated.ts`；新关卡只需引用原版肖像记录号，
+不再为新角色手工登记动画。`D/63` 因原版没有动画元数据和覆盖帧而明确保持静态，
+`D/67` 按原版行为沿用 `D/56` 布局。
+
 ## 战斗动画实验室
 
 全景战斗表现可以从独立页面直接测试，不需要进入关卡、移动单位或触发真实结算：
@@ -68,6 +99,7 @@ pnpm test:coverage # 单元测试与核心覆盖率门槛
 pnpm build         # TypeScript 与生产构建
 pnpm test:e2e      # 固定版本 Chromium 端到端验收
 pnpm check         # 顺序执行以上全部检查
+pnpm content:portraits # 从 D.SWF 渲染与原版元数据重建全角色肖像目录
 pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉淡化参数
 ```
 
@@ -81,6 +113,9 @@ pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉�
 - `src/game/ui.ts`：剧情、HUD、目标、胜负和保存界面；
 - `src/combat-lab.ts`：复用正式全景战斗脚本与渲染器的独立动画实验室；
 - `src/deployment-lab.ts`：复用正式部署模拟、DOM 和 Phaser 投影的第 1 关验收表面；
+- `src/portrait-lab.ts`：集中检查全战役肖像眨眼、口型和原版覆盖片落点；
+- `src/game/debug-scenarios.ts`：按关登记开发场景、确定性夹具与调试工具栏；
+- `scripts/generate-portrait-catalog.mjs`：从原版 `D` 记录与布局证据生成全角色运行时目录；
 - `scripts/generate-stage0-runtime.mjs`：从 `B/0001` 固化 50×50 地形内容；
 - `public/assets/original/`：切片使用的调色板修正素材与已转换原版音频；
 - `tests/`：模拟与浏览器验收。

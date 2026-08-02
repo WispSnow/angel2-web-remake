@@ -1,0 +1,355 @@
+:root {
+  color: #f4e8cf;
+  background: #090608;
+  font-family: "Noto Serif TC", "PingFang TC", serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.debug-hub-page {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 18% 0%, rgb(102 35 44 / 28%), transparent 32rem),
+    linear-gradient(180deg, #130b0f, #080608 34rem);
+}
+
+.debug-hub-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.debug-hub-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 26px 28px;
+  border: 1px solid #74444a;
+  background: rgb(24 12 17 / 92%);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 36%);
+}
+
+.debug-kicker,
+.debug-stage-heading p {
+  margin: 0 0 8px;
+  color: #e6b642;
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+}
+
+.debug-hub-header h1 {
+  margin: 0;
+  color: #fff5df;
+  font-size: clamp(30px, 5vw, 52px);
+  line-height: 1.1;
+}
+
+.debug-hub-header p:not(.debug-kicker) {
+  max-width: 700px;
+  margin: 14px 0 0;
+  color: #cbb8aa;
+  line-height: 1.8;
+}
+
+.debug-back-link,
+.debug-scenario-card a,
+.debug-toolbar a,
+.debug-toolbar button {
+  color: #ffe8ad;
+  border: 1px solid #a56d37;
+  background: #3a171b;
+  text-decoration: none;
+}
+
+.debug-back-link {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+}
+
+.debug-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 30px;
+  padding: 14px 18px;
+  border-left: 3px solid #d9a837;
+  background: #1d1014;
+}
+
+.debug-options label {
+  color: #f1c35c;
+  font-weight: 700;
+}
+
+.debug-options select {
+  padding: 8px 34px 8px 10px;
+  color: #fff2d3;
+  border: 1px solid #82524b;
+  background: #2b161b;
+}
+
+.debug-options span {
+  color: #aa9690;
+  font-size: 13px;
+}
+
+.debug-tool-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.debug-tool-links a {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  color: #ffe8ad;
+  border: 1px solid #5f4142;
+  background: #1b1114;
+  text-decoration: none;
+}
+
+.debug-tool-links span {
+  color: #a9948e;
+  font-size: 12px;
+}
+
+.debug-tool-links a:hover,
+.debug-tool-links a:focus-visible {
+  border-color: #efc25a;
+  outline: 2px solid rgb(239 194 90 / 28%);
+  outline-offset: 2px;
+}
+
+.debug-stage-group {
+  margin-top: 34px;
+}
+
+.debug-stage-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.debug-stage-heading h2 {
+  margin: 0;
+  color: #f8e9ce;
+  font-size: 24px;
+}
+
+.debug-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.debug-scenario-card {
+  min-height: 220px;
+  padding: 18px;
+  border: 1px solid #57343b;
+  background: linear-gradient(145deg, rgb(43 22 28 / 96%), rgb(21 13 17 / 98%));
+}
+
+.debug-scenario-card.is-fixture {
+  border-color: #79582d;
+}
+
+.debug-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #b89f92;
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 11px;
+}
+
+.debug-card-meta em {
+  color: #dfb34f;
+  font-style: normal;
+}
+
+.debug-scenario-card h3 {
+  margin: 18px 0 8px;
+  color: #fff0ce;
+  font-size: 20px;
+}
+
+.debug-scenario-card p {
+  min-height: 68px;
+  margin: 0 0 18px;
+  color: #bca8a0;
+  line-height: 1.65;
+}
+
+.debug-scenario-card a {
+  display: inline-block;
+  padding: 8px 13px;
+}
+
+.debug-back-link:hover,
+.debug-scenario-card a:hover,
+.debug-back-link:focus-visible,
+.debug-scenario-card a:focus-visible,
+.debug-toolbar a:hover,
+.debug-toolbar button:hover:not(:disabled),
+.debug-toolbar a:focus-visible,
+.debug-toolbar button:focus-visible {
+  color: #fff;
+  border-color: #efc25a;
+  outline: 2px solid rgb(239 194 90 / 28%);
+  outline-offset: 2px;
+}
+
+.debug-hub-footer {
+  margin-top: 38px;
+  padding: 18px 22px;
+  color: #a9948e;
+  border: 1px dashed #59383e;
+  line-height: 1.7;
+}
+
+.debug-hub-footer p {
+  margin: 4px 0;
+}
+
+.debug-hub-footer b,
+.debug-hub-footer code {
+  color: #e6bd60;
+}
+
+.debug-toolbar {
+  position: fixed;
+  z-index: 5000;
+  top: 12px;
+  right: 12px;
+  width: min(300px, calc(100vw - 24px));
+  color: #f8e7c5;
+  font-family: "Noto Serif TC", "PingFang TC", serif;
+  filter: drop-shadow(0 12px 24px rgb(0 0 0 / 48%));
+}
+
+.debug-toolbar-toggle {
+  float: right;
+  min-width: 72px;
+  padding: 7px 10px;
+  color: #180c10 !important;
+  border-color: #f0c75d !important;
+  background: #f0c75d !important;
+  font: 800 11px/1 ui-monospace, monospace;
+  letter-spacing: 0.15em;
+}
+
+.debug-toolbar-panel {
+  clear: both;
+  padding: 14px;
+  border: 1px solid #a56d37;
+  background: rgb(24 11 16 / 96%);
+}
+
+.debug-toolbar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.debug-toolbar-heading b {
+  color: #f2c65c;
+}
+
+.debug-toolbar-heading a {
+  padding: 4px 7px;
+  font-size: 12px;
+}
+
+.debug-toolbar p {
+  margin: 9px 0;
+  color: #c9b1a2;
+  font-size: 12px;
+}
+
+.debug-toolbar-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 12px 0 8px;
+}
+
+.debug-toolbar-actions button {
+  min-height: 38px;
+  padding: 5px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.debug-toolbar-actions button:disabled {
+  color: #756361;
+  border-color: #4b3537;
+  background: #24181a;
+}
+
+.debug-toolbar small {
+  color: #8d7b76;
+  font-size: 10px;
+}
+
+@media (max-width: 820px) {
+  .debug-hub-shell {
+    width: min(100% - 20px, 640px);
+    padding-top: 16px;
+  }
+
+  .debug-hub-header {
+    display: block;
+    padding: 20px;
+  }
+
+  .debug-back-link {
+    display: inline-block;
+    margin-top: 18px;
+  }
+
+  .debug-options {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .debug-options span {
+    flex-basis: 100%;
+  }
+
+  .debug-scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .debug-tool-links {
+    grid-template-columns: 1fr;
+  }
+
+  .debug-scenario-card {
+    min-height: auto;
+  }
+
+  .debug-scenario-card p {
+    min-height: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
