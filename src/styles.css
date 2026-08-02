@@ -594,6 +594,8 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   text-shadow: 2px 2px #000;
   cursor: var(--native-cursor-hand);
 }
+.action-menu.native-command-menu[data-kind="initial"] button,
+.action-menu.native-command-menu[data-kind="postMove"] button { text-indent: .75em; }
 .action-menu.native-command-menu button::before {
   content: "";
   position: absolute;

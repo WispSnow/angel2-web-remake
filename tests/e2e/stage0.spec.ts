@@ -530,6 +530,14 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       selection: selected ? getComputedStyle(selected, "::before").backgroundImage : "",
       pointer: selected ? getComputedStyle(selected).cursor : "",
       duplicatePointer: label ? getComputedStyle(label, "::after").content : "",
+      labelInkCenterOffset: selected && label
+        ? label.getBoundingClientRect().left + label.getBoundingClientRect().width / 2
+          - (
+            Number.parseFloat(getComputedStyle(selected).letterSpacing)
+            - Number.parseFloat(getComputedStyle(selected).textIndent)
+          ) / 2
+          - (menu.getBoundingClientRect().left + menu.getBoundingClientRect().width / 2)
+        : Number.NaN,
     };
   });
   expect(nativeMenuArt).toMatchObject({ width: 144, height: 100 });
@@ -543,6 +551,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(nativeMenuArt.selection).toContain("command-menu-selection.png");
   expect(nativeMenuArt.pointer).toContain("command-menu-pointer.png");
   expect(nativeMenuArt.duplicatePointer).toBe("none");
+  expect(Math.abs(nativeMenuArt.labelInkCenterOffset)).toBeLessThan(0.5);
   const commandMenuPlacement = await page.getByTestId("action-menu").evaluate((menu) => {
     const bounds = menu.getBoundingClientRect();
     const screen = menu.closest("[data-testid=game-screen]")!.getBoundingClientRect();
