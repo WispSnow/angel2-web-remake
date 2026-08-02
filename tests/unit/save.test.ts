@@ -14,29 +14,35 @@ import {
   saveSlotKey,
 } from "../../src/game/save";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
+import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
+import { Stage1Battle } from "../../src/game/simulation/stage1-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
   format: "ANGEL2-web-save",
   version: SAVE_VERSION,
-  contentVersion: "native-actions-1",
+  contentVersion: "stage-01-actions-1",
   kind: "completed",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 1,
   stageId: "stage-01",
-  stageLabel: "下一關",
+  stageLabel: "騎士城堡前",
   ruleset: "stableRemake",
   difficulty: 0,
   rngState: 0x0a11ce02,
-  roster: [
+  rngCalls: 0,
+  roster: completeCampaignRoster([
     { slot: 0, classId: "soldier", experience: 319, life: 170 },
-  ],
+  ]),
+  stageProgress: 0,
+  consumedEventIds: [],
 });
 
 const battleSave = (): BattleSaveData => ({
   format: "ANGEL2-web-save",
   version: SAVE_VERSION,
-  contentVersion: "native-actions-1",
+  contentVersion: "stage-01-actions-1",
   kind: "battle",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 2,
@@ -45,8 +51,16 @@ const battleSave = (): BattleSaveData => ({
   ruleset: "stableRemake",
   difficulty: 2,
   rngState: 0x1020_3040,
-  roster: [
+  rngCalls: 0,
+  roster: completeCampaignRoster([
     { slot: 0, classId: "soldier", experience: 399, life: 160 },
+  ]),
+  stageProgress: 0,
+  consumedEventIds: [
+    "stage-00-prebattle-story",
+    "stage-00-opening-move",
+    "stage-00-opening-story",
+    "stage-00-round-2-story",
   ],
   battle: {
     phase: "player",
@@ -89,6 +103,53 @@ const battleSave = (): BattleSaveData => ({
   },
 });
 
+const stage1BattleSave = (): BattleSaveData => {
+  const prior = completedSave();
+  const deployment = {
+    placements: [
+      ...STAGE1_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot,
+        position: { ...position },
+        fixed: true,
+      })),
+      {
+        slot: 24,
+        position: { ...STAGE1_DEFINITION.deployment.openCells[0] },
+        fixed: false,
+      },
+    ],
+  };
+  const battle = new Stage1Battle({
+    difficulty: prior.difficulty,
+    roster: prior.roster,
+    rngState: prior.rngState,
+    rngCalls: prior.rngCalls,
+  }, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    ...prior,
+    kind: "battle",
+    saveCount: 2,
+    stageId: "stage-01",
+    stageLabel: "騎士城堡前",
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    consumedEventIds: [
+      "stage-01-prebattle-story",
+      "stage-01-enter-deployment",
+      "stage-01-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...STAGE1_DEFINITION.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -100,7 +161,7 @@ function legacyCompletedSave(
     savedAt: save.savedAt,
     saveCount: save.saveCount,
     stage: 1,
-    stageLabel: save.stageLabel,
+    stageLabel: "下一關",
     ruleset: save.ruleset,
     difficulty: save.difficulty,
     rngState: save.rngState,
@@ -126,10 +187,14 @@ function legacyBattleSave(
     ruleset: save.ruleset,
     difficulty: save.difficulty,
     rngState: save.rngState,
-    roster: save.roster.map((entry) => ({
-      ...entry,
-      classId: entry.classId === "cavalry" ? 22 : 0,
-    })),
+    roster: save.roster
+      .filter((entry) => save.battle.units.some(
+        (unit) => unit.side === 1 && unit.slot === entry.slot,
+      ))
+      .map((entry) => ({
+        ...entry,
+        classId: entry.classId === "cavalry" ? 22 : 0,
+      })),
     battle: {
       ...save.battle,
       units: save.battle.units.map((unit) => ({
@@ -157,9 +222,54 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-6 battle and completed saves", () => {
+  it("accepts complete version-7 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
+    expect(parseSaveData(JSON.stringify(stage1BattleSave()))).toEqual(stage1BattleSave());
+  });
+
+  it("strictly correlates stage-1 deployment, events and completed route state", () => {
+    const missingFixedUnit = stage1BattleSave();
+    missingFixedUnit.battle.units = missingFixedUnit.battle.units.filter(({ id }) => id !== "1:42");
+    expect(isSaveData(missingFixedUnit)).toBe(false);
+
+    const wrongMagicianOverride = stage1BattleSave();
+    const magician = wrongMagicianOverride.battle.units.find(({ id }) => id === "1:24")!;
+    magician.classId = "soldier";
+    magician.className = "士兵";
+    wrongMagicianOverride.roster[24] = {
+      ...wrongMagicianOverride.roster[24],
+      classId: "soldier",
+    };
+    expect(isSaveData(wrongMagicianOverride)).toBe(false);
+
+    const skippedOpening = stage1BattleSave();
+    skippedOpening.consumedEventIds.pop();
+    expect(isSaveData(skippedOpening)).toBe(false);
+
+    const completedStage1 = stage1BattleSave();
+    const completedRoute: CompletedSaveData = {
+      format: completedStage1.format,
+      version: completedStage1.version,
+      contentVersion: completedStage1.contentVersion,
+      kind: "completed",
+      savedAt: completedStage1.savedAt,
+      saveCount: completedStage1.saveCount,
+      stageId: "stage-02",
+      stageLabel: "下一關",
+      ruleset: completedStage1.ruleset,
+      difficulty: completedStage1.difficulty,
+      rngState: completedStage1.rngState,
+      rngCalls: completedStage1.rngCalls,
+      roster: completedStage1.roster,
+      stageProgress: 1000,
+      consumedEventIds: STAGE1_DEFINITION.events.map(({ id }) => id),
+    };
+    expect(isSaveData(completedRoute)).toBe(true);
+    expect(isSaveData({
+      ...completedRoute,
+      consumedEventIds: completedRoute.consumedEventIds.slice(0, -1),
+    })).toBe(false);
   });
 
   it("migrates version-5 semantic saves by adding empty status state", () => {
@@ -168,6 +278,7 @@ describe("Web save validation", () => {
       ...current,
       version: 5,
       contentVersion: "native-classes-1",
+      roster: current.roster.filter(({ slot }) => slot === 0),
       battle: {
         ...current.battle,
         units: current.battle.units.map(({ statuses: _statuses, ...unit }) => unit),

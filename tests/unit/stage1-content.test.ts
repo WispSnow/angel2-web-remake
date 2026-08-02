@@ -28,9 +28,9 @@ const workspace = path.resolve(import.meta.dirname, "../..");
 const sha256 = (value: Buffer) => createHash("sha256").update(value).digest("hex");
 
 describe("stage 1 generated content", () => {
-  it("assembles the stable definition without registering partial runtime content", () => {
-    expect(Object.keys(RUNTIME_STAGE_DEFINITIONS)).toEqual(["stage-00"]);
-    expect(isRuntimeStageId("stage-01")).toBe(false);
+  it("assembles and registers the runnable stable definition", () => {
+    expect(RUNTIME_STAGE_DEFINITIONS["stage-01"]).toBe(STAGE1_DEFINITION);
+    expect(isRuntimeStageId("stage-01")).toBe(true);
     expect(STAGE1_DEFINITION).toMatchObject({
       id: "stage-01",
       nativeStage: 1,

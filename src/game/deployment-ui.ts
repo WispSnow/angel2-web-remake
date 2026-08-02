@@ -99,7 +99,7 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
         ${feedback ?? (state.submitted ? `部署完成：${state.placements.length} 人編隊已建立。` : "選擇出場人物；五至八人均可完成。")}
       </div>
       ${state.submitted ? `<div class="deployment-submitted" data-testid="deployment-submitted">
-        <strong>部署結果已建立</strong><span>P5 將由戰鬥工廠接續 SAY/0005</span>
+        <strong>部署結果已建立</strong><span>正在進入第 1 關開場劇情</span>
       </div>` : ""}
     `;
     root.dataset.focusKind = state.focus.kind;

@@ -1,13 +1,13 @@
 # M01 第 1 关部署系统规格
 
-状态：`specified`；用户已授权在有界 M02 中实现
+状态：`implemented`；自动验收完成，等待 M02 人工接受
 
 纸面授权日期：2026-08-01；M02 代码授权日期：2026-08-01
 
 实现状态：纯模拟位于 `src/game/simulation/deployment/`，语义输入会话位于
 `src/game/deployment-session.ts`；固定/可选/空位、提交、反馈门、焦点与 PRNG 独立性
-已通过单元验收。DOM 名单与 Phaser 地图共用该会话，并已在 `/deployment-lab.html`
-通过键盘、鼠标、手柄、桌面、窄屏与减少动态浏览器验收；正式战役接入仍属于 P5。
+已通过单元验收。DOM 名单与 Phaser 地图共用该会话，并已同时接入正式战役与
+`/deployment-lab.html`，通过键盘、鼠标、手柄、失败重试、桌面、窄屏与减少动态验收。
 
 依赖：第 1 关关卡合同、战役 roster、职业目录、地图模板、语义输入
 

@@ -21,10 +21,9 @@ import type { Difficulty } from "../../src/game/types";
 import { shortestPath } from "../../src/game/simulation/grid";
 
 describe("stage 0 evidence-backed content", () => {
-  it("registers stage 0 as the only runnable stage definition", () => {
-    expect(Object.keys(RUNTIME_STAGE_DEFINITIONS)).toEqual(["stage-00"]);
+  it("registers stage 0 as runnable content", () => {
+    expect(RUNTIME_STAGE_DEFINITIONS["stage-00"]).toBe(STAGE0_DEFINITION);
     expect(isRuntimeStageId("stage-00")).toBe(true);
-    expect(isRuntimeStageId("stage-01")).toBe(false);
     expect(STAGE0_DEFINITION).toMatchObject({
       contentIdentity: "stage-00/native-actions-1",
       deployment: { kind: "fixed" },

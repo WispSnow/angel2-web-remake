@@ -108,3 +108,20 @@ export function techniqueSelectionRange(
     (movementRule) => movementRule >= 99,
   );
 }
+
+export function techniqueEffectRange(
+  center: Position,
+  width: number,
+  height: number,
+  effectRadius: number,
+): NumericRangeMap {
+  const result = new NumericRangeMap(width, height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const distance = Math.abs(center.x - x) + Math.abs(center.y - y);
+      const value = effectRadius - distance;
+      if (value > 0) result.set({ x, y }, value);
+    }
+  }
+  return result;
+}

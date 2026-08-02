@@ -1,6 +1,6 @@
 # 《天使帝国 II》Web 复刻
 
-当前普通入口可运行内容是首个垂直切片：第 0 关“瓦爾克麗宮”。它从原版关前剧情开始，覆盖固定编队开战、妮雅脚本移动、玩家战术操作、行为 12 敌军、第二回合事件、失败重试、全灭胜利、战后对白、手动存档和第 1 关路由。第 1 关已完成证据生成内容及部署纯模拟/投影，但尚未接入普通战役入口。
+当前普通入口可连续运行第 0 关“瓦爾克麗宮”和第 1 关“騎士城堡前”。流程从原版关前剧情开始，覆盖固定编队、第 0 关脚本事件与撤离敌军、交互部署、第 1 关玩家/敌方技术、失败重试、战中与战后存档、首领芳胜利、传令兵剧情，并终止在明确的 `stage-02` 未实现边界。
 
 运行时采用 Phaser 4.2.1、TypeScript 和 Vite。战斗规则与内容数据独立于 Phaser，场景层只负责地图、单位、镜头、输入和范围表现。
 
@@ -39,7 +39,8 @@ pnpm dev:deployment
 
 也可以在 `pnpm dev` 已运行时打开 `http://127.0.0.1:4173/deployment-lab.html`。该页面
 复用正式部署 reducer、语义输入会话、DOM 名单和 Phaser 地图投影，支持鼠标、键盘和
-标准手柄；提交结果不会建立敌军、推进 PRNG 或进入 `SAY/0005`，正式战役接入留在 M02 P5。
+标准手柄；提交结果不会建立敌军、推进 PRNG 或进入 `SAY/0005`。普通入口中的正式部署
+复用同一状态机，并在提交后建立第 1 关战斗。
 
 ## 存档与继续游戏
 
@@ -53,7 +54,7 @@ pnpm dev:deployment
 2. 从职业行动菜单选择“移动”，再在原版网点范围内选择合法格；
 3. 移动后选择“攻击／结束／返悔”，或在初始菜单直接“攻击／休息”；
 4. 所有手动单位提交后进入我方自动与敌方阶段；也可用“全部休息”一次提交剩余单位；
-5. 清除全部敌人胜利；妮雅被移除则失败。
+5. 第 0 关清除全部敌人胜利；第 1 关只需击败首领芳；妮雅被移除则失败。
 
 没有单位焦点时，右栏显示战术桌与实时小地图；悬浮或选中单位时改为单位详情。`Esc` 根菜单提供原文五项“遊戲功能／勝利條件／讀取記錄／儲存記錄／離開遊戲”；表现速度与地图/全景战斗位于“遊戲功能”子菜单，“音效設定”进入“說話／移動／戰鬥／按鍵”四项独立开关，“音樂”进入“無聲／1／2／3／最大”五档单选。表现与声音选项不会改变模拟状态或随机数序列。
 
@@ -70,11 +71,11 @@ pnpm check         # 顺序执行以上全部检查
 pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉淡化参数
 ```
 
-端到端测试覆盖 `S00-A` 到 `S00-P`，包括真实鼠标攻击、目标/系统/集体命令、AI 与 ZOC、地图/全景战斗、第二回合剧情、失败重试、战中存读档、胜利保存、关前音乐与玩家/敌方战斗曲对、原版音效事件、键盘输入、减少动画和窄屏。`S00-O` 从普通 `/` 启动，不带 `?test=1`、不读取调试状态，只用玩家可见控件让第一关完整通关；固定版本 Chromium 在 Darwin 本地另对最终下一关画面执行黄金截图比对，CI 保留同一流程的语义断言以避开跨系统字形光栅差异。过程截图生成到 `artifacts/playwright/`。
+端到端测试覆盖 `S00-A` 到 `S00-P` 与 `S01-A` 到 `S01-H`，包括真实鼠标攻击、目标/系统/集体命令、AI 与 ZOC、部署、落雷/冰雪、敌方修女、地图/全景战斗、剧情、失败重试、战中存读档、胜利保存、音乐/音效、键盘输入、减少动画、窄屏和按关延迟加载。`S00-O` 从普通 `/` 启动，不带 `?test=1`、不读取调试状态，只用玩家可见控件完整通关第 0 关并进入第 1 关；固定版本 Chromium 在 Darwin 本地执行代表性黄金截图比对，CI 保留同一流程的语义断言以避开跨系统字形光栅差异。过程截图生成到 `artifacts/playwright/`。
 
 ## 结构
 
-- `src/game/content/`：证据驱动的第 0 关内容、原始数值与对白；
+- `src/game/content/`：证据驱动的第 0–1 关内容、原始数值与对白；
 - `src/game/simulation/`：与 Phaser 无关的确定性网格、伤害、经验和 AI；
 - `src/game/phaser/`：地图、单位、镜头和范围表现；
 - `src/game/ui.ts`：剧情、HUD、目标、胜负和保存界面；
@@ -85,4 +86,4 @@ pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉�
 - `tests/`：模拟与浏览器验收。
 - `planning/`：当前进度、路线、里程碑和跨阶段风险。
 
-当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`design/remake-gdd/vertical-slices/stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md) 与 [`design/remake-gdd/vertical-slices/stage-01.md`](design/remake-gdd/vertical-slices/stage-01.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 1 关是已授权的有界 M02 实施范围；`stage-02` 战斗和后续关卡仍冻结。
+当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`design/remake-gdd/vertical-slices/stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md) 与 [`design/remake-gdd/vertical-slices/stage-01.md`](design/remake-gdd/vertical-slices/stage-01.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 1 关 M02 已通过自动验收并等待用户手动接受；`stage-02` 战斗和后续关卡仍冻结。

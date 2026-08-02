@@ -1,5 +1,5 @@
 import { STAGE0_SPEECH_RECORD_BY_CHARACTER, STAGE0_TERRAIN_TOKENS_BASE64, STAGE0_TOKEN_TO_SLOT_BASE64 } from "./stage0-runtime.generated";
-import type { BattleUnit, Difficulty, Position, UnitClassId, UnitStats } from "../types";
+import type { BattleUnit, Difficulty, Position, SaveRosterEntry, UnitClassId, UnitStats } from "../types";
 import {
   className,
   classStatsFor,
@@ -114,6 +114,24 @@ export function createStage0Units(difficulty: Difficulty = 0): BattleUnit[] {
     unit.className = className(unit.classId);
     unit.life = statsFor(unit, difficulty).maxLife;
     return unit;
+  });
+}
+
+export function completeCampaignRoster(
+  entries: readonly SaveRosterEntry[] = [],
+): SaveRosterEntry[] {
+  const bySlot = new Map(entries.map((entry) => [entry.slot, entry]));
+  return Array.from({ length: 75 }, (_, slot) => {
+    const entry = bySlot.get(slot);
+    if (entry) return { ...entry };
+    const classId = "soldier" as const;
+    const experience = STAGE0_ALLY_INITIAL_EXPERIENCE[slot] ?? 0;
+    return {
+      slot,
+      classId,
+      experience,
+      life: classStatsFor({ classId, experience }).maxLife,
+    };
   });
 }
 

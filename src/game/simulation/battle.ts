@@ -2,10 +2,10 @@ import {
   killRewardFor,
   terrainDefensePercentFor,
 } from "../content/classes";
-import { STAGE0, STAGE0_AI_CLASS_PRIORITY, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
-import { STAGE0_ACTION_DEFINITIONS } from "../content/stage0-actions.generated";
-import { STAGE0_DEFINITION } from "../content/stages";
-import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, Position, UnitStats, UnitStatuses } from "../types";
+import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
+import { STAGE0, STAGE0_AI_CLASS_PRIORITY, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
+import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
+import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, Position, SaveRosterEntry, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
 import { manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath } from "./grid";
 import {
@@ -29,10 +29,12 @@ import type {
 import { UNIT_STATUS_KEYS } from "./status";
 import { battleOutcomeForObjective } from "./objectives";
 
-const ACTION_CLASS: Readonly<Record<BattleActionId, ClassId>> = {
-  "archer-shot": "archer",
-  "fire-1": "sister",
-  "heal-1": "sister",
+const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
+  "archer-shot": ["archer"],
+  "fire-1": ["sister", "magician"],
+  "heal-1": ["sister"],
+  "lightning-1": ["magician"],
+  "ice-1": ["magician"],
 };
 
 function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
@@ -41,7 +43,7 @@ function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
 
 function canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
   return !actor.acted
-    && actor.classId === ACTION_CLASS[actionId]
+    && ACTION_CLASSES[actionId].includes(actor.classId)
     && (actionId === "archer-shot" || actor.statuses.techniqueSeal === 0);
 }
 
@@ -50,6 +52,41 @@ export interface RouteMoveResult {
   destination: Position;
   reachedExit: boolean;
 }
+
+export interface BattleScenario {
+  stage: StageDefinition;
+  width: number;
+  height: number;
+  terrainSlotAt: (position: Position) => number;
+  createUnits: (difficulty: Difficulty) => BattleUnit[];
+  createCampaignRoster: (difficulty: Difficulty) => SaveRosterEntry[];
+  enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
+  enemyBehaviorById?: ReadonlyMap<string, number>;
+  routeEnemy?: {
+    target: Position;
+    movement: number;
+    isExit: (position: Position) => boolean;
+  };
+}
+
+const STAGE0_BATTLE_SCENARIO: BattleScenario = {
+  stage: STAGE0_DEFINITION,
+  width: STAGE0_DEFINITION.width,
+  height: STAGE0_DEFINITION.height,
+  terrainSlotAt,
+  createUnits: createStage0Units,
+  createCampaignRoster: (difficulty) => completeCampaignRoster(
+    createStage0Units(difficulty)
+      .filter(({ side }) => side === 1)
+      .map(({ slot, classId, experience, life }) => ({ slot, classId, experience, life })),
+  ),
+  enemyClassPriority: STAGE0_AI_CLASS_PRIORITY,
+  routeEnemy: {
+    target: STAGE0.enemyRouteTarget,
+    movement: STAGE0.enemyRouteMovement,
+    isExit: isStage0Exit,
+  },
+};
 
 export interface AlliedAiAction {
   unitId: string;
@@ -60,25 +97,43 @@ export interface AlliedAiAction {
 }
 
 export class Stage0Battle {
-  readonly stage = STAGE0_DEFINITION;
+  readonly stage: StageDefinition;
   units: BattleUnit[];
   round = 1;
   focusId = "1:0";
+  private readonly campaignRoster: SaveRosterEntry[];
+  private readonly campaignUnitSlots: ReadonlySet<number>;
 
   constructor(
     public readonly difficulty: Difficulty = 0,
     public readonly rng = new DeterministicRng(),
+    protected readonly scenario: BattleScenario = STAGE0_BATTLE_SCENARIO,
   ) {
-    this.units = createStage0Units(difficulty);
+    this.stage = scenario.stage;
+    this.units = scenario.createUnits(difficulty);
+    this.campaignRoster = scenario.createCampaignRoster(difficulty);
+    this.campaignUnitSlots = new Set(
+      this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
+    );
   }
 
-  restore(snapshot: Pick<ReturnType<Stage0Battle["serializableSnapshot"]>, "round" | "focusId" | "units">): void {
+  restore(
+    snapshot: Pick<ReturnType<Stage0Battle["serializableSnapshot"]>, "round" | "focusId" | "units">,
+    campaignRoster?: readonly SaveRosterEntry[],
+  ): void {
     this.round = snapshot.round;
     this.focusId = snapshot.focusId;
     this.units = snapshot.units.map((unit) => ({
       ...unit,
       statuses: { ...unit.statuses },
     }));
+    if (campaignRoster) {
+      this.campaignRoster.splice(
+        0,
+        this.campaignRoster.length,
+        ...completeCampaignRoster(campaignRoster),
+      );
+    }
   }
 
   get focus(): BattleUnit | undefined {
@@ -91,6 +146,10 @@ export class Stage0Battle {
 
   unitAt(position: Position): BattleUnit | undefined {
     return this.units.find((unit) => unit.x === position.x && unit.y === position.y);
+  }
+
+  enemyBehaviorFor(id: string): number {
+    return this.scenario.enemyBehaviorById?.get(id) ?? 0;
   }
 
   promotionQueue(): string[] {
@@ -122,7 +181,7 @@ export class Stage0Battle {
     const unit = this.unit(id);
     const occupant = this.unitAt(destination);
     if (!unit || unit.acted || (occupant && occupant.id !== unit.id)) return [];
-    return findMovementPath(unit, destination, this.units);
+    return findMovementPath(unit, destination, this.units, this.scenario);
   }
 
   moveUnitStep(id: string, destination: Position, allowFriendlyTransit = false): boolean {
@@ -132,12 +191,33 @@ export class Stage0Battle {
       !unit
       || manhattan(unit, destination) !== 1
       || (occupant && (!allowFriendlyTransit || occupant.side !== unit.side))
-      || movementCost(unit.classId, destination) >= 98
+      || movementCost(unit.classId, destination, this.scenario) >= 98
     ) return false;
     unit.x = destination.x;
     unit.y = destination.y;
     this.focusId = id;
     return true;
+  }
+
+  reachableCells(id: string, movementBudget?: number): Position[] {
+    const unit = this.unit(id);
+    if (!unit) return [];
+    return movementBudget === undefined
+      ? reachableCells(unit, this.units, undefined, this.scenario)
+      : reachableCells(unit, this.units, movementBudget, this.scenario);
+  }
+
+  scriptedPath(id: string, destination: Position, movementBudget: number): Position[] {
+    const unit = this.unit(id);
+    if (!unit) return [];
+    return shortestPath(
+      unit,
+      destination,
+      unit.classId,
+      movementBudget,
+      this.units.filter((candidate) => candidate.id !== unit.id),
+      this.scenario,
+    );
   }
 
   attack(attackerId: string, defenderId: string): AttackResult {
@@ -151,7 +231,7 @@ export class Stage0Battle {
     const defenderStats = this.statsFor(defender);
     const terrainDefense = Math.floor(
       defenderStats.defense
-      * terrainDefensePercentFor(defender.classId, terrainSlotAt(defender))
+      * terrainDefensePercentFor(defender.classId, this.scenario.terrainSlotAt(defender))
       / 100,
     );
     const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense) + this.rng.between(4, 7) + this.rng.between(4, 7);
@@ -162,7 +242,7 @@ export class Stage0Battle {
     if (counterOccurred) {
       const attackerTerrainDefense = Math.floor(
         attackerStats.defense
-        * terrainDefensePercentFor(attacker.classId, terrainSlotAt(attacker))
+        * terrainDefensePercentFor(attacker.classId, this.scenario.terrainSlotAt(attacker))
         / 100,
       );
       counterDamage = Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
@@ -175,6 +255,8 @@ export class Stage0Battle {
     const experienceGained = defenderDied ? reward + this.rng.between(4, 7) : defenderStats.level + this.rng.between(4, 7);
     attacker.experience += experienceGained;
     attacker.acted = true;
+    this.recordCampaignUnit(attacker);
+    this.recordCampaignUnit(defender);
 
     if (defenderDied) this.units = this.units.filter((unit) => unit.id !== defender.id);
     if (attackerDied) this.units = this.units.filter((unit) => unit.id !== attacker.id);
@@ -191,20 +273,35 @@ export class Stage0Battle {
     const battlefield = {
       width: this.stage.width,
       height: this.stage.height,
-      terrainSlotAt,
+      terrainSlotAt: this.scenario.terrainSlotAt,
     };
     if (actionId === "archer-shot") return archerShootingRange(actor, battlefield);
     return techniqueSelectionRange(
       actor,
       battlefield,
-      STAGE0_ACTION_DEFINITIONS[actionId].range.selectionRadius,
+      BATTLE_ACTION_DEFINITIONS[actionId].range.selectionRadius,
     );
+  }
+
+  actionTargetCells(actorId: string, actionId: BattleActionId): Position[] {
+    const actor = this.unit(actorId);
+    if (!actor || !canUseSpecialAction(actor, actionId)) return [];
+    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    const range = this.actionRange(actorId, actionId);
+    if (definition.target === "area") return range.cells();
+    return this.units
+      .filter((target) => range.valueAt(target) > 0
+        && (definition.target === "ally"
+          ? target.side === actor.side
+          : target.side !== actor.side))
+      .map(({ x, y }) => ({ x, y }));
   }
 
   actionTargets(actorId: string, actionId: BattleActionId): BattleUnit[] {
     const actor = this.unit(actorId);
     if (!actor || !canUseSpecialAction(actor, actionId)) return [];
-    const definition = STAGE0_ACTION_DEFINITIONS[actionId];
+    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    if (definition.target === "area") return [];
     const range = this.actionRange(actorId, actionId);
     return this.units.filter((target) =>
       range.valueAt(target) > 0
@@ -215,12 +312,19 @@ export class Stage0Battle {
 
   prepareSpecialAction(intent: BattleActionIntent): PreparedBattleAction {
     const actor = this.unit(intent.actorId);
-    const target = this.unit(intent.targetId);
+    const target = intent.targetId ? this.unit(intent.targetId) : undefined;
+    const center = intent.target ?? (target ? { x: target.x, y: target.y } : undefined);
+    const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
+    const legalCell = center
+      ? this.actionTargetCells(intent.actorId, intent.actionId)
+        .some(({ x, y }) => x === center.x && y === center.y)
+      : false;
     if (
       !actor
-      || !target
+      || !center
       || !canUseSpecialAction(actor, intent.actionId)
-      || !this.actionTargets(actor.id, intent.actionId).some(({ id }) => id === target.id)
+      || !legalCell
+      || (definition.target !== "area" && !target)
     ) {
       throw new Error("illegal special action");
     }
@@ -229,36 +333,62 @@ export class Stage0Battle {
       actor,
       target,
       this.rng,
-      this.statsFor(target).maxLife,
+      {
+        units: this.units,
+        battlefield: {
+          width: this.stage.width,
+          height: this.stage.height,
+          terrainSlotAt: this.scenario.terrainSlotAt,
+        },
+        statsFor: (unit) => this.statsFor(unit),
+      },
+      center,
     );
   }
 
   commitPreparedAction(prepared: PreparedBattleAction): SpecialActionResult {
     const actor = this.unit(prepared.intent.actorId);
-    const target = this.unit(prepared.intent.targetId);
+    const affectedAreCurrent = prepared.affectedUnits.every((affected) => {
+      const unit = this.unit(affected.unitId);
+      return unit
+        && unit.life === affected.lifeBefore
+        && unit.x === affected.positionBefore.x
+        && unit.y === affected.positionBefore.y
+        && statusesEqual(unit.statuses, affected.statusesBefore);
+    });
     if (
       !actor
-      || !target
       || !canUseSpecialAction(actor, prepared.intent.actionId)
       || this.rng.state !== prepared.rngBefore
+      || this.rng.calls !== prepared.rngCallsBefore
       || actor.experience !== prepared.actorExperienceBefore
-      || target.life !== prepared.targetLifeBefore
-      || target.x !== prepared.result.target.x
-      || target.y !== prepared.result.target.y
-      || !statusesEqual(target.statuses, prepared.targetStatusesBefore)
+      || !affectedAreCurrent
     ) {
       throw new Error("stale prepared special action");
     }
 
     this.rng.state = prepared.rngAfter;
+    this.rng.calls = prepared.rngCallsAfter;
     actor.experience = prepared.actorExperienceAfter;
     actor.acted = true;
-    target.life = prepared.targetLifeAfter;
-    target.statuses = { ...prepared.targetStatusesAfter };
-    if (prepared.result.targetDied) {
-      this.units = this.units.filter(({ id }) => id !== target.id);
+    for (const affected of prepared.affectedUnits) {
+      const unit = this.unit(affected.unitId);
+      if (!unit) throw new Error("stale prepared special action");
+      unit.x = affected.positionAfter.x;
+      unit.y = affected.positionAfter.y;
+      unit.life = affected.lifeAfter;
+      unit.statuses = { ...affected.statusesAfter };
+      this.recordCampaignUnit(unit);
     }
-    this.focusId = this.unit(actor.id) ? actor.id : target.id;
+    this.recordCampaignUnit(actor);
+    const deadIds = new Set(
+      prepared.affectedUnits.filter(({ died }) => died).map(({ unitId }) => unitId),
+    );
+    if (deadIds.size > 0) this.units = this.units.filter(({ id }) => !deadIds.has(id));
+    this.focusId = this.unit(actor.id)?.id
+      ?? prepared.result.targetId
+      ?? this.units[0]?.id
+      ?? actor.id;
     return prepared.result;
   }
 
@@ -272,7 +402,7 @@ export class Stage0Battle {
 
   rest(id: string): number {
     const unit = this.unit(id);
-    if (!unit || unit.side !== 1 || unit.acted) return 0;
+    if (!unit || unit.acted) return 0;
     const maximumLife = this.statsFor(unit).maxLife;
     const recovered = Math.max(0, Math.min(Math.floor(maximumLife * 15 / 100), maximumLife - unit.life));
     unit.life += recovered;
@@ -296,7 +426,7 @@ export class Stage0Battle {
     const unit = this.unit(id);
     if (!unit || unit.side !== 1 || unit.acted) return undefined;
 
-    const classAction = this.planAlliedClassAction(unit);
+    const classAction = this.planClassAction(unit);
     if (classAction) return classAction;
 
     const leader = leaderId ? this.unit(leaderId) : undefined;
@@ -307,22 +437,53 @@ export class Stage0Battle {
         unit.classId,
         this.statsFor(unit).movement,
         this.units.filter((candidate) => candidate.id !== unit.id),
+        this.scenario,
       );
       if (leaderPath.length === 0) {
-        const path = routePath(unit, neighbors(leader), this.units, this.statsFor(unit).movement);
+        const path = routePath(
+          unit,
+          neighbors(leader, this.scenario),
+          this.units,
+          this.statsFor(unit).movement,
+          this.scenario,
+        );
         if (path.length > 1) return { unitId: id, kind: "move", path };
       }
     }
 
+    return this.planOrdinaryAiAction(unit, 2, 0);
+  }
+
+  planEnemyAiAction(id: string, behavior: number): AlliedAiAction | undefined {
+    const unit = this.unit(id);
+    if (!unit || unit.side !== 2 || unit.acted) return undefined;
     const stats = this.statsFor(unit);
     const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
-    if (lifePercent < 20) return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+    if (lifePercent < 20) {
+      return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+    }
+    if (unit.classId === "sister" && unit.statuses.techniqueSeal === 0) {
+      const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "fire-1" : "heal-1";
+      const special = this.planSpecialAiAction(id, actionId);
+      if (special) return special;
+    }
+    return this.planOrdinaryAiAction(unit, 1, behavior);
+  }
 
-    const reachable = reachableCells(unit, this.units);
+  private planOrdinaryAiAction(
+    unit: BattleUnit,
+    opponentSide: BattleUnit["side"],
+    behavior: number,
+  ): AlliedAiAction {
+    const stats = this.statsFor(unit);
+    const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
+    if (lifePercent < 20) return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+
+    const reachable = reachableCells(unit, this.units, undefined, this.scenario);
     const reachableKeys = new Set(reachable.map(positionKey));
     const occupied = new Set(this.units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
     const enemies = this.units
-      .filter((candidate) => candidate.side === 2)
+      .filter((candidate) => candidate.side === opponentSide)
       .sort((left, right) => left.y * this.stage.width + left.x - (right.y * this.stage.width + right.x));
     const nativeCandidateOffsets = [
       { x: 0, y: 1 },
@@ -339,7 +500,7 @@ export class Stage0Battle {
         const candidate = { x: enemy.x + offset.x, y: enemy.y + offset.y };
         const candidateKey = positionKey(candidate);
         if (!reachableKeys.has(candidateKey) || occupied.has(candidateKey)) continue;
-        const defense = terrainDefensePercentFor(unit.classId, terrainSlotAt(candidate));
+        const defense = terrainDefensePercentFor(unit.classId, this.scenario.terrainSlotAt(candidate));
         if (defense >= attackPositionDefense) {
           attackTarget = enemy;
           attackPosition = candidate;
@@ -349,44 +510,60 @@ export class Stage0Battle {
     }
 
     if (attackTarget && attackPosition) {
+      if (behavior === 1 && positionKey(attackPosition) !== positionKey(unit)) {
+        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      }
       const path = positionKey(attackPosition) === positionKey(unit)
         ? [{ x: unit.x, y: unit.y }]
         : this.movementPath(unit.id, attackPosition);
-      if (path.length > 0) return { unitId: id, kind: "attack", path, targetId: attackTarget.id };
+      if (path.length > 0) return { unitId: unit.id, kind: "attack", path, targetId: attackTarget.id };
     }
 
-    if (unit.life < stats.maxLife) return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+    if (unit.life < stats.maxLife) return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+    if (behavior === 1) {
+      return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    }
 
     const pursuitTargets = enemies
       .map((enemy) => ({ x: enemy.x, y: enemy.y + 1 }))
       .filter(({ x, y }) => x >= 0 && y >= 0 && x < this.stage.width && y < this.stage.height);
-    const pursuitPath = routePath(unit, pursuitTargets, this.units, stats.movement);
-    if (pursuitPath.length > 1) return { unitId: id, kind: "move", path: pursuitPath };
-    return { unitId: id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    const pursuitPath = routePath(unit, pursuitTargets, this.units, stats.movement, this.scenario);
+    if (pursuitPath.length > 1) return { unitId: unit.id, kind: "move", path: pursuitPath };
+    return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
   }
 
-  private planAlliedClassAction(unit: BattleUnit): AlliedAiAction | undefined {
+  planSpecialAiAction(id: string, actionId: BattleActionId): AlliedAiAction | undefined {
+    const unit = this.unit(id);
+    if (!unit || unit.acted) return undefined;
+    return this.planClassAction(unit, [actionId]);
+  }
+
+  private planClassAction(
+    unit: BattleUnit,
+    requestedActionIds?: readonly BattleActionId[],
+  ): AlliedAiAction | undefined {
     if (unit.classId === "sister" && unit.statuses.techniqueSeal > 0) return undefined;
-    const actionIds: readonly BattleActionId[] = unit.classId === "archer"
-      ? ["archer-shot"]
-      : unit.classId === "sister"
-        ? ["heal-1", "fire-1"]
-        : [];
+    const actionIds: readonly BattleActionId[] = requestedActionIds
+      ?? (unit.classId === "archer"
+        ? ["archer-shot"]
+        : unit.classId === "sister"
+          ? ["heal-1", "fire-1"]
+          : []);
     if (actionIds.length === 0) return undefined;
 
     const occupied = new Set(
       this.units.filter(({ id }) => id !== unit.id).map(positionKey),
     );
-    const positions = reachableCells(unit, this.units)
+    const positions = reachableCells(unit, this.units, undefined, this.scenario)
       .filter((position) => !occupied.has(positionKey(position)));
     const battlefield = {
       width: this.stage.width,
       height: this.stage.height,
-      terrainSlotAt,
+      terrainSlotAt: this.scenario.terrainSlotAt,
     };
 
     for (const actionId of actionIds) {
-      const definition = STAGE0_ACTION_DEFINITIONS[actionId];
+      const definition = BATTLE_ACTION_DEFINITIONS[actionId];
       const candidates: Array<{
         position: Position;
         target: BattleUnit;
@@ -404,8 +581,8 @@ export class Stage0Battle {
             rangeActor,
             battlefield,
             actionId === "fire-1"
-              ? STAGE0_ACTION_DEFINITIONS["fire-1"].range.selectionRadius
-              : STAGE0_ACTION_DEFINITIONS["heal-1"].range.selectionRadius,
+              ? BATTLE_ACTION_DEFINITIONS["fire-1"].range.selectionRadius
+              : BATTLE_ACTION_DEFINITIONS["heal-1"].range.selectionRadius,
           );
         const path = positionKey(position) === positionKey(unit)
           ? [{ x: unit.x, y: unit.y }]
@@ -422,7 +599,7 @@ export class Stage0Battle {
           if (actionId === "heal-1" && missingLife <= 0) continue;
           const effectiveDefense = targetStats.defense + Math.floor(
             targetStats.defense
-            * terrainDefensePercentFor(target.classId, terrainSlotAt(target))
+            * terrainDefensePercentFor(target.classId, this.scenario.terrainSlotAt(target))
             / 100,
           );
           candidates.push({
@@ -431,7 +608,7 @@ export class Stage0Battle {
             path,
             missingLife,
             effectiveDefense,
-            positionDefense: terrainDefensePercentFor(unit.classId, terrainSlotAt(position)),
+            positionDefense: terrainDefensePercentFor(unit.classId, this.scenario.terrainSlotAt(position)),
           });
         }
       }
@@ -484,16 +661,17 @@ export class Stage0Battle {
 
   enemyMovementRange(id: string): Position[] {
     const unit = this.unit(id);
-    if (!unit || unit.side !== 2) return [];
-    return reachableCells(unit, this.units, STAGE0.enemyRouteMovement);
+    const route = this.scenario.routeEnemy;
+    if (!unit || unit.side !== 2 || !route) return [];
+    return reachableCells(unit, this.units, route.movement, this.scenario);
   }
 
   enemyActionOrder(): string[] {
     return this.units
       .filter((unit) => unit.side === 2 && !unit.acted)
       .sort((left, right) => {
-        const priority = (STAGE0_AI_CLASS_PRIORITY[left.classId] ?? Number.MAX_SAFE_INTEGER)
-          - (STAGE0_AI_CLASS_PRIORITY[right.classId] ?? Number.MAX_SAFE_INTEGER);
+        const priority = (this.scenario.enemyClassPriority[left.classId] ?? Number.MAX_SAFE_INTEGER)
+          - (this.scenario.enemyClassPriority[right.classId] ?? Number.MAX_SAFE_INTEGER);
         if (priority !== 0) return priority;
         return (left.y * this.stage.width + left.x) - (right.y * this.stage.width + right.x);
       })
@@ -502,15 +680,16 @@ export class Stage0Battle {
 
   planRouteEnemy(id: string): RouteMoveResult | undefined {
     const unit = this.unit(id);
-    if (!unit || unit.side !== 2) return undefined;
-    const route = routePath(unit, [STAGE0.enemyRouteTarget], this.units, STAGE0.enemyRouteMovement);
-    const exitIndex = route.findIndex((position, index) => index > 0 && isStage0Exit(position));
+    const definition = this.scenario.routeEnemy;
+    if (!unit || unit.side !== 2 || !definition) return undefined;
+    const route = routePath(unit, [definition.target], this.units, definition.movement, this.scenario);
+    const exitIndex = route.findIndex((position, index) => index > 0 && definition.isExit(position));
     const path = exitIndex >= 0 ? route.slice(0, exitIndex + 1) : route;
     const destination = path.at(-1) ?? { x: unit.x, y: unit.y };
     return {
       path,
       destination,
-      reachedExit: isStage0Exit(destination),
+      reachedExit: definition.isExit(destination),
     };
   }
 
@@ -527,7 +706,8 @@ export class Stage0Battle {
 
   evacuateEnemy(id: string): boolean {
     const unit = this.unit(id);
-    if (!unit || unit.side !== 2 || !isStage0Exit(unit)) return false;
+    const route = this.scenario.routeEnemy;
+    if (!unit || unit.side !== 2 || !route?.isExit(unit)) return false;
     this.units = this.units.filter((candidate) => candidate.id !== id);
     if (this.focusId === id && this.unit("1:0")) this.focusId = "1:0";
     return true;
@@ -548,6 +728,7 @@ export class Stage0Battle {
       round: this.round,
       focusId: this.focusId,
       rngState: this.rng.state,
+      rngCalls: this.rng.calls,
       units: this.units.map((unit) => ({ ...unit, statuses: { ...unit.statuses } })),
       outcome: this.outcome(),
     };
@@ -562,14 +743,36 @@ export class Stage0Battle {
   }
 
   campaignSnapshot(): CampaignState {
+    const rosterBySlot = new Map(this.campaignRoster.map((entry) => [entry.slot, { ...entry }]));
+    for (const unit of this.units) {
+      if (unit.side !== 1 || !this.campaignUnitSlots.has(unit.slot)) continue;
+      rosterBySlot.set(unit.slot, {
+        slot: unit.slot,
+        classId: unit.classId,
+        experience: unit.experience,
+        life: unit.life,
+      });
+    }
     return {
       stageId: this.stage.id,
       ruleset: "stableRemake",
       difficulty: this.difficulty,
-      roster: this.units
-        .filter((unit) => unit.side === 1)
-        .map(({ slot, classId, experience, life }) => ({ slot, classId, experience, life })),
+      roster: [...rosterBySlot.values()].sort((left, right) => left.slot - right.slot),
       rngState: this.rng.state,
+      rngCalls: this.rng.calls,
     };
+  }
+
+  private recordCampaignUnit(unit: BattleUnit): void {
+    if (unit.side !== 1 || !this.campaignUnitSlots.has(unit.slot)) return;
+    const index = this.campaignRoster.findIndex(({ slot }) => slot === unit.slot);
+    const entry = {
+      slot: unit.slot,
+      classId: unit.classId,
+      experience: unit.experience,
+      life: unit.life,
+    };
+    if (index >= 0) this.campaignRoster[index] = entry;
+    else this.campaignRoster.push(entry);
   }
 }

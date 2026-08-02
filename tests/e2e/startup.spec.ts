@@ -1,11 +1,10 @@
 import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { createStage0Units } from "../../src/game/content/stage0";
-import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
 
-const battleSave = (): BattleSaveData => {
+const battleSave = () => {
   const units = createStage0Units(2);
   const nia = units.find((unit) => unit.id === "1:0");
   if (!nia) throw new Error("missing Nia fixture");
@@ -43,7 +42,7 @@ const battleSave = (): BattleSaveData => {
   };
 };
 
-const completedSave = (): CompletedSaveData => {
+const completedSave = () => {
   const source = battleSave();
   return {
     format: source.format,
@@ -149,6 +148,19 @@ test("pointer difficulty confirmation carries audio activation into stage zero",
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MAGIC/73");
   await expect(page.locator("#app")).toHaveAttribute("data-music-playing", "true");
+});
+
+test("stage-one code and deployment surfaces stay deferred during stage-zero startup", async ({ page }) => {
+  const stage1Requests: string[] = [];
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (/stage1|stage-01|deployment/.test(pathname)) stage1Requests.push(pathname);
+  });
+
+  await page.goto("/?test=1&skipStartup");
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "天使帝國 II · 瓦爾克麗宮" })).toBeVisible();
+  expect(stage1Requests).toEqual([]);
 });
 
 test("BOOT-A: opening story, title and difficulty selection enter stage zero", async ({ page }) => {
@@ -300,7 +312,7 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
   });
 });
 
-test("BOOT-C: a normal reconnect loads a completed slot into the next-stage route", async ({ page }) => {
+test("BOOT-C: a normal reconnect migrates a stage-0 clear into stage-1 prebattle", async ({ page }) => {
   const save = completedSave();
   await page.goto("/");
   await writeLocalSave(page, 1, save);
@@ -310,10 +322,12 @@ test("BOOT-C: a normal reconnect loads a completed slot into the next-stage rout
   await page.keyboard.press("x");
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("continue-game").click();
-  await expect(page.getByTestId("title-record-detail")).toContainText("下一關");
+  await expect(page.getByTestId("title-record-detail")).toContainText("騎士城堡前");
   await page.getByTestId("title-record-slot-1").click();
 
-  await expect(page.getByText("下一關路由已建立", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "4");
+  await expect(page.getByRole("heading", { name: "天使帝國 II · 騎士城堡前" })).toBeVisible();
   expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
   expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBe(JSON.stringify(save));
 });

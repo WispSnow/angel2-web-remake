@@ -1,8 +1,11 @@
 export class DeterministicRng {
-  constructor(public state = 0x0a11ce02) {}
+  constructor(
+    public state = 0x0a11ce02,
+    public calls = 0,
+  ) {}
 
   clone(): DeterministicRng {
-    return new DeterministicRng(this.state);
+    return new DeterministicRng(this.state, this.calls);
   }
 
   nextUint(): number {
@@ -11,6 +14,7 @@ export class DeterministicRng {
     value ^= value >>> 17;
     value ^= value << 5;
     this.state = value >>> 0;
+    this.calls += 1;
     return this.state;
   }
 

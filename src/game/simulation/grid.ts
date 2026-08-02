@@ -2,20 +2,39 @@ import { classStatsFor, movementRulesFor } from "../content/classes";
 import { STAGE0, terrainSlotAt } from "../content/stage0";
 import type { BattleUnit, Position, UnitClassId } from "../types";
 
+export interface GridBattlefield {
+  width: number;
+  height: number;
+  terrainSlotAt: (position: Position) => number;
+}
+
+const STAGE0_BATTLEFIELD: GridBattlefield = {
+  width: STAGE0.width,
+  height: STAGE0.height,
+  terrainSlotAt,
+};
+
 export const positionKey = ({ x, y }: Position): string => `${x},${y}`;
 export const manhattan = (left: Position, right: Position): number => Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
 
-export function neighbors(position: Position): Position[] {
+export function neighbors(
+  position: Position,
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+): Position[] {
   return [
     { x: position.x + 1, y: position.y },
     { x: position.x - 1, y: position.y },
     { x: position.x, y: position.y + 1 },
     { x: position.x, y: position.y - 1 },
-  ].filter(({ x, y }) => x >= 0 && y >= 0 && x < STAGE0.width && y < STAGE0.height);
+  ].filter(({ x, y }) => x >= 0 && y >= 0 && x < battlefield.width && y < battlefield.height);
 }
 
-export function movementCost(classId: UnitClassId, position: Position): number {
-  return movementRulesFor(classId)[terrainSlotAt(position)] ?? 99;
+export function movementCost(
+  classId: UnitClassId,
+  position: Position,
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+): number {
+  return movementRulesFor(classId)[battlefield.terrainSlotAt(position)] ?? 99;
 }
 
 interface SearchResult {
@@ -35,11 +54,15 @@ const STABLE_NATIVE_ROUTE_DIRECTIONS: readonly Direction[] = [
   { x: 1, y: 0 },
 ];
 
-function directedNeighbors(position: Position, directions?: readonly Direction[]): Position[] {
-  if (!directions) return neighbors(position);
+function directedNeighbors(
+  position: Position,
+  battlefield: GridBattlefield,
+  directions?: readonly Direction[],
+): Position[] {
+  if (!directions) return neighbors(position, battlefield);
   return directions
     .map(({ x, y }) => ({ x: position.x + x, y: position.y + y }))
-    .filter(({ x, y }) => x >= 0 && y >= 0 && x < STAGE0.width && y < STAGE0.height);
+    .filter(({ x, y }) => x >= 0 && y >= 0 && x < battlefield.width && y < battlefield.height);
 }
 
 function search(
@@ -49,6 +72,7 @@ function search(
   blocked: ReadonlySet<string>,
   stopAfterEntering: ReadonlySet<string> = new Set(),
   directions?: readonly Direction[],
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): SearchResult {
   const costs = new Map<string, number>([[positionKey(start), 0]]);
   const previous = new Map<string, string>();
@@ -66,9 +90,9 @@ function search(
     // terminal cell and cannot be used to reach cells beyond it.
     if (currentKey !== startKey && stopAfterEntering.has(currentKey)) continue;
 
-    for (const next of directedNeighbors(current.position, directions)) {
+    for (const next of directedNeighbors(current.position, battlefield, directions)) {
       const key = positionKey(next);
-      const step = movementCost(classId, next);
+      const step = movementCost(classId, next, battlefield);
       if (step >= 98 || (blocked.has(key) && key !== positionKey(start))) continue;
       const cost = current.cost + step;
       // The native range map stores the movement value at the origin and only
@@ -87,6 +111,7 @@ export function reachableCells(
   unit: BattleUnit,
   units: readonly BattleUnit[],
   movementBudget = unitStatsMovement(unit),
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): Position[] {
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
   const blocked = new Set(
@@ -99,7 +124,9 @@ export function reachableCells(
     unit.classId,
     movementBudget,
     blocked,
-    zoneOfControl(unit, units),
+    zoneOfControl(unit, units, battlefield),
+    undefined,
+    battlefield,
   );
   const originKey = positionKey(unit);
   return [...result.costs.keys()]
@@ -107,11 +134,15 @@ export function reachableCells(
     .map(parsePositionKey);
 }
 
-export function zoneOfControl(unit: BattleUnit, units: readonly BattleUnit[]): ReadonlySet<string> {
+export function zoneOfControl(
+  unit: BattleUnit,
+  units: readonly BattleUnit[],
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+): ReadonlySet<string> {
   const controlled = new Set<string>();
   for (const opponent of units) {
     if (opponent.side === unit.side) continue;
-    for (const position of neighbors(opponent)) controlled.add(positionKey(position));
+    for (const position of neighbors(opponent, battlefield)) controlled.add(positionKey(position));
   }
   return controlled;
 }
@@ -126,10 +157,11 @@ export function shortestPath(
   classId: UnitClassId,
   budget: number,
   units: readonly BattleUnit[] = [],
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): Position[] {
   const targetKey = positionKey(target);
   const blocked = new Set(units.filter((unit) => positionKey(unit) !== targetKey).map(positionKey));
-  const result = search(start, classId, budget, blocked);
+  const result = search(start, classId, budget, blocked, new Set(), undefined, battlefield);
   return reconstructPath(start, target, result);
 }
 
@@ -137,6 +169,7 @@ export function movementPath(
   unit: BattleUnit,
   destination: Position,
   units: readonly BattleUnit[],
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): Position[] {
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
   if (occupied.has(positionKey(destination))) return [];
@@ -145,7 +178,15 @@ export function movementPath(
       .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
       .map(positionKey),
   );
-  const result = search(unit, unit.classId, unitStatsMovement(unit), blocked, zoneOfControl(unit, units));
+  const result = search(
+    unit,
+    unit.classId,
+    unitStatsMovement(unit),
+    blocked,
+    zoneOfControl(unit, units, battlefield),
+    undefined,
+    battlefield,
+  );
   return reconstructPath(unit, destination, result);
 }
 
@@ -154,6 +195,7 @@ export function routePath(
   targets: readonly Position[],
   units: readonly BattleUnit[],
   movementBudget = 5,
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): Position[] {
   if (targets.length === 0) return [{ x: unit.x, y: unit.y }];
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
@@ -167,8 +209,9 @@ export function routePath(
     unit.classId,
     movementBudget,
     blocked,
-    zoneOfControl(unit, units),
+    zoneOfControl(unit, units, battlefield),
     STABLE_NATIVE_ROUTE_DIRECTIONS,
+    battlefield,
   );
   const reachableExits = targets
     .filter((target) => routeResult.costs.has(positionKey(target)) && !occupied.has(positionKey(target)))
@@ -196,8 +239,9 @@ export function routeStep(
   target: Position,
   units: readonly BattleUnit[],
   movementBudget = 5,
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): Position {
-  return routePath(unit, [target], units, movementBudget).at(-1) ?? { x: unit.x, y: unit.y };
+  return routePath(unit, [target], units, movementBudget, battlefield).at(-1) ?? { x: unit.x, y: unit.y };
 }
 
 function reconstructPath(start: Position, target: Position, result: SearchResult): Position[] {

@@ -1,11 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { className } from "../../src/game/content/classes";
+import { activateStage1Content } from "../../src/game/content/stage1";
 import { Stage0Battle } from "../../src/game/simulation/battle";
 import {
   archerShootingRange,
   techniqueSelectionRange,
 } from "../../src/game/simulation/actions/range-map";
+import { prepareSpecialAction } from "../../src/game/simulation/actions/resolve";
 import type { BattleActionId } from "../../src/game/simulation/actions/types";
+import { DeterministicRng } from "../../src/game/simulation/rng";
 import type { BattleUnit, Position } from "../../src/game/types";
 
 const openBattlefield = {
@@ -14,8 +17,14 @@ const openBattlefield = {
   terrainSlotAt: (_position: Position) => 1,
 };
 
+beforeAll(() => activateStage1Content());
+
 function promoteForAction(unit: BattleUnit, actionId: BattleActionId): void {
-  unit.classId = actionId === "archer-shot" ? "archer" : "sister";
+  unit.classId = actionId === "archer-shot"
+    ? "archer"
+    : actionId === "lightning-1" || actionId === "ice-1"
+      ? "magician"
+      : "sister";
   unit.className = className(unit.classId);
 }
 
@@ -188,5 +197,124 @@ describe("Stage-0 class actions", () => {
       actionId: "fire-1",
       targetId: enemy.id,
     });
+  });
+
+  it("resolves lightning against every enemy in the effect diamond and consumes magic guard", () => {
+    const battle = new Stage0Battle(0);
+    const actor = { ...battle.unit("1:0")!, x: 5, y: 5, classId: "magician" as const };
+    const centerTarget = {
+      ...battle.units.find((unit) => unit.side === 2)!,
+      id: "lightning-center",
+      x: 5,
+      y: 2,
+      life: 200,
+    };
+    const guardedTarget = {
+      ...battle.units.find((unit) => unit.side === 2)!,
+      id: "lightning-guarded",
+      x: 6,
+      y: 2,
+      life: 200,
+      statuses: {
+        ...battle.units.find((unit) => unit.side === 2)!.statuses,
+        magicGuard: 1,
+      },
+    };
+    const outsideTarget = {
+      ...battle.units.find((unit) => unit.side === 2)!,
+      id: "lightning-outside",
+      x: 9,
+      y: 2,
+      life: 200,
+    };
+    const rng = new DeterministicRng(0x1234);
+    const prepared = prepareSpecialAction(
+      { actionId: "lightning-1", actorId: actor.id, targetId: centerTarget.id },
+      actor,
+      centerTarget,
+      rng,
+      {
+        units: [actor, centerTarget, guardedTarget, outsideTarget],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      centerTarget,
+    );
+
+    expect(prepared.result.affectedUnits).toHaveLength(2);
+    expect(prepared.result.affectedUnits).toEqual(expect.arrayContaining([
+      expect.objectContaining({ unitId: centerTarget.id, damage: 50, lifeAfter: 150 }),
+      expect.objectContaining({
+        unitId: guardedTarget.id,
+        damage: 0,
+        blocked: true,
+        statusesAfter: expect.objectContaining({ magicGuard: 0 }),
+      }),
+    ]));
+    expect(prepared.result.affectedUnits.some(({ unitId }) => unitId === outsideTarget.id)).toBe(false);
+    expect(prepared.rngAfter).toBe(prepared.rngBefore);
+  });
+
+  it("pushes ice targets down first, resolves occupancy in row-major order, and rolls experience only when something moved", () => {
+    const battle = new Stage0Battle(0);
+    const actor = { ...battle.unit("1:0")!, id: "ice-actor", x: 5, y: 7, classId: "magician" as const };
+    const first = {
+      ...battle.units.find((unit) => unit.side === 2)!,
+      id: "ice-first",
+      x: 5,
+      y: 4,
+    };
+    const second = {
+      ...battle.units.find((unit) => unit.side === 2)!,
+      id: "ice-second",
+      x: 5,
+      y: 5,
+    };
+    const rng = new DeterministicRng(0x5678);
+    const prepared = prepareSpecialAction(
+      { actionId: "ice-1", actorId: actor.id, target: { x: 5, y: 4 } },
+      actor,
+      undefined,
+      rng,
+      {
+        units: [actor, first, second],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      { x: 5, y: 4 },
+    );
+
+    expect(prepared.result.affectedUnits).toEqual([
+      expect.objectContaining({ unitId: first.id, positionAfter: { x: 5, y: 3 }, moved: true }),
+      expect.objectContaining({ unitId: second.id, positionAfter: { x: 5, y: 6 }, moved: true }),
+    ]);
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(8);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(9);
+    expect(prepared.rngAfter).not.toBe(prepared.rngBefore);
+
+    const blockedRng = new DeterministicRng(0x5678);
+    const guarded = {
+      ...first,
+      statuses: { ...first.statuses, magicGuard: 1 },
+    };
+    const blocked = prepareSpecialAction(
+      { actionId: "ice-1", actorId: actor.id, target: { x: 5, y: 4 } },
+      actor,
+      undefined,
+      blockedRng,
+      {
+        units: [actor, guarded],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      { x: 5, y: 4 },
+    );
+    expect(blocked.result.affectedUnits[0]).toMatchObject({
+      blocked: true,
+      moved: false,
+      statusesAfter: { magicGuard: 0 },
+    });
+    expect(blocked.result.experienceGained).toBe(0);
+    expect(blocked.rngAfter).toBe(blocked.rngBefore);
   });
 });

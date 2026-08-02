@@ -1,8 +1,11 @@
 import type { MusicProgram } from "../music-transport";
 import type { PortraitRecord, Position, UnitClassId } from "../types";
 import type { DeploymentRosterUnit } from "../deployment-session";
+import * as stage1ActionContent from "./stage1-actions.generated";
+import { registerStage1ActionContent } from "./actions";
 import { classIdFromNativeRecord, className, classStatsFor } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
+import { registerStageSimulationEffects } from "./stage-effects";
 import { registerStageMusicPrograms } from "./music";
 import {
   STAGE1_CONTENT_IDENTITY,
@@ -21,7 +24,12 @@ import {
   STAGE1_TITLE,
   STAGE1_TOKEN_TO_SLOT_BASE64,
 } from "./stage1-runtime.generated";
-import type { StageDefinition, StageMusicId, StageStoryId } from "./stages";
+import {
+  registerRuntimeStageDefinition,
+  type StageDefinition,
+  type StageMusicId,
+  type StageStoryId,
+} from "./stages";
 
 const decode = (encoded: string): Uint8Array => {
   const binary = globalThis.atob(encoded);
@@ -101,6 +109,8 @@ export const STAGE1_DEFINITION = {
   ],
 } as const satisfies StageDefinition<"stage-01">;
 
+registerRuntimeStageDefinition(STAGE1_DEFINITION);
+
 export const STAGE1_TERRAIN_TOKENS = decode(STAGE1_TERRAIN_TOKENS_BASE64);
 export const STAGE1_TOKEN_TO_TERRAIN_SLOT = decode(STAGE1_TOKEN_TO_SLOT_BASE64);
 
@@ -118,7 +128,7 @@ const stage1ClassForSlot = (slot: number): UnitClassId =>
   STAGE1_SEMANTIC_CLASS_OVERRIDES.find((override) => override.slot === slot)?.classId
     ?? "soldier";
 
-/** Evidence-backed stage-1 deployment roster used until the campaign roster adapter lands in P4. */
+/** Evidence-backed stage-1 deployment roster seed merged with inherited campaign state at runtime. */
 export const STAGE1_DEPLOYMENT_PREVIEW_ROSTER: readonly DeploymentRosterUnit[] =
   STAGE1_GENERATED_DEPLOYMENT_ACTORS.map((actor) => {
     const classId = stage1ClassForSlot(actor.slot);
@@ -202,6 +212,25 @@ export function stage1StoryPagesForId(storyId: StageStoryId) {
 
 /** Installs only the lightweight semantic registries after the stage-1 chunk loads. */
 export function activateStage1Content(): void {
+  registerStage1ActionContent(stage1ActionContent);
+  registerStageSimulationEffects({
+    "stage-01-enter-deployment": { type: "enter-deployment" },
+    "stage-01-set-victory-999": { type: "victory-state", value: 999 },
+    "stage-01-messenger-arrival": {
+      type: "messenger-arrival",
+      actor: {
+        side: STAGE1_EVENT_PROGRAM.messenger.side,
+        slot: STAGE1_EVENT_PROGRAM.messenger.slot,
+      },
+      from: STAGE1_EVENT_PROGRAM.messenger.from,
+      targetPortrait: STAGE1_EVENT_PROGRAM.messenger.targetPortrait,
+      movementBudget: STAGE1_EVENT_PROGRAM.messenger.movementBudget,
+    },
+    "stage-01-route-to-stage-02": {
+      type: "campaign-route",
+      destination: "stage-02",
+    },
+  });
   registerStageStoryPages(STAGE1_STORY_PAGES);
   registerStageMusicPrograms(STAGE1_MUSIC_PROGRAMS);
 }

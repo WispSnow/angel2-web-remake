@@ -15,9 +15,24 @@ export type StageSimulationEffectDefinition =
   | {
     type: "campaign-route";
     destination: CampaignRouteId;
+  }
+  | {
+    type: "enter-deployment";
+  }
+  | {
+    type: "victory-state";
+    value: 999;
+  }
+  | {
+    type: "messenger-arrival";
+    actor: { side: 1; slot: 48 };
+    from: Position;
+    targetPortrait: number;
+    movementBudget: number;
   };
 
-export const STAGE_SIMULATION_EFFECTS = {
+export const STAGE_SIMULATION_EFFECTS:
+  Partial<Record<StageSimulationEffectId, StageSimulationEffectDefinition>> = {
   "stage-00-opening-move": {
     type: "scripted-unit-move",
     actor: { side: 1, slot: 0 },
@@ -29,11 +44,25 @@ export const STAGE_SIMULATION_EFFECTS = {
     type: "campaign-route",
     destination: "stage-01",
   },
-} as const satisfies Partial<Record<StageSimulationEffectId, StageSimulationEffectDefinition>>;
+};
 
 const STAGE_SIMULATION_EFFECT_REGISTRY:
-Partial<Record<StageSimulationEffectId, StageSimulationEffectDefinition>> =
+  Partial<Record<StageSimulationEffectId, StageSimulationEffectDefinition>> =
   STAGE_SIMULATION_EFFECTS;
+
+export function registerStageSimulationEffects(
+  definitions: Partial<Record<StageSimulationEffectId, StageSimulationEffectDefinition>>,
+): void {
+  for (const [id, definition] of Object.entries(definitions)) {
+    const effectId = id as StageSimulationEffectId;
+    const existing = STAGE_SIMULATION_EFFECT_REGISTRY[effectId];
+    if (existing && existing !== definition) {
+      if (JSON.stringify(existing) === JSON.stringify(definition)) continue;
+      throw new Error(`stage simulation effect ${id} is already registered`);
+    }
+    STAGE_SIMULATION_EFFECT_REGISTRY[effectId] = definition;
+  }
+}
 
 export function stageSimulationEffectFor(
   id: Exclude<StageSimulationEffectId, "none">,

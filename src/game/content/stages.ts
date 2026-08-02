@@ -192,16 +192,20 @@ export const STAGE0_DEFINITION = {
   ],
 } as const satisfies StageDefinition<"stage-00">;
 
-/**
- * Only runnable content belongs in this registry. `stage-01` remains a campaign
- * destination until its generated definition, simulation, and acceptance gates
- * are ready together; authorization alone does not register partial content.
- */
-export const RUNTIME_STAGE_DEFINITIONS = {
+/** Runnable definitions; later stage chunks register themselves when loaded. */
+export const RUNTIME_STAGE_DEFINITIONS: Partial<Record<StageId, StageDefinition>> = {
   "stage-00": STAGE0_DEFINITION,
-} as const;
+};
 
-export type RuntimeStageId = keyof typeof RUNTIME_STAGE_DEFINITIONS;
+export type RuntimeStageId = StageId;
+
+export function registerRuntimeStageDefinition(definition: StageDefinition): void {
+  const existing = RUNTIME_STAGE_DEFINITIONS[definition.id];
+  if (existing && existing !== definition) {
+    throw new Error(`runtime stage ${definition.id} is already registered`);
+  }
+  RUNTIME_STAGE_DEFINITIONS[definition.id] = definition;
+}
 
 export function isRuntimeStageId(value: unknown): value is RuntimeStageId {
   return typeof value === "string"

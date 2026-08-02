@@ -47,6 +47,7 @@ export interface BattleUnit extends Position {
 export type BattleOutcome = "ongoing" | "victory" | "defeat";
 export type GamePhase =
   | "prebattleStory"
+  | "deployment"
   | "scriptedMove"
   | "openingStory"
   | "player"
@@ -121,27 +122,30 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 6;
-  contentVersion: "native-actions-1";
+  version: 7;
+  contentVersion: "stage-01-actions-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
   difficulty: Difficulty;
   rngState: number;
+  rngCalls: number;
   roster: SaveRosterEntry[];
+  stageProgress: 0 | 999 | 1000;
+  consumedEventIds: string[];
 }
 
 export interface BattleSaveData extends SaveDataBase {
   kind: "battle";
-  stageId: "stage-00";
-  stageLabel: "瓦爾克麗宮";
+  stageId: "stage-00" | "stage-01";
+  stageLabel: "瓦爾克麗宮" | "騎士城堡前";
   battle: SavedBattleState;
 }
 
 export interface CompletedSaveData extends SaveDataBase {
   kind: "completed";
-  stageId: "stage-01";
-  stageLabel: "下一關";
+  stageId: "stage-01" | "stage-02";
+  stageLabel: "騎士城堡前" | "下一關";
 }
 
 export type SaveData = BattleSaveData | CompletedSaveData;
@@ -152,4 +156,5 @@ export interface CampaignState {
   difficulty: Difficulty;
   roster: SaveRosterEntry[];
   rngState: number;
+  rngCalls: number;
 }

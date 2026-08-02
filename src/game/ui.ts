@@ -1,6 +1,6 @@
 import { ASSETS, nextExperienceThresholdFor } from "./content/stage0";
+import { BATTLE_ACTION_DEFINITIONS } from "./content/actions";
 import {
-  STAGE0_ACTION_DEFINITIONS,
   STAGE0_FULL_COMBAT_ASSETS,
   STAGE0_FULL_COMBAT_COMMON_EFFECTS,
 } from "./content/stage0-actions.generated";
@@ -45,12 +45,14 @@ export interface CombatPresentationRenderSource {
   unitStats: (unit: BattleUnit) => UnitStats;
 }
 
-export function mountUi(root: HTMLElement, controller: GameController, audio: AudioManager): void {
+export function mountUi(root: HTMLElement, controller: GameController, audio: AudioManager): () => void {
   const stage = controller.battle.stage;
+  const stage1Assets = stage.id === "stage-01" ? controller.stage1Assets : undefined;
+  const eventController = new AbortController();
   root.innerHTML = `
     <div class="page-shell">
       <header class="project-header">
-        <div><span class="eyebrow">首個可玩垂直切片</span><h1>天使帝國 II · ${stage.name}</h1></div>
+        <div><span class="eyebrow">WEB REMAKE · CAMPAIGN</span><h1>天使帝國 II · ${stage.name}</h1></div>
       </header>
       <div class="game-stage">
         <div class="game-viewport" id="game-viewport">
@@ -212,6 +214,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const dialogueControls = required(root, "#dialogue-controls");
   const skipDialogueButton = required<HTMLButtonElement>(root, "[data-action=skip-dialogue]");
   const storyBackground = required(root, "#story-background");
+  storyBackground.style.backgroundImage = `url("${stage1Assets?.storyBackground ?? ASSETS.storyBackground}")`;
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
   const settingsMenu = required(root, "#settings-menu");
@@ -238,7 +241,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let activeFeedbackPortrait: HTMLElement | undefined;
   let sidePanelHintTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let sidePanelHintTarget: HTMLElement | undefined;
-  startPortraitAnimations(
+  const stopPortraitAnimations = startPortraitAnimations(
     root,
     controller.isTestMode,
     () => controller.phase === "nextStage" || controller.phase === "quit",
@@ -392,20 +395,20 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const button = (event.target as Element).closest<HTMLElement>("[data-side-panel-hotspot]");
     if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return;
     scheduleSidePanelHint(button);
-  });
+  }, { signal: eventController.signal });
   root.addEventListener("pointerout", (event) => {
     const button = (event.target as Element).closest<HTMLElement>("[data-side-panel-hotspot]");
     if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return;
     if (sidePanelHintTarget === button) hideSidePanelHint();
-  });
+  }, { signal: eventController.signal });
   root.addEventListener("focusin", (event) => {
     const button = (event.target as Element).closest<HTMLElement>("[data-side-panel-hotspot]");
     if (button) showSidePanelHint(button);
-  });
+  }, { signal: eventController.signal });
   root.addEventListener("focusout", (event) => {
     const button = (event.target as Element).closest<HTMLElement>("[data-side-panel-hotspot]");
     if (button && sidePanelHintTarget === button) hideSidePanelHint();
-  });
+  }, { signal: eventController.signal });
 
   root.addEventListener("click", (event) => {
     const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
@@ -502,7 +505,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     else if (action === "overwrite-confirm") controller.confirmOverwrite();
     else if (action === "overwrite-cancel") controller.cancelOverwrite();
-  });
+  }, { signal: eventController.signal });
 
   root.addEventListener("pointermove", (event) => {
     const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
@@ -539,7 +542,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     preview.hidden = false;
     preview.style.left = `${origin.x * 3}px`;
     preview.style.top = `${origin.y * 3}px`;
-  });
+  }, { signal: eventController.signal });
 
   root.addEventListener("pointerout", (event) => {
     const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
@@ -547,13 +550,13 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     controller.clearMinimapPreview();
     const preview = minimap.querySelector<HTMLElement>("[data-testid=minimap-preview]");
     if (preview) preview.hidden = true;
-  });
+  }, { signal: eventController.signal });
 
   root.addEventListener("contextmenu", (event) => {
     if (!(event.target as Element).closest("#logical-screen")) return;
     event.preventDefault();
     if (!(event.target instanceof HTMLCanvasElement)) void controller.rightClickAction();
-  });
+  }, { signal: eventController.signal });
 
   window.addEventListener("keydown", (event) => {
     const key = event.key;
@@ -604,7 +607,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (lower === "e") controller.openSoundSettings();
     else if (lower === "m") controller.openMusicSettings();
     else if (lower === "o") controller.objectiveOpen ? controller.closeObjectives() : controller.openObjectives();
-  });
+  }, { signal: eventController.signal });
 
   const render = () => {
     screen.dataset.phase = controller.phase;
@@ -621,12 +624,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (controller.actionMode === "techniqueMenu") {
         actionMenu.dataset.kind = "technique";
         actionMenu.style.height = `${controller.techniqueActions.length * 24 + 28}px`;
-        actionMenu.setAttribute("aria-label", "選擇修女技術");
+        actionMenu.setAttribute(
+          "aria-label",
+          `選擇${controller.selectedUnit?.className ?? "單位"}技術`,
+        );
         actionMenu.innerHTML = controller.techniqueActions.map((actionId, index) => {
           const selected = index === controller.techniqueIndex;
           return `<button type="button" role="menuitem" data-action="technique-action"
             data-technique-index="${index}" data-testid="technique-${actionId}"
-            class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${STAGE0_ACTION_DEFINITIONS[actionId].label}</span></button>`;
+            class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${BATTLE_ACTION_DEFINITIONS[actionId].label}</span></button>`;
         }).join("");
       } else {
         actionMenu.dataset.kind = controller.commandMenuKind;
@@ -971,10 +977,20 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     renderCombat(combatPresentation, controller);
   };
-  controller.onChange(render);
+  const unsubscribe = controller.onChange(render);
   render();
-  configureGameScaling(required(root, "#game-viewport"), screen);
-  bindGamepad(controller);
+  const stopScaling = configureGameScaling(required(root, "#game-viewport"), screen);
+  const stopGamepad = bindGamepad(controller);
+  return () => {
+    eventController.abort();
+    unsubscribe();
+    stopScaling();
+    stopGamepad();
+    stopPortraitAnimations();
+    stopDialogueTimer();
+    stopFeedbackTimer();
+    hideSidePanelHint();
+  };
 }
 
 function fullSpriteAsset(sprite: FullCombatSpriteState): {
@@ -1025,7 +1041,7 @@ function buildFullCombatSkeleton(
     const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
     return `
       <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
-        <img src="${ASSETS.portraits[unit.portrait as keyof typeof ASSETS.portraits]}" alt="${unit.name}肖像" />
+        <img src="${ASSETS.portraits[unit.portrait as keyof typeof ASSETS.portraits] ?? `/assets/original/portrait-${unit.portrait}.png`}" alt="${unit.name}肖像" />
         <dl>
           <div><dt>經驗</dt><dd>${unit.experience}</dd></div>
           <div><dt>生命</dt><dd>${life}</dd></div>
@@ -1334,6 +1350,9 @@ function renderTactical(controller: GameController, underUnit = false): string {
     `<i class="minimap-unit side-${unit.side}" style="left:${unit.x * 3}px;top:${unit.y * 3}px" aria-hidden="true"></i>`,
   ).join("");
   const viewport = controller.cameraOrigin;
+  const minimap = controller.battle.stage.id === "stage-01"
+    ? controller.stage1Assets.minimap
+    : ASSETS.minimap;
   const toggleState: Record<SidePanelToggleVisualId, boolean> = {
     battleAnimation: controller.battlePresentation === "full",
     grid: controller.gridEnabled,
@@ -1358,8 +1377,8 @@ function renderTactical(controller: GameController, underUnit = false): string {
     <div class="hud-tactical${underUnit ? " under-unit" : ""}" data-testid="tactical-hud" aria-label="戰術輔助與即時小地圖">
       <img class="tactical-panel-art" src="${ASSETS.tacticalPanel.foundation}" alt="戰術桌、卷軸與照明器具" />
       ${statePatches}
-      <div class="tactical-minimap" data-testid="tactical-minimap" aria-label="第 0 關即時小地圖">
-        <img src="${ASSETS.minimap}" alt="" />
+      <div class="tactical-minimap" data-testid="tactical-minimap" aria-label="${controller.battle.stage.name}即時小地圖">
+        <img src="${minimap}" alt="" />
         ${underUnit ? "" : `<span class="minimap-viewport" style="left:${viewport.x * 3}px;top:${viewport.y * 3}px" aria-hidden="true"></span>`}
         ${underUnit ? "" : `<span class="minimap-preview" data-testid="minimap-preview" aria-hidden="true" hidden></span>`}
         ${markers}
@@ -1406,7 +1425,7 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
   } else if (phase === "quit") {
     layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2>天使帝國 II</h2><p>已離開遊戲</p></div>`;
   } else if (phase === "nextStage") {
-    layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE 01</span><h2>下一關路由已建立</h2><p>第 0 關垂直切片到此完成；存檔已指向第 1 關關前流程。後續關卡不屬於本切片的實作範圍。</p><div class="completion-seal">垂直切片完成</div></div>`;
+    layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE 02</span><h2>第 1 關已完成</h2><p>戰役進度已寫入第 2 關入口；第 2 關仍在設計凍結範圍內，尚未接入可玩流程。</p><div class="completion-seal">第一關完成</div></div>`;
   }
 }
 
@@ -1430,9 +1449,10 @@ function required<T extends HTMLElement = HTMLElement>(root: ParentNode, selecto
   return element;
 }
 
-function bindGamepad(controller: GameController): void {
+function bindGamepad(controller: GameController): () => void {
   let priorButtons: boolean[] = [];
   let lastNavigation = 0;
+  let animationFrame = 0;
   const poll = (time: number) => {
     const pad = navigator.getGamepads?.()[0];
     if (pad) {
@@ -1451,7 +1471,8 @@ function bindGamepad(controller: GameController): void {
       }
       priorButtons = pressed;
     }
-    requestAnimationFrame(poll);
+    animationFrame = requestAnimationFrame(poll);
   };
-  requestAnimationFrame(poll);
+  animationFrame = requestAnimationFrame(poll);
+  return () => cancelAnimationFrame(animationFrame);
 }

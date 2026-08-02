@@ -1,6 +1,10 @@
 import * as Phaser from "phaser";
 import { ASSETS } from "../content/stage0";
-import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../content/stage0-actions.generated";
+import {
+  STAGE0_ACTION_PRESENTATION_ASSETS,
+  stage1ActionPresentation,
+  stage1ActionPresentationAssets,
+} from "../content/actions";
 import type { GameController } from "../controller";
 import type { BattleUnit } from "../types";
 
@@ -16,6 +20,13 @@ const EDGE_PAN_INTERVAL_MS = 110;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 const NATIVE_CURSOR_SHADOW = 0x000000;
 const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
+
+interface MapEffectDescriptor {
+  xOffset: number;
+  yOffset: number;
+  width: number;
+  low7BitFrameIndices: readonly (number | null)[];
+}
 
 type NativePointerCursor = "hand" | "up" | "down" | "left" | "right";
 
@@ -73,6 +84,15 @@ interface UnitView {
 }
 
 export function createBattleScene(controller: GameController): typeof Phaser.Scene {
+  const stage1 = controller.battle.stage.id === "stage-01";
+  const stage1Assets = stage1 ? controller.stage1Assets : undefined;
+  const stage1Presentation = stage1 ? stage1ActionPresentation() : undefined;
+  const stage1PresentationAssets = stage1 ? stage1ActionPresentationAssets() : undefined;
+  const lightningMainDescriptors: readonly MapEffectDescriptor[] = stage1Presentation
+    ? stage1Presentation.lightning1.phases.flatMap<MapEffectDescriptor>(
+      ({ descriptorSequence }) => [...descriptorSequence],
+    )
+    : [];
   return class BattleScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
     private rangeGraphics!: Phaser.GameObjects.Graphics;
@@ -99,12 +119,19 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     preload(): void {
-      this.load.image("stage0-map", ASSETS.map);
+      this.load.image(
+        stage1 ? "stage1-map" : "stage0-map",
+        stage1Assets?.map ?? ASSETS.map,
+      );
       this.load.image("ally-soldier", ASSETS.allySoldier);
       Object.entries(ASSETS.allyPromotionTargets).forEach(([classId, source]) =>
         this.load.image(`ally-${classId}`, source));
       this.load.image("enemy-soldier", ASSETS.enemySoldier);
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
+      if (stage1Assets) {
+        this.load.image("ally-magician", stage1Assets.allyMagician);
+        this.load.image("enemy-sister", stage1Assets.enemySister);
+      }
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
       ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
       STAGE0_ACTION_PRESENTATION_ASSETS.shoot.hit.forEach((source, frame) =>
@@ -115,13 +142,27 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.load.image(`map-heal-1-primary-${frame}`, source));
       STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.forEach((source, frame) =>
         this.load.image(`map-heal-1-tail-${frame}`, source));
+      if (stage1PresentationAssets) {
+        stage1PresentationAssets.lightning1.main.forEach((source, frame) =>
+          this.load.image(`map-lightning-1-main-${frame}`, source));
+        stage1PresentationAssets.lightning1.hit.forEach((source, frame) =>
+          this.load.image(`map-lightning-1-hit-${frame}`, source));
+        stage1PresentationAssets.lightning1.cleanup.forEach((source, frame) =>
+          this.load.image(`map-lightning-1-cleanup-${frame}`, source));
+        stage1PresentationAssets.ice1.expansion.forEach((source, frame) =>
+          this.load.image(`map-ice-1-expansion-${frame}`, source));
+      }
     }
 
     create(): void {
       this.cameras.main.setViewport(40, 23, 400, 308);
       this.cameras.main.setBackgroundColor("#050405");
       this.cameras.main.setBounds(0, 0, 2000, 2200);
-      this.add.image(0, 0, "stage0-map").setOrigin(0).setDepth(0);
+      this.add.image(
+        0,
+        0,
+        controller.battle.stage.id === "stage-01" ? "stage1-map" : "stage0-map",
+      ).setOrigin(0).setDepth(0);
       this.gridGraphics = this.add.graphics().setDepth(1);
       this.rangeGraphics = this.add.graphics().setDepth(2);
       this.cursorGraphics = this.add.graphics().setDepth(10);
@@ -183,7 +224,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.sync();
       const canvas = this.game.canvas;
       canvas.addEventListener("pointerleave", this.handleCanvasPointerLeave);
-      canvas.setAttribute("aria-label", "瓦爾克麗宮戰術地圖，使用滑鼠或方向鍵操作");
+      canvas.setAttribute(
+        "aria-label",
+        `${controller.battle.stage.name}戰術地圖，使用滑鼠或方向鍵操作`,
+      );
       canvas.setAttribute("role", "application");
       canvas.dataset.testid = "battle-canvas";
       canvas.dataset.edgePanDirection = "0,0";
@@ -284,6 +328,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     private sync(): void {
+      // A controller notification can already be iterating when the main
+      // surface destroys this scene. Ignore that last stale callback after
+      // Phaser has released the camera during a battle/deployment swap.
+      if (!this.sys.isActive() || !this.cameras.main) return;
       if (!controller.edgeScrollEnabled && !this.primaryPointerHeld && this.edgePan) this.clearEdgePan();
       this.syncCamera();
       this.drawGrid();
@@ -389,11 +437,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           unit.classId === "archer"
           || unit.classId === "cavalry"
           || unit.classId === "sister"
+          || unit.classId === "magician"
           || unit.classId === "warrior"
         ) return `ally-${unit.classId}`;
         return "ally-soldier";
       }
-      return unit.classId === "cavalry" ? "enemy-cavalry" : "enemy-soldier";
+      if (unit.classId === "cavalry") return "enemy-cavalry";
+      if (unit.classId === "sister") return "enemy-sister";
+      return "enemy-soldier";
     }
 
     private unitVisualOffset(unit: BattleUnit): number {
@@ -563,6 +614,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const canvas = this.game.canvas;
       if (special) {
         const target = special.target;
+        const center = special.center;
         let texture: string | undefined;
         if (special.phase === "shootHit") texture = `map-shoot-${special.frame}`;
         else if (special.phase === "fireEffect") texture = `map-fire-1-${special.frame}`;
@@ -572,12 +624,58 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         if (texture) {
           this.combatEffects.push(
             this.add.image(
-              target.x * TILE_WIDTH + TILE_WIDTH / 2,
-              target.y * TILE_HEIGHT + TILE_HEIGHT,
+              center.x * TILE_WIDTH + TILE_WIDTH / 2,
+              center.y * TILE_HEIGHT + TILE_HEIGHT,
               texture,
             ).setOrigin(.5, 1).setDepth(8),
           );
-        } else if (special.phase === "specialDeath") {
+        } else if (special.phase === "lightningMain") {
+          const descriptor = lightningMainDescriptors[special.frame];
+          descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
+            if (sourceFrame === null) return;
+            const column = index % descriptor.width;
+            const row = Math.floor(index / descriptor.width);
+            this.combatEffects.push(
+              this.add.image(
+                (center.x + descriptor.xOffset + column) * TILE_WIDTH,
+                (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
+                `map-lightning-1-main-${sourceFrame}`,
+              ).setOrigin(0).setDepth(8),
+            );
+          });
+        } else if (special.phase === "lightningHit") {
+          const sourceFrame = special.frame % 2 === 0 ? 4 : 5;
+          for (const { position } of special.result.effectCells) {
+            this.combatEffects.push(
+              this.add.image(
+                position.x * TILE_WIDTH + TILE_WIDTH / 2,
+                position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+                `map-lightning-1-hit-${sourceFrame}`,
+              ).setOrigin(.5).setDepth(8),
+            );
+          }
+        } else if (special.phase === "lightningCleanup") {
+          for (const affected of special.result.affectedUnits) {
+            this.combatEffects.push(
+              this.add.image(
+                affected.positionBefore.x * TILE_WIDTH + TILE_WIDTH / 2,
+                affected.positionBefore.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+                `map-lightning-1-cleanup-${special.frame}`,
+              ).setOrigin(.5).setDepth(8),
+            );
+          }
+        } else if (special.phase === "iceExpansion") {
+          const sourceFrame = special.frame % stage1PresentationAssets!.ice1.expansion.length;
+          for (const { position } of special.result.effectCells) {
+            this.combatEffects.push(
+              this.add.image(
+                position.x * TILE_WIDTH + TILE_WIDTH / 2,
+                position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+                `map-ice-1-expansion-${sourceFrame}`,
+              ).setOrigin(.5).setDepth(8),
+            );
+          }
+        } else if (special.phase === "specialDeath" && target) {
           const descriptor = MAP_DEATH_DESCRIPTORS[special.frame];
           descriptor?.frames.forEach((sourceFrame, index) => {
             if (sourceFrame === null) return;
@@ -596,7 +694,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         if (controller.isTestMode) {
           canvas.dataset.mapCombatPhase = special.phase;
           canvas.dataset.mapCombatFrame = String(special.frame);
-          canvas.dataset.mapCombatTarget = target.id;
+          canvas.dataset.mapCombatTarget = target?.id ?? `${center.x},${center.y}`;
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
         }
         return;

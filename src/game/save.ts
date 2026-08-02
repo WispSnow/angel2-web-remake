@@ -6,10 +6,13 @@ import {
 } from "./content/classes";
 import {
   STAGE0_ALLY_INITIAL_EXPERIENCE,
+  completeCampaignRoster,
   createStage0Units,
   initialEnemyExperience,
   statsFor,
 } from "./content/stage0";
+import { STAGE0_DEFINITION } from "./content/stages";
+import { consumedEventIdsForBattleResume } from "./simulation/stage-events";
 import type {
   BattleUnit,
   Difficulty,
@@ -23,8 +26,8 @@ import type {
 } from "./types";
 import { emptyUnitStatuses, UNIT_STATUS_KEYS } from "./simulation/status";
 
-export const SAVE_VERSION = 6 as const;
-export const SAVE_CONTENT_VERSION = "native-actions-1" as const;
+export const SAVE_VERSION = 7 as const;
+export const SAVE_CONTENT_VERSION = "stage-01-actions-1" as const;
 export const SAVE_SLOT_COUNT = 20;
 export const SAVE_SLOTS_PER_PAGE = 5;
 export const SAVE_SLOT_PAGE_COUNT = SAVE_SLOT_COUNT / SAVE_SLOTS_PER_PAGE;
@@ -78,6 +81,33 @@ const STAGE0_ALLY_CLASSES = new Set<UnitClassId>([
 const STAGE0_ENEMY_CLASS_BY_ID = new Map(
   createStage0Units().filter((unit) => unit.side === 2).map((unit) => [unit.id, unit.classId]),
 );
+// Save validation deliberately keeps this compact schema identity separate from the
+// heavy stage-1 content chunk. Changes to the generated deployment or enemy slots
+// require an explicit save-version decision instead of silently changing v7 meaning.
+const STAGE1_SAVE_DEPLOYMENT = {
+  eligibleSlots: [0, 1, 2, 4, 24, 40, 41, 42, 43],
+  fixedSlots: [42, 40, 43, 41, 0],
+  optionalSlots: [1, 2, 4, 24],
+  maximumUnits: 8,
+  openCellCount: 3,
+} as const;
+const STAGE1_SAVE_EVENT_IDS = [
+  "stage-01-prebattle-story",
+  "stage-01-enter-deployment",
+  "stage-01-opening-story",
+  "stage-01-boss-defeated",
+  "stage-01-messenger-arrival",
+  "stage-01-completed-route",
+] as const;
+const STAGE1_ENEMY_CLASS_BY_ID = new Map<string, UnitClassId>([
+  ["2:40", "soldier"],
+  ["2:41", "soldier"],
+  ["2:43", "sister"],
+  ["2:16", "cavalry"],
+  ["2:42", "sister"],
+  ["2:45", "soldier"],
+  ["2:46", "soldier"],
+]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -91,7 +121,8 @@ const isDifficulty = (value: unknown): value is Difficulty =>
 const isSide = (value: unknown): value is Side => value === 1 || value === 2;
 
 const isPortrait = (value: unknown): value is PortraitRecord =>
-  value === 15 || value === 45 || value === 46 || value === 47 || value === 48;
+  value === 0 || value === 15 || value === 42 || value === 43 || value === 44
+    || value === 45 || value === 46 || value === 47 || value === 48;
 
 function isPosition(
   value: unknown,
@@ -116,7 +147,7 @@ function isUnitStatuses(value: unknown): value is BattleUnit["statuses"] {
     && UNIT_STATUS_KEYS.every((key) => isIntegerBetween(value[key], 0, MAX_STATUS));
 }
 
-function isBattleUnit(value: unknown): value is BattleUnit {
+function isBattleUnit(value: unknown, stageId: "stage-00" | "stage-01"): value is BattleUnit {
   if (
     !isRecord(value)
     || !isSide(value.side)
@@ -136,12 +167,21 @@ function isBattleUnit(value: unknown): value is BattleUnit {
     || !isPosition(value)
   ) return false;
 
-  if (value.side === 1) return STAGE0_ALLY_CLASSES.has(value.classId);
-  return STAGE0_ENEMY_CLASS_BY_ID.get(value.id) === value.classId;
+  if (value.side === 1) return stageId === "stage-01" || STAGE0_ALLY_CLASSES.has(value.classId);
+  const enemyClasses = stageId === "stage-01"
+    ? STAGE1_ENEMY_CLASS_BY_ID
+    : STAGE0_ENEMY_CLASS_BY_ID;
+  return enemyClasses.get(value.id) === value.classId;
 }
 
 function hasUniqueValues<T>(values: readonly T[]): boolean {
   return new Set(values).size === values.length;
+}
+
+function hasExactlyTheseValues(values: readonly string[], expected: readonly string[]): boolean {
+  if (values.length !== expected.length) return false;
+  const actual = new Set(values);
+  return expected.every((value) => actual.has(value));
 }
 
 function hasNamedAllyExperienceFloor(
@@ -155,6 +195,7 @@ function isSavedBattleState(
   value: unknown,
   roster: readonly SaveRosterEntry[],
   difficulty: Difficulty,
+  stageId: "stage-00" | "stage-01",
 ): value is SavedBattleState {
   if (
     !isRecord(value)
@@ -164,7 +205,7 @@ function isSavedBattleState(
     || !Array.isArray(value.units)
     || value.units.length === 0
     || value.units.length > 150
-    || !value.units.every(isBattleUnit)
+    || !value.units.every((unit) => isBattleUnit(unit, stageId))
     || !isPosition(value.cursor)
     || !isPosition(value.cameraOrigin, CAMERA_MAX_X, CAMERA_MAX_Y)
   ) return false;
@@ -182,11 +223,25 @@ function isSavedBattleState(
   ) return false;
 
   const allies = units.filter((unit) => unit.side === 1);
-  if (allies.length !== roster.length) return false;
-  const allyBySlot = new Map(allies.map((unit) => [unit.slot, unit]));
-  return roster.every((entry) => {
-    const unit = allyBySlot.get(entry.slot);
-    return unit !== undefined
+  if (stageId === "stage-01") {
+    const eligibleSlots = new Set<number>(STAGE1_SAVE_DEPLOYMENT.eligibleSlots);
+    const fixedSlots = new Set<number>(STAGE1_SAVE_DEPLOYMENT.fixedSlots);
+    const optionalSlots = new Set<number>(STAGE1_SAVE_DEPLOYMENT.optionalSlots);
+    const alliedSlots = new Set(allies.map(({ slot }) => slot));
+    if (allies.length < fixedSlots.size
+      || allies.length > STAGE1_SAVE_DEPLOYMENT.maximumUnits
+      || allies.some(({ slot }) => !eligibleSlots.has(slot))
+      || [...fixedSlots].some((slot) => !alliedSlots.has(slot))
+      || allies.filter(({ slot }) => optionalSlots.has(slot)).length
+        > STAGE1_SAVE_DEPLOYMENT.openCellCount
+      || allies.some(({ slot, classId }) => slot === 24 && classId !== "magician")) {
+      return false;
+    }
+  }
+  const rosterBySlot = new Map(roster.map((entry) => [entry.slot, entry]));
+  return allies.every((unit) => {
+    const entry = rosterBySlot.get(unit.slot);
+    return entry !== undefined
       && unit.classId === entry.classId
       && unit.experience === entry.experience
       && unit.life === entry.life;
@@ -204,10 +259,14 @@ function hasValidBase(value: Record<string, unknown>): boolean {
     || !isIntegerBetween(value.saveCount, 1, Number.MAX_SAFE_INTEGER)
     || !isDifficulty(value.difficulty)
     || !isIntegerBetween(value.rngState, 1, 0xffff_ffff)
+    || !isIntegerBetween(value.rngCalls, 0, Number.MAX_SAFE_INTEGER)
     || !Array.isArray(value.roster)
-    || value.roster.length === 0
-    || value.roster.length > MAX_UNIT_SLOT + 1
+    || value.roster.length !== MAX_UNIT_SLOT + 1
     || !value.roster.every(isRosterEntry)
+    || !Array.isArray(value.consumedEventIds)
+    || !value.consumedEventIds.every((id) => typeof id === "string")
+    || !hasUniqueValues(value.consumedEventIds)
+    || (value.stageProgress !== 0 && value.stageProgress !== 999 && value.stageProgress !== 1000)
   ) return false;
 
   return hasUniqueValues(value.roster.map((entry) => entry.slot))
@@ -215,24 +274,138 @@ function hasValidBase(value: Record<string, unknown>): boolean {
 }
 
 function isCompletedSave(value: Record<string, unknown>): boolean {
-  return value.kind === "completed"
-    && value.stageId === "stage-01"
+  if (value.kind !== "completed" || value.battle !== undefined) return false;
+  const consumedEventIds = value.consumedEventIds as string[];
+  if (value.stageId === "stage-01") {
+    return value.stageLabel === "騎士城堡前"
+      && value.stageProgress === 0
+      && consumedEventIds.length === 0;
+  }
+  return value.stageId === "stage-02"
     && value.stageLabel === "下一關"
-    && value.battle === undefined;
+    && value.stageProgress === 1000
+    && hasExactlyTheseValues(
+      consumedEventIds,
+      STAGE1_SAVE_EVENT_IDS,
+    );
 }
 
 function isBattleSave(value: Record<string, unknown>): boolean {
   const difficulty = isDifficulty(value.difficulty) ? value.difficulty : undefined;
+  const stageId = value.stageId === "stage-00" || value.stageId === "stage-01"
+    ? value.stageId
+    : undefined;
+  if (!stageId || difficulty === undefined || value.stageProgress !== 0) return false;
+  const validEventIds = new Set<string>(stageId === "stage-01"
+    ? STAGE1_SAVE_EVENT_IDS
+    : STAGE0_DEFINITION.events.map(({ id }) => id));
+  const consumedEventIds = value.consumedEventIds as string[];
   return value.kind === "battle"
-    && value.stageId === "stage-00"
-    && value.stageLabel === "瓦爾克麗宮"
-    && difficulty !== undefined
-    && isSavedBattleState(value.battle, value.roster as SaveRosterEntry[], difficulty);
+    && value.stageLabel === (stageId === "stage-01" ? "騎士城堡前" : "瓦爾克麗宮")
+    && consumedEventIds.every((id) => validEventIds.has(id))
+    && (stageId !== "stage-01" || hasExactlyTheseValues(consumedEventIds, [
+      "stage-01-prebattle-story",
+      "stage-01-enter-deployment",
+      "stage-01-opening-story",
+    ]))
+    && isSavedBattleState(
+      value.battle,
+      value.roster as SaveRosterEntry[],
+      difficulty,
+      stageId,
+    );
 }
 
 export function isSaveData(value: unknown): value is SaveData {
   if (!isRecord(value) || !hasValidBase(value)) return false;
   return isCompletedSave(value) || isBattleSave(value);
+}
+
+interface Version6SaveBase {
+  format: "ANGEL2-web-save";
+  version: 6;
+  contentVersion: "native-actions-1";
+  savedAt: string;
+  saveCount: number;
+  ruleset: "stableRemake";
+  difficulty: Difficulty;
+  rngState: number;
+  roster: SaveRosterEntry[];
+}
+
+interface Version6BattleSave extends Version6SaveBase {
+  kind: "battle";
+  stageId: "stage-00";
+  stageLabel: "瓦爾克麗宮";
+  battle: SavedBattleState;
+}
+
+interface Version6CompletedSave extends Version6SaveBase {
+  kind: "completed";
+  stageId: "stage-01";
+  stageLabel: "下一關";
+}
+
+type Version6SaveData = Version6BattleSave | Version6CompletedSave;
+
+function isVersion6SaveData(value: unknown): value is Version6SaveData {
+  if (
+    !isRecord(value)
+    || value.format !== "ANGEL2-web-save"
+    || value.version !== 6
+    || value.contentVersion !== "native-actions-1"
+    || value.ruleset !== "stableRemake"
+    || typeof value.savedAt !== "string"
+    || Number.isNaN(Date.parse(value.savedAt))
+    || !isIntegerBetween(value.saveCount, 1, Number.MAX_SAFE_INTEGER)
+    || !isDifficulty(value.difficulty)
+    || !isIntegerBetween(value.rngState, 1, 0xffff_ffff)
+    || !Array.isArray(value.roster)
+    || value.roster.length === 0
+    || value.roster.length > MAX_UNIT_SLOT + 1
+    || !value.roster.every(isRosterEntry)
+    || !hasUniqueValues(value.roster.map((entry) => entry.slot))
+    || !value.roster.every(hasNamedAllyExperienceFloor)
+  ) return false;
+  if (value.kind === "completed") {
+    return value.stageId === "stage-01"
+      && value.stageLabel === "下一關"
+      && value.battle === undefined;
+  }
+  if (value.kind !== "battle" || value.stageId !== "stage-00" || value.stageLabel !== "瓦爾克麗宮") {
+    return false;
+  }
+  if (!isSavedBattleState(value.battle, value.roster, value.difficulty, "stage-00")) return false;
+  return value.battle.units.filter(({ side }) => side === 1).length === value.roster.length;
+}
+
+function migrateVersion6Save(save: Version6SaveData): SaveData {
+  const roster = completeCampaignRoster(save.roster);
+  const base = {
+    ...save,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    rngCalls: 0,
+    roster,
+    stageProgress: 0 as const,
+  };
+  if (save.kind === "completed") {
+    return {
+      ...base,
+      kind: "completed",
+      stageId: "stage-01",
+      stageLabel: "騎士城堡前",
+      consumedEventIds: [],
+    };
+  }
+  return {
+    ...base,
+    kind: "battle",
+    stageId: "stage-00",
+    stageLabel: "瓦爾克麗宮",
+    consumedEventIds: consumedEventIdsForBattleResume(STAGE0_DEFINITION, save.battle.round),
+    battle: save.battle,
+  };
 }
 
 interface Version5BattleUnit extends Omit<BattleUnit, "statuses"> {}
@@ -371,16 +544,16 @@ function isVersion5SaveData(value: unknown): value is Version5SaveData {
 
 function migrateVersion5Save(save: Version5SaveData): SaveData {
   if (save.kind === "completed") {
-    return {
+    return migrateVersion6Save({
       ...save,
-      version: SAVE_VERSION,
-      contentVersion: SAVE_CONTENT_VERSION,
-    };
+      version: 6,
+      contentVersion: "native-actions-1",
+    });
   }
-  return {
+  return migrateVersion6Save({
     ...save,
-    version: SAVE_VERSION,
-    contentVersion: SAVE_CONTENT_VERSION,
+    version: 6,
+    contentVersion: "native-actions-1",
     battle: {
       ...save.battle,
       units: save.battle.units.map((unit) => ({
@@ -388,7 +561,7 @@ function migrateVersion5Save(save: Version5SaveData): SaveData {
         statuses: emptyUnitStatuses(),
       })),
     },
-  };
+  });
 }
 
 type LegacySaveVersion = 2 | 3 | 4;
@@ -547,8 +720,8 @@ function migrateLegacySave(save: LegacySaveData): SaveData {
   const roster = save.roster.map(migrateRosterEntry);
   const base = {
     format: "ANGEL2-web-save" as const,
-    version: SAVE_VERSION,
-    contentVersion: SAVE_CONTENT_VERSION,
+    version: 6 as const,
+    contentVersion: "native-actions-1" as const,
     savedAt: save.savedAt,
     saveCount: save.saveCount,
     ruleset: "stableRemake" as const,
@@ -558,12 +731,12 @@ function migrateLegacySave(save: LegacySaveData): SaveData {
   };
 
   if (save.kind === "completed") {
-    return {
+    return migrateVersion6Save({
       ...base,
       kind: "completed",
       stageId: "stage-01",
       stageLabel: "下一關",
-    };
+    });
   }
 
   const units = save.battle.units.map((legacyUnit): BattleUnit => {
@@ -592,7 +765,7 @@ function migrateLegacySave(save: LegacySaveData): SaveData {
     };
   });
 
-  return {
+  return migrateVersion6Save({
     ...base,
     kind: "battle",
     stageId: "stage-00",
@@ -601,13 +774,17 @@ function migrateLegacySave(save: LegacySaveData): SaveData {
       ...save.battle,
       units,
     },
-  };
+  });
 }
 
 export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    if (isVersion6SaveData(value)) {
+      const migrated = migrateVersion6Save(value);
+      return isSaveData(migrated) ? migrated : undefined;
+    }
     if (isVersion5SaveData(value)) {
       const migrated = migrateVersion5Save(value);
       return isSaveData(migrated) ? migrated : undefined;

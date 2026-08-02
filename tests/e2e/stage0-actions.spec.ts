@@ -73,6 +73,15 @@ const clickMapCell = (
   y: number,
 ) => page.getByTestId("battle-canvas").click({ position: { x, y } });
 
+const openActorMenu = async (page: Page) => {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await clickMapCell(page, 220, 177);
+    if ((await state(page)).actionMode === "actionMenu") return;
+    await page.waitForTimeout(50);
+  }
+  expect((await state(page)).actionMode).toBe("actionMenu");
+};
+
 test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
 
 test("M00.6 archer shooting keeps simulation frozen through UN/60, then commits", async ({ page }) => {
@@ -81,7 +90,7 @@ test("M00.6 archer shooting keeps simulation frozen through UN/60, then commits"
   const before = await state(page);
   const targetBefore = before.units.find(({ id }) => id === "2:48")!;
 
-  await clickMapCell(page, 220, 177);
+  await openActorMenu(page);
   expect((await state(page)).commands).toContainEqual({ id: "shoot", label: "射擊" });
   await page.getByTestId("unit-command-shoot").click();
   await expect.poll(async () => (await state(page)).actionMode).toBe("specialTarget");
@@ -126,7 +135,7 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
   const beforeHeal = await state(page);
   const allyBefore = beforeHeal.units.find(({ id }) => id === "1:1")!;
 
-  await clickMapCell(page, 220, 177);
+  await openActorMenu(page);
   await page.getByTestId("unit-command-technique").click();
   await expect(page.getByTestId("technique-fire-1")).toHaveText("初級炎暴");
   await expect(page.getByTestId("technique-heal-1")).toHaveText("初級治療");
@@ -171,7 +180,7 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
   await forceSetup(page, "sister");
   const beforeFire = await state(page);
   const enemyBefore = beforeFire.units.find(({ id }) => id === "2:48")!;
-  await clickMapCell(page, 220, 177);
+  await openActorMenu(page);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-fire-1").click();
   await clickMapCell(page, 380, 177);
@@ -208,7 +217,7 @@ for (const [classId, nativeRecord, voiceRecord] of [
     await page.goto("/?test=1&slowFull=1&skipStartup=1");
     await forceSetup(page, classId, true);
     expect((await state(page)).battlePresentation).toBe("full");
-    await clickMapCell(page, 220, 177);
+    await openActorMenu(page);
     await page.getByTestId("unit-command-attack").click();
     await page.waitForFunction((expectedRecord) => {
       const current = window.__ANGEL2__?.getState() as ActionDebugState;
