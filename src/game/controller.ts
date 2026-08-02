@@ -5,7 +5,10 @@ import {
   promotionTargetsFor,
   type PromotionTarget,
 } from "./content/classes";
-import { STORY_BY_PHASE } from "./content/dialogue";
+import {
+  storyPagesForStagePhase,
+  type StageStoryPhase,
+} from "./content/dialogue";
 import {
   groupCommandDialogueFor,
   type SpokenGroupCommandId,
@@ -41,7 +44,6 @@ import {
 import type { ActionMode, AttackResult, BattleUnit, DialoguePage, Difficulty, GamePhase, Position, SaveData, UnitStats } from "./types";
 
 type Listener = () => void;
-type StoryPhase = keyof typeof STORY_BY_PHASE;
 type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
 export type CombatPresentationPhase =
   | "primaryHit"
@@ -146,7 +148,13 @@ export interface MovementPresentation {
   stepIndex: number;
 }
 
-const isStoryPhase = (phase: GamePhase): phase is StoryPhase => phase in STORY_BY_PHASE;
+const STORY_PHASES = new Set<GamePhase>([
+  "prebattleStory",
+  "openingStory",
+  "round2Story",
+  "victoryStory",
+]);
+const isStoryPhase = (phase: GamePhase): phase is StageStoryPhase => STORY_PHASES.has(phase);
 const pause = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
 
 export class GameController {
@@ -257,7 +265,7 @@ export class GameController {
       return promotionDialogueFor(promotionUnit)[this.promotionDialogueIndex];
     }
     if (!isStoryPhase(this.phase)) return undefined;
-    return STORY_BY_PHASE[this.phase][this.dialogueIndex];
+    return storyPagesForStagePhase(this.battle.stage, this.phase)[this.dialogueIndex];
   }
 
   get focusedUnit(): BattleUnit | undefined {
@@ -408,7 +416,7 @@ export class GameController {
       return;
     }
     if (!isStoryPhase(this.phase)) return;
-    const pages = STORY_BY_PHASE[this.phase];
+    const pages = storyPagesForStagePhase(this.battle.stage, this.phase);
     if (this.dialogueIndex < pages.length - 1) {
       this.dialogueIndex += 1;
       this.emit();
@@ -1824,7 +1832,7 @@ export class GameController {
     this.cursor = { ...STAGE0.opening.from };
     this.statusMessage = message;
     this.phase = "prebattleStory";
-    this.dialogueIndex = STORY_BY_PHASE.prebattleStory.length - 1;
+    this.dialogueIndex = storyPagesForStagePhase(this.battle.stage, "prebattleStory").length - 1;
     this.busy = false;
     void this.runOpeningMove();
   }

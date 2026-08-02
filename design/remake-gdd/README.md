@@ -4,9 +4,9 @@
 
 日期：2026-08-01
 
-阶段：第 0 关扩展项已接受；第 1 关纸面与接口方案已建立
+阶段：第 0 关扩展项已接受；第 1 关有界 M02 已授权并开始实施
 
-开发状态：全战役设计仍为 `implementationFrozen=true`；第 0 关及 M00.5–M00.7 已获用户接受。第 1 关已完成纸面合同、部署/技术规格与候选接口边界，但尚未解除 M02 代码实现冻结
+开发状态：全战役设计仍为 `implementationFrozen=true`；第 0 关及 M00.5–M00.7 已获用户接受。用户于 2026-08-01 明确授权第 1 关作为有界 M02 实现例外；`stage 2` 战斗和其余战役继续冻结
 
 ## 文档目的
 
@@ -43,8 +43,9 @@
 | [`08-mod-policy.md`](08-mod-policy.md) | 哪些内容可改、如何保持可追溯 | Draft 0.1 |
 | [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.3 |
 | [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的玩法合同与实现验收 | Draft 0.6 / 自动验收通过 |
-| [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术扩展与首领目标关 | Draft 0.2 / M01 已规格化 |
+| [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术扩展与首领目标关 | Draft 0.3 / M02 实施中 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
+| [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / M02 实施前合同 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
 | [`systems/action-resolution.md`](systems/action-resolution.md) | 普通、射击、技术共享的预览、准备、表现与提交边界 | M00.6 / 已接受 |
 | [`systems/shooting.md`](systems/shooting.md) | 弓兵射程、伤害、经验、AI 与棋盘表现 | M00.6 / 已接受 |
@@ -74,5 +75,6 @@
 - 可以：复核原版证据、制定玩家体验、定义规则顺序、设计 UI 流程、建立验收场景、提出并记录现代化便利功能。
 - 不可以：把 DOS 内存结构当成 Web 领域模型、为了方便编码而改玩法、在 `[TBD]` 上自行补规则。
 - 第 0 关已由用户明确授权作为首个实现例外；其 Phaser 工程、独立模拟与自动验收见仓库根目录 [`README.md`](../../README.md)。
-- 第 1 关纸面合同已经建立；这不自动解除第 1 关代码或后续关卡、系统的实现冻结。
+- 第 1 关已由用户明确授权作为有界 M02 实现例外；只解除其合同列出的部署、内容、
+  `1F/1H/1L/1C`、事件、v7 和路由范围。
 - 其余战役仍须通过 [`09-design-acceptance.md`](09-design-acceptance.md) 的对应门槛并得到用户明确授权后再进入实现。

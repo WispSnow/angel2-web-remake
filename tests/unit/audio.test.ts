@@ -5,6 +5,11 @@ import {
   soundEffectChannelForCue,
   type SoundEffectChannel,
 } from "../../src/game/audio-settings";
+import {
+  PRELOAD_STAGE_MUSIC_PROGRAMS,
+  musicProgramFor,
+} from "../../src/game/content/music";
+import { STAGE0_DEFINITION } from "../../src/game/content/stages";
 
 describe("native sound-effect request gates", () => {
   test("routes scripted movement separately from map and full combat cues", () => {
@@ -38,6 +43,26 @@ describe("five-level music gain", () => {
       2: 0.16,
       3: 0.24,
       4: 0.32,
+    });
+  });
+});
+
+describe("stage music registry", () => {
+  test("resolves stage 0 programs through stable stage-definition IDs", () => {
+    expect(PRELOAD_STAGE_MUSIC_PROGRAMS).toHaveLength(3);
+    expect(musicProgramFor(STAGE0_DEFINITION.music.story)).toMatchObject({
+      id: "stage0-story",
+      track: "MAGIC/73",
+    });
+    expect(musicProgramFor(STAGE0_DEFINITION.music.playerPhase)).toMatchObject({
+      id: "stage0-player-battle",
+      entryTrack: "MUSIC/7",
+      loopTrack: "MUSIC/6",
+    });
+    expect(musicProgramFor(STAGE0_DEFINITION.music.enemyPhase)).toMatchObject({
+      id: "stage0-enemy-battle",
+      entryTrack: "MUSIC/5",
+      loopTrack: "MUSIC/4",
     });
   });
 });

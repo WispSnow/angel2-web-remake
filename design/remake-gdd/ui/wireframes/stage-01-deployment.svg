@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="700" viewBox="0 0 640 350" role="img" aria-labelledby="title desc">
+  <title id="title">第 1 关部署界面低保真图</title>
+  <desc id="desc">640×350 地图背景上叠放三列五行名单、页签、结束按钮、出场计数和底部错误条。</desc>
+  <defs>
+    <pattern id="grid" width="40" height="44" patternUnits="userSpaceOnUse">
+      <rect width="40" height="44" fill="#283426"/>
+      <path d="M40 0H0V44" fill="none" stroke="#65745a" stroke-width="0.6"/>
+    </pattern>
+    <pattern id="menu" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="4" fill="#612b20"/>
+      <rect width="2" height="2" fill="#8b4127"/>
+      <rect x="2" y="2" width="2" height="2" fill="#8b4127"/>
+    </pattern>
+    <style>
+      .label { font: 8px sans-serif; fill: #fff6c8; }
+      .small { font: 6px sans-serif; fill: #f1deb0; }
+      .panel { fill: url(#menu); stroke: #e0b864; stroke-width: 1; }
+      .fixed { stroke: #f3d96b; stroke-width: 1.5; }
+      .selected { stroke: #fff; stroke-width: 1.5; }
+    </style>
+  </defs>
+  <rect width="640" height="350" fill="#0a0708"/>
+  <rect x="40" y="23" width="400" height="308" fill="url(#grid)" stroke="#c18a3a"/>
+  <rect x="480" y="0" width="160" height="331" fill="#211719" stroke="#8f6035"/>
+  <text x="488" y="16" class="label">騎士城堡前 · 部署</text>
+  <text x="488" y="30" class="label">已出場 5／8</text>
+  <text x="488" y="42" class="small">剩餘空位 3 · 下一落點 1／3</text>
+
+  <g aria-label="地图部署格">
+    <rect x="160" y="215" width="40" height="44" fill="none" stroke="#fff" stroke-width="1.5"/>
+    <rect x="240" y="215" width="40" height="44" fill="#ffffff18" stroke="#d9c96d" stroke-dasharray="3 2"/>
+    <rect x="320" y="215" width="40" height="44" fill="#ffffff18" stroke="#d9c96d" stroke-dasharray="3 2"/>
+    <text x="165" y="211" class="small">下一落點</text>
+  </g>
+
+  <g aria-label="三列五行名单">
+    <g transform="translate(57 59)">
+      <rect width="112" height="24" class="panel fixed"/><text x="4" y="10" class="label">妮雅 · 士兵</text><text x="4" y="19" class="small">固定 · 已出場</text>
+      <rect y="60" width="112" height="24" class="panel"/><text x="4" y="70" class="label">希蜜 · 士兵</text><text x="4" y="79" class="small">可選 · 未出場</text>
+      <rect y="120" width="112" height="24" class="panel"/><text x="4" y="130" class="label">蒙欣曼 · 士兵</text><text x="4" y="139" class="small">可選 · 未出場</text>
+      <rect y="180" width="112" height="24" class="panel"/><text x="4" y="190" class="label">空名單</text><text x="4" y="199" class="small">此處沒有人.</text>
+      <rect y="240" width="112" height="24" class="panel"/><text x="4" y="250" class="label">空名單</text>
+    </g>
+    <g transform="translate(201 59)">
+      <rect width="112" height="24" class="panel fixed"/><text x="4" y="10" class="label">士兵 · 槽 40</text><text x="4" y="19" class="small">固定 · 已出場</text>
+      <rect y="60" width="112" height="24" class="panel selected"/><text x="4" y="70" class="label">拉朵那 · 士兵</text><text x="4" y="79" class="small">可選 · 焦點</text>
+      <rect y="120" width="112" height="24" class="panel"/><text x="4" y="130" class="label">葛蒂拉斯 · 魔術士</text><text x="4" y="139" class="small">可選 · 未出場</text>
+      <rect y="180" width="112" height="24" class="panel fixed"/><text x="4" y="190" class="label">士兵 · 槽 41</text><text x="4" y="199" class="small">固定 · 已出場</text>
+      <rect y="240" width="112" height="24" class="panel"/><text x="4" y="250" class="label">空名單</text>
+    </g>
+    <g transform="translate(345 59)">
+      <rect width="84" height="24" class="panel fixed"/><text x="4" y="10" class="label">士兵 42</text><text x="4" y="19" class="small">固定</text>
+      <rect y="60" width="84" height="24" class="panel fixed"/><text x="4" y="70" class="label">士兵 43</text><text x="4" y="79" class="small">固定</text>
+      <rect y="120" width="84" height="24" class="panel"/><text x="4" y="130" class="label">空名單</text>
+      <rect y="180" width="84" height="24" class="panel"/><text x="4" y="190" class="label">空名單</text>
+      <rect y="240" width="84" height="24" class="panel"/><text x="4" y="250" class="label">空名單</text>
+    </g>
+  </g>
+
+  <g aria-label="页签与完成">
+    <rect x="440" y="35" width="36" height="24" class="panel selected"/><text x="454" y="50" class="label">Ⅰ</text>
+    <rect x="440" y="65" width="36" height="24" class="panel"/><text x="454" y="80" class="label">Ⅱ</text>
+    <rect x="440" y="95" width="36" height="24" class="panel"/><text x="454" y="110" class="label">Ⅲ</text>
+    <rect x="540" y="55" width="80" height="28" class="panel"/><text x="565" y="73" class="label">結束</text>
+  </g>
+
+  <rect x="2" y="328" width="636" height="20" fill="#170b0d" stroke="#e0b864"/>
+  <text x="10" y="341" class="label">錯誤條／狀態：只有新的主操作關閉，輸入不可穿透</text>
+</svg>

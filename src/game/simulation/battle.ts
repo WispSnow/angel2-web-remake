@@ -27,6 +27,7 @@ import type {
   SpecialActionResult,
 } from "./actions/types";
 import { UNIT_STATUS_KEYS } from "./status";
+import { battleOutcomeForObjective } from "./objectives";
 
 const ACTION_CLASS: Readonly<Record<BattleActionId, ClassId>> = {
   "archer-shot": "archer",
@@ -539,9 +540,7 @@ export class Stage0Battle {
   }
 
   outcome(): BattleOutcome {
-    if (!this.unit("1:0")) return "defeat";
-    if (!this.units.some((unit) => unit.side === 2)) return "victory";
-    return "ongoing";
+    return battleOutcomeForObjective(this.units, this.stage.objective);
   }
 
   snapshot(): object {

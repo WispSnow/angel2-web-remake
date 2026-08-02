@@ -1,11 +1,12 @@
 import { ASSETS, SPEECH_RECORD_BY_CHARACTER } from "./content/stage0";
 import { STAGE0_ACTION_AUDIO_ASSETS } from "./content/stage0-actions.generated";
-import { STAGE0_MUSIC_SEAM_CROSSFADE_SECONDS } from "./content/stage0-music.generated";
+import {
+  PRELOAD_STAGE_MUSIC_PROGRAMS,
+  musicProgramFor,
+} from "./content/music";
 import type { GameController } from "./controller";
 import {
   MusicTransport,
-  type IntroLoopMusicProgram,
-  type LoopMusicProgram,
   type MusicProgram,
   type MusicTransportState,
 } from "./music-transport";
@@ -32,44 +33,6 @@ const battleMusicSide = (phase: GamePhase): BattleMusicSide | undefined => {
   if (phase === "enemy") return "enemy";
   return undefined;
 };
-
-const storyMusicProgram = {
-  id: "stage0-story",
-  kind: "loop",
-  track: "MAGIC/73",
-  source: ASSETS.audio.story,
-  seamlessLoop: ASSETS.audio.storySeamlessLoop,
-} satisfies LoopMusicProgram;
-
-const playerBattleMusicProgram = {
-  id: "stage0-player-battle",
-  kind: "intro-loop",
-  entryTrack: "MUSIC/7",
-  loopTrack: "MUSIC/6",
-  entry: ASSETS.audio.playerBattleEntry,
-  seamlessLoop: ASSETS.audio.playerBattleSeamlessLoop,
-  crossfadeSeconds: STAGE0_MUSIC_SEAM_CROSSFADE_SECONDS,
-} satisfies IntroLoopMusicProgram;
-
-const enemyBattleMusicProgram = {
-  id: "stage0-enemy-battle",
-  kind: "intro-loop",
-  entryTrack: "MUSIC/5",
-  loopTrack: "MUSIC/4",
-  entry: ASSETS.audio.enemyBattleEntry,
-  seamlessLoop: ASSETS.audio.enemyBattleSeamlessLoop,
-  crossfadeSeconds: STAGE0_MUSIC_SEAM_CROSSFADE_SECONDS,
-} satisfies IntroLoopMusicProgram;
-
-const battleMusicProgram = (side: BattleMusicSide): IntroLoopMusicProgram => side === "player"
-  ? playerBattleMusicProgram
-  : enemyBattleMusicProgram;
-
-const musicPrograms = [
-  storyMusicProgram,
-  playerBattleMusicProgram,
-  enemyBattleMusicProgram,
-] as const;
 
 export class AudioManager {
   private unlocked = false;
@@ -100,7 +63,7 @@ export class AudioManager {
       MUSIC_GAIN_BY_VOLUME[controller.musicVolume],
       (state) => this.updateMusicDebugState(state),
     );
-    this.music.preload(musicPrograms);
+    this.music.preload(PRELOAD_STAGE_MUSIC_PROGRAMS);
     this.updateEffectDebugState();
     root.addEventListener("pointerdown", () => this.unlock(), { capture: true });
     root.addEventListener("click", (event) => {
@@ -151,10 +114,16 @@ export class AudioManager {
     const previousSide = battleMusicSide(this.previousPhase);
     let desired = this.selectedMusic;
     let restart = false;
-    if (this.controller.phase === "prebattleStory") desired = storyMusicProgram;
+    if (this.controller.phase === "prebattleStory") {
+      desired = musicProgramFor(this.controller.battle.stage.music.story);
+    }
     else if (side && (side !== previousSide || !desired)) {
-      desired = battleMusicProgram(side);
-      restart = desired.id === this.selectedMusic?.id;
+      desired = musicProgramFor(
+        side === "player"
+          ? this.controller.battle.stage.music.playerPhase
+          : this.controller.battle.stage.music.enemyPhase,
+      );
+      restart = desired?.id === this.selectedMusic?.id;
     }
     else if (this.controller.phase === "quit" || this.controller.phase === "nextStage") {
       desired = undefined;

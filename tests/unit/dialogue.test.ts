@@ -3,9 +3,12 @@ import {
   OPENING_STORY,
   PREBATTLE_STORY,
   ROUND2_STORY,
+  STORY_PAGES_BY_ID,
   VICTORY_STORY,
+  storyPagesForStagePhase,
 } from "../../src/game/content/dialogue";
 import { GROUP_COMMAND_DIALOGUE } from "../../src/game/content/group-command-dialogue";
+import { STAGE0_DEFINITION } from "../../src/game/content/stages";
 
 describe("native stage-zero dialogue checkpoints", () => {
   it("preserves every module 25 and module 29 KY wait", () => {
@@ -43,6 +46,14 @@ describe("native stage-zero dialogue checkpoints", () => {
       lower: undefined,
       source: { record: 3, wait: 3 },
     });
+  });
+
+  it("resolves stage 0 dialogue through stable story IDs without changing pages", () => {
+    expect(STORY_PAGES_BY_ID["stage-00-prebattle-story"]).toBe(PREBATTLE_STORY);
+    expect(storyPagesForStagePhase(STAGE0_DEFINITION, "prebattleStory")).toBe(PREBATTLE_STORY);
+    expect(storyPagesForStagePhase(STAGE0_DEFINITION, "openingStory")).toBe(OPENING_STORY);
+    expect(storyPagesForStagePhase(STAGE0_DEFINITION, "round2Story")).toBe(ROUND2_STORY);
+    expect(storyPagesForStagePhase(STAGE0_DEFINITION, "victoryStory")).toBe(VICTORY_STORY);
   });
 
   it("preserves the three native group-command lines and selector addresses", () => {

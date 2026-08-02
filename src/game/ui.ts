@@ -1,4 +1,4 @@
-import { ASSETS, STAGE0, nextExperienceThresholdFor } from "./content/stage0";
+import { ASSETS, nextExperienceThresholdFor } from "./content/stage0";
 import {
   STAGE0_ACTION_DEFINITIONS,
   STAGE0_FULL_COMBAT_ASSETS,
@@ -46,14 +46,15 @@ export interface CombatPresentationRenderSource {
 }
 
 export function mountUi(root: HTMLElement, controller: GameController, audio: AudioManager): void {
+  const stage = controller.battle.stage;
   root.innerHTML = `
     <div class="page-shell">
       <header class="project-header">
-        <div><span class="eyebrow">首個可玩垂直切片</span><h1>天使帝國 II · 瓦爾克麗宮</h1></div>
+        <div><span class="eyebrow">首個可玩垂直切片</span><h1>天使帝國 II · ${stage.name}</h1></div>
       </header>
       <div class="game-stage">
         <div class="game-viewport" id="game-viewport">
-          <section class="logical-screen" id="logical-screen" data-testid="game-screen" aria-label="天使帝國 II 第 0 關遊戲畫面">
+          <section class="logical-screen" id="logical-screen" data-testid="game-screen" aria-label="天使帝國 II ${stage.name}遊戲畫面">
             <div class="battle-chrome" data-testid="battle-chrome" aria-hidden="true">
               <img class="chrome-top" src="${ASSETS.battleChrome.top}" alt="" />
               <img class="chrome-corner-left" src="${ASSETS.battleChrome.cornerLeft}" alt="" />
@@ -73,7 +74,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             </div>
             <div class="story-background" id="story-background"></div>
             <section class="unit-hud" id="unit-hud" data-testid="unit-hud" aria-live="polite"></section>
-            <div class="bottom-location">瓦爾克麗宮</div>
+            <div class="bottom-location">${stage.name}</div>
             <div class="bottom-round" id="bottom-round"></div>
             ${renderSidePanelHotspots()}
             <div class="side-panel-tooltip" id="side-panel-tooltip" data-testid="side-panel-tooltip"
@@ -172,9 +173,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               </div>
             </section>
             <section class="objective-panel modal-panel" id="objective-panel" data-testid="objective-panel" hidden>
-              <span class="panel-kicker">瓦爾克麗宮</span>
-              <h2>勝利條件</h2><p>${STAGE0.objective}</p>
-              <h2>失敗條件</h2><p>「妮雅」戰敗。</p>
+              <span class="panel-kicker">${stage.name}</span>
+              <h2>勝利條件</h2><p>${stage.objective.victoryText}</p>
+              <h2>失敗條件</h2><p>${stage.objective.defeatText}</p>
               <button data-action="close-objectives">返回戰場</button>
             </section>
             <section class="result-layer" id="result-layer" data-testid="result-layer" hidden></section>
@@ -529,8 +530,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     const bounds = minimap.getBoundingClientRect();
     const cell = {
-      x: Math.max(0, Math.min(STAGE0.width - 1, Math.floor((event.clientX - bounds.left) * STAGE0.width / bounds.width))),
-      y: Math.max(0, Math.min(STAGE0.height - 1, Math.floor((event.clientY - bounds.top) * STAGE0.height / bounds.height))),
+      x: Math.max(0, Math.min(stage.width - 1, Math.floor((event.clientX - bounds.left) * stage.width / bounds.width))),
+      y: Math.max(0, Math.min(stage.height - 1, Math.floor((event.clientY - bounds.top) * stage.height / bounds.height))),
     };
     const origin = controller.previewMinimapCell(cell);
     const preview = minimap.querySelector<HTMLElement>("[data-testid=minimap-preview]");

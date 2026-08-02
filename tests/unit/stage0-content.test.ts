@@ -14,6 +14,7 @@ import {
 } from "../../src/game/content/stage0";
 import {
   RUNTIME_STAGE_DEFINITIONS,
+  STAGE0_DEFINITION,
   isRuntimeStageId,
 } from "../../src/game/content/stages";
 import type { Difficulty } from "../../src/game/types";
@@ -24,6 +25,35 @@ describe("stage 0 evidence-backed content", () => {
     expect(Object.keys(RUNTIME_STAGE_DEFINITIONS)).toEqual(["stage-00"]);
     expect(isRuntimeStageId("stage-00")).toBe(true);
     expect(isRuntimeStageId("stage-01")).toBe(false);
+    expect(STAGE0_DEFINITION).toMatchObject({
+      contentIdentity: "stage-00/native-actions-1",
+      deployment: { kind: "fixed" },
+      objective: {
+        victory: { type: "eliminate-side", side: 2 },
+        defeat: { type: "unit-removed", side: 1, slot: 0 },
+        victoryText: STAGE0.objective,
+        defeatText: STAGE0.defeat,
+      },
+      stories: {
+        prebattle: "stage-00-prebattle-story",
+        opening: "stage-00-opening-story",
+        roundStarts: [{ round: 2, storyId: "stage-00-round-2-story" }],
+        victory: "stage-00-victory-story",
+      },
+      music: {
+        story: "stage-00-story-music",
+        playerPhase: "stage-00-player-phase-music",
+        enemyPhase: "stage-00-enemy-phase-music",
+      },
+    });
+    expect(STAGE0_DEFINITION.events.map(({ id }) => id)).toEqual([
+      "stage-00-prebattle-story",
+      "stage-00-opening-move",
+      "stage-00-opening-story",
+      "stage-00-round-2-story",
+      "stage-00-victory-story",
+      "stage-00-completed-route",
+    ]);
   });
 
   it("binds the native full-combat background and complete cavalry attack records", () => {

@@ -1,8 +1,11 @@
 # M01 第 1 关部署系统规格
 
-状态：`specified`；`implementationFrozen=true`
+状态：`specified`；用户已授权在有界 M02 中实现
 
-授权日期：2026-08-01（仅纸面与接口，不包含 M02 代码）
+纸面授权日期：2026-08-01；M02 代码授权日期：2026-08-01
+
+实现状态：纯模拟位于 `src/game/simulation/deployment/`，固定/可选/空位、提交、反馈门、
+焦点与 PRNG 独立性已通过单元验收；DOM/Phaser 投影尚未接入。
 
 依赖：第 1 关关卡合同、战役 roster、职业目录、地图模板、语义输入
 

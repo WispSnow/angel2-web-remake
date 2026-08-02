@@ -1,8 +1,8 @@
 # M01 第 1 关技术扩展规格
 
-状态：`specified`；`implementationFrozen=true`
+状态：`specified`；用户已授权在有界 M02 中实现
 
-授权日期：2026-08-01（仅纸面与接口，不包含 M02 代码）
+纸面授权日期：2026-08-01；M02 代码授权日期：2026-08-01
 
 依赖：[`action-resolution.md`](action-resolution.md)、[`techniques-stage0.md`](techniques-stage0.md)、
 [`status-foundation.md`](status-foundation.md)、确定性 PRNG、范围图

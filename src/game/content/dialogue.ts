@@ -1,4 +1,5 @@
 import type { DialoguePage, DialogueWindowState } from "../types";
+import type { StageDefinition, StageStoryId } from "./stages";
 
 const windowState = (
   text: string,
@@ -80,3 +81,30 @@ export const STORY_BY_PHASE = {
   round2Story: ROUND2_STORY,
   victoryStory: VICTORY_STORY,
 } as const;
+
+export type StageStoryPhase = keyof typeof STORY_BY_PHASE;
+
+export const STORY_PAGES_BY_ID = {
+  "stage-00-prebattle-story": PREBATTLE_STORY,
+  "stage-00-opening-story": OPENING_STORY,
+  "stage-00-round-2-story": ROUND2_STORY,
+  "stage-00-victory-story": VICTORY_STORY,
+} as const satisfies Partial<Record<StageStoryId, readonly DialoguePage[]>>;
+
+const STORY_PAGE_REGISTRY: Partial<Record<StageStoryId, readonly DialoguePage[]>> =
+  STORY_PAGES_BY_ID;
+
+export function storyPagesForStagePhase(
+  stage: StageDefinition,
+  phase: StageStoryPhase,
+): readonly DialoguePage[] {
+  const storyId = phase === "prebattleStory"
+    ? stage.stories.prebattle
+    : phase === "openingStory"
+      ? stage.stories.opening
+      : phase === "round2Story"
+        ? stage.stories.roundStarts.find(({ round }) => round === 2)?.storyId
+        : stage.stories.victory;
+  if (!storyId) return [];
+  return STORY_PAGE_REGISTRY[storyId] ?? [];
+}
