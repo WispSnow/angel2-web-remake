@@ -83,9 +83,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private unsubscribe?: () => void;
     private edgePan?: { x: number; y: number };
     private nextEdgePanAt = 0;
+    private primaryPointerHeld = false;
     private readonly handleCanvasPointerLeave = () => {
       this.clearEdgePan();
       this.setNativePointerCursor("hand");
+    };
+    private readonly handlePointerRelease = (pointer: Phaser.Input.Pointer) => {
+      if (pointer.primaryDown) return;
+      this.setPrimaryPointerHeld(false);
+      if (!controller.edgeScrollEnabled) this.clearEdgePan();
     };
 
     constructor() {
@@ -140,6 +146,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           return;
         }
         if (pointer.button !== 0) return;
+        this.setPrimaryPointerHeld(true);
+        const edgeDirection = this.edgeDirectionFor(pointer);
+        if (edgeDirection) {
+          this.setNativePointerCursor(this.nativeCursorFor(edgeDirection));
+          this.startEdgePan(edgeDirection);
+          return;
+        }
         if (
           pointer.x < BATTLE_INPUT_LEFT
           || pointer.x >= BATTLE_INPUT_RIGHT
@@ -150,11 +163,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         controller.selectCell({ x: Math.floor(world.x / TILE_WIDTH), y: Math.floor(world.y / TILE_HEIGHT) });
       });
       this.input.on("pointermove", this.handlePointerMove, this);
+      this.input.on("pointerup", this.handlePointerRelease, this);
+      this.input.on("pointerupoutside", this.handlePointerRelease, this);
       this.unsubscribe = controller.onChange(() => this.sync());
       this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.publishMovementFrame, this);
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
         this.unsubscribe?.();
         this.input.off("pointermove", this.handlePointerMove, this);
+        this.input.off("pointerup", this.handlePointerRelease, this);
+        this.input.off("pointerupoutside", this.handlePointerRelease, this);
         this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.publishMovementFrame, this);
         this.game.canvas.removeEventListener("pointerleave", this.handleCanvasPointerLeave);
         for (const tile of this.rangeMaskTiles) tile.destroy();
@@ -170,11 +187,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       canvas.setAttribute("role", "application");
       canvas.dataset.testid = "battle-canvas";
       canvas.dataset.edgePanDirection = "0,0";
+      canvas.dataset.primaryPointerHeld = "false";
       this.setNativePointerCursor("hand");
     }
 
     update(time: number): void {
-      if (!controller.edgeScrollEnabled) {
+      if (!controller.edgeScrollEnabled && !this.primaryPointerHeld) {
         if (this.edgePan) this.clearEdgePan();
         return;
       }
@@ -186,15 +204,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private handlePointerMove(pointer: Phaser.Input.Pointer): void {
       const edgeDirection = this.edgeDirectionFor(pointer);
       this.setNativePointerCursor(edgeDirection ? this.nativeCursorFor(edgeDirection) : "hand");
-      const edgePan = controller.edgeScrollEnabled ? edgeDirection : undefined;
+      const edgePan = controller.edgeScrollEnabled || this.primaryPointerHeld ? edgeDirection : undefined;
       if (edgePan) {
-        const changed = !this.edgePan || this.edgePan.x !== edgePan.x || this.edgePan.y !== edgePan.y;
-        this.edgePan = edgePan;
-        this.game.canvas.dataset.edgePanDirection = `${edgePan.x},${edgePan.y}`;
-        if (changed) {
-          controller.panCamera(edgePan);
-          this.nextEdgePanAt = this.time.now + EDGE_PAN_INTERVAL_MS;
-        }
+        this.startEdgePan(edgePan);
         return;
       }
 
@@ -236,6 +248,20 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       canvas.dataset.nativePointerFrame = String(NATIVE_POINTER_FRAME[cursor]);
     }
 
+    private setPrimaryPointerHeld(held: boolean): void {
+      this.primaryPointerHeld = held;
+      this.game.canvas.dataset.primaryPointerHeld = String(held);
+    }
+
+    private startEdgePan(edgePan: { x: number; y: number }): void {
+      const changed = !this.edgePan || this.edgePan.x !== edgePan.x || this.edgePan.y !== edgePan.y;
+      this.edgePan = edgePan;
+      this.game.canvas.dataset.edgePanDirection = `${edgePan.x},${edgePan.y}`;
+      if (!changed) return;
+      controller.panCamera(edgePan);
+      this.nextEdgePanAt = this.time.now + EDGE_PAN_INTERVAL_MS;
+    }
+
     private clearEdgePan(): void {
       this.edgePan = undefined;
       this.nextEdgePanAt = 0;
@@ -258,7 +284,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     private sync(): void {
-      if (!controller.edgeScrollEnabled && this.edgePan) this.clearEdgePan();
+      if (!controller.edgeScrollEnabled && !this.primaryPointerHeld && this.edgePan) this.clearEdgePan();
       this.syncCamera();
       this.drawGrid();
       this.drawRanges();

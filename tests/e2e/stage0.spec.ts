@@ -1356,6 +1356,46 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expectNativePointer({ x: 420, y: 45 }, "hand", 0, "command-menu-pointer.png");
   await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
   expect((await debugState(page)).cameraOrigin).toEqual(cameraBeforeDisabledEdge);
+
+  // The native edge direction survives the toggle: with automatic scrolling
+  // off, primary down still moves once immediately and repeats while held.
+  const cameraBeforeDisabledClick = (await debugState(page)).cameraOrigin;
+  await canvas.click({ position: { x: 5, y: 177 } });
+  await expect.poll(async () => (await debugState(page)).cameraOrigin.x).toBe(
+    cameraBeforeDisabledClick.x - 1,
+  );
+  await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");
+  const cameraAfterDisabledClick = (await debugState(page)).cameraOrigin;
+  await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
+  expect((await debugState(page)).cameraOrigin).toEqual(cameraAfterDisabledClick);
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-disabled-edge-click-pan.png",
+  });
+
+  const canvasBounds = await canvas.boundingBox();
+  expect(canvasBounds).not.toBeNull();
+  await page.mouse.move(canvasBounds!.x + 5, canvasBounds!.y + 177);
+  await page.mouse.down({ button: "left" });
+  await expect(canvas).toHaveAttribute("data-primary-pointer-held", "true");
+  await expect(canvas).toHaveAttribute("data-edge-pan-direction", "-1,0");
+  await expect.poll(async () => (await debugState(page)).cameraOrigin.x).toBeLessThanOrEqual(
+    cameraAfterDisabledClick.x - 2,
+  );
+  await page.mouse.up({ button: "left" });
+  await expect(canvas).toHaveAttribute("data-primary-pointer-held", "false");
+  await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");
+  const cameraAfterDisabledHold = (await debugState(page)).cameraOrigin;
+  await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
+  expect((await debugState(page)).cameraOrigin).toEqual(cameraAfterDisabledHold);
+
+  const restoreSteps = cameraBeforeDisabledEdge.x - cameraAfterDisabledHold.x;
+  expect(restoreSteps).toBeGreaterThan(0);
+  for (let step = 0; step < restoreSteps; step += 1) {
+    await canvas.click({ position: { x: 450, y: 177 } });
+  }
+  expect((await debugState(page)).cameraOrigin).toEqual(cameraBeforeDisabledEdge);
+  await expectNativePointer({ x: 420, y: 45 }, "hand", 0, "command-menu-pointer.png");
+
   await edgeScroll.click();
   await expect(canvas).toHaveAttribute("data-edge-scroll-enabled", "true");
   await edgeScroll.click();
