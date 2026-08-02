@@ -128,7 +128,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="quit-cancel" data-quit-index="1">取 消</button>
               </div>
             </section>
-            <section class="group-command-menu action-menu" id="group-command-menu" data-testid="group-command-menu" role="menu" aria-label="集體命令" hidden></section>
+            <section class="group-command-menu action-menu native-command-menu" id="group-command-menu" data-testid="group-command-menu" role="menu" aria-label="集體命令" hidden></section>
             <section class="retreat-confirm modal-panel native-feedback-confirm" id="retreat-confirm" data-testid="retreat-confirm" role="dialog" aria-label="全面撤退確認" hidden>
               ${animatedPortraitMarkup(46, {
                 alt: "妮雅肖像",
@@ -142,7 +142,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="retreat-cancel" data-retreat-index="1">取 消</button>
               </div>
             </section>
-            <div class="action-menu" id="action-menu" data-testid="action-menu" role="menu" aria-label="單位行動" hidden></div>
+            <div class="action-menu native-command-menu" id="action-menu" data-testid="action-menu" role="menu" aria-label="單位行動" hidden></div>
             <div class="status-strip" id="status-strip" aria-live="polite"></div>
             <section class="combat-presentation" id="combat-presentation" data-testid="combat-presentation" hidden></section>
             <section class="promotion-layer" id="promotion-layer" data-testid="promotion-layer"
@@ -619,22 +619,22 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       actionMenu.style.top = `${position.y}px`;
       if (controller.actionMode === "techniqueMenu") {
         actionMenu.dataset.kind = "technique";
-        actionMenu.style.height = `${controller.techniqueActions.length * 24 + 20}px`;
+        actionMenu.style.height = `${controller.techniqueActions.length * 24 + 28}px`;
         actionMenu.setAttribute("aria-label", "選擇修女技術");
         actionMenu.innerHTML = controller.techniqueActions.map((actionId, index) => {
           const selected = index === controller.techniqueIndex;
           return `<button type="button" role="menuitem" data-action="technique-action"
             data-technique-index="${index}" data-testid="technique-${actionId}"
-            class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${STAGE0_ACTION_DEFINITIONS[actionId].label}</button>`;
+            class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${STAGE0_ACTION_DEFINITIONS[actionId].label}</span></button>`;
         }).join("");
       } else {
         actionMenu.dataset.kind = controller.commandMenuKind;
-        actionMenu.style.height = `${controller.unitCommands.length * 24 + 20}px`;
+        actionMenu.style.height = `${controller.unitCommands.length * 24 + 28}px`;
         actionMenu.setAttribute("aria-label", controller.commandMenuKind === "initial" ? "選擇單位行動" : "選擇移動後行動");
         actionMenu.innerHTML = controller.unitCommands.map((command, index) => {
           const action = command.id === "end" ? "end-unit" : command.id === "undo" ? "undo-move" : command.id;
           const selected = index === controller.commandIndex;
-          return `<button type="button" role="menuitem" data-action="${action}" data-command-index="${index}" data-testid="unit-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${command.label}</button>`;
+          return `<button type="button" role="menuitem" data-action="${action}" data-command-index="${index}" data-testid="unit-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${command.label}</span></button>`;
         }).join("");
       }
     }
@@ -757,7 +757,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               : "request-retreat";
         const selected = index === controller.groupCommandIndex;
         const disabled = command.id === "followLeader" && !controller.followLeaderAvailable;
-        return `<button type="button" role="menuitem" data-action="${action}" data-group-command-index="${index}" data-testid="group-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}" ${disabled ? "disabled" : ""}>${command.label}</button>`;
+        return `<button type="button" role="menuitem" data-action="${action}" data-group-command-index="${index}" data-testid="group-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}" ${disabled ? "disabled" : ""}><span class="native-command-label">${command.label}</span></button>`;
       }).join("");
     }
     retreatConfirm.hidden = !controller.retreatConfirmOpen;

@@ -516,6 +516,33 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   await expect(page.getByTestId("action-menu")).toBeVisible();
   await expect(page.getByTestId("unit-command-move")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("action-menu")).toHaveClass(/native-command-menu/);
+  const nativeMenuArt = await page.getByTestId("action-menu").evaluate((menu) => {
+    const selected = menu.querySelector<HTMLElement>("button.is-selected");
+    const label = selected?.querySelector<HTMLElement>(".native-command-label");
+    return {
+      width: menu.offsetWidth,
+      height: menu.offsetHeight,
+      chrome: getComputedStyle(menu).backgroundImage,
+      backgroundColor: getComputedStyle(menu).backgroundColor,
+      darkTexture: getComputedStyle(menu).getPropertyValue("--native-menu-dark").trim(),
+      lightTexture: getComputedStyle(menu).getPropertyValue("--native-menu-light").trim(),
+      selection: selected ? getComputedStyle(selected, "::before").backgroundImage : "",
+      pointer: selected ? getComputedStyle(selected).cursor : "",
+      duplicatePointer: label ? getComputedStyle(label, "::after").content : "",
+    };
+  });
+  expect(nativeMenuArt).toMatchObject({ width: 144, height: 100 });
+  expect(nativeMenuArt.chrome).toContain("command-menu-top.png");
+  expect(nativeMenuArt.chrome).toContain("command-menu-side.png");
+  expect(nativeMenuArt.chrome).toContain("command-menu-bottom.png");
+  expect(nativeMenuArt.chrome).toContain("conic-gradient");
+  expect(nativeMenuArt.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(nativeMenuArt.darkTexture).toBe("rgb(95 0 0 / 50%)");
+  expect(nativeMenuArt.lightTexture).toBe("rgb(231 138 69 / 50%)");
+  expect(nativeMenuArt.selection).toContain("command-menu-selection.png");
+  expect(nativeMenuArt.pointer).toContain("command-menu-pointer.png");
+  expect(nativeMenuArt.duplicatePointer).toBe("none");
   const commandMenuPlacement = await page.getByTestId("action-menu").evaluate((menu) => {
     const bounds = menu.getBoundingClientRect();
     const screen = menu.closest("[data-testid=game-screen]")!.getBoundingClientRect();
@@ -700,6 +727,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     ],
   });
   await expect(page.getByTestId("group-command-followLeader")).toBeDisabled();
+  await expect(page.getByTestId("group-command-menu")).toHaveClass(/native-command-menu/);
+  await expect(page.getByTestId("group-command-menu")).toHaveCSS("width", "144px");
+  await expect(page.getByTestId("group-command-menu")).toHaveCSS("height", "124px");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-group-command-menu.png" });
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-menu")).toBeHidden();

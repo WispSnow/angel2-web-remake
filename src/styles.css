@@ -539,19 +539,71 @@ button:disabled { cursor: wait; filter: grayscale(.7); opacity: .52; }
   letter-spacing: .18em;
   text-indent: .18em;
 }
+.action-menu.native-command-menu {
+  --native-menu-dark: rgb(95 0 0 / 50%);
+  --native-menu-light: rgb(231 138 69 / 50%);
+  width: 144px;
+  height: 100px;
+  padding: 16px 4px 12px;
+  border: 0;
+  background:
+    url("/assets/original/command-menu-top.png") left top / 144px 17px no-repeat,
+    url("/assets/original/command-menu-bottom.png") left bottom / 144px 30px no-repeat,
+    url("/assets/original/command-menu-side.png") left 17px / 144px 15px repeat-y,
+    conic-gradient(
+      from 90deg at 1px 1px,
+      var(--native-menu-dark) 25%,
+      var(--native-menu-light) 0 50%,
+      var(--native-menu-dark) 0 75%,
+      var(--native-menu-light) 0
+    ) left top / 2px 2px repeat;
+  background-color: transparent;
+  box-shadow: 3px 4px 0 #0009;
+  image-rendering: pixelated;
+}
+.action-menu.native-command-menu::before,
+.action-menu.native-command-menu::after { content: none; }
+.action-menu.native-command-menu button {
+  z-index: 1;
+  width: 136px;
+  height: 24px;
+  color: #fff;
+  background: transparent;
+  font-size: 16px;
+  line-height: 24px;
+  text-shadow: 2px 2px #000;
+  cursor: url("/assets/original/command-menu-pointer.png") 3 2, pointer;
+}
+.action-menu.native-command-menu button::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -4px;
+  top: -6px;
+  width: 144px;
+  height: 37px;
+  background: url("/assets/original/command-menu-selection.png") left top / 144px 37px no-repeat;
+  opacity: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+.action-menu.native-command-menu button:hover,
+.action-menu.native-command-menu button.is-selected { color: #fff; background: transparent; }
+.action-menu.native-command-menu button.is-selected::before { opacity: 1; }
+.native-command-label { position: relative; display: inline-block; }
 .group-command-menu {
   left: 276px;
   top: 92px;
-  width: 190px;
-  height: 120px;
-  padding: 9px 5px;
+  width: 144px;
+  height: 124px;
 }
+.action-menu.native-command-menu.group-command-menu { height: 124px; }
 .group-command-menu button {
-  width: 179px;
+  width: 136px;
   height: 24px;
-  font-size: 17px;
-  letter-spacing: .24em;
-  text-indent: .24em;
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-indent: 1px;
 }
 .group-command-menu button:disabled {
   color: #81766d;

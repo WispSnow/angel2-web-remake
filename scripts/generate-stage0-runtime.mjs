@@ -25,6 +25,13 @@ const battleChromeAssets = {
   "battle-chrome-bottom-left.png": "06.png",
   "battle-chrome-bottom-right.png": "07.png",
 };
+const commandMenuAssets = {
+  "command-menu-pointer.png": "00.png",
+  "command-menu-top.png": "05.png",
+  "command-menu-side.png": "06.png",
+  "command-menu-bottom.png": "07.png",
+  "command-menu-selection.png": "08.png",
+};
 const tacticalPanelToggleAssets = {
   "tactical-panel-battle-animation-off.png": "20.png",
   "tactical-panel-battle-animation-on.png": "21.png",
@@ -101,6 +108,17 @@ await Promise.all([
 // 重跑生成器只在像素真的变化时才产生 diff。
 function runMagick(args) {
   execFileSync("magick", ["-define", "png:exclude-chunk=date,time", ...args]);
+}
+
+// A/0001 uses palette index 0 as the native transparent compositing color.
+// The planar audit renders retain that index as opaque black, so every runtime
+// menu part restores that alpha before the texture and battlefield are layered.
+for (const [output, source] of Object.entries(commandMenuAssets)) {
+  runMagick([
+    path.join(planarAssetPath, "0001", source),
+    "-transparent", "#000000",
+    path.join(publicAssetPath, output),
+  ]);
 }
 
 function copyAlphaMask(colorFrame, maskFrame, output) {
@@ -181,4 +199,4 @@ composeStatueForeground(
 );
 
 console.log(`wrote ${path.relative(root, outputPath)} (${terrain.length} terrain cells)`);
-console.log("wrote stage 0 battle chrome/statue foreground, stateful tactical panel, map sprites and ordinary-combat VOC assets");
+console.log("wrote stage 0 battle chrome/statue foreground, command-menu chrome, stateful tactical panel, map sprites and ordinary-combat VOC assets");
