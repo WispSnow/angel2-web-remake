@@ -140,6 +140,24 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     path: `${ARTIFACT_DIR}/stage1-player-start.png`,
   });
 
+  for (let step = 0; step < 20; step += 1) await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByText("修女／騎士團修女", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "49");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0049\/base\.png$/u);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-enemy-sister-portrait.png`,
+  });
+
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByText("騎兵／芳", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "34");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0034\/base\.png$/u);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-fang-portrait.png`,
+  });
+
   const checkpoint = await state(page);
   await page.keyboard.press("Escape");
   await page.getByTestId("system-command-save").click();

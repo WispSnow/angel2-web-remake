@@ -94,12 +94,8 @@ export function createStage1Units(
       slot: definition.slot,
       classId: definition.classId,
       className: className(definition.classId),
-      name: definition.slot === 16
-        ? "芳"
-        : definition.classId === "sister"
-          ? "騎士團修女"
-          : "騎士團士兵",
-      portrait: 48,
+      name: definition.name,
+      portrait: definition.portrait,
       x: definition.position.x,
       y: definition.position.y,
       life: 0,

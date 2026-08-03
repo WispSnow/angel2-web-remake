@@ -147,10 +147,31 @@ export const STAGE1_DEPLOYMENT_PREVIEW_ROSTER: readonly DeploymentRosterUnit[] =
     };
   });
 
-export const STAGE1_SEMANTIC_ENEMY_UNITS = STAGE1_ENEMY_UNITS.map((unit) => ({
-  ...unit,
-  classId: semanticClassId(unit.nativeClassRecord),
-}));
+function stage1EnemyIdentity(
+  slot: number,
+  classId: UnitClassId,
+): { name: string; portrait: PortraitRecord } {
+  if (slot === 16) return { name: "芳", portrait: 34 };
+  switch (classId) {
+    case "soldier":
+      return { name: "騎士團士兵", portrait: 48 };
+    case "sister":
+      return { name: "騎士團修女", portrait: 49 };
+    case "cavalry":
+      return { name: "騎士團騎兵", portrait: 53 };
+    default:
+      throw new Error(`Unsupported stage 1 enemy class identity: ${classId}`);
+  }
+}
+
+export const STAGE1_SEMANTIC_ENEMY_UNITS = STAGE1_ENEMY_UNITS.map((unit) => {
+  const classId = semanticClassId(unit.nativeClassRecord);
+  return {
+    ...unit,
+    classId,
+    ...stage1EnemyIdentity(unit.slot, classId),
+  };
+});
 
 export const STAGE1_ASSETS = {
   map: "/assets/original/stage1-map.png",

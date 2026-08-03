@@ -41,7 +41,7 @@ describe("generated campaign portrait catalog", () => {
   });
 
   it("provides complete eye and mouth layers for every stage-zero and stage-one portrait", () => {
-    for (const record of [0, 15, 42, 43, 44, 45, 46, 47, 48] as const) {
+    for (const record of [0, 15, 34, 42, 43, 44, 45, 46, 47, 48, 49] as const) {
       const animation = PORTRAIT_CATALOG[record].animation;
       expect(animation, `D/${record} animation`).not.toBeNull();
       expect(animation?.eyes).toHaveLength(3);

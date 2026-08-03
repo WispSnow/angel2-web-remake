@@ -51,8 +51,14 @@ describe("stage 1 battle construction", () => {
     expect(battle.unit("2:16")).toMatchObject({
       classId: "cavalry",
       name: "芳",
+      portrait: 34,
       x: 25,
       y: 16,
+    });
+    expect(battle.unit("2:43")).toMatchObject({
+      classId: "sister",
+      name: "騎士團修女",
+      portrait: 49,
     });
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(7);
     expect(battle.enemyBehaviorFor("2:43")).toBe(2);
