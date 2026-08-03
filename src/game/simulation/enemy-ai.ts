@@ -156,7 +156,7 @@ export function planModernEnemyAction(
   intent: ModernIntent,
 ): AlliedAiAction | undefined {
   const unit = context.unit(id);
-  if (!unit || unit.side !== 2 || unit.acted) return undefined;
+  if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
   const allowMove = intent === "pursuit";
   const fire = unit.classId === "sister" && unit.statuses.techniqueSeal === 0
     ? context.planSisterAction(unit, "fire-1")
@@ -201,7 +201,7 @@ export function hasModernDamageActionThisTurn(
   id: string,
 ): boolean {
   const unit = context.unit(id);
-  if (!unit || unit.side !== 2 || unit.acted) return false;
+  if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return false;
   if (
     unit.classId === "sister"
     && unit.statuses.techniqueSeal === 0

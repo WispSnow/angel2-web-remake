@@ -37,6 +37,7 @@ const unit = (
   life: side === 1 ? 160 : 180,
   experience: 0,
   acted: false,
+  actionDisabled: false,
   statuses: emptyUnitStatuses(),
 });
 

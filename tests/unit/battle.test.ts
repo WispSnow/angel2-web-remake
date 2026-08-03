@@ -317,10 +317,27 @@ describe("stage 0 battle simulation", () => {
   it("advances rounds and refreshes action state", () => {
     const battle = battleAtPlayableOpening();
     battle.unit("1:0")!.acted = true;
+    battle.unit("1:0")!.actionDisabled = true;
+    battle.unit("2:15")!.actionDisabled = true;
+    battle.clearActionDisableState(1);
+    expect(battle.unit("1:0")!.actionDisabled).toBe(false);
+    expect(battle.unit("2:15")!.actionDisabled).toBe(true);
+    expect(battle.enemyActionOrder()).not.toContain("2:15");
     battle.startNextRound();
     expect(battle.round).toBe(2);
     expect(battle.units.every((unit) => unit.acted === false)).toBe(true);
+    expect(battle.units.every((unit) => unit.actionDisabled === false)).toBe(true);
     expect(battle.focusId).toBe("1:0");
+  });
+
+  it("prevents an ice-disabled survivor from counterattacking", () => {
+    const battle = battleAtPlayableOpening();
+    expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    battle.unit("2:45")!.actionDisabled = true;
+    const result = battle.attack("1:0", "2:45");
+    expect(result.defenderDied).toBe(false);
+    expect(result.counterOccurred).toBe(false);
+    expect(result.counterDamage).toBe(0);
   });
 
   it("keeps every surviving ally mobile after the first enemy route phase", () => {

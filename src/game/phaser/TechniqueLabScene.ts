@@ -42,6 +42,7 @@ export type TechniqueLabVisualFrame =
 export interface TechniqueLabSceneHandle {
   readonly game: Phaser.Game;
   setVisualFrame(frame: TechniqueLabVisualFrame): void;
+  setFrozenUnitIds(unitIds: readonly string[]): void;
 }
 
 export function startTechniqueLabPhaser(
@@ -50,11 +51,13 @@ export function startTechniqueLabPhaser(
 ): TechniqueLabSceneHandle {
   let sceneInstance: TechniqueLabScene | undefined;
   let pendingFrame: TechniqueLabVisualFrame = { kind: "none" };
+  let pendingFrozenUnitIds: readonly string[] = [];
 
   class TechniqueLabScene extends Phaser.Scene {
     private state!: TechniqueLabState;
     private unsubscribe?: () => void;
     private unitObjects: Phaser.GameObjects.GameObject[] = [];
+    private frozenObjects: Phaser.GameObjects.Image[] = [];
     private effectObjects: Phaser.GameObjects.Image[] = [];
     private overlay!: Phaser.GameObjects.Graphics;
 
@@ -222,10 +225,31 @@ export function startTechniqueLabPhaser(
         ).setStrokeStyle(1, 0x12090c, 1).setDepth(7);
         this.unitObjects.push(sprite, badge);
       }
+      this.drawFrozenUnits();
       this.drawVisualFrame(pendingFrame);
       this.game.canvas.dataset.unitCount = String(this.state.units.length);
       this.game.canvas.dataset.actorId = this.state.actorId ?? "";
       this.game.canvas.dataset.target = center ? `${center.x},${center.y}` : "";
+    }
+
+    drawFrozenUnits(): void {
+      for (const object of this.frozenObjects) object.destroy();
+      this.frozenObjects = [];
+      if (!this.state) return;
+      const frozenIds = new Set(pendingFrozenUnitIds);
+      for (const unit of this.state.units) {
+        if (!frozenIds.has(unit.id)) continue;
+        this.frozenObjects.push(this.add.image(
+          unit.x * TILE_WIDTH + TILE_WIDTH / 2,
+          unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+          "technique-lab-ice-5",
+        ).setOrigin(.5).setDepth(8));
+      }
+      this.game.canvas.dataset.frozenUnitCount = String(this.frozenObjects.length);
+      this.game.canvas.dataset.frozenUnitIds = this.state.units
+        .filter(({ id }) => frozenIds.has(id))
+        .map(({ id }) => id)
+        .join(",");
     }
 
     private updateCanvasDataset(
@@ -270,6 +294,10 @@ export function startTechniqueLabPhaser(
     setVisualFrame(frame): void {
       pendingFrame = frame;
       sceneInstance?.drawVisualFrame(frame);
+    },
+    setFrozenUnitIds(unitIds): void {
+      pendingFrozenUnitIds = [...unitIds];
+      sceneInstance?.drawFrozenUnits();
     },
   };
 }

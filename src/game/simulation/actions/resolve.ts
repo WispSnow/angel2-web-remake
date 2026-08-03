@@ -22,7 +22,7 @@ const copyPosition = ({ x, y }: Position): Position => ({ x, y });
 function affectedUnit(
   unit: BattleUnit,
   patch: Partial<Pick<SpecialActionAffectedUnit,
-    "positionAfter" | "lifeAfter" | "statusesAfter" | "damage" | "healing" | "blocked">>,
+    "positionAfter" | "lifeAfter" | "actionDisabledAfter" | "statusesAfter" | "damage" | "healing" | "blocked">>,
 ): SpecialActionAffectedUnit {
   const positionBefore = copyPosition(unit);
   const positionAfter = patch.positionAfter ? copyPosition(patch.positionAfter) : copyPosition(unit);
@@ -33,6 +33,8 @@ function affectedUnit(
     positionAfter,
     lifeBefore: unit.life,
     lifeAfter,
+    actionDisabledBefore: unit.actionDisabled,
+    actionDisabledAfter: patch.actionDisabledAfter ?? unit.actionDisabled,
     statusesBefore: cloneUnitStatuses(unit.statuses),
     statusesAfter: patch.statusesAfter
       ? cloneUnitStatuses(patch.statusesAfter)
@@ -202,7 +204,12 @@ function prepareIce(
           moved += 1;
         }
       }
-      return affectedUnit(unit, { positionAfter, statusesAfter, blocked });
+      return affectedUnit(unit, {
+        positionAfter,
+        actionDisabledAfter: blocked ? unit.actionDisabled : true,
+        statusesAfter,
+        blocked,
+      });
     });
   const experienceGained = moved > 0
     ? trial.between(definition.experience.base + definition.experience.randomMinimum,

@@ -81,6 +81,7 @@ const battleSave = (): BattleSaveData => ({
         life: 160,
         experience: 399,
         acted: false,
+        actionDisabled: false,
         statuses: emptyUnitStatuses(),
       },
       {
@@ -96,6 +97,7 @@ const battleSave = (): BattleSaveData => ({
         life: 250,
         experience: 461,
         acted: true,
+        actionDisabled: false,
         statuses: emptyUnitStatuses(),
       },
     ],
@@ -198,7 +200,7 @@ function legacyBattleSave(
       })),
     battle: {
       ...save.battle,
-      units: save.battle.units.map((unit) => ({
+      units: save.battle.units.map(({ actionDisabled: _actionDisabled, ...unit }) => ({
         ...unit,
         classId: unit.classId === "cavalry" ? 22 : 0,
       })),
@@ -223,15 +225,39 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-8 battle and completed saves", () => {
+  it("accepts complete version-9 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
     expect(parseSaveData(JSON.stringify(stage1BattleSave()))).toEqual(stage1BattleSave());
   });
 
+  it("round-trips an active ice action-disable byte", () => {
+    const current = stage1BattleSave();
+    current.battle.units.find(({ id }) => id === "2:16")!.actionDisabled = true;
+    expect(parseSaveData(JSON.stringify(current))).toEqual(current);
+  });
+
+  it("migrates version-8 units by adding the ice action-disable state", () => {
+    const current = stage1BattleSave();
+    const legacy = {
+      ...current,
+      version: 8,
+      contentVersion: "stage-01-ai-3",
+      battle: {
+        ...current.battle,
+        units: current.battle.units.map(({ actionDisabled: _actionDisabled, ...unit }) => unit),
+      },
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
   it("migrates version-7 stage-1 AI state from observable battle activity", () => {
     const dormantCurrent = stage1BattleSave();
-    const { enemyAi: _dormantAi, ...dormantBattle } = dormantCurrent.battle;
+    const { enemyAi: _dormantAi, ...dormantBattleWithIce } = dormantCurrent.battle;
+    const dormantBattle = {
+      ...dormantBattleWithIce,
+      units: dormantBattleWithIce.units.map(({ actionDisabled: _actionDisabled, ...unit }) => unit),
+    };
     const dormantLegacy = {
       ...dormantCurrent,
       version: 7,
@@ -243,7 +269,11 @@ describe("Web save validation", () => {
     const activeCurrent = stage1BattleSave();
     const guard = activeCurrent.battle.units.find(({ id }) => id === "2:40")!;
     guard.x += 1;
-    const { enemyAi: _activeAi, ...activeBattle } = activeCurrent.battle;
+    const { enemyAi: _activeAi, ...activeBattleWithIce } = activeCurrent.battle;
+    const activeBattle = {
+      ...activeBattleWithIce,
+      units: activeBattleWithIce.units.map(({ actionDisabled: _actionDisabled, ...unit }) => unit),
+    };
     const activeLegacy = {
       ...activeCurrent,
       version: 7,
@@ -261,7 +291,11 @@ describe("Web save validation", () => {
 
     const damagedCurrent = stage1BattleSave();
     damagedCurrent.battle.units.find(({ id }) => id === "2:40")!.life -= 1;
-    const { enemyAi: _damagedAi, ...damagedBattle } = damagedCurrent.battle;
+    const { enemyAi: _damagedAi, ...damagedBattleWithIce } = damagedCurrent.battle;
+    const damagedBattle = {
+      ...damagedBattleWithIce,
+      units: damagedBattleWithIce.units.map(({ actionDisabled: _actionDisabled, ...unit }) => unit),
+    };
     const damagedLegacy = {
       ...damagedCurrent,
       version: 7,
@@ -329,7 +363,11 @@ describe("Web save validation", () => {
       roster: current.roster.filter(({ slot }) => slot === 0),
       battle: {
         ...current.battle,
-        units: current.battle.units.map(({ statuses: _statuses, ...unit }) => unit),
+        units: current.battle.units.map(({
+          statuses: _statuses,
+          actionDisabled: _actionDisabled,
+          ...unit
+        }) => unit),
       },
     };
 

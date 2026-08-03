@@ -285,8 +285,20 @@ describe("Stage-0 class actions", () => {
     );
 
     expect(prepared.result.affectedUnits).toEqual([
-      expect.objectContaining({ unitId: first.id, positionAfter: { x: 4, y: 5 }, moved: true }),
-      expect.objectContaining({ unitId: second.id, positionAfter: { x: 5, y: 6 }, moved: true }),
+      expect.objectContaining({
+        unitId: first.id,
+        positionAfter: { x: 4, y: 5 },
+        moved: true,
+        actionDisabledBefore: false,
+        actionDisabledAfter: true,
+      }),
+      expect.objectContaining({
+        unitId: second.id,
+        positionAfter: { x: 5, y: 6 },
+        moved: true,
+        actionDisabledBefore: false,
+        actionDisabledAfter: true,
+      }),
     ]);
     expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(8);
     expect(prepared.result.experienceGained).toBeLessThanOrEqual(9);
@@ -312,10 +324,36 @@ describe("Stage-0 class actions", () => {
     expect(blocked.result.affectedUnits[0]).toMatchObject({
       blocked: true,
       moved: false,
+      actionDisabledAfter: false,
       statusesAfter: { magicGuard: 0 },
     });
     expect(blocked.result.experienceGained).toBe(0);
     expect(blocked.rngAfter).toBe(blocked.rngBefore);
+
+    const pinned = { ...first, id: "ice-pinned", x: 5, y: 5 };
+    const occupiedRetreats = [
+      { ...actor, id: "ice-ally-blocker-down", x: 5, y: 6 },
+      { ...actor, id: "ice-ally-blocker-left", x: 4, y: 5 },
+      { ...actor, id: "ice-ally-blocker-right", x: 6, y: 5 },
+    ];
+    const noMove = prepareSpecialAction(
+      { actionId: "ice-1", actorId: actor.id },
+      { ...actor, x: 5, y: 4 },
+      undefined,
+      new DeterministicRng(0x5678),
+      {
+        units: [{ ...actor, x: 5, y: 4 }, pinned, ...occupiedRetreats],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      { x: 5, y: 4 },
+    );
+    expect(noMove.result.affectedUnits).toContainEqual(expect.objectContaining({
+      unitId: pinned.id,
+      moved: false,
+      blocked: false,
+      actionDisabledAfter: true,
+    }));
   });
 
   it("locks ice to the actor cell and rejects any caller-supplied target center", () => {
@@ -341,6 +379,10 @@ describe("Stage-0 class actions", () => {
     expect(prepared.result.target).toEqual({ x: 5, y: 5 });
     expect(prepared.result.affectedUnits).toContainEqual(expect.objectContaining({
       unitId: enemy.id,
+      actionDisabledAfter: true,
     }));
+    battle.commitPreparedAction(prepared);
+    expect(enemy.actionDisabled).toBe(true);
+    expect(battle.enemyActionOrder()).not.toContain(enemy.id);
   });
 });

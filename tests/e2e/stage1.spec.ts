@@ -28,6 +28,7 @@ interface Stage1DebugState {
     y: number;
     life: number;
     acted: boolean;
+    actionDisabled: boolean;
   }>;
   lastSpecialAction?: {
     actionId: string;
@@ -184,8 +185,8 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.getByTestId("record-slot-2").click();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.2") ?? "null"));
   expect(saved).toMatchObject({
-    version: 8,
-    contentVersion: "stage-01-ai-3",
+    version: 9,
+    contentVersion: "stage-01-ice-lock-1",
     kind: "battle",
     stageId: "stage-01",
     stageLabel: "騎士城堡前",
@@ -386,7 +387,13 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   expect(iceAfter.lastSpecialAction?.affectedUnits).toContainEqual(expect.objectContaining({
     unitId: "2:16",
     moved: true,
+    actionDisabledAfter: true,
   }));
+  expect(iceAfter.units.find(({ id }) => id === "2:16")?.actionDisabled).toBe(true);
+  await expect(battleCanvas).toHaveAttribute("data-ice-disabled-unit-ids", /2:16/u);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-ice-frozen-result.png`,
+  });
   expect(iceAfter.specialActionPresentationTrace.filter(({ phase }) => phase === "iceExpansion"))
     .toHaveLength(12);
   expect(iceAfter.specialActionPresentationTrace.at(-1)).toMatchObject({

@@ -109,6 +109,7 @@ export function createStage0Units(difficulty: Difficulty = 0): BattleUnit[] {
       life: 0,
       experience,
       acted: false,
+      actionDisabled: false,
       statuses: emptyUnitStatuses(),
     };
     unit.className = className(unit.classId);

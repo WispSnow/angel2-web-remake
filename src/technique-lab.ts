@@ -77,6 +77,7 @@ root.innerHTML = `
           <button type="button" data-command="play" data-testid="technique-lab-play">播放</button>
           <button type="button" data-command="pause" data-testid="technique-lab-pause">暫停</button>
           <button type="button" data-command="step" data-testid="technique-lab-step">單步</button>
+          <button type="button" data-command="next-side-phase" data-testid="technique-lab-next-side-phase">推進陣營階段</button>
           <label>時間軸 <input data-testid="technique-lab-timeline" type="range" min="0" value="0" step="1" /></label>
         </div>
         <dl class="technique-lab-readout">
@@ -85,6 +86,7 @@ root.innerHTML = `
           <div><dt>施法者</dt><dd data-readout="actor">—</dd></div>
           <div><dt>目標</dt><dd data-readout="target">—</dd></div>
           <div><dt>命中預覽</dt><dd data-readout="affected">—</dd></div>
+          <div><dt>規則結果</dt><dd data-readout="result">—</dd></div>
         </dl>
       </section>
 
@@ -171,6 +173,14 @@ let phase = "main";
 let visibleFrame = 0;
 let playedAudioCues = new Set<number>();
 let timelineActionCode: TechniqueLabNativeCode | undefined;
+let iceOutcomeCleared = false;
+
+function iceFrozenUnitIds(): readonly string[] {
+  if (!session.state.actionCode.endsWith("C")) return [];
+  return session.affectedUnits()
+    .filter(({ classId }) => classId !== "dragon" && classId !== "head" && classId !== "hand")
+    .map(({ id }) => id);
+}
 
 function rebuildTimeline(): void {
   timelineActionCode = session.state.actionCode;
@@ -309,7 +319,11 @@ function render(): void {
     phase = "complete";
     visibleFrame = -1;
     renderer.setVisualFrame({ kind: "none" });
+    renderer.setFrozenUnitIds(
+      session.state.actionCode.endsWith("C") && !iceOutcomeCleared ? iceFrozenUnitIds() : [],
+    );
   } else {
+    renderer.setFrozenUnitIds([]);
     renderer.setVisualFrame(visualFrameAt(timeMs));
   }
   timelineInput.value = String(Math.round(timeMs));
@@ -341,6 +355,19 @@ function render(): void {
     ? `${center.x}, ${center.y}${selfCenteredIce ? " · 施法者中心" : ""}`
     : "未指定");
   setReadout("affected", damage || "無");
+  setReadout("result", session.state.actionCode.endsWith("C")
+    ? completed && !iceOutcomeCleared
+      ? `冰封 ${iceFrozenUnitIds().length} 名 · 跳過下一次本陣營行動`
+      : completed
+        ? "已經歷一次本陣營階段 · 冰封解除"
+        : "演出完成後套用冰封"
+    : "只預覽動畫／命中範圍");
+  const nextPhaseButton = root.querySelector<HTMLButtonElement>(
+    '[data-command="next-side-phase"]',
+  );
+  if (nextPhaseButton) nextPhaseButton.disabled = !(
+    completed && session.state.actionCode.endsWith("C") && !iceOutcomeCleared
+  );
   for (const button of root.querySelectorAll<HTMLButtonElement>("[data-tool]")) {
     button.setAttribute("aria-pressed", String(button.dataset.tool === session.state.tool));
     if (button.dataset.tool === "target") {
@@ -356,6 +383,7 @@ function render(): void {
 
 function restart(autoplay = true): void {
   timeMs = 0;
+  iceOutcomeCleared = false;
   playedAudioCues = new Set();
   playing = autoplay;
   lastAnimationTime = performance.now();
@@ -365,6 +393,7 @@ function restart(autoplay = true): void {
 
 function seek(nextTimeMs: number): void {
   timeMs = Math.max(0, Math.min(durationMs, nextTimeMs));
+  if (timeMs < durationMs) iceOutcomeCleared = false;
   playedAudioCues = new Set();
   playing = false;
   render();
@@ -416,6 +445,7 @@ root.addEventListener("click", (event) => {
     playAudioBetween(-1, timeMs);
   } else if (command === "pause") playing = false;
   else if (command === "step") step();
+  else if (command === "next-side-phase") iceOutcomeCleared = true;
   else if (command === "reset") {
     session.reset();
     restart(true);

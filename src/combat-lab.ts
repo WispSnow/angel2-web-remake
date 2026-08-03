@@ -513,6 +513,7 @@ function makeUnit(
     life,
     experience: labExperience(classId),
     acted: false,
+    actionDisabled: false,
     statuses: emptyUnitStatuses(),
   };
 }

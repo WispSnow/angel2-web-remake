@@ -73,7 +73,7 @@
 
 .technique-lab-transport {
   display: grid;
-  grid-template-columns: repeat(4, auto) minmax(160px, 1fr);
+  grid-template-columns: repeat(5, auto) minmax(160px, 1fr);
   gap: 6px;
   align-items: center;
   padding: 10px;
@@ -111,11 +111,16 @@
   background: linear-gradient(#58303a, #28151c);
 }
 
+.technique-lab-transport button:disabled {
+  cursor: default;
+  opacity: .45;
+}
+
 .technique-lab-toolbox button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px #9a7030; }
 
 .technique-lab-readout {
   display: grid;
-  grid-template-columns: .8fr 1fr 1fr .8fr 2fr;
+  grid-template-columns: .8fr 1fr 1fr .8fr 1.6fr 2fr;
   gap: 1px;
   margin: 0 10px 10px;
   border: 1px solid #493821;
@@ -176,7 +181,7 @@
 @media (max-width: 620px) {
   .technique-lab-header { align-items: start; }
   .technique-lab-header p { display: none; }
-  .technique-lab-transport { grid-template-columns: repeat(4, 1fr); }
+  .technique-lab-transport { grid-template-columns: repeat(5, 1fr); }
   .technique-lab-transport label { grid-column: 1 / -1; }
   .technique-lab-readout { grid-template-columns: repeat(2, 1fr); }
   .technique-lab-readout div:last-child { grid-column: 1 / -1; }

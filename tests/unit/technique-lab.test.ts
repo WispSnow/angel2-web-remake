@@ -152,7 +152,7 @@ describe("map technique laboratory session", () => {
 
     session.setActionCode("4C");
     expect(session.effectCells()).toHaveLength(61);
-    expect(session.state.target).toEqual({ x: 20, y: 18 });
+    expect(session.state.target).toEqual({ x: 21, y: 18 });
 
     session.setPlacementSide(1);
     session.setPlacementClass("wizard");

@@ -69,6 +69,7 @@ function preparedRosterEntry(
     life: untouchedNamedBaseline ? preview.life : inherited?.life ?? preview.life,
     experience,
     acted: false,
+    actionDisabled: false,
     statuses: emptyUnitStatuses(),
   };
 }
@@ -116,6 +117,7 @@ export function createStage1Units(
       life: 0,
       experience,
       acted: false,
+      actionDisabled: false,
       statuses: emptyUnitStatuses(),
     };
     unit.life = statsFor(unit, difficulty).maxLife;
@@ -194,7 +196,7 @@ export class Stage1Battle extends Stage0Battle {
 
   override planEnemyAiAction(id: string, _behavior?: number): AlliedAiAction | undefined {
     const unit = this.unit(id);
-    if (!unit || unit.side !== 2 || unit.acted) return undefined;
+    if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
     const intent = this.enemyAiIntentFor(id);
     if (intent === "alert") {
       if (unit.life * 100 < this.statsFor(unit).maxLife * 40) {

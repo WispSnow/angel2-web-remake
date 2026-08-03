@@ -16,6 +16,8 @@ export interface SpecialActionAffectedUnit {
   positionAfter: Position;
   lifeBefore: number;
   lifeAfter: number;
+  actionDisabledBefore: boolean;
+  actionDisabledAfter: boolean;
   statusesBefore: UnitStatuses;
   statusesAfter: UnitStatuses;
   damage: number;

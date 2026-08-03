@@ -43,6 +43,8 @@ export interface BattleUnit extends Position {
   life: number;
   experience: number;
   acted: boolean;
+  /** Native per-slot action-disable byte; ice clears after this side's next phase. */
+  actionDisabled: boolean;
   statuses: UnitStatuses;
 }
 
@@ -131,8 +133,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 8;
-  contentVersion: "stage-01-ai-3";
+  version: 9;
+  contentVersion: "stage-01-ice-lock-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

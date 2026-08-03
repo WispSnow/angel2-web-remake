@@ -147,6 +147,19 @@ test("already implemented fire, healing and ice remain available in the same map
     await seek(page, contract.duration);
     await expect(canvas).toHaveAttribute("data-technique-phase", "none");
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+    if (contract.code === "1C") {
+      await expect(canvas).toHaveAttribute("data-frozen-unit-count", "1");
+      await expect(page.locator('[data-readout="result"]')).toContainText("跳過下一次本陣營行動");
+      await page.screenshot({
+        path: "artifacts/playwright/technique-lab-ice-frozen-result.png",
+        fullPage: true,
+      });
+      await page.getByTestId("technique-lab-next-side-phase").click();
+      await expect(canvas).toHaveAttribute("data-frozen-unit-count", "0");
+      await expect(page.locator('[data-readout="result"]')).toContainText("冰封解除");
+    } else {
+      await expect(canvas).toHaveAttribute("data-frozen-unit-count", "0");
+    }
   }
   expect(await page.evaluate(() =>
     window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("2L"))).toBe(true);
@@ -200,6 +213,7 @@ test("all four ice tiers expand one complete six-frame ring at a time", async ({
     await seek(page, contract.duration);
     await expect(canvas).toHaveAttribute("data-technique-phase", "none");
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+    expect(Number(await canvas.getAttribute("data-frozen-unit-count"))).toBeGreaterThan(0);
   }
   expect(pageErrors).toEqual([]);
 });

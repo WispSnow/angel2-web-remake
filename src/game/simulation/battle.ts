@@ -48,6 +48,7 @@ function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
 
 function canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
   return !actor.acted
+    && !actor.actionDisabled
     && ACTION_CLASSES[actionId].includes(actor.classId)
     && (actionId === "archer-shot" || actor.statuses.techniqueSeal === 0);
 }
@@ -199,7 +200,7 @@ export class Stage0Battle {
   movementPath(id: string, destination: Position): Position[] {
     const unit = this.unit(id);
     const occupant = this.unitAt(destination);
-    if (!unit || unit.acted || (occupant && occupant.id !== unit.id)) return [];
+    if (!unit || unit.acted || unit.actionDisabled || (occupant && occupant.id !== unit.id)) return [];
     return findMovementPath(unit, destination, this.units, this.scenario);
   }
 
@@ -242,7 +243,7 @@ export class Stage0Battle {
   attack(attackerId: string, defenderId: string): AttackResult {
     const attacker = this.unit(attackerId);
     const defender = this.unit(defenderId);
-    if (!attacker || !defender || attacker.side === defender.side || attacker.acted || manhattan(attacker, defender) !== 1) {
+    if (!attacker || !defender || attacker.side === defender.side || attacker.acted || attacker.actionDisabled || manhattan(attacker, defender) !== 1) {
       throw new Error("illegal ordinary attack");
     }
     this.onHostileTargeted(attacker, defender);
@@ -257,7 +258,7 @@ export class Stage0Battle {
     const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense) + this.rng.between(4, 7) + this.rng.between(4, 7);
     defender.life = Math.max(0, defender.life - damage);
 
-    const counterOccurred = defender.life > 0;
+    const counterOccurred = defender.life > 0 && !defender.actionDisabled;
     let counterDamage = 0;
     if (counterOccurred) {
       const attackerTerrainDefense = Math.floor(
@@ -385,6 +386,7 @@ export class Stage0Battle {
         && unit.life === affected.lifeBefore
         && unit.x === affected.positionBefore.x
         && unit.y === affected.positionBefore.y
+        && unit.actionDisabled === affected.actionDisabledBefore
         && statusesEqual(unit.statuses, affected.statusesBefore);
     });
     if (
@@ -413,6 +415,7 @@ export class Stage0Battle {
       unit.x = affected.positionAfter.x;
       unit.y = affected.positionAfter.y;
       unit.life = affected.lifeAfter;
+      unit.actionDisabled = affected.actionDisabledAfter;
       unit.statuses = { ...affected.statusesAfter };
       this.recordCampaignUnit(unit);
     }
@@ -430,7 +433,7 @@ export class Stage0Battle {
 
   wait(id: string): boolean {
     const unit = this.unit(id);
-    if (!unit || unit.side !== 1 || unit.acted) return false;
+    if (!unit || unit.side !== 1 || unit.acted || unit.actionDisabled) return false;
     unit.acted = true;
     this.focusId = id;
     return true;
@@ -438,7 +441,7 @@ export class Stage0Battle {
 
   rest(id: string): number {
     const unit = this.unit(id);
-    if (!unit || unit.acted) return 0;
+    if (!unit || unit.acted || unit.actionDisabled) return 0;
     const maximumLife = this.statsFor(unit).maxLife;
     const recovered = Math.max(0, Math.min(Math.floor(maximumLife * 15 / 100), maximumLife - unit.life));
     unit.life += recovered;
@@ -451,7 +454,7 @@ export class Stage0Battle {
     let count = 0;
     let recovered = 0;
     for (const unit of this.units) {
-      if (unit.side !== 1 || unit.acted) continue;
+      if (unit.side !== 1 || unit.acted || unit.actionDisabled) continue;
       recovered += this.rest(unit.id);
       count += 1;
     }
@@ -460,7 +463,7 @@ export class Stage0Battle {
 
   planAlliedAiAction(id: string, leaderId?: string): AlliedAiAction | undefined {
     const unit = this.unit(id);
-    if (!unit || unit.side !== 1 || unit.acted) return undefined;
+    if (!unit || unit.side !== 1 || unit.acted || unit.actionDisabled) return undefined;
 
     const classAction = this.planClassAction(unit);
     if (classAction) return classAction;
@@ -492,7 +495,7 @@ export class Stage0Battle {
 
   planEnemyAiAction(id: string, behavior = this.enemyBehaviorFor(id)): AlliedAiAction | undefined {
     const unit = this.unit(id);
-    if (!unit || unit.side !== 2 || unit.acted) return undefined;
+    if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
     const stats = this.statsFor(unit);
     const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
     if (lifePercent < 20) {
@@ -599,7 +602,7 @@ export class Stage0Battle {
 
   planSpecialAiAction(id: string, actionId: BattleActionId): AlliedAiAction | undefined {
     const unit = this.unit(id);
-    if (!unit || unit.acted) return undefined;
+    if (!unit || unit.acted || unit.actionDisabled) return undefined;
     return this.planClassAction(unit, [actionId]);
   }
 
@@ -731,7 +734,7 @@ export class Stage0Battle {
 
   spendAction(id: string): boolean {
     const unit = this.unit(id);
-    if (!unit || unit.acted) return false;
+    if (!unit || unit.acted || unit.actionDisabled) return false;
     unit.acted = true;
     this.focusId = id;
     return true;
@@ -743,16 +746,22 @@ export class Stage0Battle {
     }
   }
 
+  clearActionDisableState(side: BattleUnit["side"]): void {
+    for (const unit of this.units) {
+      if (unit.side === side) unit.actionDisabled = false;
+    }
+  }
+
   enemyMovementRange(id: string): Position[] {
     const unit = this.unit(id);
     const route = this.scenario.routeEnemy;
-    if (!unit || unit.side !== 2 || !route) return [];
+    if (!unit || unit.side !== 2 || unit.actionDisabled || !route) return [];
     return reachableCells(unit, this.units, route.movement, this.scenario);
   }
 
   enemyActionOrder(): string[] {
     return this.units
-      .filter((unit) => unit.side === 2 && !unit.acted)
+      .filter((unit) => unit.side === 2 && !unit.acted && !unit.actionDisabled)
       .sort((left, right) => {
         const priority = (this.scenario.enemyClassPriority[left.classId] ?? Number.MAX_SAFE_INTEGER)
           - (this.scenario.enemyClassPriority[right.classId] ?? Number.MAX_SAFE_INTEGER);
@@ -765,7 +774,7 @@ export class Stage0Battle {
   planRouteEnemy(id: string): RouteMoveResult | undefined {
     const unit = this.unit(id);
     const definition = this.scenario.routeEnemy;
-    if (!unit || unit.side !== 2 || !definition) return undefined;
+    if (!unit || unit.side !== 2 || unit.actionDisabled || !definition) return undefined;
     const route = routePath(unit, [definition.target], this.units, definition.movement, this.scenario);
     const exitIndex = route.findIndex((position, index) => index > 0 && definition.isExit(position));
     const path = exitIndex >= 0 ? route.slice(0, exitIndex + 1) : route;
@@ -799,7 +808,10 @@ export class Stage0Battle {
 
   startNextRound(): void {
     this.round += 1;
-    for (const unit of this.units) unit.acted = false;
+    for (const unit of this.units) {
+      unit.acted = false;
+      if (unit.side === 2) unit.actionDisabled = false;
+    }
     if (this.unit("1:0")) this.focusId = "1:0";
   }
 

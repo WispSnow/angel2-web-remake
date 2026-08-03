@@ -81,7 +81,7 @@ const legacyBattleSave = () => {
     }),
     battle: {
       ...source.battle,
-      units: source.battle.units.map((unit) => {
+      units: source.battle.units.map(({ actionDisabled: _actionDisabled, ...unit }) => {
         const classId = unit.classId === "cavalry" ? 22 as const : 0 as const;
         if (unit.side === 2) {
           return {

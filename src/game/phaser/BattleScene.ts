@@ -78,6 +78,7 @@ const DIGIT_PATTERNS: Record<string, readonly string[]> = {
 interface UnitView {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Image;
+  iceDisabledOverlay?: Phaser.GameObjects.Image;
   lifeDigits: Phaser.GameObjects.Graphics;
   actedBadge: Phaser.GameObjects.Graphics;
 }
@@ -459,6 +460,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private createUnitView(unit: BattleUnit): UnitView {
       const container = this.add.container(this.unitWorldX(unit), unit.y * TILE_HEIGHT + 43).setDepth(5);
       const sprite = this.add.image(this.unitVisualOffset(unit), 0, this.textureFor(unit)).setOrigin(0.5, 1);
+      const iceDisabledOverlay = stage1PresentationAssets
+        ? this.add.image(0, -21, "map-ice-1-expansion-5").setOrigin(.5)
+        : undefined;
       // Native map labels occupy the unit frame's bottom rows instead of
       // extending into the next 44px cell. The original 16×14 acted marker
       // has a fixed offset from the logical unit center, so three-digit life
@@ -495,8 +499,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         }
       }
 
-      container.add([sprite, lifeDigits, actedBadge]);
-      return { container, sprite, lifeDigits, actedBadge };
+      container.add([
+        sprite,
+        ...(iceDisabledOverlay ? [iceDisabledOverlay] : []),
+        lifeDigits,
+        actedBadge,
+      ]);
+      return { container, sprite, iceDisabledOverlay, lifeDigits, actedBadge };
     }
 
     private drawLifeDigits(view: UnitView, unit: BattleUnit): void {
@@ -573,6 +582,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         view.container.setVisible(!erasedByDeath);
         if (!erasedByDeath) visibleCount += 1;
         this.drawLifeDigits(view, { ...unit, life: displayedLife });
+        view.iceDisabledOverlay?.setVisible(unit.actionDisabled && !mapPresentation);
         view.actedBadge.setVisible(unit.acted && !mapPresentation);
       }
       for (const [id, view] of this.unitViews) {
@@ -583,6 +593,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (controller.isTestMode) {
         this.game.canvas.dataset.unitLifeLabelCount = String(visibleCount);
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);
+        this.game.canvas.dataset.iceDisabledCount = String(
+          controller.battle.units.filter((unit) => unit.actionDisabled).length,
+        );
+        this.game.canvas.dataset.iceDisabledUnitIds = controller.battle.units
+          .filter((unit) => unit.actionDisabled)
+          .map((unit) => unit.id)
+          .join(",");
         this.game.canvas.dataset.actedBadgeGeometry = "-22,-15,16,14";
         this.game.canvas.dataset.rangeMode = controller.actionMode;
         this.game.canvas.dataset.rangeCellCount = String(

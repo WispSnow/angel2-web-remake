@@ -1328,7 +1328,7 @@ function renderHud(
   const nextExperience = nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
   const side = unit.side === 1 ? "我方" : "敵方";
-  const acted = unit.acted ? "已行動" : "可行動";
+  const acted = unit.actionDisabled ? "冰封中" : unit.acted ? "已行動" : "可行動";
   const intent = unit.side === 2 ? controller.battle.enemyAiIntentFor(unit.id) : undefined;
   const intentLabel = intent ? {
     route: "撤離",

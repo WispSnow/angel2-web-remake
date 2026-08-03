@@ -45,7 +45,7 @@ export interface TechniqueLabState {
 type Listener = (state: TechniqueLabState) => void;
 
 const initialUnits: readonly TechniqueLabUnit[] = [
-  { id: "lab-1", side: 1, classId: "magician", x: 20, y: 18 },
+  { id: "lab-1", side: 1, classId: "magician", x: 21, y: 18 },
   { id: "lab-2", side: 2, classId: "soldier", x: 23, y: 18 },
   { id: "lab-3", side: 2, classId: "cavalry", x: 25, y: 18 },
   { id: "lab-4", side: 2, classId: "sister", x: 23, y: 21 },

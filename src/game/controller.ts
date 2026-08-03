@@ -466,13 +466,15 @@ export class GameController {
 
   get groupLeader(): BattleUnit | undefined {
     const cursorUnit = this.battle.unitAt(this.cursor);
-    if (cursorUnit?.side === 1 && !cursorUnit.acted) return cursorUnit;
+    if (cursorUnit?.side === 1 && !cursorUnit.acted && !cursorUnit.actionDisabled) return cursorUnit;
 
     // The tactical desk is only visible while the pointer cursor is over an
     // empty cell. Keep that presentation hover separate from the battle's
     // retained unit focus, as the native side-panel path does.
     const retainedUnit = this.battle.focus;
-    return retainedUnit?.side === 1 && !retainedUnit.acted ? retainedUnit : undefined;
+    return retainedUnit?.side === 1 && !retainedUnit.acted && !retainedUnit.actionDisabled
+      ? retainedUnit
+      : undefined;
   }
 
   get followLeaderAvailable(): boolean {
@@ -719,6 +721,7 @@ export class GameController {
         life: 160,
         experience: 0,
         acted: true,
+        actionDisabled: false,
         statuses: {
           attackUp: 0,
           defenseUp: 0,
@@ -795,7 +798,7 @@ export class GameController {
       this.reachable = this.battle.enemyMovementRange(unit.id);
       this.actionMode = "enemyPreview";
       this.statusMessage = "紅色格為敵軍本次行動的可移動範圍；預覽不會改變戰鬥狀態。";
-    } else if (!unit.acted) {
+    } else if (!unit.acted && !unit.actionDisabled) {
       this.selectedId = unit.id;
       this.pendingOrigin = { x: unit.x, y: unit.y };
       this.pendingPath = undefined;
@@ -803,6 +806,8 @@ export class GameController {
       this.commandIndex = 0;
       this.actionMode = "actionMenu";
       this.statusMessage = `選擇${unit.className}的行動。`;
+    } else if (unit.actionDisabled) {
+      this.statusMessage = "此單位正被冰封，本次我方階段不能行動。";
     } else {
       this.statusMessage = "此單位本回合已行動。";
     }
@@ -1111,10 +1116,9 @@ export class GameController {
         if (presentation) await this.presentSpecialDeath(actorPresentation, presentation, result);
       }
       const moved = result.affectedUnits.filter(({ moved }) => moved).length;
+      const frozen = result.affectedUnits.filter(({ actionDisabledAfter }) => actionDisabledAfter).length;
       this.statusMessage = actionId === "ice-1"
-        ? moved > 0
-          ? `冰雪擊退 ${moved} 名敵人。`
-          : "冰雪完成；沒有敵人可以被擊退。"
+        ? `冰雪擊退 ${moved} 名敵人，冰封 ${frozen} 名；其下一次本陣營行動被跳過。`
         : actionId === "lightning-1"
           ? `落雷對 ${result.affectedUnits.length} 名敵人造成共 ${result.damage} 點傷害。`
           : result.blocked && targetPresentation
@@ -1130,7 +1134,8 @@ export class GameController {
       this.busy = false;
       const ended = this.resolveOutcome();
       this.emit();
-      if (!ended && this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) {
+      if (!ended && this.battle.units.filter((unit) => unit.side === 1)
+        .every((unit) => unit.acted || unit.actionDisabled)) {
         void this.runTurnPhases("autonomous");
       }
     } catch (error) {
@@ -1258,7 +1263,8 @@ export class GameController {
       this.busy = false;
       const ended = this.resolveOutcome();
       this.emit();
-      if (!ended && this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) {
+      if (!ended && this.battle.units.filter((unit) => unit.side === 1)
+        .every((unit) => unit.acted || unit.actionDisabled)) {
         void this.runTurnPhases("autonomous");
       }
     } catch (error) {
@@ -1287,7 +1293,8 @@ export class GameController {
       return;
     }
     this.emit();
-    if (this.battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)) {
+    if (this.battle.units.filter((unit) => unit.side === 1)
+      .every((unit) => unit.acted || unit.actionDisabled)) {
       void this.runTurnPhases("autonomous");
     }
   }
@@ -1439,7 +1446,7 @@ export class GameController {
   private async executeFollowLeader(leaderId: string): Promise<void> {
     if (this.phase !== "player" || this.busy) return;
     const leader = this.battle.unit(leaderId);
-    if (!leader || leader.side !== 1 || leader.acted) return;
+    if (!leader || leader.side !== 1 || leader.acted || leader.actionDisabled) return;
     this.battle.wait(leader.id);
     this.statusMessage = `${leader.name}成為臨時主將；其餘單位交由我方 AI 行動。`;
     this.emit();
@@ -1535,7 +1542,9 @@ export class GameController {
     this.emit();
 
     if (mode !== "autonomous") {
-      const allyIds = this.battle.units.filter((unit) => unit.side === 1 && !unit.acted).map((unit) => unit.id);
+      const allyIds = this.battle.units
+        .filter((unit) => unit.side === 1 && !unit.acted && !unit.actionDisabled)
+        .map((unit) => unit.id);
       for (const id of allyIds) {
         const action = this.battle.planAlliedAiAction(id, mode === "follow" ? leaderId : undefined);
         if (!action) continue;
@@ -1548,6 +1557,9 @@ export class GameController {
     }
 
     this.battle.clearActionState(1);
+    // The native side-1 disable array is cleared after the player/ally phase,
+    // immediately before enemy scheduling. Side 2 is cleared at next-round start.
+    this.battle.clearActionDisableState(1);
     this.phase = "enemy";
     const enemyPhaseUpdate = this.battle.beginEnemyPhase();
     this.statusMessage = enemyPhaseUpdate.activatedGroupIds.includes("castle-guard")
@@ -2084,10 +2096,10 @@ export class GameController {
     const anchorId = this.selectedUnit?.id ?? (cursorUnit?.side === 1 ? cursorUnit.id : this.battle.focusId);
     const allies = this.battle.units.filter((unit) => unit.side === 1);
     const anchorIndex = allies.findIndex((unit) => unit.id === anchorId);
-    let next = allies.find((unit) => !unit.acted);
+    let next = allies.find((unit) => !unit.acted && !unit.actionDisabled);
     for (let offset = 1; offset <= allies.length; offset += 1) {
       const candidate = allies[(anchorIndex + offset + allies.length) % allies.length];
-      if (candidate && !candidate.acted) {
+      if (candidate && !candidate.acted && !candidate.actionDisabled) {
         next = candidate;
         break;
       }
