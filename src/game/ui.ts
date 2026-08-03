@@ -82,7 +82,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             ${renderSidePanelHotspots()}
             <div class="side-panel-tooltip" id="side-panel-tooltip" data-testid="side-panel-tooltip"
               role="tooltip" aria-live="polite" hidden></div>
-            <section class="system-menu action-menu" id="system-menu" data-testid="system-menu" role="menu" aria-label="戰鬥系統選單" hidden></section>
+            <section class="system-menu action-menu native-command-menu" id="system-menu" data-testid="system-menu"
+              data-kind="system" role="menu" aria-label="戰鬥系統選單" hidden></section>
             <section class="settings-menu modal-panel" id="settings-menu" data-testid="settings-menu" role="dialog" aria-label="遊戲功能" hidden>
               <span class="panel-kicker">SYSTEM</span><h2>遊戲功能</h2>
               <div class="system-menu-grid">
@@ -119,7 +120,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               </div>
             </section>
             <section class="record-menu action-menu" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
-            <section class="quit-confirm modal-panel native-feedback-confirm" id="quit-confirm" data-testid="quit-confirm" role="dialog" aria-label="離開遊戲確認" hidden>
+            <section class="quit-confirm native-feedback-confirm" id="quit-confirm" data-testid="quit-confirm" role="dialog" aria-label="離開遊戲確認" hidden>
               ${animatedPortraitMarkup(46, {
                 alt: "妮雅肖像",
                 channel: "quit-feedback",
@@ -127,13 +128,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               })}
               <p data-testid="quit-feedback-text" data-full-text="唉啊！．．．要休息了嗎？&#10;請再考慮一下吧！">唉啊！．．．要休息了嗎？
 請再考慮一下吧！</p>
-              <div class="button-row">
-                <button data-action="quit-confirm" data-quit-index="0">確 定</button>
-                <button data-action="quit-cancel" data-quit-index="1">取 消</button>
+              <div class="button-row action-menu native-command-menu native-confirm-menu"
+                data-testid="quit-confirm-menu" data-kind="confirmation" role="menu" aria-label="離開遊戲選擇">
+                <button type="button" role="menuitem" data-action="quit-confirm" data-quit-index="0"><span class="native-command-label">確 定</span></button>
+                <button type="button" role="menuitem" data-action="quit-cancel" data-quit-index="1"><span class="native-command-label">取 消</span></button>
               </div>
             </section>
             <section class="group-command-menu action-menu native-command-menu" id="group-command-menu" data-testid="group-command-menu" role="menu" aria-label="集體命令" hidden></section>
-            <section class="retreat-confirm modal-panel native-feedback-confirm" id="retreat-confirm" data-testid="retreat-confirm" role="dialog" aria-label="全面撤退確認" hidden>
+            <section class="retreat-confirm native-feedback-confirm" id="retreat-confirm" data-testid="retreat-confirm" role="dialog" aria-label="全面撤退確認" hidden>
               ${animatedPortraitMarkup(46, {
                 alt: "妮雅肖像",
                 channel: "retreat-feedback",
@@ -141,9 +143,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               })}
               <p data-testid="retreat-feedback-text" data-full-text="哦！．．．要撤退嗎？&#10;必竟是沒辦法的事，雙方的實力差太多了．">哦！．．．要撤退嗎？
 必竟是沒辦法的事，雙方的實力差太多了．</p>
-              <div class="button-row">
-                <button data-action="retreat-confirm" data-retreat-index="0">確 定</button>
-                <button data-action="retreat-cancel" data-retreat-index="1">取 消</button>
+              <div class="button-row action-menu native-command-menu native-confirm-menu"
+                data-testid="retreat-confirm-menu" data-kind="confirmation" role="menu" aria-label="全面撤退選擇">
+                <button type="button" role="menuitem" data-action="retreat-confirm" data-retreat-index="0"><span class="native-command-label">確 定</span></button>
+                <button type="button" role="menuitem" data-action="retreat-cancel" data-retreat-index="1"><span class="native-command-label">取 消</span></button>
               </div>
             </section>
             <div class="action-menu native-command-menu" id="action-menu" data-testid="action-menu" role="menu" aria-label="單位行動" hidden></div>
@@ -714,7 +717,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             ? "objectives"
             : `system-${command.id}`;
         const selected = index === controller.systemMenuIndex;
-        return `<button type="button" role="menuitem" data-action="${action}" data-system-index="${index}" data-testid="system-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}">${command.label}</button>`;
+        return `<button type="button" role="menuitem" data-action="${action}" data-system-index="${index}" data-testid="system-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${command.label}</span></button>`;
       }).join("");
     }
     settingsMenu.hidden = !controller.settingsOpen;
@@ -1412,9 +1415,12 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
   } else if (phase === "savePrompt") {
     const text = "哦！．．\n這次的戰役結束了，是否要記錄下來．";
     layer.innerHTML = `${nativeFeedbackMarkup(text)}
-      <div class="native-confirm-menu" role="menu" aria-label="是否儲存">
-        <button data-action="save-yes" data-testid="save-yes" class="${controller.savePromptIndex === 0 ? "is-selected" : ""}">確 定</button>
-        <button data-action="save-no" class="${controller.savePromptIndex === 1 ? "is-selected" : ""}">取 消</button>
+      <div class="native-confirm-menu action-menu native-command-menu" data-testid="save-confirm-menu"
+        data-kind="confirmation" role="menu" aria-label="是否儲存">
+        <button type="button" role="menuitem" data-action="save-yes" data-testid="save-yes"
+          class="${controller.savePromptIndex === 0 ? "is-selected" : ""}" aria-current="${controller.savePromptIndex === 0}"><span class="native-command-label">確 定</span></button>
+        <button type="button" role="menuitem" data-action="save-no" data-testid="save-no"
+          class="${controller.savePromptIndex === 1 ? "is-selected" : ""}" aria-current="${controller.savePromptIndex === 1}"><span class="native-command-label">取 消</span></button>
       </div>`;
   } else if (phase === "saveSlots") {
     const page = saveSlotPageIndex(controller.postSaveSlotIndex);

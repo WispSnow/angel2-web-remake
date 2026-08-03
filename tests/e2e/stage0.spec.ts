@@ -175,6 +175,35 @@ const openSystemMenu = async (page: Page) => {
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("system-menu")).toBeVisible();
 };
+const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => {
+  await expect(menu).toHaveClass(/native-command-menu/);
+  const presentation = await menu.evaluate((element) => {
+    const selected = element.querySelector<HTMLElement>("button.is-selected");
+    const label = selected?.querySelector<HTMLElement>(".native-command-label");
+    return {
+      width: (element as HTMLElement).offsetWidth,
+      height: (element as HTMLElement).offsetHeight,
+      chrome: getComputedStyle(element).backgroundImage,
+      selection: selected ? getComputedStyle(selected, "::before").backgroundImage : "",
+      pointer: selected ? getComputedStyle(selected).cursor : "",
+      labelCenterOffset: selected && label
+        ? label.getBoundingClientRect().left + label.getBoundingClientRect().width / 2
+          - (
+            Number.parseFloat(getComputedStyle(selected).letterSpacing)
+            - Number.parseFloat(getComputedStyle(selected).textIndent)
+          ) / 2
+          - (element.getBoundingClientRect().left + element.getBoundingClientRect().width / 2)
+        : Number.NaN,
+    };
+  });
+  expect(presentation).toMatchObject({ width: 144, height: expectedHeight });
+  expect(presentation.chrome).toContain("command-menu-top.png");
+  expect(presentation.chrome).toContain("command-menu-side.png");
+  expect(presentation.chrome).toContain("command-menu-bottom.png");
+  expect(presentation.selection).toContain("command-menu-selection.png");
+  expect(presentation.pointer).toContain("command-menu-pointer.png");
+  expect(Math.abs(presentation.labelCenterOffset)).toBeLessThanOrEqual(0.5);
+};
 const openSettingsMenu = async (page: Page) => {
   await openSystemMenu(page);
   await page.getByTestId("system-command-settings").click();
@@ -492,6 +521,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await page.getByTestId("system-menu-button").click();
   await expect(page.getByTestId("system-menu")).toBeVisible();
+  await expectNativeMenuChrome(page.getByTestId("system-menu"), 148);
   await expect(page.locator("[data-system-index]")).toHaveCount(5);
   await expect(page.getByTestId("end-turn-button")).toHaveCount(0);
   const systemMenuContained = await page.getByTestId("system-menu").evaluate((menu) => {
@@ -1075,6 +1105,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   });
   await page.getByTestId("group-command-retreat").click();
   await expect(page.getByTestId("retreat-confirm")).toBeVisible();
+  await expectNativeMenuChrome(page.getByTestId("retreat-confirm-menu"), 76);
   await page.locator("[data-action=retreat-confirm]").click();
   await expect(page.getByTestId("retreat-confirm")).toContainText("哦！．．．要撤退嗎？");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-retreat-confirm.png" });
@@ -2334,6 +2365,7 @@ test("S00-M: native system records restore battle state and combat cues follow p
   ]);
   await page.getByTestId("system-command-quit").click();
   await expect(page.getByTestId("quit-confirm")).toBeVisible();
+  await expectNativeMenuChrome(page.getByTestId("quit-confirm-menu"), 76);
   await page.locator("[data-action=quit-confirm]").click();
   await expect(page.getByTestId("quit-feedback-text")).toHaveText("唉啊！．．．要休息了嗎？\n請再考慮一下吧！");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-quit-confirm.png" });
@@ -2441,7 +2473,9 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await page.getByTestId("victory-continue").click();
   expect((await debugState(page)).phase).toBe("savePrompt");
   await expect(page.getByRole("menu", { name: "是否儲存" })).toBeVisible();
+  await expectNativeMenuChrome(page.getByTestId("save-confirm-menu"), 76);
   await expect(page.getByTestId("save-yes")).toHaveText("確 定");
+  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-save-confirm.png" });
 });
 
 test("S00-R: Ximi independently enters the shared promotion tree and commits a semantic class", async ({ page }) => {
