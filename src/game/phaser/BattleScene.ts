@@ -28,6 +28,11 @@ interface MapEffectDescriptor {
   low7BitFrameIndices: readonly (number | null)[];
 }
 
+interface LightningMainDraw {
+  descriptor: MapEffectDescriptor;
+  anchorOffset: { x: number; y: number };
+}
+
 type NativePointerCursor = "hand" | "up" | "down" | "left" | "right";
 
 const NATIVE_POINTER_FRAME: Readonly<Record<NativePointerCursor, number>> = {
@@ -88,10 +93,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
   const stage1Assets = stage1 ? controller.stage1Assets : undefined;
   const stage1Presentation = stage1 ? stage1ActionPresentation() : undefined;
   const stage1PresentationAssets = stage1 ? stage1ActionPresentationAssets() : undefined;
-  const lightningMainDescriptors: readonly MapEffectDescriptor[] = stage1Presentation
-    ? stage1Presentation.lightning1.phases.flatMap<MapEffectDescriptor>(
-      ({ descriptorSequence }) => [...descriptorSequence],
-    )
+  const lightningMainDraws: readonly LightningMainDraw[] = stage1Presentation
+    ? stage1Presentation.lightning1.phases.flatMap<LightningMainDraw>((phase) => {
+      const anchorOffsets = "anchorOffsetSequence" in phase
+        ? phase.anchorOffsetSequence
+        : undefined;
+      return phase.descriptorSequence.map((descriptor, index) => ({
+        descriptor,
+        anchorOffset: anchorOffsets?.[index] ?? { x: 0, y: 0 },
+      }));
+    })
     : [];
   return class BattleScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
@@ -615,6 +626,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (special) {
         const target = special.target;
         const center = special.center;
+        let lightningAnchorOffset: { x: number; y: number } | undefined;
         let texture: string | undefined;
         if (special.phase === "shootHit") texture = `map-shoot-${special.frame}`;
         else if (special.phase === "fireEffect") texture = `map-fire-1-${special.frame}`;
@@ -630,22 +642,35 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             ).setOrigin(.5, 1).setDepth(8),
           );
         } else if (special.phase === "lightningMain") {
-          const descriptor = lightningMainDescriptors[special.frame];
+          const draw = lightningMainDraws[special.frame];
+          const descriptor = draw?.descriptor;
+          lightningAnchorOffset = draw?.anchorOffset;
           descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
             if (sourceFrame === null) return;
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
             this.combatEffects.push(
               this.add.image(
-                (center.x + descriptor.xOffset + column) * TILE_WIDTH,
-                (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
+                (center.x + (lightningAnchorOffset?.x ?? 0) + descriptor.xOffset + column) * TILE_WIDTH,
+                (center.y + (lightningAnchorOffset?.y ?? 0) + descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-lightning-1-main-${sourceFrame}`,
               ).setOrigin(0).setDepth(8),
             );
           });
         } else if (special.phase === "lightningHit") {
-          const sourceFrame = special.frame % 2 === 0 ? 4 : 5;
-          for (const { position } of special.result.effectCells) {
+          const hit = stage1Presentation!.lightning1.commonHit;
+          const descriptor = hit.descriptors[special.frame % hit.descriptors.length];
+          const sourceFrame = descriptor?.low7BitFrameIndices[0];
+          const sweepLevel = hit.rangeMapMaximumMinusOne - special.frame;
+          const rangeValueByPosition = new Map(
+            special.result.effectCells.map(({ position, value }) => [`${position.x},${position.y}`, value]),
+          );
+          for (const affected of special.result.affectedUnits) {
+            const position = affected.positionBefore;
+            const rangeValue = rangeValueByPosition.get(`${position.x},${position.y}`) ?? 0;
+            const waveDistance = rangeValue - sweepLevel;
+            if (sourceFrame === null || sourceFrame === undefined
+              || waveDistance < 0 || waveDistance > hit.sweepWidth) continue;
             this.combatEffects.push(
               this.add.image(
                 position.x * TILE_WIDTH + TILE_WIDTH / 2,
@@ -655,11 +680,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             );
           }
         } else if (special.phase === "lightningCleanup") {
-          for (const affected of special.result.affectedUnits) {
+          for (const unit of controller.battle.units.filter(({ side }) => side !== special.actor.side)) {
             this.combatEffects.push(
               this.add.image(
-                affected.positionBefore.x * TILE_WIDTH + TILE_WIDTH / 2,
-                affected.positionBefore.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+                unit.x * TILE_WIDTH + TILE_WIDTH / 2,
+                unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
                 `map-lightning-1-cleanup-${special.frame}`,
               ).setOrigin(.5).setDepth(8),
             );
@@ -696,6 +721,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatFrame = String(special.frame);
           canvas.dataset.mapCombatTarget = target?.id ?? `${center.x},${center.y}`;
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
+          if (lightningAnchorOffset) {
+            canvas.dataset.mapCombatAnchorOffset =
+              `${lightningAnchorOffset.x},${lightningAnchorOffset.y}`;
+          } else {
+            delete canvas.dataset.mapCombatAnchorOffset;
+          }
         }
         return;
       }
@@ -705,6 +736,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatPhase;
           delete canvas.dataset.mapCombatFrame;
           delete canvas.dataset.mapCombatTarget;
+          delete canvas.dataset.mapCombatAnchorOffset;
           canvas.dataset.mapCombatEffectTileCount = "0";
         }
         return;

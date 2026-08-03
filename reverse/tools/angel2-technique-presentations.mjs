@@ -472,9 +472,21 @@ function buildPresentations(buffer) {
         code: "1L", entry: "1000:5DB2", effectRadius: 3,
         audioRequests: [{ resource: "E/43", entry: "0000:0224", afterFixedWaitNativeTicks: 80 }],
         phases: [
-          stage(buffer, "MAGIC/8", Array(8).fill(0x6248), 10, { motion: "DS:5234 shifts -51 after each draw" }),
+          stage(buffer, "MAGIC/8", Array(8).fill(0x6248), 10, {
+            anchorOffsetSequence: Array.from({ length: 8 }, (_, index) => ({
+              x: 8 - index,
+              y: 8 - index,
+            })),
+            motion: "DS:5234 starts at the selected cell +408 and shifts -51 after each draw, moving the cloud anchor from (+8,+8) through (+1,+1)",
+          }),
           stage(buffer, "MAGIC/8", Array.from({ length: 4 }, () => [0x61c8, 0x61e8, 0x6228, 0x6208]).flat(), 10),
-          stage(buffer, "MAGIC/8", Array(8).fill(0x6248), 10, { motion: "reverse of the opening shift" }),
+          stage(buffer, "MAGIC/8", Array(8).fill(0x6248), 10, {
+            anchorOffsetSequence: Array.from({ length: 8 }, (_, index) => ({
+              x: -(index + 1),
+              y: -(index + 1),
+            })),
+            motion: "DS:5234 continues shifting -51 after the centered body, moving the cloud anchor from (-1,-1) through (-8,-8)",
+          }),
         ],
         commonHit: lightningCommon("MAGIC/31", 3, 9, 5, 6),
         fixedGraphicWaitNativeTicks: 414,

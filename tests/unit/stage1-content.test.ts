@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { STAGE1_ACTION_PRESENTATION } from "../../src/game/content/stage1-actions.generated";
 import {
   STAGE1_ASSETS,
   STAGE1_DEFINITION,
@@ -29,6 +30,26 @@ const workspace = path.resolve(import.meta.dirname, "../..");
 const sha256 = (value: Buffer) => createHash("sha256").update(value).digest("hex");
 
 describe("stage 1 generated content", () => {
+  it("preserves the native initial-lightning cloud pass and full presentation boundary", () => {
+    const lightning = STAGE1_ACTION_PRESENTATION.lightning1;
+    expect(lightning.phases[0].anchorOffsetSequence).toEqual(
+      Array.from({ length: 8 }, (_, index) => ({ x: 8 - index, y: 8 - index })),
+    );
+    expect(lightning.phases[2].anchorOffsetSequence).toEqual(
+      Array.from({ length: 8 }, (_, index) => ({ x: -(index + 1), y: -(index + 1) })),
+    );
+    expect(lightning.phases.map(({ drawCount }) => drawCount)).toEqual([8, 16, 8]);
+    expect(lightning.commonHit).toMatchObject({
+      rangeMapMaximumMinusOne: 2,
+      sweepWidth: 9,
+      iterations: 11,
+      waveDrawsPerIteration: 2,
+      rangeWaveFixedGraphicWaitNativeTicks: 44,
+      cleanup: { drawCount: 5, fixedGraphicWaitNativeTicks: 50 },
+    });
+    expect(lightning.fixedGraphicWaitNativeTicks).toBe(414);
+  });
+
   it("assembles and registers the runnable stable definition", () => {
     expect(RUNTIME_STAGE_DEFINITIONS["stage-01"]).toBe(STAGE1_DEFINITION);
     expect(isRuntimeStageId("stage-01")).toBe(true);

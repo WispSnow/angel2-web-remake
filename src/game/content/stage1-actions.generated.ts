@@ -356,7 +356,41 @@ export const STAGE1_ACTION_PRESENTATION = {
         "drawCount": 8,
         "waitPerDrawNativeTicks": 10,
         "fixedGraphicWaitNativeTicks": 80,
-        "motion": "DS:5234 shifts -51 after each draw"
+        "anchorOffsetSequence": [
+          {
+            "x": 8,
+            "y": 8
+          },
+          {
+            "x": 7,
+            "y": 7
+          },
+          {
+            "x": 6,
+            "y": 6
+          },
+          {
+            "x": 5,
+            "y": 5
+          },
+          {
+            "x": 4,
+            "y": 4
+          },
+          {
+            "x": 3,
+            "y": 3
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 1,
+            "y": 1
+          }
+        ],
+        "motion": "DS:5234 starts at the selected cell +408 and shifts -51 after each draw, moving the cloud anchor from (+8,+8) through (+1,+1)"
       },
       {
         "resource": "MAGIC/8",
@@ -1213,7 +1247,41 @@ export const STAGE1_ACTION_PRESENTATION = {
         "drawCount": 8,
         "waitPerDrawNativeTicks": 10,
         "fixedGraphicWaitNativeTicks": 80,
-        "motion": "reverse of the opening shift"
+        "anchorOffsetSequence": [
+          {
+            "x": -1,
+            "y": -1
+          },
+          {
+            "x": -2,
+            "y": -2
+          },
+          {
+            "x": -3,
+            "y": -3
+          },
+          {
+            "x": -4,
+            "y": -4
+          },
+          {
+            "x": -5,
+            "y": -5
+          },
+          {
+            "x": -6,
+            "y": -6
+          },
+          {
+            "x": -7,
+            "y": -7
+          },
+          {
+            "x": -8,
+            "y": -8
+          }
+        ],
+        "motion": "DS:5234 continues shifting -51 after the centered body, moving the cloud anchor from (-1,-1) through (-8,-8)"
       }
     ],
     "commonHit": {

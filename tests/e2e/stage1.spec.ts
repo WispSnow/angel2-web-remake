@@ -282,15 +282,47 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByTestId("technique-ice-1")).toHaveText("初級冰雪");
   await page.getByTestId("technique-lightning-1").click();
   await clickMapCell(page, 260, 177);
+  const battleCanvas = page.getByTestId("battle-canvas");
+  await page.waitForFunction(() => {
+    const value = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")
+      ?.dataset.mapCombatAnchorOffset;
+    if (!value) return false;
+    const [x, y] = value.split(",").map(Number);
+    return x === 4 && y === 4;
+  });
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-lightning-cloud-entry.png`,
+  });
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
     return current?.specialActionPresentation?.phase === "lightningMain"
       && current.specialActionPresentation.frame >= 8;
   });
-  await expect(page.getByTestId("battle-canvas"))
-    .not.toHaveAttribute("data-map-combat-effect-tile-count", "0");
+  await expect(battleCanvas).toHaveAttribute("data-map-combat-anchor-offset", "0,0");
+  await expect(battleCanvas).not.toHaveAttribute("data-map-combat-effect-tile-count", "0");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-lightning.png`,
+  });
+  await page.waitForFunction(() => {
+    const value = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")
+      ?.dataset.mapCombatAnchorOffset;
+    if (!value) return false;
+    const [x, y] = value.split(",").map(Number);
+    return x < 0 && x === y;
+  });
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-lightning-cloud-exit.png`,
+  });
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
+    return current?.specialActionPresentation?.phase === "lightningCleanup";
+  });
+  await expect(battleCanvas).toHaveAttribute(
+    "data-map-combat-effect-tile-count",
+    String(lightningBefore.units.filter(({ side }) => side === 2).length),
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-lightning-cleanup.png`,
   });
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
