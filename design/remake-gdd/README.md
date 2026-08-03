@@ -53,6 +53,7 @@
 | [`systems/status-foundation.md`](systems/status-foundation.md) | 防魔消费与 v6 最小状态边界 | M00.6 / 已接受 |
 | [`systems/deployment-stage1.md`](systems/deployment-stage1.md) | 第 1 关固定/可选单位与部署提交 | M02 / 已实现并通过自动验收 |
 | [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M02 / 已实现并通过自动验收 |
+| [`systems/technique-lab.md`](systems/technique-lab.md) | 任意敌我职业配置与 `1L..4L` 原版地图表现重放 | 开发工具 / 已实现 |
 | [`systems/debug-harness.md`](systems/debug-harness.md) | 按关选择、快速结算与确定性测试场景 | 开发工具 / 已实现 |
 | [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现，待第 1 关人工复验 |
 

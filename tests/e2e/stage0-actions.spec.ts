@@ -194,6 +194,11 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
     .toHaveLength(39);
   expect(afterHeal.specialActionPresentationTrace.filter(({ phase }) => phase === "healTail"))
     .toHaveLength(5);
+  expect(afterHeal.specialActionPresentationTrace.at(-1)).toMatchObject({
+    phase: "healTail",
+    frame: 4,
+    nativeTicks: 15,
+  });
   expect(afterHeal.audioCueLog).toContainEqual(expect.objectContaining({
     group: "e",
     record: 36,
@@ -224,6 +229,11 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
   const afterFire = await state(page);
   expect(afterFire.specialActionPresentationTrace.filter(({ phase }) => phase === "fireEffect"))
     .toHaveLength(7);
+  expect(afterFire.specialActionPresentationTrace.at(-1)).toMatchObject({
+    phase: "fireEffect",
+    frame: 6,
+    nativeTicks: 10,
+  });
   expect(afterFire.audioCueLog).toContainEqual(expect.objectContaining({
     group: "magic",
     record: 83,

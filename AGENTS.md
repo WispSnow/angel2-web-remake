@@ -66,6 +66,7 @@
 - 浏览器验收：Playwright 版本绑定的 Chromium；
 - 主游戏开发地址：`http://127.0.0.1:4173/`；
 - 战斗动画实验室：`http://127.0.0.1:4173/combat-lab.html`。
+- 地图技能动画实验室：`http://127.0.0.1:4173/technique-lab.html`。
 - 肖像动画实验室：`http://127.0.0.1:4173/portrait-lab.html`。
 
 常用命令：
@@ -75,6 +76,7 @@ pnpm install
 pnpm dev
 pnpm dev:debug
 pnpm dev:combat
+pnpm dev:techniques
 pnpm dev:portraits
 pnpm test
 pnpm test:coverage
@@ -92,6 +94,11 @@ node reverse/tools/angel2-phase1-verify.mjs
 数据逐字节复用士兵，龍／頭／手只在 side 2 编队出现、原版没有填 side 1 表现块与
 `M_00/86..88`。实验室按 `reach` 锁定方向并显示说明——它们当攻方时锁右、当守方时锁左，
 不得据此伪造左侧画面或女帝独立动画。
+
+`pnpm dev:techniques` 会打开 `/technique-lab.html` 地图技能动画实验室。它允许在独立
+内存地图上配置任意敌我职业、施法者和目标并重放已接入的地图表现；未实现动作必须
+保持禁用。实验室可以消费已取证但尚未开放玩法的表现脚本，不得借此把对应规则、AI、
+战役内容或存档语义解冻。龍、頭、手缺少原版 side 1 地图图形，只能配置为敌方。
 
 `pnpm dev:debug` 会打开 `/debug.html` 战役调试中心。新增可玩关卡时，必须在
 `src/game/debug-scenarios.ts` 至少登记适用的关前、部署/准备、玩家回合、胜利准备和

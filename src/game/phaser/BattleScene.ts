@@ -7,6 +7,12 @@ import {
 } from "../content/actions";
 import type { GameController } from "../controller";
 import type { BattleUnit } from "../types";
+import { lightningFrameAtMainIndex } from "../map-technique-presentation";
+import {
+  preloadMapTechniqueAssets,
+  renderLightningFrame,
+  type MapTechniqueGraphicAssets,
+} from "./MapTechniqueRenderer";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
@@ -20,18 +26,6 @@ const EDGE_PAN_INTERVAL_MS = 110;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 const NATIVE_CURSOR_SHADOW = 0x000000;
 const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
-
-interface MapEffectDescriptor {
-  xOffset: number;
-  yOffset: number;
-  width: number;
-  low7BitFrameIndices: readonly (number | null)[];
-}
-
-interface LightningMainDraw {
-  descriptor: MapEffectDescriptor;
-  anchorOffset: { x: number; y: number };
-}
 
 type NativePointerCursor = "hand" | "up" | "down" | "left" | "right";
 
@@ -93,17 +87,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
   const stage1Assets = stage1 ? controller.stage1Assets : undefined;
   const stage1Presentation = stage1 ? stage1ActionPresentation() : undefined;
   const stage1PresentationAssets = stage1 ? stage1ActionPresentationAssets() : undefined;
-  const lightningMainDraws: readonly LightningMainDraw[] = stage1Presentation
-    ? stage1Presentation.lightning1.phases.flatMap<LightningMainDraw>((phase) => {
-      const anchorOffsets = "anchorOffsetSequence" in phase
-        ? phase.anchorOffsetSequence
-        : undefined;
-      return phase.descriptorSequence.map((descriptor, index) => ({
-        descriptor,
-        anchorOffset: anchorOffsets?.[index] ?? { x: 0, y: 0 },
-      }));
-    })
-    : [];
+  const lightningAssets: MapTechniqueGraphicAssets | undefined = stage1PresentationAssets
+    ? {
+      "MAGIC/8": stage1PresentationAssets.lightning1.main,
+      "MAGIC/31": stage1PresentationAssets.lightning1.hit,
+      "MAGIC/6": stage1PresentationAssets.lightning1.cleanup,
+    }
+    : undefined;
   return class BattleScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
     private rangeGraphics!: Phaser.GameObjects.Graphics;
@@ -154,12 +144,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.forEach((source, frame) =>
         this.load.image(`map-heal-1-tail-${frame}`, source));
       if (stage1PresentationAssets) {
-        stage1PresentationAssets.lightning1.main.forEach((source, frame) =>
-          this.load.image(`map-lightning-1-main-${frame}`, source));
-        stage1PresentationAssets.lightning1.hit.forEach((source, frame) =>
-          this.load.image(`map-lightning-1-hit-${frame}`, source));
-        stage1PresentationAssets.lightning1.cleanup.forEach((source, frame) =>
-          this.load.image(`map-lightning-1-cleanup-${frame}`, source));
+        preloadMapTechniqueAssets(this, lightningAssets!);
         stage1PresentationAssets.ice1.expansion.forEach((source, frame) =>
           this.load.image(`map-ice-1-expansion-${frame}`, source));
       }
@@ -641,53 +626,26 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               texture,
             ).setOrigin(.5, 1).setDepth(8),
           );
-        } else if (special.phase === "lightningMain") {
-          const draw = lightningMainDraws[special.frame];
-          const descriptor = draw?.descriptor;
-          lightningAnchorOffset = draw?.anchorOffset;
-          descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
-            if (sourceFrame === null) return;
-            const column = index % descriptor.width;
-            const row = Math.floor(index / descriptor.width);
-            this.combatEffects.push(
-              this.add.image(
-                (center.x + (lightningAnchorOffset?.x ?? 0) + descriptor.xOffset + column) * TILE_WIDTH,
-                (center.y + (lightningAnchorOffset?.y ?? 0) + descriptor.yOffset + row) * TILE_HEIGHT,
-                `map-lightning-1-main-${sourceFrame}`,
-              ).setOrigin(0).setDepth(8),
-            );
-          });
-        } else if (special.phase === "lightningHit") {
-          const hit = stage1Presentation!.lightning1.commonHit;
-          const descriptor = hit.descriptors[special.frame % hit.descriptors.length];
-          const sourceFrame = descriptor?.low7BitFrameIndices[0];
-          const sweepLevel = hit.rangeMapMaximumMinusOne - special.frame;
-          const rangeValueByPosition = new Map(
-            special.result.effectCells.map(({ position, value }) => [`${position.x},${position.y}`, value]),
-          );
-          for (const affected of special.result.affectedUnits) {
-            const position = affected.positionBefore;
-            const rangeValue = rangeValueByPosition.get(`${position.x},${position.y}`) ?? 0;
-            const waveDistance = rangeValue - sweepLevel;
-            if (sourceFrame === null || sourceFrame === undefined
-              || waveDistance < 0 || waveDistance > hit.sweepWidth) continue;
-            this.combatEffects.push(
-              this.add.image(
-                position.x * TILE_WIDTH + TILE_WIDTH / 2,
-                position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-                `map-lightning-1-hit-${sourceFrame}`,
-              ).setOrigin(.5).setDepth(8),
-            );
-          }
-        } else if (special.phase === "lightningCleanup") {
-          for (const unit of controller.battle.units.filter(({ side }) => side !== special.actor.side)) {
-            this.combatEffects.push(
-              this.add.image(
-                unit.x * TILE_WIDTH + TILE_WIDTH / 2,
-                unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-                `map-lightning-1-cleanup-${special.frame}`,
-              ).setOrigin(.5).setDepth(8),
-            );
+        } else if (special.phase === "lightningMain"
+          || special.phase === "lightningHit"
+          || special.phase === "lightningCleanup") {
+          const definition = stage1Presentation!.lightning1;
+          const frame = special.phase === "lightningMain"
+            ? lightningFrameAtMainIndex(definition, special.frame)
+            : special.phase === "lightningHit"
+              ? { kind: "wave" as const, frame: special.frame, durationNativeTicks: 2 }
+              : { kind: "cleanup" as const, frame: special.frame, durationNativeTicks: 10 };
+          if (frame) {
+            const rendered = renderLightningFrame(this, definition, frame, {
+              center,
+              effectCells: special.result.effectCells,
+              wavePositions: special.result.affectedUnits.map(({ positionBefore }) => positionBefore),
+              cleanupPositions: controller.battle.units
+                .filter(({ side }) => side !== special.actor.side)
+                .map(({ x, y }) => ({ x, y })),
+            });
+            this.combatEffects.push(...rendered.images);
+            lightningAnchorOffset = rendered.anchorOffset;
           }
         } else if (special.phase === "iceExpansion") {
           const sourceFrame = special.frame % stage1PresentationAssets!.ice1.expansion.length;

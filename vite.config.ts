@@ -13,6 +13,7 @@ export default defineConfig({
         portraitLab: "portrait-lab.html",
         combatLab: "combat-lab.html",
         deploymentLab: "deployment-lab.html",
+        techniqueLab: "technique-lab.html",
       },
     },
   },

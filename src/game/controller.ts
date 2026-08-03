@@ -121,6 +121,7 @@ export interface SpecialActionPresentation {
   result: SpecialActionResult;
   phase: SpecialActionPresentationPhase;
   frame: number;
+  nativeTicks: number;
 }
 
 export type AudioCueGroup = "e" | "magic" | "un";
@@ -243,7 +244,11 @@ export class GameController {
   combatPresentation?: CombatPresentation;
   combatPresentationTrace: CombatPresentationTraceEntry[] = [];
   specialActionPresentation?: SpecialActionPresentation;
-  specialActionPresentationTrace: Array<{ phase: SpecialActionPresentationPhase; frame: number }> = [];
+  specialActionPresentationTrace: Array<{
+    phase: SpecialActionPresentationPhase;
+    frame: number;
+    nativeTicks: number;
+  }> = [];
   movementPresentation?: MovementPresentation;
   statusMessage = "";
   pendingSaveSlot?: number;
@@ -1149,8 +1154,9 @@ export class GameController {
         result,
         phase,
         frame,
+        nativeTicks,
       };
-      this.specialActionPresentationTrace.push({ phase, frame });
+      this.specialActionPresentationTrace.push({ phase, frame, nativeTicks });
       this.emit();
       await pause(this.mapCombatDelay(nativeTicks));
     };
@@ -1219,8 +1225,9 @@ export class GameController {
         result,
         phase: "specialDeath",
         frame,
+        nativeTicks: 10,
       };
-      this.specialActionPresentationTrace.push({ phase: "specialDeath", frame });
+      this.specialActionPresentationTrace.push({ phase: "specialDeath", frame, nativeTicks: 10 });
       this.emit();
       await pause(this.mapCombatDelay(10));
     }

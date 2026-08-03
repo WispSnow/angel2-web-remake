@@ -13,6 +13,7 @@
     "dev:combat": "vite --host 127.0.0.1 --open /combat-lab.html",
     "dev:deployment": "vite --host 127.0.0.1 --open /deployment-lab.html",
     "dev:portraits": "vite --host 127.0.0.1 --open /portrait-lab.html",
+    "dev:techniques": "vite --host 127.0.0.1 --open /technique-lab.html",
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
@@ -21,12 +22,13 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "pnpm run test:coverage && pnpm run build && pnpm run test:e2e",
-    "content": "pnpm run content:classes && pnpm run content:portraits && pnpm run content:stage0 && pnpm run content:stage1 && pnpm run content:actions && pnpm run content:music",
+    "content": "pnpm run content:classes && pnpm run content:portraits && pnpm run content:stage0 && pnpm run content:stage1 && pnpm run content:actions && pnpm run content:technique-lab && pnpm run content:music",
     "content:classes": "node scripts/generate-class-catalog.mjs",
     "content:portraits": "node scripts/generate-portrait-catalog.mjs",
     "content:stage0": "node scripts/generate-stage0-runtime.mjs",
     "content:stage1": "node scripts/generate-stage1-runtime.mjs",
     "content:actions": "node scripts/generate-stage0-actions.mjs && node scripts/generate-stage1-actions.mjs",
+    "content:technique-lab": "node scripts/generate-technique-lab.mjs",
     "content:music": "node scripts/generate-stage0-music.mjs"
   },
   "dependencies": {

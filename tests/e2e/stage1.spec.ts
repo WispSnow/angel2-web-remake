@@ -338,6 +338,11 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     .toHaveLength(22);
   expect(lightningAfter.specialActionPresentationTrace.filter(({ phase }) => phase === "lightningCleanup"))
     .toHaveLength(5);
+  expect(lightningAfter.specialActionPresentationTrace.at(-1)).toMatchObject({
+    phase: "lightningCleanup",
+    frame: 4,
+    nativeTicks: 10,
+  });
   expect(lightningAfter.audioCueLog).toContainEqual(expect.objectContaining({
     group: "e",
     record: 43,
@@ -368,6 +373,11 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   }));
   expect(iceAfter.specialActionPresentationTrace.filter(({ phase }) => phase === "iceExpansion"))
     .toHaveLength(12);
+  expect(iceAfter.specialActionPresentationTrace.at(-1)).toMatchObject({
+    phase: "iceExpansion",
+    frame: 11,
+    nativeTicks: 10,
+  });
   expect(iceAfter.audioCueLog.filter(({ group, record }) => group === "un" && record === 50))
     .toHaveLength(2);
 
