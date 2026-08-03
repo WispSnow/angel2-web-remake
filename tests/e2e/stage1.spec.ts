@@ -32,6 +32,7 @@ interface Stage1DebugState {
   lastSpecialAction?: {
     actionId: string;
     actorId: string;
+    target: { x: number; y: number };
     damage: number;
     affectedUnits: Array<{ unitId: string; moved: boolean }>;
   };
@@ -353,13 +354,23 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await clickMapCell(page, 220, 177);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-ice-1").click();
-  await clickMapCell(page, 260, 177);
   await page.waitForFunction(() => {
-    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
-    return current?.specialActionPresentation?.phase === "iceExpansion";
+    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
+    return canvas?.dataset.mapCombatIceRangeValue === "2";
   });
+  await expect(battleCanvas).toHaveAttribute("data-map-combat-ice-distance", "1");
+  await expect(battleCanvas).toHaveAttribute("data-map-combat-effect-tile-count", "4");
   await page.getByTestId("game-screen").screenshot({
-    path: `${ARTIFACT_DIR}/stage1-ice.png`,
+    path: `${ARTIFACT_DIR}/stage1-ice-inner-ring.png`,
+  });
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
+    return canvas?.dataset.mapCombatIceRangeValue === "1";
+  });
+  await expect(battleCanvas).toHaveAttribute("data-map-combat-ice-distance", "2");
+  await expect(battleCanvas).toHaveAttribute("data-map-combat-effect-tile-count", "8");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-ice-outer-ring.png`,
   });
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
@@ -367,6 +378,11 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
       && current.specialActionPresentation === undefined;
   });
   const iceAfter = await state(page);
+  expect(iceAfter.lastSpecialAction).toMatchObject({
+    actionId: "ice-1",
+    actorId: "1:0",
+    target: { x: 29, y: 26 },
+  });
   expect(iceAfter.lastSpecialAction?.affectedUnits).toContainEqual(expect.objectContaining({
     unitId: "2:16",
     moved: true,

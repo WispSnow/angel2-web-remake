@@ -7,7 +7,7 @@ import {
 } from "../content/actions";
 import type { GameController } from "../controller";
 import type { BattleUnit } from "../types";
-import { lightningFrameAtMainIndex } from "../map-technique-presentation";
+import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-technique-presentation";
 import {
   preloadMapTechniqueAssets,
   renderLightningFrame,
@@ -612,6 +612,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         const target = special.target;
         const center = special.center;
         let lightningAnchorOffset: { x: number; y: number } | undefined;
+        let iceRangeValue: number | undefined;
+        let iceDistanceFromCenter: number | undefined;
         let texture: string | undefined;
         if (special.phase === "shootHit") texture = `map-shoot-${special.frame}`;
         else if (special.phase === "fireEffect") texture = `map-fire-1-${special.frame}`;
@@ -648,8 +650,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             lightningAnchorOffset = rendered.anchorOffset;
           }
         } else if (special.phase === "iceExpansion") {
-          const sourceFrame = special.frame % stage1PresentationAssets!.ice1.expansion.length;
-          for (const { position } of special.result.effectCells) {
+          const iceFrame = iceFrameAtGlobalIndex(stage1Presentation!.ice1, special.frame);
+          const sourceFrame = iceFrame?.sourceFrame;
+          iceRangeValue = iceFrame?.rangeValue;
+          iceDistanceFromCenter = iceFrame?.distanceFromCenter;
+          for (const { position, value } of special.result.effectCells) {
+            if (sourceFrame === undefined || value !== iceRangeValue) continue;
             this.combatEffects.push(
               this.add.image(
                 position.x * TILE_WIDTH + TILE_WIDTH / 2,
@@ -685,6 +691,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           } else {
             delete canvas.dataset.mapCombatAnchorOffset;
           }
+          if (iceRangeValue !== undefined && iceDistanceFromCenter !== undefined) {
+            canvas.dataset.mapCombatIceRangeValue = String(iceRangeValue);
+            canvas.dataset.mapCombatIceDistance = String(iceDistanceFromCenter);
+          } else {
+            delete canvas.dataset.mapCombatIceRangeValue;
+            delete canvas.dataset.mapCombatIceDistance;
+          }
         }
         return;
       }
@@ -695,6 +708,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatFrame;
           delete canvas.dataset.mapCombatTarget;
           delete canvas.dataset.mapCombatAnchorOffset;
+          delete canvas.dataset.mapCombatIceRangeValue;
+          delete canvas.dataset.mapCombatIceDistance;
           canvas.dataset.mapCombatEffectTileCount = "0";
         }
         return;

@@ -70,18 +70,24 @@ assertEqual({
   fixedGraphicWaitNativeTicks: 414,
 }, "initial lightning contract");
 assertEqual({
-  selectionRadius: iceDispatch.selectionRadius,
+  dispatchSelectionWord: iceDispatch.selectionRadius,
+  centerMode: rules.rules.families.C.centerMode,
   effectRadius: iceTier.effectRadius,
   experienceBase: iceTier.experienceBase,
   experienceRandom: iceTier.experienceRandom,
   cycles: icePresentation.cycles,
+  rangeValueSequence: icePresentation.rangeValueSequence,
+  distanceFromCenterSequence: icePresentation.distanceFromCenterSequence,
   fixedGraphicWaitNativeTicks: icePresentation.fixedGraphicWaitNativeTicks,
 }, {
-  selectionRadius: 2,
+  dispatchSelectionWord: 2,
+  centerMode: "actor position",
   effectRadius: 3,
   experienceBase: 8,
   experienceRandom: [0, 1],
   cycles: 2,
+  rangeValueSequence: [2, 1],
+  distanceFromCenterSequence: [1, 2],
   fixedGraphicWaitNativeTicks: 120,
 }, "initial ice contract");
 
@@ -149,10 +155,9 @@ const definitions = {
     nativeCode: "1C",
     label: "初級冰雪",
     kind: "technique",
-    target: "area",
+    target: "self-area",
     range: {
       mode: 0,
-      selectionRadius: iceDispatch.selectionRadius,
       effectRadius: iceTier.effectRadius,
     },
     displacement: {

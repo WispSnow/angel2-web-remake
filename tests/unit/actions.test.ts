@@ -257,11 +257,11 @@ describe("Stage-0 class actions", () => {
 
   it("pushes ice targets down first, resolves occupancy in row-major order, and rolls experience only when something moved", () => {
     const battle = new Stage0Battle(0);
-    const actor = { ...battle.unit("1:0")!, id: "ice-actor", x: 5, y: 7, classId: "magician" as const };
+    const actor = { ...battle.unit("1:0")!, id: "ice-actor", x: 5, y: 4, classId: "magician" as const };
     const first = {
       ...battle.units.find((unit) => unit.side === 2)!,
       id: "ice-first",
-      x: 5,
+      x: 4,
       y: 4,
     };
     const second = {
@@ -272,7 +272,7 @@ describe("Stage-0 class actions", () => {
     };
     const rng = new DeterministicRng(0x5678);
     const prepared = prepareSpecialAction(
-      { actionId: "ice-1", actorId: actor.id, target: { x: 5, y: 4 } },
+      { actionId: "ice-1", actorId: actor.id },
       actor,
       undefined,
       rng,
@@ -281,11 +281,11 @@ describe("Stage-0 class actions", () => {
         battlefield: openBattlefield,
         statsFor: (unit) => battle.statsFor(unit),
       },
-      { x: 5, y: 4 },
+      actor,
     );
 
     expect(prepared.result.affectedUnits).toEqual([
-      expect.objectContaining({ unitId: first.id, positionAfter: { x: 5, y: 3 }, moved: true }),
+      expect.objectContaining({ unitId: first.id, positionAfter: { x: 4, y: 5 }, moved: true }),
       expect.objectContaining({ unitId: second.id, positionAfter: { x: 5, y: 6 }, moved: true }),
     ]);
     expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(8);
@@ -298,7 +298,7 @@ describe("Stage-0 class actions", () => {
       statuses: { ...first.statuses, magicGuard: 1 },
     };
     const blocked = prepareSpecialAction(
-      { actionId: "ice-1", actorId: actor.id, target: { x: 5, y: 4 } },
+      { actionId: "ice-1", actorId: actor.id },
       actor,
       undefined,
       blockedRng,
@@ -307,7 +307,7 @@ describe("Stage-0 class actions", () => {
         battlefield: openBattlefield,
         statsFor: (unit) => battle.statsFor(unit),
       },
-      { x: 5, y: 4 },
+      actor,
     );
     expect(blocked.result.affectedUnits[0]).toMatchObject({
       blocked: true,
@@ -316,5 +316,31 @@ describe("Stage-0 class actions", () => {
     });
     expect(blocked.result.experienceGained).toBe(0);
     expect(blocked.rngAfter).toBe(blocked.rngBefore);
+  });
+
+  it("locks ice to the actor cell and rejects any caller-supplied target center", () => {
+    const battle = new Stage0Battle(0);
+    const actor = battle.unit("1:0")!;
+    promoteForAction(actor, "ice-1");
+    actor.x = 5;
+    actor.y = 5;
+    actor.acted = false;
+    const enemy = battle.units.find((unit) => unit.side === 2)!;
+    enemy.x = 5;
+    enemy.y = 6;
+    battle.units = [actor, enemy];
+
+    expect(battle.actionTargetCells(actor.id, "ice-1")).toEqual([{ x: 5, y: 5 }]);
+    expect(() => battle.prepareSpecialAction({
+      actionId: "ice-1",
+      actorId: actor.id,
+      target: { x: 5, y: 6 },
+    })).toThrow("illegal special action");
+
+    const prepared = battle.prepareSpecialAction({ actionId: "ice-1", actorId: actor.id });
+    expect(prepared.result.target).toEqual({ x: 5, y: 5 });
+    expect(prepared.result.affectedUnits).toContainEqual(expect.objectContaining({
+      unitId: enemy.id,
+    }));
   });
 });

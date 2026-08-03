@@ -30,10 +30,9 @@ export const STAGE1_ACTION_DEFINITIONS = {
     "nativeCode": "1C",
     "label": "初級冰雪",
     "kind": "technique",
-    "target": "area",
+    "target": "self-area",
     "range": {
       "mode": 0,
-      "selectionRadius": 2,
       "effectRadius": 3
     },
     "displacement": {
@@ -1407,6 +1406,14 @@ export const STAGE1_ACTION_PRESENTATION = {
     "code": "1C",
     "effectRadius": 3,
     "cycles": 2,
+    "rangeValueSequence": [
+      2,
+      1
+    ],
+    "distanceFromCenterSequence": [
+      1,
+      2
+    ],
     "soundRequests": 2,
     "drawCount": 12,
     "fixedGraphicWaitNativeTicks": 120,

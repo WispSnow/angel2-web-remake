@@ -101,6 +101,11 @@ test("intermediate, advanced and ultimate lightning preserve distinct native vis
     await seek(page, time);
     await expect(canvas).toHaveAttribute("data-map-combat-anchor-offset", anchor);
   }
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("4L"));
+  for (const [time, anchor] of [[0, "0,-8"], [60, "0,-7"], [120, "0,-6"], [480, "0,0"], [540, "0,1"]] as const) {
+    await seek(page, time);
+    await expect(canvas).toHaveAttribute("data-map-combat-anchor-offset", anchor);
+  }
 
   const captures = [
     { code: "2L", time: 700, name: "technique-lab-lightning-2-main.png" },
@@ -150,12 +155,62 @@ test("already implemented fire, healing and ice remain available in the same map
   expect((await labState(page))?.playback.durationMs).toBe(2570);
 });
 
+test("all four ice tiers expand one complete six-frame ring at a time", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/technique-lab.html");
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  const action = page.getByTestId("technique-lab-action");
+  await expect(canvas).toBeVisible();
+  const contracts = [
+    { code: "1C", duration: 1200, distances: 2 },
+    { code: "2C", duration: 1800, distances: 3 },
+    { code: "3C", duration: 2400, distances: 4 },
+    { code: "4C", duration: 3000, distances: 5 },
+  ] as const;
+  for (const contract of contracts) {
+    await expect(action.locator(`option[value="${contract.code}"]`)).not.toHaveAttribute("disabled", "");
+    await action.selectOption(contract.code);
+    await expect(action).toHaveValue(contract.code);
+    expect((await labState(page))?.session.actionCode).toBe(contract.code);
+    expect((await labState(page))?.playback.durationMs).toBe(contract.duration);
+    await page.getByTestId("technique-lab-restart").click();
+    await expect.poll(async () => (await labState(page))?.playback.timeMs ?? 0).toBeGreaterThan(0);
+    await page.getByTestId("technique-lab-pause").click();
+    for (let distance = 1; distance <= contract.distances; distance += 1) {
+      await seek(page, (distance - 1) * 600);
+      await expect(canvas).toHaveAttribute("data-technique-phase", "ice");
+      await expect(canvas).toHaveAttribute("data-ice-distance-from-center", String(distance));
+      await expect(canvas).toHaveAttribute(
+        "data-effect-tile-count",
+        String(distance * 4),
+      );
+      if (contract.code === "1C") {
+        await page.screenshot({
+          path: `artifacts/playwright/technique-lab-ice-1-ring-${distance}.png`,
+          fullPage: true,
+        });
+      } else if (contract.code === "4C" && distance === contract.distances) {
+        await page.screenshot({
+          path: "artifacts/playwright/technique-lab-ice-4-outer-ring.png",
+          fullPage: true,
+        });
+      }
+    }
+    await seek(page, contract.duration);
+    await expect(canvas).toHaveAttribute("data-technique-phase", "none");
+    await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+  }
+  expect(pageErrors).toEqual([]);
+});
+
 test("map tools place either side and unavailable techniques stay disabled", async ({ page }) => {
   await page.goto("/technique-lab.html");
   await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
   const action = page.getByTestId("technique-lab-action");
   await expect(action.locator('option[value="4F"]')).toHaveAttribute("disabled", "");
   await expect(action.locator('option[value="2L"]')).not.toHaveAttribute("disabled", "");
+  await expect(action.locator('option[value="4C"]')).not.toHaveAttribute("disabled", "");
 
   const side = page.getByTestId("technique-lab-side");
   const unitClass = page.getByTestId("technique-lab-class");
@@ -182,6 +237,11 @@ test("map tools place either side and unavailable techniques stay disabled", asy
   await page.getByRole("button", { name: "指定目標格" }).click();
   await clickCell(26, 20);
   expect((await labState(page))?.session.target).toEqual({ x: 26, y: 20 });
+
+  await action.selectOption("4C");
+  await expect(page.getByTestId("technique-lab-target-tool")).toBeDisabled();
+  await expect(page.getByTestId("technique-lab-hint")).toContainText("鎖定施法者格為中心");
+  expect((await labState(page))?.session.target).toEqual({ x: 27, y: 21 });
 
   await side.selectOption("2");
   await unitClass.selectOption("dragon");

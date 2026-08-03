@@ -25,6 +25,7 @@ import { RUNTIME_STAGE_DEFINITIONS, isRuntimeStageId } from "../../src/game/cont
 import { storyPagesForId } from "../../src/game/content/dialogue";
 import { musicProgramFor } from "../../src/game/content/music";
 import { DEPLOYMENT_FEEDBACK_TEXT, createDeploymentState } from "../../src/game/simulation/deployment";
+import { iceFrameAtGlobalIndex } from "../../src/game/map-technique-presentation";
 
 const workspace = path.resolve(import.meta.dirname, "../..");
 const sha256 = (value: Buffer) => createHash("sha256").update(value).digest("hex");
@@ -48,6 +49,29 @@ describe("stage 1 generated content", () => {
       cleanup: { drawCount: 5, fixedGraphicWaitNativeTicks: 50 },
     });
     expect(lightning.fixedGraphicWaitNativeTicks).toBe(414);
+  });
+
+  it("preserves initial ice as two six-frame rings from the actor center outward", () => {
+    const ice = STAGE1_ACTION_PRESENTATION.ice1;
+    expect(ice).toMatchObject({
+      effectRadius: 3,
+      cycles: 2,
+      rangeValueSequence: [2, 1],
+      distanceFromCenterSequence: [1, 2],
+      fixedGraphicWaitNativeTicks: 120,
+    });
+    expect(iceFrameAtGlobalIndex(ice, 0)).toMatchObject({
+      cycleIndex: 0,
+      sourceFrame: 0,
+      rangeValue: 2,
+      distanceFromCenter: 1,
+    });
+    expect(iceFrameAtGlobalIndex(ice, 6)).toMatchObject({
+      cycleIndex: 1,
+      sourceFrame: 0,
+      rangeValue: 1,
+      distanceFromCenter: 2,
+    });
   });
 
   it("assembles and registers the runnable stable definition", () => {

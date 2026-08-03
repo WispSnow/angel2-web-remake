@@ -916,9 +916,16 @@ export class GameController {
       || !unit
     ) return;
     this.selectedActionId = actionId;
+    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    if (definition.target === "self-area") {
+      this.actionRange = [];
+      this.targets = [];
+      this.cursor = { x: unit.x, y: unit.y };
+      void this.commitSpecialAction(this.cursor);
+      return;
+    }
     this.actionRange = this.battle.actionRange(unit.id, actionId).cells();
     this.targets = this.battle.actionTargetCells(unit.id, actionId);
-    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     if (this.targets.length === 0) {
       this.actionRange = [];
       this.selectedActionId = undefined;
@@ -927,9 +934,7 @@ export class GameController {
       return;
     }
     this.actionMode = "specialTarget";
-    this.statusMessage = definition.target === "area"
-      ? `選擇「${definition.label}」的效果中心。`
-      : `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
+    this.statusMessage = `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
   }
 
@@ -1074,15 +1079,15 @@ export class GameController {
     const actor = this.selectedUnit;
     const actionId = this.selectedActionId;
     const definition = actionId ? BATTLE_ACTION_DEFINITIONS[actionId] : undefined;
-    const target = this.battle.unitAt(position);
+    const target = definition?.target === "self-area" ? undefined : this.battle.unitAt(position);
     if (!actor || !actionId || !definition || this.busy) return;
-    if (definition.target !== "area" && !target) return;
+    if (definition.target !== "self-area" && !target) return;
     try {
       const prepared = this.battle.prepareSpecialAction({
         actionId,
         actorId: actor.id,
         targetId: target?.id,
-        target: position,
+        target: definition.target === "self-area" ? undefined : position,
       });
       const actorPresentation = { ...actor, statuses: { ...actor.statuses } };
       const targetPresentation = target

@@ -32,6 +32,9 @@ const assertEqual = (actual, expected, label) => {
 
 const lightningActions = presentations.presentations.lightning.actions;
 const lightningTiers = rules.rules.families.L.tiers;
+const icePresentation = presentations.presentations.ice;
+const iceActions = icePresentation.actions;
+const iceTiers = rules.rules.families.C.tiers;
 assertEqual(
   lightningActions.map(({ code, effectRadius, fixedGraphicWaitNativeTicks }) => ({
     code,
@@ -59,6 +62,45 @@ assertEqual(
   ],
   "3L rising cloud and strike-point anchors",
 );
+const lightning4 = lightningActions.find(({ code }) => code === "4L");
+if (!lightning4) throw new Error("missing 4L lightning presentation");
+assertEqual(
+  lightning4.phases.map(({ anchorOffsetSequence }) => anchorOffsetSequence),
+  [
+    Array.from({ length: 18 }, (_, index) => ({
+      x: 0,
+      y: -8 + Math.floor(index / 2),
+    })),
+    Array.from({ length: 4 }, () => ({ x: 0, y: 1 })),
+    Array.from({ length: 6 }, () => ({ x: 0, y: 1 })),
+    Array.from({ length: 4 }, () => ({ x: 0, y: 1 })),
+  ],
+  "4L descending bolt and strike-point anchors",
+);
+assertEqual(
+  iceActions.map(({
+    code,
+    effectRadius,
+    cycles,
+    rangeValueSequence,
+    distanceFromCenterSequence,
+    fixedGraphicWaitNativeTicks,
+  }) => ({
+    code,
+    effectRadius,
+    cycles,
+    rangeValueSequence,
+    distanceFromCenterSequence,
+    fixedGraphicWaitNativeTicks,
+  })),
+  [
+    { code: "1C", effectRadius: 3, cycles: 2, rangeValueSequence: [2, 1], distanceFromCenterSequence: [1, 2], fixedGraphicWaitNativeTicks: 120 },
+    { code: "2C", effectRadius: 4, cycles: 3, rangeValueSequence: [3, 2, 1], distanceFromCenterSequence: [1, 2, 3], fixedGraphicWaitNativeTicks: 180 },
+    { code: "3C", effectRadius: 5, cycles: 4, rangeValueSequence: [4, 3, 2, 1], distanceFromCenterSequence: [1, 2, 3, 4], fixedGraphicWaitNativeTicks: 240 },
+    { code: "4C", effectRadius: 6, cycles: 5, rangeValueSequence: [5, 4, 3, 2, 1], distanceFromCenterSequence: [1, 2, 3, 4, 5], fixedGraphicWaitNativeTicks: 300 },
+  ],
+  "ice inner-to-outer range-stage contracts",
+);
 
 const menuLabels = new Map();
 for (const classEntry of rules.techniqueMenu.classes) {
@@ -68,6 +110,9 @@ for (const classEntry of rules.techniqueMenu.classes) {
 }
 const implementedByCode = {
   "1C": "ice-1",
+  "2C": "ice-2",
+  "3C": "ice-3",
+  "4C": "ice-4",
   "1F": "fire-1",
   "1H": "heal-1",
   "1L": "lightning-1",
@@ -104,15 +149,17 @@ for (const resource of requiredResources) {
   }
 }
 
-const audioResources = [...new Set(lightningActions.flatMap((action) =>
-  action.audioRequests.map(({ resource }) => resource)))];
+const audioResources = [...new Set([
+  ...lightningActions.flatMap((action) => action.audioRequests.map(({ resource }) => resource)),
+  icePresentation.audioResource,
+])];
 const techniqueAudioAssets = {};
 await mkdir(path.join(publicRoot, "audio"), { recursive: true });
 for (const resource of audioResources) {
-  const [, number] = resource.split("/");
-  const filename = `${number}.wav`;
+  const [group, number] = resource.split("/");
+  const filename = group === "E" ? `${number}.wav` : `${group.toLowerCase()}-${number}.wav`;
   await copyFile(
-    path.join(root, "reverse/converted/audio/wav/E", `${number.padStart(4, "0")}.wav`),
+    path.join(root, "reverse/converted/audio/wav", group, `${number.padStart(4, "0")}.wav`),
     path.join(publicRoot, "audio", filename),
   );
   techniqueAudioAssets[resource] = `/assets/original/technique-lab/audio/${filename}`;
@@ -163,6 +210,18 @@ const lightningDefinitions = Object.fromEntries(lightningActions.map((presentati
     damageByRangeValue: tier.damageByRangeValue,
   }];
 }));
+const iceDefinitions = Object.fromEntries(iceActions.map((presentation) => {
+  const tier = iceTiers.find(({ code }) => code === presentation.code);
+  if (!tier) throw new Error(`missing ${presentation.code} ice rules tier`);
+  return [presentation.code, {
+    ...presentation,
+    centerMode: rules.rules.families.C.centerMode,
+    dispatchSelectionWord: tier.dispatchSelectionWord,
+    cycle: icePresentation.cycle,
+    audioResource: icePresentation.audioResource,
+    soundRequestEntry: icePresentation.soundRequestEntry,
+  }];
+}));
 
 const fire1Presentation = presentations.presentations.fire.actions
   .find(({ code }) => code === "1F");
@@ -174,7 +233,10 @@ if (!fire1Presentation || !heal1Presentation) {
 const terminalHoldNativeTicks = {
   "1F": fire1Presentation.phases.at(-1).waitPerDrawNativeTicks,
   "1H": heal1Presentation.phases.at(-1).waitPerDrawNativeTicks,
-  "1C": presentations.presentations.ice.cycle.waitPerDrawNativeTicks,
+  ...Object.fromEntries(iceActions.map(({ code }) => [
+    code,
+    icePresentation.cycle.waitPerDrawNativeTicks,
+  ])),
   ...Object.fromEntries(lightningActions.map((presentation) => [
     presentation.code,
     presentation.commonHit.cleanup.waitPerDrawNativeTicks,
@@ -184,6 +246,9 @@ assertEqual(terminalHoldNativeTicks, {
   "1F": 10,
   "1H": 15,
   "1C": 10,
+  "2C": 10,
+  "3C": 10,
+  "4C": 10,
   "1L": 10,
   "2L": 10,
   "3L": 10,
@@ -194,6 +259,7 @@ const source = `// Generated by scripts/generate-technique-lab.mjs from native t
   + `// Do not hand-edit.\n`
   + `export const TECHNIQUE_LAB_CATALOG = ${JSON.stringify(techniques, null, 2)} as const;\n\n`
   + `export const TECHNIQUE_LAB_LIGHTNING = ${JSON.stringify(lightningDefinitions, null, 2)} as const;\n\n`
+  + `export const TECHNIQUE_LAB_ICE = ${JSON.stringify(iceDefinitions, null, 2)} as const;\n\n`
   + `export const TECHNIQUE_LAB_GRAPHIC_ASSETS = ${JSON.stringify(techniqueGraphicAssets, null, 2)} as const;\n\n`
   + `export const TECHNIQUE_LAB_AUDIO_ASSETS = ${JSON.stringify(techniqueAudioAssets, null, 2)} as const;\n\n`
   + `export const TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS = ${JSON.stringify(terminalHoldNativeTicks, null, 2)} as const;\n\n`

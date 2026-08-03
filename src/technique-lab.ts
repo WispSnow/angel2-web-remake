@@ -6,16 +6,17 @@ import {
   isClassId,
 } from "./game/content/classes";
 import { STAGE0_ACTION_PRESENTATION_ASSETS } from "./game/content/stage0-actions.generated";
-import { STAGE1_ACTION_PRESENTATION } from "./game/content/stage1-actions.generated";
 import {
   TECHNIQUE_LAB_AUDIO_ASSETS,
   TECHNIQUE_LAB_CATALOG,
+  TECHNIQUE_LAB_ICE,
   TECHNIQUE_LAB_LIGHTNING,
   TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS,
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "./game/content/technique-lab.generated";
 import {
   buildLightningTimeline,
+  iceFrameAtGlobalIndex,
   lightningFrameAtTime,
   type TimedLightningFrame,
 } from "./game/map-technique-presentation";
@@ -95,7 +96,7 @@ root.innerHTML = `
         <div class="technique-lab-toolbox" role="group" aria-label="地圖操作">
           <button type="button" data-tool="place">放置／替換</button>
           <button type="button" data-tool="actor">指定施法者</button>
-          <button type="button" data-tool="target">指定目標格</button>
+          <button type="button" data-tool="target" data-testid="technique-lab-target-tool">指定目標格</button>
           <button type="button" data-tool="erase">刪除單位</button>
         </div>
         <label>陣營
@@ -112,7 +113,7 @@ root.innerHTML = `
             <option value="1" selected>1× 原速</option><option value="2">2×</option><option value="4">4×</option>
           </select>
         </label>
-        <label class="technique-lab-check"><input id="technique-lab-sound" type="checkbox" /> 落雷原聲音效</label>
+        <label class="technique-lab-check"><input id="technique-lab-sound" type="checkbox" /> 技能原聲音效</label>
         <label class="technique-lab-check">
           <input id="technique-lab-original-cleanup" data-testid="technique-lab-original-cleanup" type="checkbox" />
           原版全敵收尾 <span>（非額外傷害）</span>
@@ -186,11 +187,14 @@ function rebuildTimeline(): void {
     lightningTimeline = [];
     durationMs = STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary.length * 50 + 50
       + STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.length * 150;
-  } else {
+  } else if (session.state.actionCode.endsWith("C")) {
     lightningTimeline = [];
-    durationMs = STAGE1_ACTION_PRESENTATION.ice1.cycles
-      * STAGE1_ACTION_PRESENTATION.ice1.cycle.drawCount
-      * STAGE1_ACTION_PRESENTATION.ice1.cycle.waitPerDrawNativeTicks * 10;
+    const definition = TECHNIQUE_LAB_ICE[
+      session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE
+    ];
+    durationMs = definition.fixedGraphicWaitNativeTicks * 10;
+  } else {
+    throw new Error(`${session.state.actionCode} has no technique laboratory timeline`);
   }
   timelineInput.max = String(durationMs);
 }
@@ -228,27 +232,51 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     phase = "heal-tail";
     return { kind: "heal-tail", frame: visibleFrame };
   }
-  const ice = STAGE1_ACTION_PRESENTATION.ice1;
+  const ice = TECHNIQUE_LAB_ICE[code as keyof typeof TECHNIQUE_LAB_ICE];
   const frameDuration = ice.cycle.waitPerDrawNativeTicks * 10;
   visibleFrame = Math.min(ice.cycles * ice.cycle.drawCount - 1, Math.floor(currentTimeMs / frameDuration));
+  const iceFrame = iceFrameAtGlobalIndex(ice, visibleFrame);
+  if (!iceFrame) throw new Error(`${code} has no ice frame ${visibleFrame}`);
   phase = "ice";
-  return { kind: "ice", frame: visibleFrame };
+  return {
+    kind: "ice",
+    frame: visibleFrame,
+    rangeValue: iceFrame.rangeValue,
+    distanceFromCenter: iceFrame.distanceFromCenter,
+  };
 }
 
 function playAudioBetween(previousMs: number, currentMs: number): void {
-  if (!sound || !session.state.actionCode.endsWith("L")) return;
-  const definition = TECHNIQUE_LAB_LIGHTNING[
-    session.state.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING
-  ];
-  definition.audioRequests.forEach((request, index) => {
-    const cueMs = request.afterFixedWaitNativeTicks * 10;
-    if (playedAudioCues.has(index) || cueMs < previousMs || cueMs > currentMs) return;
-    playedAudioCues.add(index);
-    const source = TECHNIQUE_LAB_AUDIO_ASSETS[
-      request.resource as keyof typeof TECHNIQUE_LAB_AUDIO_ASSETS
+  if (!sound) return;
+  if (session.state.actionCode.endsWith("L")) {
+    const definition = TECHNIQUE_LAB_LIGHTNING[
+      session.state.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING
     ];
-    if (source) void new Audio(source).play().catch(() => undefined);
-  });
+    definition.audioRequests.forEach((request, index) => {
+      const cueMs = request.afterFixedWaitNativeTicks * 10;
+      if (playedAudioCues.has(index) || cueMs < previousMs || cueMs > currentMs) return;
+      playedAudioCues.add(index);
+      const source = TECHNIQUE_LAB_AUDIO_ASSETS[
+        request.resource as keyof typeof TECHNIQUE_LAB_AUDIO_ASSETS
+      ];
+      if (source) void new Audio(source).play().catch(() => undefined);
+    });
+    return;
+  }
+  if (session.state.actionCode.endsWith("C")) {
+    const definition = TECHNIQUE_LAB_ICE[
+      session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE
+    ];
+    const cycleMs = definition.cycle.drawCount
+      * definition.cycle.waitPerDrawNativeTicks * 10;
+    for (let cycle = 0; cycle < definition.cycles; cycle += 1) {
+      const cueMs = cycle * cycleMs;
+      if (playedAudioCues.has(cycle) || cueMs < previousMs || cueMs > currentMs) continue;
+      playedAudioCues.add(cycle);
+      const source = TECHNIQUE_LAB_AUDIO_ASSETS[definition.audioResource];
+      if (source) void new Audio(source).play().catch(() => undefined);
+    }
+  }
 }
 
 function terminalHoldMs(): number {
@@ -286,6 +314,8 @@ function render(): void {
   }
   timelineInput.value = String(Math.round(timeMs));
   const actor = session.actor();
+  const center = session.effectCenter();
+  const selfCenteredIce = session.state.actionCode.endsWith("C");
   const affected = session.affectedUnits();
   const damage = affected.map((unit) => {
     const preview = session.lightningDamageFor(unit);
@@ -307,11 +337,21 @@ function render(): void {
   setReadout("phase", phaseLabel);
   setReadout("time", `${Math.round(timeMs)} / ${durationMs} ms`);
   setReadout("actor", actor ? `${className(actor.classId)} · ${actor.side === 1 ? "我" : "敵"}` : "未指定");
-  setReadout("target", `${session.state.target.x}, ${session.state.target.y}`);
+  setReadout("target", center
+    ? `${center.x}, ${center.y}${selfCenteredIce ? " · 施法者中心" : ""}`
+    : "未指定");
   setReadout("affected", damage || "無");
   for (const button of root.querySelectorAll<HTMLButtonElement>("[data-tool]")) {
     button.setAttribute("aria-pressed", String(button.dataset.tool === session.state.tool));
+    if (button.dataset.tool === "target") {
+      button.disabled = selfCenteredIce;
+      button.title = selfCenteredIce ? "冰雪只能以施法者為中心" : "";
+    }
   }
+  const hint = root.querySelector<HTMLElement>("[data-testid='technique-lab-hint']");
+  if (hint) hint.textContent = selfCenteredIce
+    ? "冰雪依原版鎖定施法者格為中心，不能指定目標格；藍圈與金框應重合。右鍵仍可刪除。"
+    : "左鍵依目前工具操作；右鍵可隨時刪除。藍圈是施法者，金框是技能中心。預設收尾只顯示實際命中範圍。";
 }
 
 function restart(autoplay = true): void {
@@ -338,7 +378,9 @@ function step(): void {
   }
   const interval = session.state.actionCode === "1F" ? 100
     : session.state.actionCode === "1H" ? 50
-      : STAGE1_ACTION_PRESENTATION.ice1.cycle.waitPerDrawNativeTicks * 10;
+      : TECHNIQUE_LAB_ICE[
+        session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE
+      ].cycle.waitPerDrawNativeTicks * 10;
   seek(Math.min(durationMs, timeMs + interval));
 }
 
@@ -412,7 +454,11 @@ timelineInput.addEventListener("input", () => seek(Number(timelineInput.value)))
 function animate(now: number): void {
   if (playing) {
     const previous = timeMs;
-    timeMs = Math.min(durationMs, timeMs + (now - lastAnimationTime) * speed);
+    // A control event can call restart() after the browser has captured this
+    // frame's RAF timestamp. Never let that older timestamp move the semantic
+    // animation clock below zero or into an invalid generated frame.
+    const elapsedMs = Math.max(0, now - lastAnimationTime);
+    timeMs = Math.min(durationMs, timeMs + elapsedMs * speed);
     playAudioBetween(previous, timeMs);
     if (timeMs >= durationMs) playing = false;
     render();

@@ -39,7 +39,7 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "2C",
     "label": "中級冰雪",
-    "implementationId": null
+    "implementationId": "ice-2"
   },
   {
     "nativeCode": "2D",
@@ -74,7 +74,7 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "3C",
     "label": "高級冰雪",
-    "implementationId": null
+    "implementationId": "ice-3"
   },
   {
     "nativeCode": "3D",
@@ -104,7 +104,7 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "4C",
     "label": "究級冰雪",
-    "implementationId": null
+    "implementationId": "ice-4"
   },
   {
     "nativeCode": "4F",
@@ -4182,7 +4182,82 @@ export const TECHNIQUE_LAB_LIGHTNING = {
         ],
         "drawCount": 18,
         "waitPerDrawNativeTicks": 3,
-        "fixedGraphicWaitNativeTicks": 54
+        "fixedGraphicWaitNativeTicks": 54,
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": -8
+          },
+          {
+            "x": 0,
+            "y": -8
+          },
+          {
+            "x": 0,
+            "y": -7
+          },
+          {
+            "x": 0,
+            "y": -7
+          },
+          {
+            "x": 0,
+            "y": -6
+          },
+          {
+            "x": 0,
+            "y": -6
+          },
+          {
+            "x": 0,
+            "y": -5
+          },
+          {
+            "x": 0,
+            "y": -5
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -3
+          },
+          {
+            "x": 0,
+            "y": -3
+          },
+          {
+            "x": 0,
+            "y": -2
+          },
+          {
+            "x": 0,
+            "y": -2
+          },
+          {
+            "x": 0,
+            "y": -1
+          },
+          {
+            "x": 0,
+            "y": -1
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "motion": "DS:5234 starts eight rows above the selected cell and shifts +50 after each two-descriptor cycle, descending through the selected row"
       },
       {
         "resource": "MAGIC/39",
@@ -4318,7 +4393,25 @@ export const TECHNIQUE_LAB_LIGHTNING = {
         ],
         "drawCount": 4,
         "waitPerDrawNativeTicks": 10,
-        "fixedGraphicWaitNativeTicks": 40
+        "fixedGraphicWaitNativeTicks": 40,
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          }
+        ]
       },
       {
         "resource": "MAGIC/40",
@@ -4644,7 +4737,33 @@ export const TECHNIQUE_LAB_LIGHTNING = {
         ],
         "drawCount": 6,
         "waitPerDrawNativeTicks": 10,
-        "fixedGraphicWaitNativeTicks": 60
+        "fixedGraphicWaitNativeTicks": 60,
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          }
+        ]
       },
       {
         "resource": "MAGIC/39",
@@ -4781,6 +4900,24 @@ export const TECHNIQUE_LAB_LIGHTNING = {
         "drawCount": 4,
         "waitPerDrawNativeTicks": 10,
         "fixedGraphicWaitNativeTicks": 40,
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 0,
+            "y": 1
+          }
+        ],
         "direction": "reverse"
       }
     ],
@@ -4910,6 +5047,453 @@ export const TECHNIQUE_LAB_LIGHTNING = {
       "4": 90,
       "5": 110
     }
+  }
+} as const;
+
+export const TECHNIQUE_LAB_ICE = {
+  "1C": {
+    "code": "1C",
+    "effectRadius": 3,
+    "cycles": 2,
+    "rangeValueSequence": [
+      2,
+      1
+    ],
+    "distanceFromCenterSequence": [
+      1,
+      2
+    ],
+    "soundRequests": 2,
+    "drawCount": 12,
+    "fixedGraphicWaitNativeTicks": 120,
+    "centerMode": "actor position",
+    "dispatchSelectionWord": 2,
+    "cycle": {
+      "resource": "MAGIC/10",
+      "descriptorSequence": [
+        {
+          "address": "DS:17CA",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:17D4",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            2
+          ],
+          "low7BitFrameIndices": [
+            1
+          ]
+        },
+        {
+          "address": "DS:17DE",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            3
+          ],
+          "low7BitFrameIndices": [
+            2
+          ]
+        },
+        {
+          "address": "DS:17E8",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            4
+          ],
+          "low7BitFrameIndices": [
+            3
+          ]
+        },
+        {
+          "address": "DS:17F2",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            5
+          ],
+          "low7BitFrameIndices": [
+            4
+          ]
+        },
+        {
+          "address": "DS:17FC",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            6
+          ],
+          "low7BitFrameIndices": [
+            5
+          ]
+        }
+      ],
+      "drawCount": 6,
+      "waitPerDrawNativeTicks": 10,
+      "fixedGraphicWaitNativeTicks": 60,
+      "audioRequestTiming": "once at the start of every expansion cycle",
+      "drawScope": "each of the six descriptors is drawn on cells in the current range-map stage and then flushed/waited once"
+    },
+    "audioResource": "UN/50",
+    "soundRequestEntry": "0000:0224"
+  },
+  "2C": {
+    "code": "2C",
+    "effectRadius": 4,
+    "cycles": 3,
+    "rangeValueSequence": [
+      3,
+      2,
+      1
+    ],
+    "distanceFromCenterSequence": [
+      1,
+      2,
+      3
+    ],
+    "soundRequests": 3,
+    "drawCount": 18,
+    "fixedGraphicWaitNativeTicks": 180,
+    "centerMode": "actor position",
+    "dispatchSelectionWord": 3,
+    "cycle": {
+      "resource": "MAGIC/10",
+      "descriptorSequence": [
+        {
+          "address": "DS:17CA",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:17D4",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            2
+          ],
+          "low7BitFrameIndices": [
+            1
+          ]
+        },
+        {
+          "address": "DS:17DE",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            3
+          ],
+          "low7BitFrameIndices": [
+            2
+          ]
+        },
+        {
+          "address": "DS:17E8",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            4
+          ],
+          "low7BitFrameIndices": [
+            3
+          ]
+        },
+        {
+          "address": "DS:17F2",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            5
+          ],
+          "low7BitFrameIndices": [
+            4
+          ]
+        },
+        {
+          "address": "DS:17FC",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            6
+          ],
+          "low7BitFrameIndices": [
+            5
+          ]
+        }
+      ],
+      "drawCount": 6,
+      "waitPerDrawNativeTicks": 10,
+      "fixedGraphicWaitNativeTicks": 60,
+      "audioRequestTiming": "once at the start of every expansion cycle",
+      "drawScope": "each of the six descriptors is drawn on cells in the current range-map stage and then flushed/waited once"
+    },
+    "audioResource": "UN/50",
+    "soundRequestEntry": "0000:0224"
+  },
+  "3C": {
+    "code": "3C",
+    "effectRadius": 5,
+    "cycles": 4,
+    "rangeValueSequence": [
+      4,
+      3,
+      2,
+      1
+    ],
+    "distanceFromCenterSequence": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "soundRequests": 4,
+    "drawCount": 24,
+    "fixedGraphicWaitNativeTicks": 240,
+    "centerMode": "actor position",
+    "dispatchSelectionWord": 3,
+    "cycle": {
+      "resource": "MAGIC/10",
+      "descriptorSequence": [
+        {
+          "address": "DS:17CA",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:17D4",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            2
+          ],
+          "low7BitFrameIndices": [
+            1
+          ]
+        },
+        {
+          "address": "DS:17DE",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            3
+          ],
+          "low7BitFrameIndices": [
+            2
+          ]
+        },
+        {
+          "address": "DS:17E8",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            4
+          ],
+          "low7BitFrameIndices": [
+            3
+          ]
+        },
+        {
+          "address": "DS:17F2",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            5
+          ],
+          "low7BitFrameIndices": [
+            4
+          ]
+        },
+        {
+          "address": "DS:17FC",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            6
+          ],
+          "low7BitFrameIndices": [
+            5
+          ]
+        }
+      ],
+      "drawCount": 6,
+      "waitPerDrawNativeTicks": 10,
+      "fixedGraphicWaitNativeTicks": 60,
+      "audioRequestTiming": "once at the start of every expansion cycle",
+      "drawScope": "each of the six descriptors is drawn on cells in the current range-map stage and then flushed/waited once"
+    },
+    "audioResource": "UN/50",
+    "soundRequestEntry": "0000:0224"
+  },
+  "4C": {
+    "code": "4C",
+    "effectRadius": 6,
+    "cycles": 5,
+    "rangeValueSequence": [
+      5,
+      4,
+      3,
+      2,
+      1
+    ],
+    "distanceFromCenterSequence": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "soundRequests": 5,
+    "drawCount": 30,
+    "fixedGraphicWaitNativeTicks": 300,
+    "centerMode": "actor position",
+    "dispatchSelectionWord": 4,
+    "cycle": {
+      "resource": "MAGIC/10",
+      "descriptorSequence": [
+        {
+          "address": "DS:17CA",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:17D4",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            2
+          ],
+          "low7BitFrameIndices": [
+            1
+          ]
+        },
+        {
+          "address": "DS:17DE",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            3
+          ],
+          "low7BitFrameIndices": [
+            2
+          ]
+        },
+        {
+          "address": "DS:17E8",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            4
+          ],
+          "low7BitFrameIndices": [
+            3
+          ]
+        },
+        {
+          "address": "DS:17F2",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            5
+          ],
+          "low7BitFrameIndices": [
+            4
+          ]
+        },
+        {
+          "address": "DS:17FC",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            6
+          ],
+          "low7BitFrameIndices": [
+            5
+          ]
+        }
+      ],
+      "drawCount": 6,
+      "waitPerDrawNativeTicks": 10,
+      "fixedGraphicWaitNativeTicks": 60,
+      "audioRequestTiming": "once at the start of every expansion cycle",
+      "drawScope": "each of the six descriptors is drawn on cells in the current range-map stage and then flushed/waited once"
+    },
+    "audioResource": "UN/50",
+    "soundRequestEntry": "0000:0224"
   }
 } as const;
 
@@ -5227,13 +5811,17 @@ export const TECHNIQUE_LAB_AUDIO_ASSETS = {
   "E/43": "/assets/original/technique-lab/audio/43.wav",
   "E/63": "/assets/original/technique-lab/audio/63.wav",
   "E/41": "/assets/original/technique-lab/audio/41.wav",
-  "E/9": "/assets/original/technique-lab/audio/9.wav"
+  "E/9": "/assets/original/technique-lab/audio/9.wav",
+  "UN/50": "/assets/original/technique-lab/audio/un-50.wav"
 } as const;
 
 export const TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS = {
   "1F": 10,
   "1H": 15,
   "1C": 10,
+  "2C": 10,
+  "3C": 10,
+  "4C": 10,
   "1L": 10,
   "2L": 10,
   "3L": 10,

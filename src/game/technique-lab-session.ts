@@ -1,6 +1,7 @@
 import type { ClassId } from "./content/classes";
 import {
   TECHNIQUE_LAB_CATALOG,
+  TECHNIQUE_LAB_ICE,
   TECHNIQUE_LAB_LIGHTNING,
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "./content/technique-lab.generated";
@@ -14,6 +15,8 @@ export const TECHNIQUE_LAB_MAP = {
 export type TechniqueLabSide = 1 | 2;
 export type TechniqueLabTool = "place" | "actor" | "target" | "erase";
 export type TechniqueLabNativeCode = (typeof TECHNIQUE_LAB_CATALOG)[number]["nativeCode"];
+
+const isSelfCenteredIce = (code: TechniqueLabNativeCode): boolean => code.endsWith("C");
 
 export interface TechniqueLabUnit {
   readonly id: string;
@@ -74,6 +77,7 @@ export class TechniqueLabSession {
   }
 
   setTool(tool: TechniqueLabTool): void {
+    if (tool === "target" && isSelfCenteredIce(this.current.actionCode)) return;
     this.update({ ...this.current, tool });
   }
 
@@ -95,13 +99,24 @@ export class TechniqueLabSession {
   setActionCode(actionCode: TechniqueLabNativeCode): boolean {
     const entry = TECHNIQUE_LAB_CATALOG.find((candidate) => candidate.nativeCode === actionCode);
     if (!entry || entry.implementationId === null) return false;
-    this.update({ ...this.current, actionCode });
+    const actor = this.actor();
+    this.update({
+      ...this.current,
+      actionCode,
+      tool: isSelfCenteredIce(actionCode) && this.current.tool === "target"
+        ? "actor"
+        : this.current.tool,
+      target: isSelfCenteredIce(actionCode) && actor
+        ? { x: actor.x, y: actor.y }
+        : this.current.target,
+    });
     return true;
   }
 
   interact(x: number, y: number): boolean {
     if (!this.inBounds(x, y)) return false;
     if (this.current.tool === "target") {
+      if (isSelfCenteredIce(this.current.actionCode)) return false;
       this.update({ ...this.current, target: { x, y } });
       return true;
     }
@@ -109,7 +124,13 @@ export class TechniqueLabSession {
     if (this.current.tool === "actor") {
       const unit = this.unitAt(x, y);
       if (!unit) return false;
-      this.update({ ...this.current, actorId: unit.id });
+      this.update({
+        ...this.current,
+        actorId: unit.id,
+        target: isSelfCenteredIce(this.current.actionCode)
+          ? { x: unit.x, y: unit.y }
+          : this.current.target,
+      });
       return true;
     }
     return this.place(x, y);
@@ -149,15 +170,27 @@ export class TechniqueLabSession {
     return this.current.units.find(({ id }) => id === this.current.actorId);
   }
 
+  effectCenter(): { readonly x: number; readonly y: number } | undefined {
+    if (isSelfCenteredIce(this.current.actionCode)) {
+      const actor = this.actor();
+      return actor ? { x: actor.x, y: actor.y } : undefined;
+    }
+    return this.current.target;
+  }
+
   effectCells(): readonly TechniqueLabEffectCell[] {
+    const center = this.effectCenter();
+    if (!center) return [];
     const radius = this.current.actionCode.endsWith("L")
       ? TECHNIQUE_LAB_LIGHTNING[this.current.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING]
         .effectRadius
-      : this.current.actionCode === "1C" ? 3 : 1;
+      : this.current.actionCode.endsWith("C")
+        ? TECHNIQUE_LAB_ICE[this.current.actionCode as keyof typeof TECHNIQUE_LAB_ICE].effectRadius
+        : 1;
     const cells: TechniqueLabEffectCell[] = [];
     for (let y = 0; y < 50; y += 1) {
       for (let x = 0; x < 50; x += 1) {
-        const distance = Math.abs(this.current.target.x - x) + Math.abs(this.current.target.y - y);
+        const distance = Math.abs(center.x - x) + Math.abs(center.y - y);
         const value = radius - distance;
         if (value > 0) cells.push({ position: { x, y }, value });
       }

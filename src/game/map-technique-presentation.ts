@@ -5,6 +5,49 @@ export interface MapEffectDescriptor {
   readonly low7BitFrameIndices: readonly (number | null)[];
 }
 
+export interface IcePresentationDefinition {
+  readonly effectRadius: number;
+  readonly cycles: number;
+  readonly rangeValueSequence: readonly number[];
+  readonly distanceFromCenterSequence: readonly number[];
+  readonly cycle: {
+    readonly drawCount: number;
+    readonly waitPerDrawNativeTicks: number;
+  };
+  readonly fixedGraphicWaitNativeTicks: number;
+}
+
+export interface IcePresentationFrame {
+  readonly globalFrame: number;
+  readonly cycleIndex: number;
+  readonly sourceFrame: number;
+  readonly rangeValue: number;
+  readonly distanceFromCenter: number;
+  readonly durationNativeTicks: number;
+}
+
+export function iceFrameAtGlobalIndex(
+  definition: IcePresentationDefinition,
+  globalFrame: number,
+): IcePresentationFrame | undefined {
+  if (!Number.isInteger(globalFrame) || globalFrame < 0) return undefined;
+  const cycleIndex = Math.floor(globalFrame / definition.cycle.drawCount);
+  const sourceFrame = globalFrame % definition.cycle.drawCount;
+  const rangeValue = definition.rangeValueSequence[cycleIndex];
+  const distanceFromCenter = definition.distanceFromCenterSequence[cycleIndex];
+  if (cycleIndex >= definition.cycles
+    || rangeValue === undefined
+    || distanceFromCenter === undefined) return undefined;
+  return {
+    globalFrame,
+    cycleIndex,
+    sourceFrame,
+    rangeValue,
+    distanceFromCenter,
+    durationNativeTicks: definition.cycle.waitPerDrawNativeTicks,
+  };
+}
+
 export interface LightningPresentationDefinition {
   readonly code: string;
   readonly effectRadius: number;

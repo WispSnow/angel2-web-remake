@@ -296,6 +296,11 @@ export class Stage0Battle {
       terrainSlotAt: this.scenario.terrainSlotAt,
     };
     if (actionId === "archer-shot") return archerShootingRange(actor, battlefield);
+    if (BATTLE_ACTION_DEFINITIONS[actionId].target === "self-area") {
+      const result = new NumericRangeMap(this.stage.width, this.stage.height);
+      result.set(actor, 1);
+      return result;
+    }
     return techniqueSelectionRange(
       actor,
       battlefield,
@@ -308,7 +313,7 @@ export class Stage0Battle {
     if (!actor || !canUseSpecialAction(actor, actionId)) return [];
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     const range = this.actionRange(actorId, actionId);
-    if (definition.target === "area") return range.cells();
+    if (definition.target === "self-area") return [{ x: actor.x, y: actor.y }];
     return this.units
       .filter((target) => range.valueAt(target) > 0
         && (definition.target === "ally"
@@ -321,7 +326,7 @@ export class Stage0Battle {
     const actor = this.unit(actorId);
     if (!actor || !canUseSpecialAction(actor, actionId)) return [];
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-    if (definition.target === "area") return [];
+    if (definition.target === "self-area") return [];
     const range = this.actionRange(actorId, actionId);
     return this.units.filter((target) =>
       range.valueAt(target) > 0
@@ -333,18 +338,24 @@ export class Stage0Battle {
   prepareSpecialAction(intent: BattleActionIntent): PreparedBattleAction {
     const actor = this.unit(intent.actorId);
     const target = intent.targetId ? this.unit(intent.targetId) : undefined;
-    const center = intent.target ?? (target ? { x: target.x, y: target.y } : undefined);
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
-    const legalCell = center
-      ? this.actionTargetCells(intent.actorId, intent.actionId)
-        .some(({ x, y }) => x === center.x && y === center.y)
-      : false;
+    const requestedCenter = intent.target ?? (target ? { x: target.x, y: target.y } : undefined);
+    const selfCentered = definition.target === "self-area";
+    const center = selfCentered && actor
+      ? { x: actor.x, y: actor.y }
+      : requestedCenter;
+    const legalCell = selfCentered
+      ? Boolean(actor
+        && !intent.targetId
+        && (!intent.target || (intent.target.x === actor.x && intent.target.y === actor.y)))
+      : Boolean(center && this.actionTargetCells(intent.actorId, intent.actionId)
+        .some(({ x, y }) => x === center.x && y === center.y));
     if (
       !actor
       || !center
       || !canUseSpecialAction(actor, intent.actionId)
       || !legalCell
-      || (definition.target !== "area" && !target)
+      || (definition.target !== "self-area" && !target)
     ) {
       throw new Error("illegal special action");
     }

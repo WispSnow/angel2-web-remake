@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  TECHNIQUE_LAB_AUDIO_ASSETS,
   TECHNIQUE_LAB_CATALOG,
+  TECHNIQUE_LAB_ICE,
   TECHNIQUE_LAB_LIGHTNING,
   TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS,
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "../../src/game/content/technique-lab.generated";
 import {
   buildLightningTimeline,
+  iceFrameAtGlobalIndex,
   lightningWaveDistance,
 } from "../../src/game/map-technique-presentation";
 import { TechniqueLabSession } from "../../src/game/technique-lab-session";
@@ -53,11 +56,63 @@ describe("map technique laboratory evidence", () => {
     });
   });
 
+  it("descends ultimate lightning and keeps every full bolt planted on the selected cell", () => {
+    const lightning = TECHNIQUE_LAB_LIGHTNING["4L"];
+    expect(lightning.phases[0].anchorOffsetSequence).toEqual(
+      Array.from({ length: 18 }, (_, index) => ({
+        x: 0,
+        y: -8 + Math.floor(index / 2),
+      })),
+    );
+    expect(lightning.phases.slice(1).map(({ anchorOffsetSequence }) => anchorOffsetSequence))
+      .toEqual([
+        Array.from({ length: 4 }, () => ({ x: 0, y: 1 })),
+        Array.from({ length: 6 }, () => ({ x: 0, y: 1 })),
+        Array.from({ length: 4 }, () => ({ x: 0, y: 1 })),
+      ]);
+    lightning.phases.slice(1).forEach((phase) => {
+      phase.descriptorSequence.forEach((descriptor, index) => {
+        const anchor = phase.anchorOffsetSequence[index];
+        expect(anchor.y + descriptor.yOffset + descriptor.height - 1).toBe(0);
+      });
+    });
+  });
+
+  it("plays every ice tier as six-frame rings expanding from the actor center", () => {
+    expect(Object.values(TECHNIQUE_LAB_ICE).map((definition) => ({
+      code: definition.code,
+      duration: definition.fixedGraphicWaitNativeTicks,
+      ranges: definition.rangeValueSequence,
+      distances: definition.distanceFromCenterSequence,
+    }))).toEqual([
+      { code: "1C", duration: 120, ranges: [2, 1], distances: [1, 2] },
+      { code: "2C", duration: 180, ranges: [3, 2, 1], distances: [1, 2, 3] },
+      { code: "3C", duration: 240, ranges: [4, 3, 2, 1], distances: [1, 2, 3, 4] },
+      { code: "4C", duration: 300, ranges: [5, 4, 3, 2, 1], distances: [1, 2, 3, 4, 5] },
+    ]);
+    const ice1 = TECHNIQUE_LAB_ICE["1C"];
+    expect([0, 5, 6, 11].map((frame) => iceFrameAtGlobalIndex(ice1, frame)))
+      .toEqual([
+        expect.objectContaining({ cycleIndex: 0, sourceFrame: 0, rangeValue: 2, distanceFromCenter: 1 }),
+        expect.objectContaining({ cycleIndex: 0, sourceFrame: 5, rangeValue: 2, distanceFromCenter: 1 }),
+        expect.objectContaining({ cycleIndex: 1, sourceFrame: 0, rangeValue: 1, distanceFromCenter: 2 }),
+        expect.objectContaining({ cycleIndex: 1, sourceFrame: 5, rangeValue: 1, distanceFromCenter: 2 }),
+      ]);
+    expect(iceFrameAtGlobalIndex(ice1, 12)).toBeUndefined();
+    expect(TECHNIQUE_LAB_AUDIO_ASSETS["UN/50"])
+      .toBe("/assets/original/technique-lab/audio/un-50.wav");
+    expect(Object.values(TECHNIQUE_LAB_ICE).every(({ centerMode }) => centerMode === "actor position"))
+      .toBe(true);
+  });
+
   it("keeps every implemented final effect for its native post-draw wait", () => {
     expect(TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS).toEqual({
       "1F": 10,
       "1H": 15,
       "1C": 10,
+      "2C": 10,
+      "3C": 10,
+      "4C": 10,
       "1L": 10,
       "2L": 10,
       "3L": 10,
@@ -68,7 +123,8 @@ describe("map technique laboratory evidence", () => {
   it("exposes the full native menu while gating unfinished techniques", () => {
     expect(TECHNIQUE_LAB_CATALOG).toHaveLength(33);
     expect(TECHNIQUE_LAB_CATALOG.filter(({ implementationId }) => implementationId !== null)
-      .map(({ nativeCode }) => nativeCode)).toEqual(["1C", "1F", "1H", "1L", "2L", "3L", "4L"]);
+      .map(({ nativeCode }) => nativeCode))
+      .toEqual(["1C", "1F", "1H", "1L", "2C", "2L", "3C", "3L", "4C", "4L"]);
     expect(TECHNIQUE_LAB_CATALOG.find(({ nativeCode }) => nativeCode === "4F"))
       .toMatchObject({ label: "究級炎暴", implementationId: null });
   });
@@ -94,6 +150,10 @@ describe("map technique laboratory session", () => {
     expect(session.affectedUnits().map((unit) => session.lightningDamageFor(unit)))
       .toEqual([110, 70, 50]);
 
+    session.setActionCode("4C");
+    expect(session.effectCells()).toHaveLength(61);
+    expect(session.state.target).toEqual({ x: 20, y: 18 });
+
     session.setPlacementSide(1);
     session.setPlacementClass("wizard");
     session.interact(24, 20);
@@ -102,9 +162,11 @@ describe("map technique laboratory session", () => {
     session.setTool("actor");
     session.interact(24, 20);
     expect(session.actor()?.classId).toBe("wizard");
+    expect(session.state.target).toEqual({ x: 24, y: 20 });
     session.setTool("target");
-    session.interact(25, 20);
-    expect(session.state.target).toEqual({ x: 25, y: 20 });
+    expect(session.state.tool).toBe("actor");
+    expect(session.interact(25, 20)).toBe(false);
+    expect(session.state.target).toEqual({ x: 24, y: 20 });
   });
 
   it("rejects unfinished techniques and missing allied boss-part graphics", () => {

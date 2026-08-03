@@ -32,7 +32,12 @@ export type TechniqueLabVisualFrame =
   | { readonly kind: "fire"; readonly frame: number }
   | { readonly kind: "heal-primary"; readonly frame: number }
   | { readonly kind: "heal-tail"; readonly frame: number }
-  | { readonly kind: "ice"; readonly frame: number };
+  | {
+    readonly kind: "ice";
+    readonly frame: number;
+    readonly rangeValue: number;
+    readonly distanceFromCenter: number;
+  };
 
 export interface TechniqueLabSceneHandle {
   readonly game: Phaser.Game;
@@ -106,7 +111,11 @@ export function startTechniqueLabPhaser(
         this.updateCanvasDataset(frame, 0);
         return;
       }
-      const center = this.state.target;
+      const center = session.effectCenter();
+      if (!center) {
+        this.updateCanvasDataset(frame, 0);
+        return;
+      }
       let lightningAnchorOffset: { readonly x: number; readonly y: number } | undefined;
       if (frame.kind === "lightning") {
         const actionCode = this.state.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING;
@@ -142,7 +151,8 @@ export function startTechniqueLabPhaser(
         ).setOrigin(.5, 1).setDepth(8));
       } else {
         const sourceFrame = frame.frame % STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion.length;
-        for (const { position } of session.effectCells()) {
+        for (const { position, value } of session.effectCells()) {
+          if (value !== frame.rangeValue) continue;
           this.effectObjects.push(this.add.image(
             position.x * TILE_WIDTH + TILE_WIDTH / 2,
             position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
@@ -178,13 +188,16 @@ export function startTechniqueLabPhaser(
       for (const { position } of session.effectCells()) {
         this.overlay.fillRect(position.x * TILE_WIDTH, position.y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT);
       }
-      this.overlay.lineStyle(2, 0xffe36b, .95);
-      this.overlay.strokeRect(
-        this.state.target.x * TILE_WIDTH + 2,
-        this.state.target.y * TILE_HEIGHT + 2,
-        TILE_WIDTH - 4,
-        TILE_HEIGHT - 4,
-      );
+      const center = session.effectCenter();
+      if (center) {
+        this.overlay.lineStyle(2, 0xffe36b, .95);
+        this.overlay.strokeRect(
+          center.x * TILE_WIDTH + 2,
+          center.y * TILE_HEIGHT + 2,
+          TILE_WIDTH - 4,
+          TILE_HEIGHT - 4,
+        );
+      }
       const actor = session.actor();
       if (actor) {
         this.overlay.lineStyle(2, 0x7de4ff, 1);
@@ -212,7 +225,7 @@ export function startTechniqueLabPhaser(
       this.drawVisualFrame(pendingFrame);
       this.game.canvas.dataset.unitCount = String(this.state.units.length);
       this.game.canvas.dataset.actorId = this.state.actorId ?? "";
-      this.game.canvas.dataset.target = `${this.state.target.x},${this.state.target.y}`;
+      this.game.canvas.dataset.target = center ? `${center.x},${center.y}` : "";
     }
 
     private updateCanvasDataset(
@@ -231,6 +244,10 @@ export function startTechniqueLabPhaser(
         : "";
       canvas.dataset.mapCombatAnchorOffset = lightningAnchorOffset
         ? `${lightningAnchorOffset.x},${lightningAnchorOffset.y}`
+        : "";
+      canvas.dataset.iceRangeValue = frame.kind === "ice" ? String(frame.rangeValue) : "";
+      canvas.dataset.iceDistanceFromCenter = frame.kind === "ice"
+        ? String(frame.distanceFromCenter)
         : "";
     }
   }
