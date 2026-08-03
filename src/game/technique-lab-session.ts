@@ -205,10 +205,14 @@ export class TechniqueLabSession {
       `${position.x},${position.y}`,
       value,
     ]));
-    const desiredSide = this.current.actionCode === "1H" ? actor.side : actor.side === 1 ? 2 : 1;
+    const desiredSide = this.current.actionCode === "1H" || this.current.actionCode === "TR"
+      ? actor.side
+      : actor.side === 1 ? 2 : 1;
     return this.current.units.filter((unit) => {
       if (unit.side !== desiredSide) return false;
-      if (this.current.actionCode === "1F" || this.current.actionCode === "1H") {
+      if (this.current.actionCode === "1F"
+        || this.current.actionCode === "1H"
+        || this.current.actionCode === "TR") {
         return unit.x === this.current.target.x && unit.y === this.current.target.y;
       }
       return (effectValues.get(`${unit.x},${unit.y}`) ?? 0) > 0;

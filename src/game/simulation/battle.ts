@@ -40,6 +40,7 @@ const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "heal-1": ["sister"],
   "lightning-1": ["magician"],
   "ice-1": ["magician"],
+  "dispel": ["magic-priest"],
 };
 
 function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
@@ -243,7 +244,13 @@ export class Stage0Battle {
   attack(attackerId: string, defenderId: string): AttackResult {
     const attacker = this.unit(attackerId);
     const defender = this.unit(defenderId);
-    if (!attacker || !defender || attacker.side === defender.side || attacker.acted || attacker.actionDisabled || manhattan(attacker, defender) !== 1) {
+    if (!attacker
+      || !defender
+      || attacker.side === defender.side
+      || attacker.acted
+      || attacker.actionDisabled
+      || defender.actionDisabled
+      || manhattan(attacker, defender) !== 1) {
       throw new Error("illegal ordinary attack");
     }
     this.onHostileTargeted(attacker, defender);
@@ -255,7 +262,9 @@ export class Stage0Battle {
       * terrainDefensePercentFor(defender.classId, this.scenario.terrainSlotAt(defender))
       / 100,
     );
-    const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense) + this.rng.between(4, 7) + this.rng.between(4, 7);
+    const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense)
+      + this.rng.between(4, 7)
+      + this.rng.between(4, 7);
     defender.life = Math.max(0, defender.life - damage);
 
     const counterOccurred = defender.life > 0 && !defender.actionDisabled;
@@ -283,7 +292,16 @@ export class Stage0Battle {
     if (attackerDied) this.units = this.units.filter((unit) => unit.id !== attacker.id);
     this.focusId = this.unit(attackerId) ? attackerId : defenderId;
 
-    return { attackerId, defenderId, damage, counterDamage, counterOccurred, defenderDied, attackerDied, experienceGained };
+    return {
+      attackerId,
+      defenderId,
+      damage,
+      counterDamage,
+      counterOccurred,
+      defenderDied,
+      attackerDied,
+      experienceGained,
+    };
   }
 
   actionRange(actorId: string, actionId: BattleActionId): NumericRangeMap {
@@ -319,7 +337,8 @@ export class Stage0Battle {
       .filter((target) => range.valueAt(target) > 0
         && (definition.target === "ally"
           ? target.side === actor.side
-          : target.side !== actor.side))
+          : target.side !== actor.side)
+        && (actionId === "dispel" || !target.actionDisabled))
       .map(({ x, y }) => ({ x, y }));
   }
 
@@ -333,7 +352,8 @@ export class Stage0Battle {
       range.valueAt(target) > 0
       && (definition.target === "ally"
         ? target.side === actor.side
-        : target.side !== actor.side));
+        : target.side !== actor.side)
+      && (actionId === "dispel" || !target.actionDisabled));
   }
 
   prepareSpecialAction(intent: BattleActionIntent): PreparedBattleAction {
@@ -551,7 +571,7 @@ export class Stage0Battle {
     const reachableKeys = new Set(reachable.map(positionKey));
     const occupied = new Set(this.units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
     const enemies = this.units
-      .filter((candidate) => candidate.side === opponentSide)
+      .filter((candidate) => candidate.side === opponentSide && !candidate.actionDisabled)
       .sort((left, right) => left.y * this.stage.width + left.x - (right.y * this.stage.width + right.x));
     const nativeCandidateOffsets = [
       { x: 0, y: 1 },
@@ -666,7 +686,7 @@ export class Stage0Battle {
           const correctSide = definition.target === "ally"
             ? target.side === unit.side
             : target.side !== unit.side;
-          if (!correctSide || range.valueAt(target) === 0) continue;
+          if (!correctSide || range.valueAt(target) === 0 || target.actionDisabled) continue;
           const targetStats = this.statsFor(target);
           const missingLife = targetStats.maxLife - target.life;
           if (actionId === "heal-1" && missingLife <= 0) continue;

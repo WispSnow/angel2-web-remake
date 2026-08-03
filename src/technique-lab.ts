@@ -9,6 +9,7 @@ import { STAGE0_ACTION_PRESENTATION_ASSETS } from "./game/content/stage0-actions
 import {
   TECHNIQUE_LAB_AUDIO_ASSETS,
   TECHNIQUE_LAB_CATALOG,
+  TECHNIQUE_LAB_DISPEL,
   TECHNIQUE_LAB_ICE,
   TECHNIQUE_LAB_LIGHTNING,
   TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS,
@@ -174,6 +175,8 @@ let visibleFrame = 0;
 let playedAudioCues = new Set<number>();
 let timelineActionCode: TechniqueLabNativeCode | undefined;
 let iceOutcomeCleared = false;
+let iceOutcomeApplied = false;
+let frozenUnitIds = new Set<string>();
 
 function iceFrozenUnitIds(): readonly string[] {
   if (!session.state.actionCode.endsWith("C")) return [];
@@ -203,6 +206,9 @@ function rebuildTimeline(): void {
       session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE
     ];
     durationMs = definition.fixedGraphicWaitNativeTicks * 10;
+  } else if (session.state.actionCode === "TR") {
+    lightningTimeline = [];
+    durationMs = TECHNIQUE_LAB_DISPEL.fixedGraphicWaitNativeTicks * 10;
   } else {
     throw new Error(`${session.state.actionCode} has no technique laboratory timeline`);
   }
@@ -241,6 +247,19 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     visibleFrame = Math.min(4, Math.floor((currentTimeMs - primaryDuration - 50) / 150));
     phase = "heal-tail";
     return { kind: "heal-tail", frame: visibleFrame };
+  }
+  if (code === "TR") {
+    const states: Array<readonly number[]> = [];
+    for (const { runtimeTileCodeStates } of TECHNIQUE_LAB_DISPEL.phases) {
+      for (const state of runtimeTileCodeStates) states.push(state);
+    }
+    visibleFrame = Math.min(states.length - 1, Math.floor(currentTimeMs / 50));
+    phase = "dispel";
+    return {
+      kind: "dispel",
+      frame: visibleFrame,
+      runtimeTileCodes: states[visibleFrame] ?? [],
+    };
   }
   const ice = TECHNIQUE_LAB_ICE[code as keyof typeof TECHNIQUE_LAB_ICE];
   const frameDuration = ice.cycle.waitPerDrawNativeTicks * 10;
@@ -315,15 +334,23 @@ function playbackState(): LabPlaybackState {
 
 function render(): void {
   const completed = durationMs > 0 && timeMs >= durationMs;
+  if (completed
+    && session.state.actionCode.endsWith("C")
+    && !iceOutcomeCleared
+    && !iceOutcomeApplied) {
+    frozenUnitIds = new Set([...frozenUnitIds, ...iceFrozenUnitIds()]);
+    iceOutcomeApplied = true;
+  }
+  if (completed && session.state.actionCode === "TR") {
+    for (const { id } of session.affectedUnits()) frozenUnitIds.delete(id);
+  }
   if (completed) {
     phase = "complete";
     visibleFrame = -1;
     renderer.setVisualFrame({ kind: "none" });
-    renderer.setFrozenUnitIds(
-      session.state.actionCode.endsWith("C") && !iceOutcomeCleared ? iceFrozenUnitIds() : [],
-    );
+    renderer.setFrozenUnitIds([...frozenUnitIds]);
   } else {
-    renderer.setFrozenUnitIds([]);
+    renderer.setFrozenUnitIds([...frozenUnitIds]);
     renderer.setVisualFrame(visualFrameAt(timeMs));
   }
   timelineInput.value = String(Math.round(timeMs));
@@ -357,10 +384,14 @@ function render(): void {
   setReadout("affected", damage || "無");
   setReadout("result", session.state.actionCode.endsWith("C")
     ? completed && !iceOutcomeCleared
-      ? `冰封 ${iceFrozenUnitIds().length} 名 · 跳過下一次本陣營行動`
+      ? `冰封 ${iceFrozenUnitIds().length} 名 · 跳過下一次本陣營行動、不可攻治且不可疊加`
       : completed
         ? "已經歷一次本陣營階段 · 冰封解除"
         : "演出完成後套用冰封"
+    : session.state.actionCode === "TR"
+      ? completed
+        ? "破邪完成 · 解除目標的冰封與異常狀態"
+        : "演出完成後解除目標的冰封與異常狀態"
     : "只預覽動畫／命中範圍");
   const nextPhaseButton = root.querySelector<HTMLButtonElement>(
     '[data-command="next-side-phase"]',
@@ -378,12 +409,18 @@ function render(): void {
   const hint = root.querySelector<HTMLElement>("[data-testid='technique-lab-hint']");
   if (hint) hint.textContent = selfCenteredIce
     ? "冰雪依原版鎖定施法者格為中心，不能指定目標格；藍圈與金框應重合。右鍵仍可刪除。"
+    : session.state.actionCode === "TR"
+      ? "破邪只能指定同陣營單位；原版清除五種負面狀態，stableRemake 另可解除冰封。"
     : "左鍵依目前工具操作；右鍵可隨時刪除。藍圈是施法者，金框是技能中心。預設收尾只顯示實際命中範圍。";
 }
 
 function restart(autoplay = true): void {
   timeMs = 0;
   iceOutcomeCleared = false;
+  if (session.state.actionCode.endsWith("C")) {
+    frozenUnitIds = new Set();
+    iceOutcomeApplied = false;
+  }
   playedAudioCues = new Set();
   playing = autoplay;
   lastAnimationTime = performance.now();
@@ -393,7 +430,11 @@ function restart(autoplay = true): void {
 
 function seek(nextTimeMs: number): void {
   timeMs = Math.max(0, Math.min(durationMs, nextTimeMs));
-  if (timeMs < durationMs) iceOutcomeCleared = false;
+  if (timeMs < durationMs && session.state.actionCode.endsWith("C")) {
+    iceOutcomeCleared = false;
+    iceOutcomeApplied = false;
+    frozenUnitIds = new Set();
+  }
   playedAudioCues = new Set();
   playing = false;
   render();
@@ -407,6 +448,7 @@ function step(): void {
   }
   const interval = session.state.actionCode === "1F" ? 100
     : session.state.actionCode === "1H" ? 50
+      : session.state.actionCode === "TR" ? 50
       : TECHNIQUE_LAB_ICE[
         session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE
       ].cycle.waitPerDrawNativeTicks * 10;
@@ -445,8 +487,14 @@ root.addEventListener("click", (event) => {
     playAudioBetween(-1, timeMs);
   } else if (command === "pause") playing = false;
   else if (command === "step") step();
-  else if (command === "next-side-phase") iceOutcomeCleared = true;
+  else if (command === "next-side-phase") {
+    iceOutcomeCleared = true;
+    iceOutcomeApplied = true;
+    frozenUnitIds = new Set();
+  }
   else if (command === "reset") {
+    frozenUnitIds = new Set();
+    iceOutcomeApplied = false;
     session.reset();
     restart(true);
   } else if (command === "clear") session.clear();
@@ -454,6 +502,7 @@ root.addEventListener("click", (event) => {
 });
 
 actionSelect.addEventListener("change", () => {
+  timeMs = 0;
   if (session.setActionCode(actionSelect.value as TechniqueLabNativeCode)) {
     restart(true);
   }
@@ -525,6 +574,7 @@ window.__ANGEL2_TECHNIQUE_LAB__ = {
     playing = false;
   },
   setActionCode: (code) => {
+    timeMs = 0;
     const changed = session.setActionCode(code);
     if (changed) {
       restart(false);

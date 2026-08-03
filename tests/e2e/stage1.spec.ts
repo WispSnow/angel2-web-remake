@@ -185,8 +185,8 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.getByTestId("record-slot-2").click();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.2") ?? "null"));
   expect(saved).toMatchObject({
-    version: 9,
-    contentVersion: "stage-01-ice-lock-1",
+    version: 10,
+    contentVersion: "stage-01-frozen-dispel-1",
     kind: "battle",
     stageId: "stage-01",
     stageLabel: "騎士城堡前",

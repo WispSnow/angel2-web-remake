@@ -330,14 +330,23 @@ describe("stage 0 battle simulation", () => {
     expect(battle.focusId).toBe("1:0");
   });
 
-  it("prevents an ice-disabled survivor from counterattacking", () => {
+  it("makes a frozen defender untargetable, then vulnerable next round", () => {
     const battle = battleAtPlayableOpening();
     expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
-    battle.unit("2:45")!.actionDisabled = true;
-    const result = battle.attack("1:0", "2:45");
-    expect(result.defenderDied).toBe(false);
-    expect(result.counterOccurred).toBe(false);
-    expect(result.counterDamage).toBe(0);
+    const defender = battle.unit("2:45")!;
+    defender.actionDisabled = true;
+    const lifeBefore = defender.life;
+    const rngBefore = { state: battle.rng.state, calls: battle.rng.calls };
+    expect(() => battle.attack("1:0", "2:45")).toThrow("illegal ordinary attack");
+    expect(defender.life).toBe(lifeBefore);
+    expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(rngBefore);
+    expect(battle.unit("1:0")!.acted).toBe(false);
+
+    battle.startNextRound();
+    expect(defender.actionDisabled).toBe(false);
+    const thawedResult = battle.attack("1:0", "2:45");
+    expect(thawedResult.damage).toBeGreaterThan(0);
+    expect(defender.life).toBeLessThan(lifeBefore);
   });
 
   it("keeps every surviving ally mobile after the first enemy route phase", () => {

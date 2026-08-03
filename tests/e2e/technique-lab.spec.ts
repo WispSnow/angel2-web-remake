@@ -218,6 +218,58 @@ test("all four ice tiers expand one complete six-frame ring at a time", async ({
   expect(pageErrors).toEqual([]);
 });
 
+test("dispel preserves its original timeline and removes a frozen ally", async ({ page }) => {
+  await page.goto("/technique-lab.html");
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("technique laboratory canvas has no bounds");
+  const clickCell = async (worldX: number, worldY: number) => {
+    await canvas.click({
+      position: {
+        x: (worldX - 15 + .5) * box.width / 16,
+        y: (worldY - 13 + .5) * box.height / 11,
+      },
+    });
+  };
+
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1C"));
+  await seek(page, 1200);
+  await expect(canvas).toHaveAttribute("data-frozen-unit-ids", /lab-2/u);
+
+  await page.getByTestId("technique-lab-side").selectOption("2");
+  await page.getByTestId("technique-lab-class").selectOption("magic-priest");
+  await page.getByRole("button", { name: "放置／替換" }).click();
+  await clickCell(22, 19);
+  await page.getByRole("button", { name: "指定施法者" }).click();
+  await clickCell(22, 19);
+  await page.getByTestId("technique-lab-action").selectOption("TR");
+  await page.getByRole("button", { name: "指定目標格" }).click();
+  await clickCell(23, 18);
+  await seek(page, 1000);
+
+  expect((await labState(page))?.playback.durationMs).toBe(2500);
+  expect((await labState(page))?.playback.terminalHoldMs).toBe(50);
+  await expect(canvas).toHaveAttribute("data-technique-phase", "dispel");
+  await expect(canvas).toHaveAttribute("data-frozen-unit-ids", /lab-2/u);
+  expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
+  await page.screenshot({
+    path: "artifacts/playwright/technique-lab-dispel-animation.png",
+    fullPage: true,
+  });
+
+  await seek(page, 2499);
+  await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 50 ms");
+  await seek(page, 2500);
+  await expect(canvas).toHaveAttribute("data-technique-phase", "none");
+  await expect(canvas).toHaveAttribute("data-frozen-unit-count", "0");
+  await expect(page.locator('[data-readout="result"]')).toContainText("冰封與異常狀態");
+  await page.screenshot({
+    path: "artifacts/playwright/technique-lab-dispel-result.png",
+    fullPage: true,
+  });
+});
+
 test("map tools place either side and unavailable techniques stay disabled", async ({ page }) => {
   await page.goto("/technique-lab.html");
   await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());

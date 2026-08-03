@@ -8,7 +8,7 @@ test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 test("debug hub selects a difficulty and opens the formal stage-one deployment", async ({ page }) => {
   await page.goto("/debug.html");
   await expect(page.getByTestId("debug-hub")).toBeVisible();
-  await expect(page.locator("[data-debug-scenario-id]")).toHaveCount(11);
+  await expect(page.locator("[data-debug-scenario-id]")).toHaveCount(12);
   expect(await page.evaluate(() => window.__ANGEL2_DEBUG__)).toBeUndefined();
 
   await page.getByTestId("debug-difficulty").selectOption("3");
@@ -146,6 +146,69 @@ test("the magician range fixture releases its pursuing target after exactly one 
     .not.toEqual({ x: thawedTarget?.x, y: thawedTarget?.y });
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/debug-stage1-magician-thawed.png`,
+  });
+});
+
+test("dispel uses its original map animation and releases a frozen ally", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-01-dispel&difficulty=0&test=1");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+  const frozenTargetId = await page.evaluate(() => {
+    const state = window.__ANGEL2__?.getState() as {
+      units: Array<{ id: string; actionDisabled: boolean }>;
+    };
+    return state.units.find(({ actionDisabled }) => actionDisabled)?.id;
+  });
+  if (!frozenTargetId) throw new Error("dispel fixture is missing its frozen ally");
+  await expect(canvas).toHaveAttribute("data-ice-disabled-unit-ids", frozenTargetId);
+
+  await page.keyboard.press("Space");
+  await page.getByTestId("unit-command-technique").click();
+  await expect(page.getByTestId("technique-dispel")).toHaveText("破邪");
+  await page.getByTestId("technique-dispel").click();
+  await canvas.click({ position: { x: 260, y: 177 } });
+
+  await page.waitForFunction(() => {
+    const element = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
+    return element?.dataset.mapCombatPhase === "dispelEffect"
+      && Number(element.dataset.mapCombatFrame) >= 20;
+  });
+  await expect(canvas).toHaveAttribute("data-ice-disabled-unit-ids", frozenTargetId);
+  await expect(canvas).not.toHaveAttribute("data-map-combat-effect-tile-count", "0");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/debug-stage1-dispel-animation.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as {
+      lastSpecialAction?: { actionId?: string };
+      specialActionPresentation?: object;
+    } | undefined;
+    return current?.lastSpecialAction?.actionId === "dispel"
+      && current.specialActionPresentation === undefined;
+  });
+  const state = await page.evaluate(() => window.__ANGEL2__?.getState() as {
+    units: Array<{
+      id: string;
+      acted: boolean;
+      actionDisabled: boolean;
+      statuses: Record<string, number>;
+    }>;
+  });
+  expect(state.units.find(({ id }) => id === frozenTargetId)).toMatchObject({
+    acted: false,
+    actionDisabled: false,
+    statuses: {
+      attackDown: 0,
+      defenseDown: 0,
+      confusion: 0,
+      poison: 0,
+      techniqueSeal: 0,
+    },
+  });
+  await expect(canvas).not.toHaveAttribute("data-ice-disabled-unit-ids", frozenTargetId);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/debug-stage1-dispel-result.png`,
   });
 });
 

@@ -3,6 +3,8 @@ import type { Position, UnitStatuses } from "../../types";
 
 export type { BattleActionId };
 
+export type ActionBlockReason = "magicGuard" | "frozen" | "classImmune";
+
 export interface BattleActionIntent {
   actionId: BattleActionId;
   actorId: string;
@@ -23,6 +25,7 @@ export interface SpecialActionAffectedUnit {
   damage: number;
   healing: number;
   blocked: boolean;
+  blockReason?: ActionBlockReason;
   died: boolean;
   moved: boolean;
 }
@@ -40,6 +43,7 @@ export interface SpecialActionResult {
   damage: number;
   healing: number;
   blocked: boolean;
+  blockReason?: ActionBlockReason;
   targetDied: boolean;
   experienceGained: number;
   affectedUnits: readonly SpecialActionAffectedUnit[];

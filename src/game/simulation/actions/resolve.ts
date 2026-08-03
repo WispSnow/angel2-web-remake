@@ -5,6 +5,7 @@ import type { DeterministicRng } from "../rng";
 import { cloneUnitStatuses } from "../status";
 import { techniqueEffectRange, type ActionBattlefield } from "./range-map";
 import type {
+  ActionBlockReason,
   BattleActionIntent,
   PreparedBattleAction,
   SpecialActionAffectedUnit,
@@ -22,7 +23,7 @@ const copyPosition = ({ x, y }: Position): Position => ({ x, y });
 function affectedUnit(
   unit: BattleUnit,
   patch: Partial<Pick<SpecialActionAffectedUnit,
-    "positionAfter" | "lifeAfter" | "actionDisabledAfter" | "statusesAfter" | "damage" | "healing" | "blocked">>,
+    "positionAfter" | "lifeAfter" | "actionDisabledAfter" | "statusesAfter" | "damage" | "healing" | "blocked" | "blockReason">>,
 ): SpecialActionAffectedUnit {
   const positionBefore = copyPosition(unit);
   const positionAfter = patch.positionAfter ? copyPosition(patch.positionAfter) : copyPosition(unit);
@@ -42,6 +43,7 @@ function affectedUnit(
     damage: patch.damage ?? 0,
     healing: patch.healing ?? 0,
     blocked: patch.blocked ?? false,
+    blockReason: patch.blockReason,
     died: lifeAfter === 0,
     moved: positionKey(positionBefore) !== positionKey(positionAfter),
   };
@@ -56,15 +58,25 @@ function prepareSingleTarget(
   let damage = 0;
   let healing = 0;
   let blocked = false;
+  let blockReason: ActionBlockReason | undefined;
   const targetStatusesAfter = cloneUnitStatuses(target.statuses);
 
   if (intent.actionId === "archer-shot") {
     const definition = BATTLE_ACTION_DEFINITIONS["archer-shot"];
-    damage = trial.between(definition.damage.minimum, definition.damage.maximum);
+    if (target.actionDisabled) {
+      blocked = true;
+      blockReason = "frozen";
+    } else {
+      damage = trial.between(definition.damage.minimum, definition.damage.maximum);
+    }
   } else if (intent.actionId === "fire-1") {
     const definition = BATTLE_ACTION_DEFINITIONS["fire-1"];
-    if (target.statuses.magicGuard > 0) {
+    if (target.actionDisabled) {
       blocked = true;
+      blockReason = "frozen";
+    } else if (target.statuses.magicGuard > 0) {
+      blocked = true;
+      blockReason = "magicGuard";
       targetStatusesAfter.magicGuard = 0;
     } else {
       damage = Math.min(
@@ -73,12 +85,34 @@ function prepareSingleTarget(
         Math.floor(targetMaximumLife * definition.damage.maxLifePercent / 100),
       );
     }
-  } else {
+  } else if (intent.actionId === "heal-1") {
     const definition = BATTLE_ACTION_DEFINITIONS["heal-1"];
-    healing = Math.min(
-      targetMaximumLife - target.life,
-      Math.floor(targetMaximumLife * definition.healing.maxLifePercent / 100),
-    );
+    if (target.actionDisabled) {
+      blocked = true;
+      blockReason = "frozen";
+    } else {
+      healing = Math.min(
+        targetMaximumLife - target.life,
+        Math.floor(targetMaximumLife * definition.healing.maxLifePercent / 100),
+      );
+    }
+  } else {
+    const definition = BATTLE_ACTION_DEFINITIONS.dispel;
+    targetStatusesAfter.confusion = 0;
+    targetStatusesAfter.attackDown = 0;
+    targetStatusesAfter.defenseDown = 0;
+    targetStatusesAfter.poison = 0;
+    targetStatusesAfter.techniqueSeal = 0;
+    return {
+      affected: affectedUnit(target, {
+        actionDisabledAfter: false,
+        statusesAfter: targetStatusesAfter,
+      }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
   }
 
   const lifeAfter = Math.max(0, Math.min(targetMaximumLife, target.life - damage + healing));
@@ -98,7 +132,7 @@ function prepareSingleTarget(
       definition.experience.randomMaximum,
     );
     if (targetDied) experienceGained += killRewardFor(target.classId, target.side);
-  } else {
+  } else if (intent.actionId === "heal-1") {
     const definition = BATTLE_ACTION_DEFINITIONS["heal-1"];
     const q = Math.floor(healing * 10 / targetMaximumLife);
     experienceGained = trial.between(
@@ -114,6 +148,7 @@ function prepareSingleTarget(
       damage,
       healing,
       blocked,
+      blockReason,
     }),
     experienceGained,
   };
@@ -138,15 +173,28 @@ function prepareLightning(
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {
       const statusesAfter = cloneUnitStatuses(unit.statuses);
-      const blocked = unit.statuses.magicGuard > 0;
-      statusesAfter.magicGuard = 0;
+      const frozen = unit.actionDisabled;
+      const guarded = unit.statuses.magicGuard > 0;
+      const blocked = frozen || guarded;
+      const blockReason: ActionBlockReason | undefined = frozen
+        ? "frozen"
+        : guarded
+          ? "magicGuard"
+          : undefined;
+      if (!frozen) statusesAfter.magicGuard = 0;
       const rangeValue = effect.valueAt(unit) as 1 | 2 | 3;
       const damage = blocked
         ? 0
         : Math.min(unit.life, definition.damage.byRangeValue[rangeValue]);
       const lifeAfter = unit.life - damage;
       if (lifeAfter === 0) experienceGained += killRewardFor(unit.classId, unit.side);
-      return affectedUnit(unit, { statusesAfter, blocked, damage, lifeAfter });
+      return affectedUnit(unit, {
+        statusesAfter,
+        blocked,
+        blockReason,
+        damage,
+        lifeAfter,
+      });
     });
   return {
     affectedUnits,
@@ -182,11 +230,20 @@ function prepareIce(
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {
       const statusesAfter = cloneUnitStatuses(unit.statuses);
-      const blocked = unit.statuses.magicGuard > 0
-        || unit.classId === "dragon"
+      const alreadyFrozen = unit.actionDisabled;
+      const guarded = unit.statuses.magicGuard > 0;
+      const classImmune = unit.classId === "dragon"
         || unit.classId === "head"
         || unit.classId === "hand";
-      if (unit.statuses.magicGuard > 0) statusesAfter.magicGuard = 0;
+      const blocked = alreadyFrozen || guarded || classImmune;
+      const blockReason: ActionBlockReason | undefined = alreadyFrozen
+        ? "frozen"
+        : guarded
+          ? "magicGuard"
+          : classImmune
+            ? "classImmune"
+            : undefined;
+      if (!alreadyFrozen && guarded) statusesAfter.magicGuard = 0;
       let positionAfter = copyPosition(unit);
       if (!blocked) {
         const currentValue = effect.valueAt(unit);
@@ -209,6 +266,7 @@ function prepareIce(
         actionDisabledAfter: blocked ? unit.actionDisabled : true,
         statusesAfter,
         blocked,
+        blockReason,
       });
     });
   const experienceGained = moved > 0
@@ -260,6 +318,7 @@ export function prepareSpecialAction(
       damage: affectedUnits.reduce((total, affected) => total + affected.damage, 0),
       healing: affectedUnits.reduce((total, affected) => total + affected.healing, 0),
       blocked: affectedUnits.length > 0 && affectedUnits.every(({ blocked }) => blocked),
+      blockReason: primary?.blockReason,
       targetDied: primary?.died ?? false,
       experienceGained,
       affectedUnits,

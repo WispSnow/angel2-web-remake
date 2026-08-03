@@ -31,6 +31,7 @@ function minimumOrdinaryDamage(
   attacker: BattleUnit,
   defender: BattleUnit,
 ): number {
+  if (defender.actionDisabled) return 0;
   const attackerStats = context.statsFor(attacker);
   const defenderStats = context.statsFor(defender);
   const terrainDefense = Math.floor(
@@ -71,7 +72,8 @@ function planOrdinaryAttack(
     positionDefense: number;
   }> = [];
 
-  for (const target of context.units.filter((candidate) => candidate.side === 1)) {
+  for (const target of context.units.filter((candidate) =>
+    candidate.side === 1 && !candidate.actionDisabled)) {
     for (const offset of offsets) {
       const position = { x: target.x + offset.x, y: target.y + offset.y };
       if (!positionKeys.has(positionKey(position)) || occupied.has(positionKey(position))) continue;
@@ -131,7 +133,7 @@ function isGuaranteedSpecialKill(
 ): boolean {
   if (action.actionId !== "fire-1" || !action.targetId) return false;
   const target = context.unit(action.targetId);
-  if (!target || target.statuses.magicGuard > 0) return false;
+  if (!target || target.actionDisabled || target.statuses.magicGuard > 0) return false;
   const definition = BATTLE_ACTION_DEFINITIONS["fire-1"];
   const damage = Math.min(
     target.life,

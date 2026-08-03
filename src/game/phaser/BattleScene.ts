@@ -132,6 +132,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
       if (stage1Assets) {
         this.load.image("ally-magician", stage1Assets.allyMagician);
+        this.load.image("ally-magic-priest", stage1Assets.allyMagicPriest);
         this.load.image("enemy-sister", stage1Assets.enemySister);
       }
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
@@ -148,6 +149,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         preloadMapTechniqueAssets(this, lightningAssets!);
         stage1PresentationAssets.ice1.expansion.forEach((source, frame) =>
           this.load.image(`map-ice-1-expansion-${frame}`, source));
+        stage1PresentationAssets.dispel.effect.forEach((source, frame) =>
+          this.load.image(`map-dispel-${frame}`, source));
       }
     }
 
@@ -230,6 +233,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       canvas.dataset.edgePanDirection = "0,0";
       canvas.dataset.primaryPointerHeld = "false";
       this.setNativePointerCursor("hand");
+      // Phaser still reports the scene as inactive during part of create(), so
+      // the eager sync above can be ignored by the stale-scene guard. Static
+      // debug fixtures may not emit another controller update before their
+      // first frame; draw once more after the scene has entered its first tick.
+      this.time.delayedCall(0, () => this.sync());
     }
 
     update(time: number): void {
@@ -435,6 +443,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           || unit.classId === "cavalry"
           || unit.classId === "sister"
           || unit.classId === "magician"
+          || unit.classId === "magic-priest"
           || unit.classId === "warrior"
         ) return `ally-${unit.classId}`;
         return "ally-soldier";
@@ -582,7 +591,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         view.container.setVisible(!erasedByDeath);
         if (!erasedByDeath) visibleCount += 1;
         this.drawLifeDigits(view, { ...unit, life: displayedLife });
-        view.iceDisabledOverlay?.setVisible(unit.actionDisabled && !mapPresentation);
+        // Frozen units are state-driven and untargetable; keep the shell visible
+        // while unrelated area techniques play until dispel or phase cleanup.
+        view.iceDisabledOverlay?.setVisible(unit.actionDisabled);
         view.actedBadge.setVisible(unit.acted && !mapPresentation);
       }
       for (const [id, view] of this.unitViews) {
@@ -681,6 +692,23 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ).setOrigin(.5).setDepth(8),
             );
           }
+        } else if (special.phase === "dispelEffect") {
+          const dispel = stage1Presentation!.dispel;
+          const states: Array<readonly number[]> = [];
+          for (const { runtimeTileCodeStates } of dispel.phases) {
+            for (const state of runtimeTileCodeStates) states.push(state);
+          }
+          const runtimeTileCodes = states[special.frame] ?? [];
+          runtimeTileCodes.forEach((runtimeTileCode, row) => {
+            if (runtimeTileCode === 0) return;
+            this.combatEffects.push(
+              this.add.image(
+                center.x * TILE_WIDTH,
+                (center.y + dispel.dynamicPresentation.descriptor.yOffset + row) * TILE_HEIGHT,
+                `map-dispel-${runtimeTileCode - 1}`,
+              ).setOrigin(0).setDepth(8),
+            );
+          });
         } else if (special.phase === "specialDeath" && target) {
           const descriptor = MAP_DEATH_DESCRIPTORS[special.frame];
           descriptor?.frames.forEach((sourceFrame, index) => {

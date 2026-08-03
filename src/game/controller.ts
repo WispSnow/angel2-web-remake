@@ -5,6 +5,7 @@ import {
   stage1ActionPresentation,
 } from "./content/actions";
 import {
+  classDefinition,
   className,
   promotionTargetsFor,
   type PromotionTarget,
@@ -112,6 +113,7 @@ export type SpecialActionPresentationPhase =
   | "lightningHit"
   | "lightningCleanup"
   | "iceExpansion"
+  | "dispelEffect"
   | "specialDeath";
 
 export interface SpecialActionPresentation {
@@ -157,10 +159,13 @@ const CLASS_COMMANDS: Readonly<Partial<Record<BattleUnit["classId"], UnitCommand
   archer: { id: "shoot", label: "射擊" },
   sister: { id: "technique", label: "技術" },
   magician: { id: "technique", label: "技術" },
+  "magic-priest": { id: "technique", label: "技術" },
 };
 
 const SISTER_TECHNIQUES = ["fire-1", "heal-1"] as const satisfies readonly BattleActionId[];
 const MAGICIAN_TECHNIQUES = ["fire-1", "lightning-1", "ice-1"] as const satisfies readonly BattleActionId[];
+const MAGIC_PRIEST_TIER3_TECHNIQUES = ["dispel"] as const satisfies readonly BattleActionId[];
+const MAGIC_PRIEST_TIER3_EXPERIENCE = classDefinition("magic-priest").dataRows[2].experienceThreshold;
 
 const GROUP_COMMANDS: readonly GroupCommand[] = [
   { id: "allRest", label: "全部休息" },
@@ -486,10 +491,13 @@ export class GameController {
   }
 
   get unitCommands(): readonly UnitCommand[] {
-    const classCommand = this.selectedUnit
-      && !(this.selectedUnit.classId === "sister" && this.selectedUnit.statuses.techniqueSeal > 0)
+    const selectedClassCommand = this.selectedUnit
       ? CLASS_COMMANDS[this.selectedUnit.classId]
       : undefined;
+    const classCommand = selectedClassCommand?.id === "technique"
+      && this.selectedUnit?.statuses.techniqueSeal
+      ? undefined
+      : selectedClassCommand;
     if (this.commandMenuKind === "postMove") {
       return classCommand?.id === "shoot"
         ? [POST_MOVE_COMMANDS[0], classCommand, ...POST_MOVE_COMMANDS.slice(1)]
@@ -505,6 +513,9 @@ export class GameController {
       ? SISTER_TECHNIQUES
       : this.selectedUnit?.classId === "magician"
         ? MAGICIAN_TECHNIQUES
+        : this.selectedUnit?.classId === "magic-priest"
+          && this.selectedUnit.experience >= MAGIC_PRIEST_TIER3_EXPERIENCE
+          ? MAGIC_PRIEST_TIER3_TECHNIQUES
         : [];
   }
 
@@ -807,7 +818,7 @@ export class GameController {
       this.actionMode = "actionMenu";
       this.statusMessage = `選擇${unit.className}的行動。`;
     } else if (unit.actionDisabled) {
-      this.statusMessage = "此單位正被冰封，本次我方階段不能行動。";
+      this.statusMessage = "此單位正被冰封，本次我方階段不能行動，也不能被攻擊或治療。";
     } else {
       this.statusMessage = "此單位本回合已行動。";
     }
@@ -844,7 +855,9 @@ export class GameController {
     const unit = this.selectedUnit;
     if (this.phase !== "player" || this.actionMode !== "actionMenu" || !unit) return;
     this.targets = this.battle.units
-      .filter((candidate) => candidate.side !== unit.side && manhattan(unit, candidate) === 1)
+      .filter((candidate) => candidate.side !== unit.side
+        && !candidate.actionDisabled
+        && manhattan(unit, candidate) === 1)
       .map(({ x, y }) => ({ x, y }));
     if (this.targets.length === 0) {
       this.statusMessage = this.commandMenuKind === "postMove"
@@ -879,7 +892,8 @@ export class GameController {
       this.phase !== "player"
       || this.actionMode !== "actionMenu"
       || this.commandMenuKind !== "initial"
-      || (unit?.classId !== "sister" && unit?.classId !== "magician")
+      || !unit
+      || CLASS_COMMANDS[unit.classId]?.id !== "technique"
       || unit.statuses.techniqueSeal > 0
     ) return;
     this.techniqueIndex = 0;
@@ -1116,9 +1130,15 @@ export class GameController {
         if (presentation) await this.presentSpecialDeath(actorPresentation, presentation, result);
       }
       const moved = result.affectedUnits.filter(({ moved }) => moved).length;
-      const frozen = result.affectedUnits.filter(({ actionDisabledAfter }) => actionDisabledAfter).length;
+      const frozen = result.affectedUnits.filter(({ actionDisabledBefore, actionDisabledAfter }) =>
+        !actionDisabledBefore && actionDisabledAfter).length;
+      const cleansedFrozen = actionId === "dispel"
+        && result.affectedUnits.some(({ actionDisabledBefore, actionDisabledAfter }) =>
+          actionDisabledBefore && !actionDisabledAfter);
       this.statusMessage = actionId === "ice-1"
-        ? `冰雪擊退 ${moved} 名敵人，冰封 ${frozen} 名；其下一次本陣營行動被跳過。`
+        ? `冰雪擊退 ${moved} 名敵人，冰封 ${frozen} 名；其下一次本陣營行動被跳過，期間不能成為攻擊或治療目標。`
+        : actionId === "dispel" && targetPresentation
+          ? `${targetPresentation.name}的${cleansedFrozen ? "冰封及異常狀態" : "異常狀態"}已由破邪解除。`
         : actionId === "lightning-1"
           ? `落雷對 ${result.affectedUnits.length} 名敵人造成共 ${result.damage} 點傷害。`
           : result.blocked && targetPresentation
@@ -1210,12 +1230,21 @@ export class GameController {
       for (let frame = 0; frame < hit.cleanup.drawCount; frame += 1) {
         await present("lightningCleanup", frame, hit.cleanup.waitPerDrawNativeTicks);
       }
-    } else {
+    } else if (result.actionId === "ice-1") {
       const ice = stage1ActionPresentation().ice1;
       for (let cycle = 0; cycle < ice.cycles; cycle += 1) {
         this.queueAudioCue(50, `ice-1-cycle-${cycle + 1}`, "un");
         for (let frame = 0; frame < ice.cycle.drawCount; frame += 1) {
           await present("iceExpansion", cycle * ice.cycle.drawCount + frame, ice.cycle.waitPerDrawNativeTicks);
+        }
+      }
+    } else {
+      const dispel = stage1ActionPresentation().dispel;
+      let frame = 0;
+      for (const phase of dispel.phases) {
+        for (let draw = 0; draw < phase.drawCount; draw += 1) {
+          await present("dispelEffect", frame, phase.waitPerDrawNativeTicks);
+          frame += 1;
         }
       }
     }
@@ -2965,6 +2994,48 @@ export class GameController {
     this.statusMessage = pursuingStage1Target
       ? `調試場景：${actor.className}可對追擊型敵兵驗證一次敵方階段冰封。`
       : `自動驗收：${actor.className}職業行動場景。`;
+    this.busy = false;
+    this.emit();
+  }
+
+  forceDispelSetupForTest(): void {
+    if (!this.debugMode || this.battle.stage.id !== "stage-01") return;
+    const actor = this.battle.unit("1:0");
+    const ally = this.battle.unit("1:1")
+      ?? this.battle.units.find((unit) => unit.side === 1 && unit.id !== actor?.id);
+    const objective = this.battle.unit("2:16");
+    if (!actor || !ally || !objective) return;
+
+    actor.classId = "magic-priest";
+    actor.className = className(actor.classId);
+    actor.experience = MAGIC_PRIEST_TIER3_EXPERIENCE;
+    actor.life = this.battle.statsFor(actor).maxLife;
+    actor.x = 29;
+    actor.y = 26;
+    actor.acted = false;
+    actor.actionDisabled = false;
+
+    ally.x = 30;
+    ally.y = 26;
+    ally.acted = false;
+    ally.actionDisabled = true;
+    ally.statuses.attackDown = 3;
+    ally.statuses.defenseDown = 3;
+    ally.statuses.confusion = 3;
+    ally.statuses.poison = 3;
+    ally.statuses.techniqueSeal = 3;
+
+    objective.x = 1;
+    objective.y = 1;
+    objective.acted = true;
+    objective.actionDisabled = false;
+    this.battle.units = [actor, ally, objective];
+    this.battle.focusId = actor.id;
+    this.phase = "player";
+    this.centerCamera(actor);
+    this.cursor = { x: actor.x, y: actor.y };
+    this.resetAction();
+    this.statusMessage = "調試場景：冰封友軍不能被治療；魔祭師可用破邪解除冰封與異常。";
     this.busy = false;
     this.emit();
   }

@@ -24,6 +24,8 @@ function promoteForAction(unit: BattleUnit, actionId: BattleActionId): void {
     ? "archer"
     : actionId === "lightning-1" || actionId === "ice-1"
       ? "magician"
+      : actionId === "dispel"
+        ? "magic-priest"
       : "sister";
   unit.className = className(unit.classId);
 }
@@ -104,6 +106,78 @@ describe("Stage-0 class actions", () => {
     battle.commitPreparedAction(prepared);
     expect(target.life).toBe(lifeBefore);
     expect(target.statuses.magicGuard).toBe(0);
+  });
+
+  it("excludes frozen units from shooting, damage, and healing targets", () => {
+    for (const actionId of ["archer-shot", "fire-1", "lightning-1", "heal-1"] as const) {
+      const battle = new Stage0Battle(0);
+      const { actor, target } = arrangeTarget(
+        battle,
+        actionId,
+        actionId === "heal-1" ? 1 : 2,
+      );
+      target.actionDisabled = true;
+      target.statuses.magicGuard = 2;
+      const lifeBefore = target.life;
+      const rngBefore = { state: battle.rng.state, calls: battle.rng.calls };
+
+      expect(battle.actionTargets(actor.id, actionId)).not.toContain(target);
+      expect(() => battle.prepareSpecialAction({
+        actionId,
+        actorId: actor.id,
+        targetId: target.id,
+      })).toThrow("illegal special action");
+      expect(target.life).toBe(lifeBefore);
+      expect(target.statuses.magicGuard).toBe(2);
+      expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(rngBefore);
+      expect(actor.acted).toBe(false);
+    }
+  });
+
+  it("lets dispel clear frozen and original negative statuses while preserving positive statuses", () => {
+    const battle = new Stage0Battle(0);
+    const { actor, target } = arrangeTarget(battle, "dispel", 1);
+    actor.experience = 1160;
+    target.actionDisabled = true;
+    target.statuses = {
+      attackUp: 2,
+      defenseUp: 1,
+      magicGuard: 1,
+      confusion: 3,
+      attackDown: 3,
+      defenseDown: 3,
+      poison: 3,
+      techniqueSeal: 3,
+    };
+    battle.units = [actor, target];
+
+    expect(battle.actionTargets(actor.id, "dispel")).toContain(target);
+    const prepared = battle.prepareSpecialAction({
+      actionId: "dispel",
+      actorId: actor.id,
+      targetId: target.id,
+    });
+    expect(prepared.result.affectedUnits[0]).toMatchObject({
+      unitId: target.id,
+      actionDisabledBefore: true,
+      actionDisabledAfter: false,
+      statusesAfter: {
+        attackUp: 2,
+        defenseUp: 1,
+        magicGuard: 1,
+        confusion: 0,
+        attackDown: 0,
+        defenseDown: 0,
+        poison: 0,
+        techniqueSeal: 0,
+      },
+    });
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(14);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(17);
+
+    battle.commitPreparedAction(prepared);
+    expect(target.actionDisabled).toBe(false);
+    expect(target.statuses.poison).toBe(0);
   });
 
   it("heals an ally by 24% of maximum life and rejects stale prepared patches", () => {
@@ -220,6 +294,18 @@ describe("Stage-0 class actions", () => {
         magicGuard: 1,
       },
     };
+    const frozenTarget = {
+      ...battle.units.find((unit) => unit.side === 2)!,
+      id: "lightning-frozen",
+      x: 4,
+      y: 2,
+      life: 200,
+      actionDisabled: true,
+      statuses: {
+        ...battle.units.find((unit) => unit.side === 2)!.statuses,
+        magicGuard: 1,
+      },
+    };
     const outsideTarget = {
       ...battle.units.find((unit) => unit.side === 2)!,
       id: "lightning-outside",
@@ -234,21 +320,30 @@ describe("Stage-0 class actions", () => {
       centerTarget,
       rng,
       {
-        units: [actor, centerTarget, guardedTarget, outsideTarget],
+        units: [actor, centerTarget, guardedTarget, frozenTarget, outsideTarget],
         battlefield: openBattlefield,
         statsFor: (unit) => battle.statsFor(unit),
       },
       centerTarget,
     );
 
-    expect(prepared.result.affectedUnits).toHaveLength(2);
+    expect(prepared.result.affectedUnits).toHaveLength(3);
     expect(prepared.result.affectedUnits).toEqual(expect.arrayContaining([
       expect.objectContaining({ unitId: centerTarget.id, damage: 50, lifeAfter: 150 }),
       expect.objectContaining({
         unitId: guardedTarget.id,
         damage: 0,
         blocked: true,
+        blockReason: "magicGuard",
         statusesAfter: expect.objectContaining({ magicGuard: 0 }),
+      }),
+      expect.objectContaining({
+        unitId: frozenTarget.id,
+        damage: 0,
+        blocked: true,
+        blockReason: "frozen",
+        lifeAfter: 200,
+        statusesAfter: expect.objectContaining({ magicGuard: 1 }),
       }),
     ]));
     expect(prepared.result.affectedUnits.some(({ unitId }) => unitId === outsideTarget.id)).toBe(false);
@@ -354,6 +449,54 @@ describe("Stage-0 class actions", () => {
       blocked: false,
       actionDisabledAfter: true,
     }));
+  });
+
+  it("does not stack, refresh, move, or consume guard when ice hits an already frozen target", () => {
+    const battle = new Stage0Battle(0);
+    const actor = {
+      ...battle.unit("1:0")!,
+      id: "ice-actor",
+      x: 5,
+      y: 5,
+      classId: "magician" as const,
+    };
+    const target = {
+      ...battle.units.find((unit) => unit.side === 2)!,
+      id: "already-frozen",
+      x: 5,
+      y: 6,
+      actionDisabled: true,
+      statuses: {
+        ...battle.units.find((unit) => unit.side === 2)!.statuses,
+        magicGuard: 1,
+      },
+    };
+    const prepared = prepareSpecialAction(
+      { actionId: "ice-1", actorId: actor.id },
+      actor,
+      undefined,
+      new DeterministicRng(0x5678),
+      {
+        units: [actor, target],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      actor,
+    );
+
+    expect(prepared.result.affectedUnits).toEqual([
+      expect.objectContaining({
+        unitId: target.id,
+        positionAfter: { x: 5, y: 6 },
+        actionDisabledBefore: true,
+        actionDisabledAfter: true,
+        blocked: true,
+        blockReason: "frozen",
+        statusesAfter: expect.objectContaining({ magicGuard: 1 }),
+      }),
+    ]);
+    expect(prepared.result.experienceGained).toBe(0);
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore);
   });
 
   it("locks ice to the actor cell and rejects any caller-supplied target center", () => {

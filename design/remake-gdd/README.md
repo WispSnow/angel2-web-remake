@@ -53,7 +53,7 @@
 | [`systems/status-foundation.md`](systems/status-foundation.md) | 防魔消费与 v6 最小状态边界 | M00.6 / 已接受 |
 | [`systems/deployment-stage1.md`](systems/deployment-stage1.md) | 第 1 关固定/可选单位与部署提交 | M02 / 已实现并通过自动验收 |
 | [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M02 / 已实现并通过自动验收 |
-| [`systems/technique-lab.md`](systems/technique-lab.md) | 任意敌我职业配置与 `1L..4L` 原版地图表现重放 | 开发工具 / 已实现 |
+| [`systems/technique-lab.md`](systems/technique-lab.md) | 任意敌我职业配置、`1L..4L/1C..4C/TR` 原版地图表现与冰封净化 | 开发工具 / 已实现 |
 | [`systems/debug-harness.md`](systems/debug-harness.md) | 按关选择、快速结算与确定性测试场景 | 开发工具 / 已实现 |
 | [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现，待第 1 关人工复验 |
 
@@ -79,5 +79,6 @@
 - 不可以：把 DOS 内存结构当成 Web 领域模型、为了方便编码而改玩法、在 `[TBD]` 上自行补规则。
 - 第 0 关已由用户明确授权作为首个实现例外；其 Phaser 工程、独立模拟与自动验收见仓库根目录 [`README.md`](../../README.md)。
 - 第 1 关已由用户明确授权作为有界 M02 实现例外；只解除其合同列出的部署、内容、
-  `1F/1H/1L/1C`、`REMAKE-012` AI、事件、v9（含 v2–v8 迁移）和路由范围。
+  `1F/1H/1L/1C`、`REMAKE-012` AI、`REMAKE-013` 冰封、事件、v10（含 v2–v9 迁移）和
+  路由范围。
 - 其余战役仍须通过 [`09-design-acceptance.md`](09-design-acceptance.md) 的对应门槛并得到用户明确授权后再进入实现。

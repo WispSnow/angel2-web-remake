@@ -253,6 +253,19 @@ describe("stage 1 battle construction", () => {
     expect(battle.enemyAiIntentFor("2:16")).toBe("pursuit");
   });
 
+  it("does not treat a frozen player unit as a damage-action candidate", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const player = battle.unit("1:0")!;
+    const sister = battle.unit("2:43")!;
+    player.x = sister.x;
+    player.y = sister.y + 5;
+    player.actionDisabled = true;
+
+    expect(battle.actionRange(sister.id, "fire-1").valueAt(player)).toBeGreaterThan(0);
+    expect(battle.planSpecialAiAction(sister.id, "fire-1")).toBeUndefined();
+    expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: [] });
+  });
+
   it("keeps low-life pursuit units in place to rest unless they have a guaranteed kill", () => {
     const battle = new Stage1Battle(campaign, deploymentWithMagician());
     const soldier = battle.unit("2:45")!;

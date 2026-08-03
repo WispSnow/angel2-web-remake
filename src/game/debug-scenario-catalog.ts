@@ -79,6 +79,15 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-01-dispel",
+    stageId: "stage-01",
+    stageLabel: "第 1 關 · 騎士城堡前",
+    title: "冰封／破邪靶場",
+    phase: "TR / REMAKE-013",
+    description: "魔祭師可對相鄰冰封友軍施展破邪，驗證攻擊／治療不可選與演出後解封。",
+    fixture: true,
+  },
+  {
     id: "stage-01-enemy-sister",
     stageId: "stage-01",
     stageLabel: "第 1 關 · 騎士城堡前",

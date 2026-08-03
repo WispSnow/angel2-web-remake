@@ -43,7 +43,7 @@ export interface BattleUnit extends Position {
   life: number;
   experience: number;
   acted: boolean;
-  /** Native per-slot action-disable byte; ice clears after this side's next phase. */
+  /** v9 save field backing the stableRemake “冰封” state; it does not stack. */
   actionDisabled: boolean;
   statuses: UnitStatuses;
 }
@@ -133,8 +133,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 9;
-  contentVersion: "stage-01-ice-lock-1";
+  version: 10;
+  contentVersion: "stage-01-frozen-dispel-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

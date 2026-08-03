@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   TECHNIQUE_LAB_AUDIO_ASSETS,
   TECHNIQUE_LAB_CATALOG,
+  TECHNIQUE_LAB_DISPEL,
   TECHNIQUE_LAB_ICE,
   TECHNIQUE_LAB_LIGHTNING,
   TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS,
@@ -117,14 +118,29 @@ describe("map technique laboratory evidence", () => {
       "2L": 10,
       "3L": 10,
       "4L": 10,
+      "TR": 5,
     });
+  });
+
+  it("uses the original 50-frame, 250-tick dispel presentation", () => {
+    expect(TECHNIQUE_LAB_DISPEL).toMatchObject({
+      code: "TR",
+      visibleName: "破邪",
+      fixedGraphicWaitNativeTicks: 250,
+      audioRequests: [],
+    });
+    expect(TECHNIQUE_LAB_DISPEL.phases.map(({ drawCount }) => drawCount)).toEqual([24, 26]);
+    expect(TECHNIQUE_LAB_DISPEL.phases.reduce(
+      (total, { runtimeTileCodeStates }) => total + runtimeTileCodeStates.length,
+      0,
+    )).toBe(50);
   });
 
   it("exposes the full native menu while gating unfinished techniques", () => {
     expect(TECHNIQUE_LAB_CATALOG).toHaveLength(33);
     expect(TECHNIQUE_LAB_CATALOG.filter(({ implementationId }) => implementationId !== null)
       .map(({ nativeCode }) => nativeCode))
-      .toEqual(["1C", "1F", "1H", "1L", "2C", "2L", "3C", "3L", "4C", "4L"]);
+      .toEqual(["1C", "1F", "1H", "1L", "2C", "2L", "3C", "3L", "4C", "4L", "TR"]);
     expect(TECHNIQUE_LAB_CATALOG.find(({ nativeCode }) => nativeCode === "4F"))
       .toMatchObject({ label: "究級炎暴", implementationId: null });
   });

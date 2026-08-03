@@ -195,6 +195,7 @@ export const STAGE1_ASSETS = {
   minimap: "/assets/original/stage1-minimap.png",
   storyBackground: "/assets/original/story-stage1-background.png",
   allyMagician: "/assets/original/unit-ally-magician.png",
+  allyMagicPriest: "/assets/original/unit-ally-magic-priest.png",
   enemySister: "/assets/original/unit-enemy-sister.png",
   portraits: {
     0: "/assets/original/portrait-0.png",

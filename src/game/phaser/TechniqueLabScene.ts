@@ -3,6 +3,7 @@ import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../content/stage0-actions.gen
 import { STAGE1_ACTION_PRESENTATION_ASSETS } from "../content/stage1-actions.generated";
 import {
   TECHNIQUE_LAB_GRAPHIC_ASSETS,
+  TECHNIQUE_LAB_DISPEL,
   TECHNIQUE_LAB_LIGHTNING,
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "../content/technique-lab.generated";
@@ -32,6 +33,7 @@ export type TechniqueLabVisualFrame =
   | { readonly kind: "fire"; readonly frame: number }
   | { readonly kind: "heal-primary"; readonly frame: number }
   | { readonly kind: "heal-tail"; readonly frame: number }
+  | { readonly kind: "dispel"; readonly frame: number; readonly runtimeTileCodes: readonly number[] }
   | {
     readonly kind: "ice";
     readonly frame: number;
@@ -152,6 +154,16 @@ export function startTechniqueLabPhaser(
             ? `technique-lab-heal-primary-${frame.frame}`
             : `technique-lab-heal-tail-${frame.frame}`,
         ).setOrigin(.5, 1).setDepth(8));
+      } else if (frame.kind === "dispel") {
+        frame.runtimeTileCodes.forEach((runtimeTileCode, row) => {
+          if (runtimeTileCode === 0) return;
+          this.effectObjects.push(this.add.image(
+            center.x * TILE_WIDTH,
+            (center.y + TECHNIQUE_LAB_DISPEL.dynamicPresentation.descriptor.yOffset + row)
+              * TILE_HEIGHT,
+            `map-technique-un-57-${runtimeTileCode - 1}`,
+          ).setOrigin(0).setDepth(8));
+        });
       } else {
         const sourceFrame = frame.frame % STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion.length;
         for (const { position, value } of session.effectCells()) {

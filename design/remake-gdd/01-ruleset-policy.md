@@ -2,7 +2,7 @@
 
 ## 目的
 
-本文件决定原版事实、默认修复、严格兼容和 Mod 的关系。具体九项已确认修复见 [`reverse/gdd/web-remake-rule-decisions.md`](../../reverse/gdd/web-remake-rule-decisions.md)。
+本文件决定原版事实、默认修复、严格兼容和 Mod 的关系。具体已确认修复见 [`reverse/gdd/web-remake-rule-decisions.md`](../../reverse/gdd/web-remake-rule-decisions.md)。
 
 ## 四层模型
 
@@ -15,7 +15,7 @@
 
 `originalFacts` 不是运行时可混搭配置，而是所有规则选择的证据来源。一次游玩只选择一个基础规则集；`modProfile` 不能同时要求互斥的 `stableRemake` 与 `legacyStrict` 行为。
 
-## 默认规则的九项已确认决策
+## 默认规则的已确认决策
 
 | 编号 | `stableRemake` 结果 | `legacyStrict` 差异 |
 | --- | --- | --- |
@@ -28,6 +28,10 @@
 | REMAKE-007 | 存档保存版本化 PRNG 完整状态 | 只可近似原版不可恢复的 PIT 未来 |
 | REMAKE-008 | 无消费者兼容字段原样往返、不赋予效果 | 同默认规则 |
 | REMAKE-009 | 同一动作的范围、数值、效果几何和结算规则不因阵营或人工/AI 控制而改变 | 保留原版玩家/AI 分表及射击数值差异；冰雪双方原本都以自身为中心 |
+| REMAKE-010 | 校正原版休眠的 `D/59` 弓兵眼部覆盖坐标 | 保留原始错误坐标 |
+| REMAKE-011 | 第 1 关出击准备使用现代三列卡片、小地图与详情构图 | 保留原版名单热区构图 |
+| REMAKE-012 | 第 1 关敌军使用守卫／军团警戒／追击语义状态机 | 保留原版逐槽行为编号策略 |
+| REMAKE-013 | 冰封一阶段内不能行动或被攻治、不可叠加；破邪可解除 | 仍可受伤／治疗，破邪不解除冰雪禁用位 |
 
 ## 便利功能分类
 
