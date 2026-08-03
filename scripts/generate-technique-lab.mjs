@@ -46,6 +46,19 @@ assertEqual(
   ],
   "lightning presentation contracts",
 );
+const lightning3 = lightningActions.find(({ code }) => code === "3L");
+if (!lightning3) throw new Error("missing 3L lightning presentation");
+assertEqual(
+  lightning3.phases.map(({ anchorOffsetSequence }) => anchorOffsetSequence),
+  [
+    Array.from({ length: 12 }, (_, index) => ({
+      x: 0,
+      y: index < 3 ? 0 : -Math.floor(index / 3),
+    })),
+    Array.from({ length: 15 }, () => ({ x: 0, y: -4 })),
+  ],
+  "3L rising cloud and strike-point anchors",
+);
 
 const menuLabels = new Map();
 for (const classEntry of rules.techniqueMenu.classes) {

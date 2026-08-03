@@ -107,6 +107,7 @@ export function startTechniqueLabPhaser(
         return;
       }
       const center = this.state.target;
+      let lightningAnchorOffset: { readonly x: number; readonly y: number } | undefined;
       if (frame.kind === "lightning") {
         const actionCode = this.state.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING;
         const definition = TECHNIQUE_LAB_LIGHTNING[actionCode];
@@ -123,6 +124,7 @@ export function startTechniqueLabPhaser(
               : session.affectedUnits().map(({ x, y }) => ({ x, y })),
           });
           this.effectObjects.push(...rendered.images);
+          lightningAnchorOffset = rendered.anchorOffset;
         }
       } else if (frame.kind === "fire") {
         this.effectObjects.push(this.add.image(
@@ -148,7 +150,7 @@ export function startTechniqueLabPhaser(
           ).setOrigin(.5).setDepth(8));
         }
       }
-      this.updateCanvasDataset(frame, this.effectObjects.length);
+      this.updateCanvasDataset(frame, this.effectObjects.length, lightningAnchorOffset);
     }
 
     private drawState(): void {
@@ -213,7 +215,11 @@ export function startTechniqueLabPhaser(
       this.game.canvas.dataset.target = `${this.state.target.x},${this.state.target.y}`;
     }
 
-    private updateCanvasDataset(frame: TechniqueLabVisualFrame, count: number): void {
+    private updateCanvasDataset(
+      frame: TechniqueLabVisualFrame,
+      count: number,
+      lightningAnchorOffset?: { readonly x: number; readonly y: number },
+    ): void {
       const canvas = this.game.canvas;
       canvas.dataset.techniquePhase = frame.kind === "lightning" ? frame.frame.kind : frame.kind;
       canvas.dataset.techniqueFrame = frame.kind === "lightning"
@@ -222,6 +228,9 @@ export function startTechniqueLabPhaser(
       canvas.dataset.effectTileCount = String(count);
       canvas.dataset.lightningCleanupScope = frame.kind === "lightning"
         ? frame.cleanupScope
+        : "";
+      canvas.dataset.mapCombatAnchorOffset = lightningAnchorOffset
+        ? `${lightningAnchorOffset.x},${lightningAnchorOffset.y}`
         : "";
     }
   }

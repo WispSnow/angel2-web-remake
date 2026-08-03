@@ -2758,7 +2758,58 @@ export const TECHNIQUE_LAB_LIGHTNING = {
         ],
         "drawCount": 12,
         "waitPerDrawNativeTicks": 10,
-        "fixedGraphicWaitNativeTicks": 120
+        "fixedGraphicWaitNativeTicks": 120,
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": -1
+          },
+          {
+            "x": 0,
+            "y": -1
+          },
+          {
+            "x": 0,
+            "y": -1
+          },
+          {
+            "x": 0,
+            "y": -2
+          },
+          {
+            "x": 0,
+            "y": -2
+          },
+          {
+            "x": 0,
+            "y": -2
+          },
+          {
+            "x": 0,
+            "y": -3
+          },
+          {
+            "x": 0,
+            "y": -3
+          },
+          {
+            "x": 0,
+            "y": -3
+          }
+        ],
+        "motion": "DS:5234 starts at the selected cell and shifts -50 after every three-descriptor cloud cycle, raising the anchor from row 0 through row -3"
       },
       {
         "resource": "MAGIC/4",
@@ -3472,7 +3523,69 @@ export const TECHNIQUE_LAB_LIGHTNING = {
         "drawCount": 15,
         "waitPerDrawNativeTicks": 10,
         "fixedGraphicWaitNativeTicks": 150,
-        "sequence": "three MAGIC/4 descriptor layouts cycle five times"
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          },
+          {
+            "x": 0,
+            "y": -4
+          }
+        ],
+        "sequence": "three MAGIC/4 descriptor layouts cycle five times at the inherited DS:5234 anchor four rows above the selected cell, placing the six-row bolt's bottom on the selected cell"
       }
     ],
     "commonHit": {

@@ -36,6 +36,23 @@ describe("map technique laboratory evidence", () => {
       .toEqual([1, 1, 2, 2]);
   });
 
+  it("raises the advanced-lightning cloud so the bolt bottom lands on the selected cell", () => {
+    const lightning = TECHNIQUE_LAB_LIGHTNING["3L"];
+    expect(lightning.phases[0].anchorOffsetSequence).toEqual(
+      Array.from({ length: 12 }, (_, index) => ({
+        x: 0,
+        y: index < 3 ? 0 : -Math.floor(index / 3),
+      })),
+    );
+    expect(lightning.phases[1].anchorOffsetSequence).toEqual(
+      Array.from({ length: 15 }, () => ({ x: 0, y: -4 })),
+    );
+    lightning.phases[1].descriptorSequence.forEach((descriptor, index) => {
+      const anchor = lightning.phases[1].anchorOffsetSequence[index];
+      expect(anchor.y + descriptor.yOffset + descriptor.height - 1).toBe(0);
+    });
+  });
+
   it("keeps every implemented final effect for its native post-draw wait", () => {
     expect(TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS).toEqual({
       "1F": 10,

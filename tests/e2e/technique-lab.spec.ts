@@ -96,6 +96,12 @@ test("intermediate, advanced and ultimate lightning preserve distinct native vis
   const canvas = page.locator("#technique-lab-canvas canvas");
   await expect(canvas).toBeVisible();
 
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("3L"));
+  for (const [time, anchor] of [[0, "0,0"], [300, "0,-1"], [600, "0,-2"], [900, "0,-3"], [1200, "0,-4"]] as const) {
+    await seek(page, time);
+    await expect(canvas).toHaveAttribute("data-map-combat-anchor-offset", anchor);
+  }
+
   const captures = [
     { code: "2L", time: 700, name: "technique-lab-lightning-2-main.png" },
     { code: "3L", time: 1700, name: "technique-lab-lightning-3-main.png" },

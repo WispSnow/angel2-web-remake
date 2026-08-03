@@ -19,7 +19,7 @@ const CODE_SIGNATURES = [
   ["0000:64D6", 16, "apply-one-fire-damage-point", "442f4f824d85a18c947418efc6fcb337dd47362b26ed438b0a875ae0e6a1586d"],
   ["1000:5DB2", 24, "lightning-1-presentation", "63b88a19e3000b598262878e5c2b9dc4481b793a25fb0baed3213a50bdab82e3"],
   ["1000:5E80", 24, "lightning-2-presentation", "a43a28c9f95ef73e171ee76e043a197ec4e4cab99cdeb1f442624a3e7df6e32f"],
-  ["1000:5F62", 24, "lightning-3-presentation", "c036959ee7ec0d37b85e93757bcc9fa7095b8c586be56eb49f689966f4d55b3a"],
+  ["1000:5F62", 96, "lightning-3-presentation-and-rising-anchor", "dfb649ff61ae484ed349da75f9d3df20d0a6abf600de8f5e28dea60938d59150"],
   ["1000:6084", 24, "lightning-4-presentation", "1ef18e9f92958456029199ece7bf9af77f31e137c126c2c7b9facc0a77b0d185"],
   ["1000:6C14", 24, "lightning-1-hit-loader", "cee44c02aeea90d1bfe0cae0555a43b241c855a9cc515838b3a5ee2e2172d665"],
   ["1000:6C4D", 24, "lightning-2-hit-loader", "6657e0fd56e75d77ec3ab16971cad60397297a699f63f3bf732d1cddf29d9a35"],
@@ -511,9 +511,18 @@ function buildPresentations(buffer) {
           { resource: "E/9", entry: "0000:0224", afterFixedWaitNativeTicks: 120 },
         ],
         phases: [
-          stage(buffer, "MAGIC/3", Array.from({ length: 4 }, () => [0x6350, 0x6364, 0x6378]).flat(), 10),
+          stage(buffer, "MAGIC/3", Array.from({ length: 4 }, () => [0x6350, 0x6364, 0x6378]).flat(), 10, {
+            anchorOffsetSequence: Array.from({ length: 12 }, (_, index) => ({
+              x: 0,
+              y: index < 3 ? 0 : -Math.floor(index / 3),
+            })),
+            motion: "DS:5234 starts at the selected cell and shifts -50 after every three-descriptor cloud cycle, raising the anchor from row 0 through row -3",
+          }),
           stage(buffer, "MAGIC/4", Array.from({ length: 5 }, () => [0x638c, 0x63b8, 0x63e4]).flat(), 10,
-            { sequence: "three MAGIC/4 descriptor layouts cycle five times" }),
+            {
+              anchorOffsetSequence: Array.from({ length: 15 }, () => ({ x: 0, y: -4 })),
+              sequence: "three MAGIC/4 descriptor layouts cycle five times at the inherited DS:5234 anchor four rows above the selected cell, placing the six-row bolt's bottom on the selected cell",
+            }),
         ],
         commonHit: lightningCommon("MAGIC/25", 4, 4, 5, 6),
         fixedGraphicWaitNativeTicks: 348,
