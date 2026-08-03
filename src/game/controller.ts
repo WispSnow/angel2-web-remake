@@ -2959,7 +2959,13 @@ export class GameController {
     ally.acted = false;
     ally.actionDisabled = false;
 
-    enemy.x = ordinaryCombat ? 30 : classId === "archer" ? 33 : 30;
+    enemy.x = ordinaryCombat
+      ? 30
+      : classId === "archer"
+        ? 33
+        : pursuingStage1Target
+          ? 31
+          : 30;
     enemy.y = 26;
     enemy.life = ordinaryCombat ? 1 : this.battle.statsFor(enemy).maxLife;
     enemy.acted = false;

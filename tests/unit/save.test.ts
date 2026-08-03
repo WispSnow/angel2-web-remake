@@ -225,7 +225,7 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-10 battle and completed saves", () => {
+  it("accepts complete version-11 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
     expect(parseSaveData(JSON.stringify(stage1BattleSave()))).toEqual(stage1BattleSave());
@@ -235,6 +235,17 @@ describe("Web save validation", () => {
     const current = stage1BattleSave();
     current.battle.units.find(({ id }) => id === "2:16")!.actionDisabled = true;
     expect(parseSaveData(JSON.stringify(current))).toEqual(current);
+  });
+
+  it("migrates version-10 frozen units into the outer-ring rules identity", () => {
+    const current = stage1BattleSave();
+    current.battle.units.find(({ id }) => id === "2:16")!.actionDisabled = true;
+    const legacy = {
+      ...current,
+      version: 10,
+      contentVersion: "stage-01-frozen-dispel-1",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
 
   it("migrates version-9 frozen units without clearing their active state", () => {

@@ -75,7 +75,7 @@ export const DEBUG_SCENARIOS = [
     stageLabel: "第 1 關 · 騎士城堡前",
     title: "魔術士技能靶場",
     phase: "1F / 1L / 1C",
-    description: "把施法者和追擊型敵兵放到合法位置，可驗證冰封只跳過一次敵方行動。",
+    description: "追擊型敵兵位於冰雪最外圈，可驗證只冰封不外推，並只跳過一次敵方行動。",
     fixture: true,
   },
   {

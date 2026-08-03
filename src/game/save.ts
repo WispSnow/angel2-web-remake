@@ -28,8 +28,8 @@ import type {
 } from "./types";
 import { emptyUnitStatuses, UNIT_STATUS_KEYS } from "./simulation/status";
 
-export const SAVE_VERSION = 10 as const;
-export const SAVE_CONTENT_VERSION = "stage-01-frozen-dispel-1" as const;
+export const SAVE_VERSION = 11 as const;
+export const SAVE_CONTENT_VERSION = "stage-01-ice-outer-ring-1" as const;
 export const SAVE_SLOT_COUNT = 20;
 export const SAVE_SLOTS_PER_PAGE = 5;
 export const SAVE_SLOT_PAGE_COUNT = SAVE_SLOT_COUNT / SAVE_SLOTS_PER_PAGE;
@@ -365,6 +365,72 @@ function isBattleSave(value: Record<string, unknown>): boolean {
 export function isSaveData(value: unknown): value is SaveData {
   if (!isRecord(value) || !hasValidBase(value)) return false;
   return isCompletedSave(value) || isBattleSave(value);
+}
+
+interface Version10SaveBase {
+  format: "ANGEL2-web-save";
+  version: 10;
+  contentVersion: "stage-01-frozen-dispel-1";
+  savedAt: string;
+  saveCount: number;
+  ruleset: "stableRemake";
+  difficulty: Difficulty;
+  rngState: number;
+  rngCalls: number;
+  roster: SaveRosterEntry[];
+  stageProgress: 0 | 999 | 1000;
+  consumedEventIds: string[];
+}
+
+interface Version10BattleSave extends Version10SaveBase {
+  kind: "battle";
+  stageId: "stage-00" | "stage-01";
+  stageLabel: "瓦爾克麗宮" | "騎士城堡前";
+  battle: SavedBattleState;
+}
+
+interface Version10CompletedSave extends Version10SaveBase {
+  kind: "completed";
+  stageId: "stage-01" | "stage-02";
+  stageLabel: "騎士城堡前" | "下一關";
+}
+
+type Version10SaveData = Version10BattleSave | Version10CompletedSave;
+
+function hasValidVersion10Base(value: Record<string, unknown>): boolean {
+  return value.format === "ANGEL2-web-save"
+    && value.version === 10
+    && value.contentVersion === "stage-01-frozen-dispel-1"
+    && value.ruleset === "stableRemake"
+    && typeof value.savedAt === "string"
+    && !Number.isNaN(Date.parse(value.savedAt))
+    && isIntegerBetween(value.saveCount, 1, Number.MAX_SAFE_INTEGER)
+    && isDifficulty(value.difficulty)
+    && isIntegerBetween(value.rngState, 1, 0xffff_ffff)
+    && isIntegerBetween(value.rngCalls, 0, Number.MAX_SAFE_INTEGER)
+    && Array.isArray(value.roster)
+    && value.roster.length === MAX_UNIT_SLOT + 1
+    && value.roster.every(isRosterEntry)
+    && hasUniqueValues(value.roster.map((entry) => entry.slot))
+    && value.roster.every(hasNamedAllyExperienceFloor)
+    && Array.isArray(value.consumedEventIds)
+    && value.consumedEventIds.every((id) => typeof id === "string")
+    && hasUniqueValues(value.consumedEventIds)
+    && (value.stageProgress === 0 || value.stageProgress === 999 || value.stageProgress === 1000);
+}
+
+function isVersion10SaveData(value: unknown): value is Version10SaveData {
+  return isRecord(value)
+    && hasValidVersion10Base(value)
+    && (isCompletedSave(value) || isBattleSave(value));
+}
+
+function migrateVersion10Save(save: Version10SaveData): SaveData {
+  return {
+    ...save,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
 }
 
 interface Version9SaveBase {
@@ -1167,6 +1233,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    if (isVersion10SaveData(value)) {
+      const migrated = migrateVersion10Save(value);
+      return isSaveData(migrated) ? migrated : undefined;
+    }
     if (isVersion9SaveData(value)) {
       const migrated = migrateVersion9Save(value);
       return isSaveData(migrated) ? migrated : undefined;

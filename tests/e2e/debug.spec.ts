@@ -77,7 +77,12 @@ test("the magician range fixture releases its pursuing target after exactly one 
       actionDisabled: boolean;
     }>;
     enemyIntents: Record<string, string>;
-    lastSpecialAction?: { actionId: string };
+    rngCalls: number;
+    lastSpecialAction?: {
+      actionId: string;
+      experienceGained: number;
+      affectedUnits: Array<{ unitId: string; moved: boolean }>;
+    };
     specialActionPresentation?: object;
   });
   const finishPlayerPhase = async (round: number) => {
@@ -102,6 +107,7 @@ test("the magician range fixture releases its pursuing target after exactly one 
   };
 
   const initial = await debugState();
+  const initialTarget = initial.units.find(({ id }) => id === "2:45");
   expect(initial.enemyIntents).toMatchObject({ "2:45": "pursuit", "2:16": "sentry" });
   expect(initial.units.filter(({ id }) => id.startsWith("2:")).map(({ id }) => id).sort())
     .toEqual(["2:16", "2:45"]);
@@ -121,7 +127,17 @@ test("the magician range fixture releases its pursuing target after exactly one 
 
   const frozen = await debugState();
   const frozenTarget = frozen.units.find(({ id }) => id === "2:45");
-  expect(frozenTarget?.actionDisabled).toBe(true);
+  expect(frozenTarget).toMatchObject({
+    x: initialTarget?.x,
+    y: initialTarget?.y,
+    actionDisabled: true,
+  });
+  expect(frozen.lastSpecialAction).toMatchObject({
+    actionId: "ice-1",
+    experienceGained: 0,
+    affectedUnits: [expect.objectContaining({ unitId: "2:45", moved: false })],
+  });
+  expect(frozen.rngCalls).toBe(initial.rngCalls);
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
     "data-ice-disabled-unit-ids",
     /2:45/u,

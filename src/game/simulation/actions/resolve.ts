@@ -251,6 +251,7 @@ function prepareIce(
         const destination = offsets
           .map((offset) => ({ x: unit.x + offset.x, y: unit.y + offset.y }))
           .find((position) => effect.contains(position)
+            && effect.valueAt(position) > 0
             && effect.valueAt(position) < currentValue
             && !occupied.has(positionKey(position))
             && (movementRules[context.battlefield.terrainSlotAt(position)] ?? 99) < 99);

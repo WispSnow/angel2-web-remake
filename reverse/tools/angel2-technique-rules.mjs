@@ -270,7 +270,7 @@ function nativeTechniqueRules() {
           { code: "3C", dispatchSelectionWord: 3, effectRadius: 5, experienceBase: 12, experienceRandom: [0, 2] },
           { code: "4C", dispatchSelectionWord: 4, effectRadius: 6, experienceBase: 15, experienceRandom: [0, 2] },
         ],
-        displacement: "for each affected enemy, try destination offsets +50, -50, -1, +1 in that order; accept only an empty passable cell with a lower range-map value",
+        displacement: "for each affected enemy, try destination offsets +50, -50, -1, +1 in that order; accept only an empty passable cell with a lower range-map value; zero is allowed, so an outer-ring value 1 target may move outside the effect",
         immunity: "defense-magic high bit blocks the effect; 1P/2P/3P boss parts are immune",
         shieldConsumption: "after resolving the area, +0C is cleared for affected enemies",
         experience: "zero if no unit is successfully affected; otherwise tier base + tier random",

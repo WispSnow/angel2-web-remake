@@ -399,6 +399,32 @@ describe("Stage-0 class actions", () => {
     expect(prepared.result.experienceGained).toBeLessThanOrEqual(9);
     expect(prepared.rngAfter).not.toBe(prepared.rngBefore);
 
+    const outerRng = new DeterministicRng(0x5678);
+    const outerTarget = { ...first, id: "ice-outer", x: 5, y: 6 };
+    const outer = prepareSpecialAction(
+      { actionId: "ice-1", actorId: actor.id },
+      actor,
+      undefined,
+      outerRng,
+      {
+        units: [actor, outerTarget],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      actor,
+    );
+    expect(outer.result.affectedUnits).toEqual([
+      expect.objectContaining({
+        unitId: outerTarget.id,
+        positionAfter: { x: 5, y: 6 },
+        moved: false,
+        blocked: false,
+        actionDisabledAfter: true,
+      }),
+    ]);
+    expect(outer.result.experienceGained).toBe(0);
+    expect(outer.rngAfter).toBe(outer.rngBefore);
+
     const blockedRng = new DeterministicRng(0x5678);
     const guarded = {
       ...first,

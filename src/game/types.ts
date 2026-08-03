@@ -133,8 +133,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 10;
-  contentVersion: "stage-01-frozen-dispel-1";
+  version: 11;
+  contentVersion: "stage-01-ice-outer-ring-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
