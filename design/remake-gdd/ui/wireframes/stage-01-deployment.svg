@@ -1,69 +1,122 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="700" viewBox="0 0 640 350" role="img" aria-labelledby="title desc">
-  <title id="title">第 1 关部署界面低保真图</title>
-  <desc id="desc">640×350 纯黑左栏使用原版职业棋子、三列五行复合名单和原版热区；右侧保留 Remake 信息框与落点按钮。</desc>
+  <title id="title">第 1 关出击准备界面低保真图</title>
+  <desc id="desc">640×350 现代出击准备构图：顶栏关卡与人数、左侧三列五行人物卡、右栏战场预览小地图（我方蓝、敌方红、空落点白、当前落点闪烁）与人物详情、底栏状态与結束。</desc>
   <defs>
-    <pattern id="menu" width="4" height="4" patternUnits="userSpaceOnUse">
-      <rect width="4" height="4" fill="#612b20"/>
-      <rect width="2" height="2" fill="#8b4127"/>
-      <rect x="2" y="2" width="2" height="2" fill="#8b4127"/>
-    </pattern>
     <style>
       .label { font: 8px sans-serif; fill: #fff6c8; }
       .small { font: 6px sans-serif; fill: #f1deb0; }
-      .dim { font: 6px sans-serif; fill: #746b5e; }
-      .panel { fill: url(#menu); stroke: #e0b864; stroke-width: 1; }
-      .slot { fill: #050405; stroke: #75694f; stroke-width: 1; }
-      .fixed { fill: #201608; stroke: #f3d96b; stroke-width: 1.5; }
-      .figure { fill: #194f75; stroke: #f1d66b; stroke-width: .8; }
+      .dim { font: 6px sans-serif; fill: #8b7d69; }
+      .kicker { font: 5px sans-serif; fill: #dba638; }
+      .frame { fill: #1c1216; stroke: #7c4d2e; stroke-width: 1; }
+      .card { fill: #3a1f24; stroke: #59392a; stroke-width: 1; }
+      .card-on { fill: #52281f; stroke: #a97c33; stroke-width: 1; }
+      .empty { fill: #0e0a0c; stroke: #3d2c26; stroke-width: 1; stroke-dasharray: 3 2; }
+      .off { fill: #1c1013; stroke: #6b4a2c; stroke-width: 1; }
+      .meter { fill: #7fae51; }
+      .meter-bg { fill: #180e11; stroke: #513628; stroke-width: .6; }
+      .gold { fill: #d8a63c; stroke: #ffe37b; stroke-width: 1; }
     </style>
   </defs>
-  <rect width="640" height="350" fill="#050405"/>
-  <rect x="480" y="0" width="160" height="329" fill="#211719" stroke="#8f6035"/>
+  <rect width="640" height="350" fill="#150d11"/>
 
-  <g aria-label="原版三列五行复合名单">
-    <g aria-label="第一列">
-      <rect x="11" y="37" width="34" height="43" rx="8" class="figure"/><text x="80" y="47" class="label">妮雅</text><rect x="57" y="59" width="80" height="24" class="fixed"/><text x="64" y="73" class="small">士兵 · Lv 3</text>
-      <rect x="11" y="97" width="34" height="43" rx="8" class="figure"/><text x="80" y="107" class="label">希蜜</text><rect x="57" y="119" width="80" height="24" class="slot"/><text x="64" y="133" class="small">士兵 · Lv 3</text>
-      <rect x="11" y="157" width="34" height="43" rx="8" class="figure"/><text x="80" y="167" class="label">蒙欣曼</text><rect x="57" y="179" width="80" height="24" class="slot"/><text x="64" y="193" class="small">士兵 · Lv 3</text>
-      <rect x="11" y="217" width="34" height="43" rx="8" class="figure"/><text x="80" y="227" class="label">拉朵那</text><rect x="57" y="239" width="80" height="24" class="slot"/><text x="64" y="253" class="small">士兵 · Lv 3</text>
-      <rect x="11" y="277" width="38" height="43" rx="8" fill="#235735" stroke="#f1d66b"/><text x="80" y="287" class="label">葛蒂拉斯</text><rect x="57" y="299" width="80" height="24" class="slot"/><text x="64" y="313" class="small">魔術士 · Lv 1</text>
+  <g aria-label="顶栏 y3..27">
+    <text x="8" y="20" class="kicker">STAGE 01</text>
+    <text x="46" y="21" class="label">騎士城堡前 · 出擊準備</text>
+    <text x="176" y="21" class="dim">勝利條件：打敗敵人首領「芳」</text>
+    <text x="508" y="21" class="small">已出場 5／8</text>
+    <rect x="570" y="14" width="5" height="8" class="gold"/><rect x="577" y="14" width="5" height="8" class="gold"/>
+    <rect x="584" y="14" width="5" height="8" class="gold"/><rect x="591" y="14" width="5" height="8" class="gold"/>
+    <rect x="598" y="14" width="5" height="8" class="gold"/>
+    <rect x="605" y="14" width="5" height="8" class="off"/><rect x="612" y="14" width="5" height="8" class="off"/>
+    <rect x="619" y="14" width="5" height="8" class="off"/>
+    <line x1="6" y1="27" x2="634" y2="27" stroke="#d7ab5b" stroke-opacity=".3"/>
+  </g>
+
+  <g aria-label="名单面板 x6..486 y31..317">
+    <rect x="6" y="31" width="480" height="286" class="frame"/>
+    <text x="11" y="42" class="label">出場名單</text>
+    <text x="58" y="42" class="dim">剩餘空位 3 · 五至八人均可出擊</text>
+    <rect x="398" y="32" width="26" height="13" class="gold"/><text x="408" y="42" class="small">Ⅰ</text>
+    <rect x="426" y="32" width="26" height="13" class="off"/><text x="436" y="42" class="dim">Ⅱ</text>
+    <rect x="454" y="32" width="26" height="13" class="off"/><text x="464" y="42" class="dim">Ⅲ</text>
+
+    <g aria-label="第一列：roster 索引 0..4">
+      <rect x="11" y="49" width="153" height="49" class="card-on"/>
+      <rect x="14" y="55" width="30" height="38" fill="#194f75" stroke="#f1d66b" stroke-width=".6"/>
+      <text x="48" y="66" class="label">妮雅</text><rect x="132" y="57" width="26" height="9" class="gold"/><text x="136" y="64" class="dim">固定</text>
+      <text x="48" y="77" class="small">士兵 · Lv 3</text>
+      <rect x="48" y="83" width="80" height="5" class="meter-bg"/><rect x="49" y="84" width="78" height="3" class="meter"/>
+      <text x="131" y="88" class="dim">180/180</text>
+
+      <rect x="11" y="102" width="153" height="49" class="card"/>
+      <rect x="14" y="108" width="30" height="38" fill="#123a57" stroke="#7a6a4a" stroke-width=".6"/>
+      <text x="48" y="119" class="label">希蜜</text><rect x="132" y="110" width="26" height="9" fill="#231a14" stroke="#4f3a2c"/><text x="136" y="117" class="dim">待命</text>
+      <text x="48" y="130" class="small">士兵 · Lv 3</text>
+      <rect x="48" y="136" width="80" height="5" class="meter-bg"/><rect x="49" y="137" width="78" height="3" class="meter"/>
+
+      <rect x="11" y="155" width="153" height="49" class="card"/><text x="48" y="172" class="label">蒙欣曼</text><text x="48" y="183" class="small">士兵 · Lv 3</text>
+      <rect x="11" y="208" width="153" height="49" class="card"/><text x="48" y="225" class="label">拉朵那</text><text x="48" y="236" class="small">士兵 · Lv 3</text>
+      <rect x="11" y="261" width="153" height="49" class="card"/><text x="48" y="278" class="label">葛蒂拉斯</text><text x="48" y="289" class="small">魔術士 · Lv 1</text>
     </g>
-    <g aria-label="第二列">
-      <rect x="155" y="37" width="34" height="43" rx="8" class="figure"/><text x="224" y="47" class="label">士兵</text><rect x="201" y="59" width="80" height="24" class="fixed"/><text x="208" y="73" class="small">士兵 · Lv 1</text>
-      <rect x="155" y="97" width="34" height="43" rx="8" class="figure"/><text x="224" y="107" class="label">士兵</text><rect x="201" y="119" width="80" height="24" class="fixed"/><text x="208" y="133" class="small">士兵 · Lv 1</text>
-      <rect x="155" y="157" width="34" height="43" rx="8" class="figure"/><text x="224" y="167" class="label">士兵</text><rect x="201" y="179" width="80" height="24" class="fixed"/><text x="208" y="193" class="small">士兵 · Lv 1</text>
-      <rect x="155" y="217" width="34" height="43" rx="8" class="figure"/><text x="224" y="227" class="label">士兵</text><rect x="201" y="239" width="80" height="24" class="fixed"/><text x="208" y="253" class="small">士兵 · Lv 1</text>
-      <rect x="201" y="299" width="80" height="24" class="slot"/><text x="208" y="313" class="dim">空名單</text>
+    <g aria-label="第二列：roster 索引 5..9">
+      <rect x="168" y="49" width="153" height="49" class="card-on"/><text x="205" y="66" class="label">士兵</text><text x="205" y="77" class="small">士兵 · Lv 1</text>
+      <rect x="168" y="102" width="153" height="49" class="card-on"/><text x="205" y="119" class="label">士兵</text><text x="205" y="130" class="small">士兵 · Lv 1</text>
+      <rect x="168" y="155" width="153" height="49" class="card-on"/><text x="205" y="172" class="label">士兵</text><text x="205" y="183" class="small">士兵 · Lv 1</text>
+      <rect x="168" y="208" width="153" height="49" class="card-on"/><text x="205" y="225" class="label">士兵</text><text x="205" y="236" class="small">士兵 · Lv 1</text>
+      <rect x="168" y="261" width="153" height="49" class="empty"/><text x="224" y="288" class="dim">空名單</text>
     </g>
-    <g aria-label="第三列空名单">
-      <rect x="345" y="59" width="80" height="24" class="slot"/><text x="352" y="73" class="dim">空名單</text>
-      <rect x="345" y="119" width="80" height="24" class="slot"/><text x="352" y="133" class="dim">空名單</text>
-      <rect x="345" y="179" width="80" height="24" class="slot"/><text x="352" y="193" class="dim">空名單</text>
-      <rect x="345" y="239" width="80" height="24" class="slot"/><text x="352" y="253" class="dim">空名單</text>
-      <rect x="345" y="299" width="80" height="24" class="slot"/><text x="352" y="313" class="dim">空名單</text>
+    <g aria-label="第三列：roster 索引 10..14">
+      <rect x="325" y="49" width="153" height="49" class="empty"/><text x="381" y="76" class="dim">空名單</text>
+      <rect x="325" y="102" width="153" height="49" class="empty"/><text x="381" y="129" class="dim">空名單</text>
+      <rect x="325" y="155" width="153" height="49" class="empty"/><text x="381" y="182" class="dim">空名單</text>
+      <rect x="325" y="208" width="153" height="49" class="empty"/><text x="381" y="235" class="dim">空名單</text>
+      <rect x="325" y="261" width="153" height="49" class="empty"/><text x="381" y="288" class="dim">空名單</text>
     </g>
   </g>
 
-  <g aria-label="原版页签与完成">
-    <rect x="440" y="35" width="80" height="24" class="panel"/><text x="477" y="50" class="label">Ⅰ</text>
-    <rect x="440" y="65" width="80" height="24" class="panel"/><text x="477" y="80" class="label">Ⅱ</text>
-    <rect x="440" y="95" width="80" height="24" class="panel"/><text x="477" y="110" class="label">Ⅲ</text>
-    <rect x="540" y="35" width="80" height="24" class="panel"/><text x="565" y="50" class="label">結束</text>
+  <g aria-label="战场预览 x492..634 y31..191">
+    <rect x="492" y="31" width="142" height="160" class="frame"/>
+    <text x="497" y="42" class="label">戰場預覽</text>
+    <rect x="551" y="36" width="5" height="5" fill="#5555ff" stroke="#000" stroke-width=".6"/><text x="559" y="42" class="dim">我方</text>
+    <rect x="579" y="36" width="5" height="5" fill="#ff5555" stroke="#000" stroke-width=".6"/><text x="587" y="42" class="dim">敵方</text>
+    <rect x="607" y="36" width="5" height="5" fill="#fff" stroke="#000" stroke-width=".6"/><text x="615" y="42" class="dim">空位</text>
+    <rect x="508" y="49" width="110" height="125" fill="#3f7a2c" stroke="#d7ab5b"/>
+    <text x="519" y="106" class="dim">裁切到已繪製地形</text>
+    <text x="519" y="116" class="dim">22×25 格 · 每格 5 像素</text>
+    <rect x="539" y="60" width="6" height="6" fill="#ff5555" stroke="#000" stroke-width=".6"/>
+    <rect x="559" y="60" width="6" height="6" fill="#ff5555" stroke="#000" stroke-width=".6"/>
+    <rect x="549" y="72" width="6" height="6" fill="#ff5555" stroke="#000" stroke-width=".6"/>
+    <rect x="536" y="140" width="52" height="14" fill="#0006" stroke="#d8a63c" stroke-opacity=".5"/>
+    <rect x="539" y="144" width="6" height="6" fill="#5555ff" stroke="#000" stroke-width=".6"/>
+    <rect x="549" y="144" width="6" height="6" fill="#fff" stroke="#ffd34d"/>
+    <rect x="559" y="144" width="6" height="6" fill="#fff" stroke="#000" stroke-width=".6"/>
+    <rect x="569" y="144" width="6" height="6" fill="#fff" stroke="#000" stroke-width=".6"/>
+    <text x="536" y="163" class="dim">當前落點：金環 + 白／藍 0.5 秒閃爍</text>
+    <rect x="497" y="177" width="42" height="12" class="gold"/><text x="506" y="186" class="dim">21,33</text>
+    <rect x="541" y="177" width="42" height="12" fill="#0e090b" stroke="#6f5335"/><text x="550" y="186" class="small">23,33</text>
+    <rect x="585" y="177" width="42" height="12" fill="#0e090b" stroke="#6f5335"/><text x="594" y="186" class="small">25,33</text>
   </g>
 
-  <g aria-label="Remake 右侧信息框">
-    <rect x="488" y="127" width="144" height="191" fill="#10080bd8" stroke="#704137"/>
-    <text x="496" y="142" class="label">騎士城堡前 · 部署</text>
-    <text x="496" y="157" class="label">已出場 5／8</text>
-    <text x="496" y="168" class="small">剩餘空位 3</text>
-    <text x="496" y="179" class="small">下一落點 21,33</text>
-    <rect x="496" y="184" width="40" height="14" class="slot"/><rect x="538" y="184" width="40" height="14" class="slot"/><rect x="580" y="184" width="40" height="14" class="slot"/>
-    <text x="499" y="193" class="dim">21,33</text><text x="541" y="193" class="small">23,33</text><text x="583" y="193" class="small">25,33</text>
-    <rect x="496" y="207" width="40" height="40" fill="#305080" stroke="#e0b864"/>
-    <text x="542" y="218" class="small">人物　妮雅</text><text x="542" y="229" class="small">職業　士兵</text><text x="542" y="240" class="small">狀態　固定 · 已出場</text>
-    <text x="496" y="271" class="dim">方向鍵／WZAS 移動</text><text x="496" y="282" class="dim">主／次操作 · Tab 落點焦點</text>
+  <g aria-label="人物详情 x492..634 y195..317">
+    <rect x="492" y="195" width="142" height="122" class="frame"/>
+    <rect x="497" y="200" width="46" height="46" fill="#305080" stroke="#d7ab5b"/>
+    <rect x="498" y="236" width="44" height="9" fill="#090507cc"/><text x="505" y="243" class="dim">固定出場</text>
+    <text x="548" y="212" class="label">妮雅</text>
+    <text x="548" y="224" class="small">士兵 · Lv 3 · 普通</text>
+    <text x="548" y="234" class="dim">生命</text><text x="598" y="234" class="small">180／180</text>
+    <rect x="548" y="238" width="80" height="6" class="meter-bg"/><rect x="549" y="239" width="78" height="4" class="meter"/>
+    <rect x="497" y="252" width="42" height="22" fill="#09060899" stroke="#4e3527"/><text x="507" y="260" class="dim">攻擊</text><text x="512" y="271" class="label">45</text>
+    <rect x="541" y="252" width="42" height="22" fill="#09060899" stroke="#4e3527"/><text x="551" y="260" class="dim">防禦</text><text x="556" y="271" class="label">27</text>
+    <rect x="585" y="252" width="42" height="22" fill="#09060899" stroke="#4e3527"/><text x="595" y="260" class="dim">移動</text><text x="602" y="271" class="label">4</text>
+    <text x="497" y="286" class="dim">經驗</text>
+    <rect x="517" y="281" width="70" height="5" class="meter-bg"/><rect x="518" y="282" width="68" height="3" fill="#86c2e8"/>
+    <text x="591" y="286" class="small">299／300</text>
+    <text x="497" y="300" class="dim">行動</text><text x="517" y="300" class="small">技術／射程等職業行動</text>
   </g>
 
-  <rect x="2" y="329" width="636" height="19" fill="#170b0d" stroke="#e0b864"/>
-  <text x="10" y="342" class="label">選擇出場人物；五至八人均可完成。</text>
+  <g aria-label="底栏 y321..346">
+    <text x="8" y="338" class="label">選擇出場人物；五至八人均可完成。</text>
+    <text x="270" y="338" class="dim">方向鍵／WZAS 移動 · Ctrl/Ins/Space 主操作 · Alt/Del/Enter 次操作 · Tab 落點</text>
+    <rect x="492" y="321" width="142" height="25" class="gold"/><text x="546" y="338" class="label">結 束</text>
+  </g>
 </svg>

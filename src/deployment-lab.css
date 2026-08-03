@@ -63,261 +63,636 @@
 #deployment-phaser-root { z-index: 0; }
 #deployment-phaser-root canvas { image-rendering: pixelated; }
 
+/* ---------------------------------------------------------------------------
+   Deployment screen (REMAKE-011)
+
+   The 2026-08-02 native roster geometry was replaced by a modern preparation
+   layout on user request: a card roster on the left, an evidence-accurate
+   terrain minimap plus a full character read-out on the right, and a single
+   status/primary-action footer. Keyboard topology still follows the native
+   five cyclic columns (three roster columns, the page column, the finish
+   column) because that is `[OF]`; only the pixel placement is remade.
+--------------------------------------------------------------------------- */
+
 .deployment-ui-root {
+  --panel-edge: #7c4d2e;
+  --panel-edge-bright: #d7ab5b;
+  --gold-bright: #ffe37b;
+  --ink-deep: #0b0709;
+
   z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 142px;
+  grid-template-rows: 24px minmax(0, 1fr) 25px;
+  gap: 4px 6px;
+  padding: 3px 6px 4px;
   outline: none;
-  pointer-events: none;
   color: #fff4cf;
+  background:
+    radial-gradient(120% 90% at 26% -10%, rgba(140, 52, 46, .55), transparent 62%),
+    linear-gradient(158deg, #241318 0%, #150d11 46%, #0a0709 100%);
   font-family: "PMingLiU", "MingLiU", "Noto Serif TC", serif;
-  text-shadow: 1px 1px #000;
-}
-
-.deployment-ui-root::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  left: 480px;
-  top: 0;
-  width: 160px;
-  height: 329px;
-  border-left: 2px ridge #bf9b5b;
-  background:
-    linear-gradient(90deg, rgba(117, 37, 29, .86), rgba(34, 20, 23, .96)),
-    repeating-conic-gradient(#68271e 0 25%, #8f3f28 0 50%) 0 / 4px 4px;
-  box-shadow: inset 2px 0 #1a0b0d, inset 0 0 0 2px #442327;
-}
-
-.deployment-roster-entry,
-.deployment-page,
-.deployment-finish {
-  position: absolute;
-  z-index: 3;
-  height: 24px;
-  padding: 0;
-  color: #f7ebcf;
-  border: 1px solid #d0a752;
-  background:
-    linear-gradient(90deg, rgba(63, 12, 12, .88), rgba(132, 50, 31, .9)),
-    repeating-conic-gradient(#68271e 0 25%, #8f3f28 0 50%) 0 / 4px 4px;
-  box-shadow: inset 1px 1px #f0c37b, inset -1px -1px #381015, 1px 1px #000;
-  cursor: var(--native-cursor-hand);
-  image-rendering: pixelated;
-  pointer-events: auto;
-}
-
-.deployment-roster-entry {
-  width: 80px;
-  overflow: visible;
-  border-color: #71644e;
-  background: rgba(3, 3, 3, .82);
-  box-shadow: inset 1px 1px #a69b82, inset -1px -1px #17120f, 1px 1px #000;
-  text-align: left;
-}
-
-.deployment-entry-figure,
-.deployment-entry-name,
-.deployment-entry-class {
-  position: absolute;
   pointer-events: none;
 }
 
-.deployment-entry-figure {
-  left: -47px;
-  bottom: 2px;
-  max-width: 40px;
-  max-height: 44px;
-  object-fit: contain;
-  object-position: center bottom;
-  filter: saturate(.55) brightness(.72);
-  image-rendering: pixelated;
+.deployment-ui-root button { pointer-events: auto; }
+.deployment-ui-root h2,
+.deployment-ui-root h3,
+.deployment-ui-root p,
+.deployment-ui-root dl { margin: 0; }
+
+/* --- shared panel chrome --- */
+
+.deployment-roster-panel,
+.deployment-map-panel,
+.deployment-detail {
+  min-height: 0;
+  border: 1px solid var(--panel-edge);
+  background: linear-gradient(180deg, rgba(58, 28, 33, .82), rgba(15, 10, 13, .9));
+  box-shadow: inset 0 0 0 1px rgba(255, 219, 150, .07), 0 1px 0 #000;
 }
 
-.deployment-entry-name {
-  left: 22px;
-  top: -22px;
-  min-width: 58px;
-  color: #bcb29f;
-  font-size: 10px;
-  line-height: 16px;
+.deployment-panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 13px;
+  border-bottom: 1px solid rgba(215, 171, 91, .28);
+}
+
+.deployment-panel-bar h3 {
+  flex: none;
+  padding-left: 4px;
+  color: var(--gold-bright);
+  font: 700 10px/13px "PMingLiU", "MingLiU", serif;
+  letter-spacing: .06em;
+}
+
+.deployment-panel-note {
+  flex: 1;
+  overflow: hidden;
+  color: #b6a488;
+  font: 8px/13px system-ui, sans-serif;
   white-space: nowrap;
 }
 
-.deployment-entry-class {
-  left: 6px;
-  top: 2px;
-  width: 70px;
+/* --- header --- */
+
+.deployment-header {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: baseline;
+  gap: 7px;
+  padding: 0 2px 2px;
+  border-bottom: 1px solid rgba(215, 171, 91, .3);
+}
+
+.deployment-kicker {
+  flex: none;
+  color: #dba638;
+  font: 700 8px/1 system-ui, sans-serif;
+  letter-spacing: .18em;
+}
+
+.deployment-title {
+  flex: none;
+  color: #fff6da;
+  font: 700 15px/1 "PMingLiU", "MingLiU", serif;
+  letter-spacing: .04em;
+  text-shadow: 1px 1px #000;
+}
+
+.deployment-objective {
+  flex: 1;
   overflow: hidden;
-  color: #b9aa91;
-  font-size: 8px;
-  line-height: 16px;
+  color: #b8a68a;
+  font: 9px/1 system-ui, sans-serif;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.deployment-roster-entry.is-deployed {
-  border-color: #e2c569;
-  background: rgba(38, 21, 10, .88);
+.deployment-capacity {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 4px;
+  color: #cbb894;
+  font: 9px/1 system-ui, sans-serif;
 }
 
-.deployment-roster-entry.is-deployed .deployment-entry-figure {
-  filter: none;
-}
-
-.deployment-roster-entry.is-deployed .deployment-entry-name {
-  color: #fff1bd;
-}
-
-.deployment-roster-entry.is-deployed .deployment-entry-class {
-  color: #f5d86c;
-}
-
-.deployment-roster-entry.is-fixed {
-  border-style: double;
-  border-color: #fff0a0;
-}
-
-.deployment-empty {
-  left: 5px;
-  color: #675e51;
-  letter-spacing: .08em;
-}
-
-.deployment-roster-entry.is-focused,
-.deployment-page.is-focused,
-.deployment-finish.is-focused {
+.deployment-capacity b {
   color: #fff;
-  outline: 2px solid #fff;
-  outline-offset: 1px;
-  filter: brightness(1.18);
+  font: 700 13px/1 "PMingLiU", "MingLiU", serif;
 }
 
-.deployment-roster-entry.is-focused::after,
-.deployment-page.is-focused::after,
-.deployment-finish.is-focused::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border: 1px solid #161018;
-  pointer-events: none;
+.deployment-pips { display: flex; gap: 2px; align-self: center; }
+
+.deployment-pips i {
+  width: 5px;
+  height: 8px;
+  border: 1px solid #6b4a2c;
+  background: #1b1013;
 }
+
+.deployment-pips i.is-on {
+  border-color: #f2cd63;
+  background: linear-gradient(#ffe895, #d09a2c);
+}
+
+/* --- roster --- */
+
+.deployment-roster-panel {
+  display: grid;
+  grid-template-rows: 13px minmax(0, 1fr);
+  gap: 4px;
+  padding: 0 4px 4px;
+}
+
+.deployment-pages { display: flex; flex: none; gap: 2px; }
 
 .deployment-page {
-  left: 440px;
-  width: 80px;
-  font-size: 13px;
-  line-height: 22px;
+  width: 26px;
+  height: 13px;
+  padding: 0;
+  color: #c6b291;
+  border: 1px solid #6b4a2c;
+  border-bottom: 0;
+  background: linear-gradient(#3a1f24, #1c1013);
+  font: 10px/12px "PMingLiU", "MingLiU", serif;
+  cursor: var(--native-cursor-hand);
 }
 
 .deployment-page.is-active {
-  color: #fff8a6;
-  border-color: #fff0a2;
-  background: linear-gradient(90deg, #5e1730, #a7472e);
+  color: #1b0f0d;
+  border-color: #f0cf72;
+  background: linear-gradient(#ffe9a2, #d8a63c);
 }
 
-.deployment-finish {
-  left: 540px;
-  top: 35px;
-  width: 80px;
-  font-size: 13px;
-  letter-spacing: .2em;
-  text-indent: .2em;
+/* Roster indices are `column * 5 + row`, matching the native five cyclic
+   keyboard columns, so the grid must flow down each column before wrapping. */
+.deployment-roster {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(5, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 4px;
+  min-height: 0;
 }
 
-.deployment-summary {
+.deployment-entry {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: end;
+  gap: 3px;
+  min-width: 0;
+  padding: 2px 4px 3px 2px;
+  color: #f2e6cd;
+  border: 1px solid #59392a;
+  border-left: 3px solid #59392a;
+  background: linear-gradient(158deg, rgba(70, 36, 38, .78), rgba(15, 10, 13, .86));
+  text-align: left;
+  cursor: var(--native-cursor-hand);
+}
+
+.deployment-entry > * { pointer-events: none; }
+
+.deployment-entry-figure {
+  display: block;
+  align-self: end;
+  height: 100%;
+  min-height: 0;
+}
+
+.deployment-entry-figure img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: saturate(.5) brightness(.66);
+  image-rendering: pixelated;
+}
+
+.deployment-entry-body {
+  display: grid;
+  grid-template-rows: 15px 11px 6px;
+  gap: 2px;
+  align-content: center;
+  min-width: 0;
+}
+
+.deployment-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.deployment-entry-name {
+  flex: 1;
+  overflow: hidden;
+  color: #d9caab;
+  font: 400 13px/15px "PMingLiU", "MingLiU", serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-entry-badge {
+  flex: none;
+  padding: 0 3px;
+  color: #a2907a;
+  border: 1px solid #4f3a2c;
+  font: 7px/9px system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: .04em;
+}
+
+.deployment-entry-class {
+  overflow: hidden;
+  color: #a2947c;
+  font: 8px/11px system-ui, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-entry-life {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.deployment-entry-life-value {
+  flex: none;
+  color: #9c8f78;
+  font: 7px/7px ui-monospace, monospace;
+}
+
+.deployment-meter {
+  flex: 1;
+  min-width: 0;
+  height: 5px;
+  border: 1px solid #513628;
+  background: #180e11;
+}
+
+.deployment-meter i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4d7a3c, #7fae51);
+}
+
+.deployment-entry.is-deployed {
+  border-color: #a97c33;
+  border-left-color: var(--gold-bright);
+  background: linear-gradient(158deg, rgba(116, 62, 42, .82), rgba(26, 14, 15, .9));
+}
+
+.deployment-entry.is-deployed .deployment-entry-name { color: #fff3cd; }
+.deployment-entry.is-deployed .deployment-entry-class { color: #d4bd8f; }
+.deployment-entry.is-deployed .deployment-entry-figure img { filter: none; }
+.deployment-entry.is-deployed .deployment-entry-badge {
+  color: #21140f;
+  border-color: #f0cf72;
+  background: linear-gradient(#ffe9a2, #d8a63c);
+}
+.deployment-entry.is-deployed .deployment-meter i {
+  background: linear-gradient(90deg, #7fc25b, #cfe97f);
+}
+
+.deployment-entry.is-fixed .deployment-entry-badge {
+  color: #ffdf90;
+  border-color: #8a6a2c;
+  background: rgba(66, 42, 16, .8);
+}
+
+.deployment-entry.is-empty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  border: 1px dashed #3d2c26;
+  border-left: 3px solid #2a1e1c;
+  background: rgba(10, 7, 9, .55);
+}
+
+.deployment-entry-empty {
+  color: #5f5348;
+  font: 10px/1 "PMingLiU", "MingLiU", serif;
+  letter-spacing: .12em;
+}
+
+.deployment-entry.is-focused,
+.deployment-page.is-focused,
+.deployment-open-cell.is-focused,
+.deployment-finish.is-focused {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: -1px;
+  box-shadow: 0 0 0 1px #1a0f12, 0 0 9px rgba(255, 214, 108, .55);
+}
+
+.deployment-entry.is-focused .deployment-entry-name { color: #fff; }
+
+/* --- right rail --- */
+
+.deployment-rail {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 4px;
+  min-height: 0;
+}
+
+.deployment-map-panel { padding: 0 3px 3px; }
+
+.deployment-legend {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding-right: 3px;
+  color: #a4947a;
+  font: 7px/13px system-ui, sans-serif;
+}
+
+.deployment-legend em {
+  width: 5px;
+  height: 5px;
+  margin-left: 3px;
+  border: 1px solid #000;
+}
+
+.deployment-legend em.is-ally { background: #5555ff; }
+.deployment-legend em.is-enemy { background: #ff5555; }
+.deployment-legend em.is-open { background: #fff; }
+
+/* Sized by the canvas itself: the preview crops the battlefield to its drawn
+   terrain and scales by whole pixels, so the frame must not stretch it. */
+.deployment-map-frame {
+  position: relative;
+  width: max-content;
+  margin: 2px auto 0;
+  box-shadow: 0 0 0 1px #000, 0 0 0 2px rgba(215, 171, 91, .45);
+}
+
+.deployment-map-frame.is-focused {
+  box-shadow: 0 0 0 1px #000, 0 0 0 2px var(--gold-bright), 0 0 10px rgba(255, 214, 108, .5);
+}
+
+.deployment-map {
+  display: block;
+  background: #0a0f08;
+  image-rendering: pixelated;
+}
+
+/* Half-second hard toggle between the painted white `FFh` core and the ally
+   blue. Kept in CSS so reduced motion and frozen-animation captures fall back
+   to the static canvas marker instead of a mid-blink frame. */
+.deployment-map-blink {
   position: absolute;
-  z-index: 2;
-  left: 488px;
-  top: 127px;
-  width: 144px;
-  height: 191px;
-  padding: 7px 8px;
-  border-top: 1px solid #9e6d3d;
-  background: rgba(16, 8, 11, .52);
-  font-size: 9px;
-  line-height: 1.3;
+  background: #5555ff;
+  opacity: 0;
+  animation: deployment-cell-blink 1s step-end infinite;
+  pointer-events: none;
 }
 
-.deployment-summary p { margin: 0 0 3px; }
-.deployment-stage-name { color: #ffe170; font-size: 11px; }
-.deployment-count b { color: #fff; font-size: 13px; }
-.deployment-next { color: #fff0a2; }
+@keyframes deployment-cell-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}
 
 .deployment-open-cells {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 2px;
-  margin: 3px 0 0;
+  margin-top: 3px;
 }
 
 .deployment-open-cell {
+  flex: 1;
   min-width: 0;
-  height: 14px;
+  height: 12px;
   padding: 0;
-  color: #bcae91;
-  border: 1px solid #675640;
-  background: #090708;
-  font: 6px/12px ui-monospace, monospace;
+  color: #d3c3a2;
+  border: 1px solid #6f5335;
+  background: rgba(14, 9, 11, .92);
+  font: 7px/10px ui-monospace, monospace;
   cursor: var(--native-cursor-hand);
-  pointer-events: auto;
 }
 
 .deployment-open-cell.is-current {
-  color: #fff3a7;
-  border-color: #f1d86c;
+  color: #1c1009;
+  border-color: #ffe37b;
+  background: linear-gradient(#ffe9a2, #d8a63c);
+  font-weight: 700;
 }
 
 .deployment-open-cell.is-occupied {
-  color: #665d50;
-  border-color: #3b342d;
+  color: #6d6154;
+  border-color: #3a2f27;
+  background: rgba(8, 5, 7, .9);
   text-decoration: line-through;
   cursor: default;
 }
 
-.deployment-unit-detail {
-  min-height: 62px;
-  margin-top: 4px;
-  padding-top: 5px;
-  border-top: 1px solid #704137;
+/* --- character detail --- */
+
+.deployment-detail {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-height: 0;
+  padding: 4px;
 }
 
-.deployment-unit-detail > img {
-  float: left;
-  width: 40px;
-  height: 40px;
-  margin: 0 5px 4px 0;
+.deployment-detail:has(.deployment-detail-hint) { align-content: center; }
+
+.deployment-detail-hint {
+  padding: 0 4px;
+  color: #9c8d76;
+  font: 9px/1.45 "PMingLiU", "MingLiU", serif;
+  text-align: center;
+}
+
+.deployment-detail-head {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 5px;
+  height: 46px;
+}
+
+.deployment-detail-figure { position: relative; display: block; width: 46px; height: 46px; }
+
+.deployment-detail-portrait {
+  display: block;
+  width: 46px;
+  height: 46px;
   object-fit: cover;
   object-position: center top;
-  border: 1px solid #d0a752;
+  border: 1px solid var(--panel-edge-bright);
   image-rendering: pixelated;
 }
 
-.deployment-unit-detail dl { margin: 0; }
-.deployment-unit-detail dl div { display: grid; grid-template-columns: 24px 1fr; }
-.deployment-unit-detail dt { color: #caae82; }
-.deployment-unit-detail dd { margin: 0; color: #fff7dc; white-space: nowrap; }
-.deployment-input-hint { clear: both; color: #cbbda5; font-size: 7px; line-height: 1.35; }
-
-/* The native roster uses five 60 px rows. Its unit figure sits outside the
-   80x24 pointer rectangle; keep overflow visible without enlarging hit areas. */
-.deployment-roster-entry > * { pointer-events: none; }
-
-.deployment-status {
+.deployment-detail-state {
   position: absolute;
-  z-index: 8;
-  left: 2px;
-  top: 329px;
-  width: 636px;
-  height: 19px;
-  padding: 2px 8px 0;
-  overflow: hidden;
-  color: #f8e9bd;
-  border: 1px solid #d0a752;
-  background: rgba(20, 7, 10, .96);
-  font-size: 10px;
-  line-height: 14px;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  color: #ffe9ae;
+  background: rgba(9, 5, 7, .82);
+  font: 7px/10px system-ui, sans-serif;
+  font-style: normal;
+  text-align: center;
 }
 
-.deployment-status.is-error { color: #fff; background: #741f28; }
+.deployment-detail-copy {
+  display: grid;
+  grid-template-rows: 15px 10px 9px 6px;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.deployment-detail-name {
+  overflow: hidden;
+  color: #fff3cd;
+  font: 13px/15px "PMingLiU", "MingLiU", serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-detail-class {
+  overflow: hidden;
+  color: #b5a486;
+  font: 8px/10px system-ui, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-detail-life {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: #9c8d76;
+  font: 7px/9px system-ui, sans-serif;
+}
+
+.deployment-detail-life b {
+  color: #f4e6c4;
+  font: 700 9px/9px ui-monospace, monospace;
+}
+
+.deployment-meter.is-life { height: 6px; }
+.deployment-meter.is-life i { background: linear-gradient(90deg, #59a13f, #b8e06a); }
+
+.deployment-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+}
+
+.deployment-detail-stats div {
+  display: grid;
+  align-content: center;
+  height: 22px;
+  border: 1px solid #4e3527;
+  background: rgba(9, 6, 8, .6);
+  text-align: center;
+}
+
+.deployment-detail-stats dt { color: #a4947a; font: 7px/8px system-ui, sans-serif; }
+.deployment-detail-stats dd { margin: 0; color: #ffe8b4; font: 700 12px/12px "PMingLiU", "MingLiU", serif; }
+
+.deployment-detail-exp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #9c8d76;
+  font: 7px/9px system-ui, sans-serif;
+}
+
+.deployment-detail-exp > span:first-child,
+.deployment-detail-actions > span:first-child { flex: none; }
+
+.deployment-detail-exp b { flex: none; color: #cfe0f4; font: 700 8px/9px ui-monospace, monospace; }
+.deployment-meter.is-exp { height: 5px; }
+.deployment-meter.is-exp i { background: linear-gradient(90deg, #3f6f9c, #86c2e8); }
+
+.deployment-detail-actions {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  overflow: hidden;
+  color: #9c8d76;
+  font: 7px/11px system-ui, sans-serif;
+}
+
+.deployment-detail-actions b {
+  max-height: 22px;
+  overflow: hidden;
+  color: #e2c2ee;
+  font: 9px/11px "PMingLiU", "MingLiU", serif;
+}
+
+/* --- footer --- */
+
+.deployment-footer {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.deployment-status {
+  flex: none;
+  max-width: 250px;
+  overflow: hidden;
+  color: #f8e9bd;
+  font: 11px/25px "PMingLiU", "MingLiU", serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-status.is-error {
+  flex: 1;
+  max-width: none;
+  padding: 0 8px;
+  color: #fff;
+  border: 1px solid #e08a8a;
+  background: #741f28;
+  line-height: 23px;
+}
+
+/* The native error line owns the bar while it is up; the control hint is
+   redundant there because every key except a new primary action is blocked. */
+.deployment-footer:has(.is-error) .deployment-hint { display: none; }
+
+.deployment-hint {
+  flex: 1;
+  overflow: hidden;
+  color: #8b7d69;
+  font: 7px/25px system-ui, sans-serif;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deployment-finish {
+  flex: none;
+  width: 162px;
+  height: 25px;
+  padding: 0;
+  color: #2a1608;
+  border: 1px solid #ffe9a2;
+  background: linear-gradient(#ffe9a2, #d09a2c 55%, #b57f22);
+  box-shadow: inset 0 1px 0 #fff6d2, 0 1px 0 #000;
+  font: 700 14px/23px "PMingLiU", "MingLiU", serif;
+  letter-spacing: .3em;
+  text-indent: .3em;
+  cursor: var(--native-cursor-hand);
+}
+
+.deployment-finish:hover { background: linear-gradient(#fff3c4, #e0ab38 55%, #c48c26); }
+
+/* --- submitted overlay --- */
 
 .deployment-submitted {
   position: absolute;
