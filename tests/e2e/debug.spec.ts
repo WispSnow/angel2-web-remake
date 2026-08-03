@@ -63,6 +63,92 @@ test("debug scenarios can enter player phases and directly complete either imple
   }))).toMatchObject({ stageProgress: 1000, campaignRoute: "stage-02" });
 });
 
+test("the magician range fixture releases its pursuing target after exactly one enemy phase", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-01-magician&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  const debugState = () => page.evaluate(() => window.__ANGEL2__?.getState() as {
+    phase: string;
+    round: number;
+    units: Array<{
+      id: string;
+      x: number;
+      y: number;
+      actionDisabled: boolean;
+    }>;
+    enemyIntents: Record<string, string>;
+    lastSpecialAction?: { actionId: string };
+    specialActionPresentation?: object;
+  });
+  const finishPlayerPhase = async (round: number) => {
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("group-command-menu")).toBeVisible();
+    await page.getByTestId("group-command-allRest").click();
+    await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+    for (let input = 0; input < 6; input += 1) {
+      const dialogue = page.getByTestId("dialogue-layer");
+      if (!await dialogue.isVisible()
+        || await dialogue.getAttribute("data-source-record") !== "battle-command") break;
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(20);
+    }
+    await page.waitForFunction((expectedRound) => {
+      const current = window.__ANGEL2__?.getState() as {
+        phase?: string;
+        round?: number;
+      } | undefined;
+      return current?.phase === "player" && current.round === expectedRound;
+    }, round);
+  };
+
+  const initial = await debugState();
+  expect(initial.enemyIntents).toMatchObject({ "2:45": "pursuit", "2:16": "sentry" });
+  expect(initial.units.filter(({ id }) => id.startsWith("2:")).map(({ id }) => id).sort())
+    .toEqual(["2:16", "2:45"]);
+
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("unit-command-technique")).toBeVisible();
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-ice-1").click();
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as {
+      lastSpecialAction?: { actionId?: string };
+      specialActionPresentation?: object;
+    } | undefined;
+    return current?.lastSpecialAction?.actionId === "ice-1"
+      && current.specialActionPresentation === undefined;
+  });
+
+  const frozen = await debugState();
+  const frozenTarget = frozen.units.find(({ id }) => id === "2:45");
+  expect(frozenTarget?.actionDisabled).toBe(true);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-ice-disabled-unit-ids",
+    /2:45/u,
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/debug-stage1-magician-frozen.png`,
+  });
+
+  await finishPlayerPhase(2);
+  const thawed = await debugState();
+  const thawedTarget = thawed.units.find(({ id }) => id === "2:45");
+  expect(thawedTarget).toMatchObject({
+    x: frozenTarget?.x,
+    y: frozenTarget?.y,
+    actionDisabled: false,
+  });
+
+  await finishPlayerPhase(3);
+  const movedTarget = (await debugState()).units.find(({ id }) => id === "2:45");
+  expect(movedTarget).toBeDefined();
+  expect({ x: movedTarget?.x, y: movedTarget?.y })
+    .not.toEqual({ x: thawedTarget?.x, y: thawedTarget?.y });
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/debug-stage1-magician-thawed.png`,
+  });
+});
+
 test("debug hub remains usable at a narrow reduced-motion viewport", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 844 });

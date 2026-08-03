@@ -75,7 +75,7 @@ export const DEBUG_SCENARIOS = [
     stageLabel: "第 1 關 · 騎士城堡前",
     title: "魔術士技能靶場",
     phase: "1F / 1L / 1C",
-    description: "把施法者和目標放到合法位置，便於連續檢查三項技術。",
+    description: "把施法者和追擊型敵兵放到合法位置，可驗證冰封只跳過一次敵方行動。",
     fixture: true,
   },
   {

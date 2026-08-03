@@ -207,7 +207,7 @@ export async function createDebugScenarioController(
       return createStage1Player(difficulty);
     case "stage-01-magician": {
       const controller = await createStage1Player(difficulty);
-      controller.forceClassActionSetupForTest("magician");
+      controller.forceClassActionSetupForTest("magician", false, "pursuing");
       return controller;
     }
     case "stage-01-enemy-sister": {

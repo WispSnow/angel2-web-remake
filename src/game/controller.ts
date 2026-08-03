@@ -2905,28 +2905,44 @@ export class GameController {
   forceClassActionSetupForTest(
     classId: "archer" | "cavalry" | "magician" | "sister" | "warrior",
     ordinaryCombat = false,
+    stage1Target: "boss" | "pursuing" = "boss",
   ): void {
     if (!this.debugMode) return;
     const actor = this.battle.unit("1:0");
     const ally = this.battle.unit("1:1")
       ?? this.battle.units.find((unit) => unit.side === 1 && unit.id !== actor?.id);
+    const pursuingStage1Target = this.battle.stage.id === "stage-01"
+      && classId === "magician"
+      && stage1Target === "pursuing";
     const enemy = this.battle.stage.id === "stage-01"
-      ? this.battle.unit("2:16")
+      ? this.battle.unit(pursuingStage1Target ? "2:45" : "2:16")
       : this.battle.units.find((unit) => unit.side === 2 && unit.id !== "2:15");
+    const objectiveAnchor = pursuingStage1Target ? this.battle.unit("2:16") : undefined;
     if (!actor || !ally || !enemy) return;
     actor.classId = classId;
     actor.className = className(classId);
     actor.experience = 0;
     actor.acted = false;
+    actor.actionDisabled = false;
     actor.x = 29;
     actor.y = 26;
     actor.life = this.battle.statsFor(actor).maxLife;
     ally.acted = false;
+    ally.actionDisabled = false;
 
     enemy.x = ordinaryCombat ? 30 : classId === "archer" ? 33 : 30;
     enemy.y = 26;
     enemy.life = ordinaryCombat ? 1 : this.battle.statsFor(enemy).maxLife;
     enemy.acted = false;
+    enemy.actionDisabled = false;
+
+    if (objectiveAnchor) {
+      objectiveAnchor.x = 1;
+      objectiveAnchor.y = 1;
+      objectiveAnchor.life = this.battle.statsFor(objectiveAnchor).maxLife;
+      objectiveAnchor.acted = true;
+      objectiveAnchor.actionDisabled = false;
+    }
 
     if (classId === "sister" && !ordinaryCombat) {
       ally.x = 31;
@@ -2936,7 +2952,7 @@ export class GameController {
     }
 
     this.battle.units = this.battle.units.filter((unit) =>
-      unit.side === 1 || unit.id === enemy.id);
+      unit.side === 1 || unit.id === enemy.id || unit.id === objectiveAnchor?.id);
     for (const unit of this.battle.units.filter((unit) =>
       unit.side === 1 && unit.id !== actor.id && unit.id !== ally.id)) {
       unit.acted = true;
@@ -2946,7 +2962,9 @@ export class GameController {
     this.centerCamera(actor);
     this.cursor = { x: actor.x, y: actor.y };
     this.resetAction();
-    this.statusMessage = `自動驗收：${actor.className}職業行動場景。`;
+    this.statusMessage = pursuingStage1Target
+      ? `調試場景：${actor.className}可對追擊型敵兵驗證一次敵方階段冰封。`
+      : `自動驗收：${actor.className}職業行動場景。`;
     this.busy = false;
     this.emit();
   }
