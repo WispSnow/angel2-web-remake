@@ -13,6 +13,7 @@ import type {
   BattleUnit,
   CampaignState,
   Difficulty,
+  Position,
   SaveRosterEntry,
   SavedBattleState,
   SavedEnemyAiState,
@@ -192,6 +193,13 @@ export class Stage1Battle extends Stage0Battle {
         : "sentry";
     }
     return "pursuit";
+  }
+
+  override enemyMovementRange(id: string): Position[] {
+    const unit = this.unit(id);
+    if (!unit || unit.side !== 2 || unit.actionDisabled) return [];
+    if (this.enemyAiIntentFor(id) === "sentry") return [{ x: unit.x, y: unit.y }];
+    return this.reachableCells(id);
   }
 
   override planEnemyAiAction(id: string, _behavior?: number): AlliedAiAction | undefined {

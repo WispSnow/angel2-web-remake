@@ -151,6 +151,31 @@ describe("stage 1 battle construction", () => {
     expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(rngBefore);
   });
 
+  it("previews the movement budget of each enemy's current intent", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const rngBefore = { state: battle.rng.state, calls: battle.rng.calls };
+
+    const patrol = battle.unit("2:45")!;
+    const patrolRange = battle.enemyMovementRange(patrol.id);
+    expect(patrolRange).toContainEqual({ x: patrol.x, y: patrol.y });
+    expect(patrolRange.length).toBeGreaterThan(1);
+
+    const guard = battle.unit("2:40")!;
+    const alertRange = battle.enemyMovementRange(guard.id);
+    expect(alertRange).toContainEqual({ x: guard.x, y: guard.y });
+    expect(alertRange.length).toBeGreaterThan(1);
+    const fang = battle.unit("2:16")!;
+    expect(battle.enemyMovementRange(fang.id)).toEqual([{ x: fang.x, y: fang.y }]);
+
+    activateCastleGuard(battle);
+    expect(battle.enemyMovementRange(guard.id)).toEqual(alertRange);
+    expect(battle.enemyMovementRange(fang.id)).toEqual([{ x: fang.x, y: fang.y }]);
+
+    battle.unit(guard.id)!.actionDisabled = true;
+    expect(battle.enemyMovementRange(guard.id)).toEqual([]);
+    expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(rngBefore);
+  });
+
   it("ignores move-plus-technique and Fang reach when the second group cannot deal damage", () => {
     const battle = new Stage1Battle(campaign, deploymentWithMagician());
     const player = battle.unit("1:0")!;

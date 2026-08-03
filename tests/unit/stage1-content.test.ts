@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { STAGE1_ACTION_PRESENTATION } from "../../src/game/content/stage1-actions.generated";
 import {
   STAGE1_ASSETS,
+  STAGE1_CAMERA_ORIGIN_BOUNDS,
   STAGE1_DEFINITION,
   STAGE1_DEPLOYMENT_PREVIEW_ROSTER,
   STAGE1_DEPLOYMENT_UI,
@@ -15,6 +16,7 @@ import {
   STAGE1_SOURCES,
   STAGE1_STORY_PAGES,
   STAGE1_STABLE_AI,
+  STAGE1_TERRAIN_CONTENT_BOUNDS,
   STAGE1_TERRAIN_TOKENS,
   STAGE1_TOKEN_TO_TERRAIN_SLOT,
   activateStage1Content,
@@ -83,7 +85,12 @@ describe("stage 1 generated content", () => {
       name: "騎士城堡前",
       width: 50,
       height: 50,
-      viewport: { width: 10, height: 7, initialOrigin: { x: 18, y: 33 } },
+      viewport: {
+        width: 10,
+        height: 7,
+        initialOrigin: { x: 18, y: 31 },
+        originBounds: { min: { x: 14, y: 13 }, max: { x: 26, y: 31 } },
+      },
       objective: {
         victory: { type: "unit-removed", side: 2, slot: 16 },
         defeat: { type: "unit-removed", side: 1, slot: 0 },
@@ -118,6 +125,14 @@ describe("stage 1 generated content", () => {
 
   it("decodes the complete terrain and evidence-backed deployment", () => {
     expect(STAGE1_TERRAIN_TOKENS).toHaveLength(2500);
+    expect(STAGE1_TERRAIN_CONTENT_BOUNDS).toEqual({
+      min: { x: 14, y: 13 },
+      max: { x: 35, y: 37 },
+    });
+    expect(STAGE1_CAMERA_ORIGIN_BOUNDS).toEqual({
+      min: { x: 14, y: 13 },
+      max: { x: 26, y: 31 },
+    });
     expect(STAGE1_TOKEN_TO_TERRAIN_SLOT).toHaveLength(128);
     expect(new Set(STAGE1_TERRAIN_TOKENS).size).toBe(91);
     expect(stage1TerrainSlotAt({ x: 25, y: 16 })).toBeGreaterThan(0);

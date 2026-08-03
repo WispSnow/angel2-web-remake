@@ -30,6 +30,10 @@ import {
   type StageMusicId,
   type StageStoryId,
 } from "./stages";
+import {
+  terrainContentBounds,
+  viewportOriginBoundsForContent,
+} from "./terrain";
 
 const decode = (encoded: string): Uint8Array => {
   const binary = globalThis.atob(encoded);
@@ -42,15 +46,32 @@ const semanticClassId = (nativeClassRecord: number): UnitClassId => {
   return classId;
 };
 
+export const STAGE1_TERRAIN_TOKENS = decode(STAGE1_TERRAIN_TOKENS_BASE64);
+export const STAGE1_TOKEN_TO_TERRAIN_SLOT = decode(STAGE1_TOKEN_TO_SLOT_BASE64);
+export const STAGE1_TERRAIN_CONTENT_BOUNDS = terrainContentBounds(
+  STAGE1_TERRAIN_TOKENS,
+  50,
+  50,
+);
+export const STAGE1_CAMERA_ORIGIN_BOUNDS = viewportOriginBoundsForContent(
+  STAGE1_TERRAIN_CONTENT_BOUNDS,
+  { width: 10, height: 7 },
+);
+
 export const STAGE1 = {
   id: "stage-01",
   nativeStage: 1,
   name: STAGE1_TITLE,
   width: 50,
   height: 50,
-  // The round-1 native presentation focuses portrait 46 (Nia) at (22,36).
-  // The shared 10x7 centering rule therefore yields this battle origin.
-  viewport: { width: 10, height: 7, initialOrigin: { x: 18, y: 33 } },
+  // Native centering on Nia at (22,36) yields (18,33). The stable remake
+  // clamps that presentation-only origin to the fully drawn map at y=31.
+  viewport: {
+    width: 10,
+    height: 7,
+    initialOrigin: { x: 18, y: STAGE1_CAMERA_ORIGIN_BOUNDS.max.y },
+    originBounds: STAGE1_CAMERA_ORIGIN_BOUNDS,
+  },
 } as const;
 
 /** REMAKE-012 semantic AI layout; native aiBehavior remains on the generated units as evidence. */
@@ -127,9 +148,6 @@ export const STAGE1_DEFINITION = {
 } as const satisfies StageDefinition<"stage-01">;
 
 registerRuntimeStageDefinition(STAGE1_DEFINITION);
-
-export const STAGE1_TERRAIN_TOKENS = decode(STAGE1_TERRAIN_TOKENS_BASE64);
-export const STAGE1_TOKEN_TO_TERRAIN_SLOT = decode(STAGE1_TOKEN_TO_SLOT_BASE64);
 
 export function stage1TerrainSlotAt(position: Position): number {
   if (position.x < 0 || position.y < 0 || position.x >= STAGE1.width || position.y >= STAGE1.height) return 0;

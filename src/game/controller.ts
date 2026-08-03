@@ -1,4 +1,10 @@
 import { STAGE0 } from "./content/stage0";
+import {
+  cameraFocusForOrigin,
+  cameraOriginForFocus,
+  clampCameraFocus,
+  clampCameraOrigin,
+} from "./camera";
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import {
   BATTLE_ACTION_DEFINITIONS,
@@ -360,7 +366,7 @@ export class GameController {
     this.activeStoryId = undefined;
     this.stageEventState = createStageEventState(this.battle.stage);
     this.resetAction();
-    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
     const nia = this.battle.unit("1:0");
     this.cursor = nia ? { x: nia.x, y: nia.y } : { ...this.cameraOrigin };
     this.statusMessage = "第一軍團抵達騎士城堡前。";
@@ -385,7 +391,7 @@ export class GameController {
       this.stage1Campaign,
       deployment,
     );
-    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
     const nia = this.battle.unit("1:0");
     this.cursor = nia ? { x: nia.x, y: nia.y } : { ...this.cameraOrigin };
     this.resetAction();
@@ -702,7 +708,7 @@ export class GameController {
     await this.animateUnitPath(actor.id, path, "scripted");
     actor.x = definition.destination.x;
     actor.y = definition.destination.y;
-    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
     this.cursor = { ...definition.destination };
     this.busy = false;
   }
@@ -808,7 +814,7 @@ export class GameController {
       this.selectedId = unit.id;
       this.reachable = this.battle.enemyMovementRange(unit.id);
       this.actionMode = "enemyPreview";
-      this.statusMessage = "紅色格為敵軍本次行動的可移動範圍；預覽不會改變戰鬥狀態。";
+      this.statusMessage = "紅色格為敵軍目前行為採用的移動或警戒範圍；預覽不會改變戰鬥狀態。";
     } else if (!unit.acted && !unit.actionDisabled) {
       this.selectedId = unit.id;
       this.pendingOrigin = { x: unit.x, y: unit.y };
@@ -2542,8 +2548,10 @@ export class GameController {
     this.phase = "player";
     this.campaignRoute = undefined;
     this.stageProgress = save.stageProgress;
-    this.cursor = { ...save.battle.cursor };
-    this.cameraOrigin = { ...save.battle.cameraOrigin };
+    this.cursor = clampCameraFocus(this.battle.stage, save.battle.cursor);
+    // Camera state is presentation-only. Normalize older/current saves that
+    // were written before a stage-specific drawn-map boundary was enforced.
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, save.battle.cameraOrigin);
     this.recordMenuMode = undefined;
     this.recordMenuReturn = undefined;
     this.recordMenuIndex = 0;
@@ -2671,10 +2679,10 @@ export class GameController {
       return;
     }
     this.minimapPreviewOrigin = undefined;
-    this.cursor = {
-      x: Math.max(0, Math.min(this.battle.stage.width - 1, this.cursor.x + delta.x)),
-      y: Math.max(0, Math.min(this.battle.stage.height - 1, this.cursor.y + delta.y)),
-    };
+    this.cursor = clampCameraFocus(this.battle.stage, {
+      x: this.cursor.x + delta.x,
+      y: this.cursor.y + delta.y,
+    });
     this.centerCamera(this.cursor);
     this.emit();
   }
@@ -2687,10 +2695,10 @@ export class GameController {
       || this.actionMode === "actionMenu"
       || this.actionMode === "techniqueMenu"
     ) return;
-    const next = {
-      x: Math.max(0, Math.min(this.battle.stage.width - this.battle.stage.viewport.width, this.cameraOrigin.x + delta.x)),
-      y: Math.max(0, Math.min(this.battle.stage.height - this.battle.stage.viewport.height, this.cameraOrigin.y + delta.y)),
-    };
+    const next = clampCameraOrigin(this.battle.stage, {
+      x: this.cameraOrigin.x + delta.x,
+      y: this.cameraOrigin.y + delta.y,
+    });
     if (positionKey(next) === positionKey(this.cameraOrigin)) return;
     this.minimapPreviewOrigin = undefined;
     this.cameraOrigin = next;
@@ -2704,10 +2712,7 @@ export class GameController {
       || this.busy
       || this.hasBlockingOverlay
     ) return undefined;
-    this.minimapPreviewOrigin = {
-      x: Math.max(0, Math.min(this.battle.stage.width - this.battle.stage.viewport.width, position.x - 4)),
-      y: Math.max(0, Math.min(this.battle.stage.height - this.battle.stage.viewport.height, position.y - 3)),
-    };
+    this.minimapPreviewOrigin = cameraOriginForFocus(this.battle.stage, position);
     return { ...this.minimapPreviewOrigin };
   }
 
@@ -2717,9 +2722,9 @@ export class GameController {
 
   commitMinimapPreview(): void {
     if (!this.minimapPreviewOrigin) return;
-    const origin = { ...this.minimapPreviewOrigin };
+    const origin = clampCameraOrigin(this.battle.stage, this.minimapPreviewOrigin);
     this.cameraOrigin = origin;
-    this.cursor = { x: origin.x + 4, y: origin.y + 3 };
+    this.cursor = cameraFocusForOrigin(this.battle.stage, origin);
     this.battle.focusId = this.battle.unitAt(this.cursor)?.id ?? this.battle.focusId;
     this.minimapPreviewOrigin = undefined;
     this.emit();
@@ -2840,7 +2845,7 @@ export class GameController {
     for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) unit.acted = true;
     this.battle.focusId = nia.id;
     this.phase = "player";
-    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
     this.cursor = { x: nia.x, y: nia.y };
     this.resetAction();
     this.statusMessage = "自動驗收：妮雅已有兩個合法普通攻擊目標。";
@@ -2864,7 +2869,7 @@ export class GameController {
     for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) unit.acted = true;
     this.battle.focusId = nia.id;
     this.phase = "player";
-    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
     this.cursor = { x: nia.x, y: nia.y };
     this.resetAction();
     this.statusMessage = "自動驗收：哈釘已置於可反擊位置。";
@@ -3293,10 +3298,7 @@ export class GameController {
   }
 
   private centerCamera(position: Position): void {
-    this.cameraOrigin = {
-      x: Math.max(0, Math.min(this.battle.stage.width - this.battle.stage.viewport.width, position.x - 4)),
-      y: Math.max(0, Math.min(this.battle.stage.height - this.battle.stage.viewport.height, position.y - 3)),
-    };
+    this.cameraOrigin = cameraOriginForFocus(this.battle.stage, position);
   }
 
   unitStats(unit: Pick<BattleUnit, "classId" | "experience" | "side">): UnitStats {

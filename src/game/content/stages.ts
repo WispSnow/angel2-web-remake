@@ -1,5 +1,6 @@
 import { STAGE0 } from "./stage0";
 import type { Position, Side, StageId } from "../types";
+import type { CellBounds } from "./terrain";
 
 export type StageStoryId =
   | "stage-00-prebattle-story"
@@ -116,6 +117,7 @@ export interface StageDefinition<Id extends StageId = StageId> {
     width: number;
     height: number;
     initialOrigin: Position;
+    originBounds: CellBounds;
   };
   contentIdentity: string;
   objective: StageObjectiveDefinition;

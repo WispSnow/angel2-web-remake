@@ -20,7 +20,13 @@ export const STAGE0 = {
   name: "瓦爾克麗宮",
   width: 50,
   height: 50,
-  viewport: { width: 10, height: 7, initialOrigin: { x: 25, y: 23 } },
+  viewport: {
+    width: 10,
+    height: 7,
+    initialOrigin: { x: 25, y: 23 },
+    // Preserve the accepted stage-0 native 50x50 address-space navigation.
+    originBounds: { min: { x: 0, y: 0 }, max: { x: 40, y: 43 } },
+  },
   opening: { from: { x: 10, y: 23 }, to: { x: 29, y: 26 }, budget: 50 },
   enemyRouteTarget: { x: 25, y: 47 },
   enemyRouteMovement: 5,

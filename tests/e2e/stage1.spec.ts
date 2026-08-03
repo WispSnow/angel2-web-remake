@@ -8,6 +8,12 @@ interface Stage1DebugState {
   stageId: string;
   stageProgress: number;
   phase: string;
+  actionMode: string;
+  selectedId?: string;
+  cursor: { x: number; y: number };
+  reachable: Array<{ x: number; y: number }>;
+  cameraOrigin: { x: number; y: number };
+  minimapPreviewOrigin?: { x: number; y: number };
   activeStoryId?: string;
   consumedEventIds: string[];
   rngState: number;
@@ -444,6 +450,134 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
+});
+
+test("S01-J: every stage-1 camera entry stays inside the drawn map", async ({ page }) => {
+  await enterStage1PlayerPhase(page);
+  const battleCanvas = page.getByTestId("battle-canvas");
+  await expect(battleCanvas).toHaveAttribute("data-camera-origin-bounds", "14,13,26,31");
+  expect((await state(page)).cameraOrigin).toEqual({ x: 18, y: 31 });
+
+  const hint = page.locator("#hint-toast");
+  if (await hint.isVisible()) {
+    await hint.click();
+    await page.getByTestId("objective-panel").click({ button: "right" });
+  }
+
+  // Focus an empty visible cell so the live tactical minimap is available.
+  await battleCanvas.click({ position: { x: 60, y: 45 } });
+  const minimap = page.getByTestId("tactical-minimap");
+  await expect(minimap).toBeVisible();
+
+  // A pointer in the unused lower-right of the native 50x50 minimap clamps to
+  // the last fully drawn 10x7 viewport instead of relocating into black space.
+  await minimap.hover({ position: { x: 121, y: 121 } });
+  expect((await state(page)).minimapPreviewOrigin).toEqual({ x: 26, y: 31 });
+  await expect(page.getByTestId("minimap-preview")).toHaveAttribute(
+    "style",
+    /left: 78px; top: 93px/u,
+  );
+  await minimap.click({ position: { x: 121, y: 121 } });
+  expect(await state(page)).toMatchObject({
+    cameraOrigin: { x: 26, y: 31 },
+    cursor: { x: 30, y: 34 },
+  });
+
+  // Edge scrolling shares the same clamp and cannot advance beyond the corner.
+  await battleCanvas.hover({ position: { x: 475, y: 340 } });
+  await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "1,1");
+  await page.waitForTimeout(350);
+  expect((await state(page)).cameraOrigin).toEqual({ x: 26, y: 31 });
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-camera-lower-right-bound.png`,
+  });
+
+  await minimap.hover({ position: { x: 2, y: 2 } });
+  expect((await state(page)).minimapPreviewOrigin).toEqual({ x: 14, y: 13 });
+  await minimap.click({ position: { x: 2, y: 2 } });
+  expect(await state(page)).toMatchObject({
+    cameraOrigin: { x: 14, y: 13 },
+    cursor: { x: 18, y: 16 },
+  });
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-camera-upper-left-bound.png`,
+  });
+
+  // Presentation-only camera data from a previously written v11 save is
+  // normalized on restore; simulation and save versions do not change.
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-3").click();
+  await page.evaluate(() => {
+    const key = "angel2.save.3";
+    const save = JSON.parse(localStorage.getItem(key) ?? "null");
+    save.battle.cameraOrigin = { x: 40, y: 43 };
+    save.battle.cursor = { x: 44, y: 46 };
+    localStorage.setItem(key, JSON.stringify(save));
+  });
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-load").click();
+  await page.getByTestId("record-slot-3").click();
+  expect(await state(page)).toMatchObject({
+    cameraOrigin: { x: 26, y: 31 },
+    cursor: { x: 35, y: 37 },
+  });
+});
+
+test("S01-K: enemy movement preview follows the current stage-1 AI intent", async ({ page }) => {
+  await enterStage1PlayerPhase(page);
+  const battleCanvas = page.getByTestId("battle-canvas");
+
+  for (let step = 0; step < 18; step += 1) await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  const patrolFocus = await state(page);
+  expect(patrolFocus.cursor).toEqual({ x: 24, y: 18 });
+  await battleCanvas.click({
+    position: {
+      x: 40 + (24 - patrolFocus.cameraOrigin.x) * 40 + 20,
+      y: 23 + (18 - patrolFocus.cameraOrigin.y) * 44 + 22,
+    },
+  });
+
+  const patrolPreview = await state(page);
+  expect(patrolPreview).toMatchObject({ actionMode: "enemyPreview", selectedId: "2:45" });
+  expect(patrolPreview.reachable).toContainEqual({ x: 24, y: 18 });
+  expect(patrolPreview.reachable.length).toBeGreaterThan(1);
+  await expect(battleCanvas).toHaveAttribute("data-range-mode", "enemyPreview");
+  await expect(battleCanvas).toHaveAttribute(
+    "data-range-cell-count",
+    String(patrolPreview.reachable.length),
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-enemy-movement-preview.png`,
+  });
+
+  await battleCanvas.click({ button: "right", position: { x: 20, y: 22 } });
+  for (let step = 0; step < 4; step += 1) await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  const guardFocus = await state(page);
+  expect(guardFocus.cursor).toEqual({ x: 22, y: 14 });
+  await battleCanvas.click({
+    position: {
+      x: 40 + (22 - guardFocus.cameraOrigin.x) * 40 + 20,
+      y: 23 + (14 - guardFocus.cameraOrigin.y) * 44 + 22,
+    },
+  });
+
+  const guardPreview = await state(page);
+  expect(guardPreview).toMatchObject({ actionMode: "enemyPreview", selectedId: "2:40" });
+  expect(guardPreview.reachable).toContainEqual({ x: 22, y: 14 });
+  expect(guardPreview.reachable.length).toBeGreaterThan(1);
+  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖警戒");
+  await expect(battleCanvas).toHaveAttribute(
+    "data-range-cell-count",
+    String(guardPreview.reachable.length),
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-alert-movement-preview.png`,
+  });
 });
 
 test("S01-I: move-plus-technique and Fang pursuit reach do not wake the second army", async ({ page }) => {

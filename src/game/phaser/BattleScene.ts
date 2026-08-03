@@ -157,7 +157,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     create(): void {
       this.cameras.main.setViewport(40, 23, 400, 308);
       this.cameras.main.setBackgroundColor("#050405");
-      this.cameras.main.setBounds(0, 0, 2000, 2200);
+      const { originBounds, width, height } = controller.battle.stage.viewport;
+      this.cameras.main.setBounds(
+        originBounds.min.x * TILE_WIDTH,
+        originBounds.min.y * TILE_HEIGHT,
+        (originBounds.max.x - originBounds.min.x + width) * TILE_WIDTH,
+        (originBounds.max.y - originBounds.min.y + height) * TILE_HEIGHT,
+      );
       this.add.image(
         0,
         0,
@@ -232,6 +238,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       canvas.dataset.testid = "battle-canvas";
       canvas.dataset.edgePanDirection = "0,0";
       canvas.dataset.primaryPointerHeld = "false";
+      canvas.dataset.cameraOriginBounds = [
+        originBounds.min.x,
+        originBounds.min.y,
+        originBounds.max.x,
+        originBounds.max.y,
+      ].join(",");
       this.setNativePointerCursor("hand");
       // Phaser still reports the scene as inactive during part of create(), so
       // the eager sync above can be ignored by the stale-scene guard. Static
