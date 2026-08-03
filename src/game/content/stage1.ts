@@ -53,6 +53,23 @@ export const STAGE1 = {
   viewport: { width: 10, height: 7, initialOrigin: { x: 18, y: 33 } },
 } as const;
 
+/** REMAKE-012 semantic AI layout; native aiBehavior remains on the generated units as evidence. */
+export const STAGE1_STABLE_AI = {
+  pursuitGroup: {
+    id: "forward-patrol",
+    slots: [45, 46],
+  },
+  alertGroup: {
+    id: "castle-guard",
+    slots: [40, 41, 42, 43],
+    trigger: "damage-this-turn",
+  },
+  commander: {
+    slot: 16,
+    pursuitDelayRounds: 1,
+  },
+} as const;
+
 export const STAGE1_DEFINITION = {
   ...STAGE1,
   contentIdentity: STAGE1_CONTENT_IDENTITY,

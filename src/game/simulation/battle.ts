@@ -5,7 +5,7 @@ import {
 import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
-import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, Position, SaveRosterEntry, UnitStats, UnitStatuses } from "../types";
+import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, Position, SaveRosterEntry, SavedBattleState, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
 import { manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath } from "./grid";
 import {
@@ -28,6 +28,11 @@ import type {
 } from "./actions/types";
 import { UNIT_STATUS_KEYS } from "./status";
 import { battleOutcomeForObjective } from "./objectives";
+import {
+  hasModernDamageActionThisTurn,
+  planModernEnemyAction,
+  type ModernEnemyAiContext,
+} from "./enemy-ai";
 
 const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "archer-shot": ["archer"],
@@ -96,6 +101,12 @@ export interface AlliedAiAction {
   actionId?: BattleActionId;
 }
 
+export type EnemyAiIntent = "route" | "sentry" | "alert" | "pursuit";
+
+export interface EnemyPhaseUpdate {
+  activatedGroupIds: readonly string[];
+}
+
 export class Stage0Battle {
   readonly stage: StageDefinition;
   units: BattleUnit[];
@@ -118,7 +129,7 @@ export class Stage0Battle {
   }
 
   restore(
-    snapshot: Pick<ReturnType<Stage0Battle["serializableSnapshot"]>, "round" | "focusId" | "units">,
+    snapshot: Pick<SavedBattleState, "round" | "focusId" | "units" | "enemyAi">,
     campaignRoster?: readonly SaveRosterEntry[],
   ): void {
     this.round = snapshot.round;
@@ -150,6 +161,14 @@ export class Stage0Battle {
 
   enemyBehaviorFor(id: string): number {
     return this.scenario.enemyBehaviorById?.get(id) ?? 0;
+  }
+
+  enemyAiIntentFor(_id: string): EnemyAiIntent | undefined {
+    return undefined;
+  }
+
+  beginEnemyPhase(): EnemyPhaseUpdate {
+    return { activatedGroupIds: [] };
   }
 
   promotionQueue(): string[] {
@@ -226,6 +245,7 @@ export class Stage0Battle {
     if (!attacker || !defender || attacker.side === defender.side || attacker.acted || manhattan(attacker, defender) !== 1) {
       throw new Error("illegal ordinary attack");
     }
+    this.onHostileTargeted(attacker, defender);
 
     const attackerStats = this.statsFor(attacker);
     const defenderStats = this.statsFor(defender);
@@ -367,6 +387,11 @@ export class Stage0Battle {
       throw new Error("stale prepared special action");
     }
 
+    for (const affected of prepared.affectedUnits) {
+      const target = this.unit(affected.unitId);
+      if (target && target.side !== actor.side) this.onHostileTargeted(actor, target);
+    }
+
     this.rng.state = prepared.rngAfter;
     this.rng.calls = prepared.rngCallsAfter;
     actor.experience = prepared.actorExperienceAfter;
@@ -454,7 +479,7 @@ export class Stage0Battle {
     return this.planOrdinaryAiAction(unit, 2, 0);
   }
 
-  planEnemyAiAction(id: string, behavior: number): AlliedAiAction | undefined {
+  planEnemyAiAction(id: string, behavior = this.enemyBehaviorFor(id)): AlliedAiAction | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2 || unit.acted) return undefined;
     const stats = this.statsFor(unit);
@@ -468,6 +493,35 @@ export class Stage0Battle {
       if (special) return special;
     }
     return this.planOrdinaryAiAction(unit, 1, behavior);
+  }
+
+  protected planModernEnemyAiAction(
+    id: string,
+    intent: Extract<EnemyAiIntent, "sentry" | "pursuit">,
+  ): AlliedAiAction | undefined {
+    return planModernEnemyAction(this.modernEnemyAiContext(), id, intent);
+  }
+
+  protected hasDamageActionThisTurn(id: string): boolean {
+    return hasModernDamageActionThisTurn(this.modernEnemyAiContext(), id);
+  }
+
+  protected onHostileTargeted(_actor: BattleUnit, _target: BattleUnit): void {}
+
+  private modernEnemyAiContext(): ModernEnemyAiContext {
+    return {
+      width: this.stage.width,
+      battlefield: this.scenario,
+      units: this.units,
+      unit: (id) => this.unit(id),
+      statsFor: (unit) => this.statsFor(unit),
+      movementPath: (id, destination) => this.movementPath(id, destination),
+      planSisterAction: (unit, actionId) => this.planClassAction(
+        unit,
+        [actionId],
+        { modernRanking: true },
+      ),
+    };
   }
 
   private planOrdinaryAiAction(
@@ -538,9 +592,10 @@ export class Stage0Battle {
     return this.planClassAction(unit, [actionId]);
   }
 
-  private planClassAction(
+  protected planClassAction(
     unit: BattleUnit,
     requestedActionIds?: readonly BattleActionId[],
+    options: { modernRanking?: boolean } = {},
   ): AlliedAiAction | undefined {
     if (unit.classId === "sister" && unit.statuses.techniqueSeal > 0) return undefined;
     const actionIds: readonly BattleActionId[] = requestedActionIds
@@ -554,8 +609,6 @@ export class Stage0Battle {
     const occupied = new Set(
       this.units.filter(({ id }) => id !== unit.id).map(positionKey),
     );
-    const positions = reachableCells(unit, this.units, undefined, this.scenario)
-      .filter((position) => !occupied.has(positionKey(position)));
     const battlefield = {
       width: this.stage.width,
       height: this.stage.height,
@@ -564,6 +617,10 @@ export class Stage0Battle {
 
     for (const actionId of actionIds) {
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+      const positions = (actionId === "archer-shot"
+        ? reachableCells(unit, this.units, undefined, this.scenario)
+        : [{ x: unit.x, y: unit.y }])
+        .filter((position) => !occupied.has(positionKey(position)));
       const candidates: Array<{
         position: Position;
         target: BattleUnit;
@@ -571,6 +628,8 @@ export class Stage0Battle {
         missingLife: number;
         effectiveDefense: number;
         positionDefense: number;
+        lethal: boolean;
+        critical: boolean;
       }> = [];
 
       for (const position of positions) {
@@ -609,11 +668,25 @@ export class Stage0Battle {
             missingLife,
             effectiveDefense,
             positionDefense: terrainDefensePercentFor(unit.classId, this.scenario.terrainSlotAt(position)),
+            lethal: actionId === "fire-1"
+              && target.statuses.magicGuard === 0
+              && target.life <= Math.min(
+                BATTLE_ACTION_DEFINITIONS["fire-1"].damage.cap,
+                Math.floor(
+                  targetStats.maxLife
+                  * BATTLE_ACTION_DEFINITIONS["fire-1"].damage.maxLifePercent
+                  / 100,
+                ),
+              ),
+            critical: actionId === "heal-1"
+              && target.life * 100 < targetStats.maxLife * 40,
           });
         }
       }
 
       candidates.sort((left, right) => {
+        if (options.modernRanking && left.lethal !== right.lethal) return left.lethal ? -1 : 1;
+        if (options.modernRanking && left.critical !== right.critical) return left.critical ? -1 : 1;
         if (actionId === "heal-1" && left.missingLife !== right.missingLife) {
           return right.missingLife - left.missingLife;
         }
@@ -734,7 +807,7 @@ export class Stage0Battle {
     };
   }
 
-  serializableSnapshot(): { round: number; focusId: string; units: BattleUnit[] } {
+  serializableSnapshot(): Pick<SavedBattleState, "round" | "focusId" | "units" | "enemyAi"> {
     return {
       round: this.round,
       focusId: this.focusId,

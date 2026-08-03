@@ -22,13 +22,14 @@ import type {
   SaveData,
   SaveRosterEntry,
   SavedBattleState,
+  SavedEnemyAiState,
   Side,
   UnitClassId,
 } from "./types";
 import { emptyUnitStatuses, UNIT_STATUS_KEYS } from "./simulation/status";
 
-export const SAVE_VERSION = 7 as const;
-export const SAVE_CONTENT_VERSION = "stage-01-actions-1" as const;
+export const SAVE_VERSION = 8 as const;
+export const SAVE_CONTENT_VERSION = "stage-01-ai-3" as const;
 export const SAVE_SLOT_COUNT = 20;
 export const SAVE_SLOTS_PER_PAGE = 5;
 export const SAVE_SLOT_PAGE_COUNT = SAVE_SLOT_COUNT / SAVE_SLOTS_PER_PAGE;
@@ -84,7 +85,7 @@ const STAGE0_ENEMY_CLASS_BY_ID = new Map(
 );
 // Save validation deliberately keeps this compact schema identity separate from the
 // heavy stage-1 content chunk. Changes to the generated deployment or enemy slots
-// require an explicit save-version decision instead of silently changing v7 meaning.
+// require an explicit save-version decision instead of silently changing v8 meaning.
 const STAGE1_SAVE_DEPLOYMENT = {
   eligibleSlots: [0, 1, 2, 4, 24, 40, 41, 42, 43],
   fixedSlots: [42, 40, 43, 41, 0],
@@ -108,6 +109,13 @@ const STAGE1_ENEMY_CLASS_BY_ID = new Map<string, UnitClassId>([
   ["2:42", "sister"],
   ["2:45", "soldier"],
   ["2:46", "soldier"],
+]);
+const STAGE1_CASTLE_GUARD_GROUP_ID = "castle-guard";
+const STAGE1_CASTLE_GUARD_INITIAL_POSITIONS = new Map<string, Position>([
+  ["2:40", { x: 22, y: 14 }],
+  ["2:41", { x: 28, y: 14 }],
+  ["2:42", { x: 27, y: 16 }],
+  ["2:43", { x: 23, y: 16 }],
 ]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -196,6 +204,7 @@ function isSavedBattleState(
   roster: readonly SaveRosterEntry[],
   difficulty: Difficulty,
   stageId: "stage-00" | "stage-01",
+  requireStage1Ai = true,
 ): value is SavedBattleState {
   if (
     !isRecord(value)
@@ -209,6 +218,12 @@ function isSavedBattleState(
     || !isPosition(value.cursor)
     || !isPosition(value.cameraOrigin, CAMERA_MAX_X, CAMERA_MAX_Y)
   ) return false;
+
+  if (stageId === "stage-01") {
+    if (requireStage1Ai) {
+      if (!isSavedEnemyAiState(value.enemyAi, value.round)) return false;
+    } else if (value.enemyAi !== undefined) return false;
+  } else if (value.enemyAi !== undefined) return false;
 
   const units = value.units;
   if (
@@ -246,6 +261,29 @@ function isSavedBattleState(
       && unit.experience === entry.experience
       && unit.life === entry.life;
   });
+}
+
+function isSavedEnemyAiState(value: unknown, round: number): value is SavedEnemyAiState {
+  if (
+    !isRecord(value)
+    || !Array.isArray(value.activeGroupIds)
+    || !value.activeGroupIds.every((id) => id === STAGE1_CASTLE_GUARD_GROUP_ID)
+    || !hasUniqueValues(value.activeGroupIds)
+    || !Array.isArray(value.pendingNoticeGroupIds)
+    || !value.pendingNoticeGroupIds.every((id) => id === STAGE1_CASTLE_GUARD_GROUP_ID)
+    || !hasUniqueValues(value.pendingNoticeGroupIds)
+  ) return false;
+
+  const activeGroupIds = value.activeGroupIds as string[];
+  const pendingNoticeGroupIds = value.pendingNoticeGroupIds as string[];
+  if (pendingNoticeGroupIds.some((id) => !activeGroupIds.includes(id))) return false;
+
+  if (activeGroupIds.length === 0) {
+    return pendingNoticeGroupIds.length === 0 && value.fangPursuitRound === null;
+  }
+  return activeGroupIds.length === 1
+    && isIntegerBetween(value.fangPursuitRound, 1, MAX_ROUND + 1)
+    && value.fangPursuitRound <= round + 1;
 }
 
 function hasValidBase(value: Record<string, unknown>): boolean {
@@ -319,6 +357,144 @@ function isBattleSave(value: Record<string, unknown>): boolean {
 export function isSaveData(value: unknown): value is SaveData {
   if (!isRecord(value) || !hasValidBase(value)) return false;
   return isCompletedSave(value) || isBattleSave(value);
+}
+
+interface Version7SavedBattleState extends Omit<SavedBattleState, "enemyAi"> {
+  enemyAi?: never;
+}
+
+interface Version7SaveBase {
+  format: "ANGEL2-web-save";
+  version: 7;
+  contentVersion: "stage-01-actions-1";
+  savedAt: string;
+  saveCount: number;
+  ruleset: "stableRemake";
+  difficulty: Difficulty;
+  rngState: number;
+  rngCalls: number;
+  roster: SaveRosterEntry[];
+  stageProgress: 0 | 999 | 1000;
+  consumedEventIds: string[];
+}
+
+interface Version7BattleSave extends Version7SaveBase {
+  kind: "battle";
+  stageId: "stage-00" | "stage-01";
+  stageLabel: "瓦爾克麗宮" | "騎士城堡前";
+  battle: Version7SavedBattleState;
+}
+
+interface Version7CompletedSave extends Version7SaveBase {
+  kind: "completed";
+  stageId: "stage-01" | "stage-02";
+  stageLabel: "騎士城堡前" | "下一關";
+}
+
+type Version7SaveData = Version7BattleSave | Version7CompletedSave;
+
+function hasValidVersion7Base(value: Record<string, unknown>): boolean {
+  return value.format === "ANGEL2-web-save"
+    && value.version === 7
+    && value.contentVersion === "stage-01-actions-1"
+    && value.ruleset === "stableRemake"
+    && typeof value.savedAt === "string"
+    && !Number.isNaN(Date.parse(value.savedAt))
+    && isIntegerBetween(value.saveCount, 1, Number.MAX_SAFE_INTEGER)
+    && isDifficulty(value.difficulty)
+    && isIntegerBetween(value.rngState, 1, 0xffff_ffff)
+    && isIntegerBetween(value.rngCalls, 0, Number.MAX_SAFE_INTEGER)
+    && Array.isArray(value.roster)
+    && value.roster.length === MAX_UNIT_SLOT + 1
+    && value.roster.every(isRosterEntry)
+    && hasUniqueValues(value.roster.map((entry) => entry.slot))
+    && value.roster.every(hasNamedAllyExperienceFloor)
+    && Array.isArray(value.consumedEventIds)
+    && value.consumedEventIds.every((id) => typeof id === "string")
+    && hasUniqueValues(value.consumedEventIds)
+    && (value.stageProgress === 0 || value.stageProgress === 999 || value.stageProgress === 1000);
+}
+
+function isVersion7SaveData(value: unknown): value is Version7SaveData {
+  if (!isRecord(value) || !hasValidVersion7Base(value)) return false;
+  const consumedEventIds = value.consumedEventIds as string[];
+  if (value.kind === "completed") {
+    if (value.battle !== undefined) return false;
+    if (value.stageId === "stage-01") {
+      return value.stageLabel === "騎士城堡前"
+        && value.stageProgress === 0
+        && consumedEventIds.length === 0;
+    }
+    return value.stageId === "stage-02"
+      && value.stageLabel === "下一關"
+      && value.stageProgress === 1000
+      && hasExactlyTheseValues(consumedEventIds, STAGE1_SAVE_EVENT_IDS);
+  }
+
+  const stageId = value.stageId === "stage-00" || value.stageId === "stage-01"
+    ? value.stageId
+    : undefined;
+  if (value.kind !== "battle" || !stageId || value.stageProgress !== 0) return false;
+  const validEventIds = new Set<string>(stageId === "stage-01"
+    ? STAGE1_SAVE_EVENT_IDS
+    : STAGE0_DEFINITION.events.map(({ id }) => id));
+  return value.stageLabel === (stageId === "stage-01" ? "騎士城堡前" : "瓦爾克麗宮")
+    && consumedEventIds.every((id) => validEventIds.has(id))
+    && (stageId !== "stage-01" || hasExactlyTheseValues(consumedEventIds, [
+      "stage-01-prebattle-story",
+      "stage-01-enter-deployment",
+      "stage-01-opening-story",
+    ]))
+    && isSavedBattleState(
+      value.battle,
+      value.roster as SaveRosterEntry[],
+      value.difficulty as Difficulty,
+      stageId,
+      false,
+    );
+}
+
+function inferredStage1EnemyAiState(save: Version7BattleSave): SavedEnemyAiState {
+  const observations = [...STAGE1_CASTLE_GUARD_INITIAL_POSITIONS].map(([id, initial]) => {
+    const unit = save.battle.units.find((candidate) => candidate.id === id);
+    return {
+      movedOrMissing: !unit || unit.x !== initial.x || unit.y !== initial.y,
+      damaged: Boolean(unit && unit.life < statsFor(unit, save.difficulty).maxLife),
+    };
+  });
+  const movedOrMissing = observations.some((observation) => observation.movedOrMissing);
+  const active = movedOrMissing || observations.some((observation) => observation.damaged);
+  return active
+    ? {
+      activeGroupIds: [STAGE1_CASTLE_GUARD_GROUP_ID],
+      pendingNoticeGroupIds: [],
+      // A moved/missing guard must have acted before this player phase. Damage without
+      // movement may have happened moments before the save, so preserve the one-round delay.
+      fangPursuitRound: movedOrMissing ? save.battle.round : save.battle.round + 1,
+    }
+    : {
+      activeGroupIds: [],
+      pendingNoticeGroupIds: [],
+      fangPursuitRound: null,
+    };
+}
+
+function migrateVersion7Save(save: Version7SaveData): SaveData {
+  if (save.kind === "completed") {
+    return {
+      ...save,
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+    };
+  }
+  return {
+    ...save,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    battle: save.stageId === "stage-01"
+      ? { ...save.battle, enemyAi: inferredStage1EnemyAiState(save) }
+      : save.battle,
+  };
 }
 
 interface Version6SaveBase {
@@ -781,6 +957,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    if (isVersion7SaveData(value)) {
+      const migrated = migrateVersion7Save(value);
+      return isSaveData(migrated) ? migrated : undefined;
+    }
     if (isVersion6SaveData(value)) {
       const migrated = migrateVersion6Save(value);
       return isSaveData(migrated) ? migrated : undefined;

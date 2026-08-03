@@ -12,6 +12,13 @@ interface Stage1DebugState {
   consumedEventIds: string[];
   rngState: number;
   rngCalls: number;
+  round: number;
+  enemyAi: {
+    activeGroupIds: string[];
+    pendingNoticeGroupIds: string[];
+    fangPursuitRound: number | null;
+  };
+  enemyIntents: Record<string, string>;
   units: Array<{
     id: string;
     side: number;
@@ -120,6 +127,16 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
   await waitForPhase(page, "player");
 }
 
+async function completeBattleCommandDialogue(page: Page): Promise<void> {
+  for (let input = 0; input < 6; input += 1) {
+    const dialogue = page.getByTestId("dialogue-layer");
+    if (!await dialogue.isVisible()
+      || await dialogue.getAttribute("data-source-record") !== "battle-command") return;
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(20);
+  }
+}
+
 test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 
 test("S01-A through S01-E: deployment, techniques, save restore and victory route run in the main game", async ({ page }) => {
@@ -145,6 +162,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByText("修女／騎士團修女", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "49");
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0049\/base\.png$/u);
+  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖警戒");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-portrait.png`,
   });
@@ -154,6 +172,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByText("騎兵／芳", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "34");
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0034\/base\.png$/u);
+  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖守衛");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-fang-portrait.png`,
   });
@@ -164,14 +183,21 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.getByTestId("record-slot-2").click();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.2") ?? "null"));
   expect(saved).toMatchObject({
-    version: 7,
-    contentVersion: "stage-01-actions-1",
+    version: 8,
+    contentVersion: "stage-01-ai-3",
     kind: "battle",
     stageId: "stage-01",
     stageLabel: "騎士城堡前",
     rngCalls: checkpoint.rngCalls,
     stageProgress: 0,
     consumedEventIds: checkpoint.consumedEventIds,
+    battle: {
+      enemyAi: {
+        activeGroupIds: [],
+        pendingNoticeGroupIds: [],
+        fangPursuitRound: null,
+      },
+    },
   });
   expect(saved.roster).toHaveLength(75);
 
@@ -214,17 +240,19 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     "data-source-record",
     "battle-command",
   );
-  for (let input = 0; input < 6; input += 1) {
-    const commandDialogue = page.getByTestId("dialogue-layer");
-    if (!await commandDialogue.isVisible()
-      || await commandDialogue.getAttribute("data-source-record") !== "battle-command") break;
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(20);
-  }
+  await completeBattleCommandDialogue(page);
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
     return current?.specialActionPresentation?.phase === "fireEffect";
   });
+  const activeEnemyPhase = await state(page);
+  expect(activeEnemyPhase.enemyAi).toEqual({
+    activeGroupIds: ["castle-guard"],
+    pendingNoticeGroupIds: [],
+    fangPursuitRound: 2,
+  });
+  expect(activeEnemyPhase.enemyIntents["2:16"]).toBe("sentry");
+  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖追擊");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-fire.png`,
   });
@@ -235,6 +263,8 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
       && current.lastSpecialAction.actionId === "fire-1";
   });
   const enemyFireAfter = await state(page);
+  expect(enemyFireAfter.round).toBe(2);
+  expect(enemyFireAfter.enemyIntents["2:16"]).toBe("pursuit");
   expect(enemyFireAfter.units.find(({ id }) => id === "1:0")?.life)
     .toBe(niaBeforeEnemyFire.life - enemyFireAfter.lastSpecialAction!.damage);
 
@@ -349,4 +379,54 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
+});
+
+test("S01-I: move-plus-technique and Fang pursuit reach do not wake the second army", async ({ page }) => {
+  await enterStage1PlayerPhase(page);
+  await page.evaluate(() => window.__ANGEL2__?.forceEnemyAlertBoundarySetup());
+  const setup = await state(page);
+  expect(setup.units.find(({ id }) => id === "1:0")).toMatchObject({ x: 25, y: 21 });
+  expect(setup.enemyIntents).toMatchObject({
+    "2:45": "pursuit",
+    "2:46": "pursuit",
+    "2:40": "alert",
+    "2:41": "alert",
+    "2:42": "alert",
+    "2:43": "alert",
+    "2:16": "sentry",
+  });
+
+  await page.keyboard.press("F1");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute(
+    "data-source-record",
+    "battle-command",
+  );
+  await completeBattleCommandDialogue(page);
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
+    return current?.phase === "player" && current.round === 2;
+  });
+
+  const nextRound = await state(page);
+  expect(nextRound.round).toBe(2);
+  expect(nextRound.enemyAi).toEqual({
+    activeGroupIds: [],
+    pendingNoticeGroupIds: [],
+    fangPursuitRound: null,
+  });
+  expect(nextRound.enemyIntents).toMatchObject({
+    "2:40": "alert",
+    "2:41": "alert",
+    "2:42": "alert",
+    "2:43": "alert",
+    "2:16": "sentry",
+  });
+
+  for (let step = 0; step < 5; step += 1) await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖警戒");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-second-army-stays-alert.png`,
+  });
 });

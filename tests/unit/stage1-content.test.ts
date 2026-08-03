@@ -13,6 +13,7 @@ import {
   STAGE1_SEMANTIC_ENEMY_UNITS,
   STAGE1_SOURCES,
   STAGE1_STORY_PAGES,
+  STAGE1_STABLE_AI,
   STAGE1_TERRAIN_TOKENS,
   STAGE1_TOKEN_TO_TERRAIN_SLOT,
   activateStage1Content,
@@ -59,6 +60,15 @@ describe("stage 1 generated content", () => {
       "stage-01-messenger-arrival",
       "stage-01-completed-route",
     ]);
+    expect(STAGE1_STABLE_AI).toEqual({
+      pursuitGroup: { id: "forward-patrol", slots: [45, 46] },
+      alertGroup: {
+        id: "castle-guard",
+        slots: [40, 41, 42, 43],
+        trigger: "damage-this-turn",
+      },
+      commander: { slot: 16, pursuitDelayRounds: 1 },
+    });
   });
 
   it("decodes the complete terrain and evidence-backed deployment", () => {

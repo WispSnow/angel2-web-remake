@@ -5,6 +5,7 @@ import {
   moveSaveSlotPage,
   parseSaveData,
   readSaveSlot,
+  SAVE_CONTENT_VERSION,
   SAVE_SLOT_COUNT,
   SAVE_SLOT_PAGE_COUNT,
   SAVE_SLOTS_PER_PAGE,
@@ -22,7 +23,7 @@ import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 const completedSave = (): CompletedSaveData => ({
   format: "ANGEL2-web-save",
   version: SAVE_VERSION,
-  contentVersion: "stage-01-actions-1",
+  contentVersion: SAVE_CONTENT_VERSION,
   kind: "completed",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 1,
@@ -42,7 +43,7 @@ const completedSave = (): CompletedSaveData => ({
 const battleSave = (): BattleSaveData => ({
   format: "ANGEL2-web-save",
   version: SAVE_VERSION,
-  contentVersion: "stage-01-actions-1",
+  contentVersion: SAVE_CONTENT_VERSION,
   kind: "battle",
   savedAt: "2026-07-25T12:00:00.000Z",
   saveCount: 2,
@@ -222,10 +223,57 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-7 battle and completed saves", () => {
+  it("accepts complete version-8 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
     expect(parseSaveData(JSON.stringify(stage1BattleSave()))).toEqual(stage1BattleSave());
+  });
+
+  it("migrates version-7 stage-1 AI state from observable battle activity", () => {
+    const dormantCurrent = stage1BattleSave();
+    const { enemyAi: _dormantAi, ...dormantBattle } = dormantCurrent.battle;
+    const dormantLegacy = {
+      ...dormantCurrent,
+      version: 7,
+      contentVersion: "stage-01-actions-1",
+      battle: dormantBattle,
+    };
+    expect(parseSaveData(JSON.stringify(dormantLegacy))).toEqual(dormantCurrent);
+
+    const activeCurrent = stage1BattleSave();
+    const guard = activeCurrent.battle.units.find(({ id }) => id === "2:40")!;
+    guard.x += 1;
+    const { enemyAi: _activeAi, ...activeBattle } = activeCurrent.battle;
+    const activeLegacy = {
+      ...activeCurrent,
+      version: 7,
+      contentVersion: "stage-01-actions-1",
+      battle: activeBattle,
+    };
+    const migrated = parseSaveData(JSON.stringify(activeLegacy));
+    expect(migrated?.kind).toBe("battle");
+    if (migrated?.kind !== "battle") throw new Error("expected migrated battle save");
+    expect(migrated.battle.enemyAi).toEqual({
+      activeGroupIds: ["castle-guard"],
+      pendingNoticeGroupIds: [],
+      fangPursuitRound: activeLegacy.battle.round,
+    });
+
+    const damagedCurrent = stage1BattleSave();
+    damagedCurrent.battle.units.find(({ id }) => id === "2:40")!.life -= 1;
+    const { enemyAi: _damagedAi, ...damagedBattle } = damagedCurrent.battle;
+    const damagedLegacy = {
+      ...damagedCurrent,
+      version: 7,
+      contentVersion: "stage-01-actions-1",
+      battle: damagedBattle,
+    };
+    const damagedMigrated = parseSaveData(JSON.stringify(damagedLegacy));
+    expect(damagedMigrated?.kind).toBe("battle");
+    if (damagedMigrated?.kind !== "battle") throw new Error("expected migrated battle save");
+    expect(damagedMigrated.battle.enemyAi?.fangPursuitRound).toBe(
+      damagedLegacy.battle.round + 1,
+    );
   });
 
   it("strictly correlates stage-1 deployment, events and completed route state", () => {
@@ -401,6 +449,14 @@ describe("Web save validation", () => {
     const invalidPortrait = battleSave();
     invalidPortrait.battle.units[0].portrait = 68 as never;
     expect(isSaveData(invalidPortrait)).toBe(false);
+
+    const invalidAi = stage1BattleSave();
+    invalidAi.battle.enemyAi = {
+      activeGroupIds: [],
+      pendingNoticeGroupIds: ["castle-guard"],
+      fangPursuitRound: null,
+    };
+    expect(isSaveData(invalidAi)).toBe(false);
   });
 
   it("rejects duplicate occupancy and roster snapshots that disagree with battle state", () => {

@@ -484,7 +484,7 @@ export class GameController {
       ? CLASS_COMMANDS[this.selectedUnit.classId]
       : undefined;
     if (this.commandMenuKind === "postMove") {
-      return classCommand
+      return classCommand?.id === "shoot"
         ? [POST_MOVE_COMMANDS[0], classCommand, ...POST_MOVE_COMMANDS.slice(1)]
         : POST_MOVE_COMMANDS;
     }
@@ -868,6 +868,7 @@ export class GameController {
     if (
       this.phase !== "player"
       || this.actionMode !== "actionMenu"
+      || this.commandMenuKind !== "initial"
       || (unit?.classId !== "sister" && unit?.classId !== "magician")
       || unit.statuses.techniqueSeal > 0
     ) return;
@@ -1536,16 +1537,21 @@ export class GameController {
 
     this.battle.clearActionState(1);
     this.phase = "enemy";
-    this.statusMessage = this.battle.stage.id === "stage-00"
-      ? "敵方階段：騎士團部隊向出口撤離。"
-      : "敵方階段：騎士團開始行動。";
+    const enemyPhaseUpdate = this.battle.beginEnemyPhase();
+    this.statusMessage = enemyPhaseUpdate.activatedGroupIds.includes("castle-guard")
+      ? "城堡守軍解除警戒，全軍進入追擊；芳將於下一回合出擊。"
+      : this.battle.stage.id === "stage-00"
+        ? "敵方階段：騎士團部隊向出口撤離。"
+        : "敵方階段：騎士團開始行動。";
     this.emit();
+    if (enemyPhaseUpdate.activatedGroupIds.length > 0) {
+      await pause(this.mapCombatDelay(40));
+    }
     const enemyIds = this.battle.enemyActionOrder();
     for (const id of enemyIds) {
       if (!this.battle.unit(id)) continue;
       if (this.battle.stage.id === "stage-01") {
-        const behavior = this.battle.enemyBehaviorFor(id);
-        const action = this.battle.planEnemyAiAction(id, behavior);
+        const action = this.battle.planEnemyAiAction(id);
         if (action && await this.runAlliedAiAction(action, "enemy")) {
           this.busy = false;
           this.emit();
@@ -2842,6 +2848,36 @@ export class GameController {
     this.emit();
   }
 
+  forceEnemyAlertBoundarySetupForTest(): void {
+    if (!this.debugMode || this.battle.stage.id !== "stage-01") return;
+    this.battle.restore({
+      ...this.battle.serializableSnapshot(),
+      enemyAi: {
+        activeGroupIds: [],
+        pendingNoticeGroupIds: [],
+        fangPursuitRound: null,
+      },
+    });
+    const nia = this.battle.unit("1:0");
+    if (!nia) return;
+    nia.x = 25;
+    nia.y = 21;
+    nia.life = this.battle.statsFor(nia).maxLife;
+    nia.acted = false;
+    for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) {
+      unit.acted = true;
+    }
+    for (const unit of this.battle.units.filter((unit) => unit.side === 2)) unit.acted = false;
+    this.battle.focusId = nia.id;
+    this.phase = "player";
+    this.centerCamera(nia);
+    this.cursor = { x: nia.x, y: nia.y };
+    this.resetAction();
+    this.statusMessage = "自動驗收：我軍僅在第二軍團移動後施術的潛在範圍內。";
+    this.busy = false;
+    this.emit();
+  }
+
   forceClassActionSetupForTest(
     classId: "archer" | "cavalry" | "magician" | "sister" | "warrior",
     ordinaryCombat = false,
@@ -3167,6 +3203,7 @@ export interface Angel2DebugApi {
   forceMultipleTargets: () => void;
   forceCavalryCounterSetup: () => void;
   forceEnemySisterSetup: () => void;
+  forceEnemyAlertBoundarySetup: () => void;
   forceClassActionSetup: (
     classId: "archer" | "cavalry" | "magician" | "sister" | "warrior",
     ordinaryCombat?: boolean,
@@ -3191,6 +3228,7 @@ export function exposeDebugApi(controller: GameController): void {
     forceMultipleTargets: () => controller.forceMultipleTargetsForTest(),
     forceCavalryCounterSetup: () => controller.forceCavalryCounterSetupForTest(),
     forceEnemySisterSetup: () => controller.forceEnemySisterSetupForTest(),
+    forceEnemyAlertBoundarySetup: () => controller.forceEnemyAlertBoundarySetupForTest(),
     forceClassActionSetup: (classId, ordinaryCombat) =>
       controller.forceClassActionSetupForTest(classId, ordinaryCombat),
     clearSaves: () => {

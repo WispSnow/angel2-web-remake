@@ -29,6 +29,17 @@ function deploymentWithMagician() {
   return finishDeployment(state);
 }
 
+function activateCastleGuard(battle: Stage1Battle): void {
+  battle.restore({
+    ...battle.serializableSnapshot(),
+    enemyAi: {
+      activeGroupIds: ["castle-guard"],
+      pendingNoticeGroupIds: [],
+      fangPursuitRound: battle.round + 1,
+    },
+  });
+}
+
 describe("stage 1 battle construction", () => {
   it("builds deployment-selected allies, applies the magician override, and loads evidence-backed enemies", () => {
     const battle = new Stage1Battle(campaign, deploymentWithMagician());
@@ -92,6 +103,7 @@ describe("stage 1 battle construction", () => {
     target.y = boundary.y;
     battle.units = [sister, target];
     battle.rng.state = 2;
+    expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: ["castle-guard"] });
 
     expect(battle.planEnemyAiAction(sister.id, 2)).toMatchObject({
       unitId: sister.id,
@@ -113,12 +125,236 @@ describe("stage 1 battle construction", () => {
     ally.life -= 10;
     battle.units = [sister, ally];
     battle.rng.state = 1;
+    activateCastleGuard(battle);
 
     expect(battle.planEnemyAiAction(sister.id, 2)).toMatchObject({
       unitId: sister.id,
       kind: "special",
       actionId: "heal-1",
       targetId: ally.id,
+    });
+  });
+
+  it("starts the lower soldiers in pursuit while the castle guard and Fang hold", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const rngBefore = { state: battle.rng.state, calls: battle.rng.calls };
+
+    expect(battle.enemyAiIntentFor("2:45")).toBe("pursuit");
+    expect(battle.enemyAiIntentFor("2:46")).toBe("pursuit");
+    for (const id of ["2:40", "2:41", "2:42", "2:43"]) {
+      expect(battle.enemyAiIntentFor(id)).toBe("alert");
+      expect(battle.planEnemyAiAction(id)).toMatchObject({ kind: "wait" });
+    }
+    expect(battle.enemyAiIntentFor("2:16")).toBe("sentry");
+    expect(battle.planEnemyAiAction("2:16")).toMatchObject({ kind: "wait" });
+    expect(battle.planEnemyAiAction("2:45")).toMatchObject({ kind: "move" });
+    expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(rngBefore);
+  });
+
+  it("ignores move-plus-technique and Fang reach when the second group cannot deal damage", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const player = battle.unit("1:0")!;
+    player.x = 25;
+    player.y = 21;
+
+    for (const sisterId of ["2:42", "2:43"]) {
+      expect(battle.actionRange(sisterId, "fire-1").valueAt(player)).toBe(0);
+    }
+    expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: [] });
+    for (const id of ["2:40", "2:41", "2:42", "2:43"]) {
+      expect(battle.enemyAiIntentFor(id)).toBe("alert");
+    }
+
+    const pursuing = new Stage1Battle(campaign, deploymentWithMagician());
+    const pursuitTarget = pursuing.unit("1:0")!;
+    pursuitTarget.x = player.x;
+    pursuitTarget.y = player.y;
+    activateCastleGuard(pursuing);
+    const sisterAction = pursuing.planEnemyAiAction("2:43");
+    expect(sisterAction).toMatchObject({ kind: "move" });
+    expect(sisterAction?.path.length).toBeGreaterThan(1);
+    expect(sisterAction).not.toHaveProperty("actionId");
+    pursuing.startNextRound();
+    expect(pursuing.planEnemyAiAction("2:16")).toMatchObject({
+      kind: "attack",
+      targetId: pursuitTarget.id,
+    });
+  });
+
+  it("activates the second group when a member can move and ordinary-attack this turn", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const player = battle.unit("1:0")!;
+    const guard = battle.unit("2:40")!;
+    const sisterRanges = ["2:42", "2:43"].map((id) => battle.actionRange(id, "fire-1"));
+    const candidate = battle.reachableCells(guard.id)
+      .flatMap(({ x, y }) => [
+        { x: x + 1, y },
+        { x: x - 1, y },
+        { x, y: y + 1 },
+        { x, y: y - 1 },
+      ])
+      .find((position) =>
+        position.x >= 0
+        && position.y >= 0
+        && position.x < battle.stage.width
+        && position.y < battle.stage.height
+        && Math.abs(position.x - guard.x) + Math.abs(position.y - guard.y) > 1
+        && !battle.unitAt(position)
+        && sisterRanges.every((range) => range.valueAt(position) === 0));
+    expect(candidate).toBeDefined();
+    if (!candidate) return;
+    player.x = candidate.x;
+    player.y = candidate.y;
+
+    expect(sisterRanges.every((range) => range.valueAt(player) === 0)).toBe(true);
+    expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: ["castle-guard"] });
+    const guardAction = battle.planEnemyAiAction("2:40");
+    expect(guardAction).toMatchObject({ kind: "attack", targetId: player.id });
+    expect(guardAction?.path.length).toBeGreaterThan(1);
+  });
+
+  it("never plans a technique from a moved position for enemy or allied AI", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const sister = battle.unit("2:43")!;
+    const player = battle.unit("1:0")!;
+    player.x = 25;
+    player.y = 21;
+    battle.units = [sister, player];
+
+    expect(battle.planSpecialAiAction(sister.id, "fire-1")).toBeUndefined();
+    activateCastleGuard(battle);
+    expect(battle.planEnemyAiAction(sister.id)).toMatchObject({ kind: "move" });
+
+    sister.side = 1;
+    player.side = 2;
+    expect(battle.planSpecialAiAction(sister.id, "fire-1")).toBeUndefined();
+    expect(battle.planAlliedAiAction(sister.id)).not.toMatchObject({ kind: "special" });
+  });
+
+  it("activates the whole guard on a current-position action threat and delays Fang one round", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const player = battle.unit("1:0")!;
+    const sister = battle.unit("2:43")!;
+    player.x = sister.x;
+    player.y = sister.y + 5;
+
+    expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: ["castle-guard"] });
+    for (const id of ["2:40", "2:41", "2:42", "2:43"]) {
+      expect(battle.enemyAiIntentFor(id)).toBe("pursuit");
+    }
+    expect(battle.enemyAiIntentFor("2:16")).toBe("sentry");
+    expect(battle.serializableSnapshot().enemyAi).toEqual({
+      activeGroupIds: ["castle-guard"],
+      pendingNoticeGroupIds: [],
+      fangPursuitRound: 2,
+    });
+
+    battle.startNextRound();
+    expect(battle.enemyAiIntentFor("2:16")).toBe("pursuit");
+  });
+
+  it("keeps low-life pursuit units in place to rest unless they have a guaranteed kill", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const soldier = battle.unit("2:45")!;
+    const player = battle.unit("1:0")!;
+    soldier.life = Math.floor(battle.statsFor(soldier).maxLife * 39 / 100);
+    player.x = soldier.x;
+    player.y = soldier.y + 1;
+    player.life = battle.statsFor(player).maxLife;
+
+    expect(battle.planEnemyAiAction(soldier.id)).toEqual({
+      unitId: soldier.id,
+      kind: "rest",
+      path: [{ x: soldier.x, y: soldier.y }],
+    });
+
+    battle.unit(player.id)!.life = 1;
+    expect(battle.planEnemyAiAction(soldier.id)).toMatchObject({
+      kind: "attack",
+      targetId: player.id,
+    });
+
+    const alertGuard = battle.unit("2:40")!;
+    alertGuard.life = Math.floor(battle.statsFor(alertGuard).maxLife * 39 / 100);
+    expect(battle.planEnemyAiAction(alertGuard.id)).toEqual({
+      unitId: alertGuard.id,
+      kind: "rest",
+      path: [{ x: alertGuard.x, y: alertGuard.y }],
+    });
+  });
+
+  it("records an attacked guard immediately and preserves its pending alert through restore", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const player = battle.unit("1:0")!;
+    const guard = battle.unit("2:40")!;
+    player.x = guard.x;
+    player.y = guard.y + 1;
+    battle.attack(player.id, guard.id);
+
+    expect(battle.serializableSnapshot().enemyAi).toEqual({
+      activeGroupIds: ["castle-guard"],
+      pendingNoticeGroupIds: ["castle-guard"],
+      fangPursuitRound: 2,
+    });
+
+    const restored = new Stage1Battle(campaign, deploymentWithMagician());
+    restored.restore(battle.serializableSnapshot());
+    expect(restored.beginEnemyPhase()).toEqual({ activatedGroupIds: ["castle-guard"] });
+    expect(restored.beginEnemyPhase()).toEqual({ activatedGroupIds: [] });
+    expect(restored.enemyAiIntentFor("2:16")).toBe("sentry");
+  });
+
+  it("lets pursuit units move and attack in one action", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const soldier = battle.unit("2:45")!;
+    const player = battle.unit("1:0")!;
+    player.x = soldier.x;
+    player.y = soldier.y + battle.statsFor(soldier).movement;
+    battle.units = [soldier, player];
+
+    const action = battle.planEnemyAiAction(soldier.id);
+    expect(action).toMatchObject({ kind: "attack", targetId: player.id });
+    expect(action?.path.length).toBeGreaterThan(1);
+  });
+
+  it("ranks sister actions without peeking at PRNG", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const sister = battle.unit("2:43")!;
+    const ally = battle.unit("2:40")!;
+    const player = battle.unit("1:0")!;
+    const fireBoundary = battle.actionRange(sister.id, "fire-1").cells()
+      .find((position) => battle.actionRange(sister.id, "fire-1").valueAt(position) === 1)!;
+    ally.x = sister.x + 1;
+    ally.y = sister.y;
+    ally.life = Math.floor(battle.statsFor(ally).maxLife * 30 / 100);
+    player.x = fireBoundary.x;
+    player.y = fireBoundary.y;
+    player.life = battle.statsFor(player).maxLife;
+    battle.units = [sister, ally, player];
+    activateCastleGuard(battle);
+    const rngBefore = { state: battle.rng.state, calls: battle.rng.calls };
+
+    expect(battle.planEnemyAiAction(sister.id)).toMatchObject({
+      kind: "special",
+      actionId: "heal-1",
+      targetId: ally.id,
+    });
+    expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(rngBefore);
+
+    battle.unit(player.id)!.life = 1;
+    expect(battle.planEnemyAiAction(sister.id)).toMatchObject({
+      kind: "special",
+      actionId: "fire-1",
+      targetId: player.id,
+    });
+    expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(rngBefore);
+
+    battle.unit(player.id)!.life = battle.statsFor(player).maxLife;
+    battle.unit(ally.id)!.life = Math.floor(battle.statsFor(ally).maxLife * 70 / 100);
+    expect(battle.planEnemyAiAction(sister.id)).toMatchObject({
+      kind: "special",
+      actionId: "fire-1",
+      targetId: player.id,
     });
   });
 });

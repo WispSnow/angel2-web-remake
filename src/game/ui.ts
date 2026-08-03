@@ -836,7 +836,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       else button.setAttribute("aria-pressed", String(pressed));
     }
     if (!sidePanelHotspotsActive) hideSidePanelHint();
-    hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${focus ? renderHud(focus.unit, focus.stats) : ""}`;
+    hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${focus ? renderHud(controller, focus.unit, focus.stats) : ""}`;
 
     const page = controller.currentDialogue;
     const dialogueVisible = page !== undefined;
@@ -1316,14 +1316,25 @@ function renderSidePanelHotspots(): string {
   }).join("");
 }
 
-function renderHud(unit: NonNullable<GameController["focusedUnit"]>, stats: UnitStats): string {
+function renderHud(
+  controller: GameController,
+  unit: NonNullable<GameController["focusedUnit"]>,
+  stats: UnitStats,
+): string {
   const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
   const nextExperience = nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
   const side = unit.side === 1 ? "我方" : "敵方";
   const acted = unit.acted ? "已行動" : "可行動";
+  const intent = unit.side === 2 ? controller.battle.enemyAiIntentFor(unit.id) : undefined;
+  const intentLabel = intent ? {
+    route: "撤離",
+    sentry: "守衛",
+    alert: "警戒",
+    pursuit: "追擊",
+  }[intent] : undefined;
   return `
-    <div class="unit-detail" data-testid="unit-detail" aria-label="${side}${acted}，${unit.className}${unit.name}">
+    <div class="unit-detail" data-testid="unit-detail" aria-label="${side}${acted}，${unit.className}${unit.name}${intentLabel ? `，意圖${intentLabel}` : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
       ${animatedPortraitMarkup(unit.portrait, {
         alt: `${unit.name}肖像`,
@@ -1342,6 +1353,7 @@ function renderHud(unit: NonNullable<GameController["focusedUnit"]>, stats: Unit
         <div><dt>防禦</dt><dd>${stats.defense}／${stats.defense}</dd></div>
         <div><dt>等級</dt><dd>${stats.level}</dd></div>
         <div><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
+        ${intentLabel ? `<div data-testid="enemy-ai-intent"><dt>意圖</dt><dd>${intentLabel}</dd></div>` : ""}
       </dl>
     </div>`;
 }

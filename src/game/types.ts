@@ -113,19 +113,26 @@ export interface SaveRosterEntry {
   life: number;
 }
 
+export interface SavedEnemyAiState {
+  activeGroupIds: string[];
+  pendingNoticeGroupIds: string[];
+  fangPursuitRound: number | null;
+}
+
 export interface SavedBattleState {
   phase: "player";
   round: number;
   focusId: string;
   units: BattleUnit[];
+  enemyAi?: SavedEnemyAiState;
   cursor: Position;
   cameraOrigin: Position;
 }
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 7;
-  contentVersion: "stage-01-actions-1";
+  version: 8;
+  contentVersion: "stage-01-ai-3";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -129,6 +129,31 @@ test("M00.6 archer shooting keeps simulation frozen through UN/60, then commits"
     .toHaveLength(8);
 });
 
+test("M00.6 post-move menus keep shooting but never offer techniques", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await forceSetup(page, "sister");
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-move").click();
+  await clickMapCell(page, 180, 177);
+  await expect.poll(async () => (await state(page)).actionMode).toBe("actionMenu");
+  expect((await state(page)).commands).toEqual([
+    { id: "attack", label: "攻擊" },
+    { id: "end", label: "結束" },
+    { id: "undo", label: "返悔" },
+  ]);
+  await expect(page.getByTestId("unit-command-technique")).toHaveCount(0);
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-sister-post-move-no-technique.png",
+  });
+
+  await forceSetup(page, "archer");
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-move").click();
+  await clickMapCell(page, 180, 177);
+  await expect.poll(async () => (await state(page)).actionMode).toBe("actionMenu");
+  expect((await state(page)).commands).toContainEqual({ id: "shoot", label: "射擊" });
+});
+
 test("M00.6 sister technique menu preserves nested cancel and both native timelines", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await forceSetup(page, "sister");
