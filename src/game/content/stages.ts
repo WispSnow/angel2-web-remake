@@ -11,7 +11,9 @@ export type StageStoryId =
   | "stage-01-opening-story"
   | "stage-01-victory-story"
   | "stage-02-opening-story"
-  | "stage-02-victory-story";
+  | "stage-02-victory-story"
+  | "stage-03-opening-story"
+  | "stage-03-victory-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -21,7 +23,9 @@ export type StageMusicId =
   | "stage-01-player-phase-music"
   | "stage-01-enemy-phase-music"
   | "stage-02-player-phase-music"
-  | "stage-02-enemy-phase-music";
+  | "stage-02-enemy-phase-music"
+  | "stage-03-player-phase-music"
+  | "stage-03-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -39,7 +43,11 @@ export type StageEventId =
   | "stage-02-opening-story"
   | "stage-02-boss-defeated"
   | "stage-02-victory-story"
-  | "stage-02-completed-route";
+  | "stage-02-completed-route"
+  | "stage-03-opening-story"
+  | "stage-03-boss-defeated"
+  | "stage-03-victory-story"
+  | "stage-03-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -51,7 +59,9 @@ export type StageSimulationEffectId =
   | "stage-01-messenger-arrival"
   | "stage-01-route-to-stage-02"
   | "stage-02-set-victory-999"
-  | "stage-02-route-to-stage-03";
+  | "stage-02-route-to-stage-03"
+  | "stage-03-set-victory-999"
+  | "stage-03-route-to-stage-04";
 
 export type StagePresentationId =
   | "none"
@@ -77,7 +87,8 @@ export interface StageEventDefinition {
 
 export type StageObjectiveCondition =
   | { type: "eliminate-side"; side: Side }
-  | { type: "unit-removed"; side: Side; slot: number };
+  | { type: "unit-removed"; side: Side; slot: number }
+  | { type: "any-unit-removed"; side: Side; slots: readonly number[] };
 
 export interface StageObjectiveDefinition {
   victory: StageObjectiveCondition;

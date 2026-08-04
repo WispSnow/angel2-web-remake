@@ -28,6 +28,8 @@ function promoteForAction(unit: BattleUnit, actionId: BattleActionId): void {
     ? "archer"
     : actionId === "lightning-1" || actionId === "ice-1"
       ? "magician"
+      : actionId === "recovery-1"
+        ? "monk"
       : actionId === "dispel"
         ? "magic-priest"
       : "sister";
@@ -376,6 +378,77 @@ describe("Stage-0 class actions", () => {
     ]));
     expect(prepared.result.affectedUnits.some(({ unitId }) => unitId === outsideTarget.id)).toBe(false);
     expect(prepared.rngAfter).toBe(prepared.rngBefore);
+  });
+
+  it("heals every unfrozen ally in the recovery diamond and derives experience from actual healing", () => {
+    const battle = new Stage0Battle(0);
+    const actor = {
+      ...battle.unit("1:0")!,
+      id: "recovery-actor",
+      x: 5,
+      y: 5,
+      classId: "monk" as const,
+    };
+    const baseline = battle.units.find((unit) => unit.side === 1 && unit.id !== "1:0")!;
+    const center = { ...baseline, id: "recovery-center", x: 5, y: 3, life: 1 };
+    const middle = { ...baseline, id: "recovery-middle", x: 5, y: 4, life: 1 };
+    const frozen = {
+      ...baseline,
+      id: "recovery-frozen",
+      x: 4,
+      y: 3,
+      life: 1,
+      actionDisabled: true,
+    };
+    const outside = { ...baseline, id: "recovery-outside", x: 8, y: 3, life: 1 };
+    const rng = new DeterministicRng(0x2468);
+    const prepared = prepareSpecialAction(
+      { actionId: "recovery-1", actorId: actor.id, targetId: center.id },
+      actor,
+      center,
+      rng,
+      {
+        units: [actor, center, middle, frozen, outside],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      center,
+    );
+
+    expect(prepared.result.affectedUnits).toEqual(expect.arrayContaining([
+      expect.objectContaining({ unitId: center.id, healing: 60 }),
+      expect.objectContaining({ unitId: middle.id, healing: 45 }),
+      expect.objectContaining({ unitId: frozen.id, healing: 0, blocked: true, blockReason: "frozen" }),
+    ]));
+    expect(prepared.result.affectedUnits.some(({ unitId }) => unitId === outside.id)).toBe(false);
+    expect(prepared.result.healing).toBeGreaterThanOrEqual(105);
+    const quotient = Math.floor(prepared.result.healing / 50);
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(8 + Math.min(quotient, 8));
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(9 + Math.min(quotient, 8));
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
+  });
+
+  it("awards no recovery experience and consumes no PRNG when actual healing stays below fifty", () => {
+    const battle = new Stage0Battle(0);
+    const actor = { ...battle.unit("1:0")!, x: 5, y: 5, classId: "monk" as const };
+    const maximumLife = battle.statsFor(actor).maxLife;
+    const center = { ...actor, id: "recovery-small", x: 5, y: 4, life: maximumLife - 10 };
+    const rng = new DeterministicRng(0x1357, 4);
+    const prepared = prepareSpecialAction(
+      { actionId: "recovery-1", actorId: actor.id, targetId: center.id },
+      actor,
+      center,
+      rng,
+      {
+        units: [{ ...actor, life: maximumLife }, center],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      center,
+    );
+    expect(prepared.result).toMatchObject({ healing: 10, experienceGained: 0 });
+    expect(prepared.rngAfter).toBe(prepared.rngBefore);
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore);
   });
 
   it("pushes ice targets down first, resolves occupancy in row-major order, and rolls experience only when something moved", () => {

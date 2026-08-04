@@ -32,4 +32,14 @@ describe("stage objective evaluation", () => {
       { type: "unit-removed", side: 2, slot: 16 },
     )).toBe(false);
   });
+
+  it("supports defeat when any protected named unit is removed", () => {
+    const protectedUnits = { type: "any-unit-removed", side: 1, slots: [1, 3] } as const;
+    expect(objectiveConditionSatisfied(
+      [{ side: 1, slot: 1 }, { side: 1, slot: 3 }],
+      protectedUnits,
+    )).toBe(false);
+    expect(objectiveConditionSatisfied([{ side: 1, slot: 1 }], protectedUnits)).toBe(true);
+    expect(objectiveConditionSatisfied([{ side: 1, slot: 3 }], protectedUnits)).toBe(true);
+  });
 });

@@ -9,7 +9,7 @@ import type { Difficulty } from "./game/types";
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
 
-const stageOrder = ["stage-00", "stage-01", "stage-02"] as const;
+const stageOrder = ["stage-00", "stage-01", "stage-02", "stage-03"] as const;
 const stageGroups = stageOrder.map((stageId) => ({
   stageId,
   scenarios: DEBUG_SCENARIOS.filter((scenario) => scenario.stageId === stageId),

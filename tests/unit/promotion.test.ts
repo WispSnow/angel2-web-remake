@@ -122,6 +122,31 @@ describe("evidence-backed class catalog and promotion", () => {
     });
   });
 
+  it("uses the on-field commander when Nia is absent from the battle", () => {
+    const units = createStage0Units();
+    const himi = units.find((unit) => unit.id === "1:1")!;
+    const teammate = units.find((unit) => unit.id === "1:40")!;
+
+    expect(promotionDialogueFor(himi, himi)).toEqual([
+      expect.objectContaining({
+        activeSlot: "upper",
+        upper: {
+          text: PROMOTION_DIALOGUE_TEXT.niaQuestion,
+          portrait: 45,
+          speaker: "希蜜",
+        },
+      }),
+    ]);
+
+    const pages = promotionDialogueFor(teammate, himi);
+    expect(pages[0]?.lower).toMatchObject({ speaker: teammate.name });
+    expect(pages[1]?.upper).toMatchObject({
+      text: PROMOTION_DIALOGUE_TEXT.niaGrant,
+      portrait: 45,
+      speaker: "希蜜",
+    });
+  });
+
   it("atomically changes class and clears experience without healing or spending PRNG", () => {
     const nia = createStage0Units().find((unit) => unit.id === "1:0")!;
     nia.experience = 307;

@@ -19,6 +19,7 @@ import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
 import { Stage1Battle } from "../../src/game/simulation/stage1-battle";
 import { Stage2Battle } from "../../src/game/simulation/stage2-battle";
+import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -217,6 +218,52 @@ const stage2BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage3BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-03" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x2030_4050,
+    rngCalls: 9,
+    roster: completeCampaignRoster([
+      { slot: 1, classId: "monk", experience: 520, life: 120 },
+      { slot: 3, classId: "warrior", experience: 480, life: 140 },
+      { slot: 4, classId: "archer", experience: 360, life: 90 },
+    ]),
+  };
+  const battle = new Stage3Battle(source);
+  const campaign = battle.campaignSnapshot();
+  const himi = battle.unit("1:1")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-04T12:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-03",
+    stageLabel: "通過力場",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: {
+      ...campaign,
+      stageId: "stage-03",
+      roster: campaign.roster.map((entry) => ({ ...entry })),
+    },
+    stageProgress: 0,
+    consumedEventIds: ["stage-03-opening-story"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: himi.x, y: himi.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -289,7 +336,7 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-13 battle and completed saves", () => {
+  it("accepts complete current-version battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
     expect(parseSaveData(JSON.stringify(stage1BattleSave()))).toEqual(stage1BattleSave());
@@ -300,6 +347,37 @@ describe("Web save validation", () => {
 
     expect(save.stageEntrySnapshot.roster).not.toEqual(save.roster);
     expect(parseSaveData(JSON.stringify(save))).toEqual(save);
+  });
+
+  it("round-trips stage-3 fixed battles and rejects missing protected allies", () => {
+    const save = stage3BattleSave();
+    expect(parseSaveData(JSON.stringify(save))).toEqual(save);
+
+    const missingHimi = stage3BattleSave();
+    missingHimi.battle.units = missingHimi.battle.units.filter(({ id }) => id !== "1:1");
+    expect(isSaveData(missingHimi)).toBe(false);
+  });
+
+  it("migrates the version-13 stage-3 boundary into the playable stage label", () => {
+    const current: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-03",
+      stageLabel: "通過力場",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-02-opening-story",
+        "stage-02-boss-defeated",
+        "stage-02-victory-story",
+        "stage-02-completed-route",
+      ],
+    };
+    const legacy = {
+      ...current,
+      version: 13,
+      contentVersion: "stage-entry-snapshot-1",
+      stageLabel: "下一關",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
 
   it("migrates version-12 battles by adopting their current campaign as the entry baseline", () => {

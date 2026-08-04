@@ -30,8 +30,8 @@ import type {
 } from "./types";
 import { emptyUnitStatuses, UNIT_STATUS_KEYS } from "./simulation/status";
 
-export const SAVE_VERSION = 13 as const;
-export const SAVE_CONTENT_VERSION = "stage-entry-snapshot-1" as const;
+export const SAVE_VERSION = 14 as const;
+export const SAVE_CONTENT_VERSION = "stage-03-recovery-1" as const;
 export const SAVE_SLOT_COUNT = 20;
 export const SAVE_SLOTS_PER_PAGE = 5;
 export const SAVE_SLOT_PAGE_COUNT = SAVE_SLOT_COUNT / SAVE_SLOTS_PER_PAGE;
@@ -126,6 +126,27 @@ const STAGE2_ENEMY_CLASS_BY_ID = new Map<string, UnitClassId>([
   ["2:51", "soldier"],
   ["2:50", "soldier"],
 ]);
+const STAGE3_SAVE_ALLIED_SLOTS = [1, 3, 4, 20, 21, 45, 46, 47, 50, 51, 52, 53, 54] as const;
+const STAGE3_SAVE_EVENT_IDS = [
+  "stage-03-opening-story",
+  "stage-03-boss-defeated",
+  "stage-03-victory-story",
+  "stage-03-completed-route",
+] as const;
+const STAGE3_ENEMY_CLASS_BY_ID = new Map<string, UnitClassId>([
+  ["2:42", "soldier"],
+  ["2:41", "soldier"],
+  ["2:40", "soldier"],
+  ["2:43", "sister"],
+  ["2:17", "monk"],
+  ["2:44", "soldier"],
+  ["2:45", "soldier"],
+  ["2:47", "soldier"],
+  ["2:46", "soldier"],
+  ["2:50", "cavalry"],
+  ["2:48", "soldier"],
+  ["2:49", "soldier"],
+]);
 const STAGE1_CASTLE_GUARD_GROUP_ID = "castle-guard";
 const STAGE1_CASTLE_GUARD_INITIAL_POSITIONS = new Map<string, Position>([
   ["2:40", { x: 22, y: 14 }],
@@ -193,7 +214,7 @@ function isUnitStatuses(value: unknown): value is BattleUnit["statuses"] {
 
 function isBattleUnit(
   value: unknown,
-  stageId: "stage-00" | "stage-01" | "stage-02",
+  stageId: "stage-00" | "stage-01" | "stage-02" | "stage-03",
   requireActionDisabled = true,
 ): value is BattleUnit {
   if (
@@ -223,6 +244,8 @@ function isBattleUnit(
     ? STAGE1_ENEMY_CLASS_BY_ID
     : stageId === "stage-02"
       ? STAGE2_ENEMY_CLASS_BY_ID
+      : stageId === "stage-03"
+        ? STAGE3_ENEMY_CLASS_BY_ID
       : STAGE0_ENEMY_CLASS_BY_ID;
   return enemyClasses.get(value.id) === value.classId;
 }
@@ -248,7 +271,7 @@ function isSavedBattleState(
   value: unknown,
   roster: readonly SaveRosterEntry[],
   difficulty: Difficulty,
-  stageId: "stage-00" | "stage-01" | "stage-02",
+  stageId: "stage-00" | "stage-01" | "stage-02" | "stage-03",
   requireStage1Ai = true,
   requireActionDisabled = true,
 ): value is SavedBattleState {
@@ -302,6 +325,12 @@ function isSavedBattleState(
     const alliedSlots = allies.map(({ slot }) => slot).sort((left, right) => left - right);
     if (alliedSlots.length !== STAGE2_SAVE_ALLIED_SLOTS.length
       || !alliedSlots.every((slot, index) => slot === STAGE2_SAVE_ALLIED_SLOTS[index])) {
+      return false;
+    }
+  } else if (stageId === "stage-03") {
+    const alliedSlots = allies.map(({ slot }) => slot).sort((left, right) => left - right);
+    if (alliedSlots.length !== STAGE3_SAVE_ALLIED_SLOTS.length
+      || !alliedSlots.every((slot, index) => slot === STAGE3_SAVE_ALLIED_SLOTS[index])) {
       return false;
     }
   }
@@ -376,10 +405,15 @@ function isCompletedSave(value: Record<string, unknown>): boolean {
       && value.stageProgress === 1000
       && hasExactlyTheseValues(consumedEventIds, STAGE1_SAVE_EVENT_IDS);
   }
-  return value.stageId === "stage-03"
+  if (value.stageId === "stage-03") {
+    return value.stageLabel === "通過力場"
+      && value.stageProgress === 1000
+      && hasExactlyTheseValues(consumedEventIds, STAGE2_SAVE_EVENT_IDS);
+  }
+  return value.stageId === "stage-04"
     && value.stageLabel === "下一關"
     && value.stageProgress === 1000
-    && hasExactlyTheseValues(consumedEventIds, STAGE2_SAVE_EVENT_IDS);
+    && hasExactlyTheseValues(consumedEventIds, STAGE3_SAVE_EVENT_IDS);
 }
 
 function isBattleSave(
@@ -387,7 +421,8 @@ function isBattleSave(
   requireStageEntrySnapshot = true,
 ): boolean {
   const difficulty = isDifficulty(value.difficulty) ? value.difficulty : undefined;
-  const stageId = value.stageId === "stage-00" || value.stageId === "stage-01" || value.stageId === "stage-02"
+  const stageId = value.stageId === "stage-00" || value.stageId === "stage-01"
+    || value.stageId === "stage-02" || value.stageId === "stage-03"
     ? value.stageId
     : undefined;
   if (!stageId || difficulty === undefined || value.stageProgress !== 0) return false;
@@ -395,12 +430,16 @@ function isBattleSave(
     ? STAGE1_SAVE_EVENT_IDS
     : stageId === "stage-02"
       ? STAGE2_SAVE_EVENT_IDS
+      : stageId === "stage-03"
+        ? STAGE3_SAVE_EVENT_IDS
       : STAGE0_DEFINITION.events.map(({ id }) => id));
   const consumedEventIds = value.consumedEventIds as string[];
   return value.kind === "battle"
     && value.stageLabel === (stageId === "stage-01"
       ? "騎士城堡前"
-      : stageId === "stage-02" ? "救援友軍" : "瓦爾克麗宮")
+      : stageId === "stage-02"
+        ? "救援友軍"
+        : stageId === "stage-03" ? "通過力場" : "瓦爾克麗宮")
     && consumedEventIds.every((id) => validEventIds.has(id))
     && (stageId !== "stage-01" || hasExactlyTheseValues(consumedEventIds, [
       "stage-01-prebattle-story",
@@ -409,6 +448,9 @@ function isBattleSave(
     ]))
     && (stageId !== "stage-02" || hasExactlyTheseValues(consumedEventIds, [
       "stage-02-opening-story",
+    ]))
+    && (stageId !== "stage-03" || hasExactlyTheseValues(consumedEventIds, [
+      "stage-03-opening-story",
     ]))
     && (!requireStageEntrySnapshot
       || isStageEntrySnapshot(value.stageEntrySnapshot, stageId, difficulty))
@@ -423,6 +465,21 @@ function isBattleSave(
 export function isSaveData(value: unknown): value is SaveData {
   if (!isRecord(value) || !hasValidBase(value)) return false;
   return isCompletedSave(value) || isBattleSave(value);
+}
+
+function migrateVersion13Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 13
+    || value.contentVersion !== "stage-entry-snapshot-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    ...(value.kind === "completed" && value.stageId === "stage-03"
+      ? { stageLabel: "通過力場" }
+      : {}),
+  };
+  return isSaveData(migrated) ? migrated : undefined;
 }
 
 interface Version12SaveBase {
@@ -466,7 +523,15 @@ function isVersion12SaveData(value: unknown): value is Version12SaveData {
       contentVersion: SAVE_CONTENT_VERSION,
     })
   ) return false;
-  return isCompletedSave(value) || isBattleSave(value, false);
+  const normalized = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    ...(value.kind === "completed" && value.stageId === "stage-03"
+      ? { stageLabel: "通過力場" }
+      : {}),
+  };
+  return isCompletedSave(normalized) || isBattleSave(value, false);
 }
 
 function migrateVersion12Save(save: Version12SaveData): SaveData {
@@ -475,6 +540,7 @@ function migrateVersion12Save(save: Version12SaveData): SaveData {
       ...save,
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
+      ...(save.stageId === "stage-03" ? { stageLabel: "通過力場" as const } : {}),
     };
   }
   return {
@@ -1470,6 +1536,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion13 = migrateVersion13Save(value);
+    if (migratedVersion13) return migratedVersion13;
     if (isVersion12SaveData(value)) {
       const migrated = migrateVersion12Save(value);
       return isSaveData(migrated) ? migrated : undefined;

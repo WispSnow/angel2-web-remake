@@ -7,6 +7,10 @@ import {
 } from "./game/content/classes";
 import { STAGE0_ACTION_PRESENTATION_ASSETS } from "./game/content/stage0-actions.generated";
 import {
+  STAGE1_ACTION_AUDIO_ASSETS,
+  STAGE1_ACTION_PRESENTATION,
+} from "./game/content/stage1-actions.generated";
+import {
   TECHNIQUE_LAB_AUDIO_ASSETS,
   TECHNIQUE_LAB_CATALOG,
   TECHNIQUE_LAB_DISPEL,
@@ -200,6 +204,10 @@ function rebuildTimeline(): void {
     lightningTimeline = [];
     durationMs = STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary.length * 50 + 50
       + STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.length * 150;
+  } else if (session.state.actionCode === "1I") {
+    lightningTimeline = [];
+    durationMs = STAGE1_ACTION_PRESENTATION.recovery1.presentation
+      .fixedGraphicWaitNativeTicks * 10;
   } else if (session.state.actionCode.endsWith("C")) {
     lightningTimeline = [];
     const definition = TECHNIQUE_LAB_ICE[
@@ -248,6 +256,15 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     phase = "heal-tail";
     return { kind: "heal-tail", frame: visibleFrame };
   }
+  if (code === "1I") {
+    const recovery = STAGE1_ACTION_PRESENTATION.recovery1.presentation;
+    visibleFrame = Math.min(
+      recovery.drawCount - 1,
+      Math.floor(currentTimeMs / (recovery.waitPerDrawNativeTicks * 10)),
+    );
+    phase = "recovery";
+    return { kind: "recovery", frame: visibleFrame };
+  }
   if (code === "TR") {
     const states: Array<readonly number[]> = [];
     for (const { runtimeTileCodeStates } of TECHNIQUE_LAB_DISPEL.phases) {
@@ -277,6 +294,13 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
 
 function playAudioBetween(previousMs: number, currentMs: number): void {
   if (!sound) return;
+  if (session.state.actionCode === "1I") {
+    if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
+      playedAudioCues.add(0);
+      void new Audio(STAGE1_ACTION_AUDIO_ASSETS["e-36"]).play().catch(() => undefined);
+    }
+    return;
+  }
   if (session.state.actionCode.endsWith("L")) {
     const definition = TECHNIQUE_LAB_LIGHTNING[
       session.state.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING
@@ -448,10 +472,12 @@ function step(): void {
   }
   const interval = session.state.actionCode === "1F" ? 100
     : session.state.actionCode === "1H" ? 50
-      : session.state.actionCode === "TR" ? 50
-      : TECHNIQUE_LAB_ICE[
-        session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE
-      ].cycle.waitPerDrawNativeTicks * 10;
+      : session.state.actionCode === "1I"
+        ? STAGE1_ACTION_PRESENTATION.recovery1.presentation.waitPerDrawNativeTicks * 10
+        : session.state.actionCode === "TR" ? 50
+          : TECHNIQUE_LAB_ICE[
+            session.state.actionCode as keyof typeof TECHNIQUE_LAB_ICE
+          ].cycle.waitPerDrawNativeTicks * 10;
   seek(Math.min(durationMs, timeMs + interval));
 }
 

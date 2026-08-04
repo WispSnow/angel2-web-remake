@@ -13,6 +13,11 @@ export function objectiveConditionSatisfied(
   if (condition.type === "eliminate-side") {
     return !units.some((unit) => unit.side === condition.side);
   }
+  if (condition.type === "any-unit-removed") {
+    return condition.slots.some((slot) => !units.some(
+      (unit) => unit.side === condition.side && unit.slot === slot,
+    ));
+  }
   return !units.some(
     (unit) => unit.side === condition.side && unit.slot === condition.slot,
   );

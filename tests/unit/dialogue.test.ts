@@ -9,7 +9,10 @@ import {
   storyPagesForStagePhase,
   storyPhaseForStageStory,
 } from "../../src/game/content/dialogue";
-import { GROUP_COMMAND_DIALOGUE } from "../../src/game/content/group-command-dialogue";
+import {
+  GROUP_COMMAND_DIALOGUE,
+  groupCommandDialogueFor,
+} from "../../src/game/content/group-command-dialogue";
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
 
 describe("native stage-zero dialogue checkpoints", () => {
@@ -103,6 +106,21 @@ describe("native stage-zero dialogue checkpoints", () => {
           source: { record: "battle-command", wait: 0x20, address: "DS:8716" },
         },
       },
+    });
+  });
+
+  it("projects the native command line through the current allied focus", () => {
+    expect(groupCommandDialogueFor("allRest", { name: "希蜜", portrait: 45 })).toMatchObject({
+      upper: {
+        portrait: 45,
+        speaker: "希蜜",
+        text: GROUP_COMMAND_DIALOGUE.allRest.page.upper?.text,
+      },
+      source: GROUP_COMMAND_DIALOGUE.allRest.page.source,
+    });
+    expect(GROUP_COMMAND_DIALOGUE.allRest.page.upper).toMatchObject({
+      portrait: 46,
+      speaker: "妮雅",
     });
   });
 });

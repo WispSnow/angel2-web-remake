@@ -168,6 +168,32 @@ test("already implemented fire, healing and ice remain available in the same map
   expect((await labState(page))?.playback.durationMs).toBe(2570);
 });
 
+test("initial recovery keeps all 17 native stages while marking only affected same-side cells", async ({ page }) => {
+  await page.goto("/technique-lab.html");
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  expect(await page.evaluate(() =>
+    window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1I"))).toBe(true);
+  await page.getByTestId("technique-lab-target-tool").click();
+  await canvas.click({ position: { x: 260, y: 242 } });
+  expect((await labState(page))?.playback).toMatchObject({
+    actionCode: "1I",
+    durationMs: 2550,
+    terminalHoldMs: 150,
+  });
+  await seek(page, 1200);
+  await expect(canvas).toHaveAttribute("data-technique-phase", "recovery");
+  await expect(canvas).toHaveAttribute("data-effect-tile-count", "1");
+  await page.screenshot({
+    path: "artifacts/playwright/technique-lab-recovery-1.png",
+    fullPage: true,
+  });
+  await seek(page, 2549);
+  await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 150 ms");
+  await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
+  await seek(page, 2550);
+  await expect(canvas).toHaveAttribute("data-technique-phase", "none");
+});
+
 test("all four ice tiers expand one complete six-frame ring at a time", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

@@ -712,8 +712,17 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     } else {
       promotionLayer.replaceChildren();
     }
-    hint.hidden = !controller.hintVisible || controller.phase !== "player";
-    hint.textContent = `查看勝利條件：保護妮雅；敵軍被擊倒或撤離均計入清除。`;
+    hint.hidden = !controller.hintVisible
+      || controller.phase !== "player"
+      || controller.systemMenuOpen
+      || controller.settingsOpen
+      || controller.soundSettingsOpen
+      || controller.musicSettingsOpen
+      || controller.recordMenuMode !== undefined
+      || controller.objectiveOpen
+      || controller.groupCommandOpen
+      || controller.retreatConfirmOpen;
+    hint.textContent = `查看勝利條件：${controller.battle.stage.objective.victoryText}`;
     objectivePanel.hidden = !controller.objectiveOpen;
     systemMenu.hidden = !controller.systemMenuOpen;
     if (!systemMenu.hidden) {
@@ -1521,9 +1530,12 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
   } else if (phase === "quit") {
     layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2>天使帝國 II</h2><p>已離開遊戲</p></div>`;
   } else if (phase === "nextStage") {
-    const completedStage = controller.campaignRoute === "stage-03" ? 2 : 1;
+    const completedStage = controller.campaignRoute === "stage-04"
+      ? 3
+      : controller.campaignRoute === "stage-03" ? 2 : 1;
     const destination = completedStage + 1;
-    layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE 0${destination}</span><h2>第 ${completedStage} 關已完成</h2><p>戰役進度已寫入第 ${destination} 關入口；第 ${destination} 關仍在設計凍結範圍內，尚未接入可玩流程。</p><div class="completion-seal">第${completedStage === 1 ? "一" : "二"}關完成</div></div>`;
+    const completedStageName = completedStage === 1 ? "一" : completedStage === 2 ? "二" : "三";
+    layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE 0${destination}</span><h2>第 ${completedStage} 關已完成</h2><p>戰役進度已寫入第 ${destination} 關入口；第 ${destination} 關仍在設計凍結範圍內，尚未接入可玩流程。</p><div class="completion-seal">第${completedStageName}關完成</div></div>`;
   }
 }
 

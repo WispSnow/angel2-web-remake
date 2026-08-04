@@ -110,6 +110,7 @@ describe("map technique laboratory evidence", () => {
     expect(TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS).toEqual({
       "1F": 10,
       "1H": 15,
+      "1I": 15,
       "1C": 10,
       "2C": 10,
       "3C": 10,
@@ -140,7 +141,7 @@ describe("map technique laboratory evidence", () => {
     expect(TECHNIQUE_LAB_CATALOG).toHaveLength(33);
     expect(TECHNIQUE_LAB_CATALOG.filter(({ implementationId }) => implementationId !== null)
       .map(({ nativeCode }) => nativeCode))
-      .toEqual(["1C", "1F", "1H", "1L", "2C", "2L", "3C", "3L", "4C", "4L", "TR"]);
+      .toEqual(["1C", "1F", "1H", "1I", "1L", "2C", "2L", "3C", "3L", "4C", "4L", "TR"]);
     expect(TECHNIQUE_LAB_CATALOG.find(({ nativeCode }) => nativeCode === "4F"))
       .toMatchObject({ label: "究級炎暴", implementationId: null });
   });

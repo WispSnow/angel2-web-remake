@@ -1,6 +1,9 @@
 import * as Phaser from "phaser";
 import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../content/stage0-actions.generated";
-import { STAGE1_ACTION_PRESENTATION_ASSETS } from "../content/stage1-actions.generated";
+import {
+  STAGE1_ACTION_PRESENTATION,
+  STAGE1_ACTION_PRESENTATION_ASSETS,
+} from "../content/stage1-actions.generated";
 import {
   TECHNIQUE_LAB_GRAPHIC_ASSETS,
   TECHNIQUE_LAB_DISPEL,
@@ -33,6 +36,7 @@ export type TechniqueLabVisualFrame =
   | { readonly kind: "fire"; readonly frame: number }
   | { readonly kind: "heal-primary"; readonly frame: number }
   | { readonly kind: "heal-tail"; readonly frame: number }
+  | { readonly kind: "recovery"; readonly frame: number }
   | { readonly kind: "dispel"; readonly frame: number; readonly runtimeTileCodes: readonly number[] }
   | {
     readonly kind: "ice";
@@ -80,6 +84,8 @@ export function startTechniqueLabPhaser(
         this.load.image(`technique-lab-heal-primary-${frame}`, source));
       STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.forEach((source, frame) =>
         this.load.image(`technique-lab-heal-tail-${frame}`, source));
+      STAGE1_ACTION_PRESENTATION_ASSETS.recovery1.effect.forEach((source, frame) =>
+        this.load.image(`technique-lab-recovery-${frame}`, source));
       STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion.forEach((source, frame) =>
         this.load.image(`technique-lab-ice-${frame}`, source));
     }
@@ -154,6 +160,19 @@ export function startTechniqueLabPhaser(
             ? `technique-lab-heal-primary-${frame.frame}`
             : `technique-lab-heal-tail-${frame.frame}`,
         ).setOrigin(.5, 1).setDepth(8));
+      } else if (frame.kind === "recovery") {
+        const descriptor = STAGE1_ACTION_PRESENTATION.recovery1.presentation
+          .descriptorSequence[frame.frame];
+        const sourceFrame = descriptor?.low7BitFrameIndices[0];
+        if (sourceFrame !== null && sourceFrame !== undefined) {
+          for (const unit of session.affectedUnits()) {
+            this.effectObjects.push(this.add.image(
+              unit.x * TILE_WIDTH + TILE_WIDTH / 2,
+              unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+              `technique-lab-recovery-${sourceFrame}`,
+            ).setOrigin(.5).setDepth(8));
+          }
+        }
       } else if (frame.kind === "dispel") {
         frame.runtimeTileCodes.forEach((runtimeTileCode, row) => {
           if (runtimeTileCode === 0) return;

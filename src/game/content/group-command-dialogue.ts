@@ -1,4 +1,4 @@
-import type { DialoguePage } from "../types";
+import type { BattleUnit, DialoguePage } from "../types";
 
 export type SpokenGroupCommandId = "allRest" | "followLeader" | "freeAction";
 
@@ -44,5 +44,18 @@ export const GROUP_COMMAND_DIALOGUE: Readonly<Record<SpokenGroupCommandId, Group
   ),
 };
 
-export const groupCommandDialogueFor = (command: SpokenGroupCommandId): DialoguePage =>
-  GROUP_COMMAND_DIALOGUE[command].page;
+export const groupCommandDialogueFor = (
+  command: SpokenGroupCommandId,
+  speaker?: Pick<BattleUnit, "name" | "portrait">,
+): DialoguePage => {
+  const page = GROUP_COMMAND_DIALOGUE[command].page;
+  if (!speaker || !page.upper) return page;
+  return {
+    ...page,
+    upper: {
+      ...page.upper,
+      portrait: speaker.portrait,
+      speaker: speaker.name,
+    },
+  };
+};

@@ -24,7 +24,7 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "1I",
     "label": "初級回復",
-    "implementationId": null
+    "implementationId": "recovery-1"
   },
   {
     "nativeCode": "1K",
@@ -6636,6 +6636,7 @@ export const TECHNIQUE_LAB_AUDIO_ASSETS = {
 export const TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS = {
   "1F": 10,
   "1H": 15,
+  "1I": 15,
   "1C": 10,
   "2C": 10,
   "3C": 10,

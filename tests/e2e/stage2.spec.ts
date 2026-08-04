@@ -123,7 +123,7 @@ test("S02-C/D: all-rest spends only manual units, then every automatic ally acts
   expect((await state(page)).phase).toBe("enemy");
 });
 
-test("S02-E/H: defeating Lan plays SAY/175 once and completes to the stage-03 boundary", async ({ page }) => {
+test("S02-E/H: defeating Lan plays SAY/175 once and enters stage 3", async ({ page }) => {
   await page.goto("/?debugScenario=stage-02-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await clickUnit(page, "1:0");
@@ -146,12 +146,13 @@ test("S02-E/H: defeating Lan plays SAY/175 once and completes to the stage-03 bo
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("victory-continue").click();
   await page.locator("[data-action=save-no]").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "openingStory");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-02",
+    stageId: "stage-03",
     campaignRoute: "stage-03",
+    activeStoryId: "stage-03-opening-story",
   });
-  await expect(page.getByText("第 2 關已完成", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "12");
 });
 
 test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign", async ({ page }) => {
@@ -206,8 +207,8 @@ test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign"
     };
   });
   expect(baseline).toMatchObject({
-    version: 13,
-    contentVersion: "stage-entry-snapshot-1",
+    version: 14,
+    contentVersion: "stage-03-recovery-1",
   });
 
   const loadMutatedBattle = async () => {

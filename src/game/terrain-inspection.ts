@@ -80,6 +80,13 @@ const STAGE_TERRAIN_DISPLAY_NAMES: Readonly<
     11: "城牆",
     12: "河流",
   },
+  "stage-03": {
+    0: "地圖邊界",
+    1: "沙地",
+    2: "平原",
+    3: "森林",
+    5: "山地",
+  },
 };
 
 export function terrainDisplayNameForSlot(

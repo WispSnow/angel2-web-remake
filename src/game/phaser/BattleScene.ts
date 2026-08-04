@@ -142,6 +142,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.load.image("ally-magician", stageAssets.allyMagician);
         this.load.image("ally-magic-priest", stageAssets.allyMagicPriest);
         this.load.image("enemy-sister", stageAssets.enemySister);
+        if ("enemyMonk" in stageAssets) this.load.image("enemy-monk", stageAssets.enemyMonk);
       }
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
       ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
@@ -162,6 +163,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         preloadMapTechniqueAssets(this, lightningAssets!);
         stage1PresentationAssets.ice1.expansion.forEach((source, frame) =>
           this.load.image(`map-ice-1-expansion-${frame}`, source));
+        stage1PresentationAssets.recovery1.effect.forEach((source, frame) =>
+          this.load.image(`map-recovery-1-${frame}`, source));
         stage1PresentationAssets.dispel.effect.forEach((source, frame) =>
           this.load.image(`map-dispel-${frame}`, source));
       }
@@ -487,6 +490,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
       if (unit.classId === "cavalry") return "enemy-cavalry";
       if (unit.classId === "sister") return "enemy-sister";
+      if (unit.classId === "monk") return "enemy-monk";
       return "enemy-soldier";
     }
 
@@ -755,6 +759,21 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
                 `map-ice-1-expansion-${sourceFrame}`,
               ).setOrigin(.5).setDepth(8),
             );
+          }
+        } else if (special.phase === "recoveryEffect") {
+          const descriptor = stage1Presentation!.recovery1.presentation
+            .descriptorSequence[special.frame];
+          const sourceFrame = descriptor?.low7BitFrameIndices[0];
+          if (sourceFrame !== null && sourceFrame !== undefined) {
+            for (const affected of special.result.affectedUnits) {
+              this.combatEffects.push(
+                this.add.image(
+                  affected.positionBefore.x * TILE_WIDTH + TILE_WIDTH / 2,
+                  affected.positionBefore.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+                  `map-recovery-1-${sourceFrame}`,
+                ).setOrigin(.5).setDepth(8),
+              );
+            }
           }
         } else if (special.phase === "dispelEffect") {
           const dispel = stage1Presentation!.dispel;

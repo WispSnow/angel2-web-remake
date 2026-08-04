@@ -123,6 +123,7 @@ const implementedByCode = {
   "4C": "ice-4",
   "1F": "fire-1",
   "1H": "heal-1",
+  "1I": "recovery-1",
   "1L": "lightning-1",
   "2L": "lightning-2",
   "3L": "lightning-3",
@@ -245,6 +246,7 @@ if (!fire1Presentation || !heal1Presentation) {
 const terminalHoldNativeTicks = {
   "1F": fire1Presentation.phases.at(-1).waitPerDrawNativeTicks,
   "1H": heal1Presentation.phases.at(-1).waitPerDrawNativeTicks,
+  "1I": 15,
   ...Object.fromEntries(iceActions.map(({ code }) => [
     code,
     icePresentation.cycle.waitPerDrawNativeTicks,
@@ -258,6 +260,7 @@ const terminalHoldNativeTicks = {
 assertEqual(terminalHoldNativeTicks, {
   "1F": 10,
   "1H": 15,
+  "1I": 15,
   "1C": 10,
   "2C": 10,
   "3C": 10,

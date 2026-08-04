@@ -38,9 +38,10 @@ import {
 const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "archer-shot": ["archer"],
   "fire-1": ["sister", "magician"],
-  "heal-1": ["sister"],
+  "heal-1": ["sister", "monk"],
   "lightning-1": ["magician"],
   "ice-1": ["magician"],
+  "recovery-1": ["monk"],
   "dispel": ["magic-priest"],
 };
 
@@ -529,6 +530,32 @@ export class Stage0Battle {
     const unit = this.unit(id);
     if (!unit || unit.side !== 1 || unit.acted || unit.actionDisabled) return undefined;
 
+    const behavior = this.alliedBehaviorFor(id);
+    const automaticLeader = behavior >= 4 && behavior % 2 === 0
+      ? this.units.find((candidate) => candidate.side === unit.side
+        && this.alliedBehaviorFor(candidate.id) === behavior - 1)
+      : undefined;
+    if (automaticLeader && automaticLeader.id !== unit.id) {
+      const leaderPath = shortestPath(
+        unit,
+        automaticLeader,
+        unit.classId,
+        this.statsFor(unit).movement,
+        this.units.filter((candidate) => candidate.id !== unit.id),
+        this.scenario,
+      );
+      if (leaderPath.length === 0) {
+        const path = routePath(
+          unit,
+          neighbors(automaticLeader, this.scenario),
+          this.units,
+          this.statsFor(unit).movement,
+          this.scenario,
+        );
+        if (path.length > 1) return { unitId: id, kind: "move", path };
+      }
+    }
+
     const classAction = this.planClassAction(unit);
     if (classAction) return classAction;
 
@@ -554,7 +581,7 @@ export class Stage0Battle {
       }
     }
 
-    return this.planOrdinaryAiAction(unit, 2, this.alliedBehaviorFor(id));
+    return this.planOrdinaryAiAction(unit, 2, behavior);
   }
 
   planEnemyAiAction(id: string, behavior = this.enemyBehaviorFor(id)): AlliedAiAction | undefined {
@@ -567,6 +594,11 @@ export class Stage0Battle {
     }
     if (unit.classId === "sister" && unit.statuses.techniqueSeal === 0) {
       const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "fire-1" : "heal-1";
+      const special = this.planSpecialAiAction(id, actionId);
+      if (special) return special;
+    }
+    if (unit.classId === "monk" && unit.statuses.techniqueSeal === 0) {
+      const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "heal-1" : "recovery-1";
       const special = this.planSpecialAiAction(id, actionId);
       if (special) return special;
     }
@@ -675,12 +707,14 @@ export class Stage0Battle {
     requestedActionIds?: readonly BattleActionId[],
     options: { modernRanking?: boolean } = {},
   ): AlliedAiAction | undefined {
-    if (unit.classId === "sister" && unit.statuses.techniqueSeal > 0) return undefined;
+    if (unit.classId !== "archer" && unit.statuses.techniqueSeal > 0) return undefined;
     const actionIds: readonly BattleActionId[] = requestedActionIds
       ?? (unit.classId === "archer"
         ? ["archer-shot"]
         : unit.classId === "sister"
           ? ["heal-1", "fire-1"]
+          : unit.classId === "monk"
+            ? ["heal-1", "recovery-1"]
           : []);
     if (actionIds.length === 0) return undefined;
 
@@ -714,13 +748,8 @@ export class Stage0Battle {
         const rangeActor = { ...unit, x: position.x, y: position.y };
         const range = actionId === "archer-shot"
           ? archerShootingRange(rangeActor, battlefield)
-          : techniqueSelectionRange(
-            rangeActor,
-            battlefield,
-            actionId === "fire-1"
-              ? BATTLE_ACTION_DEFINITIONS["fire-1"].range.selectionRadius
-              : BATTLE_ACTION_DEFINITIONS["heal-1"].range.selectionRadius,
-          );
+          : techniqueSelectionRange(rangeActor, battlefield,
+            "selectionRadius" in definition.range ? definition.range.selectionRadius : 0);
         const path = positionKey(position) === positionKey(unit)
           ? [{ x: unit.x, y: unit.y }]
           : this.movementPath(unit.id, position);
@@ -733,7 +762,7 @@ export class Stage0Battle {
           if (!correctSide || range.valueAt(target) === 0 || target.actionDisabled) continue;
           const targetStats = this.statsFor(target);
           const missingLife = targetStats.maxLife - target.life;
-          if (actionId === "heal-1" && missingLife <= 0) continue;
+          if (definition.target === "ally" && actionId !== "dispel" && missingLife <= 0) continue;
           const effectiveDefense = targetStats.defense + Math.floor(
             targetStats.defense
             * terrainDefensePercentFor(target.classId, this.scenario.terrainSlotAt(target))
@@ -756,7 +785,7 @@ export class Stage0Battle {
                   / 100,
                 ),
               ),
-            critical: actionId === "heal-1"
+            critical: definition.target === "ally" && actionId !== "dispel"
               && target.life * 100 < targetStats.maxLife * 40,
           });
         }
@@ -765,10 +794,12 @@ export class Stage0Battle {
       candidates.sort((left, right) => {
         if (options.modernRanking && left.lethal !== right.lethal) return left.lethal ? -1 : 1;
         if (options.modernRanking && left.critical !== right.critical) return left.critical ? -1 : 1;
-        if (actionId === "heal-1" && left.missingLife !== right.missingLife) {
+        if (definition.target === "ally" && actionId !== "dispel"
+          && left.missingLife !== right.missingLife) {
           return right.missingLife - left.missingLife;
         }
-        if (actionId !== "heal-1" && left.effectiveDefense !== right.effectiveDefense) {
+        if ((definition.target !== "ally" || actionId === "dispel")
+          && left.effectiveDefense !== right.effectiveDefense) {
           return left.effectiveDefense - right.effectiveDefense;
         }
         if (left.target.life !== right.target.life) return left.target.life - right.target.life;

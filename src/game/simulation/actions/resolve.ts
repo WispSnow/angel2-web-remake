@@ -281,6 +281,55 @@ function prepareIce(
   };
 }
 
+function prepareRecovery(
+  actor: BattleUnit,
+  center: Position,
+  context: SpecialActionResolutionContext,
+  trial: DeterministicRng,
+): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
+  const definition = BATTLE_ACTION_DEFINITIONS["recovery-1"];
+  const effect = techniqueEffectRange(
+    center,
+    context.battlefield.width,
+    context.battlefield.height,
+    definition.range.effectRadius,
+  );
+  let totalActualHealing = 0;
+  const affectedUnits = context.units
+    .filter((unit) => unit.side === actor.side && effect.valueAt(unit) > 0)
+    .sort((left, right) => left.y * context.battlefield.width + left.x
+      - (right.y * context.battlefield.width + right.x))
+    .map((unit) => {
+      const frozen = unit.actionDisabled;
+      const rangeValue = effect.valueAt(unit) as 1 | 2 | 3;
+      const maximumLife = context.statsFor(unit).maxLife;
+      const healing = frozen
+        ? 0
+        : Math.min(maximumLife - unit.life, definition.healing.byRangeValue[rangeValue]);
+      totalActualHealing += healing;
+      return affectedUnit(unit, {
+        lifeAfter: unit.life + healing,
+        healing,
+        blocked: frozen,
+        blockReason: frozen ? "frozen" : undefined,
+      });
+    });
+  const quotient = Math.floor(totalActualHealing / definition.experience.divisor);
+  const experienceGained = quotient === 0
+    ? 0
+    : Math.min(quotient, definition.experience.quotientCap)
+      + definition.experience.base
+      + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      );
+  return {
+    affectedUnits,
+    experienceGained,
+    effectCells: effect.cells().map((position) => ({ position, value: effect.valueAt(position) })),
+  };
+}
+
 export function prepareSpecialAction(
   intent: BattleActionIntent,
   actor: BattleUnit,
@@ -298,6 +347,8 @@ export function prepareSpecialAction(
     ({ affectedUnits, experienceGained, effectCells } = prepareLightning(actor, center, context));
   } else if (intent.actionId === "ice-1") {
     ({ affectedUnits, experienceGained, effectCells } = prepareIce(actor, center, context, trial));
+  } else if (intent.actionId === "recovery-1") {
+    ({ affectedUnits, experienceGained, effectCells } = prepareRecovery(actor, center, context, trial));
   } else {
     if (!target) throw new Error("single-target action requires a target unit");
     const single = prepareSingleTarget(intent, target, trial, context.statsFor(target).maxLife);

@@ -38,7 +38,10 @@ import {
   groupCommandDialogueFor,
   type SpokenGroupCommandId,
 } from "./content/group-command-dialogue";
-import { promotionDialogueFor } from "./content/promotion-dialogue";
+import {
+  NIA_CHARACTER_RECORD,
+  promotionDialogueFor,
+} from "./content/promotion-dialogue";
 import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneState } from "./full-combat";
 import { inspectTerrain, type TerrainInspection } from "./terrain-inspection";
 import {
@@ -95,6 +98,12 @@ interface Stage2Runtime {
   content: Stage2ContentModule;
   battle: Stage2BattleModule;
 }
+type Stage3ContentModule = typeof import("./content/stage3");
+type Stage3BattleModule = typeof import("./simulation/stage3-battle");
+interface Stage3Runtime {
+  content: Stage3ContentModule;
+  battle: Stage3BattleModule;
+}
 
 function cloneCampaignState(campaign: CampaignState): CampaignState {
   return {
@@ -142,6 +151,7 @@ export type SpecialActionPresentationPhase =
   | "lightningHit"
   | "lightningCleanup"
   | "iceExpansion"
+  | "recoveryEffect"
   | "dispelEffect"
   | "lifeDrain"
   | "specialDeath";
@@ -207,11 +217,13 @@ const CLASS_COMMANDS: Readonly<Partial<Record<BattleUnit["classId"], UnitCommand
   archer: { id: "shoot", label: "射擊" },
   sister: { id: "technique", label: "技術" },
   magician: { id: "technique", label: "技術" },
+  monk: { id: "technique", label: "技術" },
   "magic-priest": { id: "technique", label: "技術" },
 };
 
 const SISTER_TECHNIQUES = ["fire-1", "heal-1"] as const satisfies readonly BattleActionId[];
 const MAGICIAN_TECHNIQUES = ["fire-1", "lightning-1", "ice-1"] as const satisfies readonly BattleActionId[];
+const MONK_TECHNIQUES = ["heal-1", "recovery-1"] as const satisfies readonly BattleActionId[];
 const MAGIC_PRIEST_TIER3_TECHNIQUES = ["dispel"] as const satisfies readonly BattleActionId[];
 const MAGIC_PRIEST_TIER3_EXPERIENCE = classDefinition("magic-priest").dataRows[2].experienceThreshold;
 
@@ -336,6 +348,8 @@ export class GameController {
   private stage1RuntimePromise?: Promise<Stage1Runtime>;
   private stage2Runtime?: Stage2Runtime;
   private stage2RuntimePromise?: Promise<Stage2Runtime>;
+  private stage3Runtime?: Stage3Runtime;
+  private stage3RuntimePromise?: Promise<Stage3Runtime>;
   private listeners = new Set<Listener>();
   private readonly testMode = new URLSearchParams(location.search).has("test");
   private readonly debugMode = this.testMode
@@ -382,6 +396,7 @@ export class GameController {
   get currentStageAssets() {
     if (this.battle.stage.id === "stage-01") return this.requireStage1Runtime().content.STAGE1_ASSETS;
     if (this.battle.stage.id === "stage-02") return this.requireStage2Runtime().content.STAGE2_ASSETS;
+    if (this.battle.stage.id === "stage-03") return this.requireStage3Runtime().content.STAGE3_ASSETS;
     return undefined;
   }
 
@@ -421,6 +436,25 @@ export class GameController {
       return runtime;
     });
     return this.stage2RuntimePromise;
+  }
+
+  private requireStage3Runtime(): Stage3Runtime {
+    if (!this.stage3Runtime) throw new Error("stage 3 runtime has not loaded");
+    return this.stage3Runtime;
+  }
+
+  private async loadStage3Runtime(): Promise<Stage3Runtime> {
+    if (this.stage3Runtime) return this.stage3Runtime;
+    this.stage3RuntimePromise ??= Promise.all([
+      import("./content/stage3"),
+      import("./simulation/stage3-battle"),
+    ]).then(([content, battle]) => {
+      content.activateStage3Content();
+      const runtime = { content, battle };
+      this.stage3Runtime = runtime;
+      return runtime;
+    });
+    return this.stage3RuntimePromise;
   }
 
   async enterStage1(campaign: CampaignState = {
@@ -501,6 +535,29 @@ export class GameController {
     this.emit();
   }
 
+  async enterStage3(campaign: CampaignState = {
+    ...this.battle.campaignSnapshot(),
+    stageId: "stage-03",
+  }, statusMessage = "希蜜與第四軍團會合，共同通過力場。") : Promise<void> {
+    const runtime = await this.loadStage3Runtime();
+    this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId: "stage-03" });
+    this.stage1Campaign = undefined;
+    this.battle = new runtime.battle.Stage3Battle(this.stageEntrySnapshot);
+    this.difficulty = campaign.difficulty;
+    this.campaignRoute = "stage-03";
+    this.activeStoryId = undefined;
+    this.stageEventState = createStageEventState(this.battle.stage);
+    this.resetAction();
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
+    const himi = this.battle.unit("1:1");
+    this.cursor = himi ? { x: himi.x, y: himi.y } : { ...this.cameraOrigin };
+    this.phase = "player";
+    this.statusMessage = statusMessage;
+    const events = this.consumeStageTrigger({ type: "battle-started" });
+    await this.processStageEvents(events);
+    this.emit();
+  }
+
   onChange(listener: Listener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -509,11 +566,14 @@ export class GameController {
   get currentDialogue(): DialoguePage | undefined {
     if (this.aiTechniqueDialogue) return this.aiTechniqueDialogue.page;
     if (this.groupCommandDialogueId) {
-      return groupCommandDialogueFor(this.groupCommandDialogueId);
+      return groupCommandDialogueFor(this.groupCommandDialogueId, this.groupCommandSpeaker);
     }
     const promotionUnit = this.promotionUnit;
     if (promotionUnit && this.promotionDialogueIndex !== undefined) {
-      return promotionDialogueFor(promotionUnit)[this.promotionDialogueIndex];
+      return promotionDialogueFor(
+        promotionUnit,
+        this.promotionGrantor,
+      )[this.promotionDialogueIndex];
     }
     if (!this.activeStoryId || !isStoryPhase(this.phase)) return undefined;
     return storyPagesForId(this.activeStoryId)[this.dialogueIndex];
@@ -544,6 +604,17 @@ export class GameController {
   get promotionUnit(): BattleUnit | undefined {
     const id = this.promotionUnitIds[0];
     return id ? this.battle.unit(id) : undefined;
+  }
+
+  get promotionGrantor(): BattleUnit | undefined {
+    const nia = this.battle.units.find(
+      ({ side, portrait }) => side === 1 && portrait === NIA_CHARACTER_RECORD,
+    );
+    if (nia) return nia;
+    const himi = this.battle.unit("1:1");
+    return himi?.side === 1
+      ? himi
+      : this.battle.units.find(({ side }) => side === 1);
   }
 
   get promotionDialogueActive(): boolean {
@@ -610,6 +681,15 @@ export class GameController {
       : undefined;
   }
 
+  get groupCommandSpeaker(): BattleUnit | undefined {
+    const leader = this.groupCommandLeaderId
+      ? this.battle.unit(this.groupCommandLeaderId)
+      : undefined;
+    if (leader?.side === 1) return leader;
+    const focus = this.battle.focus;
+    return focus?.side === 1 ? focus : this.battle.units.find(({ side }) => side === 1);
+  }
+
   get followLeaderAvailable(): boolean {
     return this.groupLeader !== undefined;
   }
@@ -641,10 +721,12 @@ export class GameController {
       ? SISTER_TECHNIQUES
       : this.selectedUnit?.classId === "magician"
         ? MAGICIAN_TECHNIQUES
-        : this.selectedUnit?.classId === "magic-priest"
-          && this.selectedUnit.experience >= MAGIC_PRIEST_TIER3_EXPERIENCE
-          ? MAGIC_PRIEST_TIER3_TECHNIQUES
-        : [];
+        : this.selectedUnit?.classId === "monk"
+          ? MONK_TECHNIQUES
+          : this.selectedUnit?.classId === "magic-priest"
+            && this.selectedUnit.experience >= MAGIC_PRIEST_TIER3_EXPERIENCE
+            ? MAGIC_PRIEST_TIER3_TECHNIQUES
+            : [];
   }
 
   get commandMenuPosition(): Position {
@@ -692,7 +774,7 @@ export class GameController {
     }
     const promotionUnit = this.promotionUnit;
     if (promotionUnit && this.promotionDialogueIndex !== undefined) {
-      const pages = promotionDialogueFor(promotionUnit);
+      const pages = promotionDialogueFor(promotionUnit, this.promotionGrantor);
       if (this.promotionDialogueIndex < pages.length - 1) {
         this.promotionDialogueIndex += 1;
       } else {
@@ -795,7 +877,11 @@ export class GameController {
       await this.enterStage2({ ...this.battle.campaignSnapshot(), stageId: "stage-02" });
       return;
     }
-    if (definition.destination === "stage-03") this.stageProgress = 1000;
+    if (definition.destination === "stage-03" && this.battle.stage.id === "stage-02") {
+      await this.enterStage3({ ...this.battle.campaignSnapshot(), stageId: "stage-03" });
+      return;
+    }
+    if (definition.destination === "stage-04") this.stageProgress = 1000;
     this.phase = "nextStage";
   }
 
@@ -1306,6 +1392,8 @@ export class GameController {
           ? `${targetPresentation.name}的${cleansedFrozen ? "冰封及異常狀態" : "異常狀態"}已由破邪解除。`
         : actionId === "lightning-1"
           ? `落雷對 ${result.affectedUnits.length} 名敵人造成共 ${result.damage} 點傷害。`
+          : actionId === "recovery-1"
+            ? `回復使 ${result.affectedUnits.filter(({ healing }) => healing > 0).length} 名友軍恢復共 ${result.healing} 點生命。`
           : result.blocked && targetPresentation
             ? `${targetPresentation.name}的魔法防禦抵消了攻擊。`
             : result.healing > 0 && targetPresentation
@@ -1417,6 +1505,12 @@ export class GameController {
         for (let frame = 0; frame < ice.cycle.drawCount; frame += 1) {
           await present("iceExpansion", cycle * ice.cycle.drawCount + frame, ice.cycle.waitPerDrawNativeTicks);
         }
+      }
+    } else if (result.actionId === "recovery-1") {
+      const recovery = stage1ActionPresentation().recovery1;
+      this.queueAudioCue(36, "recovery-1-start", "e");
+      for (let frame = 0; frame < recovery.presentation.drawCount; frame += 1) {
+        await present("recoveryEffect", frame, recovery.presentation.waitPerDrawNativeTicks);
       }
     } else {
       const dispel = stage1ActionPresentation().dispel;
@@ -1684,7 +1778,7 @@ export class GameController {
     this.groupCommandOpen = false;
     this.resetAction();
     this.groupCommandDialogueId = "allRest";
-    this.statusMessage = "妮雅下令全軍休息。";
+    this.statusMessage = `${this.groupCommandSpeaker?.name ?? "主將"}下令全軍休息。`;
     this.emit();
   }
 
@@ -1716,7 +1810,7 @@ export class GameController {
     this.resetAction();
     this.groupCommandDialogueId = "followLeader";
     this.groupCommandLeaderId = leader.id;
-    this.statusMessage = "妮雅下令其餘部隊跟隨主將。";
+    this.statusMessage = `${leader.name}下令其餘部隊跟隨主將。`;
     this.emit();
   }
 
@@ -1743,7 +1837,7 @@ export class GameController {
     this.groupCommandOpen = false;
     this.resetAction();
     this.groupCommandDialogueId = "freeAction";
-    this.statusMessage = "妮雅下令其餘部隊自由行動。";
+    this.statusMessage = `${this.groupCommandSpeaker?.name ?? "主將"}下令其餘部隊自由行動。`;
     this.emit();
   }
 
@@ -1795,6 +1889,8 @@ export class GameController {
       ? "全面撤退：返回第 1 關關前流程並重新編隊。"
       : this.battle.stage.id === "stage-02"
         ? "全面撤退：重新建立第 2 關固定編隊。"
+        : this.battle.stage.id === "stage-03"
+          ? "全面撤退：重新建立第 3 關固定編隊。"
         : "全面撤退：重新建立第 0 關固定編隊。");
   }
 
@@ -2524,10 +2620,16 @@ export class GameController {
       ? "重新開始第 1 關關前流程。"
       : this.battle.stage.id === "stage-02"
         ? "重新建立第 2 關固定編隊。"
+        : this.battle.stage.id === "stage-03"
+          ? "重新建立第 3 關固定編隊。"
         : "重新建立第 0 關固定編隊。");
   }
 
   private restartBattle(message: string): void {
+    if (this.battle.stage.id === "stage-03") {
+      void this.enterStage3(cloneCampaignState(this.stageEntrySnapshot), message);
+      return;
+    }
     if (this.battle.stage.id === "stage-02") {
       void this.enterStage2(cloneCampaignState(this.stageEntrySnapshot), message);
       return;
@@ -2660,7 +2762,9 @@ export class GameController {
       ? { stageId: "stage-01" as const, stageLabel: "騎士城堡前" as const, stageProgress: 0 as const }
       : completedStage === "stage-01"
         ? { stageId: "stage-02" as const, stageLabel: "救援友軍" as const, stageProgress: 1000 as const }
-        : { stageId: "stage-03" as const, stageLabel: "下一關" as const, stageProgress: 1000 as const };
+        : completedStage === "stage-02"
+          ? { stageId: "stage-03" as const, stageLabel: "通過力場" as const, stageProgress: 1000 as const }
+          : { stageId: "stage-04" as const, stageLabel: "下一關" as const, stageProgress: 1000 as const };
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
@@ -2755,7 +2859,9 @@ export class GameController {
       stageId: this.battle.stage.id,
       stageLabel: this.battle.stage.id === "stage-01"
         ? "騎士城堡前"
-        : this.battle.stage.id === "stage-02" ? "救援友軍" : "瓦爾克麗宮",
+        : this.battle.stage.id === "stage-02"
+          ? "救援友軍"
+          : this.battle.stage.id === "stage-03" ? "通過力場" : "瓦爾克麗宮",
       ruleset: campaign.ruleset,
       difficulty: campaign.difficulty,
       rngState: campaign.rngState,
@@ -2794,11 +2900,20 @@ export class GameController {
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
       this.recordMenuReturn = undefined;
-      if (save.stageId === "stage-03") {
+      if (save.stageId === "stage-04") {
         this.activeStoryId = undefined;
-        this.campaignRoute = "stage-03";
+        this.campaignRoute = "stage-04";
         this.stageProgress = 1000;
         this.phase = "nextStage";
+      } else if (save.stageId === "stage-03") {
+        await this.enterStage3({
+          stageId: "stage-03",
+          ruleset: save.ruleset,
+          difficulty: save.difficulty,
+          roster: save.roster,
+          rngState: save.rngState,
+          rngCalls: save.rngCalls,
+        });
       } else if (save.stageId === "stage-02") {
         await this.enterStage2({
           stageId: "stage-02",
@@ -2822,7 +2937,15 @@ export class GameController {
       return;
     }
     let battle: Stage0Battle;
-    if (save.stageId === "stage-02") {
+    if (save.stageId === "stage-03") {
+      const runtime = await this.loadStage3Runtime();
+      battle = new runtime.battle.Stage3Battle({
+        difficulty: save.difficulty,
+        roster: save.roster,
+        rngState: save.rngState,
+        rngCalls: save.rngCalls,
+      }, new DeterministicRng(save.rngState, save.rngCalls));
+    } else if (save.stageId === "stage-02") {
       const runtime = await this.loadStage2Runtime();
       battle = new runtime.battle.Stage2Battle({
         difficulty: save.difficulty,
@@ -3115,42 +3238,96 @@ export class GameController {
       this.emit();
       return;
     }
-    this.campaignRoute = "stage-03";
+    if (this.battle.stage.id === "stage-02") {
+      await this.enterStage3({
+        ...this.battle.campaignSnapshot(),
+        stageId: "stage-03",
+      });
+      this.statusMessage = "調試：第 2 關已直接完成，進入第 3 關。";
+      this.emit();
+      return;
+    }
+    this.campaignRoute = "stage-04";
     this.stageProgress = 1000;
     this.phase = "nextStage";
-    this.statusMessage = "調試：第 2 關已直接完成，進入 stage-03 邊界。";
+    this.statusMessage = "調試：第 3 關已直接完成，進入 stage-04 邊界。";
     this.emit();
   }
 
   forceDefeatForTest(): void {
     if (!this.debugMode) return;
-    this.battle.units = this.battle.units.filter((unit) => unit.id !== "1:0");
+    const defeat = this.battle.stage.objective.defeat;
+    const slot = defeat.type === "unit-removed"
+      ? defeat.slot
+      : defeat.type === "any-unit-removed" ? defeat.slots[0] : undefined;
+    const target = this.battle.units.find(
+      (unit) => unit.side === defeat.side && (slot === undefined || unit.slot === slot),
+    );
+    if (!target) return;
+    this.battle.units = this.battle.units.filter((unit) => unit.id !== target.id);
     this.resolveOutcome();
     this.emit();
   }
 
   forceVictorySetupForTest(): void {
     if (!this.debugMode) return;
-    const nia = this.battle.unit("1:0");
+    const commander = this.battle.unit("1:0")
+      ?? this.battle.units.find((unit) => this.battle.isPlayerControllableAlly(unit.id));
     const victory = this.battle.stage.objective.victory;
     const finalEnemy = victory.type === "unit-removed"
       ? this.battle.units.find((unit) => unit.side === victory.side && unit.slot === victory.slot)
       : this.battle.units.find((unit) => unit.side === 2);
-    if (!nia || !finalEnemy) return;
-    nia.x = 29;
-    nia.y = 26;
-    nia.acted = false;
+    if (!commander || !finalEnemy) return;
+    commander.x = 29;
+    commander.y = 26;
+    commander.acted = false;
     finalEnemy.x = 30;
     finalEnemy.y = 26;
     finalEnemy.life = 1;
     this.battle.units = this.battle.units.filter((unit) => unit.side === 1 || unit.id === finalEnemy.id);
-    for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== nia.id)) unit.acted = true;
-    this.battle.focusId = nia.id;
+    for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== commander.id)) unit.acted = true;
+    this.battle.focusId = commander.id;
     this.phase = "player";
-    this.centerCamera(nia);
-    this.cursor = { x: nia.x, y: nia.y };
+    this.centerCamera(commander);
+    this.cursor = { x: commander.x, y: commander.y };
     this.resetAction();
     this.statusMessage = "自動驗收：最後一名敵人已置於合法攻擊位。";
+    this.emit();
+  }
+
+  forcePromotionSetupForTest(): void {
+    if (!this.debugMode || this.battle.stage.id !== "stage-03") return;
+    const candidate = this.battle.unit("1:4");
+    const target = this.battle.units.find(({ side, id }) => side === 2 && id !== "2:17");
+    const boss = this.battle.unit("2:17");
+    if (!candidate || !target || !boss) return;
+    candidate.classId = "soldier";
+    candidate.className = className(candidate.classId);
+    candidate.experience = 299;
+    candidate.x = 29;
+    candidate.y = 26;
+    candidate.life = this.battle.statsFor(candidate).maxLife;
+    candidate.acted = false;
+    target.x = 30;
+    target.y = 26;
+    target.life = 1;
+    target.acted = false;
+    boss.x = 1;
+    boss.y = 1;
+    boss.acted = true;
+    this.battle.units = this.battle.units.filter(
+      (unit) => unit.side === 1 || unit.id === target.id || unit.id === boss.id,
+    );
+    for (const unit of this.battle.units.filter(
+      ({ side, id }) => side === 1 && id !== candidate.id,
+    )) unit.acted = true;
+    this.battle.focusId = candidate.id;
+    this.phase = "player";
+    this.centerCamera(candidate);
+    this.cursor = { x: candidate.x, y: candidate.y };
+    this.resetAction();
+    this.statusMessage = "自動驗收：拉朵那將在妮雅缺席時請希蜜授職。";
+    this.busy = false;
     this.emit();
   }
 
@@ -3281,14 +3458,17 @@ export class GameController {
   }
 
   forceClassActionSetupForTest(
-    classId: "archer" | "cavalry" | "magician" | "sister" | "warrior",
+    classId: "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
     ordinaryCombat = false,
     stage1Target: "boss" | "pursuing" = "boss",
   ): void {
     if (!this.debugMode) return;
-    const actor = this.battle.unit("1:0");
-    const ally = this.battle.unit("1:1")
-      ?? this.battle.units.find((unit) => unit.side === 1 && unit.id !== actor?.id);
+    const actor = this.battle.unit("1:0")
+      ?? this.battle.units.find((unit) => this.battle.isPlayerControllableAlly(unit.id));
+    const preferredAlly = this.battle.unit("1:1");
+    const ally = preferredAlly && preferredAlly.id !== actor?.id
+      ? preferredAlly
+      : this.battle.units.find((unit) => unit.side === 1 && unit.id !== actor?.id);
     const pursuingStage1Target = this.battle.stage.id === "stage-01"
       && classId === "magician"
       && stage1Target === "pursuing";
@@ -3328,7 +3508,7 @@ export class GameController {
       objectiveAnchor.actionDisabled = false;
     }
 
-    if (classId === "sister" && !ordinaryCombat) {
+    if ((classId === "sister" || classId === "monk") && !ordinaryCombat) {
       ally.x = 31;
       ally.y = 26;
       ally.life = Math.max(1, this.battle.statsFor(ally).maxLife - 60);
@@ -3611,6 +3791,15 @@ export class GameController {
           this.battle.focusId = protectedUnit.id;
           this.centerCamera(protectedUnit);
         }
+      } else if (defeatCondition.type === "any-unit-removed") {
+        const protectedUnit = this.battle.units.find(
+          (unit) => unit.side === defeatCondition.side
+            && defeatCondition.slots.some((slot) => slot === unit.slot),
+        );
+        if (protectedUnit) {
+          this.battle.focusId = protectedUnit.id;
+          this.centerCamera(protectedUnit);
+        }
       }
       const victoryEvents = this.consumeStageTrigger({ type: "objective-satisfied" });
       void this.processStageEvents(victoryEvents).then(() => this.emit());
@@ -3777,9 +3966,11 @@ export class GameController {
 
 export interface Angel2DebugApi {
   getState: () => object;
+  advanceDialogue: () => void;
   skipDialogue: () => void;
   forceDefeat: () => void;
   forceVictorySetup: () => void;
+  forcePromotionSetup: () => void;
   forceEvacuationSetup: () => void;
   forceMultipleTargets: () => void;
   forceCavalryCounterSetup: () => void;
@@ -3787,7 +3978,7 @@ export interface Angel2DebugApi {
   forceEnemyAlertBoundarySetup: () => void;
   forceRestSetup: () => void;
   forceClassActionSetup: (
-    classId: "archer" | "cavalry" | "magician" | "sister" | "warrior",
+    classId: "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
     ordinaryCombat?: boolean,
   ) => void;
   clearSaves: () => void;
@@ -3803,9 +3994,11 @@ export function exposeDebugApi(controller: GameController): void {
   if (!controller.isTestMode) return;
   window.__ANGEL2__ = {
     getState: () => controller.debugState(),
+    advanceDialogue: () => controller.advanceDialogue(),
     skipDialogue: () => controller.skipDialogue(),
     forceDefeat: () => controller.forceDefeatForTest(),
     forceVictorySetup: () => controller.forceVictorySetupForTest(),
+    forcePromotionSetup: () => controller.forcePromotionSetupForTest(),
     forceEvacuationSetup: () => controller.forceEvacuationSetupForTest(),
     forceMultipleTargets: () => controller.forceMultipleTargetsForTest(),
     forceCavalryCounterSetup: () => controller.forceCavalryCounterSetupForTest(),

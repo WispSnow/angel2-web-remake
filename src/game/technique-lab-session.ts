@@ -186,7 +186,7 @@ export class TechniqueLabSession {
         .effectRadius
       : this.current.actionCode.endsWith("C")
         ? TECHNIQUE_LAB_ICE[this.current.actionCode as keyof typeof TECHNIQUE_LAB_ICE].effectRadius
-        : 1;
+        : this.current.actionCode === "1I" ? 3 : 1;
     const cells: TechniqueLabEffectCell[] = [];
     for (let y = 0; y < 50; y += 1) {
       for (let x = 0; x < 50; x += 1) {
@@ -205,7 +205,9 @@ export class TechniqueLabSession {
       `${position.x},${position.y}`,
       value,
     ]));
-    const desiredSide = this.current.actionCode === "1H" || this.current.actionCode === "TR"
+    const desiredSide = this.current.actionCode === "1H"
+      || this.current.actionCode === "1I"
+      || this.current.actionCode === "TR"
       ? actor.side
       : actor.side === 1 ? 2 : 1;
     return this.current.units.filter((unit) => {

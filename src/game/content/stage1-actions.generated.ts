@@ -51,6 +51,34 @@ export const STAGE1_ACTION_DEFINITIONS = {
     },
     "presentationId": "ice-1"
   },
+  "recovery-1": {
+    "id": "recovery-1",
+    "nativeCode": "1I",
+    "label": "初級回復",
+    "kind": "technique",
+    "target": "ally",
+    "range": {
+      "mode": 0,
+      "selectionRadius": 4,
+      "effectRadius": 3
+    },
+    "healing": {
+      "type": "magic-area",
+      "byRangeValue": {
+        "1": 30,
+        "2": 45,
+        "3": 60
+      }
+    },
+    "experience": {
+      "base": 8,
+      "randomMinimum": 0,
+      "randomMaximum": 1,
+      "divisor": 50,
+      "quotientCap": 8
+    },
+    "presentationId": "recovery-1"
+  },
   "dispel": {
     "id": "dispel",
     "nativeCode": "TR",
@@ -1534,6 +1562,258 @@ export const STAGE1_ACTION_PRESENTATION = {
     },
     "audioResource": "UN/50"
   },
+  "recovery1": {
+    "family": "I",
+    "visibleName": "回復",
+    "commonEntry": "1000:6EE0",
+    "dispatchEntry": "1000:5DA4",
+    "actionCodes": [
+      "1I",
+      "2I",
+      "3I"
+    ],
+    "audioRequests": [
+      {
+        "resource": "E/36",
+        "entry": "0000:0220",
+        "afterFixedWaitNativeTicks": 0
+      }
+    ],
+    "presentation": {
+      "resource": "MAGIC/20",
+      "descriptorSequence": [
+        {
+          "address": "DS:6C41",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:6C41",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:6C41",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:6C4B",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            2
+          ],
+          "low7BitFrameIndices": [
+            1
+          ]
+        },
+        {
+          "address": "DS:6C55",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            3
+          ],
+          "low7BitFrameIndices": [
+            2
+          ]
+        },
+        {
+          "address": "DS:6C5F",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            4
+          ],
+          "low7BitFrameIndices": [
+            3
+          ]
+        },
+        {
+          "address": "DS:6C69",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            5
+          ],
+          "low7BitFrameIndices": [
+            4
+          ]
+        },
+        {
+          "address": "DS:6C73",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            6
+          ],
+          "low7BitFrameIndices": [
+            5
+          ]
+        },
+        {
+          "address": "DS:6C7D",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            7
+          ],
+          "low7BitFrameIndices": [
+            6
+          ]
+        },
+        {
+          "address": "DS:6C87",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            8
+          ],
+          "low7BitFrameIndices": [
+            7
+          ]
+        },
+        {
+          "address": "DS:6C91",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            9
+          ],
+          "low7BitFrameIndices": [
+            8
+          ]
+        },
+        {
+          "address": "DS:6C9B",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            10
+          ],
+          "low7BitFrameIndices": [
+            9
+          ]
+        },
+        {
+          "address": "DS:6C41",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:6C41",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:6C41",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            1
+          ],
+          "low7BitFrameIndices": [
+            0
+          ]
+        },
+        {
+          "address": "DS:6CA5",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            0
+          ],
+          "low7BitFrameIndices": [
+            null
+          ]
+        },
+        {
+          "address": "DS:6CA5",
+          "xOffset": 0,
+          "yOffset": 0,
+          "width": 1,
+          "height": 1,
+          "tileCodes": [
+            0
+          ],
+          "low7BitFrameIndices": [
+            null
+          ]
+        }
+      ],
+      "drawCount": 17,
+      "waitPerDrawNativeTicks": 15,
+      "fixedGraphicWaitNativeTicks": 255,
+      "pointerTable": "DS:6C1D",
+      "drawScope": "each descriptor is drawn without an individual wait on every occupied same-side cell, then the whole map effect is flushed and waits once"
+    },
+    "fixedGraphicWaitNativeTicks": 255,
+    "tierPresentationDifferences": false,
+    "settlementBoundary": "1000:6FFE scans and heals same-side cells only after all 17 presentation stages; tier changes range/heal values, not graphics, sound or timing"
+  },
   "dispel": {
     "code": "TR",
     "visibleName": "破邪",
@@ -2401,6 +2681,20 @@ export const STAGE1_ACTION_PRESENTATION_ASSETS = {
       "/assets/original/map-actions/ice-1/expansion/05.png"
     ]
   },
+  "recovery1": {
+    "effect": [
+      "/assets/original/map-actions/recovery-1/effect/00.png",
+      "/assets/original/map-actions/recovery-1/effect/01.png",
+      "/assets/original/map-actions/recovery-1/effect/02.png",
+      "/assets/original/map-actions/recovery-1/effect/03.png",
+      "/assets/original/map-actions/recovery-1/effect/04.png",
+      "/assets/original/map-actions/recovery-1/effect/05.png",
+      "/assets/original/map-actions/recovery-1/effect/06.png",
+      "/assets/original/map-actions/recovery-1/effect/07.png",
+      "/assets/original/map-actions/recovery-1/effect/08.png",
+      "/assets/original/map-actions/recovery-1/effect/09.png"
+    ]
+  },
   "dispel": {
     "effect": [
       "/assets/original/map-actions/dispel/effect/00.png",
@@ -2455,6 +2749,7 @@ export const STAGE1_ACTION_PRESENTATION_ASSETS = {
 } as const;
 
 export const STAGE1_ACTION_AUDIO_ASSETS = {
+  "e-36": "/assets/original/audio/e/36.wav",
   "e-43": "/assets/original/audio/e/43.wav",
   "un-50": "/assets/original/audio/un/50.wav"
 } as const;
