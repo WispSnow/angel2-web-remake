@@ -168,6 +168,22 @@ interface DebugState {
 const debugState = (page: Page) => page.evaluate(() => window.__ANGEL2__?.getState() as DebugState);
 const waitForPhase = (page: Page, phase: string) => page.waitForFunction((expected) => window.__ANGEL2__?.getState().phase === expected, phase);
 const clickCanvas = (page: Page, x: number, y: number) => page.getByTestId("battle-canvas").click({ position: { x, y } });
+const expectDialoguePortraitAttached = async (page: Page, slot: "upper" | "lower") => {
+  const [copyBounds, portraitBounds] = await Promise.all([
+    page.locator(`#dialogue-copy-${slot}`).boundingBox(),
+    page.locator(`#dialogue-portrait-${slot}`).boundingBox(),
+  ]);
+  expect(copyBounds).not.toBeNull();
+  expect(portraitBounds).not.toBeNull();
+  if (slot === "upper") {
+    expect(portraitBounds!.y).toBeCloseTo(copyBounds!.y, 4);
+    expect(portraitBounds!.x + portraitBounds!.width).toBeCloseTo(copyBounds!.x, 4);
+  } else {
+    expect(portraitBounds!.y + portraitBounds!.height)
+      .toBeCloseTo(copyBounds!.y + copyBounds!.height, 4);
+    expect(copyBounds!.x + copyBounds!.width).toBeCloseTo(portraitBounds!.x, 4);
+  }
+};
 const finishGroupCommandDialogue = async (page: Page) => {
   const layer = page.getByTestId("dialogue-layer");
   await expect(layer).toBeVisible();
@@ -352,6 +368,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     .toBeLessThanOrEqual(upperCopyBounds!.x + upperCopyBounds!.width);
   expect(upperSkipBounds!.y + upperSkipBounds!.height)
     .toBeLessThanOrEqual(upperCopyBounds!.y + upperCopyBounds!.height);
+  await expectDialoguePortraitAttached(page, "upper");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-skip-upper.png" });
   const dialoguePortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(dialoguePortrait).toBeVisible();
@@ -734,6 +751,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     "data-portrait-record",
     "46",
   );
+  await expectDialoguePortraitAttached(page, "upper");
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-nia-promotion-dialogue.png",
   });
@@ -2564,6 +2582,8 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("怎麼會傷成這樣");
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("不好了");
   await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute("data-portrait-record", "47");
+  await expectDialoguePortraitAttached(page, "upper");
+  await expectDialoguePortraitAttached(page, "lower");
 
   await page.getByTestId("advance-dialogue").click();
   await page.getByTestId("advance-dialogue").click();
@@ -2787,6 +2807,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
     "data-portrait-record",
     "45",
   );
+  await expectDialoguePortraitAttached(page, "lower");
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-ximi-promotion-request.png",
   });
@@ -2801,6 +2822,8 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
     "data-portrait-record",
     "46",
   );
+  await expectDialoguePortraitAttached(page, "upper");
+  await expectDialoguePortraitAttached(page, "lower");
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-ximi-promotion-grant.png",
   });

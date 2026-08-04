@@ -880,14 +880,13 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 .dialogue-box.upper { top: 20px; }
 .dialogue-box.lower { top: 194px; }
-.dialogue-layer.promotion-dialogue .dialogue-box.upper .dialogue-copy { left: 165px; width: 459px; }
 .dialogue-layer.promotion-dialogue .dialogue-box.lower { top: 206px; }
-.dialogue-layer.promotion-dialogue .dialogue-box.lower .dialogue-copy { left: 125px; width: 371px; }
+.dialogue-layer.promotion-dialogue .dialogue-box.lower .dialogue-copy { left: 125px; }
 .dialogue-layer.prebattle .dialogue-box.upper { top: 12px; }
 .dialogue-layer.prebattle .dialogue-box.lower { top: 204px; }
 .dialogue-portrait { position: absolute; width: 112px; height: 112px; }
-.dialogue-box.upper .dialogue-portrait { left: 32px; top: 6px; }
-.dialogue-box.lower .dialogue-portrait { left: 504px; top: 6px; }
+.dialogue-box.upper .dialogue-portrait { left: 32px; top: 0; }
+.dialogue-box.lower .dialogue-portrait { left: 504px; top: 29px; }
 .dialogue-layer.prebattle .dialogue-box.upper .dialogue-portrait { left: 8px; }
 .dialogue-layer.prebattle .dialogue-box.lower .dialogue-portrait { left: 512px; }
 .dialogue-portrait::after { border-width: 2px; border-color: #d7aa32; }
@@ -900,8 +899,13 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
     repeating-linear-gradient(0deg, #231316f2 0 2px, #1a0c10f2 2px 4px);
   box-shadow: inset 0 0 0 2px #6e2932, 3px 3px #0008;
 }
-.dialogue-box.upper .dialogue-copy { left: 145px; top: 0; width: 479px; }
-.dialogue-box.lower .dialogue-copy { left: 89px; top: 57px; width: 407px; }
+/* Keep each 112px portrait on its native horizontal anchor, then extend the
+   adjoining copy panel to that exact edge. Upper portraits share the panel's
+   top edge; lower portraits share its bottom edge. */
+.dialogue-box.upper .dialogue-copy { left: 144px; right: 16px; top: 0; }
+.dialogue-box.lower .dialogue-copy { left: 89px; right: 136px; top: 57px; }
+.dialogue-layer.prebattle .dialogue-box.upper .dialogue-copy { left: 120px; }
+.dialogue-layer.prebattle .dialogue-box.lower .dialogue-copy { right: 128px; }
 .dialogue-speaker {
   position: absolute;
   width: 1px;
