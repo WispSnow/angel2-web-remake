@@ -856,7 +856,7 @@
     {
       "fileName": "JUST.TST",
       "bytes": 1174,
-      "sha256": "f69a2838d97dbc470620fe9a6d6c85ccba718e88241bd07721c829efa6e96ec8",
+      "sha256": "c358370cca2f94c42009ba4050faa8594fbe57b9ea69aecacc4cef9b9130db8e",
       "category": "data_or_configuration",
       "status": "next_battle_state_template_decoded",
       "saveState": {
