@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { stage3TerrainSlotAt } from "../../src/game/content/stage3";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
 import type { CampaignState } from "../../src/game/types";
@@ -17,7 +18,7 @@ const campaign: CampaignState = {
   rngCalls: 7,
 };
 
-describe("stage 3 battle construction and native automation", () => {
+describe("stage 3 battle construction and stable-remake automation", () => {
   it("builds the fixed 13-vs-12 roster with inherited classes and named leaders", () => {
     const battle = new Stage3Battle(campaign);
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(13);
@@ -50,6 +51,83 @@ describe("stage 3 battle construction and native automation", () => {
     const destination = action!.path.at(-1)!;
     expect(Math.abs(destination.x - leader.x) + Math.abs(destination.y - leader.y))
       .toBeLessThan(distanceBefore);
+  });
+
+  it("moves automatic allies that start outside the defense area into forest first", () => {
+    const battle = new Stage3Battle(campaign);
+    for (const id of ["1:47", "1:20"]) {
+      const unit = battle.unit(id)!;
+      expect(stage3TerrainSlotAt(unit)).toBe(2);
+      const action = battle.planAlliedAiAction(id);
+      expect(action).toMatchObject({ unitId: id, kind: "move" });
+      expect(stage3TerrainSlotAt(action!.path.at(-1)!)).toBe(3);
+    }
+  });
+
+  it("keeps every automatic-allied movement step inside forest or mountain", () => {
+    const battle = new Stage3Battle(campaign);
+    battle.units = battle.units.filter((unit) => unit.side === 1 || unit.id === "2:44");
+    const enemy = battle.unit("2:44")!;
+    enemy.x = 31;
+    enemy.y = 20;
+    const action = battle.planAlliedAiAction("1:45");
+    expect(action).toBeDefined();
+    expect(action!.kind).not.toBe("attack");
+    expect(action!.path.every((position) => [3, 5].includes(stage3TerrainSlotAt(position))))
+      .toBe(true);
+  });
+
+  it("rests an automatic ally below half life before it can attack or pursue", () => {
+    const battle = new Stage3Battle(campaign);
+    const unit = battle.unit("1:46")!;
+    unit.life = Math.floor((battle.statsFor(unit).maxLife - 1) / 2);
+    expect(battle.planAlliedAiAction(unit.id)).toEqual({
+      unitId: unit.id,
+      kind: "rest",
+      path: [{ x: unit.x, y: unit.y }],
+    });
+  });
+
+  it("has an automatic sister heal a sub-half-life automatic ally before other actions", () => {
+    const battle = new Stage3Battle(campaign);
+    const healer = battle.unit("1:46")!;
+    healer.classId = "sister";
+    healer.className = "修女";
+    const target = battle.unit("1:45")!;
+    target.life = Math.floor((battle.statsFor(target).maxLife - 1) / 2);
+    expect(battle.planAlliedAiAction(healer.id)).toMatchObject({
+      unitId: healer.id,
+      kind: "special",
+      actionId: "heal-1",
+      targetId: target.id,
+    });
+  });
+
+  it("keeps the two enemy corps on their assigned targets while those groups survive", () => {
+    const assertAssignedTarget = (enemyId: string, expectsAutomatic: boolean) => {
+      const battle = new Stage3Battle({ ...campaign, difficulty: 3 });
+      battle.units = battle.units.filter((unit) => unit.side === 1 || unit.id === enemyId);
+      const enemy = battle.unit(enemyId)!;
+      const automatic = battle.unit("1:46")!;
+      const rescue = battle.unit("1:54")!;
+      enemy.x = 24;
+      enemy.y = 13;
+      automatic.x = 24;
+      automatic.y = 14;
+      rescue.x = 23;
+      rescue.y = 13;
+
+      const action = battle.planEnemyAiAction(enemyId);
+      expect(action?.targetId, `${enemyId} should select an assigned target`).toBeDefined();
+      expect(battle.isPlayerControllableAlly(action!.targetId!)).toBe(!expectsAutomatic);
+    };
+
+    for (const id of ["2:42", "2:41", "2:40", "2:43", "2:17"]) {
+      assertAssignedTarget(id, true);
+    }
+    for (const id of ["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"]) {
+      assertAssignedTarget(id, false);
+    }
   });
 
   it("lets the enemy monk select its native healing pool and consumes one planning roll", () => {

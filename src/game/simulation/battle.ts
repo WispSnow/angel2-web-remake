@@ -106,6 +106,20 @@ export interface AlliedAiAction {
   actionId?: BattleActionId;
 }
 
+interface OrdinaryAiPlanningOptions {
+  targetFilter?: (target: BattleUnit) => boolean;
+  destinationFilter?: (position: Position) => boolean;
+  pathFilter?: (path: readonly Position[]) => boolean;
+  restThresholdPercent?: number;
+}
+
+interface ClassActionPlanningOptions {
+  modernRanking?: boolean;
+  targetFilter?: (target: BattleUnit) => boolean;
+  positionFilter?: (position: Position) => boolean;
+  pathFilter?: (path: readonly Position[]) => boolean;
+}
+
 export type EnemyAiIntent = "route" | "sentry" | "alert" | "pursuit";
 
 export interface EnemyPhaseUpdate {
@@ -634,20 +648,26 @@ export class Stage0Battle {
     };
   }
 
-  private planOrdinaryAiAction(
+  protected planOrdinaryAiAction(
     unit: BattleUnit,
     opponentSide: BattleUnit["side"],
     behavior: number,
+    options: OrdinaryAiPlanningOptions = {},
   ): AlliedAiAction {
     const stats = this.statsFor(unit);
     const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
-    if (lifePercent < 20) return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+    if (lifePercent < (options.restThresholdPercent ?? 20)) {
+      return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+    }
 
-    const reachable = reachableCells(unit, this.units, undefined, this.scenario);
+    const reachable = reachableCells(unit, this.units, undefined, this.scenario)
+      .filter((position) => options.destinationFilter?.(position) ?? true);
     const reachableKeys = new Set(reachable.map(positionKey));
     const occupied = new Set(this.units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
     const enemies = this.units
-      .filter((candidate) => candidate.side === opponentSide && !candidate.actionDisabled)
+      .filter((candidate) => candidate.side === opponentSide
+        && !candidate.actionDisabled
+        && (options.targetFilter?.(candidate) ?? true))
       .sort((left, right) => left.y * this.stage.width + left.x - (right.y * this.stage.width + right.x));
     const nativeCandidateOffsets = [
       { x: 0, y: 1 },
@@ -657,6 +677,7 @@ export class Stage0Battle {
     ];
     let attackTarget: BattleUnit | undefined;
     let attackPosition: Position | undefined;
+    let attackPath: Position[] | undefined;
     let attackPositionDefense = -1;
 
     for (const enemy of enemies) {
@@ -664,23 +685,25 @@ export class Stage0Battle {
         const candidate = { x: enemy.x + offset.x, y: enemy.y + offset.y };
         const candidateKey = positionKey(candidate);
         if (!reachableKeys.has(candidateKey) || occupied.has(candidateKey)) continue;
+        const path = candidateKey === positionKey(unit)
+          ? [{ x: unit.x, y: unit.y }]
+          : this.movementPath(unit.id, candidate);
+        if (path.length === 0 || !(options.pathFilter?.(path) ?? true)) continue;
         const defense = terrainDefensePercentFor(unit.classId, this.scenario.terrainSlotAt(candidate));
         if (defense >= attackPositionDefense) {
           attackTarget = enemy;
           attackPosition = candidate;
+          attackPath = path;
           attackPositionDefense = defense;
         }
       }
     }
 
-    if (attackTarget && attackPosition) {
+    if (attackTarget && attackPosition && attackPath) {
       if (behavior === 1 && positionKey(attackPosition) !== positionKey(unit)) {
         return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
       }
-      const path = positionKey(attackPosition) === positionKey(unit)
-        ? [{ x: unit.x, y: unit.y }]
-        : this.movementPath(unit.id, attackPosition);
-      if (path.length > 0) return { unitId: unit.id, kind: "attack", path, targetId: attackTarget.id };
+      return { unitId: unit.id, kind: "attack", path: attackPath, targetId: attackTarget.id };
     }
 
     if (unit.life < stats.maxLife) return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
@@ -692,7 +715,32 @@ export class Stage0Battle {
       .map((enemy) => ({ x: enemy.x, y: enemy.y + 1 }))
       .filter(({ x, y }) => x >= 0 && y >= 0 && x < this.stage.width && y < this.stage.height);
     const pursuitPath = routePath(unit, pursuitTargets, this.units, stats.movement, this.scenario);
-    if (pursuitPath.length > 1) return { unitId: unit.id, kind: "move", path: pursuitPath };
+    if (pursuitPath.length > 1
+      && (options.destinationFilter?.(pursuitPath.at(-1)!) ?? true)
+      && (options.pathFilter?.(pursuitPath) ?? true)) {
+      return { unitId: unit.id, kind: "move", path: pursuitPath };
+    }
+
+    if (pursuitTargets.length > 0 && (options.destinationFilter || options.pathFilter)) {
+      const originDistance = Math.min(...pursuitTargets.map((target) => manhattan(unit, target)));
+      const constrained = reachable
+        .map((position) => ({
+          position,
+          path: positionKey(position) === positionKey(unit)
+            ? [{ x: unit.x, y: unit.y }]
+            : this.movementPath(unit.id, position),
+          distance: Math.min(...pursuitTargets.map((target) => manhattan(position, target))),
+        }))
+        .filter(({ path }) => path.length > 1 && (options.pathFilter?.(path) ?? true))
+        .sort((left, right) => left.distance - right.distance
+          || right.path.length - left.path.length
+          || left.position.y * this.stage.width + left.position.x
+            - (right.position.y * this.stage.width + right.position.x));
+      const selected = constrained[0];
+      if (selected && selected.distance < originDistance) {
+        return { unitId: unit.id, kind: "move", path: selected.path };
+      }
+    }
     return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
   }
 
@@ -705,7 +753,7 @@ export class Stage0Battle {
   protected planClassAction(
     unit: BattleUnit,
     requestedActionIds?: readonly BattleActionId[],
-    options: { modernRanking?: boolean } = {},
+    options: ClassActionPlanningOptions = {},
   ): AlliedAiAction | undefined {
     if (unit.classId !== "archer" && unit.statuses.techniqueSeal > 0) return undefined;
     const actionIds: readonly BattleActionId[] = requestedActionIds
@@ -732,7 +780,8 @@ export class Stage0Battle {
       const positions = (actionId === "archer-shot"
         ? reachableCells(unit, this.units, undefined, this.scenario)
         : [{ x: unit.x, y: unit.y }])
-        .filter((position) => !occupied.has(positionKey(position)));
+        .filter((position) => !occupied.has(positionKey(position))
+          && (options.positionFilter?.(position) ?? true));
       const candidates: Array<{
         position: Position;
         target: BattleUnit;
@@ -753,13 +802,16 @@ export class Stage0Battle {
         const path = positionKey(position) === positionKey(unit)
           ? [{ x: unit.x, y: unit.y }]
           : this.movementPath(unit.id, position);
-        if (path.length === 0) continue;
+        if (path.length === 0 || !(options.pathFilter?.(path) ?? true)) continue;
 
         for (const target of this.units) {
           const correctSide = definition.target === "ally"
             ? target.side === unit.side
             : target.side !== unit.side;
-          if (!correctSide || range.valueAt(target) === 0 || target.actionDisabled) continue;
+          if (!correctSide
+            || range.valueAt(target) === 0
+            || target.actionDisabled
+            || !(options.targetFilter?.(target) ?? true)) continue;
           const targetStats = this.statsFor(target);
           const missingLife = targetStats.maxLife - target.life;
           if (definition.target === "ally" && actionId !== "dispel" && missingLife <= 0) continue;

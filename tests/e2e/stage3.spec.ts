@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { stage3TerrainSlotAt } from "../../src/game/content/stage3";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -172,6 +173,27 @@ test("stage 3 group commands use the current allied focus instead of absent Nia"
     .toHaveAttribute("data-portrait-record", "45");
   await expect(page.getByTestId("dialogue-layer"))
     .toHaveAttribute("data-source-address", "DS:86E4");
+});
+
+test("S03-C/L: hard-mode automatic allies finish their first phase inside the defense area", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-03-player&difficulty=3&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await page.keyboard.press("Tab");
+  await page.getByTestId("group-command-allRest").click();
+  await page.getByTestId("advance-dialogue").click();
+  await waitForPhase(page, "enemy");
+
+  const current = await state(page);
+  const automaticIds = new Set(["1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50"]);
+  const automaticAllies = current.units.filter(({ id }) => automaticIds.has(id));
+  expect(automaticAllies).toHaveLength(7);
+  for (const unit of automaticAllies) {
+    expect([3, 5], `${unit.id} should remain in forest or mountain`)
+      .toContain(stage3TerrainSlotAt(unit));
+  }
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage3-defensive-allies-hard.png`,
+  });
 });
 
 test("stage 3 promotions use Himi as the on-field grantor while Nia is absent", async ({ page }) => {
