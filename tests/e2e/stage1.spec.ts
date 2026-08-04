@@ -267,8 +267,8 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.getByTestId("record-slot-2").click();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.2") ?? "null"));
   expect(saved).toMatchObject({
-    version: 11,
-    contentVersion: "stage-01-ice-outer-ring-1",
+    version: 12,
+    contentVersion: "stage-02-allied-auto-1",
     kind: "battle",
     stageId: "stage-01",
     stageLabel: "騎士城堡前",
@@ -559,14 +559,14 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("victory-continue").click();
   await page.locator("[data-action=save-no]").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "openingStory");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-01",
-    stageProgress: 1000,
+    stageId: "stage-02",
+    activeStoryId: "stage-02-opening-story",
   });
-  await expect(page.getByText("第 1 關已完成", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "155");
   await page.getByTestId("game-screen").screenshot({
-    path: `${ARTIFACT_DIR}/stage1-complete.png`,
+    path: `${ARTIFACT_DIR}/stage1-complete-stage2-entry.png`,
   });
 
   expect(consoleErrors).toEqual([]);
@@ -648,12 +648,19 @@ test("S01-J: every stage-1 camera entry stays inside the drawn map", async ({ pa
 test("S01-K: enemy movement preview follows the current stage-1 AI intent", async ({ page }) => {
   await enterStage1PlayerPhase(page);
   const battleCanvas = page.getByTestId("battle-canvas");
+  const waitForCameraProjection = () => page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
 
   for (let step = 0; step < 18; step += 1) await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
   const patrolFocus = await state(page);
   expect(patrolFocus.cursor).toEqual({ x: 24, y: 18 });
+  // The controller publishes camera state synchronously, while Phaser refreshes
+  // the pointer world transform during rendering. Wait for that projection before
+  // converting the same controller origin back into a physical canvas click.
+  await waitForCameraProjection();
   await battleCanvas.click({
     position: {
       x: 40 + (24 - patrolFocus.cameraOrigin.x) * 40 + 20,
@@ -680,6 +687,7 @@ test("S01-K: enemy movement preview follows the current stage-1 AI intent", asyn
   await page.keyboard.press("ArrowLeft");
   const guardFocus = await state(page);
   expect(guardFocus.cursor).toEqual({ x: 22, y: 14 });
+  await waitForCameraProjection();
   await battleCanvas.click({
     position: {
       x: 40 + (22 - guardFocus.cameraOrigin.x) * 40 + 20,

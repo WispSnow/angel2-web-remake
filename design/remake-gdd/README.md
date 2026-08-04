@@ -1,12 +1,12 @@
 # 《天使帝国 II》Web 复刻版设计文档
 
-版本：Draft 0.4
+版本：Draft 0.5
 
-日期：2026-08-01
+日期：2026-08-03
 
-阶段：第 0 关扩展项已接受；第 1 关有界 M02 已授权并开始实施
+阶段：第 1 关 M02 已接受；第 2 关有界 M03 已完成自动验收，等待人工接受
 
-开发状态：全战役设计仍为 `implementationFrozen=true`；第 0 关及 M00.5–M00.7 已获用户接受。用户于 2026-08-01 明确授权第 1 关作为有界 M02 实现例外；`stage 2` 战斗和其余战役继续冻结
+开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–1 关已获用户接受。用户于 2026-08-03 明确授权第 2 关作为有界 M03 实现例外；第 3 关和其余战役继续冻结
 
 ## 文档目的
 
@@ -43,7 +43,8 @@
 | [`08-mod-policy.md`](08-mod-policy.md) | 哪些内容可改、如何保持可追溯 | Draft 0.1 |
 | [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.3 |
 | [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的玩法合同与实现验收 | Draft 0.6 / 自动验收通过 |
-| [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术扩展与首领目标关 | Draft 0.3 / 自动验收通过，待人工接受 |
+| [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术扩展与首领目标关 | Draft 0.3 / 已接受 |
+| [`vertical-slices/stage-02.md`](vertical-slices/stage-02.md) | 固定续关、友军自动阶段与首领目标关 | Draft 0.1 / M03 自动验收通过 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
@@ -55,7 +56,7 @@
 | [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M02 / 已实现并通过自动验收 |
 | [`systems/technique-lab.md`](systems/technique-lab.md) | 任意敌我职业配置、`1L..4L/1C..4C/TR` 原版地图表现与冰封净化 | 开发工具 / 已实现 |
 | [`systems/debug-harness.md`](systems/debug-harness.md) | 按关选择、快速结算与确定性测试场景 | 开发工具 / 已实现 |
-| [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现，待第 1 关人工复验 |
+| [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现并随第 1 关接受 |
 
 ## 写作规范
 
@@ -81,4 +82,6 @@
 - 第 1 关已由用户明确授权作为有界 M02 实现例外；只解除其合同列出的部署、内容、
   `1F/1H/1L/1C`、`REMAKE-012` AI、`REMAKE-013` 冰封、事件、v11（含 v2–v10 迁移）和
   路由范围。
-- 其余战役仍须通过 [`09-design-acceptance.md`](09-design-acceptance.md) 的对应门槛并得到用户明确授权后再进入实现。
+- 第 2 关已由用户明确授权作为有界 M03 实现例外；只解除其合同列出的固定阵容、友军
+  自动阶段、既有职业动作、首领目标、剧情/音乐、v12（含旧档迁移）和 `stage-03` 路由。
+- 第 3 关及其余战役仍须通过 [`09-design-acceptance.md`](09-design-acceptance.md) 的对应门槛并得到用户明确授权后再进入实现。

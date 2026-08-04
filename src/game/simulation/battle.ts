@@ -68,6 +68,7 @@ export interface BattleScenario {
   createUnits: (difficulty: Difficulty) => BattleUnit[];
   createCampaignRoster: (difficulty: Difficulty) => SaveRosterEntry[];
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
+  alliedBehaviorById?: ReadonlyMap<string, number>;
   enemyBehaviorById?: ReadonlyMap<string, number>;
   routeEnemy?: {
     target: Position;
@@ -163,6 +164,21 @@ export class Stage0Battle {
 
   enemyBehaviorFor(id: string): number {
     return this.scenario.enemyBehaviorById?.get(id) ?? 0;
+  }
+
+  alliedBehaviorFor(id: string): number {
+    return this.scenario.alliedBehaviorById?.get(id) ?? 0;
+  }
+
+  isPlayerControllableAlly(id: string): boolean {
+    const unit = this.unit(id);
+    return unit?.side === 1 && this.alliedBehaviorFor(id) === 0;
+  }
+
+  playerManualPhaseComplete(): boolean {
+    return this.units
+      .filter(({ id }) => this.isPlayerControllableAlly(id))
+      .every(({ acted, actionDisabled }) => acted || actionDisabled);
   }
 
   enemyAiIntentFor(_id: string): EnemyAiIntent | undefined {
@@ -474,7 +490,7 @@ export class Stage0Battle {
     let count = 0;
     let recovered = 0;
     for (const unit of this.units) {
-      if (unit.side !== 1 || unit.acted || unit.actionDisabled) continue;
+      if (!this.isPlayerControllableAlly(unit.id) || unit.acted || unit.actionDisabled) continue;
       recovered += this.rest(unit.id);
       count += 1;
     }
@@ -510,7 +526,7 @@ export class Stage0Battle {
       }
     }
 
-    return this.planOrdinaryAiAction(unit, 2, 0);
+    return this.planOrdinaryAiAction(unit, 2, this.alliedBehaviorFor(id));
   }
 
   planEnemyAiAction(id: string, behavior = this.enemyBehaviorFor(id)): AlliedAiAction | undefined {
@@ -775,8 +791,21 @@ export class Stage0Battle {
   enemyMovementRange(id: string): Position[] {
     const unit = this.unit(id);
     const route = this.scenario.routeEnemy;
-    if (!unit || unit.side !== 2 || unit.actionDisabled || !route) return [];
-    return reachableCells(unit, this.units, route.movement, this.scenario);
+    if (!unit || unit.side !== 2 || unit.actionDisabled) return [];
+    return route
+      ? reachableCells(unit, this.units, route.movement, this.scenario)
+      : this.reachableCells(id);
+  }
+
+  alliedActionOrder(includeManual: boolean): string[] {
+    return this.units
+      .filter((unit) => unit.side === 1
+        && !unit.acted
+        && !unit.actionDisabled
+        && (includeManual || this.alliedBehaviorFor(unit.id) !== 0))
+      .sort((left, right) =>
+        (left.y * this.stage.width + left.x) - (right.y * this.stage.width + right.x))
+      .map(({ id }) => id);
   }
 
   enemyActionOrder(): string[] {
@@ -804,6 +833,10 @@ export class Stage0Battle {
       destination,
       reachedExit: definition.isExit(destination),
     };
+  }
+
+  hasRouteEnemy(): boolean {
+    return this.scenario.routeEnemy !== undefined;
   }
 
   moveRouteEnemy(id: string): RouteMoveResult | undefined {

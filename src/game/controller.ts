@@ -88,6 +88,12 @@ interface Stage1Runtime {
   content: Stage1ContentModule;
   battle: Stage1BattleModule;
 }
+type Stage2ContentModule = typeof import("./content/stage2");
+type Stage2BattleModule = typeof import("./simulation/stage2-battle");
+interface Stage2Runtime {
+  content: Stage2ContentModule;
+  battle: Stage2BattleModule;
+}
 export type CombatPresentationPhase =
   | "primaryHit"
   | "primaryDamage"
@@ -317,6 +323,9 @@ export class GameController {
   private stage1Campaign?: CampaignState;
   private stage1Runtime?: Stage1Runtime;
   private stage1RuntimePromise?: Promise<Stage1Runtime>;
+  private stage2Campaign?: CampaignState;
+  private stage2Runtime?: Stage2Runtime;
+  private stage2RuntimePromise?: Promise<Stage2Runtime>;
   private listeners = new Set<Listener>();
   private readonly testMode = new URLSearchParams(location.search).has("test");
   private readonly debugMode = this.testMode
@@ -359,8 +368,10 @@ export class GameController {
     return this.requireStage1Runtime().content.STAGE1_DEFINITION.deployment;
   }
 
-  get stage1Assets() {
-    return this.requireStage1Runtime().content.STAGE1_ASSETS;
+  get currentStageAssets() {
+    if (this.battle.stage.id === "stage-01") return this.requireStage1Runtime().content.STAGE1_ASSETS;
+    if (this.battle.stage.id === "stage-02") return this.requireStage2Runtime().content.STAGE2_ASSETS;
+    return undefined;
   }
 
   private requireStage1Runtime(): Stage1Runtime {
@@ -380,6 +391,25 @@ export class GameController {
       return runtime;
     });
     return this.stage1RuntimePromise;
+  }
+
+  private requireStage2Runtime(): Stage2Runtime {
+    if (!this.stage2Runtime) throw new Error("stage 2 runtime has not loaded");
+    return this.stage2Runtime;
+  }
+
+  private async loadStage2Runtime(): Promise<Stage2Runtime> {
+    if (this.stage2Runtime) return this.stage2Runtime;
+    this.stage2RuntimePromise ??= Promise.all([
+      import("./content/stage2"),
+      import("./simulation/stage2-battle"),
+    ]).then(([content, battle]) => {
+      content.activateStage2Content();
+      const runtime = { content, battle };
+      this.stage2Runtime = runtime;
+      return runtime;
+    });
+    return this.stage2RuntimePromise;
   }
 
   async enterStage1(campaign: CampaignState = {
@@ -434,6 +464,29 @@ export class GameController {
     this.statusMessage = `部署完成：${deployment.placements.length} 人編隊已建立。`;
     const events = this.consumeStageTrigger({ type: "battle-started" });
     void this.processStageEvents(events).then(() => this.emit());
+  }
+
+  async enterStage2(campaign: CampaignState = {
+    ...this.battle.campaignSnapshot(),
+    stageId: "stage-02",
+  }, statusMessage = "第一軍團繼續向騎士團堡推進。") : Promise<void> {
+    const runtime = await this.loadStage2Runtime();
+    this.stage2Campaign = { ...campaign, stageId: "stage-02" };
+    this.stage1Campaign = undefined;
+    this.battle = new runtime.battle.Stage2Battle(this.stage2Campaign);
+    this.difficulty = campaign.difficulty;
+    this.campaignRoute = "stage-02";
+    this.activeStoryId = undefined;
+    this.stageEventState = createStageEventState(this.battle.stage);
+    this.resetAction();
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
+    const nia = this.battle.unit("1:0");
+    this.cursor = nia ? { x: nia.x, y: nia.y } : { ...this.cameraOrigin };
+    this.phase = "player";
+    this.statusMessage = statusMessage;
+    const events = this.consumeStageTrigger({ type: "battle-started" });
+    await this.processStageEvents(events);
+    this.emit();
   }
 
   onChange(listener: Listener): () => void {
@@ -519,13 +572,15 @@ export class GameController {
 
   get groupLeader(): BattleUnit | undefined {
     const cursorUnit = this.battle.unitAt(this.cursor);
-    if (cursorUnit?.side === 1 && !cursorUnit.acted && !cursorUnit.actionDisabled) return cursorUnit;
+    if (cursorUnit && this.battle.isPlayerControllableAlly(cursorUnit.id)
+      && !cursorUnit.acted && !cursorUnit.actionDisabled) return cursorUnit;
 
     // The tactical desk is only visible while the pointer cursor is over an
     // empty cell. Keep that presentation hover separate from the battle's
     // retained unit focus, as the native side-panel path does.
     const retainedUnit = this.battle.focus;
-    return retainedUnit?.side === 1 && !retainedUnit.acted && !retainedUnit.actionDisabled
+    return retainedUnit && this.battle.isPlayerControllableAlly(retainedUnit.id)
+      && !retainedUnit.acted && !retainedUnit.actionDisabled
       ? retainedUnit
       : undefined;
   }
@@ -711,7 +766,11 @@ export class GameController {
       await this.enterStage1({ ...this.battle.campaignSnapshot(), stageId: "stage-01" });
       return;
     }
-    if (definition.destination === "stage-02") this.stageProgress = 1000;
+    if (definition.destination === "stage-02" && this.battle.stage.id === "stage-01") {
+      await this.enterStage2({ ...this.battle.campaignSnapshot(), stageId: "stage-02" });
+      return;
+    }
+    if (definition.destination === "stage-03") this.stageProgress = 1000;
     this.phase = "nextStage";
   }
 
@@ -846,7 +905,7 @@ export class GameController {
     }
 
     if (this.actionMode === "actionMenu" || this.actionMode === "techniqueMenu") return;
-    if (this.actionMode === "enemyPreview") this.resetAction();
+    if (this.actionMode === "enemyPreview" || this.actionMode === "allyPreview") this.resetAction();
     if (!unit) {
       this.emit();
       return;
@@ -857,6 +916,11 @@ export class GameController {
       this.reachable = this.battle.enemyMovementRange(unit.id);
       this.actionMode = "enemyPreview";
       this.statusMessage = "紅色格為敵軍目前行為採用的移動或警戒範圍；預覽不會改變戰鬥狀態。";
+    } else if (!this.battle.isPlayerControllableAlly(unit.id)) {
+      this.selectedId = unit.id;
+      this.reachable = this.battle.reachableCells(unit.id);
+      this.actionMode = "allyPreview";
+      this.statusMessage = "藍色格為友軍自動單位的目前移動範圍；它會在玩家手動階段結束後自行行動。";
     } else if (!unit.acted && !unit.actionDisabled) {
       this.selectedId = unit.id;
       this.pendingOrigin = { x: unit.x, y: unit.y };
@@ -1157,7 +1221,7 @@ export class GameController {
       this.reachable = [];
       this.commandIndex = 0;
       this.actionMode = "actionMenu";
-    } else if (this.actionMode === "enemyPreview") {
+    } else if (this.actionMode === "enemyPreview" || this.actionMode === "allyPreview") {
       this.resetAction();
     }
     this.statusMessage = "已返回上一層。";
@@ -1224,8 +1288,7 @@ export class GameController {
       this.busy = false;
       const ended = this.resolveOutcome();
       this.emit();
-      if (!ended && this.battle.units.filter((unit) => unit.side === 1)
-        .every((unit) => unit.acted || unit.actionDisabled)) {
+      if (!ended && this.battle.playerManualPhaseComplete()) {
         void this.runTurnPhases("autonomous");
       }
     } catch (error) {
@@ -1446,8 +1509,7 @@ export class GameController {
       this.busy = false;
       const ended = this.resolveOutcome();
       this.emit();
-      if (!ended && this.battle.units.filter((unit) => unit.side === 1)
-        .every((unit) => unit.acted || unit.actionDisabled)) {
+      if (!ended && this.battle.playerManualPhaseComplete()) {
         void this.runTurnPhases("autonomous");
       }
     } catch (error) {
@@ -1476,8 +1538,7 @@ export class GameController {
       return;
     }
     this.emit();
-    if (this.battle.units.filter((unit) => unit.side === 1)
-      .every((unit) => unit.acted || unit.actionDisabled)) {
+    if (this.battle.playerManualPhaseComplete()) {
       void this.runTurnPhases("autonomous");
     }
   }
@@ -1698,7 +1759,9 @@ export class GameController {
     this.retreatConfirmOpen = false;
     this.restartBattle(this.battle.stage.id === "stage-01"
       ? "全面撤退：返回第 1 關關前流程並重新編隊。"
-      : "全面撤退：重新建立第 0 關固定編隊。");
+      : this.battle.stage.id === "stage-02"
+        ? "全面撤退：重新建立第 2 關固定編隊。"
+        : "全面撤退：重新建立第 0 關固定編隊。");
   }
 
   cancelRetreat(): void {
@@ -1724,18 +1787,18 @@ export class GameController {
         : "我方自動階段：其餘單位自由行動。";
     this.emit();
 
-    if (mode !== "autonomous") {
-      const allyIds = this.battle.units
-        .filter((unit) => unit.side === 1 && !unit.acted && !unit.actionDisabled)
-        .map((unit) => unit.id);
-      for (const id of allyIds) {
-        const action = this.battle.planAlliedAiAction(id, mode === "follow" ? leaderId : undefined);
-        if (!action) continue;
-        if (await this.runAlliedAiAction(action)) {
-          this.busy = false;
-          this.emit();
-          return;
-        }
+    const allyIds = this.battle.alliedActionOrder(mode !== "autonomous");
+    for (const id of allyIds) {
+      const automatic = this.battle.alliedBehaviorFor(id) !== 0;
+      const action = this.battle.planAlliedAiAction(
+        id,
+        !automatic && mode === "follow" ? leaderId : undefined,
+      );
+      if (!action) continue;
+      if (await this.runAlliedAiAction(action)) {
+        this.busy = false;
+        this.emit();
+        return;
       }
     }
 
@@ -1758,7 +1821,7 @@ export class GameController {
     const enemyIds = this.battle.enemyActionOrder();
     for (const id of enemyIds) {
       if (!this.battle.unit(id)) continue;
-      if (this.battle.stage.id === "stage-01") {
+      if (!this.battle.hasRouteEnemy()) {
         const action = this.battle.planEnemyAiAction(id);
         if (action && await this.runAlliedAiAction(action, "enemy")) {
           this.busy = false;
@@ -2317,7 +2380,7 @@ export class GameController {
     ) return;
     const cursorUnit = this.battle.unitAt(this.cursor);
     const anchorId = this.selectedUnit?.id ?? (cursorUnit?.side === 1 ? cursorUnit.id : this.battle.focusId);
-    const allies = this.battle.units.filter((unit) => unit.side === 1);
+    const allies = this.battle.units.filter((unit) => this.battle.isPlayerControllableAlly(unit.id));
     const anchorIndex = allies.findIndex((unit) => unit.id === anchorId);
     let next = allies.find((unit) => !unit.acted && !unit.actionDisabled);
     for (let offset = 1; offset <= allies.length; offset += 1) {
@@ -2413,10 +2476,16 @@ export class GameController {
   retry(): void {
     this.restartBattle(this.battle.stage.id === "stage-01"
       ? "重新開始第 1 關關前流程。"
-      : "重新建立第 0 關固定編隊。");
+      : this.battle.stage.id === "stage-02"
+        ? "重新建立第 2 關固定編隊。"
+        : "重新建立第 0 關固定編隊。");
   }
 
   private restartBattle(message: string): void {
+    if (this.battle.stage.id === "stage-02" && this.stage2Campaign) {
+      void this.enterStage2(this.stage2Campaign, message);
+      return;
+    }
     const stage1Campaign = this.battle.stage.id === "stage-01"
       ? this.stage1Campaign
       : undefined;
@@ -2539,6 +2608,12 @@ export class GameController {
   private writeCompletedSave(slot: number): void {
     const prior = this.readSave(slot);
     const campaign = this.battle.campaignSnapshot();
+    const completedStage = this.battle.stage.id;
+    const destination = completedStage === "stage-00"
+      ? { stageId: "stage-01" as const, stageLabel: "騎士城堡前" as const, stageProgress: 0 as const }
+      : completedStage === "stage-01"
+        ? { stageId: "stage-02" as const, stageLabel: "救援友軍" as const, stageProgress: 1000 as const }
+        : { stageId: "stage-03" as const, stageLabel: "下一關" as const, stageProgress: 1000 as const };
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
@@ -2546,17 +2621,17 @@ export class GameController {
       kind: "completed",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
-      stageId: this.battle.stage.id === "stage-01" ? "stage-02" : "stage-01",
-      stageLabel: this.battle.stage.id === "stage-01" ? "下一關" : "騎士城堡前",
+      stageId: destination.stageId,
+      stageLabel: destination.stageLabel,
       ruleset: campaign.ruleset,
       difficulty: campaign.difficulty,
       rngState: campaign.rngState,
       rngCalls: campaign.rngCalls,
       roster: campaign.roster,
-      stageProgress: this.battle.stage.id === "stage-01" ? 1000 : 0,
-      consumedEventIds: this.battle.stage.id === "stage-01"
-        ? this.battle.stage.events.map(({ id }) => id)
-        : [],
+      stageProgress: destination.stageProgress,
+      consumedEventIds: completedStage === "stage-00"
+        ? []
+        : this.battle.stage.events.map(({ id }) => id),
     };
     localStorage.setItem(saveSlotKey(slot), JSON.stringify(save));
     this.pendingSaveSlot = undefined;
@@ -2631,7 +2706,9 @@ export class GameController {
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
       stageId: this.battle.stage.id,
-      stageLabel: this.battle.stage.id === "stage-01" ? "騎士城堡前" : "瓦爾克麗宮",
+      stageLabel: this.battle.stage.id === "stage-01"
+        ? "騎士城堡前"
+        : this.battle.stage.id === "stage-02" ? "救援友軍" : "瓦爾克麗宮",
       ruleset: campaign.ruleset,
       difficulty: campaign.difficulty,
       rngState: campaign.rngState,
@@ -2669,11 +2746,20 @@ export class GameController {
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
       this.recordMenuReturn = undefined;
-      if (save.stageId === "stage-02") {
+      if (save.stageId === "stage-03") {
         this.activeStoryId = undefined;
-        this.campaignRoute = "stage-02";
+        this.campaignRoute = "stage-03";
         this.stageProgress = 1000;
         this.phase = "nextStage";
+      } else if (save.stageId === "stage-02") {
+        await this.enterStage2({
+          stageId: "stage-02",
+          ruleset: save.ruleset,
+          difficulty: save.difficulty,
+          roster: save.roster,
+          rngState: save.rngState,
+          rngCalls: save.rngCalls,
+        });
       } else {
         await this.enterStage1({
           stageId: "stage-01",
@@ -2688,7 +2774,15 @@ export class GameController {
       return;
     }
     let battle: Stage0Battle;
-    if (save.stageId === "stage-01") {
+    if (save.stageId === "stage-02") {
+      const runtime = await this.loadStage2Runtime();
+      battle = new runtime.battle.Stage2Battle({
+        difficulty: save.difficulty,
+        roster: save.roster,
+        rngState: save.rngState,
+        rngCalls: save.rngCalls,
+      }, new DeterministicRng(save.rngState, save.rngCalls));
+    } else if (save.stageId === "stage-01") {
       const runtime = await this.loadStage1Runtime();
       const deploymentDefinition = runtime.content.STAGE1_DEFINITION.deployment;
       const optionalPlacements = save.battle.units
@@ -2730,6 +2824,16 @@ export class GameController {
     this.stage1Campaign = save.stageId === "stage-01"
       ? {
         stageId: "stage-01",
+        ruleset: save.ruleset,
+        difficulty: save.difficulty,
+        roster: save.roster,
+        rngState: save.rngState,
+        rngCalls: save.rngCalls,
+      }
+      : undefined;
+    this.stage2Campaign = save.stageId === "stage-02"
+      ? {
+        stageId: "stage-02",
         ruleset: save.ruleset,
         difficulty: save.difficulty,
         roster: save.roster,
@@ -2970,10 +3074,19 @@ export class GameController {
       this.emit();
       return;
     }
-    this.campaignRoute = "stage-02";
+    if (this.battle.stage.id === "stage-01") {
+      await this.enterStage2({
+        ...this.battle.campaignSnapshot(),
+        stageId: "stage-02",
+      });
+      this.statusMessage = "調試：第 1 關已直接完成，進入第 2 關。";
+      this.emit();
+      return;
+    }
+    this.campaignRoute = "stage-03";
     this.stageProgress = 1000;
     this.phase = "nextStage";
-    this.statusMessage = "調試：第 1 關已直接完成，進入 stage-02 邊界。";
+    this.statusMessage = "調試：第 2 關已直接完成，進入 stage-03 邊界。";
     this.emit();
   }
 

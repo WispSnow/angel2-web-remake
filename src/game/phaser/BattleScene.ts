@@ -88,10 +88,11 @@ interface UnitView {
 }
 
 export function createBattleScene(controller: GameController): typeof Phaser.Scene {
-  const stage1 = controller.battle.stage.id === "stage-01";
-  const stage1Assets = stage1 ? controller.stage1Assets : undefined;
-  const stage1Presentation = stage1 ? stage1ActionPresentation() : undefined;
-  const stage1PresentationAssets = stage1 ? stage1ActionPresentationAssets() : undefined;
+  const expandedActions = controller.battle.stage.id !== "stage-00";
+  const stageAssets = controller.currentStageAssets;
+  const mapTextureKey = `${controller.battle.stage.id}-map`;
+  const stage1Presentation = expandedActions ? stage1ActionPresentation() : undefined;
+  const stage1PresentationAssets = expandedActions ? stage1ActionPresentationAssets() : undefined;
   const lightningAssets: MapTechniqueGraphicAssets | undefined = stage1PresentationAssets
     ? {
       "MAGIC/8": stage1PresentationAssets.lightning1.main,
@@ -129,18 +130,18 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     preload(): void {
       this.load.image(
-        stage1 ? "stage1-map" : "stage0-map",
-        stage1Assets?.map ?? ASSETS.map,
+        mapTextureKey,
+        stageAssets?.map ?? ASSETS.map,
       );
       this.load.image("ally-soldier", ASSETS.allySoldier);
       Object.entries(ASSETS.allyPromotionTargets).forEach(([classId, source]) =>
         this.load.image(`ally-${classId}`, source));
       this.load.image("enemy-soldier", ASSETS.enemySoldier);
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
-      if (stage1Assets) {
-        this.load.image("ally-magician", stage1Assets.allyMagician);
-        this.load.image("ally-magic-priest", stage1Assets.allyMagicPriest);
-        this.load.image("enemy-sister", stage1Assets.enemySister);
+      if (stageAssets) {
+        this.load.image("ally-magician", stageAssets.allyMagician);
+        this.load.image("ally-magic-priest", stageAssets.allyMagicPriest);
+        this.load.image("enemy-sister", stageAssets.enemySister);
       }
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
       ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
@@ -179,7 +180,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.add.image(
         0,
         0,
-        controller.battle.stage.id === "stage-01" ? "stage1-map" : "stage0-map",
+        mapTextureKey,
       ).setOrigin(0).setDepth(0);
       this.gridGraphics = this.add.graphics().setDepth(1);
       this.rangeGraphics = this.add.graphics().setDepth(2);
@@ -453,9 +454,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           }
         }
       }
-      if (controller.actionMode === "enemyPreview") {
-        this.rangeGraphics.fillStyle(0xc92332, 0.34);
-        this.rangeGraphics.lineStyle(2, 0xffa08f, 0.9);
+      const previewColors = controller.actionMode === "enemyPreview"
+        ? { fill: 0xc92332, stroke: 0xffa08f }
+        : controller.actionMode === "allyPreview"
+          ? { fill: 0x286fd6, stroke: 0x9fc8ff }
+          : undefined;
+      if (previewColors) {
+        this.rangeGraphics.fillStyle(previewColors.fill, 0.34);
+        this.rangeGraphics.lineStyle(2, previewColors.stroke, 0.9);
         for (const cell of controller.reachable) {
           this.rangeGraphics.fillRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
           this.rangeGraphics.strokeRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);

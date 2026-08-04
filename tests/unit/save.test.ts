@@ -18,6 +18,7 @@ import { emptyUnitStatuses } from "../../src/game/simulation/status";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
 import { Stage1Battle } from "../../src/game/simulation/stage1-battle";
+import { Stage2Battle } from "../../src/game/simulation/stage2-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -149,6 +150,46 @@ const stage1BattleSave = (): BattleSaveData => {
       ...battle.serializableSnapshot(),
       cursor: { x: nia.x, y: nia.y },
       cameraOrigin: { ...STAGE1_DEFINITION.viewport.initialOrigin },
+    },
+  };
+};
+
+const stage2BattleSave = (): BattleSaveData => {
+  const campaign = {
+    stageId: "stage-02" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x1020_3040,
+    rngCalls: 3,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "cavalry", experience: 450, life: 100 },
+      { slot: 2, classId: "archer", experience: 360, life: 90 },
+    ]),
+  };
+  const battle = new Stage2Battle(campaign);
+  const snapshot = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-03T12:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-02",
+    stageLabel: "救援友軍",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: snapshot.rngState,
+    rngCalls: snapshot.rngCalls,
+    roster: snapshot.roster,
+    stageProgress: 0,
+    consumedEventIds: ["stage-02-opening-story"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
     },
   };
 };
@@ -360,7 +401,7 @@ describe("Web save validation", () => {
       savedAt: completedStage1.savedAt,
       saveCount: completedStage1.saveCount,
       stageId: "stage-02",
-      stageLabel: "下一關",
+      stageLabel: "救援友軍",
       ruleset: completedStage1.ruleset,
       difficulty: completedStage1.difficulty,
       rngState: completedStage1.rngState,
@@ -374,6 +415,38 @@ describe("Web save validation", () => {
       ...completedRoute,
       consumedEventIds: completedRoute.consumedEventIds.slice(0, -1),
     })).toBe(false);
+  });
+
+  it("round-trips stage-2 fixed battles and rejects missing automatic allies", () => {
+    const save = stage2BattleSave();
+    save.battle.units.find(({ id }) => id === "1:44")!.acted = true;
+    expect(parseSaveData(JSON.stringify(save))).toEqual(save);
+
+    const missingAutomatic = stage2BattleSave();
+    missingAutomatic.battle.units = missingAutomatic.battle.units
+      .filter(({ id }) => id !== "1:44");
+    expect(isSaveData(missingAutomatic)).toBe(false);
+
+    const wrongOpening = stage2BattleSave();
+    wrongOpening.consumedEventIds = [];
+    expect(isSaveData(wrongOpening)).toBe(false);
+  });
+
+  it("migrates version-11 stage-1 completion into the playable stage-2 label", () => {
+    const current: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-02",
+      stageLabel: "救援友軍",
+      stageProgress: 1000,
+      consumedEventIds: STAGE1_DEFINITION.events.map(({ id }) => id),
+    };
+    const legacy = {
+      ...current,
+      version: 11,
+      contentVersion: "stage-01-ice-outer-ring-1",
+      stageLabel: "下一關",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
 
   it("migrates version-5 semantic saves by adding empty status state", () => {

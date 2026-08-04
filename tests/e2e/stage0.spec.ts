@@ -5,7 +5,7 @@ const EDGE_PAN_SETTLE_MS = 180;
 
 interface DebugState {
   phase: string;
-  campaignRoute?: "stage-01" | "stage-02";
+  campaignRoute?: "stage-01" | "stage-02" | "stage-03";
   activeStoryId?: string;
   consumedEventIds: string[];
   dialogueIndex: number;
@@ -943,8 +943,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 11,
-    contentVersion: "stage-01-ice-outer-ring-1",
+    version: 12,
+    contentVersion: "stage-02-allied-auto-1",
     kind: "completed",
     stageId: "stage-01",
     stageLabel: "騎士城堡前",
@@ -1512,8 +1512,8 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 11,
-    contentVersion: "stage-01-ice-outer-ring-1",
+    version: 12,
+    contentVersion: "stage-02-allied-auto-1",
     kind: "battle",
     stageId: "stage-00",
     rngState: initial.rngState,
@@ -2565,8 +2565,8 @@ test("S00-M: native system records restore battle state and combat cues follow p
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 11,
-    contentVersion: "stage-01-ice-outer-ring-1",
+    version: 12,
+    contentVersion: "stage-02-allied-auto-1",
     kind: "battle",
     stageId: "stage-00",
     stageLabel: "瓦爾克麗宮",

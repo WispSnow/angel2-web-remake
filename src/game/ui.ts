@@ -48,7 +48,7 @@ export interface CombatPresentationRenderSource {
 
 export function mountUi(root: HTMLElement, controller: GameController, audio: AudioManager): () => void {
   const stage = controller.battle.stage;
-  const stage1Assets = stage.id === "stage-01" ? controller.stage1Assets : undefined;
+  const stageAssets = controller.currentStageAssets;
   const eventController = new AbortController();
   root.innerHTML = `
     <div class="page-shell">
@@ -219,7 +219,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const dialogueControls = required(root, "#dialogue-controls");
   const skipDialogueButton = required<HTMLButtonElement>(root, "[data-action=skip-dialogue]");
   const storyBackground = required(root, "#story-background");
-  storyBackground.style.backgroundImage = `url("${stage1Assets?.storyBackground ?? ASSETS.storyBackground}")`;
+  const storyBackgroundSource = stageAssets && "storyBackground" in stageAssets
+    ? stageAssets.storyBackground
+    : ASSETS.storyBackground;
+  storyBackground.style.backgroundImage = `url("${storyBackgroundSource}")`;
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
   const settingsMenu = required(root, "#settings-menu");
@@ -1361,8 +1364,11 @@ function renderHud(
     alert: "警戒",
     pursuit: "追擊",
   }[intent] : undefined;
+  const controlLabel = unit.side === 1 && !controller.battle.isPlayerControllableAlly(unit.id)
+    ? "友軍自動"
+    : undefined;
   return `
-    <div class="unit-detail" data-testid="unit-detail" aria-label="${side}${acted}，${unit.className}${unit.name}${intentLabel ? `，意圖${intentLabel}` : ""}">
+    <div class="unit-detail" data-testid="unit-detail" aria-label="${side}${acted}，${unit.className}${unit.name}${controlLabel ? `，${controlLabel}` : ""}${intentLabel ? `，意圖${intentLabel}` : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
       ${animatedPortraitMarkup(unit.portrait, {
         alt: `${unit.name}肖像`,
@@ -1381,6 +1387,7 @@ function renderHud(
         <div><dt>防禦</dt><dd>${stats.defense}／${stats.defense}</dd></div>
         <div><dt>等級</dt><dd>${stats.level}</dd></div>
         <div><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
+        ${controlLabel ? `<div data-testid="allied-control-mode"><dt>控制</dt><dd>${controlLabel}</dd></div>` : ""}
         ${intentLabel ? `<div data-testid="enemy-ai-intent"><dt>意圖</dt><dd>${intentLabel}</dd></div>` : ""}
       </dl>
     </div>`;
@@ -1391,9 +1398,7 @@ function renderTactical(controller: GameController, underUnit = false): string {
     `<i class="minimap-unit side-${unit.side}" style="left:${unit.x * 3}px;top:${unit.y * 3}px" aria-hidden="true"></i>`,
   ).join("");
   const viewport = controller.cameraOrigin;
-  const minimap = controller.battle.stage.id === "stage-01"
-    ? controller.stage1Assets.minimap
-    : ASSETS.minimap;
+  const minimap = controller.currentStageAssets?.minimap ?? ASSETS.minimap;
   const toggleState: Record<SidePanelToggleVisualId, boolean> = {
     battleAnimation: controller.battlePresentation === "full",
     grid: controller.gridEnabled,
@@ -1469,7 +1474,9 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
   } else if (phase === "quit") {
     layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2>天使帝國 II</h2><p>已離開遊戲</p></div>`;
   } else if (phase === "nextStage") {
-    layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE 02</span><h2>第 1 關已完成</h2><p>戰役進度已寫入第 2 關入口；第 2 關仍在設計凍結範圍內，尚未接入可玩流程。</p><div class="completion-seal">第一關完成</div></div>`;
+    const completedStage = controller.campaignRoute === "stage-03" ? 2 : 1;
+    const destination = completedStage + 1;
+    layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE 0${destination}</span><h2>第 ${completedStage} 關已完成</h2><p>戰役進度已寫入第 ${destination} 關入口；第 ${destination} 關仍在設計凍結範圍內，尚未接入可玩流程。</p><div class="completion-seal">第${completedStage === 1 ? "一" : "二"}關完成</div></div>`;
   }
 }
 

@@ -36,6 +36,13 @@ const STAGE1_COMPLETED_EVENT_IDS = [
   "stage-01-completed-route",
 ] as const;
 
+const STAGE2_COMPLETED_EVENT_IDS = [
+  "stage-02-opening-story",
+  "stage-02-boss-defeated",
+  "stage-02-victory-story",
+  "stage-02-completed-route",
+] as const;
+
 function stage0Campaign(difficulty: Difficulty): CampaignState {
   return new GameController(difficulty).battle.campaignSnapshot();
 }
@@ -172,7 +179,7 @@ async function createStage1Completed(difficulty: Difficulty): Promise<GameContro
     savedAt: "2000-01-01T00:00:00.000Z",
     saveCount: 1,
     stageId: "stage-02",
-    stageLabel: "下一關",
+    stageLabel: "救援友軍",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
     rngState: campaign.rngState,
@@ -180,6 +187,44 @@ async function createStage1Completed(difficulty: Difficulty): Promise<GameContro
     roster: completeCampaignRoster(campaign.roster),
     stageProgress: 1000,
     consumedEventIds: [...STAGE1_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
+async function createStage2Opening(difficulty: Difficulty): Promise<GameController> {
+  const controller = new GameController(difficulty);
+  await controller.enterStage2({
+    ...controller.battle.campaignSnapshot(),
+    stageId: "stage-02",
+  }, "調試場景：第 2 關固定編隊。" );
+  return controller;
+}
+
+async function createStage2Player(difficulty: Difficulty): Promise<GameController> {
+  const controller = await createStage2Opening(difficulty);
+  controller.skipDialogue();
+  controller.statusMessage = "調試場景：第 2 關玩家回合；六名友軍將自動行動。";
+  return controller;
+}
+
+async function createStage2Completed(difficulty: Difficulty): Promise<GameController> {
+  const campaign = stage0Campaign(difficulty);
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-03",
+    stageLabel: "下一關",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(campaign.roster),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE2_COMPLETED_EVENT_IDS],
   };
   return GameController.fromSave(save, 1);
 }
@@ -227,6 +272,18 @@ export async function createDebugScenarioController(
     }
     case "stage-01-cleared":
       return createStage1Completed(difficulty);
+    case "stage-02-prebattle":
+    case "stage-02-preparation":
+      return createStage2Opening(difficulty);
+    case "stage-02-player":
+      return createStage2Player(difficulty);
+    case "stage-02-near-victory": {
+      const controller = await createStage2Player(difficulty);
+      controller.forceVictorySetupForTest();
+      return controller;
+    }
+    case "stage-02-cleared":
+      return createStage2Completed(difficulty);
   }
 }
 

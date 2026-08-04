@@ -8,7 +8,7 @@ test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 test("debug hub selects a difficulty and opens the formal stage-one deployment", async ({ page }) => {
   await page.goto("/debug.html");
   await expect(page.getByTestId("debug-hub")).toBeVisible();
-  await expect(page.locator("[data-debug-scenario-id]")).toHaveCount(12);
+  await expect(page.locator("[data-debug-scenario-id]")).toHaveCount(16);
   expect(await page.evaluate(() => window.__ANGEL2_DEBUG__)).toBeUndefined();
 
   await page.getByTestId("debug-difficulty").selectOption("3");
@@ -55,12 +55,23 @@ test("debug scenarios can enter player phases and directly complete either imple
   expect(player.units).toContainEqual(expect.objectContaining({ id: "1:24", classId: "magician" }));
 
   await page.getByRole("button", { name: "直接通關" }).click();
-  await expect(page.getByText("第 1 關已完成", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("debug-toolbar")).toContainText("stage-01 · nextStage");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "155");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("stage-02 · openingStory");
   expect((await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageProgress: number;
     campaignRoute?: string;
-  }))).toMatchObject({ stageProgress: 1000, campaignRoute: "stage-02" });
+    stageId: string;
+  }))).toMatchObject({ stageId: "stage-02", campaignRoute: "stage-02" });
+
+  await page.goto("/?debugScenario=stage-02-player&difficulty=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await page.getByRole("button", { name: "直接通關" }).click();
+  await expect(page.getByText("第 2 關已完成", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("debug-toolbar")).toContainText("stage-02 · nextStage");
+  expect((await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+    stageProgress: number;
+    campaignRoute?: string;
+  }))).toMatchObject({ stageProgress: 1000, campaignRoute: "stage-03" });
 });
 
 test("the magician range fixture releases its pursuing target after exactly one enemy phase", async ({ page }) => {

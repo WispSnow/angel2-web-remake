@@ -6,7 +6,7 @@ export type { PortraitRecord } from "./content/portrait-catalog.generated";
 export type Side = 1 | 2;
 export type Difficulty = 0 | 1 | 2 | 3;
 export type UnitClassId = ClassId;
-export type StageId = "stage-00" | "stage-01";
+export type StageId = "stage-00" | "stage-01" | "stage-02";
 
 export interface Position {
   x: number;
@@ -74,6 +74,7 @@ export type ActionMode =
   | "techniqueMenu"
   | "target"
   | "specialTarget"
+  | "allyPreview"
   | "enemyPreview";
 
 export interface AttackResult {
@@ -102,7 +103,7 @@ export interface DialoguePage {
   /** Characters already present before an appended line starts typing. */
   revealStart?: number;
   source: {
-    record: 0 | 1 | 2 | 3 | 4 | 5 | 6 | "promotion" | "battle-command" | "ai-technique";
+    record: number | "promotion" | "battle-command" | "ai-technique";
     wait: number;
     address?: string;
   };
@@ -133,8 +134,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 11;
-  contentVersion: "stage-01-ice-outer-ring-1";
+  version: 12;
+  contentVersion: "stage-02-allied-auto-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
@@ -148,15 +149,15 @@ interface SaveDataBase {
 
 export interface BattleSaveData extends SaveDataBase {
   kind: "battle";
-  stageId: "stage-00" | "stage-01";
-  stageLabel: "瓦爾克麗宮" | "騎士城堡前";
+  stageId: "stage-00" | "stage-01" | "stage-02";
+  stageLabel: "瓦爾克麗宮" | "騎士城堡前" | "救援友軍";
   battle: SavedBattleState;
 }
 
 export interface CompletedSaveData extends SaveDataBase {
   kind: "completed";
-  stageId: "stage-01" | "stage-02";
-  stageLabel: "騎士城堡前" | "下一關";
+  stageId: "stage-01" | "stage-02" | "stage-03";
+  stageLabel: "騎士城堡前" | "救援友軍" | "下一關";
 }
 
 export type SaveData = BattleSaveData | CompletedSaveData;

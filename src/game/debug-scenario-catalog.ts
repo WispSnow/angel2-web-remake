@@ -2,7 +2,7 @@ import type { Difficulty } from "./types";
 
 export interface DebugScenarioDefinition {
   id: string;
-  stageId: "stage-00" | "stage-01" | "stage-02";
+  stageId: "stage-00" | "stage-01" | "stage-02" | "stage-03";
   stageLabel: string;
   title: string;
   phase: string;
@@ -111,7 +111,49 @@ export const DEBUG_SCENARIOS = [
     stageLabel: "第 1 關完成",
     title: "直接通關",
     phase: "Route to stage 2",
-    description: "視為第 1 關已經完成，直接查看 stage-02 凍結邊界。",
+    description: "視為第 1 關已經完成，直接進入第 2 關開場事件。",
+    fixture: true,
+  },
+  {
+    id: "stage-02-prebattle",
+    stageId: "stage-02",
+    stageLabel: "第 2 關 · 救援友軍",
+    title: "關前／開場敘事",
+    phase: "SAY/0155",
+    description: "由第 1 關完成 roster 建立固定戰場，保留第 1 回合開場敘事。",
+  },
+  {
+    id: "stage-02-preparation",
+    stageId: "stage-02",
+    stageLabel: "第 2 關 · 救援友軍",
+    title: "固定編隊準備",
+    phase: "Fixed 9 vs 5",
+    description: "顯示完整固定陣容與自動友軍標記；本關沒有交互部署。",
+  },
+  {
+    id: "stage-02-player",
+    stageId: "stage-02",
+    stageLabel: "第 2 關 · 救援友軍",
+    title: "玩家回合",
+    phase: "Round 1",
+    description: "跳過開場敘事，直接驗證三名手動角色與六名自動友軍。",
+  },
+  {
+    id: "stage-02-near-victory",
+    stageId: "stage-02",
+    stageLabel: "第 2 關 · 救援友軍",
+    title: "一擊擊敗蘭",
+    phase: "Victory 999",
+    description: "蘭只剩 1 點生命且位於妮雅身邊，攻擊一次進入 SAY/0175。",
+    fixture: true,
+  },
+  {
+    id: "stage-02-cleared",
+    stageId: "stage-03",
+    stageLabel: "第 2 關完成",
+    title: "完成路由",
+    phase: "Route to stage 3",
+    description: "視為第 2 關已完成，直接查看 stage-03 未實現邊界。",
     fixture: true,
   },
 ] as const satisfies readonly DebugScenarioDefinition[];
