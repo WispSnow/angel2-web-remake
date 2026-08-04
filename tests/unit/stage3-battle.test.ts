@@ -40,6 +40,16 @@ describe("stage 3 battle construction and stable-remake automation", () => {
       "1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50",
     ]);
     expect(battle.groupCommander?.id).toBe("1:1");
+    expect(battle.forceForUnit("1:1")).toMatchObject({
+      id: "himi-rescue-force",
+      control: "player",
+      doctrine: { strategy: "native" },
+    });
+    expect(battle.forceForUnit("1:46")).toMatchObject({
+      id: "fourth-corps",
+      control: "independent-ai",
+      doctrine: { strategy: "terrain-hold" },
+    });
     expect(battle.planAlliedAiAction("1:54")).toBeDefined();
   });
 
@@ -148,6 +158,23 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     for (const id of ["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"]) {
       assertAssignedTarget(id, false);
     }
+  });
+
+  it("falls back to any surviving opponent after an enemy corps loses its preferred force", () => {
+    const battle = new Stage3Battle(campaign);
+    battle.units = battle.units.filter((unit) =>
+      unit.id === "2:42" || battle.forceForUnit(unit.id)?.id === "himi-rescue-force");
+    const enemy = battle.unit("2:42")!;
+    const rescue = battle.unit("1:54")!;
+    enemy.x = 24;
+    enemy.y = 13;
+    rescue.x = 24;
+    rescue.y = 14;
+
+    expect(battle.planEnemyAiAction(enemy.id)).toMatchObject({
+      kind: "attack",
+      targetId: rescue.id,
+    });
   });
 
   it("lets the enemy monk select its native healing pool and consumes one planning roll", () => {

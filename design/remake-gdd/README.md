@@ -56,6 +56,7 @@
 | [`systems/deployment-stage1.md`](systems/deployment-stage1.md) | 第 1 关固定/可选单位与部署提交 | M02 / 已实现并通过自动验收 |
 | [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M02 / 已实现并通过自动验收 |
 | [`systems/techniques-stage3.md`](systems/techniques-stage3.md) | 僧侣 `1H/1I`、范围回復、AI 与 255 tick 表现 | M04 / 已验证，待人工接受 |
+| [`systems/force-ai-groups.md`](systems/force-ai-groups.md) | 显式军团控制权、独立友军 AI、策略与跨军团目标 | M04 框架提取 / 已验证 |
 | [`systems/technique-lab.md`](systems/technique-lab.md) | 任意敌我职业配置、`1L..4L/1C..4C/TR` 原版地图表现与冰封净化 | 开发工具 / 已实现 |
 | [`systems/debug-harness.md`](systems/debug-harness.md) | 按关选择、快速结算与确定性测试场景 | 开发工具 / 已实现 |
 | [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现并随第 1 关接受 |

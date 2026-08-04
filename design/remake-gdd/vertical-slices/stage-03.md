@@ -125,6 +125,9 @@ victoryFeedback → savePrompt/saveSlots → nextStage(stage-04)`。自动友军
 本关棋盘，转职前对话由当前主将希蜜自问或回应队友请求。集团命令同样固定由希蜜下令；
 “全部休息”只结算六名玩家角色，“跟随主将／自由行动”先接管剩余玩家角色，再运行七名
 固定自动友军的独立军团阶段；NPC 不接收希蜜的凝聚目标或自由行动指令。
+四组成员、控制权、希蜜主将、`terrain-hold/native` 策略和敌军优先目标统一使用
+[`force-ai-groups.md`](../systems/force-ai-groups.md) 的模拟层合同；本关不再按槽位分支决定
+控制器队列或目标过滤器。
 
 ## 11. 规则集差异
 

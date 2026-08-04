@@ -34,6 +34,11 @@ import {
   planModernEnemyAction,
   type ModernEnemyAiContext,
 } from "./enemy-ai";
+import {
+  ForceRegistry,
+  type ForceDefinition,
+} from "./forces";
+import { planTerrainHoldForceAiAction } from "./force-ai";
 
 const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "archer-shot": ["archer"],
@@ -72,8 +77,7 @@ export interface BattleScenario {
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   alliedBehaviorById?: ReadonlyMap<string, number>;
   enemyBehaviorById?: ReadonlyMap<string, number>;
-  /** Optional remake commander used by stage-level group-command policy. */
-  groupCommanderId?: string;
+  forces?: readonly ForceDefinition[];
   routeEnemy?: {
     target: Position;
     movement: number;
@@ -108,14 +112,14 @@ export interface AlliedAiAction {
   actionId?: BattleActionId;
 }
 
-interface OrdinaryAiPlanningOptions {
+export interface OrdinaryAiPlanningOptions {
   targetFilter?: (target: BattleUnit) => boolean;
   destinationFilter?: (position: Position) => boolean;
   pathFilter?: (path: readonly Position[]) => boolean;
   restThresholdPercent?: number;
 }
 
-interface ClassActionPlanningOptions {
+export interface ClassActionPlanningOptions {
   modernRanking?: boolean;
   targetFilter?: (target: BattleUnit) => boolean;
   positionFilter?: (position: Position) => boolean;
@@ -135,6 +139,7 @@ export class Stage0Battle {
   focusId = "1:0";
   private readonly campaignRoster: SaveRosterEntry[];
   private readonly campaignUnitSlots: ReadonlySet<number>;
+  protected readonly forces: ForceRegistry;
 
   constructor(
     public readonly difficulty: Difficulty = 0,
@@ -143,6 +148,7 @@ export class Stage0Battle {
   ) {
     this.stage = scenario.stage;
     this.units = scenario.createUnits(difficulty);
+    this.forces = new ForceRegistry(scenario.forces ?? [], this.units);
     this.campaignRoster = scenario.createCampaignRoster(difficulty);
     this.campaignUnitSlots = new Set(
       this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
@@ -182,6 +188,7 @@ export class Stage0Battle {
       ...unit,
       statuses: { ...unit.statuses },
     }));
+    this.forces.assertKnownUnits(this.units);
     if (campaignRoster) {
       this.campaignRoster.splice(
         0,
@@ -196,9 +203,8 @@ export class Stage0Battle {
   }
 
   get groupCommander(): BattleUnit | undefined {
-    return this.scenario.groupCommanderId
-      ? this.unit(this.scenario.groupCommanderId)
-      : undefined;
+    const commanderId = this.forces.commanderId();
+    return commanderId ? this.unit(commanderId) : undefined;
   }
 
   unit(id: string): BattleUnit | undefined {
@@ -223,7 +229,14 @@ export class Stage0Battle {
 
   isPlayerControllableAlly(id: string): boolean {
     const unit = this.unit(id);
-    return unit?.side === 1 && this.alliedBehaviorFor(id) === 0;
+    if (unit?.side !== 1) return false;
+    const forceControl = this.forces.controlForUnit(id);
+    if (forceControl) return forceControl === "player";
+    return !this.forces.hasExplicitDefinitions() && this.alliedBehaviorFor(id) === 0;
+  }
+
+  forceForUnit(id: string): ForceDefinition | undefined {
+    return this.forces.definitionForUnit(id);
   }
 
   playerManualPhaseComplete(): boolean {
@@ -552,9 +565,16 @@ export class Stage0Battle {
     const unit = this.unit(id);
     if (!unit || unit.side !== 1 || unit.acted || unit.actionDisabled) return undefined;
 
+    const doctrine = this.forces.definitionForUnit(id)?.doctrine;
+    if (doctrine?.strategy === "terrain-hold") {
+      return this.planTerrainHoldAiAction(unit, doctrine);
+    }
+
     const behavior = this.alliedBehaviorFor(id);
+    const forceMembers = this.forces.membersForUnit(id, this.units);
     const automaticLeader = behavior >= 4 && behavior % 2 === 0
-      ? this.units.find((candidate) => candidate.side === unit.side
+      ? (forceMembers.length > 0 ? forceMembers : this.units).find((candidate) =>
+        candidate.side === unit.side
         && this.alliedBehaviorFor(candidate.id) === behavior - 1)
       : undefined;
     if (automaticLeader && automaticLeader.id !== unit.id) {
@@ -581,7 +601,9 @@ export class Stage0Battle {
     const classAction = this.planClassAction(unit);
     if (classAction) return classAction;
 
-    const leader = leaderId ? this.unit(leaderId) : undefined;
+    const leader = leaderId && this.isPlayerControllableAlly(id)
+      ? this.unit(leaderId)
+      : undefined;
     if (leader && leader.id !== unit.id && leader.side === unit.side) {
       const leaderPath = shortestPath(
         unit,
@@ -609,14 +631,23 @@ export class Stage0Battle {
   planEnemyAiAction(id: string, behavior = this.enemyBehaviorFor(id)): AlliedAiAction | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
+    const doctrine = this.forces.definitionForUnit(id)?.doctrine;
+    if (doctrine?.strategy === "terrain-hold") {
+      return this.planTerrainHoldAiAction(unit, doctrine);
+    }
     const stats = this.statsFor(unit);
     const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
     if (lifePercent < 20) {
       return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
     }
+    const targetFilter = this.forces.targetFilterFor(id, this.units);
     if (unit.classId === "sister" && unit.statuses.techniqueSeal === 0) {
       const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "fire-1" : "heal-1";
-      const special = this.planSpecialAiAction(id, actionId);
+      const special = this.planClassAction(
+        unit,
+        [actionId],
+        actionId === "fire-1" ? { targetFilter } : undefined,
+      );
       if (special) return special;
     }
     if (unit.classId === "monk" && unit.statuses.techniqueSeal === 0) {
@@ -624,7 +655,28 @@ export class Stage0Battle {
       const special = this.planSpecialAiAction(id, actionId);
       if (special) return special;
     }
-    return this.planOrdinaryAiAction(unit, 1, behavior);
+    return this.planOrdinaryAiAction(unit, 1, behavior, { targetFilter });
+  }
+
+  private planTerrainHoldAiAction(
+    unit: BattleUnit,
+    doctrine: Extract<ForceDefinition["doctrine"], { strategy: "terrain-hold" }>,
+  ): AlliedAiAction {
+    return planTerrainHoldForceAiAction({
+      width: this.stage.width,
+      battlefield: this.scenario,
+      units: this.units,
+      forces: this.forces,
+      statsFor: (candidate) => this.statsFor(candidate),
+      reachableCells: (unitId) => this.reachableCells(unitId),
+      movementPath: (unitId, destination) => this.movementPath(unitId, destination),
+      alliedBehaviorFor: (unitId) => this.alliedBehaviorFor(unitId),
+      enemyBehaviorFor: (unitId) => this.enemyBehaviorFor(unitId),
+      planClassAction: (candidate, requestedActionIds, options) =>
+        this.planClassAction(candidate, requestedActionIds, options),
+      planOrdinaryAction: (candidate, opponentSide, behavior, options) =>
+        this.planOrdinaryAiAction(candidate, opponentSide, behavior, options),
+    }, unit, doctrine);
   }
 
   protected planModernEnemyAiAction(
@@ -921,7 +973,7 @@ export class Stage0Battle {
       .filter((unit) => unit.side === 1
         && !unit.acted
         && !unit.actionDisabled
-        && (includeManual || this.alliedBehaviorFor(unit.id) !== 0))
+        && (includeManual || !this.isPlayerControllableAlly(unit.id)))
       .sort((left, right) =>
         (left.y * this.stage.width + left.x) - (right.y * this.stage.width + right.x))
       .map(({ id }) => id);

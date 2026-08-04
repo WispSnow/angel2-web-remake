@@ -14,6 +14,7 @@ import type {
   SaveRosterEntry,
 } from "../types";
 import { Stage0Battle, type BattleScenario } from "./battle";
+import type { ForceDefinition } from "./forces";
 import { DeterministicRng } from "./rng";
 import { emptyUnitStatuses } from "./status";
 
@@ -21,6 +22,30 @@ const STAGE2_AI_CLASS_PRIORITY = {
   cavalry: 16,
   soldier: 36,
 } as const;
+
+const STAGE2_FORCE_DEFINITIONS = [
+  {
+    id: "stage2-player-force",
+    side: 1,
+    control: "player",
+    unitIds: ["1:0", "1:2", "1:24"],
+    doctrine: { strategy: "native" },
+  },
+  {
+    id: "stage2-allied-corps",
+    side: 1,
+    control: "independent-ai",
+    unitIds: ["1:40", "1:41", "1:42", "1:43", "1:44", "1:45"],
+    doctrine: { strategy: "native" },
+  },
+  {
+    id: "stage2-enemy-force",
+    side: 2,
+    control: "independent-ai",
+    unitIds: STAGE2_SEMANTIC_ENEMY_UNITS.map(({ slot }) => `2:${slot}`),
+    doctrine: { strategy: "native" },
+  },
+] as const satisfies readonly ForceDefinition[];
 
 function stage2Ally(
   definition: typeof STAGE2_SEMANTIC_ALLIED_UNITS[number],
@@ -118,6 +143,7 @@ export class Stage2Battle extends Stage0Battle {
       enemyBehaviorById: new Map(
         STAGE2_SEMANTIC_ENEMY_UNITS.map(({ slot, aiBehavior }) => [`2:${slot}`, aiBehavior]),
       ),
+      forces: STAGE2_FORCE_DEFINITIONS,
     };
     super(campaign.difficulty, rng, scenario);
   }

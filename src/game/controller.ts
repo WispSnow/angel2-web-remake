@@ -1929,7 +1929,7 @@ export class GameController {
     const manualIds = mode === "autonomous"
       ? []
       : this.battle.alliedActionOrder(true)
-        .filter((id) => this.battle.alliedBehaviorFor(id) === 0);
+        .filter((id) => this.battle.isPlayerControllableAlly(id));
     const automaticIds = this.battle.alliedActionOrder(false);
     const runQueue = async (ids: readonly string[], followId?: string): Promise<boolean> => {
       for (const id of ids) {
@@ -2040,7 +2040,7 @@ export class GameController {
     this.centerCamera(unit);
     this.statusMessage = movementKind === "enemy"
       ? `${unit.name}正在自動行動。`
-      : this.battle.alliedBehaviorFor(unit.id) === 0
+      : this.battle.isPlayerControllableAlly(unit.id)
         ? `玩家軍團：${unit.name}正在執行集團命令。`
         : `友軍 NPC 軍團：${unit.name}正在獨立行動。`;
     this.emit();
