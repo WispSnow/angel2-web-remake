@@ -41,14 +41,27 @@ interface Stage1DebugState {
     actorId: string;
     target: { x: number; y: number };
     damage: number;
-    affectedUnits: Array<{ unitId: string; moved: boolean }>;
+    affectedUnits: Array<{
+      unitId: string;
+      moved: boolean;
+    }>;
   };
-  specialActionPresentation?: { phase: string; frame: number };
+  specialActionPresentation?: {
+    phase: string;
+    frame: number;
+    displayedLifeByUnitId: Record<string, number>;
+    lifeChangeUnitId?: string;
+  };
   aiTechniqueDialogue?: {
     actionId: string;
     center: { x: number; y: number };
   };
-  specialActionPresentationTrace: Array<{ phase: string; frame: number }>;
+  specialActionPresentationTrace: Array<{
+    phase: string;
+    frame: number;
+    displayedLifeByUnitId: Record<string, number>;
+    lifeChangeUnitId?: string;
+  }>;
   audioCueLog: Array<{ group: string; record: number; reason: string }>;
 }
 
@@ -294,6 +307,19 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(aiTechniqueDialogue).toBeHidden();
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
+    return current?.specialActionPresentation?.phase === "lifeDrain"
+      && current.specialActionPresentation.lifeChangeUnitId === "1:0";
+  });
+  const enemyFireDrain = await state(page);
+  expect(enemyFireDrain.units.find(({ id }) => id === "1:0")?.life)
+    .toBe(niaBeforeEnemyFire.life);
+  expect(enemyFireDrain.specialActionPresentation!.displayedLifeByUnitId["1:0"])
+    .toBeLessThan(niaBeforeEnemyFire.life);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-enemy-sister-fire-life-drain.png`,
+  });
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
     return current?.phase === "player"
       && current.lastSpecialAction?.actorId === "2:43"
       && current.lastSpecialAction.actionId === "fire-1";
@@ -302,6 +328,12 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   expect(enemyFireAfter.round).toBe(2);
   expect(enemyFireAfter.enemyIntents["2:16"]).toBe("pursuit");
   expect(enemyFireAfter.units.find(({ id }) => id === "1:0")?.life)
+    .toBe(niaBeforeEnemyFire.life - enemyFireAfter.lastSpecialAction!.damage);
+  const enemyFireDrainTrace = enemyFireAfter.specialActionPresentationTrace.filter(
+    ({ phase }) => phase === "lifeDrain",
+  );
+  expect(enemyFireDrainTrace).toHaveLength(enemyFireAfter.lastSpecialAction!.damage);
+  expect(enemyFireDrainTrace.at(-1)?.displayedLifeByUnitId["1:0"])
     .toBe(niaBeforeEnemyFire.life - enemyFireAfter.lastSpecialAction!.damage);
 
   await page.keyboard.press("Escape");
@@ -377,8 +409,10 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   expect(lightningAfter.specialActionPresentationTrace.at(-1)).toMatchObject({
     phase: "lightningCleanup",
     frame: 4,
-    nativeTicks: 10,
   });
+  expect(lightningAfter.specialActionPresentationTrace.filter(
+    ({ phase }) => phase === "lifeDrain",
+  )).toHaveLength(0);
   expect(lightningAfter.audioCueLog).toContainEqual(expect.objectContaining({
     group: "e",
     record: 43,

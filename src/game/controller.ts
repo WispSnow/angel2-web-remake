@@ -121,6 +121,7 @@ export type SpecialActionPresentationPhase =
   | "lightningCleanup"
   | "iceExpansion"
   | "dispelEffect"
+  | "lifeDrain"
   | "specialDeath";
 
 export interface SpecialActionPresentation {
@@ -131,6 +132,8 @@ export interface SpecialActionPresentation {
   phase: SpecialActionPresentationPhase;
   frame: number;
   nativeTicks: number;
+  displayedLifeByUnitId: Readonly<Record<string, number>>;
+  lifeChangeUnitId?: string;
 }
 
 export interface AiTechniqueDialoguePresentation {
@@ -268,6 +271,8 @@ export class GameController {
     phase: SpecialActionPresentationPhase;
     frame: number;
     nativeTicks: number;
+    displayedLifeByUnitId: Readonly<Record<string, number>>;
+    lifeChangeUnitId?: string;
   }> = [];
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
   movementPresentation?: MovementPresentation;
@@ -1195,10 +1200,14 @@ export class GameController {
     result: SpecialActionResult,
   ): Promise<void> {
     this.specialActionPresentationTrace = [];
+    const displayedLifeByUnitId: Record<string, number> = Object.fromEntries(
+      result.affectedUnits.map((affected) => [affected.unitId, affected.lifeBefore]),
+    );
     const present = async (
       phase: SpecialActionPresentationPhase,
       frame: number,
       nativeTicks: number,
+      lifeChangeUnitId?: string,
     ): Promise<void> => {
       this.specialActionPresentation = {
         actor,
@@ -1208,10 +1217,22 @@ export class GameController {
         phase,
         frame,
         nativeTicks,
+        displayedLifeByUnitId: { ...displayedLifeByUnitId },
+        lifeChangeUnitId,
       };
-      this.specialActionPresentationTrace.push({ phase, frame, nativeTicks });
+      this.specialActionPresentationTrace.push({
+        phase,
+        frame,
+        nativeTicks,
+        displayedLifeByUnitId: { ...displayedLifeByUnitId },
+        lifeChangeUnitId,
+      });
       this.emit();
-      await pause(this.mapCombatDelay(nativeTicks));
+      await pause(
+        phase === "lifeDrain" && this.testMode
+          ? 8
+          : this.mapCombatDelay(nativeTicks),
+      );
     };
 
     if (result.actionId === "archer-shot") {
@@ -1271,6 +1292,32 @@ export class GameController {
         }
       }
     }
+
+    // Native fire and common-shooting handlers run only after their fixed
+    // graphics timeline, then redraw once per successfully removed life point.
+    // Keep this evidence-tagged step as a read-only projection until the
+    // prepared result is atomically committed below the presentation boundary.
+    const definition = BATTLE_ACTION_DEFINITIONS[result.actionId];
+    if (
+      "damagePresentation" in definition
+      && definition.damagePresentation.mode === "post-graphics-point-drain"
+    ) {
+      for (const affected of result.affectedUnits) {
+        for (
+          let applied = 1;
+          displayedLifeByUnitId[affected.unitId] > affected.lifeAfter;
+          applied += 1
+        ) {
+          displayedLifeByUnitId[affected.unitId] -= 1;
+          await present(
+            "lifeDrain",
+            applied,
+            definition.damagePresentation.waitPerPointNativeTicks,
+            affected.unitId,
+          );
+        }
+      }
+    }
     this.specialActionPresentation = undefined;
   }
 
@@ -1288,8 +1335,18 @@ export class GameController {
         phase: "specialDeath",
         frame,
         nativeTicks: 10,
+        displayedLifeByUnitId: Object.fromEntries(
+          result.affectedUnits.map((affected) => [affected.unitId, affected.lifeAfter]),
+        ),
       };
-      this.specialActionPresentationTrace.push({ phase: "specialDeath", frame, nativeTicks: 10 });
+      this.specialActionPresentationTrace.push({
+        phase: "specialDeath",
+        frame,
+        nativeTicks: 10,
+        displayedLifeByUnitId: Object.fromEntries(
+          result.affectedUnits.map((affected) => [affected.unitId, affected.lifeAfter]),
+        ),
+      });
       this.emit();
       await pause(this.mapCombatDelay(10));
     }
@@ -3169,8 +3226,12 @@ export class GameController {
           statuses: { ...this.specialActionPresentation.target.statuses },
         } : undefined,
         result: { ...this.specialActionPresentation.result },
+        displayedLifeByUnitId: { ...this.specialActionPresentation.displayedLifeByUnitId },
       } : undefined,
-      specialActionPresentationTrace: this.specialActionPresentationTrace.map((entry) => ({ ...entry })),
+      specialActionPresentationTrace: this.specialActionPresentationTrace.map((entry) => ({
+        ...entry,
+        displayedLifeByUnitId: { ...entry.displayedLifeByUnitId },
+      })),
       aiTechniqueDialogue: this.aiTechniqueDialogue ? {
         ...this.aiTechniqueDialogue,
         actor: {
@@ -3379,7 +3440,7 @@ export class GameController {
     this.emit();
     const text = page.activeSlot ? page[page.activeSlot]?.text ?? "" : "";
     const delay = this.testMode
-      ? 400
+      ? 800
       : this.presentationFast
         ? Math.max(360, text.length * 20 + 120)
         : Math.max(1_200, text.length * 80 + 220);

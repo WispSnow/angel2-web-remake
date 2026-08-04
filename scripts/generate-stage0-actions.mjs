@@ -6,13 +6,23 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const techniqueRulesPath = path.join(root, "reverse/parsed/native/technique-rules.json");
 const combatPresentationsPath = path.join(root, "reverse/parsed/native/combat-presentations.json");
+const shootingPresentationsPath = path.join(root, "reverse/parsed/native/shooting-presentations.json");
+const techniquePresentationsPath = path.join(root, "reverse/parsed/native/technique-presentations.json");
 const classCatalogPath = path.join(root, "src/game/content/class-catalog.generated.ts");
 const outputPath = path.join(root, "src/game/content/stage0-actions.generated.ts");
 const publicRoot = path.join(root, "public/assets/original");
 
-const [techniqueRules, combatPresentations, classCatalogSource] = await Promise.all([
+const [
+  techniqueRules,
+  combatPresentations,
+  shootingPresentations,
+  techniquePresentations,
+  classCatalogSource,
+] = await Promise.all([
   readFile(techniqueRulesPath, "utf8").then(JSON.parse),
   readFile(combatPresentationsPath, "utf8").then(JSON.parse),
+  readFile(shootingPresentationsPath, "utf8").then(JSON.parse),
+  readFile(techniquePresentationsPath, "utf8").then(JSON.parse),
   readFile(classCatalogPath, "utf8"),
 ]);
 const classIdsMatch = /export const CLASS_IDS = (?<ids>\[[\s\S]*?\]) as const;/u.exec(
@@ -26,6 +36,8 @@ const fireDispatch = techniqueRules.dispatchTable.entries.find((entry) => entry.
 const healDispatch = techniqueRules.dispatchTable.entries.find((entry) => entry.actionCode === "1H");
 const fireTier = techniqueRules.rules.families.F.tiers.find((entry) => entry.code === "1F");
 const healTier = techniqueRules.rules.families.H.tiers.find((entry) => entry.code === "1H");
+const commonShootingDamageTimeline = shootingPresentations.commonImpact?.damageTimeline;
+const fireSettlementBoundary = techniquePresentations.presentations?.fire?.settlementBoundary;
 
 if (
   !archerShooting
@@ -35,6 +47,8 @@ if (
   || fireTier?.percentMaxLife !== 18
   || fireTier?.damageCap !== 108
   || healTier?.maxLifePercent !== 24
+  || !commonShootingDamageTimeline?.behavior?.includes("waits one native tick")
+  || !fireSettlementBoundary?.includes("once per requested damage point")
 ) {
   throw new Error("stage-0 action evidence no longer matches the authorized M00.6 contract");
 }
@@ -244,6 +258,10 @@ const actions = {
       maximumDistance: archerShooting.maximumRange - 1,
     },
     damage: { minimum: 30, maximum: 49, type: "physical-ranged" },
+    damagePresentation: {
+      mode: "post-graphics-point-drain",
+      waitPerPointNativeTicks: 1,
+    },
     experience: { minimum: 8, maximum: 11, addKillReward: true },
     presentationId: "shoot-common",
   },
@@ -258,6 +276,10 @@ const actions = {
       type: "magic",
       maxLifePercent: fireTier.percentMaxLife,
       cap: fireTier.damageCap,
+    },
+    damagePresentation: {
+      mode: "post-graphics-point-drain",
+      waitPerPointNativeTicks: 1,
     },
     experience: {
       base: fireTier.experienceBase,

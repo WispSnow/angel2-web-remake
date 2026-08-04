@@ -33,6 +33,7 @@ const CODE_SIGNATURES = [
   ["1000:6E25", 24, "find-range-map-maximum-minus-one", "306fc5743c59098d109f884a9cccfab268d2757c4a31f5c46c271bf9fe045850"],
   ["1000:6E46", 24, "draw-lightning-wave-on-stage-cells", "d08a5b1796dcbee6abd4a6456d4a89971cd5fcb38ef01ba4579f50a1ce397486"],
   ["1000:7166", 24, "apply-lightning-damage-after-presentation", "39d24bb03083638848777dfcf4cc6fef52db3759c4bcf254e9f07a258ea39820"],
+  ["1000:736D", 24, "apply-one-lightning-target-in-one-subtraction", "80db643c8b22d4c391d7fbf6c29202c2451f0ba376a3ed05ab633d154bc58189"],
   ["1000:621C", 24, "fire-1-presentation", "26c44b9b4acd2678542892036e784f5f64fbff26c6e6bec61b9402d1658f6ff2"],
   ["1000:62CE", 24, "fire-2-presentation", "b444245028fbd691f87435765d71699dc28c8dbef5f4d16273c3e9216914a8f4"],
   ["1000:63B4", 24, "fire-3-presentation", "b5037285691e6bf53ccd514093a71c8aa65e4f6bda22f106d0302e4d5e902d3c"],
@@ -555,7 +556,7 @@ function buildPresentations(buffer) {
         fixedGraphicWaitNativeTicks: 304,
       },
     ],
-    settlementBoundary: "the tier-specific presentation, distance-layer wave and five-stage MAGIC/6 cleanup all finish before 1000:7166 scans targets, applies defense-magic behavior and damage, then calls 0000:63CF",
+    settlementBoundary: "the tier-specific presentation, distance-layer wave and five-stage MAGIC/6 cleanup all finish before 1000:7166 scans targets; 1000:736D subtracts the prepared range damage once per target rather than calling the fire/common-shooting point-drain loop, then 0000:63CF removes dead units",
   };
 
   assert(heal.actions.map((entry) => entry.fixedGraphicWaitNativeTicks).join(",") === "275,215,235",

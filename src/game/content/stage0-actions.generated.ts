@@ -18,6 +18,10 @@ export const STAGE0_ACTION_DEFINITIONS = {
       "maximum": 49,
       "type": "physical-ranged"
     },
+    "damagePresentation": {
+      "mode": "post-graphics-point-drain",
+      "waitPerPointNativeTicks": 1
+    },
     "experience": {
       "minimum": 8,
       "maximum": 11,
@@ -39,6 +43,10 @@ export const STAGE0_ACTION_DEFINITIONS = {
       "type": "magic",
       "maxLifePercent": 18,
       "cap": 108
+    },
+    "damagePresentation": {
+      "mode": "post-graphics-point-drain",
+      "waitPerPointNativeTicks": 1
     },
     "experience": {
       "base": 8,

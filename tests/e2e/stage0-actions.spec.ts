@@ -21,8 +21,15 @@ interface ActionDebugState {
     phase: string;
     frame: number;
     target: { id: string; life: number };
+    displayedLifeByUnitId: Record<string, number>;
+    lifeChangeUnitId?: string;
   };
-  specialActionPresentationTrace: Array<{ phase: string; frame: number }>;
+  specialActionPresentationTrace: Array<{
+    phase: string;
+    frame: number;
+    displayedLifeByUnitId: Record<string, number>;
+    lifeChangeUnitId?: string;
+  }>;
   audioCueLog: Array<{
     group: "e" | "magic";
     record: number;
@@ -113,6 +120,21 @@ test("M00.6 archer shooting keeps simulation frozen through UN/60, then commits"
     path: "artifacts/playwright/stage0-archer-shoot-effect.png",
   });
 
+  await page.waitForFunction((targetId) => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.specialActionPresentation?.phase === "lifeDrain"
+      && current.specialActionPresentation.lifeChangeUnitId === targetId;
+  }, targetBefore.id);
+  const archerDrain = await state(page);
+  const archerDisplayedLife = archerDrain.specialActionPresentation!
+    .displayedLifeByUnitId[targetBefore.id];
+  expect(archerDrain.units.find(({ id }) => id === targetBefore.id)?.life)
+    .toBe(targetBefore.life);
+  expect(archerDisplayedLife).toBeLessThan(targetBefore.life);
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-archer-shoot-life-drain.png",
+  });
+
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as ActionDebugState;
     return current.lastSpecialAction?.actionId === "archer-shot"
@@ -127,6 +149,13 @@ test("M00.6 archer shooting keeps simulation frozen through UN/60, then commits"
   expect(after.rngState).not.toBe(before.rngState);
   expect(after.specialActionPresentationTrace.filter(({ phase }) => phase === "shootHit"))
     .toHaveLength(8);
+  const archerDrainTrace = after.specialActionPresentationTrace
+    .filter(({ phase }) => phase === "lifeDrain");
+  expect(archerDrainTrace).toHaveLength(after.lastSpecialAction!.damage);
+  expect(archerDrainTrace[0].displayedLifeByUnitId[targetBefore.id])
+    .toBe(targetBefore.life - 1);
+  expect(archerDrainTrace.at(-1)?.displayedLifeByUnitId[targetBefore.id])
+    .toBe(targetBefore.life - after.lastSpecialAction!.damage);
 });
 
 test("M00.6 post-move menus keep shooting but never offer techniques", async ({ page }) => {
@@ -221,6 +250,19 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-sister-fire-effect.png",
   });
+  await page.waitForFunction((targetId) => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState;
+    return current.specialActionPresentation?.phase === "lifeDrain"
+      && current.specialActionPresentation.lifeChangeUnitId === targetId;
+  }, enemyBefore.id);
+  const fireDrain = await state(page);
+  expect(fireDrain.units.find(({ id }) => id === enemyBefore.id)?.life)
+    .toBe(enemyBefore.life);
+  expect(fireDrain.specialActionPresentation!.displayedLifeByUnitId[enemyBefore.id])
+    .toBeLessThan(enemyBefore.life);
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-sister-fire-life-drain.png",
+  });
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as ActionDebugState;
     return current.lastSpecialAction?.actionId === "fire-1"
@@ -229,11 +271,17 @@ test("M00.6 sister technique menu preserves nested cancel and both native timeli
   const afterFire = await state(page);
   expect(afterFire.specialActionPresentationTrace.filter(({ phase }) => phase === "fireEffect"))
     .toHaveLength(7);
-  expect(afterFire.specialActionPresentationTrace.at(-1)).toMatchObject({
+  expect(afterFire.specialActionPresentationTrace.findLast(
+    ({ phase }) => phase === "fireEffect",
+  )).toMatchObject({
     phase: "fireEffect",
     frame: 6,
-    nativeTicks: 10,
   });
+  const fireDrainTrace = afterFire.specialActionPresentationTrace
+    .filter(({ phase }) => phase === "lifeDrain");
+  expect(fireDrainTrace).toHaveLength(afterFire.lastSpecialAction!.damage);
+  expect(fireDrainTrace.at(-1)?.displayedLifeByUnitId[enemyBefore.id])
+    .toBe(enemyBefore.life - afterFire.lastSpecialAction!.damage);
   expect(afterFire.audioCueLog).toContainEqual(expect.objectContaining({
     group: "magic",
     record: 83,

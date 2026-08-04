@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { BATTLE_ACTION_DEFINITIONS } from "../../src/game/content/actions";
 import { className } from "../../src/game/content/classes";
 import { activateStage1Content } from "../../src/game/content/stage1";
 import { Stage0Battle } from "../../src/game/simulation/battle";
@@ -48,6 +49,18 @@ function arrangeTarget(
 }
 
 describe("Stage-0 class actions", () => {
+  it("marks only native post-graphics point-drain actions with that presentation contract", () => {
+    expect(BATTLE_ACTION_DEFINITIONS["archer-shot"].damagePresentation).toEqual({
+      mode: "post-graphics-point-drain",
+      waitPerPointNativeTicks: 1,
+    });
+    expect(BATTLE_ACTION_DEFINITIONS["fire-1"].damagePresentation).toEqual({
+      mode: "post-graphics-point-drain",
+      waitPerPointNativeTicks: 1,
+    });
+    expect("damagePresentation" in BATTLE_ACTION_DEFINITIONS["lightning-1"]).toBe(false);
+  });
+
   it("builds native numeric shooting and technique ranges without occupying the origin", () => {
     const actor = { x: 5, y: 5, classId: "archer" as const };
     const shooting = archerShootingRange(actor, openBattlefield);

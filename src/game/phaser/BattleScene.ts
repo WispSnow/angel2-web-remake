@@ -556,6 +556,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private drawUnits(): void {
       const presentation = controller.combatPresentation;
       const mapPresentation = presentation && !presentation.phase.startsWith("full") ? presentation : undefined;
+      const specialPresentation = controller.specialActionPresentation;
       const displayedUnits = new Map(controller.battle.units.map((unit) => [unit.id, unit]));
       if (mapPresentation) {
         if (!displayedUnits.has(mapPresentation.attacker.id)) displayedUnits.set(mapPresentation.attacker.id, mapPresentation.attacker);
@@ -589,11 +590,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         view.sprite.setX(this.unitVisualOffset(unit));
         view.sprite.setAlpha(1);
         view.sprite.clearTint();
-        const displayedLife = mapPresentation?.attacker.id === unit.id
-          ? mapPresentation.displayedAttackerLife
-          : mapPresentation?.defender.id === unit.id
-            ? mapPresentation.displayedDefenderLife
-            : unit.life;
+        const specialDisplayedLife = specialPresentation?.displayedLifeByUnitId[unit.id];
+        const displayedLife = specialDisplayedLife
+          ?? (mapPresentation?.attacker.id === unit.id
+            ? mapPresentation.displayedAttackerLife
+            : mapPresentation?.defender.id === unit.id
+              ? mapPresentation.displayedDefenderLife
+              : unit.life);
         const erasedByDeath = mapPresentation
           && (
             (mapPresentation.phase === "defenderDeath" && mapPresentation.defender.id === unit.id)
@@ -742,6 +745,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatFrame = String(special.frame);
           canvas.dataset.mapCombatTarget = target?.id ?? `${center.x},${center.y}`;
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
+          if (special.lifeChangeUnitId) {
+            canvas.dataset.mapCombatLifeChangeUnit = special.lifeChangeUnitId;
+            canvas.dataset.mapCombatDisplayedLife = String(
+              special.displayedLifeByUnitId[special.lifeChangeUnitId],
+            );
+          } else {
+            delete canvas.dataset.mapCombatLifeChangeUnit;
+            delete canvas.dataset.mapCombatDisplayedLife;
+          }
           if (lightningAnchorOffset) {
             canvas.dataset.mapCombatAnchorOffset =
               `${lightningAnchorOffset.x},${lightningAnchorOffset.y}`;
@@ -767,6 +779,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatAnchorOffset;
           delete canvas.dataset.mapCombatIceRangeValue;
           delete canvas.dataset.mapCombatIceDistance;
+          delete canvas.dataset.mapCombatLifeChangeUnit;
+          delete canvas.dataset.mapCombatDisplayedLife;
           canvas.dataset.mapCombatEffectTileCount = "0";
         }
         return;
@@ -802,6 +816,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
 
       if (controller.isTestMode) {
+        delete canvas.dataset.mapCombatLifeChangeUnit;
+        delete canvas.dataset.mapCombatDisplayedLife;
         canvas.dataset.mapCombatPhase = presentation.phase;
         canvas.dataset.mapCombatFrame = String(presentation.frame);
         canvas.dataset.mapCombatTarget = target.id;
