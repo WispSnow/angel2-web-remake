@@ -81,7 +81,7 @@ test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment hazard map", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /遭遇丁塔琪/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /通過力場/u })).toBeVisible();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "7");
   expect(await state(page)).toMatchObject({
     stageId: "stage-04",
@@ -172,7 +172,7 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   }
 });
 
-test("S04-G: the active deployment round-trips through save format v15", async ({ page }) => {
+test("S04-G: the active deployment round-trips through save format v16", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const before = await state(page);
@@ -186,8 +186,8 @@ test("S04-G: the active deployment round-trips through save format v15", async (
     battle: { units: Stage4State["units"] };
   });
   expect(saved).toMatchObject({
-    version: 15,
-    contentVersion: "stage-04-force-field-1",
+    version: 16,
+    contentVersion: "stage-title-and-roster-inheritance-1",
     stageId: "stage-04",
   });
   expect(saved.battle.units).toHaveLength(before.units.length);
@@ -227,7 +227,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
     campaignRoute: "stage-05",
   });
   await expect(page.getByText("第 4 關已完成", { exact: true })).toBeVisible();
-  await expect(page.getByText(/「過異世界之門」（stage-05）入口/u)).toBeVisible();
+  await expect(page.getByText(/「遭遇丁塔琪」（stage-05）入口/u)).toBeVisible();
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage4-stage5-boundary.png`,
   });

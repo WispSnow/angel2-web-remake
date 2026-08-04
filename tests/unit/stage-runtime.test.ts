@@ -34,6 +34,15 @@ describe("stage runtime manifest", () => {
       "stage-04",
       "stage-05",
     ]);
+    expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ label }) => label)).toEqual([
+      "瓦爾克麗宮",
+      "騎士城堡前",
+      "攻打騎士堡",
+      "救援友軍",
+      "通過力場",
+    ]);
+    expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ completion }) => completion.destinationLabel))
+      .toEqual(["騎士城堡前", "攻打騎士堡", "救援友軍", "通過力場", "遭遇丁塔琪"]);
     expect(isPlayableStageId("stage-03")).toBe(true);
     expect(isPlayableStageId("stage-04")).toBe(true);
     expect(isPlayableStageId("stage-05")).toBe(false);

@@ -141,7 +141,7 @@ export const STAGE4_SEMANTIC_CLASS_OVERRIDES = STAGE4_PLAYER_CLASS_OVERRIDES.map
 
 export const STAGE4_SEMANTIC_ALLIED_UNITS = STAGE4_DEPLOYMENT_ACTORS.map((actor) => ({
   slot: actor.slot,
-  classOverride: STAGE4_SEMANTIC_CLASS_OVERRIDES.find(({ slot }) => slot === actor.slot)?.classId,
+  initialClassId: STAGE4_SEMANTIC_CLASS_OVERRIDES.find(({ slot }) => slot === actor.slot)?.classId,
   name: actor.normalizedName,
   portrait: actor.portraitRecord as PortraitRecord,
   aiBehavior: actor.slot === 24 ? 12 : 0,

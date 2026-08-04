@@ -44,7 +44,7 @@ const moveAlong = (
 };
 
 describe("stage 4 deployment, forces, and route pulse", () => {
-  it("inherits selected campaign units and forces Gadirath to the magician role", () => {
+  it("inherits selected campaign units and applies Gadirath's untouched magician baseline", () => {
     const roster = createStage4DeploymentRoster(campaign);
     expect(roster).toHaveLength(8);
     expect(roster.find(({ slot }) => slot === 0)).toMatchObject({
@@ -70,6 +70,19 @@ describe("stage 4 deployment, forces, and route pulse", () => {
       control: "independent-ai",
     });
     expect(battle.forceForUnit("2:40")).toMatchObject({ id: "castle-sentries" });
+  });
+
+  it("preserves Gadirath's promoted campaign class in deployment and battle", () => {
+    const promotedCampaign: CampaignState = {
+      ...campaign,
+      roster: campaign.roster.map((entry) => entry.slot === 24
+        ? { ...entry, classId: "evil-mage", experience: 1_050, life: 300 }
+        : entry),
+    };
+    expect(createStage4DeploymentRoster(promotedCampaign).find(({ slot }) => slot === 24))
+      .toMatchObject({ classId: "evil-mage", experience: 1_050, life: 300 });
+    expect(new Stage4Battle(promotedCampaign, fullDeployment()).unit("1:24"))
+      .toMatchObject({ classId: "evil-mage", experience: 1_050, life: 300 });
   });
 
   it("plans behavior 12 before ordinary AI and pulses after moving toward the lower cell", () => {

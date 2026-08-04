@@ -50,7 +50,7 @@ const STAGE1_AI_CLASS_PRIORITY = {
 const STAGE1_UNIT_CONFIG: DeployedStageUnitConfig = {
   alliedUnits: STAGE1_DEPLOYMENT_PREVIEW_ROSTER.map((preview) => ({
     slot: preview.slot,
-    classOverride: STAGE1_SEMANTIC_CLASS_OVERRIDES
+    initialClassId: STAGE1_SEMANTIC_CLASS_OVERRIDES
       .find(({ slot }) => slot === preview.slot)?.classId,
     name: preview.name,
     portrait: preview.portrait,

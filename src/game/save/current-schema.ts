@@ -27,8 +27,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 15 as const;
-export const SAVE_CONTENT_VERSION = "stage-04-force-field-1" as const;
+export const SAVE_VERSION = 16 as const;
+export const SAVE_CONTENT_VERSION = "stage-title-and-roster-inheritance-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_ROUND = 9_999;
@@ -218,11 +218,7 @@ export function isSavedBattleState(
       || allies.some(({ slot }) => !eligibleSlots.has(slot))
       || [...fixedSlots].some((slot) => !alliedSlots.has(slot))
       || allies.filter(({ slot }) => optionalSlots.has(slot)).length
-        > alliedRule.openCellCount
-      || allies.some(({ slot, classId }) => {
-        const requiredClass = alliedRule.requiredClassBySlot[slot];
-        return requiredClass !== undefined && classId !== requiredClass;
-      })) {
+        > alliedRule.openCellCount) {
       return false;
     }
   } else if (alliedRule.kind === "exact-slots") {

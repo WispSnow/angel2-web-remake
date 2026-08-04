@@ -54,7 +54,7 @@ test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as automatic", async ({ page }) => {
   await page.goto("/?debugScenario=stage-02-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /救援友軍/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /攻打騎士堡/u })).toBeVisible();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "155");
   expect(await state(page)).toMatchObject({
     stageId: "stage-02",
@@ -207,8 +207,8 @@ test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign"
     };
   });
   expect(baseline).toMatchObject({
-    version: 15,
-    contentVersion: "stage-04-force-field-1",
+    version: 16,
+    contentVersion: "stage-title-and-roster-inheritance-1",
   });
 
   const loadMutatedBattle = async () => {

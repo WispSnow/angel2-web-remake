@@ -17,7 +17,8 @@ import type { ForceDefinition } from "./forces";
 export interface FixedStageAlliedUnitDefinition {
   slot: number;
   position: Position;
-  classOverride?: UnitClassId;
+  /** Initial class supplied by the native template for an untouched campaign slot. */
+  initialClassId?: UnitClassId;
   name: string;
   portrait: PortraitRecord;
   aiBehavior: number;
@@ -56,10 +57,13 @@ function createInheritedAlly(
   inheritance: FixedStageUnitConfig["inheritance"],
 ): BattleUnit {
   const inherited = campaignRoster.find(({ slot }) => slot === definition.slot);
-  const classId = definition.classOverride ?? inherited?.classId ?? inheritance.defaultClassId;
+  const untouchedCampaignSlot = inherited === undefined
+    || (inherited.classId === inheritance.defaultClassId && inherited.experience === 0);
+  const classId = untouchedCampaignSlot
+    ? definition.initialClassId ?? inherited?.classId ?? inheritance.defaultClassId
+    : inherited.classId;
   const namedBaseline = definition.portrait !== inheritance.genericPortrait
-    && inherited?.classId === inheritance.defaultClassId
-    && inherited.experience === 0;
+    && untouchedCampaignSlot;
   const experience = namedBaseline
     ? definition.untouchedExperience ?? inheritance.untouchedNamedExperience
     : inherited?.experience ?? 0;

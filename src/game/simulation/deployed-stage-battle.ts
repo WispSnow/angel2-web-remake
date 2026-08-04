@@ -22,7 +22,7 @@ import type { RoutePulseDefinition } from "./route-pulse";
 
 export interface DeployedStageAllyDefinition {
   slot: number;
-  classOverride?: UnitClassId;
+  initialClassId?: UnitClassId;
   name: string;
   portrait: PortraitRecord;
   aiBehavior: number;

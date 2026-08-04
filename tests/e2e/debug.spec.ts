@@ -12,9 +12,9 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.locator(".debug-stage-heading h2")).toHaveText([
     "第 0 關 · 瓦爾克麗宮",
     "第 1 關 · 騎士城堡前",
-    "第 2 關 · 救援友軍",
-    "第 3 關 · 通過力場",
-    "第 4 關 · 遭遇丁塔琪",
+    "第 2 關 · 攻打騎士堡",
+    "第 3 關 · 救援友軍",
+    "第 4 關 · 通過力場",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -67,7 +67,7 @@ test("debug scenarios can enter player phases and directly complete either imple
 
   await page.getByRole("button", { name: "直接通關" }).click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "155");
-  await expect(page.getByTestId("debug-toolbar")).toContainText("第 2 關 · 救援友軍");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("第 2 關 · 攻打騎士堡");
   await expect(page.getByTestId("debug-toolbar")).toContainText("stage-02 · openingStory");
   expect((await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageProgress: number;
@@ -79,7 +79,7 @@ test("debug scenarios can enter player phases and directly complete either imple
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.getByRole("button", { name: "直接通關" }).click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "12");
-  await expect(page.getByTestId("debug-toolbar")).toContainText("第 3 關 · 通過力場");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("第 3 關 · 救援友軍");
   await expect(page.getByTestId("debug-toolbar")).toContainText("stage-03 · openingStory");
   expect((await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageProgress: number;
@@ -90,7 +90,7 @@ test("debug scenarios can enter player phases and directly complete either imple
 
 test("a completed stage-three save enters the playable stage-four prebattle", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-cleared&difficulty=0");
-  await expect(page.getByRole("heading", { name: /遭遇丁塔琪/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /通過力場/u })).toBeVisible();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "7");
   const resources = await page.evaluate(() =>
     performance.getEntriesByType("resource").map(({ name }) => name));

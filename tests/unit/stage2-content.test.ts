@@ -33,7 +33,7 @@ describe("stage 2 generated content", () => {
     expect(STAGE2_DEFINITION).toMatchObject({
       id: "stage-02",
       nativeStage: 2,
-      name: "救援友軍",
+      name: "攻打騎士堡",
       width: 50,
       height: 50,
       viewport: {
@@ -55,6 +55,8 @@ describe("stage 2 generated content", () => {
       },
     });
     expect(STAGE2_DEFINITION.contentIdentity).toMatch(/^stage-02\/evidence-[a-f0-9]{64}$/u);
+    expect(STAGE2_SOURCES.find(({ id }) => id === "title")?.path)
+      .toBe("reverse/parsed/dialogue/0163.json");
     expect(STAGE2_DEFINITION.events.map(({ id }) => id)).toEqual([
       "stage-02-opening-story",
       "stage-02-boss-defeated",
@@ -83,21 +85,21 @@ describe("stage 2 generated content", () => {
     expect(stage2TerrainSlotAt({ x: 25, y: 21 })).toBeGreaterThanOrEqual(0);
     expect(stage2TerrainSlotAt({ x: -1, y: 0 })).toBe(0);
 
-    expect(STAGE2_SEMANTIC_ALLIED_UNITS.map(({ slot, aiBehavior, position, classOverride }) => ({
+    expect(STAGE2_SEMANTIC_ALLIED_UNITS.map(({ slot, aiBehavior, position, initialClassId }) => ({
       slot,
       aiBehavior,
       position,
-      classOverride,
+      initialClassId,
     }))).toEqual([
-      { slot: 44, aiBehavior: 11, position: { x: 22, y: 32 }, classOverride: undefined },
-      { slot: 45, aiBehavior: 11, position: { x: 28, y: 32 }, classOverride: undefined },
-      { slot: 43, aiBehavior: 11, position: { x: 20, y: 33 }, classOverride: undefined },
-      { slot: 41, aiBehavior: 11, position: { x: 23, y: 33 }, classOverride: undefined },
-      { slot: 40, aiBehavior: 11, position: { x: 27, y: 33 }, classOverride: undefined },
-      { slot: 42, aiBehavior: 11, position: { x: 29, y: 33 }, classOverride: undefined },
-      { slot: 0, aiBehavior: 0, position: { x: 21, y: 35 }, classOverride: undefined },
-      { slot: 24, aiBehavior: 0, position: { x: 25, y: 35 }, classOverride: "magician" },
-      { slot: 2, aiBehavior: 0, position: { x: 28, y: 35 }, classOverride: undefined },
+      { slot: 44, aiBehavior: 11, position: { x: 22, y: 32 }, initialClassId: undefined },
+      { slot: 45, aiBehavior: 11, position: { x: 28, y: 32 }, initialClassId: undefined },
+      { slot: 43, aiBehavior: 11, position: { x: 20, y: 33 }, initialClassId: undefined },
+      { slot: 41, aiBehavior: 11, position: { x: 23, y: 33 }, initialClassId: undefined },
+      { slot: 40, aiBehavior: 11, position: { x: 27, y: 33 }, initialClassId: undefined },
+      { slot: 42, aiBehavior: 11, position: { x: 29, y: 33 }, initialClassId: undefined },
+      { slot: 0, aiBehavior: 0, position: { x: 21, y: 35 }, initialClassId: undefined },
+      { slot: 24, aiBehavior: 0, position: { x: 25, y: 35 }, initialClassId: "magician" },
+      { slot: 2, aiBehavior: 0, position: { x: 28, y: 35 }, initialClassId: undefined },
     ]);
     expect(STAGE2_SEMANTIC_ENEMY_UNITS.map(({ slot, classId, name, portrait, aiBehavior }) => ({
       slot,

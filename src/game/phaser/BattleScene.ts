@@ -5,6 +5,7 @@ import {
   actionPresentationAssetCatalog,
   actionPresentationCatalog,
 } from "../content/actions";
+import { ALLY_MAP_UNIT_ASSETS, allyMapUnitAsset } from "../content/map-unit-assets";
 import type { GameController } from "../controller";
 import type { BattleUnit } from "../types";
 import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-technique-presentation";
@@ -139,13 +140,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         mapTextureKey,
         stageAssets?.map ?? ASSETS.map,
       );
-      this.load.image("ally-soldier", ASSETS.allySoldier);
-      Object.entries(ASSETS.allyPromotionTargets).forEach(([classId, source]) =>
+      Object.entries(ALLY_MAP_UNIT_ASSETS).forEach(([classId, source]) =>
         this.load.image(`ally-${classId}`, source));
       this.load.image("enemy-soldier", ASSETS.enemySoldier);
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
-      Object.entries(stageAssets?.unitSprites ?? {}).forEach(([key, source]) =>
-        this.load.image(key, source));
+      Object.entries(stageAssets?.unitSprites ?? {}).forEach(([key, source]) => {
+        const classId = key.startsWith("ally-") ? key.slice("ally-".length) : undefined;
+        if (classId && allyMapUnitAsset(classId as BattleUnit["classId"])) return;
+        this.load.image(key, source);
+      });
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
       ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
       this.load.image("turn-transition-player", ASSETS.turnTransition.player);
@@ -529,14 +532,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private textureFor(unit: BattleUnit): string {
       if (unit.side === 1) {
-        if (
-          unit.classId === "archer"
-          || unit.classId === "cavalry"
-          || unit.classId === "sister"
-          || unit.classId === "magician"
-          || unit.classId === "magic-priest"
-          || unit.classId === "warrior"
-        ) return `ally-${unit.classId}`;
+        if (allyMapUnitAsset(unit.classId)) return `ally-${unit.classId}`;
         return "ally-soldier";
       }
       if (unit.classId === "cavalry") return "enemy-cavalry";

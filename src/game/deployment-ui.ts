@@ -5,6 +5,7 @@ import {
   type ClassId,
 } from "./content/classes";
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
+import { allyMapUnitAsset } from "./content/map-unit-assets";
 import type { DeploymentRosterUnit, DeploymentSession } from "./deployment-session";
 import {
   DeploymentMinimap,
@@ -25,17 +26,8 @@ const ACTION_CATEGORY_LABEL = {
   special_runtime: "特殊",
 } as const;
 
-const ALLY_FIGURE_SOURCE: Partial<Record<ClassId, string>> = {
-  archer: "/assets/original/unit-ally-archer.png",
-  cavalry: "/assets/original/unit-ally-cavalry.png",
-  magician: "/assets/original/unit-ally-magician.png",
-  sister: "/assets/original/unit-ally-sister.png",
-  soldier: "/assets/original/unit-ally-soldier.png",
-  warrior: "/assets/original/unit-ally-warrior.png",
-};
-
 const figureSourceFor = (classId: ClassId): string =>
-  ALLY_FIGURE_SOURCE[classId] ?? "/assets/original/unit-ally-soldier.png";
+  allyMapUnitAsset(classId) ?? "/assets/original/unit-ally-soldier.png";
 
 const positionKey = ({ x, y }: Position): string => `${x},${y}`;
 

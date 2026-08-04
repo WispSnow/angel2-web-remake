@@ -15,6 +15,7 @@ import {
   saveSlotKey,
 } from "../../src/game/save";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
+import { className, classStatsFor } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
 import { Stage1Battle } from "../../src/game/simulation/stage1-battle";
@@ -199,7 +200,7 @@ const stage2BattleSave = (): BattleSaveData => {
     savedAt: "2026-08-03T12:00:00.000Z",
     saveCount: 1,
     stageId: "stage-02",
-    stageLabel: "救援友軍",
+    stageLabel: "攻打騎士堡",
     ruleset: "stableRemake",
     difficulty: 0,
     rngState: snapshot.rngState,
@@ -244,7 +245,7 @@ const stage3BattleSave = (): BattleSaveData => {
     savedAt: "2026-08-04T12:00:00.000Z",
     saveCount: 1,
     stageId: "stage-03",
-    stageLabel: "通過力場",
+    stageLabel: "救援友軍",
     ruleset: "stableRemake",
     difficulty: 0,
     rngState: campaign.rngState,
@@ -303,7 +304,7 @@ const stage4BattleSave = (): BattleSaveData => {
     savedAt: "2026-08-04T12:00:00.000Z",
     saveCount: 1,
     stageId: "stage-04",
-    stageLabel: "遭遇丁塔琪",
+    stageLabel: "通過力場",
     ruleset: "stableRemake",
     difficulty: 0,
     rngState: campaign.rngState,
@@ -422,7 +423,7 @@ describe("Web save validation", () => {
     expect(isSaveData(missingHimi)).toBe(false);
   });
 
-  it("round-trips stage-4 deployments and rejects a missing or wrong-class guide", () => {
+  it("round-trips stage-4 deployments and rejects a missing or roster-mismatched guide", () => {
     const save = stage4BattleSave();
     expect(parseSaveData(JSON.stringify(save))).toEqual(save);
 
@@ -441,7 +442,7 @@ describe("Web save validation", () => {
     const current: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-05",
-      stageLabel: "過異世界之門",
+      stageLabel: "遭遇丁塔琪",
       stageProgress: 1000,
       consumedEventIds: [
         "stage-04-prebattle-story",
@@ -461,7 +462,7 @@ describe("Web save validation", () => {
     const current: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-04",
-      stageLabel: "遭遇丁塔琪",
+      stageLabel: "通過力場",
       stageProgress: 1000,
       consumedEventIds: [
         "stage-03-opening-story",
@@ -479,11 +480,70 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
 
+  it("migrates a version-15 stage-4 battle and corrects its shifted title", () => {
+    const current = stage4BattleSave();
+    const legacy = {
+      ...current,
+      version: 15,
+      contentVersion: "stage-04-force-field-1",
+      stageLabel: "遭遇丁塔琪",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
+  it("migrates a version-15 stage-2 battle to the non-sequential original title", () => {
+    const current = stage2BattleSave();
+    const legacy = {
+      ...current,
+      version: 15,
+      contentVersion: "stage-04-force-field-1",
+      stageLabel: "救援友軍",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
+  it("recovers Gadirath's promoted class from a version-15 battle entry snapshot", () => {
+    const current = stage4BattleSave();
+    const currentUnit = current.battle.units.find(({ id }) => id === "1:24")!;
+    const promotedClass = "evil-mage" as const;
+    const promotedExperience = 1_050;
+    const currentLife = 150;
+    currentUnit.classId = promotedClass;
+    currentUnit.className = className(promotedClass);
+    currentUnit.experience = promotedExperience;
+    currentUnit.life = currentLife;
+    current.roster[24] = {
+      ...current.roster[24],
+      classId: promotedClass,
+      experience: promotedExperience,
+      life: currentLife,
+    };
+    current.stageEntrySnapshot.roster[24] = {
+      ...current.stageEntrySnapshot.roster[24],
+      classId: promotedClass,
+      experience: promotedExperience,
+      life: currentLife,
+    };
+
+    const legacy = {
+      ...structuredClone(current),
+      version: 15,
+      contentVersion: "stage-04-force-field-1",
+      stageLabel: "遭遇丁塔琪",
+    };
+    const legacyUnit = legacy.battle.units.find(({ id }) => id === "1:24")!;
+    legacyUnit.classId = "magician";
+    legacyUnit.className = className("magician");
+    legacy.roster[24] = { ...legacy.roster[24], classId: "magician" };
+
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
   it("migrates the version-13 stage-3 boundary into the playable stage label", () => {
     const current: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-03",
-      stageLabel: "通過力場",
+      stageLabel: "救援友軍",
       stageProgress: 1000,
       consumedEventIds: [
         "stage-02-opening-story",
@@ -637,15 +697,19 @@ describe("Web save validation", () => {
     missingFixedUnit.battle.units = missingFixedUnit.battle.units.filter(({ id }) => id !== "1:42");
     expect(isSaveData(missingFixedUnit)).toBe(false);
 
-    const wrongMagicianOverride = stage1BattleSave();
-    const magician = wrongMagicianOverride.battle.units.find(({ id }) => id === "1:24")!;
-    magician.classId = "soldier";
-    magician.className = "士兵";
-    wrongMagicianOverride.roster[24] = {
-      ...wrongMagicianOverride.roster[24],
-      classId: "soldier",
+    const promotedGadirath = stage1BattleSave();
+    const magician = promotedGadirath.battle.units.find(({ id }) => id === "1:24")!;
+    magician.classId = "wizard";
+    magician.className = className("wizard");
+    magician.experience = 1_050;
+    magician.life = classStatsFor(magician).maxLife;
+    promotedGadirath.roster[24] = {
+      ...promotedGadirath.roster[24],
+      classId: magician.classId,
+      experience: magician.experience,
+      life: magician.life,
     };
-    expect(isSaveData(wrongMagicianOverride)).toBe(false);
+    expect(isSaveData(promotedGadirath)).toBe(true);
 
     const skippedOpening = stage1BattleSave();
     skippedOpening.consumedEventIds.pop();
@@ -660,7 +724,7 @@ describe("Web save validation", () => {
       savedAt: completedStage1.savedAt,
       saveCount: completedStage1.saveCount,
       stageId: "stage-02",
-      stageLabel: "救援友軍",
+      stageLabel: "攻打騎士堡",
       ruleset: completedStage1.ruleset,
       difficulty: completedStage1.difficulty,
       rngState: completedStage1.rngState,
@@ -695,7 +759,7 @@ describe("Web save validation", () => {
     const current: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-02",
-      stageLabel: "救援友軍",
+      stageLabel: "攻打騎士堡",
       stageProgress: 1000,
       consumedEventIds: STAGE1_DEFINITION.events.map(({ id }) => id),
     };

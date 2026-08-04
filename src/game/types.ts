@@ -135,8 +135,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 15;
-  contentVersion: "stage-04-force-field-1";
+  version: 16;
+  contentVersion: "stage-title-and-roster-inheritance-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

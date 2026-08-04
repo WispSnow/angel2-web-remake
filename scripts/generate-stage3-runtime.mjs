@@ -19,7 +19,7 @@ const inputPaths = {
   campaignRoster: reversePath("parsed/native/campaign-roster.json"),
   events: reversePath("parsed/native/stage-events.json"),
   music: reversePath("parsed/native/music-catalog.json"),
-  title: reversePath("parsed/dialogue/0122.json"),
+  title: reversePath("parsed/dialogue/0121.json"),
   objectiveText: reversePath("parsed/dialogue/0085.json"),
   openingStory: reversePath("parsed/dialogue/0012.json"),
   victoryStory: reversePath("parsed/dialogue/0013.json"),
@@ -139,7 +139,7 @@ if (!objectiveText.includes("打敗敵人首領「莎」") || !objectiveText.inc
 
 const titleText = titleDocument.actions.filter(({ op }) => op === "text").map(({ text }) => text)
   .join("").replace(/[\t$]/gu, "").trim();
-if (titleText !== "通過力場") throw new Error(`stage 3 title changed: ${titleText}`);
+if (titleText !== "救援友軍") throw new Error(`stage 3 title changed: ${titleText}`);
 
 const handler = requireEntry(
   eventsDocument.module29BattleRuntime.handlerBehaviorCatalog.handlers,

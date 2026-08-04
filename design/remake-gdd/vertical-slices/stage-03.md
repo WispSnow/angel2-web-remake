@@ -1,4 +1,4 @@
-# 第 3 关垂直切片：`stage-03 / 通過力場`
+# 第 3 关垂直切片：`stage-03 / 救援友軍`
 
 版本：Draft 0.1
 
@@ -23,7 +23,7 @@
 
 ## 3. 证据入口
 
-- 标题/目标文本：[`0122.json`](../../../reverse/parsed/dialogue/0122.json)、
+- 标题/目标文本：[`0121.json`](../../../reverse/parsed/dialogue/0121.json)、
   [`0085.json`](../../../reverse/parsed/dialogue/0085.json)；
 - 地图/模板：[`battle-templates.json`](../../../reverse/parsed/native/battle-templates.json)
   的 native stage `3`、`B/0007/00.raw`；

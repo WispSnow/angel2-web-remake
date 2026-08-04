@@ -128,7 +128,7 @@ export const STAGE2_SEMANTIC_ALLIED_UNITS = STAGE2_ALLIED_UNITS.map((unit) => {
   if (!actor) throw new Error(`Missing stage 2 allied actor ${unit.slot}`);
   return {
     ...unit,
-    classOverride: unit.nativeClassRecord === null ? undefined : semanticClassId(unit.nativeClassRecord),
+    initialClassId: unit.nativeClassRecord === null ? undefined : semanticClassId(unit.nativeClassRecord),
     name: actor.portraitRecord === 255 ? "士兵" : actor.normalizedName,
     portrait: (actor.portraitRecord === 255 ? 47 : actor.portraitRecord) as PortraitRecord,
   };

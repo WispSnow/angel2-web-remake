@@ -513,7 +513,7 @@ export class GameController {
   async enterStage3(campaign: CampaignState = {
     ...this.battle.campaignSnapshot(),
     stageId: "stage-03",
-  }, statusMessage = "希蜜與第四軍團會合，共同通過力場。") : Promise<void> {
+  }, statusMessage = "希蜜與第四軍團會合，開始救援友軍。") : Promise<void> {
     await this.enterStage("stage-03", campaign, { statusMessage });
   }
 

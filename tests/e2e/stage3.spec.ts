@@ -69,7 +69,7 @@ test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected objective", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /通過力場/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /救援友軍/u })).toBeVisible();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "12");
   expect(await state(page)).toMatchObject({
     stageId: "stage-03",
@@ -191,31 +191,55 @@ test("stage 3 group commands use Himi as the fixed commander while Nia is absent
 test("S03-N/O: free action hands off player units first and round two still follows Himi", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await page.evaluate(() => {
+    const traceHost = window as typeof window & {
+      __stage3HandoffTimer?: number;
+      __stage3HandoffTrace?: Array<{ unitId?: string; statusMessage: string }>;
+    };
+    traceHost.__stage3HandoffTrace = [];
+    traceHost.__stage3HandoffTimer = window.setInterval(() => {
+      const current = window.__ANGEL2__?.getState() as Stage3State | undefined;
+      if (!current) return;
+      const sample = {
+        unitId: current.movementPresentation?.unitId,
+        statusMessage: current.statusMessage,
+      };
+      const prior = traceHost.__stage3HandoffTrace?.at(-1);
+      if (prior?.unitId === sample.unitId && prior.statusMessage === sample.statusMessage) return;
+      traceHost.__stage3HandoffTrace?.push(sample);
+    }, 20);
+  });
   await page.keyboard.press("F3");
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("希蜜");
   await page.getByTestId("advance-dialogue").click();
   await page.waitForFunction(() => {
-    const current = window.__ANGEL2__?.getState() as Stage3State | undefined;
-    return current?.phase === "allyAuto"
-      && current.movementPresentation?.kind === "allyAuto";
+    const playerUnitIds = new Set(["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"]);
+    const traceHost = window as typeof window & {
+      __stage3HandoffTrace?: Array<{ unitId?: string; statusMessage: string }>;
+    };
+    return traceHost.__stage3HandoffTrace?.some(({ unitId }) => playerUnitIds.has(unitId ?? ""));
   });
-  const firstHandoff = await state(page);
-  expect(["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"])
-    .toContain(firstHandoff.movementPresentation?.unitId);
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage3-player-group-handoff.png`,
   });
 
-  await page.waitForFunction(() => {
-    const current = window.__ANGEL2__?.getState() as Stage3State | undefined;
-    return current?.phase === "allyAuto"
-      && current.statusMessage.includes("友軍 NPC 軍團")
-      && current.statusMessage.includes("獨立行動");
-  });
-  await page.getByTestId("game-screen").screenshot({
-    path: `${ARTIFACT_DIR}/stage3-independent-npc-corps.png`,
-  });
   await waitForPhase(page, "enemy");
+  const handoffTrace = await page.evaluate(() => {
+    const traceHost = window as typeof window & {
+      __stage3HandoffTimer?: number;
+      __stage3HandoffTrace?: Array<{ unitId?: string; statusMessage: string }>;
+    };
+    if (traceHost.__stage3HandoffTimer !== undefined) {
+      window.clearInterval(traceHost.__stage3HandoffTimer);
+    }
+    return traceHost.__stage3HandoffTrace ?? [];
+  });
+  const playerHandoffIndex = handoffTrace.findIndex(({ unitId }) =>
+    ["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"].includes(unitId ?? ""));
+  const independentNpcIndex = handoffTrace.findIndex(({ statusMessage }) =>
+    statusMessage.includes("友軍 NPC 軍團") && statusMessage.includes("獨立行動"));
+  expect(playerHandoffIndex).toBeGreaterThanOrEqual(0);
+  expect(independentNpcIndex).toBeGreaterThan(playerHandoffIndex);
   await waitForPhase(page, "player");
   expect((await state(page)).round).toBe(2);
   await page.keyboard.press("Tab");

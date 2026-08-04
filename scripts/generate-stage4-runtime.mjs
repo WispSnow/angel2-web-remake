@@ -21,7 +21,7 @@ const inputPaths = {
   events: reversePath("parsed/native/stage-events.json"),
   music: reversePath("parsed/native/music-catalog.json"),
   behavior12: reversePath("parsed/native/behavior12-effects.json"),
-  title: reversePath("parsed/dialogue/0123.json"),
+  title: reversePath("parsed/dialogue/0122.json"),
   objectiveText: reversePath("parsed/dialogue/0086.json"),
   prebattleStory: reversePath("parsed/dialogue/0007.json"),
   openingStory: reversePath("parsed/dialogue/0008.json"),
@@ -162,7 +162,7 @@ if (!originalObjective.includes("打敗敵人首領「倩」") || !originalObjec
 
 const titleText = parseInput("title").actions.filter(({ op }) => op === "text").map(({ text }) => text)
   .join("").replace(/[\t$]/gu, "").trim();
-if (titleText !== "遭遇丁塔琪") throw new Error(`stage 4 title changed: ${titleText}`);
+if (titleText !== "通過力場") throw new Error(`stage 4 title changed: ${titleText}`);
 
 const handler = requireEntry(eventsDocument.module29BattleRuntime.handlerBehaviorCatalog.handlers, ({ stage }) => stage === 4, "stage 4 event handler");
 if (handler.handler !== "1000:44D7") throw new Error("stage 4 event handler address changed");

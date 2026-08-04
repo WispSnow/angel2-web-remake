@@ -18,7 +18,9 @@ const inputPaths = {
   campaignRoster: reversePath("parsed/native/campaign-roster.json"),
   events: reversePath("parsed/native/stage-events.json"),
   music: reversePath("parsed/native/music-catalog.json"),
-  title: reversePath("parsed/dialogue/0121.json"),
+  // Stage 2 is the non-sequential title record SAY/0163. Do not infer battle
+  // banners from 119 + native stage: that sequence resumes at stage 3.
+  title: reversePath("parsed/dialogue/0163.json"),
   objectiveText: reversePath("parsed/dialogue/0084.json"),
   openingStory: reversePath("parsed/dialogue/0155.json"),
   victoryStory: reversePath("parsed/dialogue/0175.json"),
@@ -125,7 +127,7 @@ if (!objectiveText.includes("打敗敵人首領「蘭」") || !objectiveText.inc
 
 const titleText = titleDocument.actions.filter(({ op }) => op === "text").map(({ text }) => text)
   .join("").replace(/[\t$]/gu, "").trim();
-if (titleText !== "救援友軍") throw new Error(`stage 2 title changed: ${titleText}`);
+if (titleText !== "攻打騎士堡") throw new Error(`stage 2 title changed: ${titleText}`);
 
 const handler = requireEntry(
   eventsDocument.module29BattleRuntime.handlerBehaviorCatalog.handlers,

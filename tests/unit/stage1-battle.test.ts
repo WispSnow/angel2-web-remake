@@ -41,7 +41,7 @@ function activateCastleGuard(battle: Stage1Battle): void {
 }
 
 describe("stage 1 battle construction", () => {
-  it("builds deployment-selected allies, applies the magician override, and loads evidence-backed enemies", () => {
+  it("builds deployment-selected allies, applies the untouched magician baseline, and loads evidence-backed enemies", () => {
     const battle = new Stage1Battle(campaign, deploymentWithMagician());
 
     expect(battle.stage.id).toBe("stage-01");
@@ -73,6 +73,23 @@ describe("stage 1 battle construction", () => {
     });
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(7);
     expect(battle.enemyBehaviorFor("2:43")).toBe(2);
+  });
+
+  it("preserves Gadirath's promoted campaign class", () => {
+    const promotedCampaign: CampaignState = {
+      ...campaign,
+      roster: [
+        ...campaign.roster,
+        { slot: 24, classId: "wizard", experience: 1_050, life: 300 },
+      ],
+    };
+
+    const battle = new Stage1Battle(promotedCampaign, deploymentWithMagician());
+    expect(battle.unit("1:24")).toMatchObject({
+      classId: "wizard",
+      experience: 1_050,
+      life: 300,
+    });
   });
 
   it("uses the stage objective contract instead of requiring enemy elimination", () => {

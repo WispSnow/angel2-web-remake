@@ -64,7 +64,6 @@ export type StageSaveAlliedUnitRule =
     optionalSlots: readonly number[];
     maximumUnits: number;
     openCellCount: number;
-    requiredClassBySlot: Readonly<Partial<Record<number, UnitClassId>>>;
   }
   | { kind: "exact-slots"; slots: readonly number[] };
 
@@ -427,7 +426,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "全面撤退：返回第 1 關關前流程並重新編隊。",
     },
     completion: {
-      destinationLabel: "救援友軍",
+      destinationLabel: "攻打騎士堡",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -452,7 +451,6 @@ export const STAGE_RUNTIME_MANIFEST = {
         optionalSlots: [1, 2, 4, 24],
         maximumUnits: 8,
         openCellCount: 3,
-        requiredClassBySlot: { 24: "magician" },
       },
       enemyClassById: [
         ["2:40", "soldier"],
@@ -470,7 +468,7 @@ export const STAGE_RUNTIME_MANIFEST = {
   "stage-02": {
     id: "stage-02",
     ordinal: 2,
-    label: "救援友軍",
+    label: "攻打騎士堡",
     nextStageId: "stage-03",
     focusUnitId: "1:0",
     mapPresentationActionIds: [
@@ -495,7 +493,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "全面撤退：重新建立第 2 關固定編隊。",
     },
     completion: {
-      destinationLabel: "通過力場",
+      destinationLabel: "救援友軍",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -525,7 +523,7 @@ export const STAGE_RUNTIME_MANIFEST = {
   "stage-03": {
     id: "stage-03",
     ordinal: 3,
-    label: "通過力場",
+    label: "救援友軍",
     nextStageId: "stage-04",
     focusUnitId: "1:1",
     mapPresentationActionIds: [
@@ -540,7 +538,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     entry: {
       trigger: "battle-started",
       phase: "player",
-      statusText: "希蜜與第四軍團會合，共同通過力場。",
+      statusText: "希蜜與第四軍團會合，開始救援友軍。",
       campaignRoute: "stage-03",
     },
     enemyPhaseStatusText: "敵方階段：騎士團開始行動。",
@@ -550,7 +548,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "全面撤退：重新建立第 3 關固定編隊。",
     },
     completion: {
-      destinationLabel: "遭遇丁塔琪",
+      destinationLabel: "通過力場",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -587,7 +585,7 @@ export const STAGE_RUNTIME_MANIFEST = {
   "stage-04": {
     id: "stage-04",
     ordinal: 4,
-    label: "遭遇丁塔琪",
+    label: "通過力場",
     nextStageId: "stage-05",
     focusUnitId: "1:0",
     mapPresentationActionIds: [
@@ -612,7 +610,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "全面撤退：返回第 4 關關前流程並重新編隊。",
     },
     completion: {
-      destinationLabel: "過異世界之門",
+      destinationLabel: "遭遇丁塔琪",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -637,7 +635,6 @@ export const STAGE_RUNTIME_MANIFEST = {
         optionalSlots: [1, 2, 3, 4, 20, 21],
         maximumUnits: 8,
         openCellCount: 6,
-        requiredClassBySlot: { 24: "magician" },
       },
       enemyClassById: [
         ["2:40", "soldier"],

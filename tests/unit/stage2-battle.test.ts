@@ -18,7 +18,7 @@ const campaign: CampaignState = {
 };
 
 describe("stage 2 battle construction and allied automation", () => {
-  it("builds the fixed 9 vs 5 roster with inherited classes and the magician override", () => {
+  it("builds the fixed 9 vs 5 roster with inherited classes and the untouched magician baseline", () => {
     const battle = new Stage2Battle(campaign);
     expect(battle.stage.id).toBe("stage-02");
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(9);
@@ -38,6 +38,21 @@ describe("stage 2 battle construction and allied automation", () => {
       portrait: 35,
       x: 25,
       y: 21,
+    });
+  });
+
+  it("preserves Gadirath's promoted campaign class", () => {
+    const promotedCampaign: CampaignState = {
+      ...campaign,
+      roster: campaign.roster.map((entry) => entry.slot === 24
+        ? { ...entry, classId: "magic-master", experience: 1_050, life: 300 }
+        : entry),
+    };
+    const battle = new Stage2Battle(promotedCampaign);
+    expect(battle.unit("1:24")).toMatchObject({
+      classId: "magic-master",
+      experience: 1_050,
+      life: 300,
     });
   });
 

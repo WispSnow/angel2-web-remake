@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { storyPagesForId } from "../../src/game/content/dialogue";
+import { ALLY_MAP_UNIT_ASSETS } from "../../src/game/content/map-unit-assets";
 import { musicProgramFor } from "../../src/game/content/music";
 import {
   STAGE4_ASSETS,
@@ -35,7 +36,7 @@ describe("stage 4 generated content", () => {
     expect(STAGE4_DEFINITION).toMatchObject({
       id: "stage-04",
       nativeStage: 4,
-      name: "遭遇丁塔琪",
+      name: "通過力場",
       width: 50,
       height: 50,
       viewport: { width: 10, height: 7, initialOrigin: { x: 21, y: 37 } },
@@ -89,7 +90,7 @@ describe("stage 4 generated content", () => {
     expect(STAGE4_SEMANTIC_ALLIED_UNITS).toHaveLength(8);
     expect(STAGE4_SEMANTIC_ENEMY_UNITS).toHaveLength(2);
     expect(STAGE4_SEMANTIC_ALLIED_UNITS.find(({ slot }) => slot === 24)).toMatchObject({
-      classOverride: "magician",
+      initialClassId: "magician",
       name: "葛蒂拉斯",
       portrait: 0,
       aiBehavior: 12,
@@ -161,6 +162,19 @@ describe("stage 4 generated content", () => {
       ...Object.values(STAGE4_ASSETS.audio),
       ...STAGE4_FORCE_FIELD_PRESENTATION.frames,
     ]) {
+      expect((await readFile(path.join(workspace, "public", source))).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("ships distinct map figures for every promotion reachable from Gadirath", async () => {
+    expect(ALLY_MAP_UNIT_ASSETS).toMatchObject({
+      magician: "/assets/original/unit-ally-magician.png",
+      "evil-mage": "/assets/original/technique-lab/units/ally-evil-mage.png",
+      "magic-master": "/assets/original/technique-lab/units/ally-magic-master.png",
+      wizard: "/assets/original/technique-lab/units/ally-wizard.png",
+    });
+    for (const classId of ["magician", "evil-mage", "magic-master", "wizard"] as const) {
+      const source = ALLY_MAP_UNIT_ASSETS[classId];
       expect((await readFile(path.join(workspace, "public", source))).length).toBeGreaterThan(0);
     }
   });

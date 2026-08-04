@@ -20,6 +20,7 @@ import type {
   SaveRosterEntry,
   SavedBattleState,
   SavedEnemyAiState,
+  StageId,
   UnitClassId,
 } from "../../types";
 import { emptyUnitStatuses } from "../../simulation/status";
@@ -62,34 +63,109 @@ const STAGE1_CASTLE_GUARD_INITIAL_POSITIONS = new Map<string, Position>([
   ["2:43", { x: 23, y: 16 }],
 ]);
 
-function migrateVersion14Save(value: unknown): SaveData | undefined {
+const correctedStageLabel = (stageId: unknown): string | undefined => {
+  if (stageId === "stage-00") return "瓦爾克麗宮";
+  if (stageId === "stage-01") return "騎士城堡前";
+  if (stageId === "stage-02") return "攻打騎士堡";
+  if (stageId === "stage-03") return "救援友軍";
+  if (stageId === "stage-04") return "通過力場";
+  if (stageId === "stage-05") return "遭遇丁塔琪";
+  return undefined;
+};
+
+const GADIRATH_SLOT = 24;
+const GADIRATH_TEMPLATE_CLASS = "magician" as const;
+const GADIRATH_TEMPLATE_STAGES = new Set<StageId>(["stage-01", "stage-02", "stage-04"]);
+
+/**
+ * v13-v15 battle saves retain the immutable pre-entry roster. Use it to undo
+ * the old Web template override when the current battle/roster were both
+ * flattened to magician. Completed saves have no entry snapshot and cannot be
+ * reconstructed without guessing which promotion the player chose.
+ */
+function restoreGadirathClassFromEntrySnapshot(save: SaveData): SaveData {
+  if (save.kind !== "battle" || !GADIRATH_TEMPLATE_STAGES.has(save.stageId)) return save;
+  const entry = save.stageEntrySnapshot.roster.find(({ slot }) => slot === GADIRATH_SLOT);
+  const roster = save.roster.find(({ slot }) => slot === GADIRATH_SLOT);
+  const unit = save.battle.units.find(({ side, slot }) => side === 1 && slot === GADIRATH_SLOT);
+  if (!entry || !roster || !unit
+    || roster.classId !== GADIRATH_TEMPLATE_CLASS
+    || unit.classId !== GADIRATH_TEMPLATE_CLASS
+    || entry.classId === GADIRATH_TEMPLATE_CLASS
+    || (entry.classId === "soldier" && entry.experience === 0)) return save;
+
+  const life = Math.min(
+    unit.life,
+    classStatsFor({ classId: entry.classId, experience: unit.experience }).maxLife,
+  );
+  return {
+    ...save,
+    roster: save.roster.map((candidate) => candidate.slot === GADIRATH_SLOT
+      ? { ...candidate, classId: entry.classId, life }
+      : candidate),
+    battle: {
+      ...save.battle,
+      units: save.battle.units.map((candidate) => candidate.id === unit.id
+        ? {
+          ...candidate,
+          classId: entry.classId,
+          className: className(entry.classId),
+          life,
+        }
+        : candidate),
+    },
+  };
+}
+
+function finalizeDirectMigration(value: unknown): SaveData | undefined {
+  if (!isSaveData(value)) return undefined;
+  const restored = restoreGadirathClassFromEntrySnapshot(value);
+  return isSaveData(restored) ? restored : undefined;
+}
+
+function migrateVersion15Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
-    || value.version !== 14
-    || value.contentVersion !== "stage-03-recovery-1") return undefined;
+    || value.version !== 15
+    || value.contentVersion !== "stage-04-force-field-1") return undefined;
+  const stageLabel = correctedStageLabel(value.stageId);
+  if (!stageLabel) return undefined;
   const migrated = {
     ...value,
     version: SAVE_VERSION,
     contentVersion: SAVE_CONTENT_VERSION,
-    ...(value.kind === "completed" && value.stageId === "stage-04"
-      ? { stageLabel: "遭遇丁塔琪" }
-      : {}),
+    stageLabel,
   };
-  return isSaveData(migrated) ? migrated : undefined;
+  return finalizeDirectMigration(migrated);
+}
+
+function migrateVersion14Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 14
+    || value.contentVersion !== "stage-03-recovery-1") return undefined;
+  const stageLabel = correctedStageLabel(value.stageId);
+  if (!stageLabel) return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    stageLabel,
+  };
+  return finalizeDirectMigration(migrated);
 }
 
 function migrateVersion13Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 13
     || value.contentVersion !== "stage-entry-snapshot-1") return undefined;
+  const stageLabel = correctedStageLabel(value.stageId);
+  if (!stageLabel) return undefined;
   const migrated = {
     ...value,
     version: SAVE_VERSION,
     contentVersion: SAVE_CONTENT_VERSION,
-    ...(value.kind === "completed" && value.stageId === "stage-03"
-      ? { stageLabel: "通過力場" }
-      : {}),
+    stageLabel,
   };
-  return isSaveData(migrated) ? migrated : undefined;
+  return finalizeDirectMigration(migrated);
 }
 
 interface Version12SaveBase {
@@ -137,26 +213,27 @@ function isVersion12SaveData(value: unknown): value is Version12SaveData {
     ...value,
     version: SAVE_VERSION,
     contentVersion: SAVE_CONTENT_VERSION,
-    ...(value.kind === "completed" && value.stageId === "stage-03"
-      ? { stageLabel: "通過力場" }
-      : {}),
+    stageLabel: correctedStageLabel(value.stageId),
   };
-  return isCompletedSave(normalized) || isBattleSave(value, false);
+  return isCompletedSave(normalized) || isBattleSave(normalized, false);
 }
 
 function migrateVersion12Save(save: Version12SaveData): SaveData {
+  const stageLabel = correctedStageLabel(save.stageId);
+  if (!stageLabel) throw new Error(`Cannot migrate unknown stage ${save.stageId}`);
   if (save.kind === "completed") {
     return {
       ...save,
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
-      ...(save.stageId === "stage-03" ? { stageLabel: "通過力場" as const } : {}),
+      stageLabel,
     };
   }
   return {
     ...save,
     version: SAVE_VERSION,
     contentVersion: SAVE_CONTENT_VERSION,
+    stageLabel,
     // v12 did not retain an earlier immutable baseline. Adopt its current
     // campaign state once; gains made after migration will then roll back.
     stageEntrySnapshot: {
@@ -261,15 +338,19 @@ function isVersion11SaveData(value: unknown): value is Version11SaveData {
 }
 
 function migrateVersion11Save(save: Version11SaveData): SaveData {
-  const version12 = {
+  if (save.kind === "completed" && save.stageId === "stage-02") {
+    return migrateVersion12Save({
+      ...save,
+      version: 12,
+      contentVersion: "stage-02-allied-auto-1",
+      stageLabel: "下一關",
+    });
+  }
+  return migrateVersion12Save({
     ...save,
-    version: 12 as const,
-    contentVersion: "stage-02-allied-auto-1" as const,
-    ...(save.kind === "completed" && save.stageId === "stage-02"
-      ? { stageLabel: "救援友軍" as const }
-      : {}),
-  };
-  return migrateVersion12Save(version12);
+    version: 12,
+    contentVersion: "stage-02-allied-auto-1",
+  });
 }
 
 interface Version10SaveBase {
@@ -1146,6 +1227,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion15 = migrateVersion15Save(value);
+    if (migratedVersion15) return migratedVersion15;
     const migratedVersion14 = migrateVersion14Save(value);
     if (migratedVersion14) return migratedVersion14;
     const migratedVersion13 = migrateVersion13Save(value);

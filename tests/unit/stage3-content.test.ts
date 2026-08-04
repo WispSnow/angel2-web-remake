@@ -33,7 +33,7 @@ describe("stage 3 generated content", () => {
     expect(STAGE3_DEFINITION).toMatchObject({
       id: "stage-03",
       nativeStage: 3,
-      name: "通過力場",
+      name: "救援友軍",
       width: 50,
       height: 50,
       viewport: {
