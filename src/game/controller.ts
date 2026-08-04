@@ -10,6 +10,7 @@ import {
   BATTLE_ACTION_DEFINITIONS,
   stage1ActionPresentation,
 } from "./content/actions";
+import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
 import {
   classDefinition,
   className,
@@ -132,6 +133,13 @@ export interface SpecialActionPresentation {
   nativeTicks: number;
 }
 
+export interface AiTechniqueDialoguePresentation {
+  actionId: BattleActionId;
+  actor: BattleUnit;
+  center: Position;
+  page: DialoguePage;
+}
+
 export type AudioCueGroup = "e" | "magic" | "un";
 
 export type UnitCommandId = "move" | "attack" | "shoot" | "technique" | "rest" | "end" | "undo";
@@ -245,6 +253,7 @@ export class GameController {
   gridEnabled: boolean;
   edgeScrollEnabled: boolean;
   portraitsEnabled: boolean;
+  aiDialogueEnabled: boolean;
   musicVolume: MusicVolume;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
@@ -260,6 +269,7 @@ export class GameController {
     frame: number;
     nativeTicks: number;
   }> = [];
+  aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
   movementPresentation?: MovementPresentation;
   statusMessage = "";
   pendingSaveSlot?: number;
@@ -298,6 +308,7 @@ export class GameController {
     this.gridEnabled = preferences.gridEnabled;
     this.edgeScrollEnabled = preferences.edgeScrollEnabled;
     this.portraitsEnabled = preferences.portraitsEnabled;
+    this.aiDialogueEnabled = preferences.aiDialogueEnabled;
     this.musicVolume = loadMusicPreferences(localStorage).musicVolume;
     const soundPreferences = loadSoundPreferences(localStorage);
     this.speechEnabled = soundPreferences.speechEnabled;
@@ -406,6 +417,7 @@ export class GameController {
   }
 
   get currentDialogue(): DialoguePage | undefined {
+    if (this.aiTechniqueDialogue) return this.aiTechniqueDialogue.page;
     if (this.groupCommandDialogueId) {
       return groupCommandDialogueFor(this.groupCommandDialogueId);
     }
@@ -437,6 +449,10 @@ export class GameController {
 
   get groupCommandDialogueActive(): boolean {
     return this.groupCommandDialogueId !== undefined;
+  }
+
+  get aiTechniqueDialogueActive(): boolean {
+    return this.aiTechniqueDialogue !== undefined;
   }
 
   get promotionChoiceVisible(): boolean {
@@ -471,6 +487,7 @@ export class GameController {
       || this.objectiveOpen
       || this.groupCommandOpen
       || this.retreatConfirmOpen
+      || this.aiTechniqueDialogueActive
       || this.groupCommandDialogueActive
       || this.promotionUnitIds.length > 0;
   }
@@ -1694,6 +1711,16 @@ export class GameController {
           const actorPresentation = { ...unit, statuses: { ...unit.statuses } };
           const targetPresentation = { ...target, statuses: { ...target.statuses } };
           this.statusMessage = `${unit.name}施展${BATTLE_ACTION_DEFINITIONS[action.actionId].label}。`;
+          if (movementKind === "enemy") {
+            // REMAKE-014: native AI dialogue did not recenter; the Web presentation
+            // deliberately focuses the already-prepared semantic effect center.
+            await this.focusCameraOnAction(prepared.result.target);
+            await this.presentAiTechniqueDialogue(
+              actorPresentation,
+              action.actionId,
+              prepared.result.target,
+            );
+          }
           await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
           const result = this.battle.commitPreparedAction(prepared);
           this.lastSpecialAction = result;
@@ -1706,6 +1733,7 @@ export class GameController {
               ? `${unit.name}使${target.name}恢復 ${result.healing} 點生命。`
               : `${unit.name}造成 ${result.damage} 點傷害。`;
         } catch {
+          this.aiTechniqueDialogue = undefined;
           this.battle.spendAction(unit.id);
           this.statusMessage = `${unit.name}的特殊行動已失效，改為待命。`;
         }
@@ -2185,6 +2213,12 @@ export class GameController {
     this.emit();
   }
 
+  toggleAiDialogue(): void {
+    this.aiDialogueEnabled = !this.aiDialogueEnabled;
+    this.persistPresentationPreferences();
+    this.emit();
+  }
+
   setMusicVolume(volume: number): void {
     if (!isMusicVolume(volume) || volume === this.musicVolume) return;
     this.musicVolume = volume;
@@ -2575,6 +2609,7 @@ export class GameController {
     this.combatPresentation = undefined;
     this.specialActionPresentation = undefined;
     this.specialActionPresentationTrace = [];
+    this.aiTechniqueDialogue = undefined;
     this.busy = false;
     this.resetAction();
     this.statusMessage = message;
@@ -2762,6 +2797,7 @@ export class GameController {
     this.movementPresentation = undefined;
     this.combatPresentation = undefined;
     this.specialActionPresentation = undefined;
+    this.aiTechniqueDialogue = undefined;
     if (this.battle.stage.id === "stage-00") {
       await this.enterStage1({
         ...this.battle.campaignSnapshot(),
@@ -3113,6 +3149,7 @@ export class GameController {
       gridEnabled: this.gridEnabled,
       edgeScrollEnabled: this.edgeScrollEnabled,
       portraitsEnabled: this.portraitsEnabled,
+      aiDialogueEnabled: this.aiDialogueEnabled,
       lastCombat: this.lastCombat ? { ...this.lastCombat } : undefined,
       lastSpecialAction: this.lastSpecialAction ? { ...this.lastSpecialAction } : undefined,
       combatPresentation: this.combatPresentation ? {
@@ -3136,6 +3173,15 @@ export class GameController {
         result: { ...this.specialActionPresentation.result },
       } : undefined,
       specialActionPresentationTrace: this.specialActionPresentationTrace.map((entry) => ({ ...entry })),
+      aiTechniqueDialogue: this.aiTechniqueDialogue ? {
+        ...this.aiTechniqueDialogue,
+        actor: {
+          ...this.aiTechniqueDialogue.actor,
+          statuses: { ...this.aiTechniqueDialogue.actor.statuses },
+        },
+        center: { ...this.aiTechniqueDialogue.center },
+        page: { ...this.aiTechniqueDialogue.page },
+      } : undefined,
       movementPresentation: this.movementPresentation ? {
         ...this.movementPresentation,
         path: this.movementPresentation.path.map((step) => ({ ...step })),
@@ -3221,6 +3267,7 @@ export class GameController {
       gridEnabled: this.gridEnabled,
       edgeScrollEnabled: this.edgeScrollEnabled,
       portraitsEnabled: this.portraitsEnabled,
+      aiDialogueEnabled: this.aiDialogueEnabled,
     });
   }
 
@@ -3299,6 +3346,48 @@ export class GameController {
 
   private centerCamera(position: Position): void {
     this.cameraOrigin = cameraOriginForFocus(this.battle.stage, position);
+  }
+
+  private async focusCameraOnAction(position: Position): Promise<void> {
+    const target = cameraOriginForFocus(this.battle.stage, position);
+    this.cursor = { ...position };
+    while (positionKey(this.cameraOrigin) !== positionKey(target)) {
+      const stepAxis = (current: number, destination: number) =>
+        current === destination ? current : current + Math.sign(destination - current);
+      this.cameraOrigin = {
+        x: stepAxis(this.cameraOrigin.x, target.x),
+        y: stepAxis(this.cameraOrigin.y, target.y),
+      };
+      this.emit();
+      await pause(this.testMode ? 12 : this.presentationFast ? 24 : 55);
+    }
+    this.emit();
+  }
+
+  private async presentAiTechniqueDialogue(
+    actor: BattleUnit,
+    actionId: BattleActionId,
+    center: Position,
+  ): Promise<void> {
+    if (!this.aiDialogueEnabled) return;
+    const page = aiTechniqueDialogueFor(actor, actionId);
+    if (!page) return;
+    this.aiTechniqueDialogue = {
+      actionId,
+      actor,
+      center: { ...center },
+      page,
+    };
+    this.emit();
+    const text = page.activeSlot ? page[page.activeSlot]?.text ?? "" : "";
+    const delay = this.testMode
+      ? 400
+      : this.presentationFast
+        ? Math.max(360, text.length * 20 + 120)
+        : Math.max(1_200, text.length * 80 + 220);
+    await pause(delay);
+    this.aiTechniqueDialogue = undefined;
+    this.emit();
   }
 
   unitStats(unit: Pick<BattleUnit, "classId" | "experience" | "side">): UnitStats {

@@ -881,6 +881,23 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 .continue-mark { position: absolute; right: 108px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
 .dialogue-box:not(.is-active) .continue-mark { display: none; }
+.dialogue-layer.enemy-technique-dialogue .dialogue-controls,
+.dialogue-layer.enemy-technique-dialogue .continue-mark { display: none; }
+.dialogue-layer.enemy-technique-dialogue .dialogue-speaker {
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  margin-bottom: 3px;
+  color: #ffd94a;
+  font-size: 12px;
+  line-height: 14px;
+  white-space: nowrap;
+  text-shadow: 1px 1px #000;
+}
+.dialogue-layer.enemy-technique-dialogue .dialogue-copy p { color: #fff6d7; }
 .dialogue-controls {
   position: absolute;
   z-index: 3;

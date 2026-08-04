@@ -3,6 +3,7 @@ export interface PresentationPreferences {
   gridEnabled: boolean;
   edgeScrollEnabled: boolean;
   portraitsEnabled: boolean;
+  aiDialogueEnabled: boolean;
 }
 
 export interface SoundPreferences {
@@ -32,6 +33,7 @@ export const DEFAULT_PRESENTATION_PREFERENCES: Readonly<PresentationPreferences>
   gridEnabled: false,
   edgeScrollEnabled: true,
   portraitsEnabled: true,
+  aiDialogueEnabled: true,
 };
 
 export const DEFAULT_SOUND_PREFERENCES: Readonly<SoundPreferences> = {
@@ -66,6 +68,9 @@ export function loadPresentationPreferences(storage: PreferenceStorage): Present
       portraitsEnabled: typeof candidate.portraitsEnabled === "boolean"
         ? candidate.portraitsEnabled
         : DEFAULT_PRESENTATION_PREFERENCES.portraitsEnabled,
+      aiDialogueEnabled: typeof candidate.aiDialogueEnabled === "boolean"
+        ? candidate.aiDialogueEnabled
+        : DEFAULT_PRESENTATION_PREFERENCES.aiDialogueEnabled,
     };
   } catch {
     return { ...DEFAULT_PRESENTATION_PREFERENCES };

@@ -93,6 +93,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="toggle-grid" data-testid="grid-button">方格 關</button>
                 <button data-action="toggle-edge-scroll" data-testid="edge-scroll-button">捲動 開</button>
                 <button data-action="toggle-portraits" data-testid="portraits-button">圖像 開</button>
+                <button data-action="toggle-ai-dialogue" data-testid="ai-dialogue-button">ＡＩ對話 開</button>
                 <button data-action="open-music-settings" data-testid="music-button">音樂 最大</button>
                 <button data-action="open-sound-settings" data-testid="sound-button">音效設定</button>
                 <button data-action="close-settings">返回</button>
@@ -480,6 +481,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "toggle-grid") controller.toggleGrid();
     else if (action === "toggle-edge-scroll") controller.toggleEdgeScroll();
     else if (action === "toggle-portraits") controller.togglePortraits();
+    else if (action === "toggle-ai-dialogue") controller.toggleAiDialogue();
     else if (action === "move") controller.chooseMove();
     else if (action === "attack") controller.chooseAttack();
     else if (action === "shoot") controller.chooseShoot();
@@ -789,6 +791,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (edgeScroll) edgeScroll.textContent = controller.edgeScrollEnabled ? "捲動 開" : "捲動 關";
     const portraits = root.querySelector<HTMLElement>("[data-testid=portraits-button]");
     if (portraits) portraits.textContent = controller.portraitsEnabled ? "圖像 開" : "圖像 關";
+    const aiDialogue = root.querySelector<HTMLElement>("[data-testid=ai-dialogue-button]");
+    if (aiDialogue) {
+      aiDialogue.textContent = controller.aiDialogueEnabled ? "ＡＩ對話 開" : "ＡＩ對話 關";
+      aiDialogue.setAttribute("aria-pressed", String(controller.aiDialogueEnabled));
+    }
     const music = root.querySelector<HTMLElement>("[data-testid=music-button]");
     const musicVolumeLabels = ["無聲", "1", "2", "3", "最大"] as const;
     if (music) music.textContent = `音樂 ${musicVolumeLabels[controller.musicVolume]}`;
@@ -846,7 +853,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     dialogueLayer.hidden = !dialogueVisible;
     storyBackground.hidden = controller.phase !== "prebattleStory";
     if (page) {
-      const pageKey = controller.groupCommandDialogueId
+      const pageKey = controller.aiTechniqueDialogue
+        ? `ai-technique:${controller.aiTechniqueDialogue.actor.id}:${controller.aiTechniqueDialogue.actionId}`
+        : controller.groupCommandDialogueId
         ? `group-command:${controller.groupCommandDialogueId}`
         : controller.promotionDialogueActive
           ? `promotion:${controller.promotionUnit?.id}:${controller.promotionDialogueIndex}`
@@ -858,13 +867,26 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       else delete dialogueLayer.dataset.sourceAddress;
       dialogueLayer.dataset.activeSlot = page.activeSlot ?? "none";
       dialogueLayer.dataset.revealStart = String(page.revealStart ?? 0);
+      if (controller.aiTechniqueDialogue) {
+        dialogueLayer.dataset.actionId = controller.aiTechniqueDialogue.actionId;
+        dialogueLayer.dataset.effectCenter =
+          `${controller.aiTechniqueDialogue.center.x},${controller.aiTechniqueDialogue.center.y}`;
+      } else {
+        delete dialogueLayer.dataset.actionId;
+        delete dialogueLayer.dataset.effectCenter;
+      }
       dialogueLayer.classList.toggle("prebattle", controller.phase === "prebattleStory");
       dialogueLayer.classList.toggle("promotion-dialogue", controller.promotionDialogueActive);
       dialogueLayer.classList.toggle("group-command-dialogue", controller.groupCommandDialogueActive);
-      skipDialogueButton.hidden = controller.promotionDialogueActive || controller.groupCommandDialogueActive;
+      dialogueLayer.classList.toggle("enemy-technique-dialogue", controller.aiTechniqueDialogueActive);
+      skipDialogueButton.hidden = controller.promotionDialogueActive
+        || controller.groupCommandDialogueActive
+        || controller.aiTechniqueDialogueActive;
       dialogueControls.setAttribute(
         "aria-label",
-        controller.groupCommandDialogueActive
+        controller.aiTechniqueDialogueActive
+          ? "敵方技術提示"
+          : controller.groupCommandDialogueActive
           ? "集體命令對話控制"
           : controller.promotionDialogueActive
             ? "轉職對話控制"
@@ -926,6 +948,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     } else {
       dialogueLayer.classList.remove("promotion-dialogue");
       dialogueLayer.classList.remove("group-command-dialogue");
+      dialogueLayer.classList.remove("enemy-technique-dialogue");
+      delete dialogueLayer.dataset.actionId;
+      delete dialogueLayer.dataset.effectCenter;
       skipDialogueButton.hidden = false;
       stopDialogueTimer();
       stopSpeaking(activeDialoguePortrait);

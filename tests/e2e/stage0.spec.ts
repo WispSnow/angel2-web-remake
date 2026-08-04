@@ -49,6 +49,7 @@ interface DebugState {
   gridEnabled: boolean;
   edgeScrollEnabled: boolean;
   portraitsEnabled: boolean;
+  aiDialogueEnabled: boolean;
   lastCombat?: {
     attackerId: string;
     defenderId: string;
@@ -1402,6 +1403,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
     gridEnabled: false,
     edgeScrollEnabled: true,
     portraitsEnabled: true,
+    aiDialogueEnabled: true,
   });
   await expect(canvas).toHaveAttribute("data-grid-enabled", "false");
   await expect(canvas).toHaveAttribute("data-grid-line-count", "0");
@@ -1535,6 +1537,13 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expect(page.getByTestId("grid-button")).toHaveText("方格 開");
   await expect(page.getByTestId("edge-scroll-button")).toHaveText("捲動 關");
   await expect(page.getByTestId("portraits-button")).toHaveText("圖像 關");
+  await expect(page.getByTestId("ai-dialogue-button")).toHaveText("ＡＩ對話 開");
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-settings-ai-dialogue.png",
+  });
+  await page.getByTestId("ai-dialogue-button").click();
+  await expect(page.getByTestId("ai-dialogue-button")).toHaveText("ＡＩ對話 關");
+  expect((await debugState(page)).aiDialogueEnabled).toBe(false);
 
   await page.reload();
   expect(await debugState(page)).toMatchObject({
@@ -1542,6 +1551,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
     gridEnabled: true,
     edgeScrollEnabled: false,
     portraitsEnabled: false,
+    aiDialogueEnabled: false,
   });
 });
 

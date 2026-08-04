@@ -26,6 +26,7 @@ const CODE_SIGNATURES = [
   { address: "1000:1DFA", offset: 0x11dfa, hex: "33c0e4403b069a0d73f68bd88b369c0d03db8b00a34a3d" },
   { address: "1000:1E19", offset: 0x11e19, hex: "bbe80ea14a3d8b0f3bc1740e83f9ff740583c30aebf0" },
   { address: "1000:1E51", offset: 0x11e51, hex: "2ea17f01a3f91e2ea1710aa3181fa1e40effd0833e051f" },
+  { address: "1000:1E6B", offset: 0x11e6b, hex: "9afc7b0000e81d062ea1770a3d3143743d3d324374383d334374333d3443742e2ea1790affd0893ec1778b1e161f2ea1730ae8af06a1c177a3095ab91400a1e60e9adeca0000" },
   { address: "1000:1EEB", offset: 0x11eeb, hex: "2ec706790a880a9a2d069d13c3" },
   { address: "1000:1EFE", offset: 0x11efe, hex: "2ec706790a9b0a9a16069d13c3" },
   { address: "1000:1F11", offset: 0x11f11, hex: "a1430d3d334174113d304974133d31497415c706181f0500" },
@@ -63,9 +64,19 @@ const CODE_SIGNATURES = [
   { address: "1000:216E", offset: 0x1216e, hex: "a1a9018ec033ffb9c409268a053c007406e440a8017409e2f1c7067a040000c3893e7a04c3" },
   { address: "1000:2193", offset: 0x12193, hex: "2ea17f01a30f1fc7060f1f4100a1470d3d08007703b80800a3181f9a04009d1333c02ea083018b1ef63b4b9a0a0070108b36161f" },
   { address: "1000:255D", offset: 0x1255d, hex: "a13f0d3d00007504ba4e00c3ba4e00c3" },
+  { address: "1000:254F", offset: 0x1254f, hex: "803e1c11017401c39a7ac90000c3" },
   { address: "1000:3D6D", offset: 0x13d6d, hex: "813e0f1f46597436813e0f1f464d742e813e0f1f43597426813e0f1f434d741e813e0f1f46417416833e0f1f59740f83" },
   { address: "1000:3DC5", offset: 0x13dc5, hex: "833e0f1f4d7437833e0f1f597430813e0f1f46597428813e0f1f464d7420813e0f1f43597418813e0f1f434d7410833e" },
   { address: "1000:40EE", offset: 0x140ee, hex: "813e0f1f46597417833e0f1f597410813e0f1f46417408833e0f1f417401c3a1a9018ec0c7061a1f5f07e8f7fca12400" },
+  { address: "0000:7BFC", offset: 0x07bfc, hex: "e80100cb" },
+];
+
+const DATA_SIGNATURES = [
+  { address: "DS:111C", offset: 0x1fcbc, hex: "01" },
+  { address: "DS:84BB[0Ah]", offset: 0x2706f, hex: "ca85" },
+  { address: "DS:85CA", offset: 0x2716a, hex: "acdda7daaabaa4f5b279c55daa6b2e24" },
+  { address: "DS:84BB[0Fh]", offset: 0x27079, hex: "0c86" },
+  { address: "DS:860C", offset: 0x271ac, hex: "a5cda952b3e62e24" },
 ];
 
 const EXPECTED_CLASS_POOLS = {
@@ -123,11 +134,11 @@ function descriptorIndex(descriptors) {
   return byCode;
 }
 
-function validateCodeSignatures(buffer) {
-  return CODE_SIGNATURES.map((signature) => {
+function validateSignatures(buffer, signatures, kind) {
+  return signatures.map((signature) => {
     const expected = Buffer.from(signature.hex, "hex");
     const actual = buffer.subarray(signature.offset, signature.offset + expected.length);
-    if (!actual.equals(expected)) throw new Error(`${signature.address}: AI code signature mismatch`);
+    if (!actual.equals(expected)) throw new Error(`${signature.address}: AI ${kind} signature mismatch`);
     return {
       address: signature.address,
       fileOffset: signature.offset,
@@ -355,6 +366,31 @@ function nativeRules(descriptorsByCode, behaviorTemplates) {
       iceCenter: "AI 1C/2C/3C/4C first requires a reachable enemy but executes with the acting unit's cell as the effect center",
       noCandidate: "the selected action attempt returns failure; its enclosing class flow may then move, rest, or try another fallback",
     },
+    aiTechniquePresentation: {
+      successfulActionPath: "1000:1E51",
+      dialogueGate: {
+        label: "ＡＩ對話",
+        address: "DS:111C",
+        releasedInitialValue: 1,
+        callPath: "1000:1E6B -> 1000:254F -> 0000:C97A",
+      },
+      contextualDialogue: {
+        portrait: "the current acting unit portrait",
+        side1Window: "upper",
+        side2Window: "lower A/18 contextual battle-dialogue window",
+        completion: "automatic close and battlefield restore; no confirmation input",
+      },
+      stage1Lines: [
+        { actionCode: "1F", presentationGroup: 10, selector: "0Ah", address: "DS:85CA", text: "看我的火球魔法." },
+        { actionCode: "1H", presentationGroup: 15, selector: "0Fh", address: "DS:860C", text: "生命單." },
+      ],
+      viewport: {
+        beforeEffect: "1000:1E6B calls 0000:7BFC -> 0000:7C00 to redraw the current viewport",
+        effectTarget: "the selected target cell is copied to DS:5A09 immediately before the effect handler call",
+        recenter: "the complete successful-action block does not call the target-focus primitive 1000:834A/834E; the native viewport is not recentered on the effect target",
+      },
+      evidence: ["1000:1E51", "1000:1E6B", "1000:254F", "0000:7BFC", "DS:111C", "DS:84BB[0Ah]", "DS:85CA", "DS:84BB[0Fh]", "DS:860C"],
+    },
     shooting: {
       sharedRange: { mode: "2", minimumManhattanRange: 2 },
       targetRule: "minimum effective defense, then minimum current life",
@@ -557,12 +593,13 @@ async function extract(runtimePath, descriptorPath, guideComparisonPath, battleT
       reproductionPolicy: "preserve the raw data in the original-compatibility layer; expose any OJ/FM repair as a separate documented fix/mod option",
       orphanPoolCodes,
     },
-    verifiedCodeSignatures: validateCodeSignatures(buffer),
+    verifiedCodeSignatures: validateSignatures(buffer, CODE_SIGNATURES, "code"),
+    verifiedDataSignatures: validateSignatures(buffer, DATA_SIGNATURES, "data"),
   };
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`);
-  console.log(`extracted ${classPools.length} AI class pools, ${actionEntries.length} action rows, ${orphanPoolCodes.length} native anomalies and ${result.verifiedCodeSignatures.length} signatures to ${outputPath}`);
+  console.log(`extracted ${classPools.length} AI class pools, ${actionEntries.length} action rows, ${orphanPoolCodes.length} native anomalies, ${result.verifiedCodeSignatures.length} code signatures and ${result.verifiedDataSignatures.length} data signatures to ${outputPath}`);
 }
 
 function usage() {

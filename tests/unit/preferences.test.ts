@@ -36,12 +36,14 @@ describe("presentation preferences", () => {
       gridEnabled: "yes",
       edgeScrollEnabled: false,
       portraitsEnabled: false,
+      aiDialogueEnabled: "yes",
     }));
     expect(loadPresentationPreferences(storage)).toEqual({
       battlePresentation: "full",
       gridEnabled: false,
       edgeScrollEnabled: false,
       portraitsEnabled: false,
+      aiDialogueEnabled: true,
     });
     storage.setItem(PRESENTATION_PREFERENCES_KEY, "{");
     expect(loadPresentationPreferences(storage)).toEqual(DEFAULT_PRESENTATION_PREFERENCES);
@@ -54,6 +56,7 @@ describe("presentation preferences", () => {
       gridEnabled: true,
       edgeScrollEnabled: false,
       portraitsEnabled: false,
+      aiDialogueEnabled: false,
     };
     savePresentationPreferences(storage, preferences);
     expect(loadPresentationPreferences(storage)).toEqual(preferences);

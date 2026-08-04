@@ -102,7 +102,7 @@ export interface DialoguePage {
   /** Characters already present before an appended line starts typing. */
   revealStart?: number;
   source: {
-    record: 0 | 1 | 2 | 3 | 4 | 5 | 6 | "promotion" | "battle-command";
+    record: 0 | 1 | 2 | 3 | 4 | 5 | 6 | "promotion" | "battle-command" | "ai-technique";
     wait: number;
     address?: string;
   };

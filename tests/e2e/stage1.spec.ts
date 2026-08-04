@@ -44,6 +44,10 @@ interface Stage1DebugState {
     affectedUnits: Array<{ unitId: string; moved: boolean }>;
   };
   specialActionPresentation?: { phase: string; frame: number };
+  aiTechniqueDialogue?: {
+    actionId: string;
+    center: { x: number; y: number };
+  };
   specialActionPresentationTrace: Array<{ phase: string; frame: number }>;
   audioCueLog: Array<{ group: string; record: number; reason: string }>;
 }
@@ -249,6 +253,26 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     "battle-command",
   );
   await completeBattleCommandDialogue(page);
+  const aiTechniqueDialogue = page.getByTestId("dialogue-layer");
+  await expect(aiTechniqueDialogue).toHaveAttribute("data-source-record", "ai-technique");
+  await expect(aiTechniqueDialogue).toHaveAttribute("data-action-id", "fire-1");
+  await expect(aiTechniqueDialogue).toHaveAttribute("data-effect-center", "34,26");
+  await expect(page.getByText("騎士團修女・初級炎暴", { exact: true })).toBeVisible();
+  await expect(page.getByText("看我的火球魔法.", { exact: true })).toBeVisible();
+  const enemyFireNotice = await state(page);
+  expect(enemyFireNotice).toMatchObject({
+    cameraOrigin: { x: 26, y: 23 },
+    cursor: { x: 34, y: 26 },
+    aiTechniqueDialogue: {
+      actionId: "fire-1",
+      center: { x: 34, y: 26 },
+    },
+  });
+  expect(enemyFireNotice.units.find(({ id }) => id === "1:0")?.life)
+    .toBe(niaBeforeEnemyFire.life);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-enemy-sister-fire-notice.png`,
+  });
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
     return current?.specialActionPresentation?.phase === "fireEffect";
@@ -264,6 +288,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-fire.png`,
   });
+  await expect(aiTechniqueDialogue).toBeHidden();
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
     return current?.phase === "player"
