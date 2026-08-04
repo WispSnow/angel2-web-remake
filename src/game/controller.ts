@@ -95,6 +95,14 @@ interface Stage2Runtime {
   content: Stage2ContentModule;
   battle: Stage2BattleModule;
 }
+
+function cloneCampaignState(campaign: CampaignState): CampaignState {
+  return {
+    ...campaign,
+    roster: campaign.roster.map((entry) => ({ ...entry })),
+  };
+}
+
 export type CombatPresentationPhase =
   | "primaryHit"
   | "primaryDamage"
@@ -322,10 +330,10 @@ export class GameController {
   private groupCommandLeaderId?: string;
   private activeStoryId?: StageStoryId;
   private stageEventState: StageEventState;
+  private stageEntrySnapshot: CampaignState;
   private stage1Campaign?: CampaignState;
   private stage1Runtime?: Stage1Runtime;
   private stage1RuntimePromise?: Promise<Stage1Runtime>;
-  private stage2Campaign?: CampaignState;
   private stage2Runtime?: Stage2Runtime;
   private stage2RuntimePromise?: Promise<Stage2Runtime>;
   private listeners = new Set<Listener>();
@@ -338,6 +346,7 @@ export class GameController {
   constructor(difficulty: Difficulty = 0) {
     this.difficulty = difficulty;
     this.battle = new Stage0Battle(difficulty);
+    this.stageEntrySnapshot = cloneCampaignState(this.battle.campaignSnapshot());
     this.stageEventState = createStageEventState(this.battle.stage);
     const preferences = loadPresentationPreferences(localStorage);
     this.battlePresentation = preferences.battlePresentation;
@@ -420,7 +429,8 @@ export class GameController {
   }, entry: "prebattle" | "deployment" = "prebattle", statusMessage?: string): Promise<void> {
     const runtime = await this.loadStage1Runtime();
     const { STAGE1_DEFINITION } = runtime.content;
-    this.stage1Campaign = { ...campaign, stageId: "stage-01" };
+    this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId: "stage-01" });
+    this.stage1Campaign = cloneCampaignState(this.stageEntrySnapshot);
     const initialDeployment: DeploymentResult = {
       placements: STAGE1_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
         slot,
@@ -473,9 +483,9 @@ export class GameController {
     stageId: "stage-02",
   }, statusMessage = "第一軍團繼續向騎士團堡推進。") : Promise<void> {
     const runtime = await this.loadStage2Runtime();
-    this.stage2Campaign = { ...campaign, stageId: "stage-02" };
+    this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId: "stage-02" });
     this.stage1Campaign = undefined;
-    this.battle = new runtime.battle.Stage2Battle(this.stage2Campaign);
+    this.battle = new runtime.battle.Stage2Battle(this.stageEntrySnapshot);
     this.difficulty = campaign.difficulty;
     this.campaignRoute = "stage-02";
     this.activeStoryId = undefined;
@@ -2518,12 +2528,12 @@ export class GameController {
   }
 
   private restartBattle(message: string): void {
-    if (this.battle.stage.id === "stage-02" && this.stage2Campaign) {
-      void this.enterStage2(this.stage2Campaign, message);
+    if (this.battle.stage.id === "stage-02") {
+      void this.enterStage2(cloneCampaignState(this.stageEntrySnapshot), message);
       return;
     }
     const stage1Campaign = this.battle.stage.id === "stage-01"
-      ? this.stage1Campaign
+      ? cloneCampaignState(this.stageEntrySnapshot)
       : undefined;
     if (stage1Campaign) {
       this.movementPresentation = undefined;
@@ -2543,7 +2553,8 @@ export class GameController {
       void this.enterStage1(stage1Campaign, "deployment", message);
       return;
     }
-    this.battle = new Stage0Battle(this.difficulty);
+    this.battle = Stage0Battle.fromCampaignEntry(this.stageEntrySnapshot);
+    this.difficulty = this.stageEntrySnapshot.difficulty;
     this.campaignRoute = undefined;
     this.movementPresentation = undefined;
     this.systemMenuOpen = false;
@@ -2752,6 +2763,7 @@ export class GameController {
       roster: campaign.roster,
       stageProgress: 0,
       consumedEventIds: [...this.stageEventState.consumedEventIds],
+      stageEntrySnapshot: cloneCampaignState(this.stageEntrySnapshot),
       battle: {
         phase: "player",
         ...snapshot,
@@ -2857,25 +2869,9 @@ export class GameController {
       battle.stage,
       save.consumedEventIds as StageEventState["consumedEventIds"],
     );
+    this.stageEntrySnapshot = cloneCampaignState(save.stageEntrySnapshot);
     this.stage1Campaign = save.stageId === "stage-01"
-      ? {
-        stageId: "stage-01",
-        ruleset: save.ruleset,
-        difficulty: save.difficulty,
-        roster: save.roster,
-        rngState: save.rngState,
-        rngCalls: save.rngCalls,
-      }
-      : undefined;
-    this.stage2Campaign = save.stageId === "stage-02"
-      ? {
-        stageId: "stage-02",
-        ruleset: save.ruleset,
-        difficulty: save.difficulty,
-        roster: save.roster,
-        rngState: save.rngState,
-        rngCalls: save.rngCalls,
-      }
+      ? cloneCampaignState(save.stageEntrySnapshot)
       : undefined;
     this.activeStoryId = undefined;
     this.difficulty = save.difficulty;

@@ -1,4 +1,5 @@
 import {
+  className,
   killRewardFor,
   terrainDefensePercentFor,
 } from "../content/classes";
@@ -129,6 +130,29 @@ export class Stage0Battle {
     this.campaignUnitSlots = new Set(
       this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
     );
+  }
+
+  static fromCampaignEntry(campaign: CampaignState): Stage0Battle {
+    const battle = new Stage0Battle(
+      campaign.difficulty,
+      new DeterministicRng(campaign.rngState, campaign.rngCalls),
+    );
+    const rosterBySlot = new Map(campaign.roster.map((entry) => [entry.slot, entry]));
+    for (const unit of battle.units) {
+      if (unit.side !== 1) continue;
+      const entry = rosterBySlot.get(unit.slot);
+      if (!entry) continue;
+      unit.classId = entry.classId;
+      unit.className = className(entry.classId);
+      unit.experience = entry.experience;
+      unit.life = entry.life;
+    }
+    battle.campaignRoster.splice(
+      0,
+      battle.campaignRoster.length,
+      ...completeCampaignRoster(campaign.roster),
+    );
+    return battle;
   }
 
   restore(

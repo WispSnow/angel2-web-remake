@@ -9,6 +9,8 @@ interface Stage2State {
   round: number;
   actionMode: string;
   focusId: string;
+  rngState: number;
+  rngCalls: number;
   selectedId?: string;
   activeStoryId?: string;
   campaignRoute?: string;
@@ -17,8 +19,11 @@ interface Stage2State {
     id: string;
     side: number;
     slot: number;
+    classId: string;
     x: number;
     y: number;
+    life: number;
+    experience: number;
     acted: boolean;
   }>;
 }
@@ -147,6 +152,109 @@ test("S02-E/H: defeating Lan plays SAY/175 once and completes to the stage-03 bo
     campaignRoute: "stage-03",
   });
   await expect(page.getByText("第 2 關已完成", { exact: true })).toBeVisible();
+});
+
+test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+  const baseline = await page.evaluate(() => {
+    const save = JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
+      version: number;
+      contentVersion: string;
+      rngState: number;
+      rngCalls: number;
+      roster: Array<{ slot: number; classId: string; experience: number; life: number }>;
+      stageEntrySnapshot: {
+        rngState: number;
+        rngCalls: number;
+        roster: Array<{ slot: number; classId: string; experience: number; life: number }>;
+      };
+      battle: {
+        units: Array<{
+          id: string;
+          classId: string;
+          className: string;
+          experience: number;
+          life: number;
+        }>;
+      };
+    };
+    const entry = save.stageEntrySnapshot.roster.find(({ slot }) => slot === 0);
+    const current = save.roster.find(({ slot }) => slot === 0);
+    const unit = save.battle.units.find(({ id }) => id === "1:0");
+    if (!entry || !current || !unit) throw new Error("stage-2 save is missing Nia");
+    current.classId = "cavalry";
+    current.experience = 0;
+    current.life = 123;
+    unit.classId = "cavalry";
+    unit.className = "騎兵";
+    unit.experience = 0;
+    unit.life = 123;
+    save.rngState = 0x2468_ace0;
+    save.rngCalls += 23;
+    localStorage.setItem("angel2.save.1", JSON.stringify(save));
+    return {
+      version: save.version,
+      contentVersion: save.contentVersion,
+      rngState: save.stageEntrySnapshot.rngState,
+      rngCalls: save.stageEntrySnapshot.rngCalls,
+      rosterEntry: entry,
+    };
+  });
+  expect(baseline).toMatchObject({
+    version: 13,
+    contentVersion: "stage-entry-snapshot-1",
+  });
+
+  const loadMutatedBattle = async () => {
+    await page.keyboard.press("Escape");
+    await page.getByTestId("system-command-load").click();
+    await page.getByTestId("record-slot-1").click();
+    await waitForPhase(page, "player");
+    const loaded = await state(page);
+    expect(loaded).toMatchObject({ rngState: 0x2468_ace0 });
+    expect(loaded.units.find(({ id }) => id === "1:0")).toMatchObject({
+      classId: "cavalry",
+      experience: 0,
+      life: 123,
+    });
+  };
+  const expectEntryCampaign = async () => {
+    await waitForPhase(page, "openingStory");
+    const restarted = await state(page);
+    expect(restarted).toMatchObject({
+      stageId: "stage-02",
+      round: 1,
+      rngState: baseline.rngState,
+      rngCalls: baseline.rngCalls,
+    });
+    expect(restarted.units.find(({ id }) => id === "1:0")).toMatchObject({
+      classId: baseline.rosterEntry.classId,
+      experience: baseline.rosterEntry.experience,
+      life: baseline.rosterEntry.life,
+      acted: false,
+    });
+  };
+
+  await loadMutatedBattle();
+  await page.keyboard.press("Tab");
+  await page.getByTestId("group-command-retreat").click();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await expectEntryCampaign();
+
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+  await loadMutatedBattle();
+  await page.evaluate(() => window.__ANGEL2__?.forceDefeat());
+  await expect(page.getByTestId("native-feedback")).toBeVisible();
+  await page.getByTestId("retry-button").click();
+  await page.getByTestId("retry-button").click();
+  await expectEntryCampaign();
 });
 
 test("S02-J: fixed battle remains readable in a narrow reduced-motion viewport", async ({ page }) => {

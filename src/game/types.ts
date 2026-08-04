@@ -134,8 +134,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 12;
-  contentVersion: "stage-02-allied-auto-1";
+  version: 13;
+  contentVersion: "stage-entry-snapshot-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
@@ -151,6 +151,7 @@ export interface BattleSaveData extends SaveDataBase {
   kind: "battle";
   stageId: "stage-00" | "stage-01" | "stage-02";
   stageLabel: "瓦爾克麗宮" | "騎士城堡前" | "救援友軍";
+  stageEntrySnapshot: CampaignState;
   battle: SavedBattleState;
 }
 

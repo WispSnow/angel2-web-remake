@@ -13,6 +13,32 @@ function battleAtPlayableOpening(seed = 0x1234, difficulty: 0 | 1 | 2 | 3 = 0): 
 }
 
 describe("stage 0 battle simulation", () => {
+  it("rebuilds the fixed battle from an immutable campaign-entry snapshot", () => {
+    const source = new Stage0Battle(2, new DeterministicRng(0x1357_2468, 11));
+    const entry = source.campaignSnapshot();
+    entry.roster[0] = {
+      ...entry.roster[0],
+      classId: "cavalry",
+      experience: 0,
+      life: 123,
+    };
+
+    const restored = Stage0Battle.fromCampaignEntry(entry);
+
+    expect(restored).toMatchObject({ difficulty: 2, round: 1, focusId: "1:0" });
+    expect(restored.rng).toMatchObject({ state: 0x1357_2468, calls: 11 });
+    expect(restored.unit("1:0")).toMatchObject({
+      classId: "cavalry",
+      className: "騎兵",
+      experience: 0,
+      life: 123,
+      acted: false,
+      actionDisabled: false,
+    });
+    expect(restored.units.filter(({ side }) => side === 2)).toHaveLength(10);
+    expect(restored.campaignSnapshot()).toEqual(entry);
+  });
+
   it("uses difficulty-derived enemies in deterministic combat", () => {
     const easy = battleAtPlayableOpening(42, 0);
     const hardest = battleAtPlayableOpening(42, 3);

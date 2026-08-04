@@ -41,71 +41,82 @@ const completedSave = (): CompletedSaveData => ({
   consumedEventIds: [],
 });
 
-const battleSave = (): BattleSaveData => ({
-  format: "ANGEL2-web-save",
-  version: SAVE_VERSION,
-  contentVersion: SAVE_CONTENT_VERSION,
-  kind: "battle",
-  savedAt: "2026-07-25T12:00:00.000Z",
-  saveCount: 2,
-  stageId: "stage-00",
-  stageLabel: "瓦爾克麗宮",
-  ruleset: "stableRemake",
-  difficulty: 2,
-  rngState: 0x1020_3040,
-  rngCalls: 0,
-  roster: completeCampaignRoster([
+const battleSave = (): BattleSaveData => {
+  const roster = completeCampaignRoster([
     { slot: 0, classId: "soldier", experience: 399, life: 160 },
-  ]),
-  stageProgress: 0,
-  consumedEventIds: [
-    "stage-00-prebattle-story",
-    "stage-00-opening-move",
-    "stage-00-opening-story",
-    "stage-00-round-2-story",
-  ],
-  battle: {
-    phase: "player",
-    round: 3,
-    focusId: "1:0",
-    units: [
-      {
-        id: "1:0",
-        side: 1,
-        slot: 0,
-        classId: "soldier",
-        className: "士兵",
-        name: "妮雅",
-        portrait: 46,
-        x: 29,
-        y: 26,
-        life: 160,
-        experience: 399,
-        acted: false,
-        actionDisabled: false,
-        statuses: emptyUnitStatuses(),
-      },
-      {
-        id: "2:15",
-        side: 2,
-        slot: 15,
-        classId: "cavalry",
-        className: "騎兵",
-        name: "哈釘",
-        portrait: 15,
-        x: 23,
-        y: 32,
-        life: 250,
-        experience: 461,
-        acted: true,
-        actionDisabled: false,
-        statuses: emptyUnitStatuses(),
-      },
+  ]);
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-07-25T12:00:00.000Z",
+    saveCount: 2,
+    stageId: "stage-00",
+    stageLabel: "瓦爾克麗宮",
+    ruleset: "stableRemake",
+    difficulty: 2,
+    rngState: 0x1020_3040,
+    rngCalls: 0,
+    roster,
+    stageEntrySnapshot: {
+      stageId: "stage-00",
+      ruleset: "stableRemake",
+      difficulty: 2,
+      rngState: 0x1020_3040,
+      rngCalls: 0,
+      roster: roster.map((entry) => ({ ...entry })),
+    },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-00-prebattle-story",
+      "stage-00-opening-move",
+      "stage-00-opening-story",
+      "stage-00-round-2-story",
     ],
-    cursor: { x: 29, y: 26 },
-    cameraOrigin: { x: 25, y: 23 },
-  },
-});
+    battle: {
+      phase: "player",
+      round: 3,
+      focusId: "1:0",
+      units: [
+        {
+          id: "1:0",
+          side: 1,
+          slot: 0,
+          classId: "soldier",
+          className: "士兵",
+          name: "妮雅",
+          portrait: 46,
+          x: 29,
+          y: 26,
+          life: 160,
+          experience: 399,
+          acted: false,
+          actionDisabled: false,
+          statuses: emptyUnitStatuses(),
+        },
+        {
+          id: "2:15",
+          side: 2,
+          slot: 15,
+          classId: "cavalry",
+          className: "騎兵",
+          name: "哈釘",
+          portrait: 15,
+          x: 23,
+          y: 32,
+          life: 250,
+          experience: 461,
+          acted: true,
+          actionDisabled: false,
+          statuses: emptyUnitStatuses(),
+        },
+      ],
+      cursor: { x: 29, y: 26 },
+      cameraOrigin: { x: 25, y: 23 },
+    },
+  };
+};
 
 const stage1BattleSave = (): BattleSaveData => {
   const prior = completedSave();
@@ -140,6 +151,14 @@ const stage1BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    stageEntrySnapshot: {
+      stageId: "stage-01",
+      ruleset: "stableRemake",
+      difficulty: campaign.difficulty,
+      rngState: campaign.rngState,
+      rngCalls: campaign.rngCalls,
+      roster: campaign.roster.map((entry) => ({ ...entry })),
+    },
     consumedEventIds: [
       "stage-01-prebattle-story",
       "stage-01-enter-deployment",
@@ -183,6 +202,10 @@ const stage2BattleSave = (): BattleSaveData => {
     rngState: snapshot.rngState,
     rngCalls: snapshot.rngCalls,
     roster: snapshot.roster,
+    stageEntrySnapshot: {
+      ...campaign,
+      roster: campaign.roster.map((entry) => ({ ...entry })),
+    },
     stageProgress: 0,
     consumedEventIds: ["stage-02-opening-story"],
     battle: {
@@ -266,10 +289,47 @@ describe("Web save validation", () => {
     expect(moveSaveSlotPage(17, 1)).toBe(2);
   });
 
-  it("accepts complete version-11 battle and completed saves", () => {
+  it("accepts complete version-13 battle and completed saves", () => {
     expect(isSaveData(completedSave())).toBe(true);
     expect(parseSaveData(JSON.stringify(battleSave()))).toEqual(battleSave());
     expect(parseSaveData(JSON.stringify(stage1BattleSave()))).toEqual(stage1BattleSave());
+  });
+
+  it("round-trips a stage-2 battle with a distinct immutable entry snapshot", () => {
+    const save = stage2BattleSave();
+
+    expect(save.stageEntrySnapshot.roster).not.toEqual(save.roster);
+    expect(parseSaveData(JSON.stringify(save))).toEqual(save);
+  });
+
+  it("migrates version-12 battles by adopting their current campaign as the entry baseline", () => {
+    const current = battleSave();
+    const { stageEntrySnapshot: _stageEntrySnapshot, ...legacy } = current;
+    const version12 = {
+      ...legacy,
+      version: 12,
+      contentVersion: "stage-02-allied-auto-1",
+    };
+
+    expect(parseSaveData(JSON.stringify(version12))).toEqual(current);
+  });
+
+  it("strictly validates the stage-entry snapshot identity and campaign state", () => {
+    const missingSnapshot = battleSave();
+    delete (missingSnapshot as Partial<BattleSaveData>).stageEntrySnapshot;
+    expect(isSaveData(missingSnapshot)).toBe(false);
+
+    const wrongStage = battleSave();
+    wrongStage.stageEntrySnapshot.stageId = "stage-01";
+    expect(isSaveData(wrongStage)).toBe(false);
+
+    const wrongDifficulty = battleSave();
+    wrongDifficulty.stageEntrySnapshot.difficulty = 1;
+    expect(isSaveData(wrongDifficulty)).toBe(false);
+
+    const invalidRng = battleSave();
+    invalidRng.stageEntrySnapshot.rngState = 0;
+    expect(isSaveData(invalidRng)).toBe(false);
   });
 
   it("round-trips an active ice action-disable byte", () => {

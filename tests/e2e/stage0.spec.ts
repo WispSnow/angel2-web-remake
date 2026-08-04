@@ -957,8 +957,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 12,
-    contentVersion: "stage-02-allied-auto-1",
+    version: 13,
+    contentVersion: "stage-entry-snapshot-1",
     kind: "completed",
     stageId: "stage-01",
     stageLabel: "騎士城堡前",
@@ -1589,11 +1589,15 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 12,
-    contentVersion: "stage-02-allied-auto-1",
+    version: 13,
+    contentVersion: "stage-entry-snapshot-1",
     kind: "battle",
     stageId: "stage-00",
     rngState: initial.rngState,
+    stageEntrySnapshot: {
+      stageId: "stage-00",
+      rngState: initial.rngState,
+    },
     battle: {
       round: initial.round,
       cursor: initial.cursor,
@@ -2642,12 +2646,16 @@ test("S00-M: native system records restore battle state and combat cues follow p
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 12,
-    contentVersion: "stage-02-allied-auto-1",
+    version: 13,
+    contentVersion: "stage-entry-snapshot-1",
     kind: "battle",
     stageId: "stage-00",
     stageLabel: "瓦爾克麗宮",
     rngState: initial.rngState,
+    stageEntrySnapshot: {
+      stageId: "stage-00",
+      rngState: initial.rngState,
+    },
     battle: {
       phase: "player",
       round: initial.round,
