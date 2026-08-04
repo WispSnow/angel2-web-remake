@@ -8,6 +8,7 @@ import {
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import {
   BATTLE_ACTION_DEFINITIONS,
+  STAGE0_REST_PRESENTATION,
   stage1ActionPresentation,
 } from "./content/actions";
 import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
@@ -143,6 +144,15 @@ export interface AiTechniqueDialoguePresentation {
   page: DialoguePage;
 }
 
+export type RestPresentationPhase = "restEffect" | "restBlank";
+
+export interface RestPresentation {
+  unit: BattleUnit;
+  phase: RestPresentationPhase;
+  frame: number;
+  nativeTicks: number;
+}
+
 export type AudioCueGroup = "e" | "magic" | "un";
 
 export type UnitCommandId = "move" | "attack" | "shoot" | "technique" | "rest" | "end" | "undo";
@@ -274,6 +284,8 @@ export class GameController {
     displayedLifeByUnitId: Readonly<Record<string, number>>;
     lifeChangeUnitId?: string;
   }> = [];
+  restPresentation?: RestPresentation;
+  restPresentationTrace: RestPresentation[] = [];
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
   movementPresentation?: MovementPresentation;
   statusMessage = "";
@@ -992,9 +1004,31 @@ export class GameController {
       || this.phase !== "player"
       || this.actionMode !== "actionMenu"
       || this.commandMenuKind !== "initial"
+      || this.busy
     ) return;
-    const recovered = this.battle.rest(unit.id);
-    this.finishUnitAction(recovered > 0 ? `休息恢復 ${recovered} 點生命。` : "休息完成；生命已滿。", true);
+    void this.commitRest(unit);
+  }
+
+  private async commitRest(unit: BattleUnit): Promise<void> {
+    const presentationUnit = { ...unit, statuses: { ...unit.statuses } };
+    this.busy = true;
+    this.resetAction();
+    this.statusMessage = `${unit.name}正在休息……`;
+    this.emit();
+    try {
+      await this.presentRest(presentationUnit);
+      const recovered = this.battle.rest(unit.id);
+      this.busy = false;
+      this.finishUnitAction(
+        recovered > 0 ? `休息恢復 ${recovered} 點生命。` : "休息完成；生命已滿。",
+        true,
+      );
+    } catch (error) {
+      this.busy = false;
+      this.restPresentation = undefined;
+      this.statusMessage = error instanceof Error ? error.message : "休息無效。";
+      this.emit();
+    }
   }
 
   chooseEnd(): void {
@@ -1351,6 +1385,38 @@ export class GameController {
       await pause(this.mapCombatDelay(10));
     }
     this.specialActionPresentation = undefined;
+  }
+
+  private async presentRest(unit: BattleUnit): Promise<void> {
+    this.restPresentationTrace = [];
+    const present = async (
+      phase: RestPresentationPhase,
+      frame: number,
+      nativeTicks: number,
+    ): Promise<void> => {
+      this.restPresentation = { unit, phase, frame, nativeTicks };
+      this.restPresentationTrace.push({ unit, phase, frame, nativeTicks });
+      this.emit();
+      await pause(this.testMode ? 120 : this.mapCombatDelay(nativeTicks));
+    };
+
+    // Native player and AI rest both enter 1000:5D12: MAGIC/0 tile codes
+    // 1..5 at 15 ticks each, followed by a blank cleanup descriptor. This is
+    // the same visible sequence as the healing family's common finish, but it
+    // deliberately has no E/36 healing sound request.
+    for (let frame = 0; frame < STAGE0_REST_PRESENTATION.frameCount; frame += 1) {
+      await present(
+        "restEffect",
+        frame,
+        STAGE0_REST_PRESENTATION.waitPerFrameNativeTicks,
+      );
+    }
+    await present(
+      "restBlank",
+      -1,
+      STAGE0_REST_PRESENTATION.cleanupWaitNativeTicks,
+    );
+    this.restPresentation = undefined;
   }
 
   private async commitAttack(defenderId: string): Promise<void> {
@@ -1808,6 +1874,8 @@ export class GameController {
         this.battle.spendAction(unit.id);
       }
     } else if (action.kind === "rest") {
+      const presentationUnit = { ...unit, statuses: { ...unit.statuses } };
+      await this.presentRest(presentationUnit);
       const recovered = this.battle.rest(unit.id);
       this.statusMessage = `${unit.name}休息，恢復 ${recovered} 點生命。`;
     } else {
@@ -2664,6 +2732,8 @@ export class GameController {
     this.combatPresentation = undefined;
     this.specialActionPresentation = undefined;
     this.specialActionPresentationTrace = [];
+    this.restPresentation = undefined;
+    this.restPresentationTrace = [];
     this.aiTechniqueDialogue = undefined;
     this.busy = false;
     this.resetAction();
@@ -2852,6 +2922,7 @@ export class GameController {
     this.movementPresentation = undefined;
     this.combatPresentation = undefined;
     this.specialActionPresentation = undefined;
+    this.restPresentation = undefined;
     this.aiTechniqueDialogue = undefined;
     if (this.battle.stage.id === "stage-00") {
       await this.enterStage1({
@@ -3100,6 +3171,47 @@ export class GameController {
     this.emit();
   }
 
+  forceRestSetupForTest(): void {
+    if (!this.debugMode) return;
+    const ally = this.battle.unit("1:0");
+    const enemy = this.battle.stage.id === "stage-01"
+      ? this.battle.unit("2:40")
+      : this.battle.units.find((unit) => unit.side === 2);
+    const objective = this.battle.stage.id === "stage-01"
+      ? this.battle.unit("2:16")
+      : undefined;
+    if (!ally || !enemy) return;
+    ally.classId = "warrior";
+    ally.className = className(ally.classId);
+    ally.x = 29;
+    ally.y = 26;
+    ally.life = Math.max(1, this.battle.statsFor(ally).maxLife - 60);
+    ally.acted = false;
+    ally.actionDisabled = false;
+    enemy.x = this.battle.stage.id === "stage-01" ? 35 : 34;
+    enemy.y = this.battle.stage.id === "stage-01" ? 37 : 26;
+    enemy.life = Math.max(1, Math.floor(this.battle.statsFor(enemy).maxLife * 10 / 100));
+    enemy.acted = false;
+    enemy.actionDisabled = false;
+    if (objective) {
+      objective.x = 34;
+      objective.y = 14;
+      objective.acted = false;
+      objective.actionDisabled = true;
+    }
+    this.battle.units = [ally, enemy, ...(objective ? [objective] : [])];
+    this.battle.focusId = ally.id;
+    this.phase = "player";
+    this.centerCamera(ally);
+    this.cursor = { x: ally.x, y: ally.y };
+    this.resetAction();
+    this.restPresentation = undefined;
+    this.restPresentationTrace = [];
+    this.statusMessage = "自動驗收：敵我雙方均可在本回合休息。";
+    this.busy = false;
+    this.emit();
+  }
+
   forceDispelSetupForTest(): void {
     if (!this.debugMode || this.battle.stage.id !== "stage-01") return;
     const actor = this.battle.unit("1:0");
@@ -3231,6 +3343,17 @@ export class GameController {
       specialActionPresentationTrace: this.specialActionPresentationTrace.map((entry) => ({
         ...entry,
         displayedLifeByUnitId: { ...entry.displayedLifeByUnitId },
+      })),
+      restPresentation: this.restPresentation ? {
+        ...this.restPresentation,
+        unit: {
+          ...this.restPresentation.unit,
+          statuses: { ...this.restPresentation.unit.statuses },
+        },
+      } : undefined,
+      restPresentationTrace: this.restPresentationTrace.map((entry) => ({
+        ...entry,
+        unit: { ...entry.unit, statuses: { ...entry.unit.statuses } },
       })),
       aiTechniqueDialogue: this.aiTechniqueDialogue ? {
         ...this.aiTechniqueDialogue,
@@ -3473,6 +3596,7 @@ export interface Angel2DebugApi {
   forceCavalryCounterSetup: () => void;
   forceEnemySisterSetup: () => void;
   forceEnemyAlertBoundarySetup: () => void;
+  forceRestSetup: () => void;
   forceClassActionSetup: (
     classId: "archer" | "cavalry" | "magician" | "sister" | "warrior",
     ordinaryCombat?: boolean,
@@ -3498,6 +3622,7 @@ export function exposeDebugApi(controller: GameController): void {
     forceCavalryCounterSetup: () => controller.forceCavalryCounterSetupForTest(),
     forceEnemySisterSetup: () => controller.forceEnemySisterSetupForTest(),
     forceEnemyAlertBoundarySetup: () => controller.forceEnemyAlertBoundarySetupForTest(),
+    forceRestSetup: () => controller.forceRestSetupForTest(),
     forceClassActionSetup: (classId, ordinaryCombat) =>
       controller.forceClassActionSetupForTest(classId, ordinaryCombat),
     clearSaves: () => {

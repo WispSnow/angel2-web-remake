@@ -38834,6 +38834,16 @@ export const STAGE0_ACTION_PRESENTATION_ASSETS = {
   }
 } as const;
 
+export const STAGE0_REST_PRESENTATION = {
+  "mode": "heal-common-finish",
+  "resource": "MAGIC/0",
+  "frameCount": 5,
+  "waitPerFrameNativeTicks": 15,
+  "cleanupFrame": null,
+  "cleanupWaitNativeTicks": 15,
+  "audioRequests": []
+} as const;
+
 export const STAGE0_ACTION_AUDIO_ASSETS = {
   "e-11": "/assets/original/audio/e/11.wav",
   "e-2": "/assets/original/audio/e/2.wav",

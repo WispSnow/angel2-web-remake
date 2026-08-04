@@ -35,7 +35,7 @@ const CODE_SIGNATURES = [
   { address: "1000:22C9", offset: 0x122c9, hex: "b9c409be0000a124008ec0268a042e3a0683017511a12200" },
   { address: "1000:24A5", offset: 0x124a5, hex: "833e772e1a7401c3e80400e80100c3bb" },
   { address: "1000:41BC", offset: 0x141bc, hex: "e80400e83e00cba124008ec033dbb9c4" },
-  { address: "1000:5D12", offset: 0x15d12, hex: "c706181f05009af2620000a180f88ec0bf0000b9" },
+  { address: "1000:5D12", offset: 0x15d12, hex: "c706181f05009af2620000a180f88ec0bf0000b90000bb04009a8efd0000" },
 ];
 
 function sha256(buffer) {
@@ -82,6 +82,56 @@ function validateStage37ToggleData(buffer) {
     codeSegmentFileBase: AI_CODE_SEGMENT_FILE_BASE,
     derivation: "the main-loop far call at 0000:4A52 stores segment 1147h and offset 0036h for 1000:14A6, proving this AI code segment's static file base is 11470h",
     entries,
+  };
+}
+
+function restPresentationEvidence(buffer) {
+  const readDsWord = (offset) => buffer.readUInt16LE(DATA_LINEAR_BASE + offset);
+  const pointers = Array.from({ length: 5 }, (_, index) => readDsWord(0x60e0 + index * 2));
+  const expectedPointers = [0x60ec, 0x60f6, 0x6100, 0x610a, 0x6114];
+  if (
+    pointers.join(",") !== expectedPointers.join(",")
+    || readDsWord(0x60ea) !== SENTINEL
+  ) {
+    throw new Error("rest MAGIC/0 descriptor pointer table changed");
+  }
+  const descriptorValues = pointers.map((pointer) =>
+    Array.from({ length: 5 }, (_, index) => readDsWord(pointer + index * 2)));
+  const expectedDescriptors = Array.from(
+    { length: 5 },
+    (_, index) => [0, 0, 1, 1, index + 1],
+  );
+  const cleanupDescriptor = Array.from({ length: 5 }, (_, index) =>
+    readDsWord(0x611e + index * 2));
+  if (
+    JSON.stringify(descriptorValues) !== JSON.stringify(expectedDescriptors)
+    || JSON.stringify(cleanupDescriptor) !== JSON.stringify([0, 0, 1, 1, 0])
+  ) {
+    throw new Error("rest MAGIC/0 descriptors changed");
+  }
+  return {
+    function: "1000:5D12",
+    callers: {
+      player: "0000:7528",
+      ai: "1000:2213",
+    },
+    resource: "MAGIC/0",
+    descriptorPointerTable: "DS:60E0",
+    descriptorAddresses: pointers.map((pointer) =>
+      `DS:${pointer.toString(16).toUpperCase().padStart(4, "0")}`),
+    tileCodes: descriptorValues.map((descriptor) => descriptor[4]),
+    drawCount: pointers.length,
+    waitPerDrawNativeTicks: 15,
+    fixedGraphicWaitNativeTicks: pointers.length * 15,
+    cleanupDescriptor: {
+      address: "DS:611E",
+      tileCode: cleanupDescriptor[4],
+      waitNativeTicks: 15,
+    },
+    audioRequests: [],
+    settlementBoundary: "play all five MAGIC/0 visible draws, recover floor(maxLife*15/100) with a max-life clamp, draw the blank cleanup descriptor, then let the caller set the action-spent bit",
+    commonHealRelationship: "the separate DS:60E0 table is descriptor-for-descriptor identical to the first five entries of the healing family common finish at DS:608A",
+    allRestException: "0000:6DEA directly scans and settles every eligible side-1 unit without calling 1000:5D12, so the group command has no per-unit MAGIC/0 presentation",
   };
 }
 
@@ -252,6 +302,7 @@ async function extract(runtimePath, descriptorPath, battleTemplatePath, outputPa
   ]);
   const signatures = validateCodeSignatures(buffer);
   const toggleData = validateStage37ToggleData(buffer);
+  const restPresentation = restPresentationEvidence(buffer);
   const descriptorsByCode = buildDescriptorIndex(descriptors);
   const aiPriority = parseAiPriority(buffer, descriptorsByCode);
   const stage37 = extractStage37(battleTemplates, aiPriority, toggleData);
@@ -304,6 +355,7 @@ async function extract(runtimePath, descriptorPath, battleTemplatePath, outputPa
       rest: {
         functions: ["0000:7528", "1000:5D12"],
         behavior: "restore floor(maxLife * 15 / 100), clamp to maxLife, then set bit 7 on the acting cell",
+        presentation: restPresentation,
       },
       technique: {
         functions: ["0000:75E4", "0000:7BE5"],

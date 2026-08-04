@@ -2,6 +2,7 @@ import {
   STAGE0_ACTION_DEFINITIONS,
   STAGE0_ACTION_AUDIO_ASSETS,
   STAGE0_ACTION_PRESENTATION_ASSETS,
+  STAGE0_REST_PRESENTATION,
 } from "./stage0-actions.generated";
 
 type Stage1ActionContent = typeof import("./stage1-actions.generated");
@@ -44,4 +45,4 @@ export function stage1ActionPresentationAssets():
   return stage1PresentationAssets;
 }
 
-export { STAGE0_ACTION_PRESENTATION_ASSETS };
+export { STAGE0_ACTION_PRESENTATION_ASSETS, STAGE0_REST_PRESENTATION };

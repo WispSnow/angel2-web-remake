@@ -1,5 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { BATTLE_ACTION_DEFINITIONS } from "../../src/game/content/actions";
+import {
+  BATTLE_ACTION_DEFINITIONS,
+  STAGE0_REST_PRESENTATION,
+} from "../../src/game/content/actions";
 import { className } from "../../src/game/content/classes";
 import { activateStage1Content } from "../../src/game/content/stage1";
 import { Stage0Battle } from "../../src/game/simulation/battle";
@@ -49,6 +52,18 @@ function arrangeTarget(
 }
 
 describe("Stage-0 class actions", () => {
+  it("generates the individual-rest MAGIC/0 finish without a healing sound", () => {
+    expect(STAGE0_REST_PRESENTATION).toEqual({
+      mode: "heal-common-finish",
+      resource: "MAGIC/0",
+      frameCount: 5,
+      waitPerFrameNativeTicks: 15,
+      cleanupFrame: null,
+      cleanupWaitNativeTicks: 15,
+      audioRequests: [],
+    });
+  });
+
   it("marks only native post-graphics point-drain actions with that presentation contract", () => {
     expect(BATTLE_ACTION_DEFINITIONS["archer-shot"].damagePresentation).toEqual({
       mode: "post-graphics-point-drain",

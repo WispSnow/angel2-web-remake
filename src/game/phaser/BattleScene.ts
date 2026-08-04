@@ -650,7 +650,31 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.combatEffects = [];
       const presentation = controller.combatPresentation;
       const special = controller.specialActionPresentation;
+      const rest = controller.restPresentation;
       const canvas = this.game.canvas;
+      if (rest) {
+        if (rest.phase === "restEffect") {
+          this.combatEffects.push(
+            this.add.image(
+              rest.unit.x * TILE_WIDTH + TILE_WIDTH / 2,
+              rest.unit.y * TILE_HEIGHT + TILE_HEIGHT,
+              `map-heal-1-tail-${rest.frame}`,
+            ).setOrigin(.5, 1).setDepth(8),
+          );
+        }
+        if (controller.isTestMode) {
+          canvas.dataset.mapCombatPhase = rest.phase;
+          canvas.dataset.mapCombatFrame = String(rest.frame);
+          canvas.dataset.mapCombatTarget = rest.unit.id;
+          canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
+          delete canvas.dataset.mapCombatLifeChangeUnit;
+          delete canvas.dataset.mapCombatDisplayedLife;
+          delete canvas.dataset.mapCombatAnchorOffset;
+          delete canvas.dataset.mapCombatIceRangeValue;
+          delete canvas.dataset.mapCombatIceDistance;
+        }
+        return;
+      }
       if (special) {
         const target = special.target;
         const center = special.center;
@@ -835,7 +859,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         canvas.dataset.cursorFrameShadow = "palette-0:40x44:2px";
         canvas.dataset.cursorFrameHighlight = "palette-15:39x43:1px";
       }
-      if (controller.combatPresentation || controller.specialActionPresentation) return;
+      if (
+        controller.combatPresentation
+        || controller.specialActionPresentation
+        || controller.restPresentation
+      ) return;
       const focus = controller.cursor;
       this.drawNativeCursorFrame(focus.x * TILE_WIDTH, focus.y * TILE_HEIGHT);
       const unit = controller.focusedUnit;

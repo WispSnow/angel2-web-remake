@@ -62,6 +62,18 @@ interface Stage1DebugState {
     displayedLifeByUnitId: Record<string, number>;
     lifeChangeUnitId?: string;
   }>;
+  restPresentation?: {
+    unit: { id: string; side: 1 | 2; life: number };
+    phase: "restEffect" | "restBlank";
+    frame: number;
+    nativeTicks: number;
+  };
+  restPresentationTrace: Array<{
+    unit: { id: string; side: 1 | 2; life: number };
+    phase: "restEffect" | "restBlank";
+    frame: number;
+    nativeTicks: number;
+  }>;
   audioCueLog: Array<{ group: string; record: number; reason: string }>;
 }
 
@@ -163,6 +175,53 @@ async function completeBattleCommandDialogue(page: Page): Promise<void> {
 }
 
 test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
+
+test("stage-1 low-life enemy rest plays the same silent MAGIC/0 finish", async ({ page }) => {
+  await enterStage1PlayerPhase(page);
+  await page.evaluate(() => window.__ANGEL2__?.forceRestSetup());
+  const before = await state(page);
+  const enemyBefore = before.units.find(({ id }) => id === "2:40")!;
+
+  await page.getByTestId("battle-canvas").click({ position: { x: 220, y: 177 } });
+  await expect(page.getByTestId("action-menu")).toBeVisible();
+  await page.getByTestId("unit-command-rest").click();
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
+    return current?.restPresentation?.phase === "restEffect"
+      && current.restPresentation.unit.id === "2:40";
+  });
+  const during = await state(page);
+  expect(during.units.find(({ id }) => id === enemyBefore.id)?.life).toBe(enemyBefore.life);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-phase", "restEffect");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-target", enemyBefore.id);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-effect-tile-count", "1");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage1-enemy-rest-effect.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
+    return current?.round === 2 && !current.restPresentation;
+  });
+  const after = await state(page);
+  expect(after.units.find(({ id }) => id === enemyBefore.id)?.life).toBeGreaterThan(enemyBefore.life);
+  expect(after.restPresentationTrace.map(({ phase, frame, nativeTicks }) => ({
+    phase,
+    frame,
+    nativeTicks,
+  }))).toEqual([
+    ...Array.from({ length: 5 }, (_, frame) => ({
+      phase: "restEffect",
+      frame,
+      nativeTicks: 15,
+    })),
+    { phase: "restBlank", frame: -1, nativeTicks: 15 },
+  ]);
+  expect(after.audioCueLog).not.toContainEqual(expect.objectContaining({
+    group: "e",
+    record: 36,
+  }));
+});
 
 test("S01-A through S01-E: deployment, techniques, save restore and victory route run in the main game", async ({ page }) => {
   const consoleErrors: string[] = [];

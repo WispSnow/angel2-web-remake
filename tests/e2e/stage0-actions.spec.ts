@@ -5,6 +5,8 @@ type ClassActionId = "archer-shot" | "fire-1" | "heal-1";
 type PromotedClassId = "archer" | "cavalry" | "sister" | "warrior";
 
 interface ActionDebugState {
+  phase: string;
+  round: number;
   actionMode: string;
   battlePresentation: "map" | "full";
   rngState: number;
@@ -29,6 +31,18 @@ interface ActionDebugState {
     frame: number;
     displayedLifeByUnitId: Record<string, number>;
     lifeChangeUnitId?: string;
+  }>;
+  restPresentation?: {
+    unit: { id: string; side: 1 | 2; life: number };
+    phase: "restEffect" | "restBlank";
+    frame: number;
+    nativeTicks: number;
+  };
+  restPresentationTrace: Array<{
+    unit: { id: string; side: 1 | 2; life: number };
+    phase: "restEffect" | "restBlank";
+    frame: number;
+    nativeTicks: number;
   }>;
   audioCueLog: Array<{
     group: "e" | "magic";
@@ -90,6 +104,52 @@ const openActorMenu = async (page: Page) => {
 };
 
 test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
+
+test("individual player rest reuses the silent MAGIC/0 healing finish", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => window.__ANGEL2__?.forceRestSetup());
+  const before = await state(page);
+  const allyBefore = before.units.find(({ id }) => id === "1:0")!;
+
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-rest").click();
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState | undefined;
+    return current?.restPresentation?.phase === "restEffect"
+      && current.restPresentation.unit.side === 1;
+  });
+  const playerRest = await state(page);
+  expect(playerRest.units.find(({ id }) => id === allyBefore.id)?.life).toBe(allyBefore.life);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-phase", "restEffect");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-target", allyBefore.id);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-effect-tile-count", "1");
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-player-rest-effect.png",
+  });
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as ActionDebugState | undefined;
+    return current?.round === 2 && !current.restPresentation;
+  });
+  const after = await state(page);
+  expect(after.units.find(({ id }) => id === allyBefore.id)?.life).toBeGreaterThan(allyBefore.life);
+  expect(after.restPresentationTrace.map(({ phase, frame, nativeTicks }) => ({
+    phase,
+    frame,
+    nativeTicks,
+  }))).toEqual([
+    ...Array.from({ length: 5 }, (_, frame) => ({
+      phase: "restEffect",
+      frame,
+      nativeTicks: 15,
+    })),
+    { phase: "restBlank", frame: -1, nativeTicks: 15 },
+  ]);
+  expect(after.audioCueLog).not.toContainEqual(expect.objectContaining({
+    group: "e",
+    record: 36,
+  }));
+});
 
 test("M00.6 archer shooting keeps simulation frozen through UN/60, then commits", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
