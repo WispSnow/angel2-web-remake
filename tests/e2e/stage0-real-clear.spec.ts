@@ -63,10 +63,12 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   let capturedRoundTwo = false;
   for (let round = 1; round <= 18; round += 1) {
     if (round === 1) {
-      // Move the visible focus to empty ground so the tactical desk returns,
+      // Move the visible focus to empty ground, close the remake terrain card,
       // verify the shipping map menu retains Nia as the command leader, then
       // use the shipping shoe hotspot instead of a debug action.
       await page.getByTestId("battle-canvas").click({ position: { x: 420, y: 45 } });
+      await expect(page.getByTestId("terrain-detail")).toBeVisible();
+      await page.getByTestId("close-terrain-detail").click();
       await expect(page.getByTestId("game-screen")).toHaveAttribute("data-side-panel-hotspots", "active");
       await page.getByTestId("group-command-hotspot").click();
       await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();

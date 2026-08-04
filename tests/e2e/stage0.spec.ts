@@ -41,6 +41,17 @@ interface DebugState {
   keySoundEnabled: boolean;
   audioCueLog: Array<{ sequence: number; record: number; reason: string }>;
   rngState: number;
+  terrainInspection?: {
+    position: { x: number; y: number };
+    terrainSlot: number;
+    referenceUnit?: { id: string; name: string; classId: string; className: string };
+    movementRule?: number;
+    movementCost?: number;
+    traversable?: boolean;
+    attackBonusPercent: 0;
+    defenseBonusPercent?: number;
+    defenseBonusPoints?: number;
+  };
   minimapPreviewOrigin?: { x: number; y: number };
   round: number;
   cursor: { x: number; y: number };
@@ -440,9 +451,11 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "player");
 
-  // Empty terrain restores the bright tactical side panel and its live unit markers.
+  // Empty terrain keeps the live minimap and adds the remake terrain card in
+  // the upper side-panel surface.
   await clickCanvas(page, 420, 45);
   await expect(page.getByTestId("tactical-hud")).toBeVisible();
+  await expect(page.getByTestId("terrain-detail")).toBeVisible();
   await expect(page.locator(".minimap-unit")).toHaveCount(16);
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-unit-life-label-count")).toBe("16");
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-acted-badge-count")).toBe("0");
@@ -958,6 +971,66 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
+});
+
+test("REMAKE-015: clicking empty terrain shows class-specific traits in the side panel", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+
+  const baseline = await debugState(page);
+  await clickCanvas(page, 420, 45);
+  const inspected = await debugState(page);
+  expect(inspected.terrainInspection).toMatchObject({
+    referenceUnit: { id: "1:0", name: "妮雅", classId: "soldier", className: "士兵" },
+    attackBonusPercent: 0,
+  });
+  expect(inspected.actionMode).toBe("idle");
+  expect(inspected.units).toEqual(baseline.units);
+  expect(inspected.rngState).toBe(baseline.rngState);
+
+  const detail = page.getByTestId("terrain-detail");
+  const terrain = inspected.terrainInspection!;
+  await expect(detail).toBeVisible();
+  await expect(page.getByTestId("game-screen")).toHaveAttribute("data-hud-mode", "terrain");
+  await expect(page.getByTestId("terrain-slot")).toHaveText(`槽 ${terrain.terrainSlot}`);
+  await expect(page.getByTestId("terrain-position"))
+    .toHaveText(`格 ${terrain.position.x}，${terrain.position.y}`);
+  await expect(page.getByTestId("terrain-reference")).toHaveText("妮雅・士兵");
+  await expect(page.getByTestId("terrain-movement-cost"))
+    .toHaveText(terrain.traversable ? String(terrain.movementCost) : "不可進入");
+  await expect(page.getByTestId("terrain-attack-bonus")).toHaveText("無");
+  await expect(page.getByTestId("terrain-defense-bonus")).toHaveText(
+    terrain.traversable
+      ? `+${terrain.defenseBonusPercent}%（+${terrain.defenseBonusPoints}）`
+      : "—",
+  );
+  await expect(page.getByTestId("tactical-minimap")).toBeVisible();
+  await expect(page.locator(".minimap-unit")).toHaveCount(16);
+  await expect(page.locator("[data-side-panel-hotspot]:visible")).toHaveCount(0);
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-terrain-inspection.png",
+  });
+
+  await page.getByTestId("close-terrain-detail").click();
+  await expect(detail).toBeHidden();
+  expect((await debugState(page)).terrainInspection).toBeUndefined();
+  await page.keyboard.press(" ");
+  await expect(page.getByTestId("terrain-detail")).toBeVisible();
+
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("terrain-detail")).toBeHidden();
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press(" ");
+  await expect(page.getByTestId("terrain-detail")).toBeVisible();
+
+  await clickCanvas(page, 220, 177);
+  await expect(page.getByTestId("terrain-detail")).toBeHidden();
+  await expect(page.getByTestId("action-menu")).toBeVisible();
+  expect((await debugState(page)).terrainInspection).toBeUndefined();
 });
 
 test("S00-E: keyboard objectives and responsive reduced-motion layout preserve the 640×350 simulation surface", async ({ page }) => {

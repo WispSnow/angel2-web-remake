@@ -16,6 +16,7 @@ import {
   type FullCombatSpriteState,
 } from "./full-combat";
 import type { BattleUnit, Position, UnitClassId, UnitStats } from "./types";
+import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import {
   animatedPortraitMarkup,
@@ -454,6 +455,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "toggle-sound-key") controller.toggleKeySound();
     else if (action === "open-music-settings") controller.openMusicSettings();
     else if (action === "close-music-settings") controller.closeMusicSettings();
+    else if (action === "close-terrain-inspection") controller.closeTerrainInspection();
     else if (action === "music-volume") controller.setMusicVolume(Number(button.dataset.musicLevel));
     else if (action === "record-slot") {
       controller.selectRecordMenuSlot(Number(button.dataset.recordIndex));
@@ -825,13 +827,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
 
     const focus = controller.portraitsEnabled ? controller.describeFocus() : undefined;
-    screen.dataset.hudMode = focus ? "unit" : "tactical";
+    const terrain = focus ? undefined : controller.terrainInspection;
+    screen.dataset.hudMode = focus ? "unit" : terrain ? "terrain" : "tactical";
     screen.dataset.portraitsEnabled = String(controller.portraitsEnabled);
     const sidePanelHotspotsActive = controller.phase === "player"
       && controller.actionMode === "idle"
       && !controller.hasBlockingOverlay
       && !controller.inputLocked
-      && !focus;
+      && !focus
+      && !terrain;
     screen.dataset.sidePanelHotspots = sidePanelHotspotsActive ? "active" : "inactive";
     for (const button of root.querySelectorAll<HTMLButtonElement>("[data-side-panel-hotspot]")) {
       button.tabIndex = sidePanelHotspotsActive ? 0 : -1;
@@ -849,7 +853,13 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       else button.setAttribute("aria-pressed", String(pressed));
     }
     if (!sidePanelHotspotsActive) hideSidePanelHint();
-    hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${focus ? renderHud(controller, focus.unit, focus.stats) : ""}`;
+    hud.innerHTML = `${renderTactical(controller, Boolean(focus))}${
+      focus
+        ? renderHud(controller, focus.unit, focus.stats)
+        : terrain
+          ? renderTerrainInspection(terrain)
+          : ""
+    }`;
 
     const page = controller.currentDialogue;
     const dialogueVisible = page !== undefined;
@@ -1391,6 +1401,42 @@ function renderHud(
         ${intentLabel ? `<div data-testid="enemy-ai-intent"><dt>意圖</dt><dd>${intentLabel}</dd></div>` : ""}
       </dl>
     </div>`;
+}
+
+function renderTerrainInspection(inspection: TerrainInspection): string {
+  const reference = inspection.referenceUnit;
+  const movement = reference
+    ? inspection.traversable
+      ? String(inspection.movementCost)
+      : "不可進入"
+    : "依職業";
+  const defense = reference
+    ? inspection.traversable
+      ? `+${inspection.defenseBonusPercent}%（+${inspection.defenseBonusPoints}）`
+      : "—"
+    : "依職業";
+  const aria = [
+    `地形規則槽 ${inspection.terrainSlot}`,
+    `座標 ${inspection.position.x},${inspection.position.y}`,
+    reference ? `參照 ${reference.name} ${reference.className}` : "尚無參照單位",
+    `移動損耗 ${movement}`,
+    "攻擊加成 無",
+    `防禦加成 ${defense}`,
+  ].join("，");
+  return `
+    <section class="terrain-detail" data-testid="terrain-detail" role="status" aria-label="${aria}">
+      <header><span>地形特性</span><b data-testid="terrain-slot">槽 ${inspection.terrainSlot}</b></header>
+      <p class="terrain-position" data-testid="terrain-position">格 ${inspection.position.x}，${inspection.position.y}</p>
+      <dl>
+        <div><dt>參照</dt><dd data-testid="terrain-reference">${reference ? `${reference.name}・${reference.className}` : "未選擇單位"}</dd></div>
+        <div><dt>移動損耗</dt><dd data-testid="terrain-movement-cost">${movement}</dd></div>
+        <div><dt>攻擊加成</dt><dd data-testid="terrain-attack-bonus">無</dd></div>
+        <div><dt>防禦加成</dt><dd data-testid="terrain-defense-bonus">${defense}</dd></div>
+      </dl>
+      <p class="terrain-note">移動與防禦依參照職業計算</p>
+      <button type="button" class="terrain-detail-close" data-action="close-terrain-inspection"
+        data-testid="close-terrain-detail" aria-label="關閉地形特性">×</button>
+    </section>`;
 }
 
 function renderTactical(controller: GameController, underUnit = false): string {

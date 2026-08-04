@@ -162,6 +162,10 @@ export class Stage0Battle {
     return this.units.find((unit) => unit.x === position.x && unit.y === position.y);
   }
 
+  terrainSlotAt(position: Position): number {
+    return this.scenario.terrainSlotAt(position);
+  }
+
   enemyBehaviorFor(id: string): number {
     return this.scenario.enemyBehaviorById?.get(id) ?? 0;
   }

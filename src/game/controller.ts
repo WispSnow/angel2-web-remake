@@ -40,6 +40,7 @@ import {
 } from "./content/group-command-dialogue";
 import { promotionDialogueFor } from "./content/promotion-dialogue";
 import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneState } from "./full-combat";
+import { inspectTerrain, type TerrainInspection } from "./terrain-inspection";
 import {
   TURN_TRANSITION_HOLD_NATIVE_TICKS,
   turnTransitionFrames,
@@ -247,6 +248,7 @@ export class GameController {
   selectedId?: string;
   commandIndex = 0;
   cursor: Position = { x: 29, y: 26 };
+  terrainInspectionPosition?: Position;
   cameraOrigin: Position = { x: 25, y: 23 };
   minimapPreviewOrigin?: Position;
   reachable: Position[] = [];
@@ -510,6 +512,18 @@ export class GameController {
   get focusedUnit(): BattleUnit | undefined {
     if (this.phase === "player") return this.selectedUnit ?? this.battle.unitAt(this.cursor);
     return this.battle.focus;
+  }
+
+  get terrainInspection(): TerrainInspection | undefined {
+    const position = this.terrainInspectionPosition;
+    if (!position) return undefined;
+    const referenceUnit = this.battle.focus;
+    return inspectTerrain(
+      position,
+      this.battle.terrainSlotAt(position),
+      referenceUnit,
+      referenceUnit ? this.unitStats(referenceUnit) : undefined,
+    );
   }
 
   get selectedUnit(): BattleUnit | undefined {
@@ -907,9 +921,15 @@ export class GameController {
     if (this.actionMode === "actionMenu" || this.actionMode === "techniqueMenu") return;
     if (this.actionMode === "enemyPreview" || this.actionMode === "allyPreview") this.resetAction();
     if (!unit) {
+      this.terrainInspectionPosition = { ...position };
+      const reference = this.battle.focus;
+      this.statusMessage = reference
+        ? `顯示此格對${reference.name}（${reference.className}）的地形特性。`
+        : "顯示此格的地形特性；選擇單位後可查看職業適性。";
       this.emit();
       return;
     }
+    this.terrainInspectionPosition = undefined;
     this.battle.focusId = unit.id;
     if (unit.side === 2) {
       this.selectedId = unit.id;
@@ -1583,6 +1603,7 @@ export class GameController {
     this.selectedActionId = undefined;
     this.techniqueIndex = 0;
     this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
   }
 
   openGroupCommands(): void {
@@ -1605,6 +1626,7 @@ export class GameController {
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
     this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
     this.groupCommandIndex = 0;
     this.groupCommandOpen = true;
     this.statusMessage = "選擇集體命令。";
@@ -1730,6 +1752,7 @@ export class GameController {
     ) return;
     this.systemMenuOpen = false;
     this.groupCommandOpen = false;
+    this.terrainInspectionPosition = undefined;
     this.retreatConfirmOpen = true;
     this.retreatConfirmIndex = 1;
     this.statusMessage = "確認是否全面撤退。";
@@ -2211,6 +2234,7 @@ export class GameController {
     this.musicSettingsReturn = undefined;
     this.groupCommandOpen = false;
     this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
     this.objectiveOpen = true;
     this.markHintSeen();
     this.emit();
@@ -2229,6 +2253,7 @@ export class GameController {
       || this.actionMode !== "idle"
     ) return;
     this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
     this.systemMenuOpen = true;
     this.systemMenuIndex = 0;
     this.emit();
@@ -2298,6 +2323,7 @@ export class GameController {
     this.soundSettingsOpen = true;
     this.soundSettingsReturn = fromSettings ? "settings" : "battle";
     this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
     this.emit();
   }
 
@@ -2322,6 +2348,7 @@ export class GameController {
     this.musicSettingsOpen = true;
     this.musicSettingsReturn = fromSettings ? "settings" : "battle";
     this.minimapPreviewOrigin = undefined;
+    this.terrainInspectionPosition = undefined;
     this.emit();
   }
 
@@ -2360,10 +2387,18 @@ export class GameController {
     else if (this.groupCommandOpen) this.closeGroupCommands();
     else if (this.objectiveOpen) this.closeObjectives();
     else if (this.systemMenuOpen) this.closeSystemMenu();
+    else if (this.terrainInspectionPosition) this.closeTerrainInspection();
     else if (this.phase === "player" && this.actionMode !== "idle") {
       if (!this.busy) this.cancelAction();
     } else return false;
     return true;
+  }
+
+  closeTerrainInspection(): void {
+    if (!this.terrainInspectionPosition) return;
+    this.terrainInspectionPosition = undefined;
+    this.statusMessage = "已關閉地形特性；返回戰場。";
+    this.emit();
   }
 
   async rightClickAction(): Promise<void> {
@@ -3428,6 +3463,7 @@ export class GameController {
       cursor: { ...this.cursor },
       cameraOrigin: this.cameraOrigin,
       minimapPreviewOrigin: this.minimapPreviewOrigin ? { ...this.minimapPreviewOrigin } : undefined,
+      terrainInspection: this.terrainInspection,
       objectiveOpen: this.objectiveOpen,
       systemMenuOpen: this.systemMenuOpen,
       systemMenuIndex: this.systemMenuIndex,

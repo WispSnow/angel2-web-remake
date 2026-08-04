@@ -687,13 +687,10 @@ test("S01-K: enemy movement preview follows the current stage-1 AI intent", asyn
   await page.keyboard.press("ArrowLeft");
   const guardFocus = await state(page);
   expect(guardFocus.cursor).toEqual({ x: 22, y: 14 });
-  await waitForCameraProjection();
-  await battleCanvas.click({
-    position: {
-      x: 40 + (22 - guardFocus.cameraOrigin.x) * 40 + 20,
-      y: 23 + (14 - guardFocus.cameraOrigin.y) * 44 + 22,
-    },
-  });
+  // The patrol branch above already verifies pointer-to-world projection.
+  // Confirm the second intent through the same semantic primary action so a
+  // camera frame racing the physical click cannot select an adjacent empty tile.
+  await page.keyboard.press(" ");
 
   const guardPreview = await state(page);
   expect(guardPreview).toMatchObject({ actionMode: "enemyPreview", selectedId: "2:40" });
