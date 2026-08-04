@@ -133,7 +133,7 @@ test("S03-F/G: monk recovery exposes the native menu and marks only allies insid
   }));
 });
 
-test("S03-D/E/H/I: Sha defeat plays SAY/13 once and completes to the stage-04 boundary", async ({ page }) => {
+test("S03-D/E/H/I: Sha defeat plays SAY/13 once and enters stage 4", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const commander = (await state(page)).units.find(({ side, acted }) => side === 1 && !acted);
@@ -153,14 +153,15 @@ test("S03-D/E/H/I: Sha defeat plays SAY/13 once and completes to the stage-04 bo
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("victory-continue").click();
   await page.locator("[data-action=save-no]").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-03",
+    stageId: "stage-04",
     campaignRoute: "stage-04",
+    activeStoryId: "stage-04-prebattle-story",
   });
-  await expect(page.getByText("第 3 關已完成", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "7");
   await page.getByTestId("game-screen").screenshot({
-    path: `${ARTIFACT_DIR}/stage3-stage4-boundary.png`,
+    path: `${ARTIFACT_DIR}/stage3-to-stage4-prebattle.png`,
   });
 });
 

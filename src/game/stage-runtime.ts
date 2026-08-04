@@ -10,6 +10,7 @@ import type {
   BattleUnit,
   CampaignState,
   GamePhase,
+  Position,
   SavedBattleState,
   StageId,
   UnitClassId,
@@ -22,6 +23,36 @@ export interface StageRuntimeAssets {
   minimap: string;
   storyBackground?: string;
   unitSprites: Readonly<Partial<Record<MapUnitSpriteKey, string>>>;
+  routePulsePresentations?: readonly RoutePulsePresentationDefinition[];
+}
+
+export interface RoutePulsePresentationDefinition {
+  id: string;
+  resource: string;
+  frames: readonly string[];
+  frameIndices: readonly number[];
+  iterations: number;
+  drawsPerIteration: number;
+  waitPerDrawNativeTicks: number;
+  fixedGraphicWaitNativeTicks: number;
+}
+
+export interface StageDeploymentPresentation {
+  kicker: string;
+  title: string;
+  objective: string;
+  minimap: string;
+  terrain: Uint8Array;
+  gridWidth: number;
+  gridHeight: number;
+  enemies: readonly Position[];
+  pageLabels: readonly [string, string, string];
+  finishLabel: string;
+  minimumUnits: number;
+  safeCells?: readonly Position[];
+  dangerCells?: readonly Position[];
+  dangerText?: string;
+  guidanceText?: string;
 }
 
 export type StageSaveAlliedUnitRule =
@@ -48,6 +79,7 @@ export interface StageSaveSchema {
 export interface StagePreparationAdapter {
   kind: "deployment";
   definition: InteractiveDeploymentDefinition;
+  presentation: StageDeploymentPresentation;
   consumedEventIdsOnRetry: readonly string[];
   createRoster: (campaign: CampaignState) => readonly DeploymentRosterUnit[];
   createInitialResult: () => DeploymentResult;
@@ -127,21 +159,18 @@ const stage0Module: StageRuntimeModule = {
   },
 };
 
-async function loadStage1Module(): Promise<StageRuntimeModule> {
-  const [content, battleModule] = await Promise.all([
-    import("./content/stage1"),
-    import("./simulation/stage1-battle"),
-  ]);
-  content.activateStage1Content();
-  const definition = content.STAGE1_DEFINITION.deployment;
-  const preparation: StagePreparationAdapter = {
+function createDeploymentPreparation(
+  definition: InteractiveDeploymentDefinition,
+  presentation: StageDeploymentPresentation,
+  consumedEventIdsOnRetry: readonly string[],
+  createRoster: StagePreparationAdapter["createRoster"],
+): StagePreparationAdapter {
+  return {
     kind: "deployment",
     definition,
-    consumedEventIdsOnRetry: [
-      "stage-01-prebattle-story",
-      "stage-01-enter-deployment",
-    ],
-    createRoster: (campaign) => battleModule.createStage1DeploymentRoster(campaign.roster),
+    presentation,
+    consumedEventIdsOnRetry,
+    createRoster,
     createInitialResult: () => ({
       placements: definition.fixedPlacements.map(({ slot, position }) => ({
         slot,
@@ -155,7 +184,7 @@ async function loadStage1Module(): Promise<StageRuntimeModule> {
           && definition.optionalSlots.some((optionalSlot) => optionalSlot === slot))
         .map(({ slot }, index) => {
           const position = definition.openCells[index];
-          if (!position) throw new Error("stage 1 save exceeds deployment cells");
+          if (!position) throw new Error("saved deployment exceeds its open cells");
           return { slot, position: { ...position }, fixed: false };
         });
       return {
@@ -170,6 +199,36 @@ async function loadStage1Module(): Promise<StageRuntimeModule> {
       };
     },
   };
+}
+
+async function loadStage1Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage1"),
+    import("./simulation/stage1-battle"),
+  ]);
+  content.activateStage1Content();
+  const definition = content.STAGE1_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 01",
+      title: content.STAGE1.name,
+      objective: content.STAGE1_DEFINITION.objective.victoryText,
+      minimap: content.STAGE1_ASSETS.minimap,
+      terrain: content.STAGE1_TERRAIN_TOKENS,
+      gridWidth: content.STAGE1.width,
+      gridHeight: content.STAGE1.height,
+      enemies: content.STAGE1_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: content.STAGE1_DEPLOYMENT_UI.feedbackText.pages,
+      finishLabel: content.STAGE1_DEPLOYMENT_UI.feedbackText.finish,
+      minimumUnits: definition.fixedPlacements.length,
+    },
+    [
+      "stage-01-prebattle-story",
+      "stage-01-enter-deployment",
+    ],
+    (campaign) => battleModule.createStage1DeploymentRoster(campaign.roster),
+  );
   const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
     if (!deployment) throw new Error("stage 1 requires a deployment result");
     return new battleModule.Stage1Battle(campaign, deployment, rng);
@@ -243,6 +302,59 @@ async function loadStage3Module(): Promise<StageRuntimeModule> {
     },
     createBattle,
     restoreBattle: (campaign, snapshot) => restoreBattle(createBattle, campaign, snapshot),
+  };
+}
+
+async function loadStage4Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage4"),
+    import("./simulation/stage4-battle"),
+  ]);
+  content.activateStage4Content();
+  const definition = content.STAGE4_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 04",
+      title: content.STAGE4.name,
+      objective: content.STAGE4_DEFINITION.objective.victoryText,
+      minimap: content.STAGE4_ASSETS.minimap,
+      terrain: content.STAGE4_TERRAIN_TOKENS,
+      gridWidth: content.STAGE4.width,
+      gridHeight: content.STAGE4.height,
+      enemies: content.STAGE4_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      safeCells: content.STAGE4_INITIAL_SAFE_CELLS,
+      dangerCells: content.STAGE4_INITIAL_DANGER_CELLS,
+      dangerText: "首輪力場區外：目前生命減半",
+      guidanceText: "葛蒂拉斯行動後，結界外我方目前生命減半；防魔無效。",
+    },
+    ["stage-04-prebattle-story", "stage-04-enter-deployment"],
+    (campaign) => battleModule.createStage4DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 4 requires a deployment result");
+    return new battleModule.Stage4Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE4_DEFINITION,
+    assets: {
+      map: content.STAGE4_ASSETS.map,
+      minimap: content.STAGE4_ASSETS.minimap,
+      storyBackground: content.STAGE4_ASSETS.storyBackground,
+      unitSprites: content.STAGE4_ASSETS.unitSprites,
+      routePulsePresentations: [content.STAGE4_ASSETS.forceFieldPulse],
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
   };
 }
 
@@ -438,7 +550,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "全面撤退：重新建立第 3 關固定編隊。",
     },
     completion: {
-      destinationLabel: "下一關",
+      destinationLabel: "遭遇丁塔琪",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -471,6 +583,69 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage3Module,
+  },
+  "stage-04": {
+    id: "stage-04",
+    ordinal: 4,
+    label: "遭遇丁塔琪",
+    nextStageId: "stage-05",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: [
+      "archer-shot",
+      "fire-1",
+      "heal-1",
+      "lightning-1",
+      "ice-1",
+      "recovery-1",
+      "dispel",
+    ],
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "第一軍團進入騎士團堡，準備穿過強化力場。",
+      campaignRoute: "stage-04",
+    },
+    enemyPhaseStatusText: "敵方階段：力場守軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始第 4 關關前流程。",
+      retreatStatusText: "全面撤退：返回第 4 關關前流程並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "過異世界之門",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-04-prebattle-story",
+        "stage-04-enter-deployment",
+        "stage-04-opening-story",
+        "stage-04-objective-reached",
+        "stage-04-victory-story",
+        "stage-04-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-04-prebattle-story",
+        "stage-04-enter-deployment",
+        "stage-04-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 20, 21, 24],
+        fixedSlots: [0, 24],
+        optionalSlots: [1, 2, 3, 4, 20, 21],
+        maximumUnits: 8,
+        openCellCount: 6,
+        requiredClassBySlot: { 24: "magician" },
+      },
+      enemyClassById: [
+        ["2:40", "soldier"],
+        ["2:41", "soldier"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage4Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

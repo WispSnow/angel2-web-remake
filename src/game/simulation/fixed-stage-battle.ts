@@ -21,6 +21,7 @@ export interface FixedStageAlliedUnitDefinition {
   name: string;
   portrait: PortraitRecord;
   aiBehavior: number;
+  untouchedExperience?: number;
 }
 
 export interface FixedStageEnemyUnitDefinition {
@@ -60,7 +61,7 @@ function createInheritedAlly(
     && inherited?.classId === inheritance.defaultClassId
     && inherited.experience === 0;
   const experience = namedBaseline
-    ? inheritance.untouchedNamedExperience
+    ? definition.untouchedExperience ?? inheritance.untouchedNamedExperience
     : inherited?.experience ?? 0;
   const maximumLife = classStatsFor({ classId, experience }).maxLife;
   return {

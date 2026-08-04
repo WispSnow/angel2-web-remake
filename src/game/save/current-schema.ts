@@ -27,8 +27,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 14 as const;
-export const SAVE_CONTENT_VERSION = "stage-03-recovery-1" as const;
+export const SAVE_VERSION = 15 as const;
+export const SAVE_CONTENT_VERSION = "stage-04-force-field-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_ROUND = 9_999;

@@ -34,6 +34,8 @@ export interface ForceTargetingPolicy {
  */
 export interface ForceDefinition {
   id: string;
+  /** Optional player-facing name; the stable id remains the simulation identity. */
+  label?: string;
   side: Side;
   control: ForceControl;
   unitIds: readonly string[];
@@ -63,6 +65,9 @@ export class ForceRegistry {
     for (const definition of definitions) {
       if (this.definitionsById.has(definition.id)) {
         throw new Error(`Duplicate force id: ${definition.id}`);
+      }
+      if (definition.label !== undefined && definition.label.trim().length === 0) {
+        throw new Error(`Force ${definition.id} has an empty player-facing label`);
       }
       if (definition.unitIds.length === 0) {
         throw new Error(`Force ${definition.id} must contain at least one unit`);

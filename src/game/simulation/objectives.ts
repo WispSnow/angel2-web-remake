@@ -4,6 +4,8 @@ import type { BattleOutcome, Side } from "../types";
 export interface ObjectiveUnitIdentity {
   side: Side;
   slot: number;
+  x?: number;
+  y?: number;
 }
 
 export function objectiveConditionSatisfied(
@@ -17,6 +19,14 @@ export function objectiveConditionSatisfied(
     return condition.slots.some((slot) => !units.some(
       (unit) => unit.side === condition.side && unit.slot === slot,
     ));
+  }
+  if (condition.type === "unit-in-cell-range") {
+    return units.some((unit) => unit.side === condition.side
+      && unit.slot === condition.slot
+      && unit.x !== undefined
+      && unit.y !== undefined
+      && unit.y * condition.width + unit.x >= condition.minimum
+      && unit.y * condition.width + unit.x <= condition.maximum);
   }
   return !units.some(
     (unit) => unit.side === condition.side && unit.slot === condition.slot,

@@ -52,6 +52,7 @@ import {
 } from "./turn-transition-presentation";
 import { Stage0Battle } from "./simulation/battle";
 import type { AlliedAiAction } from "./simulation/ai-contracts";
+import type { PreparedRoutePulse } from "./simulation/route-pulse";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
 import {
@@ -160,6 +161,14 @@ export interface SpecialActionPresentation {
   nativeTicks: number;
   displayedLifeByUnitId: Readonly<Record<string, number>>;
   lifeChangeUnitId?: string;
+}
+
+export interface RoutePulsePresentation {
+  result: PreparedRoutePulse;
+  frame: number;
+  draw: number;
+  nativeTicks: number;
+  displayedLifeByUnitId: Readonly<Record<string, number>>;
 }
 
 export interface AiTechniqueDialoguePresentation {
@@ -302,9 +311,12 @@ export class GameController {
   keySoundEnabled: boolean;
   lastCombat?: AttackResult;
   lastSpecialAction?: SpecialActionResult;
+  lastRoutePulse?: PreparedRoutePulse;
   combatPresentation?: CombatPresentation;
   combatPresentationTrace: CombatPresentationTraceEntry[] = [];
   specialActionPresentation?: SpecialActionPresentation;
+  routePulsePresentation?: RoutePulsePresentation;
+  routePulsePresentationTrace: Array<Pick<RoutePulsePresentation, "frame" | "draw" | "nativeTicks">> = [];
   specialActionPresentationTrace: Array<{
     phase: SpecialActionPresentationPhase;
     frame: number;
@@ -389,12 +401,30 @@ export class GameController {
     return preparation.definition;
   }
 
+  get deploymentPresentation() {
+    const preparation = this.stageRuntime.preparation;
+    if (!preparation) throw new Error(`${this.stageRuntime.id} has no deployment presentation`);
+    return preparation.presentation;
+  }
+
   get currentStageAssets() {
     return this.stageRuntime.assets;
   }
 
   get currentMapPresentationActionIds() {
     return this.stageRuntime.mapPresentationActionIds;
+  }
+
+  get routePulseGuidance(): string | undefined {
+    return this.stageRuntime.preparation?.presentation.guidanceText;
+  }
+
+  get currentRoutePulseSafeArea(): Position[] {
+    if (this.routePulsePresentation) {
+      return this.routePulsePresentation.result.safeCells.map((position) => ({ ...position }));
+    }
+    const unit = this.focusedUnit;
+    return unit ? this.battle.routePulseSafeArea(unit.id) : [];
   }
 
   get currentStageProgressMetadata() {
@@ -795,7 +825,7 @@ export class GameController {
     }
     if (definition.type === "enter-deployment") {
       this.phase = "deployment";
-      this.statusMessage = "選擇第 1 關出場編隊。";
+      this.statusMessage = `${this.stageRuntime.label}：選擇出場編隊。`;
       return;
     }
     if (definition.type === "victory-state") {
@@ -1962,7 +1992,8 @@ export class GameController {
     this.emit();
 
     if (
-      (action.kind === "move" || action.kind === "attack" || action.kind === "special")
+      (action.kind === "move" || action.kind === "attack" || action.kind === "special"
+        || action.kind === "route-pulse")
       && action.path.length > 1
     ) {
       await this.animateUnitPath(unit.id, action.path, movementKind);
@@ -1970,7 +2001,17 @@ export class GameController {
       if (!unit) return this.resolveOutcome();
     }
 
-    if (action.kind === "special" && action.targetId && action.actionId) {
+    if (action.kind === "route-pulse") {
+      const prepared = this.battle.prepareRoutePulse(unit.id, action.path);
+      this.statusMessage = action.path.length > 1
+        ? `${unit.name}向前引導結界；力場即將發動。`
+        : `${unit.name}的結界未前進；力場仍然發動。`;
+      await this.presentRoutePulse(prepared);
+      this.lastRoutePulse = this.battle.commitRoutePulse(prepared);
+      this.statusMessage = prepared.affectedUnits.length > 0
+        ? `力場命中 ${prepared.affectedUnits.length} 名結界外我方；目前生命減半。`
+        : "所有我方都在結界安全區內。";
+    } else if (action.kind === "special" && action.targetId && action.actionId) {
       const target = this.battle.unit(action.targetId);
       if (target) {
         try {
@@ -2036,6 +2077,42 @@ export class GameController {
     const ended = this.resolveOutcome();
     this.emit();
     return ended;
+  }
+
+  private async presentRoutePulse(result: PreparedRoutePulse): Promise<void> {
+    const definition = this.stageRuntime.assets?.routePulsePresentations
+      ?.find(({ id }) => id === result.definition.presentationId);
+    if (!definition) {
+      throw new Error(`Missing route-pulse presentation ${result.definition.presentationId}`);
+    }
+    const displayedLifeByUnitId = Object.fromEntries(
+      result.affectedUnits.map(({ unitId, lifeBefore }) => [unitId, lifeBefore]),
+    );
+    this.routePulsePresentationTrace = [];
+    const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const drawCount = reducedMotion
+      ? 1
+      : definition.iterations * definition.drawsPerIteration;
+    for (let draw = 0; draw < drawCount; draw += 1) {
+      const frameIndex = reducedMotion
+        ? definition.frameIndices.at(-1) ?? 0
+        : definition.frameIndices[draw % definition.frameIndices.length] ?? 0;
+      this.routePulsePresentation = {
+        result,
+        frame: frameIndex,
+        draw,
+        nativeTicks: definition.waitPerDrawNativeTicks,
+        displayedLifeByUnitId,
+      };
+      this.routePulsePresentationTrace.push({
+        frame: frameIndex,
+        draw,
+        nativeTicks: definition.waitPerDrawNativeTicks,
+      });
+      this.emit();
+      await pause(this.mapCombatDelay(definition.waitPerDrawNativeTicks));
+    }
+    this.routePulsePresentation = undefined;
   }
 
   private async presentOrdinaryCombat(
@@ -2832,7 +2909,7 @@ export class GameController {
           destinationLabel: source.completion.destinationLabel,
         } : undefined;
         this.activeStoryId = undefined;
-        this.campaignRoute = "stage-04";
+        this.campaignRoute = save.stageId;
         this.stageProgress = 1000;
         this.phase = "nextStage";
       } else {
@@ -3128,9 +3205,31 @@ export class GameController {
 
   forceVictorySetupForTest(): void {
     if (!this.debugMode) return;
+    const victory = this.battle.stage.objective.victory;
+    if (victory.type === "unit-in-cell-range") {
+      const protectedUnit = this.battle.units.find(
+        ({ side, slot }) => side === victory.side && slot === victory.slot,
+      );
+      if (!protectedUnit) return;
+      const destinationCell = victory.maximum + victory.width;
+      protectedUnit.x = destinationCell % victory.width;
+      protectedUnit.y = Math.floor(destinationCell / victory.width);
+      protectedUnit.acted = false;
+      for (const unit of this.battle.units.filter(
+        ({ side, id }) => side === victory.side && id !== protectedUnit.id,
+      )) unit.acted = true;
+      this.battle.focusId = protectedUnit.id;
+      this.phase = "player";
+      this.centerCamera(protectedUnit);
+      this.cursor = { x: protectedUnit.x, y: protectedUnit.y };
+      this.resetAction();
+      this.statusMessage = "自動驗收：護送目標將在下一次獨立行動進入出口。";
+      this.busy = false;
+      this.emit();
+      return;
+    }
     const commander = this.battle.unit("1:0")
       ?? this.battle.units.find((unit) => this.battle.isPlayerControllableAlly(unit.id));
-    const victory = this.battle.stage.objective.victory;
     const finalEnemy = victory.type === "unit-removed"
       ? this.battle.units.find((unit) => unit.side === victory.side && unit.slot === victory.slot)
       : this.battle.units.find((unit) => unit.side === 2);
@@ -3540,6 +3639,15 @@ export class GameController {
       aiDialogueEnabled: this.aiDialogueEnabled,
       lastCombat: this.lastCombat ? { ...this.lastCombat } : undefined,
       lastSpecialAction: this.lastSpecialAction ? { ...this.lastSpecialAction } : undefined,
+      lastRoutePulse: this.lastRoutePulse ? {
+        ...this.lastRoutePulse,
+        path: this.lastRoutePulse.path.map((position) => ({ ...position })),
+        safeCells: this.lastRoutePulse.safeCells.map((position) => ({ ...position })),
+        affectedUnits: this.lastRoutePulse.affectedUnits.map((affected) => ({
+          ...affected,
+          position: { ...affected.position },
+        })),
+      } : undefined,
       combatPresentation: this.combatPresentation ? {
         ...this.combatPresentation,
         attacker: { ...this.combatPresentation.attacker },
@@ -3565,6 +3673,11 @@ export class GameController {
         ...entry,
         displayedLifeByUnitId: { ...entry.displayedLifeByUnitId },
       })),
+      routePulsePresentation: this.routePulsePresentation ? {
+        ...this.routePulsePresentation,
+        displayedLifeByUnitId: { ...this.routePulsePresentation.displayedLifeByUnitId },
+      } : undefined,
+      routePulsePresentationTrace: this.routePulsePresentationTrace.map((entry) => ({ ...entry })),
       restPresentation: this.restPresentation ? {
         ...this.restPresentation,
         unit: {

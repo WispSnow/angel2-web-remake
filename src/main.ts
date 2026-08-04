@@ -41,12 +41,12 @@ const mountController = (controller: GameController, userActivated: boolean) => 
     root.innerHTML = `
       <div class="page-shell">
         <header class="project-header">
-          <div><span class="eyebrow">STAGE 01 · DEPLOYMENT</span><h1>天使帝國 II · 騎士城堡前</h1></div>
+          <div><span class="eyebrow">${controller.deploymentPresentation.kicker} · DEPLOYMENT</span><h1>天使帝國 II · ${controller.deploymentPresentation.title}</h1></div>
         </header>
         <div class="game-stage">
           <div class="game-viewport deployment-viewport" id="deployment-viewport">
             <section class="logical-screen deployment-screen" id="deployment-screen" data-testid="deployment-screen"
-              aria-label="騎士城堡前部署畫面">
+              aria-label="${controller.deploymentPresentation.title}部署畫面">
               <div id="deployment-phaser-root" aria-hidden="true"></div>
               <div id="deployment-ui-root" class="deployment-ui-root"></div>
             </section>
@@ -61,8 +61,8 @@ const mountController = (controller: GameController, userActivated: boolean) => 
       controller.deploymentDefinition,
       controller.deploymentRoster,
     );
-    const destroyUi = mountDeploymentUi(uiRoot, session);
-    const game = startDeploymentPhaser(session);
+    const destroyUi = mountDeploymentUi(uiRoot, session, controller.deploymentPresentation);
+    const game = startDeploymentPhaser(session, "deployment-phaser-root", `deployment-${controller.battle.stage.id}`);
     const destroyScaling = configureGameScaling(viewport, screen);
     const unsubscribe = session.onChange((state) => {
       if (state.submitted) controller.completeDeployment(finishDeployment(state));
@@ -78,7 +78,7 @@ const mountController = (controller: GameController, userActivated: boolean) => 
 
   const syncSurface = () => {
     const nextKey = controller.phase === "deployment"
-      ? "deployment:stage-01"
+      ? `deployment:${controller.battle.stage.id}`
       : `battle:${controller.battle.stage.id}`;
     if (nextKey === surfaceKey) return;
     destroySurface();

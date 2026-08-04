@@ -104,9 +104,14 @@ describe("source architecture", () => {
     );
     const sharedActions = fs.readFileSync(path.resolve("src/game/content/actions.ts"), "utf8");
     const battleScene = fs.readFileSync(path.resolve("src/game/phaser/BattleScene.ts"), "utf8");
+    const controller = fs.readFileSync(path.resolve("src/game/controller.ts"), "utf8");
+    const ui = fs.readFileSync(path.resolve("src/game/ui.ts"), "utf8");
 
     expect(currentSaveSchema).not.toMatch(/stageId\s*===\s*["']stage-/);
     expect(sharedActions).not.toMatch(/export function \w*Stage1/);
     expect(battleScene).not.toMatch(/stage\.id\s*!==\s*["']stage-00["']/);
+    expect(controller).not.toContain('"stage-04"');
+    expect(battleScene).not.toContain('"stage-04"');
+    expect(ui).not.toContain('"stage-04"');
   });
 });

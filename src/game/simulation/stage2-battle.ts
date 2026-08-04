@@ -29,6 +29,7 @@ const STAGE2_AI_CLASS_PRIORITY = {
 const STAGE2_FORCE_DEFINITIONS = [
   {
     id: "stage2-player-force",
+    label: "第一軍團",
     side: 1,
     control: "player",
     unitIds: ["1:0", "1:2", "1:24"],
@@ -36,6 +37,7 @@ const STAGE2_FORCE_DEFINITIONS = [
   },
   {
     id: "stage2-allied-corps",
+    label: "友軍軍團",
     side: 1,
     control: "independent-ai",
     unitIds: ["1:40", "1:41", "1:42", "1:43", "1:44", "1:45"],
@@ -43,6 +45,7 @@ const STAGE2_FORCE_DEFINITIONS = [
   },
   {
     id: "stage2-enemy-force",
+    label: "騎士團守軍",
     side: 2,
     control: "independent-ai",
     unitIds: STAGE2_SEMANTIC_ENEMY_UNITS.map(({ slot }) => `2:${slot}`),

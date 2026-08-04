@@ -14,6 +14,8 @@ export interface DeploymentMinimapMarker {
 export interface DeploymentMinimapFrame {
   markers: readonly DeploymentMinimapMarker[];
   zone?: CellBounds;
+  safeCells?: readonly Position[];
+  dangerCells?: readonly Position[];
 }
 
 export interface DeploymentMinimapOptions {
@@ -53,6 +55,8 @@ export const DEPLOYMENT_CURRENT_BLINK_COLOR = MARKER_COLOR.ally;
 const FRAME_COLOR = "#000000";
 const CURRENT_RING_COLOR = "#ffd34d";
 const ZONE_COLOR = "rgba(255, 211, 77, .5)";
+const SAFE_COLOR = "rgba(85, 255, 170, .8)";
+const DANGER_COLOR = "rgba(255, 85, 85, .95)";
 
 /**
  * Owns the decoded terrain minimap and repaints a canvas from deployment
@@ -95,7 +99,10 @@ export class DeploymentMinimap {
     else this.pendingFrame = paint;
   }
 
-  private paint(canvas: HTMLCanvasElement, { markers, zone }: DeploymentMinimapFrame): void {
+  private paint(
+    canvas: HTMLCanvasElement,
+    { markers, zone, safeCells = [], dangerCells = [] }: DeploymentMinimapFrame,
+  ): void {
     const context = canvas.getContext("2d");
     if (!context) return;
     const { viewBox } = this.options;
@@ -127,6 +134,19 @@ export class DeploymentMinimap {
         (zone.max.y - zone.min.y + 1) * this.cellSize - 1,
       );
     }
+
+    const drawCellOutline = (position: Position, color: string) => {
+      context.strokeStyle = color;
+      context.lineWidth = 1;
+      context.strokeRect(
+        this.pixelX(position.x) + .5,
+        this.pixelY(position.y) + .5,
+        this.cellSize - 1,
+        this.cellSize - 1,
+      );
+    };
+    for (const position of safeCells) drawCellOutline(position, SAFE_COLOR);
+    for (const position of dangerCells) drawCellOutline(position, DANGER_COLOR);
 
     const frameSize = this.cellSize + 1;
     const coreSize = this.cellSize - 1;

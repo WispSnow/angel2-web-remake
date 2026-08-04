@@ -8,7 +8,17 @@ test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 test("debug hub selects a difficulty and opens the formal stage-one deployment", async ({ page }) => {
   await page.goto("/debug.html");
   await expect(page.getByTestId("debug-hub")).toBeVisible();
-  await expect(page.locator("[data-debug-scenario-id]")).toHaveCount(22);
+  await expect(page.locator("[data-debug-scenario-id]")).toHaveCount(28);
+  await expect(page.locator(".debug-stage-heading h2")).toHaveText([
+    "第 0 關 · 瓦爾克麗宮",
+    "第 1 關 · 騎士城堡前",
+    "第 2 關 · 救援友軍",
+    "第 3 關 · 通過力場",
+    "第 4 關 · 遭遇丁塔琪",
+  ]);
+  const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
+    headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
+  expect(new Set(titleOffsets).size).toBe(1);
   expect(await page.evaluate(() => window.__ANGEL2_DEBUG__)).toBeUndefined();
 
   await page.getByTestId("debug-difficulty").selectOption("3");
@@ -42,6 +52,7 @@ test("debug scenarios can enter player phases and directly complete either imple
   await expect(page.getByTestId("debug-toolbar")).toContainText("第 0 關");
   await page.getByRole("button", { name: "直接通關" }).click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "4");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("第 1 關 · 騎士城堡前");
   await expect(page.getByTestId("debug-toolbar")).toContainText("stage-01 · prebattleStory");
 
   await page.goto("/?debugScenario=stage-01-player&difficulty=1");
@@ -56,6 +67,7 @@ test("debug scenarios can enter player phases and directly complete either imple
 
   await page.getByRole("button", { name: "直接通關" }).click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "155");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("第 2 關 · 救援友軍");
   await expect(page.getByTestId("debug-toolbar")).toContainText("stage-02 · openingStory");
   expect((await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageProgress: number;
@@ -67,6 +79,7 @@ test("debug scenarios can enter player phases and directly complete either imple
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.getByRole("button", { name: "直接通關" }).click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "12");
+  await expect(page.getByTestId("debug-toolbar")).toContainText("第 3 關 · 通過力場");
   await expect(page.getByTestId("debug-toolbar")).toContainText("stage-03 · openingStory");
   expect((await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageProgress: number;
@@ -75,14 +88,13 @@ test("debug scenarios can enter player phases and directly complete either imple
   }))).toMatchObject({ stageId: "stage-03", campaignRoute: "stage-03" });
 });
 
-test("a completed stage-three save projects stage-four metadata without swapping the backing battle assets", async ({ page }) => {
+test("a completed stage-three save enters the playable stage-four prebattle", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-cleared&difficulty=0");
-  await expect(page.getByText("第 3 關已完成", { exact: true })).toBeVisible();
-  await expect(page.getByText(/「下一關」（stage-04）入口/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /遭遇丁塔琪/u })).toBeVisible();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "7");
   const resources = await page.evaluate(() =>
     performance.getEntriesByType("resource").map(({ name }) => name));
-  expect(resources.some((url) => url.includes("stage3-map.png"))).toBe(false);
-  expect(resources.some((url) => url.includes("stage0-map.png"))).toBe(true);
+  expect(resources.some((url) => url.includes("stage4-map.png"))).toBe(true);
 });
 
 test("the magician range fixture releases its pursuing target after exactly one enemy phase", async ({ page }) => {

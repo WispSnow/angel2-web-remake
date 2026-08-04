@@ -7,8 +7,7 @@ import {
   STAGE1_STABLE_AI,
   stage1TerrainSlotAt,
 } from "../content/stage1";
-import { className } from "../content/classes";
-import { completeCampaignRoster, initialEnemyExperience, statsFor } from "../content/stage0";
+import { completeCampaignRoster } from "../content/stage0";
 import type {
   BattleUnit,
   CampaignState,
@@ -21,7 +20,11 @@ import type {
 import type { DeploymentRosterUnit } from "../deployment-session";
 import { validateDeploymentResult, type DeploymentResult } from "./deployment";
 import { DeterministicRng } from "./rng";
-import { emptyUnitStatuses } from "./status";
+import {
+  createDeployedStageRoster,
+  createDeployedStageUnits,
+  type DeployedStageUnitConfig,
+} from "./deployed-stage-battle";
 import {
   Stage0Battle,
   type BattleScenario,
@@ -44,55 +47,28 @@ const STAGE1_AI_CLASS_PRIORITY = {
   soldier: 36,
 } as const;
 
-function preparedRosterEntry(
-  slot: number,
-  campaignRoster: readonly SaveRosterEntry[],
-): BattleUnit | undefined {
-  const preview = STAGE1_DEPLOYMENT_PREVIEW_ROSTER.find((unit) => unit.slot === slot);
-  if (!preview) return undefined;
-  const inherited = campaignRoster.find((unit) => unit.slot === slot);
-  const override = STAGE1_SEMANTIC_CLASS_OVERRIDES.find((unit) => unit.slot === slot);
-  const classId = override?.classId ?? inherited?.classId ?? preview.classId;
-  const untouchedNamedBaseline = inherited?.classId === "soldier"
-    && inherited.experience === 0
-    && preview.experience > 0;
-  const experience = untouchedNamedBaseline
-    ? preview.experience
-    : inherited?.experience ?? preview.experience;
-  return {
-    id: `1:${slot}`,
-    side: 1,
-    slot,
-    classId,
-    className: className(classId),
+const STAGE1_UNIT_CONFIG: DeployedStageUnitConfig = {
+  alliedUnits: STAGE1_DEPLOYMENT_PREVIEW_ROSTER.map((preview) => ({
+    slot: preview.slot,
+    classOverride: STAGE1_SEMANTIC_CLASS_OVERRIDES
+      .find(({ slot }) => slot === preview.slot)?.classId,
     name: preview.name,
     portrait: preview.portrait,
-    x: 0,
-    y: 0,
-    life: untouchedNamedBaseline ? preview.life : inherited?.life ?? preview.life,
-    experience,
-    acted: false,
-    actionDisabled: false,
-    statuses: emptyUnitStatuses(),
-  };
-}
+    aiBehavior: 0,
+    baselineExperience: preview.experience,
+  })),
+  enemyUnits: STAGE1_SEMANTIC_ENEMY_UNITS,
+  inheritance: {
+    genericPortrait: 47,
+    defaultClassId: "soldier",
+    untouchedNamedExperience: 299,
+  },
+};
 
 export function createStage1DeploymentRoster(
   campaignRoster: readonly SaveRosterEntry[],
 ): DeploymentRosterUnit[] {
-  return STAGE1_DEFINITION.deployment.eligibleSlots.map((slot) => {
-    const unit = preparedRosterEntry(slot, campaignRoster);
-    if (!unit) throw new Error(`stage 1 roster is missing eligible slot ${slot}`);
-    return {
-      slot: unit.slot,
-      name: unit.name,
-      portrait: unit.portrait,
-      classId: unit.classId,
-      className: unit.className,
-      experience: unit.experience,
-      life: unit.life,
-    };
-  });
+  return createDeployedStageRoster(STAGE1_UNIT_CONFIG, 0, campaignRoster);
 }
 
 export function createStage1Units(
@@ -100,33 +76,12 @@ export function createStage1Units(
   campaignRoster: readonly SaveRosterEntry[],
   deployment: DeploymentResult,
 ): BattleUnit[] {
-  const allies = deployment.placements.map(({ slot, position }) => {
-    const unit = preparedRosterEntry(slot, campaignRoster);
-    if (!unit) throw new Error(`stage 1 deployment references missing roster slot ${slot}`);
-    return { ...unit, x: position.x, y: position.y };
-  });
-  const enemies = STAGE1_SEMANTIC_ENEMY_UNITS.map((definition): BattleUnit => {
-    const experience = initialEnemyExperience(definition.classId, difficulty);
-    const unit: BattleUnit = {
-      id: `2:${definition.slot}`,
-      side: 2,
-      slot: definition.slot,
-      classId: definition.classId,
-      className: className(definition.classId),
-      name: definition.name,
-      portrait: definition.portrait,
-      x: definition.position.x,
-      y: definition.position.y,
-      life: 0,
-      experience,
-      acted: false,
-      actionDisabled: false,
-      statuses: emptyUnitStatuses(),
-    };
-    unit.life = statsFor(unit, difficulty).maxLife;
-    return unit;
-  });
-  return [...allies, ...enemies];
+  return createDeployedStageUnits(
+    STAGE1_UNIT_CONFIG,
+    difficulty,
+    campaignRoster,
+    deployment,
+  );
 }
 
 export class Stage1Battle extends Stage0Battle {

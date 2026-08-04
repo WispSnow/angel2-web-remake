@@ -31,6 +31,9 @@ const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 const NATIVE_CURSOR_SHADOW = 0x000000;
 const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
 
+const routePulseTextureKey = (presentationId: string, frame: number): string =>
+  `route-pulse-${presentationId}-${frame}`;
+
 type NativePointerCursor = "hand" | "up" | "down" | "left" | "right";
 
 const NATIVE_POINTER_FRAME: Readonly<Record<NativePointerCursor, number>> = {
@@ -166,6 +169,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           this.load.image(`map-recovery-1-${frame}`, source));
         if (presentationActionIds.has("dispel")) presentationAssets.dispel.effect.forEach((source, frame) =>
           this.load.image(`map-dispel-${frame}`, source));
+      }
+      for (const presentation of stageAssets?.routePulsePresentations ?? []) {
+        presentation.frames.forEach((source, frame) =>
+          this.load.image(routePulseTextureKey(presentation.id, frame), source));
       }
     }
 
@@ -469,9 +476,54 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           this.rangeGraphics.strokeRect(cell.x * TILE_WIDTH + 2, cell.y * TILE_HEIGHT + 2, TILE_WIDTH - 4, TILE_HEIGHT - 4);
         }
       }
+      const routePulseSafeArea = controller.currentRoutePulseSafeArea;
+      if (routePulseSafeArea.length > 0) {
+        const safe = new Set(routePulseSafeArea.map(({ x, y }) => `${x},${y}`));
+        this.rangeGraphics.fillStyle(0x57d66b, 0.2);
+        this.rangeGraphics.lineStyle(2, 0xb8ffbf, 0.9);
+        for (const cell of routePulseSafeArea) {
+          this.rangeGraphics.fillRect(
+            cell.x * TILE_WIDTH + 2,
+            cell.y * TILE_HEIGHT + 2,
+            TILE_WIDTH - 4,
+            TILE_HEIGHT - 4,
+          );
+          this.rangeGraphics.strokeRect(
+            cell.x * TILE_WIDTH + 2,
+            cell.y * TILE_HEIGHT + 2,
+            TILE_WIDTH - 4,
+            TILE_HEIGHT - 4,
+          );
+        }
+        this.rangeGraphics.fillStyle(0xd92e3c, 0.28);
+        this.rangeGraphics.lineStyle(2, 0xff8a91, 0.9);
+        for (const unit of controller.battle.units) {
+          if (unit.side !== 1 || safe.has(`${unit.x},${unit.y}`)) continue;
+          this.rangeGraphics.fillRect(
+            unit.x * TILE_WIDTH + 2,
+            unit.y * TILE_HEIGHT + 2,
+            TILE_WIDTH - 4,
+            TILE_HEIGHT - 4,
+          );
+          this.rangeGraphics.strokeRect(
+            unit.x * TILE_WIDTH + 2,
+            unit.y * TILE_HEIGHT + 2,
+            TILE_WIDTH - 4,
+            TILE_HEIGHT - 4,
+          );
+        }
+      }
       if (controller.isTestMode) {
         this.game.canvas.dataset.nativeDitherCellCount = String(this.rangeMaskTiles.length);
         this.game.canvas.dataset.nativeDitherRetainedFraction = this.rangeMaskTiles.length > 0 ? "0.25" : "1";
+        this.game.canvas.dataset.routePulseSafeCellCount = String(routePulseSafeArea.length);
+        this.game.canvas.dataset.routePulseDangerUnitIds = routePulseSafeArea.length > 0
+          ? controller.battle.units
+            .filter(({ side, x, y }) => side === 1
+              && !routePulseSafeArea.some((cell) => cell.x === x && cell.y === y))
+            .map(({ id }) => id)
+            .join(",")
+          : "";
       }
     }
 
@@ -585,6 +637,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const presentation = controller.combatPresentation;
       const mapPresentation = presentation && !presentation.phase.startsWith("full") ? presentation : undefined;
       const specialPresentation = controller.specialActionPresentation;
+      const routePulsePresentation = controller.routePulsePresentation;
       const displayedUnits = new Map(controller.battle.units.map((unit) => [unit.id, unit]));
       if (mapPresentation) {
         if (!displayedUnits.has(mapPresentation.attacker.id)) displayedUnits.set(mapPresentation.attacker.id, mapPresentation.attacker);
@@ -618,8 +671,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         view.sprite.setX(this.unitVisualOffset(unit));
         view.sprite.setAlpha(1);
         view.sprite.clearTint();
+        const routePulseDisplayedLife = routePulsePresentation?.displayedLifeByUnitId[unit.id];
         const specialDisplayedLife = specialPresentation?.displayedLifeByUnitId[unit.id];
-        const displayedLife = specialDisplayedLife
+        const displayedLife = routePulseDisplayedLife
+          ?? specialDisplayedLife
           ?? (mapPresentation?.attacker.id === unit.id
             ? mapPresentation.displayedAttackerLife
             : mapPresentation?.defender.id === unit.id
@@ -678,8 +733,36 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.combatEffects = [];
       const presentation = controller.combatPresentation;
       const special = controller.specialActionPresentation;
+      const routePulse = controller.routePulsePresentation;
       const rest = controller.restPresentation;
       const canvas = this.game.canvas;
+      if (routePulse) {
+        for (const affected of routePulse.result.affectedUnits) {
+          this.combatEffects.push(
+            this.add.image(
+              affected.position.x * TILE_WIDTH + TILE_WIDTH / 2,
+              affected.position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+              routePulseTextureKey(routePulse.result.definition.presentationId, routePulse.frame),
+            ).setOrigin(.5).setDepth(8),
+          );
+        }
+        if (controller.isTestMode) {
+          canvas.dataset.mapCombatPhase = "route-pulse";
+          canvas.dataset.mapCombatFrame = String(routePulse.frame);
+          canvas.dataset.mapCombatTarget = routePulse.result.affectedUnits
+            .map(({ unitId }) => unitId)
+            .join(",");
+          canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
+          canvas.dataset.routePulseDraw = String(routePulse.draw);
+          canvas.dataset.routePulseNativeTicks = String(routePulse.nativeTicks);
+          delete canvas.dataset.mapCombatLifeChangeUnit;
+          delete canvas.dataset.mapCombatDisplayedLife;
+          delete canvas.dataset.mapCombatAnchorOffset;
+          delete canvas.dataset.mapCombatIceRangeValue;
+          delete canvas.dataset.mapCombatIceDistance;
+        }
+        return;
+      }
       if (rest) {
         if (rest.phase === "restEffect") {
           this.combatEffects.push(
@@ -697,6 +780,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
           delete canvas.dataset.mapCombatLifeChangeUnit;
           delete canvas.dataset.mapCombatDisplayedLife;
+          delete canvas.dataset.routePulseDraw;
+          delete canvas.dataset.routePulseNativeTicks;
           delete canvas.dataset.mapCombatAnchorOffset;
           delete canvas.dataset.mapCombatIceRangeValue;
           delete canvas.dataset.mapCombatIceDistance;
@@ -1005,6 +1090,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (
         controller.combatPresentation
         || controller.specialActionPresentation
+        || controller.routePulsePresentation
         || controller.restPresentation
         || controller.turnTransitionPresentation
       ) return;

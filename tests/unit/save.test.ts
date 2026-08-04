@@ -20,6 +20,8 @@ import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
 import { Stage1Battle } from "../../src/game/simulation/stage1-battle";
 import { Stage2Battle } from "../../src/game/simulation/stage2-battle";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
+import { STAGE4_DEFINITION } from "../../src/game/content/stage4";
+import { Stage4Battle } from "../../src/game/simulation/stage4-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -264,6 +266,68 @@ const stage3BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage4BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-04" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x3040_5060,
+    rngCalls: 12,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "cavalry", experience: 520, life: 120 },
+      { slot: 1, classId: "monk", experience: 480, life: 111 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE4_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot,
+        position: { ...position },
+        fixed: true,
+      })),
+      ...STAGE4_DEFINITION.deployment.optionalSlots.map((slot, index) => ({
+        slot,
+        position: { ...STAGE4_DEFINITION.deployment.openCells[index] },
+        fixed: false,
+      })),
+    ],
+  };
+  const battle = new Stage4Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-04T12:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-04",
+    stageLabel: "遭遇丁塔琪",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: {
+      ...source,
+      roster: source.roster.map((entry) => ({ ...entry })),
+    },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-04-prebattle-story",
+      "stage-04-enter-deployment",
+      "stage-04-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -356,6 +420,63 @@ describe("Web save validation", () => {
     const missingHimi = stage3BattleSave();
     missingHimi.battle.units = missingHimi.battle.units.filter(({ id }) => id !== "1:1");
     expect(isSaveData(missingHimi)).toBe(false);
+  });
+
+  it("round-trips stage-4 deployments and rejects a missing or wrong-class guide", () => {
+    const save = stage4BattleSave();
+    expect(parseSaveData(JSON.stringify(save))).toEqual(save);
+
+    const missingGuide = stage4BattleSave();
+    missingGuide.battle.units = missingGuide.battle.units.filter(({ id }) => id !== "1:24");
+    expect(isSaveData(missingGuide)).toBe(false);
+
+    const wrongGuide = stage4BattleSave();
+    const guide = wrongGuide.battle.units.find(({ id }) => id === "1:24")!;
+    guide.classId = "soldier";
+    guide.className = "士兵";
+    expect(isSaveData(wrongGuide)).toBe(false);
+  });
+
+  it("accepts the stage-05 boundary only with the complete stage-4 route identity", () => {
+    const current: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-05",
+      stageLabel: "過異世界之門",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-04-prebattle-story",
+        "stage-04-enter-deployment",
+        "stage-04-opening-story",
+        "stage-04-objective-reached",
+        "stage-04-victory-story",
+        "stage-04-completed-route",
+      ],
+    };
+    expect(isSaveData(current)).toBe(true);
+    expect(isSaveData({ ...current, consumedEventIds: current.consumedEventIds.slice(0, -1) }))
+      .toBe(false);
+  });
+
+  it("migrates the version-14 stage-4 boundary into the playable stage label", () => {
+    const current: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-04",
+      stageLabel: "遭遇丁塔琪",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-03-opening-story",
+        "stage-03-boss-defeated",
+        "stage-03-victory-story",
+        "stage-03-completed-route",
+      ],
+    };
+    const legacy = {
+      ...current,
+      version: 14,
+      contentVersion: "stage-03-recovery-1",
+      stageLabel: "下一關",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
 
   it("migrates the version-13 stage-3 boundary into the playable stage label", () => {

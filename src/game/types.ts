@@ -6,8 +6,8 @@ export type { PortraitRecord } from "./content/portrait-catalog.generated";
 export type Side = 1 | 2;
 export type Difficulty = 0 | 1 | 2 | 3;
 export type UnitClassId = ClassId;
-export type StageId = "stage-00" | "stage-01" | "stage-02" | "stage-03";
-export type CampaignRouteId = "stage-01" | "stage-02" | "stage-03" | "stage-04";
+export type StageId = "stage-00" | "stage-01" | "stage-02" | "stage-03" | "stage-04";
+export type CampaignRouteId = "stage-01" | "stage-02" | "stage-03" | "stage-04" | "stage-05";
 
 export interface Position {
   x: number;
@@ -135,8 +135,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 14;
-  contentVersion: "stage-03-recovery-1";
+  version: 15;
+  contentVersion: "stage-04-force-field-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

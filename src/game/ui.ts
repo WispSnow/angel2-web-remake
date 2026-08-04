@@ -184,6 +184,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               <span class="panel-kicker">${stage.name}</span>
               <h2>勝利條件</h2><p>${stage.objective.victoryText}</p>
               <h2>失敗條件</h2><p>${stage.objective.defeatText}</p>
+              ${controller.routePulseGuidance
+                ? `<h2>力場提示</h2><p data-testid="route-pulse-guidance">${controller.routePulseGuidance}</p>`
+                : ""}
               <button data-action="close-objectives">返回戰場</button>
             </section>
             <section class="result-layer" id="result-layer" data-testid="result-layer" hidden></section>
@@ -1384,6 +1387,8 @@ function renderHud(
   const controlLabel = unit.side === 1 && !controller.battle.isPlayerControllableAlly(unit.id)
     ? "友軍自動"
     : undefined;
+  const force = controller.battle.forceForUnit(unit.id);
+  const routePulseSafeCells = controller.battle.routePulseSafeArea(unit.id);
   return `
     <div class="unit-detail" data-testid="unit-detail" aria-label="${side}${acted}，${unit.className}${unit.name}${controlLabel ? `，${controlLabel}` : ""}${intentLabel ? `，意圖${intentLabel}` : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
@@ -1405,6 +1410,10 @@ function renderHud(
         <div><dt>等級</dt><dd>${stats.level}</dd></div>
         <div><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
         ${controlLabel ? `<div data-testid="allied-control-mode"><dt>控制</dt><dd>${controlLabel}</dd></div>` : ""}
+        ${force?.label ? `<div data-testid="unit-force"><dt>軍團</dt><dd>${force.label}</dd></div>` : ""}
+        ${routePulseSafeCells.length > 0
+          ? `<div data-testid="route-pulse-safe-area"><dt>結界</dt><dd>安全區 ${routePulseSafeCells.length} 格</dd></div>`
+          : ""}
         ${intentLabel ? `<div data-testid="enemy-ai-intent"><dt>意圖</dt><dd>${intentLabel}</dd></div>` : ""}
       </dl>
     </div>`;

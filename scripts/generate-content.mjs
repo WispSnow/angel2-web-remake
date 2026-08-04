@@ -8,6 +8,7 @@ const generators = [
   "generate-stage1-runtime.mjs",
   "generate-stage2-runtime.mjs",
   "generate-stage3-runtime.mjs",
+  "generate-stage4-runtime.mjs",
   "generate-stage0-actions.mjs",
   "generate-stage1-actions.mjs",
   "generate-ai-technique-dialogue.mjs",

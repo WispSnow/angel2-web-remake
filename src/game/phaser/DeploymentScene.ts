@@ -3,12 +3,15 @@ import type { DeploymentSession } from "../deployment-session";
 
 const positionKey = ({ x, y }: { x: number; y: number }): string => `${x},${y}`;
 
-export function createDeploymentScene(session: DeploymentSession): typeof Phaser.Scene {
+export function createDeploymentScene(
+  session: DeploymentSession,
+  sceneKey = "deployment",
+): typeof Phaser.Scene {
   return class DeploymentScene extends Phaser.Scene {
     private unsubscribe?: () => void;
 
     constructor() {
-      super("stage1-deployment");
+      super(sceneKey);
     }
 
     create(): void {
@@ -46,6 +49,7 @@ export function createDeploymentScene(session: DeploymentSession): typeof Phaser
 export function startDeploymentPhaser(
   session: DeploymentSession,
   parent: string | HTMLElement = "deployment-phaser-root",
+  sceneKey = "deployment",
 ): Phaser.Game {
   return new Phaser.Game({
     type: Phaser.WEBGL,
@@ -58,6 +62,6 @@ export function startDeploymentPhaser(
     roundPixels: true,
     render: { pixelArt: true, antialias: false, roundPixels: true },
     input: { gamepad: true },
-    scene: [createDeploymentScene(session)],
+    scene: [createDeploymentScene(session, sceneKey)],
   });
 }

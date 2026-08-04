@@ -207,8 +207,8 @@ test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign"
     };
   });
   expect(baseline).toMatchObject({
-    version: 14,
-    contentVersion: "stage-03-recovery-1",
+    version: 15,
+    contentVersion: "stage-04-force-field-1",
   });
 
   const loadMutatedBattle = async () => {

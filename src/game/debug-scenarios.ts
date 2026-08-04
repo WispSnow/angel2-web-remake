@@ -12,6 +12,7 @@ import type {
 import {
   DEBUG_SCENARIOS,
   debugScenarioUrl,
+  debugStageLabel,
   isDebugScenarioId,
   type DebugScenarioId,
 } from "./debug-scenario-catalog";
@@ -48,6 +49,19 @@ const STAGE3_COMPLETED_EVENT_IDS = [
   "stage-03-boss-defeated",
   "stage-03-victory-story",
   "stage-03-completed-route",
+] as const;
+
+const STAGE4_BATTLE_EVENT_IDS = [
+  "stage-04-prebattle-story",
+  "stage-04-enter-deployment",
+  "stage-04-opening-story",
+] as const;
+
+const STAGE4_COMPLETED_EVENT_IDS = [
+  ...STAGE4_BATTLE_EVENT_IDS,
+  "stage-04-objective-reached",
+  "stage-04-victory-story",
+  "stage-04-completed-route",
 ] as const;
 
 function stage0Campaign(difficulty: Difficulty): CampaignState {
@@ -268,7 +282,7 @@ async function createStage3Completed(difficulty: Difficulty): Promise<GameContro
     savedAt: "2000-01-01T00:00:00.000Z",
     saveCount: 1,
     stageId: "stage-04",
-    stageLabel: "下一關",
+    stageLabel: "遭遇丁塔琪",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
     rngState: campaign.rngState,
@@ -276,6 +290,91 @@ async function createStage3Completed(difficulty: Difficulty): Promise<GameContro
     roster: completeCampaignRoster(campaign.roster),
     stageProgress: 1000,
     consumedEventIds: [...STAGE3_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
+async function createStage4Prebattle(difficulty: Difficulty): Promise<GameController> {
+  const controller = new GameController(difficulty);
+  await controller.enterStage("stage-04", {
+    ...controller.battle.campaignSnapshot(),
+    stageId: "stage-04",
+  });
+  return controller;
+}
+
+async function createStage4Deployment(difficulty: Difficulty): Promise<GameController> {
+  const controller = new GameController(difficulty);
+  await controller.enterStage("stage-04", {
+    ...controller.battle.campaignSnapshot(),
+    stageId: "stage-04",
+  }, { preparation: true, statusMessage: "調試場景：第 4 關結界部署。" });
+  return controller;
+}
+
+async function createStage4Player(difficulty: Difficulty): Promise<GameController> {
+  const campaign = {
+    ...stage0Campaign(difficulty),
+    stageId: "stage-04" as const,
+  };
+  const [{ STAGE4_DEFINITION }, { Stage4Battle }] = await Promise.all([
+    import("./content/stage4"),
+    import("./simulation/stage4-battle"),
+  ]);
+  const deployment = {
+    placements: [
+      ...STAGE4_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot,
+        position: { ...position },
+        fixed: true,
+      })),
+      ...STAGE4_DEFINITION.deployment.optionalSlots.map((slot, index) => ({
+        slot,
+        position: { ...STAGE4_DEFINITION.deployment.openCells[index] },
+        fixed: false,
+      })),
+    ],
+  };
+  const battle = new Stage4Battle(campaign, deployment);
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 4 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-04"),
+    stageLabel: "遭遇丁塔琪",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE4_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：第 4 關八人編隊玩家回合。";
+  return controller;
+}
+
+async function createStage4Completed(difficulty: Difficulty): Promise<GameController> {
+  const campaign = stage0Campaign(difficulty);
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-05",
+    stageLabel: "過異世界之門",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(campaign.roster),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE4_COMPLETED_EVENT_IDS],
   };
   return GameController.fromSave(save, 1);
 }
@@ -337,6 +436,16 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictorySetupForTest();
   }),
   "stage-03-cleared": createStage3Completed,
+  "stage-04-prebattle": createStage4Prebattle,
+  "stage-04-deployment": createStage4Deployment,
+  "stage-04-player": createStage4Player,
+  "stage-04-first-pulse": withSetup(createStage4Player, (controller) => {
+    controller.statusMessage = "調試場景：結束玩家回合以觀察首輪力場脈衝。";
+  }),
+  "stage-04-near-victory": withSetup(createStage4Player, (controller) => {
+    controller.forceVictorySetupForTest();
+  }),
+  "stage-04-cleared": createStage4Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {
@@ -390,9 +499,9 @@ export function mountDebugToolbar(
   }
 
   const scenario = DEBUG_SCENARIOS.find(({ id }) => id === scenarioId);
-  scenarioLabel.textContent = scenario ? `${scenario.stageLabel} · ${scenario.title}` : scenarioId;
 
   const render = () => {
+    scenarioLabel.textContent = `${debugStageLabel(controller.battle.stage.id)} · ${scenario?.title ?? scenarioId}`;
     stateLabel.textContent = `${controller.battle.stage.id} · ${controller.phase}`;
     const battleActive = controller.phase === "player";
     victory.disabled = !battleActive;

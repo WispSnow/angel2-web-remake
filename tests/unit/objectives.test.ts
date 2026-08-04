@@ -42,4 +42,21 @@ describe("stage objective evaluation", () => {
     expect(objectiveConditionSatisfied([{ side: 1, slot: 1 }], protectedUnits)).toBe(true);
     expect(objectiveConditionSatisfied([{ side: 1, slot: 3 }], protectedUnits)).toBe(true);
   });
+
+  it("uses the condition's declared width for an inclusive unit cell range", () => {
+    const condition = {
+      type: "unit-in-cell-range",
+      side: 1,
+      slot: 24,
+      width: 50,
+      minimum: 0,
+      maximum: 174,
+    } as const;
+    expect(objectiveConditionSatisfied([{ side: 1, slot: 24, x: 24, y: 3 }], condition))
+      .toBe(true);
+    expect(objectiveConditionSatisfied([{ side: 1, slot: 24, x: 25, y: 3 }], condition))
+      .toBe(false);
+    expect(objectiveConditionSatisfied([{ side: 1, slot: 0, x: 24, y: 3 }], condition))
+      .toBe(false);
+  });
 });

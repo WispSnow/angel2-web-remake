@@ -1,6 +1,7 @@
 import "./styles.css";
 import "./deployment-lab.css";
 import { STAGE1_DEFINITION, STAGE1_DEPLOYMENT_PREVIEW_ROSTER } from "./game/content/stage1";
+import { STAGE1, STAGE1_ASSETS, STAGE1_DEPLOYMENT_UI, STAGE1_SEMANTIC_ENEMY_UNITS, STAGE1_TERRAIN_TOKENS } from "./game/content/stage1";
 import { DeploymentSession } from "./game/deployment-session";
 import { mountDeploymentUi } from "./game/deployment-ui";
 import { startDeploymentPhaser } from "./game/phaser/DeploymentScene";
@@ -42,7 +43,19 @@ const session = new DeploymentSession(
   STAGE1_DEFINITION.deployment,
   STAGE1_DEPLOYMENT_PREVIEW_ROSTER,
 );
-const destroyUi = mountDeploymentUi(uiRoot, session);
+const destroyUi = mountDeploymentUi(uiRoot, session, {
+  kicker: "STAGE 01",
+  title: STAGE1.name,
+  objective: STAGE1_DEFINITION.objective.victoryText,
+  minimap: STAGE1_ASSETS.minimap,
+  terrain: STAGE1_TERRAIN_TOKENS,
+  gridWidth: STAGE1.width,
+  gridHeight: STAGE1.height,
+  enemies: STAGE1_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+  pageLabels: STAGE1_DEPLOYMENT_UI.feedbackText.pages,
+  finishLabel: STAGE1_DEPLOYMENT_UI.feedbackText.finish,
+  minimumUnits: STAGE1_DEFINITION.deployment.fixedPlacements.length,
+});
 const game = startDeploymentPhaser(session);
 const destroyScaling = configureGameScaling(viewport, screen);
 uiRoot.focus({ preventScroll: true });

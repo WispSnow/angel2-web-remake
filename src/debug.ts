@@ -1,6 +1,7 @@
 import "./debug.css";
 import {
   DEBUG_SCENARIOS,
+  debugStageLabel,
   debugScenarioUrl,
   type DebugScenarioId,
 } from "./game/debug-scenario-catalog";
@@ -39,14 +40,14 @@ root.innerHTML = `
     <nav class="debug-tool-links" aria-label="專項實驗室">
       <a href="/portrait-lab.html"><b>肖像動畫實驗室</b><span>一次檢查 D/0–67 的眨眼、口型與原版落點</span></a>
       <a href="/combat-lab.html"><b>戰鬥動畫實驗室</b><span>組合職業、方向、格擋、重傷與死亡</span></a>
-      <a href="/deployment-lab.html"><b>部署實驗室</b><span>獨立檢查第 1 關部署名單與輸入</span></a>
+      <a href="/deployment-lab.html"><b>部署實驗室</b><span>獨立檢查通用部署名單與輸入</span></a>
     </nav>
     <main class="debug-stage-list" data-testid="debug-hub">
       ${stageGroups.map(({ stageId, scenarios }) => `
-        <section class="debug-stage-group" aria-labelledby="debug-${stageId}">
+        <section class="debug-stage-group" data-debug-stage-id="${stageId}" aria-labelledby="debug-${stageId}">
           <div class="debug-stage-heading">
             <p>${stageId.toUpperCase()}</p>
-            <h2 id="debug-${stageId}">${scenarios[0]?.stageLabel}</h2>
+            <h2 id="debug-${stageId}">${debugStageLabel(stageId)}</h2>
           </div>
           <div class="debug-scenario-grid">
             ${scenarios.map((scenario) => {

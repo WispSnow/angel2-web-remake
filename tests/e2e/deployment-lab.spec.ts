@@ -108,7 +108,7 @@ test("deployment projection keeps native roster topology, semantic focus and fee
   expect((await deploymentState(page))?.focus).toEqual({ kind: "roster", index: 0 });
   await ui.press("Space");
   await expect(page.getByTestId("deployment-status"))
-    .toHaveText("選擇出場人物；五至八人均可完成。");
+    .toHaveText("選擇出場人物；5至8人均可完成。");
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 6／8");
 
   await page.getByTestId("deployment-screen").screenshot({
@@ -192,7 +192,7 @@ test("pointer chooses a deployment cell without placing and empty pages use nati
   await expect(page.getByTestId("deployment-status")).toHaveText("此處沒有人.");
   await page.getByTestId("deployment-page-0").click();
   await expect(page.getByTestId("deployment-status"))
-    .toHaveText("選擇出場人物；五至八人均可完成。");
+    .toHaveText("選擇出場人物；5至8人均可完成。");
   await expect(page.locator("#deployment-ui-root")).toHaveAttribute("data-roster-page", "1");
   await page.getByTestId("deployment-page-0").click();
   await expect(page.locator("#deployment-ui-root")).toHaveAttribute("data-roster-page", "0");

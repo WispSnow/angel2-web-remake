@@ -46,6 +46,14 @@ import type {
   EnemyPhaseUpdate,
   OrdinaryAiPlanningOptions,
 } from "./ai-contracts";
+import {
+  assertRoutePulseDefinition,
+  planRoutePulsePath,
+  prepareRoutePulse as resolveRoutePulse,
+  routePulseSafeCells,
+  type PreparedRoutePulse,
+  type RoutePulseDefinition,
+} from "./route-pulse";
 
 export type {
   AlliedAiAction,
@@ -93,6 +101,7 @@ export interface BattleScenario {
   alliedBehaviorById?: ReadonlyMap<string, number>;
   enemyBehaviorById?: ReadonlyMap<string, number>;
   forces?: readonly ForceDefinition[];
+  routePulses?: readonly RoutePulseDefinition[];
   routeEnemy?: {
     target: Position;
     movement: number;
@@ -127,6 +136,7 @@ export class Stage0Battle {
   private readonly campaignRoster: SaveRosterEntry[];
   private readonly campaignUnitSlots: ReadonlySet<number>;
   protected readonly forces: ForceRegistry;
+  private readonly routePulseByActorId: ReadonlyMap<string, RoutePulseDefinition>;
 
   constructor(
     public readonly difficulty: Difficulty = 0,
@@ -136,6 +146,19 @@ export class Stage0Battle {
     this.stage = scenario.stage;
     this.units = scenario.createUnits(difficulty);
     this.forces = new ForceRegistry(scenario.forces ?? [], this.units);
+    const routePulseByActorId = new Map<string, RoutePulseDefinition>();
+    for (const definition of scenario.routePulses ?? []) {
+      if (routePulseByActorId.has(definition.actorId)) {
+        throw new Error(`Duplicate route pulse actor ${definition.actorId}`);
+      }
+      assertRoutePulseDefinition(definition, this.units);
+      const force = this.forces.definitionForUnit(definition.actorId);
+      if (force && force.control !== "independent-ai") {
+        throw new Error(`Route pulse actor ${definition.actorId} must use independent AI control`);
+      }
+      routePulseByActorId.set(definition.actorId, definition);
+    }
+    this.routePulseByActorId = routePulseByActorId;
     this.campaignRoster = scenario.createCampaignRoster(difficulty);
     this.campaignUnitSlots = new Set(
       this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
@@ -552,6 +575,15 @@ export class Stage0Battle {
     const unit = this.unit(id);
     if (!unit || unit.side !== 1 || unit.acted || unit.actionDisabled) return undefined;
 
+    const routePulse = this.routePulseByActorId.get(id);
+    if (routePulse) {
+      return {
+        unitId: id,
+        kind: "route-pulse",
+        path: planRoutePulsePath(routePulse, unit, this.units, this.scenario),
+      };
+    }
+
     const doctrine = this.forces.definitionForUnit(id)?.doctrine;
     if (doctrine?.strategy === "terrain-hold") {
       return this.planTerrainHoldAiAction(unit, doctrine);
@@ -613,6 +645,56 @@ export class Stage0Battle {
     }
 
     return this.planOrdinaryAiAction(unit, 2, behavior);
+  }
+
+  routePulseSafeArea(id: string): Position[] {
+    const unit = this.unit(id);
+    const definition = this.routePulseByActorId.get(id);
+    if (!unit || !definition) return [];
+    return routePulseSafeCells(definition, unit, this.scenario);
+  }
+
+  prepareRoutePulse(id: string, path: readonly Position[]): PreparedRoutePulse {
+    const actor = this.unit(id);
+    const definition = this.routePulseByActorId.get(id);
+    if (!actor || !definition || actor.acted || actor.actionDisabled) {
+      throw new Error("illegal route pulse");
+    }
+    return resolveRoutePulse(definition, actor, this.units, this.scenario, path);
+  }
+
+  commitRoutePulse(prepared: PreparedRoutePulse): PreparedRoutePulse {
+    const actor = this.unit(prepared.actorId);
+    const affectedAreCurrent = prepared.affectedUnits.every((affected) => {
+      const unit = this.unit(affected.unitId);
+      return unit
+        && unit.x === affected.position.x
+        && unit.y === affected.position.y
+        && unit.life === affected.lifeBefore;
+    });
+    if (!actor
+      || actor.acted
+      || actor.actionDisabled
+      || actor.x !== prepared.actorDestination.x
+      || actor.y !== prepared.actorDestination.y
+      || this.routePulseByActorId.get(actor.id) !== prepared.definition
+      || !affectedAreCurrent) {
+      throw new Error("stale prepared route pulse");
+    }
+    actor.acted = true;
+    for (const affected of prepared.affectedUnits) {
+      const unit = this.unit(affected.unitId);
+      if (!unit) throw new Error("stale prepared route pulse");
+      unit.life = affected.lifeAfter;
+      this.recordCampaignUnit(unit);
+    }
+    this.recordCampaignUnit(actor);
+    const deadIds = new Set(
+      prepared.affectedUnits.filter(({ died }) => died).map(({ unitId }) => unitId),
+    );
+    if (deadIds.size > 0) this.units = this.units.filter(({ id }) => !deadIds.has(id));
+    this.focusId = this.unit(actor.id)?.id ?? this.units[0]?.id ?? actor.id;
+    return prepared;
   }
 
   planEnemyAiAction(id: string, behavior = this.enemyBehaviorFor(id)): AlliedAiAction | undefined {

@@ -1,12 +1,4 @@
 import {
-  STAGE1,
-  STAGE1_ASSETS,
-  STAGE1_DEFINITION,
-  STAGE1_DEPLOYMENT_UI,
-  STAGE1_SEMANTIC_ENEMY_UNITS,
-  STAGE1_TERRAIN_TOKENS,
-} from "./content/stage1";
-import {
   classDefinition,
   classStatsFor,
   nextExperienceThresholdFor,
@@ -21,26 +13,10 @@ import {
 } from "./deployment-minimap";
 import { DEPLOYMENT_FEEDBACK_TEXT } from "./simulation/deployment";
 import type { Position } from "./types";
-
-/** The only stage-scoped values this surface reads; stage 2+ stays frozen. */
-const STAGE_PRESENTATION = {
-  kicker: "STAGE 01",
-  title: STAGE1.name,
-  objective: STAGE1_DEFINITION.objective.victoryText,
-  minimap: STAGE1_ASSETS.minimap,
-  terrain: STAGE1_TERRAIN_TOKENS,
-  gridWidth: STAGE1.width,
-  gridHeight: STAGE1.height,
-  // Starting enemy placements are stage content, not deployment state; the
-  // preview only reads them so the player can plan the opening approach.
-  enemies: STAGE1_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
-} as const;
+import type { StageDeploymentPresentation } from "./stage-runtime";
 
 /** Longest preview side that still leaves the rail room for the read-out. */
 const MINIMAP_MAX_PIXELS = 128;
-
-const PAGE_LABELS = STAGE1_DEPLOYMENT_UI.feedbackText.pages;
-const FINISH_LABEL = STAGE1_DEPLOYMENT_UI.feedbackText.finish;
 
 const ACTION_CATEGORY_LABEL = {
   ordinary: "普通",
@@ -52,7 +28,7 @@ const ACTION_CATEGORY_LABEL = {
 const ALLY_FIGURE_SOURCE: Partial<Record<ClassId, string>> = {
   archer: "/assets/original/unit-ally-archer.png",
   cavalry: "/assets/original/unit-ally-cavalry.png",
-  magician: STAGE1_ASSETS.allyMagician,
+  magician: "/assets/original/unit-ally-magician.png",
   sister: "/assets/original/unit-ally-sister.png",
   soldier: "/assets/original/unit-ally-soldier.png",
   warrior: "/assets/original/unit-ally-warrior.png",
@@ -193,17 +169,21 @@ function detailHtml(
       <b>${actions.map(escapeHtml).join("・")}</b></p>` : ""}`;
 }
 
-export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession): () => void {
+export function mountDeploymentUi(
+  root: HTMLElement,
+  session: DeploymentSession,
+  presentation: StageDeploymentPresentation,
+): () => void {
   root.tabIndex = 0;
   root.setAttribute("role", "application");
-  root.setAttribute("aria-label", "第 1 關出擊準備；方向鍵移動，Control、Insert 或空白鍵主操作，Alt、Delete 或 Enter 次操作，Tab 切換落點焦點");
+  root.setAttribute("aria-label", `${presentation.title}出擊準備；方向鍵移動，Control、Insert 或空白鍵主操作，Alt、Delete 或 Enter 次操作，Tab 切換落點焦點`);
 
   const minimap = new DeploymentMinimap({
-    source: STAGE_PRESENTATION.minimap,
+    source: presentation.minimap,
     viewBox: terrainContentBounds(
-      STAGE_PRESENTATION.terrain,
-      STAGE_PRESENTATION.gridWidth,
-      STAGE_PRESENTATION.gridHeight,
+      presentation.terrain,
+      presentation.gridWidth,
+      presentation.gridHeight,
     ),
     maxPixels: MINIMAP_MAX_PIXELS,
   });
@@ -229,6 +209,7 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
     const remaining = state.definition.openCells.length
       - state.placements.filter(({ fixed }) => !fixed).length;
     const feedback = state.feedback ? DEPLOYMENT_FEEDBACK_TEXT[state.feedback] : undefined;
+    const dangerKeys = new Set((presentation.dangerCells ?? []).map(positionKey));
 
     const entries = Array.from({ length: 15 }, (_, index): RosterEntryView => {
       const slot = session.rosterSlotAt(index);
@@ -246,7 +227,7 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
     const capacityPips = Array.from({ length: state.definition.maximumUnits }, (_, index) =>
       `<i class="${index < state.placements.length ? "is-on" : ""}"></i>`).join("");
 
-    const pageTabs = PAGE_LABELS.map((label, page) => {
+    const pageTabs = presentation.pageLabels.map((label, page) => {
       const typedPage = page as 0 | 1 | 2;
       const focused = state.focus.kind === "page" && state.focus.page === typedPage;
       const active = state.rosterPage === typedPage;
@@ -264,17 +245,19 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
       const key = positionKey(position);
       const occupied = occupiedCells.has(key);
       const selected = current?.x === position.x && current.y === position.y;
+      const dangerous = dangerKeys.has(key);
       return `<button type="button" tabindex="-1" data-open-cell="${key}"
-        class="deployment-open-cell${selected ? " is-current" : ""}${occupied ? " is-occupied" : ""}"
-        aria-label="部署落點 ${key}${occupied ? "，已使用" : selected ? "，目前選擇" : ""}"
-        ${occupied || state.submitted ? "disabled" : ""}>${key}</button>`;
+        class="deployment-open-cell${selected ? " is-current" : ""}${occupied ? " is-occupied" : ""}${dangerous ? " is-danger" : ""}"
+        aria-label="部署落點 ${key}${occupied ? "，已使用" : selected ? "，目前選擇" : ""}${dangerous ? `，${presentation.dangerText ?? "危險區"}` : "，首輪安全"}"
+        ${occupied || state.submitted ? "disabled" : ""}>${key}${dangerous ? "<em>危險</em>" : ""}</button>`;
     }).join("");
 
     root.innerHTML = `
       <header class="deployment-header">
-        <span class="deployment-kicker">${STAGE_PRESENTATION.kicker}</span>
-        <h2 class="deployment-title">${escapeHtml(STAGE_PRESENTATION.title)} · 出擊準備</h2>
-        <p class="deployment-objective">勝利條件：${escapeHtml(STAGE_PRESENTATION.objective)}</p>
+        <span class="deployment-kicker">${presentation.kicker}</span>
+        <h2 class="deployment-title">${escapeHtml(presentation.title)} · 出擊準備</h2>
+        <p class="deployment-objective">勝利條件：${escapeHtml(presentation.objective)}</p>
+        ${presentation.guidanceText ? `<p class="deployment-guidance" data-testid="deployment-guidance">${escapeHtml(presentation.guidanceText)}</p>` : ""}
         <p class="deployment-capacity" data-testid="deployment-summary">
           已出場 <b>${state.placements.length}／${state.definition.maximumUnits}</b>
           <span class="deployment-pips" aria-hidden="true">${capacityPips}</span>
@@ -284,7 +267,7 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
       <section class="deployment-roster-panel" aria-label="出場名單">
         <div class="deployment-panel-bar">
           <h3>出場名單</h3>
-          <p class="deployment-panel-note">剩餘空位 ${remaining}　·　五至八人均可出擊</p>
+          <p class="deployment-panel-note">剩餘空位 ${remaining}　·　${presentation.minimumUnits}至${state.definition.maximumUnits}人均可出擊</p>
           <nav class="deployment-pages" aria-label="名單頁面">${pageTabs}</nav>
         </div>
         <div class="deployment-roster">${entries.map(rosterEntryHtml).join("")}</div>
@@ -301,7 +284,7 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
           <div class="deployment-map-frame${state.focus.kind === "map" ? " is-focused" : ""}">
             <canvas class="deployment-map" data-testid="deployment-minimap"
               width="${minimap.width}" height="${minimap.height}"
-              role="img" aria-label="騎士城堡前戰場預覽，顯示我方單位、敵方單位與可用落點"></canvas>
+              role="img" aria-label="${escapeHtml(presentation.title)}戰場預覽，顯示我方單位、敵方單位、可用落點與首輪結界"></canvas>
             ${blinkRect ? `<span class="deployment-map-blink" data-testid="deployment-minimap-blink"
               aria-hidden="true" style="left:${blinkRect.left}px;top:${blinkRect.top}px;
               width:${blinkRect.size}px;height:${blinkRect.size}px"></span>` : ""}
@@ -325,22 +308,22 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
           ${feedback ? 'role="alert"' : 'aria-live="polite"'}>
           ${feedback ?? (state.submitted
             ? `部署完成：${state.placements.length} 人編隊已建立。`
-            : "選擇出場人物；五至八人均可完成。")}
+            : `選擇出場人物；${presentation.minimumUnits}至${state.definition.maximumUnits}人均可完成。`)}
         </p>
         <p class="deployment-hint">方向鍵／WZAS 移動 · Ctrl/Ins/Space 主操作 · Alt/Del/Enter 次操作 · Tab 落點</p>
         <button type="button" tabindex="-1" data-finish data-testid="deployment-finish"
-          class="deployment-finish${state.focus.kind === "finish" ? " is-focused" : ""}">${FINISH_LABEL}</button>
+          class="deployment-finish${state.focus.kind === "finish" ? " is-focused" : ""}">${presentation.finishLabel}</button>
       </footer>
 
       ${state.submitted ? `<div class="deployment-submitted" data-testid="deployment-submitted">
-        <strong>部署結果已建立</strong><span>正在進入第 1 關開場劇情</span>
+        <strong>部署結果已建立</strong><span>正在進入${escapeHtml(presentation.title)}開場劇情</span>
       </div>` : ""}
     `;
 
     const canvas = root.querySelector<HTMLCanvasElement>(".deployment-map");
     if (canvas) {
       const markers: DeploymentMinimapMarker[] = [
-        ...STAGE_PRESENTATION.enemies.map((position): DeploymentMinimapMarker =>
+        ...presentation.enemies.map((position): DeploymentMinimapMarker =>
           ({ position, kind: "enemy" })),
         ...state.placements.map(({ position }): DeploymentMinimapMarker =>
           ({ position, kind: "ally" })),
@@ -353,7 +336,12 @@ export function mountDeploymentUi(root: HTMLElement, session: DeploymentSession)
               : "open",
           })),
       ];
-      minimap.render(canvas, { markers, zone: deploymentZone });
+      minimap.render(canvas, {
+        markers,
+        zone: deploymentZone,
+        safeCells: presentation.safeCells,
+        dangerCells: presentation.dangerCells,
+      });
     }
 
     root.dataset.focusKind = state.focus.kind;

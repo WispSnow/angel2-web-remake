@@ -62,6 +62,21 @@ const STAGE1_CASTLE_GUARD_INITIAL_POSITIONS = new Map<string, Position>([
   ["2:43", { x: 23, y: 16 }],
 ]);
 
+function migrateVersion14Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 14
+    || value.contentVersion !== "stage-03-recovery-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    ...(value.kind === "completed" && value.stageId === "stage-04"
+      ? { stageLabel: "遭遇丁塔琪" }
+      : {}),
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
 function migrateVersion13Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 13
@@ -1131,6 +1146,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion14 = migrateVersion14Save(value);
+    if (migratedVersion14) return migratedVersion14;
     const migratedVersion13 = migrateVersion13Save(value);
     if (migratedVersion13) return migratedVersion13;
     if (isVersion12SaveData(value)) {

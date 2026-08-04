@@ -13,7 +13,10 @@ export type StageStoryId =
   | "stage-02-opening-story"
   | "stage-02-victory-story"
   | "stage-03-opening-story"
-  | "stage-03-victory-story";
+  | "stage-03-victory-story"
+  | "stage-04-prebattle-story"
+  | "stage-04-opening-story"
+  | "stage-04-victory-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -25,7 +28,10 @@ export type StageMusicId =
   | "stage-02-player-phase-music"
   | "stage-02-enemy-phase-music"
   | "stage-03-player-phase-music"
-  | "stage-03-enemy-phase-music";
+  | "stage-03-enemy-phase-music"
+  | "stage-04-story-music"
+  | "stage-04-player-phase-music"
+  | "stage-04-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -47,7 +53,13 @@ export type StageEventId =
   | "stage-03-opening-story"
   | "stage-03-boss-defeated"
   | "stage-03-victory-story"
-  | "stage-03-completed-route";
+  | "stage-03-completed-route"
+  | "stage-04-prebattle-story"
+  | "stage-04-enter-deployment"
+  | "stage-04-opening-story"
+  | "stage-04-objective-reached"
+  | "stage-04-victory-story"
+  | "stage-04-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -61,7 +73,10 @@ export type StageSimulationEffectId =
   | "stage-02-set-victory-999"
   | "stage-02-route-to-stage-03"
   | "stage-03-set-victory-999"
-  | "stage-03-route-to-stage-04";
+  | "stage-03-route-to-stage-04"
+  | "stage-04-enter-deployment"
+  | "stage-04-set-victory-999"
+  | "stage-04-route-to-stage-05";
 
 export type StagePresentationId =
   | "none"
@@ -88,7 +103,15 @@ export interface StageEventDefinition {
 export type StageObjectiveCondition =
   | { type: "eliminate-side"; side: Side }
   | { type: "unit-removed"; side: Side; slot: number }
-  | { type: "any-unit-removed"; side: Side; slots: readonly number[] };
+  | { type: "any-unit-removed"; side: Side; slots: readonly number[] }
+  | {
+    type: "unit-in-cell-range";
+    side: Side;
+    slot: number;
+    width: number;
+    minimum: number;
+    maximum: number;
+  };
 
 export interface StageObjectiveDefinition {
   victory: StageObjectiveCondition;

@@ -3,7 +3,7 @@ import type { BattleUnit, Position } from "../types";
 
 export interface AlliedAiAction {
   unitId: string;
-  kind: "attack" | "special" | "move" | "rest" | "wait";
+  kind: "attack" | "special" | "route-pulse" | "move" | "rest" | "wait";
   path: Position[];
   targetId?: string;
   actionId?: BattleActionId;

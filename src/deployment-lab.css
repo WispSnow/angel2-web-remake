@@ -171,6 +171,14 @@
   white-space: nowrap;
 }
 
+.deployment-guidance {
+  flex: 0 1 170px;
+  overflow: hidden;
+  color: #f0b76b;
+  font: 7px/9px system-ui, sans-serif;
+  text-overflow: ellipsis;
+}
+
 .deployment-capacity {
   display: flex;
   flex: none;
@@ -466,6 +474,7 @@
 }
 
 .deployment-open-cell {
+  position: relative;
   flex: 1;
   min-width: 0;
   height: 12px;
@@ -475,6 +484,29 @@
   background: rgba(14, 9, 11, .92);
   font: 7px/10px ui-monospace, monospace;
   cursor: var(--native-cursor-hand);
+}
+
+.deployment-open-cell.is-danger {
+  color: #ffd2c8;
+  border-color: #c75548;
+  box-shadow: inset 0 0 0 1px rgba(255, 85, 85, .16);
+}
+
+.deployment-open-cell.is-danger em {
+  position: absolute;
+  top: -8px;
+  right: -1px;
+  padding: 0 1px;
+  color: #fff;
+  background: #9f302e;
+  font: 700 5px/7px system-ui, sans-serif;
+  font-style: normal;
+}
+
+.deployment-open-cell.is-danger.is-current {
+  color: #240705;
+  border-color: #ff6b5f;
+  background: linear-gradient(#ffd2c8, #df6559);
 }
 
 .deployment-open-cell.is-current {
