@@ -232,7 +232,10 @@
       "FM",
       "SM"
     ],
-    "verifiedAiRuleCodeSignatures": 54,
+    "verifiedAiRuleCodeSignatures": 57,
+    "verifiedAiRuleDataSignatures": 7,
+    "nativeAiTechniqueDialogueGroups": 14,
+    "nativeAiTechniqueDialogueBindings": 33,
     "nativeAiBehaviorActiveInstances": 672,
     "nativeAiBehaviorStaticDomain": [
       0,

@@ -50,6 +50,16 @@ interface DebugState {
   edgeScrollEnabled: boolean;
   portraitsEnabled: boolean;
   aiDialogueEnabled: boolean;
+  aiTechniqueDialogue?: {
+    actionId: string;
+    center: { x: number; y: number };
+  };
+  lastSpecialAction?: {
+    actorId: string;
+    actionId: string;
+    target: { x: number; y: number };
+    healing: number;
+  };
   lastCombat?: {
     attackerId: string;
     defenderId: string;
@@ -1168,6 +1178,57 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
       + Math.abs(alliedMovement.path[index - 1].y - alliedMovement.path[index].y)).toBe(1);
   }
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-follow-leader.png" });
+});
+
+test("REMAKE-014: side-1 autonomous techniques use the upper native dialogue window", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+
+  await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("sister"));
+  const before = await debugState(page);
+  const allyBefore = before.units.find(({ id }) => id === "1:1")!;
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("F3");
+  await finishGroupCommandDialogue(page);
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().aiTechniqueDialogue?.actionId === "heal-1",
+  );
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
+  await expect(dialogue).toHaveAttribute("data-source-wait", "15");
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:860C");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "upper");
+  await expect(page.getByText("妮雅・初級治療", { exact: true })).toBeVisible();
+  await expect(page.getByText("生命單.", { exact: true })).toBeVisible();
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-ally-auto-heal-notice.png",
+  });
+  const during = await debugState(page);
+  expect(during).toMatchObject({
+    cursor: { x: 31, y: 26 },
+    aiTechniqueDialogue: {
+      actionId: "heal-1",
+      center: { x: 31, y: 26 },
+    },
+  });
+  expect(during.units.find(({ id }) => id === "1:1")?.life).toBe(allyBefore.life);
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState();
+    return current?.lastSpecialAction?.actorId === "1:0"
+      && current.lastSpecialAction.actionId === "heal-1"
+      && current.aiTechniqueDialogue === undefined;
+  });
+  const after = await debugState(page);
+  const allyAfter = after.units.find(({ id }) => id === "1:1")!.life;
+  expect(allyAfter).toBeGreaterThan(allyBefore.life);
+  expect(allyAfter).toBeLessThanOrEqual(
+    allyBefore.life + after.lastSpecialAction!.healing,
+  );
 });
 
 test("S00-H: minimap hover previews and primary click relocates the native viewport", async ({ page }) => {

@@ -1,27 +1,30 @@
 import type { BattleActionId } from "./actions";
 import { BATTLE_ACTION_DEFINITIONS } from "./actions";
+import {
+  NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
+  NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
+  type NativeAiTechniqueDialogueRecord,
+} from "./ai-technique-dialogue.generated";
 import type { BattleUnit, DialoguePage } from "../types";
 
-interface NativeAiTechniqueLine {
-  selector: number;
-  address: `DS:${string}`;
-  text: string;
-}
-
 /**
- * Module 29 DS:84BB contextual AI lines selected by the action parameter
- * table. Stage 1 only reaches the two entries below through enemy sisters.
+ * Module 29 DS:84BB contextual AI lines selected by all 33 native action
+ * parameter rows. Both side-1 autonomous actors and side-2 enemies use them.
  */
-export const NATIVE_AI_TECHNIQUE_LINES: Readonly<Partial<Record<BattleActionId, NativeAiTechniqueLine>>> = {
-  "fire-1": { selector: 0x0a, address: "DS:85CA", text: "看我的火球魔法." },
-  "heal-1": { selector: 0x0f, address: "DS:860C", text: "生命單." },
-};
+export { NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE, NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS };
+
+export function nativeAiTechniqueDialogueForCode(
+  nativeCode: string,
+): NativeAiTechniqueDialogueRecord | undefined {
+  return NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE[nativeCode];
+}
 
 export function aiTechniqueDialogueFor(
   actor: Pick<BattleUnit, "name" | "portrait" | "side">,
   actionId: BattleActionId,
 ): DialoguePage | undefined {
-  const line = NATIVE_AI_TECHNIQUE_LINES[actionId];
+  const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+  const line = nativeAiTechniqueDialogueForCode(definition.nativeCode);
   if (!line) return undefined;
   const window = {
     portrait: actor.portrait,

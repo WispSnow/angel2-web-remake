@@ -1290,6 +1290,12 @@ async function buildInventory(referenceDirectory, reverseDirectory) {
       aiRules?.anomalyRuntimeConsequence?.orphanPoolCodes ?? [],
     verifiedAiRuleCodeSignatures:
       aiRules?.verifiedCodeSignatures?.length ?? 0,
+    verifiedAiRuleDataSignatures:
+      aiRules?.verifiedDataSignatures?.length ?? 0,
+    nativeAiTechniqueDialogueGroups:
+      aiRules?.rules?.aiTechniquePresentation?.groups?.length ?? 0,
+    nativeAiTechniqueDialogueBindings:
+      aiRules?.rules?.aiTechniquePresentation?.actionBindings?.length ?? 0,
     nativeAiBehaviorActiveInstances:
       aiRules?.rules?.loadedDecisionInputs?.battleTemplateValidation?.activeInstances ?? 0,
     nativeAiBehaviorStaticDomain:

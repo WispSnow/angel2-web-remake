@@ -4,11 +4,13 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { TextDecoder } from "node:util";
 
 const DATA_SEGMENT = 0x1eba;
 const DATA_LINEAR_BASE = DATA_SEGMENT * 16;
 const AI_CLASS_POOL_TABLE = 0x0d9e;
 const AI_ACTION_TABLE = 0x0ee8;
+const AI_CONTEXT_DIALOGUE_POINTER_TABLE = 0x84bb;
 const SENTINEL = 0xffff;
 
 const CODE_SIGNATURES = [
@@ -77,6 +79,25 @@ const DATA_SIGNATURES = [
   { address: "DS:85CA", offset: 0x2716a, hex: "acdda7daaabaa4f5b279c55daa6b2e24" },
   { address: "DS:84BB[0Fh]", offset: 0x27079, hex: "0c86" },
   { address: "DS:860C", offset: 0x271ac, hex: "a5cda952b3e62e24" },
+  { address: "DS:84BB[0Ah..17h]", offset: 0x2706f, hex: "ca85da85ea85f88504860c8614861e86288632863c86428648864e86" },
+  { address: "DS:85CA..8653", offset: 0x2716a, hex: "acdda7daaabaa4f5b279c55daa6b2e24acdda7daaabab970b971c55daa6b2e24acdda7daaabaa642c55daa6b2e24acdda7daaabaa5a8c0732e24a5cda952a5fe2e24a5cda952b3e62e24a8bebf6db4a3aa402e24a55cc0bbb4a3aa402e24a8bebf6dadb0a7432e24a55cc0bbadb0a7432e24a4a4ac722e24b854a9472e24b256b6c32e24af7da8b82e24" },
+];
+
+const EXPECTED_AI_TECHNIQUE_DIALOGUE_GROUPS = [
+  { presentationGroup: 10, text: "看我的火球魔法." },
+  { presentationGroup: 11, text: "看我的雷電魔法." },
+  { presentationGroup: 12, text: "看我的冰魔法." },
+  { presentationGroup: 13, text: "看我的巨龍." },
+  { presentationGroup: 14, text: "生命全." },
+  { presentationGroup: 15, text: "生命單." },
+  { presentationGroup: 16, text: "防禦提昇." },
+  { presentationGroup: 17, text: "功擊提昇." },
+  { presentationGroup: 18, text: "防禦降低." },
+  { presentationGroup: 19, text: "功擊降低." },
+  { presentationGroup: 20, text: "中毒." },
+  { presentationGroup: 21, text: "禁咒." },
+  { presentationGroup: 22, text: "混亂." },
+  { presentationGroup: 23, text: "破邪." },
 ];
 
 const EXPECTED_CLASS_POOLS = {
@@ -219,6 +240,63 @@ function parseActionTable(buffer) {
   return entries;
 }
 
+function parseAiTechniqueDialogue(buffer, actionEntries) {
+  const decoder = new TextDecoder("big5", { fatal: true });
+  const groups = EXPECTED_AI_TECHNIQUE_DIALOGUE_GROUPS.map((expected) => {
+    const pointerEntry = AI_CONTEXT_DIALOGUE_POINTER_TABLE + expected.presentationGroup * 2;
+    const stringAddress = buffer.readUInt16LE(dataOffset(pointerEntry, 2, buffer));
+    const stringFileOffset = dataOffset(stringAddress, 1, buffer);
+    const terminator = buffer.indexOf(0x24, stringFileOffset);
+    if (terminator < stringFileOffset) {
+      throw new Error(`DS:${hex(stringAddress)}: AI dialogue has no dollar terminator`);
+    }
+    const text = decoder.decode(buffer.subarray(stringFileOffset, terminator));
+    if (text !== expected.text) {
+      throw new Error(
+        `AI presentation group ${expected.presentationGroup}: expected ${expected.text}, got ${text}`,
+      );
+    }
+    return {
+      presentationGroup: expected.presentationGroup,
+      selector: `${hex(expected.presentationGroup, 2)}h`,
+      pointerEntry: `DS:${hex(pointerEntry)}`,
+      address: `DS:${hex(stringAddress)}`,
+      text,
+    };
+  });
+  const groupsById = new Map(groups.map((group) => [group.presentationGroup, group]));
+  const actionBindings = actionEntries.map((action) => {
+    const group = groupsById.get(action.presentationGroup);
+    if (!group) {
+      throw new Error(
+        `${action.actionCode}: missing AI dialogue group ${action.presentationGroup}`,
+      );
+    }
+    return {
+      actionCode: action.actionCode,
+      actionTableAddress: action.address,
+      presentationGroup: action.presentationGroup,
+      selector: group.selector,
+      address: group.address,
+      text: group.text,
+    };
+  });
+  if (new Set(actionBindings.map(({ actionCode }) => actionCode)).size !== actionEntries.length) {
+    throw new Error("AI dialogue action bindings are not unique by action code");
+  }
+  return {
+    pointerTable: `DS:${hex(AI_CONTEXT_DIALOGUE_POINTER_TABLE)}`,
+    presentationGroupRange: [10, 23],
+    groups,
+    actionBindings,
+    coverage: {
+      actionRows: actionEntries.length,
+      boundActionRows: actionBindings.length,
+      distinctDialogueGroups: groups.length,
+    },
+  };
+}
+
 function attachDescriptors(codes, descriptorsByCode) {
   return codes.map((classCode) => ({
     classCode,
@@ -306,7 +384,7 @@ function summarizeBehaviorTemplates(templates, templatePath) {
   };
 }
 
-function nativeRules(descriptorsByCode, behaviorTemplates) {
+function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue) {
   return {
     phaseConfiguration: {
       side2: { side: 2, baseMovementMode: "Y", pursuitMode: "FY", entry: "1000:14D8" },
@@ -380,10 +458,7 @@ function nativeRules(descriptorsByCode, behaviorTemplates) {
         side2Window: "lower A/18 contextual battle-dialogue window",
         completion: "automatic close and battlefield restore; no confirmation input",
       },
-      stage1Lines: [
-        { actionCode: "1F", presentationGroup: 10, selector: "0Ah", address: "DS:85CA", text: "看我的火球魔法." },
-        { actionCode: "1H", presentationGroup: 15, selector: "0Fh", address: "DS:860C", text: "生命單." },
-      ],
+      ...aiTechniqueDialogue,
       viewport: {
         beforeEffect: "1000:1E6B calls 0000:7BFC -> 0000:7C00 to redraw the current viewport",
         effectTarget: "the selected target cell is copied to DS:5A09 immediately before the effect handler call",
@@ -527,6 +602,7 @@ async function extract(runtimePath, descriptorPath, guideComparisonPath, battleT
   const behaviorTemplates = summarizeBehaviorTemplates(battleTemplates, battleTemplatePath);
   const classPools = parseClassPools(buffer, descriptorsByCode);
   const actionEntries = parseActionTable(buffer);
+  const aiTechniqueDialogue = parseAiTechniqueDialogue(buffer, actionEntries);
   const poolCodes = new Set(classPools.flatMap((entry) => entry.tiers.flatMap((tier) => tier.actions)));
   const dispatchCodes = new Set(actionEntries.map((entry) => entry.actionCode));
   const dormantVPoolCodes = ["1V", "2V", "3V"].filter((code) => poolCodes.has(code));
@@ -556,7 +632,7 @@ async function extract(runtimePath, descriptorPath, guideComparisonPath, battleT
     },
     addressModel: { dataSegment: hex(DATA_SEGMENT), dataLinearBase: DATA_LINEAR_BASE, code1000FileBase: 0x10000 },
     battleTemplates: battleTemplatePath,
-    rules: nativeRules(descriptorsByCode, behaviorTemplates),
+    rules: nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue),
     techniqueSelection: {
       classPoolTable: `${hex(DATA_SEGMENT)}:${hex(AI_CLASS_POOL_TABLE)}`,
       tierSelector: "current DATA row count at DS:0D45, minus one and clamped to tier index 0..2",
@@ -599,7 +675,7 @@ async function extract(runtimePath, descriptorPath, guideComparisonPath, battleT
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`);
-  console.log(`extracted ${classPools.length} AI class pools, ${actionEntries.length} action rows, ${orphanPoolCodes.length} native anomalies, ${result.verifiedCodeSignatures.length} code signatures and ${result.verifiedDataSignatures.length} data signatures to ${outputPath}`);
+  console.log(`extracted ${classPools.length} AI class pools, ${actionEntries.length} action/dialogue rows, ${aiTechniqueDialogue.groups.length} dialogue groups, ${orphanPoolCodes.length} native anomalies, ${result.verifiedCodeSignatures.length} code signatures and ${result.verifiedDataSignatures.length} data signatures to ${outputPath}`);
 }
 
 function usage() {
@@ -617,4 +693,10 @@ main().catch((error) => {
   process.exitCode = 1;
 });
 
-export { extract, parseActionTable, parseClassPools, summarizeBehaviorTemplates };
+export {
+  extract,
+  parseActionTable,
+  parseAiTechniqueDialogue,
+  parseClassPools,
+  summarizeBehaviorTemplates,
+};

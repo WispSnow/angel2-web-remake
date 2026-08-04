@@ -1711,16 +1711,14 @@ export class GameController {
           const actorPresentation = { ...unit, statuses: { ...unit.statuses } };
           const targetPresentation = { ...target, statuses: { ...target.statuses } };
           this.statusMessage = `${unit.name}施展${BATTLE_ACTION_DEFINITIONS[action.actionId].label}。`;
-          if (movementKind === "enemy") {
-            // REMAKE-014: native AI dialogue did not recenter; the Web presentation
-            // deliberately focuses the already-prepared semantic effect center.
-            await this.focusCameraOnAction(prepared.result.target);
-            await this.presentAiTechniqueDialogue(
-              actorPresentation,
-              action.actionId,
-              prepared.result.target,
-            );
-          }
+          // Native side-1 autonomous and side-2 enemy techniques share this
+          // dialogue path. REMAKE-014 additionally focuses the prepared center.
+          await this.focusCameraOnAction(prepared.result.target);
+          await this.presentAiTechniqueDialogue(
+            actorPresentation,
+            action.actionId,
+            prepared.result.target,
+          );
           await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
           const result = this.battle.commitPreparedAction(prepared);
           this.lastSpecialAction = result;

@@ -878,14 +878,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       dialogueLayer.classList.toggle("prebattle", controller.phase === "prebattleStory");
       dialogueLayer.classList.toggle("promotion-dialogue", controller.promotionDialogueActive);
       dialogueLayer.classList.toggle("group-command-dialogue", controller.groupCommandDialogueActive);
-      dialogueLayer.classList.toggle("enemy-technique-dialogue", controller.aiTechniqueDialogueActive);
+      dialogueLayer.classList.toggle("ai-technique-dialogue", controller.aiTechniqueDialogueActive);
       skipDialogueButton.hidden = controller.promotionDialogueActive
         || controller.groupCommandDialogueActive
         || controller.aiTechniqueDialogueActive;
       dialogueControls.setAttribute(
         "aria-label",
         controller.aiTechniqueDialogueActive
-          ? "敵方技術提示"
+          ? "自動施術提示"
           : controller.groupCommandDialogueActive
           ? "集體命令對話控制"
           : controller.promotionDialogueActive
@@ -948,7 +948,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     } else {
       dialogueLayer.classList.remove("promotion-dialogue");
       dialogueLayer.classList.remove("group-command-dialogue");
-      dialogueLayer.classList.remove("enemy-technique-dialogue");
+      dialogueLayer.classList.remove("ai-technique-dialogue");
       delete dialogueLayer.dataset.actionId;
       delete dialogueLayer.dataset.effectCenter;
       skipDialogueButton.hidden = false;
