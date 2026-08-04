@@ -40,6 +40,12 @@ import {
 } from "./content/group-command-dialogue";
 import { promotionDialogueFor } from "./content/promotion-dialogue";
 import { buildFullCombatScript, type FullCombatPhaseName, type FullCombatSceneState } from "./full-combat";
+import {
+  TURN_TRANSITION_HOLD_NATIVE_TICKS,
+  turnTransitionFrames,
+  type TurnTransitionPresentation,
+  type TurnTransitionSide,
+} from "./turn-transition-presentation";
 import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
@@ -286,6 +292,8 @@ export class GameController {
   }> = [];
   restPresentation?: RestPresentation;
   restPresentationTrace: RestPresentation[] = [];
+  turnTransitionPresentation?: TurnTransitionPresentation;
+  turnTransitionPresentationTrace: TurnTransitionPresentation[] = [];
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
   movementPresentation?: MovementPresentation;
   statusMessage = "";
@@ -1731,6 +1739,7 @@ export class GameController {
       }
     }
 
+    await this.presentTurnTransition("enemy");
     this.battle.clearActionState(1);
     // The native side-1 disable array is cleared after the player/ally phase,
     // immediately before enemy scheduling. Side 2 is cleared at next-round start.
@@ -1780,6 +1789,7 @@ export class GameController {
         return;
       }
     }
+    await this.presentTurnTransition("player");
     this.battle.startNextRound();
     const nia = this.battle.unit("1:0");
     if (nia) {
@@ -2093,6 +2103,33 @@ export class GameController {
     if (this.testMode) return Math.max(4, nativeTicks * 4);
     if (this.presentationFast) return Math.max(3, Math.round(nativeTicks * 2.5));
     return nativeTicks * 10;
+  }
+
+  private async presentTurnTransition(side: TurnTransitionSide): Promise<void> {
+    this.turnTransitionPresentationTrace = [];
+    const hold: TurnTransitionPresentation = {
+      side,
+      phase: "hold",
+      frame: -1,
+      nativeTicks: TURN_TRANSITION_HOLD_NATIVE_TICKS,
+    };
+    this.turnTransitionPresentation = hold;
+    this.turnTransitionPresentationTrace.push(hold);
+    this.emit();
+    await pause(this.mapCombatDelay(hold.nativeTicks));
+
+    for (const frame of turnTransitionFrames(side)) {
+      const presentation: TurnTransitionPresentation = { ...frame, phase: "motion" };
+      this.turnTransitionPresentation = presentation;
+      this.turnTransitionPresentationTrace.push(presentation);
+      this.emit();
+      await pause(this.mapCombatDelay(frame.nativeTicks));
+    }
+
+    // The caller advances simulation/phase state immediately after the native
+    // runner exits. Let that single update remove the visual and publish the
+    // new side, avoiding an intermediate blank notification.
+    this.turnTransitionPresentation = undefined;
   }
 
   openObjectives(): void {
@@ -3354,6 +3391,12 @@ export class GameController {
       restPresentationTrace: this.restPresentationTrace.map((entry) => ({
         ...entry,
         unit: { ...entry.unit, statuses: { ...entry.unit.statuses } },
+      })),
+      turnTransitionPresentation: this.turnTransitionPresentation
+        ? { ...this.turnTransitionPresentation }
+        : undefined,
+      turnTransitionPresentationTrace: this.turnTransitionPresentationTrace.map((entry) => ({
+        ...entry,
       })),
       aiTechniqueDialogue: this.aiTechniqueDialogue ? {
         ...this.aiTechniqueDialogue,

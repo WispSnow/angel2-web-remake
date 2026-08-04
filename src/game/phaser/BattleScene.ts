@@ -8,6 +8,7 @@ import {
 import type { GameController } from "../controller";
 import type { BattleUnit } from "../types";
 import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-technique-presentation";
+import { TURN_TRANSITION_DUST } from "../turn-transition-presentation";
 import {
   preloadMapTechniqueAssets,
   renderLightningFrame,
@@ -22,6 +23,9 @@ const BATTLE_INPUT_LEFT = 40;
 const BATTLE_INPUT_RIGHT = 433;
 const BATTLE_INPUT_TOP = 26;
 const BATTLE_INPUT_BOTTOM = 326;
+const TURN_TRANSITION_BUFFER_SOURCE_Y = 200;
+const TURN_TRANSITION_SCREEN_Y = 155;
+const TURN_TRANSITION_BUFFER_HEIGHT = 132;
 const EDGE_PAN_INTERVAL_MS = 110;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 const NATIVE_CURSOR_SHADOW = 0x000000;
@@ -101,6 +105,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
     private combatEffects: Phaser.GameObjects.Image[] = [];
+    private turnTransitionEffects: Phaser.GameObjects.Image[] = [];
+    private turnTransitionMask?: Phaser.Display.Masks.GeometryMask;
+    private turnTransitionMaskShape?: Phaser.GameObjects.Graphics;
     private unitViews = new Map<string, UnitView>();
     private unsubscribe?: () => void;
     private edgePan?: { x: number; y: number };
@@ -137,6 +144,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
       ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
+      this.load.image("turn-transition-player", ASSETS.turnTransition.player);
+      this.load.image("turn-transition-enemy", ASSETS.turnTransition.enemy);
+      this.load.image("turn-transition-shadow", ASSETS.turnTransition.shadow);
+      ASSETS.turnTransition.dust.forEach((source, frame) =>
+        this.load.image(`turn-transition-dust-${frame}`, source));
       STAGE0_ACTION_PRESENTATION_ASSETS.shoot.hit.forEach((source, frame) =>
         this.load.image(`map-shoot-${frame}`, source));
       STAGE0_ACTION_PRESENTATION_ASSETS.fire1.effect.forEach((source, frame) =>
@@ -225,6 +237,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.rangeMaskTiles = [];
         for (const effect of this.combatEffects) effect.destroy();
         this.combatEffects = [];
+        for (const effect of this.turnTransitionEffects) effect.destroy();
+        this.turnTransitionEffects = [];
+        this.turnTransitionMask?.destroy();
+        this.turnTransitionMask = undefined;
+        this.turnTransitionMaskShape?.destroy();
+        this.turnTransitionMaskShape = undefined;
         this.clearEdgePan();
       });
       this.sync();
@@ -355,6 +373,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.drawRanges();
       this.drawUnits();
       this.drawCombatEffects();
+      this.drawTurnTransition();
       this.drawCursor();
     }
 
@@ -851,6 +870,106 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
     }
 
+    private drawTurnTransition(): void {
+      for (const effect of this.turnTransitionEffects) effect.destroy();
+      this.turnTransitionEffects = [];
+      this.turnTransitionMask?.destroy();
+      this.turnTransitionMask = undefined;
+      this.turnTransitionMaskShape?.destroy();
+      this.turnTransitionMaskShape = undefined;
+      const presentation = controller.turnTransitionPresentation;
+      const canvas = this.game.canvas;
+
+      if (!presentation) {
+        if (controller.isTestMode) {
+          delete canvas.dataset.turnTransitionSide;
+          delete canvas.dataset.turnTransitionPhase;
+          delete canvas.dataset.turnTransitionFrame;
+          delete canvas.dataset.turnTransitionX;
+          delete canvas.dataset.turnTransitionY;
+          delete canvas.dataset.turnTransitionScreenX;
+          delete canvas.dataset.turnTransitionScreenY;
+          delete canvas.dataset.turnTransitionClip;
+          canvas.dataset.turnTransitionSpriteCount = "0";
+          canvas.dataset.turnTransitionDustCount = "0";
+        }
+        return;
+      }
+
+      if (controller.isTestMode) {
+        canvas.dataset.turnTransitionSide = presentation.side;
+        canvas.dataset.turnTransitionPhase = presentation.phase;
+        canvas.dataset.turnTransitionFrame = String(presentation.frame);
+      }
+      if (presentation.phase === "hold") {
+        if (controller.isTestMode) {
+          delete canvas.dataset.turnTransitionX;
+          delete canvas.dataset.turnTransitionY;
+          delete canvas.dataset.turnTransitionScreenX;
+          delete canvas.dataset.turnTransitionScreenY;
+          delete canvas.dataset.turnTransitionClip;
+          canvas.dataset.turnTransitionSpriteCount = "0";
+          canvas.dataset.turnTransitionDustCount = "0";
+        }
+        return;
+      }
+
+      // 1000:37E8 prepares three D4EA copy descriptors. The runner is drawn in
+      // the offscreen (0,200)..(399,331) strip, which 1000:389D copies onto the
+      // visible (40,155)..(439,286) strip. This is an exact x+40/y-45 mapping,
+      // not a tween anchor adjustment; the same strip clips A/19, its shadow,
+      // and every A/26 puff before the battle chrome is composited above it.
+      this.turnTransitionMaskShape = this.make.graphics({ x: 0, y: 0 });
+      this.turnTransitionMaskShape.fillStyle(0xffffff);
+      this.turnTransitionMaskShape.fillRect(
+        this.cameras.main.scrollX,
+        this.cameras.main.scrollY + TURN_TRANSITION_SCREEN_Y - this.cameras.main.y,
+        400,
+        TURN_TRANSITION_BUFFER_HEIGHT,
+      );
+      const transitionMask = this.turnTransitionMaskShape.createGeometryMask();
+      this.turnTransitionMask = transitionMask;
+
+      const addFixedImage = (x: number, y: number, texture: string, depth: number) => {
+        const screenX = x + BATTLE_INPUT_LEFT;
+        const screenY = y - TURN_TRANSITION_BUFFER_SOURCE_Y + TURN_TRANSITION_SCREEN_Y;
+        const image = this.add.image(
+          screenX - this.cameras.main.x,
+          screenY - this.cameras.main.y,
+          texture,
+        ).setOrigin(0).setScrollFactor(0).setDepth(depth).setMask(transitionMask);
+        this.turnTransitionEffects.push(image);
+      };
+
+      addFixedImage(presentation.x + 16, 322, "turn-transition-shadow", 11);
+      addFixedImage(
+        presentation.x,
+        presentation.y,
+        presentation.side === "player" ? "turn-transition-player" : "turn-transition-enemy",
+        12,
+      );
+      for (const dust of TURN_TRANSITION_DUST) {
+        addFixedImage(dust.x, dust.y, `turn-transition-dust-${dust.frame}`, 13);
+      }
+
+      if (controller.isTestMode) {
+        canvas.dataset.turnTransitionX = String(presentation.x);
+        canvas.dataset.turnTransitionY = String(presentation.y);
+        canvas.dataset.turnTransitionScreenX = String(presentation.x + BATTLE_INPUT_LEFT);
+        canvas.dataset.turnTransitionScreenY = String(
+          presentation.y - TURN_TRANSITION_BUFFER_SOURCE_Y + TURN_TRANSITION_SCREEN_Y,
+        );
+        canvas.dataset.turnTransitionClip = [
+          BATTLE_INPUT_LEFT,
+          TURN_TRANSITION_SCREEN_Y,
+          400,
+          TURN_TRANSITION_BUFFER_HEIGHT,
+        ].join(",");
+        canvas.dataset.turnTransitionSpriteCount = "2";
+        canvas.dataset.turnTransitionDustCount = String(TURN_TRANSITION_DUST.length);
+      }
+    }
+
     private drawCursor(): void {
       this.cursorGraphics.clear();
       if (controller.isTestMode) {
@@ -863,6 +982,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         controller.combatPresentation
         || controller.specialActionPresentation
         || controller.restPresentation
+        || controller.turnTransitionPresentation
       ) return;
       const focus = controller.cursor;
       this.drawNativeCursorFrame(focus.x * TILE_WIDTH, focus.y * TILE_HEIGHT);

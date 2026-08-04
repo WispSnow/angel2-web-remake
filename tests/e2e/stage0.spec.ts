@@ -122,6 +122,22 @@ interface DebugState {
     displayedDefenderLife: number;
     fullScene?: NonNullable<DebugState["combatPresentation"]>["fullScene"];
   }>;
+  turnTransitionPresentation?: {
+    side: "player" | "enemy";
+    phase: "hold" | "motion";
+    frame: number;
+    x?: number;
+    y?: number;
+    nativeTicks: number;
+  };
+  turnTransitionPresentationTrace: Array<{
+    side: "player" | "enemy";
+    phase: "hold" | "motion";
+    frame: number;
+    x?: number;
+    y?: number;
+    nativeTicks: number;
+  }>;
   movementPresentation?: {
     unitId: string;
     kind: "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
@@ -1091,6 +1107,102 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
   expect(evacuated.units.filter((unit) => unit.side === 2)).toHaveLength(0);
   expect(evacuated.round).toBe(1);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-evacuation-victory.png" });
+});
+
+test("turn handoff replays the native A/19 runners, hops, shadow and A/26 edge dust", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "openingStory");
+  await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "player");
+
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.getByTestId("group-command-allRest").click();
+  await finishGroupCommandDialogue(page);
+  await page.waitForFunction(() => {
+    const transition = window.__ANGEL2__?.getState().turnTransitionPresentation;
+    return transition?.side === "enemy"
+      && transition.phase === "motion"
+      && transition.x <= 250
+      && transition.x >= 110;
+  }, undefined, { polling: 10 });
+
+  const enemyFrame = await debugState(page);
+  expect(enemyFrame.phase).toBe("allyAuto");
+  expect(enemyFrame.turnTransitionPresentation).toMatchObject({
+    side: "enemy",
+    phase: "motion",
+    nativeTicks: 10,
+  });
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-side", "enemy");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-sprite-count", "2");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-dust-count", "6");
+  expect(await page.getByTestId("battle-canvas").evaluate((canvas) => {
+    const transition = window.__ANGEL2__?.getState().turnTransitionPresentation;
+    return {
+      screenOffsetX: Number((canvas as HTMLCanvasElement).dataset.turnTransitionScreenX)
+        - transition.x,
+      screenOffsetY: Number((canvas as HTMLCanvasElement).dataset.turnTransitionScreenY)
+        - transition.y,
+      clip: (canvas as HTMLCanvasElement).dataset.turnTransitionClip,
+    };
+  })).toEqual({ screenOffsetX: 40, screenOffsetY: -45, clip: "40,155,400,132" });
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-turn-transition-enemy.png",
+  });
+  await page.waitForFunction((frame) => {
+    const transition = window.__ANGEL2__?.getState().turnTransitionPresentation;
+    return transition?.side === "enemy"
+      && transition.phase === "motion"
+      && transition.frame > frame;
+  }, enemyFrame.turnTransitionPresentation!.frame, { polling: 10 });
+  const enemyLaterFrame = await debugState(page);
+  expect(enemyLaterFrame.units).toEqual(enemyFrame.units);
+  expect(enemyLaterFrame.rngState).toBe(enemyFrame.rngState);
+  expect(enemyLaterFrame.round).toBe(enemyFrame.round);
+
+  await page.waitForFunction(() => {
+    const transition = window.__ANGEL2__?.getState().turnTransitionPresentation;
+    return transition?.side === "player"
+      && transition.phase === "motion"
+      && transition.x >= 95
+      && transition.x <= 225;
+  }, undefined, { polling: 10 });
+  const playerFrame = await debugState(page);
+  expect(playerFrame.phase).toBe("enemy");
+  expect(playerFrame.turnTransitionPresentation).toMatchObject({
+    side: "player",
+    phase: "motion",
+    nativeTicks: 10,
+  });
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-side", "player");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-sprite-count", "2");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-dust-count", "6");
+  await page.getByTestId("game-screen").screenshot({
+    path: "artifacts/playwright/stage0-turn-transition-player.png",
+  });
+  await page.waitForFunction((frame) => {
+    const transition = window.__ANGEL2__?.getState().turnTransitionPresentation;
+    return transition?.side === "player"
+      && transition.phase === "motion"
+      && transition.frame > frame;
+  }, playerFrame.turnTransitionPresentation!.frame, { polling: 10 });
+  const playerLaterFrame = await debugState(page);
+  expect(playerLaterFrame.units).toEqual(playerFrame.units);
+  expect(playerLaterFrame.rngState).toBe(playerFrame.rngState);
+  expect(playerLaterFrame.round).toBe(playerFrame.round);
+
+  await waitForPhase(page, "round2Story");
+  const completed = await debugState(page);
+  expect(completed.turnTransitionPresentation).toBeUndefined();
+  expect(completed.turnTransitionPresentationTrace).toHaveLength(21);
+  expect(completed.turnTransitionPresentationTrace[0]).toEqual({
+    side: "player",
+    phase: "hold",
+    frame: -1,
+    nativeTicks: 100,
+  });
 });
 
 test("S00-G: group commands provide allied AI handoff and confirmed retreat", async ({ page }) => {

@@ -48,6 +48,15 @@ const tacticalPanelToggleAssets = {
   "tactical-panel-portraits-off.png": "30.png",
   "tactical-panel-portraits-on.png": "31.png",
 };
+const turnTransitionAssets = {
+  "turn-transition-player.png": "0019/00.png",
+  "turn-transition-enemy.png": "0019/01.png",
+  "turn-transition-shadow.png": "0019/02.png",
+  ...Object.fromEntries(Array.from({ length: 6 }, (_, frame) => [
+    `turn-transition-dust-${String(frame).padStart(2, "0")}.png`,
+    `0026/${String(frame).padStart(2, "0")}.png`,
+  ])),
+};
 
 const [template, mappingDocument, ...dialogueDocuments] = await Promise.all([
   readFile(templatePath),
@@ -107,6 +116,8 @@ await Promise.all([
     copyFile(path.join(planarAssetPath, "0000", source), path.join(publicAssetPath, output))),
   ...Object.entries(tacticalPanelToggleAssets).map(([output, source]) =>
     copyFile(path.join(planarAssetPath, "0006", source), path.join(publicAssetPath, output))),
+  ...Object.entries(turnTransitionAssets).map(([output, source]) =>
+    copyFile(path.join(planarAssetPath, source), path.join(publicAssetPath, output))),
 ]);
 
 // ImageMagick 默认往 PNG 里写 tIME 与 date:create/modify/timestamp 文本块，
@@ -205,4 +216,4 @@ composeStatueForeground(
 );
 
 console.log(`wrote ${path.relative(root, outputPath)} (${terrain.length} terrain cells)`);
-console.log("wrote stage 0 battle chrome/statue foreground, native cursors/command-menu chrome, stateful tactical panel, map sprites and ordinary-combat VOC assets");
+console.log("wrote stage 0 battle chrome/statue foreground, native cursors/command-menu chrome, stateful tactical panel, turn-transition graphics, map sprites and ordinary-combat VOC assets");

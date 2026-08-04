@@ -36,7 +36,7 @@ const battleMusicSide = (phase: GamePhase): BattleMusicSide | undefined => {
 
 export class AudioManager {
   private unlocked = false;
-  private previousPhase: GamePhase;
+  private previousBattleMusicSide?: BattleMusicSide;
   private previousCueSequence = 0;
   private selectedMusic?: MusicProgram;
   private readonly music: MusicTransport;
@@ -58,7 +58,7 @@ export class AudioManager {
     initiallyUnlocked = false,
   ) {
     this.unlocked = initiallyUnlocked;
-    this.previousPhase = controller.phase;
+    this.previousBattleMusicSide = battleMusicSide(controller.phase);
     this.music = new MusicTransport(
       MUSIC_GAIN_BY_VOLUME[controller.musicVolume],
       (state) => this.updateMusicDebugState(state),
@@ -110,8 +110,14 @@ export class AudioManager {
 
   private syncMusic(): void {
     this.applyMusicVolume();
-    const side = battleMusicSide(this.controller.phase);
-    const previousSide = battleMusicSide(this.previousPhase);
+    // Module 29 starts the incoming side's program immediately before the
+    // first A/19 motion frame, while the simulation phase still belongs to
+    // the outgoing side. Keep that presentation-only music boundary separate
+    // from the deterministic turn lifecycle.
+    const side = this.controller.turnTransitionPresentation?.phase === "motion"
+      ? this.controller.turnTransitionPresentation.side
+      : battleMusicSide(this.controller.phase);
+    const previousSide = this.previousBattleMusicSide;
     let desired = this.selectedMusic;
     let restart = false;
     if (this.controller.phase === "prebattleStory") {
@@ -133,7 +139,7 @@ export class AudioManager {
       this.selectedMusic = desired;
       this.music.select(desired, restart);
     }
-    this.previousPhase = this.controller.phase;
+    this.previousBattleMusicSide = side;
   }
 
   private applyMusicVolume(): void {

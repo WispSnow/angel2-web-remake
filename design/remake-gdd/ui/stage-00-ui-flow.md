@@ -80,8 +80,11 @@ stateDiagram-v2
     RetreatConfirm --> PlayerPhase: 取消
     RetreatConfirm --> BuildBattle: 确认
     PlayerPhase --> AllyAutoPhase: 剩余手动单位均已提交
-    AllyAutoPhase --> EnemyPhase: 我方自动/特殊单位处理完成
-    EnemyPhase --> Round2Story: 未终局且回合进入 2
+    AllyAutoPhase --> EnemyTurnTransition: 我方自动/特殊单位处理完成
+    EnemyTurnTransition --> EnemyPhase: 敵軍進攻跑动结束
+    EnemyPhase --> PlayerTurnTransition: 未终局
+    PlayerTurnTransition --> Round2Story: 回合进入 2
+    PlayerTurnTransition --> PlayerPhase: 无回合剧情
     Round2Story --> PlayerPhase: SAY 0002 结束
     PlayerPhase --> Defeat: 妮雅从棋盘消失
     EnemyPhase --> Defeat: 妮雅从棋盘消失
@@ -136,7 +139,9 @@ stateDiagram-v2
   原版手指，战场边缘按上述五态切换；不再显示系统箭头、十字或 resize 光标，也不为
   移动、攻击和禁用按钮虚构原版未提供的额外状态图。
 | `S00-UI-06b` | 我方自动阶段 | 手动单位全部提交或选择 AI 接管 | 逐单位显示移动、攻击、休息与行动完成；玩家战斗输入锁定 | 仅表现速度控制 | 敌方阶段或即时终局 |
+| `S00-UI-06c` | 敌军回合过渡 | 我方自动阶段正常结束 | `[OF]` 先保留战场 100 native tick；随后 `A/19`“敵軍進攻”人物按 24 个离散帧从右向左跑过，配黑色影子、六枚 `A/26` 边缘尘团和多段小跳；首帧切入敌方音乐 | 战斗输入锁定；表现速度只缩短等待 | 敌方规则入口 |
 | `S00-UI-07` | 敌方阶段 | 玩家阶段结束 | 敌人沿实际可通行格逐段折线移动；进入楼梯任一出口格后当场消失；可选高层“撤離”意图不公开精确格 | 仅允许表现速度控制、系统级暂停 | 下一单位、下一回合事件或即时终局 |
+| `S00-UI-07a` | 我军回合过渡 | 敌方阶段正常结束且未终局 | `[OF]` 先保留战场 100 native tick；随后 `A/19`“我軍進攻”人物按 20 个离散帧从左向右跑过，配黑色影子、六枚 `A/26` 边缘尘团和两次跳跃；首帧切回我方音乐 | 战斗输入锁定；表现速度只缩短等待 | 下一回合 tick／剧情／玩家阶段 |
 | `S00-UI-08` | 失败反馈 | 妮雅从棋盘消失 | `D/46` 肖像与失败原文逐字显示 | 第一次主操作补全，第二次确认 | 重建本关固定初态 |
 | `S00-UI-09` | 胜利反馈 | `SAY/0003` 结束 | `D/46` 肖像与胜利原文逐字显示 | 第一次主操作补全，第二次确认 | 保存询问 |
 | `S00-UI-10` | 保存询问 | 胜利确认后 | 是否记录本次战役 | 选择、确认、取消 | 分页手动槽选择或下一关 |

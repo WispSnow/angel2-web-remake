@@ -194,6 +194,13 @@ export const ASSETS = {
   },
   enemySoldier: "/assets/original/unit-enemy-soldier.png",
   enemyCavalry: "/assets/original/unit-enemy-cavalry.png",
+  turnTransition: {
+    player: "/assets/original/turn-transition-player.png",
+    enemy: "/assets/original/turn-transition-enemy.png",
+    shadow: "/assets/original/turn-transition-shadow.png",
+    dust: Array.from({ length: 6 }, (_, frame) =>
+      `/assets/original/turn-transition-dust-${String(frame).padStart(2, "0")}.png`),
+  },
   mapCombat: {
     hit: Array.from({ length: 8 }, (_, frame) => `/assets/original/map-combat/hit/${String(frame).padStart(2, "0")}.png`),
     death: Array.from({ length: 38 }, (_, frame) => `/assets/original/map-combat/death/${String(frame).padStart(2, "0")}.png`),
