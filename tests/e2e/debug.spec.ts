@@ -75,6 +75,16 @@ test("debug scenarios can enter player phases and directly complete either imple
   }))).toMatchObject({ stageId: "stage-03", campaignRoute: "stage-03" });
 });
 
+test("a completed stage-three save projects stage-four metadata without swapping the backing battle assets", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-03-cleared&difficulty=0");
+  await expect(page.getByText("第 3 關已完成", { exact: true })).toBeVisible();
+  await expect(page.getByText(/「下一關」（stage-04）入口/)).toBeVisible();
+  const resources = await page.evaluate(() =>
+    performance.getEntriesByType("resource").map(({ name }) => name));
+  expect(resources.some((url) => url.includes("stage3-map.png"))).toBe(false);
+  expect(resources.some((url) => url.includes("stage0-map.png"))).toBe(true);
+});
+
 test("the magician range fixture releases its pursuing target after exactly one enemy phase", async ({ page }) => {
   await page.goto("/?debugScenario=stage-01-magician&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();

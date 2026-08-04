@@ -7,6 +7,7 @@ export type Side = 1 | 2;
 export type Difficulty = 0 | 1 | 2 | 3;
 export type UnitClassId = ClassId;
 export type StageId = "stage-00" | "stage-01" | "stage-02" | "stage-03";
+export type CampaignRouteId = "stage-01" | "stage-02" | "stage-03" | "stage-04";
 
 export interface Position {
   x: number;
@@ -149,16 +150,16 @@ interface SaveDataBase {
 
 export interface BattleSaveData extends SaveDataBase {
   kind: "battle";
-  stageId: "stage-00" | "stage-01" | "stage-02" | "stage-03";
-  stageLabel: "瓦爾克麗宮" | "騎士城堡前" | "救援友軍" | "通過力場";
+  stageId: StageId;
+  stageLabel: string;
   stageEntrySnapshot: CampaignState;
   battle: SavedBattleState;
 }
 
 export interface CompletedSaveData extends SaveDataBase {
   kind: "completed";
-  stageId: "stage-01" | "stage-02" | "stage-03" | "stage-04";
-  stageLabel: "騎士城堡前" | "救援友軍" | "通過力場" | "下一關";
+  stageId: CampaignRouteId;
+  stageLabel: string;
 }
 
 export type SaveData = BattleSaveData | CompletedSaveData;

@@ -1,6 +1,6 @@
 # 《天使帝国 II》Web 复刻
 
-当前普通入口可连续运行第 0 关“瓦爾克麗宮”、第 1 关“騎士城堡前”和第 2 关“救援友軍”。流程从原版关前剧情开始，覆盖固定编队、第 0 关脚本事件与撤离敌军、第 1 关交互部署和技术、第 2 关固定 `9 vs 5` 阵容与六名自动友军、失败重试、战中与战后存档、首领芳／蘭胜利及逐关剧情，并终止在明确的 `stage-03` 未实现边界。
+当前普通入口可连续运行第 0 关“瓦爾克麗宮”、第 1 关“騎士城堡前”、第 2 关“救援友軍”和第 3 关“通過力場”。流程从原版关前剧情开始，覆盖固定／交互编队、逐关事件与剧情、玩家与独立友军军团、敌方多军团、僧侣范围回復、失败重试、战中与战后存档及首领胜利，并终止在明确的 `stage-04` 未实现边界。
 
 运行时采用 Phaser 4.2.1、TypeScript 和 Vite。战斗规则与内容数据独立于 Phaser，场景层只负责地图、单位、镜头、输入和范围表现。
 
@@ -24,7 +24,7 @@ pnpm dev:debug
 ```
 
 也可以在开发服务器已经运行时打开 `http://127.0.0.1:4173/debug.html`。调试中心目前提供
-第 0–2 关的关前剧情、部署／固定准备、玩家回合、魔术士技能、敌方修女、一击胜利和直接通关入口，
+第 0–3 关的关前剧情、部署／固定准备、玩家回合、魔术士／僧侣技能、一击胜利和直接通关入口，
 并可选择四档难度。场景内右上角工具栏可随时准备一击胜利、直接通关或触发战败。
 
 调试场景由 `src/game/debug-scenarios.ts` 的注册表统一管理；新增关卡必须至少登记关前、
@@ -104,7 +104,7 @@ pnpm dev:deployment
 
 当前没有自动存档或云同步；只有玩家明确选择存档槽时才写入进度。标题会拒绝空槽、损坏数据和不兼容的存档版本。
 
-当前 v13 战中档会同时保存“当前战况”和不可变的“入关快照”。读档仍从保存时的当前
+当前 v14 战中档会同时保存“当前战况”和不可变的“入关快照”。读档仍从保存时的当前
 回合继续；之后若战败或确认全面撤退，则从入关快照重新开始本关，本次尝试取得的经验、
 升级、转职、生命变化和随机进度都不会保留。正常胜利仍把最终成长带入下一关。v12 及
 更早的战中档因没有历史快照，迁移时会把旧档当前状态一次性作为重试基线。
@@ -115,7 +115,7 @@ pnpm dev:deployment
 2. 从职业行动菜单选择“移动”，再在原版网点范围内选择合法格；
 3. 移动后选择“攻击／结束／返悔”，或在初始菜单直接“攻击／休息”；
 4. 所有手动单位提交后进入我方自动与敌方阶段；也可用“全部休息”一次提交剩余单位；
-5. 第 0 关清除全部敌人胜利；第 1、2 关分别只需击败首领芳、蘭；妮雅被移除则失败。
+5. 第 0 关清除全部敌人胜利；第 1、2、3 关分别需击败首领芳、蘭、莎；各关保护目标按右栏胜利条件显示。
 
 没有单位焦点时，右栏显示战术桌与实时小地图；悬浮或选中单位时改为单位详情。`Esc` 根菜单提供原文五项“遊戲功能／勝利條件／讀取記錄／儲存記錄／離開遊戲”；表现速度与地图/全景战斗位于“遊戲功能”子菜单，“音效設定”进入“說話／移動／戰鬥／按鍵”四项独立开关，“音樂”进入“無聲／1／2／3／最大”五档单选。表现与声音选项不会改变模拟状态或随机数序列。
 
@@ -132,14 +132,17 @@ pnpm check         # 顺序执行以上全部检查
 pnpm content:portraits # 从 D.SWF 渲染与原版元数据重建全角色肖像目录
 pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉淡化参数
 pnpm content:stage2 # 从第 2 关机器证据重建地图、固定阵容、剧情与音乐内容
+pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧情与音乐内容
 ```
 
-端到端测试覆盖 `S00-A` 到 `S00-P`、`S01-A` 到 `S01-J` 与 `S02-A` 到 `S02-J`，包括真实鼠标攻击、目标/系统/集体命令、AI 与 ZOC、部署、友军自动阶段、落雷/冰雪、敌方修女、地图/全景战斗、剧情、失败重试、战中存读档、胜利保存、音乐/音效、键盘输入、减少动画、窄屏和按关延迟加载。`S00-O` 从普通 `/` 启动，不带 `?test=1`、不读取调试状态，只用玩家可见控件完整通关第 0 关并进入第 1 关；第 1 关普通入口完成路径继续建立第 2 关固定战斗。固定版本 Chromium 在 Darwin 本地执行代表性截图审计，CI 保留同一流程的语义断言以避开跨系统字形光栅差异。过程截图生成到 `artifacts/playwright/`。
+端到端测试覆盖第 0–3 关的逐关合同，包括真实鼠标攻击、目标/系统/集体命令、AI 与 ZOC、部署、独立友军阶段、多军团目标、落雷/冰雪/回復、地图/全景战斗、剧情、失败重试、战中存读档、胜利保存、音乐/音效、键盘输入、减少动画、窄屏和按关延迟加载。普通 `/` 的真实流程不带 `?test=1`、不读取调试状态，只使用玩家可见控件。固定版本 Chromium 在 Darwin 本地执行代表性截图审计，CI 保留同一流程的语义断言以避开跨系统字形光栅差异。过程截图生成到 `artifacts/playwright/`。
 
 ## 结构
 
-- `src/game/content/`：证据驱动的第 0–2 关内容、原始数值与对白；
+- `src/game/content/`：证据驱动的第 0–3 关内容、原始数值与对白；
 - `src/game/simulation/`：与 Phaser 无关的确定性网格、伤害、经验和 AI；
+- `src/game/stage-runtime.ts`：第 0–3 关唯一运行时装配、延迟加载、恢复与存档元数据清单；
+- `src/game/save/`：当前 schema、冻结历史迁移链与本地槽位 repository；
 - `src/game/phaser/`：地图、单位、镜头和范围表现；
 - `src/game/ui.ts`：剧情、HUD、目标、胜负和保存界面；
 - `src/combat-lab.ts`：复用正式全景战斗脚本与渲染器的独立动画实验室；
@@ -148,11 +151,13 @@ pnpm content:stage2 # 从第 2 关机器证据重建地图、固定阵容、剧�
 - `src/portrait-lab.ts`：集中检查全战役肖像眨眼、口型和原版覆盖片落点；
 - `src/game/debug-scenarios.ts`：按关登记开发场景、确定性夹具与调试工具栏；
 - `scripts/generate-portrait-catalog.mjs`：从原版 `D` 记录与布局证据生成全角色运行时目录；
+- `scripts/generate-content.mjs`：按唯一顺序编排全部可单独审计的内容生成器；
 - `scripts/generate-stage0-runtime.mjs`：从 `B/0001` 固化 50×50 地形内容；
 - `scripts/generate-stage2-runtime.mjs`：从机器证据固化第 2 关地图、固定阵容、事件、剧情和音乐；
+- `scripts/generate-stage3-runtime.mjs`：从机器证据固化第 3 关地图、固定阵容、事件、剧情和音乐；
 - `scripts/generate-technique-lab.mjs`：从技术证据与 `A/0002..0003` 生成落雷时间线资源及敌我职业棋子；
 - `public/assets/original/`：切片使用的调色板修正素材与已转换原版音频；
 - `tests/`：模拟与浏览器验收。
 - `planning/`：当前进度、路线、里程碑和跨阶段风险。
 
-当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md)、[`stage-01.md`](design/remake-gdd/vertical-slices/stage-01.md) 与 [`stage-02.md`](design/remake-gdd/vertical-slices/stage-02.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 1 关 M02 已由用户手动接受；第 2 关 M03 已完成自动验收并等待人工试玩，`stage-03` 战斗和后续能力仍冻结。
+当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md)、[`stage-01.md`](design/remake-gdd/vertical-slices/stage-01.md)、[`stage-02.md`](design/remake-gdd/vertical-slices/stage-02.md) 与 [`stage-03.md`](design/remake-gdd/vertical-slices/stage-03.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 0–3 关均已通过用户人工验收；第 4 关前框架审计与 M04.5 收口见 [`stage-04-framework-readiness.md`](planning/audits/stage-04-framework-readiness.md) 和 [`M04.5-stage-04-framework-consolidation.md`](planning/milestones/M04.5-stage-04-framework-consolidation.md)，`stage-04` 战斗和后续能力仍冻结。

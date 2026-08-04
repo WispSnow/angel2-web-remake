@@ -1,8 +1,8 @@
 import type { MusicProgram } from "../music-transport";
 import type { PortraitRecord, Position, UnitClassId } from "../types";
 import type { DeploymentRosterUnit } from "../deployment-session";
-import * as stage1ActionContent from "./stage1-actions.generated";
-import { registerStage1ActionContent } from "./actions";
+import * as actionContent from "./stage1-actions.generated";
+import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className, classStatsFor } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
@@ -269,7 +269,7 @@ export function stage1StoryPagesForId(storyId: StageStoryId) {
 
 /** Installs only the lightweight semantic registries after the stage-1 chunk loads. */
 export function activateStage1Content(): void {
-  registerStage1ActionContent(stage1ActionContent);
+  registerActionContent(actionContent);
   registerStageSimulationEffects({
     "stage-01-enter-deployment": { type: "enter-deployment" },
     "stage-01-set-victory-999": { type: "victory-state", value: 999 },

@@ -5,11 +5,12 @@ import {
   type DebugScenarioId,
 } from "./game/debug-scenario-catalog";
 import type { Difficulty } from "./game/types";
+import { STAGE_RUNTIME_MANIFEST } from "./game/stage-runtime";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
 
-const stageOrder = ["stage-00", "stage-01", "stage-02", "stage-03"] as const;
+const stageOrder = Object.keys(STAGE_RUNTIME_MANIFEST) as Array<keyof typeof STAGE_RUNTIME_MANIFEST>;
 const stageGroups = stageOrder.map((stageId) => ({
   stageId,
   scenarios: DEBUG_SCENARIOS.filter((scenario) => scenario.stageId === stageId),

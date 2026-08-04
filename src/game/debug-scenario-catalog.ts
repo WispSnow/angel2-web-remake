@@ -1,8 +1,8 @@
-import type { Difficulty } from "./types";
+import type { Difficulty, StageId } from "./types";
 
 export interface DebugScenarioDefinition {
   id: string;
-  stageId: "stage-00" | "stage-01" | "stage-02" | "stage-03";
+  stageId: StageId;
   stageLabel: string;
   title: string;
   phase: string;
@@ -107,7 +107,7 @@ export const DEBUG_SCENARIOS = [
   },
   {
     id: "stage-01-cleared",
-    stageId: "stage-02",
+    stageId: "stage-01",
     stageLabel: "第 1 關完成",
     title: "直接通關",
     phase: "Route to stage 2",
@@ -149,7 +149,7 @@ export const DEBUG_SCENARIOS = [
   },
   {
     id: "stage-02-cleared",
-    stageId: "stage-03",
+    stageId: "stage-02",
     stageLabel: "第 2 關完成",
     title: "完成路由",
     phase: "Route to stage 3",

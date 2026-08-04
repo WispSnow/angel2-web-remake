@@ -3,7 +3,7 @@ import type {
   AlliedAiAction,
   ClassActionPlanningOptions,
   OrdinaryAiPlanningOptions,
-} from "./battle";
+} from "./ai-contracts";
 import type { TerrainHoldForceAiDoctrine } from "./forces";
 import type { ForceRegistry } from "./forces";
 import {

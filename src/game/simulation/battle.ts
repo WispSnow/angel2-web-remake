@@ -39,6 +39,21 @@ import {
   type ForceDefinition,
 } from "./forces";
 import { planTerrainHoldForceAiAction } from "./force-ai";
+import type {
+  AlliedAiAction,
+  ClassActionPlanningOptions,
+  EnemyAiIntent,
+  EnemyPhaseUpdate,
+  OrdinaryAiPlanningOptions,
+} from "./ai-contracts";
+
+export type {
+  AlliedAiAction,
+  ClassActionPlanningOptions,
+  EnemyAiIntent,
+  EnemyPhaseUpdate,
+  OrdinaryAiPlanningOptions,
+} from "./ai-contracts";
 
 const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "archer-shot": ["archer"],
@@ -103,34 +118,6 @@ const STAGE0_BATTLE_SCENARIO: BattleScenario = {
     isExit: isStage0Exit,
   },
 };
-
-export interface AlliedAiAction {
-  unitId: string;
-  kind: "attack" | "special" | "move" | "rest" | "wait";
-  path: Position[];
-  targetId?: string;
-  actionId?: BattleActionId;
-}
-
-export interface OrdinaryAiPlanningOptions {
-  targetFilter?: (target: BattleUnit) => boolean;
-  destinationFilter?: (position: Position) => boolean;
-  pathFilter?: (path: readonly Position[]) => boolean;
-  restThresholdPercent?: number;
-}
-
-export interface ClassActionPlanningOptions {
-  modernRanking?: boolean;
-  targetFilter?: (target: BattleUnit) => boolean;
-  positionFilter?: (position: Position) => boolean;
-  pathFilter?: (path: readonly Position[]) => boolean;
-}
-
-export type EnemyAiIntent = "route" | "sentry" | "alert" | "pursuit";
-
-export interface EnemyPhaseUpdate {
-  activatedGroupIds: readonly string[];
-}
 
 export class Stage0Battle {
   readonly stage: StageDefinition;

@@ -1,7 +1,7 @@
 import type { MusicProgram } from "../music-transport";
 import type { PortraitRecord, Position, UnitClassId } from "../types";
-import * as stage1ActionContent from "./stage1-actions.generated";
-import { registerStage1ActionContent } from "./actions";
+import * as actionContent from "./stage1-actions.generated";
+import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
@@ -181,7 +181,7 @@ export const STAGE2_MUSIC_PROGRAMS = {
 } as const satisfies Partial<Record<StageMusicId, MusicProgram>>;
 
 export function activateStage2Content(): void {
-  registerStage1ActionContent(stage1ActionContent);
+  registerActionContent(actionContent);
   registerStageSimulationEffects({
     "stage-02-set-victory-999": { type: "victory-state", value: 999 },
     "stage-02-route-to-stage-03": { type: "campaign-route", destination: "stage-03" },

@@ -1,8 +1,8 @@
-import type { Position, Side } from "../types";
+import type { CampaignRouteId, Position, Side } from "../types";
 import type { StageSimulationEffectId } from "./stages";
 import { STAGE0 } from "./stage0";
 
-export type CampaignRouteId = "stage-01" | "stage-02" | "stage-03" | "stage-04";
+export type { CampaignRouteId } from "../types";
 
 export type StageSimulationEffectDefinition =
   | {

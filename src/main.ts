@@ -58,14 +58,14 @@ const mountController = (controller: GameController, userActivated: boolean) => 
     const uiRoot = root.querySelector<HTMLElement>("#deployment-ui-root");
     if (!viewport || !screen || !uiRoot) throw new Error("deployment surface not found");
     const session = new DeploymentSession(
-      controller.stage1DeploymentDefinition,
-      controller.stage1DeploymentRoster,
+      controller.deploymentDefinition,
+      controller.deploymentRoster,
     );
     const destroyUi = mountDeploymentUi(uiRoot, session);
     const game = startDeploymentPhaser(session);
     const destroyScaling = configureGameScaling(viewport, screen);
     const unsubscribe = session.onChange((state) => {
-      if (state.submitted) controller.completeStage1Deployment(finishDeployment(state));
+      if (state.submitted) controller.completeDeployment(finishDeployment(state));
     });
     uiRoot.focus({ preventScroll: true });
     return () => {

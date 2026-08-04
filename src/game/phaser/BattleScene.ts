@@ -2,8 +2,8 @@ import * as Phaser from "phaser";
 import { ASSETS } from "../content/stage0";
 import {
   STAGE0_ACTION_PRESENTATION_ASSETS,
-  stage1ActionPresentation,
-  stage1ActionPresentationAssets,
+  actionPresentationAssetCatalog,
+  actionPresentationCatalog,
 } from "../content/actions";
 import type { GameController } from "../controller";
 import type { BattleUnit } from "../types";
@@ -88,16 +88,19 @@ interface UnitView {
 }
 
 export function createBattleScene(controller: GameController): typeof Phaser.Scene {
-  const expandedActions = controller.battle.stage.id !== "stage-00";
+  const presentationActionIds = new Set(controller.currentMapPresentationActionIds);
+  const hasExtendedActions = (["lightning-1", "ice-1", "recovery-1", "dispel"] as const)
+    .some((actionId) => presentationActionIds.has(actionId));
   const stageAssets = controller.currentStageAssets;
   const mapTextureKey = `${controller.battle.stage.id}-map`;
-  const stage1Presentation = expandedActions ? stage1ActionPresentation() : undefined;
-  const stage1PresentationAssets = expandedActions ? stage1ActionPresentationAssets() : undefined;
-  const lightningAssets: MapTechniqueGraphicAssets | undefined = stage1PresentationAssets
+  const presentationCatalog = hasExtendedActions ? actionPresentationCatalog() : undefined;
+  const presentationAssets = hasExtendedActions ? actionPresentationAssetCatalog() : undefined;
+  const lightningAssets: MapTechniqueGraphicAssets | undefined = presentationAssets
+    && presentationActionIds.has("lightning-1")
     ? {
-      "MAGIC/8": stage1PresentationAssets.lightning1.main,
-      "MAGIC/31": stage1PresentationAssets.lightning1.hit,
-      "MAGIC/6": stage1PresentationAssets.lightning1.cleanup,
+      "MAGIC/8": presentationAssets.lightning1.main,
+      "MAGIC/31": presentationAssets.lightning1.hit,
+      "MAGIC/6": presentationAssets.lightning1.cleanup,
     }
     : undefined;
   return class BattleScene extends Phaser.Scene {
@@ -138,12 +141,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.load.image(`ally-${classId}`, source));
       this.load.image("enemy-soldier", ASSETS.enemySoldier);
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
-      if (stageAssets) {
-        this.load.image("ally-magician", stageAssets.allyMagician);
-        this.load.image("ally-magic-priest", stageAssets.allyMagicPriest);
-        this.load.image("enemy-sister", stageAssets.enemySister);
-        if ("enemyMonk" in stageAssets) this.load.image("enemy-monk", stageAssets.enemyMonk);
-      }
+      Object.entries(stageAssets?.unitSprites ?? {}).forEach(([key, source]) =>
+        this.load.image(key, source));
       ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
       ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
       this.load.image("turn-transition-player", ASSETS.turnTransition.player);
@@ -159,13 +158,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.load.image(`map-heal-1-primary-${frame}`, source));
       STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.forEach((source, frame) =>
         this.load.image(`map-heal-1-tail-${frame}`, source));
-      if (stage1PresentationAssets) {
-        preloadMapTechniqueAssets(this, lightningAssets!);
-        stage1PresentationAssets.ice1.expansion.forEach((source, frame) =>
+      if (presentationAssets) {
+        if (lightningAssets) preloadMapTechniqueAssets(this, lightningAssets);
+        if (presentationActionIds.has("ice-1")) presentationAssets.ice1.expansion.forEach((source, frame) =>
           this.load.image(`map-ice-1-expansion-${frame}`, source));
-        stage1PresentationAssets.recovery1.effect.forEach((source, frame) =>
+        if (presentationActionIds.has("recovery-1")) presentationAssets.recovery1.effect.forEach((source, frame) =>
           this.load.image(`map-recovery-1-${frame}`, source));
-        stage1PresentationAssets.dispel.effect.forEach((source, frame) =>
+        if (presentationActionIds.has("dispel")) presentationAssets.dispel.effect.forEach((source, frame) =>
           this.load.image(`map-dispel-${frame}`, source));
       }
     }
@@ -510,7 +509,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private createUnitView(unit: BattleUnit): UnitView {
       const container = this.add.container(this.unitWorldX(unit), unit.y * TILE_HEIGHT + 43).setDepth(5);
       const sprite = this.add.image(this.unitVisualOffset(unit), 0, this.textureFor(unit)).setOrigin(0.5, 1);
-      const iceDisabledOverlay = stage1PresentationAssets
+      const iceDisabledOverlay = presentationActionIds.has("ice-1")
         ? this.add.image(0, -21, "map-ice-1-expansion-5").setOrigin(.5)
         : undefined;
       // Native map labels occupy the unit frame's bottom rows instead of
@@ -727,7 +726,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         } else if (special.phase === "lightningMain"
           || special.phase === "lightningHit"
           || special.phase === "lightningCleanup") {
-          const definition = stage1Presentation!.lightning1;
+          const definition = presentationCatalog!.lightning1;
           const frame = special.phase === "lightningMain"
             ? lightningFrameAtMainIndex(definition, special.frame)
             : special.phase === "lightningHit"
@@ -746,7 +745,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             lightningAnchorOffset = rendered.anchorOffset;
           }
         } else if (special.phase === "iceExpansion") {
-          const iceFrame = iceFrameAtGlobalIndex(stage1Presentation!.ice1, special.frame);
+          const iceFrame = iceFrameAtGlobalIndex(presentationCatalog!.ice1, special.frame);
           const sourceFrame = iceFrame?.sourceFrame;
           iceRangeValue = iceFrame?.rangeValue;
           iceDistanceFromCenter = iceFrame?.distanceFromCenter;
@@ -761,7 +760,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             );
           }
         } else if (special.phase === "recoveryEffect") {
-          const descriptor = stage1Presentation!.recovery1.presentation
+          const descriptor = presentationCatalog!.recovery1.presentation
             .descriptorSequence[special.frame];
           const sourceFrame = descriptor?.low7BitFrameIndices[0];
           if (sourceFrame !== null && sourceFrame !== undefined) {
@@ -776,7 +775,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             }
           }
         } else if (special.phase === "dispelEffect") {
-          const dispel = stage1Presentation!.dispel;
+          const dispel = presentationCatalog!.dispel;
           const states: Array<readonly number[]> = [];
           for (const { runtimeTileCodeStates } of dispel.phases) {
             for (const state of runtimeTileCodeStates) states.push(state);

@@ -284,71 +284,60 @@ export async function createDebugScenarioController(
   id: DebugScenarioId,
   difficulty: Difficulty,
 ): Promise<GameController> {
-  switch (id) {
-    case "stage-00-prebattle":
-      return new GameController(difficulty);
-    case "stage-00-player":
-      return createStage0Player(difficulty);
-    case "stage-00-near-victory": {
-      const controller = await createStage0Player(difficulty);
-      controller.forceVictorySetupForTest();
-      return controller;
-    }
-    case "stage-00-cleared":
-    case "stage-01-prebattle":
-      return createStage1Prebattle(difficulty);
-    case "stage-01-deployment":
-      return createStage1Deployment(difficulty);
-    case "stage-01-player":
-      return createStage1Player(difficulty);
-    case "stage-01-magician": {
-      const controller = await createStage1Player(difficulty);
-      controller.forceClassActionSetupForTest("magician", false, "pursuing");
-      return controller;
-    }
-    case "stage-01-dispel": {
-      const controller = await createStage1Player(difficulty);
-      controller.forceDispelSetupForTest();
-      return controller;
-    }
-    case "stage-01-enemy-sister": {
-      const controller = await createStage1Player(difficulty);
-      controller.forceEnemySisterSetupForTest();
-      return controller;
-    }
-    case "stage-01-near-victory": {
-      const controller = await createStage1Player(difficulty);
-      controller.forceVictorySetupForTest();
-      return controller;
-    }
-    case "stage-01-cleared":
-      return createStage1Completed(difficulty);
-    case "stage-02-prebattle":
-    case "stage-02-preparation":
-      return createStage2Opening(difficulty);
-    case "stage-02-player":
-      return createStage2Player(difficulty);
-    case "stage-02-near-victory": {
-      const controller = await createStage2Player(difficulty);
-      controller.forceVictorySetupForTest();
-      return controller;
-    }
-    case "stage-02-cleared":
-      return createStage2Completed(difficulty);
-    case "stage-03-prebattle":
-    case "stage-03-preparation":
-      return createStage3Opening(difficulty);
-    case "stage-03-player":
-      return createStage3Player(difficulty);
-    case "stage-03-near-victory": {
-      const controller = await createStage3Player(difficulty);
-      controller.forceVictorySetupForTest();
-      return controller;
-    }
-    case "stage-03-cleared":
-      return createStage3Completed(difficulty);
-  }
+  return DEBUG_SCENARIO_FACTORIES[id](difficulty);
 }
+
+type DebugScenarioFactory = (difficulty: Difficulty) => Promise<GameController> | GameController;
+
+function withSetup(
+  create: (difficulty: Difficulty) => Promise<GameController>,
+  setup: (controller: GameController) => void,
+): DebugScenarioFactory {
+  return async (difficulty) => {
+    const controller = await create(difficulty);
+    setup(controller);
+    return controller;
+  };
+}
+
+const DEBUG_SCENARIO_FACTORIES = {
+  "stage-00-prebattle": (difficulty) => new GameController(difficulty),
+  "stage-00-player": createStage0Player,
+  "stage-00-near-victory": withSetup(createStage0Player, (controller) => {
+    controller.forceVictorySetupForTest();
+  }),
+  "stage-00-cleared": createStage1Prebattle,
+  "stage-01-prebattle": createStage1Prebattle,
+  "stage-01-deployment": createStage1Deployment,
+  "stage-01-player": createStage1Player,
+  "stage-01-magician": withSetup(createStage1Player, (controller) => {
+    controller.forceClassActionSetupForTest("magician", false, "pursuing");
+  }),
+  "stage-01-dispel": withSetup(createStage1Player, (controller) => {
+    controller.forceDispelSetupForTest();
+  }),
+  "stage-01-enemy-sister": withSetup(createStage1Player, (controller) => {
+    controller.forceEnemySisterSetupForTest();
+  }),
+  "stage-01-near-victory": withSetup(createStage1Player, (controller) => {
+    controller.forceVictorySetupForTest();
+  }),
+  "stage-01-cleared": createStage1Completed,
+  "stage-02-prebattle": createStage2Opening,
+  "stage-02-preparation": createStage2Opening,
+  "stage-02-player": createStage2Player,
+  "stage-02-near-victory": withSetup(createStage2Player, (controller) => {
+    controller.forceVictorySetupForTest();
+  }),
+  "stage-02-cleared": createStage2Completed,
+  "stage-03-prebattle": createStage3Opening,
+  "stage-03-preparation": createStage3Opening,
+  "stage-03-player": createStage3Player,
+  "stage-03-near-victory": withSetup(createStage3Player, (controller) => {
+    controller.forceVictorySetupForTest();
+  }),
+  "stage-03-cleared": createStage3Completed,
+} as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {
   scenarioId: DebugScenarioId;

@@ -1,7 +1,7 @@
 import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
 import { terrainDefensePercentFor } from "../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../types";
-import type { AlliedAiAction, EnemyAiIntent } from "./battle";
+import type { AlliedAiAction, EnemyAiIntent } from "./ai-contracts";
 import {
   neighbors,
   positionKey,

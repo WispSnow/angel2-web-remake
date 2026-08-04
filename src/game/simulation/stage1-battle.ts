@@ -24,11 +24,13 @@ import { DeterministicRng } from "./rng";
 import { emptyUnitStatuses } from "./status";
 import {
   Stage0Battle,
-  type AlliedAiAction,
   type BattleScenario,
-  type EnemyAiIntent,
-  type EnemyPhaseUpdate,
 } from "./battle";
+import type {
+  AlliedAiAction,
+  EnemyAiIntent,
+  EnemyPhaseUpdate,
+} from "./ai-contracts";
 
 export const STAGE1_CASTLE_GUARD_GROUP_ID = STAGE1_STABLE_AI.alertGroup.id;
 const enemyId = (slot: number): string => `2:${slot}`;

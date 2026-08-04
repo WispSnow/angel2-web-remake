@@ -9,7 +9,7 @@ import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import {
   BATTLE_ACTION_DEFINITIONS,
   STAGE0_REST_PRESENTATION,
-  stage1ActionPresentation,
+  actionPresentationCatalog,
 } from "./content/actions";
 import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
 import {
@@ -50,10 +50,10 @@ import {
   type TurnTransitionPresentation,
   type TurnTransitionSide,
 } from "./turn-transition-presentation";
-import { Stage0Battle, type AlliedAiAction } from "./simulation/battle";
+import { Stage0Battle } from "./simulation/battle";
+import type { AlliedAiAction } from "./simulation/ai-contracts";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
-import { DeterministicRng } from "./simulation/rng";
 import {
   createStageEventState,
   dispatchStageEvents,
@@ -82,27 +82,21 @@ import {
   SAVE_VERSION,
   saveSlotKey,
 } from "./save";
-import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, Position, SaveData, UnitStats } from "./types";
+import {
+  INITIAL_STAGE_RUNTIME,
+  isPlayableStageId,
+  loadStageRuntime,
+  stageRuntimeSourceForDestination,
+  type LoadedStageRuntime,
+} from "./stage-runtime";
+import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, Position, SaveData, StageId, UnitStats } from "./types";
 
 type Listener = () => void;
 type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
-type Stage1ContentModule = typeof import("./content/stage1");
-type Stage1BattleModule = typeof import("./simulation/stage1-battle");
-interface Stage1Runtime {
-  content: Stage1ContentModule;
-  battle: Stage1BattleModule;
-}
-type Stage2ContentModule = typeof import("./content/stage2");
-type Stage2BattleModule = typeof import("./simulation/stage2-battle");
-interface Stage2Runtime {
-  content: Stage2ContentModule;
-  battle: Stage2BattleModule;
-}
-type Stage3ContentModule = typeof import("./content/stage3");
-type Stage3BattleModule = typeof import("./simulation/stage3-battle");
-interface Stage3Runtime {
-  content: Stage3ContentModule;
-  battle: Stage3BattleModule;
+
+interface StageEntryOptions {
+  preparation?: boolean;
+  statusMessage?: string;
 }
 
 function cloneCampaignState(campaign: CampaignState): CampaignState {
@@ -343,13 +337,13 @@ export class GameController {
   private activeStoryId?: StageStoryId;
   private stageEventState: StageEventState;
   private stageEntrySnapshot: CampaignState;
-  private stage1Campaign?: CampaignState;
-  private stage1Runtime?: Stage1Runtime;
-  private stage1RuntimePromise?: Promise<Stage1Runtime>;
-  private stage2Runtime?: Stage2Runtime;
-  private stage2RuntimePromise?: Promise<Stage2Runtime>;
-  private stage3Runtime?: Stage3Runtime;
-  private stage3RuntimePromise?: Promise<Stage3Runtime>;
+  private preparationCampaign?: CampaignState;
+  private stageRuntime: LoadedStageRuntime = INITIAL_STAGE_RUNTIME;
+  private completedProgressMetadata?: {
+    completedOrdinal: number;
+    destinationId: CampaignRouteId;
+    destinationLabel: string;
+  };
   private listeners = new Set<Listener>();
   private readonly testMode = new URLSearchParams(location.search).has("test");
   private readonly debugMode = this.testMode
@@ -383,129 +377,96 @@ export class GameController {
     return controller;
   }
 
-  get stage1DeploymentRoster() {
-    return this.stage1Campaign
-      ? this.requireStage1Runtime().battle.createStage1DeploymentRoster(this.stage1Campaign.roster)
+  get deploymentRoster() {
+    return this.preparationCampaign && this.stageRuntime.preparation
+      ? this.stageRuntime.preparation.createRoster(this.preparationCampaign)
       : [];
   }
 
-  get stage1DeploymentDefinition() {
-    return this.requireStage1Runtime().content.STAGE1_DEFINITION.deployment;
+  get deploymentDefinition() {
+    const preparation = this.stageRuntime.preparation;
+    if (!preparation) throw new Error(`${this.stageRuntime.id} has no deployment preparation`);
+    return preparation.definition;
   }
 
   get currentStageAssets() {
-    if (this.battle.stage.id === "stage-01") return this.requireStage1Runtime().content.STAGE1_ASSETS;
-    if (this.battle.stage.id === "stage-02") return this.requireStage2Runtime().content.STAGE2_ASSETS;
-    if (this.battle.stage.id === "stage-03") return this.requireStage3Runtime().content.STAGE3_ASSETS;
-    return undefined;
+    return this.stageRuntime.assets;
   }
 
-  private requireStage1Runtime(): Stage1Runtime {
-    if (!this.stage1Runtime) throw new Error("stage 1 runtime has not loaded");
-    return this.stage1Runtime;
+  get currentMapPresentationActionIds() {
+    return this.stageRuntime.mapPresentationActionIds;
   }
 
-  private async loadStage1Runtime(): Promise<Stage1Runtime> {
-    if (this.stage1Runtime) return this.stage1Runtime;
-    this.stage1RuntimePromise ??= Promise.all([
-      import("./content/stage1"),
-      import("./simulation/stage1-battle"),
-    ]).then(([content, battle]) => {
-      content.activateStage1Content();
-      const runtime = { content, battle };
-      this.stage1Runtime = runtime;
-      return runtime;
-    });
-    return this.stage1RuntimePromise;
+  get currentStageProgressMetadata() {
+    return this.completedProgressMetadata ?? {
+      completedOrdinal: this.stageRuntime.ordinal,
+      destinationId: this.stageRuntime.nextStageId,
+      destinationLabel: this.stageRuntime.completion.destinationLabel,
+    };
   }
 
-  private requireStage2Runtime(): Stage2Runtime {
-    if (!this.stage2Runtime) throw new Error("stage 2 runtime has not loaded");
-    return this.stage2Runtime;
-  }
-
-  private async loadStage2Runtime(): Promise<Stage2Runtime> {
-    if (this.stage2Runtime) return this.stage2Runtime;
-    this.stage2RuntimePromise ??= Promise.all([
-      import("./content/stage2"),
-      import("./simulation/stage2-battle"),
-    ]).then(([content, battle]) => {
-      content.activateStage2Content();
-      const runtime = { content, battle };
-      this.stage2Runtime = runtime;
-      return runtime;
-    });
-    return this.stage2RuntimePromise;
-  }
-
-  private requireStage3Runtime(): Stage3Runtime {
-    if (!this.stage3Runtime) throw new Error("stage 3 runtime has not loaded");
-    return this.stage3Runtime;
-  }
-
-  private async loadStage3Runtime(): Promise<Stage3Runtime> {
-    if (this.stage3Runtime) return this.stage3Runtime;
-    this.stage3RuntimePromise ??= Promise.all([
-      import("./content/stage3"),
-      import("./simulation/stage3-battle"),
-    ]).then(([content, battle]) => {
-      content.activateStage3Content();
-      const runtime = { content, battle };
-      this.stage3Runtime = runtime;
-      return runtime;
-    });
-    return this.stage3RuntimePromise;
+  async enterStage(
+    stageId: StageId,
+    campaign: CampaignState = { ...this.battle.campaignSnapshot(), stageId },
+    options: StageEntryOptions = {},
+  ): Promise<void> {
+    const runtime = await loadStageRuntime(stageId);
+    this.stageRuntime = runtime;
+    this.completedProgressMetadata = undefined;
+    this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId });
+    this.preparationCampaign = runtime.preparation
+      ? cloneCampaignState(this.stageEntrySnapshot)
+      : undefined;
+    this.battle = runtime.createBattle(
+      this.stageEntrySnapshot,
+      runtime.preparation?.createInitialResult(),
+    );
+    this.difficulty = campaign.difficulty;
+    this.campaignRoute = runtime.entry.campaignRoute;
+    this.activeStoryId = undefined;
+    this.stageEventState = createStageEventState(this.battle.stage);
+    this.resetAction();
+    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
+    const focus = this.battle.unit(runtime.focusUnitId) ?? this.battle.focus;
+    this.cursor = focus ? { x: focus.x, y: focus.y } : { ...this.cameraOrigin };
+    this.statusMessage = options.statusMessage ?? runtime.entry.statusText;
+    if (options.preparation) {
+      if (!runtime.preparation) throw new Error(`${stageId} has no preparation entry`);
+      this.stageEventState = createStageEventState(
+        this.battle.stage,
+        runtime.preparation.consumedEventIdsOnRetry as StageEventState["consumedEventIds"],
+      );
+      this.phase = "deployment";
+      this.emit();
+      return;
+    }
+    this.phase = runtime.entry.phase;
+    if (runtime.entry.trigger === "campaign-entered") {
+      this.initializeStageEventProgress();
+      this.emit();
+      return;
+    }
+    const events = this.consumeStageTrigger({ type: "battle-started" });
+    await this.processStageEvents(events);
+    this.emit();
   }
 
   async enterStage1(campaign: CampaignState = {
     ...this.battle.campaignSnapshot(),
     stageId: "stage-01",
   }, entry: "prebattle" | "deployment" = "prebattle", statusMessage?: string): Promise<void> {
-    const runtime = await this.loadStage1Runtime();
-    const { STAGE1_DEFINITION } = runtime.content;
-    this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId: "stage-01" });
-    this.stage1Campaign = cloneCampaignState(this.stageEntrySnapshot);
-    const initialDeployment: DeploymentResult = {
-      placements: STAGE1_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
-        slot,
-        position: { ...position },
-        fixed: true,
-      })),
-    };
-    this.battle = new runtime.battle.Stage1Battle(this.stage1Campaign, initialDeployment);
-    this.difficulty = campaign.difficulty;
-    this.campaignRoute = "stage-01";
-    this.activeStoryId = undefined;
-    this.stageEventState = createStageEventState(this.battle.stage);
-    this.resetAction();
-    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
-    const nia = this.battle.unit("1:0");
-    this.cursor = nia ? { x: nia.x, y: nia.y } : { ...this.cameraOrigin };
-    this.statusMessage = "第一軍團抵達騎士城堡前。";
-    if (entry === "deployment") {
-      this.stageEventState = createStageEventState(this.battle.stage, [
-        "stage-01-prebattle-story",
-        "stage-01-enter-deployment",
-      ]);
-      this.phase = "deployment";
-      this.statusMessage = statusMessage ?? "重新選擇第 1 關出場編隊。";
-      this.emit();
-      return;
-    }
-    this.initializeStageEventProgress();
-    this.emit();
+    await this.enterStage("stage-01", campaign, {
+      preparation: entry === "deployment",
+      statusMessage,
+    });
   }
 
-  completeStage1Deployment(deployment: DeploymentResult): void {
-    if (this.phase !== "deployment" || !this.stage1Campaign) return;
-    const { Stage1Battle } = this.requireStage1Runtime().battle;
-    this.battle = new Stage1Battle(
-      this.stage1Campaign,
-      deployment,
-    );
+  completeDeployment(deployment: DeploymentResult): void {
+    if (this.phase !== "deployment" || !this.preparationCampaign || !this.stageRuntime.preparation) return;
+    this.battle = this.stageRuntime.createBattle(this.preparationCampaign, deployment);
     this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
-    const nia = this.battle.unit("1:0");
-    this.cursor = nia ? { x: nia.x, y: nia.y } : { ...this.cameraOrigin };
+    const focus = this.battle.unit(this.stageRuntime.focusUnitId) ?? this.battle.focus;
+    this.cursor = focus ? { x: focus.x, y: focus.y } : { ...this.cameraOrigin };
     this.resetAction();
     this.statusMessage = `部署完成：${deployment.placements.length} 人編隊已建立。`;
     const events = this.consumeStageTrigger({ type: "battle-started" });
@@ -516,46 +477,14 @@ export class GameController {
     ...this.battle.campaignSnapshot(),
     stageId: "stage-02",
   }, statusMessage = "第一軍團繼續向騎士團堡推進。") : Promise<void> {
-    const runtime = await this.loadStage2Runtime();
-    this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId: "stage-02" });
-    this.stage1Campaign = undefined;
-    this.battle = new runtime.battle.Stage2Battle(this.stageEntrySnapshot);
-    this.difficulty = campaign.difficulty;
-    this.campaignRoute = "stage-02";
-    this.activeStoryId = undefined;
-    this.stageEventState = createStageEventState(this.battle.stage);
-    this.resetAction();
-    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
-    const nia = this.battle.unit("1:0");
-    this.cursor = nia ? { x: nia.x, y: nia.y } : { ...this.cameraOrigin };
-    this.phase = "player";
-    this.statusMessage = statusMessage;
-    const events = this.consumeStageTrigger({ type: "battle-started" });
-    await this.processStageEvents(events);
-    this.emit();
+    await this.enterStage("stage-02", campaign, { statusMessage });
   }
 
   async enterStage3(campaign: CampaignState = {
     ...this.battle.campaignSnapshot(),
     stageId: "stage-03",
   }, statusMessage = "希蜜與第四軍團會合，共同通過力場。") : Promise<void> {
-    const runtime = await this.loadStage3Runtime();
-    this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId: "stage-03" });
-    this.stage1Campaign = undefined;
-    this.battle = new runtime.battle.Stage3Battle(this.stageEntrySnapshot);
-    this.difficulty = campaign.difficulty;
-    this.campaignRoute = "stage-03";
-    this.activeStoryId = undefined;
-    this.stageEventState = createStageEventState(this.battle.stage);
-    this.resetAction();
-    this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
-    const himi = this.battle.unit("1:1");
-    this.cursor = himi ? { x: himi.x, y: himi.y } : { ...this.cameraOrigin };
-    this.phase = "player";
-    this.statusMessage = statusMessage;
-    const events = this.consumeStageTrigger({ type: "battle-started" });
-    await this.processStageEvents(events);
-    this.emit();
+    await this.enterStage("stage-03", campaign, { statusMessage });
   }
 
   onChange(listener: Listener): () => void {
@@ -878,19 +807,14 @@ export class GameController {
       return;
     }
     this.campaignRoute = definition.destination;
-    if (definition.destination === "stage-01" && this.battle.stage.id === "stage-00") {
-      await this.enterStage1({ ...this.battle.campaignSnapshot(), stageId: "stage-01" });
+    if (isPlayableStageId(definition.destination)) {
+      await this.enterStage(definition.destination, {
+        ...this.battle.campaignSnapshot(),
+        stageId: definition.destination,
+      });
       return;
     }
-    if (definition.destination === "stage-02" && this.battle.stage.id === "stage-01") {
-      await this.enterStage2({ ...this.battle.campaignSnapshot(), stageId: "stage-02" });
-      return;
-    }
-    if (definition.destination === "stage-03" && this.battle.stage.id === "stage-02") {
-      await this.enterStage3({ ...this.battle.campaignSnapshot(), stageId: "stage-03" });
-      return;
-    }
-    if (definition.destination === "stage-04") this.stageProgress = 1000;
+    this.stageProgress = 1000;
     this.phase = "nextStage";
   }
 
@@ -1489,7 +1413,7 @@ export class GameController {
         await present("healTail", frame, 15);
       }
     } else if (result.actionId === "lightning-1") {
-      const presentation = stage1ActionPresentation();
+      const presentation = actionPresentationCatalog();
       let draw = 0;
       for (const phase of presentation.lightning1.phases) {
         for (const _descriptor of phase.descriptorSequence) {
@@ -1508,7 +1432,7 @@ export class GameController {
         await present("lightningCleanup", frame, hit.cleanup.waitPerDrawNativeTicks);
       }
     } else if (result.actionId === "ice-1") {
-      const ice = stage1ActionPresentation().ice1;
+      const ice = actionPresentationCatalog().ice1;
       for (let cycle = 0; cycle < ice.cycles; cycle += 1) {
         this.queueAudioCue(50, `ice-1-cycle-${cycle + 1}`, "un");
         for (let frame = 0; frame < ice.cycle.drawCount; frame += 1) {
@@ -1516,13 +1440,13 @@ export class GameController {
         }
       }
     } else if (result.actionId === "recovery-1") {
-      const recovery = stage1ActionPresentation().recovery1;
+      const recovery = actionPresentationCatalog().recovery1;
       this.queueAudioCue(36, "recovery-1-start", "e");
       for (let frame = 0; frame < recovery.presentation.drawCount; frame += 1) {
         await present("recoveryEffect", frame, recovery.presentation.waitPerDrawNativeTicks);
       }
     } else {
-      const dispel = stage1ActionPresentation().dispel;
+      const dispel = actionPresentationCatalog().dispel;
       let frame = 0;
       for (const phase of dispel.phases) {
         for (let draw = 0; draw < phase.drawCount; draw += 1) {
@@ -1894,13 +1818,7 @@ export class GameController {
   confirmRetreat(): void {
     if (!this.retreatConfirmOpen || this.busy) return;
     this.retreatConfirmOpen = false;
-    this.restartBattle(this.battle.stage.id === "stage-01"
-      ? "全面撤退：返回第 1 關關前流程並重新編隊。"
-      : this.battle.stage.id === "stage-02"
-        ? "全面撤退：重新建立第 2 關固定編隊。"
-        : this.battle.stage.id === "stage-03"
-          ? "全面撤退：重新建立第 3 關固定編隊。"
-        : "全面撤退：重新建立第 0 關固定編隊。");
+    this.restartBattle(this.stageRuntime.retry.retreatStatusText);
   }
 
   cancelRetreat(): void {
@@ -1965,9 +1883,7 @@ export class GameController {
     const enemyPhaseUpdate = this.battle.beginEnemyPhase();
     this.statusMessage = enemyPhaseUpdate.activatedGroupIds.includes("castle-guard")
       ? "城堡守軍解除警戒，全軍進入追擊；芳將於下一回合出擊。"
-      : this.battle.stage.id === "stage-00"
-        ? "敵方階段：騎士團部隊向出口撤離。"
-        : "敵方階段：騎士團開始行動。";
+      : this.stageRuntime.enemyPhaseStatusText;
     this.emit();
     if (enemyPhaseUpdate.activatedGroupIds.length > 0) {
       await pause(this.mapCombatDelay(40));
@@ -2645,28 +2561,11 @@ export class GameController {
   }
 
   retry(): void {
-    this.restartBattle(this.battle.stage.id === "stage-01"
-      ? "重新開始第 1 關關前流程。"
-      : this.battle.stage.id === "stage-02"
-        ? "重新建立第 2 關固定編隊。"
-        : this.battle.stage.id === "stage-03"
-          ? "重新建立第 3 關固定編隊。"
-        : "重新建立第 0 關固定編隊。");
+    this.restartBattle(this.stageRuntime.retry.statusText);
   }
 
   private restartBattle(message: string): void {
-    if (this.battle.stage.id === "stage-03") {
-      void this.enterStage3(cloneCampaignState(this.stageEntrySnapshot), message);
-      return;
-    }
-    if (this.battle.stage.id === "stage-02") {
-      void this.enterStage2(cloneCampaignState(this.stageEntrySnapshot), message);
-      return;
-    }
-    const stage1Campaign = this.battle.stage.id === "stage-01"
-      ? cloneCampaignState(this.stageEntrySnapshot)
-      : undefined;
-    if (stage1Campaign) {
+    if (this.stageRuntime.retry.mode !== "skip-entry-story") {
       this.movementPresentation = undefined;
       this.systemMenuOpen = false;
       this.settingsOpen = false;
@@ -2681,10 +2580,17 @@ export class GameController {
       this.promotionDialogueIndex = undefined;
       this.promotionResume = undefined;
       this.busy = false;
-      void this.enterStage1(stage1Campaign, "deployment", message);
+      void this.enterStage(
+        this.stageRuntime.id,
+        cloneCampaignState(this.stageEntrySnapshot),
+        {
+          preparation: this.stageRuntime.retry.mode === "preparation",
+          statusMessage: message,
+        },
+      );
       return;
     }
-    this.battle = Stage0Battle.fromCampaignEntry(this.stageEntrySnapshot);
+    this.battle = this.stageRuntime.createBattle(this.stageEntrySnapshot);
     this.difficulty = this.stageEntrySnapshot.difficulty;
     this.campaignRoute = undefined;
     this.movementPresentation = undefined;
@@ -2711,7 +2617,7 @@ export class GameController {
     this.promotionSelectionIndex = 0;
     this.promotionResume = undefined;
     this.resetAction();
-    this.cameraOrigin = { x: 6, y: 20 };
+    this.cameraOrigin = { ...this.battle.stage.viewport.initialOrigin };
     const focus = this.battle.focus;
     this.cursor = focus
       ? { x: focus.x, y: focus.y }
@@ -2786,14 +2692,7 @@ export class GameController {
   private writeCompletedSave(slot: number): void {
     const prior = this.readSave(slot);
     const campaign = this.battle.campaignSnapshot();
-    const completedStage = this.battle.stage.id;
-    const destination = completedStage === "stage-00"
-      ? { stageId: "stage-01" as const, stageLabel: "騎士城堡前" as const, stageProgress: 0 as const }
-      : completedStage === "stage-01"
-        ? { stageId: "stage-02" as const, stageLabel: "救援友軍" as const, stageProgress: 1000 as const }
-        : completedStage === "stage-02"
-          ? { stageId: "stage-03" as const, stageLabel: "通過力場" as const, stageProgress: 1000 as const }
-          : { stageId: "stage-04" as const, stageLabel: "下一關" as const, stageProgress: 1000 as const };
+    const runtime = this.stageRuntime;
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
@@ -2801,17 +2700,17 @@ export class GameController {
       kind: "completed",
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
-      stageId: destination.stageId,
-      stageLabel: destination.stageLabel,
+      stageId: runtime.nextStageId,
+      stageLabel: runtime.completion.destinationLabel,
       ruleset: campaign.ruleset,
       difficulty: campaign.difficulty,
       rngState: campaign.rngState,
       rngCalls: campaign.rngCalls,
       roster: campaign.roster,
-      stageProgress: destination.stageProgress,
-      consumedEventIds: completedStage === "stage-00"
-        ? []
-        : this.battle.stage.events.map(({ id }) => id),
+      stageProgress: runtime.completion.destinationProgress,
+      consumedEventIds: runtime.completion.consumedEvents === "all"
+        ? this.battle.stage.events.map(({ id }) => id)
+        : [],
     };
     localStorage.setItem(saveSlotKey(slot), JSON.stringify(save));
     this.pendingSaveSlot = undefined;
@@ -2886,11 +2785,7 @@ export class GameController {
       savedAt: new Date().toISOString(),
       saveCount: (prior?.saveCount ?? 0) + 1,
       stageId: this.battle.stage.id,
-      stageLabel: this.battle.stage.id === "stage-01"
-        ? "騎士城堡前"
-        : this.battle.stage.id === "stage-02"
-          ? "救援友軍"
-          : this.battle.stage.id === "stage-03" ? "通過力場" : "瓦爾克麗宮",
+      stageLabel: this.stageRuntime.label,
       ruleset: campaign.ruleset,
       difficulty: campaign.difficulty,
       rngState: campaign.rngState,
@@ -2929,32 +2824,20 @@ export class GameController {
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
       this.recordMenuReturn = undefined;
-      if (save.stageId === "stage-04") {
+      if (!isPlayableStageId(save.stageId)) {
+        const source = stageRuntimeSourceForDestination(save.stageId);
+        this.completedProgressMetadata = source ? {
+          completedOrdinal: source.ordinal,
+          destinationId: source.nextStageId,
+          destinationLabel: source.completion.destinationLabel,
+        } : undefined;
         this.activeStoryId = undefined;
         this.campaignRoute = "stage-04";
         this.stageProgress = 1000;
         this.phase = "nextStage";
-      } else if (save.stageId === "stage-03") {
-        await this.enterStage3({
-          stageId: "stage-03",
-          ruleset: save.ruleset,
-          difficulty: save.difficulty,
-          roster: save.roster,
-          rngState: save.rngState,
-          rngCalls: save.rngCalls,
-        });
-      } else if (save.stageId === "stage-02") {
-        await this.enterStage2({
-          stageId: "stage-02",
-          ruleset: save.ruleset,
-          difficulty: save.difficulty,
-          roster: save.roster,
-          rngState: save.rngState,
-          rngCalls: save.rngCalls,
-        });
       } else {
-        await this.enterStage1({
-          stageId: "stage-01",
+        await this.enterStage(save.stageId, {
+          stageId: save.stageId,
           ruleset: save.ruleset,
           difficulty: save.difficulty,
           roster: save.roster,
@@ -2965,64 +2848,25 @@ export class GameController {
       this.statusMessage = message;
       return;
     }
-    let battle: Stage0Battle;
-    if (save.stageId === "stage-03") {
-      const runtime = await this.loadStage3Runtime();
-      battle = new runtime.battle.Stage3Battle({
-        difficulty: save.difficulty,
-        roster: save.roster,
-        rngState: save.rngState,
-        rngCalls: save.rngCalls,
-      }, new DeterministicRng(save.rngState, save.rngCalls));
-    } else if (save.stageId === "stage-02") {
-      const runtime = await this.loadStage2Runtime();
-      battle = new runtime.battle.Stage2Battle({
-        difficulty: save.difficulty,
-        roster: save.roster,
-        rngState: save.rngState,
-        rngCalls: save.rngCalls,
-      }, new DeterministicRng(save.rngState, save.rngCalls));
-    } else if (save.stageId === "stage-01") {
-      const runtime = await this.loadStage1Runtime();
-      const deploymentDefinition = runtime.content.STAGE1_DEFINITION.deployment;
-      const optionalPlacements = save.battle.units
-        .filter(({ side, slot }) => side === 1
-          && deploymentDefinition.optionalSlots.some((optionalSlot) => optionalSlot === slot))
-        .map(({ slot }, index) => {
-          const position = deploymentDefinition.openCells[index];
-          if (!position) throw new Error("stage 1 save exceeds deployment cells");
-          return { slot, position: { ...position }, fixed: false };
-        });
-      const deployment: DeploymentResult = {
-        placements: [
-          ...deploymentDefinition.fixedPlacements.map(({ slot, position }) => ({
-            slot,
-            position: { ...position },
-            fixed: true,
-          })),
-          ...optionalPlacements,
-        ],
-      };
-      battle = new runtime.battle.Stage1Battle({
-        difficulty: save.difficulty,
-        roster: save.roster,
-        rngState: save.rngState,
-        rngCalls: save.rngCalls,
-      }, deployment, new DeterministicRng(save.rngState, save.rngCalls));
-    } else {
-      battle = new Stage0Battle(
-        save.difficulty,
-        new DeterministicRng(save.rngState, save.rngCalls),
-      );
-    }
-    battle.restore(save.battle, save.roster);
+    const campaign: CampaignState = {
+      stageId: save.stageId,
+      ruleset: save.ruleset,
+      difficulty: save.difficulty,
+      roster: save.roster,
+      rngState: save.rngState,
+      rngCalls: save.rngCalls,
+    };
+    const runtime = await loadStageRuntime(save.stageId);
+    const battle = runtime.restoreBattle(campaign, save.battle);
+    this.stageRuntime = runtime;
+    this.completedProgressMetadata = undefined;
     this.battle = battle;
     this.stageEventState = createStageEventState(
       battle.stage,
       save.consumedEventIds as StageEventState["consumedEventIds"],
     );
     this.stageEntrySnapshot = cloneCampaignState(save.stageEntrySnapshot);
-    this.stage1Campaign = save.stageId === "stage-01"
+    this.preparationCampaign = runtime.preparation
       ? cloneCampaignState(save.stageEntrySnapshot)
       : undefined;
     this.activeStoryId = undefined;
@@ -3249,37 +3093,21 @@ export class GameController {
     this.specialActionPresentation = undefined;
     this.restPresentation = undefined;
     this.aiTechniqueDialogue = undefined;
-    if (this.battle.stage.id === "stage-00") {
-      await this.enterStage1({
+    const completedOrdinal = this.stageRuntime.ordinal;
+    const destination = this.stageRuntime.nextStageId;
+    if (isPlayableStageId(destination)) {
+      await this.enterStage(destination, {
         ...this.battle.campaignSnapshot(),
-        stageId: "stage-01",
+        stageId: destination,
       });
-      this.statusMessage = "調試：第 0 關已直接完成，進入第 1 關關前劇情。";
+      this.statusMessage = `調試：第 ${completedOrdinal} 關已直接完成，進入第 ${completedOrdinal + 1} 關。`;
       this.emit();
       return;
     }
-    if (this.battle.stage.id === "stage-01") {
-      await this.enterStage2({
-        ...this.battle.campaignSnapshot(),
-        stageId: "stage-02",
-      });
-      this.statusMessage = "調試：第 1 關已直接完成，進入第 2 關。";
-      this.emit();
-      return;
-    }
-    if (this.battle.stage.id === "stage-02") {
-      await this.enterStage3({
-        ...this.battle.campaignSnapshot(),
-        stageId: "stage-03",
-      });
-      this.statusMessage = "調試：第 2 關已直接完成，進入第 3 關。";
-      this.emit();
-      return;
-    }
-    this.campaignRoute = "stage-04";
+    this.campaignRoute = destination;
     this.stageProgress = 1000;
     this.phase = "nextStage";
-    this.statusMessage = "調試：第 3 關已直接完成，進入 stage-04 邊界。";
+    this.statusMessage = `調試：第 ${completedOrdinal} 關已直接完成，進入 ${destination} 邊界。`;
     this.emit();
   }
 
