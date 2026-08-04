@@ -129,6 +129,7 @@ export class Stage3Battle extends Stage0Battle {
       enemyBehaviorById: new Map(
         STAGE3_SEMANTIC_ENEMY_UNITS.map(({ slot, aiBehavior }) => [`2:${slot}`, aiBehavior]),
       ),
+      groupCommanderId: "1:1",
     };
     super(campaign.difficulty, rng, scenario);
     this.focusId = "1:1";
@@ -138,9 +139,10 @@ export class Stage3Battle extends Stage0Battle {
     const unit = this.unit(id);
     if (!unit
       || unit.side !== 1
-      || this.isPlayerControllableAlly(id)
       || unit.acted
       || unit.actionDisabled) return undefined;
+
+    if (this.isPlayerControllableAlly(id)) return super.planAlliedAiAction(id, leaderId);
 
     if (!this.isDefensivePosition(unit)) return this.planForestEntry(unit);
 
@@ -171,12 +173,6 @@ export class Stage3Battle extends Stage0Battle {
       ? this.planDefensiveFormationMove(unit, automaticLeader)
       : undefined;
     if (formationMove) return formationMove;
-
-    const requestedLeader = leaderId ? this.unit(leaderId) : undefined;
-    const requestedMove = requestedLeader?.side === unit.side
-      ? this.planDefensiveFormationMove(unit, requestedLeader)
-      : undefined;
-    if (requestedMove) return requestedMove;
 
     const defensiveActionOptions = {
       positionFilter: (position: Position) => this.isDefensivePosition(position),

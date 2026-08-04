@@ -7,11 +7,21 @@ const ARTIFACT_DIR = "artifacts/playwright";
 interface Stage3State {
   stageId: string;
   phase: string;
+  round: number;
+  focusId: string;
   actionMode: string;
   activeStoryId?: string;
   campaignRoute?: string;
+  groupLeaderId?: string;
+  groupCommandDialogueId?: string;
+  statusMessage: string;
   cameraOrigin: { x: number; y: number };
   rngCalls: number;
+  movementPresentation?: {
+    unitId: string;
+    kind: string;
+    path: Array<{ x: number; y: number }>;
+  };
   audioCueLog: Array<{ group: string; record: number; reason: string }>;
   specialActionPresentation?: { phase: string; frame: number };
   lastSpecialAction?: {
@@ -163,16 +173,60 @@ test("S03-E: either protected commander triggers defeat", async ({ page }) => {
   await expect(page.getByTestId("feedback-text")).toContainText("竟然失敗了");
 });
 
-test("stage 3 group commands use the current allied focus instead of absent Nia", async ({ page }) => {
+test("stage 3 group commands use Himi as the fixed commander while Nia is absent", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.keyboard.press("Tab");
+  await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
+  expect((await state(page)).groupLeaderId).toBe("1:1");
   await page.getByTestId("group-command-allRest").click();
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("希蜜");
   await expect(page.getByTestId("dialogue-portrait-composite"))
     .toHaveAttribute("data-portrait-record", "45");
   await expect(page.getByTestId("dialogue-layer"))
     .toHaveAttribute("data-source-address", "DS:86E4");
+});
+
+test("S03-N/O: free action hands off player units first and round two still follows Himi", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await page.keyboard.press("F3");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("希蜜");
+  await page.getByTestId("advance-dialogue").click();
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage3State | undefined;
+    return current?.phase === "allyAuto"
+      && current.movementPresentation?.kind === "allyAuto";
+  });
+  const firstHandoff = await state(page);
+  expect(["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"])
+    .toContain(firstHandoff.movementPresentation?.unitId);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage3-player-group-handoff.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage3State | undefined;
+    return current?.phase === "allyAuto"
+      && current.statusMessage.includes("友軍 NPC 軍團")
+      && current.statusMessage.includes("獨立行動");
+  });
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage3-independent-npc-corps.png`,
+  });
+  await waitForPhase(page, "enemy");
+  await waitForPhase(page, "player");
+  expect((await state(page)).round).toBe(2);
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
+  expect((await state(page)).groupLeaderId).toBe("1:1");
+  await page.getByTestId("group-command-followLeader").click();
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("希蜜");
+  await expect(page.getByTestId("dialogue-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "45");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage3-round2-himi-group-commander.png`,
+  });
 });
 
 test("S03-C/L: hard-mode automatic allies finish their first phase inside the defense area", async ({ page }) => {

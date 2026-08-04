@@ -72,6 +72,8 @@ export interface BattleScenario {
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   alliedBehaviorById?: ReadonlyMap<string, number>;
   enemyBehaviorById?: ReadonlyMap<string, number>;
+  /** Optional remake commander used by stage-level group-command policy. */
+  groupCommanderId?: string;
   routeEnemy?: {
     target: Position;
     movement: number;
@@ -191,6 +193,12 @@ export class Stage0Battle {
 
   get focus(): BattleUnit | undefined {
     return this.unit(this.focusId);
+  }
+
+  get groupCommander(): BattleUnit | undefined {
+    return this.scenario.groupCommanderId
+      ? this.unit(this.scenario.groupCommanderId)
+      : undefined;
   }
 
   unit(id: string): BattleUnit | undefined {

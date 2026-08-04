@@ -39,6 +39,26 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     expect(battle.alliedActionOrder(false)).toEqual([
       "1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50",
     ]);
+    expect(battle.groupCommander?.id).toBe("1:1");
+    expect(battle.planAlliedAiAction("1:54")).toBeDefined();
+  });
+
+  it("applies all-rest only to manual rescue units and leaves automatic allies for their phase", () => {
+    const battle = new Stage3Battle(campaign);
+    const manualIds = ["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"];
+    const automaticIds = ["1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50"];
+    for (const id of [...manualIds, ...automaticIds]) battle.unit(id)!.life -= 10;
+
+    expect(battle.restAllUnspentAllies().count).toBe(6);
+    expect(manualIds.every((id) => battle.unit(id)?.acted)).toBe(true);
+    expect(automaticIds.every((id) => !battle.unit(id)?.acted)).toBe(true);
+    expect(battle.alliedActionOrder(false)).toEqual(automaticIds);
+  });
+
+  it("keeps automatic allies independent from the player's temporary group leader", () => {
+    const independent = new Stage3Battle(campaign).planAlliedAiAction("1:46");
+    const commanded = new Stage3Battle(campaign).planAlliedAiAction("1:46", "1:1");
+    expect(commanded).toEqual(independent);
   });
 
   it("moves a behavior-4 follower toward its behavior-3 leader before ordinary actions", () => {

@@ -667,6 +667,13 @@ export class GameController {
   }
 
   get groupLeader(): BattleUnit | undefined {
+    const fixedCommander = this.battle.groupCommander;
+    if (fixedCommander) {
+      return !fixedCommander.acted && !fixedCommander.actionDisabled
+        ? fixedCommander
+        : undefined;
+    }
+
     const cursorUnit = this.battle.unitAt(this.cursor);
     if (cursorUnit && this.battle.isPlayerControllableAlly(cursorUnit.id)
       && !cursorUnit.acted && !cursorUnit.actionDisabled) return cursorUnit;
@@ -686,6 +693,8 @@ export class GameController {
       ? this.battle.unit(this.groupCommandLeaderId)
       : undefined;
     if (leader?.side === 1) return leader;
+    const fixedCommander = this.battle.groupCommander;
+    if (fixedCommander) return fixedCommander;
     const focus = this.battle.focus;
     return focus?.side === 1 ? focus : this.battle.units.find(({ side }) => side === 1);
   }
@@ -1911,25 +1920,40 @@ export class GameController {
     this.resetAction();
     this.phase = "allyAuto";
     this.statusMessage = mode === "autonomous"
-      ? "我方自動／特殊單位階段。"
+      ? "友軍 NPC 軍團獨立行動。"
       : mode === "follow"
-        ? "我方自動階段：其餘單位跟隨主將。"
-        : "我方自動階段：其餘單位自由行動。";
+        ? "玩家軍團接管：其餘可操控角色跟隨主將。"
+        : "玩家軍團接管：其餘可操控角色自由行動。";
     this.emit();
 
-    const allyIds = this.battle.alliedActionOrder(mode !== "autonomous");
-    for (const id of allyIds) {
-      const automatic = this.battle.alliedBehaviorFor(id) !== 0;
-      const action = this.battle.planAlliedAiAction(
-        id,
-        !automatic && mode === "follow" ? leaderId : undefined,
-      );
-      if (!action) continue;
-      if (await this.runAlliedAiAction(action)) {
-        this.busy = false;
-        this.emit();
-        return;
+    const manualIds = mode === "autonomous"
+      ? []
+      : this.battle.alliedActionOrder(true)
+        .filter((id) => this.battle.alliedBehaviorFor(id) === 0);
+    const automaticIds = this.battle.alliedActionOrder(false);
+    const runQueue = async (ids: readonly string[], followId?: string): Promise<boolean> => {
+      for (const id of ids) {
+        const action = this.battle.planAlliedAiAction(id, followId);
+        if (!action) continue;
+        if (await this.runAlliedAiAction(action)) return true;
       }
+      return false;
+    };
+
+    if (await runQueue(manualIds, mode === "follow" ? leaderId : undefined)) {
+      this.busy = false;
+      this.emit();
+      return;
+    }
+
+    if (automaticIds.length > 0 && mode !== "autonomous") {
+      this.statusMessage = "友軍 NPC 軍團獨立行動；不受玩家集團命令控制。";
+      this.emit();
+    }
+    if (await runQueue(automaticIds)) {
+      this.busy = false;
+      this.emit();
+      return;
     }
 
     await this.presentTurnTransition("enemy");
@@ -1984,10 +2008,11 @@ export class GameController {
     }
     await this.presentTurnTransition("player");
     this.battle.startNextRound();
-    const nia = this.battle.unit("1:0");
-    if (nia) {
-      this.cursor = { x: nia.x, y: nia.y };
-      this.centerCamera(nia);
+    const commander = this.battle.groupCommander ?? this.battle.unit("1:0");
+    if (commander) {
+      this.battle.focusId = commander.id;
+      this.cursor = { x: commander.x, y: commander.y };
+      this.centerCamera(commander);
     }
     const roundEvents = this.consumeStageTrigger({
       type: "round-started",
@@ -2013,7 +2038,11 @@ export class GameController {
     this.battle.focusId = unit.id;
     this.cursor = { x: unit.x, y: unit.y };
     this.centerCamera(unit);
-    this.statusMessage = `${unit.name}正在自動行動。`;
+    this.statusMessage = movementKind === "enemy"
+      ? `${unit.name}正在自動行動。`
+      : this.battle.alliedBehaviorFor(unit.id) === 0
+        ? `玩家軍團：${unit.name}正在執行集團命令。`
+        : `友軍 NPC 軍團：${unit.name}正在獨立行動。`;
     this.emit();
 
     if (
@@ -3621,6 +3650,7 @@ export class GameController {
       stageId: this.battle.stage.id,
       stageProgress: this.stageProgress,
       phase: this.phase,
+      statusMessage: this.statusMessage,
       campaignRoute: this.campaignRoute,
       difficulty: this.difficulty,
       dialogueIndex: this.dialogueIndex,
