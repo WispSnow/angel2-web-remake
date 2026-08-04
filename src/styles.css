@@ -401,8 +401,8 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
     #261516;
   text-shadow: 1px 1px #000;
 }
-.terrain-detail header { display: flex; align-items: center; justify-content: space-between; padding-right: 16px; color: #f4d25c; font: 700 13px/16px "PMingLiU", serif; letter-spacing: .08em; }
-.terrain-detail header b { padding: 0 4px; border: 1px solid #9d6c24; color: #fff1b0; background: #4d2423; font: 700 9px/14px system-ui, sans-serif; letter-spacing: 0; }
+.terrain-detail header { display: flex; gap: 6px; align-items: center; justify-content: space-between; padding-right: 16px; color: #f4d25c; font: 700 13px/16px "PMingLiU", serif; letter-spacing: .08em; }
+.terrain-detail header b { max-width: 72px; overflow: hidden; color: #fff1b0; font: 700 12px/16px "PMingLiU", serif; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
 .terrain-position { margin: 0 0 3px; color: #cbbf9f; font: 9px/11px ui-monospace, monospace; }
 .terrain-detail dl { margin: 0; font: 10px/17px "PMingLiU", serif; }
 .terrain-detail dl div { display: grid; grid-template-columns: 50px minmax(0, 1fr); border-top: 1px dotted #84682e; }

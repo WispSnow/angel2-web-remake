@@ -523,6 +523,7 @@ export class GameController {
       this.battle.terrainSlotAt(position),
       referenceUnit,
       referenceUnit ? this.unitStats(referenceUnit) : undefined,
+      this.battle.stage.id,
     );
   }
 

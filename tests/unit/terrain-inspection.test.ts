@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { inspectTerrain } from "../../src/game/terrain-inspection";
+import {
+  inspectTerrain,
+  terrainDisplayNameForSlot,
+} from "../../src/game/terrain-inspection";
 import type { BattleUnit, UnitStats } from "../../src/game/types";
 
 const soldier: BattleUnit = {
@@ -38,9 +41,10 @@ const soldierStats: UnitStats = {
 
 describe("terrain inspection", () => {
   it("projects the current class movement and defense profiles without inventing attack bonuses", () => {
-    expect(inspectTerrain({ x: 30, y: 27 }, 13, soldier, soldierStats)).toEqual({
+    expect(inspectTerrain({ x: 30, y: 27 }, 13, soldier, soldierStats, "stage-00")).toEqual({
       position: { x: 30, y: 27 },
       terrainSlot: 13,
+      terrainName: "宮殿地面",
       referenceUnit: {
         id: "1:0",
         name: "妮雅",
@@ -59,6 +63,7 @@ describe("terrain inspection", () => {
   it("marks blocked terrain without implying that its defense profile can be occupied", () => {
     expect(inspectTerrain({ x: 0, y: 0 }, 0, soldier, soldierStats)).toMatchObject({
       terrainSlot: 0,
+      terrainName: "地圖邊界",
       movementRule: 99,
       traversable: false,
       attackBonusPercent: 0,
@@ -72,7 +77,25 @@ describe("terrain inspection", () => {
     expect(inspectTerrain({ x: 4, y: 5 }, 16)).toEqual({
       position: { x: 4, y: 5 },
       terrainSlot: 16,
+      terrainName: "通道",
       attackBonusPercent: 0,
     });
+  });
+
+  it("uses stage-specific visual names and broad remake classifications without exposing slot ids", () => {
+    expect([0, 13, 14, 15, 16].map((slot) => terrainDisplayNameForSlot(slot, "stage-00"))).toEqual([
+      "城牆與邊界",
+      "宮殿地面",
+      "宮殿階梯",
+      "王座",
+      "紅毯",
+    ]);
+    expect(terrainDisplayNameForSlot(3, "stage-01")).toBe("森林");
+    expect(terrainDisplayNameForSlot(11, "stage-02")).toBe("城牆");
+    expect(terrainDisplayNameForSlot(7)).toBe("海域");
+    expect(terrainDisplayNameForSlot(17)).toBe("未分類地形");
+    expect(terrainDisplayNameForSlot(23)).toBe("未分類地形");
+    expect(Array.from({ length: 23 }, (_, slot) => terrainDisplayNameForSlot(slot)))
+      .not.toContainEqual(expect.stringMatching(/槽\s*\d+/));
   });
 });

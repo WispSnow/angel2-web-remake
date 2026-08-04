@@ -44,6 +44,7 @@ interface DebugState {
   terrainInspection?: {
     position: { x: number; y: number };
     terrainSlot: number;
+    terrainName: string;
     referenceUnit?: { id: string; name: string; classId: string; className: string };
     movementRule?: number;
     movementCost?: number;
@@ -984,6 +985,7 @@ test("REMAKE-015: clicking empty terrain shows class-specific traits in the side
   await clickCanvas(page, 420, 45);
   const inspected = await debugState(page);
   expect(inspected.terrainInspection).toMatchObject({
+    terrainName: "宮殿地面",
     referenceUnit: { id: "1:0", name: "妮雅", classId: "soldier", className: "士兵" },
     attackBonusPercent: 0,
   });
@@ -995,7 +997,9 @@ test("REMAKE-015: clicking empty terrain shows class-specific traits in the side
   const terrain = inspected.terrainInspection!;
   await expect(detail).toBeVisible();
   await expect(page.getByTestId("game-screen")).toHaveAttribute("data-hud-mode", "terrain");
-  await expect(page.getByTestId("terrain-slot")).toHaveText(`槽 ${terrain.terrainSlot}`);
+  await expect(page.getByTestId("terrain-name")).toHaveText("宮殿地面");
+  await expect(detail).toHaveAttribute("data-terrain-slot", String(terrain.terrainSlot));
+  await expect(detail).not.toContainText(/槽\s*\d+/);
   await expect(page.getByTestId("terrain-position"))
     .toHaveText(`格 ${terrain.position.x}，${terrain.position.y}`);
   await expect(page.getByTestId("terrain-reference")).toHaveText("妮雅・士兵");

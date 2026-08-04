@@ -1416,7 +1416,7 @@ function renderTerrainInspection(inspection: TerrainInspection): string {
       : "—"
     : "依職業";
   const aria = [
-    `地形規則槽 ${inspection.terrainSlot}`,
+    `地形 ${inspection.terrainName}`,
     `座標 ${inspection.position.x},${inspection.position.y}`,
     reference ? `參照 ${reference.name} ${reference.className}` : "尚無參照單位",
     `移動損耗 ${movement}`,
@@ -1424,8 +1424,9 @@ function renderTerrainInspection(inspection: TerrainInspection): string {
     `防禦加成 ${defense}`,
   ].join("，");
   return `
-    <section class="terrain-detail" data-testid="terrain-detail" role="status" aria-label="${aria}">
-      <header><span>地形特性</span><b data-testid="terrain-slot">槽 ${inspection.terrainSlot}</b></header>
+    <section class="terrain-detail" data-testid="terrain-detail" data-terrain-slot="${inspection.terrainSlot}"
+      role="status" aria-label="${aria}">
+      <header><span>地形特性</span><b data-testid="terrain-name">${inspection.terrainName}</b></header>
       <p class="terrain-position" data-testid="terrain-position">格 ${inspection.position.x}，${inspection.position.y}</p>
       <dl>
         <div><dt>參照</dt><dd data-testid="terrain-reference">${reference ? `${reference.name}・${reference.className}` : "未選擇單位"}</dd></div>
