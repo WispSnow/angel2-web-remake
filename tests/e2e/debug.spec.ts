@@ -1,5 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { classStatsFor } from "../../src/game/content/classes";
+import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import type { CompletedSaveData } from "../../src/game/types";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -24,12 +28,14 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "href",
     "/technique-lab.html",
   );
+  await expect(page.getByTestId("debug-roster-source")).toHaveValue("representative-growth");
+  await expect(page.locator("[data-debug-roster-description]")).toContainText("合法轉職混編");
 
   await page.getByTestId("debug-difficulty").selectOption("3");
   const deployment = page.getByTestId("debug-scenario-stage-01-deployment");
   await expect(deployment).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-01-deployment&difficulty=3",
+    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth",
   );
   await page.screenshot({ path: `${ARTIFACT_DIR}/debug-hub.png`, fullPage: true });
   await deployment.click();
@@ -37,17 +43,107 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 5／8");
   await expect(page.getByTestId("debug-toolbar")).toBeVisible();
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageId: string;
     phase: string;
     difficulty: number;
+    units: Array<{ id: string; classId: string }>;
   });
   expect(state).toMatchObject({
     stageId: "stage-01",
     phase: "deployment",
     difficulty: 3,
   });
+  expect(state.units).toContainEqual(expect.objectContaining({ id: "1:0", classId: "cavalry" }));
   await page.screenshot({ path: `${ARTIFACT_DIR}/debug-stage1-deployment.png` });
+});
+
+test("stage-four debug profiles cover inherited multi-promotion rosters", async ({ page }) => {
+  await page.goto(
+    "/?debugScenario=stage-04-player&difficulty=2&roster=promotion-coverage&test=1",
+  );
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：深層轉職分支覆蓋");
+  const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+    units: Array<{ id: string; classId: string }>;
+  });
+  expect(state.units.filter(({ id }) => id.startsWith("1:"))).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: "1:0", classId: "swift-dragon-knight" }),
+    expect.objectContaining({ id: "1:1", classId: "magic-priest" }),
+    expect.objectContaining({ id: "1:2", classId: "crossbow" }),
+    expect.objectContaining({ id: "1:3", classId: "magic-armor-warrior" }),
+    expect.objectContaining({ id: "1:4", classId: "prayer-guide" }),
+    expect.objectContaining({ id: "1:20", classId: "flying-dragon-knight" }),
+    expect.objectContaining({ id: "1:21", classId: "evil-sword-warrior" }),
+    expect.objectContaining({ id: "1:24", classId: "wizard" }),
+  ]));
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/debug-stage4-promotion-coverage.png`,
+  });
+});
+
+test("debug hub imports a formal save roster read-only", async ({ page }) => {
+  const experience = 321;
+  const classId = "swift-dragon-knight" as const;
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2026-08-04T12:00:00.000Z",
+    saveCount: 2,
+    stageId: "stage-04",
+    stageLabel: "通過力場",
+    ruleset: "stableRemake",
+    difficulty: 1,
+    rngState: 0x1234_5678,
+    rngCalls: 42,
+    roster: completeCampaignRoster([{
+      slot: 0,
+      classId,
+      experience,
+      life: classStatsFor({ classId, experience }).maxLife,
+    }]),
+    stageProgress: 1000,
+    consumedEventIds: [
+      "stage-03-opening-story",
+      "stage-03-boss-defeated",
+      "stage-03-victory-story",
+      "stage-03-completed-route",
+    ],
+  };
+  const serialized = JSON.stringify(save);
+
+  await page.goto("/debug.html");
+  await page.evaluate((value) => localStorage.setItem("angel2.save.1", value), serialized);
+  await page.reload();
+  await expect(page.getByTestId("debug-roster-source").locator("option[value='save-1-current']"))
+    .toHaveText("記錄 1 · 通過力場 · 完成名單");
+  await page.getByTestId("debug-roster-source").selectOption("save-1-current");
+  await page.getByTestId("debug-difficulty").selectOption("3");
+  const player = page.getByTestId("debug-scenario-stage-04-player");
+  await expect(player).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-04-player&difficulty=3&roster=save-1-current",
+  );
+  await player.click();
+
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await expect(page.getByTestId("debug-toolbar")).toContainText(
+    "成長：記錄 1 · 通過力場 · 完成名單",
+  );
+  const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+    difficulty: number;
+    units: Array<{ id: string; classId: string; experience: number }>;
+  });
+  expect(state.difficulty).toBe(3);
+  expect(state.units).toContainEqual(expect.objectContaining({
+    id: "1:0",
+    classId,
+    experience,
+  }));
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBe(serialized);
 });
 
 test("debug scenarios can enter player phases and directly complete either implemented stage", async ({ page }) => {

@@ -7,6 +7,11 @@ import {
 } from "./game/debug-scenario-catalog";
 import type { Difficulty } from "./game/types";
 import { STAGE_RUNTIME_MANIFEST } from "./game/stage-runtime";
+import {
+  debugRosterSourceOptions,
+  DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID,
+  type DebugRosterSourceId,
+} from "./game/debug-roster-profiles";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
@@ -16,6 +21,7 @@ const stageGroups = stageOrder.map((stageId) => ({
   stageId,
   scenarios: DEBUG_SCENARIOS.filter((scenario) => scenario.stageId === stageId),
 })).filter(({ scenarios }) => scenarios.length > 0);
+const rosterOptions = debugRosterSourceOptions(localStorage);
 
 root.innerHTML = `
   <div class="debug-hub-shell">
@@ -23,7 +29,7 @@ root.innerHTML = `
       <div>
         <p class="debug-kicker">DEVELOPER SCENE SELECT</p>
         <h1>戰役調試中心</h1>
-        <p>直接選擇關卡、階段或快速結算場景。調試會話與普通入口隔離，不會自動寫入正式存檔。</p>
+        <p>直接選擇關卡、階段、成長檔案或快速結算場景。調試會話與普通入口隔離，正式記錄只讀且不會被改寫。</p>
       </div>
       <a href="/" class="debug-back-link">返回普通遊戲</a>
     </header>
@@ -35,7 +41,13 @@ root.innerHTML = `
         <option value="2">小有挑戰</option>
         <option value="3">無法無天</option>
       </select>
-      <span>切換難度會更新下方全部場景入口。</span>
+      <label for="debug-roster-source">成長檔案</label>
+      <select id="debug-roster-source" data-testid="debug-roster-source">
+        ${rosterOptions.map((option) => `<option value="${option.id}"${
+          option.id === DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID ? " selected" : ""
+        }>${option.label}</option>`).join("")}
+      </select>
+      <span data-debug-roster-description></span>
     </section>
     <nav class="debug-tool-links" aria-label="專項實驗室">
       <a href="/portrait-lab.html"><b>肖像動畫實驗室</b><span>一次檢查 D/0–67 的眨眼、口型與原版落點</span></a>
@@ -57,7 +69,7 @@ root.innerHTML = `
               <article class="debug-scenario-card${fixture ? " is-fixture" : ""}">
                 <div class="debug-card-meta">
                   <span>${scenario.phase}</span>
-                  ${fixture ? "<em>調試夾具</em>" : "<em>正式初態</em>"}
+                  ${fixture ? "<em>階段夾具</em>" : "<em>場景初態</em>"}
                 </div>
                 <h3>${scenario.title}</h3>
                 <p>${scenario.description}</p>
@@ -71,20 +83,27 @@ root.innerHTML = `
     </main>
     <footer class="debug-hub-footer">
       <p><b>擴充約定：</b>新增關卡時向場景註冊表加入關前、部署/準備、玩家回合、勝利準備和完成路由條目。</p>
-      <p>調試入口允許使用確定性夾具；普通 <code>/</code> 仍不載入或暴露這些介面。</p>
+      <p>代表性成長與分支覆蓋是確定性調試夾具，不是唯一標準陣容；正式記錄來源只讀取 roster 與 PRNG。普通 <code>/</code> 仍不載入或暴露這些介面。</p>
     </footer>
   </div>`;
 
 const difficultySelect = root.querySelector<HTMLSelectElement>("#debug-difficulty");
 if (!difficultySelect) throw new Error("debug difficulty selector not found");
+const rosterSelect = root.querySelector<HTMLSelectElement>("#debug-roster-source");
+const rosterDescription = root.querySelector<HTMLElement>("[data-debug-roster-description]");
+if (!rosterSelect || !rosterDescription) throw new Error("debug roster selector not found");
 
 const updateLinks = () => {
   const difficulty = Number(difficultySelect.value) as Difficulty;
+  const rosterSourceId = rosterSelect.value as DebugRosterSourceId;
+  const rosterOption = rosterOptions.find(({ id }) => id === rosterSourceId);
+  rosterDescription.textContent = rosterOption?.description ?? "未知成長檔案";
   root.querySelectorAll<HTMLAnchorElement>("[data-debug-scenario-id]").forEach((link) => {
     const id = link.dataset.debugScenarioId as DebugScenarioId | undefined;
-    if (id) link.href = debugScenarioUrl(id, difficulty);
+    if (id) link.href = debugScenarioUrl(id, difficulty, rosterSourceId);
   });
 };
 
 difficultySelect.addEventListener("change", updateLinks);
+rosterSelect.addEventListener("change", updateLinks);
 updateLinks();

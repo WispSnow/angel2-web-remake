@@ -137,9 +137,18 @@ if (debugScenario) {
       || difficultyValue === 2 || difficultyValue === 3
       ? difficultyValue
       : 0;
-    const controller = await debug.createDebugScenarioController(debugScenario, difficulty);
+    const rosterSource = debug.parseDebugRosterSourceId(parameters.get("roster"));
+    if (!rosterSource) {
+      renderDebugLoadError("未知成長檔案", parameters.get("roster") ?? "");
+      return;
+    }
+    const controller = await debug.createDebugScenarioController(debugScenario, {
+      difficulty,
+      rosterSource,
+      storage: localStorage,
+    });
     mountController(controller, false);
-    debug.mountDebugToolbar(controller, debugScenario, difficulty);
+    debug.mountDebugToolbar(controller, debugScenario, difficulty, rosterSource, localStorage);
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     renderDebugLoadError("調試場景載入失敗", message);

@@ -2,6 +2,11 @@ import "../debug.css";
 import { STAGE0, completeCampaignRoster } from "./content/stage0";
 import { GameController } from "./controller";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "./save";
+import {
+  createDebugCampaignState,
+  debugRosterSourceOption,
+  type DebugRosterSource,
+} from "./debug-roster-profiles";
 import { consumedEventIdsForBattleResume } from "./simulation/stage-events";
 import type {
   BattleSaveData,
@@ -23,6 +28,10 @@ export {
   isDebugScenarioId,
   type DebugScenarioId,
 } from "./debug-scenario-catalog";
+export {
+  parseDebugRosterSourceId,
+  type DebugRosterSource,
+} from "./debug-roster-profiles";
 
 const STAGE1_BATTLE_EVENT_IDS = [
   "stage-01-prebattle-story",
@@ -64,8 +73,22 @@ const STAGE4_COMPLETED_EVENT_IDS = [
   "stage-04-completed-route",
 ] as const;
 
-function stage0Campaign(difficulty: Difficulty): CampaignState {
-  return new GameController(difficulty).battle.campaignSnapshot();
+export interface DebugScenarioContext {
+  difficulty: Difficulty;
+  rosterSource: DebugRosterSource;
+  storage: Pick<Storage, "getItem">;
+}
+
+function debugCampaign(
+  context: DebugScenarioContext,
+  stageId: CampaignState["stageId"],
+): CampaignState {
+  return createDebugCampaignState(
+    stageId,
+    context.difficulty,
+    context.rosterSource,
+    context.storage,
+  );
 }
 
 function battleSaveBase(
@@ -108,8 +131,8 @@ function battleSaveBase(
   };
 }
 
-async function createStage0Player(difficulty: Difficulty): Promise<GameController> {
-  const source = new GameController(difficulty);
+async function createStage0Player(context: DebugScenarioContext): Promise<GameController> {
+  const source = new GameController(context.difficulty);
   const nia = source.battle.unit("1:0");
   if (!nia) throw new Error("stage 0 debug scenario is missing Nia");
   nia.x = STAGE0.opening.to.x;
@@ -133,29 +156,24 @@ async function createStage0Player(difficulty: Difficulty): Promise<GameControlle
   return controller;
 }
 
-async function createStage1Prebattle(difficulty: Difficulty): Promise<GameController> {
-  const controller = new GameController(difficulty);
-  await controller.enterStage1({
-    ...controller.battle.campaignSnapshot(),
-    stageId: "stage-01",
-  });
+async function createStage1Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage1(debugCampaign(context, "stage-01"));
   return controller;
 }
 
-async function createStage1Deployment(difficulty: Difficulty): Promise<GameController> {
-  const controller = new GameController(difficulty);
-  await controller.enterStage1({
-    ...controller.battle.campaignSnapshot(),
-    stageId: "stage-01",
-  }, "deployment", "調試場景：第 1 關正式部署。");
+async function createStage1Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage1(
+    debugCampaign(context, "stage-01"),
+    "deployment",
+    "調試場景：第 1 關正式部署。",
+  );
   return controller;
 }
 
-async function createStage1Player(difficulty: Difficulty): Promise<GameController> {
-  const campaign = {
-    ...stage0Campaign(difficulty),
-    stageId: "stage-01" as const,
-  };
+async function createStage1Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-01");
   const [{ STAGE1_DEFINITION }, { Stage1Battle }] = await Promise.all([
     import("./content/stage1"),
     import("./simulation/stage1-battle"),
@@ -196,8 +214,8 @@ async function createStage1Player(difficulty: Difficulty): Promise<GameControlle
   return controller;
 }
 
-async function createStage1Completed(difficulty: Difficulty): Promise<GameController> {
-  const campaign = stage0Campaign(difficulty);
+async function createStage1Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-01");
   const save: CompletedSaveData = {
     format: "ANGEL2-web-save",
     version: SAVE_VERSION,
@@ -218,24 +236,24 @@ async function createStage1Completed(difficulty: Difficulty): Promise<GameContro
   return GameController.fromSave(save, 1);
 }
 
-async function createStage2Opening(difficulty: Difficulty): Promise<GameController> {
-  const controller = new GameController(difficulty);
-  await controller.enterStage2({
-    ...controller.battle.campaignSnapshot(),
-    stageId: "stage-02",
-  }, "調試場景：第 2 關固定編隊。" );
+async function createStage2Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage2(
+    debugCampaign(context, "stage-02"),
+    "調試場景：第 2 關固定編隊。",
+  );
   return controller;
 }
 
-async function createStage2Player(difficulty: Difficulty): Promise<GameController> {
-  const controller = await createStage2Opening(difficulty);
+async function createStage2Player(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage2Opening(context);
   controller.skipDialogue();
   controller.statusMessage = "調試場景：第 2 關玩家回合；六名友軍將自動行動。";
   return controller;
 }
 
-async function createStage2Completed(difficulty: Difficulty): Promise<GameController> {
-  const campaign = stage0Campaign(difficulty);
+async function createStage2Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-02");
   const save: CompletedSaveData = {
     format: "ANGEL2-web-save",
     version: SAVE_VERSION,
@@ -256,24 +274,24 @@ async function createStage2Completed(difficulty: Difficulty): Promise<GameContro
   return GameController.fromSave(save, 1);
 }
 
-async function createStage3Opening(difficulty: Difficulty): Promise<GameController> {
-  const controller = new GameController(difficulty);
-  await controller.enterStage3({
-    ...controller.battle.campaignSnapshot(),
-    stageId: "stage-03",
-  }, "調試場景：第 3 關固定編隊。" );
+async function createStage3Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage3(
+    debugCampaign(context, "stage-03"),
+    "調試場景：第 3 關固定編隊。",
+  );
   return controller;
 }
 
-async function createStage3Player(difficulty: Difficulty): Promise<GameController> {
-  const controller = await createStage3Opening(difficulty);
+async function createStage3Player(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage3Opening(context);
   controller.skipDialogue();
   controller.statusMessage = "調試場景：第 3 關玩家回合；第四軍團由黛西帶隊自動行動。";
   return controller;
 }
 
-async function createStage3Completed(difficulty: Difficulty): Promise<GameController> {
-  const campaign = stage0Campaign(difficulty);
+async function createStage3Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-03");
   const save: CompletedSaveData = {
     format: "ANGEL2-web-save",
     version: SAVE_VERSION,
@@ -294,29 +312,24 @@ async function createStage3Completed(difficulty: Difficulty): Promise<GameContro
   return GameController.fromSave(save, 1);
 }
 
-async function createStage4Prebattle(difficulty: Difficulty): Promise<GameController> {
-  const controller = new GameController(difficulty);
-  await controller.enterStage("stage-04", {
-    ...controller.battle.campaignSnapshot(),
-    stageId: "stage-04",
-  });
+async function createStage4Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-04", debugCampaign(context, "stage-04"));
   return controller;
 }
 
-async function createStage4Deployment(difficulty: Difficulty): Promise<GameController> {
-  const controller = new GameController(difficulty);
-  await controller.enterStage("stage-04", {
-    ...controller.battle.campaignSnapshot(),
-    stageId: "stage-04",
-  }, { preparation: true, statusMessage: "調試場景：第 4 關結界部署。" });
+async function createStage4Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-04",
+    debugCampaign(context, "stage-04"),
+    { preparation: true, statusMessage: "調試場景：第 4 關結界部署。" },
+  );
   return controller;
 }
 
-async function createStage4Player(difficulty: Difficulty): Promise<GameController> {
-  const campaign = {
-    ...stage0Campaign(difficulty),
-    stageId: "stage-04" as const,
-  };
+async function createStage4Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-04");
   const [{ STAGE4_DEFINITION }, { Stage4Battle }] = await Promise.all([
     import("./content/stage4"),
     import("./simulation/stage4-battle"),
@@ -357,8 +370,8 @@ async function createStage4Player(difficulty: Difficulty): Promise<GameControlle
   return controller;
 }
 
-async function createStage4Completed(difficulty: Difficulty): Promise<GameController> {
-  const campaign = stage0Campaign(difficulty);
+async function createStage4Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-04");
   const save: CompletedSaveData = {
     format: "ANGEL2-web-save",
     version: SAVE_VERSION,
@@ -381,26 +394,28 @@ async function createStage4Completed(difficulty: Difficulty): Promise<GameContro
 
 export async function createDebugScenarioController(
   id: DebugScenarioId,
-  difficulty: Difficulty,
+  context: DebugScenarioContext,
 ): Promise<GameController> {
-  return DEBUG_SCENARIO_FACTORIES[id](difficulty);
+  return DEBUG_SCENARIO_FACTORIES[id](context);
 }
 
-type DebugScenarioFactory = (difficulty: Difficulty) => Promise<GameController> | GameController;
+type DebugScenarioFactory = (
+  context: DebugScenarioContext,
+) => Promise<GameController> | GameController;
 
 function withSetup(
-  create: (difficulty: Difficulty) => Promise<GameController>,
+  create: (context: DebugScenarioContext) => Promise<GameController>,
   setup: (controller: GameController) => void,
 ): DebugScenarioFactory {
-  return async (difficulty) => {
-    const controller = await create(difficulty);
+  return async (context) => {
+    const controller = await create(context);
     setup(controller);
     return controller;
   };
 }
 
 const DEBUG_SCENARIO_FACTORIES = {
-  "stage-00-prebattle": (difficulty) => new GameController(difficulty),
+  "stage-00-prebattle": (context) => new GameController(context.difficulty),
   "stage-00-player": createStage0Player,
   "stage-00-near-victory": withSetup(createStage0Player, (controller) => {
     controller.forceVictorySetupForTest();
@@ -450,6 +465,7 @@ const DEBUG_SCENARIO_FACTORIES = {
 
 export interface Angel2DeveloperApi {
   scenarioId: DebugScenarioId;
+  rosterSourceId: string;
   getState: () => object;
   completeCurrentStage: () => Promise<void>;
   prepareVictory: () => void;
@@ -467,6 +483,8 @@ export function mountDebugToolbar(
   controller: GameController,
   scenarioId: DebugScenarioId,
   difficulty: Difficulty,
+  rosterSource: DebugRosterSource,
+  storage: Pick<Storage, "getItem">,
 ): () => void {
   document.body.classList.add("debug-session-page");
   const toolbar = document.createElement("aside");
@@ -477,6 +495,7 @@ export function mountDebugToolbar(
     <div class="debug-toolbar-panel">
       <div class="debug-toolbar-heading"><b>開發調試</b><a href="/debug.html">場景選擇</a></div>
       <p data-debug-scenario></p>
+      <p data-debug-roster></p>
       <p data-debug-state></p>
       <div class="debug-toolbar-actions">
         <button type="button" data-debug-victory>一擊勝利</button>
@@ -490,18 +509,24 @@ export function mountDebugToolbar(
   const panel = toolbar.querySelector<HTMLElement>(".debug-toolbar-panel");
   const toggle = toolbar.querySelector<HTMLButtonElement>("[data-debug-toggle]");
   const scenarioLabel = toolbar.querySelector<HTMLElement>("[data-debug-scenario]");
+  const rosterLabel = toolbar.querySelector<HTMLElement>("[data-debug-roster]");
   const stateLabel = toolbar.querySelector<HTMLElement>("[data-debug-state]");
   const victory = toolbar.querySelector<HTMLButtonElement>("[data-debug-victory]");
   const complete = toolbar.querySelector<HTMLButtonElement>("[data-debug-complete]");
   const defeat = toolbar.querySelector<HTMLButtonElement>("[data-debug-defeat]");
-  if (!panel || !toggle || !scenarioLabel || !stateLabel || !victory || !complete || !defeat) {
+  if (
+    !panel || !toggle || !scenarioLabel || !rosterLabel || !stateLabel
+    || !victory || !complete || !defeat
+  ) {
     throw new Error("debug toolbar controls are missing");
   }
 
   const scenario = DEBUG_SCENARIOS.find(({ id }) => id === scenarioId);
+  const rosterOption = debugRosterSourceOption(rosterSource, storage);
 
   const render = () => {
     scenarioLabel.textContent = `${debugStageLabel(controller.battle.stage.id)} · ${scenario?.title ?? scenarioId}`;
+    rosterLabel.textContent = `成長：${rosterOption.label}`;
     stateLabel.textContent = `${controller.battle.stage.id} · ${controller.phase}`;
     const battleActive = controller.phase === "player";
     victory.disabled = !battleActive;
@@ -522,12 +547,15 @@ export function mountDebugToolbar(
 
   window.__ANGEL2_DEBUG__ = {
     scenarioId,
+    rosterSourceId: rosterSource.id,
     getState: () => controller.debugState(),
     completeCurrentStage: () => controller.completeCurrentStageForDebug(),
     prepareVictory: () => controller.forceVictorySetupForTest(),
     forceDefeat: () => controller.forceDefeatForTest(),
     openScenario: (id) => {
-      if (isDebugScenarioId(id)) location.assign(debugScenarioUrl(id, difficulty));
+      if (isDebugScenarioId(id)) {
+        location.assign(debugScenarioUrl(id, difficulty, rosterSource.id));
+      }
     },
   };
 

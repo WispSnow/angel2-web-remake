@@ -1,5 +1,6 @@
 import type { Difficulty, StageId } from "./types";
 import { STAGE_RUNTIME_MANIFEST } from "./stage-runtime";
+import type { DebugRosterSourceId } from "./debug-roster-profiles";
 
 export interface DebugScenarioDefinition {
   id: string;
@@ -235,7 +236,12 @@ export function isDebugScenarioId(value: unknown): value is DebugScenarioId {
     && DEBUG_SCENARIOS.some(({ id }) => id === value);
 }
 
-export function debugScenarioUrl(id: DebugScenarioId, difficulty: Difficulty): string {
+export function debugScenarioUrl(
+  id: DebugScenarioId,
+  difficulty: Difficulty,
+  rosterSourceId?: DebugRosterSourceId,
+): string {
   const parameters = new URLSearchParams({ debugScenario: id, difficulty: String(difficulty) });
+  if (rosterSourceId) parameters.set("roster", rosterSourceId);
   return `/?${parameters.toString()}`;
 }
