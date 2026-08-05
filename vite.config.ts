@@ -9,6 +9,7 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         game: "index.html",
+        arena: "arena.html",
         debug: "debug.html",
         portraitLab: "portrait-lab.html",
         combatLab: "combat-lab.html",

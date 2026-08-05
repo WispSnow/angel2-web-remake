@@ -247,6 +247,11 @@ const SYSTEM_COMMANDS: ReadonlyArray<{ id: SystemCommandId; label: string }> = [
   { id: "quit", label: "離開遊戲" },
 ];
 
+const MEMORY_ONLY_SYSTEM_COMMANDS: ReadonlyArray<{ id: SystemCommandId; label: string }> = [
+  { id: "settings", label: "遊戲功能" },
+  { id: "objectives", label: "勝利條件" },
+];
+
 export interface MovementPresentation {
   unitId: string;
   kind: MovementKind;
@@ -359,6 +364,7 @@ export class GameController {
     destinationLabel: string;
   };
   private listeners = new Set<Listener>();
+  private campaignPersistenceEnabled = true;
   private readonly testMode = new URLSearchParams(location.search).has("test");
   private readonly debugMode = this.testMode
     || new URLSearchParams(location.search).has("debugScenario");
@@ -388,6 +394,38 @@ export class GameController {
   static async fromSave(save: SaveData, slot: number): Promise<GameController> {
     const controller = new GameController(save.difficulty);
     await controller.restoreSave(save, `已讀取記錄 ${slot}。`);
+    return controller;
+  }
+
+  static forStandaloneBattle(
+    battle: Stage0Battle,
+    runtime: LoadedStageRuntime,
+    statusMessage: string,
+  ): GameController {
+    const controller = new GameController(battle.difficulty);
+    controller.campaignPersistenceEnabled = false;
+    controller.stageRuntime = runtime;
+    controller.battle = battle;
+    controller.difficulty = battle.difficulty;
+    controller.stageEntrySnapshot = cloneCampaignState(battle.campaignSnapshot());
+    controller.preparationCampaign = undefined;
+    controller.completedProgressMetadata = undefined;
+    controller.stageEventState = createStageEventState(battle.stage);
+    controller.activeStoryId = undefined;
+    controller.campaignRoute = undefined;
+    controller.phase = "player";
+    controller.hintVisible = false;
+    controller.resetAction();
+    const focus = battle.focus ?? battle.units.find(({ side }) => side === 1);
+    if (focus) {
+      battle.focusId = focus.id;
+      controller.cursor = { x: focus.x, y: focus.y };
+      controller.centerCamera(focus);
+    } else {
+      controller.cameraOrigin = { ...battle.stage.viewport.initialOrigin };
+      controller.cursor = { ...controller.cameraOrigin };
+    }
+    controller.statusMessage = statusMessage;
     return controller;
   }
 
@@ -608,8 +646,12 @@ export class GameController {
     return GROUP_COMMANDS;
   }
 
-  get systemCommands(): typeof SYSTEM_COMMANDS {
-    return SYSTEM_COMMANDS;
+  get systemCommands(): ReadonlyArray<{ id: SystemCommandId; label: string }> {
+    return this.campaignPersistenceEnabled ? SYSTEM_COMMANDS : MEMORY_ONLY_SYSTEM_COMMANDS;
+  }
+
+  get isCampaignPersistenceEnabled(): boolean {
+    return this.campaignPersistenceEnabled;
   }
 
   get hasBlockingOverlay(): boolean {
@@ -2403,18 +2445,19 @@ export class GameController {
 
   moveSystemMenuSelection(delta: number): void {
     if (!this.systemMenuOpen || delta === 0) return;
-    this.systemMenuIndex = (this.systemMenuIndex + delta + SYSTEM_COMMANDS.length) % SYSTEM_COMMANDS.length;
+    const commands = this.systemCommands;
+    this.systemMenuIndex = (this.systemMenuIndex + delta + commands.length) % commands.length;
     this.emit();
   }
 
   selectSystemMenuCommand(index: number): void {
-    if (!this.systemMenuOpen || index < 0 || index >= SYSTEM_COMMANDS.length || index === this.systemMenuIndex) return;
+    if (!this.systemMenuOpen || index < 0 || index >= this.systemCommands.length || index === this.systemMenuIndex) return;
     this.systemMenuIndex = index;
     this.emit();
   }
 
   activateSystemMenuSelection(): void {
-    const command = this.systemMenuOpen ? SYSTEM_COMMANDS[this.systemMenuIndex] : undefined;
+    const command = this.systemMenuOpen ? this.systemCommands[this.systemMenuIndex] : undefined;
     if (!command) return;
     if (command.id === "settings") this.openSettings();
     else if (command.id === "objectives") this.openObjectives();
@@ -2707,6 +2750,12 @@ export class GameController {
 
   continueAfterVictory(): void {
     if (this.phase !== "victoryFeedback") return;
+    if (!this.campaignPersistenceEnabled) {
+      this.phase = "nextStage";
+      this.statusMessage = "競技場測試完成；可返回編成或以相同陣容重開。";
+      this.emit();
+      return;
+    }
     this.phase = "savePrompt";
     this.savePromptIndex = 0;
     this.emit();
@@ -2792,6 +2841,13 @@ export class GameController {
   }
 
   openRecordMenu(mode: RecordMenuMode): void {
+    if (!this.campaignPersistenceEnabled) {
+      this.systemMenuOpen = false;
+      this.settingsOpen = false;
+      this.statusMessage = "競技場是純記憶體測試，不讀取或寫入戰役記錄。";
+      this.emit();
+      return;
+    }
     const fromSystem = this.systemMenuOpen || this.settingsOpen;
     const fromBattle = this.phase === "player"
       && !this.busy
@@ -3598,7 +3654,8 @@ export class GameController {
       objectiveOpen: this.objectiveOpen,
       systemMenuOpen: this.systemMenuOpen,
       systemMenuIndex: this.systemMenuIndex,
-      systemCommands: SYSTEM_COMMANDS.map((command) => ({ ...command })),
+      systemCommands: this.systemCommands.map((command) => ({ ...command })),
+      campaignPersistenceEnabled: this.campaignPersistenceEnabled,
       settingsOpen: this.settingsOpen,
       soundSettingsOpen: this.soundSettingsOpen,
       soundSettingsReturn: this.soundSettingsReturn,

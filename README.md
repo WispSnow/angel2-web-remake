@@ -1,6 +1,6 @@
 # 《天使帝国 II》Web 复刻
 
-当前普通入口可连续运行第 0 关“瓦爾克麗宮”、第 1 关“騎士城堡前”、第 2 关“救援友軍”和第 3 关“通過力場”。流程从原版关前剧情开始，覆盖固定／交互编队、逐关事件与剧情、玩家与独立友军军团、敌方多军团、僧侣范围回復、失败重试、战中与战后存档及首领胜利，并终止在明确的 `stage-04` 未实现边界。
+当前普通入口可连续运行第 0–4 关，并终止在明确的 `stage-05` 未实现边界。流程从原版关前剧情开始，覆盖固定／交互编队、逐关事件与剧情、玩家与独立友军军团、敌方多军团、僧侣范围回復、移动结界、失败重试、战中与战后存档及首领／到达目标胜利。
 
 运行时采用 Phaser 4.2.1、TypeScript 和 Vite。战斗规则与内容数据独立于 Phaser，场景层只负责地图、单位、镜头、输入和范围表现。
 
@@ -31,6 +31,23 @@ pnpm dev:debug
 部署/准备、玩家回合、胜利准备和完成路由等适用入口。调试会话只修改当前内存，不自动
 写入正式存档；普通 `/` 不加载该模块，也不暴露 `window.__ANGEL2_DEBUG__`。自动测试使用的
 `window.__ANGEL2__` 仍只在 `?test=1` 下存在，两者不得用于普通通关验收。
+
+## 全地形竞技场
+
+需要自由组合当前已接入的敌我职业并直接验证正式战斗规则时运行：
+
+```bash
+pnpm dev:arena
+```
+
+也可以打开 `http://127.0.0.1:4173/arena.html`。竞技场使用第 1 关原版地图中完整的
+22×25 区域，集中覆盖沙地、平地、森林、山地、桥、石路、墙与河流。设置页可选择敌我
+阵营、当前已发布的 22 种地图职业和 1–3 级，在符合该职业移动规则的格子上放置、替换或
+删除单位；每方最多 24 人。开战后复用正式模拟、AI、职业行动、HUD 和全景战斗表现。
+
+竞技场只维护当前页面内存，不读取或写入战役存档；战斗中的系统菜单只保留设置与胜利
+条件。可用顶部工具栏按相同阵容重开，或返回设置继续调整。职业出现在清单中只表示地图
+素材和基础数值已经接入；尚未实现的职业专属行动不会因竞技场而自动开放。
 
 ## 肖像动画实验室
 
@@ -139,9 +156,11 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 
 ## 结构
 
-- `src/game/content/`：证据驱动的第 0–3 关内容、原始数值与对白；
+- `src/game/content/`：证据驱动的第 0–4 关内容、原始数值与对白；
 - `src/game/simulation/`：与 Phaser 无关的确定性网格、伤害、经验和 AI；
-- `src/game/stage-runtime.ts`：第 0–3 关唯一运行时装配、延迟加载、恢复与存档元数据清单；
+- `src/game/stage-runtime.ts`：第 0–4 关唯一运行时装配、延迟加载、恢复与存档元数据清单；
+- `src/game/arena-session.ts`：竞技场编辑状态、放置合法性与可序列化开战配置；
+- `src/game/simulation/arena-battle.ts`：把竞技场配置接入正式战斗模拟与运行时资源；
 - `src/game/save/`：当前 schema、冻结历史迁移链与本地槽位 repository；
 - `src/game/phaser/`：地图、单位、镜头和范围表现；
 - `src/game/ui.ts`：剧情、HUD、目标、胜负和保存界面；
@@ -149,6 +168,7 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 - `src/technique-lab.ts`：任意配置敌我职业并复用正式地图技能渲染器的独立实验室；
 - `src/deployment-lab.ts`：复用正式部署模拟、DOM 和 Phaser 投影的第 1 关验收表面；
 - `src/portrait-lab.ts`：集中检查全战役肖像眨眼、口型和原版覆盖片落点；
+- `src/arena.ts`：独立的全地形竞技场设置页、正式战斗装配与内存生命周期；
 - `src/game/debug-scenarios.ts`：按关登记开发场景、确定性夹具与调试工具栏；
 - `scripts/generate-portrait-catalog.mjs`：从原版 `D` 记录与布局证据生成全角色运行时目录；
 - `scripts/generate-content.mjs`：按唯一顺序编排全部可单独审计的内容生成器；
@@ -160,4 +180,4 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 - `tests/`：模拟与浏览器验收。
 - `planning/`：当前进度、路线、里程碑和跨阶段风险。
 
-当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`stage-00.md`](design/remake-gdd/vertical-slices/stage-00.md)、[`stage-01.md`](design/remake-gdd/vertical-slices/stage-01.md)、[`stage-02.md`](design/remake-gdd/vertical-slices/stage-02.md) 与 [`stage-03.md`](design/remake-gdd/vertical-slices/stage-03.md)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 0–3 关均已通过用户人工验收；第 4 关前框架审计与 M04.5 收口见 [`stage-04-framework-readiness.md`](planning/audits/stage-04-framework-readiness.md) 和 [`M04.5-stage-04-framework-consolidation.md`](planning/milestones/M04.5-stage-04-framework-consolidation.md)，`stage-04` 战斗和后续能力仍冻结。
+当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`design/remake-gdd/vertical-slices/`](design/remake-gdd/vertical-slices/)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 0–3 关均已通过用户人工验收；第 4 关实现及自动门禁已经完成，仍等待普通入口人工接受。第 5 关和未逐项建立纸面合同的职业能力继续冻结。

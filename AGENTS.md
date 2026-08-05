@@ -68,6 +68,7 @@
 - 战斗动画实验室：`http://127.0.0.1:4173/combat-lab.html`。
 - 地图技能动画实验室：`http://127.0.0.1:4173/technique-lab.html`。
 - 肖像动画实验室：`http://127.0.0.1:4173/portrait-lab.html`。
+- 全地形竞技场：`http://127.0.0.1:4173/arena.html`。
 
 常用命令：
 
@@ -75,6 +76,7 @@
 pnpm install
 pnpm dev
 pnpm dev:debug
+pnpm dev:arena
 pnpm dev:combat
 pnpm dev:techniques
 pnpm dev:portraits
@@ -104,6 +106,12 @@ node reverse/tools/angel2-phase1-verify.mjs
 `src/game/debug-scenarios.ts` 至少登记适用的关前、部署/准备、玩家回合、胜利准备和
 完成路由场景；夹具必须确定、明确标记且只修改当前内存。普通 `/` 不得静态导入调试
 模块或暴露 `window.__ANGEL2_DEBUG__`，调试场景也不得替代无夹具的真实通关验收。
+
+`pnpm dev:arena` 会打开 `/arena.html` 全地形竞技场。设置页只允许使用共享职业目录中
+已发布的敌我地图图形，并以正式移动规则校验落点；开战后必须通过可序列化配置建立正式
+模拟状态，不得让 DOM 或 Phaser 对象成为阵容真值。竞技场会话只存在于当前内存，不得
+读取、覆盖或写入战役记录。竞技场开放职业组合测试不等于解冻该职业尚未实现的专属行动、
+AI、存档语义或后续关卡；新增职业能力时应同步补充竞技场验收，但仍须遵守对应纸面合同。
 
 `pnpm dev:portraits` 会打开 `/portrait-lab.html` 全战役肖像动画实验室。新角色只提交
 原版 `portrait` 记录号；主图、三帧眼睛、三帧嘴部、尺寸和原版落点统一来自生成目录，

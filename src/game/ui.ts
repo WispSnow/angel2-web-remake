@@ -54,7 +54,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   root.innerHTML = `
     <div class="page-shell">
       <header class="project-header">
-        <div><span class="eyebrow">WEB REMAKE · CAMPAIGN</span><h1>天使帝國 II · ${stage.name}</h1></div>
+        <div><span class="eyebrow">${controller.isCampaignPersistenceEnabled ? "WEB REMAKE · CAMPAIGN" : "DEVELOPER LAB · MEMORY ONLY"}</span><h1>天使帝國 II · ${stage.name}</h1></div>
       </header>
       <div class="game-stage">
         <div class="game-viewport" id="game-viewport">
@@ -1505,7 +1505,9 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
     const text = "啊！．．．竟然失敗了？\n我太低辜敵人的實力，再給我一次機會吧！";
     layer.innerHTML = nativeFeedbackMarkup(text, "retry", "retry-button");
   } else if (phase === "victoryFeedback") {
-    const text = "哦！．．\n這次的戰役結束了，是否要記錄下來．";
+    const text = controller.isCampaignPersistenceEnabled
+      ? "哦！．．\n這次的戰役結束了，是否要記錄下來．"
+      : "競技場測試已結束。\n可使用上方工具列返回編成，或以相同陣容重開。";
     layer.innerHTML = nativeFeedbackMarkup(text, "victory-continue", "victory-continue");
   } else if (phase === "savePrompt") {
     const text = "哦！．．\n這次的戰役結束了，是否要記錄下來．";
@@ -1539,6 +1541,10 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
   } else if (phase === "quit") {
     layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2>天使帝國 II</h2><p>已離開遊戲</p></div>`;
   } else if (phase === "nextStage") {
+    if (!controller.isCampaignPersistenceEnabled) {
+      layer.innerHTML = `<div class="modal-panel result-card next-card" data-testid="arena-complete-card"><span class="panel-kicker">ARENA COMPLETE</span><h2>競技場測試完成</h2><p>本次結果只存在記憶體中；請使用上方工具列返回編成或重開相同陣容。</p><div class="completion-seal">測試完成</div></div>`;
+      return;
+    }
     const progress = controller.currentStageProgressMetadata;
     const destinationOrdinal = progress.completedOrdinal + 1;
     const stageCode = String(destinationOrdinal).padStart(2, "0");

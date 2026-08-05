@@ -533,11 +533,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private textureFor(unit: BattleUnit): string {
       if (unit.side === 1) {
         if (allyMapUnitAsset(unit.classId)) return `ally-${unit.classId}`;
+        const stageKey = `ally-${unit.classId}`;
+        if (this.textures.exists(stageKey)) return stageKey;
         return "ally-soldier";
       }
-      if (unit.classId === "cavalry") return "enemy-cavalry";
-      if (unit.classId === "sister") return "enemy-sister";
-      if (unit.classId === "monk") return "enemy-monk";
+      const stageKey = `enemy-${unit.classId}`;
+      if (this.textures.exists(stageKey)) return stageKey;
       return "enemy-soldier";
     }
 

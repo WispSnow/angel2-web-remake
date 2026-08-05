@@ -35,6 +35,8 @@ const battleMusicSide = (phase: GamePhase): BattleMusicSide | undefined => {
 };
 
 export class AudioManager {
+  private readonly events = new AbortController();
+  private readonly unsubscribe: () => void;
   private unlocked = false;
   private previousBattleMusicSide?: BattleMusicSide;
   private previousCueSequence = 0;
@@ -65,15 +67,24 @@ export class AudioManager {
     );
     this.music.preload(PRELOAD_STAGE_MUSIC_PROGRAMS);
     this.updateEffectDebugState();
-    root.addEventListener("pointerdown", () => this.unlock(), { capture: true });
+    root.addEventListener("pointerdown", () => this.unlock(), {
+      capture: true,
+      signal: this.events.signal,
+    });
     root.addEventListener("click", (event) => {
       if ((event.target as Element).closest("button,[data-testid=tactical-minimap]")) {
         this.playEffect(ASSETS.audio.confirm, 0.22, "key");
       }
-    }, { capture: true });
-    controller.onChange(() => this.sync());
+    }, { capture: true, signal: this.events.signal });
+    this.unsubscribe = controller.onChange(() => this.sync());
     this.syncMusic();
     if (this.unlocked) this.music.unlock();
+  }
+
+  destroy(): void {
+    this.events.abort();
+    this.unsubscribe();
+    this.music.select(undefined);
   }
 
   playSpeechCharacter(character: string): void {
