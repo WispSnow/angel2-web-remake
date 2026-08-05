@@ -119,10 +119,15 @@ describe("stage 4 generated content", () => {
     expect(STAGE4_INITIAL_DANGER_CELLS).toEqual([{ x: 23, y: 40 }, { x: 27, y: 40 }]);
     expect(STAGE4_FORCE_FIELD_PRESENTATION).toMatchObject({
       resource: "MAGIC/26",
-      frameIndices: [11, 12],
+      runtimeTileCodes: [12, 13],
+      effectRangeValue: 1,
+      rangeThresholdStart: 0,
+      rangeThresholdDecrementPerDraw: 1,
+      sweepWidth: 11,
       iterations: 11,
       drawsPerIteration: 2,
       waitPerDrawNativeTicks: 2,
+      minimumStaticFeedbackNativeTicks: 15,
       fixedGraphicWaitNativeTicks: 44,
     });
     expect(STAGE4_FORCE_FIELD_PRESENTATION.frames).toHaveLength(13);

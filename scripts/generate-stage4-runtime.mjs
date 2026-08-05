@@ -210,18 +210,32 @@ const forceFieldPresentation = {
   id: "stage-04-force-field-pulse",
   resource: "MAGIC/26",
   frames: pulseFramePaths.map((_, frame) => `/assets/original/stage4-force-field-pulse/${String(frame).padStart(2, "0")}.png`),
-  frameIndices: [11, 12],
+  runtimeTileCodes: behavior12.presentation.runtimeTileCodes,
+  effectRangeValue: behavior12.presentation.invertedRangeMaximum,
+  rangeThresholdStart: behavior12.presentation.rangeThresholdStart,
+  rangeThresholdDecrementPerDraw: behavior12.presentation.rangeThresholdDecrementPerDraw,
+  sweepWidth: behavior12.presentation.sweepWidth,
   iterations: behavior12.presentation.iterations,
   drawsPerIteration: behavior12.presentation.drawsPerIteration,
   waitPerDrawNativeTicks: behavior12.presentation.waitPerDrawNativeTicks,
+  minimumStaticFeedbackNativeTicks: 15,
   fixedGraphicWaitNativeTicks: behavior12.presentation.fixedGraphicWaitNativeTicks,
 };
 assertEqual({
+  runtimeTileCodes: forceFieldPresentation.runtimeTileCodes,
+  effectRangeValue: forceFieldPresentation.effectRangeValue,
+  rangeThresholdStart: forceFieldPresentation.rangeThresholdStart,
+  rangeThresholdDecrementPerDraw: forceFieldPresentation.rangeThresholdDecrementPerDraw,
+  sweepWidth: forceFieldPresentation.sweepWidth,
   iterations: forceFieldPresentation.iterations,
   drawsPerIteration: forceFieldPresentation.drawsPerIteration,
   waitPerDrawNativeTicks: forceFieldPresentation.waitPerDrawNativeTicks,
   fixedGraphicWaitNativeTicks: forceFieldPresentation.fixedGraphicWaitNativeTicks,
-}, { iterations: 11, drawsPerIteration: 2, waitPerDrawNativeTicks: 2, fixedGraphicWaitNativeTicks: 44 }, "stage 4 force-field timing");
+}, {
+  runtimeTileCodes: [12, 13], effectRangeValue: 1, rangeThresholdStart: 0,
+  rangeThresholdDecrementPerDraw: 1, sweepWidth: 11, iterations: 11,
+  drawsPerIteration: 2, waitPerDrawNativeTicks: 2, fixedGraphicWaitNativeTicks: 44,
+}, "stage 4 force-field timing");
 
 const portraitSpeakers = { 0: "葛蒂拉斯", 42: "蒙欣曼", 43: "黛西", 44: "拉朵那", 45: "希蜜", 46: "妮雅", 47: "士兵" };
 function compileStory(document, record) {

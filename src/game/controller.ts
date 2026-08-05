@@ -53,6 +53,7 @@ import {
 import { Stage0Battle } from "./simulation/battle";
 import type { AlliedAiAction } from "./simulation/ai-contracts";
 import type { PreparedRoutePulse } from "./simulation/route-pulse";
+import { routePulsePresentationTimeline } from "./route-pulse-presentation";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
 import {
@@ -168,6 +169,7 @@ export interface RoutePulsePresentation {
   frame: number;
   draw: number;
   nativeTicks: number;
+  visible: boolean;
   displayedLifeByUnitId: Readonly<Record<string, number>>;
 }
 
@@ -316,7 +318,7 @@ export class GameController {
   combatPresentationTrace: CombatPresentationTraceEntry[] = [];
   specialActionPresentation?: SpecialActionPresentation;
   routePulsePresentation?: RoutePulsePresentation;
-  routePulsePresentationTrace: Array<Pick<RoutePulsePresentation, "frame" | "draw" | "nativeTicks">> = [];
+  routePulsePresentationTrace: Array<Pick<RoutePulsePresentation, "frame" | "draw" | "nativeTicks" | "visible">> = [];
   specialActionPresentationTrace: Array<{
     phase: SpecialActionPresentationPhase;
     frame: number;
@@ -2090,27 +2092,22 @@ export class GameController {
     );
     this.routePulsePresentationTrace = [];
     const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const drawCount = reducedMotion
-      ? 1
-      : definition.iterations * definition.drawsPerIteration;
-    for (let draw = 0; draw < drawCount; draw += 1) {
-      const frameIndex = reducedMotion
-        ? definition.frameIndices.at(-1) ?? 0
-        : definition.frameIndices[draw % definition.frameIndices.length] ?? 0;
+    const timeline = routePulsePresentationTimeline(definition, reducedMotion);
+    for (const frame of timeline) {
       this.routePulsePresentation = {
         result,
-        frame: frameIndex,
-        draw,
-        nativeTicks: definition.waitPerDrawNativeTicks,
+        ...frame,
         displayedLifeByUnitId,
       };
       this.routePulsePresentationTrace.push({
-        frame: frameIndex,
-        draw,
-        nativeTicks: definition.waitPerDrawNativeTicks,
+        ...frame,
       });
       this.emit();
-      await pause(this.mapCombatDelay(definition.waitPerDrawNativeTicks));
+      await pause(
+        reducedMotion
+          ? this.testMode ? 240 : frame.nativeTicks * 10
+          : this.mapCombatDelay(frame.nativeTicks),
+      );
     }
     this.routePulsePresentation = undefined;
   }

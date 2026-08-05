@@ -396,8 +396,10 @@ function render(): void {
       ? `${phase} · 末幀保持 ${terminalHoldMs()} ms`
     : phase === "cleanup"
       ? originalCleanup
-        ? "cleanup · 原版全敵收尾（非命中）"
-        : "cleanup · 實際命中範圍"
+        ? "共同收尾 · 原版全敵投影（非命中）"
+        : "共同收尾 · 實際命中範圍"
+      : phase === "wave"
+        ? `逐格錯相命中 · ${visibleFrame}`
       : `${phase} · ${visibleFrame}`;
   setReadout("phase", phaseLabel);
   setReadout("time", `${Math.round(timeMs)} / ${durationMs} ms`);
@@ -416,7 +418,9 @@ function render(): void {
       ? completed
         ? "破邪完成 · 解除目標的冰封與異常狀態"
         : "演出完成後解除目標的冰封與異常狀態"
-    : "只預覽動畫／命中範圍");
+    : session.state.actionCode.endsWith("L")
+      ? "各級獨立波紋／共用 MAGIC/6 收尾；不提交傷害"
+      : "只預覽動畫／命中範圍");
   const nextPhaseButton = root.querySelector<HTMLButtonElement>(
     '[data-command="next-side-phase"]',
   );

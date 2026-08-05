@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -23,6 +23,7 @@ interface Stage4State {
     frame: number;
     draw: number;
     nativeTicks: number;
+    visible: boolean;
   }>;
   lastRoutePulse?: {
     actorId: string;
@@ -55,6 +56,21 @@ const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
   (expected) => (window.__ANGEL2__?.getState() as Stage4State | undefined)?.phase === expected,
   phase,
 );
+
+async function boundsInLogicalScreen(page: Page, element: Locator) {
+  const [bounds, screen] = await Promise.all([
+    element.boundingBox(),
+    page.locator("#logical-screen").boundingBox(),
+  ]);
+  expect(bounds).not.toBeNull();
+  expect(screen).not.toBeNull();
+  return {
+    x: bounds!.x - screen!.x,
+    y: bounds!.y - screen!.y,
+    width: bounds!.width,
+    height: bounds!.height,
+  };
+}
 
 async function clickUnit(page: Page, id: string): Promise<void> {
   const current = await state(page);
@@ -144,9 +160,14 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
     const element = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
     return element?.dataset.mapCombatPhase === "route-pulse"
       && ["11", "12"].includes(element.dataset.mapCombatFrame ?? "")
+      && element.dataset.routePulseVisible === "true"
       && Number(element.dataset.mapCombatEffectTileCount) > 0;
   });
   await expect(canvas).toHaveAttribute("data-route-pulse-native-ticks", "2");
+  await expect(canvas).toHaveAttribute(
+    "data-route-pulse-visible-unit-ids",
+    "1:1,1:2,1:3,1:4,1:20,1:21",
+  );
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage4-force-field-pulse.png`,
   });
@@ -162,6 +183,8 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   expect(resolved.routePulsePresentationTrace).toHaveLength(22);
   expect(resolved.routePulsePresentationTrace.map(({ frame }) => frame))
     .toEqual(Array.from({ length: 22 }, (_, index) => index % 2 === 0 ? 11 : 12));
+  expect(resolved.routePulsePresentationTrace.map(({ visible }) => visible))
+    .toEqual([...Array<boolean>(11).fill(true), ...Array<boolean>(11).fill(false)]);
   expect(resolved.routePulsePresentationTrace.every(({ nativeTicks }) => nativeTicks === 2)).toBe(true);
   expect(resolved.rngCalls).toBe(initial.rngCalls);
   for (const affected of resolved.lastRoutePulse!.affectedUnits) {
@@ -169,6 +192,44 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
     const survivor = resolved.units.find(({ id }) => id === affected.unitId);
     if (affected.died) expect(survivor).toBeUndefined();
     else expect(survivor?.life).toBe(affected.lifeAfter);
+  }
+});
+
+test("S04-K: reduced motion keeps one readable damage impact outside the shield", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?debugScenario=stage-04-first-pulse&difficulty=0&test=1");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+  const initial = await state(page);
+
+  await endManualPhase(page);
+  await expect(canvas).toHaveAttribute("data-map-combat-phase", "route-pulse");
+  await expect(canvas).toHaveAttribute("data-route-pulse-visible", "true");
+  await expect(canvas).toHaveAttribute("data-route-pulse-native-ticks", "15");
+  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "6");
+  await expect(canvas).toHaveAttribute(
+    "data-route-pulse-visible-unit-ids",
+    "1:1,1:2,1:3,1:4,1:20,1:21",
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage4-force-field-pulse-reduced-motion.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage4State | undefined;
+    return current?.lastRoutePulse !== undefined && current.routePulsePresentation === undefined;
+  });
+  const resolved = await state(page);
+  expect(resolved.routePulsePresentationTrace).toEqual([{
+    frame: 12,
+    draw: 0,
+    nativeTicks: 15,
+    visible: true,
+  }]);
+  expect(resolved.rngCalls).toBe(initial.rngCalls);
+  for (const affected of resolved.lastRoutePulse!.affectedUnits) {
+    expect(resolved.units.find(({ id }) => id === affected.unitId)?.life)
+      .toBe(affected.lifeAfter);
   }
 });
 
@@ -213,13 +274,65 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "174");
   await expect(page.getByTestId("dialogue-window-lower"))
     .toContainText(/接下來就不需要我的結界來保護\s*了/u);
+  const gadrathPortrait = page.getByTestId("dialogue-portrait-composite");
+  await expect(gadrathPortrait).toBeVisible();
+  await expect(gadrathPortrait).toHaveAttribute("data-portrait-record", "0");
+  await expect.poll(() => gadrathPortrait.locator(".portrait-base").evaluate((image) => ({
+    complete: (image as HTMLImageElement).complete,
+    width: (image as HTMLImageElement).naturalWidth,
+  }))).toEqual({ complete: true, width: 112 });
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage4-victory-story.png`,
   });
 
+  await page.getByTestId("advance-dialogue").click();
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("謝謝妳！葛蒂拉斯");
+  const regularNiaPortrait = page.getByTestId("dialogue-portrait-composite");
+  await expect(regularNiaPortrait).toHaveAttribute("data-portrait-record", "46");
+  const regularNiaBounds = await boundsInLogicalScreen(page, regularNiaPortrait);
+  const regularUpperCopyBounds = await boundsInLogicalScreen(
+    page,
+    page.getByTestId("dialogue-window-upper").locator(".dialogue-copy"),
+  );
+  expect(regularNiaBounds).toMatchObject({ x: 32, width: 112, height: 112 });
+  expect(regularUpperCopyBounds).toMatchObject({ x: 144, width: 480, height: 84 });
+  await page.waitForTimeout(130);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage4-victory-story-nia-upper.png`,
+  });
+
   await page.getByTestId("skip-dialogue").click();
+  await waitForPhase(page, "victoryFeedback");
+  const feedbackPortrait = page.getByTestId("feedback-portrait");
+  await expect(feedbackPortrait).toHaveAttribute("data-portrait-record", "46");
+  expect(await boundsInLogicalScreen(page, feedbackPortrait)).toEqual(regularNiaBounds);
+  expect(await boundsInLogicalScreen(
+    page,
+    page.getByTestId("native-feedback").locator(".native-feedback-copy"),
+  ))
+    .toEqual(regularUpperCopyBounds);
+  await expect(page.getByTestId("feedback-text"))
+    .toHaveText("哦！．．\n這次的戰役結束了，是否要記錄下來．");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage4-victory-save-offer-portrait.png`,
+  });
   await page.getByTestId("victory-continue").click();
-  await page.getByTestId("victory-continue").click();
+  await waitForPhase(page, "savePrompt");
+  const savePromptPortrait = page.getByTestId("feedback-portrait");
+  await expect(savePromptPortrait).toHaveAttribute("data-portrait-record", "46");
+  const [savePromptPortraitBounds, savePromptCopyBounds] = await Promise.all([
+    boundsInLogicalScreen(page, savePromptPortrait),
+    boundsInLogicalScreen(
+      page,
+      page.getByTestId("native-feedback").locator(".native-feedback-copy"),
+    ),
+  ]);
+  expect(savePromptCopyBounds).toMatchObject({ width: 480, height: 84 });
+  expect(savePromptCopyBounds.x).toBe(savePromptPortraitBounds.x + savePromptPortraitBounds.width);
+  expect(savePromptCopyBounds.y).toBe(savePromptPortraitBounds.y);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage4-save-prompt-portrait-alignment.png`,
+  });
   await page.locator("[data-action=save-no]").click();
   await waitForPhase(page, "nextStage");
   expect(await state(page)).toMatchObject({

@@ -128,8 +128,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 channel: "quit-feedback",
                 className: "feedback-portrait",
               })}
-              <p data-testid="quit-feedback-text" data-full-text="唉啊！．．．要休息了嗎？&#10;請再考慮一下吧！">唉啊！．．．要休息了嗎？
-請再考慮一下吧！</p>
+              <div class="dialogue-copy native-feedback-copy"><p data-testid="quit-feedback-text" data-full-text="唉啊！．．．要休息了嗎？&#10;請再考慮一下吧！">唉啊！．．．要休息了嗎？
+請再考慮一下吧！</p></div>
               <div class="button-row action-menu native-command-menu native-confirm-menu"
                 data-testid="quit-confirm-menu" data-kind="confirmation" role="menu" aria-label="離開遊戲選擇">
                 <button type="button" role="menuitem" data-action="quit-confirm" data-quit-index="0"><span class="native-command-label">確 定</span></button>
@@ -143,8 +143,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 channel: "retreat-feedback",
                 className: "feedback-portrait",
               })}
-              <p data-testid="retreat-feedback-text" data-full-text="哦！．．．要撤退嗎？&#10;必竟是沒辦法的事，雙方的實力差太多了．">哦！．．．要撤退嗎？
-必竟是沒辦法的事，雙方的實力差太多了．</p>
+              <div class="dialogue-copy native-feedback-copy"><p data-testid="retreat-feedback-text" data-full-text="哦！．．．要撤退嗎？&#10;必竟是沒辦法的事，雙方的實力差太多了．">哦！．．．要撤退嗎？
+必竟是沒辦法的事，雙方的實力差太多了．</p></div>
               <div class="button-row action-menu native-command-menu native-confirm-menu"
                 data-testid="retreat-confirm-menu" data-kind="confirmation" role="menu" aria-label="全面撤退選擇">
                 <button type="button" role="menuitem" data-action="retreat-confirm" data-retreat-index="0"><span class="native-command-label">確 定</span></button>
@@ -931,7 +931,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         elements.speaker.textContent = state.speaker ?? "";
         elements.box.setAttribute("aria-label", state.speaker ? `${state.speaker}對話` : "旁白");
         if (!active || pageChanged) elements.text.textContent = state.text;
-        if (state.portrait) {
+        if (state.portrait !== undefined) {
           configureAnimatedPortrait(
             elements.portrait,
             state.portrait,
@@ -956,7 +956,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (page.activeSlot) {
         const activeState = page[page.activeSlot];
         const target = dialogueWindows[page.activeSlot].text;
-        const portrait = activeState?.portrait ? dialogueWindows[page.activeSlot].portrait : undefined;
+        const portrait = activeState?.portrait !== undefined
+          ? dialogueWindows[page.activeSlot].portrait
+          : undefined;
         target.id = "dialogue-text";
         if (pageChanged && activeState) revealDialogue(activeState.text, pageKey, target, page.revealStart, portrait);
       } else if (pageChanged) {
@@ -1553,7 +1555,7 @@ function nativeFeedbackMarkup(text: string, action?: string, testId?: string): s
       className: "feedback-portrait",
       wrapperTestId: "feedback-portrait",
     })}
-    <div class="native-feedback-copy"><p data-testid="feedback-text" data-full-text="${escapedText}"></p><span>▼</span></div>
+    <div class="dialogue-copy native-feedback-copy"><p data-testid="feedback-text" data-full-text="${escapedText}"></p><span>▼</span></div>
     ${action ? `<button class="feedback-primary" data-action="${action}" ${testId ? `data-testid="${testId}"` : ""} aria-label="繼續"></button>` : ""}
   </div>`;
 }

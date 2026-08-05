@@ -1399,6 +1399,8 @@ export const TECHNIQUE_LAB_LIGHTNING = {
     "commonHit": {
       "resource": "MAGIC/31",
       "rangeMapMaximumMinusOne": 2,
+      "rangeThresholdStart": 2,
+      "rangeThresholdDecrementPerWaveDraw": 1,
       "sweepWidth": 9,
       "iterations": 11,
       "descriptors": [
@@ -2336,6 +2338,8 @@ export const TECHNIQUE_LAB_LIGHTNING = {
     "commonHit": {
       "resource": "MAGIC/24",
       "rangeMapMaximumMinusOne": 3,
+      "rangeThresholdStart": 3,
+      "rangeThresholdDecrementPerWaveDraw": 1,
       "sweepWidth": 5,
       "iterations": 8,
       "descriptors": [
@@ -3591,6 +3595,8 @@ export const TECHNIQUE_LAB_LIGHTNING = {
     "commonHit": {
       "resource": "MAGIC/25",
       "rangeMapMaximumMinusOne": 3,
+      "rangeThresholdStart": 3,
+      "rangeThresholdDecrementPerWaveDraw": 1,
       "sweepWidth": 4,
       "iterations": 7,
       "descriptors": [
@@ -4924,6 +4930,8 @@ export const TECHNIQUE_LAB_LIGHTNING = {
     "commonHit": {
       "resource": "MAGIC/26",
       "rangeMapMaximumMinusOne": 4,
+      "rangeThresholdStart": 4,
+      "rangeThresholdDecrementPerWaveDraw": 1,
       "sweepWidth": 11,
       "iterations": 15,
       "descriptors": [

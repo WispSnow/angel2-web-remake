@@ -1341,6 +1341,8 @@ export const STAGE1_ACTION_PRESENTATION = {
     "commonHit": {
       "resource": "MAGIC/31",
       "rangeMapMaximumMinusOne": 2,
+      "rangeThresholdStart": 2,
+      "rangeThresholdDecrementPerWaveDraw": 1,
       "sweepWidth": 9,
       "iterations": 11,
       "descriptors": [

@@ -30,10 +30,15 @@ export interface RoutePulsePresentationDefinition {
   id: string;
   resource: string;
   frames: readonly string[];
-  frameIndices: readonly number[];
+  runtimeTileCodes: readonly number[];
+  effectRangeValue: number;
+  rangeThresholdStart: number;
+  rangeThresholdDecrementPerDraw: number;
+  sweepWidth: number;
   iterations: number;
   drawsPerIteration: number;
   waitPerDrawNativeTicks: number;
+  minimumStaticFeedbackNativeTicks: number;
   fixedGraphicWaitNativeTicks: number;
 }
 

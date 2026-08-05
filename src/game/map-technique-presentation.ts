@@ -61,6 +61,8 @@ export interface LightningPresentationDefinition {
   readonly commonHit: {
     readonly resource: string;
     readonly rangeMapMaximumMinusOne: number;
+    readonly rangeThresholdStart: number;
+    readonly rangeThresholdDecrementPerWaveDraw: number;
     readonly sweepWidth: number;
     readonly iterations: number;
     readonly runtimeTileCodes: readonly number[];
@@ -195,7 +197,7 @@ export function lightningWaveDistance(
   waveFrame: number,
   rangeValue: number,
 ): number {
-  const iteration = Math.floor(waveFrame / hit.waveDrawsPerIteration);
-  const sweepLevel = hit.rangeMapMaximumMinusOne - iteration;
-  return rangeValue - sweepLevel;
+  const rangeThreshold = hit.rangeThresholdStart
+    - waveFrame * hit.rangeThresholdDecrementPerWaveDraw;
+  return rangeValue - rangeThreshold;
 }

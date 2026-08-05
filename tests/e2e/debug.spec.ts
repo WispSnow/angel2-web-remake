@@ -20,6 +20,10 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
   expect(new Set(titleOffsets).size).toBe(1);
   expect(await page.evaluate(() => window.__ANGEL2_DEBUG__)).toBeUndefined();
+  await expect(page.getByTestId("debug-technique-lab-link")).toHaveAttribute(
+    "href",
+    "/technique-lab.html",
+  );
 
   await page.getByTestId("debug-difficulty").selectOption("3");
   const deployment = page.getByTestId("debug-scenario-stage-01-deployment");

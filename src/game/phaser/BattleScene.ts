@@ -733,14 +733,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const rest = controller.restPresentation;
       const canvas = this.game.canvas;
       if (routePulse) {
-        for (const affected of routePulse.result.affectedUnits) {
-          this.combatEffects.push(
-            this.add.image(
-              affected.position.x * TILE_WIDTH + TILE_WIDTH / 2,
-              affected.position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-              routePulseTextureKey(routePulse.result.definition.presentationId, routePulse.frame),
-            ).setOrigin(.5).setDepth(8),
-          );
+        if (routePulse.visible) {
+          for (const affected of routePulse.result.affectedUnits) {
+            this.combatEffects.push(
+              this.add.image(
+                affected.position.x * TILE_WIDTH + TILE_WIDTH / 2,
+                affected.position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+                routePulseTextureKey(routePulse.result.definition.presentationId, routePulse.frame),
+              ).setOrigin(.5).setDepth(8),
+            );
+          }
         }
         if (controller.isTestMode) {
           canvas.dataset.mapCombatPhase = "route-pulse";
@@ -751,6 +753,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
           canvas.dataset.routePulseDraw = String(routePulse.draw);
           canvas.dataset.routePulseNativeTicks = String(routePulse.nativeTicks);
+          canvas.dataset.routePulseVisible = String(routePulse.visible);
+          canvas.dataset.routePulseVisibleUnitIds = routePulse.visible
+            ? routePulse.result.affectedUnits.map(({ unitId }) => unitId).join(",")
+            : "";
           delete canvas.dataset.mapCombatLifeChangeUnit;
           delete canvas.dataset.mapCombatDisplayedLife;
           delete canvas.dataset.mapCombatAnchorOffset;
@@ -778,6 +784,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatDisplayedLife;
           delete canvas.dataset.routePulseDraw;
           delete canvas.dataset.routePulseNativeTicks;
+          delete canvas.dataset.routePulseVisible;
+          delete canvas.dataset.routePulseVisibleUnitIds;
           delete canvas.dataset.mapCombatAnchorOffset;
           delete canvas.dataset.mapCombatIceRangeValue;
           delete canvas.dataset.mapCombatIceDistance;
@@ -929,6 +937,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatIceDistance;
           delete canvas.dataset.mapCombatLifeChangeUnit;
           delete canvas.dataset.mapCombatDisplayedLife;
+          delete canvas.dataset.routePulseDraw;
+          delete canvas.dataset.routePulseNativeTicks;
+          delete canvas.dataset.routePulseVisible;
+          delete canvas.dataset.routePulseVisibleUnitIds;
           canvas.dataset.mapCombatEffectTileCount = "0";
         }
         return;

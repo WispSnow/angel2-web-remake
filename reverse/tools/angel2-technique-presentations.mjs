@@ -456,6 +456,8 @@ function buildPresentations(buffer) {
     return {
       resource,
       rangeMapMaximumMinusOne,
+      rangeThresholdStart: rangeMapMaximumMinusOne,
+      rangeThresholdDecrementPerWaveDraw: 1,
       sweepWidth,
       iterations,
       descriptors: descriptorSequence(buffer, [0x6bf3, 0x6bfd]),

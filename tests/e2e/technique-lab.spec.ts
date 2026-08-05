@@ -32,6 +32,7 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     await expect(canvas).toHaveAttribute("data-technique-phase", "main");
     await seek(page, contract.waveAt);
     await expect(canvas).toHaveAttribute("data-technique-phase", "wave");
+    await expect(page.locator('[data-readout="phase"]')).toContainText("逐格錯相命中");
     expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
     if (contract.code === "4L") {
       await page.screenshot({
@@ -41,6 +42,7 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     }
     await seek(page, contract.cleanupAt);
     await expect(canvas).toHaveAttribute("data-technique-phase", "cleanup");
+    await expect(page.locator('[data-readout="phase"]')).toContainText("共同收尾");
     await expect(canvas).toHaveAttribute("data-effect-tile-count", String(contract.affected));
     await expect(canvas).toHaveAttribute("data-lightning-cleanup-scope", "affected");
     if (contract.code === "1L") {
@@ -122,6 +124,25 @@ test("intermediate, advanced and ultimate lightning preserve distinct native vis
       fullPage: true,
     });
   }
+});
+
+test("lightning hit waves advance one range threshold after every native draw", async ({ page }) => {
+  await page.goto("/technique-lab.html");
+  const canvas = page.locator("#technique-lab-canvas canvas");
+  await expect(canvas).toBeVisible();
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("2L"));
+
+  for (const [time, visibleCells] of [[1750, 1], [1770, 2], [1790, 3]] as const) {
+    await seek(page, time);
+    await expect(canvas).toHaveAttribute("data-technique-phase", "wave");
+    await expect(canvas).toHaveAttribute("data-effect-tile-count", String(visibleCells));
+  }
+
+  await seek(page, 1770);
+  await page.screenshot({
+    path: "artifacts/playwright/technique-lab-lightning-2-staggered-hit.png",
+    fullPage: true,
+  });
 });
 
 test("already implemented fire, healing and ice remain available in the same map surface", async ({ page }) => {

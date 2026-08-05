@@ -1075,21 +1075,15 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .completion-seal { display: inline-block; padding: 8px 18px; border: 2px solid #d6af34; color: #f8dd78; letter-spacing: .16em; transform: rotate(-2deg); }
 
 .native-feedback { position: absolute; inset: 0; pointer-events: none; }
-.feedback-portrait { position: absolute; left: 32px; top: 26px; width: 112px; height: 112px; }
+/* A/18 outcome prompts reuse the complete ordinary upper-dialogue geometry. */
+.feedback-portrait { position: absolute; left: 32px; top: 20px; width: 112px; height: 112px; }
 .feedback-portrait::after { content: ""; position: absolute; z-index: 2; inset: 0; border: 2px ridge #d7aa32; pointer-events: none; }
 .native-feedback-copy {
-  position: absolute;
-  left: 160px;
+  left: 144px;
+  right: 16px;
   top: 20px;
-  width: 464px;
-  height: 84px;
-  padding: 2px 12px 5px 15px;
-  border: 5px ridge #e9bf3a;
   color: #fff;
-  background: repeating-linear-gradient(0deg, #231316f2 0 2px, #1a0c10f2 2px 4px);
-  box-shadow: inset 0 0 0 2px #6e2932, 3px 3px #0008;
 }
-.native-feedback-copy p { margin: 0; white-space: pre-wrap; font-size: 16px; line-height: 20px; text-shadow: 1px 1px #000; }
 .native-feedback-copy span { position: absolute; right: 5px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
 .feedback-primary { position: absolute; inset: 0; width: 640px; height: 350px; padding: 0; border: 0; opacity: 0; pointer-events: auto; }
 .action-menu.native-command-menu.native-confirm-menu {
@@ -1130,23 +1124,6 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 .quit-confirm .feedback-portrait,
 .retreat-confirm .feedback-portrait { display: block; }
-.quit-confirm > p,
-.retreat-confirm > p {
-  position: absolute;
-  left: 160px;
-  top: 20px;
-  width: 464px;
-  height: 84px;
-  margin: 0;
-  padding: 7px 12px 5px 20px;
-  border: 5px ridge #e9bf3a;
-  color: #fff;
-  background: #1a0c10f2;
-  text-align: left;
-  font-size: 16px;
-  line-height: 20px;
-  white-space: pre-wrap;
-}
 .quit-confirm .button-row,
 .retreat-confirm .button-row { display: block; }
 .quit-screen {

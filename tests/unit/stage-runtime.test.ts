@@ -61,7 +61,10 @@ describe("stage runtime manifest", () => {
     expect(stage4.preparation?.definition.fixedPlacements.map(({ slot }) => slot)).toEqual([0, 24]);
     expect(stage4.assets?.routePulsePresentations?.[0]).toMatchObject({
       resource: "MAGIC/26",
-      frameIndices: [11, 12],
+      runtimeTileCodes: [12, 13],
+      effectRangeValue: 1,
+      rangeThresholdStart: 0,
+      sweepWidth: 11,
     });
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);

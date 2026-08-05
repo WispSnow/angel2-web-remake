@@ -36,8 +36,15 @@ describe("map technique laboratory evidence", () => {
     expect(TECHNIQUE_LAB_LIGHTNING["3L"].commonHit.runtimeTileCodes).toEqual([5, 6]);
     expect(TECHNIQUE_LAB_LIGHTNING["4L"].commonHit.runtimeTileCodes).toEqual([12, 13]);
     const hit = TECHNIQUE_LAB_LIGHTNING["2L"].commonHit;
+    expect(hit).toMatchObject({
+      rangeThresholdStart: 3,
+      rangeThresholdDecrementPerWaveDraw: 1,
+      waveDrawsPerIteration: 2,
+    });
     expect([0, 1, 2, 3].map((frame) => lightningWaveDistance(hit, frame, 4)))
-      .toEqual([1, 1, 2, 2]);
+      .toEqual([1, 2, 3, 4]);
+    expect([0, 1, 2, 3].map((frame) => lightningWaveDistance(hit, frame, 1)))
+      .toEqual([-2, -1, 0, 1]);
   });
 
   it("raises the advanced-lightning cloud so the bolt bottom lands on the selected cell", () => {

@@ -300,6 +300,25 @@ async function extract(modulePath, decodedRoot, battleTemplatesPath, terrainMapP
   for (const call of [Buffer.from([0x9a, 0x20, 0x02, 0x00, 0x00]), Buffer.from([0x9a, 0x24, 0x02, 0x00, 0x00])]) {
     assert(effectCode.indexOf(call) < 0, "stage-4 effect unexpectedly makes a direct VOC request");
   }
+  const stage4Wave = {
+    invertedRangeMaximum: 1,
+    rangeMaximumMinusOne: 0,
+    rangeThresholdStart: 0,
+    rangeThresholdDecrementPerDraw: 1,
+    sweepWidth: 11,
+    iterations: 11,
+    drawsPerIteration: 2,
+    waitPerDrawNativeTicks: 2,
+  };
+  const stage4WaveDraws = stage4Wave.iterations * stage4Wave.drawsPerIteration;
+  const stage4VisibleDraws = Array.from({ length: stage4WaveDraws }, (_, draw) => {
+    const threshold = stage4Wave.rangeThresholdStart
+      - draw * stage4Wave.rangeThresholdDecrementPerDraw;
+    const distance = stage4Wave.invertedRangeMaximum - threshold;
+    return distance >= 0 && distance <= stage4Wave.sweepWidth;
+  }).filter(Boolean).length;
+  assert(stage4VisibleDraws === 11 && stage4WaveDraws - stage4VisibleDraws === 11,
+    "stage-4 visible wave and blank tail changed");
 
   const result = {
     format: "ANGEL2 behavior-12 stage-4 effect and stage-9 stale-DI audit",
@@ -343,13 +362,10 @@ async function extract(modulePath, decodedRoot, battleTemplatesPath, terrainMapP
         resource: magic26,
         contactSheet: magic26ContactSheet,
         runtimeTileCodes: [12, 13],
-        invertedRangeMaximum: 1,
-        rangeMaximumMinusOne: 0,
-        sweepWidth: 11,
-        iterations: 11,
-        drawsPerIteration: 2,
-        waitPerDrawNativeTicks: 2,
-        fixedGraphicWaitNativeTicks: 44,
+        ...stage4Wave,
+        visibleDraws: stage4VisibleDraws,
+        blankTailDraws: stage4WaveDraws - stage4VisibleDraws,
+        fixedGraphicWaitNativeTicks: stage4WaveDraws * stage4Wave.waitPerDrawNativeTicks,
         directVocRequest: null,
         cleanupGraphicResource: null,
         drawFilter: "occupied cells on side 1 whose inverted range byte is nonzero",
