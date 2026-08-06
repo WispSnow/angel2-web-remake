@@ -32,6 +32,14 @@
   font: 13px/1.5 system-ui, sans-serif;
 }
 
+.combat-lab-nav {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 6px;
+}
+
 .combat-lab-back {
   flex: 0 0 auto;
   padding: 7px 12px;
@@ -285,7 +293,11 @@
 
   .combat-lab-header {
     align-items: start;
+    flex-direction: column;
+    gap: 12px;
   }
+
+  .combat-lab-nav { justify-content: start; }
 
   .combat-lab-header p {
     display: none;

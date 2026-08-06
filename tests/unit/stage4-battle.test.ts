@@ -68,8 +68,12 @@ describe("stage 4 deployment, forces, and route pulse", () => {
     expect(battle.forceForUnit("1:24")).toMatchObject({
       id: "barrier-guide",
       control: "independent-ai",
+      tacticLabel: "引導結界",
     });
-    expect(battle.forceForUnit("2:40")).toMatchObject({ id: "castle-sentries" });
+    expect(battle.forceForUnit("2:40")).toMatchObject({
+      id: "castle-sentries",
+      tacticLabel: "阻擊護衛隊",
+    });
   });
 
   it("preserves Gadirath's promoted campaign class in deployment and battle", () => {
@@ -129,6 +133,11 @@ describe("stage 4 deployment, forces, and route pulse", () => {
     expect(occupied.routePulseSafeArea(guide.id)).toEqual(
       unoccupied.routePulseSafeArea("1:24"),
     );
+    expect(occupied.routePulseSafeAreaForUnit("1:0")).toEqual(
+      occupied.routePulseSafeArea(guide.id),
+    );
+    expect(occupied.routePulseSafetyForUnit(guide.id)).toBe("safe");
+    expect(occupied.routePulseSafetyForUnit("2:40")).toBeUndefined();
   });
 
   it("still pulses when the route cannot enter a lower cell and removes zero-life targets", () => {

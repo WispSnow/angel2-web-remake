@@ -1,6 +1,7 @@
 import {
   classDefinition,
   classStatsFor,
+  classTierFor,
   nextExperienceThresholdFor,
   type ClassId,
 } from "./content/classes";
@@ -45,12 +46,12 @@ function pressed(gamepad: Gamepad, button: number): boolean {
 }
 
 /**
- * Technique tiers are indexed 1..3 and stage 1 units never exceed tier 1, but
- * read the tier that matches the level so higher-level rosters stay correct.
+ * Technique tiers follow the three directly selected DATA rows. Visible native
+ * levels may start at 4, 7, 10, or later and must not be used as tier indices.
  */
 function actionLabelsFor(
   definition: ReturnType<typeof classDefinition>,
-  level: number,
+  tier: 1 | 2 | 3,
 ): readonly string[] {
   if (definition.shooting) {
     const { minimumRange, maximumRange } = definition.shooting;
@@ -58,8 +59,8 @@ function actionLabelsFor(
   }
   const tiers = definition.technique?.tiers;
   if (!tiers?.length) return [];
-  const tier = tiers[Math.min(Math.max(level, 1), tiers.length) - 1];
-  return tier?.actions.map(({ label }) => label) ?? [];
+  const selected = tiers[Math.min(tier, tiers.length) - 1];
+  return selected?.actions.map(({ label }) => label) ?? [];
 }
 
 interface RosterEntryView {
@@ -126,12 +127,13 @@ function detailHtml(
   }
 
   const stats = classStatsFor(unit);
+  const tier = classTierFor(unit);
   const definition = classDefinition(unit.classId);
-  const actions = actionLabelsFor(definition, stats.level);
+  const actions = actionLabelsFor(definition, tier);
   const nextExperience = nextExperienceThresholdFor(unit);
-  const previousExperience = stats.level <= 1
+  const previousExperience = tier <= 1
     ? 0
-    : definition.dataRows[Math.min(stats.level, 3) - 1]?.experienceThreshold ?? 0;
+    : definition.dataRows[tier - 1]?.experienceThreshold ?? 0;
   const experienceSpan = Math.max(1, nextExperience - previousExperience);
   const experienceGained = Math.max(0, unit.experience - previousExperience);
   const status = context.fixed ? "固定出場" : context.deployed ? "已出場" : "待命中";

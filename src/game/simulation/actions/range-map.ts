@@ -57,6 +57,8 @@ const OFFSETS = [
   { x: 1, y: 0 },
 ] as const;
 
+const copyPosition = ({ x, y }: Position): Position => ({ x, y });
+
 function buildUniformRange(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,
   battlefield: ActionBattlefield,
@@ -85,14 +87,15 @@ function buildUniformRange(
   return result;
 }
 
-export function archerShootingRange(
+export function shootingRange(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,
   battlefield: ActionBattlefield,
+  nativeSeed: number,
 ): NumericRangeMap {
   const result = buildUniformRange(
     actor,
     battlefield,
-    5,
+    nativeSeed,
     (movementRule) => movementRule === 0 || movementRule === 99,
   );
   result.set(actor, 0);
@@ -100,6 +103,47 @@ export function archerShootingRange(
     result.set({ x: actor.x + offset.x, y: actor.y + offset.y }, 0);
   }
   return result;
+}
+
+export function archerShootingRange(
+  actor: Pick<BattleUnit, "x" | "y" | "classId">,
+  battlefield: ActionBattlefield,
+): NumericRangeMap {
+  return shootingRange(actor, battlefield, 5);
+}
+
+export function shootingLinePath(
+  actor: Pick<BattleUnit, "x" | "y" | "classId">,
+  target: Position,
+  battlefield: ActionBattlefield,
+  nativeSeed: number,
+  choosePredecessor: (candidateCount: number) => number = () => 0,
+): Position[] {
+  const gradient = buildUniformRange(
+    actor,
+    battlefield,
+    nativeSeed,
+    (movementRule) => movementRule === 0 || movementRule === 99,
+  );
+  if (gradient.valueAt(target) === 0) return [];
+
+  const reversed = [copyPosition(target)];
+  let current = copyPosition(target);
+  while (current.x !== actor.x || current.y !== actor.y) {
+    const nextValue = gradient.valueAt(current) + 1;
+    const candidates = OFFSETS
+      .map((offset) => ({ x: current.x + offset.x, y: current.y + offset.y }))
+      .filter((position) => gradient.valueAt(position) === nextValue);
+    if (candidates.length === 0) return [];
+    const selected = candidates[Math.max(0, Math.min(
+      candidates.length - 1,
+      choosePredecessor(candidates.length),
+    ))];
+    if (!selected) return [];
+    current = selected;
+    reversed.push(copyPosition(current));
+  }
+  return reversed.reverse();
 }
 
 export function techniqueSelectionRange(

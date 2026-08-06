@@ -31,6 +31,13 @@
   font: 13px/1.55 system-ui, sans-serif;
 }
 
+.deployment-lab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 6px;
+}
+
 .deployment-lab-back {
   padding: 7px 10px;
   color: #f7d968;
@@ -764,6 +771,7 @@
 @media (max-width: 760px) {
   .deployment-lab-shell { width: min(100% - 20px, 640px); padding-top: 18px; }
   .deployment-lab-header { grid-template-columns: 1fr auto; gap: 10px; }
+  .deployment-lab-nav { max-width: 230px; }
   .deployment-lab-header > p { grid-column: 1 / -1; grid-row: 2; }
   .deployment-lab-header h1 { font-size: 22px; }
   .deployment-lab-notes { grid-template-columns: 1fr; gap: 6px; }

@@ -10,12 +10,13 @@ import {
   BATTLE_ACTION_DEFINITIONS,
   STAGE0_REST_PRESENTATION,
   actionPresentationCatalog,
+  techniqueActionIdsFor,
 } from "./content/actions";
 import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
 import {
   classDefinition,
   className,
-  classStatsFor,
+  ordinaryHitStatusFor,
   promotionTargetsFor,
   type PromotionTarget,
 } from "./content/classes";
@@ -108,6 +109,13 @@ interface StageEntryOptions {
   statusMessage?: string;
 }
 
+const ORDINARY_STATUS_ACTIONS = {
+  confusion: "confusion",
+  attackDown: "attack-down",
+  defenseDown: "defense-down",
+  poison: "poison",
+} as const;
+
 function cloneCampaignState(campaign: CampaignState): CampaignState {
   return {
     ...campaign,
@@ -146,6 +154,8 @@ export interface CombatPresentationTraceEntry {
 export type SpecialActionPresentationPhase =
   | "shootBlank"
   | "shootHit"
+  | "shootLineGrow"
+  | "shootLineFinish"
   | "fireEffect"
   | "healPrimary"
   | "healBlank"
@@ -232,7 +242,10 @@ const POST_MOVE_COMMANDS: readonly UnitCommand[] = [
 
 const CLASS_COMMANDS: Readonly<Partial<Record<BattleUnit["classId"], UnitCommand>>> = {
   archer: { id: "shoot", label: "射擊" },
+  crossbow: { id: "shoot", label: "射擊" },
+  "magic-archer": { id: "shoot", label: "射擊" },
   sister: { id: "technique", label: "技術" },
+  priest: { id: "technique", label: "技術" },
   magician: { id: "technique", label: "技術" },
   "evil-mage": { id: "technique", label: "技術" },
   monk: { id: "technique", label: "技術" },
@@ -246,35 +259,7 @@ const CLASS_COMMANDS: Readonly<Partial<Record<BattleUnit["classId"], UnitCommand
   engineer: { id: "technique", label: "技術" },
 };
 
-const SISTER_TECHNIQUES = ["fire-1", "heal-1"] as const satisfies readonly BattleActionId[];
-const MAGICIAN_TECHNIQUES = ["fire-1", "lightning-1", "ice-1"] as const satisfies readonly BattleActionId[];
-const MONK_TECHNIQUES = ["heal-1", "recovery-1"] as const satisfies readonly BattleActionId[];
-const MAGIC_PRIEST_TIER1_TECHNIQUES = ["fire-1", "recovery-1", "defense-down"] as const satisfies readonly BattleActionId[];
-const MAGIC_PRIEST_TIER2_TECHNIQUES = ["fire-1", "lightning-1", "recovery-1", "defense-down"] as const satisfies readonly BattleActionId[];
-const MAGIC_PRIEST_TIER3_TECHNIQUES = ["fire-2", "lightning-1", "recovery-1", "defense-down", "dispel"] as const satisfies readonly BattleActionId[];
-const PRAYER_GUIDE_TIER1_TECHNIQUES = ["heal-1", "recovery-1", "defense-up"] as const satisfies readonly BattleActionId[];
-const PRAYER_GUIDE_TIER2_TECHNIQUES = ["heal-1", "recovery-2", "defense-up"] as const satisfies readonly BattleActionId[];
-const PRAYER_GUIDE_TIER3_TECHNIQUES = ["heal-2", "recovery-3", "defense-up", "prayer"] as const satisfies readonly BattleActionId[];
-const MAGIC_GUIDE_TIER1_TECHNIQUES = ["heal-1", "recovery-1", "attack-up"] as const satisfies readonly BattleActionId[];
-const MAGIC_GUIDE_TIER2_TECHNIQUES = ["heal-2", "recovery-1", "attack-up"] as const satisfies readonly BattleActionId[];
-const MAGIC_GUIDE_TIER3_TECHNIQUES = ["heal-3", "recovery-2", "attack-up", "magic-guard"] as const satisfies readonly BattleActionId[];
-const CURSE_MASTER_TIER1_TECHNIQUES = ["heal-1", "attack-down", "confusion"] as const satisfies readonly BattleActionId[];
-const CURSE_MASTER_TIER2_TECHNIQUES = ["heal-1", "attack-down", "confusion", "poison"] as const satisfies readonly BattleActionId[];
-const CURSE_MASTER_TIER3_TECHNIQUES = ["heal-1", "attack-down", "confusion", "poison", "spell-seal"] as const satisfies readonly BattleActionId[];
-const EVIL_MAGE_TIER1_TECHNIQUES = ["fire-2"] as const satisfies readonly BattleActionId[];
-const EVIL_MAGE_TIER2_TECHNIQUES = ["fire-3"] as const satisfies readonly BattleActionId[];
-const EVIL_MAGE_TIER3_TECHNIQUES = ["fire-4"] as const satisfies readonly BattleActionId[];
-const MAGIC_MASTER_TIER1_TECHNIQUES = ["lightning-2"] as const satisfies readonly BattleActionId[];
-const MAGIC_MASTER_TIER2_TECHNIQUES = ["lightning-3"] as const satisfies readonly BattleActionId[];
-const MAGIC_MASTER_TIER3_TECHNIQUES = ["lightning-4"] as const satisfies readonly BattleActionId[];
 const MAGIC_PRIEST_TIER3_EXPERIENCE = classDefinition("magic-priest").dataRows[2].experienceThreshold;
-const GREAT_DRAGON_KNIGHT_TIER1_TECHNIQUES = ["stomp-1"] as const satisfies readonly BattleActionId[];
-const GREAT_DRAGON_KNIGHT_TIER2_TECHNIQUES = ["stomp-2"] as const satisfies readonly BattleActionId[];
-const GREAT_DRAGON_KNIGHT_TIER3_TECHNIQUES = ["stomp-3"] as const satisfies readonly BattleActionId[];
-const WIZARD_TIER1_TECHNIQUES = ["ice-2"] as const satisfies readonly BattleActionId[];
-const WIZARD_TIER2_TECHNIQUES = ["ice-3"] as const satisfies readonly BattleActionId[];
-const WIZARD_TIER3_TECHNIQUES = ["ice-4"] as const satisfies readonly BattleActionId[];
-const ENGINEER_TECHNIQUES = ["iron-plate", "obstacle"] as const satisfies readonly BattleActionId[];
 
 const GROUP_COMMANDS: readonly GroupCommand[] = [
   { id: "allRest", label: "全部休息" },
@@ -510,7 +495,7 @@ export class GameController {
       return this.routePulsePresentation.result.safeCells.map((position) => ({ ...position }));
     }
     const unit = this.focusedUnit;
-    return unit ? this.battle.routePulseSafeArea(unit.id) : [];
+    return unit ? this.battle.routePulseSafeAreaForUnit(unit.id) : [];
   }
 
   get currentStageProgressMetadata() {
@@ -775,65 +760,7 @@ export class GameController {
   }
 
   get techniqueActions(): readonly BattleActionId[] {
-    return this.selectedUnit?.classId === "sister"
-      ? SISTER_TECHNIQUES
-      : this.selectedUnit?.classId === "magician"
-        ? MAGICIAN_TECHNIQUES
-        : this.selectedUnit?.classId === "monk"
-          ? MONK_TECHNIQUES
-          : this.selectedUnit?.classId === "magic-priest"
-            ? classStatsFor(this.selectedUnit).level >= 3
-              ? MAGIC_PRIEST_TIER3_TECHNIQUES
-              : classStatsFor(this.selectedUnit).level === 2
-                ? MAGIC_PRIEST_TIER2_TECHNIQUES
-                : MAGIC_PRIEST_TIER1_TECHNIQUES
-          : this.selectedUnit?.classId === "evil-mage"
-            ? classStatsFor(this.selectedUnit).level === 1
-              ? EVIL_MAGE_TIER1_TECHNIQUES
-              : classStatsFor(this.selectedUnit).level === 2
-                ? EVIL_MAGE_TIER2_TECHNIQUES
-                : EVIL_MAGE_TIER3_TECHNIQUES
-            : this.selectedUnit?.classId === "prayer-guide"
-              ? classStatsFor(this.selectedUnit).level >= 3
-                ? PRAYER_GUIDE_TIER3_TECHNIQUES
-                : classStatsFor(this.selectedUnit).level === 2
-                  ? PRAYER_GUIDE_TIER2_TECHNIQUES
-                  : PRAYER_GUIDE_TIER1_TECHNIQUES
-              : this.selectedUnit?.classId === "magic-guide"
-                ? classStatsFor(this.selectedUnit).level >= 3
-                  ? MAGIC_GUIDE_TIER3_TECHNIQUES
-                  : classStatsFor(this.selectedUnit).level === 2
-                  ? MAGIC_GUIDE_TIER2_TECHNIQUES
-                  : classStatsFor(this.selectedUnit).level === 1
-                    ? MAGIC_GUIDE_TIER1_TECHNIQUES
-                    : []
-              : this.selectedUnit?.classId === "curse-master"
-                ? classStatsFor(this.selectedUnit).level >= 3
-                  ? CURSE_MASTER_TIER3_TECHNIQUES
-                  : classStatsFor(this.selectedUnit).level === 2
-                    ? CURSE_MASTER_TIER2_TECHNIQUES
-                    : CURSE_MASTER_TIER1_TECHNIQUES
-            : this.selectedUnit?.classId === "great-dragon-knight"
-              ? classStatsFor(this.selectedUnit).level === 1
-                ? GREAT_DRAGON_KNIGHT_TIER1_TECHNIQUES
-                : classStatsFor(this.selectedUnit).level === 2
-                  ? GREAT_DRAGON_KNIGHT_TIER2_TECHNIQUES
-                  : GREAT_DRAGON_KNIGHT_TIER3_TECHNIQUES
-              : this.selectedUnit?.classId === "wizard"
-                ? classStatsFor(this.selectedUnit).level === 1
-                  ? WIZARD_TIER1_TECHNIQUES
-                  : classStatsFor(this.selectedUnit).level === 2
-                    ? WIZARD_TIER2_TECHNIQUES
-                    : WIZARD_TIER3_TECHNIQUES
-              : this.selectedUnit?.classId === "magic-master"
-                ? classStatsFor(this.selectedUnit).level === 1
-                  ? MAGIC_MASTER_TIER1_TECHNIQUES
-                  : classStatsFor(this.selectedUnit).level === 2
-                    ? MAGIC_MASTER_TIER2_TECHNIQUES
-                    : MAGIC_MASTER_TIER3_TECHNIQUES
-              : this.selectedUnit?.classId === "engineer"
-                ? ENGINEER_TECHNIQUES
-            : [];
+    return this.selectedUnit ? techniqueActionIdsFor(this.selectedUnit) : [];
   }
 
   get commandMenuPosition(): Position {
@@ -1213,8 +1140,14 @@ export class GameController {
   }
 
   chooseShoot(): void {
-    if (this.selectedUnit?.classId !== "archer") return;
-    this.chooseSpecialAction("archer-shot");
+    const actionId = this.selectedUnit?.classId === "archer"
+      ? "archer-shot"
+      : this.selectedUnit?.classId === "crossbow"
+        ? "crossbow-shot"
+        : this.selectedUnit?.classId === "magic-archer"
+          ? "magic-archer-shot"
+          : undefined;
+    if (actionId) this.chooseSpecialAction(actionId);
   }
 
   chooseTechnique(): void {
@@ -1424,7 +1357,9 @@ export class GameController {
       this.actionMode = "actionMenu";
       this.targets = [];
     } else if (this.actionMode === "specialTarget") {
-      const returnToTechnique = this.selectedActionId !== "archer-shot";
+      const returnToTechnique = this.selectedActionId !== "archer-shot"
+        && this.selectedActionId !== "crossbow-shot"
+        && this.selectedActionId !== "magic-archer-shot";
       this.actionRange = [];
       this.targets = [];
       this.selectedActionId = undefined;
@@ -1650,12 +1585,20 @@ export class GameController {
       );
     };
 
-    if (result.actionId === "archer-shot") {
+    if (result.actionId === "archer-shot" || result.actionId === "crossbow-shot") {
       await present("shootBlank", -1, 6);
       for (let frame = 0; frame < 8; frame += 1) {
         await present("shootHit", frame, 6);
       }
       await present("shootBlank", -1, 6);
+    } else if (result.actionId === "magic-archer-shot") {
+      this.queueAudioCue(83, "magic-archer-shot-start", "magic");
+      for (let index = 0; index < result.effectCells.length; index += 1) {
+        await present("shootLineGrow", index, 20);
+      }
+      for (let frame = 0; frame < 8; frame += 1) {
+        await present("shootLineFinish", frame, 20);
+      }
     } else if (result.actionId === "fire-1"
       || result.actionId === "fire-2"
       || result.actionId === "fire-3"
@@ -2648,6 +2591,10 @@ export class GameController {
     if (this.battlePresentation === "full") {
       await this.presentFullScreenCombat(attacker, defender, result);
       this.combatPresentation = undefined;
+      await this.presentOrdinaryHitStatus(attacker, defender, result.defenderDied);
+      if (result.counterOccurred) {
+        await this.presentOrdinaryHitStatus(defender, attacker, result.attackerDied);
+      }
       return;
     }
 
@@ -2742,6 +2689,37 @@ export class GameController {
     }
 
     this.combatPresentation = undefined;
+    await this.presentOrdinaryHitStatus(attacker, defender, result.defenderDied);
+    if (result.counterOccurred) {
+      await this.presentOrdinaryHitStatus(defender, attacker, result.attackerDied);
+    }
+  }
+
+  private async presentOrdinaryHitStatus(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    defenderDied: boolean,
+  ): Promise<void> {
+    if (defenderDied) return;
+    const status = ordinaryHitStatusFor(attacker.classId);
+    if (!status) return;
+    const actionId = ORDINARY_STATUS_ACTIONS[status.key];
+    if (!this.currentMapPresentationActionIds.includes(actionId)) return;
+
+    const result: SpecialActionResult = {
+      actionId,
+      actorId: attacker.id,
+      targetId: defender.id,
+      target: { x: defender.x, y: defender.y },
+      damage: 0,
+      healing: 0,
+      blocked: false,
+      targetDied: false,
+      experienceGained: 0,
+      affectedUnits: [],
+      effectCells: [],
+    };
+    await this.presentSpecialAction(attacker, defender, result);
   }
 
   private async presentFullScreenCombat(

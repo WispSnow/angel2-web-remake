@@ -46,6 +46,7 @@ const STAGE3_FORCE_DEFINITIONS = [
   {
     id: "fourth-corps",
     label: "第四軍團",
+    tacticLabel: "固守防區",
     side: 1,
     control: "independent-ai",
     unitIds: sideUnitIds(1, [21, 46, 45, 47, 3, 20, 50]),
@@ -62,6 +63,7 @@ const STAGE3_FORCE_DEFINITIONS = [
   {
     id: "sha-first-corps",
     label: "莎第一軍團",
+    tacticLabel: "壓制第四軍團",
     side: 2,
     control: "independent-ai",
     unitIds: sideUnitIds(2, [42, 41, 40, 43, 17]),
@@ -74,6 +76,7 @@ const STAGE3_FORCE_DEFINITIONS = [
   {
     id: "sha-second-corps",
     label: "莎第二軍團",
+    tacticLabel: "阻擊救援隊",
     side: 2,
     control: "independent-ai",
     unitIds: sideUnitIds(2, [44, 45, 47, 46, 50, 48, 49]),

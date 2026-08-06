@@ -229,7 +229,10 @@ root.innerHTML = `
         <h1>戰鬥動畫實驗室</h1>
         <p>直接重放正式全景戰鬥腳本；不建立關卡、不提交模擬結果。</p>
       </div>
-      <a href="/" class="combat-lab-back">返回遊戲</a>
+      <nav class="combat-lab-nav" aria-label="返回入口">
+        <a href="/debug.html" class="combat-lab-back" data-testid="combat-lab-debug-link">戰役調試中心</a>
+        <a href="/" class="combat-lab-back">普通遊戲</a>
+      </nav>
     </header>
 
     <div class="combat-lab-layout">

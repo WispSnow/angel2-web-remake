@@ -1,11 +1,13 @@
 import {
-  classStatsFor,
+  classTierFor,
   classDefinition,
   className,
   killRewardFor,
+  ordinaryHitStatusFor,
+  suppressesOrdinaryCounterFor,
   terrainDefensePercentFor,
 } from "../content/classes";
-import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
+import { BATTLE_ACTION_DEFINITIONS, techniqueActionIdsFor } from "../content/actions";
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, Position, SaveRosterEntry, SavedBattleState, UnitStats, UnitStatuses } from "../types";
@@ -18,7 +20,7 @@ import {
 } from "./promotion";
 import type { ClassId } from "../content/classes";
 import {
-  archerShootingRange,
+  shootingRange,
   NumericRangeMap,
   techniqueSelectionRange,
 } from "./actions/range-map";
@@ -78,7 +80,9 @@ export type {
 
 const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "archer-shot": ["archer"],
-  "fire-1": ["sister", "magician", "magic-priest"],
+  "crossbow-shot": ["crossbow"],
+  "magic-archer-shot": ["magic-archer"],
+  "fire-1": ["sister", "magician", "magic-priest", "priest"],
   "fire-2": ["magic-priest", "evil-mage"],
   "fire-3": ["evil-mage"],
   "fire-4": ["evil-mage"],
@@ -93,7 +97,7 @@ const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "ice-2": ["wizard"],
   "ice-3": ["wizard"],
   "ice-4": ["wizard"],
-  "recovery-1": ["monk", "magic-priest", "prayer-guide", "magic-guide"],
+  "recovery-1": ["monk", "magic-priest", "prayer-guide", "magic-guide", "priest"],
   "recovery-2": ["prayer-guide", "magic-guide"],
   "recovery-3": ["prayer-guide"],
   "attack-up": ["magic-guide"],
@@ -127,53 +131,60 @@ function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
   return UNIT_STATUS_KEYS.every((key) => left[key] === right[key]);
 }
 
+function applyOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit): void {
+  const status = ordinaryHitStatusFor(attacker.classId);
+  if (status) defender.statuses[status.key] = status.counter;
+}
+
 function canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
-  const level = classStatsFor(actor).level;
+  const tier = classTierFor(actor);
+  const nativeTechniqueAction = techniqueActionIdsFor(actor).includes(actionId);
   if (actor.classId === "magic-priest") {
-    if (actionId === "fire-1" && level >= 3) return false;
-    if (actionId === "fire-2" && level < 3) return false;
-    if (actionId === "lightning-1" && level < 2) return false;
-    if (actionId === "dispel" && level < 3) return false;
+    if (actionId === "fire-1" && tier >= 3) return false;
+    if (actionId === "fire-2" && tier < 3) return false;
+    if (actionId === "lightning-1" && tier < 2) return false;
+    if (actionId === "dispel" && tier < 3) return false;
   }
   if (actor.classId === "evil-mage") {
-    if (actionId === "fire-2" && level !== 1) return false;
-    if (actionId === "fire-3" && level !== 2) return false;
-    if (actionId === "fire-4" && level !== 3) return false;
+    if (actionId === "fire-2" && tier !== 1) return false;
+    if (actionId === "fire-3" && tier !== 2) return false;
+    if (actionId === "fire-4" && tier !== 3) return false;
   }
   if (actor.classId === "magic-master") {
-    if (actionId === "lightning-2" && level !== 1) return false;
-    if (actionId === "lightning-3" && level !== 2) return false;
-    if (actionId === "lightning-4" && level !== 3) return false;
+    if (actionId === "lightning-2" && tier !== 1) return false;
+    if (actionId === "lightning-3" && tier !== 2) return false;
+    if (actionId === "lightning-4" && tier !== 3) return false;
   }
   if (actor.classId === "prayer-guide") {
-    if (actionId === "heal-1" && level >= 3) return false;
-    if (actionId === "heal-2" && level !== 3) return false;
-    if (actionId === "recovery-1" && level !== 1) return false;
-    if (actionId === "recovery-2" && level !== 2) return false;
-    if (actionId === "recovery-3" && level !== 3) return false;
-    if (actionId === "prayer" && level !== 3) return false;
+    if (actionId === "heal-1" && tier >= 3) return false;
+    if (actionId === "heal-2" && tier !== 3) return false;
+    if (actionId === "recovery-1" && tier !== 1) return false;
+    if (actionId === "recovery-2" && tier !== 2) return false;
+    if (actionId === "recovery-3" && tier !== 3) return false;
+    if (actionId === "prayer" && tier !== 3) return false;
   }
   if (actor.classId === "magic-guide") {
-    if (actionId === "heal-1" && level !== 1) return false;
-    if (actionId === "heal-2" && level !== 2) return false;
-    if (actionId === "heal-3" && level !== 3) return false;
-    if (actionId === "recovery-1" && level >= 3) return false;
-    if (actionId === "recovery-2" && level !== 3) return false;
-    if (actionId === "magic-guard" && level !== 3) return false;
+    if (actionId === "heal-1" && tier !== 1) return false;
+    if (actionId === "heal-2" && tier !== 2) return false;
+    if (actionId === "heal-3" && tier !== 3) return false;
+    if (actionId === "recovery-1" && tier >= 3) return false;
+    if (actionId === "recovery-2" && tier !== 3) return false;
+    if (actionId === "magic-guard" && tier !== 3) return false;
   }
   if (actor.classId === "curse-master") {
-    if (actionId === "poison" && level < 2) return false;
-    if (actionId === "spell-seal" && level < 3) return false;
+    if (actionId === "poison" && tier < 2) return false;
+    if (actionId === "spell-seal" && tier < 3) return false;
   }
-  if ((actionId === "stomp-1" || actionId === "ice-2") && level !== 1) return false;
-  if (actionId === "ice-3" && level !== 2) return false;
-  if (actionId === "ice-4" && level !== 3) return false;
-  if (actionId === "stomp-2" && level !== 2) return false;
-  if (actionId === "stomp-3" && level !== 3) return false;
+  if ((actionId === "stomp-1" || actionId === "ice-2") && tier !== 1) return false;
+  if (actionId === "ice-3" && tier !== 2) return false;
+  if (actionId === "ice-4" && tier !== 3) return false;
+  if (actionId === "stomp-2" && tier !== 2) return false;
+  if (actionId === "stomp-3" && tier !== 3) return false;
   return !actor.acted
     && !actor.actionDisabled
-    && ACTION_CLASSES[actionId].includes(actor.classId)
-    && (actionId === "archer-shot" || actor.statuses.techniqueSeal === 0);
+    && (nativeTechniqueAction || ACTION_CLASSES[actionId].includes(actor.classId))
+    && (actionId === "archer-shot" || actionId === "crossbow-shot"
+      || actionId === "magic-archer-shot" || actor.statuses.techniqueSeal === 0);
 }
 
 export interface RouteMoveResult {
@@ -397,7 +408,9 @@ export class Stage0Battle {
   }
 
   enemyAiIntentFor(_id: string): EnemyAiIntent | undefined {
-    return undefined;
+    const unit = this.unit(_id);
+    if (!unit || unit.side !== 2) return undefined;
+    return this.scenario.routeEnemy ? "route" : undefined;
   }
 
   beginEnemyPhase(): EnemyPhaseUpdate {
@@ -507,7 +520,9 @@ export class Stage0Battle {
       + this.rng.between(4, 7);
     defender.life = Math.max(0, defender.life - damage);
 
-    const counterOccurred = defender.life > 0 && !defender.actionDisabled;
+    const counterOccurred = defender.life > 0
+      && !defender.actionDisabled
+      && !suppressesOrdinaryCounterFor(attacker.classId);
     let counterDamage = 0;
     if (counterOccurred) {
       const attackerTerrainDefense = Math.floor(
@@ -515,9 +530,15 @@ export class Stage0Battle {
         * terrainDefensePercentFor(attacker.classId, this.terrainSlotAt(attacker))
         / 100,
       );
-      counterDamage = Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
+      const primaryCounterCandidate = defender.classId === "bone-knight"
+        && (this.rng.nextUint() & 1) === 1;
+      counterDamage = primaryCounterCandidate
+        ? damage
+        : Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
       attacker.life = Math.max(0, attacker.life - counterDamage);
     }
+    applyOrdinaryHitStatus(attacker, defender);
+    if (counterOccurred) applyOrdinaryHitStatus(defender, attacker);
 
     const defenderDied = defender.life === 0;
     const attackerDied = attacker.life === 0;
@@ -557,7 +578,9 @@ export class Stage0Battle {
       }
       return result;
     }
-    if (actionId === "archer-shot") return archerShootingRange(actor, battlefield);
+    if (actionId === "archer-shot" || actionId === "crossbow-shot" || actionId === "magic-archer-shot") {
+      return shootingRange(actor, battlefield, BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed);
+    }
     if (BATTLE_ACTION_DEFINITIONS[actionId].target === "self-area") {
       const result = new NumericRangeMap(this.stage.width, this.stage.height);
       result.set(actor, 1);
@@ -1004,6 +1027,25 @@ export class Stage0Battle {
     return routePulseSafeCells(definition, unit, this.dynamicBattlefield);
   }
 
+  routePulseSafeAreaForUnit(id: string): Position[] {
+    const unit = this.unit(id);
+    if (!unit) return [];
+    for (const [actorId, definition] of this.routePulseByActorId) {
+      if (definition.effect.side !== unit.side) continue;
+      const actor = this.unit(actorId);
+      if (actor) return routePulseSafeCells(definition, actor, this.dynamicBattlefield);
+    }
+    return [];
+  }
+
+  routePulseSafetyForUnit(id: string): "safe" | "danger" | undefined {
+    const unit = this.unit(id);
+    if (!unit) return undefined;
+    const safeArea = this.routePulseSafeAreaForUnit(id);
+    if (safeArea.length === 0) return undefined;
+    return safeArea.some(({ x, y }) => x === unit.x && y === unit.y) ? "safe" : "danger";
+  }
+
   prepareRoutePulse(id: string, path: readonly Position[]): PreparedRoutePulse {
     const actor = this.unit(id);
     const definition = this.routePulseByActorId.get(id);
@@ -1056,6 +1098,7 @@ export class Stage0Battle {
       return this.planTerrainHoldAiAction(unit, doctrine);
     }
     const stats = this.statsFor(unit);
+    const tier = classTierFor(unit);
     const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
     if (lifePercent < 20) {
       return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
@@ -1063,6 +1106,15 @@ export class Stage0Battle {
     const targetFilter = this.forces.targetFilterFor(id, this.units);
     if (unit.classId === "sister" && unit.statuses.techniqueSeal === 0) {
       const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "fire-1" : "heal-1";
+      const special = this.planClassAction(
+        unit,
+        [actionId],
+        actionId === "fire-1" ? { targetFilter } : undefined,
+      );
+      if (special) return special;
+    }
+    if (unit.classId === "priest" && unit.statuses.techniqueSeal === 0) {
+      const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "fire-1" : "recovery-1";
       const special = this.planClassAction(
         unit,
         [actionId],
@@ -1078,16 +1130,16 @@ export class Stage0Battle {
     if ((unit.classId === "prayer-guide" || unit.classId === "magic-guide")
       && unit.statuses.techniqueSeal === 0) {
       const available: readonly (BattleActionId | undefined)[] = unit.classId === "prayer-guide"
-        ? stats.level >= 3
+        ? tier >= 3
           // Native slot 4 is SM, not OJ. SM has no action row; keep the slot
           // so its draw falls through instead of inflating the other odds.
           ? ["heal-2", "recovery-3", "defense-up", undefined]
-          : stats.level === 2
+          : tier === 2
             ? ["heal-1", "recovery-2", "defense-up"]
             : ["heal-1", "recovery-1", "defense-up"]
-        : stats.level === 2
+        : tier === 2
           ? ["heal-2", "recovery-1", "attack-up"]
-          : stats.level === 1
+          : tier === 1
             ? ["heal-1", "recovery-1", "attack-up"]
             : ["heal-3", "recovery-2", "attack-up", "magic-guard"];
       if (available.length > 0) {
@@ -1099,9 +1151,9 @@ export class Stage0Battle {
       }
     }
     if (unit.classId === "curse-master" && unit.statuses.techniqueSeal === 0) {
-      const available: readonly BattleActionId[] = stats.level >= 3
+      const available: readonly BattleActionId[] = tier >= 3
         ? ["heal-1", "attack-down", "confusion", "poison", "spell-seal"]
-        : stats.level === 2
+        : tier === 2
           ? ["heal-1", "attack-down", "confusion", "poison"]
           : ["heal-1", "attack-down", "confusion"];
       const actionId = available[this.rng.between(0, available.length - 1)];
@@ -1109,9 +1161,9 @@ export class Stage0Battle {
       if (special) return special;
     }
     if (unit.classId === "magic-priest" && unit.statuses.techniqueSeal === 0) {
-      const available: readonly BattleActionId[] = stats.level >= 3
+      const available: readonly BattleActionId[] = tier >= 3
         ? ["fire-2", "lightning-1", "recovery-1", "defense-down", "dispel"]
-        : stats.level === 2
+        : tier === 2
           ? ["fire-1", "lightning-1", "recovery-1", "defense-down"]
           : ["fire-1", "recovery-1", "defense-down"];
       const actionId = available[this.rng.between(0, available.length - 1)];
@@ -1119,9 +1171,9 @@ export class Stage0Battle {
       if (special) return special;
     }
     if (unit.classId === "great-dragon-knight" && unit.statuses.techniqueSeal === 0) {
-      const actionId = stats.level === 1
+      const actionId = tier === 1
         ? "stomp-1"
-        : stats.level === 2
+        : tier === 2
           ? "stomp-2"
           : "stomp-3";
       const special = actionId
@@ -1130,9 +1182,9 @@ export class Stage0Battle {
       if (special) return special;
     }
     if (unit.classId === "wizard" && unit.statuses.techniqueSeal === 0) {
-      const actionId = stats.level === 1
+      const actionId = tier === 1
         ? "ice-2"
-        : stats.level === 2
+        : tier === 2
           ? "ice-3"
           : "ice-4";
       const special = actionId
@@ -1141,9 +1193,9 @@ export class Stage0Battle {
       if (special) return special;
     }
     if (unit.classId === "magic-master" && unit.statuses.techniqueSeal === 0) {
-      const actionId = stats.level === 1
+      const actionId = tier === 1
         ? "lightning-2"
-        : stats.level === 2
+        : tier === 2
           ? "lightning-3"
           : "lightning-4";
       const special = actionId
@@ -1154,14 +1206,14 @@ export class Stage0Battle {
     if ((unit.classId === "magic-priest" || unit.classId === "evil-mage")
       && unit.statuses.techniqueSeal === 0) {
       const available = unit.classId === "evil-mage"
-        ? stats.level === 1
+        ? tier === 1
           ? ["fire-2"] as const
-          : stats.level === 2
+          : tier === 2
             ? ["fire-3"] as const
             : ["fire-4"] as const
-        : stats.level >= 3
+        : tier >= 3
           ? ["fire-2", "lightning-1", "recovery-1", "dispel"] as const
-          : stats.level === 2
+          : tier === 2
             ? ["fire-1", "lightning-1", "recovery-1"] as const
             : ["fire-1", "recovery-1"] as const;
       if (available.length > 0) {
@@ -1376,60 +1428,68 @@ export class Stage0Battle {
     requestedActionIds?: readonly BattleActionId[],
     options: ClassActionPlanningOptions = {},
   ): AlliedAiAction | undefined {
-    if (unit.classId !== "archer" && unit.statuses.techniqueSeal > 0) return undefined;
+    if (unit.classId !== "archer" && unit.classId !== "crossbow"
+      && unit.classId !== "magic-archer" && unit.statuses.techniqueSeal > 0) return undefined;
+    const tier = classTierFor(unit);
     const actionIds: readonly BattleActionId[] = requestedActionIds
       ?? (unit.classId === "archer"
         ? ["archer-shot"]
-        : unit.classId === "sister"
+        : unit.classId === "crossbow"
+          ? ["crossbow-shot"]
+          : unit.classId === "magic-archer"
+            ? ["magic-archer-shot"]
+          : unit.classId === "sister"
           ? ["heal-1", "fire-1"]
+          : unit.classId === "priest"
+            ? ["fire-1", "recovery-1"]
           : unit.classId === "monk"
             ? ["heal-1", "recovery-1"]
           : unit.classId === "great-dragon-knight"
-            ? this.statsFor(unit).level === 1
+            ? tier === 1
               ? ["stomp-1"]
-              : this.statsFor(unit).level === 2
+              : tier === 2
                 ? ["stomp-2"]
                 : ["stomp-3"]
           : unit.classId === "wizard"
-            ? this.statsFor(unit).level === 1
+            ? tier === 1
               ? ["ice-2"]
-              : this.statsFor(unit).level === 2
+              : tier === 2
                 ? ["ice-3"]
                 : ["ice-4"]
           : unit.classId === "magic-master"
-            ? this.statsFor(unit).level === 1
+            ? tier === 1
               ? ["lightning-2"]
-              : this.statsFor(unit).level === 2
+              : tier === 2
                 ? ["lightning-3"]
                 : ["lightning-4"]
           : unit.classId === "evil-mage"
-            ? this.statsFor(unit).level === 1
+            ? tier === 1
               ? ["fire-2"]
-              : this.statsFor(unit).level === 2
+              : tier === 2
                 ? ["fire-3"]
                 : ["fire-4"]
           : unit.classId === "magic-priest"
-            ? this.statsFor(unit).level >= 3
+            ? tier >= 3
               ? ["fire-2", "lightning-1", "recovery-1", "defense-down", "dispel"]
-              : this.statsFor(unit).level === 2
+              : tier === 2
                 ? ["fire-1", "lightning-1", "recovery-1", "defense-down"]
                 : ["fire-1", "recovery-1", "defense-down"]
           : unit.classId === "prayer-guide"
-            ? this.statsFor(unit).level >= 3
+            ? tier >= 3
               ? ["heal-2", "recovery-3", "defense-up"]
-              : this.statsFor(unit).level === 2
+              : tier === 2
                 ? ["heal-1", "recovery-2", "defense-up"]
                 : ["heal-1", "recovery-1", "defense-up"]
           : unit.classId === "magic-guide"
-            ? this.statsFor(unit).level === 2
+            ? tier === 2
               ? ["heal-2", "recovery-1", "attack-up"]
-              : this.statsFor(unit).level === 1
+              : tier === 1
                 ? ["heal-1", "recovery-1", "attack-up"]
                 : ["heal-3", "recovery-2", "attack-up", "magic-guard"]
           : unit.classId === "curse-master"
-            ? this.statsFor(unit).level >= 3
+            ? tier >= 3
               ? ["heal-1", "attack-down", "confusion", "poison", "spell-seal"]
-              : this.statsFor(unit).level === 2
+              : tier === 2
                 ? ["heal-1", "attack-down", "confusion", "poison"]
               : ["heal-1", "attack-down", "confusion"]
           : []);
@@ -1447,7 +1507,8 @@ export class Stage0Battle {
     for (const actionId of actionIds) {
       if (!canUseSpecialAction(unit, actionId)) continue;
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-      const positions = (actionId === "archer-shot"
+      const positions = (actionId === "archer-shot" || actionId === "crossbow-shot"
+        || actionId === "magic-archer-shot"
         ? reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
         : [{ x: unit.x, y: unit.y }])
         .filter((position) => !occupied.has(positionKey(position))
@@ -1465,8 +1526,14 @@ export class Stage0Battle {
 
       for (const position of positions) {
         const rangeActor = { ...unit, x: position.x, y: position.y };
-        const range = actionId === "archer-shot"
-          ? archerShootingRange(rangeActor, battlefield)
+        const shootingActionId = actionId === "archer-shot" || actionId === "crossbow-shot"
+          || actionId === "magic-archer-shot" ? actionId : undefined;
+        const range = shootingActionId
+          ? shootingRange(
+            rangeActor,
+            battlefield,
+            BATTLE_ACTION_DEFINITIONS[shootingActionId].range.nativeSeed,
+          )
           : techniqueSelectionRange(rangeActor, battlefield,
             "aiCandidateSelectionRadius" in definition.range
               ? definition.range.aiCandidateSelectionRadius

@@ -145,15 +145,23 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   });
 
   await clickUnit(page, "1:24");
-  await expect(page.getByTestId("allied-control-mode")).toContainText("友軍自動");
-  await expect(page.getByTestId("unit-force")).toContainText("結界引導");
-  await expect(page.getByTestId("route-pulse-safe-area")).toContainText("安全區 13 格");
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("自動・可行動");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術引導結界");
+  await expect(page.getByTestId("route-pulse-safety")).toHaveText("力場安全");
+  await expect(page.getByTestId("route-pulse-safety")).toHaveAttribute("data-safety", "safe");
+  await expect(page.getByTestId("unit-force")).toHaveCount(0);
   await expect(canvas).toHaveAttribute("data-route-pulse-safe-cell-count", "13");
   await expect(canvas).toHaveAttribute("data-route-pulse-danger-unit-ids", /1:1/u);
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage4-safe-area-preview.png`,
   });
 
+  await page.keyboard.press("Enter");
+  await clickUnit(page, "1:1");
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
+  await expect(page.getByTestId("route-pulse-safety")).toHaveText("力場危險");
+  await expect(page.getByTestId("route-pulse-safety")).toHaveAttribute("data-safety", "danger");
+  await expect(canvas).toHaveAttribute("data-route-pulse-safe-cell-count", "13");
   await page.keyboard.press("Enter");
   await endManualPhase(page);
   await page.waitForFunction(() => {

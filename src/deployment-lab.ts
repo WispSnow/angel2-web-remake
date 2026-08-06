@@ -15,7 +15,10 @@ root.innerHTML = `
     <header class="deployment-lab-header">
       <div><p class="eyebrow">M02 · P2 PROJECTION</p><h1>第 1 關部署驗收</h1></div>
       <p>同一純模擬狀態由原版名單和右欄落點控制共同投影；此表面不建立正式戰鬥。</p>
-      <a href="/" class="deployment-lab-back">返回遊戲</a>
+      <nav class="deployment-lab-nav" aria-label="返回入口">
+        <a href="/debug.html" class="deployment-lab-back" data-testid="deployment-lab-debug-link">戰役調試中心</a>
+        <a href="/" class="deployment-lab-back">普通遊戲</a>
+      </nav>
     </header>
     <section class="deployment-lab-stage" aria-labelledby="deployment-lab-heading">
       <h2 id="deployment-lab-heading" class="visually-hidden">騎士城堡前部署畫面</h2>

@@ -49,6 +49,7 @@ export const CLASS_CATALOG = {
     "id": "soldier",
     "nativeRecord": 0,
     "nativeName": "士兵",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0A",
       "side2": "0A",
@@ -58,6 +59,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -125,6 +130,7 @@ export const CLASS_CATALOG = {
         "reward": 10
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 0,
@@ -214,6 +220,7 @@ export const CLASS_CATALOG = {
     "id": "magic-sword-warrior",
     "nativeRecord": 1,
     "nativeName": "魔劍戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1G",
       "side2": "1G",
@@ -223,6 +230,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -290,6 +301,14 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [
+      {
+        "effectName": "防禦下降",
+        "stateOffset": 18,
+        "value": 32771,
+        "confirmedEffect": "effective defense -20 while bit15 is set"
+      }
+    ],
     "shooting": null,
     "technique": null,
     "movementProfile": 1,
@@ -354,6 +373,7 @@ export const CLASS_CATALOG = {
     "id": "jungle-warrior",
     "nativeRecord": 2,
     "nativeName": "叢林戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0H",
       "side2": "0H",
@@ -363,6 +383,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -430,6 +454,14 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [
+      {
+        "effectName": "施毒",
+        "stateOffset": 20,
+        "value": 32771,
+        "confirmedEffect": "applies the same status slot named 施毒 by player technique IP; at each full-round boundary current life becomes floor(current life / 2) before countdown"
+      }
+    ],
     "shooting": null,
     "technique": null,
     "movementProfile": 2,
@@ -494,6 +526,7 @@ export const CLASS_CATALOG = {
     "id": "magic-priest",
     "nativeRecord": 3,
     "nativeName": "魔祭師",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0K",
       "side2": "0K",
@@ -503,6 +536,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -570,6 +607,7 @@ export const CLASS_CATALOG = {
         "reward": 45
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "0K",
@@ -713,6 +751,7 @@ export const CLASS_CATALOG = {
     "id": "prayer-guide",
     "nativeRecord": 4,
     "nativeName": "祈導師",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0J",
       "side2": "0J",
@@ -722,6 +761,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -789,6 +832,7 @@ export const CLASS_CATALOG = {
         "reward": 45
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "0J",
@@ -922,6 +966,7 @@ export const CLASS_CATALOG = {
     "id": "curse-master",
     "nativeRecord": 5,
     "nativeName": "咒術師",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1K",
       "side2": "1K",
@@ -931,6 +976,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -998,6 +1047,7 @@ export const CLASS_CATALOG = {
         "reward": 45
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "1K",
@@ -1141,6 +1191,7 @@ export const CLASS_CATALOG = {
     "id": "magician",
     "nativeRecord": 6,
     "nativeName": "魔術士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "2D",
       "side2": "2D",
@@ -1150,6 +1201,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -1217,6 +1272,7 @@ export const CLASS_CATALOG = {
         "reward": 35
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "2D",
@@ -1364,6 +1420,7 @@ export const CLASS_CATALOG = {
     "id": "great-axe-warrior",
     "nativeRecord": 7,
     "nativeName": "巨斧戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0G",
       "side2": "0G",
@@ -1373,6 +1430,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -1440,6 +1501,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 1,
@@ -1504,6 +1566,7 @@ export const CLASS_CATALOG = {
     "id": "half-dragon-warrior",
     "nativeRecord": 8,
     "nativeName": "半龍戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1N",
       "side2": "1N",
@@ -1513,6 +1576,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -1580,6 +1647,7 @@ export const CLASS_CATALOG = {
         "reward": 35
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 4,
@@ -1644,6 +1712,7 @@ export const CLASS_CATALOG = {
     "id": "magic-armor-warrior",
     "nativeRecord": 9,
     "nativeName": "魔鎧戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1H",
       "side2": "1H",
@@ -1653,6 +1722,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -1720,6 +1793,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 1,
@@ -1784,6 +1858,7 @@ export const CLASS_CATALOG = {
     "id": "magic-guide",
     "nativeRecord": 10,
     "nativeName": "魔導師",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1J",
       "side2": "1J",
@@ -1793,6 +1868,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -1860,6 +1939,7 @@ export const CLASS_CATALOG = {
         "reward": 45
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "1J",
@@ -1993,6 +2073,7 @@ export const CLASS_CATALOG = {
     "id": "evil-mage",
     "nativeRecord": 11,
     "nativeName": "邪法師",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0L",
       "side2": "0L",
@@ -2002,6 +2083,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -2069,6 +2154,7 @@ export const CLASS_CATALOG = {
         "reward": 45
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "0L",
@@ -2167,6 +2253,7 @@ export const CLASS_CATALOG = {
     "id": "magic-archer",
     "nativeRecord": 12,
     "nativeName": "魔弓兵",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1I",
       "side2": "1I",
@@ -2176,6 +2263,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "shooting",
+    "aiClassDispatch": {
+      "side1": "shooting",
+      "side2": "shooting"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -2243,6 +2334,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": {
       "classCode": "1I",
       "minimumRange": 2,
@@ -2313,6 +2405,7 @@ export const CLASS_CATALOG = {
     "id": "land-knight",
     "nativeRecord": 13,
     "nativeName": "陸戰騎士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0B",
       "side2": "0B",
@@ -2322,6 +2415,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -2389,6 +2486,7 @@ export const CLASS_CATALOG = {
         "reward": 30
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 6,
@@ -2478,6 +2576,7 @@ export const CLASS_CATALOG = {
     "id": "demon-dragon-knight",
     "nativeRecord": 14,
     "nativeName": "妖龍騎士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1F",
       "side2": "1F",
@@ -2487,6 +2586,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -2554,6 +2657,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 4,
@@ -2618,6 +2722,7 @@ export const CLASS_CATALOG = {
     "id": "flying-dragon-knight",
     "nativeRecord": 15,
     "nativeName": "飛龍騎士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0F",
       "side2": "0F",
@@ -2627,6 +2732,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -2694,6 +2803,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 4,
@@ -2758,6 +2868,7 @@ export const CLASS_CATALOG = {
     "id": "beast-knight",
     "nativeRecord": 16,
     "nativeName": "獸騎士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1E",
       "side2": "1E",
@@ -2767,6 +2878,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -2834,6 +2949,14 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [
+      {
+        "effectName": "攻擊下降",
+        "stateOffset": 16,
+        "value": 32771,
+        "confirmedEffect": "effective attack -20 while bit15 is set"
+      }
+    ],
     "shooting": null,
     "technique": null,
     "movementProfile": 7,
@@ -2898,6 +3021,7 @@ export const CLASS_CATALOG = {
     "id": "bone-knight",
     "nativeRecord": 17,
     "nativeName": "獸骨騎士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "2E",
       "side2": "2E",
@@ -2907,6 +3031,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -2974,6 +3102,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 6,
@@ -3038,6 +3167,7 @@ export const CLASS_CATALOG = {
     "id": "swift-dragon-knight",
     "nativeRecord": 18,
     "nativeName": "迅龍騎士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0E",
       "side2": "0E",
@@ -3047,6 +3177,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -3114,6 +3248,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 6,
@@ -3178,6 +3313,7 @@ export const CLASS_CATALOG = {
     "id": "great-dragon-knight",
     "nativeRecord": 19,
     "nativeName": "巨龍騎士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "3E",
       "side2": "3E",
@@ -3187,6 +3323,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -3254,6 +3394,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "3E",
@@ -3352,6 +3493,7 @@ export const CLASS_CATALOG = {
     "id": "archer",
     "nativeRecord": 20,
     "nativeName": "弓兵",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "3A",
       "side2": "3A",
@@ -3361,6 +3503,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "shooting",
+    "aiClassDispatch": {
+      "side1": "shooting",
+      "side2": "shooting"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -3428,6 +3574,7 @@ export const CLASS_CATALOG = {
         "reward": 25
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": {
       "classCode": "3A",
       "minimumRange": 2,
@@ -3511,6 +3658,7 @@ export const CLASS_CATALOG = {
     "id": "crossbow",
     "nativeRecord": 21,
     "nativeName": "弩兵",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0I",
       "side2": "0I",
@@ -3520,6 +3668,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "shooting",
+    "aiClassDispatch": {
+      "side1": "shooting",
+      "side2": "shooting"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -3587,6 +3739,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": {
       "classCode": "0I",
       "minimumRange": 2,
@@ -3657,6 +3810,7 @@ export const CLASS_CATALOG = {
     "id": "cavalry",
     "nativeRecord": 22,
     "nativeName": "騎兵",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1A",
       "side2": "1A",
@@ -3666,6 +3820,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -3733,6 +3891,7 @@ export const CLASS_CATALOG = {
         "reward": 20
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 6,
@@ -3810,6 +3969,7 @@ export const CLASS_CATALOG = {
     "id": "pegasus-warrior",
     "nativeRecord": 23,
     "nativeName": "飛馬戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1B",
       "side2": "1B",
@@ -3819,6 +3979,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -3886,6 +4050,7 @@ export const CLASS_CATALOG = {
         "reward": 30
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 4,
@@ -3963,6 +4128,7 @@ export const CLASS_CATALOG = {
     "id": "sister",
     "nativeRecord": 24,
     "nativeName": "修女",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "4A",
       "side2": "4A",
@@ -3972,6 +4138,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -4039,6 +4209,7 @@ export const CLASS_CATALOG = {
         "reward": 25
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "4A",
@@ -4171,6 +4342,7 @@ export const CLASS_CATALOG = {
     "id": "monk",
     "nativeRecord": 25,
     "nativeName": "僧侶",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0D",
       "side2": "0D",
@@ -4180,6 +4352,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -4247,6 +4423,7 @@ export const CLASS_CATALOG = {
         "reward": 35
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "0D",
@@ -4373,6 +4550,7 @@ export const CLASS_CATALOG = {
     "id": "water-warrior",
     "nativeRecord": 26,
     "nativeName": "水戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0N",
       "side2": "0N",
@@ -4382,6 +4560,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -4449,6 +4631,7 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 8,
@@ -4513,6 +4696,7 @@ export const CLASS_CATALOG = {
     "id": "divine-sword-warrior",
     "nativeRecord": 27,
     "nativeName": "神劍戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "0C",
       "side2": "0C",
@@ -4522,6 +4706,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -4589,6 +4777,7 @@ export const CLASS_CATALOG = {
         "reward": 30
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 1,
@@ -4672,6 +4861,7 @@ export const CLASS_CATALOG = {
     "id": "warrior",
     "nativeRecord": 28,
     "nativeName": "戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "2A",
       "side2": "2A",
@@ -4681,6 +4871,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -4748,6 +4942,7 @@ export const CLASS_CATALOG = {
         "reward": 20
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 1,
@@ -4825,6 +5020,7 @@ export const CLASS_CATALOG = {
     "id": "steel-armor-warrior",
     "nativeRecord": 29,
     "nativeName": "鋼甲戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1C",
       "side2": "0C",
@@ -4835,6 +5031,10 @@ export const CLASS_CATALOG = {
       "agreement": false
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -4913,6 +5113,7 @@ export const CLASS_CATALOG = {
         "reward": 30
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 1,
@@ -4990,6 +5191,7 @@ export const CLASS_CATALOG = {
     "id": "priest",
     "nativeRecord": 30,
     "nativeName": "祭司",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1D",
       "side2": "1D",
@@ -4999,6 +5201,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -5066,6 +5272,7 @@ export const CLASS_CATALOG = {
         "reward": 35
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "1D",
@@ -5192,6 +5399,7 @@ export const CLASS_CATALOG = {
     "id": "wizard",
     "nativeRecord": 31,
     "nativeName": "巫師",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "2L",
       "side2": "2L",
@@ -5201,6 +5409,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -5268,6 +5480,7 @@ export const CLASS_CATALOG = {
         "reward": 45
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "2L",
@@ -5366,6 +5579,7 @@ export const CLASS_CATALOG = {
     "id": "magic-master",
     "nativeRecord": 32,
     "nativeName": "魔法師",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "1L",
       "side2": "1L",
@@ -5375,6 +5589,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "technique",
+      "side2": "technique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -5442,6 +5660,7 @@ export const CLASS_CATALOG = {
         "reward": 45
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "1L",
@@ -5540,6 +5759,7 @@ export const CLASS_CATALOG = {
     "id": "evil-sword-warrior",
     "nativeRecord": 33,
     "nativeName": "邪劍戰士",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "2G",
       "side2": "2G",
@@ -5549,6 +5769,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "ordinary",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -5616,6 +5840,14 @@ export const CLASS_CATALOG = {
         "reward": 40
       }
     ],
+    "ordinaryHitStatuses": [
+      {
+        "effectName": "混亂",
+        "stateOffset": 14,
+        "value": 32771,
+        "confirmedEffect": "applies the same status slot named 混亂 by player technique LA; when the unit enters AI scheduling, bit15 forces behavior FFh and a class-dependent movement-only action"
+      }
+    ],
     "shooting": null,
     "technique": null,
     "movementProfile": 1,
@@ -5680,6 +5912,7 @@ export const CLASS_CATALOG = {
     "id": "engineer",
     "nativeRecord": 34,
     "nativeName": "工兵",
+    "recordKind": "ordinary_catalog",
     "codes": {
       "side1": "5A",
       "side2": "5A",
@@ -5689,6 +5922,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "technique",
+    "aiClassDispatch": {
+      "side1": "ordinary",
+      "side2": "ordinary"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -5756,6 +5993,7 @@ export const CLASS_CATALOG = {
         "reward": 25
       }
     ],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": {
       "classCode": "5A",
@@ -5869,6 +6107,7 @@ export const CLASS_CATALOG = {
     "id": "empress",
     "nativeRecord": 35,
     "nativeName": "女帝",
+    "recordKind": "special_runtime",
     "codes": {
       "side1": "0P",
       "side2": "0P",
@@ -5878,6 +6117,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "special_runtime",
+    "aiClassDispatch": {
+      "side1": "empressOrDragonTechnique",
+      "side2": "empressOrDragonTechnique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -5940,6 +6183,7 @@ export const CLASS_CATALOG = {
       }
     ],
     "killRewards": [],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 10,
@@ -6004,6 +6248,7 @@ export const CLASS_CATALOG = {
     "id": "dragon",
     "nativeRecord": 36,
     "nativeName": "龍",
+    "recordKind": "special_runtime",
     "codes": {
       "side1": "1P",
       "side2": "1P",
@@ -6013,6 +6258,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "special_runtime",
+    "aiClassDispatch": {
+      "side1": "empressOrDragonTechnique",
+      "side2": "empressOrDragonTechnique"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -6075,6 +6324,7 @@ export const CLASS_CATALOG = {
       }
     ],
     "killRewards": [],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 4,
@@ -6139,6 +6389,7 @@ export const CLASS_CATALOG = {
     "id": "head",
     "nativeRecord": 37,
     "nativeName": "頭",
+    "recordKind": "special_runtime",
     "codes": {
       "side1": "2P",
       "side2": "2P",
@@ -6148,6 +6399,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "special_runtime",
+    "aiClassDispatch": {
+      "side1": "stage37BossPart",
+      "side2": "stage37BossPart"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -6210,6 +6465,7 @@ export const CLASS_CATALOG = {
       }
     ],
     "killRewards": [],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 11,
@@ -6274,6 +6530,7 @@ export const CLASS_CATALOG = {
     "id": "hand",
     "nativeRecord": 38,
     "nativeName": "手",
+    "recordKind": "special_runtime",
     "codes": {
       "side1": "3P",
       "side2": "3P",
@@ -6283,6 +6540,10 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "actionCategory": "special_runtime",
+    "aiClassDispatch": {
+      "side1": "stage37BossPart",
+      "side2": "stage37BossPart"
+    },
     "dataRows": [
       {
         "row": 0,
@@ -6345,6 +6606,7 @@ export const CLASS_CATALOG = {
       }
     ],
     "killRewards": [],
+    "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
     "movementProfile": 12,

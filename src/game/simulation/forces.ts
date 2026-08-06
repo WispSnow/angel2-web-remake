@@ -36,6 +36,8 @@ export interface ForceDefinition {
   id: string;
   /** Optional player-facing name; the stable id remains the simulation identity. */
   label?: string;
+  /** Optional high-level tactic for the compact unit HUD; never an internal AI identifier. */
+  tacticLabel?: string;
   side: Side;
   control: ForceControl;
   unitIds: readonly string[];
@@ -68,6 +70,9 @@ export class ForceRegistry {
       }
       if (definition.label !== undefined && definition.label.trim().length === 0) {
         throw new Error(`Force ${definition.id} has an empty player-facing label`);
+      }
+      if (definition.tacticLabel !== undefined && definition.tacticLabel.trim().length === 0) {
+        throw new Error(`Force ${definition.id} has an empty player-facing tactic`);
       }
       if (definition.unitIds.length === 0) {
         throw new Error(`Force ${definition.id} must contain at least one unit`);

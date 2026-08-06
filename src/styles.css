@@ -372,8 +372,22 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   border: 3px ridge #e7be2c;
   pointer-events: none;
 }
-.hud-identity { position: absolute; z-index: 1; left: 0; top: 119px; width: 152px; height: 28px; color: #fff; text-align: center; }
-.hud-identity b { display: block; overflow: hidden; font-size: 16px; line-height: 25px; white-space: nowrap; text-shadow: 1px 1px #000; }
+.hud-identity { position: absolute; z-index: 1; left: 0; top: 116px; width: 152px; height: 35px; color: #fff; text-align: center; }
+.hud-identity b {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 2px;
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 1px 1px #000;
+}
+.hud-identity b.is-compact { font-size: 14px; }
+.hud-identity b.is-tight { font-size: 12px; }
+.unit-control-summary { display: block; color: var(--gold); font: 700 9px/12px "PMingLiU", serif; letter-spacing: 0; text-shadow: 1px 1px #000; }
 .meter-bar { position: absolute; z-index: 1; top: 2px; width: 15px; height: 104px; border: 2px solid #c99b27; background: #170e0e; box-sizing: border-box; display: flex; align-items: end; }
 .meter-bar i { display: block; width: 100%; }
 .hp-bar { left: 120px; }

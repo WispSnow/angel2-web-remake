@@ -48,6 +48,12 @@ interface ArenaBattleDebugState {
       prayerRolledAmount?: number;
     }>;
   };
+  lastCombat?: {
+    attackerId: string;
+    defenderId: string;
+    defenderDied: boolean;
+  };
+  combatPresentation?: { phase: string };
   specialActionPresentation?: { phase: string; frame: number; lifeChangeUnitId?: string };
   specialActionPresentationTrace: Array<{
     phase: string;
@@ -161,6 +167,74 @@ test("arena edits both rosters and starts a formal-rule battle without touching 
     Object.keys(localStorage).sort().map((key) => [key, localStorage.getItem(key)]),
   ));
   expect(storageAfter).toBe(storageBefore);
+});
+
+test("evil sword warrior ordinary attack shows confusion without overflowing the HUD identity", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("evil-sword-warrior");
+    arena.setLevel(1);
+    const attacker = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const defender = arena.interact(21, 30);
+    return [attacker, defender];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  const identity = page.locator(".hud-identity-name");
+  await expect(identity).toHaveText("邪劍戰士");
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
+  const identityMetrics = await identity.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(identityMetrics.scrollWidth).toBeLessThanOrEqual(identityMetrics.clientWidth);
+
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-attack").click();
+  await clickArenaWorldCell(page, 21, 30);
+
+  await page.waitForFunction(() => {
+    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
+    return dataset?.mapCombatPhase === "statusEffect"
+      && dataset.mapCombatTarget === "arena-2-0"
+      && dataset.mapCombatEffectTextureKeys?.split(",")
+        .some((key) => key.startsWith("map-confusion-"));
+  }, undefined, { polling: "raf" });
+  const during = await arenaBattleState(page);
+  expect(during?.units.find(({ id }) => id === "arena-2-0")?.statuses.confusion).toBe(3);
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/arena-evil-sword-confusion.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as {
+      battle?: ArenaBattleDebugState;
+    }).battle;
+    return current?.lastCombat?.attackerId === "arena-1-0"
+      && current.combatPresentation === undefined
+      && current.specialActionPresentation === undefined;
+  });
+  const after = await arenaBattleState(page);
+  expect(after?.lastCombat).toMatchObject({
+    attackerId: "arena-1-0",
+    defenderId: "arena-2-0",
+    defenderDied: false,
+  });
+  expect(after?.units.find(({ id }) => id === "arena-2-0")?.statuses.confusion).toBe(3);
+  expect(after?.specialActionPresentationTrace.filter(({ phase }) => phase === "statusEffect"))
+    .toHaveLength(11);
+  expect(pageErrors).toEqual([]);
 });
 
 test("tier-one great dragon knight performs native 1D stomp in the integrated arena", async ({ page }) => {

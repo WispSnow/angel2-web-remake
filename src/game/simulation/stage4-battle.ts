@@ -59,6 +59,7 @@ function stage4Forces(deployment: DeploymentResult): readonly ForceDefinition[] 
     {
       id: "barrier-guide",
       label: "結界引導",
+      tacticLabel: "引導結界",
       side: 1,
       control: "independent-ai",
       unitIds: ["1:24"],
@@ -68,6 +69,7 @@ function stage4Forces(deployment: DeploymentResult): readonly ForceDefinition[] 
     {
       id: "castle-sentries",
       label: "城堡守軍",
+      tacticLabel: "阻擊護衛隊",
       side: 2,
       control: "independent-ai",
       unitIds: ["2:40", "2:41"],

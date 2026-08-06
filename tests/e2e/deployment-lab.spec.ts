@@ -168,7 +168,7 @@ test("the remade read-out reports class, level, life, stats and class actions", 
 
   await page.getByTestId("deployment-roster-4").click();
   await expect(detail).toContainText("葛蒂拉斯");
-  await expect(detail).toContainText("魔術士 · Lv 1 · 技術");
+  await expect(detail).toContainText("魔術士 · Lv 7 · 技術");
   await expect(detail).toContainText("250／250");
   await expect(detail).toContainText("初級炎暴・初級落雷・初級冰雪");
   await expect(detail).toContainText("已出場");

@@ -2797,7 +2797,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   await expect(page.getByTestId("system-menu")).toBeHidden();
 
   await clickCanvas(page, 180, 309);
-  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", "我方可行動，士兵希蜜");
+  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", "我方・玩家・可行動，士兵希蜜");
   await page.getByTestId("unit-command-move").click();
   await clickCanvas(page, 100, 309);
   await expect(page.getByTestId("action-menu")).toHaveAttribute("data-kind", "postMove");
@@ -2848,7 +2848,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
 
   // The mandatory promotion overlay recenters its queued unit before it opens.
   await page.getByTestId("battle-canvas").hover({ position: { x: 220, y: 177 } });
-  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", "我方已行動，修女希蜜");
+  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", "我方・玩家・已行動，修女希蜜");
   await expect(page.getByTestId("hp-bar")).toHaveAttribute("aria-label", new RegExp(`生命 ${ximiLifeAtPromotion}／`));
   await expect(page.getByTestId("exp-bar")).toHaveAttribute("aria-label", /^經驗 0／/);
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-ximi-promoted-map.png" });

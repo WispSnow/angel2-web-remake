@@ -114,9 +114,9 @@ describe("stage 0 evidence-backed content", () => {
   it("selects native visible growth rows from cumulative experience", () => {
     expect(classStatsFor({ classId: "soldier", experience: 0 })).toMatchObject({ attack: 39, defense: 21, maxLife: 160, movement: 4, level: 1 });
     expect(classStatsFor({ classId: "soldier", experience: 100 })).toMatchObject({ attack: 42, defense: 24, maxLife: 170, level: 2 });
-    expect(classStatsFor({ classId: "cavalry", experience: 180 })).toMatchObject({ attack: 60, defense: 33, maxLife: 230, level: 2 });
+    expect(classStatsFor({ classId: "cavalry", experience: 180 })).toMatchObject({ attack: 60, defense: 33, maxLife: 230, level: 5 });
     expect(classStatsFor({ classId: "soldier", experience: 301 })).toMatchObject({ attack: 46, defense: 27, maxLife: 190, level: 4 });
-    expect(classStatsFor({ classId: "cavalry", experience: 461 })).toMatchObject({ attack: 66, defense: 36, maxLife: 270, level: 4 });
+    expect(classStatsFor({ classId: "cavalry", experience: 461 })).toMatchObject({ attack: 66, defense: 36, maxLife: 270, level: 7 });
     expect(nextExperienceThresholdFor({ classId: "soldier", experience: 32 })).toBe(100);
     expect(nextExperienceThresholdFor({ classId: "soldier", experience: 301 })).toBe(400);
     expect(nextExperienceThresholdFor({ classId: "cavalry", experience: 461 })).toBe(560);
@@ -126,19 +126,19 @@ describe("stage 0 evidence-backed content", () => {
     const expected = [
       {
         soldier: { experience: 101, attack: 42, defense: 24, maxLife: 170, level: 2 },
-        hading: { experience: 181, attack: 60, defense: 33, maxLife: 230, level: 2 },
+        hading: { experience: 181, attack: 60, defense: 33, maxLife: 230, level: 5 },
       },
       {
         soldier: { experience: 201, attack: 45, defense: 27, maxLife: 180, level: 3 },
-        hading: { experience: 361, attack: 65, defense: 36, maxLife: 260, level: 3 },
+        hading: { experience: 361, attack: 65, defense: 36, maxLife: 260, level: 6 },
       },
       {
         soldier: { experience: 301, attack: 46, defense: 27, maxLife: 190, level: 4 },
-        hading: { experience: 461, attack: 66, defense: 36, maxLife: 270, level: 4 },
+        hading: { experience: 461, attack: 66, defense: 36, maxLife: 270, level: 7 },
       },
       {
         soldier: { experience: 401, attack: 70, defense: 40, maxLife: 300, level: 5 },
-        hading: { experience: 561, attack: 100, defense: 54, maxLife: 420, level: 5 },
+        hading: { experience: 561, attack: 100, defense: 54, maxLife: 420, level: 8 },
       },
     ] as const;
 

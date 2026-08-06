@@ -9,6 +9,25 @@ const ARTIFACT_DIR = "artifacts/playwright";
 
 test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 
+test("animation and deployment labs link back to the debug hub", async ({ page }) => {
+  for (const lab of ["combat", "technique", "deployment"] as const) {
+    await page.goto(`/${lab}-lab.html`);
+    const debugLink = page.getByTestId(`${lab}-lab-debug-link`);
+    await expect(debugLink).toBeVisible();
+    await expect(debugLink).toHaveText("戰役調試中心");
+    await expect(debugLink).toHaveAttribute("href", "/debug.html");
+    await page.locator(`.${lab}-lab-header`).screenshot({
+      path: `${ARTIFACT_DIR}/${lab}-lab-debug-navigation.png`,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.locator(`.${lab}-lab-header`).screenshot({
+      path: `${ARTIFACT_DIR}/${lab}-lab-debug-navigation-narrow.png`,
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+  }
+});
+
 test("debug hub selects a difficulty and opens the formal stage-one deployment", async ({ page }) => {
   await page.goto("/debug.html");
   await expect(page.getByTestId("debug-hub")).toBeVisible();

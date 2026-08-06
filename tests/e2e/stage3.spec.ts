@@ -89,6 +89,24 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   await page.getByTestId("objective-panel").screenshot({
     path: `${ARTIFACT_DIR}/stage3-corrected-objective.png`,
   });
+  await page.locator("[data-action=close-objectives]").click();
+
+  for (let step = 0; step < 21; step += 1) await page.keyboard.press("ArrowUp");
+  for (let step = 0; step < 14; step += 1) await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("自動・可行動");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術固守防區");
+  await expect(page.getByTestId("unit-force")).toHaveCount(0);
+
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("AI・可行動");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術壓制第四軍團");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage3-tactical-unit-hud.png`,
+  });
 });
 
 test("S03-F/G: monk recovery exposes the native menu and marks only allies inside its effect diamond", async ({ page }) => {

@@ -62,7 +62,9 @@ function createArenaUnit(
     slot: placement.slot,
     classId: placement.classId,
     className: className(placement.classId),
-    name: `${placement.side === 1 ? "我方" : "敵方"}${className(placement.classId)}`,
+    // Side remains explicit in simulation state and the map figure. Keep the
+    // arena identity short so the right panel does not repeat it in the name.
+    name: className(placement.classId),
     portrait: (placement.side === 1 ? 47 : 48) as PortraitRecord,
     x: placement.x,
     y: placement.y,
@@ -111,6 +113,7 @@ function arenaForces(units: readonly BattleUnit[]): readonly ForceDefinition[] {
     {
       id: "arena-enemy-force",
       label: "競技場敵方",
+      tacticLabel: "主動進攻",
       side: 2,
       control: "independent-ai",
       unitIds: enemies,

@@ -35,6 +35,8 @@ if (!classIdsMatch?.groups?.ids) throw new Error("generated class catalog has no
 const classIds = JSON.parse(classIdsMatch.groups.ids);
 
 const archerShooting = techniqueRules.shooting.classes.find((entry) => entry.classCode === "3A");
+const crossbowShooting = techniqueRules.shooting.classes.find((entry) => entry.classCode === "0I");
+const magicArcherShooting = techniqueRules.shooting.classes.find((entry) => entry.classCode === "1I");
 const fireDispatch = techniqueRules.dispatchTable.entries.find((entry) => entry.actionCode === "1F");
 const healDispatch = techniqueRules.dispatchTable.entries.find((entry) => entry.actionCode === "1H");
 const fireTier = techniqueRules.rules.families.F.tiers.find((entry) => entry.code === "1F");
@@ -45,6 +47,8 @@ const nativeRestPresentation = turnActions.actionCommitPoints?.rest?.presentatio
 
 if (
   !archerShooting
+  || !crossbowShooting
+  || !magicArcherShooting
   || archerShooting.maximumRange !== 5
   || fireDispatch?.selectionRadius !== 5
   || healDispatch?.selectionRadius !== 5
@@ -284,6 +288,52 @@ const actions = {
     },
     experience: { minimum: 8, maximum: 11, addKillReward: true },
     presentationId: "shoot-common",
+  },
+  "crossbow-shot": {
+    id: "crossbow-shot",
+    nativeCode: "0I",
+    label: "射擊",
+    kind: "shooting",
+    target: "enemy",
+    range: {
+      mode: 2,
+      nativeSeed: crossbowShooting.maximumRange,
+      minimumDistance: techniqueRules.shooting.minimumManhattanRange,
+      maximumDistance: crossbowShooting.maximumRange - 1,
+    },
+    damage: { minimum: 70, maximum: 89, type: "physical-ranged" },
+    damagePresentation: {
+      mode: "post-graphics-point-drain",
+      waitPerPointNativeTicks: 1,
+    },
+    experience: { minimum: 13, maximum: 17, addKillReward: true },
+    presentationId: "shoot-common",
+  },
+  "magic-archer-shot": {
+    id: "magic-archer-shot",
+    nativeCode: "1I",
+    label: "射擊",
+    kind: "shooting",
+    target: "enemy",
+    range: {
+      mode: 2,
+      nativeSeed: magicArcherShooting.maximumRange,
+      minimumDistance: techniqueRules.shooting.minimumManhattanRange,
+      maximumDistance: magicArcherShooting.maximumRange - 1,
+    },
+    damage: {
+      minimum: 50,
+      maximum: 69,
+      type: "magic-ranged-line",
+      selectedTargetMultiplier: 2,
+    },
+    damagePresentation: {
+      mode: "line-effect-half-drain",
+      waitPerPointNativeTicks: 1,
+      fixedWaitNativeTicks: 20,
+    },
+    experience: { minimum: 13, maximum: 17, addKillReward: true },
+    presentationId: "shoot-line",
   },
   "fire-1": {
     id: "fire-1",

@@ -48,7 +48,14 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     expect(battle.forceForUnit("1:46")).toMatchObject({
       id: "fourth-corps",
       control: "independent-ai",
+      tacticLabel: "固守防區",
       doctrine: { strategy: "terrain-hold" },
+    });
+    expect(battle.forceForUnit("2:42")).toMatchObject({
+      tacticLabel: "壓制第四軍團",
+    });
+    expect(battle.forceForUnit("2:44")).toMatchObject({
+      tacticLabel: "阻擊救援隊",
     });
     expect(battle.planAlliedAiAction("1:54")).toBeDefined();
   });

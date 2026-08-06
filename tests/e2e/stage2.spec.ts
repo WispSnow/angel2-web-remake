@@ -71,7 +71,9 @@ test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as aut
   await clickUnit(page, "1:44");
   expect(await state(page)).toMatchObject({ actionMode: "allyPreview", selectedId: "1:44" });
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-mode", "allyPreview");
-  await expect(page.getByTestId("allied-control-mode")).toContainText("友軍自動");
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("自動・可行動");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術自主作戰");
+  await expect(page.getByTestId("unit-force")).toHaveCount(0);
   await expect(page.getByTestId("action-menu")).toBeHidden();
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage2-auto-ally-hud.png`,
@@ -80,6 +82,8 @@ test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as aut
   await page.keyboard.press("Escape");
   await clickUnit(page, "1:0");
   expect(await state(page)).toMatchObject({ actionMode: "actionMenu", selectedId: "1:0" });
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
+  await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
   await expect(page.getByTestId("action-menu")).toBeVisible();
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage2-fixed-roster-and-auto-ally.png`,

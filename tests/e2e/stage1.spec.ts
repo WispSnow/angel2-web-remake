@@ -246,7 +246,8 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByText("修女／騎士團修女", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "49");
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0049\/base\.png$/u);
-  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖警戒");
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("AI・可行動");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術警戒");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-portrait.png`,
   });
@@ -256,7 +257,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByText("騎兵／芳", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "34");
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0034\/base\.png$/u);
-  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖守衛");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術守衛");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-fang-portrait.png`,
   });
@@ -362,7 +363,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     fangPursuitRound: 2,
   });
   expect(activeEnemyPhase.enemyIntents["2:16"]).toBe("sentry");
-  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖追擊");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術追擊");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-fire.png`,
   });
@@ -699,7 +700,7 @@ test("S01-K: enemy movement preview follows the current stage-1 AI intent", asyn
   expect(guardPreview).toMatchObject({ actionMode: "enemyPreview", selectedId: "2:40" });
   expect(guardPreview.reachable).toContainEqual({ x: 22, y: 14 });
   expect(guardPreview.reachable.length).toBeGreaterThan(1);
-  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖警戒");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術警戒");
   await expect(battleCanvas).toHaveAttribute(
     "data-range-cell-count",
     String(guardPreview.reachable.length),
@@ -753,7 +754,7 @@ test("S01-I: move-plus-technique and Fang pursuit reach do not wake the second a
   for (let step = 0; step < 5; step += 1) await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByTestId("enemy-ai-intent")).toHaveText("意圖警戒");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術警戒");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-second-army-stays-alert.png`,
   });

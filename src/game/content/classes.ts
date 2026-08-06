@@ -14,6 +14,12 @@ export {
 };
 
 export type ClassActionCategory = "ordinary" | "shooting" | "technique" | "special_runtime";
+export type OrdinaryHitStatusKey = "confusion" | "attackDown" | "defenseDown" | "poison";
+
+export interface OrdinaryHitStatus {
+  key: OrdinaryHitStatusKey;
+  counter: number;
+}
 
 export interface PromotionTarget {
   id: ClassId;
@@ -61,7 +67,7 @@ export function classStatsFor(
       defense: selected.defense,
       maxLife: selected.maxLife,
       movement: selected.movement,
-      level: selectedIndex + 1,
+      level: selected.level,
     };
   }
 
@@ -72,7 +78,7 @@ export function classStatsFor(
       defense: selected.defense,
       maxLife: selected.maxLife,
       movement: selected.movement,
-      level: selectedIndex + 1,
+      level: selected.level,
     };
   }
   const thirdThreshold = fixedRows[2].experienceThreshold;
@@ -84,8 +90,19 @@ export function classStatsFor(
     defense: selected.defense,
     maxLife: selected.maxLife + postThirdRows * growth.maxLifeIncrement,
     movement: selected.movement,
-    level: 3 + postThirdRows,
+    level: selected.level + postThirdRows,
   };
+}
+
+export function classTierFor(
+  unit: Pick<BattleUnit, "classId" | "experience">,
+): 1 | 2 | 3 {
+  const rows = classDefinition(unit.classId).dataRows.slice(0, 3);
+  const selectedIndex = rows.reduce(
+    (selected, row, index) => unit.experience >= row.experienceThreshold ? index : selected,
+    0,
+  );
+  return (selectedIndex + 1) as 1 | 2 | 3;
 }
 
 export function nextExperienceThresholdFor(
@@ -120,6 +137,29 @@ export function killRewardFor(classId: ClassId, side: BattleUnit["side"]): numbe
   return definition.killRewards.find((reward) => reward.code === code)?.reward
     ?? definition.killRewards[0]?.reward
     ?? 0;
+}
+
+export function ordinaryHitStatusFor(classId: ClassId): OrdinaryHitStatus | undefined {
+  const status = classDefinition(classId).ordinaryHitStatuses[0];
+  if (!status) return undefined;
+  const stateOffset: number = status.stateOffset;
+  const key: OrdinaryHitStatusKey = stateOffset === 0x0e
+    ? "confusion"
+    : stateOffset === 0x10
+      ? "attackDown"
+      : stateOffset === 0x12
+        ? "defenseDown"
+        : stateOffset === 0x14
+          ? "poison"
+          : (() => { throw new Error(`unsupported native status offset ${stateOffset}`); })();
+  return {
+    key,
+    counter: status.value & 0x7fff,
+  };
+}
+
+export function suppressesOrdinaryCounterFor(classId: ClassId): boolean {
+  return classDefinition(classId).codes.variants.some((code) => code === "0G");
 }
 
 export function promotionTargetsFor(classId: ClassId): readonly PromotionTarget[] {

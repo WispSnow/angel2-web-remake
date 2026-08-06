@@ -32,6 +32,14 @@
   font: 13px/1.5 system-ui, sans-serif;
 }
 
+.technique-lab-nav {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 6px;
+}
+
 .technique-lab-back {
   flex: 0 0 auto;
   padding: 7px 12px;
@@ -179,7 +187,8 @@
 }
 
 @media (max-width: 620px) {
-  .technique-lab-header { align-items: start; }
+  .technique-lab-header { align-items: start; flex-direction: column; gap: 12px; }
+  .technique-lab-nav { justify-content: start; }
   .technique-lab-header p { display: none; }
   .technique-lab-transport { grid-template-columns: repeat(5, 1fr); }
   .technique-lab-transport label { grid-column: 1 / -1; }

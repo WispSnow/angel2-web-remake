@@ -123,10 +123,23 @@ describe("all-terrain arena", () => {
     }
     const archer = battle.unit("arena-1-1");
     expect(archer?.experience).toBe(arenaExperienceForLevel("archer", 3));
-    expect(archer && classStatsFor(archer).level).toBe(3);
+    expect(archer && classStatsFor(archer).level).toBe(6);
 
     battle.units = battle.units.filter(({ side }) => side === 1);
     expect(battle.outcome()).toBe("victory");
+  });
+
+  it("applies an evil sword warrior's ordinary confusion hit in the arena", () => {
+    const battle = new ArenaBattle([
+      { id: "arena-1-0", side: 1, slot: 0, classId: "evil-sword-warrior", level: 1, x: 20, y: 30 },
+      { id: "arena-2-0", side: 2, slot: 0, classId: "soldier", level: 1, x: 21, y: 30 },
+    ], 0);
+
+    const result = battle.attack("arena-1-0", "arena-2-0");
+
+    expect(result.defenderDied).toBe(false);
+    expect(battle.unit("arena-2-0")?.statuses.confusion).toBe(3);
+    expect(battle.unit("arena-1-0")?.name).toBe(battle.unit("arena-1-0")?.className);
   });
 
   it("provides a memory-only runtime with enemy sprites for the chosen roster", () => {

@@ -40,6 +40,7 @@ const STAGE2_FORCE_DEFINITIONS = [
   {
     id: "stage2-allied-corps",
     label: "友軍軍團",
+    tacticLabel: "自主作戰",
     side: 1,
     control: "independent-ai",
     unitIds: ["1:40", "1:41", "1:42", "1:43", "1:44", "1:45"],
@@ -48,6 +49,7 @@ const STAGE2_FORCE_DEFINITIONS = [
   {
     id: "stage2-enemy-force",
     label: "騎士團守軍",
+    tacticLabel: "主動進攻",
     side: 2,
     control: "independent-ai",
     unitIds: STAGE2_SEMANTIC_ENEMY_UNITS.map(({ slot }) => `2:${slot}`),

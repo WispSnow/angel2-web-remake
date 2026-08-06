@@ -34,28 +34,28 @@ describe("evidence-backed class catalog and promotion", () => {
       defense: 30,
       maxLife: 200,
       movement: 8,
-      level: 1,
+      level: 4,
     });
     expect(classStatsFor({ classId: "warrior", experience: 0 })).toMatchObject({
       attack: 50,
       defense: 32,
       maxLife: 200,
       movement: 6,
-      level: 1,
+      level: 4,
     });
     expect(classStatsFor({ classId: "archer", experience: 0 })).toMatchObject({
       attack: 48,
       defense: 28,
       maxLife: 200,
       movement: 6,
-      level: 1,
+      level: 4,
     });
     expect(classStatsFor({ classId: "sister", experience: 0 })).toMatchObject({
       attack: 47,
       defense: 30,
       maxLife: 200,
       movement: 5,
-      level: 1,
+      level: 4,
     });
 
     for (const classId of ["cavalry", "warrior", "archer", "sister"] as const) {
@@ -162,7 +162,7 @@ describe("evidence-backed class catalog and promotion", () => {
       classId: "cavalry",
       previousExperience: 307,
       life: 123,
-      stats: { attack: 55, defense: 30, maxLife: 200, movement: 8, level: 1 },
+      stats: { attack: 55, defense: 30, maxLife: 200, movement: 8, level: 4 },
     });
     expect(nia).toMatchObject({
       classId: "cavalry",

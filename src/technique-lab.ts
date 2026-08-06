@@ -91,7 +91,10 @@ root.innerHTML = `
         <h1>地圖技能動畫實驗室</h1>
         <p>任意配置敵我職業，直接重放原版地圖技能腳本；不建立關卡、不提交傷害或存檔。</p>
       </div>
-      <a href="/" class="technique-lab-back">返回遊戲</a>
+      <nav class="technique-lab-nav" aria-label="返回入口">
+        <a href="/debug.html" class="technique-lab-back" data-testid="technique-lab-debug-link">戰役調試中心</a>
+        <a href="/" class="technique-lab-back">普通遊戲</a>
+      </nav>
     </header>
 
     <div class="technique-lab-layout">

@@ -5,6 +5,7 @@ import type { DeterministicRng } from "../rng";
 import { cloneUnitStatuses } from "../status";
 import {
   stompEffectRange,
+  shootingLinePath,
   techniqueEffectRange,
   type ActionBattlefield,
   type ActionViewport,
@@ -31,6 +32,16 @@ const isFireAction = (actionId: BattleActionId): actionId is "fire-1" | "fire-2"
   actionId === "fire-1" || actionId === "fire-2" || actionId === "fire-3" || actionId === "fire-4";
 const isHealAction = (actionId: BattleActionId): actionId is "heal-1" | "heal-2" | "heal-3" =>
   actionId === "heal-1" || actionId === "heal-2" || actionId === "heal-3";
+const isShootingAction = (actionId: BattleActionId): actionId is "archer-shot" | "crossbow-shot" =>
+  actionId === "archer-shot" || actionId === "crossbow-shot";
+
+function shootingSeed(actionId: "archer-shot" | "crossbow-shot" | "magic-archer-shot"): number {
+  return BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed;
+}
+
+function shootingEvaded(target: BattleUnit, trial: DeterministicRng): boolean {
+  return target.classId === "swift-dragon-knight" && (trial.nextUint() & 1) === 1;
+}
 
 function affectedUnit(
   unit: BattleUnit,
@@ -140,6 +151,7 @@ function preparePrayer(
 
 function prepareSingleTarget(
   intent: BattleActionIntent,
+  actor: BattleUnit,
   target: BattleUnit,
   trial: DeterministicRng,
   targetMaximumLife: number,
@@ -150,13 +162,18 @@ function prepareSingleTarget(
   let blockReason: ActionBlockReason | undefined;
   const targetStatusesAfter = cloneUnitStatuses(target.statuses);
 
-  if (intent.actionId === "archer-shot") {
-    const definition = BATTLE_ACTION_DEFINITIONS["archer-shot"];
+  if (isShootingAction(intent.actionId)) {
+    const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     if (target.actionDisabled) {
       blocked = true;
       blockReason = "frozen";
+    } else if (shootingEvaded(target, trial)) {
+      damage = 0;
     } else {
-      damage = trial.between(definition.damage.minimum, definition.damage.maximum);
+      const minimum = actor.side === 2 && intent.actionId === "crossbow-shot"
+        ? 50
+        : definition.damage.minimum;
+      damage = trial.between(minimum, definition.damage.maximum);
     }
   } else if (isFireAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
@@ -322,8 +339,8 @@ function prepareSingleTarget(
   const lifeAfter = Math.max(0, Math.min(targetMaximumLife, target.life - damage + healing));
   const targetDied = lifeAfter === 0;
   let experienceGained = 0;
-  if (intent.actionId === "archer-shot") {
-    const definition = BATTLE_ACTION_DEFINITIONS["archer-shot"];
+  if (isShootingAction(intent.actionId)) {
+    const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     experienceGained = trial.between(
       definition.experience.minimum,
       definition.experience.maximum,
@@ -355,6 +372,66 @@ function prepareSingleTarget(
       blockReason,
     }),
     experienceGained,
+  };
+}
+
+function prepareMagicArcher(
+  actor: BattleUnit,
+  target: BattleUnit,
+  trial: DeterministicRng,
+  context: SpecialActionResolutionContext,
+): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
+  const definition = BATTLE_ACTION_DEFINITIONS["magic-archer-shot"];
+  const path = shootingLinePath(
+    actor,
+    target,
+    context.battlefield,
+    shootingSeed("magic-archer-shot"),
+    (count) => trial.between(0, count - 1),
+  );
+  if (path.length === 0) throw new Error("magic archer target is not connected to shooter");
+  const roll = trial.between(
+    definition.damage.minimum,
+    actor.side === 2 ? 59 : definition.damage.maximum,
+  );
+  const halfDamage = Math.floor(roll / 2);
+  const lineUnits = path
+    .slice(1)
+    .map((position) => context.units.find((unit) => unit.x === position.x && unit.y === position.y
+      && unit.side !== actor.side && !unit.actionDisabled))
+    .filter((unit): unit is BattleUnit => Boolean(unit));
+  const affectedUnits = lineUnits.map((unit) => {
+    const statusesAfter = cloneUnitStatuses(unit.statuses);
+    const guarded = unit.statuses.magicGuard > 0;
+    const evaded = unit.id === target.id && shootingEvaded(unit, trial);
+    if (!evaded) statusesAfter.magicGuard = 0;
+    const damage = evaded
+      ? 0
+      : unit.id === target.id
+        ? (guarded ? halfDamage : halfDamage * 2)
+        : (guarded ? 0 : halfDamage);
+    const lifeAfter = Math.max(0, unit.life - damage);
+    return affectedUnit(unit, {
+      lifeAfter,
+      damage,
+      blocked: guarded && damage === 0,
+      blockReason: guarded && damage === 0 ? "magicGuard" : undefined,
+      statusesAfter,
+    });
+  });
+  const experienceGained = trial.between(
+    definition.experience.minimum,
+    definition.experience.maximum,
+  ) + affectedUnits
+    .filter(({ died }) => died)
+    .reduce((total, affected) => {
+      const victim = context.units.find(({ id }) => id === affected.unitId);
+      return total + (victim ? killRewardFor(victim.classId, victim.side) : 0);
+    }, 0);
+  return {
+    affectedUnits,
+    experienceGained,
+    effectCells: path.map((position) => ({ position, value: 1 })),
   };
 }
 
@@ -604,6 +681,14 @@ export function prepareSpecialAction(
     affectedUnits = prayer.affectedUnits;
     prayerEligibleUnitIds = prayer.eligibleUnitIds;
     experienceGained = 0;
+  } else if (intent.actionId === "magic-archer-shot") {
+    if (!target) throw new Error("magic archer action requires a target unit");
+    ({ affectedUnits, experienceGained, effectCells } = prepareMagicArcher(
+      actor,
+      target,
+      trial,
+      context,
+    ));
   } else if (intent.actionId === "lightning-1"
     || intent.actionId === "lightning-2"
     || intent.actionId === "lightning-3"
@@ -649,7 +734,7 @@ export function prepareSpecialAction(
     ));
   } else {
     if (!target) throw new Error("single-target action requires a target unit");
-    const single = prepareSingleTarget(intent, target, trial, context.statsFor(target).maxLife);
+    const single = prepareSingleTarget(intent, actor, target, trial, context.statsFor(target).maxLife);
     affectedUnits = [single.affected];
     experienceGained = single.experienceGained;
   }

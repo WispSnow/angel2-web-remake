@@ -22,7 +22,7 @@ async function enterStage0FromOrdinaryStartup(page: Page, difficulty: 0 | 3): Pr
 
 async function expectHudValues(page: Page, identity: string, values: readonly string[]): Promise<void> {
   await expect(page.getByText(identity, { exact: true })).toBeVisible();
-  await expect(page.getByTestId("unit-hud").locator(".stat-list dd")).toHaveText([...values]);
+  await expect(page.getByTestId("unit-hud").locator(".unit-core-stat dd")).toHaveText([...values]);
 }
 
 test("S00-Q: ordinary startup exposes the native lowest and highest difficulty stats", async ({ page }) => {
@@ -30,13 +30,13 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
     {
       difficulty: 0 as const,
       soldier: ["170／170", "42／42", "24／24", "2", "101／200"],
-      hading: ["230／230", "60／60", "33／33", "2", "181／360"],
+      hading: ["230／230", "60／60", "33／33", "5", "181／360"],
       screenshot: "artifacts/playwright/stage0-difficulty-0-hading.png",
     },
     {
       difficulty: 3 as const,
       soldier: ["300／300", "70／70", "40／40", "5", "401／500"],
-      hading: ["420／420", "100／100", "54／54", "5", "561／660"],
+      hading: ["420／420", "100／100", "54／54", "8", "561／660"],
       screenshot: "artifacts/playwright/stage0-difficulty-3-hading.png",
     },
   ] as const;
@@ -55,11 +55,11 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
     const namedAlly = ["180／180", "45／45", "27／27", "3", "299／300"] as const;
     const genericAlly = ["160／160", "39／39", "21／21", "1", "0／100"] as const;
     const allyCycle = [
-      { identity: "士兵／士兵", values: genericAlly },
-      { identity: "士兵／士兵", values: genericAlly },
+      { identity: "士兵", values: genericAlly },
+      { identity: "士兵", values: genericAlly },
       { identity: "士兵／希蜜", values: namedAlly },
-      { identity: "士兵／士兵", values: genericAlly },
-      { identity: "士兵／士兵", values: genericAlly },
+      { identity: "士兵", values: genericAlly },
+      { identity: "士兵", values: genericAlly },
       { identity: "士兵／妮雅", values: namedAlly },
     ] as const;
     for (const [index, ally] of allyCycle.entries()) {

@@ -29,6 +29,64 @@ export const STAGE0_ACTION_DEFINITIONS = {
     },
     "presentationId": "shoot-common"
   },
+  "crossbow-shot": {
+    "id": "crossbow-shot",
+    "nativeCode": "0I",
+    "label": "射擊",
+    "kind": "shooting",
+    "target": "enemy",
+    "range": {
+      "mode": 2,
+      "nativeSeed": 8,
+      "minimumDistance": 2,
+      "maximumDistance": 7
+    },
+    "damage": {
+      "minimum": 70,
+      "maximum": 89,
+      "type": "physical-ranged"
+    },
+    "damagePresentation": {
+      "mode": "post-graphics-point-drain",
+      "waitPerPointNativeTicks": 1
+    },
+    "experience": {
+      "minimum": 13,
+      "maximum": 17,
+      "addKillReward": true
+    },
+    "presentationId": "shoot-common"
+  },
+  "magic-archer-shot": {
+    "id": "magic-archer-shot",
+    "nativeCode": "1I",
+    "label": "射擊",
+    "kind": "shooting",
+    "target": "enemy",
+    "range": {
+      "mode": 2,
+      "nativeSeed": 6,
+      "minimumDistance": 2,
+      "maximumDistance": 5
+    },
+    "damage": {
+      "minimum": 50,
+      "maximum": 69,
+      "type": "magic-ranged-line",
+      "selectedTargetMultiplier": 2
+    },
+    "damagePresentation": {
+      "mode": "line-effect-half-drain",
+      "waitPerPointNativeTicks": 1,
+      "fixedWaitNativeTicks": 20
+    },
+    "experience": {
+      "minimum": 13,
+      "maximum": 17,
+      "addKillReward": true
+    },
+    "presentationId": "shoot-line"
+  },
   "fire-1": {
     "id": "fire-1",
     "nativeCode": "1F",

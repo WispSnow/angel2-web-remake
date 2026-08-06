@@ -975,6 +975,25 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         let iceDistanceFromCenter: number | undefined;
         let texture: string | undefined;
         if (special.phase === "shootHit") texture = `map-shoot-${special.frame}`;
+        else if (special.phase === "shootLineGrow" || special.phase === "shootLineFinish") {
+          const cells = special.phase === "shootLineGrow"
+            ? special.result.effectCells.slice(0, special.frame + 1)
+            : special.result.effectCells;
+          for (let index = 0; index < cells.length; index += 1) {
+            const cell = cells[index];
+            if (!cell) continue;
+            const frame = special.phase === "shootLineGrow"
+              ? Math.min(7, Math.max(0, cells.length - index - 1))
+              : special.frame;
+            this.combatEffects.push(
+              this.add.image(
+                cell.position.x * TILE_WIDTH + TILE_WIDTH / 2,
+                cell.position.y * TILE_HEIGHT + TILE_HEIGHT,
+                `map-shoot-${frame}`,
+              ).setOrigin(.5, 1).setDepth(8),
+            );
+          }
+        }
         else if (special.phase === "fireEffect" && special.result.actionId === "fire-1") {
           texture = `map-fire-1-${special.frame}`;
         }

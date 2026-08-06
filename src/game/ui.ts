@@ -1378,8 +1378,11 @@ function renderHud(
   const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
   const nextExperience = nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
-  const side = unit.side === 1 ? "我方" : "敵方";
-  const acted = unit.actionDisabled ? "冰封中（不可攻擊／治療）" : unit.acted ? "已行動" : "可行動";
+  const playerControlled = unit.side === 1 && controller.battle.isPlayerControllableAlly(unit.id);
+  const affiliationLabel = unit.side === 2 ? "敵軍" : playerControlled ? "我方" : "友軍";
+  const controlLabel = unit.side === 2 ? "AI" : playerControlled ? "玩家" : "自動";
+  const actionLabel = unit.actionDisabled ? "冰封中" : unit.acted ? "已行動" : "可行動";
+  const controlSummary = `${affiliationLabel}・${controlLabel}・${actionLabel}`;
   const intent = unit.side === 2 ? controller.battle.enemyAiIntentFor(unit.id) : undefined;
   const intentLabel = intent ? {
     route: "撤離",
@@ -1387,13 +1390,28 @@ function renderHud(
     alert: "警戒",
     pursuit: "追擊",
   }[intent] : undefined;
-  const controlLabel = unit.side === 1 && !controller.battle.isPlayerControllableAlly(unit.id)
-    ? "友軍自動"
-    : undefined;
   const force = controller.battle.forceForUnit(unit.id);
-  const routePulseSafeCells = controller.battle.routePulseSafeArea(unit.id);
+  const tacticLabel = intentLabel
+    ?? force?.tacticLabel
+    ?? (unit.side === 2 ? "主動進攻" : !playerControlled ? "自主作戰" : undefined);
+  const routePulseSafety = controller.battle.routePulseSafetyForUnit(unit.id);
+  const routePulseSafetyLabel = routePulseSafety === "safe"
+    ? "安全"
+    : routePulseSafety === "danger"
+      ? "危險"
+      : undefined;
+  const visibleControlSummary = `${controlLabel}・${actionLabel}`;
+  const identity = unit.name === unit.className
+    ? unit.className
+    : `${unit.className}／${unit.name}`;
+  const identityLength = [...identity].length;
+  const identityClass = identityLength >= 11
+    ? "hud-identity-name is-tight"
+    : identityLength >= 9
+      ? "hud-identity-name is-compact"
+      : "hud-identity-name";
   return `
-    <div class="unit-detail" data-testid="unit-detail" aria-label="${side}${acted}，${unit.className}${unit.name}${controlLabel ? `，${controlLabel}` : ""}${intentLabel ? `，意圖${intentLabel}` : ""}">
+    <div class="unit-detail" data-testid="unit-detail" aria-label="${controlSummary}，${unit.className}${unit.name}${tacticLabel ? `，戰術${tacticLabel}` : ""}${routePulseSafetyLabel ? `，力場${routePulseSafetyLabel}` : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
       ${animatedPortraitMarkup(unit.portrait, {
         alt: `${unit.name}肖像`,
@@ -1402,22 +1420,23 @@ function renderHud(
         wrapperTestId: "unit-portrait-composite",
         baseTestId: "unit-portrait",
       })}
-      <div class="hud-identity"><b>${unit.className}／${unit.name}</b></div>
+      <div class="hud-identity">
+        <b class="${identityClass}" title="${identity}">${identity}</b>
+        <span class="unit-control-summary" data-testid="unit-control-summary">${visibleControlSummary}</span>
+      </div>
       <div class="meter-bar hp-bar" data-testid="hp-bar" aria-label="生命 ${unit.life}／${stats.maxLife}"><i style="height:${hpPercent}%"></i></div>
       <div class="meter-bar exp-bar" data-testid="exp-bar" aria-label="經驗 ${unit.experience}／${nextExperience}"><i style="height:${expPercent}%"></i></div>
       <div class="meter-labels" aria-hidden="true"><span>HP</span><span>EXP</span></div>
       <dl class="stat-list">
-        <div><dt>生命</dt><dd>${unit.life}／${stats.maxLife}</dd></div>
-        <div data-testid="unit-attack-stat"><dt>攻擊</dt><dd>${stats.attack}／${baseStats.attack}</dd></div>
-        <div data-testid="unit-defense-stat"><dt>防禦</dt><dd>${stats.defense}／${baseStats.defense}</dd></div>
-        <div><dt>等級</dt><dd>${stats.level}</dd></div>
-        <div><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
-        ${controlLabel ? `<div data-testid="allied-control-mode"><dt>控制</dt><dd>${controlLabel}</dd></div>` : ""}
-        ${force?.label ? `<div data-testid="unit-force"><dt>軍團</dt><dd>${force.label}</dd></div>` : ""}
-        ${routePulseSafeCells.length > 0
-          ? `<div data-testid="route-pulse-safe-area"><dt>結界</dt><dd>安全區 ${routePulseSafeCells.length} 格</dd></div>`
+        <div class="unit-core-stat"><dt>生命</dt><dd>${unit.life}／${stats.maxLife}</dd></div>
+        <div class="unit-core-stat" data-testid="unit-attack-stat"><dt>攻擊</dt><dd>${stats.attack}／${baseStats.attack}</dd></div>
+        <div class="unit-core-stat" data-testid="unit-defense-stat"><dt>防禦</dt><dd>${stats.defense}／${baseStats.defense}</dd></div>
+        <div class="unit-core-stat"><dt>等級</dt><dd>${stats.level}</dd></div>
+        <div class="unit-core-stat"><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
+        ${tacticLabel ? `<div data-testid="unit-tactic"><dt>戰術</dt><dd>${tacticLabel}</dd></div>` : ""}
+        ${routePulseSafetyLabel
+          ? `<div data-testid="route-pulse-safety" data-safety="${routePulseSafety}"><dt>力場</dt><dd>${routePulseSafetyLabel}</dd></div>`
           : ""}
-        ${intentLabel ? `<div data-testid="enemy-ai-intent"><dt>意圖</dt><dd>${intentLabel}</dd></div>` : ""}
       </dl>
     </div>`;
 }
