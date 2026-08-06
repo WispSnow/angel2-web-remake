@@ -233,7 +233,7 @@ test("S04-K: reduced motion keeps one readable damage impact outside the shield"
   }
 });
 
-test("S04-G: the active deployment round-trips through save format v16", async ({ page }) => {
+test("S04-G: the active deployment round-trips through save format v17", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const before = await state(page);
@@ -247,8 +247,8 @@ test("S04-G: the active deployment round-trips through save format v16", async (
     battle: { units: Stage4State["units"] };
   });
   expect(saved).toMatchObject({
-    version: 16,
-    contentVersion: "stage-title-and-roster-inheritance-1",
+    version: 18,
+    contentVersion: "dynamic-terrain-2",
     stageId: "stage-04",
   });
   expect(saved.battle.units).toHaveLength(before.units.length);

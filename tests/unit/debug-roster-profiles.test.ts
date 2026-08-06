@@ -134,6 +134,7 @@ describe("debug roster profiles", () => {
         round: 2,
         focusId: "1:0",
         units: [],
+        terrainOverrides: [],
         cursor: { x: 0, y: 0 },
         cameraOrigin: { x: 0, y: 0 },
       },

@@ -9,7 +9,7 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "1D",
     "label": "龍 踏",
-    "implementationId": null
+    "implementationId": "stomp-1"
   },
   {
     "nativeCode": "1F",
@@ -29,7 +29,7 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "1K",
     "label": "鐵  板",
-    "implementationId": null
+    "implementationId": "iron-plate"
   },
   {
     "nativeCode": "1L",
@@ -44,27 +44,27 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "2D",
     "label": "男 踏",
-    "implementationId": null
+    "implementationId": "stomp-2"
   },
   {
     "nativeCode": "2F",
     "label": "中級炎暴",
-    "implementationId": null
+    "implementationId": "fire-2"
   },
   {
     "nativeCode": "2H",
     "label": "中級治療",
-    "implementationId": null
+    "implementationId": "heal-2"
   },
   {
     "nativeCode": "2I",
     "label": "中級回復",
-    "implementationId": null
+    "implementationId": "recovery-2"
   },
   {
     "nativeCode": "2K",
     "label": "障  礙",
-    "implementationId": null
+    "implementationId": "obstacle"
   },
   {
     "nativeCode": "2L",
@@ -79,22 +79,22 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "3D",
     "label": "女 踏",
-    "implementationId": null
+    "implementationId": "stomp-3"
   },
   {
     "nativeCode": "3F",
     "label": "高級炎暴",
-    "implementationId": null
+    "implementationId": "fire-3"
   },
   {
     "nativeCode": "3H",
     "label": "高級治療",
-    "implementationId": null
+    "implementationId": "heal-3"
   },
   {
     "nativeCode": "3I",
     "label": "高級回復",
-    "implementationId": null
+    "implementationId": "recovery-3"
   },
   {
     "nativeCode": "3L",
@@ -109,7 +109,7 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "4F",
     "label": "究級炎暴",
-    "implementationId": null
+    "implementationId": "fire-4"
   },
   {
     "nativeCode": "4L",
@@ -119,47 +119,47 @@ export const TECHNIQUE_LAB_CATALOG = [
   {
     "nativeCode": "AA",
     "label": "攻擊提昇",
-    "implementationId": null
+    "implementationId": "attack-up"
   },
   {
     "nativeCode": "AD",
     "label": "防禦提昇",
-    "implementationId": null
+    "implementationId": "defense-up"
   },
   {
     "nativeCode": "FM",
     "label": "防  魔",
-    "implementationId": null
+    "implementationId": "magic-guard"
   },
   {
     "nativeCode": "IP",
     "label": "施  毒",
-    "implementationId": null
+    "implementationId": "poison"
   },
   {
     "nativeCode": "LA",
     "label": "混  亂",
-    "implementationId": null
+    "implementationId": "confusion"
   },
   {
     "nativeCode": "OJ",
     "label": "祈  禱",
-    "implementationId": null
+    "implementationId": "prayer"
   },
   {
     "nativeCode": "SA",
     "label": "攻擊下降",
-    "implementationId": null
+    "implementationId": "attack-down"
   },
   {
     "nativeCode": "SD",
     "label": "防禦下降",
-    "implementationId": null
+    "implementationId": "defense-down"
   },
   {
     "nativeCode": "SN",
     "label": "禁  咒",
-    "implementationId": null
+    "implementationId": "spell-seal"
   },
   {
     "nativeCode": "TR",
@@ -5058,6 +5058,4764 @@ export const TECHNIQUE_LAB_LIGHTNING = {
   }
 } as const;
 
+export const TECHNIQUE_LAB_FIRE = {
+  "1F": {
+    "code": "1F",
+    "entry": "1000:621C",
+    "phases": [
+      {
+        "resource": "MAGIC/22",
+        "descriptorSequence": [
+          {
+            "address": "DS:6548",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              1
+            ],
+            "low7BitFrameIndices": [
+              0
+            ]
+          },
+          {
+            "address": "DS:6552",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              2
+            ],
+            "low7BitFrameIndices": [
+              1
+            ]
+          },
+          {
+            "address": "DS:655C",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              3
+            ],
+            "low7BitFrameIndices": [
+              2
+            ]
+          },
+          {
+            "address": "DS:6566",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              4
+            ],
+            "low7BitFrameIndices": [
+              3
+            ]
+          },
+          {
+            "address": "DS:6570",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              5
+            ],
+            "low7BitFrameIndices": [
+              4
+            ]
+          },
+          {
+            "address": "DS:657A",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              6
+            ],
+            "low7BitFrameIndices": [
+              5
+            ]
+          },
+          {
+            "address": "DS:6584",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              7
+            ],
+            "low7BitFrameIndices": [
+              6
+            ]
+          }
+        ],
+        "drawCount": 7,
+        "waitPerDrawNativeTicks": 10,
+        "fixedGraphicWaitNativeTicks": 70
+      }
+    ],
+    "fixedGraphicWaitNativeTicks": 70,
+    "audioRequests": [
+      {
+        "resource": "MAGIC/83",
+        "entry": "0000:0224",
+        "afterFixedWaitNativeTicks": 0
+      }
+    ],
+    "selectionRadius": 5,
+    "percentMaxLife": 18,
+    "damageCap": 108,
+    "experienceBase": 8,
+    "experienceRandom": [
+      0,
+      1
+    ]
+  },
+  "2F": {
+    "code": "2F",
+    "entry": "1000:62CE",
+    "phases": [
+      {
+        "resource": "MAGIC/23",
+        "descriptorSequence": [
+          {
+            "address": "DS:6598",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              1
+            ],
+            "low7BitFrameIndices": [
+              0
+            ]
+          },
+          {
+            "address": "DS:65A2",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              2
+            ],
+            "low7BitFrameIndices": [
+              1
+            ]
+          },
+          {
+            "address": "DS:65AC",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              3
+            ],
+            "low7BitFrameIndices": [
+              2
+            ]
+          },
+          {
+            "address": "DS:65B6",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              4,
+              5
+            ],
+            "low7BitFrameIndices": [
+              3,
+              4
+            ]
+          },
+          {
+            "address": "DS:65C2",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              6,
+              7
+            ],
+            "low7BitFrameIndices": [
+              5,
+              6
+            ]
+          },
+          {
+            "address": "DS:65CE",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              8,
+              9
+            ],
+            "low7BitFrameIndices": [
+              7,
+              8
+            ]
+          },
+          {
+            "address": "DS:65DA",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              10,
+              11
+            ],
+            "low7BitFrameIndices": [
+              9,
+              10
+            ]
+          },
+          {
+            "address": "DS:65E6",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              12,
+              13
+            ],
+            "low7BitFrameIndices": [
+              11,
+              12
+            ]
+          },
+          {
+            "address": "DS:65F2",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              14,
+              15
+            ],
+            "low7BitFrameIndices": [
+              13,
+              14
+            ]
+          },
+          {
+            "address": "DS:65FE",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              16,
+              17
+            ],
+            "low7BitFrameIndices": [
+              15,
+              16
+            ]
+          },
+          {
+            "address": "DS:660A",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              18,
+              19
+            ],
+            "low7BitFrameIndices": [
+              17,
+              18
+            ]
+          },
+          {
+            "address": "DS:6616",
+            "xOffset": 0,
+            "yOffset": -1,
+            "width": 1,
+            "height": 2,
+            "tileCodes": [
+              20,
+              21
+            ],
+            "low7BitFrameIndices": [
+              19,
+              20
+            ]
+          }
+        ],
+        "drawCount": 12,
+        "waitPerDrawNativeTicks": 10,
+        "fixedGraphicWaitNativeTicks": 120
+      }
+    ],
+    "fixedGraphicWaitNativeTicks": 120,
+    "audioRequests": [
+      {
+        "resource": "MAGIC/83",
+        "entry": "0000:0224",
+        "afterFixedWaitNativeTicks": 0
+      }
+    ],
+    "selectionRadius": 6,
+    "percentMaxLife": 26,
+    "damageCap": 156,
+    "experienceBase": 10,
+    "experienceRandom": [
+      0,
+      1
+    ]
+  },
+  "3F": {
+    "code": "3F",
+    "entry": "1000:63B4",
+    "phases": [
+      {
+        "resource": "MAGIC/27",
+        "descriptorSequence": [
+          {
+            "address": "DS:6622",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              1
+            ],
+            "low7BitFrameIndices": [
+              0
+            ]
+          },
+          {
+            "address": "DS:662C",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 2,
+            "height": 1,
+            "tileCodes": [
+              2,
+              3
+            ],
+            "low7BitFrameIndices": [
+              1,
+              2
+            ]
+          },
+          {
+            "address": "DS:6638",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:6646",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              7,
+              8,
+              9
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "address": "DS:6654",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:6662",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              13,
+              14,
+              15
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14
+            ]
+          },
+          {
+            "address": "DS:6670",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              16,
+              17,
+              18,
+              19,
+              20,
+              21
+            ],
+            "low7BitFrameIndices": [
+              15,
+              16,
+              17,
+              18,
+              19,
+              20
+            ]
+          },
+          {
+            "address": "DS:6684",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              22,
+              23,
+              24,
+              25,
+              26,
+              27
+            ],
+            "low7BitFrameIndices": [
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+            ]
+          },
+          {
+            "address": "DS:6698",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              28,
+              29,
+              30,
+              31,
+              32,
+              33
+            ],
+            "low7BitFrameIndices": [
+              27,
+              28,
+              29,
+              30,
+              31,
+              32
+            ]
+          },
+          {
+            "address": "DS:66AC",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              34,
+              35,
+              36,
+              37,
+              38,
+              39
+            ],
+            "low7BitFrameIndices": [
+              33,
+              34,
+              35,
+              36,
+              37,
+              38
+            ]
+          },
+          {
+            "address": "DS:66C0",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              40,
+              41,
+              42,
+              43,
+              44,
+              45
+            ],
+            "low7BitFrameIndices": [
+              39,
+              40,
+              41,
+              42,
+              43,
+              44
+            ]
+          },
+          {
+            "address": "DS:66D4",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              46,
+              47,
+              48,
+              49,
+              50,
+              51
+            ],
+            "low7BitFrameIndices": [
+              45,
+              46,
+              47,
+              48,
+              49,
+              50
+            ]
+          },
+          {
+            "address": "DS:66E8",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "low7BitFrameIndices": [
+              null,
+              null,
+              null,
+              null,
+              null,
+              null
+            ]
+          }
+        ],
+        "drawCount": 13,
+        "waitPerDrawNativeTicks": 15,
+        "fixedGraphicWaitNativeTicks": 195
+      }
+    ],
+    "fixedGraphicWaitNativeTicks": 195,
+    "audioRequests": [
+      {
+        "resource": "MAGIC/83",
+        "entry": "0000:0224",
+        "afterFixedWaitNativeTicks": 0
+      }
+    ],
+    "selectionRadius": 7,
+    "percentMaxLife": 32,
+    "damageCap": 192,
+    "experienceBase": 12,
+    "experienceRandom": [
+      0,
+      2
+    ]
+  },
+  "4F": {
+    "code": "4F",
+    "entry": "0000:8D18",
+    "phases": [
+      {
+        "resource": "MAGIC/30",
+        "descriptorSequence": [
+          {
+            "address": "DS:6810",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              1
+            ],
+            "low7BitFrameIndices": [
+              0
+            ]
+          },
+          {
+            "address": "DS:681A",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 2,
+            "height": 1,
+            "tileCodes": [
+              2,
+              3
+            ],
+            "low7BitFrameIndices": [
+              1,
+              2
+            ]
+          },
+          {
+            "address": "DS:6826",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:6834",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              7,
+              8,
+              9
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "address": "DS:6842",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:6850",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              13,
+              14,
+              15
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14
+            ]
+          },
+          {
+            "address": "DS:685E",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:686C",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              19,
+              20,
+              21
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20
+            ]
+          },
+          {
+            "address": "DS:6842",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:6850",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              13,
+              14,
+              15
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14
+            ]
+          },
+          {
+            "address": "DS:685E",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:686C",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              19,
+              20,
+              21
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20
+            ]
+          }
+        ],
+        "drawCount": 12,
+        "waitPerDrawNativeTicks": 10,
+        "fixedGraphicWaitNativeTicks": 120,
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "sequence": "four direct descriptors, then the four-descriptor helper repeated twice"
+      },
+      {
+        "resource": "MAGIC/28",
+        "descriptorSequence": [
+          {
+            "address": "DS:66FC",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              1,
+              2,
+              3
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "address": "DS:670A",
+            "xOffset": -1,
+            "yOffset": 0,
+            "width": 3,
+            "height": 1,
+            "tileCodes": [
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:6718",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:672C",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:6740",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "address": "DS:6754",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
+            ],
+            "low7BitFrameIndices": [
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "address": "DS:6768",
+            "xOffset": -1,
+            "yOffset": -2,
+            "width": 3,
+            "height": 3,
+            "tileCodes": [
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39
+            ],
+            "low7BitFrameIndices": [
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38
+            ]
+          },
+          {
+            "address": "DS:6782",
+            "xOffset": -1,
+            "yOffset": -2,
+            "width": 3,
+            "height": 3,
+            "tileCodes": [
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48
+            ],
+            "low7BitFrameIndices": [
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47
+            ]
+          }
+        ],
+        "drawCount": 8,
+        "waitPerDrawNativeTicks": 10,
+        "fixedGraphicWaitNativeTicks": 80,
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "sequence": "eight direct descriptors at the selected-cell anchor; MAGIC/29 is loaded immediately afterward, before the shifted repeat helper runs"
+      },
+      {
+        "resource": "MAGIC/29",
+        "descriptorSequence": [
+          {
+            "address": "DS:679C",
+            "xOffset": -1,
+            "yOffset": -2,
+            "width": 3,
+            "height": 3,
+            "tileCodes": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "address": "DS:67B6",
+            "xOffset": -1,
+            "yOffset": -2,
+            "width": 3,
+            "height": 3,
+            "tileCodes": [
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:67D0",
+            "xOffset": -1,
+            "yOffset": -2,
+            "width": 3,
+            "height": 3,
+            "tileCodes": [
+              0,
+              19,
+              0,
+              0,
+              20,
+              0,
+              0,
+              21,
+              0
+            ],
+            "low7BitFrameIndices": [
+              null,
+              18,
+              null,
+              null,
+              19,
+              null,
+              null,
+              20,
+              null
+            ]
+          },
+          {
+            "address": "DS:67EA",
+            "xOffset": -1,
+            "yOffset": -3,
+            "width": 3,
+            "height": 5,
+            "tileCodes": [
+              0,
+              19,
+              0,
+              0,
+              20,
+              0,
+              0,
+              20,
+              0,
+              0,
+              21,
+              0,
+              0,
+              0,
+              0
+            ],
+            "low7BitFrameIndices": [
+              null,
+              18,
+              null,
+              null,
+              19,
+              null,
+              null,
+              19,
+              null,
+              null,
+              20,
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "address": "DS:67EA",
+            "xOffset": -1,
+            "yOffset": -3,
+            "width": 3,
+            "height": 5,
+            "tileCodes": [
+              0,
+              19,
+              0,
+              0,
+              20,
+              0,
+              0,
+              20,
+              0,
+              0,
+              21,
+              0,
+              0,
+              0,
+              0
+            ],
+            "low7BitFrameIndices": [
+              null,
+              18,
+              null,
+              null,
+              19,
+              null,
+              null,
+              19,
+              null,
+              null,
+              20,
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "address": "DS:67EA",
+            "xOffset": -1,
+            "yOffset": -3,
+            "width": 3,
+            "height": 5,
+            "tileCodes": [
+              0,
+              19,
+              0,
+              0,
+              20,
+              0,
+              0,
+              20,
+              0,
+              0,
+              21,
+              0,
+              0,
+              0,
+              0
+            ],
+            "low7BitFrameIndices": [
+              null,
+              18,
+              null,
+              null,
+              19,
+              null,
+              null,
+              19,
+              null,
+              null,
+              20,
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "address": "DS:67EA",
+            "xOffset": -1,
+            "yOffset": -3,
+            "width": 3,
+            "height": 5,
+            "tileCodes": [
+              0,
+              19,
+              0,
+              0,
+              20,
+              0,
+              0,
+              20,
+              0,
+              0,
+              21,
+              0,
+              0,
+              0,
+              0
+            ],
+            "low7BitFrameIndices": [
+              null,
+              18,
+              null,
+              null,
+              19,
+              null,
+              null,
+              19,
+              null,
+              null,
+              20,
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "address": "DS:67EA",
+            "xOffset": -1,
+            "yOffset": -3,
+            "width": 3,
+            "height": 5,
+            "tileCodes": [
+              0,
+              19,
+              0,
+              0,
+              20,
+              0,
+              0,
+              20,
+              0,
+              0,
+              21,
+              0,
+              0,
+              0,
+              0
+            ],
+            "low7BitFrameIndices": [
+              null,
+              18,
+              null,
+              null,
+              19,
+              null,
+              null,
+              19,
+              null,
+              null,
+              20,
+              null,
+              null,
+              null,
+              null
+            ]
+          },
+          {
+            "address": "DS:67EA",
+            "xOffset": -1,
+            "yOffset": -3,
+            "width": 3,
+            "height": 5,
+            "tileCodes": [
+              0,
+              19,
+              0,
+              0,
+              20,
+              0,
+              0,
+              20,
+              0,
+              0,
+              21,
+              0,
+              0,
+              0,
+              0
+            ],
+            "low7BitFrameIndices": [
+              null,
+              18,
+              null,
+              null,
+              19,
+              null,
+              null,
+              19,
+              null,
+              null,
+              20,
+              null,
+              null,
+              null,
+              null
+            ]
+          }
+        ],
+        "drawCount": 9,
+        "waitPerDrawNativeTicks": 10,
+        "fixedGraphicWaitNativeTicks": 90,
+        "anchorOffsetSequence": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0,
+            "y": -1
+          },
+          {
+            "x": 0,
+            "y": -2
+          },
+          {
+            "x": 0,
+            "y": -3
+          },
+          {
+            "x": 0,
+            "y": -4
+          }
+        ],
+        "sequence": "four direct descriptors at the selected-cell anchor, then DS:67EA repeats five times while DS:5234 shifts by -50 after each draw",
+        "motion": "the MAGIC/29 repeated DS:67EA anchors are selected row 0/-1/-2/-3/-4; the final post-draw shift leaves DS:5234 at row -5 without another draw"
+      }
+    ],
+    "fixedGraphicWaitNativeTicks": 290,
+    "audioRequests": [
+      {
+        "resource": "MAGIC/83",
+        "entry": "0000:0224",
+        "afterFixedWaitNativeTicks": 0
+      },
+      {
+        "resource": "E/51",
+        "entry": "0000:0224",
+        "afterFixedWaitNativeTicks": 120
+      }
+    ],
+    "selectionRadius": 7,
+    "percentMaxLife": 44,
+    "damageCap": 270,
+    "experienceBase": 15,
+    "experienceRandom": [
+      0,
+      2
+    ]
+  }
+} as const;
+
+export const TECHNIQUE_LAB_HEAL = {
+  "2H": {
+    "code": "2H",
+    "entry": "1000:791E",
+    "audioRequests": [
+      {
+        "resource": "E/36",
+        "entry": "0000:0220",
+        "afterFixedWaitNativeTicks": 0
+      }
+    ],
+    "phases": [
+      {
+        "resource": "MAGIC/37",
+        "descriptorSequence": [
+          {
+            "address": "DS:7082",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:7096",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:70AA",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:70BE",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "address": "DS:70D2",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
+            ],
+            "low7BitFrameIndices": [
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "address": "DS:70E6",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              31,
+              32,
+              33,
+              34,
+              35,
+              36
+            ],
+            "low7BitFrameIndices": [
+              30,
+              31,
+              32,
+              33,
+              34,
+              35
+            ]
+          },
+          {
+            "address": "DS:70FA",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              37,
+              38,
+              39,
+              40,
+              41,
+              42
+            ],
+            "low7BitFrameIndices": [
+              36,
+              37,
+              38,
+              39,
+              40,
+              41
+            ]
+          },
+          {
+            "address": "DS:7082",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:7096",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:70AA",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:70BE",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "address": "DS:70D2",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
+            ],
+            "low7BitFrameIndices": [
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "address": "DS:70E6",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              31,
+              32,
+              33,
+              34,
+              35,
+              36
+            ],
+            "low7BitFrameIndices": [
+              30,
+              31,
+              32,
+              33,
+              34,
+              35
+            ]
+          },
+          {
+            "address": "DS:70FA",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              37,
+              38,
+              39,
+              40,
+              41,
+              42
+            ],
+            "low7BitFrameIndices": [
+              36,
+              37,
+              38,
+              39,
+              40,
+              41
+            ]
+          }
+        ],
+        "drawCount": 14,
+        "waitPerDrawNativeTicks": 10,
+        "fixedGraphicWaitNativeTicks": 140,
+        "pointerTable": "DS:7064"
+      },
+      {
+        "resource": "MAGIC/0",
+        "descriptorSequence": [
+          {
+            "address": "DS:6098",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              1
+            ],
+            "low7BitFrameIndices": [
+              0
+            ]
+          },
+          {
+            "address": "DS:60A2",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              2
+            ],
+            "low7BitFrameIndices": [
+              1
+            ]
+          },
+          {
+            "address": "DS:60AC",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              3
+            ],
+            "low7BitFrameIndices": [
+              2
+            ]
+          },
+          {
+            "address": "DS:60B6",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              4
+            ],
+            "low7BitFrameIndices": [
+              3
+            ]
+          },
+          {
+            "address": "DS:60C0",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              5
+            ],
+            "low7BitFrameIndices": [
+              4
+            ]
+          }
+        ],
+        "drawCount": 5,
+        "waitPerDrawNativeTicks": 15,
+        "fixedGraphicWaitNativeTicks": 75,
+        "pointerTable": "DS:608A",
+        "ignoredSixthPointer": "DS:60CA",
+        "originalQuirk": "the pointer table contains a sixth descriptor with tile code 6, but the native loop is hard-coded to five draws; MAGIC/0 has five rendered frames"
+      }
+    ],
+    "fixedGraphicWaitNativeTicks": 215,
+    "lifeMutation": "after all 215 fixed graphic ticks; percent=36, experience base=12",
+    "selectionRadius": 6,
+    "maxLifePercent": 36,
+    "experienceBase": 12,
+    "experienceRandom": [
+      0,
+      3
+    ]
+  },
+  "3H": {
+    "code": "3H",
+    "entry": "1000:79A8",
+    "audioRequests": [
+      {
+        "resource": "E/36",
+        "entry": "0000:0220",
+        "afterFixedWaitNativeTicks": 30
+      }
+    ],
+    "phases": [
+      {
+        "resource": "MAGIC/42",
+        "descriptorSequence": [
+          {
+            "address": "DS:7162",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:7176",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:718A",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:719E",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "address": "DS:71B2",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
+            ],
+            "low7BitFrameIndices": [
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ]
+          }
+        ],
+        "drawCount": 5,
+        "waitPerDrawNativeTicks": 6,
+        "fixedGraphicWaitNativeTicks": 30,
+        "pointerTable": "DS:7124"
+      },
+      {
+        "resource": "MAGIC/41",
+        "descriptorSequence": [
+          {
+            "address": "DS:7162",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:7176",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:718A",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:719E",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "address": "DS:71B2",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
+            ],
+            "low7BitFrameIndices": [
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "address": "DS:71C6",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              31,
+              32,
+              33,
+              34,
+              35,
+              36
+            ],
+            "low7BitFrameIndices": [
+              30,
+              31,
+              32,
+              33,
+              34,
+              35
+            ]
+          },
+          {
+            "address": "DS:7162",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:7176",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:718A",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:719E",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "address": "DS:71B2",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
+            ],
+            "low7BitFrameIndices": [
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "address": "DS:71C6",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              31,
+              32,
+              33,
+              34,
+              35,
+              36
+            ],
+            "low7BitFrameIndices": [
+              30,
+              31,
+              32,
+              33,
+              34,
+              35
+            ]
+          },
+          {
+            "address": "DS:7162",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "address": "DS:7176",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:718A",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:719E",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "address": "DS:71B2",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
+            ],
+            "low7BitFrameIndices": [
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "address": "DS:71C6",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              31,
+              32,
+              33,
+              34,
+              35,
+              36
+            ],
+            "low7BitFrameIndices": [
+              30,
+              31,
+              32,
+              33,
+              34,
+              35
+            ]
+          }
+        ],
+        "drawCount": 18,
+        "waitPerDrawNativeTicks": 5,
+        "fixedGraphicWaitNativeTicks": 90,
+        "pointerTable": "DS:713C"
+      },
+      {
+        "resource": "MAGIC/42",
+        "descriptorSequence": [
+          {
+            "address": "DS:71B2",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
+            ],
+            "low7BitFrameIndices": [
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "address": "DS:719E",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              19,
+              20,
+              21,
+              22,
+              23,
+              24
+            ],
+            "low7BitFrameIndices": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ]
+          },
+          {
+            "address": "DS:718A",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              13,
+              14,
+              15,
+              16,
+              17,
+              18
+            ],
+            "low7BitFrameIndices": [
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "address": "DS:7176",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              7,
+              8,
+              9,
+              10,
+              11,
+              12
+            ],
+            "low7BitFrameIndices": [
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "address": "DS:7162",
+            "xOffset": -1,
+            "yOffset": -1,
+            "width": 3,
+            "height": 2,
+            "tileCodes": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "low7BitFrameIndices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          }
+        ],
+        "drawCount": 5,
+        "waitPerDrawNativeTicks": 8,
+        "fixedGraphicWaitNativeTicks": 40,
+        "pointerTable": "DS:7130",
+        "direction": "reverse"
+      },
+      {
+        "resource": "MAGIC/0",
+        "descriptorSequence": [
+          {
+            "address": "DS:6098",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              1
+            ],
+            "low7BitFrameIndices": [
+              0
+            ]
+          },
+          {
+            "address": "DS:60A2",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              2
+            ],
+            "low7BitFrameIndices": [
+              1
+            ]
+          },
+          {
+            "address": "DS:60AC",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              3
+            ],
+            "low7BitFrameIndices": [
+              2
+            ]
+          },
+          {
+            "address": "DS:60B6",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              4
+            ],
+            "low7BitFrameIndices": [
+              3
+            ]
+          },
+          {
+            "address": "DS:60C0",
+            "xOffset": 0,
+            "yOffset": 0,
+            "width": 1,
+            "height": 1,
+            "tileCodes": [
+              5
+            ],
+            "low7BitFrameIndices": [
+              4
+            ]
+          }
+        ],
+        "drawCount": 5,
+        "waitPerDrawNativeTicks": 15,
+        "fixedGraphicWaitNativeTicks": 75,
+        "pointerTable": "DS:608A",
+        "ignoredSixthPointer": "DS:60CA",
+        "originalQuirk": "the pointer table contains a sixth descriptor with tile code 6, but the native loop is hard-coded to five draws; MAGIC/0 has five rendered frames"
+      }
+    ],
+    "fixedGraphicWaitNativeTicks": 235,
+    "lifeMutation": "after all 235 fixed graphic ticks; percent=48, experience base=15",
+    "selectionRadius": 7,
+    "maxLifePercent": 48,
+    "experienceBase": 15,
+    "experienceRandom": [
+      0,
+      2
+    ]
+  }
+} as const;
+
+export const TECHNIQUE_LAB_ATTACK_UP = {
+  "code": "AA",
+  "visibleName": "攻擊提升",
+  "wrapper": "0000:CE47",
+  "presentationEntry": "1000:7572",
+  "phases": [
+    {
+      "resource": "MAGIC/16",
+      "descriptor": {
+        "address": "DS:1746",
+        "xOffset": 0,
+        "yOffset": -1,
+        "width": 1,
+        "height": 2,
+        "tileCodes": [
+          1,
+          2
+        ],
+        "low7BitFrameIndices": [
+          0,
+          1
+        ]
+      },
+      "runtimeTileCodePairs": [
+        [
+          1,
+          21
+        ],
+        [
+          2,
+          22
+        ],
+        [
+          3,
+          23
+        ],
+        [
+          4,
+          24
+        ],
+        [
+          5,
+          25
+        ],
+        [
+          6,
+          26
+        ],
+        [
+          7,
+          27
+        ],
+        [
+          8,
+          28
+        ],
+        [
+          9,
+          29
+        ],
+        [
+          10,
+          30
+        ],
+        [
+          11,
+          31
+        ],
+        [
+          12,
+          32
+        ],
+        [
+          13,
+          33
+        ],
+        [
+          14,
+          34
+        ],
+        [
+          15,
+          35
+        ],
+        [
+          16,
+          36
+        ],
+        [
+          17,
+          37
+        ],
+        [
+          18,
+          38
+        ],
+        [
+          19,
+          39
+        ],
+        [
+          20,
+          40
+        ]
+      ],
+      "drawCount": 20,
+      "waitPerDrawNativeTicks": 15,
+      "fixedGraphicWaitNativeTicks": 300
+    }
+  ],
+  "audioRequests": [
+    {
+      "resource": "UN/51",
+      "entry": "0000:0224",
+      "afterFixedWaitNativeTicks": 0
+    }
+  ],
+  "fixedGraphicWaitNativeTicks": 300,
+  "mutation": "unit+08 = 8003h",
+  "selectionRadius": 4,
+  "effectiveAttackDelta": 20,
+  "statusCounter": 3,
+  "experienceBase": 10,
+  "experienceRandom": [
+    0,
+    3
+  ]
+} as const;
+
+export const TECHNIQUE_LAB_MAGIC_GUARD = {
+  "code": "FM",
+  "visibleName": "防魔",
+  "wrapper": "0000:CE70",
+  "presentationEntry": "1000:7572",
+  "phases": [
+    {
+      "resource": "MAGIC/16",
+      "descriptor": {
+        "address": "DS:1746",
+        "xOffset": 0,
+        "yOffset": -1,
+        "width": 1,
+        "height": 2,
+        "tileCodes": [
+          1,
+          2
+        ],
+        "low7BitFrameIndices": [
+          0,
+          1
+        ]
+      },
+      "runtimeTileCodePairs": [
+        [
+          1,
+          21
+        ],
+        [
+          2,
+          22
+        ],
+        [
+          3,
+          23
+        ],
+        [
+          4,
+          24
+        ],
+        [
+          5,
+          25
+        ],
+        [
+          6,
+          26
+        ],
+        [
+          7,
+          27
+        ],
+        [
+          8,
+          28
+        ],
+        [
+          9,
+          29
+        ],
+        [
+          10,
+          30
+        ],
+        [
+          11,
+          31
+        ],
+        [
+          12,
+          32
+        ],
+        [
+          13,
+          33
+        ],
+        [
+          14,
+          34
+        ],
+        [
+          15,
+          35
+        ],
+        [
+          16,
+          36
+        ],
+        [
+          17,
+          37
+        ],
+        [
+          18,
+          38
+        ],
+        [
+          19,
+          39
+        ],
+        [
+          20,
+          40
+        ]
+      ],
+      "drawCount": 20,
+      "waitPerDrawNativeTicks": 15,
+      "fixedGraphicWaitNativeTicks": 300
+    }
+  ],
+  "audioRequests": [
+    {
+      "resource": "UN/51",
+      "entry": "0000:0224",
+      "afterFixedWaitNativeTicks": 0
+    }
+  ],
+  "fixedGraphicWaitNativeTicks": 300,
+  "mutation": "unit+0C = 8001h",
+  "originalQuirk": "AA and FM intentionally call the exact same graphic and audio presentation",
+  "selectionRadius": 7,
+  "statusCounter": 1,
+  "experienceBase": 10,
+  "experienceRandom": [
+    0,
+    3
+  ]
+} as const;
+
+export const TECHNIQUE_LAB_POISON = {
+  "code": "IP",
+  "visibleName": "施毒",
+  "wrapper": "0000:CF2C",
+  "presentationEntry": "1000:772E",
+  "phases": [
+    {
+      "resource": "MAGIC/17",
+      "descriptor": {
+        "address": "DS:6EEE",
+        "xOffset": 0,
+        "yOffset": -1,
+        "width": 2,
+        "height": 2,
+        "tileCodes": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "low7BitFrameIndices": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "runtimeTileCodeStates": [
+        [
+          1,
+          2,
+          3,
+          4
+        ],
+        [
+          5,
+          6,
+          7,
+          8
+        ],
+        [
+          9,
+          10,
+          11,
+          12
+        ],
+        [
+          13,
+          14,
+          15,
+          16
+        ],
+        [
+          17,
+          18,
+          19,
+          20
+        ],
+        [
+          21,
+          22,
+          23,
+          24
+        ],
+        [
+          25,
+          26,
+          27,
+          28
+        ],
+        [
+          29,
+          30,
+          31,
+          32
+        ],
+        [
+          33,
+          34,
+          35,
+          36
+        ],
+        [
+          37,
+          38,
+          39,
+          40
+        ],
+        [
+          41,
+          42,
+          43,
+          44
+        ],
+        [
+          45,
+          46,
+          47,
+          48
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ],
+      "drawCount": 13,
+      "waitPerDrawNativeTicks": 10,
+      "fixedGraphicWaitNativeTicks": 130
+    },
+    {
+      "resource": "MAGIC/18",
+      "pointerTable": "DS:6EFE",
+      "descriptorSequence": [
+        {
+          "address": "DS:6F20",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "low7BitFrameIndices": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "address": "DS:6F30",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            5,
+            6,
+            7,
+            8
+          ],
+          "low7BitFrameIndices": [
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        {
+          "address": "DS:6F40",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "low7BitFrameIndices": [
+            8,
+            9,
+            10,
+            11
+          ]
+        },
+        {
+          "address": "DS:6F50",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            13,
+            14,
+            15,
+            16
+          ],
+          "low7BitFrameIndices": [
+            12,
+            13,
+            14,
+            15
+          ]
+        },
+        {
+          "address": "DS:6F60",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            17,
+            18,
+            19,
+            20
+          ],
+          "low7BitFrameIndices": [
+            16,
+            17,
+            18,
+            19
+          ]
+        },
+        {
+          "address": "DS:6F70",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            21,
+            22,
+            23,
+            24
+          ],
+          "low7BitFrameIndices": [
+            20,
+            21,
+            22,
+            23
+          ]
+        },
+        {
+          "address": "DS:6F80",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27
+          ]
+        },
+        {
+          "address": "DS:6F90",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            29,
+            30,
+            31,
+            32
+          ],
+          "low7BitFrameIndices": [
+            28,
+            29,
+            30,
+            31
+          ]
+        },
+        {
+          "address": "DS:6F80",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27
+          ]
+        },
+        {
+          "address": "DS:6F70",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            21,
+            22,
+            23,
+            24
+          ],
+          "low7BitFrameIndices": [
+            20,
+            21,
+            22,
+            23
+          ]
+        },
+        {
+          "address": "DS:6F80",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27
+          ]
+        },
+        {
+          "address": "DS:6F90",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            29,
+            30,
+            31,
+            32
+          ],
+          "low7BitFrameIndices": [
+            28,
+            29,
+            30,
+            31
+          ]
+        },
+        {
+          "address": "DS:6F80",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27
+          ]
+        },
+        {
+          "address": "DS:6F70",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            21,
+            22,
+            23,
+            24
+          ],
+          "low7BitFrameIndices": [
+            20,
+            21,
+            22,
+            23
+          ]
+        },
+        {
+          "address": "DS:6F80",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27
+          ]
+        },
+        {
+          "address": "DS:6F90",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            29,
+            30,
+            31,
+            32
+          ],
+          "low7BitFrameIndices": [
+            28,
+            29,
+            30,
+            31
+          ]
+        }
+      ],
+      "drawCount": 16,
+      "waitPerDrawNativeTicks": 10,
+      "fixedGraphicWaitNativeTicks": 160
+    }
+  ],
+  "audioRequests": [
+    {
+      "resource": "E/58",
+      "entry": "0000:0220",
+      "afterFixedWaitNativeTicks": 130
+    }
+  ],
+  "fixedGraphicWaitNativeTicks": 290,
+  "mutation": "unit+14 = 8003h unless class is 1P/2P/3P",
+  "immuneClasses": [
+    "1P",
+    "2P",
+    "3P"
+  ],
+  "selectionRadius": 6,
+  "statusCounter": 3,
+  "experienceBase": 14,
+  "experienceRandom": [
+    0,
+    3
+  ],
+  "immuneClassIds": [
+    "dragon",
+    "head",
+    "hand"
+  ]
+} as const;
+
+export const TECHNIQUE_LAB_CONFUSION = {
+  "code": "LA",
+  "visibleName": "混亂",
+  "wrapper": "0000:CEEB",
+  "presentationEntry": "1000:76D6",
+  "phases": [
+    {
+      "resource": "MAGIC/44",
+      "pointerTable": "DS:6E34",
+      "descriptorSequence": [
+        {
+          "address": "DS:6E4C",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "low7BitFrameIndices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "address": "DS:6E60",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+          ],
+          "low7BitFrameIndices": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ]
+        },
+        {
+          "address": "DS:6E74",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "low7BitFrameIndices": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ]
+        },
+        {
+          "address": "DS:6E88",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "low7BitFrameIndices": [
+            18,
+            19,
+            20,
+            21,
+            22,
+            23
+          ]
+        },
+        {
+          "address": "DS:6E9C",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27,
+            28,
+            29
+          ]
+        },
+        {
+          "address": "DS:6EB0",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            31,
+            32,
+            33,
+            34,
+            35,
+            36
+          ],
+          "low7BitFrameIndices": [
+            30,
+            31,
+            32,
+            33,
+            34,
+            35
+          ]
+        },
+        {
+          "address": "DS:6EC4",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            37,
+            38,
+            39,
+            40,
+            41,
+            42
+          ],
+          "low7BitFrameIndices": [
+            36,
+            37,
+            38,
+            39,
+            40,
+            41
+          ]
+        },
+        {
+          "address": "DS:6ED8",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            43,
+            44,
+            45,
+            46,
+            47,
+            48
+          ],
+          "low7BitFrameIndices": [
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ]
+        },
+        {
+          "address": "DS:6EB0",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            31,
+            32,
+            33,
+            34,
+            35,
+            36
+          ],
+          "low7BitFrameIndices": [
+            30,
+            31,
+            32,
+            33,
+            34,
+            35
+          ]
+        },
+        {
+          "address": "DS:6EC4",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            37,
+            38,
+            39,
+            40,
+            41,
+            42
+          ],
+          "low7BitFrameIndices": [
+            36,
+            37,
+            38,
+            39,
+            40,
+            41
+          ]
+        },
+        {
+          "address": "DS:6ED8",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            43,
+            44,
+            45,
+            46,
+            47,
+            48
+          ],
+          "low7BitFrameIndices": [
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ]
+        }
+      ],
+      "drawCount": 11,
+      "waitPerDrawNativeTicks": 15,
+      "fixedGraphicWaitNativeTicks": 165
+    }
+  ],
+  "audioRequests": [],
+  "fixedGraphicWaitNativeTicks": 165,
+  "mutation": "unit+0E = 8003h unless class is 1P/2P/3P",
+  "immuneClasses": [
+    "1P",
+    "2P",
+    "3P"
+  ],
+  "selectionRadius": 5,
+  "statusCounter": 3,
+  "experienceBase": 14,
+  "experienceRandom": [
+    0,
+    3
+  ],
+  "immuneClassIds": [
+    "dragon",
+    "head",
+    "hand"
+  ]
+} as const;
+
+export const TECHNIQUE_LAB_ATTACK_DOWN = {
+  "code": "SA",
+  "visibleName": "攻擊下降",
+  "wrapper": "0000:CEC2",
+  "presentationEntry": "1000:7662",
+  "phases": [
+    {
+      "resource": "MAGIC/46",
+      "pointerTable": "DS:6E1A",
+      "descriptorSequence": [
+        {
+          "address": "DS:1746",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            1,
+            2
+          ],
+          "low7BitFrameIndices": [
+            0,
+            1
+          ]
+        },
+        {
+          "address": "DS:1752",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            3,
+            4
+          ],
+          "low7BitFrameIndices": [
+            2,
+            3
+          ]
+        },
+        {
+          "address": "DS:175E",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            5,
+            6
+          ],
+          "low7BitFrameIndices": [
+            4,
+            5
+          ]
+        },
+        {
+          "address": "DS:176A",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            7,
+            8
+          ],
+          "low7BitFrameIndices": [
+            6,
+            7
+          ]
+        },
+        {
+          "address": "DS:1776",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            9,
+            10
+          ],
+          "low7BitFrameIndices": [
+            8,
+            9
+          ]
+        },
+        {
+          "address": "DS:1782",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            11,
+            12
+          ],
+          "low7BitFrameIndices": [
+            10,
+            11
+          ]
+        },
+        {
+          "address": "DS:178E",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            13,
+            14
+          ],
+          "low7BitFrameIndices": [
+            12,
+            13
+          ]
+        },
+        {
+          "address": "DS:179A",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            15,
+            16
+          ],
+          "low7BitFrameIndices": [
+            14,
+            15
+          ]
+        },
+        {
+          "address": "DS:17A6",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            17,
+            18
+          ],
+          "low7BitFrameIndices": [
+            16,
+            17
+          ]
+        },
+        {
+          "address": "DS:17B2",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            19,
+            20
+          ],
+          "low7BitFrameIndices": [
+            18,
+            19
+          ]
+        },
+        {
+          "address": "DS:17BE",
+          "xOffset": 0,
+          "yOffset": -1,
+          "width": 1,
+          "height": 2,
+          "tileCodes": [
+            21,
+            22
+          ],
+          "low7BitFrameIndices": [
+            20,
+            21
+          ]
+        }
+      ],
+      "drawCount": 11,
+      "waitPerDrawNativeTicks": 15,
+      "fixedGraphicWaitNativeTicks": 165
+    }
+  ],
+  "audioRequests": [
+    {
+      "resource": "E/8",
+      "entry": "0000:0224",
+      "afterFixedWaitNativeTicks": 0
+    }
+  ],
+  "fixedGraphicWaitNativeTicks": 165,
+  "mutation": "unit+10 = 8003h",
+  "selectionRadius": 4,
+  "statusCounter": 3,
+  "effectiveAttackDelta": -20,
+  "experienceBase": 10,
+  "experienceRandom": [
+    0,
+    3
+  ]
+} as const;
+
+export const TECHNIQUE_LAB_DEFENSE_DOWN = {
+  "code": "SD",
+  "visibleName": "防禦下降",
+  "wrapper": "0000:CE99",
+  "presentationEntry": "1000:75EE",
+  "phases": [
+    {
+      "resource": "MAGIC/45",
+      "pointerTable": "DS:6D64",
+      "descriptorSequence": [
+        {
+          "address": "DS:6D7A",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "low7BitFrameIndices": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "address": "DS:6D8A",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            5,
+            6,
+            7,
+            8
+          ],
+          "low7BitFrameIndices": [
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        {
+          "address": "DS:6D9A",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "low7BitFrameIndices": [
+            8,
+            9,
+            10,
+            11
+          ]
+        },
+        {
+          "address": "DS:6DAA",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            13,
+            14,
+            15,
+            16
+          ],
+          "low7BitFrameIndices": [
+            12,
+            13,
+            14,
+            15
+          ]
+        },
+        {
+          "address": "DS:6DBA",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            17,
+            18,
+            19,
+            20
+          ],
+          "low7BitFrameIndices": [
+            16,
+            17,
+            18,
+            19
+          ]
+        },
+        {
+          "address": "DS:6DCA",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            21,
+            22,
+            23,
+            24
+          ],
+          "low7BitFrameIndices": [
+            20,
+            21,
+            22,
+            23
+          ]
+        },
+        {
+          "address": "DS:6DDA",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27
+          ]
+        },
+        {
+          "address": "DS:6DEA",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            29,
+            30,
+            31,
+            32
+          ],
+          "low7BitFrameIndices": [
+            28,
+            29,
+            30,
+            31
+          ]
+        },
+        {
+          "address": "DS:6DFA",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            33,
+            34,
+            35,
+            36
+          ],
+          "low7BitFrameIndices": [
+            32,
+            33,
+            34,
+            35
+          ]
+        },
+        {
+          "address": "DS:6E0A",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            37,
+            38,
+            39,
+            40
+          ],
+          "low7BitFrameIndices": [
+            36,
+            37,
+            38,
+            39
+          ]
+        }
+      ],
+      "drawCount": 10,
+      "waitPerDrawNativeTicks": 15,
+      "fixedGraphicWaitNativeTicks": 150
+    }
+  ],
+  "audioRequests": [
+    {
+      "resource": "E/8",
+      "entry": "0000:0224",
+      "afterFixedWaitNativeTicks": 0
+    }
+  ],
+  "fixedGraphicWaitNativeTicks": 150,
+  "mutation": "unit+12 = 8003h",
+  "selectionRadius": 4,
+  "statusCounter": 3,
+  "effectiveDefenseDelta": -20,
+  "experienceBase": 10,
+  "experienceRandom": [
+    0,
+    3
+  ]
+} as const;
+
+export const TECHNIQUE_LAB_SPELL_SEAL = {
+  "code": "SN",
+  "visibleName": "禁咒",
+  "wrapper": "0000:CF96",
+  "presentationEntry": "1000:7832",
+  "phases": [
+    {
+      "resource": "MAGIC/36",
+      "pointerTable": "DS:6FA2",
+      "descriptorSequence": [
+        {
+          "address": "DS:6FB6",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "low7BitFrameIndices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "address": "DS:6FCA",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            7,
+            8,
+            9,
+            10,
+            11,
+            12
+          ],
+          "low7BitFrameIndices": [
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ]
+        },
+        {
+          "address": "DS:6FDE",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "low7BitFrameIndices": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ]
+        },
+        {
+          "address": "DS:6FF2",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24
+          ],
+          "low7BitFrameIndices": [
+            18,
+            19,
+            20,
+            21,
+            22,
+            23
+          ]
+        },
+        {
+          "address": "DS:7006",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27,
+            28,
+            29
+          ]
+        },
+        {
+          "address": "DS:7006",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            25,
+            26,
+            27,
+            28,
+            29,
+            30
+          ],
+          "low7BitFrameIndices": [
+            24,
+            25,
+            26,
+            27,
+            28,
+            29
+          ]
+        },
+        {
+          "address": "DS:701A",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            31,
+            32,
+            33,
+            34,
+            35,
+            36
+          ],
+          "low7BitFrameIndices": [
+            30,
+            31,
+            32,
+            33,
+            34,
+            35
+          ]
+        },
+        {
+          "address": "DS:702E",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            37,
+            38,
+            39,
+            40,
+            41,
+            42
+          ],
+          "low7BitFrameIndices": [
+            36,
+            37,
+            38,
+            39,
+            40,
+            41
+          ]
+        },
+        {
+          "address": "DS:7042",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 3,
+          "height": 2,
+          "tileCodes": [
+            0,
+            0,
+            0,
+            43,
+            44,
+            45
+          ],
+          "low7BitFrameIndices": [
+            null,
+            null,
+            null,
+            42,
+            43,
+            44
+          ]
+        }
+      ],
+      "drawCount": 9,
+      "waitPerDrawNativeTicks": 25,
+      "fixedGraphicWaitNativeTicks": 225
+    }
+  ],
+  "audioRequests": [],
+  "fixedGraphicWaitNativeTicks": 225,
+  "mutation": "unit+16 = 8003h unless class is 1P",
+  "immuneClasses": [
+    "1P"
+  ],
+  "selectionRadius": 7,
+  "statusCounter": 3,
+  "immuneClassIds": [
+    "dragon"
+  ],
+  "experienceBase": 14,
+  "experienceRandom": [
+    0,
+    3
+  ]
+} as const;
+
+export const TECHNIQUE_LAB_PRAYER = {
+  "family": "OJ",
+  "visibleName": "祈禱",
+  "wrapper": "0000:CAE1",
+  "entry": "1000:591C",
+  "scan": {
+    "cells": 2500,
+    "eligibility": "occupied and side is not 2",
+    "perUnitGate": "read PIT channel-0 low byte and continue only when bit0 is 1 (approximately one half)",
+    "order": "linear cell index 0..2499"
+  },
+  "resourceLoads": {
+    "graphicArchiveRecords": [],
+    "audioArchiveRecords": []
+  },
+  "presentation": {
+    "type": "procedural screen drawing",
+    "entry": "1000:59AA",
+    "description": "toggle the active page, draw a 16-step two-column field plus fixed decorations with low-level screen primitives, then show one result string",
+    "resultStrings": {
+      "heal": "生 命 加|00000 點.",
+      "experience": "經 驗 加|00000 點.",
+      "attackUp": "攻擊增加",
+      "defenseUp": "防禦增加"
+    },
+    "fixedArchiveFrameSequence": false,
+    "resultHold": {
+      "entry": "1000:5993",
+      "iterations": 30,
+      "waitPerIterationNativeTicks": 2,
+      "maximumNativeTicksPerTriggeredUnit": 60,
+      "skippable": "the loop exits early when DS:F590 equals 1"
+    }
+  },
+  "outcomes": [
+    {
+      "roll": 0,
+      "visibleText": "生 命 加|00000 點.",
+      "effect": "restore 5..14 life, capped at maximum life"
+    },
+    {
+      "roll": 1,
+      "visibleText": "經 驗 加|00000 點.",
+      "effect": "add 5..14 experience"
+    },
+    {
+      "roll": 2,
+      "visibleText": "攻擊增加",
+      "effect": "write attack-up status 8003h"
+    },
+    {
+      "roll": 3,
+      "visibleText": "防禦增加",
+      "effect": "write defense-up status 8003h"
+    }
+  ],
+  "synchronizationRule": "each passing allied unit is resolved independently: procedural field first, then outcome/amount roll, result text draw, outcome mutation, page switch and an input-skippable hold of at most 60 native ticks; there is no single global presentation followed by global settlement",
+  "ignoredNativeSelectionWord": 4,
+  "eligibleSide": 1,
+  "gateBit": 0,
+  "outcomeRoll": [
+    0,
+    3
+  ],
+  "amountRoll": [
+    5,
+    14
+  ],
+  "procedural": {
+    "screen": {
+      "width": 640,
+      "height": 400
+    },
+    "fieldRows": 16,
+    "fieldYStart": 240,
+    "fieldYStep": 8,
+    "fieldColumns": [
+      {
+        "x": 150,
+        "variant": 1
+      },
+      {
+        "x": 200,
+        "variant": 0
+      }
+    ],
+    "decorationRuns": [
+      {
+        "start": 240,
+        "colors": [
+          14,
+          0,
+          11,
+          14,
+          0
+        ]
+      },
+      {
+        "start": 368,
+        "colors": [
+          0,
+          14,
+          11,
+          0,
+          14
+        ]
+      }
+    ],
+    "cornerPairs": [
+      {
+        "x": 150,
+        "y": 240,
+        "color": 5
+      },
+      {
+        "x": 198,
+        "y": 240,
+        "color": 5
+      },
+      {
+        "x": 150,
+        "y": 365,
+        "color": 5
+      },
+      {
+        "x": 198,
+        "y": 365,
+        "color": 5
+      }
+    ],
+    "resultTextPosition": {
+      "x": 248,
+      "y": 158
+    }
+  }
+} as const;
+
+export const TECHNIQUE_LAB_DEFENSE_UP = {
+  "code": "AD",
+  "visibleName": "防禦提升",
+  "wrapper": "0000:CE1E",
+  "presentationEntry": "1000:74FE",
+  "phases": [
+    {
+      "resource": "MAGIC/33",
+      "pointerTable": "DS:6CEA",
+      "descriptorSequence": [
+        {
+          "address": "DS:6D02",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "low7BitFrameIndices": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "address": "DS:6D12",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            5,
+            6,
+            7,
+            8
+          ],
+          "low7BitFrameIndices": [
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        {
+          "address": "DS:6D22",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "low7BitFrameIndices": [
+            8,
+            9,
+            10,
+            11
+          ]
+        },
+        {
+          "address": "DS:6D32",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            13,
+            14,
+            15,
+            16
+          ],
+          "low7BitFrameIndices": [
+            12,
+            13,
+            14,
+            15
+          ]
+        },
+        {
+          "address": "DS:6D42",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            17,
+            18,
+            19,
+            20
+          ],
+          "low7BitFrameIndices": [
+            16,
+            17,
+            18,
+            19
+          ]
+        },
+        {
+          "address": "DS:6D52",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            21,
+            22,
+            23,
+            24
+          ],
+          "low7BitFrameIndices": [
+            20,
+            21,
+            22,
+            23
+          ]
+        },
+        {
+          "address": "DS:6D42",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            17,
+            18,
+            19,
+            20
+          ],
+          "low7BitFrameIndices": [
+            16,
+            17,
+            18,
+            19
+          ]
+        },
+        {
+          "address": "DS:6D32",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            13,
+            14,
+            15,
+            16
+          ],
+          "low7BitFrameIndices": [
+            12,
+            13,
+            14,
+            15
+          ]
+        },
+        {
+          "address": "DS:6D22",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            9,
+            10,
+            11,
+            12
+          ],
+          "low7BitFrameIndices": [
+            8,
+            9,
+            10,
+            11
+          ]
+        },
+        {
+          "address": "DS:6D12",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            5,
+            6,
+            7,
+            8
+          ],
+          "low7BitFrameIndices": [
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        {
+          "address": "DS:6D02",
+          "xOffset": -1,
+          "yOffset": -1,
+          "width": 2,
+          "height": 2,
+          "tileCodes": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "low7BitFrameIndices": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "drawCount": 11,
+      "waitPerDrawNativeTicks": 15,
+      "fixedGraphicWaitNativeTicks": 165
+    }
+  ],
+  "audioRequests": [
+    {
+      "resource": "UN/52",
+      "entry": "0000:0224",
+      "afterFixedWaitNativeTicks": 0
+    }
+  ],
+  "fixedGraphicWaitNativeTicks": 165,
+  "mutation": "unit+0A = 8003h",
+  "selectionRadius": 4,
+  "effectiveDefenseDelta": 20,
+  "statusCounter": 3,
+  "experienceBase": 10,
+  "experienceRandom": [
+    0,
+    3
+  ]
+} as const;
+
 export const TECHNIQUE_LAB_ICE = {
   "1C": {
     "code": "1C",
@@ -6274,6 +11032,604 @@ export const TECHNIQUE_LAB_DISPEL = {
   "mutation": "clear bit15 at unit+12/+10/+0E, then write 7FFFh to unit+14/+16"
 } as const;
 
+export const TECHNIQUE_LAB_STOMPS = {
+  "1D": {
+    "family": "D",
+    "commonEntry": "1000:11BC",
+    "wrapperEntries": {
+      "1D": "0000:CD6D",
+      "2D": "0000:CD85",
+      "3D": "0000:CD9D"
+    },
+    "audioResource": "MAGIC/82",
+    "audioRequestEntry": "0000:0220",
+    "presentation": {
+      "drawPrimitive": "1000:1424 draws both loaded frames at the current procedural coordinates",
+      "rising": {
+        "positions": [
+          25,
+          55,
+          85,
+          115,
+          145,
+          175
+        ],
+        "graphicDraws": 6,
+        "timedSteps": 5,
+        "waitPerTimedStepNativeTicks": 1
+      },
+      "preQuakePageToggles": 10,
+      "quake": {
+        "cyclePositions": [
+          145,
+          125,
+          110,
+          125,
+          145,
+          175
+        ],
+        "cycles": 3,
+        "graphicDraws": 18,
+        "explicitWaitNativeTicks": 0
+      },
+      "postQuakePageToggles": 2,
+      "falling": {
+        "positions": [
+          175,
+          155,
+          135,
+          115,
+          95,
+          75,
+          55,
+          35,
+          15
+        ],
+        "graphicDraws": 9,
+        "timedSteps": 8,
+        "waitPerTimedStepNativeTicks": 1
+      },
+      "graphicDrawCount": 33,
+      "fixedGraphicWaitNativeTicks": 13,
+      "audioRequests": [
+        {
+          "afterGraphicDraw": 6,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after rising phase"
+        },
+        {
+          "afterGraphicDraw": 12,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 1"
+        },
+        {
+          "afterGraphicDraw": 18,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 2"
+        },
+        {
+          "afterGraphicDraw": 24,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 3"
+        }
+      ],
+      "restoreBeforeSettlement": [
+        "DS:0CF4",
+        "DS:0D04",
+        "DS:0D14"
+      ]
+    },
+    "actions": [
+      {
+        "code": "1D",
+        "visibleName": "龍踏",
+        "variant": 0,
+        "horizontalDrawCoordinate": 338,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/50",
+          "side2": "MAGIC/49"
+        }
+      },
+      {
+        "code": "2D",
+        "visibleName": "男踏",
+        "variant": 1,
+        "horizontalDrawCoordinate": 368,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/52",
+          "side2": "MAGIC/51"
+        }
+      },
+      {
+        "code": "3D",
+        "visibleName": "女踏",
+        "variant": 2,
+        "horizontalDrawCoordinate": 368,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/54",
+          "side2": "MAGIC/53"
+        }
+      }
+    ],
+    "normalPlayerResources": {
+      "1D": "MAGIC/49",
+      "2D": "MAGIC/51",
+      "3D": "MAGIC/53"
+    },
+    "settlementBoundary": "all 33 procedural two-frame draws, four MAGIC/82 requests, page toggles, 13 explicit native ticks and three restore descriptors finish before the relocated 173B:0006 damage consumer scans units; 0000:63CF removes zero-life units afterward",
+    "action": {
+      "code": "1D",
+      "visibleName": "龍踏",
+      "variant": 0,
+      "horizontalDrawCoordinate": 338,
+      "graphicByTargetSide": {
+        "side1": "MAGIC/50",
+        "side2": "MAGIC/49"
+      }
+    },
+    "selectionRadius": 5,
+    "damageBase": 10
+  },
+  "2D": {
+    "family": "D",
+    "commonEntry": "1000:11BC",
+    "wrapperEntries": {
+      "1D": "0000:CD6D",
+      "2D": "0000:CD85",
+      "3D": "0000:CD9D"
+    },
+    "audioResource": "MAGIC/82",
+    "audioRequestEntry": "0000:0220",
+    "presentation": {
+      "drawPrimitive": "1000:1424 draws both loaded frames at the current procedural coordinates",
+      "rising": {
+        "positions": [
+          25,
+          55,
+          85,
+          115,
+          145,
+          175
+        ],
+        "graphicDraws": 6,
+        "timedSteps": 5,
+        "waitPerTimedStepNativeTicks": 1
+      },
+      "preQuakePageToggles": 10,
+      "quake": {
+        "cyclePositions": [
+          145,
+          125,
+          110,
+          125,
+          145,
+          175
+        ],
+        "cycles": 3,
+        "graphicDraws": 18,
+        "explicitWaitNativeTicks": 0
+      },
+      "postQuakePageToggles": 2,
+      "falling": {
+        "positions": [
+          175,
+          155,
+          135,
+          115,
+          95,
+          75,
+          55,
+          35,
+          15
+        ],
+        "graphicDraws": 9,
+        "timedSteps": 8,
+        "waitPerTimedStepNativeTicks": 1
+      },
+      "graphicDrawCount": 33,
+      "fixedGraphicWaitNativeTicks": 13,
+      "audioRequests": [
+        {
+          "afterGraphicDraw": 6,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after rising phase"
+        },
+        {
+          "afterGraphicDraw": 12,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 1"
+        },
+        {
+          "afterGraphicDraw": 18,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 2"
+        },
+        {
+          "afterGraphicDraw": 24,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 3"
+        }
+      ],
+      "restoreBeforeSettlement": [
+        "DS:0CF4",
+        "DS:0D04",
+        "DS:0D14"
+      ]
+    },
+    "actions": [
+      {
+        "code": "1D",
+        "visibleName": "龍踏",
+        "variant": 0,
+        "horizontalDrawCoordinate": 338,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/50",
+          "side2": "MAGIC/49"
+        }
+      },
+      {
+        "code": "2D",
+        "visibleName": "男踏",
+        "variant": 1,
+        "horizontalDrawCoordinate": 368,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/52",
+          "side2": "MAGIC/51"
+        }
+      },
+      {
+        "code": "3D",
+        "visibleName": "女踏",
+        "variant": 2,
+        "horizontalDrawCoordinate": 368,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/54",
+          "side2": "MAGIC/53"
+        }
+      }
+    ],
+    "normalPlayerResources": {
+      "1D": "MAGIC/49",
+      "2D": "MAGIC/51",
+      "3D": "MAGIC/53"
+    },
+    "settlementBoundary": "all 33 procedural two-frame draws, four MAGIC/82 requests, page toggles, 13 explicit native ticks and three restore descriptors finish before the relocated 173B:0006 damage consumer scans units; 0000:63CF removes zero-life units afterward",
+    "action": {
+      "code": "2D",
+      "visibleName": "男踏",
+      "variant": 1,
+      "horizontalDrawCoordinate": 368,
+      "graphicByTargetSide": {
+        "side1": "MAGIC/52",
+        "side2": "MAGIC/51"
+      }
+    },
+    "selectionRadius": 5,
+    "damageBase": 15
+  },
+  "3D": {
+    "family": "D",
+    "commonEntry": "1000:11BC",
+    "wrapperEntries": {
+      "1D": "0000:CD6D",
+      "2D": "0000:CD85",
+      "3D": "0000:CD9D"
+    },
+    "audioResource": "MAGIC/82",
+    "audioRequestEntry": "0000:0220",
+    "presentation": {
+      "drawPrimitive": "1000:1424 draws both loaded frames at the current procedural coordinates",
+      "rising": {
+        "positions": [
+          25,
+          55,
+          85,
+          115,
+          145,
+          175
+        ],
+        "graphicDraws": 6,
+        "timedSteps": 5,
+        "waitPerTimedStepNativeTicks": 1
+      },
+      "preQuakePageToggles": 10,
+      "quake": {
+        "cyclePositions": [
+          145,
+          125,
+          110,
+          125,
+          145,
+          175
+        ],
+        "cycles": 3,
+        "graphicDraws": 18,
+        "explicitWaitNativeTicks": 0
+      },
+      "postQuakePageToggles": 2,
+      "falling": {
+        "positions": [
+          175,
+          155,
+          135,
+          115,
+          95,
+          75,
+          55,
+          35,
+          15
+        ],
+        "graphicDraws": 9,
+        "timedSteps": 8,
+        "waitPerTimedStepNativeTicks": 1
+      },
+      "graphicDrawCount": 33,
+      "fixedGraphicWaitNativeTicks": 13,
+      "audioRequests": [
+        {
+          "afterGraphicDraw": 6,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after rising phase"
+        },
+        {
+          "afterGraphicDraw": 12,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 1"
+        },
+        {
+          "afterGraphicDraw": 18,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 2"
+        },
+        {
+          "afterGraphicDraw": 24,
+          "afterFixedWaitNativeTicks": 5,
+          "role": "after quake cycle 3"
+        }
+      ],
+      "restoreBeforeSettlement": [
+        "DS:0CF4",
+        "DS:0D04",
+        "DS:0D14"
+      ]
+    },
+    "actions": [
+      {
+        "code": "1D",
+        "visibleName": "龍踏",
+        "variant": 0,
+        "horizontalDrawCoordinate": 338,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/50",
+          "side2": "MAGIC/49"
+        }
+      },
+      {
+        "code": "2D",
+        "visibleName": "男踏",
+        "variant": 1,
+        "horizontalDrawCoordinate": 368,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/52",
+          "side2": "MAGIC/51"
+        }
+      },
+      {
+        "code": "3D",
+        "visibleName": "女踏",
+        "variant": 2,
+        "horizontalDrawCoordinate": 368,
+        "graphicByTargetSide": {
+          "side1": "MAGIC/54",
+          "side2": "MAGIC/53"
+        }
+      }
+    ],
+    "normalPlayerResources": {
+      "1D": "MAGIC/49",
+      "2D": "MAGIC/51",
+      "3D": "MAGIC/53"
+    },
+    "settlementBoundary": "all 33 procedural two-frame draws, four MAGIC/82 requests, page toggles, 13 explicit native ticks and three restore descriptors finish before the relocated 173B:0006 damage consumer scans units; 0000:63CF removes zero-life units afterward",
+    "action": {
+      "code": "3D",
+      "visibleName": "女踏",
+      "variant": 2,
+      "horizontalDrawCoordinate": 368,
+      "graphicByTargetSide": {
+        "side1": "MAGIC/54",
+        "side2": "MAGIC/53"
+      }
+    },
+    "selectionRadius": 5,
+    "damageBase": 20
+  }
+} as const;
+
+export const TECHNIQUE_LAB_STOMP = {
+  "family": "D",
+  "commonEntry": "1000:11BC",
+  "wrapperEntries": {
+    "1D": "0000:CD6D",
+    "2D": "0000:CD85",
+    "3D": "0000:CD9D"
+  },
+  "audioResource": "MAGIC/82",
+  "audioRequestEntry": "0000:0220",
+  "presentation": {
+    "drawPrimitive": "1000:1424 draws both loaded frames at the current procedural coordinates",
+    "rising": {
+      "positions": [
+        25,
+        55,
+        85,
+        115,
+        145,
+        175
+      ],
+      "graphicDraws": 6,
+      "timedSteps": 5,
+      "waitPerTimedStepNativeTicks": 1
+    },
+    "preQuakePageToggles": 10,
+    "quake": {
+      "cyclePositions": [
+        145,
+        125,
+        110,
+        125,
+        145,
+        175
+      ],
+      "cycles": 3,
+      "graphicDraws": 18,
+      "explicitWaitNativeTicks": 0
+    },
+    "postQuakePageToggles": 2,
+    "falling": {
+      "positions": [
+        175,
+        155,
+        135,
+        115,
+        95,
+        75,
+        55,
+        35,
+        15
+      ],
+      "graphicDraws": 9,
+      "timedSteps": 8,
+      "waitPerTimedStepNativeTicks": 1
+    },
+    "graphicDrawCount": 33,
+    "fixedGraphicWaitNativeTicks": 13,
+    "audioRequests": [
+      {
+        "afterGraphicDraw": 6,
+        "afterFixedWaitNativeTicks": 5,
+        "role": "after rising phase"
+      },
+      {
+        "afterGraphicDraw": 12,
+        "afterFixedWaitNativeTicks": 5,
+        "role": "after quake cycle 1"
+      },
+      {
+        "afterGraphicDraw": 18,
+        "afterFixedWaitNativeTicks": 5,
+        "role": "after quake cycle 2"
+      },
+      {
+        "afterGraphicDraw": 24,
+        "afterFixedWaitNativeTicks": 5,
+        "role": "after quake cycle 3"
+      }
+    ],
+    "restoreBeforeSettlement": [
+      "DS:0CF4",
+      "DS:0D04",
+      "DS:0D14"
+    ]
+  },
+  "actions": [
+    {
+      "code": "1D",
+      "visibleName": "龍踏",
+      "variant": 0,
+      "horizontalDrawCoordinate": 338,
+      "graphicByTargetSide": {
+        "side1": "MAGIC/50",
+        "side2": "MAGIC/49"
+      }
+    },
+    {
+      "code": "2D",
+      "visibleName": "男踏",
+      "variant": 1,
+      "horizontalDrawCoordinate": 368,
+      "graphicByTargetSide": {
+        "side1": "MAGIC/52",
+        "side2": "MAGIC/51"
+      }
+    },
+    {
+      "code": "3D",
+      "visibleName": "女踏",
+      "variant": 2,
+      "horizontalDrawCoordinate": 368,
+      "graphicByTargetSide": {
+        "side1": "MAGIC/54",
+        "side2": "MAGIC/53"
+      }
+    }
+  ],
+  "normalPlayerResources": {
+    "1D": "MAGIC/49",
+    "2D": "MAGIC/51",
+    "3D": "MAGIC/53"
+  },
+  "settlementBoundary": "all 33 procedural two-frame draws, four MAGIC/82 requests, page toggles, 13 explicit native ticks and three restore descriptors finish before the relocated 173B:0006 damage consumer scans units; 0000:63CF removes zero-life units afterward",
+  "action": {
+    "code": "1D",
+    "visibleName": "龍踏",
+    "variant": 0,
+    "horizontalDrawCoordinate": 338,
+    "graphicByTargetSide": {
+      "side1": "MAGIC/50",
+      "side2": "MAGIC/49"
+    }
+  },
+  "selectionRadius": 5,
+  "damageBase": 10
+} as const;
+
+export const TECHNIQUE_LAB_IRON_PLATE = {
+  "code": "1K",
+  "visibleName": "鐵板",
+  "dormantWrapper": "0000:CAE7",
+  "dormantWriter": "1000:7C92",
+  "sourceToken": "copied at battle load from original map cell (16,25), linear index 1266",
+  "playerRoute": {
+    "branch": "0000:761A..762F sends 1K/2K to 0000:76C0 and bypasses the generic technique-handler call",
+    "placement": "seed 5 mode M; select an empty destination and complete the normal movement presentation to that cell",
+    "neighborOffsets": [
+      50,
+      -50,
+      1,
+      -1
+    ],
+    "neighborFilter": "skip a neighbor when its current raw token maps to logical terrain slot 0",
+    "write": "replace each accepted orthogonal neighbor with the action's stage-specific sourceToken; do not mutate the selected center cell",
+    "experience": 0
+  },
+  "tile": "/assets/original/map-actions/iron-plate/stage-01.png",
+  "logicalTerrainSlot": 3
+} as const;
+
+export const TECHNIQUE_LAB_OBSTACLE = {
+  "code": "2K",
+  "visibleName": "障礙",
+  "dormantWrapper": "0000:CAF9",
+  "dormantWriter": "1000:7CB4",
+  "sourceToken": "copied at battle load from original map cell (16,26), linear index 1316",
+  "playerRoute": {
+    "branch": "0000:761A..762F sends 1K/2K to 0000:76C0 and bypasses the generic technique-handler call",
+    "placement": "seed 5 mode M; select an empty destination and complete the normal movement presentation to that cell",
+    "neighborOffsets": [
+      50,
+      -50,
+      1,
+      -1
+    ],
+    "neighborFilter": "skip a neighbor when its current raw token maps to logical terrain slot 0",
+    "write": "replace each accepted orthogonal neighbor with the action's stage-specific sourceToken; do not mutate the selected center cell",
+    "experience": 0
+  },
+  "tile": "/assets/original/map-actions/obstacle/stage-01.png",
+  "logicalTerrainSlot": 3
+} as const;
+
 export const TECHNIQUE_LAB_GRAPHIC_ASSETS = {
   "MAGIC/8": [
     "/assets/original/technique-lab/lightning/magic-8/00.png",
@@ -6582,6 +11938,626 @@ export const TECHNIQUE_LAB_GRAPHIC_ASSETS = {
     "/assets/original/technique-lab/lightning/magic-26/11.png",
     "/assets/original/technique-lab/lightning/magic-26/12.png"
   ],
+  "MAGIC/22": [
+    "/assets/original/technique-lab/lightning/magic-22/00.png",
+    "/assets/original/technique-lab/lightning/magic-22/01.png",
+    "/assets/original/technique-lab/lightning/magic-22/02.png",
+    "/assets/original/technique-lab/lightning/magic-22/03.png",
+    "/assets/original/technique-lab/lightning/magic-22/04.png",
+    "/assets/original/technique-lab/lightning/magic-22/05.png",
+    "/assets/original/technique-lab/lightning/magic-22/06.png"
+  ],
+  "MAGIC/23": [
+    "/assets/original/technique-lab/lightning/magic-23/00.png",
+    "/assets/original/technique-lab/lightning/magic-23/01.png",
+    "/assets/original/technique-lab/lightning/magic-23/02.png",
+    "/assets/original/technique-lab/lightning/magic-23/03.png",
+    "/assets/original/technique-lab/lightning/magic-23/04.png",
+    "/assets/original/technique-lab/lightning/magic-23/05.png",
+    "/assets/original/technique-lab/lightning/magic-23/06.png",
+    "/assets/original/technique-lab/lightning/magic-23/07.png",
+    "/assets/original/technique-lab/lightning/magic-23/08.png",
+    "/assets/original/technique-lab/lightning/magic-23/09.png",
+    "/assets/original/technique-lab/lightning/magic-23/10.png",
+    "/assets/original/technique-lab/lightning/magic-23/11.png",
+    "/assets/original/technique-lab/lightning/magic-23/12.png",
+    "/assets/original/technique-lab/lightning/magic-23/13.png",
+    "/assets/original/technique-lab/lightning/magic-23/14.png",
+    "/assets/original/technique-lab/lightning/magic-23/15.png",
+    "/assets/original/technique-lab/lightning/magic-23/16.png",
+    "/assets/original/technique-lab/lightning/magic-23/17.png",
+    "/assets/original/technique-lab/lightning/magic-23/18.png",
+    "/assets/original/technique-lab/lightning/magic-23/19.png",
+    "/assets/original/technique-lab/lightning/magic-23/20.png"
+  ],
+  "MAGIC/27": [
+    "/assets/original/technique-lab/lightning/magic-27/00.png",
+    "/assets/original/technique-lab/lightning/magic-27/01.png",
+    "/assets/original/technique-lab/lightning/magic-27/02.png",
+    "/assets/original/technique-lab/lightning/magic-27/03.png",
+    "/assets/original/technique-lab/lightning/magic-27/04.png",
+    "/assets/original/technique-lab/lightning/magic-27/05.png",
+    "/assets/original/technique-lab/lightning/magic-27/06.png",
+    "/assets/original/technique-lab/lightning/magic-27/07.png",
+    "/assets/original/technique-lab/lightning/magic-27/08.png",
+    "/assets/original/technique-lab/lightning/magic-27/09.png",
+    "/assets/original/technique-lab/lightning/magic-27/10.png",
+    "/assets/original/technique-lab/lightning/magic-27/11.png",
+    "/assets/original/technique-lab/lightning/magic-27/12.png",
+    "/assets/original/technique-lab/lightning/magic-27/13.png",
+    "/assets/original/technique-lab/lightning/magic-27/14.png",
+    "/assets/original/technique-lab/lightning/magic-27/15.png",
+    "/assets/original/technique-lab/lightning/magic-27/16.png",
+    "/assets/original/technique-lab/lightning/magic-27/17.png",
+    "/assets/original/technique-lab/lightning/magic-27/18.png",
+    "/assets/original/technique-lab/lightning/magic-27/19.png",
+    "/assets/original/technique-lab/lightning/magic-27/20.png",
+    "/assets/original/technique-lab/lightning/magic-27/21.png",
+    "/assets/original/technique-lab/lightning/magic-27/22.png",
+    "/assets/original/technique-lab/lightning/magic-27/23.png",
+    "/assets/original/technique-lab/lightning/magic-27/24.png",
+    "/assets/original/technique-lab/lightning/magic-27/25.png",
+    "/assets/original/technique-lab/lightning/magic-27/26.png",
+    "/assets/original/technique-lab/lightning/magic-27/27.png",
+    "/assets/original/technique-lab/lightning/magic-27/28.png",
+    "/assets/original/technique-lab/lightning/magic-27/29.png",
+    "/assets/original/technique-lab/lightning/magic-27/30.png",
+    "/assets/original/technique-lab/lightning/magic-27/31.png",
+    "/assets/original/technique-lab/lightning/magic-27/32.png",
+    "/assets/original/technique-lab/lightning/magic-27/33.png",
+    "/assets/original/technique-lab/lightning/magic-27/34.png",
+    "/assets/original/technique-lab/lightning/magic-27/35.png",
+    "/assets/original/technique-lab/lightning/magic-27/36.png",
+    "/assets/original/technique-lab/lightning/magic-27/37.png",
+    "/assets/original/technique-lab/lightning/magic-27/38.png",
+    "/assets/original/technique-lab/lightning/magic-27/39.png",
+    "/assets/original/technique-lab/lightning/magic-27/40.png",
+    "/assets/original/technique-lab/lightning/magic-27/41.png",
+    "/assets/original/technique-lab/lightning/magic-27/42.png",
+    "/assets/original/technique-lab/lightning/magic-27/43.png",
+    "/assets/original/technique-lab/lightning/magic-27/44.png",
+    "/assets/original/technique-lab/lightning/magic-27/45.png",
+    "/assets/original/technique-lab/lightning/magic-27/46.png",
+    "/assets/original/technique-lab/lightning/magic-27/47.png",
+    "/assets/original/technique-lab/lightning/magic-27/48.png",
+    "/assets/original/technique-lab/lightning/magic-27/49.png",
+    "/assets/original/technique-lab/lightning/magic-27/50.png"
+  ],
+  "MAGIC/30": [
+    "/assets/original/technique-lab/lightning/magic-30/00.png",
+    "/assets/original/technique-lab/lightning/magic-30/01.png",
+    "/assets/original/technique-lab/lightning/magic-30/02.png",
+    "/assets/original/technique-lab/lightning/magic-30/03.png",
+    "/assets/original/technique-lab/lightning/magic-30/04.png",
+    "/assets/original/technique-lab/lightning/magic-30/05.png",
+    "/assets/original/technique-lab/lightning/magic-30/06.png",
+    "/assets/original/technique-lab/lightning/magic-30/07.png",
+    "/assets/original/technique-lab/lightning/magic-30/08.png",
+    "/assets/original/technique-lab/lightning/magic-30/09.png",
+    "/assets/original/technique-lab/lightning/magic-30/10.png",
+    "/assets/original/technique-lab/lightning/magic-30/11.png",
+    "/assets/original/technique-lab/lightning/magic-30/12.png",
+    "/assets/original/technique-lab/lightning/magic-30/13.png",
+    "/assets/original/technique-lab/lightning/magic-30/14.png",
+    "/assets/original/technique-lab/lightning/magic-30/15.png",
+    "/assets/original/technique-lab/lightning/magic-30/16.png",
+    "/assets/original/technique-lab/lightning/magic-30/17.png",
+    "/assets/original/technique-lab/lightning/magic-30/18.png",
+    "/assets/original/technique-lab/lightning/magic-30/19.png",
+    "/assets/original/technique-lab/lightning/magic-30/20.png"
+  ],
+  "MAGIC/28": [
+    "/assets/original/technique-lab/lightning/magic-28/00.png",
+    "/assets/original/technique-lab/lightning/magic-28/01.png",
+    "/assets/original/technique-lab/lightning/magic-28/02.png",
+    "/assets/original/technique-lab/lightning/magic-28/03.png",
+    "/assets/original/technique-lab/lightning/magic-28/04.png",
+    "/assets/original/technique-lab/lightning/magic-28/05.png",
+    "/assets/original/technique-lab/lightning/magic-28/06.png",
+    "/assets/original/technique-lab/lightning/magic-28/07.png",
+    "/assets/original/technique-lab/lightning/magic-28/08.png",
+    "/assets/original/technique-lab/lightning/magic-28/09.png",
+    "/assets/original/technique-lab/lightning/magic-28/10.png",
+    "/assets/original/technique-lab/lightning/magic-28/11.png",
+    "/assets/original/technique-lab/lightning/magic-28/12.png",
+    "/assets/original/technique-lab/lightning/magic-28/13.png",
+    "/assets/original/technique-lab/lightning/magic-28/14.png",
+    "/assets/original/technique-lab/lightning/magic-28/15.png",
+    "/assets/original/technique-lab/lightning/magic-28/16.png",
+    "/assets/original/technique-lab/lightning/magic-28/17.png",
+    "/assets/original/technique-lab/lightning/magic-28/18.png",
+    "/assets/original/technique-lab/lightning/magic-28/19.png",
+    "/assets/original/technique-lab/lightning/magic-28/20.png",
+    "/assets/original/technique-lab/lightning/magic-28/21.png",
+    "/assets/original/technique-lab/lightning/magic-28/22.png",
+    "/assets/original/technique-lab/lightning/magic-28/23.png",
+    "/assets/original/technique-lab/lightning/magic-28/24.png",
+    "/assets/original/technique-lab/lightning/magic-28/25.png",
+    "/assets/original/technique-lab/lightning/magic-28/26.png",
+    "/assets/original/technique-lab/lightning/magic-28/27.png",
+    "/assets/original/technique-lab/lightning/magic-28/28.png",
+    "/assets/original/technique-lab/lightning/magic-28/29.png",
+    "/assets/original/technique-lab/lightning/magic-28/30.png",
+    "/assets/original/technique-lab/lightning/magic-28/31.png",
+    "/assets/original/technique-lab/lightning/magic-28/32.png",
+    "/assets/original/technique-lab/lightning/magic-28/33.png",
+    "/assets/original/technique-lab/lightning/magic-28/34.png",
+    "/assets/original/technique-lab/lightning/magic-28/35.png",
+    "/assets/original/technique-lab/lightning/magic-28/36.png",
+    "/assets/original/technique-lab/lightning/magic-28/37.png",
+    "/assets/original/technique-lab/lightning/magic-28/38.png",
+    "/assets/original/technique-lab/lightning/magic-28/39.png",
+    "/assets/original/technique-lab/lightning/magic-28/40.png",
+    "/assets/original/technique-lab/lightning/magic-28/41.png",
+    "/assets/original/technique-lab/lightning/magic-28/42.png",
+    "/assets/original/technique-lab/lightning/magic-28/43.png",
+    "/assets/original/technique-lab/lightning/magic-28/44.png",
+    "/assets/original/technique-lab/lightning/magic-28/45.png",
+    "/assets/original/technique-lab/lightning/magic-28/46.png",
+    "/assets/original/technique-lab/lightning/magic-28/47.png"
+  ],
+  "MAGIC/29": [
+    "/assets/original/technique-lab/lightning/magic-29/00.png",
+    "/assets/original/technique-lab/lightning/magic-29/01.png",
+    "/assets/original/technique-lab/lightning/magic-29/02.png",
+    "/assets/original/technique-lab/lightning/magic-29/03.png",
+    "/assets/original/technique-lab/lightning/magic-29/04.png",
+    "/assets/original/technique-lab/lightning/magic-29/05.png",
+    "/assets/original/technique-lab/lightning/magic-29/06.png",
+    "/assets/original/technique-lab/lightning/magic-29/07.png",
+    "/assets/original/technique-lab/lightning/magic-29/08.png",
+    "/assets/original/technique-lab/lightning/magic-29/09.png",
+    "/assets/original/technique-lab/lightning/magic-29/10.png",
+    "/assets/original/technique-lab/lightning/magic-29/11.png",
+    "/assets/original/technique-lab/lightning/magic-29/12.png",
+    "/assets/original/technique-lab/lightning/magic-29/13.png",
+    "/assets/original/technique-lab/lightning/magic-29/14.png",
+    "/assets/original/technique-lab/lightning/magic-29/15.png",
+    "/assets/original/technique-lab/lightning/magic-29/16.png",
+    "/assets/original/technique-lab/lightning/magic-29/17.png",
+    "/assets/original/technique-lab/lightning/magic-29/18.png",
+    "/assets/original/technique-lab/lightning/magic-29/19.png",
+    "/assets/original/technique-lab/lightning/magic-29/20.png"
+  ],
+  "MAGIC/37": [
+    "/assets/original/technique-lab/lightning/magic-37/00.png",
+    "/assets/original/technique-lab/lightning/magic-37/01.png",
+    "/assets/original/technique-lab/lightning/magic-37/02.png",
+    "/assets/original/technique-lab/lightning/magic-37/03.png",
+    "/assets/original/technique-lab/lightning/magic-37/04.png",
+    "/assets/original/technique-lab/lightning/magic-37/05.png",
+    "/assets/original/technique-lab/lightning/magic-37/06.png",
+    "/assets/original/technique-lab/lightning/magic-37/07.png",
+    "/assets/original/technique-lab/lightning/magic-37/08.png",
+    "/assets/original/technique-lab/lightning/magic-37/09.png",
+    "/assets/original/technique-lab/lightning/magic-37/10.png",
+    "/assets/original/technique-lab/lightning/magic-37/11.png",
+    "/assets/original/technique-lab/lightning/magic-37/12.png",
+    "/assets/original/technique-lab/lightning/magic-37/13.png",
+    "/assets/original/technique-lab/lightning/magic-37/14.png",
+    "/assets/original/technique-lab/lightning/magic-37/15.png",
+    "/assets/original/technique-lab/lightning/magic-37/16.png",
+    "/assets/original/technique-lab/lightning/magic-37/17.png",
+    "/assets/original/technique-lab/lightning/magic-37/18.png",
+    "/assets/original/technique-lab/lightning/magic-37/19.png",
+    "/assets/original/technique-lab/lightning/magic-37/20.png",
+    "/assets/original/technique-lab/lightning/magic-37/21.png",
+    "/assets/original/technique-lab/lightning/magic-37/22.png",
+    "/assets/original/technique-lab/lightning/magic-37/23.png",
+    "/assets/original/technique-lab/lightning/magic-37/24.png",
+    "/assets/original/technique-lab/lightning/magic-37/25.png",
+    "/assets/original/technique-lab/lightning/magic-37/26.png",
+    "/assets/original/technique-lab/lightning/magic-37/27.png",
+    "/assets/original/technique-lab/lightning/magic-37/28.png",
+    "/assets/original/technique-lab/lightning/magic-37/29.png",
+    "/assets/original/technique-lab/lightning/magic-37/30.png",
+    "/assets/original/technique-lab/lightning/magic-37/31.png",
+    "/assets/original/technique-lab/lightning/magic-37/32.png",
+    "/assets/original/technique-lab/lightning/magic-37/33.png",
+    "/assets/original/technique-lab/lightning/magic-37/34.png",
+    "/assets/original/technique-lab/lightning/magic-37/35.png",
+    "/assets/original/technique-lab/lightning/magic-37/36.png",
+    "/assets/original/technique-lab/lightning/magic-37/37.png",
+    "/assets/original/technique-lab/lightning/magic-37/38.png",
+    "/assets/original/technique-lab/lightning/magic-37/39.png",
+    "/assets/original/technique-lab/lightning/magic-37/40.png",
+    "/assets/original/technique-lab/lightning/magic-37/41.png",
+    "/assets/original/technique-lab/lightning/magic-37/42.png",
+    "/assets/original/technique-lab/lightning/magic-37/43.png",
+    "/assets/original/technique-lab/lightning/magic-37/44.png"
+  ],
+  "MAGIC/0": [
+    "/assets/original/technique-lab/lightning/magic-0/00.png",
+    "/assets/original/technique-lab/lightning/magic-0/01.png",
+    "/assets/original/technique-lab/lightning/magic-0/02.png",
+    "/assets/original/technique-lab/lightning/magic-0/03.png",
+    "/assets/original/technique-lab/lightning/magic-0/04.png"
+  ],
+  "MAGIC/42": [
+    "/assets/original/technique-lab/lightning/magic-42/00.png",
+    "/assets/original/technique-lab/lightning/magic-42/01.png",
+    "/assets/original/technique-lab/lightning/magic-42/02.png",
+    "/assets/original/technique-lab/lightning/magic-42/03.png",
+    "/assets/original/technique-lab/lightning/magic-42/04.png",
+    "/assets/original/technique-lab/lightning/magic-42/05.png",
+    "/assets/original/technique-lab/lightning/magic-42/06.png",
+    "/assets/original/technique-lab/lightning/magic-42/07.png",
+    "/assets/original/technique-lab/lightning/magic-42/08.png",
+    "/assets/original/technique-lab/lightning/magic-42/09.png",
+    "/assets/original/technique-lab/lightning/magic-42/10.png",
+    "/assets/original/technique-lab/lightning/magic-42/11.png",
+    "/assets/original/technique-lab/lightning/magic-42/12.png",
+    "/assets/original/technique-lab/lightning/magic-42/13.png",
+    "/assets/original/technique-lab/lightning/magic-42/14.png",
+    "/assets/original/technique-lab/lightning/magic-42/15.png",
+    "/assets/original/technique-lab/lightning/magic-42/16.png",
+    "/assets/original/technique-lab/lightning/magic-42/17.png",
+    "/assets/original/technique-lab/lightning/magic-42/18.png",
+    "/assets/original/technique-lab/lightning/magic-42/19.png",
+    "/assets/original/technique-lab/lightning/magic-42/20.png",
+    "/assets/original/technique-lab/lightning/magic-42/21.png",
+    "/assets/original/technique-lab/lightning/magic-42/22.png",
+    "/assets/original/technique-lab/lightning/magic-42/23.png",
+    "/assets/original/technique-lab/lightning/magic-42/24.png",
+    "/assets/original/technique-lab/lightning/magic-42/25.png",
+    "/assets/original/technique-lab/lightning/magic-42/26.png",
+    "/assets/original/technique-lab/lightning/magic-42/27.png",
+    "/assets/original/technique-lab/lightning/magic-42/28.png",
+    "/assets/original/technique-lab/lightning/magic-42/29.png"
+  ],
+  "MAGIC/41": [
+    "/assets/original/technique-lab/lightning/magic-41/00.png",
+    "/assets/original/technique-lab/lightning/magic-41/01.png",
+    "/assets/original/technique-lab/lightning/magic-41/02.png",
+    "/assets/original/technique-lab/lightning/magic-41/03.png",
+    "/assets/original/technique-lab/lightning/magic-41/04.png",
+    "/assets/original/technique-lab/lightning/magic-41/05.png",
+    "/assets/original/technique-lab/lightning/magic-41/06.png",
+    "/assets/original/technique-lab/lightning/magic-41/07.png",
+    "/assets/original/technique-lab/lightning/magic-41/08.png",
+    "/assets/original/technique-lab/lightning/magic-41/09.png",
+    "/assets/original/technique-lab/lightning/magic-41/10.png",
+    "/assets/original/technique-lab/lightning/magic-41/11.png",
+    "/assets/original/technique-lab/lightning/magic-41/12.png",
+    "/assets/original/technique-lab/lightning/magic-41/13.png",
+    "/assets/original/technique-lab/lightning/magic-41/14.png",
+    "/assets/original/technique-lab/lightning/magic-41/15.png",
+    "/assets/original/technique-lab/lightning/magic-41/16.png",
+    "/assets/original/technique-lab/lightning/magic-41/17.png",
+    "/assets/original/technique-lab/lightning/magic-41/18.png",
+    "/assets/original/technique-lab/lightning/magic-41/19.png",
+    "/assets/original/technique-lab/lightning/magic-41/20.png",
+    "/assets/original/technique-lab/lightning/magic-41/21.png",
+    "/assets/original/technique-lab/lightning/magic-41/22.png",
+    "/assets/original/technique-lab/lightning/magic-41/23.png",
+    "/assets/original/technique-lab/lightning/magic-41/24.png",
+    "/assets/original/technique-lab/lightning/magic-41/25.png",
+    "/assets/original/technique-lab/lightning/magic-41/26.png",
+    "/assets/original/technique-lab/lightning/magic-41/27.png",
+    "/assets/original/technique-lab/lightning/magic-41/28.png",
+    "/assets/original/technique-lab/lightning/magic-41/29.png",
+    "/assets/original/technique-lab/lightning/magic-41/30.png",
+    "/assets/original/technique-lab/lightning/magic-41/31.png",
+    "/assets/original/technique-lab/lightning/magic-41/32.png",
+    "/assets/original/technique-lab/lightning/magic-41/33.png",
+    "/assets/original/technique-lab/lightning/magic-41/34.png",
+    "/assets/original/technique-lab/lightning/magic-41/35.png"
+  ],
+  "MAGIC/16": [
+    "/assets/original/technique-lab/lightning/magic-16/00.png",
+    "/assets/original/technique-lab/lightning/magic-16/01.png",
+    "/assets/original/technique-lab/lightning/magic-16/02.png",
+    "/assets/original/technique-lab/lightning/magic-16/03.png",
+    "/assets/original/technique-lab/lightning/magic-16/04.png",
+    "/assets/original/technique-lab/lightning/magic-16/05.png",
+    "/assets/original/technique-lab/lightning/magic-16/06.png",
+    "/assets/original/technique-lab/lightning/magic-16/07.png",
+    "/assets/original/technique-lab/lightning/magic-16/08.png",
+    "/assets/original/technique-lab/lightning/magic-16/09.png",
+    "/assets/original/technique-lab/lightning/magic-16/10.png",
+    "/assets/original/technique-lab/lightning/magic-16/11.png",
+    "/assets/original/technique-lab/lightning/magic-16/12.png",
+    "/assets/original/technique-lab/lightning/magic-16/13.png",
+    "/assets/original/technique-lab/lightning/magic-16/14.png",
+    "/assets/original/technique-lab/lightning/magic-16/15.png",
+    "/assets/original/technique-lab/lightning/magic-16/16.png",
+    "/assets/original/technique-lab/lightning/magic-16/17.png",
+    "/assets/original/technique-lab/lightning/magic-16/18.png",
+    "/assets/original/technique-lab/lightning/magic-16/19.png",
+    "/assets/original/technique-lab/lightning/magic-16/20.png",
+    "/assets/original/technique-lab/lightning/magic-16/21.png",
+    "/assets/original/technique-lab/lightning/magic-16/22.png",
+    "/assets/original/technique-lab/lightning/magic-16/23.png",
+    "/assets/original/technique-lab/lightning/magic-16/24.png",
+    "/assets/original/technique-lab/lightning/magic-16/25.png",
+    "/assets/original/technique-lab/lightning/magic-16/26.png",
+    "/assets/original/technique-lab/lightning/magic-16/27.png",
+    "/assets/original/technique-lab/lightning/magic-16/28.png",
+    "/assets/original/technique-lab/lightning/magic-16/29.png",
+    "/assets/original/technique-lab/lightning/magic-16/30.png",
+    "/assets/original/technique-lab/lightning/magic-16/31.png",
+    "/assets/original/technique-lab/lightning/magic-16/32.png",
+    "/assets/original/technique-lab/lightning/magic-16/33.png",
+    "/assets/original/technique-lab/lightning/magic-16/34.png",
+    "/assets/original/technique-lab/lightning/magic-16/35.png",
+    "/assets/original/technique-lab/lightning/magic-16/36.png",
+    "/assets/original/technique-lab/lightning/magic-16/37.png",
+    "/assets/original/technique-lab/lightning/magic-16/38.png",
+    "/assets/original/technique-lab/lightning/magic-16/39.png"
+  ],
+  "MAGIC/17": [
+    "/assets/original/technique-lab/lightning/magic-17/00.png",
+    "/assets/original/technique-lab/lightning/magic-17/01.png",
+    "/assets/original/technique-lab/lightning/magic-17/02.png",
+    "/assets/original/technique-lab/lightning/magic-17/03.png",
+    "/assets/original/technique-lab/lightning/magic-17/04.png",
+    "/assets/original/technique-lab/lightning/magic-17/05.png",
+    "/assets/original/technique-lab/lightning/magic-17/06.png",
+    "/assets/original/technique-lab/lightning/magic-17/07.png",
+    "/assets/original/technique-lab/lightning/magic-17/08.png",
+    "/assets/original/technique-lab/lightning/magic-17/09.png",
+    "/assets/original/technique-lab/lightning/magic-17/10.png",
+    "/assets/original/technique-lab/lightning/magic-17/11.png",
+    "/assets/original/technique-lab/lightning/magic-17/12.png",
+    "/assets/original/technique-lab/lightning/magic-17/13.png",
+    "/assets/original/technique-lab/lightning/magic-17/14.png",
+    "/assets/original/technique-lab/lightning/magic-17/15.png",
+    "/assets/original/technique-lab/lightning/magic-17/16.png",
+    "/assets/original/technique-lab/lightning/magic-17/17.png",
+    "/assets/original/technique-lab/lightning/magic-17/18.png",
+    "/assets/original/technique-lab/lightning/magic-17/19.png",
+    "/assets/original/technique-lab/lightning/magic-17/20.png",
+    "/assets/original/technique-lab/lightning/magic-17/21.png",
+    "/assets/original/technique-lab/lightning/magic-17/22.png",
+    "/assets/original/technique-lab/lightning/magic-17/23.png",
+    "/assets/original/technique-lab/lightning/magic-17/24.png",
+    "/assets/original/technique-lab/lightning/magic-17/25.png",
+    "/assets/original/technique-lab/lightning/magic-17/26.png",
+    "/assets/original/technique-lab/lightning/magic-17/27.png",
+    "/assets/original/technique-lab/lightning/magic-17/28.png",
+    "/assets/original/technique-lab/lightning/magic-17/29.png",
+    "/assets/original/technique-lab/lightning/magic-17/30.png",
+    "/assets/original/technique-lab/lightning/magic-17/31.png",
+    "/assets/original/technique-lab/lightning/magic-17/32.png",
+    "/assets/original/technique-lab/lightning/magic-17/33.png",
+    "/assets/original/technique-lab/lightning/magic-17/34.png",
+    "/assets/original/technique-lab/lightning/magic-17/35.png",
+    "/assets/original/technique-lab/lightning/magic-17/36.png",
+    "/assets/original/technique-lab/lightning/magic-17/37.png",
+    "/assets/original/technique-lab/lightning/magic-17/38.png",
+    "/assets/original/technique-lab/lightning/magic-17/39.png",
+    "/assets/original/technique-lab/lightning/magic-17/40.png",
+    "/assets/original/technique-lab/lightning/magic-17/41.png",
+    "/assets/original/technique-lab/lightning/magic-17/42.png",
+    "/assets/original/technique-lab/lightning/magic-17/43.png",
+    "/assets/original/technique-lab/lightning/magic-17/44.png",
+    "/assets/original/technique-lab/lightning/magic-17/45.png",
+    "/assets/original/technique-lab/lightning/magic-17/46.png",
+    "/assets/original/technique-lab/lightning/magic-17/47.png"
+  ],
+  "MAGIC/18": [
+    "/assets/original/technique-lab/lightning/magic-18/00.png",
+    "/assets/original/technique-lab/lightning/magic-18/01.png",
+    "/assets/original/technique-lab/lightning/magic-18/02.png",
+    "/assets/original/technique-lab/lightning/magic-18/03.png",
+    "/assets/original/technique-lab/lightning/magic-18/04.png",
+    "/assets/original/technique-lab/lightning/magic-18/05.png",
+    "/assets/original/technique-lab/lightning/magic-18/06.png",
+    "/assets/original/technique-lab/lightning/magic-18/07.png",
+    "/assets/original/technique-lab/lightning/magic-18/08.png",
+    "/assets/original/technique-lab/lightning/magic-18/09.png",
+    "/assets/original/technique-lab/lightning/magic-18/10.png",
+    "/assets/original/technique-lab/lightning/magic-18/11.png",
+    "/assets/original/technique-lab/lightning/magic-18/12.png",
+    "/assets/original/technique-lab/lightning/magic-18/13.png",
+    "/assets/original/technique-lab/lightning/magic-18/14.png",
+    "/assets/original/technique-lab/lightning/magic-18/15.png",
+    "/assets/original/technique-lab/lightning/magic-18/16.png",
+    "/assets/original/technique-lab/lightning/magic-18/17.png",
+    "/assets/original/technique-lab/lightning/magic-18/18.png",
+    "/assets/original/technique-lab/lightning/magic-18/19.png",
+    "/assets/original/technique-lab/lightning/magic-18/20.png",
+    "/assets/original/technique-lab/lightning/magic-18/21.png",
+    "/assets/original/technique-lab/lightning/magic-18/22.png",
+    "/assets/original/technique-lab/lightning/magic-18/23.png",
+    "/assets/original/technique-lab/lightning/magic-18/24.png",
+    "/assets/original/technique-lab/lightning/magic-18/25.png",
+    "/assets/original/technique-lab/lightning/magic-18/26.png",
+    "/assets/original/technique-lab/lightning/magic-18/27.png",
+    "/assets/original/technique-lab/lightning/magic-18/28.png",
+    "/assets/original/technique-lab/lightning/magic-18/29.png",
+    "/assets/original/technique-lab/lightning/magic-18/30.png",
+    "/assets/original/technique-lab/lightning/magic-18/31.png"
+  ],
+  "MAGIC/44": [
+    "/assets/original/technique-lab/lightning/magic-44/00.png",
+    "/assets/original/technique-lab/lightning/magic-44/01.png",
+    "/assets/original/technique-lab/lightning/magic-44/02.png",
+    "/assets/original/technique-lab/lightning/magic-44/03.png",
+    "/assets/original/technique-lab/lightning/magic-44/04.png",
+    "/assets/original/technique-lab/lightning/magic-44/05.png",
+    "/assets/original/technique-lab/lightning/magic-44/06.png",
+    "/assets/original/technique-lab/lightning/magic-44/07.png",
+    "/assets/original/technique-lab/lightning/magic-44/08.png",
+    "/assets/original/technique-lab/lightning/magic-44/09.png",
+    "/assets/original/technique-lab/lightning/magic-44/10.png",
+    "/assets/original/technique-lab/lightning/magic-44/11.png",
+    "/assets/original/technique-lab/lightning/magic-44/12.png",
+    "/assets/original/technique-lab/lightning/magic-44/13.png",
+    "/assets/original/technique-lab/lightning/magic-44/14.png",
+    "/assets/original/technique-lab/lightning/magic-44/15.png",
+    "/assets/original/technique-lab/lightning/magic-44/16.png",
+    "/assets/original/technique-lab/lightning/magic-44/17.png",
+    "/assets/original/technique-lab/lightning/magic-44/18.png",
+    "/assets/original/technique-lab/lightning/magic-44/19.png",
+    "/assets/original/technique-lab/lightning/magic-44/20.png",
+    "/assets/original/technique-lab/lightning/magic-44/21.png",
+    "/assets/original/technique-lab/lightning/magic-44/22.png",
+    "/assets/original/technique-lab/lightning/magic-44/23.png",
+    "/assets/original/technique-lab/lightning/magic-44/24.png",
+    "/assets/original/technique-lab/lightning/magic-44/25.png",
+    "/assets/original/technique-lab/lightning/magic-44/26.png",
+    "/assets/original/technique-lab/lightning/magic-44/27.png",
+    "/assets/original/technique-lab/lightning/magic-44/28.png",
+    "/assets/original/technique-lab/lightning/magic-44/29.png",
+    "/assets/original/technique-lab/lightning/magic-44/30.png",
+    "/assets/original/technique-lab/lightning/magic-44/31.png",
+    "/assets/original/technique-lab/lightning/magic-44/32.png",
+    "/assets/original/technique-lab/lightning/magic-44/33.png",
+    "/assets/original/technique-lab/lightning/magic-44/34.png",
+    "/assets/original/technique-lab/lightning/magic-44/35.png",
+    "/assets/original/technique-lab/lightning/magic-44/36.png",
+    "/assets/original/technique-lab/lightning/magic-44/37.png",
+    "/assets/original/technique-lab/lightning/magic-44/38.png",
+    "/assets/original/technique-lab/lightning/magic-44/39.png",
+    "/assets/original/technique-lab/lightning/magic-44/40.png",
+    "/assets/original/technique-lab/lightning/magic-44/41.png",
+    "/assets/original/technique-lab/lightning/magic-44/42.png",
+    "/assets/original/technique-lab/lightning/magic-44/43.png",
+    "/assets/original/technique-lab/lightning/magic-44/44.png",
+    "/assets/original/technique-lab/lightning/magic-44/45.png",
+    "/assets/original/technique-lab/lightning/magic-44/46.png",
+    "/assets/original/technique-lab/lightning/magic-44/47.png"
+  ],
+  "MAGIC/46": [
+    "/assets/original/technique-lab/lightning/magic-46/00.png",
+    "/assets/original/technique-lab/lightning/magic-46/01.png",
+    "/assets/original/technique-lab/lightning/magic-46/02.png",
+    "/assets/original/technique-lab/lightning/magic-46/03.png",
+    "/assets/original/technique-lab/lightning/magic-46/04.png",
+    "/assets/original/technique-lab/lightning/magic-46/05.png",
+    "/assets/original/technique-lab/lightning/magic-46/06.png",
+    "/assets/original/technique-lab/lightning/magic-46/07.png",
+    "/assets/original/technique-lab/lightning/magic-46/08.png",
+    "/assets/original/technique-lab/lightning/magic-46/09.png",
+    "/assets/original/technique-lab/lightning/magic-46/10.png",
+    "/assets/original/technique-lab/lightning/magic-46/11.png",
+    "/assets/original/technique-lab/lightning/magic-46/12.png",
+    "/assets/original/technique-lab/lightning/magic-46/13.png",
+    "/assets/original/technique-lab/lightning/magic-46/14.png",
+    "/assets/original/technique-lab/lightning/magic-46/15.png",
+    "/assets/original/technique-lab/lightning/magic-46/16.png",
+    "/assets/original/technique-lab/lightning/magic-46/17.png",
+    "/assets/original/technique-lab/lightning/magic-46/18.png",
+    "/assets/original/technique-lab/lightning/magic-46/19.png",
+    "/assets/original/technique-lab/lightning/magic-46/20.png",
+    "/assets/original/technique-lab/lightning/magic-46/21.png"
+  ],
+  "MAGIC/45": [
+    "/assets/original/technique-lab/lightning/magic-45/00.png",
+    "/assets/original/technique-lab/lightning/magic-45/01.png",
+    "/assets/original/technique-lab/lightning/magic-45/02.png",
+    "/assets/original/technique-lab/lightning/magic-45/03.png",
+    "/assets/original/technique-lab/lightning/magic-45/04.png",
+    "/assets/original/technique-lab/lightning/magic-45/05.png",
+    "/assets/original/technique-lab/lightning/magic-45/06.png",
+    "/assets/original/technique-lab/lightning/magic-45/07.png",
+    "/assets/original/technique-lab/lightning/magic-45/08.png",
+    "/assets/original/technique-lab/lightning/magic-45/09.png",
+    "/assets/original/technique-lab/lightning/magic-45/10.png",
+    "/assets/original/technique-lab/lightning/magic-45/11.png",
+    "/assets/original/technique-lab/lightning/magic-45/12.png",
+    "/assets/original/technique-lab/lightning/magic-45/13.png",
+    "/assets/original/technique-lab/lightning/magic-45/14.png",
+    "/assets/original/technique-lab/lightning/magic-45/15.png",
+    "/assets/original/technique-lab/lightning/magic-45/16.png",
+    "/assets/original/technique-lab/lightning/magic-45/17.png",
+    "/assets/original/technique-lab/lightning/magic-45/18.png",
+    "/assets/original/technique-lab/lightning/magic-45/19.png",
+    "/assets/original/technique-lab/lightning/magic-45/20.png",
+    "/assets/original/technique-lab/lightning/magic-45/21.png",
+    "/assets/original/technique-lab/lightning/magic-45/22.png",
+    "/assets/original/technique-lab/lightning/magic-45/23.png",
+    "/assets/original/technique-lab/lightning/magic-45/24.png",
+    "/assets/original/technique-lab/lightning/magic-45/25.png",
+    "/assets/original/technique-lab/lightning/magic-45/26.png",
+    "/assets/original/technique-lab/lightning/magic-45/27.png",
+    "/assets/original/technique-lab/lightning/magic-45/28.png",
+    "/assets/original/technique-lab/lightning/magic-45/29.png",
+    "/assets/original/technique-lab/lightning/magic-45/30.png",
+    "/assets/original/technique-lab/lightning/magic-45/31.png",
+    "/assets/original/technique-lab/lightning/magic-45/32.png",
+    "/assets/original/technique-lab/lightning/magic-45/33.png",
+    "/assets/original/technique-lab/lightning/magic-45/34.png",
+    "/assets/original/technique-lab/lightning/magic-45/35.png",
+    "/assets/original/technique-lab/lightning/magic-45/36.png",
+    "/assets/original/technique-lab/lightning/magic-45/37.png",
+    "/assets/original/technique-lab/lightning/magic-45/38.png",
+    "/assets/original/technique-lab/lightning/magic-45/39.png"
+  ],
+  "MAGIC/36": [
+    "/assets/original/technique-lab/lightning/magic-36/00.png",
+    "/assets/original/technique-lab/lightning/magic-36/01.png",
+    "/assets/original/technique-lab/lightning/magic-36/02.png",
+    "/assets/original/technique-lab/lightning/magic-36/03.png",
+    "/assets/original/technique-lab/lightning/magic-36/04.png",
+    "/assets/original/technique-lab/lightning/magic-36/05.png",
+    "/assets/original/technique-lab/lightning/magic-36/06.png",
+    "/assets/original/technique-lab/lightning/magic-36/07.png",
+    "/assets/original/technique-lab/lightning/magic-36/08.png",
+    "/assets/original/technique-lab/lightning/magic-36/09.png",
+    "/assets/original/technique-lab/lightning/magic-36/10.png",
+    "/assets/original/technique-lab/lightning/magic-36/11.png",
+    "/assets/original/technique-lab/lightning/magic-36/12.png",
+    "/assets/original/technique-lab/lightning/magic-36/13.png",
+    "/assets/original/technique-lab/lightning/magic-36/14.png",
+    "/assets/original/technique-lab/lightning/magic-36/15.png",
+    "/assets/original/technique-lab/lightning/magic-36/16.png",
+    "/assets/original/technique-lab/lightning/magic-36/17.png",
+    "/assets/original/technique-lab/lightning/magic-36/18.png",
+    "/assets/original/technique-lab/lightning/magic-36/19.png",
+    "/assets/original/technique-lab/lightning/magic-36/20.png",
+    "/assets/original/technique-lab/lightning/magic-36/21.png",
+    "/assets/original/technique-lab/lightning/magic-36/22.png",
+    "/assets/original/technique-lab/lightning/magic-36/23.png",
+    "/assets/original/technique-lab/lightning/magic-36/24.png",
+    "/assets/original/technique-lab/lightning/magic-36/25.png",
+    "/assets/original/technique-lab/lightning/magic-36/26.png",
+    "/assets/original/technique-lab/lightning/magic-36/27.png",
+    "/assets/original/technique-lab/lightning/magic-36/28.png",
+    "/assets/original/technique-lab/lightning/magic-36/29.png",
+    "/assets/original/technique-lab/lightning/magic-36/30.png",
+    "/assets/original/technique-lab/lightning/magic-36/31.png",
+    "/assets/original/technique-lab/lightning/magic-36/32.png",
+    "/assets/original/technique-lab/lightning/magic-36/33.png",
+    "/assets/original/technique-lab/lightning/magic-36/34.png",
+    "/assets/original/technique-lab/lightning/magic-36/35.png",
+    "/assets/original/technique-lab/lightning/magic-36/36.png",
+    "/assets/original/technique-lab/lightning/magic-36/37.png",
+    "/assets/original/technique-lab/lightning/magic-36/38.png",
+    "/assets/original/technique-lab/lightning/magic-36/39.png",
+    "/assets/original/technique-lab/lightning/magic-36/40.png",
+    "/assets/original/technique-lab/lightning/magic-36/41.png",
+    "/assets/original/technique-lab/lightning/magic-36/42.png",
+    "/assets/original/technique-lab/lightning/magic-36/43.png",
+    "/assets/original/technique-lab/lightning/magic-36/44.png"
+  ],
+  "MAGIC/33": [
+    "/assets/original/technique-lab/lightning/magic-33/00.png",
+    "/assets/original/technique-lab/lightning/magic-33/01.png",
+    "/assets/original/technique-lab/lightning/magic-33/02.png",
+    "/assets/original/technique-lab/lightning/magic-33/03.png",
+    "/assets/original/technique-lab/lightning/magic-33/04.png",
+    "/assets/original/technique-lab/lightning/magic-33/05.png",
+    "/assets/original/technique-lab/lightning/magic-33/06.png",
+    "/assets/original/technique-lab/lightning/magic-33/07.png",
+    "/assets/original/technique-lab/lightning/magic-33/08.png",
+    "/assets/original/technique-lab/lightning/magic-33/09.png",
+    "/assets/original/technique-lab/lightning/magic-33/10.png",
+    "/assets/original/technique-lab/lightning/magic-33/11.png",
+    "/assets/original/technique-lab/lightning/magic-33/12.png",
+    "/assets/original/technique-lab/lightning/magic-33/13.png",
+    "/assets/original/technique-lab/lightning/magic-33/14.png",
+    "/assets/original/technique-lab/lightning/magic-33/15.png",
+    "/assets/original/technique-lab/lightning/magic-33/16.png",
+    "/assets/original/technique-lab/lightning/magic-33/17.png",
+    "/assets/original/technique-lab/lightning/magic-33/18.png",
+    "/assets/original/technique-lab/lightning/magic-33/19.png",
+    "/assets/original/technique-lab/lightning/magic-33/20.png",
+    "/assets/original/technique-lab/lightning/magic-33/21.png",
+    "/assets/original/technique-lab/lightning/magic-33/22.png",
+    "/assets/original/technique-lab/lightning/magic-33/23.png"
+  ],
   "UN/57": [
     "/assets/original/technique-lab/lightning/un-57/00.png",
     "/assets/original/technique-lab/lightning/un-57/01.png",
@@ -6630,6 +12606,30 @@ export const TECHNIQUE_LAB_GRAPHIC_ASSETS = {
     "/assets/original/technique-lab/lightning/un-57/44.png",
     "/assets/original/technique-lab/lightning/un-57/45.png",
     "/assets/original/technique-lab/lightning/un-57/46.png"
+  ],
+  "MAGIC/50": [
+    "/assets/original/technique-lab/lightning/magic-50/00.png",
+    "/assets/original/technique-lab/lightning/magic-50/01.png"
+  ],
+  "MAGIC/49": [
+    "/assets/original/technique-lab/lightning/magic-49/00.png",
+    "/assets/original/technique-lab/lightning/magic-49/01.png"
+  ],
+  "MAGIC/52": [
+    "/assets/original/technique-lab/lightning/magic-52/00.png",
+    "/assets/original/technique-lab/lightning/magic-52/01.png"
+  ],
+  "MAGIC/51": [
+    "/assets/original/technique-lab/lightning/magic-51/00.png",
+    "/assets/original/technique-lab/lightning/magic-51/01.png"
+  ],
+  "MAGIC/54": [
+    "/assets/original/technique-lab/lightning/magic-54/00.png",
+    "/assets/original/technique-lab/lightning/magic-54/01.png"
+  ],
+  "MAGIC/53": [
+    "/assets/original/technique-lab/lightning/magic-53/00.png",
+    "/assets/original/technique-lab/lightning/magic-53/01.png"
   ]
 } as const;
 
@@ -6638,13 +12638,37 @@ export const TECHNIQUE_LAB_AUDIO_ASSETS = {
   "E/63": "/assets/original/technique-lab/audio/63.wav",
   "E/41": "/assets/original/technique-lab/audio/41.wav",
   "E/9": "/assets/original/technique-lab/audio/9.wav",
-  "UN/50": "/assets/original/technique-lab/audio/un-50.wav"
+  "MAGIC/83": "/assets/original/technique-lab/audio/magic-83.wav",
+  "E/51": "/assets/original/technique-lab/audio/51.wav",
+  "E/36": "/assets/original/technique-lab/audio/36.wav",
+  "UN/51": "/assets/original/technique-lab/audio/un-51.wav",
+  "E/58": "/assets/original/technique-lab/audio/58.wav",
+  "E/8": "/assets/original/technique-lab/audio/8.wav",
+  "UN/52": "/assets/original/technique-lab/audio/un-52.wav",
+  "UN/50": "/assets/original/technique-lab/audio/un-50.wav",
+  "MAGIC/82": "/assets/original/technique-lab/audio/magic-82.wav"
 } as const;
 
 export const TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS = {
   "1F": 10,
+  "2F": 10,
+  "3F": 15,
+  "4F": 10,
   "1H": 15,
+  "2H": 15,
+  "3H": 15,
   "1I": 15,
+  "2I": 15,
+  "3I": 15,
+  "AA": 15,
+  "FM": 15,
+  "IP": 10,
+  "LA": 15,
+  "SA": 15,
+  "SD": 15,
+  "SN": 25,
+  "OJ": 60,
+  "AD": 15,
   "1C": 10,
   "2C": 10,
   "3C": 10,
@@ -6653,7 +12677,12 @@ export const TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS = {
   "2L": 10,
   "3L": 10,
   "4L": 10,
-  "TR": 5
+  "TR": 5,
+  "1D": 0,
+  "2D": 0,
+  "3D": 0,
+  "1K": 0,
+  "2K": 0
 } as const;
 
 export const TECHNIQUE_LAB_UNIT_ASSETS = {

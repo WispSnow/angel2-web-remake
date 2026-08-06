@@ -49,6 +49,8 @@ export function isStage0Exit(position: Position): boolean {
 
 export const TERRAIN_TOKENS = decode(STAGE0_TERRAIN_TOKENS_BASE64);
 export const TOKEN_TO_TERRAIN_SLOT = decode(STAGE0_TOKEN_TO_SLOT_BASE64);
+export const STAGE0_IRON_PLATE_TERRAIN_SLOT = TOKEN_TO_TERRAIN_SLOT[50];
+export const STAGE0_OBSTACLE_TERRAIN_SLOT = TOKEN_TO_TERRAIN_SLOT[23];
 export const SPEECH_RECORD_BY_CHARACTER = STAGE0_SPEECH_RECORD_BY_CHARACTER;
 
 // Module 27 0000:0493 applies a 299-experience floor to class-0 actors

@@ -553,19 +553,28 @@ function buildEngineering() {
     family: "K",
     visibleName: "工兵構造",
     actions: [
-      { code: "1K", visibleName: "鐵板", wrapper: "0000:CAE7", writer: "1000:7C92",
+      { code: "1K", visibleName: "鐵板", dormantWrapper: "0000:CAE7", dormantWriter: "1000:7C92",
         sourceToken: "copied at battle load from original map cell (16,25), linear index 1266" },
-      { code: "2K", visibleName: "障礙", wrapper: "0000:CAF9", writer: "1000:7CB4",
+      { code: "2K", visibleName: "障礙", dormantWrapper: "0000:CAF9", dormantWriter: "1000:7CB4",
         sourceToken: "copied at battle load from original map cell (16,26), linear index 1316" },
     ],
-    write: {
+    playerRoute: {
+      branch: "0000:761A..762F sends 1K/2K to 0000:76C0 and bypasses the generic technique-handler call",
+      placement: "seed 5 mode M; select an empty destination and complete the normal movement presentation to that cell",
+      neighborOffsets: [50, -50, 1, -1],
+      neighborFilter: "skip a neighbor when its current raw token maps to logical terrain slot 0",
+      write: "replace each accepted orthogonal neighbor with the action's stage-specific sourceToken; do not mutate the selected center cell",
+      experience: 0,
+    },
+    dormantDispatchWrite: {
       target: "selected linear terrain index",
       byteCount: 5,
       offsets: [0, 1, 2, 3, 4],
       values: ["sourceToken", "sourceToken+1", "sourceToken+2", "sourceToken+3", "sourceToken+4"],
+      reachability: "present in DS:52A2, but bypassed by the released player construction branch; class 5A is ordinary AI and has no 1K/2K technique-pool producer",
     },
     resourceLoads: { graphicArchiveRecords: [], audioArchiveRecords: [] },
-    synchronizationRule: "the action wrapper calls the five-byte terrain writer directly; there is no dedicated effect graphic, VOC request, descriptor wait or delayed settlement. The changed terrain becomes visible through the normal board redraw after the action returns",
+    synchronizationRule: "there is no dedicated effect graphic, VOC request, descriptor wait or delayed settlement. The normal movement presentation completes first, the four-neighbor player mutation runs immediately, and the changed terrain becomes visible through the normal board redraw",
   };
 }
 

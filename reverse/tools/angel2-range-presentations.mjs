@@ -278,7 +278,8 @@ async function extract(module29Path, decodedBRoot, battleTemplatesPath, outputJs
       construction: {
         builder: "K1/K2 use seed 5 with mode M",
         validCell: "scratch[cell] != 0 and unitSlots[cell] == 0",
-        result: "move to the chosen empty cell, then edit its four orthogonal terrain neighbors through the construction action code",
+        result: "move to the chosen empty cell, then visit linear neighbors +50,-50,+1,-1; every neighbor whose current token maps to a nonzero logical terrain slot is replaced by the selected action's stage-specific base source token",
+        dormantDispatchBoundary: "the generic DS:52A2 K1/K2 wrappers would write five horizontal consecutive tokens, but 0000:761A..762F routes released player construction to 0000:76C0 and bypasses those wrappers",
       },
     },
     visibleMapEffectLayer: {

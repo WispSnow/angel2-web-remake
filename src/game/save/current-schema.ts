@@ -16,6 +16,7 @@ import type {
   BattleUnit,
   CampaignState,
   Difficulty,
+  DynamicTerrainKind,
   PortraitRecord,
   Position,
   SaveData,
@@ -27,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 16 as const;
-export const SAVE_CONTENT_VERSION = "stage-title-and-roster-inheritance-1" as const;
+export const SAVE_VERSION = 18 as const;
+export const SAVE_CONTENT_VERSION = "dynamic-terrain-2" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_ROUND = 9_999;
@@ -173,6 +174,7 @@ export function isSavedBattleState(
   stageId: StageId,
   requireStage1Ai = true,
   requireActionDisabled = true,
+  requireTerrainOverrides = true,
 ): value is SavedBattleState {
   if (
     !isRecord(value)
@@ -183,6 +185,14 @@ export function isSavedBattleState(
     || value.units.length === 0
     || value.units.length > 150
     || !value.units.every((unit) => isBattleUnit(unit, stageId, requireActionDisabled))
+    || (requireTerrainOverrides
+      ? !Array.isArray(value.terrainOverrides)
+        || value.terrainOverrides.length > STAGE_WIDTH * STAGE_HEIGHT
+        || !value.terrainOverrides.every((override) => isRecord(override)
+          && (override.kind === "iron-plate" || override.kind === "obstacle")
+          && isPosition(override))
+      : value.terrainOverrides !== undefined
+        && (!Array.isArray(value.terrainOverrides) || value.terrainOverrides.length !== 0))
     || !isPosition(value.cursor)
     || !isPosition(value.cameraOrigin, CAMERA_MAX_X, CAMERA_MAX_Y)
   ) return false;
@@ -195,9 +205,18 @@ export function isSavedBattleState(
   } else if (value.enemyAi !== undefined) return false;
 
   const units = value.units;
+  const terrainOverrides = (value.terrainOverrides ?? []) as Array<{
+    x: number;
+    y: number;
+    kind: DynamicTerrainKind;
+  }>;
   if (
     !hasUniqueValues(units.map((unit) => unit.id))
     || !hasUniqueValues(units.map((unit) => `${unit.x},${unit.y}`))
+    || !hasUniqueValues(terrainOverrides.map(({ x, y }) => `${x},${y}`))
+    || terrainOverrides.some((override, index) => index > 0
+      && terrainOverrides[index - 1].y * STAGE_WIDTH + terrainOverrides[index - 1].x
+        >= override.y * STAGE_WIDTH + override.x)
     || !units.some((unit) => unit.id === value.focusId)
     || units.some((unit) =>
       (unit.side === 1 && !hasNamedAllyExperienceFloor(unit))
@@ -303,6 +322,7 @@ export function isCompletedSave(value: Record<string, unknown>): boolean {
 export function isBattleSave(
   value: Record<string, unknown>,
   requireStageEntrySnapshot = true,
+  requireTerrainOverrides = true,
 ): boolean {
   const difficulty = isDifficulty(value.difficulty) ? value.difficulty : undefined;
   const stageId = isPlayableStageId(value.stageId) ? value.stageId : undefined;
@@ -323,6 +343,9 @@ export function isBattleSave(
       value.roster as SaveRosterEntry[],
       difficulty,
       stageId,
+      true,
+      true,
+      requireTerrainOverrides,
     );
 }
 

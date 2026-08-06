@@ -2,6 +2,7 @@ import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
 import { terrainDefensePercentFor } from "../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../types";
 import type { AlliedAiAction, EnemyAiIntent } from "./ai-contracts";
+import { effectiveAttack, effectiveDefense } from "./status";
 import {
   neighbors,
   positionKey,
@@ -34,15 +35,21 @@ function minimumOrdinaryDamage(
   if (defender.actionDisabled) return 0;
   const attackerStats = context.statsFor(attacker);
   const defenderStats = context.statsFor(defender);
+  const defenderDefense = effectiveDefense(defenderStats.defense, defender.statuses);
   const terrainDefense = Math.floor(
-    defenderStats.defense
+    defenderDefense
     * terrainDefensePercentFor(
       defender.classId,
       context.battlefield.terrainSlotAt(defender),
     )
     / 100,
   );
-  return Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense) + 8;
+  return Math.max(
+    0,
+    effectiveAttack(attackerStats.attack, attacker.statuses)
+      - defenderDefense
+      - terrainDefense,
+  ) + 8;
 }
 
 function planOrdinaryAttack(

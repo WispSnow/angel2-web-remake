@@ -5,6 +5,7 @@ import type { StageDefinition } from "../content/stages";
 import type {
   BattleUnit,
   Difficulty,
+  DynamicTerrainKind,
   PortraitRecord,
   Position,
   SaveRosterEntry,
@@ -47,6 +48,7 @@ export interface FixedStageUnitConfig {
 export interface FixedStageScenarioConfig extends FixedStageUnitConfig {
   stage: StageDefinition;
   terrainSlotAt: (position: Position) => number;
+  dynamicTerrainSlots?: Readonly<Partial<Record<DynamicTerrainKind, number>>>;
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   forces: readonly ForceDefinition[];
 }
@@ -152,6 +154,7 @@ export function createFixedStageScenario(
     width: config.stage.width,
     height: config.stage.height,
     terrainSlotAt: config.terrainSlotAt,
+    dynamicTerrainSlots: config.dynamicTerrainSlots,
     createUnits: (difficulty) => createFixedStageUnits(config, difficulty, campaignRoster),
     createCampaignRoster: (difficulty) =>
       createFixedStageCampaignRoster(config, difficulty, campaignRoster),

@@ -255,6 +255,38 @@ describe("stage 1 battle construction", () => {
     expect(guardAction?.path.length).toBeGreaterThan(1);
   });
 
+  it("does not unlock an alert group whose possible attackers are all confused", () => {
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const player = battle.unit("1:0")!;
+    const guard = battle.unit("2:40")!;
+    const candidate = battle.reachableCells(guard.id)
+      .flatMap(({ x, y }) => [
+        { x: x + 1, y },
+        { x: x - 1, y },
+        { x, y: y + 1 },
+        { x, y: y - 1 },
+      ])
+      .find((position) =>
+        position.x >= 0
+        && position.y >= 0
+        && position.x < battle.stage.width
+        && position.y < battle.stage.height
+        && !battle.unitAt(position));
+    expect(candidate).toBeDefined();
+    if (!candidate) return;
+    player.x = candidate.x;
+    player.y = candidate.y;
+    for (const id of ["2:40", "2:41", "2:42", "2:43"]) {
+      battle.unit(id)!.statuses.confusion = 3;
+    }
+
+    expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: [] });
+    expect(battle.planEnemyAiAction(guard.id)).not.toMatchObject({
+      kind: "attack",
+      targetId: player.id,
+    });
+  });
+
   it("never plans a technique from a moved position for enemy or allied AI", () => {
     const battle = new Stage1Battle(campaign, deploymentWithMagician());
     const sister = battle.unit("2:43")!;

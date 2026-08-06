@@ -60,7 +60,17 @@
 | [`systems/techniques-stage3.md`](systems/techniques-stage3.md) | 僧侣 `1H/1I`、范围回復、AI 与 255 tick 表现 | M04 / 已接受 |
 | [`systems/force-ai-groups.md`](systems/force-ai-groups.md) | 显式军团控制权、独立友军 AI、策略与跨军团目标 | M04 框架提取 / 已验证 |
 | [`systems/force-field-escort.md`](systems/force-field-escort.md) | 路线尝试、移动安全区、生命减半与表现边界 | M05 / specified |
-| [`systems/technique-lab.md`](systems/technique-lab.md) | 任意敌我职业配置、`1L..4L/1C..4C/TR` 原版地图表现与冰封净化 | 开发工具 / 已实现 |
+| [`systems/technique-implementation-sequence.md`](systems/technique-implementation-sequence.md) | 33 项技术的机器顺序、逐项门禁与完成状态 | 系统例外 / 已验证 |
+| [`systems/technique-aa-attack-up.md`](systems/technique-aa-attack-up.md) | 攻击提升、完整轮计数、双方 AI、原版双格光柱与冰封例外 | 已实现并通过完整门禁 |
+| [`systems/technique-ad-defense-up.md`](systems/technique-ad-defense-up.md) | 防御提升、完整轮计数、双方 AI、原版四格盾牌与冰封例外 | 已实现并通过完整门禁 |
+| [`systems/technique-fm-magic-guard.md`](systems/technique-fm-magic-guard.md) | 防魔、一次性魔法保护、原版 AI 孤项安全修复、AA 共用光焰与冰封例外 | 已实现并通过完整门禁 |
+| [`systems/technique-ip-poison.md`](systems/technique-ip-poison.md) | 施毒、轮边界折半、首领免疫、双方 AI、两段毒雾与冰封跳伤例外 | 已实现并通过完整门禁 |
+| [`systems/technique-la-confusion.md`](systems/technique-la-confusion.md) | 混亂、原版 FFh 自动调度、玩家手动例外、首领免疫、无声鬼脸／星光与冰封例外 | 已实现并通过完整门禁 |
+| [`systems/technique-oj-prayer.md`](systems/technique-oj-prayer.md) | 祈禱、全图逐单位随机、渐进提交、程序图元、原版 SM 空槽与冰封生命例外 | 已实现并通过完整门禁 |
+| [`systems/technique-sa-attack-down.md`](systems/technique-sa-attack-down.md) | 攻击下降、攻升相消、双方 AI、原版下坠光束与冰封例外 | 已实现并通过完整门禁 |
+| [`systems/technique-sd-defense-down.md`](systems/technique-sd-defense-down.md) | 防御下降、防升相消、双方 AI、原版四格破盾与冰封例外 | 已实现并通过完整门禁 |
+| [`systems/technique-sn-spell-seal.md`](systems/technique-sn-spell-seal.md) | 禁咒、技术阻断、龍免疫、双方 AI、原版九段无声封印与冰封例外 | 已实现并通过完整门禁 |
+| [`systems/technique-lab.md`](systems/technique-lab.md) | 任意敌我职业配置、全部 33 项原版地图表现与冰封净化 | 开发工具 / 已实现 |
 | [`systems/debug-harness.md`](systems/debug-harness.md) | 按关选择、快速结算与确定性测试场景 | 开发工具 / 已实现 |
 | [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现并随第 1 关接受 |
 

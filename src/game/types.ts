@@ -123,20 +123,27 @@ export interface SavedEnemyAiState {
   fangPursuitRound: number | null;
 }
 
+export type DynamicTerrainKind = "iron-plate" | "obstacle";
+
+export interface DynamicTerrainOverride extends Position {
+  kind: DynamicTerrainKind;
+}
+
 export interface SavedBattleState {
   phase: "player";
   round: number;
   focusId: string;
   units: BattleUnit[];
   enemyAi?: SavedEnemyAiState;
+  terrainOverrides: DynamicTerrainOverride[];
   cursor: Position;
   cameraOrigin: Position;
 }
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 16;
-  contentVersion: "stage-title-and-roster-inheritance-1";
+  version: 18;
+  contentVersion: "dynamic-terrain-2";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

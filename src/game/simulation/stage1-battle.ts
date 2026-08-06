@@ -2,6 +2,8 @@ import {
   activateStage1Content,
   STAGE1_DEFINITION,
   STAGE1_DEPLOYMENT_PREVIEW_ROSTER,
+  STAGE1_IRON_PLATE_TERRAIN_SLOT,
+  STAGE1_OBSTACLE_TERRAIN_SLOT,
   STAGE1_SEMANTIC_CLASS_OVERRIDES,
   STAGE1_SEMANTIC_ENEMY_UNITS,
   STAGE1_STABLE_AI,
@@ -28,6 +30,7 @@ import {
 import {
   Stage0Battle,
   type BattleScenario,
+  type RestorableBattleSnapshot,
 } from "./battle";
 import type {
   AlliedAiAction,
@@ -101,6 +104,10 @@ export class Stage1Battle extends Stage0Battle {
       width: STAGE1_DEFINITION.width,
       height: STAGE1_DEFINITION.height,
       terrainSlotAt: stage1TerrainSlotAt,
+      dynamicTerrainSlots: {
+        "iron-plate": STAGE1_IRON_PLATE_TERRAIN_SLOT,
+        obstacle: STAGE1_OBSTACLE_TERRAIN_SLOT,
+      },
       createUnits: (difficulty) => createStage1Units(difficulty, campaign.roster, deployment),
       createCampaignRoster: () => completeCampaignRoster(campaign.roster),
       enemyClassPriority: STAGE1_AI_CLASS_PRIORITY,
@@ -112,7 +119,7 @@ export class Stage1Battle extends Stage0Battle {
   }
 
   override restore(
-    snapshot: Pick<SavedBattleState, "round" | "focusId" | "units" | "enemyAi">,
+    snapshot: RestorableBattleSnapshot,
     campaignRoster?: readonly SaveRosterEntry[],
   ): void {
     super.restore(snapshot, campaignRoster);
@@ -162,6 +169,7 @@ export class Stage1Battle extends Stage0Battle {
   override planEnemyAiAction(id: string, _behavior?: number): AlliedAiAction | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
+    if (unit.statuses.confusion > 0) return this.planConfusedAiAction(unit);
     const intent = this.enemyAiIntentFor(id);
     if (intent === "alert") {
       if (unit.life * 100 < this.statsFor(unit).maxLife * 40) {
@@ -174,7 +182,7 @@ export class Stage1Battle extends Stage0Battle {
 
   override serializableSnapshot(): Pick<
     SavedBattleState,
-    "round" | "focusId" | "units" | "enemyAi"
+    "round" | "focusId" | "units" | "enemyAi" | "terrainOverrides"
   > {
     return {
       ...super.serializableSnapshot(),

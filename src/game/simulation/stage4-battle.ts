@@ -1,6 +1,8 @@
 import {
   activateStage4Content,
   STAGE4_DEFINITION,
+  STAGE4_IRON_PLATE_TERRAIN_SLOT,
+  STAGE4_OBSTACLE_TERRAIN_SLOT,
   STAGE4_ROUTE_PULSE_DEFINITION,
   STAGE4_SEMANTIC_ALLIED_UNITS,
   STAGE4_SEMANTIC_ENEMY_UNITS,
@@ -87,6 +89,10 @@ export class Stage4Battle extends Stage0Battle {
       ...STAGE4_UNIT_CONFIG,
       stage: STAGE4_DEFINITION,
       terrainSlotAt: stage4TerrainSlotAt,
+      dynamicTerrainSlots: {
+        "iron-plate": STAGE4_IRON_PLATE_TERRAIN_SLOT,
+        obstacle: STAGE4_OBSTACLE_TERRAIN_SLOT,
+      },
       enemyClassPriority: STAGE4_AI_CLASS_PRIORITY,
       forces: stage4Forces(deployment),
       routePulses: [STAGE4_ROUTE_PULSE_DEFINITION],

@@ -82,6 +82,7 @@ const battleSave = (): BattleSaveData => {
       phase: "player",
       round: 3,
       focusId: "1:0",
+      terrainOverrides: [],
       units: [
         {
           id: "1:0",
@@ -385,6 +386,53 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v17 dynamic-terrain saves without changing existing iron plate", () => {
+    const current = battleSave();
+    current.battle.terrainOverrides = [{ x: 20, y: 20, kind: "iron-plate" }];
+    const legacy = {
+      ...current,
+      version: 17,
+      contentVersion: "dynamic-terrain-1",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
+  it("migrates v16 battle saves to an empty dynamic-terrain overlay", () => {
+    const current = battleSave();
+    const { terrainOverrides: _terrainOverrides, ...battle } = current.battle;
+    const legacy = {
+      ...current,
+      version: 16,
+      contentVersion: "stage-title-and-roster-inheritance-1",
+      battle,
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
+  it("validates canonical dynamic-terrain overrides", () => {
+    const valid = battleSave();
+    valid.battle.terrainOverrides = [
+      { x: 20, y: 20, kind: "iron-plate" },
+      { x: 21, y: 20, kind: "obstacle" },
+    ];
+    expect(isSaveData(valid)).toBe(true);
+
+    const duplicate = structuredClone(valid);
+    duplicate.battle.terrainOverrides[1] = { ...duplicate.battle.terrainOverrides[0] };
+    expect(isSaveData(duplicate)).toBe(false);
+
+    const reversed = structuredClone(valid);
+    reversed.battle.terrainOverrides.reverse();
+    expect(isSaveData(reversed)).toBe(false);
+
+    const unknown = structuredClone(valid);
+    unknown.battle.terrainOverrides[0].kind = "unknown" as never;
+    expect(isSaveData(unknown)).toBe(false);
+
+    const offMap = structuredClone(valid);
+    offMap.battle.terrainOverrides[0].x = 50;
+    expect(isSaveData(offMap)).toBe(false);
+  });
   it("exposes twenty manual slots as four pages without changing legacy keys", () => {
     expect(SAVE_SLOT_COUNT).toBe(20);
     expect(SAVE_SLOTS_PER_PAGE).toBe(5);

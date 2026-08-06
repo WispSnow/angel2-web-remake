@@ -324,12 +324,23 @@ function nativeTechniqueRules() {
       K: {
         visibleNames: { "1K": "鐵板", "2K": "障礙" },
         selectionRadius: 5,
-        effect: "replace five horizontally adjacent terrain cells starting at the selected cell with consecutive raw tokens sourceToken..sourceToken+4",
+        playerRoute: {
+          branch: "0000:761A..762F recognizes 1K/2K and jumps to the construction-specific 0000:76C0 path instead of the generic technique handler call",
+          placement: "build seed 5 with mode M, require a nonzero-range empty destination, then move the engineer to that cell",
+          neighborOrder: [50, -50, 1, -1],
+          neighborFilter: "0000:77CD converts each neighboring raw token to its logical terrain slot and skips slot 0",
+          mutation: "write the stage-specific sourceToken itself to every accepted orthogonal neighbor; the selected center cell is not written by this player route",
+          experience: "none; the construction route spends the action after movement without a casting-experience write",
+        },
         sourceTokens: {
           "1K": "raw terrain token copied at battle load from map cell 1266 (x16,y25)",
           "2K": "raw terrain token copied at battle load from map cell 1316 (x16,y26)",
         },
-        actionCodes: { "1K": "mode M placement, handler 1000:7C92", "2K": "mode M placement, handler 1000:7CB4" },
+        dormantDispatchRows: {
+          "1K": "DS:52A2 still points at wrapper 0000:CAE7 / writer 1000:7C92, which would write sourceToken..sourceToken+4 at linear offsets 0..4",
+          "2K": "DS:52A2 still points at wrapper 0000:CAF9 / writer 1000:7CB4, which would write sourceToken..sourceToken+4 at linear offsets 0..4",
+          reachability: "the released player construction branch bypasses these generic wrappers, class 5A is in the ordinary AI dispatch group, and no AI technique pool produces 1K/2K",
+        },
       },
       OJ: {
         visibleName: "祈禱",

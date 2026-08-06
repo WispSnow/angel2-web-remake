@@ -5,6 +5,7 @@ import type { DeploymentRosterUnit } from "../deployment-session";
 import type {
   BattleUnit,
   Difficulty,
+  DynamicTerrainKind,
   PortraitRecord,
   Position,
   SaveRosterEntry,
@@ -38,6 +39,7 @@ export interface DeployedStageUnitConfig {
 export interface DeployedStageScenarioConfig extends DeployedStageUnitConfig {
   stage: StageDefinition;
   terrainSlotAt: (position: Position) => number;
+  dynamicTerrainSlots?: Readonly<Partial<Record<DynamicTerrainKind, number>>>;
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   forces: readonly ForceDefinition[];
   routePulses?: readonly RoutePulseDefinition[];
@@ -105,6 +107,7 @@ export function createDeployedStageScenario(
     width: config.stage.width,
     height: config.stage.height,
     terrainSlotAt: config.terrainSlotAt,
+    dynamicTerrainSlots: config.dynamicTerrainSlots,
     createUnits: (difficulty) => createDeployedStageUnits(
       config,
       difficulty,

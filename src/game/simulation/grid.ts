@@ -54,6 +54,13 @@ const STABLE_NATIVE_ROUTE_DIRECTIONS: readonly Direction[] = [
   { x: 1, y: 0 },
 ];
 
+const NATIVE_CONSTRUCTION_DIRECTIONS: readonly Direction[] = [
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+];
+
 function directedNeighbors(
   position: Position,
   battlefield: GridBattlefield,
@@ -185,6 +192,58 @@ export function movementPath(
     blocked,
     zoneOfControl(unit, units, battlefield),
     undefined,
+    battlefield,
+  );
+  return reconstructPath(unit, destination, result);
+}
+
+/** Module 29 mode M: friendly cells are transit-only, enemies block, and no ZOC is applied. */
+export function constructionReachableCells(
+  unit: BattleUnit,
+  units: readonly BattleUnit[],
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+): Position[] {
+  const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
+  const blocked = new Set(
+    units
+      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
+      .map(positionKey),
+  );
+  const result = search(
+    unit,
+    unit.classId,
+    5,
+    blocked,
+    new Set(),
+    NATIVE_CONSTRUCTION_DIRECTIONS,
+    battlefield,
+  );
+  const originKey = positionKey(unit);
+  return [...result.costs.keys()]
+    .filter((key) => key !== originKey && !occupied.has(key))
+    .map(parsePositionKey);
+}
+
+export function constructionPath(
+  unit: BattleUnit,
+  destination: Position,
+  units: readonly BattleUnit[],
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+): Position[] {
+  const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
+  if (occupied.has(positionKey(destination))) return [];
+  const blocked = new Set(
+    units
+      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
+      .map(positionKey),
+  );
+  const result = search(
+    unit,
+    unit.classId,
+    5,
+    blocked,
+    new Set(),
+    NATIVE_CONSTRUCTION_DIRECTIONS,
     battlefield,
   );
   return reconstructPath(unit, destination, result);

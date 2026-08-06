@@ -3,11 +3,18 @@ import { killRewardFor, movementRulesFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
 import type { DeterministicRng } from "../rng";
 import { cloneUnitStatuses } from "../status";
-import { techniqueEffectRange, type ActionBattlefield } from "./range-map";
+import {
+  stompEffectRange,
+  techniqueEffectRange,
+  type ActionBattlefield,
+  type ActionViewport,
+} from "./range-map";
 import type {
   ActionBlockReason,
+  BattleActionId,
   BattleActionIntent,
   PreparedBattleAction,
+  PrayerOutcomeKind,
   SpecialActionAffectedUnit,
 } from "./types";
 
@@ -15,15 +22,21 @@ export interface SpecialActionResolutionContext {
   units: readonly BattleUnit[];
   battlefield: ActionBattlefield;
   statsFor: (unit: Pick<BattleUnit, "classId" | "experience" | "side">) => UnitStats;
+  viewport?: ActionViewport;
 }
 
 const positionKey = ({ x, y }: Position): string => `${x},${y}`;
 const copyPosition = ({ x, y }: Position): Position => ({ x, y });
+const isFireAction = (actionId: BattleActionId): actionId is "fire-1" | "fire-2" | "fire-3" | "fire-4" =>
+  actionId === "fire-1" || actionId === "fire-2" || actionId === "fire-3" || actionId === "fire-4";
+const isHealAction = (actionId: BattleActionId): actionId is "heal-1" | "heal-2" | "heal-3" =>
+  actionId === "heal-1" || actionId === "heal-2" || actionId === "heal-3";
 
 function affectedUnit(
   unit: BattleUnit,
   patch: Partial<Pick<SpecialActionAffectedUnit,
-    "positionAfter" | "lifeAfter" | "actionDisabledAfter" | "statusesAfter" | "damage" | "healing" | "blocked" | "blockReason">>,
+    "positionAfter" | "lifeAfter" | "experienceAfter" | "actionDisabledAfter" | "statusesAfter"
+    | "damage" | "healing" | "blocked" | "blockReason" | "prayerOutcome" | "prayerRolledAmount">>,
 ): SpecialActionAffectedUnit {
   const positionBefore = copyPosition(unit);
   const positionAfter = patch.positionAfter ? copyPosition(patch.positionAfter) : copyPosition(unit);
@@ -34,6 +47,8 @@ function affectedUnit(
     positionAfter,
     lifeBefore: unit.life,
     lifeAfter,
+    experienceBefore: unit.experience,
+    experienceAfter: patch.experienceAfter ?? unit.experience,
     actionDisabledBefore: unit.actionDisabled,
     actionDisabledAfter: patch.actionDisabledAfter ?? unit.actionDisabled,
     statusesBefore: cloneUnitStatuses(unit.statuses),
@@ -46,6 +61,80 @@ function affectedUnit(
     blockReason: patch.blockReason,
     died: lifeAfter === 0,
     moved: positionKey(positionBefore) !== positionKey(positionAfter),
+    prayerOutcome: patch.prayerOutcome,
+    prayerRolledAmount: patch.prayerRolledAmount,
+  };
+}
+
+function preparePrayer(
+  context: SpecialActionResolutionContext,
+  trial: DeterministicRng,
+): { affectedUnits: SpecialActionAffectedUnit[]; eligibleUnitIds: string[] } {
+  const definition = BATTLE_ACTION_DEFINITIONS.prayer;
+  const eligible = context.units
+    .filter((unit) => unit.side === definition.scan.eligibleSide)
+    .sort((left, right) => left.y * context.battlefield.width + left.x
+      - (right.y * context.battlefield.width + right.x));
+  const affectedUnits: SpecialActionAffectedUnit[] = [];
+
+  for (const unit of eligible) {
+    if ((trial.nextUint() & (1 << definition.scan.gateBit)) === 0) continue;
+    const outcomeRoll = trial.between(0, 3);
+    const outcome: PrayerOutcomeKind = outcomeRoll === definition.outcomes.healing.roll
+      ? "healing"
+      : outcomeRoll === definition.outcomes.experience.roll
+        ? "experience"
+        : outcomeRoll === definition.outcomes.attackUp.roll
+          ? "attackUp"
+          : "defenseUp";
+    const statusesAfter = cloneUnitStatuses(unit.statuses);
+    let lifeAfter = unit.life;
+    let experienceAfter = unit.experience;
+    let healing = 0;
+    let blocked = false;
+    let blockReason: ActionBlockReason | undefined;
+    let prayerRolledAmount: number | undefined;
+
+    if (outcome === "healing") {
+      prayerRolledAmount = trial.between(
+        definition.outcomes.healing.minimum,
+        definition.outcomes.healing.maximum,
+      );
+      if (unit.actionDisabled) {
+        blocked = true;
+        blockReason = "frozen";
+      } else {
+        const maximumLife = context.statsFor(unit).maxLife;
+        healing = Math.min(maximumLife - unit.life, prayerRolledAmount);
+        lifeAfter += healing;
+      }
+    } else if (outcome === "experience") {
+      prayerRolledAmount = trial.between(
+        definition.outcomes.experience.minimum,
+        definition.outcomes.experience.maximum,
+      );
+      experienceAfter += prayerRolledAmount;
+    } else if (outcome === "attackUp") {
+      statusesAfter.attackUp = definition.outcomes.attackUp.counter;
+    } else {
+      statusesAfter.defenseUp = definition.outcomes.defenseUp.counter;
+    }
+
+    affectedUnits.push(affectedUnit(unit, {
+      lifeAfter,
+      experienceAfter,
+      statusesAfter,
+      healing,
+      blocked,
+      blockReason,
+      prayerOutcome: outcome,
+      prayerRolledAmount,
+    }));
+  }
+
+  return {
+    affectedUnits,
+    eligibleUnitIds: eligible.map(({ id }) => id),
   };
 }
 
@@ -69,24 +158,30 @@ function prepareSingleTarget(
     } else {
       damage = trial.between(definition.damage.minimum, definition.damage.maximum);
     }
-  } else if (intent.actionId === "fire-1") {
-    const definition = BATTLE_ACTION_DEFINITIONS["fire-1"];
+  } else if (isFireAction(intent.actionId)) {
+    const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     if (target.actionDisabled) {
       blocked = true;
       blockReason = "frozen";
-    } else if (target.statuses.magicGuard > 0) {
-      blocked = true;
-      blockReason = "magicGuard";
-      targetStatusesAfter.magicGuard = 0;
     } else {
-      damage = Math.min(
-        target.life,
-        definition.damage.cap,
-        Math.floor(targetMaximumLife * definition.damage.maxLifePercent / 100),
-      );
+      // REMAKE-005 classifies fire as magic damage: the native path pierced
+      // the guard and then cleared it, while stableRemake blocks first and
+      // still consumes the one-cast guard at the atomic settlement boundary.
+      const guarded = target.statuses.magicGuard > 0;
+      targetStatusesAfter.magicGuard = 0;
+      if (guarded) {
+        blocked = true;
+        blockReason = "magicGuard";
+      } else {
+        damage = Math.min(
+          target.life,
+          definition.damage.cap,
+          Math.floor(targetMaximumLife * definition.damage.maxLifePercent / 100),
+        );
+      }
     }
-  } else if (intent.actionId === "heal-1") {
-    const definition = BATTLE_ACTION_DEFINITIONS["heal-1"];
+  } else if (isHealAction(intent.actionId)) {
+    const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     if (target.actionDisabled) {
       blocked = true;
       blockReason = "frozen";
@@ -96,7 +191,114 @@ function prepareSingleTarget(
         Math.floor(targetMaximumLife * definition.healing.maxLifePercent / 100),
       );
     }
-  } else {
+  } else if (intent.actionId === "attack-up") {
+    const definition = BATTLE_ACTION_DEFINITIONS["attack-up"];
+    targetStatusesAfter.attackUp = definition.status.counter;
+    return {
+      affected: affectedUnit(target, { statusesAfter: targetStatusesAfter }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
+  } else if (intent.actionId === "defense-up") {
+    const definition = BATTLE_ACTION_DEFINITIONS["defense-up"];
+    targetStatusesAfter.defenseUp = definition.status.counter;
+    return {
+      affected: affectedUnit(target, { statusesAfter: targetStatusesAfter }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
+  } else if (intent.actionId === "magic-guard") {
+    const definition = BATTLE_ACTION_DEFINITIONS["magic-guard"];
+    targetStatusesAfter.magicGuard = definition.status.counter;
+    return {
+      affected: affectedUnit(target, { statusesAfter: targetStatusesAfter }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
+  } else if (intent.actionId === "poison") {
+    const definition = BATTLE_ACTION_DEFINITIONS.poison;
+    if (definition.status.immuneClasses.some((classId) => classId === target.classId)) {
+      blocked = true;
+      blockReason = "classImmune";
+    } else {
+      targetStatusesAfter.poison = definition.status.counter;
+    }
+    return {
+      affected: affectedUnit(target, {
+        statusesAfter: targetStatusesAfter,
+        blocked,
+        blockReason,
+      }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
+  } else if (intent.actionId === "confusion") {
+    const definition = BATTLE_ACTION_DEFINITIONS.confusion;
+    if (definition.status.immuneClasses.some((classId) => classId === target.classId)) {
+      blocked = true;
+      blockReason = "classImmune";
+    } else {
+      targetStatusesAfter.confusion = definition.status.counter;
+    }
+    return {
+      affected: affectedUnit(target, {
+        statusesAfter: targetStatusesAfter,
+        blocked,
+        blockReason,
+      }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
+  } else if (intent.actionId === "attack-down") {
+    const definition = BATTLE_ACTION_DEFINITIONS["attack-down"];
+    targetStatusesAfter.attackDown = definition.status.counter;
+    return {
+      affected: affectedUnit(target, { statusesAfter: targetStatusesAfter }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
+  } else if (intent.actionId === "defense-down") {
+    const definition = BATTLE_ACTION_DEFINITIONS["defense-down"];
+    targetStatusesAfter.defenseDown = definition.status.counter;
+    return {
+      affected: affectedUnit(target, { statusesAfter: targetStatusesAfter }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
+  } else if (intent.actionId === "spell-seal") {
+    const definition = BATTLE_ACTION_DEFINITIONS["spell-seal"];
+    if (definition.status.immuneClasses.some((classId) => classId === target.classId)) {
+      blocked = true;
+      blockReason = "classImmune";
+    } else {
+      targetStatusesAfter.techniqueSeal = definition.status.counter;
+    }
+    return {
+      affected: affectedUnit(target, {
+        statusesAfter: targetStatusesAfter,
+        blocked,
+        blockReason,
+      }),
+      experienceGained: definition.experience.base + trial.between(
+        definition.experience.randomMinimum,
+        definition.experience.randomMaximum,
+      ),
+    };
+  } else if (intent.actionId === "dispel") {
     const definition = BATTLE_ACTION_DEFINITIONS.dispel;
     targetStatusesAfter.confusion = 0;
     targetStatusesAfter.attackDown = 0;
@@ -113,6 +315,8 @@ function prepareSingleTarget(
         definition.experience.randomMaximum,
       ),
     };
+  } else {
+    throw new Error(`unsupported single-target action ${intent.actionId}`);
   }
 
   const lifeAfter = Math.max(0, Math.min(targetMaximumLife, target.life - damage + healing));
@@ -125,15 +329,15 @@ function prepareSingleTarget(
       definition.experience.maximum,
     );
     if (targetDied) experienceGained += killRewardFor(target.classId, target.side);
-  } else if (intent.actionId === "fire-1") {
-    const definition = BATTLE_ACTION_DEFINITIONS["fire-1"];
+  } else if (isFireAction(intent.actionId)) {
+    const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     experienceGained = definition.experience.base + trial.between(
       definition.experience.randomMinimum,
       definition.experience.randomMaximum,
     );
     if (targetDied) experienceGained += killRewardFor(target.classId, target.side);
-  } else if (intent.actionId === "heal-1") {
-    const definition = BATTLE_ACTION_DEFINITIONS["heal-1"];
+  } else if (isHealAction(intent.actionId)) {
+    const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     const q = Math.floor(healing * 10 / targetMaximumLife);
     experienceGained = trial.between(
       definition.experience.randomMinimum,
@@ -155,11 +359,13 @@ function prepareSingleTarget(
 }
 
 function prepareLightning(
+  actionId: Extract<BattleActionId, "lightning-1" | "lightning-2" | "lightning-3" | "lightning-4">,
   actor: BattleUnit,
   center: Position,
   context: SpecialActionResolutionContext,
 ): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
-  const definition = BATTLE_ACTION_DEFINITIONS["lightning-1"];
+  const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+  const damageByRangeValue: Readonly<Record<number, number>> = definition.damage.byRangeValue;
   const effect = techniqueEffectRange(
     center,
     context.battlefield.width,
@@ -182,10 +388,10 @@ function prepareLightning(
           ? "magicGuard"
           : undefined;
       if (!frozen) statusesAfter.magicGuard = 0;
-      const rangeValue = effect.valueAt(unit) as 1 | 2 | 3;
+      const rangeValue = effect.valueAt(unit);
       const damage = blocked
         ? 0
-        : Math.min(unit.life, definition.damage.byRangeValue[rangeValue]);
+        : Math.min(unit.life, damageByRangeValue[rangeValue] ?? 0);
       const lifeAfter = unit.life - damage;
       if (lifeAfter === 0) experienceGained += killRewardFor(unit.classId, unit.side);
       return affectedUnit(unit, {
@@ -204,12 +410,13 @@ function prepareLightning(
 }
 
 function prepareIce(
+  actionId: Extract<BattleActionId, "ice-1" | "ice-2" | "ice-3" | "ice-4">,
   actor: BattleUnit,
   center: Position,
   context: SpecialActionResolutionContext,
   trial: DeterministicRng,
 ): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
-  const definition = BATTLE_ACTION_DEFINITIONS["ice-1"];
+  const definition = BATTLE_ACTION_DEFINITIONS[actionId];
   const effect = techniqueEffectRange(
     center,
     context.battlefield.width,
@@ -282,12 +489,13 @@ function prepareIce(
 }
 
 function prepareRecovery(
+  actionId: Extract<BattleActionId, "recovery-1" | "recovery-2" | "recovery-3">,
   actor: BattleUnit,
   center: Position,
   context: SpecialActionResolutionContext,
   trial: DeterministicRng,
 ): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
-  const definition = BATTLE_ACTION_DEFINITIONS["recovery-1"];
+  const definition = BATTLE_ACTION_DEFINITIONS[actionId];
   const effect = techniqueEffectRange(
     center,
     context.battlefield.width,
@@ -301,11 +509,16 @@ function prepareRecovery(
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {
       const frozen = unit.actionDisabled;
-      const rangeValue = effect.valueAt(unit) as 1 | 2 | 3;
+      const rangeValue = effect.valueAt(unit);
+      const healingForRangeValue = Object.entries(definition.healing.byRangeValue)
+        .find(([value]) => Number(value) === rangeValue)?.[1];
+      if (healingForRangeValue === undefined) {
+        throw new Error(`${actionId} has no recovery value for range ${rangeValue}`);
+      }
       const maximumLife = context.statsFor(unit).maxLife;
       const healing = frozen
         ? 0
-        : Math.min(maximumLife - unit.life, definition.healing.byRangeValue[rangeValue]);
+        : Math.min(maximumLife - unit.life, healingForRangeValue);
       totalActualHealing += healing;
       return affectedUnit(unit, {
         lifeAfter: unit.life + healing,
@@ -330,6 +543,48 @@ function prepareRecovery(
   };
 }
 
+function prepareStomp(
+  actionId: Extract<BattleActionId, "stomp-1" | "stomp-2" | "stomp-3">,
+  actor: BattleUnit,
+  target: BattleUnit,
+  center: Position,
+  context: SpecialActionResolutionContext,
+  trial: DeterministicRng,
+): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
+  const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+  const viewport = context.viewport ?? {
+    origin: { x: 0, y: 0 },
+    width: definition.range.viewportWidth,
+    height: definition.range.viewportHeight,
+  };
+  const effect = stompEffectRange(actor, center, context.battlefield, viewport);
+  const affectedUnits = context.units
+    .filter((unit) => unit.side === target.side && effect.valueAt(unit) > 0)
+    .sort((left, right) => left.y * context.battlefield.width + left.x
+      - (right.y * context.battlefield.width + right.x))
+    .map((unit) => {
+      const frozen = unit.actionDisabled;
+      const rolledDamage = frozen
+        ? 0
+        : trial.between(
+          definition.damage.base,
+          definition.damage.base + definition.damage.randomBelow - 1,
+        );
+      const damage = Math.min(unit.life, rolledDamage);
+      return affectedUnit(unit, {
+        lifeAfter: unit.life - damage,
+        damage,
+        blocked: frozen,
+        blockReason: frozen ? "frozen" : undefined,
+      });
+    });
+  return {
+    affectedUnits,
+    experienceGained: definition.experience.fixed,
+    effectCells: effect.cells().map((position) => ({ position, value: effect.valueAt(position) })),
+  };
+}
+
 export function prepareSpecialAction(
   intent: BattleActionIntent,
   actor: BattleUnit,
@@ -342,13 +597,56 @@ export function prepareSpecialAction(
   let affectedUnits: SpecialActionAffectedUnit[];
   let experienceGained: number;
   let effectCells: PreparedBattleAction["result"]["effectCells"] = [];
+  let prayerEligibleUnitIds: readonly string[] | undefined;
 
-  if (intent.actionId === "lightning-1") {
-    ({ affectedUnits, experienceGained, effectCells } = prepareLightning(actor, center, context));
-  } else if (intent.actionId === "ice-1") {
-    ({ affectedUnits, experienceGained, effectCells } = prepareIce(actor, center, context, trial));
-  } else if (intent.actionId === "recovery-1") {
-    ({ affectedUnits, experienceGained, effectCells } = prepareRecovery(actor, center, context, trial));
+  if (intent.actionId === "prayer") {
+    const prayer = preparePrayer(context, trial);
+    affectedUnits = prayer.affectedUnits;
+    prayerEligibleUnitIds = prayer.eligibleUnitIds;
+    experienceGained = 0;
+  } else if (intent.actionId === "lightning-1"
+    || intent.actionId === "lightning-2"
+    || intent.actionId === "lightning-3"
+    || intent.actionId === "lightning-4") {
+    ({ affectedUnits, experienceGained, effectCells } = prepareLightning(
+      intent.actionId,
+      actor,
+      center,
+      context,
+    ));
+  } else if (intent.actionId === "ice-1"
+    || intent.actionId === "ice-2"
+    || intent.actionId === "ice-3"
+    || intent.actionId === "ice-4") {
+    ({ affectedUnits, experienceGained, effectCells } = prepareIce(
+      intent.actionId,
+      actor,
+      center,
+      context,
+      trial,
+    ));
+  } else if (intent.actionId === "recovery-1"
+    || intent.actionId === "recovery-2"
+    || intent.actionId === "recovery-3") {
+    ({ affectedUnits, experienceGained, effectCells } = prepareRecovery(
+      intent.actionId,
+      actor,
+      center,
+      context,
+      trial,
+    ));
+  } else if (intent.actionId === "stomp-1"
+    || intent.actionId === "stomp-2"
+    || intent.actionId === "stomp-3") {
+    if (!target) throw new Error("stomp action requires a target unit");
+    ({ affectedUnits, experienceGained, effectCells } = prepareStomp(
+      intent.actionId,
+      actor,
+      target,
+      center,
+      context,
+      trial,
+    ));
   } else {
     if (!target) throw new Error("single-target action requires a target unit");
     const single = prepareSingleTarget(intent, target, trial, context.statsFor(target).maxLife);
@@ -375,13 +673,16 @@ export function prepareSpecialAction(
       experienceGained,
       affectedUnits,
       effectCells,
+      prayerEligibleUnitIds,
     },
     rngBefore: rng.state,
     rngAfter: trial.state,
     rngCallsBefore: rng.calls,
     rngCallsAfter: trial.calls,
     actorExperienceBefore: actor.experience,
-    actorExperienceAfter: actor.experience + experienceGained,
+    actorExperienceAfter: intent.actionId === "prayer"
+      ? affectedUnits.find(({ unitId }) => unitId === actor.id)?.experienceAfter ?? actor.experience
+      : actor.experience + experienceGained,
     targetLifeBefore: primary?.lifeBefore ?? 0,
     targetLifeAfter: primary?.lifeAfter ?? 0,
     targetStatusesBefore: primary?.statusesBefore ?? emptyStatuses,

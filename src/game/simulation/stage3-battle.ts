@@ -1,6 +1,8 @@
 import {
   activateStage3Content,
   STAGE3_DEFINITION,
+  STAGE3_IRON_PLATE_TERRAIN_SLOT,
+  STAGE3_OBSTACLE_TERRAIN_SLOT,
   STAGE3_SEMANTIC_ALLIED_UNITS,
   STAGE3_SEMANTIC_ENEMY_UNITS,
   stage3TerrainSlotAt,
@@ -97,6 +99,10 @@ const STAGE3_SCENARIO_CONFIG = {
   ...STAGE3_UNIT_CONFIG,
   stage: STAGE3_DEFINITION,
   terrainSlotAt: stage3TerrainSlotAt,
+  dynamicTerrainSlots: {
+    "iron-plate": STAGE3_IRON_PLATE_TERRAIN_SLOT,
+    obstacle: STAGE3_OBSTACLE_TERRAIN_SLOT,
+  },
   enemyClassPriority: STAGE3_AI_CLASS_PRIORITY,
   forces: STAGE3_FORCE_DEFINITIONS,
 } as const satisfies FixedStageScenarioConfig;

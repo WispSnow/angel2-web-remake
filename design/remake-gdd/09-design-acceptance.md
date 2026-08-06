@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-全战役仍为 `implementationFrozen=true`。用户在 2026-07-16 明确要求完成首个垂直切片，因此第 0 关作为有界例外解除冻结。第 1 关纸面合同已于 2026-07-25 建立；用户于 2026-08-01 明确授权有界 M02，并于 2026-08-03 手动通关接受。用户同日进一步明确要求按建议推进第 2 关，第 2 关作为有界 M03 实现例外解除冻结；用户于 2026-08-04 确认第 2 关验收完成并要求继续推进第 3 关，因此第 3 关作为有界 M04 实现例外解除冻结。用户同日授权按建议继续建立第 4 关纸面合同，M05 已把关卡与力场系统推进到 `specified`；现又明确授权 M06，第 4 关作为有界实现例外解除冻结，但第 5 关和未被本关消费的系统仍冻结。
+全战役仍为 `implementationFrozen=true`。用户在 2026-07-16 明确要求完成首个垂直切片，因此第 0 关作为有界例外解除冻结。第 1 关纸面合同已于 2026-07-25 建立；用户于 2026-08-01 明确授权有界 M02，并于 2026-08-03 手动通关接受。用户同日进一步明确要求按建议推进第 2 关，第 2 关作为有界 M03 实现例外解除冻结；用户于 2026-08-04 确认第 2 关验收完成并要求继续推进第 3 关，因此第 3 关作为有界 M04 实现例外解除冻结。用户同日授权按建议继续建立第 4 关纸面合同，M05 已把关卡与力场系统推进到 `specified`；现又明确授权 M06，第 4 关作为有界实现例外解除冻结。用户随后进一步授权按原版目录逐项实现全部 33 项玩家技术，并要求每项先复核原版、再实现规则／AI／音画、通过自动验证后才进入下一项；该授权只解除技术系统、竞技场和实验室的逐项实施边界，第 5 关内容仍冻结。
 
 第 0 关已于 2026-07-27 达到 `accepted`：程序与自动验收通过，用户确认试玩清单全部无误。后续容量改进采用 20 个手动槽、每页五槽。验收后确认的敌方难度属性与具名我方初值差异已经修正；M00 当时建立的 v4 迁移语义先由 v5、现由 v6 继续承接，不改变第 0 关接受结论。
 
@@ -234,6 +234,159 @@
 - [x] 调试中心、代表性截图、完整自动门禁和普通 `/` 入口流程完成；
 - [ ] 用户完成第 4 关人工试玩并接受。
 
+## Q. 全技术逐项实施例外
+
+- [x] 用户于 2026-08-04 明确授权依次实现全部原版玩家技术，包括规则效果与地图画面特效；
+- [x] 33 项机器目录、状态和逐项门禁登记在
+  [`technique-implementation-sequence.md`](systems/technique-implementation-sequence.md)；
+- [x] 已实现项目与仅有实验室表现的项目分开标记，不把 `presentation-only` 当成规则完成；
+- [x] 首个未闭合动作 `1D/龍踏` 的规则、AI、视窗并集、PRNG、音画顺序和验收实例已形成
+  [`technique-1d-stomp.md`](systems/technique-1d-stomp.md)，无实施必需 `[TBD]`；
+- [x] `1D/龍踏` 已完成模拟、双方 AI、正式地图表现、竞技场、technique-lab 与自动／截图门禁；
+- [x] `1K/鐵板` 已复核正常玩家路径与休眠分发表冲突，并以 `REMAKE-025` 闭合动态地形、
+  几何边界、存档和无专用动画合同，见
+  [`technique-1k-iron-plate.md`](systems/technique-1k-iron-plate.md)；
+- [x] `1K/鐵板` 已完成 seed 5 移动、四邻动态地形、v17 存档、正式菜单、竞技场、
+  technique-lab 与完整自动／截图门禁；
+- [x] `2C/中級冰雪` 已完成巫師第一层菜单、半径 4 三圈、`10..11` 位移经验、双方 AI
+  自中心执行、组 12 对话、18 draw／180 tick／三次 `UN/50`、正式竞技场与截图门禁，见
+  [`technique-2c-intermediate-ice.md`](systems/technique-2c-intermediate-ice.md)；
+- [x] `2D/男踏` 已完成第二层限定菜单、选择距离 5、目标三步与当前视窗并集、逐单位
+  `15..29`、固定经验、双方 AI、组 13 对话、原版 `MAGIC/51/52`、x=368、共同震地时间线、
+  正式竞技场与截图门禁，见 [`technique-2d-male-stomp.md`](systems/technique-2d-male-stomp.md)；
+- [x] `2F/中級炎暴` 已完成邪法師第一层／魔祭師第三层菜单、统一距离 6、26%／156 上限、
+  `REMAKE-005` 的防魔挡伤后消耗、经验 10/11、双方 AI、组 10 对话、原版 `MAGIC/23` 21 张素材的
+  12 段组合火柱、`MAGIC/83`、正式竞技场与截图门禁，见
+  [`technique-2f-intermediate-fire.md`](systems/technique-2f-intermediate-fire.md)；
+- [x] `2H/中級治療` 已完成魔導師第二层／祈導師第三层菜单、距离 6、36% 恢复、`q` 分档经验、
+  满血时单次 PRNG、稳定规则冰封拒绝、AI 线性格较后平局、组 15 对话、`MAGIC/37`
+  两轮十四次六图块心盾与 `MAGIC/0` 共同尾效、`E/36`、正式竞技场与截图门禁，见
+  [`technique-2h-intermediate-heal.md`](systems/technique-2h-intermediate-heal.md)；
+- [x] `2I/中級回復` 已完成祈導師第二层／魔導師第三层菜单、距离 5 与半径 3、分圈
+  50／70／90 恢复、真实恢复经验门槛与封顶、零恢复不取随机、`REMAKE-013` 冰封跳过、
+  `REMAKE-019` 实际范围投影、AI 线性格较后平局、组 14 对话、`MAGIC/20` 十七阶段、
+  `E/36`、正式竞技场与截图门禁，见
+  [`technique-2i-intermediate-recovery.md`](systems/technique-2i-intermediate-recovery.md)；
+- [x] `2K/障礙` 已完成三层工兵原版顺序菜单、seed 5 空格移动、下／上／右／左四邻
+  障礙覆盖、五关 token／逻辑槽、零经验／随机／专用音画、ordinary AI、v18 动态地形与
+  v17 迁移、正式竞技场和 technique-lab 截图门禁，见
+  [`technique-2k-obstacle.md`](systems/technique-2k-obstacle.md)；
+- [x] `2L/中級落雷` 已完成魔法師第一层菜单、统一选择距离 5、半径 4 的
+  15／30／45／60 四档伤害、防魔消费、纯击杀经验、`REMAKE-013` 冰封跳过、双方 AI 与
+  组 11 对话；正式表现使用独立 `MAGIC/47/48` 主段、`MAGIC/24` 错相电波、`MAGIC/6`
+  全敌收尾及 0／35 tick 的 `E/63/41`，总计 257 tick，并通过竞技场和 technique-lab
+  截图门禁，见 [`technique-2l-intermediate-lightning.md`](systems/technique-2l-intermediate-lightning.md)；
+- [x] `3C/高級冰雪` 已完成巫師第二层自中心菜单、AI 独立 4 格候选门、半径 5 四圈、
+  `12..14` 位移经验，并严格采用 `REMAKE-013` 的最外圈只冰封、已冰封不刷新／不清盾；
+  正式玩家与 AI 共用四次 `UN/50`、24 draw／240 tick 原版表现并通过完整与截图门禁，见
+  [`technique-3c-advanced-ice.md`](systems/technique-3c-advanced-ice.md)；
+- [x] `3D/女踏` 已完成巨龍騎士第三层菜单、距离 5、目标三步与当前视窗并集、
+  逐单位 `20..39`、冰封接收者零伤害／零随机、固定经验 5、双方 AI 与组 13 对话；
+  正式表现按目标阵营分别使用独立 `MAGIC/53/54`、x=368、33 draw、12 次翻页保持、
+  13 tick 与四次 `MAGIC/82`，并通过竞技场、technique-lab、完整自动与截图门禁，见
+  [`technique-3d-female-stomp.md`](systems/technique-3d-female-stomp.md)；
+- [x] `3F/高級炎暴` 已完成邪法師第二层菜单、统一距离 7、32%／192 上限、
+  经验 `12..14`、冰封拒绝、双方 AI 与组 10 对话；共享 `1F/2F/3F` 路径同步恢复
+  `REMAKE-005` 的防魔挡伤后消耗。正式表现使用独立 `MAGIC/27` 51 张素材的
+  13 段组合火浪、末项 15 tick 空尾与 `MAGIC/83`，并通过竞技场、technique-lab、
+  完整自动与截图门禁，见 [`technique-3f-advanced-fire.md`](systems/technique-3f-advanced-fire.md)；
+- [x] `3H/高級治療` 已完成魔導師第三层菜单、距离 7、48% 恢复、`q` 分档
+  `15+q+0..2` 经验、满血单次 PRNG、稳定规则冰封拒绝、双方 AI 与组 15 对话；正式表现
+  依次组合 `MAGIC/42` 正序五项、`MAGIC/41` 三轮十八项、`MAGIC/42` 反序五项和
+  `MAGIC/0` 五帧共同尾效，唯一 `E/36` 延后至 30 tick，总计 33 draw／235 tick，并通过
+  竞技场、technique-lab、完整自动与截图门禁，见
+  [`technique-3h-advanced-heal.md`](systems/technique-3h-advanced-heal.md)；
+- [x] `3I/高級回復` 已完成祈導師第三层菜单、距离 6、半径 4 与外至中心
+  35／60／85／110 恢复、`floor(total/50)` 的基础 12／封顶 8 经验项、零恢复不取随机、
+  AI 组 14 与原版 `SM` 缺参异常边界；正式玩家与 AI 共用 `MAGIC/20` 十七阶段、
+  255 tick 与 `E/36`。`REMAKE-013` 的冰封单位零恢复、零经验／随机且不叠加回復图形，
+  已由正式竞技场和 technique-lab 的冰雪组合截图验收，见
+  [`technique-3i-advanced-recovery.md`](systems/technique-3i-advanced-recovery.md)；
+- [x] `3L/高級落雷` 已完成魔法師第二层菜单、`REMAKE-009` 统一距离 6、半径 4 的
+  45／60／75／90 伤害、防魔消费、纯击杀经验、双方 AI 与组 11 对话；正式表现按原版
+  独立使用逐组三帧上移的 `MAGIC/3`、继承目标上方四行锚点的 `MAGIC/4`、
+  `MAGIC/25` 错相电波与 `MAGIC/6` 全敌收尾，总计 348 tick。`REMAKE-013` 冰封覆盖
+  零伤害且不清防魔、冰壳持续高于雷柱，已由正式冰雪组合与完整截图门禁验证，见
+  [`technique-3l-advanced-lightning.md`](systems/technique-3l-advanced-lightning.md)；
+- [x] `4C/究級冰雪` 已完成巫師第三层自中心菜单、AI 距离 5 候选门、半径 6 五圈、
+  `15..17` 位移经验与组 12 对话；严格采用 `REMAKE-013`，值 1 最外圈只冰封不外推，
+  已冰封目标完整跳过并保留防魔。正式玩家与 AI 共用五次 `UN/50`、30 draw／300 tick
+  逐圈表现，并通过竞技场、technique-lab、完整自动与第五圈截图门禁，见
+  [`technique-4c-ultimate-ice.md`](systems/technique-4c-ultimate-ice.md)；
+- [x] `4F/究級炎暴` 已完成邪法師第三层菜单、统一距离 7、44%／270 上限、经验
+  `15..17`、`REMAKE-005` 防魔挡伤后消费、`REMAKE-013` 冰封拒绝、双方 AI 与组 10
+  对话；正式表现依次组合 `MAGIC/30` 12 项、`MAGIC/28` 8 项及 `MAGIC/29` 4 项直画
+  加 5 项逐行上升火柱，总计 29 draw／290 tick，并通过资源边界断言、竞技场、
+  technique-lab、完整自动与三阶段截图门禁，见
+  [`technique-4f-ultimate-fire.md`](systems/technique-4f-ultimate-fire.md)；
+- [x] `4L/究級落雷` 已完成魔法師第三层菜单、统一距离 7、半径 5 的
+  30／50／70／90／110 伤害、防魔消费、纯击杀经验、双方 AI 与组 11 对话；正式表现
+  依次播放 `MAGIC/39` 九轮下降细雷、`MAGIC/39/40/39` 完整七行雷柱、`MAGIC/26`
+  错相电波与 `MAGIC/6` 全敌收尾，总计 304 tick。`REMAKE-013` 冰封覆盖零伤害且不清
+  防魔、冰壳持续高于雷柱，已由正式冰雪组合、竞技场、technique-lab 与完整截图门禁
+  验证，见 [`technique-4l-ultimate-lightning.md`](systems/technique-4l-ultimate-lightning.md)；
+- [x] `AA/攻擊提昇` 已完成魔導師三层菜单、距离 4、状态重置为 3、有效攻击 `+20`、
+  完整轮递减、`10..13` 经验、一次 PRNG、双方 AI 与组 17 原文错字；正式表现使用
+  `MAGIC/16` 二十对双格帧与 `UN/51`，总计 300 tick。依 `REMAKE-013`，冰封友军仍可
+  接受该正面状态且保持冰封，冰壳持续高于增益光柱；正式玩家、AI、冰雪组合、
+  technique-lab 与完整截图门禁均已验证，见
+  [`technique-aa-attack-up.md`](systems/technique-aa-attack-up.md)；
+- [x] `AD/防禦提昇` 已完成祈導師三层菜单、距离 4、状态重置为 3、有效防御 `+20`、
+  地形防御联动、完整轮递减、`10..13` 经验、一次 PRNG、双方 AI 与组 16 原文；正式表现
+  使用 `MAGIC/33` 十一组四格盾牌与 `UN/52`，总计 165 tick。依 `REMAKE-013`，冰封友军
+  仍可接受该正面状态且保持冰封，冰壳持续高于盾牌；正式玩家、AI、冰雪组合、
+  technique-lab、完整自动与截图门禁均已验证，见
+  [`technique-ad-defense-up.md`](systems/technique-ad-defense-up.md)；
+- [x] `FM/防魔` 已完成魔導師三层菜单、距离 7、状态重置为 1、完整轮清零、`10..13`
+  经验与一次 PRNG；第三层 AI 保留原版四项池，并由 `REMAKE-026` 安全使用玩家动作定义，
+  不伪造缺失的原版对白。正式表现与 AA 逐帧共用 `MAGIC/16` 二十对双格帧和 `UN/51`，
+  总计 300 tick。依 `REMAKE-013`，冰封友军仍可获得防魔且冰壳高于光焰；魔法消费、
+  正式玩家／AI、technique-lab、完整自动与截图门禁均已验证，见
+  [`technique-fm-magic-guard.md`](systems/technique-fm-magic-guard.md)；
+- [x] `IP/施毒` 已完成咒術師第二／三层菜单、距离 6、状态重置为 3、每个完整轮边界生命
+  折半与 `REMAKE-004` 最低 1 点、首领免疫、`14..17` 经验与一次 PRNG；双方 AI 保持原生
+  层级池及组 20 原文“中毒.”。正式表现依次播放 `MAGIC/17` 十三次上升毒液、130 tick 的
+  `E/58` 与 `MAGIC/18` 十六次毒云，总计 290 tick。依 `REMAKE-013`，冻结敌军可被施毒，
+  但仍冻结的轮边界跳过毒伤并照常递减计数，冰壳高于两段毒雾；正式玩家／AI、竞技场、
+  technique-lab、完整自动与截图门禁均已验证，见
+  [`technique-ip-poison.md`](systems/technique-ip-poison.md)；
+- [x] `LA/混亂` 已完成咒術師三层菜单、距离 5、状态重置为 3、完整轮递减、首领免疫、
+  `14..17` 经验与一次 PRNG；玩家手动单位不受 FFh 覆写，自动普通职业只向无邻敌的最高
+  防御格撤退，射击／技术／女帝／龍类只按确定性随机移动，均不攻击或施术。敌方 AI 保留
+  原生池及组 22 原文“混亂.”；正式表现使用 `MAGIC/44` 十一个 `3×2` 描述符、每项
+  15 tick、总计 165 tick 且无声音。依 `REMAKE-013`，冻结敌军可被施加混亂，计数仍在
+  完整轮边界递减且冰壳高于鬼脸／星光；正式玩家／AI、竞技场、technique-lab、完整自动与
+  截图门禁均已验证，见 [`technique-la-confusion.md`](systems/technique-la-confusion.md)；
+- [x] `OJ/祈禱` 已完成祈禱導師第三层无目标菜单、side 1 全图格号扫描、逐候选随机门、
+  生命／经验／攻防四分支与逐单位渐进提交；正式表现使用原版固定坐标程序图元、结果原文、
+  每名最多 60 tick 保持且零声音。依 `REMAKE-013`，冻结候选仍消费完整随机序列，生命分支
+  显示抽取量但实际恢复为零，其余分支正常，冰壳高于图元与文字；敌方第三层原池保留
+  `2H/3I/AD/SM`，SM 走普通行动兜底而不伪装成 OJ。正式玩家、竞技场、technique-lab、
+  完整自动与截图门禁均已验证，见 [`technique-oj-prayer.md`](systems/technique-oj-prayer.md)；
+- [x] `SA/攻擊下降` 已完成咒術師三层菜单、距离 4、攻击减少 20、攻升相消、完整轮递减、
+  `10..13` 经验与一次 PRNG；双方 AI 保持原生槽位、低有效防御／低生命排序及组 19 原文
+  “功擊降低.”。正式表现使用 `MAGIC/46` 十一个 `1×2` 描述符、每项 15 tick、总计
+  165 tick，并在开头请求一次 `E/8`。依 `REMAKE-013`，冻结敌军可被施加攻降且冰壳高于
+  光束；正式玩家／AI、竞技场、technique-lab、完整自动与截图门禁均已验证，见
+  [`technique-sa-attack-down.md`](systems/technique-sa-attack-down.md)；
+- [x] `SD/防禦下降` 已完成魔祭師三层菜单、距离 4、防御减少 20、防升相消、完整轮递减、
+  `10..13` 经验与一次 PRNG；双方 AI 保持原生槽位、低有效防御／低生命排序及组 18 原文
+  “防禦降低.”。正式表现使用 `MAGIC/45` 十个 `2×2` 描述符、每项 15 tick、总计
+  150 tick，并在开头请求一次 `E/8`。依 `REMAKE-013`，冻结敌军可被施加防降且冰壳高于
+  四格破盾；正式玩家／AI、竞技场、technique-lab、完整自动与截图门禁均已验证，见
+  [`technique-sd-defense-down.md`](systems/technique-sd-defense-down.md)；
+- [x] `SN/禁咒` 已完成咒術師第三层菜单、距离 7、状态重置为 3、技术菜单／AI 阻断、
+  龍免疫、`14..17` 经验与一次 PRNG；双方 AI 保持五槽池、低有效防御／低生命排序及
+  组 21 原文“禁咒.”。正式表现使用 `MAGIC/36` 九个 `3×2` 描述符、每项 25 tick、
+  总计 225 tick 且零声音。依 `REMAKE-013`，冻结敌军可被施加禁咒且冰壳高于九段封印；
+  正式玩家／AI、竞技场、technique-lab、完整自动与截图门禁均已验证，见
+  [`technique-sn-spell-seal.md`](systems/technique-sn-spell-seal.md)；
+- [x] 其余动作均已按机器目录逐项通过同一门禁；33 项全部为 `implemented`；
+- [x] 33 项全部实现后运行完整 `pnpm check`、证据校验和全技术竞技场审计。
+
+本例外不创建第 5 关关卡、剧情、部署、胜负、战役入口或新存档路由；后续关卡仍需独立
+纸面合同与用户授权。
+
 ## 第 0 关纸面走查
 
 至少由一名未参与取证的人依据 [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) 回答以下问题：
@@ -255,5 +408,5 @@
 3. 至少第 0 关和一个交互部署关具备端到端规格与验收；
 4. 用户明确批准结束设计冻结并进入实现计划。
 
-除已明确授权的第 0–4 关有界例外外，后续系统只可先形成证据、纸面合同与候选实施拆分；
-第 5 关仍冻结。技术选择不能反向修改本目录的玩法合同。
+除已明确授权的第 0–4 关有界例外和全技术逐项实施例外外，后续系统只可先形成证据、
+纸面合同与候选实施拆分；第 5 关仍冻结。技术选择不能反向修改本目录的玩法合同。

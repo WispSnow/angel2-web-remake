@@ -95,7 +95,13 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
       });
     }
     if (await dialogue.isVisible() && await dialogue.getAttribute("data-source-record") === "battle-command") {
-      await page.getByTestId("advance-dialogue").click();
+      try {
+        await page.getByTestId("advance-dialogue").click({ timeout: 1_000 });
+      } catch (error) {
+        const commandStillVisible = await dialogue.isVisible()
+          && await dialogue.getAttribute("data-source-record") === "battle-command";
+        if (commandStillVisible) throw error;
+      }
     }
 
     const state = await waitForPlayerOrStory(page);

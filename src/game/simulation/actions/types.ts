@@ -4,12 +4,15 @@ import type { Position, UnitStatuses } from "../../types";
 export type { BattleActionId };
 
 export type ActionBlockReason = "magicGuard" | "frozen" | "classImmune";
+export type PrayerOutcomeKind = "healing" | "experience" | "attackUp" | "defenseUp";
 
 export interface BattleActionIntent {
   actionId: BattleActionId;
   actorId: string;
   targetId?: string;
   target?: Position;
+  /** Rules-significant only for native actions whose effect unions the current 10x7 view. */
+  viewportOrigin?: Position;
 }
 
 export interface SpecialActionAffectedUnit {
@@ -18,6 +21,8 @@ export interface SpecialActionAffectedUnit {
   positionAfter: Position;
   lifeBefore: number;
   lifeAfter: number;
+  experienceBefore: number;
+  experienceAfter: number;
   actionDisabledBefore: boolean;
   actionDisabledAfter: boolean;
   statusesBefore: UnitStatuses;
@@ -28,6 +33,9 @@ export interface SpecialActionAffectedUnit {
   blockReason?: ActionBlockReason;
   died: boolean;
   moved: boolean;
+  prayerOutcome?: PrayerOutcomeKind;
+  /** The native result text shows the roll even when healing is capped or frozen-blocked. */
+  prayerRolledAmount?: number;
 }
 
 export interface SpecialActionEffectCell {
@@ -48,6 +56,7 @@ export interface SpecialActionResult {
   experienceGained: number;
   affectedUnits: readonly SpecialActionAffectedUnit[];
   effectCells: readonly SpecialActionEffectCell[];
+  prayerEligibleUnitIds?: readonly string[];
 }
 
 export interface PreparedBattleAction {

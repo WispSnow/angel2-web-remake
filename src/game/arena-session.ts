@@ -88,7 +88,19 @@ export function arenaEnemyMapAsset(classId: ArenaClassId): string {
 }
 
 export function arenaClassSupportsCurrentSpecialAction(classId: ArenaClassId): boolean {
-  return ["archer", "sister", "magician", "monk", "magic-priest"].includes(classId);
+  return [
+    "archer",
+    "sister",
+    "magician",
+    "monk",
+    "magic-priest",
+    "prayer-guide",
+    "curse-master",
+    "magic-guide",
+    "great-dragon-knight",
+    "wizard",
+    "engineer",
+  ].includes(classId);
 }
 
 export function arenaTerrainSlotAt(x: number, y: number): number {

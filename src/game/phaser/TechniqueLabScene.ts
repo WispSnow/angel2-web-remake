@@ -6,8 +6,21 @@ import {
 } from "../content/stage1-actions.generated";
 import {
   TECHNIQUE_LAB_GRAPHIC_ASSETS,
+  TECHNIQUE_LAB_ATTACK_UP,
+  TECHNIQUE_LAB_DEFENSE_UP,
+  TECHNIQUE_LAB_MAGIC_GUARD,
+  TECHNIQUE_LAB_POISON,
+  TECHNIQUE_LAB_CONFUSION,
+  TECHNIQUE_LAB_ATTACK_DOWN,
+  TECHNIQUE_LAB_DEFENSE_DOWN,
+  TECHNIQUE_LAB_SPELL_SEAL,
   TECHNIQUE_LAB_DISPEL,
+  TECHNIQUE_LAB_FIRE,
+  TECHNIQUE_LAB_HEAL,
+  TECHNIQUE_LAB_IRON_PLATE,
   TECHNIQUE_LAB_LIGHTNING,
+  TECHNIQUE_LAB_OBSTACLE,
+  TECHNIQUE_LAB_STOMPS,
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "../content/technique-lab.generated";
 import type { LightningPresentationFrame } from "../map-technique-presentation";
@@ -17,9 +30,13 @@ import {
   type TechniqueLabState,
 } from "../technique-lab-session";
 import {
+  mapTechniqueTextureKey,
   preloadMapTechniqueAssets,
   renderLightningFrame,
 } from "./MapTechniqueRenderer";
+import type { StompPresentationStep } from "../stomp-presentation";
+import { renderPrayerPresentation } from "./PrayerRenderer";
+import type { PrayerOutcomeKind } from "../simulation/actions/types";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
@@ -33,11 +50,25 @@ export type TechniqueLabVisualFrame =
     readonly frame: LightningPresentationFrame;
     readonly cleanupScope: "affected" | "original-all-enemies";
   }
+  | { readonly kind: "poison"; readonly phase: 0 | 1; readonly frame: number }
+  | {
+    readonly kind: "prayer";
+    readonly outcome: PrayerOutcomeKind;
+    readonly rolledAmount?: number;
+    readonly unitId: string;
+  }
   | { readonly kind: "fire"; readonly frame: number }
   | { readonly kind: "heal-primary"; readonly frame: number }
   | { readonly kind: "heal-tail"; readonly frame: number }
   | { readonly kind: "recovery"; readonly frame: number }
+  | {
+    readonly kind: "status";
+    readonly action: "attack-up" | "defense-up" | "magic-guard" | "confusion" | "attack-down" | "defense-down" | "spell-seal";
+    readonly frame: number;
+  }
   | { readonly kind: "dispel"; readonly frame: number; readonly runtimeTileCodes: readonly number[] }
+  | { readonly kind: "stomp"; readonly step: StompPresentationStep }
+  | { readonly kind: "construction"; readonly completed: boolean }
   | {
     readonly kind: "ice";
     readonly frame: number;
@@ -64,7 +95,7 @@ export function startTechniqueLabPhaser(
     private unsubscribe?: () => void;
     private unitObjects: Phaser.GameObjects.GameObject[] = [];
     private frozenObjects: Phaser.GameObjects.Image[] = [];
-    private effectObjects: Phaser.GameObjects.Image[] = [];
+    private effectObjects: Phaser.GameObjects.GameObject[] = [];
     private overlay!: Phaser.GameObjects.Graphics;
 
     constructor() {
@@ -73,13 +104,13 @@ export function startTechniqueLabPhaser(
 
     preload(): void {
       this.load.image("technique-lab-map", "/assets/original/stage1-map.png");
+      this.load.image("technique-lab-iron-plate", TECHNIQUE_LAB_IRON_PLATE.tile);
+      this.load.image("technique-lab-obstacle", TECHNIQUE_LAB_OBSTACLE.tile);
       for (const [classId, assets] of Object.entries(TECHNIQUE_LAB_UNIT_ASSETS)) {
         if (assets.ally) this.load.image(`technique-lab-ally-${classId}`, assets.ally);
         this.load.image(`technique-lab-enemy-${classId}`, assets.enemy);
       }
       preloadMapTechniqueAssets(this, TECHNIQUE_LAB_GRAPHIC_ASSETS);
-      STAGE0_ACTION_PRESENTATION_ASSETS.fire1.effect.forEach((source, frame) =>
-        this.load.image(`technique-lab-fire-${frame}`, source));
       STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary.forEach((source, frame) =>
         this.load.image(`technique-lab-heal-primary-${frame}`, source));
       STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.forEach((source, frame) =>
@@ -118,6 +149,9 @@ export function startTechniqueLabPhaser(
       pendingFrame = frame;
       for (const object of this.effectObjects) object.destroy();
       this.effectObjects = [];
+      for (const object of this.unitObjects) {
+        (object as Phaser.GameObjects.Image).setVisible(true);
+      }
       if (!this.state || frame.kind === "none") {
         this.updateCanvasDataset(frame, 0);
         return;
@@ -127,7 +161,7 @@ export function startTechniqueLabPhaser(
         this.updateCanvasDataset(frame, 0);
         return;
       }
-      let lightningAnchorOffset: { readonly x: number; readonly y: number } | undefined;
+      let mapAnchorOffset: { readonly x: number; readonly y: number } | undefined;
       if (frame.kind === "lightning") {
         const actionCode = this.state.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING;
         const definition = TECHNIQUE_LAB_LIGHTNING[actionCode];
@@ -144,14 +178,54 @@ export function startTechniqueLabPhaser(
               : session.affectedUnits().map(({ x, y }) => ({ x, y })),
           });
           this.effectObjects.push(...rendered.images);
-          lightningAnchorOffset = rendered.anchorOffset;
+          mapAnchorOffset = rendered.anchorOffset;
         }
       } else if (frame.kind === "fire") {
-        this.effectObjects.push(this.add.image(
-          center.x * TILE_WIDTH + TILE_WIDTH / 2,
-          center.y * TILE_HEIGHT + TILE_HEIGHT,
-          `technique-lab-fire-${frame.frame}`,
-        ).setOrigin(.5, 1).setDepth(8));
+        const definition = TECHNIQUE_LAB_FIRE[
+          this.state.actionCode as keyof typeof TECHNIQUE_LAB_FIRE
+        ];
+        let remaining = frame.frame;
+        const phase = definition?.phases.find((candidate) => {
+          if (remaining < candidate.descriptorSequence.length) return true;
+          remaining -= candidate.descriptorSequence.length;
+          return false;
+        });
+        const descriptor = phase?.descriptorSequence[remaining];
+        if (!phase || !descriptor) return;
+        const anchorOffset = "anchorOffsetSequence" in phase
+          ? phase.anchorOffsetSequence[remaining] ?? { x: 0, y: 0 }
+          : { x: 0, y: 0 };
+        mapAnchorOffset = anchorOffset;
+        descriptor.low7BitFrameIndices.forEach((sourceFrame, index) => {
+          if (sourceFrame === null) return;
+          const column = index % descriptor.width;
+          const row = Math.floor(index / descriptor.width);
+          this.effectObjects.push(this.add.image(
+            (center.x + anchorOffset.x + descriptor.xOffset + column) * TILE_WIDTH,
+            (center.y + anchorOffset.y + descriptor.yOffset + row) * TILE_HEIGHT,
+            mapTechniqueTextureKey(phase.resource, sourceFrame),
+          ).setOrigin(0).setDepth(8));
+        });
+      } else if (frame.kind === "heal-primary"
+        && (this.state.actionCode === "2H" || this.state.actionCode === "3H")) {
+        const definition = TECHNIQUE_LAB_HEAL[this.state.actionCode];
+        let phaseFrame = frame.frame;
+        const phase = definition.phases.slice(0, -1).find((candidate) => {
+          if (phaseFrame < candidate.descriptorSequence.length) return true;
+          phaseFrame -= candidate.descriptorSequence.length;
+          return false;
+        });
+        const descriptor = phase?.descriptorSequence[phaseFrame];
+        descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
+          if (sourceFrame === null || !phase) return;
+          const column = index % descriptor.width;
+          const row = Math.floor(index / descriptor.width);
+          this.effectObjects.push(this.add.image(
+            (center.x + descriptor.xOffset + column) * TILE_WIDTH,
+            (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
+            mapTechniqueTextureKey(phase.resource, sourceFrame),
+          ).setOrigin(0).setDepth(8));
+        });
       } else if (frame.kind === "heal-primary" || frame.kind === "heal-tail") {
         this.effectObjects.push(this.add.image(
           center.x * TILE_WIDTH + TILE_WIDTH / 2,
@@ -161,17 +235,111 @@ export function startTechniqueLabPhaser(
             : `technique-lab-heal-tail-${frame.frame}`,
         ).setOrigin(.5, 1).setDepth(8));
       } else if (frame.kind === "recovery") {
-        const descriptor = STAGE1_ACTION_PRESENTATION.recovery1.presentation
+        const recovery = this.state.actionCode === "3I"
+          ? STAGE1_ACTION_PRESENTATION.recovery3
+          : this.state.actionCode === "2I"
+            ? STAGE1_ACTION_PRESENTATION.recovery2
+            : STAGE1_ACTION_PRESENTATION.recovery1;
+        const descriptor = recovery.presentation
           .descriptorSequence[frame.frame];
         const sourceFrame = descriptor?.low7BitFrameIndices[0];
         if (sourceFrame !== null && sourceFrame !== undefined) {
-          for (const unit of session.affectedUnits()) {
+          const frozenIds = new Set(pendingFrozenUnitIds);
+          for (const unit of session.affectedUnits().filter(({ id }) => !frozenIds.has(id))) {
             this.effectObjects.push(this.add.image(
               unit.x * TILE_WIDTH + TILE_WIDTH / 2,
               unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
               `technique-lab-recovery-${sourceFrame}`,
             ).setOrigin(.5).setDepth(8));
           }
+        }
+      } else if (frame.kind === "status") {
+        if (frame.action === "confusion" || frame.action === "attack-down"
+          || frame.action === "defense-down" || frame.action === "spell-seal") {
+          const phase = frame.action === "attack-down"
+            ? TECHNIQUE_LAB_ATTACK_DOWN.phases[0]
+            : frame.action === "defense-down"
+              ? TECHNIQUE_LAB_DEFENSE_DOWN.phases[0]
+              : frame.action === "spell-seal"
+                ? TECHNIQUE_LAB_SPELL_SEAL.phases[0]
+              : TECHNIQUE_LAB_CONFUSION.phases[0];
+          const descriptor = phase.descriptorSequence[frame.frame];
+          descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
+            if (sourceFrame === null) return;
+            const column = index % descriptor.width;
+            const row = Math.floor(index / descriptor.width);
+            this.effectObjects.push(this.add.image(
+              (center.x + descriptor.xOffset + column) * TILE_WIDTH,
+              (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
+              mapTechniqueTextureKey(phase.resource, sourceFrame),
+            ).setOrigin(0).setDepth(8));
+          });
+        } else if (frame.action === "attack-up" || frame.action === "magic-guard") {
+          const phase = frame.action === "magic-guard"
+            ? TECHNIQUE_LAB_MAGIC_GUARD.phases[0]
+            : TECHNIQUE_LAB_ATTACK_UP.phases[0];
+          const runtimeTileCodes = phase.runtimeTileCodePairs[frame.frame] ?? [];
+          runtimeTileCodes.forEach((runtimeTileCode, row) => {
+            this.effectObjects.push(this.add.image(
+              center.x * TILE_WIDTH,
+              (center.y + phase.descriptor.yOffset + row) * TILE_HEIGHT,
+              mapTechniqueTextureKey(phase.resource, runtimeTileCode - 1),
+            ).setOrigin(0).setDepth(8));
+          });
+        } else {
+          const phase = TECHNIQUE_LAB_DEFENSE_UP.phases[0];
+          const descriptor = phase.descriptorSequence[frame.frame];
+          descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
+            const column = index % descriptor.width;
+            const row = Math.floor(index / descriptor.width);
+            this.effectObjects.push(this.add.image(
+              (center.x + descriptor.xOffset + column) * TILE_WIDTH,
+              (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
+              mapTechniqueTextureKey(phase.resource, sourceFrame),
+            ).setOrigin(0).setDepth(8));
+          });
+        }
+      } else if (frame.kind === "poison") {
+        const poisonPhase = TECHNIQUE_LAB_POISON.phases[frame.phase];
+        if (frame.phase === 0) {
+          const runtimeTileCodes = TECHNIQUE_LAB_POISON.phases[0]
+            .runtimeTileCodeStates[frame.frame] ?? [];
+          runtimeTileCodes.forEach((runtimeTileCode, index) => {
+            const descriptor = TECHNIQUE_LAB_POISON.phases[0].descriptor;
+            const column = index % descriptor.width;
+            const row = Math.floor(index / descriptor.width);
+            this.effectObjects.push(this.add.image(
+              (center.x + descriptor.xOffset + column) * TILE_WIDTH,
+              (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
+              mapTechniqueTextureKey(poisonPhase.resource, runtimeTileCode - 1),
+            ).setOrigin(0).setDepth(8));
+          });
+        } else {
+          const descriptor = TECHNIQUE_LAB_POISON.phases[1]
+            .descriptorSequence[frame.frame];
+          descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
+            const column = index % descriptor.width;
+            const row = Math.floor(index / descriptor.width);
+            this.effectObjects.push(this.add.image(
+              (center.x + descriptor.xOffset + column) * TILE_WIDTH,
+              (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
+              mapTechniqueTextureKey(poisonPhase.resource, sourceFrame),
+            ).setOrigin(0).setDepth(8));
+          });
+        }
+      } else if (frame.kind === "prayer") {
+        this.effectObjects.push(...renderPrayerPresentation(
+          this,
+          frame.outcome,
+          frame.rolledAmount,
+        ));
+        const recipient = this.state.units.find(({ id }) => id === frame.unitId);
+        if (recipient) {
+          this.effectObjects.push(this.add.circle(
+            recipient.x * TILE_WIDTH + TILE_WIDTH / 2,
+            recipient.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+            19,
+          ).setStrokeStyle(3, 0xffee67, 1).setDepth(8));
         }
       } else if (frame.kind === "dispel") {
         frame.runtimeTileCodes.forEach((runtimeTileCode, row) => {
@@ -183,6 +351,61 @@ export function startTechniqueLabPhaser(
             `map-technique-un-57-${runtimeTileCode - 1}`,
           ).setOrigin(0).setDepth(8));
         });
+      } else if (frame.kind === "stomp") {
+        const stomp = TECHNIQUE_LAB_STOMPS[
+          session.state.actionCode as keyof typeof TECHNIQUE_LAB_STOMPS
+        ];
+        if (!stomp) throw new Error(`${session.state.actionCode} has no stomp presentation`);
+        const targetSide = session.actor()?.side === 1 ? 2 : 1;
+        const resource = targetSide === 1
+          ? stomp.action.graphicByTargetSide.side1
+          : stomp.action.graphicByTargetSide.side2;
+        this.effectObjects.push(
+          this.add.image(
+            stomp.action.horizontalDrawCoordinate,
+            frame.step.y,
+            mapTechniqueTextureKey(resource, 0),
+          ).setOrigin(0).setScrollFactor(0).setDepth(8),
+          this.add.image(
+            stomp.action.horizontalDrawCoordinate,
+            175,
+            mapTechniqueTextureKey(resource, 1),
+          ).setOrigin(0).setScrollFactor(0).setDepth(8),
+        );
+      } else if (frame.kind === "construction") {
+        if (frame.completed) {
+          for (const { position } of session.effectCells()) {
+            this.effectObjects.push(this.add.image(
+              position.x * TILE_WIDTH,
+              position.y * TILE_HEIGHT,
+              session.state.actionCode === "2K"
+                ? "technique-lab-obstacle"
+                : "technique-lab-iron-plate",
+            ).setOrigin(0).setDepth(2));
+          }
+          const actor = session.actor();
+          if (actor) {
+            for (const object of this.unitObjects) {
+              if (object.getData("unitId") === actor.id) {
+                (object as Phaser.GameObjects.Image).setVisible(false);
+              }
+            }
+            this.effectObjects.push(
+              this.add.image(
+                center.x * TILE_WIDTH + TILE_WIDTH / 2,
+                center.y * TILE_HEIGHT + TILE_HEIGHT,
+                `technique-lab-${actor.side === 1 ? "ally" : "enemy"}-${actor.classId}`,
+              ).setOrigin(.5, 1).setDepth(6),
+              this.add.circle(
+                center.x * TILE_WIDTH + 6,
+                center.y * TILE_HEIGHT + 7,
+                4,
+                actor.side === 1 ? 0x56c7ee : 0xe76b70,
+                .95,
+              ).setStrokeStyle(1, 0x12090c, 1).setDepth(7),
+            );
+          }
+        }
       } else {
         const sourceFrame = frame.frame % STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion.length;
         for (const { position, value } of session.effectCells()) {
@@ -194,7 +417,7 @@ export function startTechniqueLabPhaser(
           ).setOrigin(.5).setDepth(8));
         }
       }
-      this.updateCanvasDataset(frame, this.effectObjects.length, lightningAnchorOffset);
+      this.updateCanvasDataset(frame, this.effectObjects.length, mapAnchorOffset);
     }
 
     private drawState(): void {
@@ -246,14 +469,14 @@ export function startTechniqueLabPhaser(
           unit.x * TILE_WIDTH + TILE_WIDTH / 2,
           unit.y * TILE_HEIGHT + TILE_HEIGHT,
           `technique-lab-${unit.side === 1 ? "ally" : "enemy"}-${unit.classId}`,
-        ).setOrigin(.5, 1).setDepth(6);
+        ).setOrigin(.5, 1).setDepth(6).setData("unitId", unit.id);
         const badge = this.add.circle(
           unit.x * TILE_WIDTH + 6,
           unit.y * TILE_HEIGHT + 7,
           4,
           unit.side === 1 ? 0x56c7ee : 0xe76b70,
           .95,
-        ).setStrokeStyle(1, 0x12090c, 1).setDepth(7);
+        ).setStrokeStyle(1, 0x12090c, 1).setDepth(7).setData("unitId", unit.id);
         this.unitObjects.push(sprite, badge);
       }
       this.drawFrozenUnits();
@@ -274,7 +497,7 @@ export function startTechniqueLabPhaser(
           unit.x * TILE_WIDTH + TILE_WIDTH / 2,
           unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
           "technique-lab-ice-5",
-        ).setOrigin(.5).setDepth(8));
+        ).setOrigin(.5).setDepth(9));
       }
       this.game.canvas.dataset.frozenUnitCount = String(this.frozenObjects.length);
       this.game.canvas.dataset.frozenUnitIds = this.state.units
@@ -286,23 +509,47 @@ export function startTechniqueLabPhaser(
     private updateCanvasDataset(
       frame: TechniqueLabVisualFrame,
       count: number,
-      lightningAnchorOffset?: { readonly x: number; readonly y: number },
+      mapAnchorOffset?: { readonly x: number; readonly y: number },
     ): void {
       const canvas = this.game.canvas;
-      canvas.dataset.techniquePhase = frame.kind === "lightning" ? frame.frame.kind : frame.kind;
+      canvas.dataset.techniquePhase = frame.kind === "lightning"
+        ? frame.frame.kind
+        : frame.kind === "stomp"
+          ? frame.step.phase
+          : frame.kind;
       canvas.dataset.techniqueFrame = frame.kind === "lightning"
         ? frame.frame.kind === "main" ? String(frame.frame.globalDrawIndex) : String(frame.frame.frame)
         : "frame" in frame ? String(frame.frame) : "-1";
       canvas.dataset.effectTileCount = String(count);
+      canvas.dataset.effectTextureKeys = this.effectObjects.flatMap((object) =>
+        object instanceof Phaser.GameObjects.Image ? [object.texture.key] : []).join(",");
+      canvas.dataset.constructionTerrainCount = frame.kind === "construction" && frame.completed
+        ? String(session.effectCells().length)
+        : "0";
+      canvas.dataset.constructionCompleted = frame.kind === "construction"
+        ? String(frame.completed)
+        : "false";
       canvas.dataset.lightningCleanupScope = frame.kind === "lightning"
         ? frame.cleanupScope
         : "";
-      canvas.dataset.mapCombatAnchorOffset = lightningAnchorOffset
-        ? `${lightningAnchorOffset.x},${lightningAnchorOffset.y}`
+      canvas.dataset.mapCombatAnchorOffset = mapAnchorOffset
+        ? `${mapAnchorOffset.x},${mapAnchorOffset.y}`
         : "";
       canvas.dataset.iceRangeValue = frame.kind === "ice" ? String(frame.rangeValue) : "";
       canvas.dataset.iceDistanceFromCenter = frame.kind === "ice"
         ? String(frame.distanceFromCenter)
+        : "";
+      canvas.dataset.prayerOutcome = frame.kind === "prayer" ? frame.outcome : "";
+      canvas.dataset.prayerRolledAmount = frame.kind === "prayer"
+        ? String(frame.rolledAmount ?? "")
+        : "";
+      canvas.dataset.prayerUnitId = frame.kind === "prayer" ? frame.unitId : "";
+      canvas.dataset.stompY = frame.kind === "stomp" ? String(frame.step.y) : "";
+      canvas.dataset.stompGraphicDraw = frame.kind === "stomp"
+        ? String(frame.step.graphicDrawIndex ?? "")
+        : "";
+      canvas.dataset.stompExplicitTicks = frame.kind === "stomp"
+        ? String(frame.step.explicitNativeTicks)
         : "";
     }
   }

@@ -296,6 +296,8 @@ const actions = {
       type: "magic",
       maxLifePercent: fireTier.percentMaxLife,
       cap: fireTier.damageCap,
+      blockedByMagicGuard: true,
+      clearsMagicGuard: true,
     },
     damagePresentation: {
       mode: "post-graphics-point-drain",

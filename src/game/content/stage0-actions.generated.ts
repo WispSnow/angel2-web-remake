@@ -42,7 +42,9 @@ export const STAGE0_ACTION_DEFINITIONS = {
     "damage": {
       "type": "magic",
       "maxLifePercent": 18,
-      "cap": 108
+      "cap": 108,
+      "blockedByMagicGuard": true,
+      "clearsMagicGuard": true
     },
     "damagePresentation": {
       "mode": "post-graphics-point-drain",

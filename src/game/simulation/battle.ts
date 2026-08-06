@@ -1,14 +1,16 @@
 import {
+  classStatsFor,
+  classDefinition,
   className,
   killRewardFor,
   terrainDefensePercentFor,
 } from "../content/classes";
 import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
-import { STAGE0, STAGE0_AI_CLASS_PRIORITY, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
+import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
-import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, Position, SaveRosterEntry, SavedBattleState, UnitStats, UnitStatuses } from "../types";
+import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, Position, SaveRosterEntry, SavedBattleState, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
-import { manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath } from "./grid";
+import { constructionPath, constructionReachableCells, manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield } from "./grid";
 import {
   promoteUnit,
   promotionQueue,
@@ -21,13 +23,24 @@ import {
   techniqueSelectionRange,
 } from "./actions/range-map";
 import { prepareSpecialAction as resolveSpecialAction } from "./actions/resolve";
+import {
+  prepareConstruction as resolveConstruction,
+  terrainMutationFingerprint,
+  type ConstructionActionId,
+  type ConstructionResult,
+  type IronPlateConstructionResult,
+  type ObstacleConstructionResult,
+  type PreparedConstruction,
+  type PreparedIronPlateConstruction,
+  type PreparedObstacleConstruction,
+} from "./actions/construction";
 import type {
   BattleActionId,
   BattleActionIntent,
   PreparedBattleAction,
   SpecialActionResult,
 } from "./actions/types";
-import { UNIT_STATUS_KEYS } from "./status";
+import { effectiveAttack, effectiveDefense, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
 import { battleOutcomeForObjective } from "./objectives";
 import {
   hasModernDamageActionThisTurn,
@@ -65,19 +78,98 @@ export type {
 
 const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "archer-shot": ["archer"],
-  "fire-1": ["sister", "magician"],
-  "heal-1": ["sister", "monk"],
-  "lightning-1": ["magician"],
+  "fire-1": ["sister", "magician", "magic-priest"],
+  "fire-2": ["magic-priest", "evil-mage"],
+  "fire-3": ["evil-mage"],
+  "fire-4": ["evil-mage"],
+  "heal-1": ["sister", "monk", "prayer-guide", "magic-guide", "curse-master"],
+  "heal-2": ["prayer-guide", "magic-guide"],
+  "heal-3": ["magic-guide"],
+  "lightning-1": ["magician", "magic-priest"],
+  "lightning-2": ["magic-master"],
+  "lightning-3": ["magic-master"],
+  "lightning-4": ["magic-master"],
   "ice-1": ["magician"],
-  "recovery-1": ["monk"],
+  "ice-2": ["wizard"],
+  "ice-3": ["wizard"],
+  "ice-4": ["wizard"],
+  "recovery-1": ["monk", "magic-priest", "prayer-guide", "magic-guide"],
+  "recovery-2": ["prayer-guide", "magic-guide"],
+  "recovery-3": ["prayer-guide"],
+  "attack-up": ["magic-guide"],
+  "defense-up": ["prayer-guide"],
+  "magic-guard": ["magic-guide"],
+  "poison": ["curse-master"],
+  "confusion": ["curse-master"],
+  "attack-down": ["curse-master"],
+  "defense-down": ["magic-priest"],
+  "spell-seal": ["curse-master"],
+  "prayer": ["prayer-guide"],
   "dispel": ["magic-priest"],
+  "stomp-1": ["great-dragon-knight"],
+  "stomp-2": ["great-dragon-knight"],
+  "stomp-3": ["great-dragon-knight"],
+  "iron-plate": ["engineer"],
+  "obstacle": ["engineer"],
 };
+
+const isConstructionAction = (actionId: BattleActionId): actionId is ConstructionActionId =>
+  actionId === "iron-plate" || actionId === "obstacle";
+
+const canTargetFrozenUnit = (actionId: BattleActionId): boolean =>
+  actionId === "attack-up" || actionId === "defense-up" || actionId === "magic-guard"
+  || actionId === "poison" || actionId === "confusion" || actionId === "attack-down"
+  || actionId === "defense-down"
+  || actionId === "spell-seal"
+  || actionId === "dispel";
 
 function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
   return UNIT_STATUS_KEYS.every((key) => left[key] === right[key]);
 }
 
 function canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
+  const level = classStatsFor(actor).level;
+  if (actor.classId === "magic-priest") {
+    if (actionId === "fire-1" && level >= 3) return false;
+    if (actionId === "fire-2" && level < 3) return false;
+    if (actionId === "lightning-1" && level < 2) return false;
+    if (actionId === "dispel" && level < 3) return false;
+  }
+  if (actor.classId === "evil-mage") {
+    if (actionId === "fire-2" && level !== 1) return false;
+    if (actionId === "fire-3" && level !== 2) return false;
+    if (actionId === "fire-4" && level !== 3) return false;
+  }
+  if (actor.classId === "magic-master") {
+    if (actionId === "lightning-2" && level !== 1) return false;
+    if (actionId === "lightning-3" && level !== 2) return false;
+    if (actionId === "lightning-4" && level !== 3) return false;
+  }
+  if (actor.classId === "prayer-guide") {
+    if (actionId === "heal-1" && level >= 3) return false;
+    if (actionId === "heal-2" && level !== 3) return false;
+    if (actionId === "recovery-1" && level !== 1) return false;
+    if (actionId === "recovery-2" && level !== 2) return false;
+    if (actionId === "recovery-3" && level !== 3) return false;
+    if (actionId === "prayer" && level !== 3) return false;
+  }
+  if (actor.classId === "magic-guide") {
+    if (actionId === "heal-1" && level !== 1) return false;
+    if (actionId === "heal-2" && level !== 2) return false;
+    if (actionId === "heal-3" && level !== 3) return false;
+    if (actionId === "recovery-1" && level >= 3) return false;
+    if (actionId === "recovery-2" && level !== 3) return false;
+    if (actionId === "magic-guard" && level !== 3) return false;
+  }
+  if (actor.classId === "curse-master") {
+    if (actionId === "poison" && level < 2) return false;
+    if (actionId === "spell-seal" && level < 3) return false;
+  }
+  if ((actionId === "stomp-1" || actionId === "ice-2") && level !== 1) return false;
+  if (actionId === "ice-3" && level !== 2) return false;
+  if (actionId === "ice-4" && level !== 3) return false;
+  if (actionId === "stomp-2" && level !== 2) return false;
+  if (actionId === "stomp-3" && level !== 3) return false;
   return !actor.acted
     && !actor.actionDisabled
     && ACTION_CLASSES[actionId].includes(actor.classId)
@@ -90,11 +182,17 @@ export interface RouteMoveResult {
   reachedExit: boolean;
 }
 
+export type RestorableBattleSnapshot = Pick<
+  SavedBattleState,
+  "round" | "focusId" | "units" | "enemyAi"
+> & Partial<Pick<SavedBattleState, "terrainOverrides">>;
+
 export interface BattleScenario {
   stage: StageDefinition;
   width: number;
   height: number;
   terrainSlotAt: (position: Position) => number;
+  dynamicTerrainSlots?: Readonly<Partial<Record<DynamicTerrainKind, number>>>;
   createUnits: (difficulty: Difficulty) => BattleUnit[];
   createCampaignRoster: (difficulty: Difficulty) => SaveRosterEntry[];
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
@@ -114,6 +212,10 @@ const STAGE0_BATTLE_SCENARIO: BattleScenario = {
   width: STAGE0_DEFINITION.width,
   height: STAGE0_DEFINITION.height,
   terrainSlotAt,
+  dynamicTerrainSlots: {
+    "iron-plate": STAGE0_IRON_PLATE_TERRAIN_SLOT,
+    obstacle: STAGE0_OBSTACLE_TERRAIN_SLOT,
+  },
   createUnits: createStage0Units,
   createCampaignRoster: (difficulty) => completeCampaignRoster(
     createStage0Units(difficulty)
@@ -137,6 +239,7 @@ export class Stage0Battle {
   private readonly campaignUnitSlots: ReadonlySet<number>;
   protected readonly forces: ForceRegistry;
   private readonly routePulseByActorId: ReadonlyMap<string, RoutePulseDefinition>;
+  private readonly terrainOverrideByPosition = new Map<string, DynamicTerrainKind>();
 
   constructor(
     public readonly difficulty: Difficulty = 0,
@@ -189,7 +292,7 @@ export class Stage0Battle {
   }
 
   restore(
-    snapshot: Pick<SavedBattleState, "round" | "focusId" | "units" | "enemyAi">,
+    snapshot: RestorableBattleSnapshot,
     campaignRoster?: readonly SaveRosterEntry[],
   ): void {
     this.round = snapshot.round;
@@ -198,6 +301,19 @@ export class Stage0Battle {
       ...unit,
       statuses: { ...unit.statuses },
     }));
+    this.terrainOverrideByPosition.clear();
+    for (const override of snapshot.terrainOverrides ?? []) {
+      if (
+        override.x < 0
+        || override.y < 0
+        || override.x >= this.stage.width
+        || override.y >= this.stage.height
+        || this.scenario.dynamicTerrainSlots?.[override.kind] === undefined
+        || this.scenario.terrainSlotAt(override) === 0
+        || this.terrainOverrideByPosition.has(positionKey(override))
+      ) throw new Error("invalid saved dynamic terrain override");
+      this.terrainOverrideByPosition.set(positionKey(override), override.kind);
+    }
     this.forces.assertKnownUnits(this.units);
     if (campaignRoster) {
       this.campaignRoster.splice(
@@ -226,7 +342,32 @@ export class Stage0Battle {
   }
 
   terrainSlotAt(position: Position): number {
-    return this.scenario.terrainSlotAt(position);
+    const kind = this.terrainOverrideByPosition.get(positionKey(position));
+    return kind === undefined
+      ? this.scenario.terrainSlotAt(position)
+      : this.scenario.dynamicTerrainSlots?.[kind] ?? 0;
+  }
+
+  terrainKindAt(position: Position): DynamicTerrainKind | undefined {
+    return this.terrainOverrideByPosition.get(positionKey(position));
+  }
+
+  get terrainOverrides(): readonly DynamicTerrainOverride[] {
+    return [...this.terrainOverrideByPosition]
+      .map(([key, kind]) => {
+        const [x, y] = key.split(",").map(Number);
+        return { x, y, kind };
+      })
+      .sort((left, right) => left.y * this.stage.width + left.x
+        - (right.y * this.stage.width + right.x));
+  }
+
+  private get dynamicBattlefield(): GridBattlefield {
+    return {
+      width: this.stage.width,
+      height: this.stage.height,
+      terrainSlotAt: (position) => this.terrainSlotAt(position),
+    };
   }
 
   enemyBehaviorFor(id: string): number {
@@ -278,6 +419,15 @@ export class Stage0Battle {
     return statsFor(unit, this.difficulty);
   }
 
+  effectiveStatsFor(unit: BattleUnit): UnitStats {
+    const base = this.statsFor(unit);
+    return {
+      ...base,
+      attack: effectiveAttack(base.attack, unit.statuses),
+      defense: effectiveDefense(base.defense, unit.statuses),
+    };
+  }
+
   moveUnit(id: string, destination: Position): boolean {
     const unit = this.unit(id);
     const path = this.movementPath(id, destination);
@@ -292,7 +442,7 @@ export class Stage0Battle {
     const unit = this.unit(id);
     const occupant = this.unitAt(destination);
     if (!unit || unit.acted || unit.actionDisabled || (occupant && occupant.id !== unit.id)) return [];
-    return findMovementPath(unit, destination, this.units, this.scenario);
+    return findMovementPath(unit, destination, this.units, this.dynamicBattlefield);
   }
 
   moveUnitStep(id: string, destination: Position, allowFriendlyTransit = false): boolean {
@@ -302,7 +452,7 @@ export class Stage0Battle {
       !unit
       || manhattan(unit, destination) !== 1
       || (occupant && (!allowFriendlyTransit || occupant.side !== unit.side))
-      || movementCost(unit.classId, destination, this.scenario) >= 98
+      || movementCost(unit.classId, destination, this.dynamicBattlefield) >= 98
     ) return false;
     unit.x = destination.x;
     unit.y = destination.y;
@@ -314,8 +464,8 @@ export class Stage0Battle {
     const unit = this.unit(id);
     if (!unit) return [];
     return movementBudget === undefined
-      ? reachableCells(unit, this.units, undefined, this.scenario)
-      : reachableCells(unit, this.units, movementBudget, this.scenario);
+      ? reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
+      : reachableCells(unit, this.units, movementBudget, this.dynamicBattlefield);
   }
 
   scriptedPath(id: string, destination: Position, movementBudget: number): Position[] {
@@ -327,7 +477,7 @@ export class Stage0Battle {
       unit.classId,
       movementBudget,
       this.units.filter((candidate) => candidate.id !== unit.id),
-      this.scenario,
+      this.dynamicBattlefield,
     );
   }
 
@@ -345,11 +495,11 @@ export class Stage0Battle {
     }
     this.onHostileTargeted(attacker, defender);
 
-    const attackerStats = this.statsFor(attacker);
-    const defenderStats = this.statsFor(defender);
+    const attackerStats = this.effectiveStatsFor(attacker);
+    const defenderStats = this.effectiveStatsFor(defender);
     const terrainDefense = Math.floor(
       defenderStats.defense
-      * terrainDefensePercentFor(defender.classId, this.scenario.terrainSlotAt(defender))
+      * terrainDefensePercentFor(defender.classId, this.terrainSlotAt(defender))
       / 100,
     );
     const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense)
@@ -362,7 +512,7 @@ export class Stage0Battle {
     if (counterOccurred) {
       const attackerTerrainDefense = Math.floor(
         attackerStats.defense
-        * terrainDefensePercentFor(attacker.classId, this.scenario.terrainSlotAt(attacker))
+        * terrainDefensePercentFor(attacker.classId, this.terrainSlotAt(attacker))
         / 100,
       );
       counterDamage = Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
@@ -399,11 +549,14 @@ export class Stage0Battle {
     if (!actor || !canUseSpecialAction(actor, actionId)) {
       return new NumericRangeMap(this.stage.width, this.stage.height);
     }
-    const battlefield = {
-      width: this.stage.width,
-      height: this.stage.height,
-      terrainSlotAt: this.scenario.terrainSlotAt,
-    };
+    const battlefield = this.dynamicBattlefield;
+    if (isConstructionAction(actionId)) {
+      const result = new NumericRangeMap(this.stage.width, this.stage.height);
+      for (const position of constructionReachableCells(actor, this.units, battlefield)) {
+        result.set(position, 1);
+      }
+      return result;
+    }
     if (actionId === "archer-shot") return archerShootingRange(actor, battlefield);
     if (BATTLE_ACTION_DEFINITIONS[actionId].target === "self-area") {
       const result = new NumericRangeMap(this.stage.width, this.stage.height);
@@ -422,13 +575,14 @@ export class Stage0Battle {
     if (!actor || !canUseSpecialAction(actor, actionId)) return [];
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     const range = this.actionRange(actorId, actionId);
+    if (isConstructionAction(actionId)) return range.cells();
     if (definition.target === "self-area") return [{ x: actor.x, y: actor.y }];
     return this.units
       .filter((target) => range.valueAt(target) > 0
         && (definition.target === "ally"
           ? target.side === actor.side
           : target.side !== actor.side)
-        && (actionId === "dispel" || !target.actionDisabled))
+        && (canTargetFrozenUnit(actionId) || !target.actionDisabled))
       .map(({ x, y }) => ({ x, y }));
   }
 
@@ -436,6 +590,7 @@ export class Stage0Battle {
     const actor = this.unit(actorId);
     if (!actor || !canUseSpecialAction(actor, actionId)) return [];
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    if (isConstructionAction(actionId)) return [];
     if (definition.target === "self-area") return [];
     const range = this.actionRange(actorId, actionId);
     return this.units.filter((target) =>
@@ -443,10 +598,11 @@ export class Stage0Battle {
       && (definition.target === "ally"
         ? target.side === actor.side
         : target.side !== actor.side)
-      && (actionId === "dispel" || !target.actionDisabled));
+      && (canTargetFrozenUnit(actionId) || !target.actionDisabled));
   }
 
   prepareSpecialAction(intent: BattleActionIntent): PreparedBattleAction {
+    if (isConstructionAction(intent.actionId)) throw new Error("construction uses its own prepare path");
     const actor = this.unit(intent.actorId);
     const target = intent.targetId ? this.unit(intent.targetId) : undefined;
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
@@ -470,8 +626,19 @@ export class Stage0Battle {
     ) {
       throw new Error("illegal special action");
     }
+    const requestedViewportOrigin = intent.viewportOrigin ?? this.stage.viewport.initialOrigin;
+    const originBounds = this.stage.viewport.originBounds;
+    const viewportOrigin = {
+      x: Math.max(originBounds.min.x, Math.min(originBounds.max.x, requestedViewportOrigin.x)),
+      y: Math.max(originBounds.min.y, Math.min(originBounds.max.y, requestedViewportOrigin.y)),
+    };
+    const resolvedIntent = intent.actionId === "stomp-1"
+      || intent.actionId === "stomp-2"
+      || intent.actionId === "stomp-3"
+      ? { ...intent, viewportOrigin }
+      : intent;
     return resolveSpecialAction(
-      intent,
+      resolvedIntent,
       actor,
       target,
       this.rng,
@@ -480,20 +647,29 @@ export class Stage0Battle {
         battlefield: {
           width: this.stage.width,
           height: this.stage.height,
-          terrainSlotAt: this.scenario.terrainSlotAt,
+          terrainSlotAt: (position) => this.terrainSlotAt(position),
         },
         statsFor: (unit) => this.statsFor(unit),
+        viewport: {
+          origin: viewportOrigin,
+          width: this.stage.viewport.width,
+          height: this.stage.viewport.height,
+        },
       },
       center,
     );
   }
 
   commitPreparedAction(prepared: PreparedBattleAction): SpecialActionResult {
+    if (prepared.intent.actionId === "prayer") {
+      throw new Error("prayer uses progressive commit path");
+    }
     const actor = this.unit(prepared.intent.actorId);
     const affectedAreCurrent = prepared.affectedUnits.every((affected) => {
       const unit = this.unit(affected.unitId);
       return unit
         && unit.life === affected.lifeBefore
+        && unit.experience === affected.experienceBefore
         && unit.x === affected.positionBefore.x
         && unit.y === affected.positionBefore.y
         && unit.actionDisabled === affected.actionDisabledBefore
@@ -525,6 +701,7 @@ export class Stage0Battle {
       unit.x = affected.positionAfter.x;
       unit.y = affected.positionAfter.y;
       unit.life = affected.lifeAfter;
+      if (affected.prayerOutcome) unit.experience = affected.experienceAfter;
       unit.actionDisabled = affected.actionDisabledAfter;
       unit.statuses = { ...affected.statusesAfter };
       this.recordCampaignUnit(unit);
@@ -539,6 +716,178 @@ export class Stage0Battle {
       ?? this.units[0]?.id
       ?? actor.id;
     return prepared.result;
+  }
+
+  commitPreparedPrayerOutcome(
+    prepared: PreparedBattleAction,
+    index: number,
+  ): PreparedBattleAction["affectedUnits"][number] {
+    if (prepared.intent.actionId !== "prayer") throw new Error("prepared action is not prayer");
+    const affected = prepared.affectedUnits[index];
+    const actor = this.unit(prepared.intent.actorId);
+    if (!affected || !actor || actor.acted || actor.actionDisabled
+      || actor.classId !== "prayer-guide" || actor.statuses.techniqueSeal > 0) {
+      throw new Error("stale prepared prayer action");
+    }
+    const sequenceIsCurrent = prepared.affectedUnits.every((candidate, candidateIndex) => {
+      const unit = this.unit(candidate.unitId);
+      if (!unit) return false;
+      const committed = candidateIndex < index;
+      return unit.life === (committed ? candidate.lifeAfter : candidate.lifeBefore)
+        && unit.experience === (committed ? candidate.experienceAfter : candidate.experienceBefore)
+        && unit.x === (committed ? candidate.positionAfter.x : candidate.positionBefore.x)
+        && unit.y === (committed ? candidate.positionAfter.y : candidate.positionBefore.y)
+        && unit.actionDisabled === (committed
+          ? candidate.actionDisabledAfter
+          : candidate.actionDisabledBefore)
+        && statusesEqual(unit.statuses, committed ? candidate.statusesAfter : candidate.statusesBefore);
+    });
+    const expectedRngState = index === 0 ? prepared.rngBefore : prepared.rngAfter;
+    const expectedRngCalls = index === 0 ? prepared.rngCallsBefore : prepared.rngCallsAfter;
+    if (!sequenceIsCurrent
+      || this.rng.state !== expectedRngState
+      || this.rng.calls !== expectedRngCalls) {
+      throw new Error("stale prepared prayer action");
+    }
+
+    if (index === 0) {
+      this.rng.state = prepared.rngAfter;
+      this.rng.calls = prepared.rngCallsAfter;
+    }
+    const unit = this.unit(affected.unitId);
+    if (!unit) throw new Error("stale prepared prayer action");
+    unit.life = affected.lifeAfter;
+    unit.experience = affected.experienceAfter;
+    unit.statuses = { ...affected.statusesAfter };
+    this.recordCampaignUnit(unit);
+    this.focusId = unit.id;
+    return affected;
+  }
+
+  completePreparedPrayer(prepared: PreparedBattleAction): SpecialActionResult {
+    if (prepared.intent.actionId !== "prayer") throw new Error("prepared action is not prayer");
+    const actor = this.unit(prepared.intent.actorId);
+    const allOutcomesCommitted = prepared.affectedUnits.every((affected) => {
+      const unit = this.unit(affected.unitId);
+      return unit
+        && unit.life === affected.lifeAfter
+        && unit.experience === affected.experienceAfter
+        && unit.x === affected.positionAfter.x
+        && unit.y === affected.positionAfter.y
+        && unit.actionDisabled === affected.actionDisabledAfter
+        && statusesEqual(unit.statuses, affected.statusesAfter);
+    });
+    const rngStillUncommitted = prepared.affectedUnits.length === 0
+      && this.rng.state === prepared.rngBefore
+      && this.rng.calls === prepared.rngCallsBefore;
+    const rngAlreadyCommitted = prepared.affectedUnits.length > 0
+      && this.rng.state === prepared.rngAfter
+      && this.rng.calls === prepared.rngCallsAfter;
+    if (!actor || actor.acted || actor.actionDisabled || actor.classId !== "prayer-guide"
+      || actor.statuses.techniqueSeal > 0 || !allOutcomesCommitted
+      || (!rngStillUncommitted && !rngAlreadyCommitted)) {
+      throw new Error("stale prepared prayer action");
+    }
+
+    if (rngStillUncommitted) {
+      this.rng.state = prepared.rngAfter;
+      this.rng.calls = prepared.rngCallsAfter;
+    }
+    actor.acted = true;
+    this.recordCampaignUnit(actor);
+    this.focusId = prepared.affectedUnits.at(-1)?.unitId ?? actor.id;
+    return prepared.result;
+  }
+
+  prepareIronPlateConstruction(
+    actorId: string,
+    target: Position,
+  ): PreparedIronPlateConstruction {
+    return this.prepareConstruction(actorId, target, "iron-plate");
+  }
+
+  prepareObstacleConstruction(
+    actorId: string,
+    target: Position,
+  ): PreparedObstacleConstruction {
+    return this.prepareConstruction(actorId, target, "obstacle");
+  }
+
+  prepareConstruction<ActionId extends ConstructionActionId>(
+    actorId: string,
+    target: Position,
+    actionId: ActionId,
+  ): PreparedConstruction<ActionId> {
+    const actor = this.unit(actorId);
+    if (!actor || !canUseSpecialAction(actor, actionId)) {
+      throw new Error(`illegal ${actionId} construction`);
+    }
+    return resolveConstruction(actor, target, actionId, {
+      battlefield: this.dynamicBattlefield,
+      units: this.units,
+      terrainKindAt: (position) => this.terrainKindAt(position),
+      dynamicTerrainSlot: (kind) => this.scenario.dynamicTerrainSlots?.[kind],
+    });
+  }
+
+  commitIronPlateConstruction(
+    prepared: PreparedIronPlateConstruction,
+  ): IronPlateConstructionResult {
+    return this.commitConstruction(prepared);
+  }
+
+  commitObstacleConstruction(
+    prepared: PreparedObstacleConstruction,
+  ): ObstacleConstructionResult {
+    return this.commitConstruction(prepared);
+  }
+
+  commitConstruction<ActionId extends ConstructionActionId>(
+    prepared: PreparedConstruction<ActionId>,
+  ): ConstructionResult<ActionId> {
+    const actor = this.unit(prepared.actorId);
+    const currentFingerprint = terrainMutationFingerprint(
+      prepared.terrainMutations,
+      (position) => this.terrainKindAt(position),
+      (position) => this.terrainSlotAt(position),
+    );
+    const beforeFingerprint = prepared.terrainMutations.map((mutation) => [
+      positionKey(mutation),
+      mutation.kindBefore ?? "base",
+      mutation.slotBefore,
+    ].join(":"))
+      .join("|");
+    if (
+      !actor
+      || !canUseSpecialAction(actor, prepared.actionId)
+      || actor.x !== prepared.actorPositionBefore.x
+      || actor.y !== prepared.actorPositionBefore.y
+      || this.unitAt(prepared.actorPositionAfter)
+      || currentFingerprint !== beforeFingerprint
+      || constructionPath(
+        actor,
+        prepared.actorPositionAfter,
+        this.units,
+        this.dynamicBattlefield,
+      ).map(positionKey).join("|") !== prepared.path.map(positionKey).join("|")
+    ) throw new Error(`stale prepared ${prepared.actionId} construction`);
+
+    actor.x = prepared.actorPositionAfter.x;
+    actor.y = prepared.actorPositionAfter.y;
+    actor.acted = true;
+    for (const mutation of prepared.terrainMutations) {
+      this.terrainOverrideByPosition.set(positionKey(mutation), mutation.kind);
+    }
+    this.focusId = actor.id;
+    this.recordCampaignUnit(actor);
+    return {
+      actionId: prepared.actionId,
+      actorId: prepared.actorId,
+      actorPositionBefore: { ...prepared.actorPositionBefore },
+      actorPositionAfter: { ...prepared.actorPositionAfter },
+      path: prepared.path.map((position) => ({ ...position })),
+      terrainMutations: prepared.terrainMutations.map((mutation) => ({ ...mutation })),
+    };
   }
 
   wait(id: string): boolean {
@@ -574,13 +923,14 @@ export class Stage0Battle {
   planAlliedAiAction(id: string, leaderId?: string): AlliedAiAction | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 1 || unit.acted || unit.actionDisabled) return undefined;
+    if (unit.statuses.confusion > 0) return this.planConfusedAiAction(unit);
 
     const routePulse = this.routePulseByActorId.get(id);
     if (routePulse) {
       return {
         unitId: id,
         kind: "route-pulse",
-        path: planRoutePulsePath(routePulse, unit, this.units, this.scenario),
+        path: planRoutePulsePath(routePulse, unit, this.units, this.dynamicBattlefield),
       };
     }
 
@@ -603,15 +953,15 @@ export class Stage0Battle {
         unit.classId,
         this.statsFor(unit).movement,
         this.units.filter((candidate) => candidate.id !== unit.id),
-        this.scenario,
+        this.dynamicBattlefield,
       );
       if (leaderPath.length === 0) {
         const path = routePath(
           unit,
-          neighbors(automaticLeader, this.scenario),
+          neighbors(automaticLeader, this.dynamicBattlefield),
           this.units,
           this.statsFor(unit).movement,
-          this.scenario,
+          this.dynamicBattlefield,
         );
         if (path.length > 1) return { unitId: id, kind: "move", path };
       }
@@ -630,15 +980,15 @@ export class Stage0Battle {
         unit.classId,
         this.statsFor(unit).movement,
         this.units.filter((candidate) => candidate.id !== unit.id),
-        this.scenario,
+        this.dynamicBattlefield,
       );
       if (leaderPath.length === 0) {
         const path = routePath(
           unit,
-          neighbors(leader, this.scenario),
+          neighbors(leader, this.dynamicBattlefield),
           this.units,
           this.statsFor(unit).movement,
-          this.scenario,
+          this.dynamicBattlefield,
         );
         if (path.length > 1) return { unitId: id, kind: "move", path };
       }
@@ -651,7 +1001,7 @@ export class Stage0Battle {
     const unit = this.unit(id);
     const definition = this.routePulseByActorId.get(id);
     if (!unit || !definition) return [];
-    return routePulseSafeCells(definition, unit, this.scenario);
+    return routePulseSafeCells(definition, unit, this.dynamicBattlefield);
   }
 
   prepareRoutePulse(id: string, path: readonly Position[]): PreparedRoutePulse {
@@ -660,7 +1010,7 @@ export class Stage0Battle {
     if (!actor || !definition || actor.acted || actor.actionDisabled) {
       throw new Error("illegal route pulse");
     }
-    return resolveRoutePulse(definition, actor, this.units, this.scenario, path);
+    return resolveRoutePulse(definition, actor, this.units, this.dynamicBattlefield, path);
   }
 
   commitRoutePulse(prepared: PreparedRoutePulse): PreparedRoutePulse {
@@ -700,6 +1050,7 @@ export class Stage0Battle {
   planEnemyAiAction(id: string, behavior = this.enemyBehaviorFor(id)): AlliedAiAction | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
+    if (unit.statuses.confusion > 0) return this.planConfusedAiAction(unit);
     const doctrine = this.forces.definitionForUnit(id)?.doctrine;
     if (doctrine?.strategy === "terrain-hold") {
       return this.planTerrainHoldAiAction(unit, doctrine);
@@ -724,6 +1075,103 @@ export class Stage0Battle {
       const special = this.planSpecialAiAction(id, actionId);
       if (special) return special;
     }
+    if ((unit.classId === "prayer-guide" || unit.classId === "magic-guide")
+      && unit.statuses.techniqueSeal === 0) {
+      const available: readonly (BattleActionId | undefined)[] = unit.classId === "prayer-guide"
+        ? stats.level >= 3
+          // Native slot 4 is SM, not OJ. SM has no action row; keep the slot
+          // so its draw falls through instead of inflating the other odds.
+          ? ["heal-2", "recovery-3", "defense-up", undefined]
+          : stats.level === 2
+            ? ["heal-1", "recovery-2", "defense-up"]
+            : ["heal-1", "recovery-1", "defense-up"]
+        : stats.level === 2
+          ? ["heal-2", "recovery-1", "attack-up"]
+          : stats.level === 1
+            ? ["heal-1", "recovery-1", "attack-up"]
+            : ["heal-3", "recovery-2", "attack-up", "magic-guard"];
+      if (available.length > 0) {
+        const actionId = available[this.rng.between(0, available.length - 1)];
+        const special = actionId
+          ? this.planClassAction(unit, [actionId])
+          : undefined;
+        if (special) return special;
+      }
+    }
+    if (unit.classId === "curse-master" && unit.statuses.techniqueSeal === 0) {
+      const available: readonly BattleActionId[] = stats.level >= 3
+        ? ["heal-1", "attack-down", "confusion", "poison", "spell-seal"]
+        : stats.level === 2
+          ? ["heal-1", "attack-down", "confusion", "poison"]
+          : ["heal-1", "attack-down", "confusion"];
+      const actionId = available[this.rng.between(0, available.length - 1)];
+      const special = actionId ? this.planClassAction(unit, [actionId]) : undefined;
+      if (special) return special;
+    }
+    if (unit.classId === "magic-priest" && unit.statuses.techniqueSeal === 0) {
+      const available: readonly BattleActionId[] = stats.level >= 3
+        ? ["fire-2", "lightning-1", "recovery-1", "defense-down", "dispel"]
+        : stats.level === 2
+          ? ["fire-1", "lightning-1", "recovery-1", "defense-down"]
+          : ["fire-1", "recovery-1", "defense-down"];
+      const actionId = available[this.rng.between(0, available.length - 1)];
+      const special = actionId ? this.planClassAction(unit, [actionId]) : undefined;
+      if (special) return special;
+    }
+    if (unit.classId === "great-dragon-knight" && unit.statuses.techniqueSeal === 0) {
+      const actionId = stats.level === 1
+        ? "stomp-1"
+        : stats.level === 2
+          ? "stomp-2"
+          : "stomp-3";
+      const special = actionId
+        ? this.planClassAction(unit, [actionId], { targetFilter })
+        : undefined;
+      if (special) return special;
+    }
+    if (unit.classId === "wizard" && unit.statuses.techniqueSeal === 0) {
+      const actionId = stats.level === 1
+        ? "ice-2"
+        : stats.level === 2
+          ? "ice-3"
+          : "ice-4";
+      const special = actionId
+        ? this.planClassAction(unit, [actionId], { targetFilter })
+        : undefined;
+      if (special) return special;
+    }
+    if (unit.classId === "magic-master" && unit.statuses.techniqueSeal === 0) {
+      const actionId = stats.level === 1
+        ? "lightning-2"
+        : stats.level === 2
+          ? "lightning-3"
+          : "lightning-4";
+      const special = actionId
+        ? this.planClassAction(unit, [actionId], { targetFilter })
+        : undefined;
+      if (special) return special;
+    }
+    if ((unit.classId === "magic-priest" || unit.classId === "evil-mage")
+      && unit.statuses.techniqueSeal === 0) {
+      const available = unit.classId === "evil-mage"
+        ? stats.level === 1
+          ? ["fire-2"] as const
+          : stats.level === 2
+            ? ["fire-3"] as const
+            : ["fire-4"] as const
+        : stats.level >= 3
+          ? ["fire-2", "lightning-1", "recovery-1", "dispel"] as const
+          : stats.level === 2
+            ? ["fire-1", "lightning-1", "recovery-1"] as const
+            : ["fire-1", "recovery-1"] as const;
+      if (available.length > 0) {
+        const actionId = available[this.rng.between(0, available.length - 1)];
+        const special = actionId
+          ? this.planClassAction(unit, [actionId], { targetFilter })
+          : undefined;
+        if (special) return special;
+      }
+    }
     return this.planOrdinaryAiAction(unit, 1, behavior, { targetFilter });
   }
 
@@ -733,7 +1181,7 @@ export class Stage0Battle {
   ): AlliedAiAction {
     return planTerrainHoldForceAiAction({
       width: this.stage.width,
-      battlefield: this.scenario,
+      battlefield: this.dynamicBattlefield,
       units: this.units,
       forces: this.forces,
       statsFor: (candidate) => this.statsFor(candidate),
@@ -752,10 +1200,54 @@ export class Stage0Battle {
     id: string,
     intent: Extract<EnemyAiIntent, "sentry" | "pursuit">,
   ): AlliedAiAction | undefined {
+    const unit = this.unit(id);
+    if (unit?.statuses.confusion && !unit.acted && !unit.actionDisabled) {
+      return this.planConfusedAiAction(unit);
+    }
     return planModernEnemyAction(this.modernEnemyAiContext(), id, intent);
   }
 
+  protected planConfusedAiAction(unit: BattleUnit): AlliedAiAction {
+    const reachable = reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
+      .sort((left, right) => left.y * this.stage.width + left.x
+        - (right.y * this.stage.width + right.x));
+    if (classDefinition(unit.classId).actionCategory === "ordinary") {
+      let destination: Position | undefined;
+      let bestDefense = -1;
+      for (const candidate of reachable) {
+        if (neighbors(candidate, this.dynamicBattlefield).some((adjacent) =>
+          this.units.some((other) => other.side !== unit.side
+            && other.x === adjacent.x && other.y === adjacent.y))) continue;
+        const defense = terrainDefensePercentFor(unit.classId, this.terrainSlotAt(candidate));
+        if (defense >= bestDefense) {
+          destination = candidate;
+          bestDefense = defense;
+        }
+      }
+      if (!destination || positionKey(destination) === positionKey(unit)) {
+        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      }
+      const path = this.movementPath(unit.id, destination);
+      return path.length > 1
+        ? { unitId: unit.id, kind: "move", path }
+        : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    }
+
+    for (const candidate of reachable) {
+      // Native behavior FFh samples PIT bit 0 for each ascending cell. Gameplay
+      // randomness is mapped one-for-one to the serializable simulation PRNG.
+      if (this.rng.between(0, 1) !== 0) continue;
+      if (positionKey(candidate) === positionKey(unit)) {
+        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      }
+      const path = this.movementPath(unit.id, candidate);
+      if (path.length > 1) return { unitId: unit.id, kind: "move", path };
+    }
+    return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+  }
+
   protected hasDamageActionThisTurn(id: string): boolean {
+    if ((this.unit(id)?.statuses.confusion ?? 0) > 0) return false;
     return hasModernDamageActionThisTurn(this.modernEnemyAiContext(), id);
   }
 
@@ -764,7 +1256,7 @@ export class Stage0Battle {
   private modernEnemyAiContext(): ModernEnemyAiContext {
     return {
       width: this.stage.width,
-      battlefield: this.scenario,
+      battlefield: this.dynamicBattlefield,
       units: this.units,
       unit: (id) => this.unit(id),
       statsFor: (unit) => this.statsFor(unit),
@@ -789,7 +1281,7 @@ export class Stage0Battle {
       return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
     }
 
-    const reachable = reachableCells(unit, this.units, undefined, this.scenario)
+    const reachable = reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
       .filter((position) => options.destinationFilter?.(position) ?? true);
     const reachableKeys = new Set(reachable.map(positionKey));
     const occupied = new Set(this.units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
@@ -818,7 +1310,7 @@ export class Stage0Battle {
           ? [{ x: unit.x, y: unit.y }]
           : this.movementPath(unit.id, candidate);
         if (path.length === 0 || !(options.pathFilter?.(path) ?? true)) continue;
-        const defense = terrainDefensePercentFor(unit.classId, this.scenario.terrainSlotAt(candidate));
+        const defense = terrainDefensePercentFor(unit.classId, this.terrainSlotAt(candidate));
         if (defense >= attackPositionDefense) {
           attackTarget = enemy;
           attackPosition = candidate;
@@ -843,7 +1335,7 @@ export class Stage0Battle {
     const pursuitTargets = enemies
       .map((enemy) => ({ x: enemy.x, y: enemy.y + 1 }))
       .filter(({ x, y }) => x >= 0 && y >= 0 && x < this.stage.width && y < this.stage.height);
-    const pursuitPath = routePath(unit, pursuitTargets, this.units, stats.movement, this.scenario);
+    const pursuitPath = routePath(unit, pursuitTargets, this.units, stats.movement, this.dynamicBattlefield);
     if (pursuitPath.length > 1
       && (options.destinationFilter?.(pursuitPath.at(-1)!) ?? true)
       && (options.pathFilter?.(pursuitPath) ?? true)) {
@@ -892,22 +1384,71 @@ export class Stage0Battle {
           ? ["heal-1", "fire-1"]
           : unit.classId === "monk"
             ? ["heal-1", "recovery-1"]
+          : unit.classId === "great-dragon-knight"
+            ? this.statsFor(unit).level === 1
+              ? ["stomp-1"]
+              : this.statsFor(unit).level === 2
+                ? ["stomp-2"]
+                : ["stomp-3"]
+          : unit.classId === "wizard"
+            ? this.statsFor(unit).level === 1
+              ? ["ice-2"]
+              : this.statsFor(unit).level === 2
+                ? ["ice-3"]
+                : ["ice-4"]
+          : unit.classId === "magic-master"
+            ? this.statsFor(unit).level === 1
+              ? ["lightning-2"]
+              : this.statsFor(unit).level === 2
+                ? ["lightning-3"]
+                : ["lightning-4"]
+          : unit.classId === "evil-mage"
+            ? this.statsFor(unit).level === 1
+              ? ["fire-2"]
+              : this.statsFor(unit).level === 2
+                ? ["fire-3"]
+                : ["fire-4"]
+          : unit.classId === "magic-priest"
+            ? this.statsFor(unit).level >= 3
+              ? ["fire-2", "lightning-1", "recovery-1", "defense-down", "dispel"]
+              : this.statsFor(unit).level === 2
+                ? ["fire-1", "lightning-1", "recovery-1", "defense-down"]
+                : ["fire-1", "recovery-1", "defense-down"]
+          : unit.classId === "prayer-guide"
+            ? this.statsFor(unit).level >= 3
+              ? ["heal-2", "recovery-3", "defense-up"]
+              : this.statsFor(unit).level === 2
+                ? ["heal-1", "recovery-2", "defense-up"]
+                : ["heal-1", "recovery-1", "defense-up"]
+          : unit.classId === "magic-guide"
+            ? this.statsFor(unit).level === 2
+              ? ["heal-2", "recovery-1", "attack-up"]
+              : this.statsFor(unit).level === 1
+                ? ["heal-1", "recovery-1", "attack-up"]
+                : ["heal-3", "recovery-2", "attack-up", "magic-guard"]
+          : unit.classId === "curse-master"
+            ? this.statsFor(unit).level >= 3
+              ? ["heal-1", "attack-down", "confusion", "poison", "spell-seal"]
+              : this.statsFor(unit).level === 2
+                ? ["heal-1", "attack-down", "confusion", "poison"]
+              : ["heal-1", "attack-down", "confusion"]
           : []);
     if (actionIds.length === 0) return undefined;
 
     const occupied = new Set(
       this.units.filter(({ id }) => id !== unit.id).map(positionKey),
     );
-    const battlefield = {
+    const battlefield: GridBattlefield = {
       width: this.stage.width,
       height: this.stage.height,
-      terrainSlotAt: this.scenario.terrainSlotAt,
+      terrainSlotAt: (position) => this.terrainSlotAt(position),
     };
 
     for (const actionId of actionIds) {
+      if (!canUseSpecialAction(unit, actionId)) continue;
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
       const positions = (actionId === "archer-shot"
-        ? reachableCells(unit, this.units, undefined, this.scenario)
+        ? reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
         : [{ x: unit.x, y: unit.y }])
         .filter((position) => !occupied.has(positionKey(position))
           && (options.positionFilter?.(position) ?? true));
@@ -927,7 +1468,11 @@ export class Stage0Battle {
         const range = actionId === "archer-shot"
           ? archerShootingRange(rangeActor, battlefield)
           : techniqueSelectionRange(rangeActor, battlefield,
-            "selectionRadius" in definition.range ? definition.range.selectionRadius : 0);
+            "aiCandidateSelectionRadius" in definition.range
+              ? definition.range.aiCandidateSelectionRadius
+              : "selectionRadius" in definition.range
+                ? definition.range.selectionRadius
+                : 0);
         const path = positionKey(position) === positionKey(unit)
           ? [{ x: unit.x, y: unit.y }]
           : this.movementPath(unit.id, position);
@@ -939,14 +1484,24 @@ export class Stage0Battle {
             : target.side !== unit.side;
           if (!correctSide
             || range.valueAt(target) === 0
-            || target.actionDisabled
+            || (!canTargetFrozenUnit(actionId) && target.actionDisabled)
             || !(options.targetFilter?.(target) ?? true)) continue;
           const targetStats = this.statsFor(target);
           const missingLife = targetStats.maxLife - target.life;
-          if (definition.target === "ally" && actionId !== "dispel" && missingLife <= 0) continue;
-          const effectiveDefense = targetStats.defense + Math.floor(
-            targetStats.defense
-            * terrainDefensePercentFor(target.classId, this.scenario.terrainSlotAt(target))
+          if (definition.target === "ally"
+            && actionId !== "dispel"
+            && actionId !== "heal-2"
+            && actionId !== "heal-3"
+            && actionId !== "recovery-2"
+            && actionId !== "recovery-3"
+            && actionId !== "attack-up"
+            && actionId !== "defense-up"
+            && actionId !== "magic-guard"
+            && missingLife <= 0) continue;
+          const targetEffectiveStats = this.effectiveStatsFor(target);
+          const effectiveDefense = targetEffectiveStats.defense + Math.floor(
+            targetEffectiveStats.defense
+            * terrainDefensePercentFor(target.classId, this.terrainSlotAt(target))
             / 100,
           );
           candidates.push({
@@ -955,18 +1510,22 @@ export class Stage0Battle {
             path,
             missingLife,
             effectiveDefense,
-            positionDefense: terrainDefensePercentFor(unit.classId, this.scenario.terrainSlotAt(position)),
-            lethal: actionId === "fire-1"
-              && target.statuses.magicGuard === 0
+            positionDefense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
+            lethal: (actionId === "fire-1" || actionId === "fire-2" || actionId === "fire-3"
+              || actionId === "fire-4")
               && target.life <= Math.min(
-                BATTLE_ACTION_DEFINITIONS["fire-1"].damage.cap,
+                BATTLE_ACTION_DEFINITIONS[actionId].damage.cap,
                 Math.floor(
                   targetStats.maxLife
-                  * BATTLE_ACTION_DEFINITIONS["fire-1"].damage.maxLifePercent
+                  * BATTLE_ACTION_DEFINITIONS[actionId].damage.maxLifePercent
                   / 100,
                 ),
               ),
-            critical: definition.target === "ally" && actionId !== "dispel"
+            critical: definition.target === "ally"
+              && actionId !== "dispel"
+              && actionId !== "attack-up"
+              && actionId !== "defense-up"
+              && actionId !== "magic-guard"
               && target.life * 100 < targetStats.maxLife * 40,
           });
         }
@@ -978,6 +1537,17 @@ export class Stage0Battle {
         if (definition.target === "ally" && actionId !== "dispel"
           && left.missingLife !== right.missingLife) {
           return right.missingLife - left.missingLife;
+        }
+        if (actionId === "heal-2"
+          || actionId === "heal-3"
+          || actionId === "recovery-2"
+          || actionId === "recovery-3"
+          || actionId === "attack-up"
+          || actionId === "defense-up"
+          || actionId === "magic-guard") {
+          const laterTargetFirst = right.target.y * this.stage.width + right.target.x
+            - (left.target.y * this.stage.width + left.target.x);
+          if (laterTargetFirst !== 0) return laterTargetFirst;
         }
         if ((definition.target !== "ally" || actionId === "dispel")
           && left.effectiveDefense !== right.effectiveDefense) {
@@ -1033,7 +1603,7 @@ export class Stage0Battle {
     const route = this.scenario.routeEnemy;
     if (!unit || unit.side !== 2 || unit.actionDisabled) return [];
     return route
-      ? reachableCells(unit, this.units, route.movement, this.scenario)
+      ? reachableCells(unit, this.units, route.movement, this.dynamicBattlefield)
       : this.reachableCells(id);
   }
 
@@ -1064,7 +1634,7 @@ export class Stage0Battle {
     const unit = this.unit(id);
     const definition = this.scenario.routeEnemy;
     if (!unit || unit.side !== 2 || unit.actionDisabled || !definition) return undefined;
-    const route = routePath(unit, [definition.target], this.units, definition.movement, this.scenario);
+    const route = routePath(unit, [definition.target], this.units, definition.movement, this.dynamicBattlefield);
     const exitIndex = route.findIndex((position, index) => index > 0 && definition.isExit(position));
     const path = exitIndex >= 0 ? route.slice(0, exitIndex + 1) : route;
     const destination = path.at(-1) ?? { x: unit.x, y: unit.y };
@@ -1103,6 +1673,21 @@ export class Stage0Battle {
     this.round += 1;
     for (const unit of this.units) {
       unit.acted = false;
+      if (unit.statuses.poison > 0) {
+        // REMAKE-004 keeps poisoned units alive. REMAKE-013 skips persistent
+        // damage while the unit is still frozen, but the status duration is
+        // consumed normally. This must precede side-2 thawing below.
+        if (!unit.actionDisabled) unit.life = Math.max(1, Math.floor(unit.life / 2));
+        unit.statuses.poison = tickTimedStatus(unit.statuses.poison);
+        this.recordCampaignUnit(unit);
+      }
+      unit.statuses.attackUp = tickTimedStatus(unit.statuses.attackUp);
+      unit.statuses.defenseUp = tickTimedStatus(unit.statuses.defenseUp);
+      unit.statuses.magicGuard = tickTimedStatus(unit.statuses.magicGuard);
+      unit.statuses.confusion = tickTimedStatus(unit.statuses.confusion);
+      unit.statuses.attackDown = tickTimedStatus(unit.statuses.attackDown);
+      unit.statuses.defenseDown = tickTimedStatus(unit.statuses.defenseDown);
+      unit.statuses.techniqueSeal = tickTimedStatus(unit.statuses.techniqueSeal);
       if (unit.side === 2) unit.actionDisabled = false;
     }
     if (this.unit("1:0")) this.focusId = "1:0";
@@ -1119,15 +1704,17 @@ export class Stage0Battle {
       rngState: this.rng.state,
       rngCalls: this.rng.calls,
       units: this.units.map((unit) => ({ ...unit, statuses: { ...unit.statuses } })),
+      terrainOverrides: this.terrainOverrides.map((override) => ({ ...override })),
       outcome: this.outcome(),
     };
   }
 
-  serializableSnapshot(): Pick<SavedBattleState, "round" | "focusId" | "units" | "enemyAi"> {
+  serializableSnapshot(): Pick<SavedBattleState, "round" | "focusId" | "units" | "enemyAi" | "terrainOverrides"> {
     return {
       round: this.round,
       focusId: this.focusId,
       units: this.units.map((unit) => ({ ...unit, statuses: { ...unit.statuses } })),
+      terrainOverrides: this.terrainOverrides.map((override) => ({ ...override })),
     };
   }
 

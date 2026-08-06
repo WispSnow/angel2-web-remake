@@ -7,6 +7,12 @@ export interface ActionBattlefield {
   terrainSlotAt: (position: Position) => number;
 }
 
+export interface ActionViewport {
+  readonly origin: Position;
+  readonly width: number;
+  readonly height: number;
+}
+
 export class NumericRangeMap {
   readonly values: Uint8Array;
 
@@ -121,6 +127,26 @@ export function techniqueEffectRange(
       const distance = Math.abs(center.x - x) + Math.abs(center.y - y);
       const value = effectRadius - distance;
       if (value > 0) result.set({ x, y }, value);
+    }
+  }
+  return result;
+}
+
+export function stompEffectRange(
+  actor: Pick<BattleUnit, "classId">,
+  center: Position,
+  battlefield: ActionBattlefield,
+  viewport: ActionViewport,
+): NumericRangeMap {
+  const result = buildUniformRange(
+    { ...center, classId: actor.classId },
+    battlefield,
+    4,
+    (movementRule) => movementRule === 99,
+  );
+  for (let y = viewport.origin.y; y < viewport.origin.y + viewport.height; y += 1) {
+    for (let x = viewport.origin.x; x < viewport.origin.x + viewport.width; x += 1) {
+      result.set({ x, y }, 1);
     }
   }
   return result;

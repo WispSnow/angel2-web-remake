@@ -1374,6 +1374,7 @@ function renderHud(
   unit: NonNullable<GameController["focusedUnit"]>,
   stats: UnitStats,
 ): string {
+  const baseStats = controller.battle.statsFor(unit);
   const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
   const nextExperience = nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
@@ -1407,8 +1408,8 @@ function renderHud(
       <div class="meter-labels" aria-hidden="true"><span>HP</span><span>EXP</span></div>
       <dl class="stat-list">
         <div><dt>生命</dt><dd>${unit.life}／${stats.maxLife}</dd></div>
-        <div><dt>攻擊</dt><dd>${stats.attack}／${stats.attack}</dd></div>
-        <div><dt>防禦</dt><dd>${stats.defense}／${stats.defense}</dd></div>
+        <div data-testid="unit-attack-stat"><dt>攻擊</dt><dd>${stats.attack}／${baseStats.attack}</dd></div>
+        <div data-testid="unit-defense-stat"><dt>防禦</dt><dd>${stats.defense}／${baseStats.defense}</dd></div>
         <div><dt>等級</dt><dd>${stats.level}</dd></div>
         <div><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
         ${controlLabel ? `<div data-testid="allied-control-mode"><dt>控制</dt><dd>${controlLabel}</dd></div>` : ""}

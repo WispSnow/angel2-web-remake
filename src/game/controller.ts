@@ -15,6 +15,7 @@ import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
 import {
   classDefinition,
   className,
+  classStatsFor,
   promotionTargetsFor,
   type PromotionTarget,
 } from "./content/classes";
@@ -53,7 +54,12 @@ import {
 import { Stage0Battle } from "./simulation/battle";
 import type { AlliedAiAction } from "./simulation/ai-contracts";
 import type { PreparedRoutePulse } from "./simulation/route-pulse";
+import type {
+  ConstructionActionId,
+  ConstructionResult,
+} from "./simulation/actions/construction";
 import { routePulsePresentationTimeline } from "./route-pulse-presentation";
+import { buildStompPresentationSteps } from "./stomp-presentation";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
 import {
@@ -63,6 +69,7 @@ import {
 } from "./simulation/stage-events";
 import type {
   BattleActionId,
+  PreparedBattleAction,
   SpecialActionResult,
 } from "./simulation/actions/types";
 import {
@@ -148,7 +155,12 @@ export type SpecialActionPresentationPhase =
   | "lightningCleanup"
   | "iceExpansion"
   | "recoveryEffect"
+  | "statusEffect"
+  | "poisonEffect"
+  | "prayerEffect"
   | "dispelEffect"
+  | "stompEffect"
+  | "stompPageToggle"
   | "lifeDrain"
   | "specialDeath";
 
@@ -222,15 +234,47 @@ const CLASS_COMMANDS: Readonly<Partial<Record<BattleUnit["classId"], UnitCommand
   archer: { id: "shoot", label: "射擊" },
   sister: { id: "technique", label: "技術" },
   magician: { id: "technique", label: "技術" },
+  "evil-mage": { id: "technique", label: "技術" },
   monk: { id: "technique", label: "技術" },
   "magic-priest": { id: "technique", label: "技術" },
+  "prayer-guide": { id: "technique", label: "技術" },
+  "magic-guide": { id: "technique", label: "技術" },
+  "curse-master": { id: "technique", label: "技術" },
+  "great-dragon-knight": { id: "technique", label: "技術" },
+  "magic-master": { id: "technique", label: "技術" },
+  wizard: { id: "technique", label: "技術" },
+  engineer: { id: "technique", label: "技術" },
 };
 
 const SISTER_TECHNIQUES = ["fire-1", "heal-1"] as const satisfies readonly BattleActionId[];
 const MAGICIAN_TECHNIQUES = ["fire-1", "lightning-1", "ice-1"] as const satisfies readonly BattleActionId[];
 const MONK_TECHNIQUES = ["heal-1", "recovery-1"] as const satisfies readonly BattleActionId[];
-const MAGIC_PRIEST_TIER3_TECHNIQUES = ["dispel"] as const satisfies readonly BattleActionId[];
+const MAGIC_PRIEST_TIER1_TECHNIQUES = ["fire-1", "recovery-1", "defense-down"] as const satisfies readonly BattleActionId[];
+const MAGIC_PRIEST_TIER2_TECHNIQUES = ["fire-1", "lightning-1", "recovery-1", "defense-down"] as const satisfies readonly BattleActionId[];
+const MAGIC_PRIEST_TIER3_TECHNIQUES = ["fire-2", "lightning-1", "recovery-1", "defense-down", "dispel"] as const satisfies readonly BattleActionId[];
+const PRAYER_GUIDE_TIER1_TECHNIQUES = ["heal-1", "recovery-1", "defense-up"] as const satisfies readonly BattleActionId[];
+const PRAYER_GUIDE_TIER2_TECHNIQUES = ["heal-1", "recovery-2", "defense-up"] as const satisfies readonly BattleActionId[];
+const PRAYER_GUIDE_TIER3_TECHNIQUES = ["heal-2", "recovery-3", "defense-up", "prayer"] as const satisfies readonly BattleActionId[];
+const MAGIC_GUIDE_TIER1_TECHNIQUES = ["heal-1", "recovery-1", "attack-up"] as const satisfies readonly BattleActionId[];
+const MAGIC_GUIDE_TIER2_TECHNIQUES = ["heal-2", "recovery-1", "attack-up"] as const satisfies readonly BattleActionId[];
+const MAGIC_GUIDE_TIER3_TECHNIQUES = ["heal-3", "recovery-2", "attack-up", "magic-guard"] as const satisfies readonly BattleActionId[];
+const CURSE_MASTER_TIER1_TECHNIQUES = ["heal-1", "attack-down", "confusion"] as const satisfies readonly BattleActionId[];
+const CURSE_MASTER_TIER2_TECHNIQUES = ["heal-1", "attack-down", "confusion", "poison"] as const satisfies readonly BattleActionId[];
+const CURSE_MASTER_TIER3_TECHNIQUES = ["heal-1", "attack-down", "confusion", "poison", "spell-seal"] as const satisfies readonly BattleActionId[];
+const EVIL_MAGE_TIER1_TECHNIQUES = ["fire-2"] as const satisfies readonly BattleActionId[];
+const EVIL_MAGE_TIER2_TECHNIQUES = ["fire-3"] as const satisfies readonly BattleActionId[];
+const EVIL_MAGE_TIER3_TECHNIQUES = ["fire-4"] as const satisfies readonly BattleActionId[];
+const MAGIC_MASTER_TIER1_TECHNIQUES = ["lightning-2"] as const satisfies readonly BattleActionId[];
+const MAGIC_MASTER_TIER2_TECHNIQUES = ["lightning-3"] as const satisfies readonly BattleActionId[];
+const MAGIC_MASTER_TIER3_TECHNIQUES = ["lightning-4"] as const satisfies readonly BattleActionId[];
 const MAGIC_PRIEST_TIER3_EXPERIENCE = classDefinition("magic-priest").dataRows[2].experienceThreshold;
+const GREAT_DRAGON_KNIGHT_TIER1_TECHNIQUES = ["stomp-1"] as const satisfies readonly BattleActionId[];
+const GREAT_DRAGON_KNIGHT_TIER2_TECHNIQUES = ["stomp-2"] as const satisfies readonly BattleActionId[];
+const GREAT_DRAGON_KNIGHT_TIER3_TECHNIQUES = ["stomp-3"] as const satisfies readonly BattleActionId[];
+const WIZARD_TIER1_TECHNIQUES = ["ice-2"] as const satisfies readonly BattleActionId[];
+const WIZARD_TIER2_TECHNIQUES = ["ice-3"] as const satisfies readonly BattleActionId[];
+const WIZARD_TIER3_TECHNIQUES = ["ice-4"] as const satisfies readonly BattleActionId[];
+const ENGINEER_TECHNIQUES = ["iron-plate", "obstacle"] as const satisfies readonly BattleActionId[];
 
 const GROUP_COMMANDS: readonly GroupCommand[] = [
   { id: "allRest", label: "全部休息" },
@@ -318,6 +362,7 @@ export class GameController {
   keySoundEnabled: boolean;
   lastCombat?: AttackResult;
   lastSpecialAction?: SpecialActionResult;
+  lastConstruction?: ConstructionResult;
   lastRoutePulse?: PreparedRoutePulse;
   combatPresentation?: CombatPresentation;
   combatPresentationTrace: CombatPresentationTraceEntry[] = [];
@@ -352,6 +397,7 @@ export class GameController {
   private pendingPath?: Position[];
   private busy = false;
   private promotionResume?: () => void;
+  private prayerHoldSkip?: () => void;
   private groupCommandLeaderId?: string;
   private activeStoryId?: StageStoryId;
   private stageEventState: StageEventState;
@@ -736,8 +782,57 @@ export class GameController {
         : this.selectedUnit?.classId === "monk"
           ? MONK_TECHNIQUES
           : this.selectedUnit?.classId === "magic-priest"
-            && this.selectedUnit.experience >= MAGIC_PRIEST_TIER3_EXPERIENCE
-            ? MAGIC_PRIEST_TIER3_TECHNIQUES
+            ? classStatsFor(this.selectedUnit).level >= 3
+              ? MAGIC_PRIEST_TIER3_TECHNIQUES
+              : classStatsFor(this.selectedUnit).level === 2
+                ? MAGIC_PRIEST_TIER2_TECHNIQUES
+                : MAGIC_PRIEST_TIER1_TECHNIQUES
+          : this.selectedUnit?.classId === "evil-mage"
+            ? classStatsFor(this.selectedUnit).level === 1
+              ? EVIL_MAGE_TIER1_TECHNIQUES
+              : classStatsFor(this.selectedUnit).level === 2
+                ? EVIL_MAGE_TIER2_TECHNIQUES
+                : EVIL_MAGE_TIER3_TECHNIQUES
+            : this.selectedUnit?.classId === "prayer-guide"
+              ? classStatsFor(this.selectedUnit).level >= 3
+                ? PRAYER_GUIDE_TIER3_TECHNIQUES
+                : classStatsFor(this.selectedUnit).level === 2
+                  ? PRAYER_GUIDE_TIER2_TECHNIQUES
+                  : PRAYER_GUIDE_TIER1_TECHNIQUES
+              : this.selectedUnit?.classId === "magic-guide"
+                ? classStatsFor(this.selectedUnit).level >= 3
+                  ? MAGIC_GUIDE_TIER3_TECHNIQUES
+                  : classStatsFor(this.selectedUnit).level === 2
+                  ? MAGIC_GUIDE_TIER2_TECHNIQUES
+                  : classStatsFor(this.selectedUnit).level === 1
+                    ? MAGIC_GUIDE_TIER1_TECHNIQUES
+                    : []
+              : this.selectedUnit?.classId === "curse-master"
+                ? classStatsFor(this.selectedUnit).level >= 3
+                  ? CURSE_MASTER_TIER3_TECHNIQUES
+                  : classStatsFor(this.selectedUnit).level === 2
+                    ? CURSE_MASTER_TIER2_TECHNIQUES
+                    : CURSE_MASTER_TIER1_TECHNIQUES
+            : this.selectedUnit?.classId === "great-dragon-knight"
+              ? classStatsFor(this.selectedUnit).level === 1
+                ? GREAT_DRAGON_KNIGHT_TIER1_TECHNIQUES
+                : classStatsFor(this.selectedUnit).level === 2
+                  ? GREAT_DRAGON_KNIGHT_TIER2_TECHNIQUES
+                  : GREAT_DRAGON_KNIGHT_TIER3_TECHNIQUES
+              : this.selectedUnit?.classId === "wizard"
+                ? classStatsFor(this.selectedUnit).level === 1
+                  ? WIZARD_TIER1_TECHNIQUES
+                  : classStatsFor(this.selectedUnit).level === 2
+                    ? WIZARD_TIER2_TECHNIQUES
+                    : WIZARD_TIER3_TECHNIQUES
+              : this.selectedUnit?.classId === "magic-master"
+                ? classStatsFor(this.selectedUnit).level === 1
+                  ? MAGIC_MASTER_TIER1_TECHNIQUES
+                  : classStatsFor(this.selectedUnit).level === 2
+                    ? MAGIC_MASTER_TIER2_TECHNIQUES
+                    : MAGIC_MASTER_TIER3_TECHNIQUES
+              : this.selectedUnit?.classId === "engineer"
+                ? ENGINEER_TECHNIQUES
             : [];
   }
 
@@ -1189,7 +1284,9 @@ export class GameController {
       return;
     }
     this.actionMode = "specialTarget";
-    this.statusMessage = `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
+    this.statusMessage = definition.target === "empty-cell"
+      ? "選擇工兵移動並鋪設鐵板的空格。"
+      : `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
   }
 
@@ -1358,6 +1455,10 @@ export class GameController {
     const definition = actionId ? BATTLE_ACTION_DEFINITIONS[actionId] : undefined;
     const target = definition?.target === "self-area" ? undefined : this.battle.unitAt(position);
     if (!actor || !actionId || !definition || this.busy) return;
+    if (actionId === "iron-plate" || actionId === "obstacle") {
+      await this.commitConstruction(actor, position, actionId);
+      return;
+    }
     if (definition.target !== "self-area" && !target) return;
     try {
       const prepared = this.battle.prepareSpecialAction({
@@ -1365,6 +1466,9 @@ export class GameController {
         actorId: actor.id,
         targetId: target?.id,
         target: definition.target === "self-area" ? undefined : position,
+        ...(actionId === "stomp-1" || actionId === "stomp-2" || actionId === "stomp-3"
+          ? { viewportOrigin: { ...this.cameraOrigin } }
+          : {}),
       });
       const actorPresentation = { ...actor, statuses: { ...actor.statuses } };
       const targetPresentation = target
@@ -1380,6 +1484,29 @@ export class GameController {
       this.markHintSeen();
       this.emit();
 
+      if (actionId === "prayer") {
+        await this.presentPrayerAction(actorPresentation, prepared);
+        this.lastSpecialAction = this.battle.completePreparedPrayer(prepared);
+        const counts = Object.fromEntries(
+          (["healing", "experience", "attackUp", "defenseUp"] as const).map((outcome) => [
+            outcome,
+            prepared.affectedUnits.filter(({ prayerOutcome }) => prayerOutcome === outcome).length,
+          ]),
+        );
+        this.statusMessage = prepared.affectedUnits.length === 0
+          ? "祈禱沒有回應。"
+          : `祈禱回應 ${prepared.affectedUnits.length} 名我方：生命 ${counts.healing}、經驗 ${counts.experience}、攻擊 ${counts.attackUp}、防禦 ${counts.defenseUp}。`;
+        const promotionPause = this.pauseForPromotions();
+        if (promotionPause) await promotionPause;
+        this.busy = false;
+        const ended = this.resolveOutcome();
+        this.emit();
+        if (!ended && this.battle.playerManualPhaseComplete()) {
+          void this.runTurnPhases("autonomous");
+        }
+        return;
+      }
+
       await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
       this.lastSpecialAction = this.battle.commitPreparedAction(prepared);
       const result = this.lastSpecialAction;
@@ -1394,12 +1521,40 @@ export class GameController {
         && result.affectedUnits.some(({ actionDisabledBefore, actionDisabledAfter }) =>
           actionDisabledBefore && !actionDisabledAfter);
       this.statusMessage = actionId === "ice-1"
+        || actionId === "ice-2"
+        || actionId === "ice-3"
+        || actionId === "ice-4"
         ? `冰雪擊退 ${moved} 名敵人，冰封 ${frozen} 名；其下一次本陣營行動被跳過，期間不能成為攻擊或治療目標。`
         : actionId === "dispel" && targetPresentation
           ? `${targetPresentation.name}的${cleansedFrozen ? "冰封及異常狀態" : "異常狀態"}已由破邪解除。`
-        : actionId === "lightning-1"
-          ? `落雷對 ${result.affectedUnits.length} 名敵人造成共 ${result.damage} 點傷害。`
-          : actionId === "recovery-1"
+        : actionId === "attack-up" && targetPresentation
+          ? `${targetPresentation.name}的攻擊提升 20，狀態重置為 3。`
+        : actionId === "defense-up" && targetPresentation
+          ? `${targetPresentation.name}的防禦提升 20，狀態重置為 3。`
+        : actionId === "magic-guard" && targetPresentation
+          ? `${targetPresentation.name}獲得防魔；可抵消下一次適用魔法，未使用則於完整回合邊界消失。`
+        : actionId === "poison" && targetPresentation
+          ? result.blockReason === "classImmune"
+            ? `${targetPresentation.name}完整承受毒霧演出，但其職業免疫中毒。`
+            : `${targetPresentation.name}中毒，狀態重置為 3。`
+        : actionId === "confusion" && targetPresentation
+          ? result.blockReason === "classImmune"
+            ? `${targetPresentation.name}完整承受混亂演出，但其職業免疫狀態寫入。`
+            : `${targetPresentation.name}陷入混亂，狀態重置為 3。`
+        : actionId === "attack-down" && targetPresentation
+          ? `${targetPresentation.name}的攻擊下降 20，狀態重置為 3。`
+        : actionId === "defense-down" && targetPresentation
+          ? `${targetPresentation.name}的防禦下降 20，狀態重置為 3。`
+        : actionId === "spell-seal" && targetPresentation
+          ? result.blockReason === "classImmune"
+            ? `${targetPresentation.name}完整承受禁咒演出，但龍職業免疫狀態寫入。`
+            : `${targetPresentation.name}遭到禁咒，狀態重置為 3。`
+        : actionId === "lightning-1" || actionId === "lightning-2" || actionId === "lightning-3"
+          || actionId === "lightning-4"
+          ? `落雷對 ${result.affectedUnits.filter(({ blockReason }) => blockReason !== "frozen").length} 名敵人造成共 ${result.damage} 點傷害。`
+          : actionId === "stomp-1" || actionId === "stomp-2" || actionId === "stomp-3"
+            ? `${definition.label}對 ${result.affectedUnits.filter(({ blocked }) => !blocked).length} 名敵人造成共 ${result.damage} 點傷害。`
+          : actionId === "recovery-1" || actionId === "recovery-2" || actionId === "recovery-3"
             ? `回復使 ${result.affectedUnits.filter(({ healing }) => healing > 0).length} 名友軍恢復共 ${result.healing} 點生命。`
           : result.blocked && targetPresentation
             ? `${targetPresentation.name}的魔法防禦抵消了攻擊。`
@@ -1425,6 +1580,34 @@ export class GameController {
     }
   }
 
+  private async commitConstruction(
+    actor: BattleUnit,
+    position: Position,
+    actionId: ConstructionActionId,
+  ): Promise<void> {
+    const label = BATTLE_ACTION_DEFINITIONS[actionId].label;
+    try {
+      const prepared = this.battle.prepareConstruction(actor.id, position, actionId);
+      this.busy = true;
+      this.statusMessage = `${actor.name}前往${actionId === "iron-plate" ? "鋪設" : "設置"}${label}……`;
+      this.resetAction();
+      this.markHintSeen();
+      this.emit();
+      const completed = await this.presentPreparedUnitPath(actor.id, prepared.path);
+      if (!completed) throw new Error(`${label}移動路徑已失效`);
+      this.lastConstruction = this.battle.commitConstruction(prepared);
+      const changed = this.lastConstruction.terrainMutations.filter(({ changed }) => changed).length;
+      this.statusMessage = `${label}${actionId === "iron-plate" ? "鋪設" : "設置"}完成：覆蓋 ${this.lastConstruction.terrainMutations.length} 格，其中 ${changed} 格為新地形。`;
+      this.busy = false;
+      this.finishUnitAction(this.statusMessage, true);
+    } catch (error) {
+      this.busy = false;
+      this.movementPresentation = undefined;
+      this.statusMessage = error instanceof Error ? error.message : `${label}構築無效。`;
+      this.emit();
+    }
+  }
+
   private async presentSpecialAction(
     actor: BattleUnit,
     target: BattleUnit | undefined,
@@ -1439,6 +1622,7 @@ export class GameController {
       frame: number,
       nativeTicks: number,
       lifeChangeUnitId?: string,
+      displayNativeTicks = nativeTicks,
     ): Promise<void> => {
       this.specialActionPresentation = {
         actor,
@@ -1462,7 +1646,7 @@ export class GameController {
       await pause(
         phase === "lifeDrain" && this.testMode
           ? 8
-          : this.mapCombatDelay(nativeTicks),
+          : this.mapCombatDelay(displayNativeTicks),
       );
     };
 
@@ -1472,31 +1656,140 @@ export class GameController {
         await present("shootHit", frame, 6);
       }
       await present("shootBlank", -1, 6);
-    } else if (result.actionId === "fire-1") {
-      this.queueAudioCue(83, "fire-1-start", "magic");
-      for (let frame = 0; frame < 7; frame += 1) {
-        await present("fireEffect", frame, 10);
+    } else if (result.actionId === "fire-1"
+      || result.actionId === "fire-2"
+      || result.actionId === "fire-3"
+      || result.actionId === "fire-4") {
+      if (result.actionId === "fire-1") {
+        this.queueAudioCue(83, `${result.actionId}-start`, "magic");
+        for (let frame = 0; frame < 7; frame += 1) {
+          await present("fireEffect", frame, 10);
+        }
+      } else {
+        let frame = 0;
+        let elapsedNativeTicks = 0;
+        let audioRequestIndex = 0;
+        const fire = result.actionId === "fire-2"
+          ? actionPresentationCatalog().fire2
+          : result.actionId === "fire-3"
+            ? actionPresentationCatalog().fire3
+            : actionPresentationCatalog().fire4;
+        const queueDueFireAudio = (): void => {
+          while (audioRequestIndex < fire.audioRequests.length) {
+            const request = fire.audioRequests[audioRequestIndex];
+            if (!request || request.afterFixedWaitNativeTicks > elapsedNativeTicks) return;
+            const [group, record] = request.resource.split("/");
+            this.queueAudioCue(
+              Number(record),
+              request.afterFixedWaitNativeTicks === 0
+                ? `${result.actionId}-start`
+                : `${result.actionId}-${request.afterFixedWaitNativeTicks}`,
+              group === "MAGIC" ? "magic" : "e",
+            );
+            audioRequestIndex += 1;
+          }
+        };
+        for (const phase of fire.phases) {
+          for (const _descriptor of phase.descriptorSequence) {
+            queueDueFireAudio();
+            await present("fireEffect", frame, phase.waitPerDrawNativeTicks);
+            elapsedNativeTicks += phase.waitPerDrawNativeTicks;
+            frame += 1;
+          }
+        }
       }
-    } else if (result.actionId === "heal-1") {
-      this.queueAudioCue(36, "heal-1-start", "e");
-      for (let frame = 0; frame < 39; frame += 1) {
-        await present("healPrimary", frame, 5);
+    } else if (result.actionId === "heal-1"
+      || result.actionId === "heal-2"
+      || result.actionId === "heal-3") {
+      if (result.actionId === "heal-1") {
+        this.queueAudioCue(36, "heal-1-start", "e");
+        for (let frame = 0; frame < 39; frame += 1) {
+          await present("healPrimary", frame, 5);
+        }
+        await present("healBlank", -1, 5);
+        for (let frame = 0; frame < 5; frame += 1) {
+          await present("healTail", frame, 15);
+        }
+      } else if (result.actionId === "heal-2") {
+        this.queueAudioCue(36, "heal-2-start", "e");
+        const [primary, tail] = actionPresentationCatalog().heal2.phases;
+        for (let frame = 0; frame < primary.descriptorSequence.length; frame += 1) {
+          await present("healPrimary", frame, primary.waitPerDrawNativeTicks);
+        }
+        for (let frame = 0; frame < tail.descriptorSequence.length; frame += 1) {
+          await present("healTail", frame, tail.waitPerDrawNativeTicks);
+        }
+      } else {
+        const heal = actionPresentationCatalog().heal3;
+        let primaryFrame = 0;
+        let elapsedNativeTicks = 0;
+        let audioRequestIndex = 0;
+        const queueDueHealAudio = (): void => {
+          while (audioRequestIndex < heal.audioRequests.length) {
+            const request = heal.audioRequests[audioRequestIndex];
+            if (!request || request.afterFixedWaitNativeTicks > elapsedNativeTicks) return;
+            if (request.resource !== "E/36") {
+              throw new Error(`unsupported advanced-heal audio resource ${request.resource}`);
+            }
+            this.queueAudioCue(36, "heal-3-bloom", "e");
+            audioRequestIndex += 1;
+          }
+        };
+        queueDueHealAudio();
+        for (const primary of heal.phases.slice(0, -1)) {
+          for (const _descriptor of primary.descriptorSequence) {
+            await present("healPrimary", primaryFrame, primary.waitPerDrawNativeTicks);
+            primaryFrame += 1;
+            elapsedNativeTicks += primary.waitPerDrawNativeTicks;
+            queueDueHealAudio();
+          }
+        }
+        const tail = heal.phases.at(-1);
+        if (!tail) throw new Error("advanced-heal tail phase missing");
+        for (let frame = 0; frame < tail.descriptorSequence.length; frame += 1) {
+          await present("healTail", frame, tail.waitPerDrawNativeTicks);
+          elapsedNativeTicks += tail.waitPerDrawNativeTicks;
+          queueDueHealAudio();
+        }
       }
-      await present("healBlank", -1, 5);
-      for (let frame = 0; frame < 5; frame += 1) {
-        await present("healTail", frame, 15);
-      }
-    } else if (result.actionId === "lightning-1") {
+    } else if (result.actionId === "lightning-1"
+      || result.actionId === "lightning-2"
+      || result.actionId === "lightning-3"
+      || result.actionId === "lightning-4") {
       const presentation = actionPresentationCatalog();
+      const lightning = result.actionId === "lightning-4"
+        ? presentation.lightning4
+        : result.actionId === "lightning-3"
+          ? presentation.lightning3
+        : result.actionId === "lightning-2"
+          ? presentation.lightning2
+          : presentation.lightning1;
+      let elapsedNativeTicks = 0;
+      let audioRequestIndex = 0;
+      const queueDueLightningAudio = (): void => {
+        while (audioRequestIndex < lightning.audioRequests.length) {
+          const request = lightning.audioRequests[audioRequestIndex];
+          if (!request || request.afterFixedWaitNativeTicks > elapsedNativeTicks) return;
+          const match = /^E\/(\d+)$/.exec(request.resource);
+          if (!match) throw new Error(`unsupported lightning audio resource ${request.resource}`);
+          const reason = result.actionId === "lightning-1"
+            ? "lightning-1-impact"
+            : `${result.actionId}-${audioRequestIndex === 0 ? "start" : "impact"}`;
+          this.queueAudioCue(Number(match[1]), reason, "e");
+          audioRequestIndex += 1;
+        }
+      };
       let draw = 0;
-      for (const phase of presentation.lightning1.phases) {
+      queueDueLightningAudio();
+      for (const phase of lightning.phases) {
         for (const _descriptor of phase.descriptorSequence) {
           await present("lightningMain", draw, phase.waitPerDrawNativeTicks);
           draw += 1;
+          elapsedNativeTicks += phase.waitPerDrawNativeTicks;
+          queueDueLightningAudio();
         }
-        if (draw === 8) this.queueAudioCue(43, "lightning-1-impact", "e");
       }
-      const hit = presentation.lightning1.commonHit;
+      const hit = lightning.commonHit;
       for (let iteration = 0; iteration < hit.iterations; iteration += 1) {
         for (let wave = 0; wave < hit.waveDrawsPerIteration; wave += 1) {
           await present("lightningHit", iteration * hit.waveDrawsPerIteration + wave, hit.waitPerWaveDrawNativeTicks);
@@ -1505,19 +1798,114 @@ export class GameController {
       for (let frame = 0; frame < hit.cleanup.drawCount; frame += 1) {
         await present("lightningCleanup", frame, hit.cleanup.waitPerDrawNativeTicks);
       }
-    } else if (result.actionId === "ice-1") {
-      const ice = actionPresentationCatalog().ice1;
+    } else if (result.actionId === "ice-1"
+      || result.actionId === "ice-2"
+      || result.actionId === "ice-3"
+      || result.actionId === "ice-4") {
+      const presentation = actionPresentationCatalog();
+      const ice = result.actionId === "ice-4"
+        ? presentation.ice4
+        : result.actionId === "ice-3"
+          ? presentation.ice3
+          : result.actionId === "ice-2"
+            ? presentation.ice2
+            : presentation.ice1;
       for (let cycle = 0; cycle < ice.cycles; cycle += 1) {
-        this.queueAudioCue(50, `ice-1-cycle-${cycle + 1}`, "un");
+        this.queueAudioCue(50, `${result.actionId}-cycle-${cycle + 1}`, "un");
         for (let frame = 0; frame < ice.cycle.drawCount; frame += 1) {
           await present("iceExpansion", cycle * ice.cycle.drawCount + frame, ice.cycle.waitPerDrawNativeTicks);
         }
       }
-    } else if (result.actionId === "recovery-1") {
-      const recovery = actionPresentationCatalog().recovery1;
-      this.queueAudioCue(36, "recovery-1-start", "e");
+    } else if (result.actionId === "recovery-1"
+      || result.actionId === "recovery-2"
+      || result.actionId === "recovery-3") {
+      const recovery = result.actionId === "recovery-3"
+        ? actionPresentationCatalog().recovery3
+        : result.actionId === "recovery-2"
+          ? actionPresentationCatalog().recovery2
+          : actionPresentationCatalog().recovery1;
+      this.queueAudioCue(36, `${result.actionId}-start`, "e");
       for (let frame = 0; frame < recovery.presentation.drawCount; frame += 1) {
         await present("recoveryEffect", frame, recovery.presentation.waitPerDrawNativeTicks);
+      }
+    } else if (result.actionId === "attack-up") {
+      const attackUp = actionPresentationCatalog().attackUp;
+      const phase = attackUp.phases[0];
+      this.queueAudioCue(51, "attack-up-start", "un");
+      for (let frame = 0; frame < phase.runtimeTileCodePairs.length; frame += 1) {
+        await present("statusEffect", frame, phase.waitPerDrawNativeTicks);
+      }
+    } else if (result.actionId === "defense-up") {
+      const defenseUp = actionPresentationCatalog().defenseUp;
+      const phase = defenseUp.phases[0];
+      this.queueAudioCue(52, "defense-up-start", "un");
+      for (let frame = 0; frame < phase.descriptorSequence.length; frame += 1) {
+        await present("statusEffect", frame, phase.waitPerDrawNativeTicks);
+      }
+    } else if (result.actionId === "magic-guard") {
+      const magicGuard = actionPresentationCatalog().magicGuard;
+      const phase = magicGuard.phases[0];
+      this.queueAudioCue(51, "magic-guard-start", "un");
+      for (let frame = 0; frame < phase.runtimeTileCodePairs.length; frame += 1) {
+        await present("statusEffect", frame, phase.waitPerDrawNativeTicks);
+      }
+    } else if (result.actionId === "poison") {
+      const poison = actionPresentationCatalog().poison;
+      let frame = 0;
+      for (let draw = 0; draw < poison.phases[0].runtimeTileCodeStates.length; draw += 1) {
+        await present("poisonEffect", frame, poison.phases[0].waitPerDrawNativeTicks);
+        frame += 1;
+      }
+      this.queueAudioCue(58, "poison-cloud-start", "e");
+      for (let draw = 0; draw < poison.phases[1].descriptorSequence.length; draw += 1) {
+        await present("poisonEffect", frame, poison.phases[1].waitPerDrawNativeTicks);
+        frame += 1;
+      }
+    } else if (result.actionId === "confusion") {
+      const confusion = actionPresentationCatalog().confusion;
+      const phase = confusion.phases[0];
+      for (let frame = 0; frame < phase.descriptorSequence.length; frame += 1) {
+        await present("statusEffect", frame, phase.waitPerDrawNativeTicks);
+      }
+    } else if (result.actionId === "attack-down") {
+      const attackDown = actionPresentationCatalog().attackDown;
+      const phase = attackDown.phases[0];
+      this.queueAudioCue(8, "attack-down-start", "e");
+      for (let frame = 0; frame < phase.descriptorSequence.length; frame += 1) {
+        await present("statusEffect", frame, phase.waitPerDrawNativeTicks);
+      }
+    } else if (result.actionId === "defense-down") {
+      const defenseDown = actionPresentationCatalog().defenseDown;
+      const phase = defenseDown.phases[0];
+      this.queueAudioCue(8, "defense-down-start", "e");
+      for (let frame = 0; frame < phase.descriptorSequence.length; frame += 1) {
+        await present("statusEffect", frame, phase.waitPerDrawNativeTicks);
+      }
+    } else if (result.actionId === "spell-seal") {
+      const spellSeal = actionPresentationCatalog().spellSeal;
+      const phase = spellSeal.phases[0];
+      for (let frame = 0; frame < phase.descriptorSequence.length; frame += 1) {
+        await present("statusEffect", frame, phase.waitPerDrawNativeTicks);
+      }
+    } else if (result.actionId === "stomp-1"
+      || result.actionId === "stomp-2"
+      || result.actionId === "stomp-3") {
+      const stomp = result.actionId === "stomp-3"
+        ? actionPresentationCatalog().stomp3
+        : result.actionId === "stomp-2"
+          ? actionPresentationCatalog().stomp2
+          : actionPresentationCatalog().stomp1;
+      for (const step of buildStompPresentationSteps(stomp.presentation)) {
+        await present(
+          step.graphicDrawIndex === undefined ? "stompPageToggle" : "stompEffect",
+          step.index,
+          step.explicitNativeTicks,
+          undefined,
+          step.displayNativeTicks,
+        );
+        if (step.audioAfter) {
+          this.queueAudioCue(82, `${result.actionId}-impact-${step.index}`, "magic");
+        }
       }
     } else {
       const dispel = actionPresentationCatalog().dispel;
@@ -1554,6 +1942,58 @@ export class GameController {
           );
         }
       }
+    }
+    this.specialActionPresentation = undefined;
+  }
+
+  private async presentPrayerAction(
+    actor: BattleUnit,
+    prepared: PreparedBattleAction,
+  ): Promise<void> {
+    this.specialActionPresentationTrace = [];
+    const displayedLifeByUnitId: Record<string, number> = Object.fromEntries(
+      prepared.affectedUnits.map((affected) => [affected.unitId, affected.lifeBefore]),
+    );
+    const maximumHoldNativeTicks = actionPresentationCatalog()
+      .prayer.presentation.resultHold.maximumNativeTicksPerTriggeredUnit;
+
+    for (const [index, affected] of prepared.affectedUnits.entries()) {
+      const target = this.battle.unit(affected.unitId);
+      if (!target) throw new Error("stale prepared prayer action");
+      await this.focusCameraOnAction(affected.positionBefore);
+      const targetPresentation = { ...target, statuses: { ...target.statuses } };
+      this.specialActionPresentation = {
+        actor,
+        target: targetPresentation,
+        center: { ...affected.positionBefore },
+        result: prepared.result,
+        phase: "prayerEffect",
+        frame: index,
+        nativeTicks: maximumHoldNativeTicks,
+        displayedLifeByUnitId: { ...displayedLifeByUnitId },
+        lifeChangeUnitId: affected.unitId,
+      };
+      this.specialActionPresentationTrace.push({
+        phase: "prayerEffect",
+        frame: index,
+        nativeTicks: maximumHoldNativeTicks,
+        displayedLifeByUnitId: { ...displayedLifeByUnitId },
+        lifeChangeUnitId: affected.unitId,
+      });
+      this.emit();
+
+      this.battle.commitPreparedPrayerOutcome(prepared, index);
+      displayedLifeByUnitId[affected.unitId] = affected.lifeAfter;
+      this.emit();
+
+      await new Promise<void>((resolve) => {
+        const timeout = globalThis.setTimeout(resolve, this.mapCombatDelay(maximumHoldNativeTicks));
+        this.prayerHoldSkip = () => {
+          globalThis.clearTimeout(timeout);
+          resolve();
+        };
+      });
+      this.prayerHoldSkip = undefined;
     }
     this.specialActionPresentation = undefined;
   }
@@ -1965,7 +2405,7 @@ export class GameController {
     const enemyIds = this.battle.enemyActionOrder();
     for (const id of enemyIds) {
       if (!this.battle.unit(id)) continue;
-      if (!this.battle.hasRouteEnemy()) {
+      if (!this.battle.hasRouteEnemy() || this.battle.unit(id)?.statuses.confusion) {
         const action = this.battle.planEnemyAiAction(id);
         if (action && await this.runAlliedAiAction(action, "enemy")) {
           this.busy = false;
@@ -2059,13 +2499,23 @@ export class GameController {
       const target = this.battle.unit(action.targetId);
       if (target) {
         try {
+          const definition = BATTLE_ACTION_DEFINITIONS[action.actionId];
           const prepared = this.battle.prepareSpecialAction({
             actionId: action.actionId,
             actorId: unit.id,
-            targetId: target.id,
+            ...(definition.target === "self-area" ? {} : { targetId: target.id }),
+            ...(action.actionId === "stomp-1"
+              || action.actionId === "stomp-2"
+              || action.actionId === "stomp-3"
+              ? { viewportOrigin: { ...this.cameraOrigin } }
+              : {}),
           });
           const actorPresentation = { ...unit, statuses: { ...unit.statuses } };
           const targetPresentation = { ...target, statuses: { ...target.statuses } };
+          const affectedPresentations = prepared.affectedUnits
+            .map(({ unitId }) => this.battle.unit(unitId))
+            .filter((candidate): candidate is BattleUnit => candidate !== undefined)
+            .map((candidate) => ({ ...candidate, statuses: { ...candidate.statuses } }));
           this.statusMessage = `${unit.name}施展${BATTLE_ACTION_DEFINITIONS[action.actionId].label}。`;
           // Native side-1 autonomous and side-2 enemy techniques share this
           // dialogue path. REMAKE-014 additionally focuses the prepared center.
@@ -2078,14 +2528,49 @@ export class GameController {
           await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
           const result = this.battle.commitPreparedAction(prepared);
           this.lastSpecialAction = result;
-          if (result.targetDied) {
-            await this.presentSpecialDeath(actorPresentation, targetPresentation, result);
+          for (const affected of result.affectedUnits.filter(({ died }) => died)) {
+            const presentation = affectedPresentations.find(({ id }) => id === affected.unitId);
+            if (presentation) await this.presentSpecialDeath(actorPresentation, presentation, result);
           }
-          this.statusMessage = result.blocked
+          const moved = result.affectedUnits.filter(({ moved }) => moved).length;
+          const frozen = result.affectedUnits.filter(({ actionDisabledBefore, actionDisabledAfter }) =>
+            !actionDisabledBefore && actionDisabledAfter).length;
+          this.statusMessage = action.actionId === "ice-1"
+            || action.actionId === "ice-2"
+            || action.actionId === "ice-3"
+            || action.actionId === "ice-4"
+            ? `${unit.name}以冰雪擊退 ${moved} 名敵人，冰封 ${frozen} 名。`
+            : action.actionId === "attack-up"
+              ? `${unit.name}使${target.name}的攻擊提升 20，狀態重置為 3。`
+            : action.actionId === "defense-up"
+              ? `${unit.name}使${target.name}的防禦提升 20，狀態重置為 3。`
+            : action.actionId === "magic-guard"
+              ? `${unit.name}使${target.name}獲得防魔。`
+            : action.actionId === "poison"
+              ? result.blockReason === "classImmune"
+                ? `${target.name}免疫中毒。`
+                : `${unit.name}使${target.name}中毒，狀態重置為 3。`
+            : action.actionId === "confusion"
+              ? result.blockReason === "classImmune"
+                ? `${target.name}免疫混亂。`
+                : `${unit.name}使${target.name}陷入混亂，狀態重置為 3。`
+            : action.actionId === "attack-down"
+              ? `${unit.name}使${target.name}的攻擊下降 20，狀態重置為 3。`
+            : action.actionId === "defense-down"
+              ? `${unit.name}使${target.name}的防禦下降 20，狀態重置為 3。`
+            : action.actionId === "spell-seal"
+              ? result.blockReason === "classImmune"
+                ? `${target.name}免疫禁咒。`
+                : `${unit.name}使${target.name}遭到禁咒，狀態重置為 3。`
+            : result.blocked
             ? `${target.name}的魔法防禦抵消了攻擊。`
             : result.healing > 0
               ? `${unit.name}使${target.name}恢復 ${result.healing} 點生命。`
-              : `${unit.name}造成 ${result.damage} 點傷害。`;
+              : action.actionId === "stomp-1"
+                || action.actionId === "stomp-2"
+                || action.actionId === "stomp-3"
+                ? `${unit.name}以${BATTLE_ACTION_DEFINITIONS[action.actionId].label}造成共 ${result.damage} 點傷害。`
+                : `${unit.name}造成 ${result.damage} 點傷害。`;
         } catch {
           this.aiTechniqueDialogue = undefined;
           this.battle.spendAction(unit.id);
@@ -2544,6 +3029,10 @@ export class GameController {
   }
 
   secondaryAction(): boolean {
+    if (this.prayerHoldSkip) {
+      this.prayerHoldSkip();
+      return true;
+    }
     if (this.promotionUnitIds.length > 0) return true;
     if (this.groupCommandDialogueActive) return true;
     if (this.phase === "saveSlots") this.cancelPostSaveSlots();
@@ -3190,7 +3679,8 @@ export class GameController {
   }
 
   primaryAtCursor(): void {
-    if (this.groupCommandDialogueActive) this.advanceDialogue();
+    if (this.prayerHoldSkip) this.prayerHoldSkip();
+    else if (this.groupCommandDialogueActive) this.advanceDialogue();
     else if (this.promotionDialogueActive) this.advanceDialogue();
     else if (this.promotionUnitIds.length > 0) this.confirmPromotion();
     else if (isStoryPhase(this.phase)) this.advanceDialogue();
@@ -3693,6 +4183,13 @@ export class GameController {
       aiDialogueEnabled: this.aiDialogueEnabled,
       lastCombat: this.lastCombat ? { ...this.lastCombat } : undefined,
       lastSpecialAction: this.lastSpecialAction ? { ...this.lastSpecialAction } : undefined,
+      lastConstruction: this.lastConstruction ? {
+        ...this.lastConstruction,
+        actorPositionBefore: { ...this.lastConstruction.actorPositionBefore },
+        actorPositionAfter: { ...this.lastConstruction.actorPositionAfter },
+        path: this.lastConstruction.path.map((position) => ({ ...position })),
+        terrainMutations: this.lastConstruction.terrainMutations.map((mutation) => ({ ...mutation })),
+      } : undefined,
       lastRoutePulse: this.lastRoutePulse ? {
         ...this.lastRoutePulse,
         path: this.lastRoutePulse.path.map((position) => ({ ...position })),
@@ -3929,6 +4426,29 @@ export class GameController {
     return true;
   }
 
+  private async presentPreparedUnitPath(unitId: string, path: readonly Position[]): Promise<boolean> {
+    if (path.length === 0 || !this.battle.unit(unitId)) return false;
+    this.movementPresentation = {
+      unitId,
+      kind: "player",
+      path: path.map((step) => ({ ...step })),
+      stepIndex: 0,
+    };
+    this.cursor = { ...path[path.length - 1] };
+    this.emit();
+    for (let index = 1; index < path.length; index += 1) {
+      if (!this.battle.unit(unitId)) {
+        this.movementPresentation = undefined;
+        return false;
+      }
+      this.movementPresentation.stepIndex = index;
+      this.emit();
+      await pause(this.movementStepDuration);
+    }
+    this.movementPresentation = undefined;
+    return true;
+  }
+
   private centerCamera(position: Position): void {
     this.cameraOrigin = cameraOriginForFocus(this.battle.stage, position);
   }
@@ -3975,8 +4495,8 @@ export class GameController {
     this.emit();
   }
 
-  unitStats(unit: Pick<BattleUnit, "classId" | "experience" | "side">): UnitStats {
-    return this.battle.statsFor(unit);
+  unitStats(unit: BattleUnit): UnitStats {
+    return this.battle.effectiveStatsFor(unit);
   }
 
   describeFocus(): { stats: UnitStats; unit: BattleUnit } | undefined {

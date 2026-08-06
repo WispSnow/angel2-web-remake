@@ -117,10 +117,42 @@ function restoreGadirathClassFromEntrySnapshot(save: SaveData): SaveData {
   };
 }
 
+function addEmptyTerrainOverrides(value: unknown): unknown {
+  if (!isRecord(value) || value.kind !== "battle" || !isRecord(value.battle)) return value;
+  if (value.battle.terrainOverrides !== undefined) return value;
+  return {
+    ...value,
+    battle: { ...value.battle, terrainOverrides: [] },
+  };
+}
+
 function finalizeDirectMigration(value: unknown): SaveData | undefined {
-  if (!isSaveData(value)) return undefined;
-  const restored = restoreGadirathClassFromEntrySnapshot(value);
+  const normalized = addEmptyTerrainOverrides(value);
+  if (!isSaveData(normalized)) return undefined;
+  const restored = restoreGadirathClassFromEntrySnapshot(normalized);
   return isSaveData(restored) ? restored : undefined;
+}
+
+function migrateVersion17Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 17
+    || value.contentVersion !== "dynamic-terrain-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
+function migrateVersion16Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 16
+    || value.contentVersion !== "stage-title-and-roster-inheritance-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
 }
 
 function migrateVersion15Save(value: unknown): SaveData | undefined {
@@ -215,7 +247,7 @@ function isVersion12SaveData(value: unknown): value is Version12SaveData {
     contentVersion: SAVE_CONTENT_VERSION,
     stageLabel: correctedStageLabel(value.stageId),
   };
-  return isCompletedSave(normalized) || isBattleSave(normalized, false);
+  return isCompletedSave(normalized) || isBattleSave(normalized, false, false);
 }
 
 function migrateVersion12Save(save: Version12SaveData): SaveData {
@@ -334,6 +366,9 @@ function isVersion11SaveData(value: unknown): value is Version11SaveData {
       value.roster as SaveRosterEntry[],
       difficulty,
       stageId,
+      true,
+      true,
+      false,
     );
 }
 
@@ -588,6 +623,7 @@ function isVersion8SaveData(value: unknown): value is Version8SaveData {
       stageId,
       true,
       false,
+      false,
     );
 }
 
@@ -703,6 +739,7 @@ function isVersion7SaveData(value: unknown): value is Version7SaveData {
       stageId,
       false,
       false,
+      false,
     );
 }
 
@@ -813,6 +850,7 @@ function isVersion6SaveData(value: unknown): value is Version6SaveData {
     value.difficulty,
     "stage-00",
     true,
+    false,
     false,
   )) return false;
   return value.battle.units.filter(({ side }) => side === 1).length === value.roster.length;
@@ -1227,6 +1265,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion17 = migrateVersion17Save(value);
+    if (migratedVersion17) return migratedVersion17;
+    const migratedVersion16 = migrateVersion16Save(value);
+    if (migratedVersion16) return migratedVersion16;
     const migratedVersion15 = migrateVersion15Save(value);
     if (migratedVersion15) return migratedVersion15;
     const migratedVersion14 = migrateVersion14Save(value);
@@ -1235,39 +1277,39 @@ export function parseSaveData(raw: string): SaveData | undefined {
     if (migratedVersion13) return migratedVersion13;
     if (isVersion12SaveData(value)) {
       const migrated = migrateVersion12Save(value);
-      return isSaveData(migrated) ? migrated : undefined;
+      return finalizeDirectMigration(migrated);
     }
     if (isVersion11SaveData(value)) {
       const migrated = migrateVersion11Save(value);
-      return isSaveData(migrated) ? migrated : undefined;
+      return finalizeDirectMigration(migrated);
     }
     if (isVersion10SaveData(value)) {
       const migrated = migrateVersion10Save(value);
-      return isSaveData(migrated) ? migrated : undefined;
+      return finalizeDirectMigration(migrated);
     }
     if (isVersion9SaveData(value)) {
       const migrated = migrateVersion9Save(value);
-      return isSaveData(migrated) ? migrated : undefined;
+      return finalizeDirectMigration(migrated);
     }
     if (isVersion8SaveData(value)) {
       const migrated = migrateVersion8Save(value);
-      return isSaveData(migrated) ? migrated : undefined;
+      return finalizeDirectMigration(migrated);
     }
     if (isVersion7SaveData(value)) {
       const migrated = migrateVersion7Save(value);
-      return isSaveData(migrated) ? migrated : undefined;
+      return finalizeDirectMigration(migrated);
     }
     if (isVersion6SaveData(value)) {
       const migrated = migrateVersion6Save(value);
-      return isSaveData(migrated) ? migrated : undefined;
+      return finalizeDirectMigration(migrated);
     }
     if (isVersion5SaveData(value)) {
       const migrated = migrateVersion5Save(value);
-      return isSaveData(migrated) ? migrated : undefined;
+      return finalizeDirectMigration(migrated);
     }
     if (!isLegacySaveData(value)) return undefined;
     const migrated = migrateLegacySave(value);
-    return isSaveData(migrated) ? migrated : undefined;
+    return finalizeDirectMigration(migrated);
   } catch {
     return undefined;
   }

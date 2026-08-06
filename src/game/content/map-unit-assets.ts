@@ -21,6 +21,8 @@ export const ALLY_MAP_UNIT_ASSETS = {
   "steel-armor-warrior": "/assets/original/technique-lab/units/ally-steel-armor-warrior.png",
   "magic-priest": "/assets/original/unit-ally-magic-priest.png",
   "prayer-guide": "/assets/original/technique-lab/units/ally-prayer-guide.png",
+  "curse-master": "/assets/original/technique-lab/units/ally-curse-master.png",
+  "magic-guide": "/assets/original/technique-lab/units/ally-magic-guide.png",
   "magic-armor-warrior": "/assets/original/technique-lab/units/ally-magic-armor-warrior.png",
   "swift-dragon-knight": "/assets/original/technique-lab/units/ally-swift-dragon-knight.png",
   "flying-dragon-knight": "/assets/original/technique-lab/units/ally-flying-dragon-knight.png",
@@ -28,6 +30,8 @@ export const ALLY_MAP_UNIT_ASSETS = {
   "evil-mage": "/assets/original/technique-lab/units/ally-evil-mage.png",
   "magic-master": "/assets/original/technique-lab/units/ally-magic-master.png",
   wizard: "/assets/original/technique-lab/units/ally-wizard.png",
+  "great-dragon-knight": "/assets/original/technique-lab/units/ally-great-dragon-knight.png",
+  engineer: "/assets/original/technique-lab/units/ally-engineer.png",
 } as const satisfies Readonly<Partial<Record<UnitClassId, string>>>;
 
 export function allyMapUnitAsset(classId: UnitClassId): string | undefined {

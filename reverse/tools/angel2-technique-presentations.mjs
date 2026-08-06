@@ -38,6 +38,8 @@ const CODE_SIGNATURES = [
   ["1000:62CE", 24, "fire-2-presentation", "b444245028fbd691f87435765d71699dc28c8dbef5f4d16273c3e9216914a8f4"],
   ["1000:63B4", 24, "fire-3-presentation", "b5037285691e6bf53ccd514093a71c8aa65e4f6bda22f106d0302e4d5e902d3c"],
   ["0000:8D18", 24, "fire-4-three-phase-presentation", "dc57832d7b1a4d84a815269cedbe372c269ad5b05f6a75794209ba3249e473a0"],
+  ["0000:8D90", 182, "fire-4-magic28-eight-draws-then-magic29-load", "3e92eb3d92542e353c8e82aabd0d29322b78406bdc01d57e640d0a7c0106a951"],
+  ["0000:8E46", 64, "fire-4-magic29-four-draws-before-rising-repeat", "e45ba13981591d427a1ee8972fbc8702e58b4c45f41b557296e82e20d498f8ca"],
   ["0000:8E99", 24, "fire-4-repeat-four-descriptors", "7507a89d4e3915107de991dcabe0bf335d6a168cdb07b22075b26ea2607f2221"],
   ["0000:8ECD", 24, "fire-4-shifted-descriptor-repeat", "bd70257ceae105f44800cf8b05450cb16f904b2e297b9cda79331007909d7bdc"],
   ["1000:6771", 24, "ice-common-loader", "25936af587bf40a0b40234cf72e6f610eaa92b9e163896605ba5726ee70003ec"],
@@ -415,17 +417,25 @@ function buildPresentations(buffer) {
     0x6670, 0x6684, 0x6698, 0x66ac, 0x66c0, 0x66d4, 0x66e8], 15);
   const fire4aOffsets = [0x6810, 0x681a, 0x6826, 0x6834,
     ...Array.from({ length: 2 }, () => [0x6842, 0x6850, 0x685e, 0x686c]).flat()];
-  const fire4bOffsets = [0x66fc, 0x670a, 0x6718, 0x672c, 0x6740, 0x6754, 0x6768, 0x6782,
-    ...Array(5).fill(0x67ea)];
-  const fire4cOffsets = [0x679c, 0x67b6, 0x67d0, 0x67ea];
+  const fire4bOffsets = [0x66fc, 0x670a, 0x6718, 0x672c, 0x6740, 0x6754, 0x6768, 0x6782];
+  const fire4cOffsets = [0x679c, 0x67b6, 0x67d0, 0x67ea, ...Array(5).fill(0x67ea)];
   const fire4phases = [
     stage(buffer, "MAGIC/30", fire4aOffsets, 10, {
+      anchorOffsetSequence: Array.from({ length: fire4aOffsets.length }, () => ({ x: 0, y: 0 })),
       sequence: "four direct descriptors, then the four-descriptor helper repeated twice",
     }),
     stage(buffer, "MAGIC/28", fire4bOffsets, 10, {
-      sequence: "eight direct descriptors, then DS:67EA repeated five times while DS:5234 shifts by -50 after each draw",
+      anchorOffsetSequence: Array.from({ length: fire4bOffsets.length }, () => ({ x: 0, y: 0 })),
+      sequence: "eight direct descriptors at the selected-cell anchor; MAGIC/29 is loaded immediately afterward, before the shifted repeat helper runs",
     }),
-    stage(buffer, "MAGIC/29", fire4cOffsets, 10),
+    stage(buffer, "MAGIC/29", fire4cOffsets, 10, {
+      anchorOffsetSequence: [
+        ...Array.from({ length: 4 }, () => ({ x: 0, y: 0 })),
+        ...Array.from({ length: 5 }, (_, index) => ({ x: 0, y: -index })),
+      ],
+      sequence: "four direct descriptors at the selected-cell anchor, then DS:67EA repeats five times while DS:5234 shifts by -50 after each draw",
+      motion: "the MAGIC/29 repeated DS:67EA anchors are selected row 0/-1/-2/-3/-4; the final post-draw shift leaves DS:5234 at row -5 without another draw",
+    }),
   ];
   const fire = {
     family: "F",

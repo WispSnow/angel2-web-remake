@@ -1,10 +1,13 @@
-import { describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 import {
   aiTechniqueDialogueFor,
   nativeAiTechniqueDialogueForCode,
   NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
 } from "../../src/game/content/ai-technique-dialogue";
+import { activateStage1Content } from "../../src/game/content/stage1";
+
+beforeAll(() => activateStage1Content());
 
 describe("native AI technique dialogue", () => {
   test("binds all 33 native AI action rows to the 14 exact contextual lines", () => {
@@ -70,6 +73,16 @@ describe("native AI technique dialogue", () => {
         },
         source: { record: "ai-technique", wait: 0x0a, address: "DS:85CA" },
       });
+    expect(aiTechniqueDialogueFor({ name: "邪法師", portrait: 53, side: 2 }, "fire-2"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: {
+          portrait: 53,
+          speaker: "邪法師・中級炎暴",
+          text: "看我的火球魔法.",
+        },
+        source: { record: "ai-technique", wait: 0x0a, address: "DS:85CA" },
+      });
     expect(aiTechniqueDialogueFor({ name: "希蜜", portrait: 47, side: 1 }, "heal-1"))
       .toMatchObject({
         activeSlot: "upper",
@@ -79,6 +92,69 @@ describe("native AI technique dialogue", () => {
           text: "生命單.",
         },
         source: { record: "ai-technique", wait: 0x0f, address: "DS:860C" },
+      });
+    expect(aiTechniqueDialogueFor({ name: "祈導師", portrait: 47, side: 2 }, "heal-2"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: {
+          speaker: "祈導師・中級治療",
+          text: "生命單.",
+        },
+        source: { record: "ai-technique", wait: 0x0f, address: "DS:860C" },
+      });
+    expect(aiTechniqueDialogueFor({ name: "魔導師", portrait: 47, side: 2 }, "heal-3"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: {
+          speaker: "魔導師・高級治療",
+          text: "生命單.",
+        },
+        source: { record: "ai-technique", wait: 0x0f, address: "DS:860C" },
+      });
+    expect(aiTechniqueDialogueFor({ name: "祈導師", portrait: 47, side: 2 }, "recovery-2"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: {
+          speaker: "祈導師・中級回復",
+          text: "生命全.",
+        },
+        source: { record: "ai-technique", wait: 0x0e, address: "DS:8604" },
+      });
+    expect(aiTechniqueDialogueFor({ name: "祈導師", portrait: 47, side: 2 }, "recovery-3"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: {
+          speaker: "祈導師・高級回復",
+          text: "生命全.",
+        },
+        source: { record: "ai-technique", wait: 0x0e, address: "DS:8604" },
+      });
+    expect(aiTechniqueDialogueFor({ name: "魔導師", portrait: 47, side: 2 }, "attack-up"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: {
+          speaker: "魔導師・攻擊提昇",
+          text: "功擊提昇.",
+        },
+        source: { record: "ai-technique", wait: 0x11, address: "DS:861E" },
+      });
+    expect(aiTechniqueDialogueFor({ name: "祈導師", portrait: 47, side: 2 }, "defense-up"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: {
+          speaker: "祈導師・防禦提昇",
+          text: "防禦提昇.",
+        },
+        source: { record: "ai-technique", wait: 0x10, address: "DS:8614" },
+      });
+    expect(aiTechniqueDialogueFor({ name: "咒術師", portrait: 47, side: 2 }, "confusion"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: {
+          speaker: "咒術師・混亂",
+          text: "混亂.",
+        },
+        source: { record: "ai-technique", wait: 0x16, address: "DS:8648" },
       });
     expect(aiTechniqueDialogueFor({ name: "弓兵", portrait: 59, side: 2 }, "archer-shot"))
       .toBeUndefined();
