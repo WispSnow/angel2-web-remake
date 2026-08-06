@@ -192,7 +192,8 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 - `src/game/debug-scenarios.ts`：按关登记开发场景、确定性夹具与调试工具栏；
 - `scripts/generate-portrait-catalog.mjs`：从原版 `D` 记录与布局证据生成全角色运行时目录；
 - `scripts/generate-content.mjs`：按唯一顺序编排全部可单独审计的内容生成器；
-- `scripts/generate-stage0-runtime.mjs`：从 `B/0001` 固化 50×50 地形内容；
+- `scripts/generate-stage0-runtime.mjs`：从 `B/0001` 固化 50×50 地形内容，并发布第 0 关共享
+  战斗框、原生指针／菜单、回合转场与 `A/17` 八状态图标；
 - `scripts/generate-stage2-runtime.mjs`：从机器证据固化第 2 关地图、固定阵容、事件、剧情和音乐；
 - `scripts/generate-stage3-runtime.mjs`：从机器证据固化第 3 关地图、固定阵容、事件、剧情和音乐；
 - `scripts/generate-technique-lab.mjs`：从技术证据与 `A/0002..0003` 生成落雷时间线资源及敌我职业棋子；

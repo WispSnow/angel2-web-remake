@@ -16,7 +16,6 @@ import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
 import {
   classDefinition,
   className,
-  ordinaryHitStatusFor,
   promotionTargetsFor,
   type PromotionTarget,
 } from "./content/classes";
@@ -108,13 +107,6 @@ interface StageEntryOptions {
   preparation?: boolean;
   statusMessage?: string;
 }
-
-const ORDINARY_STATUS_ACTIONS = {
-  confusion: "confusion",
-  attackDown: "attack-down",
-  defenseDown: "defense-down",
-  poison: "poison",
-} as const;
 
 function cloneCampaignState(campaign: CampaignState): CampaignState {
   return {
@@ -2591,10 +2583,6 @@ export class GameController {
     if (this.battlePresentation === "full") {
       await this.presentFullScreenCombat(attacker, defender, result);
       this.combatPresentation = undefined;
-      await this.presentOrdinaryHitStatus(attacker, defender, result.defenderDied);
-      if (result.counterOccurred) {
-        await this.presentOrdinaryHitStatus(defender, attacker, result.attackerDied);
-      }
       return;
     }
 
@@ -2689,37 +2677,6 @@ export class GameController {
     }
 
     this.combatPresentation = undefined;
-    await this.presentOrdinaryHitStatus(attacker, defender, result.defenderDied);
-    if (result.counterOccurred) {
-      await this.presentOrdinaryHitStatus(defender, attacker, result.attackerDied);
-    }
-  }
-
-  private async presentOrdinaryHitStatus(
-    attacker: BattleUnit,
-    defender: BattleUnit,
-    defenderDied: boolean,
-  ): Promise<void> {
-    if (defenderDied) return;
-    const status = ordinaryHitStatusFor(attacker.classId);
-    if (!status) return;
-    const actionId = ORDINARY_STATUS_ACTIONS[status.key];
-    if (!this.currentMapPresentationActionIds.includes(actionId)) return;
-
-    const result: SpecialActionResult = {
-      actionId,
-      actorId: attacker.id,
-      targetId: defender.id,
-      target: { x: defender.x, y: defender.y },
-      damage: 0,
-      healing: 0,
-      blocked: false,
-      targetDied: false,
-      experienceGained: 0,
-      affectedUnits: [],
-      effectCells: [],
-    };
-    await this.presentSpecialAction(attacker, defender, result);
   }
 
   private async presentFullScreenCombat(

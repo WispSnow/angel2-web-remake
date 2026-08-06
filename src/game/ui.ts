@@ -10,6 +10,7 @@ import {
   classIdFromNativeRecord,
   classStatsFor,
 } from "./content/classes";
+import { activeUnitStatusPresentations } from "./content/status-presentations";
 import type { CombatPresentation, GameController } from "./controller";
 import {
   FULL_COMBAT_FRAME_META,
@@ -1382,7 +1383,9 @@ function renderHud(
   const affiliationLabel = unit.side === 2 ? "敵軍" : playerControlled ? "我方" : "友軍";
   const controlLabel = unit.side === 2 ? "AI" : playerControlled ? "玩家" : "自動";
   const actionLabel = unit.actionDisabled ? "冰封中" : unit.acted ? "已行動" : "可行動";
-  const controlSummary = `${affiliationLabel}・${controlLabel}・${actionLabel}`;
+  const controlSummary = playerControlled
+    ? `${affiliationLabel}・${controlLabel}・${actionLabel}`
+    : affiliationLabel;
   const intent = unit.side === 2 ? controller.battle.enemyAiIntentFor(unit.id) : undefined;
   const intentLabel = intent ? {
     route: "撤離",
@@ -1400,7 +1403,10 @@ function renderHud(
     : routePulseSafety === "danger"
       ? "危險"
       : undefined;
-  const visibleControlSummary = `${controlLabel}・${actionLabel}`;
+  const visibleControlSummary = playerControlled
+    ? `${controlLabel}・${actionLabel}`
+    : undefined;
+  const tacticPrefix = unit.side === 1 && !playerControlled ? `${affiliationLabel}・` : "";
   const identity = unit.name === unit.className
     ? unit.className
     : `${unit.className}／${unit.name}`;
@@ -1410,6 +1416,17 @@ function renderHud(
     : identityLength >= 9
       ? "hud-identity-name is-compact"
       : "hud-identity-name";
+  const statusIcons = activeUnitStatusPresentations(unit.statuses);
+  const statusMarkup = statusIcons.length === 0 ? "" : `
+    <ul class="hud-status-list" data-testid="unit-status-list" aria-label="目前狀態">
+      ${statusIcons.map(({ key, label, source, remainingRounds }) => `
+        <li class="hud-status-item" data-testid="status-icon-${key}"
+          data-status-key="${key}" data-remaining-rounds="${remainingRounds}"
+          aria-label="${label}，剩餘 ${remainingRounds} 回合">
+          <img src="${source}" alt="" aria-hidden="true" />
+          <span aria-hidden="true">${remainingRounds}</span>
+        </li>`).join("")}
+    </ul>`;
   return `
     <div class="unit-detail" data-testid="unit-detail" aria-label="${controlSummary}，${unit.className}${unit.name}${tacticLabel ? `，戰術${tacticLabel}` : ""}${routePulseSafetyLabel ? `，力場${routePulseSafetyLabel}` : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
@@ -1422,7 +1439,15 @@ function renderHud(
       })}
       <div class="hud-identity">
         <b class="${identityClass}" title="${identity}">${identity}</b>
-        <span class="unit-control-summary" data-testid="unit-control-summary">${visibleControlSummary}</span>
+        ${visibleControlSummary
+          ? `<span class="unit-control-summary" data-testid="unit-control-summary">${visibleControlSummary}</span>`
+          : ""}
+        ${tacticLabel || routePulseSafetyLabel ? `<span class="unit-context-summary">
+          ${tacticLabel ? `<span data-testid="unit-tactic">${tacticPrefix}<i>戰術</i>${tacticLabel}</span>` : ""}
+          ${routePulseSafetyLabel
+            ? `<span data-testid="route-pulse-safety" data-safety="${routePulseSafety}"><i>力場</i>${routePulseSafetyLabel}</span>`
+            : ""}
+        </span>` : ""}
       </div>
       <div class="meter-bar hp-bar" data-testid="hp-bar" aria-label="生命 ${unit.life}／${stats.maxLife}"><i style="height:${hpPercent}%"></i></div>
       <div class="meter-bar exp-bar" data-testid="exp-bar" aria-label="經驗 ${unit.experience}／${nextExperience}"><i style="height:${expPercent}%"></i></div>
@@ -1433,11 +1458,8 @@ function renderHud(
         <div class="unit-core-stat" data-testid="unit-defense-stat"><dt>防禦</dt><dd>${stats.defense}／${baseStats.defense}</dd></div>
         <div class="unit-core-stat"><dt>等級</dt><dd>${stats.level}</dd></div>
         <div class="unit-core-stat"><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
-        ${tacticLabel ? `<div data-testid="unit-tactic"><dt>戰術</dt><dd>${tacticLabel}</dd></div>` : ""}
-        ${routePulseSafetyLabel
-          ? `<div data-testid="route-pulse-safety" data-safety="${routePulseSafety}"><dt>力場</dt><dd>${routePulseSafetyLabel}</dd></div>`
-          : ""}
       </dl>
+      ${statusMarkup}
     </div>`;
 }
 

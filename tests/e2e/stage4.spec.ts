@@ -145,8 +145,8 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   });
 
   await clickUnit(page, "1:24");
-  await expect(page.getByTestId("unit-control-summary")).toHaveText("自動・可行動");
-  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術引導結界");
+  await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
+  await expect(page.getByTestId("unit-tactic")).toHaveText("友軍・戰術引導結界");
   await expect(page.getByTestId("route-pulse-safety")).toHaveText("力場安全");
   await expect(page.getByTestId("route-pulse-safety")).toHaveAttribute("data-safety", "safe");
   await expect(page.getByTestId("unit-force")).toHaveCount(0);

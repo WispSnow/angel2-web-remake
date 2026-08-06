@@ -380,14 +380,16 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   padding: 0 2px;
   overflow: hidden;
   font-size: 16px;
-  line-height: 20px;
+  line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-shadow: 1px 1px #000;
 }
 .hud-identity b.is-compact { font-size: 14px; }
 .hud-identity b.is-tight { font-size: 12px; }
-.unit-control-summary { display: block; color: var(--gold); font: 700 9px/12px "PMingLiU", serif; letter-spacing: 0; text-shadow: 1px 1px #000; }
+.unit-control-summary { display: block; color: var(--gold); font: 700 8px/9px "PMingLiU", serif; letter-spacing: 0; text-shadow: 1px 1px #000; }
+.unit-context-summary { display: flex; height: 9px; align-items: center; justify-content: center; gap: 5px; overflow: hidden; color: #fff1b0; font: 700 8px/9px "PMingLiU", serif; white-space: nowrap; text-shadow: 1px 1px #000; }
+.unit-context-summary i { color: #d7aa2d; font-style: normal; }
 .meter-bar { position: absolute; z-index: 1; top: 2px; width: 15px; height: 104px; border: 2px solid #c99b27; background: #170e0e; box-sizing: border-box; display: flex; align-items: end; }
 .meter-bar i { display: block; width: 100%; }
 .hp-bar { left: 120px; }
@@ -398,6 +400,10 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .stat-list { position: absolute; z-index: 1; left: 2px; top: 151px; width: 147px; margin: 0; color: white; font: 13px/1.1 "Arial Narrow", sans-serif; }
 .stat-list div { display: grid; grid-template-columns: 47px 1fr; height: 21px; align-items: center; border-top: 1px dotted #c49a26; }
 .stat-list dt { color: #f4efcf; } .stat-list dd { margin: 0; text-align: right; font-size: 15px; font-weight: 700; }
+.hud-status-list { position: absolute; z-index: 3; left: 0; top: 255px; display: grid; grid-template-columns: repeat(4, 38px); grid-auto-rows: 30px; width: 156px; height: 61px; margin: 0; padding: 0; overflow: visible; list-style: none; }
+.hud-status-item { position: relative; width: 38px; height: 30px; }
+.hud-status-item img { position: absolute; left: 0; top: 0; display: block; width: 40px; height: 31px; image-rendering: pixelated; }
+.hud-status-item > span { position: absolute; z-index: 1; left: -6px; top: 20px; min-width: 8px; color: #fff; font: 700 9px/10px "Arial Narrow", sans-serif; text-align: right; text-shadow: 1px 1px #000, -1px 0 #000; }
 .hud-tactical { position: absolute; left: -4px; top: -4px; width: 160px; height: 315px; overflow: hidden; }
 .terrain-detail {
   position: absolute;

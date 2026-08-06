@@ -169,7 +169,7 @@ test("arena edits both rosters and starts a formal-rule battle without touching 
   expect(storageAfter).toBe(storageBefore);
 });
 
-test("evil sword warrior ordinary attack shows confusion without overflowing the HUD identity", async ({ page }) => {
+test("ordinary melee status applies directly and appears in the unit HUD without a technique effect", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -181,13 +181,15 @@ test("evil sword warrior ordinary attack shows confusion without overflowing the
     arena.setClass("evil-sword-warrior");
     arena.setLevel(1);
     const attacker = arena.interact(20, 30);
+    arena.setClass("soldier");
+    const reserve = arena.interact(20, 32);
     arena.setSide(2);
     arena.setClass("soldier");
     arena.setLevel(1);
     const defender = arena.interact(21, 30);
-    return [attacker, defender];
+    return [attacker, reserve, defender];
   });
-  expect(placed).toEqual([true, true]);
+  expect(placed).toEqual([true, true, true]);
   await page.getByTestId("arena-start").click();
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
@@ -205,19 +207,6 @@ test("evil sword warrior ordinary attack shows confusion without overflowing the
   await clickArenaWorldCell(page, 21, 30);
 
   await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatTarget === "arena-2-0"
-      && dataset.mapCombatEffectTextureKeys?.split(",")
-        .some((key) => key.startsWith("map-confusion-"));
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.statuses.confusion).toBe(3);
-  await page.getByTestId("game-screen").screenshot({
-    path: `${ARTIFACT_DIR}/arena-evil-sword-confusion.png`,
-  });
-
-  await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
       battle?: ArenaBattleDebugState;
     }).battle;
@@ -232,8 +221,21 @@ test("evil sword warrior ordinary attack shows confusion without overflowing the
     defenderDied: false,
   });
   expect(after?.units.find(({ id }) => id === "arena-2-0")?.statuses.confusion).toBe(3);
-  expect(after?.specialActionPresentationTrace.filter(({ phase }) => phase === "statusEffect"))
-    .toHaveLength(11);
+  expect(after?.specialActionPresentationTrace).toEqual([]);
+  await expect(page.getByTestId("battle-canvas")).not.toHaveAttribute("data-map-combat-phase", "statusEffect");
+
+  await clickArenaWorldCell(page, 21, 30);
+  const confusionIcon = page.getByTestId("status-icon-confusion");
+  await expect(confusionIcon).toHaveAttribute("data-remaining-rounds", "3");
+  await expect(confusionIcon).toHaveAttribute("aria-label", "混亂，剩餘 3 回合");
+  await expect(confusionIcon.locator("img")).toHaveAttribute(
+    "src",
+    "/assets/original/status-icons/03.png",
+  );
+  await expect(page.getByTestId("unit-status-list")).toHaveAttribute("aria-label", "目前狀態");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/arena-ordinary-confusion-status-icon.png`,
+  });
   expect(pageErrors).toEqual([]);
 });
 
@@ -4067,6 +4069,12 @@ test("tier-one curse-master performs LA before the confused enemy spends a turn 
     0,
   )).toBe(165);
   expect(afterCast?.audioCueLog).toEqual(before?.audioCueLog);
+
+  await clickArenaWorldCell(page, 24, 30);
+  await expect(page.getByTestId("status-icon-confusion")).toHaveAttribute(
+    "data-remaining-rounds",
+    "3",
+  );
 
   await clickArenaWorldCell(page, 20, 32);
   await page.getByTestId("unit-command-rest").click();

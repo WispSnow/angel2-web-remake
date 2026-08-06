@@ -246,7 +246,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByText("修女／騎士團修女", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "49");
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0049\/base\.png$/u);
-  await expect(page.getByTestId("unit-control-summary")).toHaveText("AI・可行動");
+  await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveText("戰術警戒");
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-portrait.png`,

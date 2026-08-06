@@ -12,6 +12,7 @@ const outputPath = path.join(root, "src/game/content/stage0-runtime.generated.ts
 const planarAssetPath = path.join(root, "reverse/renders/planar/A");
 const portraitAssetPath = path.join(root, "reverse/renders/planar/D");
 const publicAssetPath = path.join(root, "public/assets/original");
+const publicStatusIconPath = path.join(publicAssetPath, "status-icons");
 const convertedEffectPath = path.join(root, "reverse/converted/audio/wav/E");
 const publicEffectPath = path.join(publicAssetPath, "audio/e");
 const stage0EffectRecords = [0, 2, 11, 14, 38, 51];
@@ -101,6 +102,7 @@ await writeFile(outputPath, source, "utf8");
 
 await mkdir(publicAssetPath, { recursive: true });
 await mkdir(publicEffectPath, { recursive: true });
+await mkdir(publicStatusIconPath, { recursive: true });
 await Promise.all([
   copyFile(path.join(planarAssetPath, "0002/00.png"), path.join(publicAssetPath, "unit-ally-soldier.png")),
   copyFile(path.join(planarAssetPath, "0002/20.png"), path.join(publicAssetPath, "unit-ally-archer.png")),
@@ -118,6 +120,10 @@ await Promise.all([
     copyFile(path.join(planarAssetPath, "0006", source), path.join(publicAssetPath, output))),
   ...Object.entries(turnTransitionAssets).map(([output, source]) =>
     copyFile(path.join(planarAssetPath, source), path.join(publicAssetPath, output))),
+  ...Array.from({ length: 8 }, (_, frame) => copyFile(
+    path.join(planarAssetPath, "0017", `${String(frame).padStart(2, "0")}.png`),
+    path.join(publicStatusIconPath, `${String(frame).padStart(2, "0")}.png`),
+  )),
 ]);
 
 // ImageMagick 默认往 PNG 里写 tIME 与 date:create/modify/timestamp 文本块，

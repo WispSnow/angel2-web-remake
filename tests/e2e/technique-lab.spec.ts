@@ -1553,7 +1553,12 @@ test("AD assembles and reverses all eleven four-tile shields below a persistent 
 
 test("map tools place either side while all 33 original techniques stay available", async ({ page }) => {
   await page.goto("/technique-lab.html");
+  const surface = page.locator("#technique-lab-canvas canvas");
+  await expect(surface).toBeVisible();
+  await expect(surface).toHaveAttribute("data-target", "23,18");
+  await expect.poll(async () => (await labState(page))?.playback.playing).toBe(true);
   await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  await expect.poll(async () => (await labState(page))?.playback.playing).toBe(false);
   const action = page.getByTestId("technique-lab-action");
   await expect(action.locator('option[value="4F"]')).not.toHaveAttribute("disabled", "");
   await expect(action.locator('option[value="AA"]')).not.toHaveAttribute("disabled", "");
@@ -1576,7 +1581,6 @@ test("map tools place either side while all 33 original techniques stay availabl
   await unitClass.selectOption("wizard");
   await page.getByRole("button", { name: "放置／替換" }).click();
 
-  const surface = page.locator("#technique-lab-canvas canvas");
   const box = await surface.boundingBox();
   if (!box) throw new Error("technique laboratory canvas has no bounds");
   const clickCell = async (worldX: number, worldY: number) => {

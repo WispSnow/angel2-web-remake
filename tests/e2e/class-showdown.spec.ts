@@ -3,6 +3,46 @@ import { expect, test } from "@playwright/test";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
+interface ClassShowdownBattleState {
+  cameraOrigin: { x: number; y: number };
+  lastCombat?: { attackerId: string; defenderId: string; defenderDied: boolean };
+  combatPresentation?: { phase: string };
+  specialActionPresentation?: { phase: string };
+  specialActionPresentationTrace: Array<{ phase: string }>;
+  units: Array<{
+    id: string;
+    classId: string;
+    statuses: Record<string, number>;
+  }>;
+}
+
+const classShowdownBattleState = (page: import("@playwright/test").Page) => page.evaluate(() =>
+  (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+    battle?: ClassShowdownBattleState;
+  }).battle);
+
+async function clickClassShowdownWorldCell(
+  page: import("@playwright/test").Page,
+  x: number,
+  y: number,
+): Promise<void> {
+  const canvas = page.getByTestId("battle-canvas");
+  const [battle, box, dimensions] = await Promise.all([
+    classShowdownBattleState(page),
+    canvas.boundingBox(),
+    canvas.evaluate((element) => ({ width: element.width, height: element.height })),
+  ]);
+  if (!battle || !box) throw new Error("class showdown battle canvas is not ready");
+  const logicalX = 40 + (x - battle.cameraOrigin.x + .5) * 40;
+  const logicalY = 23 + (y - battle.cameraOrigin.y + .5) * 44;
+  await canvas.click({
+    position: {
+      x: logicalX * box.width / dimensions.width,
+      y: logicalY * box.height / dimensions.height,
+    },
+  });
+}
+
 test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 
 test("debug hub links to the memory-only all-class showdown", async ({ page }) => {
@@ -75,5 +115,50 @@ test("all-class showdown applies one level to every mirror and enters formal bat
     Object.keys(localStorage).sort().map((key) => [key, localStorage.getItem(key)]),
   ));
   expect(storageAfter).toBe(storageBefore);
+  expect(pageErrors).toEqual([]);
+});
+
+test("jungle warrior melee poison is direct and leaves the persistent native status icon", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  await clickClassShowdownWorldCell(page, 17, 17);
+  await expect(page.locator(".hud-identity-name")).toHaveText("叢林戰士");
+  await page.getByTestId("unit-command-attack").click();
+  await clickClassShowdownWorldCell(page, 18, 17);
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState;
+    }).battle;
+    return current?.lastCombat?.attackerId === "arena-1-2"
+      && current.combatPresentation === undefined
+      && current.specialActionPresentation === undefined;
+  });
+  const battle = await classShowdownBattleState(page);
+  expect(battle?.lastCombat).toMatchObject({
+    attackerId: "arena-1-2",
+    defenderId: "arena-2-2",
+    defenderDied: false,
+  });
+  expect(battle?.units.find(({ id }) => id === "arena-2-2")?.statuses.poison).toBe(3);
+  expect(battle?.specialActionPresentationTrace).toEqual([]);
+
+  await clickClassShowdownWorldCell(page, 18, 17);
+  await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術主動進攻");
+  const poisonIcon = page.getByTestId("status-icon-poison");
+  await expect(poisonIcon).toHaveAttribute("data-remaining-rounds", "3");
+  await expect(poisonIcon).toHaveAttribute("aria-label", "施毒，剩餘 3 回合");
+  await expect(poisonIcon.locator("img")).toHaveAttribute(
+    "src",
+    "/assets/original/status-icons/06.png",
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/class-showdown-jungle-poison-status-icon.png`,
+  });
   expect(pageErrors).toEqual([]);
 });
