@@ -71,6 +71,7 @@
 | [`systems/technique-sd-defense-down.md`](systems/technique-sd-defense-down.md) | 防御下降、防升相消、双方 AI、原版四格破盾与冰封例外 | 已实现并通过完整门禁 |
 | [`systems/technique-sn-spell-seal.md`](systems/technique-sn-spell-seal.md) | 禁咒、技术阻断、龍免疫、双方 AI、原版九段无声封印与冰封例外 | 已实现并通过完整门禁 |
 | [`systems/technique-lab.md`](systems/technique-lab.md) | 任意敌我职业配置、全部 33 项原版地图表现与冰封净化 | 开发工具 / 已实现 |
+| [`systems/class-showdown-lab.md`](systems/class-showdown-lab.md) | 35 组常规职业同兵种相邻编队、统一等级与平原正式战斗 | 开发工具 / 已实现 |
 | [`systems/debug-harness.md`](systems/debug-harness.md) | 按关选择、快速结算与确定性测试场景 | 开发工具 / 已实现 |
 | [`systems/portrait-animation.md`](systems/portrait-animation.md) | 全战役肖像、眨眼、逐字口型与生成目录 | 表现系统 / 已实现并随第 1 关接受 |
 

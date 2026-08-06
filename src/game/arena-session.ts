@@ -40,7 +40,7 @@ export interface ArenaUnitPlacement {
   readonly id: string;
   readonly side: ArenaSide;
   readonly slot: number;
-  readonly classId: ArenaClassId;
+  readonly classId: ClassId;
   readonly level: ArenaLevel;
   readonly x: number;
   readonly y: number;
@@ -83,7 +83,7 @@ export function arenaExperienceForLevel(classId: ClassId, level: ArenaLevel): nu
   return row.experienceThreshold;
 }
 
-export function arenaEnemyMapAsset(classId: ArenaClassId): string {
+export function arenaEnemyMapAsset(classId: ClassId): string {
   return `/assets/original/technique-lab/units/enemy-${classId}.png`;
 }
 

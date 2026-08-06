@@ -51,6 +51,7 @@ root.innerHTML = `
     </section>
     <nav class="debug-tool-links" aria-label="專項實驗室">
       <a href="/arena.html" data-testid="debug-arena-link"><b>全地形競技場</b><span>自由配置目前可用職業，使用正式規則與 AI 開戰</span></a>
+      <a href="/class-showdown.html" data-testid="debug-class-showdown-link"><b>全職業對陣場</b><span>35 組同職業敵我相鄰，以統一等級直接開戰</span></a>
       <a href="/portrait-lab.html"><b>肖像動畫實驗室</b><span>一次檢查 D/0–67 的眨眼、口型與原版落點</span></a>
       <a href="/combat-lab.html"><b>戰鬥動畫實驗室</b><span>組合職業、方向、格擋、重傷與死亡</span></a>
       <a href="/technique-lab.html" data-testid="debug-technique-lab-link"><b>地圖技能動畫實驗室</b><span>檢查落雷、冰雪、治療等地圖技能的原版時間線</span></a>

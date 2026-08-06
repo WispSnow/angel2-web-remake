@@ -49,6 +49,24 @@ pnpm dev:arena
 条件。可用顶部工具栏按相同阵容重开，或返回设置继续调整。职业出现在清单中只表示地图
 素材和基础数值已经接入；尚未实现的职业专属行动不会因竞技场而自动开放。
 
+## 全职业对阵场
+
+需要一次部署全部常规职业并逐组测试同职业敌我对战时运行：
+
+```bash
+pnpm dev:classes
+```
+
+也可以打开 `http://127.0.0.1:4173/class-showdown.html`。页面按原版记录 `0–34` 依次建立
+35 组同职业配对，每组我方与敌方相邻；18 组纵向排在左列，17 组排在右列。战场统一使用
+平原规则，不混入全地形竞技场的地形变量。选择第 1–3 级资料后，必须点击“一键设置全部
+兵种等级”才会把该资料列同时应用到 70 名单位；开战后复用正式模拟、职业行动、敌方 AI、
+地图／全景表现和 HUD。
+
+女帝、龍、頭、手是 `special_runtime` 记录，不属于本页的常规职业同兵种对测；其中龍、頭、
+手没有原版我方地图图形，因此页面不会伪造。对阵会话与战役存档完全隔离，并可按相同等级
+重开或返回编成修改统一等级。
+
 ## 肖像动画实验室
 
 所有原版角色的眨眼、说话口型和覆盖片落点可以从独立页面集中检查：
@@ -160,6 +178,7 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 - `src/game/simulation/`：与 Phaser 无关的确定性网格、伤害、经验和 AI；
 - `src/game/stage-runtime.ts`：第 0–4 关唯一运行时装配、延迟加载、恢复与存档元数据清单；
 - `src/game/arena-session.ts`：竞技场编辑状态、放置合法性与可序列化开战配置；
+- `src/game/class-showdown-session.ts`：35 组常规职业的两列相邻编队、平原环境与统一等级配置；
 - `src/game/simulation/arena-battle.ts`：把竞技场配置接入正式战斗模拟与运行时资源；
 - `src/game/save/`：当前 schema、冻结历史迁移链与本地槽位 repository；
 - `src/game/phaser/`：地图、单位、镜头和范围表现；
@@ -169,6 +188,7 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 - `src/deployment-lab.ts`：复用正式部署模拟、DOM 和 Phaser 投影的第 1 关验收表面；
 - `src/portrait-lab.ts`：集中检查全战役肖像眨眼、口型和原版覆盖片落点；
 - `src/arena.ts`：独立的全地形竞技场设置页、正式战斗装配与内存生命周期；
+- `src/class-showdown.ts`：全职业对阵设置页、一键等级设置与正式战斗生命周期；
 - `src/game/debug-scenarios.ts`：按关登记开发场景、确定性夹具与调试工具栏；
 - `scripts/generate-portrait-catalog.mjs`：从原版 `D` 记录与布局证据生成全角色运行时目录；
 - `scripts/generate-content.mjs`：按唯一顺序编排全部可单独审计的内容生成器；

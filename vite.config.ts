@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         game: "index.html",
         arena: "arena.html",
+        classShowdown: "class-showdown.html",
         debug: "debug.html",
         portraitLab: "portrait-lab.html",
         combatLab: "combat-lab.html",

@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:arena": "vite --host 127.0.0.1 --open /arena.html",
+    "dev:classes": "vite --host 127.0.0.1 --open /class-showdown.html",
     "dev:debug": "vite --host 127.0.0.1 --open /debug.html",
     "dev:combat": "vite --host 127.0.0.1 --open /combat-lab.html",
     "dev:deployment": "vite --host 127.0.0.1 --open /deployment-lab.html",

@@ -5,6 +5,7 @@ import {
   arenaExperienceForLevel,
   type ArenaUnitPlacement,
 } from "../arena-session";
+import { TECHNIQUE_LAB_UNIT_ASSETS } from "../content/technique-lab.generated";
 import { completeCampaignRoster, statsFor } from "../content/stage0";
 import {
   activateStage1Content,
@@ -15,6 +16,8 @@ import {
   STAGE1_OBSTACLE_TERRAIN_SLOT,
 } from "../content/stage1";
 import { classDefinition, className } from "../content/classes";
+import { allyMapUnitAsset } from "../content/map-unit-assets";
+import type { StageDefinition } from "../content/stages";
 import { emptyUnitStatuses } from "./status";
 import { Stage0Battle, type BattleScenario } from "./battle";
 import { DeterministicRng } from "./rng";
@@ -24,6 +27,7 @@ import type {
   BattleUnit,
   CampaignState,
   Difficulty,
+  Position,
   PortraitRecord,
   SavedBattleState,
   SaveRosterEntry,
@@ -50,6 +54,30 @@ export const ARENA_STAGE_DEFINITION = {
   stories: { roundStarts: [] },
   events: [],
 } as const;
+
+export interface ArenaBattleEnvironment {
+  readonly definition: StageDefinition<"stage-01">;
+  readonly map: string;
+  readonly minimap: string;
+  readonly terrainSlotAt: (position: Position) => number;
+  readonly destinationLabel: string;
+  readonly entryStatusText: string;
+  readonly retryStatusText: string;
+  readonly retreatStatusText: string;
+  readonly enemyPhaseStatusText: string;
+}
+
+export const ALL_TERRAIN_ARENA_ENVIRONMENT: ArenaBattleEnvironment = {
+  definition: ARENA_STAGE_DEFINITION,
+  map: ARENA_MAP.source,
+  minimap: ARENA_MAP.minimap,
+  terrainSlotAt: stage1TerrainSlotAt,
+  destinationLabel: "競技場編成",
+  entryStatusText: "競技場測試開始。",
+  retryStatusText: "以目前競技場編成重新開始。",
+  retreatStatusText: "退出本場交戰並以目前編成重置。",
+  enemyPhaseStatusText: "敵方階段：競技場 AI 開始行動。",
+};
 
 function createArenaUnit(
   placement: ArenaUnitPlacement,
@@ -125,13 +153,14 @@ function arenaForces(units: readonly BattleUnit[]): readonly ForceDefinition[] {
 function arenaScenario(
   placements: readonly ArenaUnitPlacement[],
   difficulty: Difficulty,
+  environment: ArenaBattleEnvironment,
 ): BattleScenario {
   const units = createArenaUnits(placements, difficulty);
   return {
-    stage: ARENA_STAGE_DEFINITION,
-    width: ARENA_STAGE_DEFINITION.width,
-    height: ARENA_STAGE_DEFINITION.height,
-    terrainSlotAt: stage1TerrainSlotAt,
+    stage: environment.definition,
+    width: environment.definition.width,
+    height: environment.definition.height,
+    terrainSlotAt: environment.terrainSlotAt,
     dynamicTerrainSlots: {
       "iron-plate": STAGE1_IRON_PLATE_TERRAIN_SLOT,
       obstacle: STAGE1_OBSTACLE_TERRAIN_SLOT,
@@ -152,9 +181,10 @@ export class ArenaBattle extends Stage0Battle {
     placements: readonly ArenaUnitPlacement[],
     difficulty: Difficulty,
     rng = new DeterministicRng(ARENA_RNG_STATE),
+    environment: ArenaBattleEnvironment = ALL_TERRAIN_ARENA_ENVIRONMENT,
   ) {
     activateStage1Content();
-    super(difficulty, rng, arenaScenario(placements, difficulty));
+    super(difficulty, rng, arenaScenario(placements, difficulty, environment));
     this.focusId = placements.find(({ side }) => side === 1)?.id ?? this.focusId;
   }
 }
@@ -170,25 +200,29 @@ export function createArenaCampaignState(
 function arenaUnitSprites(
   placements: readonly ArenaUnitPlacement[],
 ): Partial<Record<MapUnitSpriteKey, string>> {
-  return Object.fromEntries(
-    [...new Set(placements.filter(({ side }) => side === 2).map(({ classId }) => classId))]
-      .map((classId) => [`enemy-${classId}` as const, arenaEnemyMapAsset(classId)]),
-  );
+  const sprites: Partial<Record<MapUnitSpriteKey, string>> = {};
+  for (const classId of new Set(placements.map(({ classId }) => classId))) {
+    sprites[`enemy-${classId}`] = arenaEnemyMapAsset(classId);
+    const allySource = TECHNIQUE_LAB_UNIT_ASSETS[classId].ally;
+    if (!allyMapUnitAsset(classId) && allySource) sprites[`ally-${classId}`] = allySource;
+  }
+  return sprites;
 }
 
 export function createArenaRuntime(
   placements: readonly ArenaUnitPlacement[],
+  environment: ArenaBattleEnvironment = ALL_TERRAIN_ARENA_ENVIRONMENT,
 ): LoadedStageRuntime {
   const frozenPlacements = placements.map((placement) => ({ ...placement }));
   const createBattle: LoadedStageRuntime["createBattle"] = (
     campaign,
     _preparation,
     rng = new DeterministicRng(campaign.rngState, campaign.rngCalls),
-  ): Stage0Battle => new ArenaBattle(frozenPlacements, campaign.difficulty, rng);
+  ): Stage0Battle => new ArenaBattle(frozenPlacements, campaign.difficulty, rng, environment);
   return {
     id: "stage-01",
     ordinal: 1,
-    label: ARENA_STAGE_DEFINITION.name,
+    label: environment.definition.name,
     nextStageId: "stage-02",
     focusUnitId: frozenPlacements.find(({ side }) => side === 1)?.id ?? "arena-1-0",
     mapPresentationActionIds: [
@@ -230,16 +264,16 @@ export function createArenaRuntime(
     entry: {
       trigger: "battle-started",
       phase: "player",
-      statusText: "競技場測試開始。",
+      statusText: environment.entryStatusText,
     },
     retry: {
       mode: "entry",
-      statusText: "以目前競技場編成重新開始。",
-      retreatStatusText: "退出本場交戰並以目前編成重置。",
+      statusText: environment.retryStatusText,
+      retreatStatusText: environment.retreatStatusText,
     },
-    enemyPhaseStatusText: "敵方階段：競技場 AI 開始行動。",
+    enemyPhaseStatusText: environment.enemyPhaseStatusText,
     completion: {
-      destinationLabel: "競技場編成",
+      destinationLabel: environment.destinationLabel,
       destinationProgress: 1000,
       consumedEvents: "none",
     },
@@ -254,10 +288,10 @@ export function createArenaRuntime(
         .map(({ id, classId }) => [id, classId] as const),
       enemyAi: "none",
     },
-    definition: ARENA_STAGE_DEFINITION,
+    definition: environment.definition,
     assets: {
-      map: ARENA_MAP.source,
-      minimap: ARENA_MAP.minimap,
+      map: environment.map,
+      minimap: environment.minimap,
       storyBackground: STAGE1_ASSETS.storyBackground,
       unitSprites: arenaUnitSprites(frozenPlacements),
     },
