@@ -174,6 +174,12 @@ export const ASSETS = {
       },
     },
   },
+  sidePanelChrome: {
+    unitTop: "/assets/original/hud-unit-top-chrome.png",
+    unitBody: "/assets/original/hud-unit-body-frame.png",
+    minimap: "/assets/original/hud-minimap-frame.png",
+    round: "/assets/original/hud-round-frame.png",
+  },
   battleChrome: {
     top: "/assets/original/battle-chrome-top.png",
     cornerLeft: "/assets/original/battle-chrome-corner-left.png",

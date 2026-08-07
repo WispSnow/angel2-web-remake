@@ -1543,6 +1543,22 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   const system = page.getByTestId("system-menu-button");
   const group = page.getByTestId("group-command-hotspot");
   const allRest = page.getByTestId("all-rest-hotspot");
+  const logicalElementBounds = async (locator: Locator) => locator.evaluate((element) => {
+    let node: HTMLElement | null = element as HTMLElement;
+    let left = 0;
+    let top = 0;
+    while (node && !node.classList.contains("logical-screen")) {
+      left += node.offsetLeft;
+      top += node.offsetTop;
+      node = node.offsetParent as HTMLElement | null;
+    }
+    const target = element as HTMLElement;
+    return { left, top, width: target.offsetWidth, height: target.offsetHeight };
+  });
+  const naturalSize = (locator: Locator) => locator.evaluate((element) => ({
+    width: (element as HTMLImageElement).naturalWidth,
+    height: (element as HTMLImageElement).naturalHeight,
+  }));
 
   // Nia is initially focused, so her detail HUD covers the desk and the
   // underlying object hitboxes must not remain blindly clickable.
@@ -1551,10 +1567,25 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   await expect(system).toBeHidden();
   await expect(group).toBeHidden();
   await expect(allRest).toBeHidden();
+  const unitTopChrome = page.getByTestId("hud-unit-top-chrome");
+  const unitBodyFrame = page.getByTestId("hud-unit-body-frame");
+  await expect(unitTopChrome).toBeVisible();
+  await expect(unitBodyFrame).toBeVisible();
+  await expect.poll(() => naturalSize(unitTopChrome)).toEqual({ width: 160, height: 149 });
+  await expect.poll(() => naturalSize(unitBodyFrame)).toEqual({ width: 160, height: 171 });
+  expect(await logicalElementBounds(unitTopChrome)).toEqual({ left: 480, top: 0, width: 160, height: 149 });
+  expect(await logicalElementBounds(unitBodyFrame)).toEqual({ left: 480, top: 150, width: 160, height: 171 });
+  expect(await logicalElementBounds(page.locator("#bottom-round"))).toEqual({ left: 480, top: 322, width: 160, height: 28 });
+  await screen.screenshot({ path: "artifacts/playwright/stage0-side-panel-unit-chrome.png" });
 
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await expect(screen).toHaveAttribute("data-hud-mode", "tactical");
   await expect(screen).toHaveAttribute("data-side-panel-hotspots", "active");
+  const minimapFrame = page.getByTestId("tactical-minimap-frame");
+  await expect(minimapFrame).toBeVisible();
+  await expect.poll(() => naturalSize(minimapFrame)).toEqual({ width: 160, height: 171 });
+  expect(await logicalElementBounds(minimapFrame)).toEqual({ left: 480, top: 150, width: 160, height: 171 });
+  expect(await logicalElementBounds(page.getByTestId("tactical-minimap"))).toEqual({ left: 485, top: 161, width: 150, height: 150 });
 
   const logicalBounds = async (locator: Locator) => locator.evaluate((element) => {
     const bounds = getComputedStyle(element);

@@ -12,6 +12,7 @@ const BIG5 = new TextDecoder("big5", { fatal: true });
 
 const CODE_SIGNATURES = [
   ["0000:2620", 0x2620, 0x263b, "fill unit-detail panel body from the native pattern", "90fd78a62ad19985d61723af673b05959cab3c6018ac435ffd9a89a545d21452"],
+  ["0000:2A1A", 0x2a1a, 0x2a8b, "draw A/6 separators and side ornaments around the tactical minimap", "c32f10e52e1bbbb5a704043c73d346941c9a0ccde1d9fe5ffa4170e15f13dc4e"],
   ["0000:7C27", 0x7c27, 0x7ce2, "refresh viewport, hovered-unit panel, cursor and minimap", "5c8a9faf6b89f9a55eabddb79346d8f3029effae7a216fa96c50729ab480387f"],
   ["0000:8492", 0x8492, 0x851a, "delay, cache and dismiss hovered-unit detail panel", "d70ec4e86ae2d8ed246007d0984109d785db37ad4916f39aec3c92a8c4285772"],
   ["0000:851A", 0x851a, 0x853f, "compose complete hovered-unit detail panel", "c6b8b0affe92e35e19882c07e4b41cd7549080187fce793670639cb6dfb72542"],
@@ -29,6 +30,24 @@ const CODE_SIGNATURES = [
   ["0000:8C24", 0x8c24, 0x8c30, "overwrite one five-character numeric field with question marks", "8dabd699d776359a584326375ad29b187b654c2e990e514250187dff6b7bd476"],
   ["0000:8C30", 0x8c30, 0x8cea, "draw stat strings and proportional life/experience bars", "995f439a19a6d0f4537f4b815678b8ffae258c24cefd07586bd72c94e9d8f024"],
   ["0000:510C", 0x510c, 0x5230, "load selected unit state, display strings and presentation fields", "e0c39d4d53c8523629d00e260dcbdb1a3a26b236ac1ad1ee33e231cb7ce5cffd"],
+];
+
+const HUD_CHROME_FRAMES = [
+  [0, 8, 6, "09f3d4ae7625ce67de6ed9923aa9a5651a191476ef745b5f8f5b067f6ce3fbee"],
+  [1, 8, 6, "ba58841a23f90b85a68c0a9921769c91bae6f4a197145b38ad87b525fca7d9bf"],
+  [2, 8, 6, "91268191cadb0209aad297724ee3f9724860fe41fc586d113ab4c5114162b03d"],
+  [3, 8, 6, "749cca1e36c1dc9d4fe44954e9f6dbffecb8cdca47509b6152839b03653a1d28"],
+  [4, 8, 6, "100148b585eb60ffc851f399bded071364d0d1ee8e22fef1c2f80b33a3ebf909"],
+  [5, 8, 7, "43e8ac9a4c43b785b2b603b4a82413b1eb042dffb375ace3ec0922c40b95a152"],
+  [6, 8, 7, "6a1ee71ff1d6701b9eda37a7e249e27e1afa94419b6bc4e0dfc3e0aaafdf0f75"],
+  [7, 8, 7, "269483fcf4c25b41b5612b75edc11f9997297765f2e6d478fca3d991cef9983a"],
+  [8, 16, 9, "2de65e16374f4d44812310f9c74d62da9447515db6d754db61c2500e4b176508"],
+  [9, 160, 10, "5de38c5f7696fc517b3df97cf57cc1f030a206e24a64a26b92a77fe7be102103"],
+  [10, 160, 10, "8a5357c1b4c98217bb849488e82cde461eadd733bb774d52a62d32346cd0c0e1"],
+  [11, 16, 28, "1c52c30a8f785ff88c27db9dd53844208117d4b99a1aa911b9259cfce541dfb5"],
+  [12, 16, 28, "ebd9a194d8007c77d965703e48bcd72832dfa9d80876ff338958b093e88ec4eb"],
+  [13, 16, 28, "29969cbeacec8fc49184d0f2dc5e90a4caf32cacd7972c10f44a3e4e31cd97a8"],
+  [14, 40, 7, "521361da28f5408552093c03faf27b2a5cc72f9acffba72ea1c50d5f38554039"],
 ];
 
 const DATA_SIGNATURES = [
@@ -273,6 +292,16 @@ async function extract(module29Path, planarRoot, outputJsonPath, outputSvgPath) 
   const representativePortrait = await loadGraphic(planarRoot, dManifest, "D", 46, 0);
   assert.equal(representativePortrait.width, 112);
   assert.equal(representativePortrait.height, 112);
+  const chromeGraphics = await Promise.all(HUD_CHROME_FRAMES.map(([frame]) =>
+    loadGraphic(planarRoot, aManifest, "A", 6, frame)));
+  HUD_CHROME_FRAMES.forEach(([frame, width, height, expectedSha256], index) => {
+    const graphic = chromeGraphics[index];
+    assert.equal(graphic.imageIndex, frame);
+    assert.equal(graphic.width, width, `A/6/${frame} width changed`);
+    assert.equal(graphic.height, height, `A/6/${frame} height changed`);
+    assert.equal(graphic.sha256, expectedSha256, `A/6/${frame} PNG changed`);
+    assert.equal(graphic.maskUsed, false);
+  });
 
   const statRows = STAT_ROWS.map(([id, address, x, y, expectedTemplate, sources]) => {
     const template = dollarString(module29, address);
@@ -368,6 +397,58 @@ async function extract(module29Path, planarRoot, outputJsonPath, outputSvgPath) 
       origin: { x: 516, y: 327 },
       formatting: "copy the final three converted characters into the visible round template; the native numeric formatter changes leading zeroes to spaces",
     },
+    sidePanelChrome: {
+      resource: "A/6",
+      unitTop: {
+        dimensions: { width: 160, height: 149 },
+        background: { x: 480, y: 0, width: 160, height: 149, colorIndex: 1 },
+        outerFrame: {
+          top: { frame: 1, firstOrigin: { x: 487, y: 0 }, stepX: 8, repeats: 20 },
+          bottom: { frame: 0, firstOrigin: { x: 487, y: 143 }, stepX: 8, repeats: 20 },
+          corners: { frame: 5, origins: [{ x: 480, y: 0 }, { x: 480, y: 142 }, { x: 633, y: 0 }, { x: 633, y: 142 }] },
+          leftVerticalColors: [14, 0, 11, 14, 0],
+          rightVerticalColors: [0, 14, 11, 0, 14],
+          verticalRange: { y: 7, height: 135 },
+        },
+        portraitFrame: {
+          left: { frame: 6, firstOrigin: { x: 488, y: 8 }, stepY: 7, repeats: 16 },
+          right: { frame: 7, firstOrigin: { x: 595, y: 8 }, stepY: 7, repeats: 16 },
+          bottom: { frame: 3, firstOrigin: { x: 488, y: 114 }, stepX: 8, repeats: 13 },
+          bottomLeft: { frame: 2, origin: { x: 488, y: 114 } },
+          bottomRight: { frame: 4, origin: { x: 592, y: 114 } },
+          centerOrnament: { frame: 8, origin: { x: 536, y: 113 } },
+          topLight: { x: 488, y: 8, width: 112, height: 1, colorIndex: 14 },
+          topShadow: { x: 488, y: 9, width: 112, height: 1, colorIndex: 0 },
+        },
+        gaugeLabel: { frame: 14, origin: { x: 600, y: 113 } },
+      },
+      body: {
+        bounds: { x: 480, y: 150, width: 160, height: 171 },
+        statRowStarts: [151, 172, 193, 214, 235],
+        rowPattern: {
+          light: { x: 480, width: 160, height: 1, colorIndex: 14 },
+          insetTop: { x: 482, width: 156, height: 1, yOffset: 1, colorIndex: 0 },
+          insetSides: { leftX: 482, rightX: 637, width: 1, height: 20, yOffset: 1, colorIndex: 0 },
+          bottom: { x: 482, width: 156, height: 1, yOffset: 20, colorIndex: 15 },
+        },
+        statusFrame: { topY: 256, insetY: 257, leftX: 482, rightX: 637, bottomY: 320 },
+      },
+      tacticalMinimap: {
+        bounds: { x: 480, y: 150, width: 160, height: 171 },
+        top: { frame: 9, origin: { x: 480, y: 150 } },
+        bottom: { frame: 10, origin: { x: 480, y: 311 } },
+        left: { frame: 6, firstOrigin: { x: 480, y: 160 }, stepY: 7, repeats: 22 },
+        right: { frame: 7, firstOrigin: { x: 635, y: 160 }, stepY: 7, repeats: 22 },
+        liveMapBounds: { x: 485, y: 161, width: 150, height: 150 },
+      },
+      roundFrame: {
+        bounds: { x: 480, y: 322, width: 160, height: 28 },
+        repeated: { frame: 12, firstOrigin: { x: 480, y: 322 }, stepX: 8, repeats: 18 },
+        left: { frame: 11, origin: { x: 480, y: 322 } },
+        right: { frame: 13, origin: { x: 624, y: 322 } },
+      },
+      frames: chromeGraphics.map(({ dataUri, ...graphic }) => graphic),
+    },
     statuses: {
       resource: { key: "A/17", frames: 8, dimensions: { width: 40, height: 31 }, transparentMask: true },
       slots: statusSlots,
@@ -390,6 +471,7 @@ async function extract(module29Path, planarRoot, outputJsonPath, outputSvgPath) 
       palette: aManifest.palette,
       paletteColors: aManifest.paletteColors,
       statusPngs: statusGraphics.map(({ dataUri, ...graphic }) => graphic),
+      hudChromePngs: chromeGraphics.map(({ dataUri, ...graphic }) => graphic),
       representativePortrait: (({ dataUri, ...graphic }) => graphic)(representativePortrait),
     },
     evidenceBoundary: {
@@ -405,6 +487,7 @@ async function extract(module29Path, planarRoot, outputJsonPath, outputSvgPath) 
       statRows: statRows.length,
       statusSlots: statusSlots.length,
       statusResources: statusGraphics.length,
+      hudChromeResources: chromeGraphics.length,
       implementationFrozen: true,
     },
   };

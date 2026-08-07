@@ -93,7 +93,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <div class="story-background" id="story-background"></div>
             <section class="unit-hud" id="unit-hud" data-testid="unit-hud" aria-live="polite"></section>
             <div class="bottom-location">${stage.name}</div>
-            <div class="bottom-round" id="bottom-round"></div>
+            <div class="bottom-round" id="bottom-round">
+              <img src="${ASSETS.sidePanelChrome.round}" alt="" aria-hidden="true" />
+              <span id="bottom-round-text"></span>
+            </div>
             ${renderSidePanelHotspots()}
             <div class="side-panel-tooltip" id="side-panel-tooltip" data-testid="side-panel-tooltip"
               role="tooltip" aria-live="polite" hidden></div>
@@ -219,7 +222,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
 
   const screen = required(root, "#logical-screen");
   const hud = required(root, "#unit-hud");
-  const round = required(root, "#bottom-round");
+  const round = required(root, "#bottom-round-text");
   const actionMenu = required(root, "#action-menu");
   const status = required(root, "#status-strip");
   const combatPresentation = required(root, "#combat-presentation");
@@ -1471,6 +1474,10 @@ function renderHud(
         wrapperTestId: "unit-portrait-composite",
         baseTestId: "unit-portrait",
       })}
+      <img class="hud-unit-top-chrome" data-testid="hud-unit-top-chrome"
+        src="${ASSETS.sidePanelChrome.unitTop}" alt="" aria-hidden="true" />
+      <img class="hud-unit-body-frame" data-testid="hud-unit-body-frame"
+        src="${ASSETS.sidePanelChrome.unitBody}" alt="" aria-hidden="true" />
       <div class="hud-identity">
         <b class="${identityClass}" title="${identity}">${identity}</b>
         ${visibleControlSummary
@@ -1485,7 +1492,6 @@ function renderHud(
       </div>
       <div class="meter-bar hp-bar" data-testid="hp-bar" aria-label="生命 ${unit.life}／${stats.maxLife}"><i style="height:${hpPercent}%"></i></div>
       <div class="meter-bar exp-bar" data-testid="exp-bar" aria-label="經驗 ${unit.experience}／${nextExperience}"><i style="height:${expPercent}%"></i></div>
-      <div class="meter-labels" aria-hidden="true"><span>HP</span><span>EXP</span></div>
       <dl class="stat-list">
         <div class="unit-core-stat"><dt>生命</dt><dd>${unit.life}／${stats.maxLife}</dd></div>
         <div class="unit-core-stat" data-testid="unit-attack-stat"><dt>攻擊</dt><dd>${stats.attack}／${baseStats.attack}</dd></div>
@@ -1570,6 +1576,8 @@ function renderTactical(controller: GameController, underUnit = false): string {
         ${underUnit ? "" : `<span class="minimap-preview" data-testid="minimap-preview" aria-hidden="true" hidden></span>`}
         ${markers}
       </div>
+      <img class="tactical-minimap-frame" data-testid="tactical-minimap-frame"
+        src="${ASSETS.sidePanelChrome.minimap}" alt="" aria-hidden="true" />
     </div>`;
 }
 

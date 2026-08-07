@@ -8,6 +8,7 @@ import iconv from "iconv-lite";
 const root = path.resolve(import.meta.dirname, "..");
 const templatePath = path.join(root, "reverse/decoded/B/0001/00.raw");
 const terrainMappingPath = path.join(root, "reverse/parsed/native/terrain-token-map.json");
+const hudPresentationPath = path.join(root, "reverse/parsed/native/hud-presentations.json");
 const outputPath = path.join(root, "src/game/content/stage0-runtime.generated.ts");
 const planarAssetPath = path.join(root, "reverse/renders/planar/A");
 const portraitAssetPath = path.join(root, "reverse/renders/planar/D");
@@ -59,14 +60,21 @@ const turnTransitionAssets = {
   ])),
 };
 
-const [template, mappingDocument, ...dialogueDocuments] = await Promise.all([
+const [template, mappingDocument, hudPresentation, ...dialogueDocuments] = await Promise.all([
   readFile(templatePath),
   readFile(terrainMappingPath, "utf8").then(JSON.parse),
+  readFile(hudPresentationPath, "utf8").then(JSON.parse),
   ...[0, 1, 2, 3].map((record) => readFile(
     path.join(root, `reverse/parsed/dialogue/${String(record).padStart(4, "0")}.json`),
     "utf8",
   ).then(JSON.parse)),
 ]);
+
+if (hudPresentation.format !== "ANGEL2 hovered-unit HUD presentation specification"
+  || hudPresentation.sidePanelChrome?.resource !== "A/6"
+  || hudPresentation.sidePanelChrome.frames?.length !== 15) {
+  throw new Error("hud-presentations.json lacks the verified A/6 side-panel chrome contract");
+}
 
 if (template.length !== 8506) {
   throw new Error(`B/0001 expected 8506 bytes, got ${template.length}`);
@@ -192,7 +200,101 @@ function composeTacticalPanelFoundation(output) {
   ]);
 }
 
+const gameplayPalette = hudPresentation.resourceValidation.paletteColors.map(
+  ([red, green, blue]) => `#${[red, green, blue].map((value) => value.toString(16).padStart(2, "0")).join("")}`,
+);
+function hudChromeFrame(frame) {
+  const graphic = hudPresentation.sidePanelChrome.frames.find(
+    (candidate) => candidate.imageIndex === frame,
+  );
+  if (!graphic) throw new Error(`missing verified A/6/${frame} HUD chrome frame`);
+  return path.join(root, graphic.path);
+}
+
+function appendComposite(args, frame, x, y) {
+  args.push(hudChromeFrame(frame), "-geometry", `+${x}+${y}`, "-composite");
+}
+
+function appendRepeatedComposite(args, frame, x, y, stepX, stepY, repeats) {
+  for (let index = 0; index < repeats; index += 1) {
+    appendComposite(args, frame, x + stepX * index, y + stepY * index);
+  }
+}
+
+function composeUnitTopChrome(output) {
+  const args = ["-size", "160x149", "canvas:none"];
+  const rectangles = [
+    [0, 7, 1, 135, 14], [1, 7, 1, 135, 0], [2, 7, 1, 135, 11], [3, 7, 1, 135, 14], [4, 7, 1, 135, 0],
+    [155, 7, 1, 135, 0], [156, 7, 1, 135, 14], [157, 7, 1, 135, 11], [158, 7, 1, 135, 0], [159, 7, 1, 135, 14],
+    [125, 7, 12, 102, 0], [127, 8, 11, 101, 7], [126, 8, 10, 100, 2],
+    [138, 7, 12, 102, 0], [140, 8, 11, 101, 7], [139, 8, 10, 100, 2],
+    [8, 8, 112, 1, 14], [8, 9, 112, 1, 0],
+  ];
+  for (const [x, y, width, height, colorIndex] of rectangles) {
+    args.push("-fill", gameplayPalette[colorIndex], "-draw", `rectangle ${x},${y} ${x + width - 1},${y + height - 1}`);
+  }
+  appendRepeatedComposite(args, 1, 7, 0, 8, 0, 20);
+  appendRepeatedComposite(args, 0, 7, 143, 8, 0, 20);
+  for (const [x, y] of [[0, 0], [0, 142], [153, 0], [153, 142]]) appendComposite(args, 5, x, y);
+  appendRepeatedComposite(args, 6, 8, 8, 0, 7, 16);
+  appendRepeatedComposite(args, 7, 115, 8, 0, 7, 16);
+  appendRepeatedComposite(args, 3, 8, 114, 8, 0, 13);
+  appendComposite(args, 2, 8, 114);
+  appendComposite(args, 4, 112, 114);
+  appendComposite(args, 8, 56, 113);
+  appendComposite(args, 14, 120, 113);
+  args.push(output);
+  runMagick(args);
+}
+
+function composeUnitBodyFrame(output) {
+  const args = ["-size", "160x171", "canvas:none"];
+  const drawRectangle = (x, y, width, height, colorIndex) => {
+    args.push("-fill", gameplayPalette[colorIndex], "-draw", `rectangle ${x},${y} ${x + width - 1},${y + height - 1}`);
+  };
+  drawRectangle(0, 0, 160, 2, 14);
+  drawRectangle(0, 0, 2, 171, 14);
+  drawRectangle(158, 0, 2, 171, 14);
+  drawRectangle(0, 169, 160, 2, 14);
+  for (const y of [1, 22, 43, 64, 85]) {
+    drawRectangle(0, y, 160, 1, 14);
+    drawRectangle(2, y + 1, 156, 1, 0);
+    drawRectangle(2, y + 1, 1, 20, 0);
+    drawRectangle(157, y + 1, 1, 20, 0);
+    drawRectangle(2, y + 20, 156, 1, 15);
+  }
+  drawRectangle(0, 106, 160, 1, 14);
+  drawRectangle(2, 107, 156, 1, 0);
+  drawRectangle(2, 107, 1, 63, 0);
+  drawRectangle(157, 107, 1, 63, 0);
+  args.push(output);
+  runMagick(args);
+}
+
+function composeMinimapFrame(output) {
+  const args = ["-size", "160x171", "canvas:none"];
+  appendComposite(args, 9, 0, 0);
+  appendRepeatedComposite(args, 6, 0, 10, 0, 7, 22);
+  appendRepeatedComposite(args, 7, 155, 10, 0, 7, 22);
+  appendComposite(args, 10, 0, 161);
+  args.push(output);
+  runMagick(args);
+}
+
+function composeRoundFrame(output) {
+  const args = ["-size", "160x28", "canvas:none"];
+  appendRepeatedComposite(args, 12, 0, 0, 8, 0, 18);
+  appendComposite(args, 11, 0, 0);
+  appendComposite(args, 13, 144, 0);
+  args.push(output);
+  runMagick(args);
+}
+
 composeTacticalPanelFoundation(path.join(publicAssetPath, "tactical-panel.png"));
+composeUnitTopChrome(path.join(publicAssetPath, "hud-unit-top-chrome.png"));
+composeUnitBodyFrame(path.join(publicAssetPath, "hud-unit-body-frame.png"));
+composeMinimapFrame(path.join(publicAssetPath, "hud-minimap-frame.png"));
+composeRoundFrame(path.join(publicAssetPath, "hud-round-frame.png"));
 
 // A/0003 carries the enemy colors but no stored mask. The same-pose A/0002
 // frames provide the exact map-sprite alpha used by the native compositor.
@@ -222,4 +324,4 @@ composeStatueForeground(
 );
 
 console.log(`wrote ${path.relative(root, outputPath)} (${terrain.length} terrain cells)`);
-console.log("wrote stage 0 battle chrome/statue foreground, native cursors/command-menu chrome, stateful tactical panel, turn-transition graphics, map sprites and ordinary-combat VOC assets");
+console.log("wrote stage 0 battle chrome/statue foreground, native cursors/command-menu chrome, stateful tactical panel, side-panel chrome, turn-transition graphics, map sprites and ordinary-combat VOC assets");
