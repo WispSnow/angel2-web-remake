@@ -23,6 +23,8 @@ ref/
 !public/assets/original/portrait-animation/*.png
 !public/assets/original/portraits/
 !public/assets/original/portraits/**/*.png
+!public/assets/original/dialogue/
+!public/assets/original/dialogue/*.png
 !public/assets/original/full-combat/
 !public/assets/original/full-combat/**/*.png
 !public/assets/original/map-actions/

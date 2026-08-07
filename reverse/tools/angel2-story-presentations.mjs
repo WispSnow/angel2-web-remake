@@ -301,6 +301,43 @@ function blit(target, source, x0, y0) {
   }
 }
 
+function composeDialogueTextWindow(windowGraphics) {
+  const frames = new Map(windowGraphics.map((frame) => [frame.imageIndex, frame]));
+  const frame = (imageIndex) => {
+    const value = frames.get(imageIndex);
+    assert(value, `missing A/18 frame ${imageIndex} for dialogue-window composition`);
+    return value;
+  };
+  const target = rgba(400, 86, [0, 0, 0, 0]);
+  const originX = 153;
+  let leftOuter = 313;
+  let leftInner = 337;
+  let rightInner = 345;
+  let rightOuter = 361;
+  for (let iteration = 0; iteration < 11; iteration++) {
+    blit(target, frame(3), leftOuter - originX, 0);
+    blit(target, frame(6), leftInner - originX, 0);
+    blit(target, frame(6), rightInner - originX, 0);
+    blit(target, frame(9), rightOuter - originX, 0);
+    for (let row = 0; row < 3; row++) {
+      const y = 24 + row * 16;
+      blit(target, frame(4), leftOuter - originX, y);
+      blit(target, frame(7), leftInner - originX, y);
+      blit(target, frame(7), rightInner - originX, y);
+      blit(target, frame(10), rightOuter - originX, y);
+    }
+    blit(target, frame(5), leftOuter - originX, 72);
+    blit(target, frame(8), leftInner - originX, 72);
+    blit(target, frame(8), rightInner - originX, 72);
+    blit(target, frame(11), rightOuter - originX, 72);
+    leftOuter -= 16;
+    leftInner -= 16;
+    rightInner += 16;
+    rightOuter += 16;
+  }
+  return target;
+}
+
 function drawNumber(target, value, x0, y0, scale = 2) {
   let x = x0;
   for (const digit of String(value).padStart(2, "0")) {
@@ -357,6 +394,11 @@ async function render(module25Path, decodedRoot, dialogueDirectory, renderRoot) 
   const windowGraphics = [];
   for (let image = 0; image < 12; image++) windowGraphics.push(await renderOne(decodedRoot, renderRoot, palette, "A", 18, image));
   windowGraphics.push(await renderOne(decodedRoot, renderRoot, palette, "A", 20, 0));
+  const dialogueWindow = composeDialogueTextWindow(windowGraphics);
+  const dialogueWindowOutput = "composites/A-0018-dialogue-window.png";
+  const dialogueWindowPng = encodeRgbaPng(dialogueWindow.width, dialogueWindow.height, dialogueWindow.pixels);
+  await mkdir(path.dirname(path.join(renderRoot, dialogueWindowOutput)), { recursive: true });
+  await writeFile(path.join(renderRoot, dialogueWindowOutput), dialogueWindowPng);
 
   const sheets = [
     await contactSheet(renderRoot, "contact-sheets/backgrounds.png", backgrounds, 4, 160, 112, 2),
@@ -375,6 +417,21 @@ async function render(module25Path, decodedRoot, dialogueDirectory, renderRoot) 
     renderedImages: backgrounds.length + portraits.length + windowGraphics.length,
     groups: {
       backgrounds: backgrounds.map(publicFrame), portraits: portraits.map(publicFrame), windowGraphics: windowGraphics.map(publicFrame),
+    },
+    dialogueWindowComposite: {
+      resource: "A/18 frames 3..11",
+      output: dialogueWindowOutput,
+      width: dialogueWindow.width,
+      height: dialogueWindow.height,
+      sha256: sha256(dialogueWindowPng),
+      nativeAssembly: {
+        iterations: 11,
+        initialX: [313, 337, 345, 361],
+        perIterationDeltaX: [-16, -16, 16, 16],
+        finalDrawBounds: [153, 0, 553, 86],
+        middleRowsY: [24, 40, 56],
+        bottomY: 72,
+      },
     },
     contactSheets: sheets,
   };
@@ -477,6 +534,134 @@ function voiceAudioEntry(manifest, record) {
   };
 }
 
+function dialoguePortraitFrameContract(renderManifest) {
+  const expectedAssets = [
+    {
+      imageIndex: 0, width: 112, height: 17, maskUsed: false,
+      output: "frames/A/0018/00.png",
+      sha256: "8f33d834601086262315e0cf0a2f62355d2bbc71cd6e38fff0a7f60e041a05fd",
+    },
+    {
+      imageIndex: 1, width: 112, height: 23, maskUsed: false,
+      output: "frames/A/0018/01.png",
+      sha256: "a56686a5147f56125c365efce5f2f057f6ab0b98bea1ce9f0fb290e472c52163",
+    },
+    {
+      imageIndex: 2, width: 8, height: 8, maskUsed: true,
+      output: "frames/A/0018/02.png",
+      sha256: "157f0052e83554f0460c0de8717cd2252036288db6fd7837d6206e85628515dd",
+    },
+  ];
+  const entries = renderManifest.groups.windowGraphics
+    .filter((entry) => entry.group === "A" && entry.record === 18);
+  for (const expected of expectedAssets) {
+    const entry = entries.find((candidate) => candidate.imageIndex === expected.imageIndex);
+    assert.deepEqual(
+      entry && {
+        imageIndex: entry.imageIndex,
+        width: entry.width,
+        height: entry.height,
+        maskUsed: entry.maskUsed,
+        output: entry.output,
+        sha256: entry.sha256,
+      },
+      expected,
+      `A/18 frame ${expected.imageIndex} changed; re-audit the native portrait compositor`,
+    );
+  }
+  const asset = (imageIndex) => {
+    const entry = entries.find((candidate) => candidate.imageIndex === imageIndex);
+    assert(entry, `missing A/18 frame ${imageIndex}`);
+    return {
+      imageIndex,
+      size: [entry.width, entry.height],
+      maskUsed: entry.maskUsed,
+      output: entry.output,
+      sha256: entry.sha256,
+    };
+  };
+  return {
+    resource: "A/18",
+    portraitSize: [112, 112],
+    compositedBoundsRelativeToPortrait: {
+      left: 0,
+      top: -15,
+      rightExclusive: 115,
+      bottomExclusive: 131,
+    },
+    top: { ...asset(0), drawOffset: [0, -15] },
+    nameplate: { ...asset(1), drawOffset: [0, 108] },
+    side: {
+      ...asset(2),
+      leftOrigin: [0, 0],
+      rightOrigin: [107, 0],
+      repeatCount: 15,
+      verticalStep: 8,
+    },
+    displayNameOrigin: [24, 111],
+    textWindowImageIndices: [3, 4, 5, 6, 7, 8, 9, 10, 11],
+  };
+}
+
+function dialogueTextWindowContract(renderManifest) {
+  const expectedAssets = [
+    [3, 24, 24, "8a0929e44be9556fd687416646ba4103dddcc75fe1ceb6ddc072aaaa4bad878b"],
+    [4, 24, 16, "8121133380c57c467f00706d9313e31b7481d2ee5fa6d85dbfbb799638c4b8bd"],
+    [5, 24, 14, "eb6244cfc66a82c5560026bd0db225b4e23a5a8fe629753ab44980a22b1b348c"],
+    [6, 16, 24, "59e1a0b8fc86c34f559ed5dc9e74a2691565f589bdd227ac4d14d611e73da92d"],
+    [7, 16, 16, "0df6de4d6dc00ba0ad52a36596dd4da37a62378c50c338b87adf24875ed52d12"],
+    [8, 16, 14, "57141f7d4a308c152a81050c809e39fb8f75b7922f1f223b053f43b72769a794"],
+    [9, 32, 24, "a2bf8f50c0ee1baa5b24af8fc12ed776006640bb88d26f42f463e608c8c75983"],
+    [10, 32, 16, "027c484fabbcdfa5bcb7d7e56262a3995afb628ef74367bb511b88ca5be82853"],
+    [11, 32, 14, "3caf752e56b264e5cd4315ed66d250097566d3a273c4fa766d29b03af444ec94"],
+  ];
+  const entries = renderManifest.groups.windowGraphics
+    .filter((entry) => entry.group === "A" && entry.record === 18);
+  const assets = expectedAssets.map(([imageIndex, width, height, expectedSha256]) => {
+    const entry = entries.find((candidate) => candidate.imageIndex === imageIndex);
+    assert(entry, `missing A/18 dialogue-window frame ${imageIndex}`);
+    assert.deepEqual(
+      [entry.width, entry.height, entry.maskUsed, entry.sha256],
+      [width, height, true, expectedSha256],
+      `A/18 frame ${imageIndex} changed; re-audit the native text-window compositor`,
+    );
+    return {
+      imageIndex,
+      size: [width, height],
+      maskUsed: true,
+      output: entry.output,
+      sha256: entry.sha256,
+    };
+  });
+  const composite = renderManifest.dialogueWindowComposite;
+  assert.deepEqual([composite.width, composite.height], [400, 86]);
+  assert.deepEqual(composite.nativeAssembly, {
+    iterations: 11,
+    initialX: [313, 337, 345, 361],
+    perIterationDeltaX: [-16, -16, 16, 16],
+    finalDrawBounds: [153, 0, 553, 86],
+    middleRowsY: [24, 40, 56],
+    bottomY: 72,
+  });
+  return {
+    resource: "A/18",
+    imageIndices: assets,
+    composite: {
+      size: [composite.width, composite.height],
+      output: composite.output,
+      sha256: composite.sha256,
+      ...composite.nativeAssembly,
+    },
+    textInset: [12, 12],
+    module25Anchors: { upper: [153, 2], lower: [97, 260] },
+    module29Anchors: { upper: [153, 10], lower: [97, 250] },
+    portraitFrameGaps: {
+      module25: { upper: 30, lower: 15 },
+      module29: { upper: 6, lower: 7 },
+    },
+  };
+}
+
 async function extract(module25Path, module29Path, stageEventsPath, audioManifestPath, dialogueDirectory, renderRoot, outputPath) {
   const [module25, module29, stageEventsBuffer, audioBuffer, dialogues, renderBuffer] = await Promise.all([
     readFile(module25Path), readFile(module29Path), readFile(stageEventsPath), readFile(audioManifestPath),
@@ -490,6 +675,8 @@ async function extract(module25Path, module29Path, stageEventsPath, audioManifes
   const globalReachabilityAudit = auditGlobalDialogueReachability(module29, corpus, dialogues);
   assert.equal(renderManifest.renderedImages, 97);
   assert.equal(renderManifest.contactSheets.length, 4);
+  const dialoguePortraitFrame = dialoguePortraitFrameContract(renderManifest);
+  const dialogueTextWindow = dialogueTextWindowContract(renderManifest);
   const paletteBytes = dataSlice(module25, 0x0de6, 0x0e16);
   const selectedMagic = stageEvents.module25CampaignStory.stageMagicRecords.entries.filter((entry) => entry.selected);
   const musicRecords = [...new Set(selectedMagic.map((entry) => entry.magicRecord))].sort((a, b) => a - b);
@@ -506,6 +693,8 @@ async function extract(module25Path, module29Path, stageEventsPath, audioManifes
       dialogueDirectory, renderManifest: { path: path.join(renderRoot, "manifest.json"), bytes: renderBuffer.length, sha256: sha256(renderBuffer) },
     },
     verifiedCodeSignatures: signatures.code, verifiedDataSignatures: signatures.data,
+    dialoguePortraitFrame,
+    dialogueTextWindow,
     commandDispatch: {
       module25: { interpreter: "0000:0736", dispatcher: "0000:07C7", recognizedFormalCommands: 15 },
       module29: { interpreter: "0000:BE14", dispatcher: "0000:BEC3", recognizedFormalCommands: 16 },
@@ -531,8 +720,8 @@ async function extract(module25Path, module29Path, stageEventsPath, audioManifes
       palette: { address: "DS:0DE6", raw: [...paletteBytes], colors: dacPalette(paletteBytes), sha256: sha256(paletteBytes) },
       text: { initialOrigin: [172, 210], asciiAdvance: 8, big5Advance: 16, lineAdvance: 20, normalGlyphWaitNativeTicks: 8, skips: ["CR", "LF"] },
       windows: {
-        upper: { textOrigin: [165, 14], firstOpenAnimationSteps: 11, closeAnimationSteps: 12, frameBoundsX: [313, 337, 345, 361] },
-        lower: { textOrigin: [109, 272], firstOpenAnimationSteps: 11, closeAnimationSteps: 12, frameBoundsX: [257, 281, 289, 305] },
+        upper: { frameAnchor: [153, 2], frameSize: [400, 86], textOrigin: [165, 14], firstOpenAnimationSteps: 11, closeAnimationSteps: 12 },
+        lower: { frameAnchor: [97, 260], frameSize: [400, 86], textOrigin: [109, 272], firstOpenAnimationSteps: 11, closeAnimationSteps: 12 },
       },
       portraits: { upperAnchor: [8, 18], lowerAnchor: [512, 210], resource: "D/<id>" },
       background: { resource: "BK/<id>", drawAt: [160, 80], dimensions: [320, 200] },
@@ -554,8 +743,8 @@ async function extract(module25Path, module29Path, stageEventsPath, audioManifes
         },
       },
       windows: {
-        upper: { textOrigin: [165, 22], firstOpenAnimationSteps: 11, closeAnimationSteps: 12, frameBoundsX: [313, 337, 345, 361] },
-        lower: { textOrigin: [109, 262], firstOpenAnimationSteps: 11, closeAnimationSteps: 12, frameBoundsX: [257, 281, 289, 305] },
+        upper: { frameAnchor: [153, 10], frameSize: [400, 86], textOrigin: [165, 22], firstOpenAnimationSteps: 11, closeAnimationSteps: 12 },
+        lower: { frameAnchor: [97, 250], frameSize: [400, 86], textOrigin: [109, 262], firstOpenAnimationSteps: 11, closeAnimationSteps: 12 },
       },
       portraits: { upperAnchor: [32, 26], lowerAnchor: [504, 200], resource: "D/<id>" },
       background: { resource: "BK/<id>", drawAt: [160, 80], dimensions: [320, 200] },

@@ -168,20 +168,36 @@ interface DebugState {
 const debugState = (page: Page) => page.evaluate(() => window.__ANGEL2__?.getState() as DebugState);
 const waitForPhase = (page: Page, phase: string) => page.waitForFunction((expected) => window.__ANGEL2__?.getState().phase === expected, phase);
 const clickCanvas = (page: Page, x: number, y: number) => page.getByTestId("battle-canvas").click({ position: { x, y } });
-const expectDialoguePortraitAttached = async (page: Page, slot: "upper" | "lower") => {
-  const [copyBounds, portraitBounds] = await Promise.all([
-    page.locator(`#dialogue-copy-${slot}`).boundingBox(),
-    page.locator(`#dialogue-portrait-${slot}`).boundingBox(),
+const expectNativeDialogueGeometry = async (page: Page, slot: "upper" | "lower") => {
+  const placement = (selector: string) => page.locator(selector).evaluate((element) => {
+    const node = element as HTMLElement;
+    const parent = node.offsetParent as HTMLElement | null;
+    return {
+      x: node.offsetLeft + (parent?.offsetLeft ?? 0),
+      y: node.offsetTop + (parent?.offsetTop ?? 0),
+      width: node.offsetWidth,
+      height: node.offsetHeight,
+    };
+  });
+  const prebattle = await page.getByTestId("dialogue-layer").evaluate((layer) =>
+    layer.classList.contains("prebattle"));
+  const [copy, portrait] = await Promise.all([
+    placement(`#dialogue-copy-${slot}`),
+    placement(`#dialogue-portrait-${slot}`),
   ]);
-  expect(copyBounds).not.toBeNull();
-  expect(portraitBounds).not.toBeNull();
+  const expected = prebattle
+    ? slot === "upper"
+      ? { copy: { x: 153, y: 2 }, portrait: { x: 8, y: 18 } }
+      : { copy: { x: 97, y: 260 }, portrait: { x: 512, y: 210 } }
+    : slot === "upper"
+      ? { copy: { x: 153, y: 10 }, portrait: { x: 32, y: 26 } }
+      : { copy: { x: 97, y: 250 }, portrait: { x: 504, y: 200 } };
+  expect(copy).toEqual({ ...expected.copy, width: 400, height: 86 });
+  expect(portrait).toEqual({ ...expected.portrait, width: 112, height: 112 });
   if (slot === "upper") {
-    expect(portraitBounds!.y).toBeCloseTo(copyBounds!.y, 4);
-    expect(portraitBounds!.x + portraitBounds!.width).toBeCloseTo(copyBounds!.x, 4);
+    expect(copy.x - (portrait.x + 115)).toBe(prebattle ? 30 : 6);
   } else {
-    expect(portraitBounds!.y + portraitBounds!.height)
-      .toBeCloseTo(copyBounds!.y + copyBounds!.height, 4);
-    expect(copyBounds!.x + copyBounds!.width).toBeCloseTo(portraitBounds!.x, 4);
+    expect(portrait.x - (copy.x + copy.width)).toBe(prebattle ? 15 : 7);
   }
 };
 const finishGroupCommandDialogue = async (page: Page) => {
@@ -372,10 +388,48 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     .toBeLessThanOrEqual(upperCopyBounds!.x + upperCopyBounds!.width);
   expect(upperSkipBounds!.y + upperSkipBounds!.height)
     .toBeLessThanOrEqual(upperCopyBounds!.y + upperCopyBounds!.height);
-  await expectDialoguePortraitAttached(page, "upper");
+  await expectNativeDialogueGeometry(page, "upper");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-skip-upper.png" });
   const dialoguePortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(dialoguePortrait).toBeVisible();
+  const dialoguePortraitName = page.getByTestId("dialogue-portrait-name");
+  await expect(dialoguePortraitName).toBeVisible();
+  expect(await dialoguePortraitName.textContent()).toBe("妮  雅");
+  const [portraitBounds, portraitNameBounds] = await Promise.all([
+    dialoguePortrait.boundingBox(),
+    dialoguePortraitName.boundingBox(),
+  ]);
+  expect(portraitBounds).not.toBeNull();
+  expect(portraitNameBounds).not.toBeNull();
+  expect(portraitNameBounds!.x).toBeCloseTo(portraitBounds!.x, 4);
+  expect(portraitNameBounds!.width).toBeCloseTo(portraitBounds!.width, 4);
+  expect(portraitNameBounds!.x + portraitNameBounds!.width / 2)
+    .toBeCloseTo(portraitBounds!.x + portraitBounds!.width / 2, 4);
+  expect(portraitNameBounds!.y).toBeCloseTo(portraitBounds!.y + 111, 4);
+  const frameBackgrounds = await dialoguePortrait.evaluate((portrait) => ({
+    horizontal: getComputedStyle(portrait, "::before").backgroundImage,
+    sides: getComputedStyle(portrait, "::after").backgroundImage,
+  }));
+  expect(frameBackgrounds.horizontal).toContain("/assets/original/dialogue/portrait-top.png");
+  expect(frameBackgrounds.horizontal).toContain("/assets/original/dialogue/portrait-nameplate.png");
+  expect(frameBackgrounds.sides).toContain("/assets/original/dialogue/portrait-side.png");
+  await expect(page.locator("#dialogue-copy-upper")).toHaveCSS(
+    "background-image",
+    /\/assets\/original\/dialogue\/text-window\.png/u,
+  );
+  const dialogueFrameSizes = await page.evaluate(async (sources) => Promise.all(sources.map((source) =>
+    new Promise<[number, number]>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve([image.naturalWidth, image.naturalHeight]);
+      image.onerror = () => reject(new Error(`failed to load ${source}`));
+      image.src = source;
+    }))), [
+    "/assets/original/dialogue/portrait-top.png",
+    "/assets/original/dialogue/portrait-nameplate.png",
+    "/assets/original/dialogue/portrait-side.png",
+    "/assets/original/dialogue/text-window.png",
+  ]);
+  expect(dialogueFrameSizes).toEqual([[112, 17], [112, 23], [8, 8], [400, 86]]);
   await expect(dialoguePortrait.locator(".portrait-eye")).toHaveCount(3);
   await expect(dialoguePortrait.locator(".portrait-mouth")).toHaveCount(3);
   await expect.poll(() => dialoguePortrait.locator(".portrait-mouth").evaluateAll((images) =>
@@ -755,7 +809,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     "data-portrait-record",
     "46",
   );
-  await expectDialoguePortraitAttached(page, "upper");
+  await expectNativeDialogueGeometry(page, "upper");
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-nia-promotion-dialogue.png",
   });
@@ -2590,8 +2644,8 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("怎麼會傷成這樣");
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("不好了");
   await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute("data-portrait-record", "47");
-  await expectDialoguePortraitAttached(page, "upper");
-  await expectDialoguePortraitAttached(page, "lower");
+  await expectNativeDialogueGeometry(page, "upper");
+  await expectNativeDialogueGeometry(page, "lower");
 
   await page.getByTestId("advance-dialogue").click();
   await page.getByTestId("advance-dialogue").click();
@@ -2753,6 +2807,8 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   expect((await debugState(page)).phase).toBe("defeat");
   await expect(page.getByTestId("feedback-text")).toHaveText("啊！．．．竟然失敗了？\n我太低辜敵人的實力，再給我一次機會吧！");
   await expect(page.getByTestId("feedback-portrait")).toHaveAttribute("data-portrait-record", "46");
+  expect(await page.getByTestId("native-feedback")
+    .getByTestId("feedback-portrait-name").textContent()).toBe("妮  雅");
   await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-defeat-feedback.png" });
 
   await enterPlayerPhase();
@@ -2815,7 +2871,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
     "data-portrait-record",
     "45",
   );
-  await expectDialoguePortraitAttached(page, "lower");
+  await expectNativeDialogueGeometry(page, "lower");
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-ximi-promotion-request.png",
   });
@@ -2830,8 +2886,8 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
     "data-portrait-record",
     "46",
   );
-  await expectDialoguePortraitAttached(page, "upper");
-  await expectDialoguePortraitAttached(page, "lower");
+  await expectNativeDialogueGeometry(page, "upper");
+  await expectNativeDialogueGeometry(page, "lower");
   await page.getByTestId("game-screen").screenshot({
     path: "artifacts/playwright/stage0-ximi-promotion-grant.png",
   });

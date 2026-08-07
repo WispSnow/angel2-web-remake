@@ -364,7 +364,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .unit-detail { position: absolute; z-index: 1; inset: 0; width: 152px; height: 315px; }
 .unit-detail-shade { position: absolute; z-index: 0; left: -4px; top: -4px; width: 160px; height: 321px; border: 4px ridge #d7aa2d; background: linear-gradient(#654431 0 146px, rgba(3, 2, 3, .72) 146px); }
 .hud-portrait { position: absolute; z-index: 1; left: 4px; top: 4px; width: 112px; height: 112px; }
-.hud-portrait::after, .dialogue-portrait::after {
+.hud-portrait::after {
   content: "";
   position: absolute;
   z-index: 2;
@@ -893,39 +893,107 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   position: absolute;
   left: 0;
   width: 640px;
-  height: 120px;
+  height: 147px;
   color: #fff;
   pointer-events: none;
   animation: dialogue-window-open 110ms steps(11);
 }
-.dialogue-box.upper { top: 20px; }
-.dialogue-box.lower { top: 194px; }
-.dialogue-layer.promotion-dialogue .dialogue-box.lower { top: 206px; }
-.dialogue-layer.promotion-dialogue .dialogue-box.lower .dialogue-copy { left: 125px; }
-.dialogue-layer.prebattle .dialogue-box.upper { top: 12px; }
-.dialogue-layer.prebattle .dialogue-box.lower { top: 204px; }
-.dialogue-portrait { position: absolute; width: 112px; height: 112px; }
-.dialogue-box.upper .dialogue-portrait { left: 32px; top: 0; }
-.dialogue-box.lower .dialogue-portrait { left: 504px; top: 29px; }
-.dialogue-layer.prebattle .dialogue-box.upper .dialogue-portrait { left: 8px; }
-.dialogue-layer.prebattle .dialogue-box.lower .dialogue-portrait { left: 512px; }
-.dialogue-portrait::after { border-width: 2px; border-color: #d7aa32; }
+.dialogue-box.upper {
+  --dialogue-portrait-left: 32px;
+  --dialogue-portrait-top: 16px;
+  --dialogue-window-left: 153px;
+  --dialogue-window-top: 0px;
+  top: 10px;
+}
+.dialogue-box.lower {
+  --dialogue-portrait-left: 504px;
+  --dialogue-portrait-top: 0px;
+  --dialogue-window-left: 97px;
+  --dialogue-window-top: 50px;
+  top: 200px;
+}
+.dialogue-layer.prebattle .dialogue-box.upper { top: 2px; }
+.dialogue-layer.prebattle .dialogue-box.lower { top: 210px; }
+.dialogue-layer.prebattle .dialogue-box.upper { --dialogue-portrait-left: 8px; }
+.dialogue-layer.prebattle .dialogue-box.lower { --dialogue-portrait-left: 512px; }
+.dialogue-portrait {
+  position: absolute;
+  left: var(--dialogue-portrait-left);
+  top: var(--dialogue-portrait-top);
+  width: 112px;
+  height: 112px;
+  overflow: visible;
+}
+/* Native A/18 frames 0..2: top at y-15, nameplate at y+108, and the
+   8x8 masked side motif repeated 15 times at x and x+107. */
+.dialogue-portrait::before,
+.feedback-portrait::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  top: -15px;
+  width: 112px;
+  height: 146px;
+  border: 0;
+  background-image:
+    var(--dialogue-portrait-frame-top),
+    var(--dialogue-portrait-frame-nameplate);
+  background-position: 0 0, 0 123px;
+  background-size: 112px 17px, 112px 23px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.dialogue-portrait::after,
+.feedback-portrait::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  width: 115px;
+  height: 120px;
+  border: 0;
+  background-image:
+    var(--dialogue-portrait-frame-side),
+    var(--dialogue-portrait-frame-side);
+  background-position: 0 0, 107px 0;
+  background-size: 8px 8px;
+  background-repeat: repeat-y;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.dialogue-portrait-name,
+.feedback-portrait-name {
+  position: absolute;
+  z-index: 4;
+  width: 112px;
+  height: 16px;
+  overflow: hidden;
+  color: #fff;
+  font: 700 16px/16px "PMingLiU", "Noto Serif TC", serif;
+  text-align: center;
+  text-shadow: 1px 1px #000;
+  white-space: pre;
+  pointer-events: none;
+}
+.dialogue-portrait-name {
+  left: var(--dialogue-portrait-left);
+  top: calc(var(--dialogue-portrait-top) + 111px);
+}
 .dialogue-copy {
   position: absolute;
-  height: 84px;
-  padding: 2px 12px 5px 15px;
-  border: 5px ridge #e9bf3a;
-  background:
-    repeating-linear-gradient(0deg, #231316f2 0 2px, #1a0c10f2 2px 4px);
-  box-shadow: inset 0 0 0 2px #6e2932, 3px 3px #0008;
+  left: var(--dialogue-window-left);
+  top: var(--dialogue-window-top);
+  width: 400px;
+  height: 86px;
+  padding: 12px;
+  border: 0;
+  background: transparent var(--dialogue-text-window) 0 0 / 400px 86px no-repeat;
+  box-shadow: none;
+  image-rendering: pixelated;
 }
-/* Keep each 112px portrait on its native horizontal anchor, then extend the
-   adjoining copy panel to that exact edge. Upper portraits share the panel's
-   top edge; lower portraits share its bottom edge. */
-.dialogue-box.upper .dialogue-copy { left: 144px; right: 16px; top: 0; }
-.dialogue-box.lower .dialogue-copy { left: 89px; right: 136px; top: 57px; }
-.dialogue-layer.prebattle .dialogue-box.upper .dialogue-copy { left: 120px; }
-.dialogue-layer.prebattle .dialogue-box.lower .dialogue-copy { right: 128px; }
 .dialogue-speaker {
   position: absolute;
   width: 1px;
@@ -1096,12 +1164,18 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 
 .native-feedback { position: absolute; inset: 0; pointer-events: none; }
 /* A/18 outcome prompts reuse the complete ordinary upper-dialogue geometry. */
-.feedback-portrait { position: absolute; left: 32px; top: 20px; width: 112px; height: 112px; }
-.feedback-portrait::after { content: ""; position: absolute; z-index: 2; inset: 0; border: 2px ridge #d7aa32; pointer-events: none; }
+.feedback-portrait {
+  position: absolute;
+  left: 32px;
+  top: 26px;
+  width: 112px;
+  height: 112px;
+  overflow: visible;
+}
+.feedback-portrait-name { left: 32px; top: 137px; }
 .native-feedback-copy {
-  left: 144px;
-  right: 16px;
-  top: 20px;
+  --dialogue-window-left: 153px;
+  --dialogue-window-top: 10px;
   color: #fff;
 }
 .native-feedback-copy span { position: absolute; right: 5px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }

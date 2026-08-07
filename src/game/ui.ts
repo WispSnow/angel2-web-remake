@@ -1,5 +1,10 @@
 import { ASSETS, nextExperienceThresholdFor } from "./content/stage0";
-import { portraitSourceFor } from "./content/portrait-catalog.generated";
+import {
+  DIALOGUE_PORTRAIT_FRAME_ASSETS,
+  DIALOGUE_TEXT_WINDOW_ASSET,
+  PORTRAIT_CATALOG,
+  portraitSourceFor,
+} from "./content/portrait-catalog.generated";
 import { BATTLE_ACTION_DEFINITIONS } from "./content/actions";
 import {
   STAGE0_FULL_COMBAT_ASSETS,
@@ -41,6 +46,13 @@ import {
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
   ASSETS.allyPromotionTargets;
+const dialoguePortraitFrameStyle = [
+  `--dialogue-portrait-frame-top:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.top}')`,
+  `--dialogue-portrait-frame-nameplate:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate}')`,
+  `--dialogue-portrait-frame-side:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.side}')`,
+  `--dialogue-text-window:url('${DIALOGUE_TEXT_WINDOW_ASSET}')`,
+].join(";");
+const niaPortraitDisplayName = (PORTRAIT_CATALOG[46].displayName ?? "妮雅").trim();
 
 export interface CombatPresentationRenderSource {
   battlePresentation: "map" | "full";
@@ -59,7 +71,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       </header>
       <div class="game-stage">
         <div class="game-viewport" id="game-viewport">
-          <section class="logical-screen" id="logical-screen" data-testid="game-screen" aria-label="天使帝國 II ${stage.name}遊戲畫面">
+          <section class="logical-screen" id="logical-screen" data-testid="game-screen"
+            style="${dialoguePortraitFrameStyle}" aria-label="天使帝國 II ${stage.name}遊戲畫面">
             <div class="battle-chrome" data-testid="battle-chrome" aria-hidden="true">
               <img class="chrome-top" src="${ASSETS.battleChrome.top}" alt="" />
               <img class="chrome-corner-left" src="${ASSETS.battleChrome.cornerLeft}" alt="" />
@@ -129,6 +142,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 channel: "quit-feedback",
                 className: "feedback-portrait",
               })}
+              <b class="feedback-portrait-name" data-testid="feedback-portrait-name"
+                aria-hidden="true">${niaPortraitDisplayName}</b>
               <div class="dialogue-copy native-feedback-copy"><p data-testid="quit-feedback-text" data-full-text="唉啊！．．．要休息了嗎？&#10;請再考慮一下吧！">唉啊！．．．要休息了嗎？
 請再考慮一下吧！</p></div>
               <div class="button-row action-menu native-command-menu native-confirm-menu"
@@ -144,6 +159,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 channel: "retreat-feedback",
                 className: "feedback-portrait",
               })}
+              <b class="feedback-portrait-name" data-testid="feedback-portrait-name"
+                aria-hidden="true">${niaPortraitDisplayName}</b>
               <div class="dialogue-copy native-feedback-copy"><p data-testid="retreat-feedback-text" data-full-text="哦！．．．要撤退嗎？&#10;必竟是沒辦法的事，雙方的實力差太多了．">哦！．．．要撤退嗎？
 必竟是沒辦法的事，雙方的實力差太多了．</p></div>
               <div class="button-row action-menu native-command-menu native-confirm-menu"
@@ -162,6 +179,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               <div class="dialogue-box upper" id="dialogue-box-upper" data-testid="dialogue-window-upper" hidden>
                 <span class="animated-portrait dialogue-portrait" id="dialogue-portrait-upper"
                   data-portrait-channel="dialogue-upper" data-blink-frame="1" data-blink-count="0" hidden></span>
+                <b class="dialogue-portrait-name" id="dialogue-portrait-name-upper"
+                  aria-hidden="true" hidden></b>
                 <div class="dialogue-copy" id="dialogue-copy-upper">
                   <b class="dialogue-speaker" id="dialogue-speaker-upper"></b>
                   <p id="dialogue-text-upper"></p><span class="continue-mark">▼</span>
@@ -170,6 +189,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               <div class="dialogue-box lower" id="dialogue-box-lower" data-testid="dialogue-window-lower" hidden>
                 <span class="animated-portrait dialogue-portrait" id="dialogue-portrait-lower"
                   data-portrait-channel="dialogue-lower" data-blink-frame="1" data-blink-count="0" hidden></span>
+                <b class="dialogue-portrait-name" id="dialogue-portrait-name-lower"
+                  aria-hidden="true" hidden></b>
                 <div class="dialogue-copy" id="dialogue-copy-lower">
                   <b class="dialogue-speaker" id="dialogue-speaker-lower"></b>
                   <p id="dialogue-text-lower"></p><span class="continue-mark">▼</span>
@@ -210,6 +231,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       box: required(root, "#dialogue-box-upper"),
       copy: required(root, "#dialogue-copy-upper"),
       portrait: required(root, "#dialogue-portrait-upper"),
+      portraitName: required(root, "#dialogue-portrait-name-upper"),
       speaker: required(root, "#dialogue-speaker-upper"),
       text: required(root, "#dialogue-text-upper"),
     },
@@ -217,6 +239,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       box: required(root, "#dialogue-box-lower"),
       copy: required(root, "#dialogue-copy-lower"),
       portrait: required(root, "#dialogue-portrait-lower"),
+      portraitName: required(root, "#dialogue-portrait-name-lower"),
       speaker: required(root, "#dialogue-speaker-lower"),
       text: required(root, "#dialogue-text-lower"),
     },
@@ -925,8 +948,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         elements.box.dataset.openSteps = "11";
         elements.text.removeAttribute("id");
         elements.portrait.removeAttribute("data-testid");
+        elements.portraitName.removeAttribute("data-testid");
         if (!state) {
           stopSpeaking(elements.portrait);
+          elements.portraitName.hidden = true;
+          elements.portraitName.textContent = "";
           continue;
         }
         elements.speaker.textContent = state.speaker ?? "";
@@ -944,10 +970,18 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           elements.portrait.dataset.testid = active
             ? "dialogue-portrait-composite"
             : `dialogue-portrait-composite-${slot}`;
+          elements.portraitName.textContent =
+            (PORTRAIT_CATALOG[state.portrait].displayName ?? state.speaker ?? "").trim();
+          elements.portraitName.hidden = false;
+          elements.portraitName.dataset.testid = active
+            ? "dialogue-portrait-name"
+            : `dialogue-portrait-name-${slot}`;
           if (!active) stopSpeaking(elements.portrait);
         } else {
           stopSpeaking(elements.portrait);
           elements.portrait.hidden = true;
+          elements.portraitName.hidden = true;
+          elements.portraitName.textContent = "";
         }
       }
       const controlsParent = page.activeSlot
@@ -1603,6 +1637,8 @@ function nativeFeedbackMarkup(text: string, action?: string, testId?: string): s
       className: "feedback-portrait",
       wrapperTestId: "feedback-portrait",
     })}
+    <b class="feedback-portrait-name" data-testid="feedback-portrait-name"
+      aria-hidden="true">${niaPortraitDisplayName}</b>
     <div class="dialogue-copy native-feedback-copy"><p data-testid="feedback-text" data-full-text="${escapedText}"></p><span>▼</span></div>
     ${action ? `<button class="feedback-primary" data-action="${action}" ${testId ? `data-testid="${testId}"` : ""} aria-label="繼續"></button>` : ""}
   </div>`;

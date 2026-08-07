@@ -164,7 +164,7 @@ pnpm test:coverage # 单元测试与核心覆盖率门槛
 pnpm build         # TypeScript 与生产构建
 pnpm test:e2e      # 固定版本 Chromium 端到端验收
 pnpm check         # 顺序执行以上全部检查
-pnpm content:portraits # 从 D.SWF 渲染与原版元数据重建全角色肖像目录
+pnpm content:portraits # 从 D.SWF、原版元数据与 A/18 纹理重建肖像、头像框和文字窗
 pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉淡化参数
 pnpm content:stage2 # 从第 2 关机器证据重建地图、固定阵容、剧情与音乐内容
 pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧情与音乐内容

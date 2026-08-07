@@ -297,14 +297,22 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("謝謝妳！葛蒂拉斯");
   const regularNiaPortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(regularNiaPortrait).toHaveAttribute("data-portrait-record", "46");
+  await page.waitForTimeout(130);
   const regularNiaBounds = await boundsInLogicalScreen(page, regularNiaPortrait);
   const regularUpperCopyBounds = await boundsInLogicalScreen(
     page,
     page.getByTestId("dialogue-window-upper").locator(".dialogue-copy"),
   );
+  const regularNiaNativeAnchor = await regularNiaPortrait.evaluate((portrait) => ({
+    x: (portrait as HTMLElement).offsetLeft
+      + ((portrait.parentElement as HTMLElement | null)?.offsetLeft ?? 0),
+    y: (portrait as HTMLElement).offsetTop
+      + ((portrait.parentElement as HTMLElement | null)?.offsetTop ?? 0),
+  }));
+  expect(regularNiaNativeAnchor).toEqual({ x: 32, y: 26 });
   expect(regularNiaBounds).toMatchObject({ x: 32, width: 112, height: 112 });
-  expect(regularUpperCopyBounds).toMatchObject({ x: 144, width: 480, height: 84 });
-  await page.waitForTimeout(130);
+  expect(regularUpperCopyBounds).toEqual({ x: 153, y: 10, width: 400, height: 86 });
+  expect(regularUpperCopyBounds.x - (regularNiaBounds.x + 115)).toBe(6);
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage4-victory-story-nia-upper.png`,
   });
@@ -335,9 +343,9 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
       page.getByTestId("native-feedback").locator(".native-feedback-copy"),
     ),
   ]);
-  expect(savePromptCopyBounds).toMatchObject({ width: 480, height: 84 });
-  expect(savePromptCopyBounds.x).toBe(savePromptPortraitBounds.x + savePromptPortraitBounds.width);
-  expect(savePromptCopyBounds.y).toBe(savePromptPortraitBounds.y);
+  expect(savePromptCopyBounds).toEqual({ x: 153, y: 10, width: 400, height: 86 });
+  expect(savePromptPortraitBounds).toEqual({ x: 32, y: 26, width: 112, height: 112 });
+  expect(savePromptCopyBounds.x - (savePromptPortraitBounds.x + 115)).toBe(6);
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage4-save-prompt-portrait-alignment.png`,
   });
