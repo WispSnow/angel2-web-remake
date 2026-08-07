@@ -60,6 +60,7 @@ import type {
 } from "./simulation/actions/construction";
 import { routePulsePresentationTimeline } from "./route-pulse-presentation";
 import { buildStompPresentationSteps } from "./stomp-presentation";
+import { techniqueEffectRange } from "./simulation/actions/range-map";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
 import {
@@ -488,6 +489,33 @@ export class GameController {
     }
     const unit = this.focusedUnit;
     return unit ? this.battle.routePulseSafeAreaForUnit(unit.id) : [];
+  }
+
+  /**
+   * The modern remake shows the selected target's area footprint while the
+   * player is still choosing a recovery or lightning target. This is derived
+   * presentation state only; the prepared action remains the simulation truth.
+   */
+  get effectPreviewCells(): Position[] {
+    if (this.actionMode !== "specialTarget" || !this.selectedActionId) return [];
+    if (!this.targets.some((target) => positionKey(target) === positionKey(this.cursor))) return [];
+    const definition = BATTLE_ACTION_DEFINITIONS[this.selectedActionId];
+    if (
+      this.selectedActionId !== "lightning-1"
+      && this.selectedActionId !== "lightning-2"
+      && this.selectedActionId !== "lightning-3"
+      && this.selectedActionId !== "lightning-4"
+      && this.selectedActionId !== "recovery-1"
+      && this.selectedActionId !== "recovery-2"
+      && this.selectedActionId !== "recovery-3"
+    ) return [];
+    if (!("effectRadius" in definition.range)) return [];
+    return techniqueEffectRange(
+      this.cursor,
+      this.battle.stage.width,
+      this.battle.stage.height,
+      definition.range.effectRadius,
+    ).cells();
   }
 
   get currentStageProgressMetadata() {
@@ -4197,6 +4225,7 @@ export class GameController {
       reachable: this.reachable.map((cell) => ({ ...cell })),
       targets: this.targets.map((cell) => ({ ...cell })),
       actionRange: this.actionRange.map((cell) => ({ ...cell })),
+      effectPreviewCells: this.effectPreviewCells.map((cell) => ({ ...cell })),
       ...this.battle.snapshot(),
     };
   }

@@ -173,6 +173,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
   return class BattleScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
     private rangeGraphics!: Phaser.GameObjects.Graphics;
+    private effectPreviewGraphics!: Phaser.GameObjects.Graphics;
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
     private combatEffects: Phaser.GameObjects.GameObject[] = [];
@@ -328,6 +329,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       ).setOrigin(0).setDepth(0);
       this.gridGraphics = this.add.graphics().setDepth(1);
       this.rangeGraphics = this.add.graphics().setDepth(2);
+      this.effectPreviewGraphics = this.add.graphics().setDepth(3);
       this.cursorGraphics = this.add.graphics().setDepth(10);
       if (!this.textures.exists("native-range-dither")) {
         const texture = this.textures.createCanvas("native-range-dither", 8, 2);
@@ -591,6 +593,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private drawRanges(): void {
       this.rangeGraphics.clear();
+      this.effectPreviewGraphics.clear();
       for (const tile of this.rangeMaskTiles) tile.destroy();
       this.rangeMaskTiles = [];
 
@@ -666,9 +669,42 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           );
         }
       }
+      const effectPreviewCells = controller.effectPreviewCells;
+      const visibleEffectPreviewCells = effectPreviewCells.filter(({ x, y }) =>
+        x >= controller.cameraOrigin.x
+        && x < controller.cameraOrigin.x + 10
+        && y >= controller.cameraOrigin.y
+        && y < controller.cameraOrigin.y + 7,
+      );
+      if (visibleEffectPreviewCells.length > 0) {
+        this.effectPreviewGraphics.fillStyle(0xf1b94a, 0.14);
+        this.effectPreviewGraphics.lineStyle(1, 0xffdf85, 0.95);
+        for (const cell of visibleEffectPreviewCells) {
+          this.effectPreviewGraphics.fillRect(
+            cell.x * TILE_WIDTH + 2,
+            cell.y * TILE_HEIGHT + 2,
+            TILE_WIDTH - 4,
+            TILE_HEIGHT - 4,
+          );
+          this.effectPreviewGraphics.strokeRect(
+            cell.x * TILE_WIDTH + 2,
+            cell.y * TILE_HEIGHT + 2,
+            TILE_WIDTH - 4,
+            TILE_HEIGHT - 4,
+          );
+        }
+      }
       if (controller.isTestMode) {
         this.game.canvas.dataset.nativeDitherCellCount = String(this.rangeMaskTiles.length);
         this.game.canvas.dataset.nativeDitherRetainedFraction = this.rangeMaskTiles.length > 0 ? "0.25" : "1";
+        this.game.canvas.dataset.effectPreviewActionId = controller.effectPreviewCells.length > 0
+          ? controller.selectedActionId ?? ""
+          : "";
+        this.game.canvas.dataset.effectPreviewCenter = controller.effectPreviewCells.length > 0
+          ? `${controller.cursor.x},${controller.cursor.y}`
+          : "";
+        this.game.canvas.dataset.effectPreviewCellCount = String(controller.effectPreviewCells.length);
+        this.game.canvas.dataset.effectPreviewVisibleCellCount = String(visibleEffectPreviewCells.length);
         this.game.canvas.dataset.routePulseSafeCellCount = String(routePulseSafeArea.length);
         this.game.canvas.dataset.routePulseDangerUnitIds = routePulseSafeArea.length > 0
           ? controller.battle.units

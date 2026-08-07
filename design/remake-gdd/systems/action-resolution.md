@@ -17,6 +17,7 @@
 - `[OF]` 原版把普通攻击、射击和技术分为独立入口；成功提交后才设置行动位，取消恢复移动前位置且不消耗行动。证据见 [`shooting-and-technique-system.md`](../../../reverse/notes/shooting-and-technique-system.md)。
 - `[OF]` 同一 `50×50` 数值范围图同时控制范围明暗和主操作合法性；表现层不得另算近似范围。证据见 [`battle-range-and-target-presentations.md`](../../../reverse/notes/battle-range-and-target-presentations.md)。
 - `[OF]` 射击和五个主技术家族完成全部固定表现后才修改生命、状态、位置或治疗。
+- `[DD]` 预备选择回复或落雷目标时，Web 在当前合法目标下显示对应效果半径框；它是随光标变化的只读表现，不替代选择范围，也不参与目标验证或结算。
 - `[SR]` 所有玩法随机来自版本化、可序列化的模拟 PRNG；表现不得消费模拟随机。
 - `[DD]` Web 使用“预览 → 准备 → 表现 → 原子提交”边界。准备阶段用 PRNG 副本产生不可变结果和后继 PRNG 状态，不修改战场；提交时一次应用补丁和 PRNG。
 - `[DD]` 表现资源缺失或播放失败时显示可见降级反馈并继续提交既定结果，不能卡住回合。

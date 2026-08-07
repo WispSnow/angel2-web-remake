@@ -8,6 +8,7 @@ interface ClassShowdownBattleState {
   actionMode: string;
   actionRange: Array<{ x: number; y: number }>;
   targets: Array<{ x: number; y: number }>;
+  effectPreviewCells: Array<{ x: number; y: number }>;
   lastCombat?: { attackerId: string; defenderId: string; defenderDied: boolean };
   combatPresentation?: { phase: string };
   specialActionPresentation?: { phase: string };
@@ -39,6 +40,28 @@ async function clickClassShowdownWorldCell(
   const logicalX = 40 + (x - battle.cameraOrigin.x + .5) * 40;
   const logicalY = 23 + (y - battle.cameraOrigin.y + .5) * 44;
   await canvas.click({
+    position: {
+      x: logicalX * box.width / dimensions.width,
+      y: logicalY * box.height / dimensions.height,
+    },
+  });
+}
+
+async function hoverClassShowdownWorldCell(
+  page: import("@playwright/test").Page,
+  x: number,
+  y: number,
+): Promise<void> {
+  const canvas = page.getByTestId("battle-canvas");
+  const [battle, box, dimensions] = await Promise.all([
+    classShowdownBattleState(page),
+    canvas.boundingBox(),
+    canvas.evaluate((element) => ({ width: element.width, height: element.height })),
+  ]);
+  if (!battle || !box) throw new Error("class showdown battle canvas is not ready");
+  const logicalX = 40 + (x - battle.cameraOrigin.x + .5) * 40;
+  const logicalY = 23 + (y - battle.cameraOrigin.y + .5) * 44;
+  await canvas.hover({
     position: {
       x: logicalX * box.width / dimensions.width,
       y: logicalY * box.height / dimensions.height,
@@ -223,7 +246,7 @@ test("unnamed class units use their native branch portrait in the battle HUD", a
   expect(pageErrors).toEqual([]);
 });
 
-test("area techniques use the native selection dither without an effect-radius box", async ({ page }) => {
+test("area techniques add a read-only effect-radius overlay to native selection dither", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/class-showdown.html?test=1");
@@ -248,6 +271,30 @@ test("area techniques use the native selection dither without an effect-radius b
     "data-native-dither-cell-count",
     /[1-9]/,
   );
+  expect(lightning?.effectPreviewCells).toHaveLength(0);
+
+  await hoverClassShowdownWorldCell(page, 18, 18);
+  const lightningPreview = await classShowdownBattleState(page);
+  expect(lightningPreview?.effectPreviewCells).toHaveLength(13);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-effect-preview-action-id",
+    "lightning-1",
+  );
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-effect-preview-center",
+    "18,18",
+  );
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-effect-preview-cell-count",
+    "13",
+  );
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-effect-preview-visible-cell-count",
+    /[1-9]/,
+  );
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/class-showdown-lightning-effect-range.png`,
+  });
 
   // Cancel returns to the technique menu; recovery uses the same target-range
   // projection and must not replace it with its effect radius.
@@ -259,6 +306,22 @@ test("area techniques use the native selection dither without an effect-radius b
   expect(recovery).toMatchObject({ actionMode: "specialTarget" });
   expect(recovery?.actionRange.length).toBe(lightning?.actionRange.length);
   expect(recovery?.targets.length).toBeGreaterThan(0);
+  expect(recovery?.effectPreviewCells).toHaveLength(0);
+  await hoverClassShowdownWorldCell(page, 17, 18);
+  const recoveryPreview = await classShowdownBattleState(page);
+  expect(recoveryPreview?.effectPreviewCells).toHaveLength(13);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-effect-preview-action-id",
+    "recovery-1",
+  );
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-effect-preview-center",
+    "17,18",
+  );
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-effect-preview-cell-count",
+    "13",
+  );
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
     "data-native-dither-retained-fraction",
     "0.25",
@@ -267,5 +330,8 @@ test("area techniques use the native selection dither without an effect-radius b
     "data-native-dither-cell-count",
     /[1-9]/,
   );
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/class-showdown-recovery-effect-range.png`,
+  });
   expect(pageErrors).toEqual([]);
 });
