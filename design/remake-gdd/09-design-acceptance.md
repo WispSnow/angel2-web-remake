@@ -254,7 +254,8 @@
   自中心执行、组 12 对话、18 draw／180 tick／三次 `UN/50`、正式竞技场与截图门禁，见
   [`technique-2c-intermediate-ice.md`](systems/technique-2c-intermediate-ice.md)；
 - [x] `2D/男踏` 已完成第二层限定菜单、选择距离 5、目标三步与当前视窗并集、逐单位
-  `15..29`、固定经验、双方 AI、组 13 对话、原版 `MAGIC/51/52`、x=368、共同震地时间线、
+  `15..29`、固定经验、双方 AI、组 13 对话、原版 `MAGIC/51/52`、相对 `(240,390)` 的共同
+  冲击几何与目标脚底映射、共同震地时间线、
   正式竞技场与截图门禁，见 [`technique-2d-male-stomp.md`](systems/technique-2d-male-stomp.md)；
 - [x] `2F/中級炎暴` 已完成邪法師第一层／魔祭師第三层菜单、统一距离 6、26%／156 上限、
   `REMAKE-005` 的防魔挡伤后消耗、经验 10/11、双方 AI、组 10 对话、原版 `MAGIC/23` 21 张素材的
@@ -284,7 +285,8 @@
   [`technique-3c-advanced-ice.md`](systems/technique-3c-advanced-ice.md)；
 - [x] `3D/女踏` 已完成巨龍騎士第三层菜单、距离 5、目标三步与当前视窗并集、
   逐单位 `20..39`、冰封接收者零伤害／零随机、固定经验 5、双方 AI 与组 13 对话；
-  正式表现按目标阵营分别使用独立 `MAGIC/53/54`、x=368、33 draw、12 次翻页保持、
+  正式表现按目标阵营分别使用独立 `MAGIC/53/54`，保留原版 x=160、影子 y=368 相对
+  `(240,390)` 的几何并把冲击点映射到目标脚底，完成 33 draw、12 次翻页保持、
   13 tick 与四次 `MAGIC/82`，并通过竞技场、technique-lab、完整自动与截图门禁，见
   [`technique-3d-female-stomp.md`](systems/technique-3d-female-stomp.md)；
 - [x] `3F/高級炎暴` 已完成邪法師第二层菜单、统一距离 7、32%／192 上限、

@@ -360,17 +360,23 @@ export function startTechniqueLabPhaser(
         const resource = targetSide === 1
           ? stomp.action.graphicByTargetSide.side1
           : stomp.action.graphicByTargetSide.side2;
+        const targetGroundX = center.x * TILE_WIDTH + TILE_WIDTH / 2;
+        const targetGroundY = center.y * TILE_HEIGHT + TILE_HEIGHT;
+        const { targetImpactAnchor } = stomp.presentation;
+        const drawX = targetGroundX
+          + stomp.action.drawXCoordinate
+          - targetImpactAnchor.x;
         this.effectObjects.push(
           this.add.image(
-            stomp.action.horizontalDrawCoordinate,
-            frame.step.y,
+            drawX,
+            targetGroundY + frame.step.y - targetImpactAnchor.y,
             mapTechniqueTextureKey(resource, 0),
-          ).setOrigin(0).setScrollFactor(0).setDepth(8),
+          ).setOrigin(0).setDepth(8),
           this.add.image(
-            stomp.action.horizontalDrawCoordinate,
-            175,
+            drawX,
+            targetGroundY + stomp.action.shadowDrawYCoordinate - targetImpactAnchor.y,
             mapTechniqueTextureKey(resource, 1),
-          ).setOrigin(0).setScrollFactor(0).setDepth(8),
+          ).setOrigin(0).setDepth(8),
         );
       } else if (frame.kind === "construction") {
         if (frame.completed) {
@@ -544,6 +550,27 @@ export function startTechniqueLabPhaser(
         ? String(frame.rolledAmount ?? "")
         : "";
       canvas.dataset.prayerUnitId = frame.kind === "prayer" ? frame.unitId : "";
+      canvas.dataset.stompX = frame.kind === "stomp"
+        ? String(TECHNIQUE_LAB_STOMPS[
+          session.state.actionCode as keyof typeof TECHNIQUE_LAB_STOMPS
+        ].action.drawXCoordinate)
+        : "";
+      canvas.dataset.stompShadowY = frame.kind === "stomp"
+        ? String(TECHNIQUE_LAB_STOMPS[
+          session.state.actionCode as keyof typeof TECHNIQUE_LAB_STOMPS
+        ].action.shadowDrawYCoordinate)
+        : "";
+      const stompCenter = frame.kind === "stomp" ? session.effectCenter() : undefined;
+      const stompTargetScreenX = stompCenter
+        ? stompCenter.x * TILE_WIDTH + TILE_WIDTH / 2 - this.cameras.main.scrollX
+        : undefined;
+      const stompTargetScreenY = stompCenter
+        ? stompCenter.y * TILE_HEIGHT + TILE_HEIGHT - this.cameras.main.scrollY
+        : undefined;
+      canvas.dataset.stompTargetScreenX = String(stompTargetScreenX ?? "");
+      canvas.dataset.stompTargetScreenY = String(stompTargetScreenY ?? "");
+      canvas.dataset.stompImpactScreenX = String(stompTargetScreenX ?? "");
+      canvas.dataset.stompImpactScreenY = String(stompTargetScreenY ?? "");
       canvas.dataset.stompY = frame.kind === "stomp" ? String(frame.step.y) : "";
       canvas.dataset.stompGraphicDraw = frame.kind === "stomp"
         ? String(frame.step.graphicDrawIndex ?? "")

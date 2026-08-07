@@ -281,6 +281,12 @@ test("tier-one great dragon knight performs native 1D stomp in the integrated ar
     )?.dataset;
     return dataset?.mapCombatStompPhase === "quake"
       && dataset.mapCombatStompExplicitTicks === "0"
+      && dataset.mapCombatStompX === "160"
+      && dataset.mapCombatStompShadowY === "338"
+      && dataset.mapCombatStompTargetScreenX !== undefined
+      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
+      && dataset.mapCombatStompTargetScreenY !== undefined
+      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY
       && dataset.mapCombatEffectTileCount === "2";
   }, undefined, { polling: "raf" });
   await page.getByTestId("game-screen").screenshot({
@@ -320,7 +326,7 @@ test("tier-one great dragon knight performs native 1D stomp in the integrated ar
   expect(pageErrors).toEqual([]);
 });
 
-test("tier-two great dragon knight performs 2D with male graphics at the native x coordinate", async ({ page }) => {
+test("tier-two great dragon knight lands native 2D male graphics on the selected target", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -358,8 +364,13 @@ test("tier-two great dragon knight performs 2D with male graphics at the native 
     )?.dataset;
     return dataset?.mapCombatStompPhase === "quake"
       && dataset.mapCombatStompAction === "stomp-2"
-      && dataset.mapCombatStompX === "368"
-      && dataset.mapCombatStompResource === "MAGIC/51";
+      && dataset.mapCombatStompX === "160"
+      && dataset.mapCombatStompShadowY === "368"
+      && dataset.mapCombatStompResource === "MAGIC/51"
+      && dataset.mapCombatStompTargetScreenX !== undefined
+      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
+      && dataset.mapCombatStompTargetScreenY !== undefined
+      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
   }, undefined, { polling: "raf" });
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/arena-stomp-2-quake.png`,
@@ -435,8 +446,13 @@ test("enemy tier-two great dragon knight uses mirrored 2D and group-13 dialogue"
     )?.dataset;
     return dataset?.mapCombatStompPhase === "quake"
       && dataset.mapCombatStompAction === "stomp-2"
-      && dataset.mapCombatStompX === "368"
-      && dataset.mapCombatStompResource === "MAGIC/52";
+      && dataset.mapCombatStompX === "160"
+      && dataset.mapCombatStompShadowY === "368"
+      && dataset.mapCombatStompResource === "MAGIC/52"
+      && dataset.mapCombatStompTargetScreenX !== undefined
+      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
+      && dataset.mapCombatStompTargetScreenY !== undefined
+      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
   }, undefined, { polling: "raf" });
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/arena-stomp-2-ai-quake.png`,
@@ -502,8 +518,13 @@ test("tier-three great dragon knight performs 3D with female graphics and 20..39
     )?.dataset;
     return dataset?.mapCombatStompPhase === "quake"
       && dataset.mapCombatStompAction === "stomp-3"
-      && dataset.mapCombatStompX === "368"
-      && dataset.mapCombatStompResource === "MAGIC/53";
+      && dataset.mapCombatStompX === "160"
+      && dataset.mapCombatStompShadowY === "368"
+      && dataset.mapCombatStompResource === "MAGIC/53"
+      && dataset.mapCombatStompTargetScreenX !== undefined
+      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
+      && dataset.mapCombatStompTargetScreenY !== undefined
+      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
   }, undefined, { polling: "raf" });
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/arena-stomp-3-quake.png`,
@@ -578,8 +599,13 @@ test("enemy tier-three great dragon knight uses mirrored 3D and group-13 dialogu
     )?.dataset;
     return dataset?.mapCombatStompPhase === "quake"
       && dataset.mapCombatStompAction === "stomp-3"
-      && dataset.mapCombatStompX === "368"
-      && dataset.mapCombatStompResource === "MAGIC/54";
+      && dataset.mapCombatStompX === "160"
+      && dataset.mapCombatStompShadowY === "368"
+      && dataset.mapCombatStompResource === "MAGIC/54"
+      && dataset.mapCombatStompTargetScreenX !== undefined
+      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
+      && dataset.mapCombatStompTargetScreenY !== undefined
+      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
   }, undefined, { polling: "raf" });
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/arena-stomp-3-ai-quake.png`,

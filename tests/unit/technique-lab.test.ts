@@ -357,9 +357,13 @@ describe("map technique laboratory evidence", () => {
       selectionRadius: 5,
       damageBase: 10,
       audioResource: "MAGIC/82",
+      presentation: {
+        targetImpactAnchor: { x: 240, y: 390 },
+      },
       action: {
         code: "1D",
-        horizontalDrawCoordinate: 338,
+        drawXCoordinate: 160,
+        shadowDrawYCoordinate: 338,
         graphicByTargetSide: { side1: "MAGIC/50", side2: "MAGIC/49" },
       },
     });
@@ -376,16 +380,20 @@ describe("map technique laboratory evidence", () => {
       .toBe("/assets/original/technique-lab/audio/magic-82.wav");
   });
 
-  it("keeps 2D on the shared stomp timeline but uses male resources, x=368, and 15..29 damage", () => {
+  it("keeps 2D on the shared stomp timeline but uses its native shadow y and 15..29 damage", () => {
     const male = TECHNIQUE_LAB_STOMPS["2D"];
     const steps = buildStompPresentationSteps(male.presentation);
     expect(male).toMatchObject({
       selectionRadius: 5,
       damageBase: 15,
       audioResource: "MAGIC/82",
+      presentation: {
+        targetImpactAnchor: { x: 240, y: 390 },
+      },
       action: {
         code: "2D",
-        horizontalDrawCoordinate: 368,
+        drawXCoordinate: 160,
+        shadowDrawYCoordinate: 368,
         graphicByTargetSide: { side1: "MAGIC/52", side2: "MAGIC/51" },
       },
     });
@@ -395,16 +403,20 @@ describe("map technique laboratory evidence", () => {
     expect(steps.reduce((total, { explicitNativeTicks }) => total + explicitNativeTicks, 0)).toBe(13);
   });
 
-  it("keeps 3D on the shared stomp timeline but uses female resources, x=368, and 20..39 damage", () => {
+  it("keeps 3D on the shared stomp timeline but uses its native shadow y and 20..39 damage", () => {
     const female = TECHNIQUE_LAB_STOMPS["3D"];
     const steps = buildStompPresentationSteps(female.presentation);
     expect(female).toMatchObject({
       selectionRadius: 5,
       damageBase: 20,
       audioResource: "MAGIC/82",
+      presentation: {
+        targetImpactAnchor: { x: 240, y: 390 },
+      },
       action: {
         code: "3D",
-        horizontalDrawCoordinate: 368,
+        drawXCoordinate: 160,
+        shadowDrawYCoordinate: 368,
         graphicByTargetSide: { side1: "MAGIC/54", side2: "MAGIC/53" },
       },
     });

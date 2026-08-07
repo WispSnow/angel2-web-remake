@@ -673,7 +673,7 @@ test("dispel preserves its original timeline and removes a frozen ally", async (
   });
 });
 
-test("stomp preserves the 33 draws, page flips, quake path and fixed-screen landing", async ({ page }) => {
+test("stomp preserves the native timeline while landing on the selected target", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/technique-lab.html");
@@ -689,6 +689,12 @@ test("stomp preserves the 33 draws, page flips, quake path and fixed-screen land
 
   await seek(page, 0);
   await expect(canvas).toHaveAttribute("data-technique-phase", "rising");
+  await expect(canvas).toHaveAttribute("data-stomp-x", "160");
+  await expect(canvas).toHaveAttribute("data-stomp-shadow-y", "338");
+  await expect(canvas).toHaveAttribute("data-stomp-target-screen-x", "340");
+  await expect(canvas).toHaveAttribute("data-stomp-target-screen-y", "264");
+  await expect(canvas).toHaveAttribute("data-stomp-impact-screen-x", "340");
+  await expect(canvas).toHaveAttribute("data-stomp-impact-screen-y", "264");
   await expect(canvas).toHaveAttribute("data-stomp-y", "25");
   await expect(canvas).toHaveAttribute("data-stomp-graphic-draw", "0");
   await expect(canvas).toHaveAttribute("data-stomp-explicit-ticks", "1");
@@ -725,7 +731,7 @@ test("stomp preserves the 33 draws, page flips, quake path and fixed-screen land
   expect(pageErrors).toEqual([]);
 });
 
-test("male stomp uses its native 15..29 preview and x=368 graphics on the shared timeline", async ({ page }) => {
+test("male stomp keeps its native geometry while landing on the selected target", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/technique-lab.html");
@@ -742,6 +748,12 @@ test("male stomp uses its native 15..29 preview and x=368 graphics on the shared
 
   await seek(page, 160);
   await expect(canvas).toHaveAttribute("data-technique-phase", "quake");
+  await expect(canvas).toHaveAttribute("data-stomp-x", "160");
+  await expect(canvas).toHaveAttribute("data-stomp-shadow-y", "368");
+  await expect(canvas).toHaveAttribute("data-stomp-target-screen-x", "340");
+  await expect(canvas).toHaveAttribute("data-stomp-target-screen-y", "264");
+  await expect(canvas).toHaveAttribute("data-stomp-impact-screen-x", "340");
+  await expect(canvas).toHaveAttribute("data-stomp-impact-screen-y", "264");
   await expect(canvas).toHaveAttribute("data-stomp-y", "145");
   await expect(canvas).toHaveAttribute("data-stomp-graphic-draw", "6");
   await expect(page.locator('[data-readout="affected"]')).toContainText("15..29");
@@ -757,7 +769,7 @@ test("male stomp uses its native 15..29 preview and x=368 graphics on the shared
   expect(pageErrors).toEqual([]);
 });
 
-test("female stomp uses its native 20..39 preview and independent x=368 graphics", async ({ page }) => {
+test("female stomp keeps its native geometry while landing on the selected target", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/technique-lab.html");
@@ -774,6 +786,12 @@ test("female stomp uses its native 20..39 preview and independent x=368 graphics
 
   await seek(page, 160);
   await expect(canvas).toHaveAttribute("data-technique-phase", "quake");
+  await expect(canvas).toHaveAttribute("data-stomp-x", "160");
+  await expect(canvas).toHaveAttribute("data-stomp-shadow-y", "368");
+  await expect(canvas).toHaveAttribute("data-stomp-target-screen-x", "340");
+  await expect(canvas).toHaveAttribute("data-stomp-target-screen-y", "264");
+  await expect(canvas).toHaveAttribute("data-stomp-impact-screen-x", "340");
+  await expect(canvas).toHaveAttribute("data-stomp-impact-screen-y", "264");
   await expect(canvas).toHaveAttribute("data-stomp-y", "145");
   await expect(canvas).toHaveAttribute("data-stomp-graphic-draw", "6");
   await expect(page.locator('[data-readout="affected"]')).toContainText("20..39");

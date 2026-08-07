@@ -966,7 +966,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatStompExplicitTicks;
           delete canvas.dataset.mapCombatStompAction;
           delete canvas.dataset.mapCombatStompX;
+          delete canvas.dataset.mapCombatStompShadowY;
           delete canvas.dataset.mapCombatStompResource;
+          delete canvas.dataset.mapCombatStompTargetScreenX;
+          delete canvas.dataset.mapCombatStompTargetScreenY;
+          delete canvas.dataset.mapCombatStompImpactScreenX;
+          delete canvas.dataset.mapCombatStompImpactScreenY;
         }
         return;
       }
@@ -992,7 +997,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatStompExplicitTicks;
           delete canvas.dataset.mapCombatStompAction;
           delete canvas.dataset.mapCombatStompX;
+          delete canvas.dataset.mapCombatStompShadowY;
           delete canvas.dataset.mapCombatStompResource;
+          delete canvas.dataset.mapCombatStompTargetScreenX;
+          delete canvas.dataset.mapCombatStompTargetScreenY;
+          delete canvas.dataset.mapCombatStompImpactScreenX;
+          delete canvas.dataset.mapCombatStompImpactScreenY;
           delete canvas.dataset.routePulseDraw;
           delete canvas.dataset.routePulseNativeTicks;
           delete canvas.dataset.routePulseVisible;
@@ -1349,17 +1359,26 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           const targetSide = target?.side ?? (special.actor.side === 1 ? 2 : 1);
           const resourceSide = targetSide === 1 ? "side1" : "side2";
           if (step) {
-            const addFixedStompFrame = (y: number, sourceFrame: number): void => {
+            const targetGroundX = (target?.x ?? center.x) * TILE_WIDTH + TILE_WIDTH / 2;
+            const targetGroundY = (target?.y ?? center.y) * TILE_HEIGHT + 43;
+            const { targetImpactAnchor } = stomp.presentation;
+            const drawX = targetGroundX
+              + stomp.action.drawXCoordinate
+              - targetImpactAnchor.x;
+            const addTargetedStompFrame = (
+              drawYCoordinate: number,
+              sourceFrame: number,
+            ): void => {
               this.combatEffects.push(
                 this.add.image(
-                  stomp.action.horizontalDrawCoordinate - this.cameras.main.x,
-                  y - this.cameras.main.y,
+                  drawX,
+                  targetGroundY + drawYCoordinate - targetImpactAnchor.y,
                   `map-${special.result.actionId}-${resourceSide}-${sourceFrame}`,
-                ).setOrigin(0).setScrollFactor(0).setDepth(8),
+                ).setOrigin(0).setDepth(8),
               );
             };
-            addFixedStompFrame(step.y, 0);
-            addFixedStompFrame(175, 1);
+            addTargetedStompFrame(step.y, 0);
+            addTargetedStompFrame(stomp.action.shadowDrawYCoordinate, 1);
           }
         } else if (special.phase === "specialDeath" && target) {
           const descriptor = MAP_DEATH_DESCRIPTORS[special.frame];
@@ -1430,17 +1449,35 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ? String(stompStep.explicitNativeTicks)
               : "";
             canvas.dataset.mapCombatStompAction = special.result.actionId;
-            canvas.dataset.mapCombatStompX = String(stomp.action.horizontalDrawCoordinate);
+            canvas.dataset.mapCombatStompX = String(stomp.action.drawXCoordinate);
+            canvas.dataset.mapCombatStompShadowY = String(stomp.action.shadowDrawYCoordinate);
             canvas.dataset.mapCombatStompResource = stompTargetSide === 1
               ? stomp.action.graphicByTargetSide.side1
               : stomp.action.graphicByTargetSide.side2;
+            const targetGroundX = (target?.x ?? center.x) * TILE_WIDTH + TILE_WIDTH / 2;
+            const targetGroundY = (target?.y ?? center.y) * TILE_HEIGHT + 43;
+            const targetScreenX = targetGroundX
+              - this.cameras.main.scrollX
+              + this.cameras.main.x;
+            const targetScreenY = targetGroundY
+              - this.cameras.main.scrollY
+              + this.cameras.main.y;
+            canvas.dataset.mapCombatStompTargetScreenX = String(targetScreenX);
+            canvas.dataset.mapCombatStompTargetScreenY = String(targetScreenY);
+            canvas.dataset.mapCombatStompImpactScreenX = String(targetScreenX);
+            canvas.dataset.mapCombatStompImpactScreenY = String(targetScreenY);
           } else {
             delete canvas.dataset.mapCombatStompPhase;
             delete canvas.dataset.mapCombatStompY;
             delete canvas.dataset.mapCombatStompExplicitTicks;
             delete canvas.dataset.mapCombatStompAction;
             delete canvas.dataset.mapCombatStompX;
+            delete canvas.dataset.mapCombatStompShadowY;
             delete canvas.dataset.mapCombatStompResource;
+            delete canvas.dataset.mapCombatStompTargetScreenX;
+            delete canvas.dataset.mapCombatStompTargetScreenY;
+            delete canvas.dataset.mapCombatStompImpactScreenX;
+            delete canvas.dataset.mapCombatStompImpactScreenY;
           }
         }
         return;
@@ -1463,7 +1500,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatStompExplicitTicks;
           delete canvas.dataset.mapCombatStompAction;
           delete canvas.dataset.mapCombatStompX;
+          delete canvas.dataset.mapCombatStompShadowY;
           delete canvas.dataset.mapCombatStompResource;
+          delete canvas.dataset.mapCombatStompTargetScreenX;
+          delete canvas.dataset.mapCombatStompTargetScreenY;
+          delete canvas.dataset.mapCombatStompImpactScreenX;
+          delete canvas.dataset.mapCombatStompImpactScreenY;
           delete canvas.dataset.routePulseDraw;
           delete canvas.dataset.routePulseNativeTicks;
           delete canvas.dataset.routePulseVisible;

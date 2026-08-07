@@ -11044,7 +11044,11 @@ export const TECHNIQUE_LAB_STOMPS = {
     "audioResource": "MAGIC/82",
     "audioRequestEntry": "0000:0220",
     "presentation": {
-      "drawPrimitive": "1000:1424 draws both loaded frames at the current procedural coordinates",
+      "drawPrimitive": "1000:1424 passes DX=160 as x and BX as y; 0000:D9FA divides DX by 8 for the VGA byte offset, confirming the axes. The native body at y=175 and each variant shadow share the impact reference (240,390), which Web maps to the selected target's ground point while preserving all native relative coordinates",
+      "targetImpactAnchor": {
+        "x": 240,
+        "y": 390
+      },
       "rising": {
         "positions": [
           25,
@@ -11124,7 +11128,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "1D",
         "visibleName": "龍踏",
         "variant": 0,
-        "horizontalDrawCoordinate": 338,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 338,
         "graphicByTargetSide": {
           "side1": "MAGIC/50",
           "side2": "MAGIC/49"
@@ -11134,7 +11139,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "2D",
         "visibleName": "男踏",
         "variant": 1,
-        "horizontalDrawCoordinate": 368,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 368,
         "graphicByTargetSide": {
           "side1": "MAGIC/52",
           "side2": "MAGIC/51"
@@ -11144,7 +11150,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "3D",
         "visibleName": "女踏",
         "variant": 2,
-        "horizontalDrawCoordinate": 368,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 368,
         "graphicByTargetSide": {
           "side1": "MAGIC/54",
           "side2": "MAGIC/53"
@@ -11161,7 +11168,8 @@ export const TECHNIQUE_LAB_STOMPS = {
       "code": "1D",
       "visibleName": "龍踏",
       "variant": 0,
-      "horizontalDrawCoordinate": 338,
+      "drawXCoordinate": 160,
+      "shadowDrawYCoordinate": 338,
       "graphicByTargetSide": {
         "side1": "MAGIC/50",
         "side2": "MAGIC/49"
@@ -11181,7 +11189,11 @@ export const TECHNIQUE_LAB_STOMPS = {
     "audioResource": "MAGIC/82",
     "audioRequestEntry": "0000:0220",
     "presentation": {
-      "drawPrimitive": "1000:1424 draws both loaded frames at the current procedural coordinates",
+      "drawPrimitive": "1000:1424 passes DX=160 as x and BX as y; 0000:D9FA divides DX by 8 for the VGA byte offset, confirming the axes. The native body at y=175 and each variant shadow share the impact reference (240,390), which Web maps to the selected target's ground point while preserving all native relative coordinates",
+      "targetImpactAnchor": {
+        "x": 240,
+        "y": 390
+      },
       "rising": {
         "positions": [
           25,
@@ -11261,7 +11273,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "1D",
         "visibleName": "龍踏",
         "variant": 0,
-        "horizontalDrawCoordinate": 338,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 338,
         "graphicByTargetSide": {
           "side1": "MAGIC/50",
           "side2": "MAGIC/49"
@@ -11271,7 +11284,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "2D",
         "visibleName": "男踏",
         "variant": 1,
-        "horizontalDrawCoordinate": 368,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 368,
         "graphicByTargetSide": {
           "side1": "MAGIC/52",
           "side2": "MAGIC/51"
@@ -11281,7 +11295,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "3D",
         "visibleName": "女踏",
         "variant": 2,
-        "horizontalDrawCoordinate": 368,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 368,
         "graphicByTargetSide": {
           "side1": "MAGIC/54",
           "side2": "MAGIC/53"
@@ -11298,7 +11313,8 @@ export const TECHNIQUE_LAB_STOMPS = {
       "code": "2D",
       "visibleName": "男踏",
       "variant": 1,
-      "horizontalDrawCoordinate": 368,
+      "drawXCoordinate": 160,
+      "shadowDrawYCoordinate": 368,
       "graphicByTargetSide": {
         "side1": "MAGIC/52",
         "side2": "MAGIC/51"
@@ -11318,7 +11334,11 @@ export const TECHNIQUE_LAB_STOMPS = {
     "audioResource": "MAGIC/82",
     "audioRequestEntry": "0000:0220",
     "presentation": {
-      "drawPrimitive": "1000:1424 draws both loaded frames at the current procedural coordinates",
+      "drawPrimitive": "1000:1424 passes DX=160 as x and BX as y; 0000:D9FA divides DX by 8 for the VGA byte offset, confirming the axes. The native body at y=175 and each variant shadow share the impact reference (240,390), which Web maps to the selected target's ground point while preserving all native relative coordinates",
+      "targetImpactAnchor": {
+        "x": 240,
+        "y": 390
+      },
       "rising": {
         "positions": [
           25,
@@ -11398,7 +11418,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "1D",
         "visibleName": "龍踏",
         "variant": 0,
-        "horizontalDrawCoordinate": 338,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 338,
         "graphicByTargetSide": {
           "side1": "MAGIC/50",
           "side2": "MAGIC/49"
@@ -11408,7 +11429,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "2D",
         "visibleName": "男踏",
         "variant": 1,
-        "horizontalDrawCoordinate": 368,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 368,
         "graphicByTargetSide": {
           "side1": "MAGIC/52",
           "side2": "MAGIC/51"
@@ -11418,7 +11440,8 @@ export const TECHNIQUE_LAB_STOMPS = {
         "code": "3D",
         "visibleName": "女踏",
         "variant": 2,
-        "horizontalDrawCoordinate": 368,
+        "drawXCoordinate": 160,
+        "shadowDrawYCoordinate": 368,
         "graphicByTargetSide": {
           "side1": "MAGIC/54",
           "side2": "MAGIC/53"
@@ -11435,7 +11458,8 @@ export const TECHNIQUE_LAB_STOMPS = {
       "code": "3D",
       "visibleName": "女踏",
       "variant": 2,
-      "horizontalDrawCoordinate": 368,
+      "drawXCoordinate": 160,
+      "shadowDrawYCoordinate": 368,
       "graphicByTargetSide": {
         "side1": "MAGIC/54",
         "side2": "MAGIC/53"
@@ -11457,7 +11481,11 @@ export const TECHNIQUE_LAB_STOMP = {
   "audioResource": "MAGIC/82",
   "audioRequestEntry": "0000:0220",
   "presentation": {
-    "drawPrimitive": "1000:1424 draws both loaded frames at the current procedural coordinates",
+    "drawPrimitive": "1000:1424 passes DX=160 as x and BX as y; 0000:D9FA divides DX by 8 for the VGA byte offset, confirming the axes. The native body at y=175 and each variant shadow share the impact reference (240,390), which Web maps to the selected target's ground point while preserving all native relative coordinates",
+    "targetImpactAnchor": {
+      "x": 240,
+      "y": 390
+    },
     "rising": {
       "positions": [
         25,
@@ -11537,7 +11565,8 @@ export const TECHNIQUE_LAB_STOMP = {
       "code": "1D",
       "visibleName": "龍踏",
       "variant": 0,
-      "horizontalDrawCoordinate": 338,
+      "drawXCoordinate": 160,
+      "shadowDrawYCoordinate": 338,
       "graphicByTargetSide": {
         "side1": "MAGIC/50",
         "side2": "MAGIC/49"
@@ -11547,7 +11576,8 @@ export const TECHNIQUE_LAB_STOMP = {
       "code": "2D",
       "visibleName": "男踏",
       "variant": 1,
-      "horizontalDrawCoordinate": 368,
+      "drawXCoordinate": 160,
+      "shadowDrawYCoordinate": 368,
       "graphicByTargetSide": {
         "side1": "MAGIC/52",
         "side2": "MAGIC/51"
@@ -11557,7 +11587,8 @@ export const TECHNIQUE_LAB_STOMP = {
       "code": "3D",
       "visibleName": "女踏",
       "variant": 2,
-      "horizontalDrawCoordinate": 368,
+      "drawXCoordinate": 160,
+      "shadowDrawYCoordinate": 368,
       "graphicByTargetSide": {
         "side1": "MAGIC/54",
         "side2": "MAGIC/53"
@@ -11574,7 +11605,8 @@ export const TECHNIQUE_LAB_STOMP = {
     "code": "1D",
     "visibleName": "龍踏",
     "variant": 0,
-    "horizontalDrawCoordinate": 338,
+    "drawXCoordinate": 160,
+    "shadowDrawYCoordinate": 338,
     "graphicByTargetSide": {
       "side1": "MAGIC/50",
       "side2": "MAGIC/49"

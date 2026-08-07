@@ -374,11 +374,14 @@ function buildStomp() {
   const quakeCycle = [145, 125, 110, 125, 145, 175];
   const fallingPositions = Array.from({ length: 9 }, (_, index) => 175 - index * 20);
   const actions = [
-    { code: "1D", visibleName: "龍踏", variant: 0, horizontalDrawCoordinate: 0x0152,
+    { code: "1D", visibleName: "龍踏", variant: 0, drawXCoordinate: 0x00a0,
+      shadowDrawYCoordinate: 0x0152,
       graphicByTargetSide: { side1: "MAGIC/50", side2: "MAGIC/49" } },
-    { code: "2D", visibleName: "男踏", variant: 1, horizontalDrawCoordinate: 0x0170,
+    { code: "2D", visibleName: "男踏", variant: 1, drawXCoordinate: 0x00a0,
+      shadowDrawYCoordinate: 0x0170,
       graphicByTargetSide: { side1: "MAGIC/52", side2: "MAGIC/51" } },
-    { code: "3D", visibleName: "女踏", variant: 2, horizontalDrawCoordinate: 0x0170,
+    { code: "3D", visibleName: "女踏", variant: 2, drawXCoordinate: 0x00a0,
+      shadowDrawYCoordinate: 0x0170,
       graphicByTargetSide: { side1: "MAGIC/54", side2: "MAGIC/53" } },
   ];
   return {
@@ -388,7 +391,8 @@ function buildStomp() {
     audioResource: "MAGIC/82",
     audioRequestEntry: "0000:0220",
     presentation: {
-      drawPrimitive: "1000:1424 draws both loaded frames at the current procedural coordinates",
+      drawPrimitive: "1000:1424 passes DX=160 as x and BX as y; 0000:D9FA divides DX by 8 for the VGA byte offset, confirming the axes. The native body at y=175 and each variant shadow share the impact reference (240,390), which Web maps to the selected target's ground point while preserving all native relative coordinates",
+      targetImpactAnchor: { x: 240, y: 390 },
       rising: { positions: risingPositions, graphicDraws: 6, timedSteps: 5, waitPerTimedStepNativeTicks: 1 },
       preQuakePageToggles: 10,
       quake: { cyclePositions: quakeCycle, cycles: 3, graphicDraws: 18, explicitWaitNativeTicks: 0 },

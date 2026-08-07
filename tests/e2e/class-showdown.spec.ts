@@ -5,6 +5,7 @@ const ARTIFACT_DIR = "artifacts/playwright";
 
 interface ClassShowdownBattleState {
   cameraOrigin: { x: number; y: number };
+  cursor: { x: number; y: number };
   actionMode: string;
   actionRange: Array<{ x: number; y: number }>;
   targets: Array<{ x: number; y: number }>;
@@ -332,6 +333,47 @@ test("area techniques add a read-only effect-radius overlay to native selection 
   );
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/class-showdown-recovery-effect-range.png`,
+  });
+  expect(pageErrors).toEqual([]);
+});
+
+test("great dragon knight stomp lands on its selected target in the all-class showdown", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  // Index 19 is the second matchup in the second column: move from the initial
+  // (17,15) focus to the allied great dragon knight at (29,16).
+  for (let step = 0; step < 12; step += 1) await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 29, y: 16 });
+  await page.keyboard.press("Space");
+  await expect(page.locator(".hud-identity-name")).toHaveText("巨龍騎士");
+  await page.getByTestId("unit-command-technique").click();
+  await expect(page.getByTestId("technique-stomp-3")).toContainText("女踏");
+  await page.getByTestId("technique-stomp-3").click();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
+
+  await page.waitForFunction(() => {
+    const dataset = document.querySelector<HTMLCanvasElement>(
+      "[data-testid='battle-canvas']",
+    )?.dataset;
+    return dataset?.mapCombatStompPhase === "quake"
+      && dataset.mapCombatStompAction === "stomp-3"
+      && dataset.mapCombatStompX === "160"
+      && dataset.mapCombatStompShadowY === "368"
+      && dataset.mapCombatStompResource === "MAGIC/53"
+      && dataset.mapCombatStompTargetScreenX !== undefined
+      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
+      && dataset.mapCombatStompTargetScreenY !== undefined
+      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
+  }, undefined, { polling: "raf" });
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/class-showdown-stomp-3-target-impact.png`,
   });
   expect(pageErrors).toEqual([]);
 });

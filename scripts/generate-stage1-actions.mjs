@@ -1440,7 +1440,9 @@ assertEqual({
   fixedGraphicWaitNativeTicks: stompPresentation.presentation.fixedGraphicWaitNativeTicks,
   graphicDrawCount: stompPresentation.presentation.graphicDrawCount,
   audioResource: stompPresentation.audioResource,
-  horizontalDrawCoordinate: stompAction.horizontalDrawCoordinate,
+  targetImpactAnchor: stompPresentation.presentation.targetImpactAnchor,
+  drawXCoordinate: stompAction.drawXCoordinate,
+  shadowDrawYCoordinate: stompAction.shadowDrawYCoordinate,
   graphicByTargetSide: stompAction.graphicByTargetSide,
 }, {
   selectionRadius: 5,
@@ -1448,7 +1450,9 @@ assertEqual({
   fixedGraphicWaitNativeTicks: 13,
   graphicDrawCount: 33,
   audioResource: "MAGIC/82",
-  horizontalDrawCoordinate: 338,
+  targetImpactAnchor: { x: 240, y: 390 },
+  drawXCoordinate: 160,
+  shadowDrawYCoordinate: 338,
   graphicByTargetSide: { side1: "MAGIC/50", side2: "MAGIC/49" },
 }, "initial stomp contract");
 assertEqual({
@@ -1458,7 +1462,9 @@ assertEqual({
   fixedGraphicWaitNativeTicks: stompPresentation.presentation.fixedGraphicWaitNativeTicks,
   graphicDrawCount: stompPresentation.presentation.graphicDrawCount,
   audioResource: stompPresentation.audioResource,
-  horizontalDrawCoordinate: stomp2Action.horizontalDrawCoordinate,
+  targetImpactAnchor: stompPresentation.presentation.targetImpactAnchor,
+  drawXCoordinate: stomp2Action.drawXCoordinate,
+  shadowDrawYCoordinate: stomp2Action.shadowDrawYCoordinate,
   graphicByTargetSide: stomp2Action.graphicByTargetSide,
 }, {
   selectionRadius: 5,
@@ -1467,7 +1473,9 @@ assertEqual({
   fixedGraphicWaitNativeTicks: 13,
   graphicDrawCount: 33,
   audioResource: "MAGIC/82",
-  horizontalDrawCoordinate: 368,
+  targetImpactAnchor: { x: 240, y: 390 },
+  drawXCoordinate: 160,
+  shadowDrawYCoordinate: 368,
   graphicByTargetSide: { side1: "MAGIC/52", side2: "MAGIC/51" },
 }, "male stomp contract");
 assertEqual({
@@ -1477,7 +1485,9 @@ assertEqual({
   fixedGraphicWaitNativeTicks: stompPresentation.presentation.fixedGraphicWaitNativeTicks,
   graphicDrawCount: stompPresentation.presentation.graphicDrawCount,
   audioResource: stompPresentation.audioResource,
-  horizontalDrawCoordinate: stomp3Action.horizontalDrawCoordinate,
+  targetImpactAnchor: stompPresentation.presentation.targetImpactAnchor,
+  drawXCoordinate: stomp3Action.drawXCoordinate,
+  shadowDrawYCoordinate: stomp3Action.shadowDrawYCoordinate,
   graphicByTargetSide: stomp3Action.graphicByTargetSide,
 }, {
   selectionRadius: 5,
@@ -1486,7 +1496,9 @@ assertEqual({
   fixedGraphicWaitNativeTicks: 13,
   graphicDrawCount: 33,
   audioResource: "MAGIC/82",
-  horizontalDrawCoordinate: 368,
+  targetImpactAnchor: { x: 240, y: 390 },
+  drawXCoordinate: 160,
+  shadowDrawYCoordinate: 368,
   graphicByTargetSide: { side1: "MAGIC/54", side2: "MAGIC/53" },
 }, "female stomp contract");
 assertEqual(
