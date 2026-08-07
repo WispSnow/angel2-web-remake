@@ -204,15 +204,26 @@ pnpm exec playwright install ffmpeg
 
 按改动风险选择最低充分验证，并在交付时说明实际运行了什么：
 
+- 默认只运行与本次修改文件和受影响行为直接相关的测试，不因完成一次普通修改而自动运行
+  `pnpm test`、`pnpm test:e2e`、`pnpm test:coverage` 或 `pnpm check` 等全量门禁。
+- 优先用文件级或用例级命令缩小范围，例如
+  `pnpm exec vitest run tests/unit/<相关文件>.test.ts`、
+  `pnpm exec playwright test tests/e2e/<相关文件>.spec.ts` 或 Playwright 的标题过滤。
+- 即使一次任务涉及多个系统，也应明确列出受影响系统并组合运行对应的定向测试；不要把
+  “跨系统”自动等同于“全仓库测试”。
+- 只有用户明确要求全量验证，或当前任务本身明确是发布前／发布候选验收时，才运行全量
+  测试；运行前在进度更新中说明原因和预计范围。
+
 | 改动 | 最低验证 |
 | --- | --- |
 | 文档、规格或逆向结论 | 检查本地链接；涉及证据基线时运行 `node reverse/tools/angel2-phase1-verify.mjs` |
-| 模拟、数值、移动、AI、PRNG | 添加/更新 Vitest；运行 `pnpm test` 和 `pnpm build` |
-| UI、输入、剧情、存档流程 | 对应 Playwright 场景；运行相关测试，完成后运行 `pnpm test:e2e` |
+| 模拟、数值、移动、AI、PRNG | 添加/更新对应 Vitest；只运行相关测试文件或用例；影响类型或生产打包时再运行 `pnpm build` |
+| UI、输入、剧情、存档流程 | 添加/更新并运行对应 Playwright 文件或用例，不默认追加全量 `pnpm test:e2e` |
 | Phaser、动画、HUD、响应式布局 | Playwright 断言加代表性截图，并人工查看截图 |
 | 音乐、音效、逐字音 | 验证请求记录、阶段切换、开关和浏览器激活边界 |
 | 生成内容或原版素材 | 重跑生成器、内容测试、生产构建和必要的视觉对照 |
-| 跨系统或发布前改动 | `pnpm check`，并复核普通 `/` 的真实玩家流程 |
+| 跨系统改动 | 组合运行各受影响系统的定向测试，不默认运行全仓库门禁 |
+| 用户明确要求的全量验证或发布前验收 | `pnpm check`，并复核普通 `/` 的真实玩家流程 |
 
 额外规则：
 
