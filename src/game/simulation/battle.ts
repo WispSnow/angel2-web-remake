@@ -131,7 +131,7 @@ function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
   return UNIT_STATUS_KEYS.every((key) => left[key] === right[key]);
 }
 
-function applyOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit): void {
+function applyActiveOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit): void {
   const status = ordinaryHitStatusFor(attacker.classId);
   if (status) defender.statuses[status.key] = status.counter;
 }
@@ -537,8 +537,9 @@ export class Stage0Battle {
         : Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
       attacker.life = Math.max(0, attacker.life - counterDamage);
     }
-    applyOrdinaryHitStatus(attacker, defender);
-    if (counterOccurred) applyOrdinaryHitStatus(defender, attacker);
+    // Native 0000:92DC applies the class status once from the original
+    // attacker/defender pair; the counter branch only resolves damage.
+    applyActiveOrdinaryHitStatus(attacker, defender);
 
     const defenderDied = defender.life === 0;
     const attackerDied = attacker.life === 0;

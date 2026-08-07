@@ -5,6 +5,9 @@ const ARTIFACT_DIR = "artifacts/playwright";
 
 interface ClassShowdownBattleState {
   cameraOrigin: { x: number; y: number };
+  actionMode: string;
+  actionRange: Array<{ x: number; y: number }>;
+  targets: Array<{ x: number; y: number }>;
   lastCombat?: { attackerId: string; defenderId: string; defenderDied: boolean };
   combatPresentation?: { phase: string };
   specialActionPresentation?: { phase: string };
@@ -166,6 +169,37 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   expect(pageErrors).toEqual([]);
 });
 
+test("ordinary-hit status careers do not apply their status during a counterattack", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  await clickClassShowdownWorldCell(page, 17, 16);
+  await expect(page.locator(".hud-identity-name")).toHaveText("魔劍戰士");
+  await page.getByTestId("unit-command-attack").click();
+  await clickClassShowdownWorldCell(page, 18, 16);
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState;
+    }).battle;
+    return current?.lastCombat?.attackerId === "arena-1-1"
+      && current.combatPresentation === undefined
+      && current.specialActionPresentation === undefined;
+  });
+  const battle = await classShowdownBattleState(page);
+  expect(battle?.lastCombat).toMatchObject({
+    attackerId: "arena-1-1",
+    defenderId: "arena-2-1",
+    defenderDied: false,
+  });
+  expect(battle?.units.find(({ id }) => id === "arena-2-1")?.statuses.defenseDown).toBe(3);
+  expect(battle?.units.find(({ id }) => id === "arena-1-1")?.statuses.defenseDown).toBe(0);
+  expect(pageErrors).toEqual([]);
+});
+
 test("unnamed class units use their native branch portrait in the battle HUD", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -186,5 +220,52 @@ test("unnamed class units use their native branch portrait in the battle HUD", a
   await clickClassShowdownWorldCell(page, 18, 17);
   await expect(page.getByTestId("unit-portrait-composite"))
     .toHaveAttribute("data-portrait-record", "58");
+  expect(pageErrors).toEqual([]);
+});
+
+test("area techniques use the native selection dither without an effect-radius box", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  // The magic priest is the first visible class with both lightning and area
+  // recovery in the showdown roster.
+  await clickClassShowdownWorldCell(page, 17, 18);
+  await page.getByTestId("unit-command-technique").click();
+
+  await page.getByTestId("technique-lightning-1").click();
+  const lightning = await classShowdownBattleState(page);
+  expect(lightning).toMatchObject({ actionMode: "specialTarget" });
+  expect(lightning?.actionRange.length).toBeGreaterThan(0);
+  expect(lightning?.targets.length).toBeGreaterThan(0);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-native-dither-retained-fraction",
+    "0.25",
+  );
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-native-dither-cell-count",
+    /[1-9]/,
+  );
+
+  // Cancel returns to the technique menu; recovery uses the same target-range
+  // projection and must not replace it with its effect radius.
+  await page.keyboard.press("Alt");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.actionMode)
+    .toBe("techniqueMenu");
+  await page.getByTestId("technique-recovery-1").click();
+  const recovery = await classShowdownBattleState(page);
+  expect(recovery).toMatchObject({ actionMode: "specialTarget" });
+  expect(recovery?.actionRange.length).toBe(lightning?.actionRange.length);
+  expect(recovery?.targets.length).toBeGreaterThan(0);
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-native-dither-retained-fraction",
+    "0.25",
+  );
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-native-dither-cell-count",
+    /[1-9]/,
+  );
   expect(pageErrors).toEqual([]);
 });

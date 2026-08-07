@@ -380,6 +380,14 @@ async function extract(runtimePath, descriptorPath, outputPath) {
         promotionReset: "promotion commit at 0000:0744 writes zero to unit state +0x02",
       },
     },
+    ordinaryAttackStatusApplication: {
+      function: "0000:92DC",
+      callSites: ["0000:928F", "0000:92AF"],
+      timing: "called once on the selected map/full battle presentation path after the primary hit and any eligible counter damage have resolved",
+      attackerSource: "the original attacker class code in DS:77BB",
+      defenderSource: "the original defender unit loaded from DS:77C1",
+      counterBehavior: "counter damage does not invoke this handler with the counterattacker as a new status source",
+    },
     ordinaryAttackStatuses: [
       {
         attacker: specialUnit(descriptorsByCode, "1G"),

@@ -74,7 +74,7 @@ describe("native class implementation sequence", () => {
     expect(definition.technique).toBeNull();
   });
 
-  it("record 1 magic sword warrior reproduces growth and refreshes defense-down on every ordinary hit", () => {
+  it("record 1 magic sword warrior reproduces growth and refreshes defense-down on active ordinary hit", () => {
     expectGeneratedClassToMatchEvidence("magic-sword-warrior", 1);
 
     const definition = classDefinition("magic-sword-warrior");
@@ -112,21 +112,6 @@ describe("native class implementation sequence", () => {
     battle.attack(attacker.id, defender.id);
     expect(defender.statuses.defenseDown).toBe(3);
 
-    const counterBattle = new Stage0Battle(0);
-    const counterTarget = counterBattle.unit("1:0")!;
-    const counterattacker = counterBattle.units.find(({ side }) => side === 2)!;
-    counterBattle.units = [counterTarget, counterattacker];
-    counterTarget.x = 20;
-    counterTarget.y = 20;
-    counterattacker.classId = "magic-sword-warrior";
-    counterattacker.className = definition.nativeName;
-    counterattacker.experience = 0;
-    counterattacker.life = classStatsFor(counterattacker).maxLife;
-    counterattacker.x = 21;
-    counterattacker.y = 20;
-
-    expect(counterBattle.attack(counterTarget.id, counterattacker.id).counterOccurred).toBe(true);
-    expect(counterTarget.statuses.defenseDown).toBe(3);
   });
 
   it("record 2 jungle warrior reproduces poison-on-hit and native post-third-row growth", () => {
@@ -502,6 +487,31 @@ describe("native class implementation sequence", () => {
     defender.y = 20;
     battle.attack(attacker.id, defender.id);
     expect(defender.statuses.attackDown).toBe(3);
+  });
+
+  it.each([
+    ["magic-sword-warrior", "defenseDown"],
+    ["beast-knight", "attackDown"],
+    ["evil-sword-warrior", "confusion"],
+    ["jungle-warrior", "poison"],
+  ] as const)("%s does not apply %s from a passive counterattack", (classId, statusKey) => {
+    const battle = new Stage0Battle(0);
+    const activeAttacker = battle.unit("1:0")!;
+    const counterAttacker = battle.units.find(({ side }) => side === 2)!;
+    battle.units = [activeAttacker, counterAttacker];
+    activeAttacker.x = 20;
+    activeAttacker.y = 20;
+    counterAttacker.classId = classId;
+    counterAttacker.className = classDefinition(classId).nativeName;
+    counterAttacker.experience = 0;
+    counterAttacker.life = classStatsFor(counterAttacker).maxLife;
+    counterAttacker.x = 21;
+    counterAttacker.y = 20;
+
+    const result = battle.attack(activeAttacker.id, counterAttacker.id);
+
+    expect(result.counterOccurred).toBe(true);
+    expect(activeAttacker.statuses[statusKey]).toBe(0);
   });
 
   it("record 17 bone knight uses the native full-damage counter candidate", () => {
