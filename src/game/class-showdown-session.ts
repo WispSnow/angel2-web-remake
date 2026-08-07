@@ -1,4 +1,9 @@
-import { classDefinition, CLASS_IDS, type ClassId } from "./content/classes";
+import {
+  classDefinition,
+  classFallbackPortraitFor,
+  CLASS_IDS,
+  type ClassId,
+} from "./content/classes";
 import { STAGE1_DEFINITION } from "./content/stage1";
 import type {
   ArenaBattleEnvironment,
@@ -53,6 +58,7 @@ export function createClassShowdownPlacements(
         slot: index,
         classId,
         level,
+        portrait: classFallbackPortraitFor(classId, 1),
         x: x.ally,
         y,
       },
@@ -62,6 +68,7 @@ export function createClassShowdownPlacements(
         slot: index,
         classId,
         level,
+        portrait: classFallbackPortraitFor(classId, 2),
         x: x.enemy,
         y,
       },

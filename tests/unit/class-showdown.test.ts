@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -15,6 +16,14 @@ import { classDefinition, classStatsFor } from "../../src/game/content/classes";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "../../src/game/content/technique-lab.generated";
 import { ArenaBattle, createArenaRuntime } from "../../src/game/simulation/arena-battle";
 
+const assetFile = (source: string): string =>
+  path.resolve("public", source.replace(/^\/assets\//, "assets/"));
+
+const pngDimensions = (source: string): readonly [number, number] => {
+  const bytes = fs.readFileSync(assetFile(source));
+  return [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
+};
+
 describe("all-class showdown lab", () => {
   it("pairs every ordinary catalog class and preserves special-runtime evidence boundaries", () => {
     expect(CLASS_SHOWDOWN_CLASS_IDS).toHaveLength(35);
@@ -26,10 +35,22 @@ describe("all-class showdown lab", () => {
       const assets = TECHNIQUE_LAB_UNIT_ASSETS[classId];
       expect(assets.ally, `${classId}: ally figure`).toBeTruthy();
       for (const source of [assets.ally, assets.enemy]) {
-        const file = path.resolve("public", source!.replace(/^\/assets\//, "assets/"));
-        expect(fs.statSync(file).size, `${classId}: ${source}`).toBeGreaterThan(0);
+        expect(fs.statSync(assetFile(source!)).size, `${classId}: ${source}`).toBeGreaterThan(0);
       }
+      expect(pngDimensions(assets.enemy), `${classId}: side-two alpha canvas`)
+        .toEqual(pngDimensions(assets.ally!));
     }
+  });
+
+  it("keeps the side-two curse-master silhouette and black shadow intact", () => {
+    const source = TECHNIQUE_LAB_UNIT_ASSETS["curse-master"].enemy;
+    const bytes = fs.readFileSync(assetFile(source));
+
+    // PNG IHDR width/height. A/0003/05 has only 41 color rows, while the
+    // horizontally mirrored A/0002/05 alpha restores the native 43-row frame.
+    expect(pngDimensions(source)).toEqual([32, 43]);
+    expect(createHash("sha256").update(bytes).digest("hex"))
+      .toBe("d9d45216ef1cc4f7092591729f292b7af2ad907887a1bb29504b83df07c4b783");
   });
 
   it("deploys 35 adjacent mirrors in two vertical columns at one selected level", () => {
@@ -84,5 +105,23 @@ describe("all-class showdown lab", () => {
       "enemy-magic-sword-warrior": TECHNIQUE_LAB_UNIT_ASSETS["magic-sword-warrior"].enemy,
       "enemy-engineer": TECHNIQUE_LAB_UNIT_ASSETS.engineer.enemy,
     });
+  });
+
+  it("uses the native class-branch portrait for unnamed showdown units", () => {
+    const placements = createClassShowdownPlacements(1);
+    const battle = new ArenaBattle(placements, 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
+    const expectedSide1 = [
+      47, 57, 57, 50, 50, 50, 50, 57, 64, 57, 50, 50, 59, 52, 52, 52, 52, 52,
+      52, 52, 59, 59, 52, 52, 50, 50, 51, 57, 57, 57, 50, 50, 50, 57, 61,
+    ];
+    const expectedSide2 = [
+      48, 58, 58, 49, 49, 49, 49, 58, 64, 58, 49, 49, 60, 53, 53, 53, 53, 53,
+      53, 53, 60, 60, 53, 53, 49, 49, 51, 58, 58, 58, 49, 49, 49, 58, 62,
+    ];
+
+    expect(battle.units.filter(({ side }) => side === 1).map(({ portrait }) => portrait))
+      .toEqual(expectedSide1);
+    expect(battle.units.filter(({ side }) => side === 2).map(({ portrait }) => portrait))
+      .toEqual(expectedSide2);
   });
 });

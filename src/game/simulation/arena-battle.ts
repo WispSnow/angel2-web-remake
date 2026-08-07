@@ -93,7 +93,7 @@ function createArenaUnit(
     // Side remains explicit in simulation state and the map figure. Keep the
     // arena identity short so the right panel does not repeat it in the name.
     name: className(placement.classId),
-    portrait: (placement.side === 1 ? 47 : 48) as PortraitRecord,
+    portrait: placement.portrait ?? (placement.side === 1 ? 47 : 48) as PortraitRecord,
     x: placement.x,
     y: placement.y,
     life: 0,

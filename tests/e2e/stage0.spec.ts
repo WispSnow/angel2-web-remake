@@ -1567,6 +1567,9 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   await expect(system).toBeHidden();
   await expect(group).toBeHidden();
   await expect(allRest).toBeHidden();
+  await expect(page.getByTestId("hud-identity").locator("span")).toHaveCount(0);
+  expect(await logicalElementBounds(page.getByTestId("hud-identity")))
+    .toEqual({ left: 484, top: 123, width: 152, height: 22 });
   const unitTopChrome = page.getByTestId("hud-unit-top-chrome");
   const unitBodyFrame = page.getByTestId("hud-unit-body-frame");
   await expect(unitTopChrome).toBeVisible();
@@ -1577,6 +1580,15 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   expect(await logicalElementBounds(unitBodyFrame)).toEqual({ left: 480, top: 150, width: 160, height: 171 });
   expect(await logicalElementBounds(page.locator("#bottom-round"))).toEqual({ left: 480, top: 322, width: 160, height: 28 });
   await screen.screenshot({ path: "artifacts/playwright/stage0-side-panel-unit-chrome.png" });
+
+  await page.getByTestId("battle-canvas").click({ position: { x: 220, y: 177 } });
+  await expect(page.getByTestId("action-menu")).toBeVisible();
+  await expect(page.getByTestId("status-strip")).toHaveText("玩家・可行動");
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
+  await expect(page.getByTestId("hud-identity").locator("span")).toHaveCount(0);
+  await screen.screenshot({ path: "artifacts/playwright/stage0-selected-unit-context-strip.png" });
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("action-menu")).toBeHidden();
 
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await expect(screen).toHaveAttribute("data-hud-mode", "tactical");

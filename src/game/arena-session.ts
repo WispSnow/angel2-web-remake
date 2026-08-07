@@ -6,6 +6,7 @@ import {
 } from "./content/classes";
 import { ALLY_MAP_UNIT_ASSETS } from "./content/map-unit-assets";
 import { stage1TerrainSlotAt } from "./content/stage1";
+import type { PortraitRecord } from "./types";
 
 export const ARENA_MAP = {
   source: "/assets/original/stage1-map.png",
@@ -42,6 +43,8 @@ export interface ArenaUnitPlacement {
   readonly slot: number;
   readonly classId: ClassId;
   readonly level: ArenaLevel;
+  /** Optional portrait identity for debug rosters with native class fallbacks. */
+  readonly portrait?: PortraitRecord;
   readonly x: number;
   readonly y: number;
 }

@@ -173,7 +173,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               </div>
             </section>
             <div class="action-menu native-command-menu" id="action-menu" data-testid="action-menu" role="menu" aria-label="單位行動" hidden></div>
-            <div class="status-strip" id="status-strip" aria-live="polite"></div>
+            <div class="status-strip" id="status-strip" data-testid="status-strip" aria-live="polite"></div>
             <section class="combat-presentation" id="combat-presentation" data-testid="combat-presentation" hidden></section>
             <section class="promotion-layer" id="promotion-layer" data-testid="promotion-layer"
               role="dialog" aria-modal="true" aria-label="選擇轉職" hidden></section>
@@ -652,7 +652,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     screen.dataset.phase = controller.phase;
     screen.dataset.actionMode = controller.actionMode;
     round.textContent = `第 ${controller.battle.round} 回合`;
-    status.textContent = controller.statusMessage;
+    const selectedUnitContext = renderSelectedUnitContext(controller);
+    if (selectedUnitContext) status.innerHTML = selectedUnitContext;
+    else status.textContent = controller.statusMessage;
     const actionMenuVisible = controller.phase === "player"
       && (controller.actionMode === "actionMenu" || controller.actionMode === "techniqueMenu");
     actionMenu.hidden = !actionMenuVisible;
@@ -1407,22 +1409,23 @@ function renderSidePanelHotspots(): string {
   }).join("");
 }
 
-function renderHud(
+interface UnitContextPresentation {
+  controlSummary: string;
+  visibleControlSummary?: string;
+  tacticLabel?: string;
+  tacticPrefix: string;
+  routePulseSafety?: "safe" | "danger";
+  routePulseSafetyLabel?: string;
+}
+
+function unitContextPresentation(
   controller: GameController,
-  unit: NonNullable<GameController["focusedUnit"]>,
-  stats: UnitStats,
-): string {
-  const baseStats = controller.battle.statsFor(unit);
-  const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
-  const nextExperience = nextExperienceThresholdFor(unit);
-  const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
+  unit: BattleUnit,
+): UnitContextPresentation {
   const playerControlled = unit.side === 1 && controller.battle.isPlayerControllableAlly(unit.id);
   const affiliationLabel = unit.side === 2 ? "敵軍" : playerControlled ? "我方" : "友軍";
   const controlLabel = unit.side === 2 ? "AI" : playerControlled ? "玩家" : "自動";
   const actionLabel = unit.actionDisabled ? "冰封中" : unit.acted ? "已行動" : "可行動";
-  const controlSummary = playerControlled
-    ? `${affiliationLabel}・${controlLabel}・${actionLabel}`
-    : affiliationLabel;
   const intent = unit.side === 2 ? controller.battle.enemyAiIntentFor(unit.id) : undefined;
   const intentLabel = intent ? {
     route: "撤離",
@@ -1435,15 +1438,57 @@ function renderHud(
     ?? force?.tacticLabel
     ?? (unit.side === 2 ? "主動進攻" : !playerControlled ? "自主作戰" : undefined);
   const routePulseSafety = controller.battle.routePulseSafetyForUnit(unit.id);
-  const routePulseSafetyLabel = routePulseSafety === "safe"
-    ? "安全"
-    : routePulseSafety === "danger"
-      ? "危險"
-      : undefined;
-  const visibleControlSummary = playerControlled
-    ? `${controlLabel}・${actionLabel}`
-    : undefined;
-  const tacticPrefix = unit.side === 1 && !playerControlled ? `${affiliationLabel}・` : "";
+  return {
+    controlSummary: playerControlled
+      ? `${affiliationLabel}・${controlLabel}・${actionLabel}`
+      : affiliationLabel,
+    visibleControlSummary: playerControlled ? `${controlLabel}・${actionLabel}` : undefined,
+    tacticLabel,
+    tacticPrefix: unit.side === 1 && !playerControlled ? `${affiliationLabel}・` : "",
+    routePulseSafety,
+    routePulseSafetyLabel: routePulseSafety === "safe"
+      ? "安全"
+      : routePulseSafety === "danger"
+        ? "危險"
+        : undefined,
+  };
+}
+
+function renderSelectedUnitContext(controller: GameController): string | undefined {
+  if (!["actionMenu", "enemyPreview", "allyPreview"].includes(controller.actionMode)) return undefined;
+  const unit = controller.selectedUnit;
+  if (!unit) return undefined;
+  const context = unitContextPresentation(controller, unit);
+  const items = [
+    context.visibleControlSummary
+      ? `<span class="selected-unit-control" data-testid="unit-control-summary">${context.visibleControlSummary}</span>`
+      : undefined,
+    context.tacticLabel
+      ? `<span class="selected-unit-tactic" data-testid="unit-tactic">${context.tacticPrefix
+        ? `<span class="selected-unit-affiliation">${context.tacticPrefix}</span>`
+        : ""}<span class="selected-unit-tactic-pair"><b data-testid="unit-tactic-label">戰術</b><span
+          data-testid="unit-tactic-value">${context.tacticLabel}</span></span></span>`
+      : undefined,
+    context.routePulseSafetyLabel
+      ? `<span class="selected-unit-safety" data-testid="route-pulse-safety"
+          data-safety="${context.routePulseSafety}">力場${context.routePulseSafetyLabel}</span>`
+      : undefined,
+  ].filter((item): item is string => item !== undefined);
+  return `<span class="selected-unit-context" data-testid="selected-unit-context">${items.join(
+    '<i class="selected-unit-separator" aria-hidden="true">・</i>',
+  )}</span>`;
+}
+
+function renderHud(
+  controller: GameController,
+  unit: NonNullable<GameController["focusedUnit"]>,
+  stats: UnitStats,
+): string {
+  const baseStats = controller.battle.statsFor(unit);
+  const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
+  const nextExperience = nextExperienceThresholdFor(unit);
+  const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
+  const context = unitContextPresentation(controller, unit);
   const identity = unit.name === unit.className
     ? unit.className
     : `${unit.className}／${unit.name}`;
@@ -1465,7 +1510,7 @@ function renderHud(
         </li>`).join("")}
     </ul>`;
   return `
-    <div class="unit-detail" data-testid="unit-detail" aria-label="${controlSummary}，${unit.className}${unit.name}${tacticLabel ? `，戰術${tacticLabel}` : ""}${routePulseSafetyLabel ? `，力場${routePulseSafetyLabel}` : ""}">
+    <div class="unit-detail" data-testid="unit-detail" aria-label="${context.controlSummary}，${unit.className}${unit.name}${context.tacticLabel ? `，戰術${context.tacticLabel}` : ""}${context.routePulseSafetyLabel ? `，力場${context.routePulseSafetyLabel}` : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
       ${animatedPortraitMarkup(unit.portrait, {
         alt: `${unit.name}肖像`,
@@ -1478,17 +1523,8 @@ function renderHud(
         src="${ASSETS.sidePanelChrome.unitTop}" alt="" aria-hidden="true" />
       <img class="hud-unit-body-frame" data-testid="hud-unit-body-frame"
         src="${ASSETS.sidePanelChrome.unitBody}" alt="" aria-hidden="true" />
-      <div class="hud-identity">
+      <div class="hud-identity" data-testid="hud-identity">
         <b class="${identityClass}" title="${identity}">${identity}</b>
-        ${visibleControlSummary
-          ? `<span class="unit-control-summary" data-testid="unit-control-summary">${visibleControlSummary}</span>`
-          : ""}
-        ${tacticLabel || routePulseSafetyLabel ? `<span class="unit-context-summary">
-          ${tacticLabel ? `<span data-testid="unit-tactic">${tacticPrefix}<i>戰術</i>${tacticLabel}</span>` : ""}
-          ${routePulseSafetyLabel
-            ? `<span data-testid="route-pulse-safety" data-safety="${routePulseSafety}"><i>力場</i>${routePulseSafetyLabel}</span>`
-            : ""}
-        </span>` : ""}
       </div>
       <div class="meter-bar hp-bar" data-testid="hp-bar" aria-label="生命 ${unit.life}／${stats.maxLife}"><i style="height:${hpPercent}%"></i></div>
       <div class="meter-bar exp-bar" data-testid="exp-bar" aria-label="經驗 ${unit.experience}／${nextExperience}"><i style="height:${expPercent}%"></i></div>

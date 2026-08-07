@@ -110,6 +110,22 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/stage3-tactical-unit-hud.png`,
   });
+
+  await page.keyboard.press("Enter");
+  for (let step = 0; step < 7; step += 1) await page.keyboard.press("ArrowDown");
+  for (let step = 0; step < 3; step += 1) await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術阻擊救援隊");
+  const [tacticLabelColor, tacticValueColor, tacticGap] = await Promise.all([
+    page.getByTestId("unit-tactic-label").evaluate((element) => getComputedStyle(element).color),
+    page.getByTestId("unit-tactic-value").evaluate((element) => getComputedStyle(element).color),
+    page.locator(".selected-unit-tactic-pair").evaluate((element) => getComputedStyle(element).gap),
+  ]);
+  expect(tacticLabelColor).not.toBe(tacticValueColor);
+  expect(tacticGap).toBe("6px");
+  await page.getByTestId("game-screen").screenshot({
+    path: `${ARTIFACT_DIR}/stage3-tactic-label-value-contrast.png`,
+  });
 });
 
 test("S03-F/G: monk recovery exposes the native menu and marks only allies inside its effect diamond", async ({ page }) => {

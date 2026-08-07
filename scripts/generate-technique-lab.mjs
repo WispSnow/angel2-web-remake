@@ -686,11 +686,25 @@ for (const resource of audioResources) {
   techniqueAudioAssets[resource] = `/assets/original/technique-lab/audio/${filename}`;
 }
 
-function copyAlphaMask(colorFrame, maskFrame, output) {
+function imageDimensions(source) {
+  const dimensions = execFileSync("magick", ["identify", "-format", "%w %h", source], {
+    encoding: "utf8",
+  }).trim().split(" ").map(Number);
+  if (dimensions.length !== 2 || dimensions.some((value) => !Number.isInteger(value) || value <= 0)) {
+    throw new Error(`could not read image dimensions for ${source}`);
+  }
+  return dimensions;
+}
+
+function copyAlphaMask(colorFrame, maskFrame, output, { flipMask = false } = {}) {
+  const [maskWidth, maskHeight] = imageDimensions(maskFrame);
   execFileSync("magick", [
     "-define", "png:exclude-chunk=date,time",
     colorFrame,
-    "(", maskFrame, "-alpha", "extract", ")",
+    "-background", "black",
+    "-gravity", "northwest",
+    "-extent", `${maskWidth}x${maskHeight}`,
+    "(", maskFrame, "-alpha", "extract", ...(flipMask ? ["-flop"] : []), ")",
     "-alpha", "off",
     "-compose", "CopyOpacity",
     "-composite",
@@ -701,6 +715,10 @@ function copyAlphaMask(colorFrame, maskFrame, output) {
 const unitDirectory = path.join(publicRoot, "units");
 await mkdir(unitDirectory, { recursive: true });
 const unitAssets = {};
+// A/0003 frame 5 is the one ordinary side-2 figure drawn facing the opposite
+// horizontal direction from its A/0002 alpha source. Keeping this evidence
+// exception explicit avoids damaging the other 35 same-orientation records.
+const horizontallyFlippedEnemyMaskRecords = new Set([5]);
 for (const [record, classId] of classIds.entries()) {
   const frame = `${String(record).padStart(2, "0")}.png`;
   const allyFilename = `ally-${classId}.png`;
@@ -713,7 +731,11 @@ for (const [record, classId] of classIds.entries()) {
     ? `/assets/original/technique-lab/units/${allyFilename}`
     : null;
   if (ally) await copyFile(allySource, allyOutput);
-  if (record <= 35) copyAlphaMask(enemySource, allySource, enemyOutput);
+  if (record <= 35) {
+    copyAlphaMask(enemySource, allySource, enemyOutput, {
+      flipMask: horizontallyFlippedEnemyMaskRecords.has(record),
+    });
+  }
   else await copyFile(enemySource, enemyOutput);
   unitAssets[classId] = {
     nativeRecord: record,

@@ -5,6 +5,7 @@ import {
   type ClassId,
 } from "./class-catalog.generated";
 import type { BattleUnit, UnitStats } from "../types";
+import type { PortraitRecord } from "./portrait-catalog.generated";
 
 export {
   CLASS_CATALOG,
@@ -43,6 +44,34 @@ export function classIdFromNativeRecord(record: number): ClassId | undefined {
 
 export function className(classId: ClassId): string {
   return classDefinition(classId).nativeName;
+}
+
+/**
+ * The native generic fallback table is side-1 data. These records are the
+ * corresponding side-2 portrait variants where the original asset exists;
+ * records 51 and 64 have no confirmed directional counterpart in the current
+ * portrait coverage and therefore remain unchanged.
+ */
+const CLASS_FALLBACK_SIDE2_PORTRAITS = {
+  47: 48,
+  50: 49,
+  51: 51,
+  52: 53,
+  57: 58,
+  59: 60,
+  61: 62,
+  64: 64,
+} as const satisfies Readonly<Record<number, PortraitRecord>>;
+
+export function classFallbackPortraitFor(
+  classId: ClassId,
+  side: BattleUnit["side"],
+): PortraitRecord | undefined {
+  const side1Record = classDefinition(classId).genericPortraitRecord;
+  if (typeof side1Record !== "number") return undefined;
+  return side === 1
+    ? side1Record as PortraitRecord
+    : CLASS_FALLBACK_SIDE2_PORTRAITS[side1Record] ?? side1Record as PortraitRecord;
 }
 
 function primaryGrowth(classId: ClassId) {

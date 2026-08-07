@@ -73,6 +73,8 @@ test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as aut
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-mode", "allyPreview");
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveText("友軍・戰術自主作戰");
+  await expect(page.getByTestId("status-strip")).toHaveText("友軍・戰術自主作戰");
+  await expect(page.getByTestId("status-strip")).not.toContainText("藍色格");
   await expect(page.getByTestId("unit-force")).toHaveCount(0);
   await expect(page.getByTestId("action-menu")).toBeHidden();
   await page.getByTestId("game-screen").screenshot({

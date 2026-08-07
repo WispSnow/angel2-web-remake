@@ -150,6 +150,9 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   await clickClassShowdownWorldCell(page, 18, 17);
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveText("戰術主動進攻");
+  await expect(page.getByTestId("status-strip")).toHaveText("戰術主動進攻");
+  await expect(page.getByTestId("status-strip")).not.toContainText("紅色格");
+  await expect(page.getByTestId("hud-identity").locator("span")).toHaveCount(0);
   const poisonIcon = page.getByTestId("status-icon-poison");
   await expect(poisonIcon).toHaveAttribute("data-remaining-rounds", "3");
   await expect(poisonIcon).toHaveAttribute("aria-label", "施毒，剩餘 3 回合");
@@ -160,5 +163,28 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   await page.getByTestId("game-screen").screenshot({
     path: `${ARTIFACT_DIR}/class-showdown-jungle-poison-status-icon.png`,
   });
+  expect(pageErrors).toEqual([]);
+});
+
+test("unnamed class units use their native branch portrait in the battle HUD", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  await clickClassShowdownWorldCell(page, 17, 15);
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "47");
+
+  await page.keyboard.press("Delete");
+  await clickClassShowdownWorldCell(page, 17, 17);
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "57");
+
+  await page.keyboard.press("Delete");
+  await clickClassShowdownWorldCell(page, 18, 17);
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "58");
   expect(pageErrors).toEqual([]);
 });
