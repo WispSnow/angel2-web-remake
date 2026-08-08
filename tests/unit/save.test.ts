@@ -386,6 +386,16 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v18 saves into the stage-05 portal identity", () => {
+    const current = battleSave();
+    const legacy = {
+      ...current,
+      version: 18,
+      contentVersion: "dynamic-terrain-2",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
   it("migrates v17 dynamic-terrain saves without changing existing iron plate", () => {
     const current = battleSave();
     current.battle.terrainOverrides = [{ x: 20, y: 20, kind: "iron-plate" }];
@@ -504,6 +514,46 @@ describe("Web save validation", () => {
     expect(isSaveData(current)).toBe(true);
     expect(isSaveData({ ...current, consumedEventIds: current.consumedEventIds.slice(0, -1) }))
       .toBe(false);
+  });
+
+  it("accepts stage-05 and native scene-42 completion routes only with exact event identities", () => {
+    const stage5Completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-42-portal",
+      stageLabel: "異世界之門",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-05-enter-deployment",
+        "stage-05-opening-story",
+        "stage-05-objective-reached",
+        "stage-05-victory-story",
+        "stage-05-completed-route",
+      ],
+    };
+    expect(isSaveData(stage5Completed)).toBe(true);
+
+    const portalCompleted: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-06",
+      stageLabel: "第 6 關",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-42-nia-move",
+        "stage-42-arrival-story",
+        "stage-42-confrontation-story",
+        "stage-42-gadirath-move",
+        "stage-42-intervention-story",
+        "stage-42-lightning",
+        "stage-42-departures",
+        "stage-42-departure-story",
+        "stage-42-completed-route",
+      ],
+    };
+    expect(isSaveData(portalCompleted)).toBe(true);
+    expect(isSaveData({
+      ...portalCompleted,
+      consumedEventIds: portalCompleted.consumedEventIds.slice(0, -1),
+    })).toBe(false);
   });
 
   it("migrates the version-14 stage-4 boundary into the playable stage label", () => {

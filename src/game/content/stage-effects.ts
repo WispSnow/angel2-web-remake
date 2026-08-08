@@ -1,4 +1,10 @@
-import type { CampaignRouteId, Position, Side } from "../types";
+import type {
+  CampaignRouteId,
+  PortraitRecord,
+  Position,
+  Side,
+  UnitClassId,
+} from "../types";
 import type { StageSimulationEffectId } from "./stages";
 import { STAGE0 } from "./stage0";
 
@@ -29,6 +35,27 @@ export type StageSimulationEffectDefinition =
     from: Position;
     targetPortrait: number;
     movementBudget: number;
+  }
+  | {
+    type: "scripted-special-action";
+    actionId: "lightning-4";
+    actor: {
+      id: string;
+      side: Side;
+      slot: number;
+      classId: UnitClassId;
+      name: string;
+      portrait: PortraitRecord;
+    };
+    target: Position;
+    targetSide: Side;
+    preserveUnitIds: readonly string[];
+    statusText: string;
+  }
+  | {
+    type: "story-departures";
+    actors: readonly { side: Side; slot: number }[];
+    statusText: string;
   };
 
 export const STAGE_SIMULATION_EFFECTS:

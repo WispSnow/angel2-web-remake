@@ -31,7 +31,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 全景普通战斗 | `full-combat.test.ts` | `combat-lab.spec.ts` 或相关关卡用例 |
 | 调试中心与场景目录 | `debug-roster-profiles.test.ts` | `debug.spec.ts` |
 | 存档 schema 与迁移 | `save.test.ts` | `startup.spec.ts` 或对应关卡的存读档用例 |
-| 第 0–4 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
+| 第 0–5 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
 | 部署 | `deployment*.test.ts` | `deployment-lab.spec.ts` 或对应关卡部署用例 |
 | 肖像目录与职业通用头像回退 | `portrait.test.ts`、`arena.test.ts`、对应 `stageN-battle.test.ts`、`promotion.test.ts` | `portrait-lab.spec.ts`、`arena.spec.ts` 或具体关卡肖像用例 |
 

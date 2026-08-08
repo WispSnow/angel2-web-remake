@@ -22,6 +22,7 @@ type BattleMusicSide = "player" | "enemy";
 
 const playerMusicPhases = new Set<GamePhase>([
   "scriptedMove",
+  "scriptedStory",
   "openingStory",
   "player",
   "allyAuto",

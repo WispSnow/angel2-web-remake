@@ -240,7 +240,7 @@ test("S04-K: reduced motion keeps one readable damage impact outside the shield"
   }
 });
 
-test("S04-G: the active deployment round-trips through save format v18", async ({ page }) => {
+test("S04-G: the active deployment round-trips through save format v19", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const before = await state(page);
@@ -254,8 +254,8 @@ test("S04-G: the active deployment round-trips through save format v18", async (
     battle: { units: Stage4State["units"] };
   });
   expect(saved).toMatchObject({
-    version: 18,
-    contentVersion: "dynamic-terrain-2",
+    version: 19,
+    contentVersion: "stage-05-portal-1",
     stageId: "stage-04",
   });
   expect(saved.battle.units).toHaveLength(before.units.length);
@@ -267,7 +267,7 @@ test("S04-G: the active deployment round-trips through save format v18", async (
   expect(await state(page)).toMatchObject({ stageId: "stage-04", round: before.round });
 });
 
-test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 boundary", async ({ page }) => {
+test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.keyboard.press("o");
@@ -349,14 +349,14 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
     path: `${ARTIFACT_DIR}/stage4-save-prompt-portrait-alignment.png`,
   });
   await page.locator("[data-action=save-no]").click();
-  await waitForPhase(page, "nextStage");
+  await expect(page.getByTestId("deployment-screen")).toBeVisible();
   expect(await state(page)).toMatchObject({
-    stageId: "stage-04",
+    stageId: "stage-05",
+    phase: "deployment",
     campaignRoute: "stage-05",
   });
-  await expect(page.getByText("第 4 關已完成", { exact: true })).toBeVisible();
-  await expect(page.getByText(/「遭遇丁塔琪」（stage-05）入口/u)).toBeVisible();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／6");
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage4-stage5-boundary.png`,
+    path: `${ARTIFACT_DIR}/stage4-stage5-deployment.png`,
   });
 });

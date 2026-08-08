@@ -14,6 +14,7 @@ import {
 } from "../../src/game/class-showdown-session";
 import { classDefinition, classStatsFor, killRewardFor } from "../../src/game/content/classes";
 import { CLASS_SHOWDOWN_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
+import { ALLY_MAP_UNIT_ASSETS } from "../../src/game/content/map-unit-assets";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "../../src/game/content/technique-lab.generated";
 import {
   ALL_TERRAIN_ARENA_ENVIRONMENT,
@@ -105,11 +106,13 @@ describe("all-class showdown lab", () => {
 
     expect(runtime.assets?.map).toBe(CLASS_SHOWDOWN_MAP.source);
     expect(runtime.assets?.minimap).toBe(CLASS_SHOWDOWN_MAP.minimap);
+    expect(ALLY_MAP_UNIT_ASSETS["magic-sword-warrior"])
+      .toBe(TECHNIQUE_LAB_UNIT_ASSETS["magic-sword-warrior"].ally);
     expect(runtime.assets?.unitSprites).toMatchObject({
-      "ally-magic-sword-warrior": TECHNIQUE_LAB_UNIT_ASSETS["magic-sword-warrior"].ally,
       "enemy-magic-sword-warrior": TECHNIQUE_LAB_UNIT_ASSETS["magic-sword-warrior"].enemy,
       "enemy-engineer": TECHNIQUE_LAB_UNIT_ASSETS.engineer.enemy,
     });
+    expect(runtime.assets?.unitSprites).not.toHaveProperty("ally-magic-sword-warrior");
   });
 
   it("uses native class-branch portraits, including shared 0N/1N records", () => {

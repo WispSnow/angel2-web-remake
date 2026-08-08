@@ -22,6 +22,8 @@ const stages = [
   { stage: 2, mapRecord: 5, graphicsRecord: 4, ironPlateToken: 4, obstacleToken: 4 },
   { stage: 3, mapRecord: 7, graphicsRecord: 6, ironPlateToken: 28, obstacleToken: 36 },
   { stage: 4, mapRecord: 9, graphicsRecord: 8, ironPlateToken: 27, obstacleToken: 27 },
+  { stage: 5, mapRecord: 11, graphicsRecord: 10, ironPlateToken: 27, obstacleToken: 27 },
+  { stage: 42, id: "stage-42-portal", mapRecord: 85, graphicsRecord: 84, ironPlateToken: 1, obstacleToken: 1 },
 ];
 const constructions = [
   { kind: "iron-plate", sourceIndex: 1266, tokenKey: "ironPlateToken" },
@@ -64,7 +66,10 @@ for (const entry of stages) {
       PALETTES.gameplay.colors,
     );
     await writeFile(
-      path.join(outputDirectory, `stage-${String(entry.stage).padStart(2, "0")}.png`),
+      path.join(
+        outputDirectory,
+        `${entry.id ?? `stage-${String(entry.stage).padStart(2, "0")}`}.png`,
+      ),
       encodeRgbaPng(image.width, image.height, image.pixels),
     );
   }

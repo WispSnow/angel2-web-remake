@@ -82,7 +82,7 @@ export const STORY_BY_PHASE = {
   victoryStory: VICTORY_STORY,
 } as const;
 
-export type StageStoryPhase = keyof typeof STORY_BY_PHASE;
+export type StageStoryPhase = keyof typeof STORY_BY_PHASE | "scriptedStory";
 
 export const STORY_PAGES_BY_ID = {
   "stage-00-prebattle-story": PREBATTLE_STORY,
@@ -113,6 +113,7 @@ export function storyIdForStagePhase(
   stage: StageDefinition,
   phase: StageStoryPhase,
 ): StageStoryId | undefined {
+  if (phase === "scriptedStory") return stage.stories.scripted?.[0];
   if (phase === "prebattleStory") return stage.stories.prebattle;
   if (phase === "openingStory") return stage.stories.opening;
   if (phase === "round2Story") {
@@ -133,6 +134,7 @@ export function storyPhaseForStageStory(
     return "round2Story";
   }
   if (stage.stories.victory === storyId) return "victoryStory";
+  if (stage.stories.scripted?.includes(storyId)) return "scriptedStory";
   return undefined;
 }
 

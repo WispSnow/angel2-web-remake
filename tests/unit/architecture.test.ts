@@ -111,7 +111,13 @@ describe("source architecture", () => {
     expect(sharedActions).not.toMatch(/export function \w*Stage1/);
     expect(battleScene).not.toMatch(/stage\.id\s*!==\s*["']stage-00["']/);
     expect(controller).not.toContain('"stage-04"');
+    expect(controller).not.toContain('"stage-05"');
+    expect(controller).not.toContain('"stage-42-portal"');
     expect(battleScene).not.toContain('"stage-04"');
+    expect(battleScene).not.toContain('"stage-05"');
+    expect(battleScene).not.toContain('"stage-42-portal"');
     expect(ui).not.toContain('"stage-04"');
+    expect(ui).not.toContain('"stage-05"');
+    expect(ui).not.toContain('"stage-42-portal"');
   });
 });

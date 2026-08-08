@@ -15,7 +15,7 @@ import {
 } from "../content/actions";
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
-import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, Position, SaveRosterEntry, SavedBattleState, UnitStats, UnitStatuses } from "../types";
+import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, Position, SaveRosterEntry, SavedBattleState, Side, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
 import { constructionPath, constructionReachableCells, manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield } from "./grid";
 import {
@@ -227,6 +227,8 @@ export interface BattleScenario {
   dynamicTerrainSlots?: Readonly<Partial<Record<DynamicTerrainKind, number>>>;
   createUnits: (difficulty: Difficulty) => BattleUnit[];
   createCampaignRoster: (difficulty: Difficulty) => SaveRosterEntry[];
+  /** Restricts which projected side-1 units write back to the campaign roster. */
+  campaignUnitSlots?: readonly number[];
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   alliedBehaviorById?: ReadonlyMap<string, number>;
   enemyBehaviorById?: ReadonlyMap<string, number>;
@@ -297,7 +299,8 @@ export class Stage0Battle {
     this.routePulseByActorId = routePulseByActorId;
     this.campaignRoster = scenario.createCampaignRoster(difficulty);
     this.campaignUnitSlots = new Set(
-      this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
+      scenario.campaignUnitSlots
+        ?? this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
     );
   }
 
@@ -958,6 +961,50 @@ export class Stage0Battle {
       ?? this.units[0]?.id
       ?? actor.id;
     return prepared.result;
+  }
+
+  commitScriptedSpecialAction(
+    result: SpecialActionResult,
+    preserveUnitIds: readonly string[] = [],
+  ): SpecialActionResult {
+    const preserved = new Set(preserveUnitIds);
+    const affectedAreCurrent = result.affectedUnits.every((affected) => {
+      const unit = this.unit(affected.unitId);
+      return unit
+        && unit.life === affected.lifeBefore
+        && unit.experience === affected.experienceBefore
+        && unit.x === affected.positionBefore.x
+        && unit.y === affected.positionBefore.y
+        && unit.actionDisabled === affected.actionDisabledBefore
+        && statusesEqual(unit.statuses, affected.statusesBefore);
+    });
+    if (!affectedAreCurrent) throw new Error("stale scripted special action");
+
+    for (const affected of result.affectedUnits) {
+      const unit = this.unit(affected.unitId);
+      if (!unit) throw new Error("stale scripted special action");
+      this.setSharedLife(unit, affected.lifeAfter);
+      unit.actionDisabled = affected.actionDisabledAfter;
+      unit.statuses = { ...affected.statusesAfter };
+      this.recordCampaignUnit(unit);
+    }
+    const deadIds = new Set<string>();
+    for (const affected of result.affectedUnits) {
+      const unit = this.unit(affected.unitId);
+      if (unit?.life === 0 && !preserved.has(unit.id)) {
+        for (const member of this.waterWarriorGroup(unit)) deadIds.add(member.id);
+      }
+    }
+    if (deadIds.size > 0) this.units = this.units.filter(({ id }) => !deadIds.has(id));
+    return result;
+  }
+
+  removeStoryUnits(actors: readonly { side: Side; slot: number }[]): readonly string[] {
+    const ids = new Set(actors.map(({ side, slot }) => `${side}:${slot}`));
+    const removed = this.units.filter(({ id }) => ids.has(id)).map(({ id }) => id);
+    this.units = this.units.filter(({ id }) => !ids.has(id));
+    if (ids.has(this.focusId)) this.focusId = this.units[0]?.id ?? this.focusId;
+    return removed;
   }
 
   commitPreparedPrayerOutcome(

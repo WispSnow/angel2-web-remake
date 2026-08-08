@@ -24,6 +24,8 @@ export interface FixedStageAlliedUnitDefinition {
   position: Position;
   /** Initial class supplied by the native template for an untouched campaign slot. */
   initialClassId?: UnitClassId;
+  /** Scene-only class override; unlike initialClassId this ignores campaign growth. */
+  forcedClassId?: UnitClassId;
   name: string;
   /** Omit for a generic class identity; named actors must provide their record. */
   portrait?: PortraitRecord;
@@ -67,9 +69,9 @@ function createInheritedAlly(
   const inherited = campaignRoster.find(({ slot }) => slot === definition.slot);
   const untouchedCampaignSlot = inherited === undefined
     || (inherited.classId === inheritance.defaultClassId && inherited.experience === 0);
-  const classId = untouchedCampaignSlot
+  const classId = definition.forcedClassId ?? (untouchedCampaignSlot
     ? definition.initialClassId ?? inherited?.classId ?? inheritance.defaultClassId
-    : inherited.classId;
+    : inherited.classId);
   const genericIdentity = definition.portrait === undefined
     || definition.portrait === inheritance.genericPortrait;
   const namedBaseline = !genericIdentity && untouchedCampaignSlot;

@@ -9,6 +9,7 @@ const generators = [
   "generate-stage2-runtime.mjs",
   "generate-stage3-runtime.mjs",
   "generate-stage4-runtime.mjs",
+  "generate-stage5-runtime.mjs",
   "generate-stage0-actions.mjs",
   "generate-stage1-actions.mjs",
   "generate-dynamic-terrain-assets.mjs",

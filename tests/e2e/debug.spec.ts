@@ -39,6 +39,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 2 關 · 攻打騎士堡",
     "第 3 關 · 救援友軍",
     "第 4 關 · 通過力場",
+    "第 5 關 · 遭遇丁塔琪",
+    "第 5 關 · 異世界之門",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));

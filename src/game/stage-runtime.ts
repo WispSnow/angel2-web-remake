@@ -114,7 +114,7 @@ export interface StageRuntimeManifestEntry {
   mapPresentationActionIds: readonly BattleActionId[];
   entry: {
     trigger: "campaign-entered" | "battle-started";
-    phase: Extract<GamePhase, "prebattleStory" | "player">;
+    phase: Extract<GamePhase, "prebattleStory" | "player" | "scriptedMove">;
     statusText: string;
     campaignRoute?: CampaignRouteId;
   };
@@ -361,6 +361,86 @@ async function loadStage4Module(): Promise<StageRuntimeModule> {
     ),
   };
 }
+
+async function loadStage5Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage5"),
+    import("./simulation/stage5-battle"),
+  ]);
+  content.activateStage5Content();
+  const definition = content.STAGE5_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 05",
+      title: content.STAGE5.name,
+      objective: content.STAGE5_DEFINITION.objective.victoryText,
+      minimap: content.STAGE5_ASSETS.minimap,
+      terrain: content.STAGE5_TERRAIN_TOKENS,
+      gridWidth: content.STAGE5.width,
+      gridHeight: content.STAGE5.height,
+      enemies: content.STAGE5_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；七名候選最多選五人。擊敗汀塔琪或萊茵任一人即可。",
+    },
+    ["stage-05-enter-deployment"],
+    (campaign) => battleModule.createStage5DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 5 requires a deployment result");
+    return new battleModule.Stage5Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE5_DEFINITION,
+    assets: {
+      map: content.STAGE5_ASSETS.map,
+      minimap: content.STAGE5_ASSETS.minimap,
+      unitSprites: content.STAGE5_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
+async function loadStage42PortalModule(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage5"),
+    import("./simulation/stage42-portal-battle"),
+  ]);
+  content.activateStage5Content();
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, _preparation, rng) =>
+    new battleModule.Stage42PortalBattle(campaign, rng);
+  return {
+    definition: content.STAGE42_PORTAL_DEFINITION,
+    assets: {
+      map: content.STAGE42_ASSETS.map,
+      minimap: content.STAGE42_ASSETS.minimap,
+      unitSprites: content.STAGE42_ASSETS.unitSprites,
+    },
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(createBattle, campaign, snapshot),
+  };
+}
+
+const RELEASED_MAP_ACTION_IDS = [
+  "archer-shot",
+  "fire-1", "fire-2", "fire-3", "fire-4",
+  "heal-1", "heal-2", "heal-3",
+  "lightning-1", "lightning-2", "lightning-3", "lightning-4",
+  "ice-1", "ice-2", "ice-3", "ice-4",
+  "recovery-1", "recovery-2", "recovery-3",
+  "attack-up", "defense-up", "magic-guard", "poison", "confusion",
+  "attack-down", "defense-down", "spell-seal", "prayer", "dispel",
+  "stomp-1", "stomp-2", "stomp-3", "iron-plate", "obstacle",
+] as const satisfies readonly BattleActionId[];
 
 function createStage0SaveEnemyClasses(): readonly (readonly [string, UnitClassId])[] {
   return createStage0Units()
@@ -756,6 +836,105 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage4Module,
+  },
+  "stage-05": {
+    id: "stage-05",
+    ordinal: 5,
+    label: "遭遇丁塔琪",
+    nextStageId: "stage-42-portal",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "第一軍團進入騎士團堡內殿。",
+      campaignRoute: "stage-05",
+    },
+    enemyPhaseStatusText: "敵方階段：騎士團精銳開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始第 5 關部署。",
+      retreatStatusText: "全面撤退：返回第 5 關部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "異世界之門",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-05-enter-deployment",
+        "stage-05-opening-story",
+        "stage-05-objective-reached",
+        "stage-05-victory-story",
+        "stage-05-completed-route",
+      ],
+      requiredResumeEventIds: ["stage-05-enter-deployment", "stage-05-opening-story"],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 20, 21, 24],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 20, 21, 24],
+        maximumUnits: 6,
+        openCellCount: 5,
+      },
+      enemyClassById: [
+        ["2:44", "archer"], ["2:40", "archer"],
+        ["2:25", "soldier"], ["2:26", "soldier"],
+        ["2:51", "warrior"], ["2:50", "cavalry"],
+        ["2:45", "soldier"], ["2:41", "soldier"],
+        ["2:46", "soldier"], ["2:42", "soldier"],
+        ["2:47", "soldier"], ["2:43", "soldier"],
+        ["2:49", "soldier"], ["2:48", "soldier"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage5Module,
+  },
+  "stage-42-portal": {
+    id: "stage-42-portal",
+    ordinal: 5,
+    label: "異世界之門",
+    nextStageId: "stage-06",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: ["lightning-4"],
+    entry: {
+      trigger: "campaign-entered",
+      phase: "scriptedMove",
+      statusText: "汀塔琪與萊茵帶領眾人進入琴斯的寢室。",
+      campaignRoute: "stage-42-portal",
+    },
+    enemyPhaseStatusText: "傳送門過場不建立敵方階段。",
+    retry: {
+      mode: "entry",
+      statusText: "重新建立傳送門過場。",
+      retreatStatusText: "傳送門過場不可撤退。",
+    },
+    completion: {
+      destinationLabel: "第 6 關",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-42-nia-move",
+        "stage-42-arrival-story",
+        "stage-42-confrontation-story",
+        "stage-42-gadirath-move",
+        "stage-42-intervention-story",
+        "stage-42-lightning",
+        "stage-42-departures",
+        "stage-42-departure-story",
+        "stage-42-completed-route",
+      ],
+      alliedUnits: {
+        kind: "exact-slots",
+        slots: [0, 1, 2, 3, 4, 5, 6, 7, 23, 24],
+      },
+      enemyClassById: [],
+      enemyAi: "none",
+    },
+    load: loadStage42PortalModule,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

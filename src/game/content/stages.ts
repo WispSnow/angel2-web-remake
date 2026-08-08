@@ -16,7 +16,13 @@ export type StageStoryId =
   | "stage-03-victory-story"
   | "stage-04-prebattle-story"
   | "stage-04-opening-story"
-  | "stage-04-victory-story";
+  | "stage-04-victory-story"
+  | "stage-05-opening-story"
+  | "stage-05-victory-story"
+  | "stage-42-portal-arrival-story"
+  | "stage-42-portal-confrontation-story"
+  | "stage-42-portal-intervention-story"
+  | "stage-42-portal-departure-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -31,7 +37,11 @@ export type StageMusicId =
   | "stage-03-enemy-phase-music"
   | "stage-04-story-music"
   | "stage-04-player-phase-music"
-  | "stage-04-enemy-phase-music";
+  | "stage-04-enemy-phase-music"
+  | "stage-05-player-phase-music"
+  | "stage-05-enemy-phase-music"
+  | "stage-42-player-phase-music"
+  | "stage-42-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -59,7 +69,21 @@ export type StageEventId =
   | "stage-04-opening-story"
   | "stage-04-objective-reached"
   | "stage-04-victory-story"
-  | "stage-04-completed-route";
+  | "stage-04-completed-route"
+  | "stage-05-enter-deployment"
+  | "stage-05-opening-story"
+  | "stage-05-objective-reached"
+  | "stage-05-victory-story"
+  | "stage-05-completed-route"
+  | "stage-42-nia-move"
+  | "stage-42-arrival-story"
+  | "stage-42-confrontation-story"
+  | "stage-42-gadirath-move"
+  | "stage-42-intervention-story"
+  | "stage-42-lightning"
+  | "stage-42-departures"
+  | "stage-42-departure-story"
+  | "stage-42-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -76,7 +100,15 @@ export type StageSimulationEffectId =
   | "stage-03-route-to-stage-04"
   | "stage-04-enter-deployment"
   | "stage-04-set-victory-999"
-  | "stage-04-route-to-stage-05";
+  | "stage-04-route-to-stage-05"
+  | "stage-05-enter-deployment"
+  | "stage-05-set-victory-999"
+  | "stage-05-route-to-stage-42"
+  | "stage-42-nia-move"
+  | "stage-42-gadirath-move"
+  | "stage-42-lightning-4"
+  | "stage-42-story-departures"
+  | "stage-42-route-to-stage-06";
 
 export type StagePresentationId =
   | "none"
@@ -143,6 +175,8 @@ export interface StageStoryDefinition {
   opening?: StageStoryId;
   roundStarts: readonly { round: number; storyId: StageStoryId }[];
   victory?: StageStoryId;
+  /** Ordered battle-map stories used by non-interactive campaign interstitials. */
+  scripted?: readonly StageStoryId[];
 }
 
 export interface StageMusicDefinition {

@@ -1,6 +1,9 @@
 # 《天使帝国 II》Web 复刻
 
-当前普通入口可连续运行第 0–4 关，并终止在明确的 `stage-05` 未实现边界。流程从原版关前剧情开始，覆盖固定／交互编队、逐关事件与剧情、玩家与独立友军军团、敌方多军团、僧侣范围回復、移动结界、失败重试、战中与战后存档及首领／到达目标胜利。
+当前普通入口可连续运行第 0–5 关，并在原版场景 42“异世界之门”过场后终止于明确的
+`stage-06` 未实现边界。流程从原版关前剧情开始，覆盖固定／交互编队、逐关事件与剧情、
+玩家与独立友军军团、敌方多军团、僧侣范围回復、移动结界、双首领任一击破、剧情落雷与
+非死亡离场、失败重试、战中与战后存档及首领／到达目标胜利。
 
 运行时采用 Phaser 4.2.1、TypeScript 和 Vite。战斗规则与内容数据独立于 Phaser，场景层只负责地图、单位、镜头、输入和范围表现。
 
@@ -181,15 +184,22 @@ pnpm content:portraits # 从 D.SWF、原版元数据与 A/18 纹理重建肖像�
 pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉淡化参数
 pnpm content:stage2 # 从第 2 关机器证据重建地图、固定阵容、剧情与音乐内容
 pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧情与音乐内容
+pnpm content:stage4 # 从第 4 关机器证据重建地图、部署、剧情、音乐与力场内容
+pnpm content:stage5 # 从第 5 关／场景 42 机器证据重建地图、阵容、剧情与音乐内容
 ```
 
-端到端测试覆盖第 0–3 关的逐关合同，包括真实鼠标攻击、目标/系统/集体命令、AI 与 ZOC、部署、独立友军阶段、多军团目标、落雷/冰雪/回復、地图/全景战斗、剧情、失败重试、战中存读档、胜利保存、音乐/音效、键盘输入、减少动画、窄屏和按关延迟加载。普通 `/` 的真实流程不带 `?test=1`、不读取调试状态，只使用玩家可见控件。固定版本 Chromium 在 Darwin 本地执行代表性截图审计，CI 保留同一流程的语义断言以避开跨系统字形光栅差异。过程截图生成到 `artifacts/playwright/`。
+端到端测试覆盖第 0–5 关与场景 42 的逐关合同，包括真实鼠标攻击、目标/系统/集体命令、
+AI 与 ZOC、部署、独立友军阶段、多军团目标、落雷/冰雪/回復、地图/全景战斗、剧情、失败
+重试、战中存读档、胜利保存、脚本移动／离场、音乐/音效、键盘输入、减少动画、窄屏和按关
+延迟加载。普通 `/` 的真实流程不带 `?test=1`、不读取调试状态，只使用玩家可见控件。
+固定版本 Chromium 在 Darwin 本地执行代表性截图审计，CI 保留同一流程的语义断言以避开
+跨系统字形光栅差异。过程截图生成到 `artifacts/playwright/`。
 
 ## 结构
 
-- `src/game/content/`：证据驱动的第 0–4 关内容、原始数值与对白；
+- `src/game/content/`：证据驱动的第 0–5 关与场景 42 内容、原始数值与对白；
 - `src/game/simulation/`：与 Phaser 无关的确定性网格、伤害、经验和 AI；
-- `src/game/stage-runtime.ts`：第 0–4 关唯一运行时装配、延迟加载、恢复与存档元数据清单；
+- `src/game/stage-runtime.ts`：第 0–5 关与场景 42 的唯一运行时装配、延迟加载、恢复与存档元数据清单；
 - `src/game/arena-session.ts`：竞技场编辑状态、放置合法性与可序列化开战配置；
 - `src/game/class-showdown-session.ts`：35 组常规职业的两列相邻编队、平原环境与统一等级配置；
 - `src/game/promotion-lab-session.ts`：12 组可转职来源的临界经验、两列相邻编队与敌我成长边界；
@@ -216,4 +226,8 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 - `tests/`：模拟与浏览器验收。
 - `planning/`：当前进度、路线、里程碑和跨阶段风险。
 
-当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见 [`design/remake-gdd/vertical-slices/`](design/remake-gdd/vertical-slices/)，原版证据基线见 [`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 0–3 关均已通过用户人工验收；第 4 关实现及自动门禁已经完成，仍等待普通入口人工接受。第 5 关和未逐项建立纸面合同的职业能力继续冻结。
+当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见
+[`design/remake-gdd/vertical-slices/`](design/remake-gdd/vertical-slices/)，原版证据基线见
+[`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 0–4 关均已通过用户人工
+验收；第 5 关与场景 42 已实现并完成自动门禁，等待普通入口人工接受。第 6 关和未获独立
+授权的后续战役内容继续冻结。

@@ -65,6 +65,7 @@ import { buildStompPresentationSteps } from "./stomp-presentation";
 import { techniqueEffectRange } from "./simulation/actions/range-map";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
+import { prepareScriptedLightning4 } from "./simulation/scripted-actions";
 import {
   createStageEventState,
   dispatchStageEvents,
@@ -293,6 +294,7 @@ const STORY_PHASES = new Set<GamePhase>([
   "openingStory",
   "round2Story",
   "victoryStory",
+  "scriptedStory",
 ]);
 const isStoryPhase = (phase: GamePhase): phase is StageStoryPhase => STORY_PHASES.has(phase);
 const pause = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
@@ -370,6 +372,7 @@ export class GameController {
   statusMessage = "";
   pendingSaveSlot?: number;
   stageProgress = 0;
+  private skippingScriptedSequence = false;
   savePromptIndex = 0;
   postSaveSlotIndex = 0;
   promotionUnitIds: string[] = [];
@@ -637,6 +640,13 @@ export class GameController {
     return storyPagesForId(this.activeStoryId)[this.dialogueIndex];
   }
 
+  get canSkipScriptedSequence(): boolean {
+    return this.phase === "scriptedStory"
+      && this.activeStoryId !== undefined
+      && (this.battle.stage.stories.scripted?.includes(this.activeStoryId) ?? false)
+      && !this.skippingScriptedSequence;
+  }
+
   get focusedUnit(): BattleUnit | undefined {
     if (this.phase === "player") return this.selectedUnit ?? this.battle.unitAt(this.cursor);
     return this.battle.focus;
@@ -872,6 +882,28 @@ export class GameController {
     else if (isStoryPhase(this.phase)) this.completeDialogue();
   }
 
+  skipScriptedSequence(): void {
+    if (!this.canSkipScriptedSequence || !this.activeStoryId) return;
+    const storyId = this.activeStoryId;
+    this.activeStoryId = undefined;
+    this.dialogueIndex = 0;
+    this.skippingScriptedSequence = true;
+    this.busy = true;
+    const events = this.consumeStageTrigger({ type: "story-completed", storyId });
+    void this.processStageEvents(events)
+      .then(() => {
+        this.busy = false;
+        this.skippingScriptedSequence = false;
+        this.emit();
+      })
+      .catch((error: unknown) => {
+        this.busy = false;
+        this.skippingScriptedSequence = false;
+        this.statusMessage = error instanceof Error ? error.message : "無法跳過目前過場。";
+        this.emit();
+      });
+  }
+
   private completeDialogue(): void {
     const completed = this.phase;
     const storyId = this.activeStoryId;
@@ -894,7 +926,7 @@ export class GameController {
   private initializeStageEventProgress(): void {
     this.stageEventState = createStageEventState(this.battle.stage);
     const events = this.consumeStageTrigger({ type: "campaign-entered" });
-    void this.processStageEvents(events);
+    void this.processStageEvents(events).then(() => this.emit());
   }
 
   private consumeStageTrigger(trigger: StageEventTrigger): readonly StageEventDefinition[] {
@@ -909,6 +941,19 @@ export class GameController {
         await this.executeStageSimulationEffect(event.simulationEffect);
       }
       this.applyStagePresentation(event.presentation);
+      if (
+        this.skippingScriptedSequence
+        && event.presentation !== "none"
+        && event.presentation !== "stage-00-opening-move"
+        && event.presentation !== "stage-01-messenger-arrival"
+        && storyPhaseForStageStory(this.battle.stage, event.presentation) === "scriptedStory"
+      ) {
+        const storyId = event.presentation;
+        this.activeStoryId = undefined;
+        this.dialogueIndex = 0;
+        const skippedStoryEvents = this.consumeStageTrigger({ type: "story-completed", storyId });
+        await this.processStageEvents(skippedStoryEvents);
+      }
       if (event.simulationEffect !== "none") {
         const chained = this.consumeStageTrigger({
           type: "effect-completed",
@@ -941,6 +986,20 @@ export class GameController {
       await this.runStage1MessengerArrival(definition);
       return;
     }
+    if (definition.type === "scripted-special-action") {
+      await this.runScriptedSpecialAction(definition);
+      return;
+    }
+    if (definition.type === "story-departures") {
+      const removed = this.battle.removeStoryUnits(definition.actors);
+      this.statusMessage = `${definition.statusText}（${removed.length} 人）`;
+      const focus = this.battle.focus;
+      if (focus) {
+        this.cursor = { x: focus.x, y: focus.y };
+        this.centerCamera(focus);
+      }
+      return;
+    }
     this.campaignRoute = definition.destination;
     if (isPlayableStageId(definition.destination)) {
       await this.enterStage(definition.destination, {
@@ -969,8 +1028,7 @@ export class GameController {
       { type: "scripted-unit-move" }
     >,
   ): Promise<void> {
-    if (this.busy) return;
-    this.busy = true;
+    if (this.busy && !this.skippingScriptedSequence) return;
     this.phase = "scriptedMove";
     this.statusMessage = definition.statusText;
     const actor = this.battle.units.find(
@@ -984,6 +1042,14 @@ export class GameController {
     this.battle.focusId = actor.id;
     this.cursor = { x: actor.x, y: actor.y };
     this.centerCamera(actor);
+    if (this.skippingScriptedSequence) {
+      actor.x = definition.destination.x;
+      actor.y = definition.destination.y;
+      this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
+      this.cursor = { ...definition.destination };
+      return;
+    }
+    this.busy = true;
     this.emit();
     await this.animateUnitPath(actor.id, path, "scripted");
     actor.x = definition.destination.x;
@@ -1046,6 +1112,70 @@ export class GameController {
     this.cursor = { x: target.x, y: target.y };
     this.centerCamera(target);
     this.busy = false;
+  }
+
+  private async runScriptedSpecialAction(
+    definition: Extract<
+      NonNullable<ReturnType<typeof stageSimulationEffectFor>>,
+      { type: "scripted-special-action" }
+    >,
+  ): Promise<void> {
+    if (this.busy && !this.skippingScriptedSequence) return;
+    const actor: BattleUnit = {
+      id: definition.actor.id,
+      side: definition.actor.side,
+      slot: definition.actor.slot,
+      classId: definition.actor.classId,
+      className: className(definition.actor.classId),
+      name: definition.actor.name,
+      portrait: definition.actor.portrait,
+      x: definition.target.x,
+      y: definition.target.y,
+      life: 1,
+      experience: 0,
+      acted: true,
+      actionDisabled: false,
+      statuses: {
+        attackUp: 0,
+        defenseUp: 0,
+        magicGuard: 0,
+        confusion: 0,
+        attackDown: 0,
+        defenseDown: 0,
+        poison: 0,
+        techniqueSeal: 0,
+      },
+    };
+    const result = prepareScriptedLightning4(
+      this.battle.units,
+      this.battle.stage,
+      definition.target,
+      definition.targetSide,
+      actor.id,
+    );
+    if (this.skippingScriptedSequence) {
+      this.specialActionPresentation = undefined;
+      this.specialActionPresentationTrace = [];
+      this.lastSpecialAction = this.battle.commitScriptedSpecialAction(
+        result,
+        definition.preserveUnitIds,
+      );
+      this.statusMessage = `究級落雷造成 ${result.damage} 點傷害。`;
+      return;
+    }
+    this.busy = true;
+    this.phase = "scriptedMove";
+    this.cursor = { ...definition.target };
+    this.centerCamera(definition.target);
+    this.statusMessage = definition.statusText;
+    this.emit();
+    await this.presentSpecialAction(actor, undefined, result);
+    this.lastSpecialAction = this.battle.commitScriptedSpecialAction(
+      result,
+      definition.preserveUnitIds,
+    );
+    this.busy = false;
+    this.statusMessage = `究級落雷造成 ${result.damage} 點傷害。`;
   }
 
   selectCell(position: Position): void {
@@ -1772,6 +1902,8 @@ export class GameController {
           : presentation.lightning1;
       let elapsedNativeTicks = 0;
       let audioRequestIndex = 0;
+      const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+        ?? false;
       const queueDueLightningAudio = (): void => {
         while (audioRequestIndex < lightning.audioRequests.length) {
           const request = lightning.audioRequests[audioRequestIndex];
@@ -1787,22 +1919,54 @@ export class GameController {
       };
       let draw = 0;
       queueDueLightningAudio();
-      for (const phase of lightning.phases) {
-        for (const _descriptor of phase.descriptorSequence) {
-          await present("lightningMain", draw, phase.waitPerDrawNativeTicks);
-          draw += 1;
-          elapsedNativeTicks += phase.waitPerDrawNativeTicks;
-          queueDueLightningAudio();
+      if (reducedMotion) {
+        const mainDrawCount = lightning.phases.reduce(
+          (total, phase) => total + phase.descriptorSequence.length,
+          0,
+        );
+        const mainNativeTicks = lightning.phases.reduce(
+          (total, phase) => total + phase.descriptorSequence.length * phase.waitPerDrawNativeTicks,
+          0,
+        );
+        const representativeDraw = Math.max(0, Math.floor(mainDrawCount * 2 / 3));
+        await present("lightningMain", representativeDraw, mainNativeTicks, undefined, 12);
+        elapsedNativeTicks += mainNativeTicks;
+        queueDueLightningAudio();
+      } else {
+        for (const phase of lightning.phases) {
+          for (const _descriptor of phase.descriptorSequence) {
+            await present("lightningMain", draw, phase.waitPerDrawNativeTicks);
+            draw += 1;
+            elapsedNativeTicks += phase.waitPerDrawNativeTicks;
+            queueDueLightningAudio();
+          }
         }
       }
       const hit = lightning.commonHit;
-      for (let iteration = 0; iteration < hit.iterations; iteration += 1) {
-        for (let wave = 0; wave < hit.waveDrawsPerIteration; wave += 1) {
-          await present("lightningHit", iteration * hit.waveDrawsPerIteration + wave, hit.waitPerWaveDrawNativeTicks);
+      if (reducedMotion) {
+        await present(
+          "lightningHit",
+          0,
+          hit.iterations * hit.waveDrawsPerIteration * hit.waitPerWaveDrawNativeTicks,
+          undefined,
+          12,
+        );
+        await present(
+          "lightningCleanup",
+          0,
+          hit.cleanup.drawCount * hit.cleanup.waitPerDrawNativeTicks,
+          undefined,
+          12,
+        );
+      } else {
+        for (let iteration = 0; iteration < hit.iterations; iteration += 1) {
+          for (let wave = 0; wave < hit.waveDrawsPerIteration; wave += 1) {
+            await present("lightningHit", iteration * hit.waveDrawsPerIteration + wave, hit.waitPerWaveDrawNativeTicks);
+          }
         }
-      }
-      for (let frame = 0; frame < hit.cleanup.drawCount; frame += 1) {
-        await present("lightningCleanup", frame, hit.cleanup.waitPerDrawNativeTicks);
+        for (let frame = 0; frame < hit.cleanup.drawCount; frame += 1) {
+          await present("lightningCleanup", frame, hit.cleanup.waitPerDrawNativeTicks);
+        }
       }
     } else if (result.actionId === "ice-1"
       || result.actionId === "ice-2"
@@ -3538,6 +3702,33 @@ export class GameController {
       this.recordMenuReturn = undefined;
       if (!isPlayableStageId(save.stageId)) {
         const source = stageRuntimeSourceForDestination(save.stageId);
+        if (source) {
+          const runtime = await loadStageRuntime(source.id);
+          const campaign = {
+            stageId: source.id,
+            ruleset: save.ruleset,
+            difficulty: save.difficulty,
+            roster: save.roster,
+            rngState: save.rngState,
+            rngCalls: save.rngCalls,
+          } as const;
+          this.stageRuntime = runtime;
+          this.battle = runtime.createBattle(
+            campaign,
+            runtime.preparation?.createInitialResult(),
+          );
+          this.stageEntrySnapshot = cloneCampaignState(campaign);
+          this.stageEventState = createStageEventState(
+            this.battle.stage,
+            save.consumedEventIds as StageEventState["consumedEventIds"],
+          );
+          this.cameraOrigin = clampCameraOrigin(
+            this.battle.stage,
+            this.battle.stage.viewport.initialOrigin,
+          );
+          const focus = this.battle.unit(runtime.focusUnitId) ?? this.battle.focus;
+          this.cursor = focus ? { x: focus.x, y: focus.y } : { ...this.cameraOrigin };
+        }
         this.completedProgressMetadata = source ? {
           completedOrdinal: source.ordinal,
           destinationId: source.nextStageId,
@@ -3839,7 +4030,7 @@ export class GameController {
     this.emit();
   }
 
-  forceVictorySetupForTest(): void {
+  forceVictorySetupForTest(targetIndex = 0): void {
     if (!this.debugMode) return;
     const victory = this.battle.stage.objective.victory;
     if (victory.type === "unit-in-cell-range") {
@@ -3868,22 +4059,55 @@ export class GameController {
       ?? this.battle.units.find((unit) => this.battle.isPlayerControllableAlly(unit.id));
     const finalEnemy = victory.type === "unit-removed"
       ? this.battle.units.find((unit) => unit.side === victory.side && unit.slot === victory.slot)
-      : this.battle.units.find((unit) => unit.side === 2);
+      : victory.type === "any-unit-removed"
+        ? this.battle.units.find((unit) => unit.side === victory.side
+          && unit.slot === victory.slots[targetIndex])
+        : this.battle.units.find((unit) => unit.side === 2);
     if (!commander || !finalEnemy) return;
+    const requiredVictoryTargets = victory.type === "any-unit-removed"
+      ? this.battle.units.filter((unit) => unit.side === victory.side
+        && victory.slots.some((slot) => slot === unit.slot))
+      : [finalEnemy];
     commander.x = 29;
     commander.y = 26;
     commander.acted = false;
     finalEnemy.x = 30;
     finalEnemy.y = 26;
     finalEnemy.life = 1;
-    this.battle.units = this.battle.units.filter((unit) => unit.side === 1 || unit.id === finalEnemy.id);
+    for (const target of requiredVictoryTargets) {
+      if (target.id === finalEnemy.id) continue;
+      target.x = Math.max(0, this.battle.stage.width - 2);
+      target.y = Math.max(0, this.battle.stage.height - 2);
+      target.acted = true;
+    }
+    const requiredVictoryTargetIds = new Set(requiredVictoryTargets.map(({ id }) => id));
+    this.battle.units = this.battle.units.filter(
+      (unit) => unit.side === 1 || requiredVictoryTargetIds.has(unit.id),
+    );
     for (const unit of this.battle.units.filter((unit) => unit.side === 1 && unit.id !== commander.id)) unit.acted = true;
     this.battle.focusId = commander.id;
     this.phase = "player";
     this.centerCamera(commander);
     this.cursor = { x: commander.x, y: commander.y };
     this.resetAction();
-    this.statusMessage = "自動驗收：最後一名敵人已置於合法攻擊位。";
+    this.statusMessage = victory.type === "any-unit-removed"
+      ? "自動驗收：指定勝利目標已置於合法攻擊位，其餘首領仍在場。"
+      : "自動驗收：最後一名敵人已置於合法攻擊位。";
+    this.emit();
+  }
+
+  forceVictoryForTest(targetIndex = 0): void {
+    if (!this.debugMode) return;
+    const victory = this.battle.stage.objective.victory;
+    const target = victory.type === "unit-removed"
+      ? this.battle.units.find(({ side, slot }) => side === victory.side && slot === victory.slot)
+      : victory.type === "any-unit-removed"
+        ? this.battle.units.find(({ side, slot }) =>
+          side === victory.side && slot === victory.slots[targetIndex])
+        : undefined;
+    if (!target) return;
+    this.battle.units = this.battle.units.filter(({ id }) => id !== target.id);
+    this.resolveOutcome();
     this.emit();
   }
 
@@ -4309,6 +4533,7 @@ export class GameController {
       retreatConfirmIndex: this.retreatConfirmIndex,
       audioCue: this.audioCue ? { ...this.audioCue } : undefined,
       audioCueLog: this.audioCueLog.map((cue) => ({ ...cue })),
+      presentationFast: this.presentationFast,
       battlePresentation: this.battlePresentation,
       gridEnabled: this.gridEnabled,
       edgeScrollEnabled: this.edgeScrollEnabled,

@@ -6,8 +6,22 @@ export type { PortraitRecord } from "./content/portrait-catalog.generated";
 export type Side = 1 | 2;
 export type Difficulty = 0 | 1 | 2 | 3;
 export type UnitClassId = ClassId;
-export type StageId = "stage-00" | "stage-01" | "stage-02" | "stage-03" | "stage-04";
-export type CampaignRouteId = "stage-01" | "stage-02" | "stage-03" | "stage-04" | "stage-05";
+export type StageId =
+  | "stage-00"
+  | "stage-01"
+  | "stage-02"
+  | "stage-03"
+  | "stage-04"
+  | "stage-05"
+  | "stage-42-portal";
+export type CampaignRouteId =
+  | "stage-01"
+  | "stage-02"
+  | "stage-03"
+  | "stage-04"
+  | "stage-05"
+  | "stage-42-portal"
+  | "stage-06";
 
 export interface Position {
   x: number;
@@ -55,6 +69,7 @@ export type GamePhase =
   | "prebattleStory"
   | "deployment"
   | "scriptedMove"
+  | "scriptedStory"
   | "openingStory"
   | "player"
   | "allyAuto"
@@ -152,8 +167,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 18;
-  contentVersion: "dynamic-terrain-2";
+  version: 19;
+  contentVersion: "stage-05-portal-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

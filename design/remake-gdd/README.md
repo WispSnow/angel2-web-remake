@@ -1,13 +1,13 @@
 # 《天使帝国 II》Web 复刻版设计文档
 
-版本：Draft 0.5
+版本：Draft 0.6
 
-日期：2026-08-04
+日期：2026-08-08
 
-阶段：第 0–3 关已接受；M04.5 框架收口已验证；M05 第 4 关纸面合同已闭合
+阶段：第 0–4 关已接受；M08 第 5 关已实现并完成自动验收
 
-开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–3 关已获用户接受，M04.5
-框架回归通过，M05 只建立第 4 关关卡／系统合同。第 4 关代码与其余战役继续冻结
+开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–4 关已获用户接受，第 5 关
+与场景 42 有界实现和自动验收完成、等待普通入口人工接受；第 6 关及后续运行时仍冻结
 
 ## 文档目的
 
@@ -47,7 +47,8 @@
 | [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术扩展与首领目标关 | Draft 0.3 / 已接受 |
 | [`vertical-slices/stage-02.md`](vertical-slices/stage-02.md) | 固定续关、友军自动阶段与首领目标关 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-03.md`](vertical-slices/stage-03.md) | 双队汇合、行为 3/4 编队、双保护目标与僧侣首领 | Draft 0.1 / 已接受 |
-| [`vertical-slices/stage-04.md`](vertical-slices/stage-04.md) | 交互部署、独立结界引导者、外圈减半与到达区胜利 | Draft 0.1 / specified |
+| [`vertical-slices/stage-04.md`](vertical-slices/stage-04.md) | 交互部署、独立结界引导者、外圈减半与到达区胜利 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-05.md`](vertical-slices/stage-05.md) | 双首领任一击破、普通战后保存与场景 42 传送门桥接 | Draft 0.2 / implemented，待人工接受 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
@@ -59,7 +60,7 @@
 | [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M02 / 已实现并通过自动验收 |
 | [`systems/techniques-stage3.md`](systems/techniques-stage3.md) | 僧侣 `1H/1I`、范围回復、AI 与 255 tick 表现 | M04 / 已接受 |
 | [`systems/force-ai-groups.md`](systems/force-ai-groups.md) | 显式军团控制权、独立友军 AI、策略与跨军团目标 | M04 框架提取 / 已验证 |
-| [`systems/force-field-escort.md`](systems/force-field-escort.md) | 路线尝试、移动安全区、生命减半与表现边界 | M05 / specified |
+| [`systems/force-field-escort.md`](systems/force-field-escort.md) | 路线尝试、移动安全区、生命减半与表现边界 | M06 / 已实现并通过自动验收 |
 | [`systems/technique-implementation-sequence.md`](systems/technique-implementation-sequence.md) | 33 项技术的机器顺序、逐项门禁与完成状态 | 系统例外 / 已验证 |
 | [`systems/technique-aa-attack-up.md`](systems/technique-aa-attack-up.md) | 攻击提升、完整轮计数、双方 AI、原版双格光柱与冰封例外 | 已实现并通过完整门禁 |
 | [`systems/technique-ad-defense-up.md`](systems/technique-ad-defense-up.md) | 防御提升、完整轮计数、双方 AI、原版四格盾牌与冰封例外 | 已实现并通过完整门禁 |
@@ -105,5 +106,6 @@
   `stage-03` 路由。
 - 第 3 关已由用户明确授权作为有界 M04 实现例外；只解除其合同列出的固定阵容、行为
   `2/3/4` 友军、双保护目标、僧侣 `1H/1I`、剧情/音乐、v14 和 `stage-04` 路由。
-- 第 4 关纸面合同与 `REMAKE-023` 已在 M05 闭合，但 `specified` 不等于实现授权；仍须用户
-  明确授权有界实施后才能生成内容、增加 v15 或开放可玩入口。第 5 关及其余战役继续冻结。
+- 第 4 关已于 2026-08-08 获用户接受；同日用户授权 M08，第 5 关、场景 42、
+  `REMAKE-027` 与 v19 已作为有界例外实现并完成自动验收。当前等待普通入口人工接受；
+  第 6 关及其余战役继续冻结。

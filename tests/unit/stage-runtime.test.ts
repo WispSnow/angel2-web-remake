@@ -25,14 +25,18 @@ describe("stage runtime manifest", () => {
       "stage-02",
       "stage-03",
       "stage-04",
+      "stage-05",
+      "stage-42-portal",
     ]);
-    expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ ordinal }) => ordinal)).toEqual([0, 1, 2, 3, 4]);
+    expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ ordinal }) => ordinal)).toEqual([0, 1, 2, 3, 4, 5, 5]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ nextStageId }) => nextStageId)).toEqual([
       "stage-01",
       "stage-02",
       "stage-03",
       "stage-04",
       "stage-05",
+      "stage-42-portal",
+      "stage-06",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ label }) => label)).toEqual([
       "瓦爾克麗宮",
@@ -40,14 +44,23 @@ describe("stage runtime manifest", () => {
       "攻打騎士堡",
       "救援友軍",
       "通過力場",
+      "遭遇丁塔琪",
+      "異世界之門",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ completion }) => completion.destinationLabel))
-      .toEqual(["騎士城堡前", "攻打騎士堡", "救援友軍", "通過力場", "遭遇丁塔琪"]);
+      .toEqual([
+        "騎士城堡前", "攻打騎士堡", "救援友軍", "通過力場",
+        "遭遇丁塔琪", "異世界之門", "第 6 關",
+      ]);
     expect(isPlayableStageId("stage-03")).toBe(true);
     expect(isPlayableStageId("stage-04")).toBe(true);
-    expect(isPlayableStageId("stage-05")).toBe(false);
+    expect(isPlayableStageId("stage-05")).toBe(true);
+    expect(isPlayableStageId("stage-42-portal")).toBe(true);
+    expect(isPlayableStageId("stage-06")).toBe(false);
     expect(stageRuntimeSourceForDestination("stage-04")?.id).toBe("stage-03");
     expect(stageRuntimeSourceForDestination("stage-05")?.id).toBe("stage-04");
+    expect(stageRuntimeSourceForDestination("stage-42-portal")?.id).toBe("stage-05");
+    expect(stageRuntimeSourceForDestination("stage-06")?.id).toBe("stage-42-portal");
     expect(STAGE_RUNTIME_MANIFEST["stage-03"].mapPresentationActionIds).toContain("recovery-1");
   });
 
@@ -55,6 +68,8 @@ describe("stage runtime manifest", () => {
     const stage2 = await loadStageRuntime("stage-02");
     const stage3 = await loadStageRuntime("stage-03");
     const stage4 = await loadStageRuntime("stage-04");
+    const stage5 = await loadStageRuntime("stage-05");
+    const portal = await loadStageRuntime("stage-42-portal");
     expect(stage2.createBattle(campaign).stage.id).toBe("stage-02");
     expect(stage3.createBattle({ ...campaign, stageId: "stage-03" }).stage.id).toBe("stage-03");
     expect(stage3.assets?.unitSprites["enemy-monk"]).toContain("unit-enemy-monk.png");
@@ -66,6 +81,10 @@ describe("stage runtime manifest", () => {
       rangeThresholdStart: 0,
       sweepWidth: 11,
     });
+    expect(stage5.preparation?.definition).toMatchObject({ maximumUnits: 6 });
+    expect(stage5.assets?.unitSprites["enemy-archer"]).toContain("enemy-archer.png");
+    expect(portal.entry.phase).toBe("scriptedMove");
+    expect(portal.mapPresentationActionIds).toEqual(["lightning-4"]);
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
   });

@@ -73,6 +73,30 @@ const STAGE4_COMPLETED_EVENT_IDS = [
   "stage-04-completed-route",
 ] as const;
 
+const STAGE5_BATTLE_EVENT_IDS = [
+  "stage-05-enter-deployment",
+  "stage-05-opening-story",
+] as const;
+
+const STAGE5_COMPLETED_EVENT_IDS = [
+  ...STAGE5_BATTLE_EVENT_IDS,
+  "stage-05-objective-reached",
+  "stage-05-victory-story",
+  "stage-05-completed-route",
+] as const;
+
+const STAGE42_COMPLETED_EVENT_IDS = [
+  "stage-42-nia-move",
+  "stage-42-arrival-story",
+  "stage-42-confrontation-story",
+  "stage-42-gadirath-move",
+  "stage-42-intervention-story",
+  "stage-42-lightning",
+  "stage-42-departures",
+  "stage-42-departure-story",
+  "stage-42-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -392,6 +416,98 @@ async function createStage4Completed(context: DebugScenarioContext): Promise<Gam
   return GameController.fromSave(save, 1);
 }
 
+async function createStage5Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-05",
+    debugCampaign(context, "stage-05"),
+    { preparation: true, statusMessage: "調試場景：第 5 關內殿部署。" },
+  );
+  return controller;
+}
+
+async function createStage5Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-05");
+  const [{ STAGE5_DEFINITION }, { Stage5Battle }] = await Promise.all([
+    import("./content/stage5"),
+    import("./simulation/stage5-battle"),
+  ]);
+  const deployment = {
+    placements: [
+      ...STAGE5_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE5_DEFINITION.deployment.optionalSlots.slice(0, 5).map((slot, index) => ({
+        slot, position: { ...STAGE5_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+  const battle = new Stage5Battle(campaign, deployment);
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 5 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-05"),
+    stageLabel: "遭遇丁塔琪",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE5_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：第 5 關六人編隊玩家回合。";
+  return controller;
+}
+
+async function createStage5Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-05");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-42-portal",
+    stageLabel: "異世界之門",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(campaign.roster),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE5_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
+async function createStage42Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-42-portal");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-06",
+    stageLabel: "第 6 關",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(campaign.roster),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE42_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -461,6 +577,29 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictorySetupForTest();
   }),
   "stage-04-cleared": createStage4Completed,
+  "stage-05-deployment": createStage5Deployment,
+  "stage-05-player": createStage5Player,
+  "stage-05-near-tintachi": withSetup(createStage5Player, (controller) => {
+    controller.forceVictorySetupForTest(0);
+  }),
+  "stage-05-near-rhein": withSetup(createStage5Player, (controller) => {
+    controller.forceVictorySetupForTest(1);
+  }),
+  "stage-05-near-defeat": withSetup(createStage5Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const enemy = controller.battle.units.find(({ side }) => side === 2);
+    if (!nia || !enemy) return;
+    nia.life = 1;
+    enemy.x = nia.x + 1;
+    enemy.y = nia.y;
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，敵兵位於相鄰格。";
+  }),
+  "stage-05-victory-ready": withSetup(createStage5Player, (controller) => {
+    controller.forceVictoryForTest(0);
+  }),
+  "stage-05-cleared": createStage5Completed,
+  "stage-42-portal-live": createStage5Completed,
+  "stage-42-completed-route": createStage42Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

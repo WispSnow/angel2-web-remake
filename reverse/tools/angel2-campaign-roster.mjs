@@ -7,6 +7,7 @@ import path from "node:path";
 import process from "node:process";
 
 const MODULE29_DATA_BASE = 0x1eba0;
+const SIDE2_ACTOR_TABLE = 0x32ad;
 const SIDE1_ACTOR_TABLE = 0x362c;
 const CLASS_VISUAL_TABLE = 0x39a6;
 const ACTOR_SLOTS = 60;
@@ -26,6 +27,12 @@ const VERIFIED_RANGES = Object.freeze({
     offset: SIDE1_ACTOR_TABLE,
     bytes: ACTOR_SLOTS * 2,
     sha256: "0dd35c1b3a4cd68947ae767a12a41f4f7a187a51117f50acfb610415662e6489",
+  },
+  side2ActorTable: {
+    address: "DS:32AD-3324",
+    offset: SIDE2_ACTOR_TABLE,
+    bytes: ACTOR_SLOTS * 2,
+    sha256: "b0d6c628518eb87c0766e7b6b878848ca558ff90b64bc61ae576870df450bc23",
   },
   classVisualTable: {
     address: "DS:39A6-3A43",
@@ -86,12 +93,20 @@ function readVisualDescriptor(module29, offset, label) {
   };
 }
 
-function parseSide1Actors(module29) {
-  const table = module29DataSlice(module29, SIDE1_ACTOR_TABLE, ACTOR_SLOTS * 2);
+function parseActors(module29, tableOffset, side) {
+  const table = module29DataSlice(module29, tableOffset, ACTOR_SLOTS * 2);
   return Array.from({ length: ACTOR_SLOTS }, (_, slot) => {
     const descriptorOffset = table.readUInt16LE(slot * 2);
-    return { slot, ...readVisualDescriptor(module29, descriptorOffset, `side-1 actor slot ${slot}`) };
+    return { slot, ...readVisualDescriptor(module29, descriptorOffset, `side-${side} actor slot ${slot}`) };
   });
+}
+
+function parseSide1Actors(module29) {
+  return parseActors(module29, SIDE1_ACTOR_TABLE, 1);
+}
+
+function parseSide2Actors(module29) {
+  return parseActors(module29, SIDE2_ACTOR_TABLE, 2);
 }
 
 function parseClassVisualFallbacks(module29) {
@@ -165,12 +180,14 @@ async function extract(
 
   const verifiedRanges = [
     verifyRange(module29, VERIFIED_RANGES.module29ActorLoader),
+    verifyRange(module29, VERIFIED_RANGES.side2ActorTable, true),
     verifyRange(module29, VERIFIED_RANGES.side1ActorTable, true),
     verifyRange(module29, VERIFIED_RANGES.classVisualTable, true),
   ];
   const meData = parseInitialGoArray(go, debugSymbols, "ME_DATA");
   const meExp = parseInitialGoArray(go, debugSymbols, "ME_EXP");
   const actors = parseSide1Actors(module29);
+  const enemyActors = parseSide2Actors(module29);
   const classFallbacks = parseClassVisualFallbacks(module29);
 
   const just = decodedSaves.files.find((entry) => entry.fileName === "JUST.TST");
@@ -214,10 +231,19 @@ async function extract(
     ["妮雅", "士兵", "士兵", "希蜜", "士兵", "士兵"]);
   assert.deepEqual(roster.map((unit) => unit.playerFacingIdentity.portraitRecord),
     [46, 47, 47, 45, 47, 47]);
+  assert.deepEqual([15, 25, 26].map((slot) => ({
+    slot,
+    name: enemyActors[slot].normalizedName,
+    portraitRecord: enemyActors[slot].portraitRecord,
+  })), [
+    { slot: 15, name: "哈釘", portraitRecord: 15 },
+    { slot: 25, name: "汀塔琪", portraitRecord: 3 },
+    { slot: 26, name: "萊茵", portraitRecord: 2 },
+  ]);
 
   const result = {
     format: "ANGEL2 campaign actor identities and stage-0 playable roster",
-    semanticVersion: 2,
+    semanticVersion: 3,
     phase: "asset_and_gdd_reconstruction_only",
     implementationFrozen: true,
     sources: {
@@ -235,9 +261,11 @@ async function extract(
     },
     displayResolution: {
       actorTable: "module 29 DS:362C, 60 side-1 actor descriptor pointers",
+      enemyActorTable: "module 29 DS:32AD, 60 side-2 actor descriptor pointers",
       fallbackTable: "module 29 DS:39A6, class code to generic portrait/name descriptor",
       rule: "a portrait byte of FF in the actor descriptor replaces both portrait and name with the current class fallback",
       actors,
+      enemyActors,
       classFallbacks,
     },
     stage0: {
@@ -272,4 +300,4 @@ main().catch((error) => {
   process.exitCode = 1;
 });
 
-export { extract, parseClassVisualFallbacks, parseSide1Actors };
+export { extract, parseClassVisualFallbacks, parseSide1Actors, parseSide2Actors };

@@ -208,6 +208,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button type="button" data-action="advance-dialogue" data-testid="advance-dialogue">繼續</button>
                 <button type="button" data-action="skip-dialogue" data-testid="skip-dialogue"
                   aria-label="跳過本輪劇情對話">跳過</button>
+                <button type="button" data-action="skip-scripted-sequence"
+                  data-testid="skip-scripted-sequence" aria-label="跳過整段過場" hidden>跳過過場</button>
               </div>
             </section>
             <section class="objective-panel modal-panel" id="objective-panel" data-testid="objective-panel" hidden>
@@ -254,6 +256,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   };
   const dialogueControls = required(root, "#dialogue-controls");
   const skipDialogueButton = required<HTMLButtonElement>(root, "[data-action=skip-dialogue]");
+  const skipScriptedSequenceButton = required<HTMLButtonElement>(
+    root,
+    "[data-action=skip-scripted-sequence]",
+  );
   const storyBackground = required(root, "#story-background");
   const storyBackgroundSource = stageAssets?.storyBackground ?? ASSETS.storyBackground;
   storyBackground.style.backgroundImage = `url("${storyBackgroundSource}")`;
@@ -473,6 +479,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (!finishDialogueTyping()) controller.advanceDialogue();
     }
     else if (action === "skip-dialogue") controller.skipDialogue();
+    else if (action === "skip-scripted-sequence") controller.skipScriptedSequence();
     else if (action === "open-system-menu") controller.openSystemMenu();
     else if (action === "close-system-menu") controller.closeSystemMenu();
     else if (action === "system-settings") controller.openSettings();
@@ -952,6 +959,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       skipDialogueButton.hidden = controller.promotionDialogueActive
         || controller.groupCommandDialogueActive
         || controller.aiTechniqueDialogueActive;
+      skipScriptedSequenceButton.hidden = !controller.canSkipScriptedSequence;
       dialogueControls.setAttribute(
         "aria-label",
         controller.aiTechniqueDialogueActive
@@ -1038,6 +1046,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       delete dialogueLayer.dataset.actionId;
       delete dialogueLayer.dataset.effectCenter;
       skipDialogueButton.hidden = false;
+      skipScriptedSequenceButton.hidden = true;
       stopDialogueTimer();
       stopSpeaking(activeDialoguePortrait);
       activeDialogueKey = "";
