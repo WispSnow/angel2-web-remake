@@ -85,9 +85,9 @@ describe("native class implementation sequence", () => {
     expect(Object.fromEntries(traitClasses.map(
       (classId) => [classId, classTraitsFor(classId).map(({ shortDescription }) => shortDescription)],
     ))).toEqual({
-      "swift-dragon-knight": ["閃避弓箭"],
+      "swift-dragon-knight": ["約50%閃避弓箭"],
       "beast-knight": ["命中降攻"],
-      "bone-knight": ["強力反擊"],
+      "bone-knight": ["約50%強力反擊"],
       "great-dragon-knight": ["龍踏技術"],
       "flying-dragon-knight": ["攻後再移動"],
       "great-axe-warrior": ["攻擊無反擊"],
@@ -439,6 +439,45 @@ describe("native class implementation sequence", () => {
     expect(definition.ordinaryHitStatuses).toEqual([]);
     expect(definition.shooting).toBeNull();
     expect(definition.technique).toBeNull();
+  });
+
+  it("records 14 and 9 use static attack/defense profiles without an exchange trait", () => {
+    const demonDragon = classDefinition("demon-dragon-knight");
+    const magicArmor = classDefinition("magic-armor-warrior");
+
+    expect(demonDragon.dataRows.slice(0, 3).map(({ level, attack, defense }) => ({
+      level,
+      attack,
+      defense,
+    }))).toEqual([
+      { level: 10, attack: 87, defense: 45 },
+      { level: 11, attack: 93, defense: 48 },
+      { level: 12, attack: 99, defense: 51 },
+    ]);
+    expect(magicArmor.dataRows.slice(0, 3).map(({ level, attack, defense }) => ({
+      level,
+      attack,
+      defense,
+    }))).toEqual([
+      { level: 10, attack: 76, defense: 60 },
+      { level: 11, attack: 78, defense: 72 },
+      { level: 12, attack: 80, defense: 84 },
+    ]);
+
+    expect(classStatsFor({ classId: "demon-dragon-knight", experience: 0 }))
+      .toMatchObject({ attack: 87, defense: 45 });
+    expect(classStatsFor({ classId: "magic-armor-warrior", experience: 0 }))
+      .toMatchObject({ attack: 76, defense: 60 });
+    expect(classTraitsFor("demon-dragon-knight")).toEqual([]);
+    expect(classTraitsFor("magic-armor-warrior")).toEqual([]);
+    expect(demonDragon.ordinaryHitStatuses).toEqual([]);
+    expect(magicArmor.ordinaryHitStatuses).toEqual([]);
+    expect(demonDragon.shooting).toBeNull();
+    expect(magicArmor.shooting).toBeNull();
+    expect(demonDragon.technique).toBeNull();
+    expect(magicArmor.technique).toBeNull();
+    expect(demonDragon.aiClassDispatch).toEqual({ side1: "ordinary", side2: "ordinary" });
+    expect(magicArmor.aiClassDispatch).toEqual({ side1: "ordinary", side2: "ordinary" });
   });
 
   it("record 10 magic guide reproduces its support-technique tiers", () => {

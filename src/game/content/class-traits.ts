@@ -20,8 +20,8 @@ export interface ClassTrait {
 const TRAITS_BY_CLASS: Readonly<Partial<Record<ClassId, readonly ClassTrait[]>>> = {
   "swift-dragon-knight": [{
     id: "swift-dragon-shooting-evasion",
-    shortDescription: "閃避弓箭",
-    description: "受到弓箭、弩箭或魔弓射擊時，約一半機率完全閃避傷害。",
+    shortDescription: "約50%閃避弓箭",
+    description: "受到弓箭、弩箭或魔弓射擊時，約 50% 機率完全閃避傷害。",
   }],
   "beast-knight": [{
     id: "beast-knight-attack-down",
@@ -30,8 +30,8 @@ const TRAITS_BY_CLASS: Readonly<Partial<Record<ClassId, readonly ClassTrait[]>>>
   }],
   "bone-knight": [{
     id: "bone-knight-full-counter",
-    shortDescription: "強力反擊",
-    description: "反擊時約一半機率直接造成本次先攻的完整傷害。",
+    shortDescription: "約50%強力反擊",
+    description: "反擊時約 50% 機率直接造成本次先攻的完整傷害。",
   }],
   "great-dragon-knight": [{
     id: "great-dragon-stomp",

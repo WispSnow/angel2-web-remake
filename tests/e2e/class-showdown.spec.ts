@@ -191,6 +191,43 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   expect(pageErrors).toEqual([]);
 });
 
+test("probability traits show approximate rates in the selected-unit strip", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  for (let step = 0; step < 17; step += 1) await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 17, y: 32 });
+  await page.keyboard.press("Space");
+  await expect(page.locator(".hud-identity-name")).toHaveText("獸骨騎士");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性約50%強力反擊");
+  await expect(page.getByTestId("unit-traits")).toHaveAttribute(
+    "aria-label",
+    /約 50% 機率.*完整傷害/u,
+  );
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-probability-traits.png`,
+  });
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("action-menu")).toBeHidden();
+  for (let step = 0; step < 12; step += 1) await page.keyboard.press("ArrowRight");
+  for (let step = 0; step < 17; step += 1) await page.keyboard.press("ArrowUp");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 29, y: 15 });
+  await page.keyboard.press("Space");
+  await expect(page.locator(".hud-identity-name")).toHaveText("迅龍騎士");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性約50%閃避弓箭");
+  await expect(page.getByTestId("unit-traits")).toHaveAttribute(
+    "aria-label",
+    /約 50% 機率.*完全閃避傷害/u,
+  );
+  expect(pageErrors).toEqual([]);
+});
+
 test("flying dragon knight can move once at half range after attacking", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
