@@ -4,6 +4,7 @@ import {
   classDefinition,
   classStatsFor,
   isPromotionEligible,
+  promotionExperienceThresholdFor,
   promotionTargetsFor,
 } from "../../src/game/content/classes";
 import {
@@ -82,6 +83,44 @@ describe("evidence-backed class catalog and promotion", () => {
     expect(isPromotionEligible(nia)).toBe(true);
     expect(isPromotionEligible(enemy)).toBe(false);
     expect(promotionQueue(units, 50)).toEqual(["1:1", "1:0"]);
+  });
+
+  it("uses the first post-third-row growth threshold instead of DATA row four", () => {
+    const expectedThresholds = new Map([
+      ["soldier", 300],
+      ["magician", 800],
+      ["land-knight", 840],
+      ["archer", 480],
+      ["cavalry", 460],
+      ["pegasus-warrior", 940],
+      ["sister", 520],
+      ["monk", 760],
+      ["divine-sword-warrior", 1000],
+      ["warrior", 500],
+      ["steel-armor-warrior", 960],
+      ["priest", 780],
+    ] as const);
+
+    for (const [classId, threshold] of expectedThresholds) {
+      const definition = classDefinition(classId);
+      expect(promotionExperienceThresholdFor(classId), classId).toBe(threshold);
+      expect(definition.promotion.triggerGrowthRow, classId).toBe(4);
+      expect(definition.promotion.triggerExperienceThreshold, classId).toBe(threshold);
+      expect(classStatsFor({ classId, experience: threshold - 1, side: 1 }).level, classId)
+        .toBe(3);
+      expect(classStatsFor({ classId, experience: threshold, side: 1 }).level, classId)
+        .toBe(4);
+      expect(isPromotionEligible({ side: 1, classId, experience: threshold - 1 }), classId)
+        .toBe(false);
+      expect(isPromotionEligible({ side: 1, classId, experience: threshold }), classId)
+        .toBe(true);
+      expect(isPromotionEligible({ side: 2, classId, experience: threshold }), classId)
+        .toBe(false);
+
+      if (classId !== "soldier") {
+        expect(definition.promotion.dataRow4ExperienceThreshold, classId).not.toBe(threshold);
+      }
+    }
   });
 
   it("uses the native Nia and teammate pre-promotion dialogue branches", () => {

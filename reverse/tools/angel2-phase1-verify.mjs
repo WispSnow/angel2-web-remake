@@ -135,10 +135,10 @@ async function verifyPhase1Artifacts(root) {
     "native promotion graph no longer exactly matches the 31-edge guide graph");
   assert(promotion.guideComparison.allSourceOptionOrdersExact === true,
     "native promotion option order no longer matches the guide");
-  assert(promotion.levelBoundaryAudit.mismatchCount === 1,
-    "promotion level-boundary exception count changed");
-  assert(promotion.levelBoundaryAudit.archerToCrossbowProof.allowedByNativeProductionPath === true,
-    "native archer-to-crossbow level-7 commit proof is no longer closed");
+  assert(promotion.dataRow4LevelAlignmentAudit.mismatchCount === 1,
+    "DATA row-four level-alignment exception count changed");
+  assert(promotion.dataRow4LevelAlignmentAudit.archerToCrossbowProof.allowedByNativeProductionPath === true,
+    "native archer-to-crossbow commit proof is no longer closed");
 
   assert(timing.moduleCoverage.auditedModules.length === 9,
     "native timing audit must cover nine released runtime modules");

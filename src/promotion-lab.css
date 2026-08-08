@@ -1,0 +1,26 @@
+.promotion-lab-page .class-pair-grid {
+  grid-template-rows: repeat(6, minmax(76px, auto));
+}
+
+.promotion-lab-page .promotion-pair {
+  min-height: 76px;
+}
+
+.promotion-lab-page .promotion-pair > div {
+  gap: 2px;
+}
+
+.promotion-lab-page .promotion-pair > div small {
+  color: #d4b86f;
+  font: 10px/1.35 system-ui, sans-serif;
+}
+
+.promotion-lab-controls {
+  grid-template-columns: minmax(320px, 1fr) minmax(170px, auto) minmax(180px, auto);
+}
+
+@media (max-width: 760px) {
+  .promotion-lab-page .class-pair-grid {
+    grid-template-rows: none;
+  }
+}

@@ -15,6 +15,8 @@ import {
   classIdFromNativeRecord,
   classStatsFor,
 } from "./content/classes";
+import { allyMapUnitAsset } from "./content/map-unit-assets";
+import { TECHNIQUE_LAB_UNIT_ASSETS } from "./content/technique-lab.generated";
 import { classTraitsFor } from "./content/class-traits";
 import { activeUnitStatusPresentations } from "./content/status-presentations";
 import type { CombatPresentation, GameController } from "./controller";
@@ -712,7 +714,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const definition = classDefinition(target.id);
         const stats = classStatsFor({ classId: target.id, experience: 0 });
         const selected = index === controller.promotionSelectionIndex;
-        const imageUrl = promotionImageByClass[target.id];
+        const imageUrl = promotionImageByClass[target.id]
+          ?? allyMapUnitAsset(target.id)
+          ?? TECHNIQUE_LAB_UNIT_ASSETS[target.id].ally;
         const optionLabel = [
           `${index + 1}．${definition.nativeName}`,
           actionLabels[definition.actionCategory],

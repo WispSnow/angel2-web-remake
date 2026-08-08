@@ -101,7 +101,7 @@ export function statsFor(
 export function initialEnemyExperience(classId: UnitClassId, difficulty: Difficulty): number {
   let experience = 0;
   for (let step = 0; step <= difficulty; step += 1) {
-    experience = nextExperienceThresholdFor({ classId, experience }) + 1;
+    experience = nextExperienceThresholdFor({ classId, experience, side: 2 }) + 1;
   }
   return experience;
 }

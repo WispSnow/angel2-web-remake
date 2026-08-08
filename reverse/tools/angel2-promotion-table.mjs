@@ -358,25 +358,27 @@ async function extract(
     })),
   );
   const dataLevels = parseDataLevels(dataBuffer, dataPath);
-  const levelBoundaryEdges = edges.map((edge) => ({
+  const dataRow4LevelEdges = edges.map((edge) => ({
     ...edge,
-    sourcePromotionMarkerTier: 3,
-    sourcePromotionMarkerLevel: dataLevels[edge.sourceRecord].tiers[3].level,
+    sourceDataRow4Tier: 3,
+    sourceDataRow4Level: dataLevels[edge.sourceRecord].tiers[3].level,
     targetFirstTierLevel: dataLevels[edge.targetRecord].tiers[0].level,
-    exactLevelMatch:
+    dataRow4MatchesTargetStartLevel:
       dataLevels[edge.sourceRecord].tiers[3].level ===
       dataLevels[edge.targetRecord].tiers[0].level,
   }));
-  const levelBoundaryMismatches = levelBoundaryEdges.filter((edge) => !edge.exactLevelMatch);
+  const dataRow4LevelMismatches = dataRow4LevelEdges.filter(
+    (edge) => !edge.dataRow4MatchesTargetStartLevel,
+  );
   if (
-    levelBoundaryMismatches.length !== 1 ||
-    levelBoundaryMismatches[0].sourceRecord !== 20 ||
-    levelBoundaryMismatches[0].targetRecord !== 21 ||
-    levelBoundaryMismatches[0].optionIndex !== 0 ||
-    levelBoundaryMismatches[0].sourcePromotionMarkerLevel !== 7 ||
-    levelBoundaryMismatches[0].targetFirstTierLevel !== 8
+    dataRow4LevelMismatches.length !== 1 ||
+    dataRow4LevelMismatches[0].sourceRecord !== 20 ||
+    dataRow4LevelMismatches[0].targetRecord !== 21 ||
+    dataRow4LevelMismatches[0].optionIndex !== 0 ||
+    dataRow4LevelMismatches[0].sourceDataRow4Level !== 7 ||
+    dataRow4LevelMismatches[0].targetFirstTierLevel !== 8
   ) {
-    throw new Error("native promotion level-boundary exception is not exactly 弓兵(20) 7 -> 弩兵(21) 8");
+    throw new Error("DATA row-four level alignment exception is not exactly 弓兵(20) 7 -> 弩兵(21) 8");
   }
   const callGraphAudit = auditPromotionCallGraph(buffer);
   const result = {
@@ -399,26 +401,28 @@ async function extract(
     edgeCount: edges.length,
     sourceRecordsWithOptions: records.filter((record) => !record.terminal).length,
     terminalRecords: records.filter((record) => record.terminal).length,
-    levelBoundaryAudit: {
-      sourceMarkerTier: 3,
-      edgeCount: levelBoundaryEdges.length,
-      exactLevelMatches: levelBoundaryEdges.filter((edge) => edge.exactLevelMatch).length,
-      mismatchCount: levelBoundaryMismatches.length,
-      mismatches: levelBoundaryMismatches,
+    dataRow4LevelAlignmentAudit: {
+      sourceDataRowTier: 3,
+      edgeCount: dataRow4LevelEdges.length,
+      exactLevelMatches: dataRow4LevelEdges.filter(
+        (edge) => edge.dataRow4MatchesTargetStartLevel,
+      ).length,
+      mismatchCount: dataRow4LevelMismatches.length,
+      mismatches: dataRow4LevelMismatches,
       archerToCrossbowProof: {
         sourceRecord: 20,
         sourceName: descriptors.records[20].normalizedName,
         optionIndex: 0,
-        sourcePromotionMarkerLevel: 7,
+        sourceDataRow4Level: 7,
         targetRecord: 21,
         targetName: descriptors.records[21].normalizedName,
         targetFirstTierLevel: 8,
-        sourceEligibilitySatisfiedAtMarker: true,
+        sourceEligibilityIndependentOfDataRow4: true,
         targetStartLevelComparedBeforeCommit: false,
         allowedByNativeProductionPath: true,
-        conclusion: "弓兵 reaches the common side-1 promotion path at its level-7 marker; 弩兵 is option 0 and the path never validates the target's level-8 first tier before commit",
+        conclusion: "DATA row-four field6 is 7 while 弩兵 row-one field6 is 8; neither value gates promotion eligibility or commit",
       },
-      edges: levelBoundaryEdges,
+      edges: dataRow4LevelEdges,
     },
     runtimeEvidence: {
       callGraphAudit,

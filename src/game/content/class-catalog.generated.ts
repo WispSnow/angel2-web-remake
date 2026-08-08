@@ -187,8 +187,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 4,
-      "markerExperienceThreshold": 300,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 300,
+      "dataRow4Level": 4,
+      "dataRow4ExperienceThreshold": 300,
       "targets": [
         {
           "id": "cavalry",
@@ -366,8 +368,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -520,8 +524,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -746,8 +752,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -962,8 +970,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -1188,8 +1198,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -1399,8 +1411,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 10,
-      "markerExperienceThreshold": 1050,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 800,
+      "dataRow4Level": 10,
+      "dataRow4ExperienceThreshold": 1050,
       "targets": [
         {
           "id": "evil-mage",
@@ -1565,8 +1579,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -1712,8 +1728,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 11,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 11,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -1859,8 +1877,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -2075,8 +2095,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -2256,8 +2278,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -2409,8 +2433,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 10,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 10,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -2556,8 +2582,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 10,
-      "markerExperienceThreshold": 1110,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 840,
+      "dataRow4Level": 10,
+      "dataRow4ExperienceThreshold": 1110,
       "targets": [
         {
           "id": "swift-dragon-knight",
@@ -2728,8 +2756,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -2875,8 +2905,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -3029,8 +3061,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -3176,8 +3210,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -3323,8 +3359,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -3504,8 +3542,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -3657,8 +3697,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 7,
-      "markerExperienceThreshold": 570,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 480,
+      "dataRow4Level": 7,
+      "dataRow4ExperienceThreshold": 570,
       "targets": [
         {
           "id": "crossbow",
@@ -3823,8 +3865,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 11,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 11,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -3970,8 +4014,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 7,
-      "markerExperienceThreshold": 540,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 460,
+      "dataRow4Level": 7,
+      "dataRow4ExperienceThreshold": 540,
       "targets": [
         {
           "id": "land-knight",
@@ -4130,8 +4176,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 10,
-      "markerExperienceThreshold": 1260,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 940,
+      "dataRow4Level": 10,
+      "dataRow4ExperienceThreshold": 1260,
       "targets": [
         {
           "id": "flying-dragon-knight",
@@ -4339,8 +4387,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 7,
-      "markerExperienceThreshold": 630,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 520,
+      "dataRow4Level": 7,
+      "dataRow4ExperienceThreshold": 630,
       "targets": [
         {
           "id": "monk",
@@ -4554,8 +4604,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 10,
-      "markerExperienceThreshold": 990,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 760,
+      "dataRow4Level": 10,
+      "dataRow4ExperienceThreshold": 990,
       "targets": [
         {
           "id": "prayer-guide",
@@ -4714,8 +4766,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 11,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 11,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -4861,8 +4915,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 10,
-      "markerExperienceThreshold": 1350,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 1000,
+      "dataRow4Level": 10,
+      "dataRow4ExperienceThreshold": 1350,
       "targets": [
         {
           "id": "great-axe-warrior",
@@ -5027,8 +5083,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 7,
-      "markerExperienceThreshold": 600,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 500,
+      "dataRow4Level": 7,
+      "dataRow4ExperienceThreshold": 600,
       "targets": [
         {
           "id": "divine-sword-warrior",
@@ -5199,8 +5257,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 10,
-      "markerExperienceThreshold": 1290,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 960,
+      "dataRow4Level": 10,
+      "dataRow4ExperienceThreshold": 1290,
       "targets": [
         {
           "id": "jungle-warrior",
@@ -5408,8 +5468,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 10,
-      "markerExperienceThreshold": 1020,
+      "triggerGrowthRow": 4,
+      "triggerExperienceThreshold": 780,
+      "dataRow4Level": 10,
+      "dataRow4ExperienceThreshold": 1020,
       "targets": [
         {
           "id": "magic-priest",
@@ -5602,8 +5664,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -5783,8 +5847,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -5937,8 +6003,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 13,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 13,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -6133,8 +6201,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": 7,
-      "markerExperienceThreshold": 0,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": 7,
+      "dataRow4ExperienceThreshold": 0,
       "targets": []
     }
   },
@@ -6275,8 +6345,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": null,
-      "markerExperienceThreshold": null,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": null,
+      "dataRow4ExperienceThreshold": null,
       "targets": []
     }
   },
@@ -6417,8 +6489,10 @@ export const CLASS_CATALOG = {
       1
     ],
     "promotion": {
-      "markerLevel": null,
-      "markerExperienceThreshold": null,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": null,
+      "dataRow4ExperienceThreshold": null,
       "targets": []
     }
   },
@@ -6559,8 +6633,10 @@ export const CLASS_CATALOG = {
       0
     ],
     "promotion": {
-      "markerLevel": null,
-      "markerExperienceThreshold": null,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": null,
+      "dataRow4ExperienceThreshold": null,
       "targets": []
     }
   },
@@ -6701,8 +6777,10 @@ export const CLASS_CATALOG = {
       0
     ],
     "promotion": {
-      "markerLevel": null,
-      "markerExperienceThreshold": null,
+      "triggerGrowthRow": null,
+      "triggerExperienceThreshold": null,
+      "dataRow4Level": null,
+      "dataRow4ExperienceThreshold": null,
       "targets": []
     }
   }

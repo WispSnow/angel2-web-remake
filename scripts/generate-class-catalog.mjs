@@ -104,8 +104,10 @@ const catalog = Object.fromEntries(unitCatalog.records.map((record, expectedReco
     movementRules: mapRule.movementRules,
     terrainDefensePercents: mapRule.terrainDefensePercents,
     promotion: {
-      markerLevel: record.promotion.markerLevel,
-      markerExperienceThreshold: record.promotion.markerExperienceThreshold,
+      triggerGrowthRow: record.promotion.triggerGrowthRow,
+      triggerExperienceThreshold: record.promotion.triggerExperienceThreshold,
+      dataRow4Level: record.promotion.dataRow4Level,
+      dataRow4ExperienceThreshold: record.promotion.dataRow4ExperienceThreshold,
       targets: record.promotion.targets.map((target) => ({
         id: idByRecord[target.record],
         nativeRecord: target.record,

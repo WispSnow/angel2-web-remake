@@ -69,6 +69,7 @@
 - 地图技能动画实验室：`http://127.0.0.1:4173/technique-lab.html`。
 - 肖像动画实验室：`http://127.0.0.1:4173/portrait-lab.html`。
 - 全地形竞技场：`http://127.0.0.1:4173/arena.html`。
+- 转职触发实验室：`http://127.0.0.1:4173/promotion-lab.html`。
 
 常用命令：
 
@@ -77,6 +78,7 @@ pnpm install
 pnpm dev
 pnpm dev:debug
 pnpm dev:arena
+pnpm dev:promotions
 pnpm dev:combat
 pnpm dev:techniques
 pnpm dev:portraits
@@ -112,6 +114,11 @@ node reverse/tools/angel2-phase1-verify.mjs
 模拟状态，不得让 DOM 或 Phaser 对象成为阵容真值。竞技场会话只存在于当前内存，不得
 读取、覆盖或写入战役记录。竞技场开放职业组合测试不等于解冻该职业尚未实现的专属行动、
 AI、存档语义或后续关卡；新增职业能力时应同步补充竞技场验收，但仍须遵守对应纸面合同。
+
+`pnpm dev:promotions` 会打开 `/promotion-lab.html` 转职触发实验室。页面按原版记录顺序
+建立全部 12 个普通转职来源的敌我相邻配对，双方经验固定为进入第 4 成长行前 1 点；我方
+复用正式授职对话和候选 UI，敌方只升级、不转职。实验室只存在于当前内存，不得读写战役
+记录，也不得为测试方便改写正式成长、动作后扫描或候选提交规则。
 
 `pnpm dev:portraits` 会打开 `/portrait-lab.html` 全战役肖像动画实验室。新角色只提交
 原版 `portrait` 记录号；主图、三帧眼睛、三帧嘴部、尺寸和原版落点统一来自生成目录，

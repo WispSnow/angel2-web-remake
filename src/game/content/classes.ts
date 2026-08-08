@@ -74,14 +74,18 @@ export function classFallbackPortraitFor(
     : CLASS_FALLBACK_SIDE2_PORTRAITS[side1Record] ?? side1Record as PortraitRecord;
 }
 
-function primaryGrowth(classId: ClassId) {
+type ClassProgressionState = Pick<BattleUnit, "classId" | "experience">
+  & Partial<Pick<BattleUnit, "side">>;
+
+function growthFor(classId: ClassId, side: BattleUnit["side"] = 1) {
   const definition = classDefinition(classId);
-  return definition.postThirdRowGrowth.find((growth) => growth.code === definition.codes.side1)
+  const code = side === 2 ? definition.codes.side2 : definition.codes.side1;
+  return definition.postThirdRowGrowth.find((growth) => growth.code === code)
     ?? definition.postThirdRowGrowth[0];
 }
 
 export function classStatsFor(
-  unit: Pick<BattleUnit, "classId" | "experience">,
+  unit: ClassProgressionState,
 ): UnitStats {
   const definition = classDefinition(unit.classId);
   const fixedRows = definition.dataRows.slice(0, 3);
@@ -103,7 +107,7 @@ export function classStatsFor(
     };
   }
 
-  const growth = primaryGrowth(unit.classId);
+  const growth = growthFor(unit.classId, unit.side);
   if (!growth) {
     return {
       attack: selected.attack,
@@ -138,7 +142,7 @@ export function classTierFor(
 }
 
 export function nextExperienceThresholdFor(
-  unit: Pick<BattleUnit, "classId" | "experience">,
+  unit: ClassProgressionState,
 ): number {
   const definition = classDefinition(unit.classId);
   const fixedThreshold = definition.dataRows
@@ -147,12 +151,22 @@ export function nextExperienceThresholdFor(
     .find((threshold) => threshold > unit.experience);
   if (fixedThreshold !== undefined) return fixedThreshold;
 
-  const growth = primaryGrowth(unit.classId);
+  const growth = growthFor(unit.classId, unit.side);
   if (!growth) return Number.MAX_SAFE_INTEGER;
   const thirdThreshold = definition.dataRows[2].experienceThreshold;
   return thirdThreshold
     + (Math.floor((unit.experience - thirdThreshold) / growth.thresholdIncrement) + 1)
       * growth.thresholdIncrement;
+}
+
+/**
+ * Module 29 ignores DATA rows four and five during battle progression. A
+ * promotable unit becomes eligible when the derived growth row advances past
+ * three, so its real trigger is the first post-third-row threshold.
+ */
+export function promotionExperienceThresholdFor(classId: ClassId): number {
+  const definition = classDefinition(classId);
+  return definition.promotion.triggerExperienceThreshold ?? Number.MAX_SAFE_INTEGER;
 }
 
 export function movementRulesFor(classId: ClassId): readonly number[] {
@@ -204,6 +218,5 @@ export function isPromotionEligible(
   if (unit.side !== 1) return false;
   const promotion = classDefinition(unit.classId).promotion;
   return promotion.targets.length > 0
-    && promotion.markerExperienceThreshold !== null
-    && unit.experience >= promotion.markerExperienceThreshold;
+    && classStatsFor(unit).level > 3;
 }

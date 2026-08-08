@@ -67,6 +67,19 @@ pnpm dev:classes
 手没有原版我方地图图形，因此页面不会伪造。对阵会话与战役存档完全隔离，并可按相同等级
 重开或返回编成修改统一等级。
 
+## 转职触发实验室
+
+需要集中检查全部普通转职来源、触发点与候选 UI 时运行：
+
+```bash
+pnpm dev:promotions
+```
+
+也可以打开 `http://127.0.0.1:4173/promotion-lab.html`。页面按原版记录顺序建立 12 组、
+24 名敌我相邻单位，经验统一设为各职业进入第 4 成长行前 1 点。我方取得经验会进入正式
+授职对话与强制候选菜单；敌方使用相同的第三行后 `+100` 成长门槛，但只升级、不转职。
+本页复用正式模拟、Phaser 战场和 DOM UI，并与战役存档完全隔离。
+
 ## 肖像动画实验室
 
 所有原版角色的眨眼、说话口型和覆盖片落点可以从独立页面集中检查：
@@ -179,6 +192,7 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 - `src/game/stage-runtime.ts`：第 0–4 关唯一运行时装配、延迟加载、恢复与存档元数据清单；
 - `src/game/arena-session.ts`：竞技场编辑状态、放置合法性与可序列化开战配置；
 - `src/game/class-showdown-session.ts`：35 组常规职业的两列相邻编队、平原环境与统一等级配置；
+- `src/game/promotion-lab-session.ts`：12 组可转职来源的临界经验、两列相邻编队与敌我成长边界；
 - `src/game/simulation/arena-battle.ts`：把竞技场配置接入正式战斗模拟与运行时资源；
 - `src/game/save/`：当前 schema、冻结历史迁移链与本地槽位 repository；
 - `src/game/phaser/`：地图、单位、镜头和范围表现；
@@ -189,6 +203,7 @@ pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧�
 - `src/portrait-lab.ts`：集中检查全战役肖像眨眼、口型和原版覆盖片落点；
 - `src/arena.ts`：独立的全地形竞技场设置页、正式战斗装配与内存生命周期；
 - `src/class-showdown.ts`：全职业对阵设置页、一键等级设置与正式战斗生命周期；
+- `src/promotion-lab.ts`：转职临界说明页、正式战斗装配与触发进度工具栏；
 - `src/game/debug-scenarios.ts`：按关登记开发场景、确定性夹具与调试工具栏；
 - `scripts/generate-portrait-catalog.mjs`：从原版 `D` 记录与布局证据生成全角色运行时目录；
 - `scripts/generate-content.mjs`：按唯一顺序编排全部可单独审计的内容生成器；

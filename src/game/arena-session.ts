@@ -44,7 +44,11 @@ export interface ArenaUnitPlacement {
   readonly slot: number;
   readonly classId: ClassId;
   readonly level: ArenaLevel;
-  /** Explicit named/debug identity; omitted units use the native class-and-side fallback. */
+  /** Optional deterministic lab override; ordinary arena placements use level. */
+  readonly experience?: number;
+  /** Optional named/debug identity; omitted units use the native class name. */
+  readonly name?: string;
+  /** Explicit portrait override; omitted units use the native class-and-side fallback. */
   readonly portrait?: PortraitRecord;
   readonly x: number;
   readonly y: number;

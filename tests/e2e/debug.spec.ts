@@ -54,6 +54,9 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   const classShowdownLink = page.getByTestId("debug-class-showdown-link");
   await expect(classShowdownLink).toHaveAttribute("href", "/class-showdown.html");
   await expect(classShowdownLink).toContainText("35 組同職業敵我相鄰");
+  const promotionLabLink = page.getByTestId("debug-promotion-lab-link");
+  await expect(promotionLabLink).toHaveAttribute("href", "/promotion-lab.html");
+  await expect(promotionLabLink).toContainText("12 組可轉職來源職業只差 1 經驗");
   await expect(page.getByTestId("debug-roster-source")).toHaveValue("representative-growth");
   await expect(page.locator("[data-debug-roster-description]")).toContainText("合法轉職混編");
 

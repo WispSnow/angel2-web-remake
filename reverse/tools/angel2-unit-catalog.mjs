@@ -346,6 +346,9 @@ async function build(inputPaths, outputJsonPath, outputCsvPath) {
         source: native === undefined ? "native_default" : "native_class_specific_table",
       };
     });
+    const eligibleAsPromotionSource = promotion !== null && !promotion.terminal;
+    const side1Growth = postThirdRowGrowth.find(({ code }) => code === codes.side1);
+    assert(side1Growth !== undefined, `record ${record}: missing side-1 growth rule`);
     return {
       record,
       name: descriptor.normalizedName,
@@ -370,9 +373,16 @@ async function build(inputPaths, outputJsonPath, outputCsvPath) {
         currentExperienceIsCumulative: true,
       },
       promotion: {
-        eligibleAsSource: promotion !== null && !promotion.terminal,
-        markerLevel: promotion === null ? null : rows[3].level,
-        markerExperienceThreshold: promotion === null ? null : rows[3].experienceThreshold,
+        eligibleAsSource: eligibleAsPromotionSource,
+        triggerGrowthRow: eligibleAsPromotionSource ? 4 : null,
+        triggerExperienceThreshold: eligibleAsPromotionSource
+          ? rows[2].experienceThreshold + side1Growth.thresholdIncrement
+          : null,
+        // DATA rows four and five are not consumed by the module-29 battle
+        // progression path. Retain row four only as table/edge metadata; it is
+        // not the runtime promotion trigger.
+        dataRow4Level: promotion === null ? null : rows[3].level,
+        dataRow4ExperienceThreshold: promotion === null ? null : rows[3].experienceThreshold,
         targets: targetEntries,
         sources: promotionSourcesByTarget.get(record) ?? [],
       },
@@ -410,10 +420,10 @@ async function build(inputPaths, outputJsonPath, outputCsvPath) {
     const targetRows = records[edge.targetRecord].dataRows;
     return {
       ...edge,
-      sourcePromotionLevel: sourceRows[3].level,
-      sourcePromotionExperienceThreshold: sourceRows[3].experienceThreshold,
+      sourceDataRow4Level: sourceRows[3].level,
+      sourceDataRow4ExperienceThreshold: sourceRows[3].experienceThreshold,
       targetStartLevel: targetRows[0].level,
-      levelBoundaryMatches: sourceRows[3].level === targetRows[0].level,
+      dataRow4MatchesTargetStartLevel: sourceRows[3].level === targetRows[0].level,
     };
   });
   const nameStatusCounts = Object.groupBy === undefined
@@ -494,8 +504,8 @@ async function build(inputPaths, outputJsonPath, outputCsvPath) {
 
   assert(result.validation.recordsWithUnresolvedAiClassDispatch === 0,
     "one or more records have no AI class dispatch category");
-  assert(promotionEdges.filter((edge) => !edge.levelBoundaryMatches).length === 1,
-    "expected exactly one promotion level-boundary exception");
+  assert(promotionEdges.filter((edge) => !edge.dataRow4MatchesTargetStartLevel).length === 1,
+    "expected exactly one DATA row-four target-level alignment exception");
 
   await mkdir(path.dirname(outputJsonPath), { recursive: true });
   await mkdir(path.dirname(outputCsvPath), { recursive: true });
@@ -506,8 +516,8 @@ async function build(inputPaths, outputJsonPath, outputCsvPath) {
     ordinaryRecords: result.ordinaryRecordCount,
     specialRuntimeRecords: result.specialRuntimeRecordCount,
     promotionEdges: result.promotionEdges.length,
-    promotionLevelBoundaryExceptions: result.promotionEdges.filter(
-      (edge) => !edge.levelBoundaryMatches,
+    dataRow4LevelAlignmentExceptions: result.promotionEdges.filter(
+      (edge) => !edge.dataRow4MatchesTargetStartLevel,
     ).map((edge) => `${edge.sourceName}->${edge.targetName}`),
     guideNameStatusCounts: result.guideAssessment.nameStatusCounts,
     validation: result.validation,

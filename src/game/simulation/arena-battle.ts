@@ -90,7 +90,8 @@ function createArenaUnit(
   placement: ArenaUnitPlacement,
   difficulty: Difficulty,
 ): BattleUnit {
-  const experience = arenaExperienceForLevel(placement.classId, placement.level);
+  const experience = placement.experience
+    ?? arenaExperienceForLevel(placement.classId, placement.level);
   const unit: BattleUnit = {
     id: placement.id,
     side: placement.side,
@@ -99,7 +100,7 @@ function createArenaUnit(
     className: className(placement.classId),
     // Side remains explicit in simulation state and the map figure. Keep the
     // arena identity short so the right panel does not repeat it in the name.
-    name: className(placement.classId),
+    name: placement.name ?? className(placement.classId),
     portrait: placement.portrait
       ?? classFallbackPortraitFor(placement.classId, placement.side)
       ?? (placement.side === 1 ? 47 : 48) as PortraitRecord,
