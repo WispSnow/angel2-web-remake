@@ -24,6 +24,7 @@ export function aiTechniqueDialogueFor(
   actionId: BattleActionId,
 ): DialoguePage | undefined {
   const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+  if (definition.nativeCode == null) return undefined;
   const line = nativeAiTechniqueDialogueForCode(definition.nativeCode);
   if (!line) return undefined;
   const window = {

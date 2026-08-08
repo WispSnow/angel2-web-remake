@@ -8,6 +8,7 @@ import {
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import {
   BATTLE_ACTION_DEFINITIONS,
+  CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
   STAGE0_REST_PRESENTATION,
   actionPresentationCatalog,
   techniqueActionIdsFor,
@@ -164,6 +165,7 @@ export type SpecialActionPresentationPhase =
   | "dispelEffect"
   | "stompEffect"
   | "stompPageToggle"
+  | "teleportEffect"
   | "lifeDrain"
   | "specialDeath";
 
@@ -764,6 +766,9 @@ export class GameController {
   get unitCommands(): readonly UnitCommand[] {
     const selectedClassCommand = this.selectedUnit
       ? CLASS_COMMANDS[this.selectedUnit.classId]
+        ?? (this.battle.additionalActionIdsFor(this.selectedUnit.id).length > 0
+          ? { id: "technique", label: "技術" }
+          : undefined)
       : undefined;
     const classCommand = selectedClassCommand?.id === "technique"
       && this.selectedUnit?.statuses.techniqueSeal
@@ -780,7 +785,11 @@ export class GameController {
   }
 
   get techniqueActions(): readonly BattleActionId[] {
-    return this.selectedUnit ? techniqueActionIdsFor(this.selectedUnit) : [];
+    if (!this.selectedUnit) return [];
+    return [...new Set([
+      ...techniqueActionIdsFor(this.selectedUnit),
+      ...this.battle.additionalActionIdsFor(this.selectedUnit.id),
+    ])];
   }
 
   get commandMenuPosition(): Position {
@@ -1177,7 +1186,7 @@ export class GameController {
       || this.actionMode !== "actionMenu"
       || this.commandMenuKind !== "initial"
       || !unit
-      || CLASS_COMMANDS[unit.classId]?.id !== "technique"
+      || this.techniqueActions.length === 0
       || unit.statuses.techniqueSeal > 0
     ) return;
     this.techniqueIndex = 0;
@@ -1238,7 +1247,9 @@ export class GameController {
     }
     this.actionMode = "specialTarget";
     this.statusMessage = definition.target === "empty-cell"
-      ? "選擇工兵移動並鋪設鐵板的空格。"
+      ? actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID
+        ? "選擇半龍戰士要瞬移到的空格。"
+        : "選擇工兵移動並鋪設鐵板的空格。"
       : `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
   }
@@ -1408,13 +1419,14 @@ export class GameController {
     const actor = this.selectedUnit;
     const actionId = this.selectedActionId;
     const definition = actionId ? BATTLE_ACTION_DEFINITIONS[actionId] : undefined;
-    const target = definition?.target === "self-area" ? undefined : this.battle.unitAt(position);
+    const requiresTargetUnit = definition?.target === "ally" || definition?.target === "enemy";
+    const target = requiresTargetUnit ? this.battle.unitAt(position) : undefined;
     if (!actor || !actionId || !definition || this.busy) return;
     if (actionId === "iron-plate" || actionId === "obstacle") {
       await this.commitConstruction(actor, position, actionId);
       return;
     }
-    if (definition.target !== "self-area" && !target) return;
+    if (requiresTargetUnit && !target) return;
     try {
       const prepared = this.battle.prepareSpecialAction({
         actionId,
@@ -1504,6 +1516,8 @@ export class GameController {
           ? result.blockReason === "classImmune"
             ? `${targetPresentation.name}完整承受禁咒演出，但龍職業免疫狀態寫入。`
             : `${targetPresentation.name}遭到禁咒，狀態重置為 3。`
+        : actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID
+          ? `${actorPresentation.name}已瞬移至（${result.target.x}, ${result.target.y}）。`
         : actionId === "lightning-1" || actionId === "lightning-2" || actionId === "lightning-3"
           || actionId === "lightning-4"
           ? `落雷對 ${result.affectedUnits.filter(({ blockReason }) => blockReason !== "frozen").length} 名敵人造成共 ${result.damage} 點傷害。`
@@ -1869,6 +1883,10 @@ export class GameController {
         if (step.audioAfter) {
           this.queueAudioCue(82, `${result.actionId}-impact-${step.index}`, "magic");
         }
+      }
+    } else if (result.actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID) {
+      for (let frame = 0; frame < 8; frame += 1) {
+        await present("teleportEffect", frame, 3);
       }
     } else {
       const dispel = actionPresentationCatalog().dispel;

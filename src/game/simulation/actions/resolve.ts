@@ -1,4 +1,7 @@
-import { BATTLE_ACTION_DEFINITIONS } from "../../content/actions";
+import {
+  BATTLE_ACTION_DEFINITIONS,
+  CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+} from "../../content/actions";
 import { killRewardFor, movementRulesFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
 import type { DeterministicRng } from "../rng";
@@ -732,6 +735,9 @@ export function prepareSpecialAction(
       context,
       trial,
     ));
+  } else if (intent.actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID) {
+    affectedUnits = [affectedUnit(actor, { positionAfter: center })];
+    experienceGained = 0;
   } else {
     if (!target) throw new Error("single-target action requires a target unit");
     const single = prepareSingleTarget(intent, actor, target, trial, context.statsFor(target).maxLife);

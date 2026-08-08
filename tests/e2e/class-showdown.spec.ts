@@ -17,6 +17,10 @@ interface ClassShowdownBattleState {
   units: Array<{
     id: string;
     classId: string;
+    x: number;
+    y: number;
+    acted: boolean;
+    experience: number;
     statuses: Record<string, number>;
   }>;
 }
@@ -366,5 +370,70 @@ test("great dragon knight stomp lands on its selected target in the all-class sh
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-stomp-3-target-impact.png`,
   });
+  expect(pageErrors).toEqual([]);
+});
+
+test("half-dragon warrior can teleport to any empty map cell in the showdown", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  // The half-dragon warrior is the ninth record, eight rows below the initial focus.
+  for (let step = 0; step < 8; step += 1) await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
+  await expect(page.locator(".hud-identity-name")).toHaveText("半龍戰士");
+  await expect(page.getByTestId("unit-command-technique")).toBeVisible();
+  await page.getByTestId("unit-command-technique").click();
+  await expect(page.getByTestId("technique-showdown-teleport")).toHaveText("瞬移");
+  await page.getByTestId("technique-showdown-teleport").click();
+
+  const selection = await classShowdownBattleState(page);
+  expect(selection?.actionMode).toBe("specialTarget");
+  expect(selection?.actionRange).toHaveLength(50 * 50);
+  expect(selection?.targets).toHaveLength(50 * 50 - 70);
+  expect(selection?.targets).not.toContainEqual({ x: 18, y: 23 });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-half-dragon-teleport-targeting.png`,
+  });
+
+  // Move the cursor to a distant empty cell and submit the semantic target.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 20, y: 24 });
+  const before = await classShowdownBattleState(page);
+  const actorBefore = before?.units.find(({ id }) => id === "arena-1-8");
+  expect(actorBefore).toMatchObject({ x: 17, y: 23, acted: false });
+
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState;
+    }).battle;
+    return current?.specialActionPresentation?.phase === "teleportEffect";
+  }, undefined, { polling: "raf" });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-half-dragon-teleport-effect.png`,
+  });
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState;
+    }).battle;
+    const actor = current?.units.find(({ id }) => id === "arena-1-8");
+    return current?.specialActionPresentation === undefined && actor?.x === 20 && actor?.y === 24;
+  });
+  const after = await classShowdownBattleState(page);
+  expect(after?.units.find(({ id }) => id === "arena-1-8")).toMatchObject({
+    x: 20,
+    y: 24,
+    acted: true,
+    experience: actorBefore?.experience,
+  });
+  expect(after?.specialActionPresentationTrace.map(({ phase }) => phase))
+    .toEqual(Array.from({ length: 8 }, () => "teleportEffect"));
   expect(pageErrors).toEqual([]);
 });

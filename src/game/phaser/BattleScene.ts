@@ -1380,6 +1380,22 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             addTargetedStompFrame(step.y, 0);
             addTargetedStompFrame(stomp.action.shadowDrawYCoordinate, 1);
           }
+        } else if (special.phase === "teleportEffect") {
+          const progress = (special.frame + 1) / 8;
+          const radius = 5 + progress * 24;
+          for (const [position, color] of [
+            [special.actor, 0x66e1ff],
+            [center, 0xffd56a],
+          ] as const) {
+            const ring = this.add.graphics().setDepth(8);
+            ring.lineStyle(2, color, 1 - progress * .55);
+            ring.strokeCircle(
+              position.x * TILE_WIDTH + TILE_WIDTH / 2,
+              position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+              radius,
+            );
+            this.combatEffects.push(ring);
+          }
         } else if (special.phase === "specialDeath" && target) {
           const descriptor = MAP_DEATH_DESCRIPTORS[special.frame];
           descriptor?.frames.forEach((sourceFrame, index) => {

@@ -7,7 +7,11 @@ import {
   suppressesOrdinaryCounterFor,
   terrainDefensePercentFor,
 } from "../content/classes";
-import { BATTLE_ACTION_DEFINITIONS, techniqueActionIdsFor } from "../content/actions";
+import {
+  BATTLE_ACTION_DEFINITIONS,
+  CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+  techniqueActionIdsFor,
+} from "../content/actions";
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, Position, SaveRosterEntry, SavedBattleState, UnitStats, UnitStatuses } from "../types";
@@ -21,6 +25,7 @@ import {
 import type { ClassId } from "../content/classes";
 import {
   shootingRange,
+  fullMapRange,
   NumericRangeMap,
   techniqueSelectionRange,
 } from "./actions/range-map";
@@ -115,6 +120,7 @@ const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "stomp-3": ["great-dragon-knight"],
   "iron-plate": ["engineer"],
   "obstacle": ["engineer"],
+  [CLASS_SHOWDOWN_TELEPORT_ACTION_ID]: [],
 };
 
 const isConstructionAction = (actionId: BattleActionId): actionId is ConstructionActionId =>
@@ -136,7 +142,11 @@ function applyActiveOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit
   if (status) defender.statuses[status.key] = status.counter;
 }
 
-function canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
+function canUseSpecialAction(
+  actor: BattleUnit,
+  actionId: BattleActionId,
+  additionalClassAction: boolean,
+): boolean {
   const tier = classTierFor(actor);
   const nativeTechniqueAction = techniqueActionIdsFor(actor).includes(actionId);
   if (actor.classId === "magic-priest") {
@@ -182,7 +192,9 @@ function canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boole
   if (actionId === "stomp-3" && tier !== 3) return false;
   return !actor.acted
     && !actor.actionDisabled
-    && (nativeTechniqueAction || ACTION_CLASSES[actionId].includes(actor.classId))
+    && (additionalClassAction
+      || nativeTechniqueAction
+      || ACTION_CLASSES[actionId].includes(actor.classId))
     && (actionId === "archer-shot" || actionId === "crossbow-shot"
       || actionId === "magic-archer-shot" || actor.statuses.techniqueSeal === 0);
 }
@@ -209,6 +221,7 @@ export interface BattleScenario {
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   alliedBehaviorById?: ReadonlyMap<string, number>;
   enemyBehaviorById?: ReadonlyMap<string, number>;
+  additionalClassActions?: Readonly<Partial<Record<ClassId, readonly BattleActionId[]>>>;
   forces?: readonly ForceDefinition[];
   routePulses?: readonly RoutePulseDefinition[];
   routeEnemy?: {
@@ -277,6 +290,19 @@ export class Stage0Battle {
     this.campaignUnitSlots = new Set(
       this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
     );
+  }
+
+  private canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
+    return canUseSpecialAction(
+      actor,
+      actionId,
+      this.scenario.additionalClassActions?.[actor.classId]?.includes(actionId) ?? false,
+    );
+  }
+
+  additionalActionIdsFor(actorId: string): readonly BattleActionId[] {
+    const actor = this.unit(actorId);
+    return actor ? this.scenario.additionalClassActions?.[actor.classId] ?? [] : [];
   }
 
   static fromCampaignEntry(campaign: CampaignState): Stage0Battle {
@@ -568,10 +594,13 @@ export class Stage0Battle {
 
   actionRange(actorId: string, actionId: BattleActionId): NumericRangeMap {
     const actor = this.unit(actorId);
-    if (!actor || !canUseSpecialAction(actor, actionId)) {
+    if (!actor || !this.canUseSpecialAction(actor, actionId)) {
       return new NumericRangeMap(this.stage.width, this.stage.height);
     }
     const battlefield = this.dynamicBattlefield;
+    if (actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID) {
+      return fullMapRange(this.stage.width, this.stage.height);
+    }
     if (isConstructionAction(actionId)) {
       const result = new NumericRangeMap(this.stage.width, this.stage.height);
       for (const position of constructionReachableCells(actor, this.units, battlefield)) {
@@ -596,10 +625,13 @@ export class Stage0Battle {
 
   actionTargetCells(actorId: string, actionId: BattleActionId): Position[] {
     const actor = this.unit(actorId);
-    if (!actor || !canUseSpecialAction(actor, actionId)) return [];
+    if (!actor || !this.canUseSpecialAction(actor, actionId)) return [];
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     const range = this.actionRange(actorId, actionId);
     if (isConstructionAction(actionId)) return range.cells();
+    if (definition.target === "empty-cell") {
+      return range.cells().filter((position) => !this.unitAt(position));
+    }
     if (definition.target === "self-area") return [{ x: actor.x, y: actor.y }];
     return this.units
       .filter((target) => range.valueAt(target) > 0
@@ -612,9 +644,9 @@ export class Stage0Battle {
 
   actionTargets(actorId: string, actionId: BattleActionId): BattleUnit[] {
     const actor = this.unit(actorId);
-    if (!actor || !canUseSpecialAction(actor, actionId)) return [];
+    if (!actor || !this.canUseSpecialAction(actor, actionId)) return [];
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-    if (isConstructionAction(actionId)) return [];
+    if (isConstructionAction(actionId) || definition.target === "empty-cell") return [];
     if (definition.target === "self-area") return [];
     const range = this.actionRange(actorId, actionId);
     return this.units.filter((target) =>
@@ -632,6 +664,7 @@ export class Stage0Battle {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     const requestedCenter = intent.target ?? (target ? { x: target.x, y: target.y } : undefined);
     const selfCentered = definition.target === "self-area";
+    const requiresTargetUnit = definition.target === "ally" || definition.target === "enemy";
     const center = selfCentered && actor
       ? { x: actor.x, y: actor.y }
       : requestedCenter;
@@ -644,9 +677,9 @@ export class Stage0Battle {
     if (
       !actor
       || !center
-      || !canUseSpecialAction(actor, intent.actionId)
+      || !this.canUseSpecialAction(actor, intent.actionId)
       || !legalCell
-      || (definition.target !== "self-area" && !target)
+      || (requiresTargetUnit && !target)
     ) {
       throw new Error("illegal special action");
     }
@@ -701,7 +734,7 @@ export class Stage0Battle {
     });
     if (
       !actor
-      || !canUseSpecialAction(actor, prepared.intent.actionId)
+      || !this.canUseSpecialAction(actor, prepared.intent.actionId)
       || this.rng.state !== prepared.rngBefore
       || this.rng.calls !== prepared.rngCallsBefore
       || actor.experience !== prepared.actorExperienceBefore
@@ -843,7 +876,7 @@ export class Stage0Battle {
     actionId: ActionId,
   ): PreparedConstruction<ActionId> {
     const actor = this.unit(actorId);
-    if (!actor || !canUseSpecialAction(actor, actionId)) {
+    if (!actor || !this.canUseSpecialAction(actor, actionId)) {
       throw new Error(`illegal ${actionId} construction`);
     }
     return resolveConstruction(actor, target, actionId, {
@@ -883,7 +916,7 @@ export class Stage0Battle {
       .join("|");
     if (
       !actor
-      || !canUseSpecialAction(actor, prepared.actionId)
+      || !this.canUseSpecialAction(actor, prepared.actionId)
       || actor.x !== prepared.actorPositionBefore.x
       || actor.y !== prepared.actorPositionBefore.y
       || this.unitAt(prepared.actorPositionAfter)
@@ -1506,7 +1539,7 @@ export class Stage0Battle {
     };
 
     for (const actionId of actionIds) {
-      if (!canUseSpecialAction(unit, actionId)) continue;
+      if (!this.canUseSpecialAction(unit, actionId)) continue;
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
       const positions = (actionId === "archer-shot" || actionId === "crossbow-shot"
         || actionId === "magic-archer-shot"

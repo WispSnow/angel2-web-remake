@@ -5,6 +5,7 @@ import {
   NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
 } from "../../src/game/content/ai-technique-dialogue";
+import { CLASS_SHOWDOWN_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
 import { activateStage1Content } from "../../src/game/content/stage1";
 
 beforeAll(() => activateStage1Content());
@@ -158,5 +159,9 @@ describe("native AI technique dialogue", () => {
       });
     expect(aiTechniqueDialogueFor({ name: "弓兵", portrait: 59, side: 2 }, "archer-shot"))
       .toBeUndefined();
+    expect(aiTechniqueDialogueFor(
+      { name: "半龍戰士", portrait: 58, side: 2 },
+      CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+    )).toBeUndefined();
   });
 });

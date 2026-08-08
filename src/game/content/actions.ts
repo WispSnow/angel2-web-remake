@@ -8,13 +8,34 @@ import { classDefinition, classTierFor } from "./classes";
 import type { BattleUnit } from "../types";
 
 type ExtendedActionContent = typeof import("./stage1-actions.generated");
+export const CLASS_SHOWDOWN_TELEPORT_ACTION_ID = "showdown-teleport" as const;
+
+const CLASS_SHOWDOWN_ACTION_DEFINITIONS = {
+  [CLASS_SHOWDOWN_TELEPORT_ACTION_ID]: {
+    id: CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+    nativeCode: null,
+    label: "瞬移",
+    kind: "technique",
+    target: "empty-cell",
+    range: {
+      mode: "full-map",
+    },
+    experience: {
+      fixed: 0,
+    },
+    presentationId: "class-showdown-teleport",
+  },
+} as const;
+
 type BattleActionDefinitions = typeof STAGE0_ACTION_DEFINITIONS
-  & ExtendedActionContent["STAGE1_ACTION_DEFINITIONS"];
+  & ExtendedActionContent["STAGE1_ACTION_DEFINITIONS"]
+  & typeof CLASS_SHOWDOWN_ACTION_DEFINITIONS;
 type BattleActionAudioAssets = typeof STAGE0_ACTION_AUDIO_ASSETS
   & ExtendedActionContent["STAGE1_ACTION_AUDIO_ASSETS"];
 
 export const BATTLE_ACTION_DEFINITIONS = {
   ...STAGE0_ACTION_DEFINITIONS,
+  ...CLASS_SHOWDOWN_ACTION_DEFINITIONS,
 } as unknown as BattleActionDefinitions;
 
 export type BattleActionId = keyof typeof BATTLE_ACTION_DEFINITIONS;

@@ -13,8 +13,13 @@ import {
   createClassShowdownPlacements,
 } from "../../src/game/class-showdown-session";
 import { classDefinition, classStatsFor } from "../../src/game/content/classes";
+import { CLASS_SHOWDOWN_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "../../src/game/content/technique-lab.generated";
-import { ArenaBattle, createArenaRuntime } from "../../src/game/simulation/arena-battle";
+import {
+  ALL_TERRAIN_ARENA_ENVIRONMENT,
+  ArenaBattle,
+  createArenaRuntime,
+} from "../../src/game/simulation/arena-battle";
 
 const assetFile = (source: string): string =>
   path.resolve("public", source.replace(/^\/assets\//, "assets/"));
@@ -123,5 +128,67 @@ describe("all-class showdown lab", () => {
       .toEqual(expectedSide1);
     expect(battle.units.filter(({ side }) => side === 2).map(({ portrait }) => portrait))
       .toEqual(expectedSide2);
+  });
+
+  it("gives only the half-dragon showdown mirror a full-map empty-cell teleport", () => {
+    const placements = createClassShowdownPlacements(1);
+    const battle = new ArenaBattle(placements, 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
+    const actor = battle.unit("arena-1-8")!;
+    const destination = { x: 0, y: 0 };
+    const targetCells = battle.actionTargetCells(actor.id, CLASS_SHOWDOWN_TELEPORT_ACTION_ID);
+
+    expect(actor.classId).toBe("half-dragon-warrior");
+    expect(battle.additionalActionIdsFor(actor.id)).toEqual([CLASS_SHOWDOWN_TELEPORT_ACTION_ID]);
+    expect(battle.actionRange(actor.id, CLASS_SHOWDOWN_TELEPORT_ACTION_ID).cells())
+      .toHaveLength(50 * 50);
+    expect(targetCells).toHaveLength(50 * 50 - placements.length);
+    expect(targetCells).toContainEqual(destination);
+    for (const placement of placements) {
+      expect(targetCells).not.toContainEqual({ x: placement.x, y: placement.y });
+    }
+    expect(() => battle.prepareSpecialAction({
+      actionId: CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+      actorId: actor.id,
+      target: { x: 18, y: 23 },
+    })).toThrow("illegal special action");
+    expect(battle.additionalActionIdsFor("arena-2-8"))
+      .toEqual([CLASS_SHOWDOWN_TELEPORT_ACTION_ID]);
+    expect(battle.planEnemyAiAction("arena-2-8")?.actionId)
+      .not.toBe(CLASS_SHOWDOWN_TELEPORT_ACTION_ID);
+
+    const before = {
+      position: { x: actor.x, y: actor.y },
+      acted: actor.acted,
+      experience: actor.experience,
+      rng: { state: battle.rng.state, calls: battle.rng.calls },
+    };
+    const prepared = battle.prepareSpecialAction({
+      actionId: CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+      actorId: actor.id,
+      target: destination,
+    });
+    expect(prepared.result.experienceGained).toBe(0);
+    expect(prepared.result.affectedUnits).toMatchObject([
+      {
+        unitId: actor.id,
+        positionBefore: before.position,
+        positionAfter: destination,
+        moved: true,
+      },
+    ]);
+    expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(before.rng);
+    expect({ x: actor.x, y: actor.y, acted: actor.acted, experience: actor.experience })
+      .toEqual({ ...before.position, acted: before.acted, experience: before.experience });
+
+    battle.commitPreparedAction(prepared);
+    expect({ x: actor.x, y: actor.y, acted: actor.acted, experience: actor.experience })
+      .toEqual({ x: destination.x, y: destination.y, acted: true, experience: before.experience });
+    expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(before.rng);
+    expect(battle.actionTargetCells(actor.id, CLASS_SHOWDOWN_TELEPORT_ACTION_ID)).toEqual([]);
+
+    const ordinaryArena = new ArenaBattle(placements, 0, undefined, ALL_TERRAIN_ARENA_ENVIRONMENT);
+    expect(ordinaryArena.additionalActionIdsFor("arena-1-8")).toEqual([]);
+    expect(ordinaryArena.actionTargetCells("arena-1-8", CLASS_SHOWDOWN_TELEPORT_ACTION_ID))
+      .toEqual([]);
   });
 });
