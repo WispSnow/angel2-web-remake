@@ -129,6 +129,25 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
   });
 });
 
+test("right-side soldier dust trail mirrors the left-side attack direction", async ({ page }) => {
+  await page.goto(
+    "/combat-lab.html?attacker=soldier&defender=soldier&side=right&reaction=hurt&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_200));
+
+  const particles = page.locator(".full-combat-particles img:not([hidden])");
+  await expect(particles).toHaveCount(3);
+  const particleXs = await particles.evaluateAll((elements) => elements.map((element) => {
+    const match = element.getAttribute("style")?.match(/translate\((-?\d+)px/u);
+    return Number(match?.[1]);
+  }));
+  expect(particleXs[1] - particleXs[0]).toBe(24);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-right-soldier-dust.png",
+    fullPage: true,
+  });
+});
+
 test("record 1 magic sword warrior keeps its body and G1 effect channels synchronized", async ({ page }) => {
   await page.goto(
     "/combat-lab.html?attacker=magic-sword-warrior&defender=soldier&reaction=hurt&speed=4",

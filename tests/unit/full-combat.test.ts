@@ -304,6 +304,7 @@ function referencePresentationFrames(
   actorSteps: readonly ReferenceCommandStep[],
   victimSteps: readonly ReferenceCommandStep[],
   coordinates: readonly { actorX: number; victimX: number }[],
+  actorSide: "left" | "right",
   initial = initialReferencePresentation(),
 ): { frames: Array<Pick<ReferencePresentationState, "viewportYOffset" | "particles">>; final: ReferencePresentationState } {
   const state = cloneReferencePresentation(initial);
@@ -337,8 +338,14 @@ function referencePresentationFrames(
     } else {
       const effect = effectRole === "actor" ? state.actorEffect : state.victimEffect;
       const subjectX = coordinates[substep][effectRole === "actor" ? "actorX" : "victimX"];
-      const towardRight = (effectRole === "actor" && effect === "U")
+      const effectPointsRightOnLeftSide = (effectRole === "actor" && effect === "U")
         || (effectRole === "victim" && effect === "Y");
+      const subjectSide = effectRole === "actor"
+        ? actorSide
+        : actorSide === "left" ? "right" : "left";
+      const towardRight = subjectSide === "right"
+        ? !effectPointsRightOnLeftSide
+        : effectPointsRightOnLeftSide;
       const direction = towardRight ? 24 : -24;
       state.trailX[0] = subjectX
         + (towardRight ? 40 + state.trailOffset : -40 - state.trailOffset);
@@ -515,6 +522,7 @@ describe("Full-screen ordinary combat choreography", () => {
           actorX: actorFrame.x,
           victimX: victimMark + mainVictimFrames[index].x - mainVictimEnd.x,
         })),
+        side,
       );
 
       expect(impact - start).toBe(mainActorFrames.length * 40);
@@ -652,6 +660,7 @@ describe("Full-screen ordinary combat choreography", () => {
             actorX: actorFrame.x,
             victimX: victimMark,
           })),
+          side,
           mainPresentation.final,
         );
         expect(reactionHold - reactionImpact).toBe(actorFrames.length * 50);
@@ -828,6 +837,7 @@ describe("Full-screen ordinary combat choreography", () => {
           actorX: actorFrame.x,
           victimX: victimMark + mainVictimFrames[index].x - mainVictimEnd.x,
         })),
+        side,
       );
       const postActor = streams.auxiliaryA.steps as readonly ReferenceCommandStep[];
       const postVictim = streams.auxiliaryB.steps as readonly ReferenceCommandStep[];
@@ -837,6 +847,7 @@ describe("Full-screen ordinary combat choreography", () => {
         postActor,
         postVictim,
         postActorFrames.map((actorFrame) => ({ actorX: actorFrame.x, victimX: victimMark })),
+        side,
         mainPresentation.final,
       );
       const victimSide = side === "left" ? "right" : "left";
@@ -850,6 +861,7 @@ describe("Full-screen ordinary combat choreography", () => {
         [],
         deathSteps,
         deathFrames.map(() => ({ actorX: victimMark, victimX: victimMark })),
+        side,
         deathInitial,
       );
       const mainCamera = referenceNativeCameraFrames(mainActor);
@@ -1733,6 +1745,65 @@ describe("Full-screen ordinary combat choreography", () => {
       damage: hold.damage,
     });
   });
+
+  it("mirrors common trail direction for the right-side counterattack", () => {
+    const script = buildFullCombatScript(
+      unit(1, 0, "我方攻手"),
+      unit(2, 48, "敵方反擊手"),
+      result(),
+    );
+    const primaryCharge = script.sample(
+      (markTime(script, "fullCharge") + markTime(script, "fullImpact")) / 2,
+    );
+    const counterCharge = script.sample(
+      (markTime(script, "fullCounterCharge") + markTime(script, "fullCounterImpact")) / 2,
+    );
+
+    expect(primaryCharge.particles[1].x - primaryCharge.particles[0].x).toBe(-24);
+    expect(counterCharge.particles[1].x - counterCharge.particles[0].x).toBe(24);
+  });
+
+  const commonTrailClasses = Object.entries(STAGE0_FULL_COMBAT_PROFILES)
+    .filter(([, profile]) => Object.values(profile.commandStreams).length === 2
+      && Object.values(profile.commandStreams).some(
+        (streams) => streams?.mainLeftOrAttacker.steps.some(
+          (step: { commands: readonly { token: string }[] }) => step.commands.some(
+            ({ token }) => token === "EY" || token === "UE",
+          ),
+        ),
+      ))
+    .map(([classId]) => classId as UnitClassId);
+
+  it.each(commonTrailClasses)(
+    "mirrors the common trail for %s when its physical side changes",
+    (classId) => {
+      const sampleDirection = (side: 1 | 2): number => {
+        const attacker = unit(side, side === 1 ? 0 : 48, "測試攻手", classId);
+        const defender = unit(side === 1 ? 2 : 1, side === 1 ? 48 : 0, "測試守手");
+        const script = buildFullCombatScript(
+          attacker,
+          defender,
+          result({
+            attackerId: attacker.id,
+            defenderId: defender.id,
+            counterOccurred: false,
+            counterDamage: 0,
+          }),
+        );
+        const start = markTime(script, "fullWindup");
+        const impact = markTime(script, "fullImpact");
+        for (let t = start; t < impact; t += 40) {
+          const particles = script.sample(t + 1).particles;
+          if (particles.length >= 2) return particles[1].x - particles[0].x;
+        }
+        throw new Error(`No common trail was rendered for class ${classId}`);
+      };
+
+      const leftDirection = sampleDirection(1);
+      expect(leftDirection === -24 || leftDirection === 24).toBe(true);
+      expect(sampleDirection(2)).toBe(-leftDirection);
+    },
+  );
 
   it("uses the native 210-pixel life-gauge tiers and updates them at each impact", () => {
     expect(nativeFullCombatLifeGauge(0)).toEqual({

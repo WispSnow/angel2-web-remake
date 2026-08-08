@@ -1228,6 +1228,7 @@ function advanceNativePresentationPhase(
   actorSteps: readonly NativeCommandStep[],
   victimSteps: readonly NativeCommandStep[],
   renderedSubsteps: number,
+  actorSide: "left" | "right",
   coordinates: (substep: number) => { actorX: number; victimX: number },
 ): void {
   for (let substep = 0; substep < renderedSubsteps; substep += 1) {
@@ -1263,8 +1264,18 @@ function advanceNativePresentationPhase(
     const effect = effectRole === "actor" ? state.actorEffect : state.victimEffect;
     const { actorX, victimX } = coordinates(substep);
     const subjectX = effectRole === "actor" ? actorX : victimX;
-    const towardRight = (effectRole === "actor" && effect === "U")
+    const effectPointsRightOnLeftSide = (effectRole === "actor" && effect === "U")
       || (effectRole === "victim" && effect === "Y");
+    // EY/UE are stored in each physical side's command block, but the common
+    // trail bitmap is not mirrored by the compositor. Resolve the native
+    // left-side direction first, then mirror the complete trail for a right
+    // side subject. This keeps the dust behind the same motion on counterattacks.
+    const subjectSide = effectRole === "actor"
+      ? actorSide
+      : actorSide === "left" ? "right" : "left";
+    const towardRight = subjectSide === "right"
+      ? !effectPointsRightOnLeftSide
+      : effectPointsRightOnLeftSide;
     const direction = towardRight ? 24 : -24;
     state.trailX[0] = subjectX + (towardRight ? 40 + state.trailOffset : -40 - state.trailOffset);
     state.trailFrame[0] ^= 1;
@@ -1323,6 +1334,7 @@ function nativePresentationAt(
     mainActor,
     mainVictim,
     renderedNativeSubsteps(mainActor, mainAge, NATIVE_STRIKE_SUBSTEP),
+    spec.actorSide,
     (substep) => {
       const age = substep * NATIVE_STRIKE_SUBSTEP;
       const actor = sampleNativeStream(mainActor, age, NATIVE_STRIKE_SUBSTEP, spec.actorX, 0);
@@ -1351,6 +1363,7 @@ function nativePresentationAt(
       postActor,
       postVictim,
       renderedNativeSubsteps(postActor, postAge, NATIVE_POST_HIT_SUBSTEP),
+      spec.actorSide,
       (substep) => ({
         actorX: sampleNativeStream(
           postActor,
@@ -1374,6 +1387,7 @@ function nativePresentationAt(
       [],
       death,
       renderedNativeSubsteps(death, t - times.holdStart, NATIVE_POST_HIT_SUBSTEP),
+      spec.actorSide,
       () => ({ actorX: spec.victimX, victimX: spec.victimX }),
     );
   }
