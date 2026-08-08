@@ -23,6 +23,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:visual": "VISUAL_AUDIT=1 playwright test",
     "check": "pnpm run test:coverage && pnpm run build && pnpm run test:e2e",
     "content": "node scripts/generate-content.mjs",
     "content:classes": "node scripts/generate-class-catalog.mjs",

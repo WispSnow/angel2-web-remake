@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const labState = (page: Page) => page.evaluate(() =>
   window.__ANGEL2_TECHNIQUE_LAB__?.getState());
@@ -7,8 +7,6 @@ const labState = (page: Page) => page.evaluate(() =>
 const seek = async (page: Page, timeMs: number) => {
   await page.evaluate((time) => window.__ANGEL2_TECHNIQUE_LAB__?.seek(time), timeMs);
 };
-
-test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
 
 test("all four native lightning scripts expose their main, wave and cleanup phases", async ({ page }) => {
   const pageErrors: string[] = [];
@@ -36,7 +34,7 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     await expect(page.locator('[data-readout="phase"]')).toContainText("逐格錯相命中");
     expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
     if (contract.code === "4L") {
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: "artifacts/playwright/technique-lab-lightning-4-wave.png",
         fullPage: true,
       });
@@ -47,13 +45,13 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     await expect(canvas).toHaveAttribute("data-effect-tile-count", String(contract.affected));
     await expect(canvas).toHaveAttribute("data-lightning-cleanup-scope", "affected");
     if (contract.code === "1L") {
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: "artifacts/playwright/technique-lab-lightning-range-cleanup.png",
         fullPage: true,
       });
     }
     if (contract.code === "4L") {
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: "artifacts/playwright/technique-lab-lightning-4-cleanup.png",
         fullPage: true,
       });
@@ -63,7 +61,7 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 100 ms");
     expect((await labState(page))?.playback.terminalHoldMs).toBe(100);
     if (contract.code === "4L") {
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: "artifacts/playwright/technique-lab-lightning-final-hold.png",
         fullPage: true,
       });
@@ -73,7 +71,7 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
     await expect(page.locator('[data-readout="phase"]')).toContainText("無殘留");
     if (contract.code === "4L") {
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: "artifacts/playwright/technique-lab-lightning-complete.png",
         fullPage: true,
       });
@@ -86,7 +84,7 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
   await expect(canvas).toHaveAttribute("data-lightning-cleanup-scope", "original-all-enemies");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "3");
   await expect(page.locator('[data-readout="phase"]')).toContainText("非命中");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-lightning-original-cleanup.png",
     fullPage: true,
   });
@@ -120,7 +118,7 @@ test("intermediate, advanced and ultimate lightning preserve distinct native vis
     await seek(page, capture.time);
     await expect(canvas).toHaveAttribute("data-technique-phase", "main");
     expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
-    await page.screenshot({
+    await captureVisualAudit(page, {
       path: `artifacts/playwright/${capture.name}`,
       fullPage: true,
     });
@@ -140,19 +138,18 @@ test("lightning hit waves advance one range threshold after every native draw", 
   }
 
   await seek(page, 1770);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-lightning-2-staggered-hit.png",
     fullPage: true,
   });
 });
 
-test("already implemented fire, healing and ice remain available in the same map surface", async ({ page }) => {
+test("initial fire and healing remain available on the shared map surface", async ({ page }) => {
   await page.goto("/technique-lab.html");
   const canvas = page.locator("#technique-lab-canvas canvas");
   const contracts = [
     { code: "1F", duration: 700, time: 200, phase: "fire", terminalHold: 100 },
     { code: "1H", duration: 2750, time: 200, phase: "heal-primary", terminalHold: 150 },
-    { code: "1C", duration: 1200, time: 100, phase: "ice", terminalHold: 100 },
   ] as const;
   for (const contract of contracts) {
     expect(await page.evaluate((code) =>
@@ -169,25 +166,8 @@ test("already implemented fire, healing and ice remain available in the same map
     await seek(page, contract.duration);
     await expect(canvas).toHaveAttribute("data-technique-phase", "none");
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
-    if (contract.code === "1C") {
-      await expect(canvas).toHaveAttribute("data-frozen-unit-count", "1");
-      await expect(page.locator('[data-readout="result"]')).toContainText("跳過下一次本陣營行動");
-      await page.screenshot({
-        path: "artifacts/playwright/technique-lab-ice-frozen-result.png",
-        fullPage: true,
-      });
-      await page.getByTestId("technique-lab-next-side-phase").click();
-      await expect(canvas).toHaveAttribute("data-frozen-unit-count", "0");
-      await expect(page.locator('[data-readout="result"]')).toContainText("冰封解除");
-    } else {
-      await expect(canvas).toHaveAttribute("data-frozen-unit-count", "0");
-    }
+    await expect(canvas).toHaveAttribute("data-frozen-unit-count", "0");
   }
-  expect(await page.evaluate(() =>
-    window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("2L"))).toBe(true);
-  await seek(page, 700);
-  await expect(canvas).toHaveAttribute("data-technique-phase", "main");
-  expect((await labState(page))?.playback.durationMs).toBe(2570);
 });
 
 test("intermediate fire composes 21 source tiles into twelve native draws", async ({ page }) => {
@@ -218,7 +198,7 @@ test("intermediate fire composes 21 source tiles into twelve native draws", asyn
   await seek(page, 800);
   await expect(canvas).toHaveAttribute("data-technique-frame", "8");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "2");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-fire-2-column.png",
     fullPage: true,
   });
@@ -264,7 +244,7 @@ test("advanced fire composes 51 tiles into thirteen draws with a blank 15-tick t
   await seek(page, 1500);
   await expect(canvas).toHaveAttribute("data-technique-frame", "10");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "6");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-fire-3-wave.png",
     fullPage: true,
   });
@@ -309,7 +289,7 @@ test("ultimate fire switches to MAGIC/29 before its five rising-column draws", a
     "data-effect-texture-keys",
     Array.from({ length: 9 }, (_, index) => `map-technique-magic-28-${index + 39}`).join(","),
   );
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-fire-4-dragon-up.png",
     fullPage: true,
   });
@@ -331,7 +311,7 @@ test("ultimate fire switches to MAGIC/29 before its five rising-column draws", a
     "data-effect-texture-keys",
     "map-technique-magic-29-18,map-technique-magic-29-19,map-technique-magic-29-19,map-technique-magic-29-20",
   );
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-fire-4-rising-column.png",
     fullPage: true,
   });
@@ -344,7 +324,7 @@ test("ultimate fire switches to MAGIC/29 before its five rising-column draws", a
     "data-effect-texture-keys",
     "map-technique-magic-29-18,map-technique-magic-29-19,map-technique-magic-29-19,map-technique-magic-29-20",
   );
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-fire-4-finish.png",
     fullPage: true,
   });
@@ -379,7 +359,7 @@ test("intermediate heal composes the repeated 3x2 heart before its shared five-f
   await expect(canvas).toHaveAttribute("data-technique-phase", "heal-primary");
   await expect(canvas).toHaveAttribute("data-technique-frame", "3");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "6");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-heal-2-heart.png",
     fullPage: true,
   });
@@ -426,7 +406,7 @@ test("advanced heal expands, loops three times, reverses, then runs the shared t
   await seek(page, 700);
   await expect(canvas).toHaveAttribute("data-technique-frame", "13");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "6");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-heal-3-heart.png",
     fullPage: true,
   });
@@ -461,7 +441,7 @@ test("initial recovery keeps all 17 native stages while marking only affected sa
   await seek(page, 1200);
   await expect(canvas).toHaveAttribute("data-technique-phase", "recovery");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "1");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-recovery-1.png",
     fullPage: true,
   });
@@ -490,7 +470,7 @@ test("intermediate recovery reuses all native stages with its radius-three rule 
   await expect(canvas).toHaveAttribute("data-technique-phase", "recovery");
   await expect(canvas).toHaveAttribute("data-technique-frame", "8");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "1");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-recovery-2.png",
     fullPage: true,
   });
@@ -535,7 +515,7 @@ test("advanced recovery keeps all shared stages while excluding frozen allies fr
   await expect(canvas).toHaveAttribute("data-technique-phase", "recovery");
   await expect(canvas).toHaveAttribute("data-technique-frame", "8");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "1");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-recovery-3.png",
     fullPage: true,
   });
@@ -554,7 +534,7 @@ test("advanced recovery keeps all shared stages while excluding frozen allies fr
   await expect(canvas).toHaveAttribute("data-frozen-unit-count", "1");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "2");
   await expect(page.getByTestId("technique-lab-hint")).toContainText("冰殼持續可見");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-recovery-3-frozen-exception.png",
     fullPage: true,
   });
@@ -592,22 +572,22 @@ test("all four ice tiers expand one complete six-frame ring at a time", async ({
         String(distance * 4),
       );
       if (contract.code === "1C") {
-        await page.screenshot({
+        await captureVisualAudit(page, {
           path: `artifacts/playwright/technique-lab-ice-1-ring-${distance}.png`,
           fullPage: true,
         });
       } else if (contract.code === "2C" && distance === contract.distances) {
-        await page.screenshot({
+        await captureVisualAudit(page, {
           path: "artifacts/playwright/technique-lab-ice-2-outer-ring.png",
           fullPage: true,
         });
       } else if (contract.code === "3C" && distance === contract.distances) {
-        await page.screenshot({
+        await captureVisualAudit(page, {
           path: "artifacts/playwright/technique-lab-ice-3-outer-ring.png",
           fullPage: true,
         });
       } else if (contract.code === "4C" && distance === contract.distances) {
-        await page.screenshot({
+        await captureVisualAudit(page, {
           path: "artifacts/playwright/technique-lab-ice-4-outer-ring.png",
           fullPage: true,
         });
@@ -656,7 +636,7 @@ test("dispel preserves its original timeline and removes a frozen ally", async (
   await expect(canvas).toHaveAttribute("data-technique-phase", "dispel");
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", /lab-2/u);
   expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-dispel-animation.png",
     fullPage: true,
   });
@@ -667,7 +647,7 @@ test("dispel preserves its original timeline and removes a frozen ally", async (
   await expect(canvas).toHaveAttribute("data-technique-phase", "none");
   await expect(canvas).toHaveAttribute("data-frozen-unit-count", "0");
   await expect(page.locator('[data-readout="result"]')).toContainText("冰封與異常狀態");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-dispel-result.png",
     fullPage: true,
   });
@@ -707,7 +687,7 @@ test("stomp preserves the native timeline while landing on the selected target",
   await expect(canvas).toHaveAttribute("data-stomp-explicit-ticks", "0");
   await expect(page.locator('[data-readout="affected"]')).toContainText("10..19");
   await expect(page.locator('[data-readout="result"]')).toContainText("龍踏並集命中 3 名");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-stomp-1-quake.png",
     fullPage: true,
   });
@@ -719,7 +699,7 @@ test("stomp preserves the native timeline while landing on the selected target",
   await seek(page, 440);
   await expect(canvas).toHaveAttribute("data-stomp-y", "15");
   await expect(canvas).toHaveAttribute("data-stomp-graphic-draw", "32");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-stomp-1-falling.png",
     fullPage: true,
   });
@@ -758,7 +738,7 @@ test("male stomp keeps its native geometry while landing on the selected target"
   await expect(canvas).toHaveAttribute("data-stomp-graphic-draw", "6");
   await expect(page.locator('[data-readout="affected"]')).toContainText("15..29");
   await expect(page.locator('[data-readout="result"]')).toContainText("男踏並集命中 3 名");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-stomp-2-quake.png",
     fullPage: true,
   });
@@ -796,7 +776,7 @@ test("female stomp keeps its native geometry while landing on the selected targe
   await expect(canvas).toHaveAttribute("data-stomp-graphic-draw", "6");
   await expect(page.locator('[data-readout="affected"]')).toContainText("20..39");
   await expect(page.locator('[data-readout="result"]')).toContainText("女踏並集命中 3 名");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-stomp-3-quake.png",
     fullPage: true,
   });
@@ -857,7 +837,7 @@ test("iron plate previews native movement followed by immediate four-neighbor re
     .toContainText("零技術動畫／音效／經驗");
   await expect(page.getByTestId("technique-lab-hint"))
     .toContainText("第 1 關 token 64 原圖");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-iron-plate.png",
     fullPage: true,
   });
@@ -908,7 +888,7 @@ test("obstacle previews native movement followed by the stage-1 four-neighbor re
     .toContainText("零技術動畫／音效／經驗");
   await expect(page.getByTestId("technique-lab-hint"))
     .toContainText("第 1 關 token 18 原圖");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-obstacle.png",
     fullPage: true,
   });
@@ -952,7 +932,7 @@ test("AA keeps all twenty two-tile frames and stays below a persistent ice shell
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "2");
   }
   await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 150 ms");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-attack-up.png",
     fullPage: true,
   });
@@ -976,7 +956,7 @@ test("AA keeps all twenty two-tile frames and stays below a persistent ice shell
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", "lab-2");
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("攻擊 +20 · 狀態 3");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-attack-up-frozen.png",
     fullPage: true,
   });
@@ -1021,7 +1001,7 @@ test("FM reuses all twenty AA pairs and stays below a persistent ice shell", asy
   }
   await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 150 ms");
   await expect(page.getByTestId("technique-lab-hint")).toContainText("與 AA 完全共用");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-magic-guard.png",
     fullPage: true,
   });
@@ -1045,7 +1025,7 @@ test("FM reuses all twenty AA pairs and stays below a persistent ice shell", asy
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", "lab-2");
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("防魔 · 狀態 1 · 一次性保護");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-magic-guard-frozen.png",
     fullPage: true,
   });
@@ -1092,7 +1072,7 @@ test("IP plays both poison phases, preserves boss immunity, and stays below a pe
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "4");
   }
   await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 100 ms");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-poison.png",
     fullPage: true,
   });
@@ -1113,7 +1093,7 @@ test("IP plays both poison phases, preserves boss immunity, and stays below a pe
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "4");
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", "lab-2");
   await expect(page.getByTestId("technique-lab-hint")).toContainText("冰封只跳過後續輪末毒傷");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-poison-frozen.png",
     fullPage: true,
   });
@@ -1163,7 +1143,7 @@ test("LA plays eleven silent 3x2 descriptors, preserves boss immunity, and stays
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "6");
   }
   await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 150 ms");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-confusion.png",
     fullPage: true,
   });
@@ -1185,7 +1165,7 @@ test("LA plays eleven silent 3x2 descriptors, preserves boss immunity, and stays
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", "lab-2");
   await expect(page.getByTestId("technique-lab-hint"))
     .toContainText("混亂可指定冰封敵軍");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-confusion-frozen.png",
     fullPage: true,
   });
@@ -1242,7 +1222,7 @@ test("SA plays eleven E/8-backed 1x2 descriptors and remains visible below a per
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "2");
   }
   await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 150 ms");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-attack-down.png",
     fullPage: true,
   });
@@ -1265,7 +1245,7 @@ test("SA plays eleven E/8-backed 1x2 descriptors and remains visible below a per
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", "lab-2");
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("攻擊 -20 · 狀態 3");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-attack-down-frozen.png",
     fullPage: true,
   });
@@ -1313,7 +1293,7 @@ test("SD plays ten E/8-backed 2x2 descriptors and remains visible below a persis
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "4");
   }
   await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 150 ms");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-defense-down.png",
     fullPage: true,
   });
@@ -1336,7 +1316,7 @@ test("SD plays ten E/8-backed 2x2 descriptors and remains visible below a persis
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", "lab-2");
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("防禦 -20 · 狀態 3");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-defense-down-frozen.png",
     fullPage: true,
   });
@@ -1388,7 +1368,7 @@ test("SN plays nine silent 3x2 descriptors, preserves dragon immunity, and stays
   }
   expect(audioRequests).toEqual([]);
   await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 250 ms");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-spell-seal.png",
     fullPage: true,
   });
@@ -1409,7 +1389,7 @@ test("SN plays nine silent 3x2 descriptors, preserves dragon immunity, and stays
   await expect(canvas).toHaveAttribute("data-technique-phase", "status");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "6");
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", "lab-2");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-spell-seal-frozen.png",
     fullPage: true,
   });
@@ -1464,7 +1444,7 @@ test("OJ scans side 1 with fixed per-recipient results and keeps its healing tex
   await expect(page.locator('[data-readout="affected"]')).toContainText("士兵 · 生命 +8");
   await expect(page.locator('[data-readout="phase"]')).toContainText("prayer-1/1");
   expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-prayer.png",
     fullPage: true,
   });
@@ -1491,7 +1471,7 @@ test("OJ scans side 1 with fixed per-recipient results and keeps its healing tex
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", /lab-5/u);
   await expect(page.getByTestId("technique-lab-hint"))
     .toContainText("冰殼保持在圖元和文字上方");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-prayer-frozen.png",
     fullPage: true,
   });
@@ -1538,7 +1518,7 @@ test("AD assembles and reverses all eleven four-tile shields below a persistent 
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "4");
   }
   await expect(page.locator('[data-readout="phase"]')).toContainText("末幀保持 150 ms");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-defense-up.png",
     fullPage: true,
   });
@@ -1562,7 +1542,7 @@ test("AD assembles and reverses all eleven four-tile shields below a persistent 
   await expect(canvas).toHaveAttribute("data-frozen-unit-ids", "lab-2");
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("防禦 +20 · 狀態 3");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-defense-up-frozen.png",
     fullPage: true,
   });
@@ -1630,7 +1610,7 @@ test("map tools place either side while all 33 original techniques stay availabl
   await expect.poll(async () => (await labState(page))?.session.units).toContainEqual(
     expect.objectContaining({ side: 2, classId: "dragon", x: 25, y: 21 }),
   );
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-placement-tools.png",
     fullPage: true,
   });

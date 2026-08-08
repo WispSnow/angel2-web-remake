@@ -1,7 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-
-test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
+import { captureVisualAudit } from "./visual-audit";
 
 async function enterStage0FromOrdinaryStartup(page: Page, difficulty: 0 | 3): Promise<void> {
   await page.goto("/");
@@ -66,7 +64,7 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
       await canvas.click({ button: "right", position: { x: 220, y: 177 } });
       await expectHudValues(page, ally.identity, ally.values);
       if (scenario.difficulty === 0 && index === 2) {
-        await page.getByTestId("game-screen").screenshot({
+        await captureVisualAudit(page.getByTestId("game-screen"), {
           path: "artifacts/playwright/stage0-allies-ximi.png",
         });
       }
@@ -79,7 +77,7 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
     for (let step = 0; step < 4; step += 1) await page.keyboard.press("ArrowLeft");
     for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
     await expectHudValues(page, "騎兵／哈釘", scenario.hading);
-    await page.getByTestId("game-screen").screenshot({ path: scenario.screenshot });
+    await captureVisualAudit(page.getByTestId("game-screen"), { path: scenario.screenshot });
 
     if (scenario.difficulty === 3) {
       await page.keyboard.press("Tab");

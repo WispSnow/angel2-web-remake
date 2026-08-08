@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -12,8 +12,6 @@ async function waitForPlayerOrStory(page: Page): Promise<"player" | "story"> {
     return false;
   }, undefined, { timeout: 90_000 }).then((handle) => handle.jsonValue() as Promise<"player" | "story">);
 }
-
-test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 
 test("S00-O: a normal build clears stage zero and reaches stage one through player-visible controls only", async ({ page }) => {
   test.setTimeout(180_000);
@@ -55,7 +53,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("system-menu")).toBeHidden();
 
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage0-real-player-start.png`,
   });
 
@@ -72,7 +70,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
       await expect(page.getByTestId("game-screen")).toHaveAttribute("data-side-panel-hotspots", "active");
       await page.getByTestId("group-command-hotspot").click();
       await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
-      await page.getByTestId("game-screen").screenshot({
+      await captureVisualAudit(page.getByTestId("game-screen"), {
         path: `${ARTIFACT_DIR}/stage0-real-follow-leader-hotspot-menu.png`,
       });
       await page.keyboard.press("Tab");
@@ -90,7 +88,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
       await expect(page.getByTestId("dialogue-window-upper")).toContainText(
         "大家聽著！\n所有還未行動的人在原地休息，補充體力．",
       );
-      await page.getByTestId("game-screen").screenshot({
+      await captureVisualAudit(page.getByTestId("game-screen"), {
         path: `${ARTIFACT_DIR}/stage0-real-all-rest-command-dialogue.png`,
       });
     }
@@ -115,7 +113,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
     expect(record).toBe("2");
     if (!capturedRoundTwo) {
       await page.getByTestId("advance-dialogue").click();
-      await page.getByTestId("game-screen").screenshot({
+      await captureVisualAudit(page.getByTestId("game-screen"), {
         path: `${ARTIFACT_DIR}/stage0-real-round2-story.png`,
       });
       capturedRoundTwo = true;
@@ -126,7 +124,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   expect(reachedVictoryStory).toBe(true);
   await expect(dialogue).toHaveAttribute("data-source-record", "3");
   await page.getByTestId("advance-dialogue").click();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage0-real-victory-story.png`,
   });
 
@@ -136,7 +134,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   await expect(page.getByTestId("feedback-text")).toHaveText(
     "哦！．．\n這次的戰役結束了，是否要記錄下來．",
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage0-real-victory-feedback.png`,
   });
   await page.getByTestId("victory-continue").click();
@@ -147,7 +145,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   await expect(dialogue).toBeVisible();
   await expect(dialogue).toHaveAttribute("data-source-record", "4");
   await expect(page.getByRole("heading", { name: "天使帝國 II · 騎士城堡前" })).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-real-prebattle-entry.png`,
     animations: "disabled",
   });

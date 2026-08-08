@@ -1,6 +1,6 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -120,7 +120,7 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
   await expect(dialogue).toBeVisible();
   await expect(dialogue).toHaveAttribute("data-source-record", "4");
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MAGIC/72");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-prebattle.png`,
   });
   await page.getByTestId("skip-dialogue").click();
@@ -130,7 +130,7 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
   await expect(page.getByTestId("deployment-roster-4")).toContainText("葛蒂拉斯");
   await page.getByTestId("deployment-roster-4").click();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 6／8");
-  await page.getByTestId("deployment-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
     path: `${ARTIFACT_DIR}/stage1-deployment.png`,
   });
   await page.getByTestId("deployment-finish").click();
@@ -138,7 +138,7 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
   await expect(dialogue).toBeVisible();
   await expect(dialogue).toHaveAttribute("data-source-record", "5");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-opening.png`,
   });
   const opening = await state(page);
@@ -174,8 +174,6 @@ async function completeBattleCommandDialogue(page: Page): Promise<void> {
   }
 }
 
-test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
-
 test("stage-1 low-life enemy rest plays the same silent MAGIC/0 finish", async ({ page }) => {
   await enterStage1PlayerPhase(page);
   await page.evaluate(() => window.__ANGEL2__?.forceRestSetup());
@@ -195,7 +193,7 @@ test("stage-1 low-life enemy rest plays the same silent MAGIC/0 finish", async (
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-phase", "restEffect");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-target", enemyBefore.id);
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-map-combat-effect-tile-count", "1");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-enemy-rest-effect.png`,
   });
 
@@ -237,7 +235,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     "aria-label",
     "騎士城堡前戰術地圖，使用滑鼠或方向鍵操作",
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-player-start.png`,
   });
 
@@ -248,7 +246,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0049\/base\.png$/u);
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-portrait.png`,
   });
 
@@ -258,7 +256,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "34");
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0034\/base\.png$/u);
   await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-fang-portrait.png`,
   });
 
@@ -338,7 +336,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(aiTechniqueDialogue).toHaveAttribute("data-effect-center", "34,26");
   await expect(page.getByText("騎士團修女・初級炎暴", { exact: true })).toBeVisible();
   await expect(page.getByText("看我的火球魔法.", { exact: true })).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-fire-notice.png`,
   });
   const enemyFireNotice = await state(page);
@@ -365,7 +363,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   expect(activeEnemyPhase.enemyIntents["2:16"]).toBe("sentry");
   await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
   await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", /戰術追擊/u);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-fire.png`,
   });
   await expect(aiTechniqueDialogue).toBeHidden();
@@ -379,7 +377,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     .toBe(niaBeforeEnemyFire.life);
   expect(enemyFireDrain.specialActionPresentation!.displayedLifeByUnitId["1:0"])
     .toBeLessThan(niaBeforeEnemyFire.life);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-enemy-sister-fire-life-drain.png`,
   });
   await page.waitForFunction(() => {
@@ -422,7 +420,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     const [x, y] = value.split(",").map(Number);
     return x === 4 && y === 4;
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-lightning-cloud-entry.png`,
   });
   await page.waitForFunction(() => {
@@ -432,7 +430,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   });
   await expect(battleCanvas).toHaveAttribute("data-map-combat-anchor-offset", "0,0");
   await expect(battleCanvas).not.toHaveAttribute("data-map-combat-effect-tile-count", "0");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-lightning.png`,
   });
   await page.waitForFunction(() => {
@@ -442,7 +440,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     const [x, y] = value.split(",").map(Number);
     return x < 0 && x === y;
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-lightning-cloud-exit.png`,
   });
   await page.waitForFunction(() => {
@@ -453,7 +451,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     "data-map-combat-effect-tile-count",
     String(lightningBefore.units.filter(({ side }) => side === 2).length),
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-lightning-cleanup.png`,
   });
   await page.waitForFunction(() => {
@@ -493,7 +491,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   });
   await expect(battleCanvas).toHaveAttribute("data-map-combat-ice-distance", "1");
   await expect(battleCanvas).toHaveAttribute("data-map-combat-effect-tile-count", "4");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-ice-inner-ring.png`,
   });
   await page.waitForFunction(() => {
@@ -502,7 +500,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   });
   await expect(battleCanvas).toHaveAttribute("data-map-combat-ice-distance", "2");
   await expect(battleCanvas).toHaveAttribute("data-map-combat-effect-tile-count", "8");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-ice-outer-ring.png`,
   });
   await page.waitForFunction(() => {
@@ -523,7 +521,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   }));
   expect(iceAfter.units.find(({ id }) => id === "2:16")?.actionDisabled).toBe(true);
   await expect(battleCanvas).toHaveAttribute("data-ice-disabled-unit-ids", /2:16/u);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-ice-frozen-result.png`,
   });
   expect(iceAfter.specialActionPresentationTrace.filter(({ phase }) => phase === "iceExpansion"))
@@ -557,7 +555,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "6");
   await page.getByTestId("advance-dialogue").click();
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("就在妮雅等人準備進入騎士團堡時");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-victory-story.png`,
   });
   await page.getByTestId("skip-dialogue").click();
@@ -570,7 +568,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     activeStoryId: "stage-02-opening-story",
   });
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "155");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-complete-stage2-entry.png`,
   });
 
@@ -614,7 +612,7 @@ test("S01-J: every stage-1 camera entry stays inside the drawn map", async ({ pa
   await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "1,1");
   await page.waitForTimeout(350);
   expect((await state(page)).cameraOrigin).toEqual({ x: 26, y: 31 });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-camera-lower-right-bound.png`,
   });
 
@@ -625,7 +623,7 @@ test("S01-J: every stage-1 camera entry stays inside the drawn map", async ({ pa
     cameraOrigin: { x: 14, y: 13 },
     cursor: { x: 18, y: 16 },
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-camera-upper-left-bound.png`,
   });
 
@@ -682,7 +680,7 @@ test("S01-K: enemy movement preview follows the current stage-1 AI intent", asyn
     "data-range-cell-count",
     String(patrolPreview.reachable.length),
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-enemy-movement-preview.png`,
   });
 
@@ -706,7 +704,7 @@ test("S01-K: enemy movement preview follows the current stage-1 AI intent", asyn
     "data-range-cell-count",
     String(guardPreview.reachable.length),
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-alert-movement-preview.png`,
   });
 });
@@ -756,7 +754,7 @@ test("S01-I: move-plus-technique and Fang pursuit reach do not wake the second a
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-second-army-stays-alert.png`,
   });
 });

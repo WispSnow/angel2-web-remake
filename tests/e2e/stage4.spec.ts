@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -92,8 +92,6 @@ async function endManualPhase(page: Page): Promise<void> {
   await page.getByTestId("advance-dialogue").click();
 }
 
-test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
-
 test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment hazard map", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
@@ -104,7 +102,7 @@ test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment 
     phase: "prebattleStory",
     activeStoryId: "stage-04-prebattle-story",
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-prebattle-story.png`,
   });
 
@@ -115,7 +113,7 @@ test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment 
     .toContainText("結界外我方目前生命減半");
   await expect(page.locator(".deployment-open-cell.is-danger")).toHaveCount(2);
   await expect(page.locator(".deployment-open-cell.is-danger").first()).toContainText("危險");
-  await page.getByTestId("deployment-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
     path: `${ARTIFACT_DIR}/stage4-deployment-danger-zones.png`,
   });
   await page.getByTestId("deployment-roster-1").click();
@@ -153,7 +151,7 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   await expect(page.getByTestId("unit-force")).toHaveCount(0);
   await expect(canvas).toHaveAttribute("data-route-pulse-safe-cell-count", "13");
   await expect(canvas).toHaveAttribute("data-route-pulse-danger-unit-ids", /1:1/u);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-safe-area-preview.png`,
   });
 
@@ -177,7 +175,7 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
     "data-route-pulse-visible-unit-ids",
     "1:1,1:2,1:3,1:4,1:20,1:21",
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-force-field-pulse.png`,
   });
 
@@ -220,7 +218,7 @@ test("S04-K: reduced motion keeps one readable damage impact outside the shield"
     "data-route-pulse-visible-unit-ids",
     "1:1,1:2,1:3,1:4,1:20,1:21",
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-force-field-pulse-reduced-motion.png`,
   });
 
@@ -242,7 +240,7 @@ test("S04-K: reduced motion keeps one readable damage impact outside the shield"
   }
 });
 
-test("S04-G: the active deployment round-trips through save format v17", async ({ page }) => {
+test("S04-G: the active deployment round-trips through save format v18", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const before = await state(page);
@@ -290,7 +288,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
     complete: (image as HTMLImageElement).complete,
     width: (image as HTMLImageElement).naturalWidth,
   }))).toEqual({ complete: true, width: 112 });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-victory-story.png`,
   });
 
@@ -314,7 +312,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
   expect(regularNiaBounds).toMatchObject({ x: 32, width: 112, height: 112 });
   expect(regularUpperCopyBounds).toEqual({ x: 153, y: 10, width: 400, height: 86 });
   expect(regularUpperCopyBounds.x - (regularNiaBounds.x + 115)).toBe(6);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-victory-story-nia-upper.png`,
   });
 
@@ -330,7 +328,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
     .toEqual(regularUpperCopyBounds);
   await expect(page.getByTestId("feedback-text"))
     .toHaveText("哦！．．\n這次的戰役結束了，是否要記錄下來．");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-victory-save-offer-portrait.png`,
   });
   await page.getByTestId("victory-continue").click();
@@ -347,7 +345,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
   expect(savePromptCopyBounds).toEqual({ x: 153, y: 10, width: 400, height: 86 });
   expect(savePromptPortraitBounds).toEqual({ x: 32, y: 26, width: 112, height: 112 });
   expect(savePromptCopyBounds.x - (savePromptPortraitBounds.x + 115)).toBe(6);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-save-prompt-portrait-alignment.png`,
   });
   await page.locator("[data-action=save-no]").click();
@@ -358,7 +356,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and stops at the stage-05 bo
   });
   await expect(page.getByText("第 4 關已完成", { exact: true })).toBeVisible();
   await expect(page.getByText(/「遭遇丁塔琪」（stage-05）入口/u)).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-stage5-boundary.png`,
   });
 });

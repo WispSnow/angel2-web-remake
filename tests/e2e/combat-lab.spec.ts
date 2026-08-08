@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 interface CombatLabState {
   config: {
@@ -50,8 +50,6 @@ const waitForVisibleSpriteImages = (page: Page) => page.waitForFunction(() => {
   });
 });
 
-test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
-
 test("record 35 empress exposes only the original right-side soldier fallback", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -74,7 +72,7 @@ test("record 35 empress exposes only the original right-side soldier fallback", 
   await expect(page.getByTestId("full-actor-sprite"))
     .toHaveAttribute("src", /right-empress-plus50\/0[45]\.png$/);
   await waitForVisibleSpriteImages(page);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-35-original-boundary.png",
     fullPage: true,
   });
@@ -98,7 +96,7 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
   await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "500");
   await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-base-color", "9");
   await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-fill-width", "80");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-00-attack.png",
     fullPage: true,
   });
@@ -108,7 +106,7 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
   await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "476");
   await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-fill-width", "56");
   await expect(page.getByTestId("full-right-status")).toContainText("生命500");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-00-hurt.png",
     fullPage: true,
   });
@@ -116,7 +114,7 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_100));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-00-guard.png",
     fullPage: true,
   });
@@ -125,7 +123,7 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
   await page.getByTestId("combat-lab-death").check();
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_460));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-00-death.png",
     fullPage: true,
   });
@@ -143,7 +141,7 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
   await expect(page.getByTestId("full-effect-G1-sprite"))
     .toHaveAttribute("src", /left-magic-sword-warrior-plus50\/03\.png$/);
   await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-channel", "G1");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-01-attack.png",
     fullPage: true,
   });
@@ -152,7 +150,7 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
   await expect(page.getByTestId("full-effect-G1-sprite"))
     .toHaveAttribute("src", /left-magic-sword-warrior-plus50\/07\.png$/);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-01-hurt.png",
     fullPage: true,
   });
@@ -164,7 +162,7 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
     .toHaveAttribute("src", /left-magic-sword-warrior-plus50\/04\.png$/);
   await expect(page.getByTestId("full-effect-G1-sprite"))
     .toHaveAttribute("data-y-offset", "-18");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-01-guard.png",
     fullPage: true,
   });
@@ -175,7 +173,7 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
   await expect(page.getByTestId("full-victim-sprite"))
     .toHaveAttribute("src", /right-soldier-direct\/02\.png$/);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-01-death.png",
     fullPage: true,
   });
@@ -196,14 +194,14 @@ test("record 2 jungle warrior passes attack, guard, hurt and death visual gates"
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_400));
   await expect(page.getByTestId("full-actor-sprite"))
     .toHaveAttribute("src", /left-jungle-warrior-plus50\/04\.png$/);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-02-attack.png",
     fullPage: true,
   });
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_320));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-02-hurt.png",
     fullPage: true,
   });
@@ -211,7 +209,7 @@ test("record 2 jungle warrior passes attack, guard, hurt and death visual gates"
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_370));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-02-guard.png",
     fullPage: true,
   });
@@ -220,7 +218,7 @@ test("record 2 jungle warrior passes attack, guard, hurt and death visual gates"
   await page.getByTestId("combat-lab-death").check();
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_770));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-02-death.png",
     fullPage: true,
   });
@@ -235,14 +233,14 @@ test("record 3 magic priest passes body, G1, reaction and death visual gates", a
     .toHaveAttribute("src", /left-magic-priest-plus50\/01\.png$/);
   await expect(page.getByTestId("full-effect-G1-sprite"))
     .toHaveAttribute("src", /left-magic-priest-plus50\/02\.png$/);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-03-attack.png",
     fullPage: true,
   });
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_400));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-03-hurt.png",
     fullPage: true,
   });
@@ -250,7 +248,7 @@ test("record 3 magic priest passes body, G1, reaction and death visual gates", a
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_450));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-03-guard.png",
     fullPage: true,
   });
@@ -259,7 +257,7 @@ test("record 3 magic priest passes body, G1, reaction and death visual gates", a
   await page.getByTestId("combat-lab-death").check();
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_200));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-03-death.png",
     fullPage: true,
   });
@@ -272,14 +270,14 @@ test("record 4 prayer guide passes attack, guard, hurt and death visual gates", 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_120));
   await expect(page.getByTestId("full-actor-sprite"))
     .toHaveAttribute("src", /left-prayer-guide-plus50\/02\.png$/);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-04-attack.png",
     fullPage: true,
   });
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_480));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-04-hurt.png",
     fullPage: true,
   });
@@ -287,7 +285,7 @@ test("record 4 prayer guide passes attack, guard, hurt and death visual gates", 
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_530));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-04-guard.png",
     fullPage: true,
   });
@@ -296,7 +294,7 @@ test("record 4 prayer guide passes attack, guard, hurt and death visual gates", 
   await page.getByTestId("combat-lab-death").check();
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_180));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-04-death.png",
     fullPage: true,
   });
@@ -311,7 +309,7 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
     .toHaveAttribute("src", /left-curse-master-plus50\/05\.png$/);
   await expect(page.getByTestId("full-effect-G1-sprite"))
     .toHaveAttribute("src", /left-curse-master-plus50\/06\.png$/);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-05-attack.png",
     fullPage: true,
   });
@@ -319,7 +317,7 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_720));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
   await expect(page.getByTestId("full-effect-G1-sprite")).toBeHidden();
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-05-hurt.png",
     fullPage: true,
   });
@@ -327,7 +325,7 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_770));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-05-guard.png",
     fullPage: true,
   });
@@ -336,7 +334,7 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
   await page.getByTestId("combat-lab-death").check();
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_520));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-05-death.png",
     fullPage: true,
   });
@@ -396,7 +394,7 @@ test.describe.serial("native records sequential visual acceptance", () => {
       await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 40);
       await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullCharge");
       await waitForVisibleSpriteImages(page);
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: `artifacts/playwright/combat-lab-record-${String(record).padStart(2, "0")}-attack.png`,
         fullPage: true,
       });
@@ -404,7 +402,7 @@ test.describe.serial("native records sequential visual acceptance", () => {
       await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt!);
       await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
       await waitForVisibleSpriteImages(page);
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: `artifacts/playwright/combat-lab-record-${String(record).padStart(2, "0")}-hurt.png`,
         fullPage: true,
       });
@@ -413,7 +411,7 @@ test.describe.serial("native records sequential visual acceptance", () => {
       await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 50);
       await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
       await waitForVisibleSpriteImages(page);
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: `artifacts/playwright/combat-lab-record-${String(record).padStart(2, "0")}-guard.png`,
         fullPage: true,
       });
@@ -423,7 +421,7 @@ test.describe.serial("native records sequential visual acceptance", () => {
       await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), holdAt!);
       await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
       await waitForVisibleSpriteImages(page);
-      await page.screenshot({
+      await captureVisualAudit(page, {
         path: `artifacts/playwright/combat-lab-record-${String(record).padStart(2, "0")}-death.png`,
         fullPage: true,
       });
@@ -448,14 +446,14 @@ test("record 20 archer passes release, flight, guard, hurt and death visual gate
     .toHaveAttribute("src", /left-archer-plus50\/05\.png$/);
   await expect(page.getByTestId("full-combat-projectile"))
     .toHaveAttribute("data-top", "91");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-20-attack.png",
     fullPage: true,
   });
 
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt!);
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-20-hurt.png",
     fullPage: true,
   });
@@ -463,7 +461,7 @@ test("record 20 archer passes release, flight, guard, hurt and death visual gate
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 50);
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-20-guard.png",
     fullPage: true,
   });
@@ -472,7 +470,7 @@ test("record 20 archer passes release, flight, guard, hurt and death visual gate
   await page.getByTestId("combat-lab-death").check();
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), holdAt!);
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-20-death.png",
     fullPage: true,
   });
@@ -501,7 +499,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   await expect(page.locator(".full-combat-lance")).toBeVisible();
   await expect(page.locator(".full-combat-lance"))
     .toHaveAttribute("src", /left-cavalry-plus50\/0[67]\.png$/);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-attack.png",
     fullPage: true,
   });
@@ -514,7 +512,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "349");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "118");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-hurt.png",
     fullPage: true,
   });
@@ -523,7 +521,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "409");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "86");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-contact-follow-through.png",
     fullPage: true,
   });
@@ -531,7 +529,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 200);
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "469");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "54");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-deflection-exit.png",
     fullPage: true,
   });
@@ -544,7 +542,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   await page.getByTestId("combat-lab-reaction").selectOption("guard");
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 50);
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-guard.png",
     fullPage: true,
   });
@@ -553,7 +551,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   await page.getByTestId("combat-lab-death").check();
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), holdAt!);
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-death.png",
     fullPage: true,
   });
@@ -570,7 +568,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-x", "120");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "106");
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-mirrored-contact.png",
     fullPage: true,
   });
@@ -635,7 +633,7 @@ for (const side of ["left", "right"] as const) {
     expect(contact.boltBottom).toBeLessThan(contact.sceneHeight);
     expect(contact.overlap).toBeGreaterThan(0);
 
-    await page.screenshot({
+    await captureVisualAudit(page, {
       path: `artifacts/playwright/combat-lab-record-21-${side}-grounded-impact.png`,
       fullPage: true,
     });
@@ -667,7 +665,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
     reaction: "hurt",
     death: false,
   });
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-warrior-hurt.png",
     fullPage: true,
   });
@@ -678,7 +676,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
     .toHaveAttribute("src", /right-warrior-direct\/02\.png$/);
   await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullDefenderDeath");
   await expect(page.getByTestId("combat-lab-reaction")).toBeDisabled();
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-warrior-death.png",
     fullPage: true,
   });
@@ -695,7 +693,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
     defenderClass: "archer",
     defenderLife: 420,
   });
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-archer-hurt.png",
     fullPage: true,
   });
@@ -706,7 +704,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
     .toHaveAttribute("src", /right-archer-direct\/02\.png$/);
   await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "0");
   await expect(page).toHaveURL(/defender=archer.*reaction=hurt.*death=1/);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-archer-death.png",
     fullPage: true,
   });
@@ -715,7 +713,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
   await expect(page.getByTestId("combat-lab-attacker-life")).toBeVisible();
   await expect(page.getByTestId("combat-lab-defender-life")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-controls-narrow.png",
     fullPage: true,
   });

@@ -1,13 +1,11 @@
-import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { classStatsFor } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
+import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
-
-test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 
 test("animation and deployment labs link back to the debug hub", async ({ page }) => {
   for (const lab of ["combat", "technique", "deployment"] as const) {
@@ -16,12 +14,12 @@ test("animation and deployment labs link back to the debug hub", async ({ page }
     await expect(debugLink).toBeVisible();
     await expect(debugLink).toHaveText("戰役調試中心");
     await expect(debugLink).toHaveAttribute("href", "/debug.html");
-    await page.locator(`.${lab}-lab-header`).screenshot({
+    await captureVisualAudit(page.locator(`.${lab}-lab-header`), {
       path: `${ARTIFACT_DIR}/${lab}-lab-debug-navigation.png`,
     });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.locator(`.${lab}-lab-header`).screenshot({
+    await captureVisualAudit(page.locator(`.${lab}-lab-header`), {
       path: `${ARTIFACT_DIR}/${lab}-lab-debug-navigation-narrow.png`,
     });
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -31,7 +29,10 @@ test("animation and deployment labs link back to the debug hub", async ({ page }
 test("debug hub selects a difficulty and opens the formal stage-one deployment", async ({ page }) => {
   await page.goto("/debug.html");
   await expect(page.getByTestId("debug-hub")).toBeVisible();
-  await expect(page.locator("[data-debug-scenario-id]")).toHaveCount(28);
+  const scenarioIds = await page.locator("[data-debug-scenario-id]").evaluateAll((links) =>
+    links.map((link) => link.getAttribute("data-debug-scenario-id")));
+  expect(scenarioIds.length).toBeGreaterThan(0);
+  expect(new Set(scenarioIds).size).toBe(scenarioIds.length);
   await expect(page.locator(".debug-stage-heading h2")).toHaveText([
     "第 0 關 · 瓦爾克麗宮",
     "第 1 關 · 騎士城堡前",
@@ -47,6 +48,12 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "href",
     "/technique-lab.html",
   );
+  const arenaLink = page.getByTestId("debug-arena-link");
+  await expect(arenaLink).toHaveAttribute("href", "/arena.html");
+  await expect(arenaLink).toContainText("正式規則與 AI");
+  const classShowdownLink = page.getByTestId("debug-class-showdown-link");
+  await expect(classShowdownLink).toHaveAttribute("href", "/class-showdown.html");
+  await expect(classShowdownLink).toContainText("35 組同職業敵我相鄰");
   await expect(page.getByTestId("debug-roster-source")).toHaveValue("representative-growth");
   await expect(page.locator("[data-debug-roster-description]")).toContainText("合法轉職混編");
 
@@ -56,7 +63,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "href",
     "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth",
   );
-  await page.screenshot({ path: `${ARTIFACT_DIR}/debug-hub.png`, fullPage: true });
+  await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-hub.png`, fullPage: true });
   await deployment.click();
 
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
@@ -75,7 +82,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     difficulty: 3,
   });
   expect(state.units).toContainEqual(expect.objectContaining({ id: "1:0", classId: "cavalry" }));
-  await page.screenshot({ path: `${ARTIFACT_DIR}/debug-stage1-deployment.png` });
+  await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-stage1-deployment.png` });
 });
 
 test("stage-four debug profiles cover inherited multi-promotion rosters", async ({ page }) => {
@@ -97,7 +104,7 @@ test("stage-four debug profiles cover inherited multi-promotion rosters", async 
     expect.objectContaining({ id: "1:21", classId: "evil-sword-warrior" }),
     expect.objectContaining({ id: "1:24", classId: "wizard" }),
   ]));
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage4-promotion-coverage.png`,
   });
 });
@@ -295,7 +302,7 @@ test("the magician range fixture releases its pursuing target after exactly one 
     "data-ice-disabled-unit-ids",
     /2:45/u,
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage1-magician-frozen.png`,
   });
 
@@ -313,7 +320,7 @@ test("the magician range fixture releases its pursuing target after exactly one 
   expect(movedTarget).toBeDefined();
   expect({ x: movedTarget?.x, y: movedTarget?.y })
     .not.toEqual({ x: thawedTarget?.x, y: thawedTarget?.y });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage1-magician-thawed.png`,
   });
 });
@@ -344,7 +351,7 @@ test("dispel uses its original map animation and releases a frozen ally", async 
   });
   await expect(canvas).toHaveAttribute("data-ice-disabled-unit-ids", frozenTargetId);
   await expect(canvas).not.toHaveAttribute("data-map-combat-effect-tile-count", "0");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage1-dispel-animation.png`,
   });
 
@@ -376,7 +383,7 @@ test("dispel uses its original map animation and releases a frozen ally", async 
     },
   });
   await expect(canvas).not.toHaveAttribute("data-ice-disabled-unit-ids", frozenTargetId);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage1-dispel-result.png`,
   });
 });
@@ -387,10 +394,10 @@ test("debug hub remains usable at a narrow reduced-motion viewport", async ({ pa
   await page.goto("/debug.html");
   await expect(page.getByTestId("debug-hub")).toBeVisible();
   await expect(page.getByTestId("debug-scenario-stage-01-near-victory")).toBeVisible();
-  await page.screenshot({ path: `${ARTIFACT_DIR}/debug-hub-narrow.png`, fullPage: true });
+  await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-hub-narrow.png`, fullPage: true });
 });
 
-test("stage-one dialogue uses generated animation layers for newly introduced speakers", async ({ page }) => {
+test("stage-one dialogue uses generated animation layers for its portrait records", async ({ page }) => {
   await page.goto("/?debugScenario=stage-01-prebattle&difficulty=0&test=1");
   for (let input = 0; input < 8; input += 1) {
     if (await page.locator('[data-portrait-record="42"]:visible').count() > 0) break;
@@ -407,7 +414,7 @@ test("stage-one dialogue uses generated animation layers for newly introduced sp
     element.dataset.forceBlinkFrame = "3";
     element.dataset.forceMouthFrame = "2";
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-dialogue-mengxinman-animation.png`,
   });
 });

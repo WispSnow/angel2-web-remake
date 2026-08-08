@@ -1,9 +1,7 @@
-import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
-
-test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
 
 test("portrait lab loads every native character and previews reusable blink and speech layers", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -42,7 +40,7 @@ test("portrait lab loads every native character and previews reusable blink and 
     .toHaveAttribute("data-force-blink-frame", "3");
   await expect(page.getByTestId("portrait-record-43").locator(".animated-portrait"))
     .toHaveAttribute("data-force-mouth-frame", "2");
-  await page.screenshot({ path: `${ARTIFACT_DIR}/portrait-lab-current-cast.png`, fullPage: true });
+  await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/portrait-lab-current-cast.png`, fullPage: true });
 
   await page.locator("[data-portrait-filter]").selectOption("all");
   const archer = page.getByTestId("portrait-record-59");
@@ -81,7 +79,7 @@ test("portrait lab loads every native character and previews reusable blink and 
   expect(archerOpenEyeMismatch.applied).toBe(0);
   expect(archerOpenEyeMismatch.native).toBeGreaterThan(0);
   await page.locator('[data-blink="3"]').click();
-  await archer.screenshot({ path: `${ARTIFACT_DIR}/portrait-lab-archer-corrected.png` });
+  await captureVisualAudit(archer, { path: `${ARTIFACT_DIR}/portrait-lab-archer-corrected.png` });
   await expect(page.getByTestId("portrait-record-67")).toBeVisible();
   await expect(page.getByTestId("portrait-record-67")).toContainText("布局沿用 D/56");
   expect(consoleErrors).toEqual([]);

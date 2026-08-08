@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const EDGE_PAN_SETTLE_MS = 180;
 
@@ -331,8 +331,6 @@ const expectCursorLocked = (
   expect(samples.every(({ cursorX, cursorY }) => cursorX === destination.x && cursorY === destination.y)).toBe(true);
 };
 
-test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
-
 test("S00-A through S00-D: complete playable, defeat/retry, victory and save loop", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
@@ -371,7 +369,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(skipBounds!.x + skipBounds!.width).toBeLessThanOrEqual(copyBounds!.x + copyBounds!.width);
   expect(skipBounds!.y).toBeGreaterThan(copyBounds!.y + copyBounds!.height / 2);
   expect(skipBounds!.y + skipBounds!.height).toBeLessThanOrEqual(copyBounds!.y + copyBounds!.height);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-skip.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-dialogue-skip.png" });
   for (let action = 0; action < 4; action += 1) await page.getByTestId("advance-dialogue").click();
   expect((await debugState(page)).dialogueIndex).toBe(2);
   await expect(skipDialogue).toBeVisible();
@@ -389,7 +387,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(upperSkipBounds!.y + upperSkipBounds!.height)
     .toBeLessThanOrEqual(upperCopyBounds!.y + upperCopyBounds!.height);
   await expectNativeDialogueGeometry(page, "upper");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-skip-upper.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-dialogue-skip-upper.png" });
   const dialoguePortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(dialoguePortrait).toBeVisible();
   const dialoguePortraitName = page.getByTestId("dialogue-portrait-name");
@@ -438,8 +436,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect.poll(async () => Number(await dialoguePortrait.getAttribute("data-talk-count"))).toBeGreaterThan(0);
   await expect(dialoguePortrait).toHaveAttribute("data-mouth-frame", /^[12]$/);
   await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-mouth-frame", "2"); });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-talk.png" });
-  await dialoguePortrait.screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-talk-detail.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-dialogue-portrait-talk.png" });
+  await captureVisualAudit(dialoguePortrait, { path: "artifacts/playwright/stage0-dialogue-portrait-talk-detail.png" });
   if (await dialoguePortrait.getAttribute("data-speaking") === "true") {
     await page.getByTestId("advance-dialogue").click();
   }
@@ -488,7 +486,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     expect(delayMs).not.toBe(priorDelay);
   }
   await dialoguePortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-dialogue-portrait-blink.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-dialogue-portrait-blink.png" });
   await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
 
   await page.getByTestId("skip-dialogue").click();
@@ -505,7 +503,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     const current = openingMovement.path[index];
     expect(Math.abs(prior.x - current.x) + Math.abs(prior.y - current.y)).toBe(1);
   }
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-path-movement.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-path-movement.png" });
   const openingSamples = await sampleTrackedUnitPosition(page);
   expectStableTracking(openingSamples);
   expectCursorLocked(openingSamples, openingMovement.path.at(-1)!);
@@ -536,7 +534,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-unit-life-label-count")).toBe("16");
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-acted-badge-count")).toBe("0");
   await expect(page.getByTestId("unit-portrait")).toHaveCount(0);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-player.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-player.png" });
 
   // Native mouse habit: entering a battle-frame edge pans immediately and
   // staying there repeats, while the logical cursor and simulation stay put.
@@ -562,7 +560,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(bottomPanned.selectedId).toBe(edgePanBaseline.selectedId);
   expect(bottomPanned.actionMode).toBe(edgePanBaseline.actionMode);
   expect(bottomPanned.units).toEqual(edgePanBaseline.units);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-bottom-banner-edge-pan.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-bottom-banner-edge-pan.png" });
 
   await page.mouse.move(canvasBounds!.x + canvasBounds!.width + 8, canvasBounds!.y + 40);
   await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "0,0");
@@ -585,7 +583,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(edgePanned.selectedId).toBe(edgePanBaseline.selectedId);
   expect(edgePanned.actionMode).toBe(edgePanBaseline.actionMode);
   expect(edgePanned.units).toEqual(edgePanBaseline.units);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-mouse-edge-pan.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-mouse-edge-pan.png" });
 
   await page.mouse.move(canvasBounds!.x + canvasBounds!.width + 8, canvasBounds!.y + 40);
   await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "0,0");
@@ -608,7 +606,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(hudPortrait).toHaveAttribute("data-speaking", "false");
   await expect.poll(async () => Number(await hudPortrait.getAttribute("data-blink-count"))).toBeGreaterThan(0);
   await hudPortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-portrait-blink.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-portrait-blink.png" });
   await hudPortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await expect(page.getByTestId("unit-portrait")).toHaveCount(0);
@@ -624,7 +622,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-mode", "enemyPreview");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-range-cell-count", String(enemyPreview.reachable.length));
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-enemy-movement-preview.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-enemy-movement-preview.png" });
   await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 420, y: 45 } });
   expect((await debugState(page))).toMatchObject({
     actionMode: "idle",
@@ -649,7 +647,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     });
   });
   expect(systemMenuContained).toBe(true);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-system-menu.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-system-menu.png" });
   const cursorBeforeSystemCancel = (await debugState(page)).cursor;
   await page.getByTestId("system-menu").click({ button: "right" });
   await expect(page.getByTestId("system-menu")).toBeHidden();
@@ -730,7 +728,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     };
   });
   expect(Object.values(commandMenuPlacement).every(Boolean)).toBe(true);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-unit-command-menu.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-unit-command-menu.png" });
   await page.getByTestId("unit-command-move").click();
   expect((await debugState(page)).actionMode).toBe("move");
   const movementRange = (await debugState(page)).reachable;
@@ -746,7 +744,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     cursor: { x: 28, y: 26 },
   });
   expect((await debugState(page)).units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 29, y: 26 });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-move-candidate-hover.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-move-candidate-hover.png" });
   const beforeMoveCancel = await debugState(page);
   await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 180, y: 177 } });
   expect((await debugState(page))).toMatchObject({
@@ -769,7 +767,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       { id: "undo", label: "返悔" },
     ],
   });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-post-move-command-menu.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-post-move-command-menu.png" });
   const movedBeforeRollback = await debugState(page);
   await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 180, y: 177 } });
   await expect.poll(async () => {
@@ -810,7 +808,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     "46",
   );
   await expectNativeDialogueGeometry(page, "upper");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-nia-promotion-dialogue.png",
   });
   await page.getByTestId("advance-dialogue").click();
@@ -852,7 +850,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("promotion-target-cavalry")).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("Alt");
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-promotion-choice.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-promotion-choice.png" });
   await confirmPromotion(page);
   state = await debugState(page);
   expect(state.lastCombat?.counterOccurred).toBe(true);
@@ -874,9 +872,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect.poll(() => page.getByTestId("battle-canvas").getAttribute("data-acted-badge-geometry")).toBe("-22,-15,16,14");
   await clickCanvas(page, 180, 177);
   await expect(page.getByTestId("exp-bar").locator("i")).not.toHaveAttribute("style", "height:0%" );
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-experience-hud.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-experience-hud.png" });
   await clickCanvas(page, 420, 45);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-acted-marker.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-acted-marker.png" });
 
   // On-demand objective layer preserves the battle phase.
   await openSystemMenu(page);
@@ -906,7 +904,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("group-command-menu")).toHaveClass(/native-command-menu/);
   await expect(page.getByTestId("group-command-menu")).toHaveCSS("width", "144px");
   await expect(page.getByTestId("group-command-menu")).toHaveCSS("height", "124px");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-group-command-menu.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-group-command-menu.png" });
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-menu")).toBeHidden();
   const beforeAllRest = await debugState(page);
@@ -923,7 +921,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     rngState: beforeAllRest.rngState,
     groupCommandDialogueId: "allRest",
   });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-all-rest-command-dialogue.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-all-rest-command-dialogue.png" });
   await finishGroupCommandDialogue(page);
   await page.waitForFunction(() => {
     const movement = window.__ANGEL2__?.getState().movementPresentation;
@@ -974,7 +972,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("unit-command-move").click();
   expect((await debugState(page)).actionMode).toBe("move");
   expect((await debugState(page)).reachable.length).toBeGreaterThan(1);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-round2-zoc-origin.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-round2-zoc-origin.png" });
 
   // S00-C: exact defeat wording and fixed-roster retry.
   await page.evaluate(() => window.__ANGEL2__?.forceDefeat());
@@ -997,7 +995,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await clickCanvas(page, 220, 177);
   await page.locator("[data-action=attack]").click();
   await expect(page.getByTestId("combat-presentation")).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-combat.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-full-combat.png" });
   await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
   expect((await debugState(page))).toMatchObject({
@@ -1019,7 +1017,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("post-save-next-page").click();
   await page.getByTestId("post-save-next-page").click();
   await expect(page.getByTestId("post-save-page")).toHaveText("第 4／4 頁");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-post-save-page-4.png",
   });
   await page.getByTestId("save-slot-20").click();
@@ -1044,7 +1042,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     consumedEventIds: [],
   });
   expect(saved.roster).toHaveLength(75);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage1-prebattle-entry.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage1-prebattle-entry.png" });
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
@@ -1090,7 +1088,7 @@ test("REMAKE-015: clicking empty terrain shows class-specific traits in the side
   await expect(page.getByTestId("tactical-minimap")).toBeVisible();
   await expect(page.locator(".minimap-unit")).toHaveCount(16);
   await expect(page.locator("[data-side-panel-hotspot]:visible")).toHaveCount(0);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-terrain-inspection.png",
   });
 
@@ -1131,7 +1129,7 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await expect(reducedMotionPortrait).toBeVisible();
   await expect.poll(async () => Number(await reducedMotionPortrait.getAttribute("data-blink-count"))).toBeGreaterThan(0);
   await reducedMotionPortrait.evaluate((portrait) => { portrait.setAttribute("data-force-blink-frame", "3"); });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-reduced-motion-portrait-blink.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-reduced-motion-portrait-blink.png" });
   await reducedMotionPortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
 
   await page.keyboard.press("o");
@@ -1205,7 +1203,7 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
       systemMenuOpen: false,
     });
     if (index === 0) {
-      await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-right-click-next-ally.png" });
+      await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-right-click-next-ally.png" });
     }
   }
   const afterRightCycle = await debugState(page);
@@ -1231,7 +1229,7 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   expect(dimensions.logicalHeight).toBe(350);
   expect(dimensions.visualWidth).toBeLessThanOrEqual(390);
   expect((await debugState(page)).cameraOrigin).toEqual({ x: 25, y: 23 });
-  await page.screenshot({ path: "artifacts/playwright/stage0-mobile.png", fullPage: true });
+  await captureVisualAudit(page, { path: "artifacts/playwright/stage0-mobile.png", fullPage: true });
 });
 
 test("S00-F: named cavalry identity and route evacuation are visible end to end", async ({ page }) => {
@@ -1245,7 +1243,7 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
   for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
   await expect(page.getByText("騎兵／哈釘", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0015\/base\.png$/);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-hading.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-hading.png" });
 
   await page.evaluate(() => window.__ANGEL2__?.forceEvacuationSetup());
   expect((await debugState(page)).units.filter((unit) => unit.side === 2)).toHaveLength(1);
@@ -1254,12 +1252,12 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
   const enemyMovement = (await debugState(page)).movementPresentation!;
   expect(enemyMovement.path.length).toBeGreaterThan(1);
   expect(enemyMovement.path.at(-1)).toEqual({ x: 24, y: 47 });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-enemy-route-movement.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-enemy-route-movement.png" });
   await waitForPhase(page, "victoryStory");
   const evacuated = await debugState(page);
   expect(evacuated.units.filter((unit) => unit.side === 2)).toHaveLength(0);
   expect(evacuated.round).toBe(1);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-evacuation-victory.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-evacuation-victory.png" });
 });
 
 test("turn handoff replays the native A/19 runners, hops, shadow and A/26 edge dust", async ({ page }) => {
@@ -1301,7 +1299,7 @@ test("turn handoff replays the native A/19 runners, hops, shadow and A/26 edge d
       clip: (canvas as HTMLCanvasElement).dataset.turnTransitionClip,
     };
   })).toEqual({ screenOffsetX: 40, screenOffsetY: -45, clip: "40,155,400,132" });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-turn-transition-enemy.png",
   });
   await page.waitForFunction((frame) => {
@@ -1332,7 +1330,7 @@ test("turn handoff replays the native A/19 runners, hops, shadow and A/26 edge d
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-side", "player");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-sprite-count", "2");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-turn-transition-dust-count", "6");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-turn-transition-player.png",
   });
   await page.waitForFunction((frame) => {
@@ -1376,7 +1374,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await page.getByTestId("group-command-hotspot").click();
   await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
   expect((await debugState(page)).groupLeaderId).toBe("1:0");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-follow-leader-hotspot-menu.png",
   });
   await page.getByTestId("group-command-retreat").click();
@@ -1384,7 +1382,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await expectNativeMenuChrome(page.getByTestId("retreat-confirm-menu"), 76);
   await page.locator("[data-action=retreat-confirm]").click();
   await expect(page.getByTestId("retreat-confirm")).toContainText("哦！．．．要撤退嗎？");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-retreat-confirm.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-retreat-confirm.png" });
   await page.locator("[data-action=retreat-cancel]").click();
   expect((await debugState(page))).toMatchObject({
     phase: "player",
@@ -1413,11 +1411,11 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
     "大家聽著！\n所有還未行動的人自由行動．",
   );
   expect((await debugState(page)).groupCommandDialogueId).toBe("freeAction");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-free-action-dialogue.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-free-action-dialogue.png" });
   await finishGroupCommandDialogue(page);
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.some((unit) => unit.side === 1 && unit.acted)).toBe(true);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-free-action.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-free-action.png" });
 
   await enterPlayerPhase();
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
@@ -1431,7 +1429,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
     groupCommandDialogueId: "followLeader",
     groupLeaderId: "1:0",
   });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-follow-leader-dialogue.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-follow-leader-dialogue.png" });
   await finishGroupCommandDialogue(page);
   await waitForPhase(page, "allyAuto");
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
@@ -1442,7 +1440,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
     expect(Math.abs(alliedMovement.path[index - 1].x - alliedMovement.path[index].x)
       + Math.abs(alliedMovement.path[index - 1].y - alliedMovement.path[index].y)).toBe(1);
   }
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-follow-leader.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-follow-leader.png" });
 });
 
 test("REMAKE-014: side-1 autonomous techniques use the upper native dialogue window", async ({ page }) => {
@@ -1469,7 +1467,7 @@ test("REMAKE-014: side-1 autonomous techniques use the upper native dialogue win
   await expect(dialogue).toHaveAttribute("data-active-slot", "upper");
   await expect(page.getByText("妮雅・初級治療", { exact: true })).toBeVisible();
   await expect(page.getByText("生命單.", { exact: true })).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-ally-auto-heal-notice.png",
   });
   const during = await debugState(page);
@@ -1511,7 +1509,7 @@ test("S00-H: minimap hover previews and primary click relocates the native viewp
   await expect(page.getByTestId("minimap-preview")).toBeVisible();
   expect((await debugState(page)).minimapPreviewOrigin).toEqual({ x: 36, y: 37 });
   await expect(page.getByTestId("minimap-preview")).toHaveAttribute("style", /left: 108px; top: 111px/);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-minimap-hover-preview.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-minimap-hover-preview.png" });
 
   await minimap.click({ position: { x: 121, y: 121 } });
   const relocated = await debugState(page);
@@ -1579,14 +1577,14 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   expect(await logicalElementBounds(unitTopChrome)).toEqual({ left: 480, top: 0, width: 160, height: 149 });
   expect(await logicalElementBounds(unitBodyFrame)).toEqual({ left: 480, top: 150, width: 160, height: 171 });
   expect(await logicalElementBounds(page.locator("#bottom-round"))).toEqual({ left: 480, top: 322, width: 160, height: 28 });
-  await screen.screenshot({ path: "artifacts/playwright/stage0-side-panel-unit-chrome.png" });
+  await captureVisualAudit(screen, { path: "artifacts/playwright/stage0-side-panel-unit-chrome.png" });
 
   await page.getByTestId("battle-canvas").click({ position: { x: 220, y: 177 } });
   await expect(page.getByTestId("action-menu")).toBeVisible();
   await expect(page.getByTestId("status-strip")).toHaveText("玩家・可行動");
   await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
   await expect(page.getByTestId("hud-identity").locator("span")).toHaveCount(0);
-  await screen.screenshot({ path: "artifacts/playwright/stage0-selected-unit-context-strip.png" });
+  await captureVisualAudit(screen, { path: "artifacts/playwright/stage0-selected-unit-context-strip.png" });
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("action-menu")).toBeHidden();
 
@@ -1613,7 +1611,7 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   expect(await logicalBounds(allRest)).toEqual({ left: 490, top: 61, width: 26, height: 24 });
 
   await system.hover();
-  await screen.screenshot({ path: "artifacts/playwright/stage0-side-panel-hotspot-foundation.png" });
+  await captureVisualAudit(screen, { path: "artifacts/playwright/stage0-side-panel-hotspot-foundation.png" });
   await system.click();
   await expect(page.getByTestId("system-menu")).toBeVisible();
   await expect(screen).toHaveAttribute("data-side-panel-hotspots", "inactive");
@@ -1643,7 +1641,7 @@ test("RHP-02: objective and battle-animation objects reuse canonical presentatio
   await expect(battleAnimationArt).toHaveAttribute("data-native-frame", "21");
 
   await objective.hover();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-objective-hotspot.png",
   });
   await objective.click();
@@ -1700,7 +1698,7 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   await page.getByTestId("record-next-page").click();
   await expect(page.getByTestId("record-page")).toHaveText("第 4／4 頁");
   await expect(page.getByTestId("record-slot-20")).toContainText("此處沒有記錄");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-record-page-4.png",
   });
   await page.getByTestId("record-slot-20").click();
@@ -1754,7 +1752,7 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   expect(restored.cameraOrigin).toEqual(initial.cameraOrigin);
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await saveHotspot.hover();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-record-hotspots.png",
   });
 });
@@ -1812,7 +1810,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expect(gridArt).toHaveAttribute("data-state", "on");
   await expect(gridArt).toHaveAttribute("data-native-frame", "25");
   await grid.hover();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-grid-enabled.png",
   });
 
@@ -1843,7 +1841,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   const cameraAfterDisabledClick = (await debugState(page)).cameraOrigin;
   await page.waitForTimeout(EDGE_PAN_SETTLE_MS);
   expect((await debugState(page)).cameraOrigin).toEqual(cameraAfterDisabledClick);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-disabled-edge-click-pan.png",
   });
 
@@ -1900,7 +1898,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   expect(afterToggles.units).toEqual(baseline.units);
   expect(afterToggles.rngState).toBe(baseline.rngState);
   expect(afterToggles.cameraOrigin).toEqual(baseline.cameraOrigin);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-toggle-visuals.png",
   });
 
@@ -1911,7 +1909,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expect(page.getByTestId("edge-scroll-button")).toHaveText("捲動 關");
   await expect(page.getByTestId("portraits-button")).toHaveText("圖像 關");
   await expect(page.getByTestId("ai-dialogue-button")).toHaveText("ＡＩ對話 開");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-settings-ai-dialogue.png",
   });
   await page.getByTestId("ai-dialogue-button").click();
@@ -1974,7 +1972,7 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
     groupCommandOpen: false,
     objectiveOpen: false,
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-sound-settings.png",
   });
 
@@ -2083,7 +2081,7 @@ test("RHP-06: music desk object selects five persistent levels without restartin
     musicSettingsReturn: "battle",
   });
   await expect(page.getByTestId("music-volume-4")).toHaveAttribute("aria-checked", "true");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-music-settings.png",
   });
 
@@ -2215,7 +2213,7 @@ test("RHP-07: all twelve desk objects are discoverable, accessible and coordinat
   await expect(tooltip).toBeHidden();
   await expect(tooltip).toHaveText("遊戲功能", { timeout: 1_000 });
   await expect(tooltip).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-discovery-hint.png",
   });
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
@@ -2328,7 +2326,7 @@ test("S00-I: native range dither and ordinary attack target-count branches", asy
   expect(multiTarget.targets).toHaveLength(2);
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "68");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-retained-fraction", "0.25");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-target-dither.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-target-dither.png" });
   await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 220, y: 177 } });
   expect((await debugState(page))).toMatchObject({
     actionMode: "actionMenu",
@@ -2373,7 +2371,7 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
   await expect(canvas).toHaveAttribute("data-map-combat-target", finalEnemy.id);
   await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "1");
   await expect(canvas).toHaveAttribute("data-combat-shadow-unit-count", "1");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-map-hit-native-frame.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-map-hit-native-frame.png" });
 
   await page.waitForFunction(() => {
     const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
@@ -2382,7 +2380,7 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
   });
   await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "6");
   await expect(canvas).toHaveAttribute("data-unit-life-label-count", "7");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-map-death-before-erase.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-map-death-before-erase.png" });
 
   await page.waitForFunction(() => {
     const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
@@ -2402,11 +2400,11 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
   expect(afterErase.frame).toBeLessThan(14);
   expect(afterErase.effectTiles).toBeGreaterThan(0);
   expect(afterErase.visibleUnits).toBe(6);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-map-death-after-erase.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-map-death-after-erase.png" });
 
   await finishPromotionDialogue(page);
   expect((await debugState(page)).phase).toBe("player");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-promotion-before-victory.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-promotion-before-victory.png" });
   await confirmPromotion(page, "warrior");
   await waitForPhase(page, "victoryStory");
   const resolved = await debugState(page);
@@ -2492,7 +2490,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   // under parallel load. Its frame/x path is covered deterministically by the
   // full-combat unit test; this browser gate uses the frozen impact trace and
   // the stable hold below instead of racing that transient frame.
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-full-primary-impact.png",
   });
 
@@ -2504,7 +2502,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-actor-sprite")).toBeHidden();
   await expect(page.getByTestId("full-victim-sprite")).toBeVisible();
   await expect(page.getByTestId("full-damage-number")).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-full-counter-buffer.png",
   });
   await page.waitForFunction(() =>
@@ -2517,7 +2515,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "3");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "0");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-counter-guard.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-full-counter-guard.png" });
 
   // The final nonfatal reaction uses the same hold instead of immediately
   // dropping the full-screen layer back to the map.
@@ -2527,7 +2525,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-actor-sprite")).toBeHidden();
   await expect(page.getByTestId("full-victim-sprite")).toBeVisible();
   await expect(page.getByTestId("full-damage-number")).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-full-final-hold.png",
   });
 
@@ -2598,7 +2596,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
     const lance = window.__ANGEL2__?.getState().combatPresentation?.fullScene?.lance;
     return lance !== undefined && lance.x < launch - 120;
   }, lanceLaunchX);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-cavalry-counter.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-full-cavalry-counter.png" });
 
   await page.waitForFunction(() =>
     window.__ANGEL2__?.getState().combatPresentation?.phase === "fullCounterImpact");
@@ -2621,7 +2619,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
       ?.getAttribute("data-lift") === "36");
   const cavalryApex = (await debugState(page)).combatPresentation?.fullScene;
   expect(cavalryApex?.sprites.find(({ set }) => set === "direct")?.x).toBe(cavalryVictimX);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-cavalry-recoil-apex.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-full-cavalry-recoil-apex.png" });
   await page.waitForFunction(() =>
     window.__ANGEL2__?.getState().combatPresentation?.fullScene?.lance === undefined);
 
@@ -2635,14 +2633,14 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "1");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "12");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-fatal-hurt.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-full-fatal-hurt.png" });
   await page.waitForFunction(() =>
     window.__ANGEL2__?.getState().combatPresentation?.phase === "fullDefenderDeath");
   await expect(fullLayer).toHaveAttribute("data-full-combat-phase", "fullDefenderDeath");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "2");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "0");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-full-native-death.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-full-native-death.png" });
   await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
   const deathResolved = await debugState(page);
@@ -2702,7 +2700,7 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   }
   await expect(appendedDialogue).toContainText("騎士團的軍隊");
   await page.waitForTimeout(130);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-dual-dialogue.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-dual-dialogue.png" });
 
   await page.getByTestId("skip-dialogue").click();
   await waitForPhase(page, "openingStory");
@@ -2757,7 +2755,7 @@ test("S00-M: native system records restore battle state and combat cues follow p
   await expectNativeMenuChrome(page.getByTestId("quit-confirm-menu"), 76);
   await page.locator("[data-action=quit-confirm]").click();
   await expect(page.getByTestId("quit-feedback-text")).toHaveText("唉啊！．．．要休息了嗎？\n請再考慮一下吧！");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-quit-confirm.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-quit-confirm.png" });
   await page.locator("[data-action=quit-cancel]").click();
   expect((await debugState(page))).toMatchObject({ phase: "player", quitConfirmOpen: false });
 
@@ -2765,7 +2763,7 @@ test("S00-M: native system records restore battle state and combat cues follow p
   await page.getByTestId("system-command-save").click();
   await expect(page.getByTestId("record-menu")).toBeVisible();
   await expect(page.getByTestId("record-slot-1")).toContainText("此處沒有記錄");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-save-selector.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-save-selector.png" });
   await page.getByTestId("record-slot-1").click();
 
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
@@ -2852,7 +2850,7 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await expect(page.getByTestId("feedback-portrait")).toHaveAttribute("data-portrait-record", "46");
   expect(await page.getByTestId("native-feedback")
     .getByTestId("feedback-portrait-name").textContent()).toBe("妮  雅");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-defeat-feedback.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-defeat-feedback.png" });
 
   await enterPlayerPhase();
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
@@ -2864,13 +2862,13 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await page.getByTestId("victory-continue").click();
   expect((await debugState(page)).phase).toBe("victoryFeedback");
   await expect(page.getByTestId("feedback-text")).toHaveText("哦！．．\n這次的戰役結束了，是否要記錄下來．");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-victory-feedback.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-victory-feedback.png" });
   await page.getByTestId("victory-continue").click();
   expect((await debugState(page)).phase).toBe("savePrompt");
   await expect(page.getByRole("menu", { name: "是否儲存" })).toBeVisible();
   await expectNativeMenuChrome(page.getByTestId("save-confirm-menu"), 76);
   await expect(page.getByTestId("save-yes")).toHaveText("確 定");
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-native-save-confirm.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-save-confirm.png" });
 });
 
 test("S00-R: Ximi independently enters the shared promotion tree and commits a semantic class", async ({ page }) => {
@@ -2915,7 +2913,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
     "45",
   );
   await expectNativeDialogueGeometry(page, "lower");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-ximi-promotion-request.png",
   });
   await page.getByTestId("advance-dialogue").click();
@@ -2931,7 +2929,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   );
   await expectNativeDialogueGeometry(page, "upper");
   await expectNativeDialogueGeometry(page, "lower");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-ximi-promotion-grant.png",
   });
   await page.getByTestId("advance-dialogue").click();
@@ -2942,7 +2940,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   const lifeMatch = currentPromotionText.match(/生命 (\d+)\//);
   expect(lifeMatch).not.toBeNull();
   const ximiLifeAtPromotion = lifeMatch![1];
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-ximi-promotion-choice.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-ximi-promotion-choice.png" });
   await confirmPromotion(page, "sister");
 
   // The mandatory promotion overlay recenters its queued unit before it opens.
@@ -2950,7 +2948,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", "我方・玩家・已行動，修女希蜜");
   await expect(page.getByTestId("hp-bar")).toHaveAttribute("aria-label", new RegExp(`生命 ${ximiLifeAtPromotion}／`));
   await expect(page.getByTestId("exp-bar")).toHaveAttribute("aria-label", /^經驗 0／/);
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/stage0-ximi-promoted-map.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-ximi-promoted-map.png" });
 });
 
 test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them across volume changes", async ({ page }) => {

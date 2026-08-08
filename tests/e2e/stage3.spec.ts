@@ -1,6 +1,6 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { stage3TerrainSlotAt } from "../../src/game/content/stage3";
+import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -64,8 +64,6 @@ async function clickUnit(page: Page, id: string): Promise<void> {
   });
 }
 
-test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
-
 test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected objective", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
@@ -77,7 +75,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
     activeStoryId: "stage-03-opening-story",
   });
   expect((await state(page)).units).toHaveLength(25);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-opening-story.png`,
   });
 
@@ -86,7 +84,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toContainText("打敗敵人首領「莎」");
   await expect(page.getByTestId("objective-panel")).toContainText("「希蜜」或「黛西」戰敗");
-  await page.getByTestId("objective-panel").screenshot({
+  await captureVisualAudit(page.getByTestId("objective-panel"), {
     path: `${ARTIFACT_DIR}/stage3-corrected-objective.png`,
   });
   await page.locator("[data-action=close-objectives]").click();
@@ -97,7 +95,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveText("友軍・戰術固守防區");
   await expect(page.getByTestId("unit-force")).toHaveCount(0);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-auto-ally-hud.png`,
   });
 
@@ -107,7 +105,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   await page.keyboard.press("Space");
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveText("戰術壓制第四軍團");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-tactical-unit-hud.png`,
   });
 
@@ -123,7 +121,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   ]);
   expect(tacticLabelColor).not.toBe(tacticValueColor);
   expect(tacticGap).toBe("6px");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-tactic-label-value-contrast.png`,
   });
 });
@@ -152,7 +150,7 @@ test("S03-F/G: monk recovery exposes the native menu and marks only allies insid
       && Number(canvas.dataset.mapCombatFrame) >= 3
       && Number(canvas.dataset.mapCombatEffectTileCount) === 2;
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-recovery-effect.png`,
   });
   await page.waitForFunction(() => {
@@ -182,7 +180,7 @@ test("S03-D/E/H/I: Sha defeat plays SAY/13 once and enters stage 4", async ({ pa
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "13");
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("由於希蜜等人的幫助");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-victory-story.png`,
   });
 
@@ -197,7 +195,7 @@ test("S03-D/E/H/I: Sha defeat plays SAY/13 once and enters stage 4", async ({ pa
     activeStoryId: "stage-04-prebattle-story",
   });
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "7");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-to-stage4-prebattle.png`,
   });
 });
@@ -256,7 +254,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
     };
     return traceHost.__stage3HandoffTrace?.some(({ unitId }) => playerUnitIds.has(unitId ?? ""));
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-player-group-handoff.png`,
   });
 
@@ -286,7 +284,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("希蜜");
   await expect(page.getByTestId("dialogue-portrait-composite"))
     .toHaveAttribute("data-portrait-record", "45");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-round2-himi-group-commander.png`,
   });
 });
@@ -307,7 +305,7 @@ test("S03-C/L: hard-mode automatic allies finish their first phase inside the de
     expect([3, 5], `${unit.id} should remain in forest or mountain`)
       .toContain(stage3TerrainSlotAt(unit));
   }
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-defensive-allies-hard.png`,
   });
 });
@@ -324,7 +322,7 @@ test("stage 3 promotions use Himi as the on-field grantor while Nia is absent", 
   await page.evaluate(() => window.__ANGEL2__?.advanceDialogue());
   expect(await page.locator("#dialogue-speaker-upper").textContent()).toBe("希蜜");
   await page.waitForTimeout(120);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-promotion-himi-grantor.png`,
   });
   await expect(page.getByTestId("dialogue-portrait-composite"))

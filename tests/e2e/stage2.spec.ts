@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -49,8 +49,6 @@ async function clickUnit(page: Page, id: string): Promise<void> {
   });
 }
 
-test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
-
 test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as automatic", async ({ page }) => {
   await page.goto("/?debugScenario=stage-02-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
@@ -62,7 +60,7 @@ test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as aut
     activeStoryId: "stage-02-opening-story",
   });
   expect((await state(page)).units).toHaveLength(14);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage2-opening-story.png`,
   });
 
@@ -77,7 +75,7 @@ test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as aut
   await expect(page.getByTestId("status-strip")).not.toContainText("藍色格");
   await expect(page.getByTestId("unit-force")).toHaveCount(0);
   await expect(page.getByTestId("action-menu")).toBeHidden();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage2-auto-ally-hud.png`,
   });
 
@@ -87,7 +85,7 @@ test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as aut
   await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
   await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
   await expect(page.getByTestId("action-menu")).toBeVisible();
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage2-fixed-roster-and-auto-ally.png`,
   });
 });
@@ -144,7 +142,7 @@ test("S02-E/H: defeating Lan plays SAY/175 once and enters stage 3", async ({ pa
     stageId: "stage-02",
     activeStoryId: "stage-02-victory-story",
   });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage2-victory-story.png`,
   });
 
@@ -278,7 +276,7 @@ test("S02-J: fixed battle remains readable in a narrow reduced-motion viewport",
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(720);
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(620);
   await expect(page.getByTestId("unit-detail")).toBeVisible();
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: `${ARTIFACT_DIR}/stage2-narrow-reduced-motion.png`,
     fullPage: true,
   });

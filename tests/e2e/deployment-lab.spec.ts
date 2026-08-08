@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const deploymentState = (page: Page) => page.evaluate(() => {
   const state = window.__ANGEL2_DEPLOYMENT_LAB__?.getState();
@@ -37,8 +37,6 @@ const minimapMarkerCounts = (page: Page) => page.getByTestId("deployment-minimap
     }
     return { ...counts, width: canvas.width, height: canvas.height };
   });
-
-test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
 
 test("deployment projection keeps native roster topology, semantic focus and feedback gate", async ({ page }) => {
   const pageErrors: string[] = [];
@@ -111,10 +109,10 @@ test("deployment projection keeps native roster topology, semantic focus and fee
     .toHaveText("選擇出場人物；5至8人均可完成。");
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 6／8");
 
-  await page.getByTestId("deployment-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
     path: "artifacts/playwright/deployment-lab-screen.png",
   });
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/deployment-lab-desktop.png",
     fullPage: true,
   });
@@ -271,7 +269,7 @@ test("five-unit finish hides FF projection and narrow reduced-motion layout stay
   expect(viewportBox?.width).toBeLessThanOrEqual(370);
   expect(viewportBox?.height).toBeGreaterThan(190);
 
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: "artifacts/playwright/deployment-lab-narrow-reduced-motion.png",
     fullPage: true,
   });

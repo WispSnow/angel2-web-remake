@@ -1,8 +1,6 @@
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { createStage0Units } from "../../src/game/content/stage0";
-
-test.beforeAll(() => mkdirSync("artifacts/playwright", { recursive: true }));
+import { captureVisualAudit } from "./visual-audit";
 
 const battleSave = () => {
   const units = createStage0Units(2);
@@ -184,7 +182,7 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await expect.poll(() => intro.locator("[data-intro-slot]").evaluateAll((lines) =>
     lines.some((line) => !line.hasAttribute("hidden") && (line.textContent?.trim().length ?? 0) > 0),
   )).toBe(true);
-  await startup.screenshot({ path: "artifacts/playwright/startup-opening-intro.png" });
+  await captureVisualAudit(startup, { path: "artifacts/playwright/startup-opening-intro.png" });
 
   await page.keyboard.press("x");
   await expect(page.getByTestId("title-screen")).toBeVisible();
@@ -199,7 +197,7 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await expect.poll(() => page.getByTestId("title-screen").locator("img").evaluateAll((images) =>
     images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
   )).toBe(true);
-  await startup.screenshot({ path: "artifacts/playwright/startup-title-menu.png" });
+  await captureVisualAudit(startup, { path: "artifacts/playwright/startup-title-menu.png" });
 
   await page.keyboard.press("Enter");
   const difficultyMenu = page.getByTestId("difficulty-menu");
@@ -213,7 +211,7 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
     const element = image as HTMLImageElement;
     return element.complete && element.naturalWidth === 144 && element.naturalHeight === 150;
   })).toBe(true);
-  await startup.screenshot({ path: "artifacts/playwright/startup-difficulty-menu.png" });
+  await captureVisualAudit(startup, { path: "artifacts/playwright/startup-difficulty-menu.png" });
 
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
@@ -225,7 +223,7 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await expect(page.locator("#app")).toHaveAttribute("data-music-playing", "true");
   const debugState = await page.evaluate(() => window.__ANGEL2__?.getState() as { phase: string; difficulty: number });
   expect(debugState).toMatchObject({ phase: "prebattleStory", difficulty: 2 });
-  await page.getByTestId("game-screen").screenshot({ path: "artifacts/playwright/startup-stage0-entry.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/startup-stage0-entry.png" });
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
@@ -253,7 +251,7 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
   await expect(page.getByTestId("title-record-slot-1")).toContainText("困難重重");
   await expect(page.getByTestId("title-record-slot-2")).toHaveAttribute("data-slot-state", "invalid");
   await expect(page.getByTestId("title-record-slot-3")).toHaveAttribute("data-slot-state", "empty");
-  await recordMenu.screenshot({ path: "artifacts/playwright/startup-title-record-menu.png" });
+  await captureVisualAudit(recordMenu, { path: "artifacts/playwright/startup-title-record-menu.png" });
 
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
@@ -272,7 +270,7 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("title-record-slot-20")).toHaveAttribute("data-slot-state", "valid");
   await expect(page.getByTestId("title-record-slot-20")).toHaveAttribute("aria-current", "true");
-  await recordMenu.screenshot({
+  await captureVisualAudit(recordMenu, {
     path: "artifacts/playwright/startup-title-record-page-4.png",
   });
 
@@ -310,7 +308,7 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
     experience: 461,
   });
   await expect(page.locator("#status-strip")).toHaveText("已讀取記錄 1。");
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/startup-title-record-restored-battle.png",
   });
 });

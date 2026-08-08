@@ -1,5 +1,5 @@
-import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -70,15 +70,6 @@ async function hoverClassShowdownWorldCell(
   });
 }
 
-test.beforeAll(() => mkdirSync(ARTIFACT_DIR, { recursive: true }));
-
-test("debug hub links to the memory-only all-class showdown", async ({ page }) => {
-  await page.goto("/debug.html");
-  const link = page.getByTestId("debug-class-showdown-link");
-  await expect(link).toHaveAttribute("href", "/class-showdown.html");
-  await expect(link).toContainText("35 組同職業敵我相鄰");
-});
-
 test("all-class showdown applies one level to every mirror and enters formal battle", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -105,7 +96,7 @@ test("all-class showdown applies one level to every mirror and enters formal bat
   expect(setupState.level).toBe(2);
   expect(setupState.placements).toHaveLength(70);
   expect(setupState.placements.every(({ level }) => level === 2)).toBe(true);
-  await page.screenshot({
+  await captureVisualAudit(page, {
     path: `${ARTIFACT_DIR}/class-showdown-setup.png`,
     fullPage: true,
   });
@@ -132,7 +123,7 @@ test("all-class showdown applies one level to every mirror and enters formal bat
   expect(battleState.battle.units).toHaveLength(70);
   expect(battleState.battle.units.filter(({ side }) => side === 1)).toHaveLength(35);
   expect(battleState.battle.units.filter(({ side }) => side === 2)).toHaveLength(35);
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-battle.png`,
   });
 
@@ -187,7 +178,7 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
     "src",
     "/assets/original/status-icons/06.png",
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-jungle-poison-status-icon.png`,
   });
   expect(pageErrors).toEqual([]);
@@ -293,7 +284,7 @@ test("area techniques add a read-only effect-radius overlay to native selection 
     "data-effect-preview-visible-cell-count",
     /[1-9]/,
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-lightning-effect-range.png`,
   });
 
@@ -331,7 +322,7 @@ test("area techniques add a read-only effect-radius overlay to native selection 
     "data-native-dither-cell-count",
     /[1-9]/,
   );
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-recovery-effect-range.png`,
   });
   expect(pageErrors).toEqual([]);
@@ -372,7 +363,7 @@ test("great dragon knight stomp lands on its selected target in the all-class sh
       && dataset.mapCombatStompTargetScreenY !== undefined
       && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
   }, undefined, { polling: "raf" });
-  await page.getByTestId("game-screen").screenshot({
+  await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-stomp-3-target-impact.png`,
   });
   expect(pageErrors).toEqual([]);

@@ -209,6 +209,7 @@ pnpm exec playwright install ffmpeg
 - 优先用文件级或用例级命令缩小范围，例如
   `pnpm exec vitest run tests/unit/<相关文件>.test.ts`、
   `pnpm exec playwright test tests/e2e/<相关文件>.spec.ts` 或 Playwright 的标题过滤。
+- 具体源码到测试文件的责任映射见 `tests/README.md`；新增系统或拆分测试时同步维护该表。
 - 即使一次任务涉及多个系统，也应明确列出受影响系统并组合运行对应的定向测试；不要把
   “跨系统”自动等同于“全仓库测试”。
 - 只有用户明确要求全量验证，或当前任务本身明确是发布前／发布候选验收时，才运行全量
@@ -233,6 +234,8 @@ pnpm exec playwright install ffmpeg
 - DOM 字形光栅化仍可能随宿主系统变化；CI 运行无夹具语义验收，Darwin 黄金图由固定 Chromium 在本地视觉审计。
 - `tests/e2e/stage0-real-clear.spec.ts` 的真实通关路径不得调用 `window.__ANGEL2__` 或添加测试查询参数。
 - DOM 断言不能代替 Canvas/WebGL 视觉检查；Canvas 测试必须保留截图证据。
+- 普通 Playwright 运行只在失败时自动截图/录像；显式视觉审计截图通过
+  `pnpm test:e2e:visual <相关文件或标题过滤>` 生成，不在每次定向回归中批量写入。
 
 ## 完成任务前
 
