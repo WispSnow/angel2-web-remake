@@ -239,10 +239,15 @@ interface ReferencePresentationState {
   trailOffset: number;
   trailX: number[];
   trailFrame: number[];
+  attackTrailTowardRight: boolean;
   particles: Array<{ x: number; y: number; frame: number }>;
 }
 
-function initialReferencePresentation(): ReferencePresentationState {
+type ReferenceTrailPhase = "attack" | "hurt" | "guard" | "death";
+
+function initialReferencePresentation(
+  actorSide: "left" | "right" = "left",
+): ReferencePresentationState {
   return {
     actorEffect: "N",
     victimEffect: "N",
@@ -252,6 +257,7 @@ function initialReferencePresentation(): ReferencePresentationState {
     trailOffset: 0,
     trailX: Array<number>(6).fill(0),
     trailFrame: Array<number>(6).fill(0),
+    attackTrailTowardRight: actorSide === "right",
     particles: [],
   };
 }
@@ -305,7 +311,8 @@ function referencePresentationFrames(
   victimSteps: readonly ReferenceCommandStep[],
   coordinates: readonly { actorX: number; victimX: number }[],
   actorSide: "left" | "right",
-  initial = initialReferencePresentation(),
+  phase: ReferenceTrailPhase,
+  initial = initialReferencePresentation(actorSide),
 ): { frames: Array<Pick<ReferencePresentationState, "viewportYOffset" | "particles">>; final: ReferencePresentationState } {
   const state = cloneReferencePresentation(initial);
   const frames: Array<Pick<ReferencePresentationState, "viewportYOffset" | "particles">> = [];
@@ -338,14 +345,20 @@ function referencePresentationFrames(
     } else {
       const effect = effectRole === "actor" ? state.actorEffect : state.victimEffect;
       const subjectX = coordinates[substep][effectRole === "actor" ? "actorX" : "victimX"];
-      const effectPointsRightOnLeftSide = (effectRole === "actor" && effect === "U")
+      const effectTowardRight = (effectRole === "actor" && effect === "U")
         || (effectRole === "victim" && effect === "Y");
       const subjectSide = effectRole === "actor"
         ? actorSide
         : actorSide === "left" ? "right" : "left";
-      const towardRight = subjectSide === "right"
-        ? !effectPointsRightOnLeftSide
-        : effectPointsRightOnLeftSide;
+      const nativeTowardRight = subjectSide === "right"
+        ? !effectTowardRight
+        : effectTowardRight;
+      const towardRight = phase === "guard"
+        ? effectRole === "actor"
+          ? !state.attackTrailTowardRight
+          : subjectSide === "left"
+        : nativeTowardRight;
+      if (phase === "attack") state.attackTrailTowardRight = towardRight;
       const direction = towardRight ? 24 : -24;
       state.trailX[0] = subjectX
         + (towardRight ? 40 + state.trailOffset : -40 - state.trailOffset);
@@ -523,6 +536,7 @@ describe("Full-screen ordinary combat choreography", () => {
           victimX: victimMark + mainVictimFrames[index].x - mainVictimEnd.x,
         })),
         side,
+        "attack",
       );
 
       expect(impact - start).toBe(mainActorFrames.length * 40);
@@ -661,6 +675,7 @@ describe("Full-screen ordinary combat choreography", () => {
             victimX: victimMark,
           })),
           side,
+          reaction,
           mainPresentation.final,
         );
         expect(reactionHold - reactionImpact).toBe(actorFrames.length * 50);
@@ -838,6 +853,7 @@ describe("Full-screen ordinary combat choreography", () => {
           victimX: victimMark + mainVictimFrames[index].x - mainVictimEnd.x,
         })),
         side,
+        "attack",
       );
       const postActor = streams.auxiliaryA.steps as readonly ReferenceCommandStep[];
       const postVictim = streams.auxiliaryB.steps as readonly ReferenceCommandStep[];
@@ -848,6 +864,7 @@ describe("Full-screen ordinary combat choreography", () => {
         postVictim,
         postActorFrames.map((actorFrame) => ({ actorX: actorFrame.x, victimX: victimMark })),
         side,
+        "hurt",
         mainPresentation.final,
       );
       const victimSide = side === "left" ? "right" : "left";
@@ -862,6 +879,7 @@ describe("Full-screen ordinary combat choreography", () => {
         deathSteps,
         deathFrames.map(() => ({ actorX: victimMark, victimX: victimMark })),
         side,
+        "death",
         deathInitial,
       );
       const mainCamera = referenceNativeCameraFrames(mainActor);
@@ -1802,6 +1820,129 @@ describe("Full-screen ordinary combat choreography", () => {
       const leftDirection = sampleDirection(1);
       expect(leftDirection === -24 || leftDirection === 24).toBe(true);
       expect(sampleDirection(2)).toBe(-leftDirection);
+    },
+  );
+
+  const guardTrailClasses = Object.entries(STAGE0_FULL_COMBAT_PROFILES)
+    .filter(([, profile]) => Object.values(profile.commandStreams).length === 2
+      && Object.values(profile.commandStreams).some(
+        (streams) => streams?.mainLeftOrAttacker.steps.some(
+          (step: { commands: readonly { token: string }[] }) => step.commands.some(
+            ({ token }) => token === "EY" || token === "UE",
+          ),
+        )
+        && (streams?.auxiliaryC.steps.some(
+          (step: { commands: readonly { token: string }[] }) => step.commands.some(
+            ({ token }) => token === "EY" || token === "UE",
+          ),
+        ) || streams?.auxiliaryD.steps.some(
+          (step: { commands: readonly { token: string }[] }) => step.commands.some(
+            ({ token }) => token === "EY" || token === "UE",
+          ),
+        )),
+      ),
+    )
+    .map(([classId]) => classId as UnitClassId);
+
+  it.each(guardTrailClasses)(
+    "uses the native physical-side direction during guard recoil for %s",
+    (classId) => {
+      const firstTrailDirection = (
+        script: FullCombatScript,
+        start: number,
+        end: number,
+        stepMs: number,
+      ): number => {
+        for (let t = start; t < end; t += stepMs) {
+          const particles = script.sample(t + 1).particles;
+          if (particles.length >= 2) return particles[1].x - particles[0].x;
+        }
+        throw new Error(`No common trail was rendered for class ${classId}`);
+      };
+      const profile = STAGE0_FULL_COMBAT_PROFILES[
+        classId as keyof typeof STAGE0_FULL_COMBAT_PROFILES
+      ];
+
+      for (const side of [1, 2] as const) {
+        const defenderSide = side === 1 ? 2 : 1;
+        const attacker = unit(side, side === 1 ? 0 : 48, "測試攻手", classId);
+        const defender = unit(defenderSide, defenderSide === 1 ? 0 : 48, "測試守手");
+        const baseResult = {
+          attackerId: attacker.id,
+          defenderId: defender.id,
+          counterOccurred: false,
+          counterDamage: 0,
+        };
+        const attack = buildFullCombatScript(
+          attacker,
+          defender,
+          result({ ...baseResult, damage: 24 }),
+        );
+        const guard = buildFullCombatScript(
+          attacker,
+          defender,
+          result({ ...baseResult, damage: 8 }),
+        );
+        const attackDirection = firstTrailDirection(
+          attack,
+          markTime(attack, "fullWindup"),
+          markTime(attack, "fullImpact"),
+          40,
+        );
+        const guardDirection = firstTrailDirection(
+          guard,
+          markTime(guard, "fullImpact"),
+          markTime(guard, "fullHold"),
+          50,
+        );
+        const streams = sideStreams(profile, side === 1 ? "left" : "right");
+        const guardState = initialReferencePresentation(side === 1 ? "left" : "right");
+        const mainSubsteps = streams.mainLeftOrAttacker.steps.reduce(
+          (sum, step) => sum + step.rendererSubsteps,
+          0,
+        );
+        for (let substep = 0; substep < mainSubsteps; substep += 1) {
+          applyReferencePresentationCommands(
+            guardState,
+            "actor",
+            referenceCommandsAtSubstep(streams.mainLeftOrAttacker.steps, substep),
+          );
+          applyReferencePresentationCommands(
+            guardState,
+            "victim",
+            referenceCommandsAtSubstep(streams.mainRightOrDefender.steps, substep),
+          );
+        }
+        let guardEffectRole: "actor" | "victim" | undefined;
+        const guardSubsteps = streams.auxiliaryC.steps.reduce(
+          (sum, step) => sum + step.rendererSubsteps,
+          0,
+        );
+        for (let substep = 0; substep < guardSubsteps; substep += 1) {
+          applyReferencePresentationCommands(
+            guardState,
+            "actor",
+            referenceCommandsAtSubstep(streams.auxiliaryC.steps, substep),
+          );
+          applyReferencePresentationCommands(
+            guardState,
+            "victim",
+            referenceCommandsAtSubstep(streams.auxiliaryD.steps, substep),
+          );
+          if (guardState.actorEffect !== "N") {
+            guardEffectRole = "actor";
+            break;
+          }
+          if (guardState.victimEffect !== "N") {
+            guardEffectRole = "victim";
+            break;
+          }
+        }
+        expect(guardEffectRole).toBeDefined();
+        const guardSubjectSide = guardEffectRole === "actor" ? side : defenderSide;
+        expect(guardDirection).toBe(guardSubjectSide === 1 ? 24 : -24);
+        if (guardEffectRole === "actor") expect(guardDirection).toBe(-attackDirection);
+      }
     },
   );
 

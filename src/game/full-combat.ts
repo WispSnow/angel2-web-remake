@@ -1177,6 +1177,7 @@ function genericNativeLinkedEffectSprites(
 
 type NativeEffectMode = "N" | "Y" | "U";
 type NativeDisplayMode = "ND" | "YD";
+type NativeTrailPhase = "attack" | "hurt" | "guard" | "death";
 
 interface NativePresentationRuntime {
   actorEffect: NativeEffectMode;
@@ -1187,6 +1188,8 @@ interface NativePresentationRuntime {
   trailOffset: number;
   trailX: number[];
   trailFrame: number[];
+  /** Direction of the attack trail, retained for guard recoil reversal. */
+  attackTrailTowardRight: boolean;
   particles: FullCombatSceneState["particles"];
 }
 
@@ -1229,6 +1232,7 @@ function advanceNativePresentationPhase(
   victimSteps: readonly NativeCommandStep[],
   renderedSubsteps: number,
   actorSide: "left" | "right",
+  phase: NativeTrailPhase,
   coordinates: (substep: number) => { actorX: number; victimX: number },
 ): void {
   for (let substep = 0; substep < renderedSubsteps; substep += 1) {
@@ -1264,7 +1268,7 @@ function advanceNativePresentationPhase(
     const effect = effectRole === "actor" ? state.actorEffect : state.victimEffect;
     const { actorX, victimX } = coordinates(substep);
     const subjectX = effectRole === "actor" ? actorX : victimX;
-    const effectPointsRightOnLeftSide = (effectRole === "actor" && effect === "U")
+    const effectTowardRight = (effectRole === "actor" && effect === "U")
       || (effectRole === "victim" && effect === "Y");
     // EY/UE are stored in each physical side's command block, but the common
     // trail bitmap is not mirrored by the compositor. Resolve the native
@@ -1273,9 +1277,20 @@ function advanceNativePresentationPhase(
     const subjectSide = effectRole === "actor"
       ? actorSide
       : actorSide === "left" ? "right" : "left";
-    const towardRight = subjectSide === "right"
-      ? !effectPointsRightOnLeftSide
-      : effectPointsRightOnLeftSide;
+    const nativeTowardRight = subjectSide === "right"
+      ? !effectTowardRight
+      : effectTowardRight;
+    // Victim-side guard streams use the native physical-side direction: the
+    // left-side defender's trail extends right, and the right-side defender's
+    // trail extends left. A few classes emit guard dust from the actor channel
+    // instead; those are recoil effects and must reverse that actor's attack
+    // trail direction.
+    const towardRight = phase === "guard"
+      ? effectRole === "actor"
+        ? !state.attackTrailTowardRight
+        : subjectSide === "left"
+      : nativeTowardRight;
+    if (phase === "attack") state.attackTrailTowardRight = towardRight;
     const direction = towardRight ? 24 : -24;
     state.trailX[0] = subjectX + (towardRight ? 40 + state.trailOffset : -40 - state.trailOffset);
     state.trailFrame[0] ^= 1;
@@ -1317,6 +1332,7 @@ function nativePresentationAt(
     trailOffset: 0,
     trailX: Array<number>(6).fill(0),
     trailFrame: Array<number>(6).fill(0),
+    attackTrailTowardRight: spec.actorSide === "right",
     particles: [],
   };
   const mainActor = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
@@ -1335,6 +1351,7 @@ function nativePresentationAt(
     mainVictim,
     renderedNativeSubsteps(mainActor, mainAge, NATIVE_STRIKE_SUBSTEP),
     spec.actorSide,
+    "attack",
     (substep) => {
       const age = substep * NATIVE_STRIKE_SUBSTEP;
       const actor = sampleNativeStream(mainActor, age, NATIVE_STRIKE_SUBSTEP, spec.actorX, 0);
@@ -1364,6 +1381,7 @@ function nativePresentationAt(
       postVictim,
       renderedNativeSubsteps(postActor, postAge, NATIVE_POST_HIT_SUBSTEP),
       spec.actorSide,
+      reaction,
       (substep) => ({
         actorX: sampleNativeStream(
           postActor,
@@ -1388,6 +1406,7 @@ function nativePresentationAt(
       death,
       renderedNativeSubsteps(death, t - times.holdStart, NATIVE_POST_HIT_SUBSTEP),
       spec.actorSide,
+      "death",
       () => ({ actorX: spec.victimX, victimX: spec.victimX }),
     );
   }

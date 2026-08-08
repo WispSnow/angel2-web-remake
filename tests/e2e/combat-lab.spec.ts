@@ -146,6 +146,22 @@ test("right-side soldier dust trail mirrors the left-side attack direction", asy
     path: "artifacts/playwright/combat-lab-right-soldier-dust.png",
     fullPage: true,
   });
+
+  const impactAt = (await labState(page)).marks
+    .find(({ phase }) => phase === "fullImpact")?.t;
+  expect(impactAt).toBeDefined();
+  await page.getByTestId("combat-lab-reaction").selectOption("guard");
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 200);
+  await expect(particles).toHaveCount(3);
+  const guardParticleXs = await particles.evaluateAll((elements) => elements.map((element) => {
+    const match = element.getAttribute("style")?.match(/translate\((-?\d+)px/u);
+    return Number(match?.[1]);
+  }));
+  expect(guardParticleXs[1] - guardParticleXs[0]).toBe(24);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-right-soldier-guard-dust.png",
+    fullPage: true,
+  });
 });
 
 test("record 1 magic sword warrior keeps its body and G1 effect channels synchronized", async ({ page }) => {
