@@ -22,6 +22,9 @@ const CODE_SIGNATURES = [
   { address: "0000:926B", offset: 0x926b, hex: "f6061911017404e82100" },
   { address: "0000:92C5", offset: 0x92c5, hex: "813ebb773047740b833eb97700" },
   { address: "0000:92DC", offset: 0x92dc, hex: "8b1ec177e847bd833ec93100" },
+  { address: "0000:931B", offset: 0x931b, hex: "8b1ec177e808bd833ec931007501c3a1bd773d304e7401c3e83c0083ff04" },
+  { address: "0000:9372", offset: 0x9372, hex: "8b16c931b9c40933f633ffa124008ec0268a04" },
+  { address: "0000:939E", offset: 0x939e, hex: "8bf0a124008ec0268a14a122008ec0268a3480fa00" },
   { address: "0000:93F2", offset: 0x93f2, hex: "8b3ebf77e86401893eb777" },
   { address: "0000:942E", offset: 0x942e, hex: "8b3ec177e82801893eb977" },
   { address: "0000:946A", offset: 0x946a, hex: "a1a7018ec033db268a1d03db" },
@@ -414,6 +417,38 @@ async function extract(runtimePath, descriptorPath, outputPath) {
         confirmedEffect: "applies the same status slot named 施毒 by player technique IP; at each full-round boundary current life becomes floor(current life / 2) before countdown",
       },
     ],
+    waterWarriorSplit: {
+      function: "0000:931B",
+      callSites: ["0000:9292", "0000:92A3"],
+      defender: specialUnit(descriptorsByCode, "0N"),
+      trigger: "the original defender still occupies DS:77C1 after an ordinary melee attack sequence",
+      excludedSources: [
+        "a water warrior acting as the original attacker and taking counter damage",
+        "shooting",
+        "techniques",
+        "route or stage damage",
+      ],
+      count: {
+        function: "0000:9372",
+        identity: "same side byte and same unit-slot byte across all 2500 board cells",
+        maximumBoardCells: 4,
+        additionsPerTrigger: 1,
+      },
+      placement: {
+        function: "0000:939E",
+        candidateOrder: ["defenderCell-50 (up)", "defenderCell+50 (down)", "defenderCell-1 (left)", "defenderCell+1 (right)"],
+        eligibility: "candidate board cell is empty and its movement-rule value is neither 98 nor 99",
+        result: "copy the defender cell's side byte and unit-slot byte to the first eligible candidate, then return",
+        randomCalls: 0,
+      },
+      sharedState: {
+        mechanism: "all split board cells retain the same unit-slot byte and therefore resolve through one unit-state record",
+        confirmedSharedFields: ["current life", "experience", "status words"],
+        death: "the 0000:96C2 zero-life scan clears every board cell that resolves to the shared zero-life state",
+        actionMarker: "the per-board-cell acted bit is copied at split time; it is not part of the shared unit-state record",
+      },
+      presentation: "no separate split animation or sound call was found; the handler writes the new board cell directly",
+    },
     actionConsumption: {
       function: "0000:9123",
       behavior: "OR 0x80 into the attacker's board unit-slot byte before damage resolution",
@@ -425,7 +460,7 @@ async function extract(runtimePath, descriptorPath, outputPath) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`);
   console.log(
-    `extracted ordinary combat rules and ${killRewards.entryCount} kill rewards to ${outputPath}`,
+    `extracted ordinary combat rules, water-warrior splitting, and ${killRewards.entryCount} kill rewards to ${outputPath}`,
   );
 }
 

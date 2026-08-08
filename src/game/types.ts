@@ -87,6 +87,8 @@ export interface AttackResult {
   defenderDied: boolean;
   attackerDied: boolean;
   experienceGained: number;
+  splitUnitId?: string;
+  splitCount?: number;
 }
 
 export interface DialogueWindowState {

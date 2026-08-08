@@ -825,6 +825,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const specialPresentation = controller.specialActionPresentation;
       const routePulsePresentation = controller.routePulsePresentation;
       const displayedUnits = new Map(controller.battle.units.map((unit) => [unit.id, unit]));
+      if (presentation?.result.splitUnitId) displayedUnits.delete(presentation.result.splitUnitId);
       if (mapPresentation) {
         if (!displayedUnits.has(mapPresentation.attacker.id)) displayedUnits.set(mapPresentation.attacker.id, mapPresentation.attacker);
         if (!displayedUnits.has(mapPresentation.defender.id)) displayedUnits.set(mapPresentation.defender.id, mapPresentation.defender);

@@ -137,6 +137,14 @@ function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
   return UNIT_STATUS_KEYS.every((key) => left[key] === right[key]);
 }
 
+const WATER_WARRIOR_SPLIT_ID = /:split-[1-3]$/u;
+
+function waterWarriorRootId(unit: Pick<BattleUnit, "id" | "classId">): string | undefined {
+  return unit.classId === "water-warrior"
+    ? unit.id.replace(WATER_WARRIOR_SPLIT_ID, "")
+    : undefined;
+}
+
 function applyActiveOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit): void {
   const status = ordinaryHitStatusFor(attacker.classId);
   if (status) defender.statuses[status.key] = status.counter;
@@ -338,6 +346,7 @@ export class Stage0Battle {
       ...unit,
       statuses: { ...unit.statuses },
     }));
+    this.restoreWaterWarriorGroups();
     this.terrainOverrideByPosition.clear();
     for (const override of snapshot.terrainOverrides ?? []) {
       if (
@@ -376,6 +385,90 @@ export class Stage0Battle {
 
   unitAt(position: Position): BattleUnit | undefined {
     return this.units.find((unit) => unit.x === position.x && unit.y === position.y);
+  }
+
+  private waterWarriorGroup(unit: BattleUnit): BattleUnit[] {
+    const rootId = waterWarriorRootId(unit);
+    if (!rootId) return [unit];
+    return this.units.filter((candidate) =>
+      candidate.side === unit.side
+      && candidate.slot === unit.slot
+      && waterWarriorRootId(candidate) === rootId);
+  }
+
+  private synchronizeWaterWarriorState(source: BattleUnit): void {
+    for (const unit of this.waterWarriorGroup(source)) {
+      if (unit.id === source.id) continue;
+      unit.life = source.life;
+      unit.experience = source.experience;
+      unit.actionDisabled = source.actionDisabled;
+      unit.statuses = { ...source.statuses };
+    }
+  }
+
+  private setSharedLife(unit: BattleUnit, life: number): void {
+    unit.life = Math.max(0, Math.min(this.statsFor(unit).maxLife, life));
+    this.synchronizeWaterWarriorState(unit);
+  }
+
+  private removeSharedUnit(unit: BattleUnit): void {
+    const ids = new Set(this.waterWarriorGroup(unit).map(({ id }) => id));
+    this.units = this.units.filter((candidate) => !ids.has(candidate.id));
+  }
+
+  private restoreWaterWarriorGroups(): void {
+    const groups = new Map<string, BattleUnit[]>();
+    for (const unit of this.units) {
+      const rootId = waterWarriorRootId(unit);
+      if (!rootId) continue;
+      const group = groups.get(rootId) ?? [];
+      group.push(unit);
+      groups.set(rootId, group);
+      if (unit.id !== rootId) this.forces.inheritUnit(rootId, unit.id);
+    }
+    for (const [rootId, group] of groups) {
+      const root = group.find(({ id }) => id === rootId);
+      if (!root || group.length > 4 || group.some((unit) =>
+        unit.side !== root.side
+        || unit.slot !== root.slot
+        || unit.life !== root.life
+        || unit.experience !== root.experience
+        || unit.actionDisabled !== root.actionDisabled
+        || !statusesEqual(unit.statuses, root.statuses))) {
+        throw new Error(`invalid restored water-warrior group ${rootId}`);
+      }
+    }
+  }
+
+  private splitWaterWarrior(defender: BattleUnit): BattleUnit | undefined {
+    const rootId = waterWarriorRootId(defender);
+    if (!rootId || this.waterWarriorGroup(defender).length >= 4) return undefined;
+    const candidates = [
+      { x: defender.x, y: defender.y - 1 },
+      { x: defender.x, y: defender.y + 1 },
+      { x: defender.x - 1, y: defender.y },
+      { x: defender.x + 1, y: defender.y },
+    ];
+    const destination = candidates.find((position) =>
+      position.x >= 0
+      && position.y >= 0
+      && position.x < this.stage.width
+      && position.y < this.stage.height
+      && !this.unitAt(position)
+      && movementCost(defender.classId, position, this.dynamicBattlefield) < 98);
+    if (!destination) return undefined;
+    const splitIndex = [1, 2, 3].find((index) => !this.unit(`${rootId}:split-${index}`));
+    if (!splitIndex) return undefined;
+    const split: BattleUnit = {
+      ...defender,
+      id: `${rootId}:split-${splitIndex}`,
+      x: destination.x,
+      y: destination.y,
+      statuses: { ...defender.statuses },
+    };
+    this.units.push(split);
+    this.forces.inheritUnit(defender.id, split.id);
+    return split;
   }
 
   terrainSlotAt(position: Position): number {
@@ -588,7 +681,7 @@ export class Stage0Battle {
     const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense)
       + this.rng.between(4, 7)
       + this.rng.between(4, 7);
-    defender.life = Math.max(0, defender.life - damage);
+    this.setSharedLife(defender, defender.life - damage);
 
     const counterOccurred = defender.life > 0
       && !defender.actionDisabled
@@ -605,23 +698,26 @@ export class Stage0Battle {
       counterDamage = primaryCounterCandidate
         ? damage
         : Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
-      attacker.life = Math.max(0, attacker.life - counterDamage);
+      this.setSharedLife(attacker, attacker.life - counterDamage);
     }
     // Native 0000:92DC applies the class status once from the original
     // attacker/defender pair; the counter branch only resolves damage.
     applyActiveOrdinaryHitStatus(attacker, defender);
+    this.synchronizeWaterWarriorState(defender);
 
     const defenderDied = defender.life === 0;
     const attackerDied = attacker.life === 0;
     const reward = killRewardFor(defender.classId, defender.side);
     const experienceGained = defenderDied ? reward + this.rng.between(4, 7) : defenderStats.level + this.rng.between(4, 7);
     attacker.experience += experienceGained;
+    this.synchronizeWaterWarriorState(attacker);
     attacker.acted = true;
     this.recordCampaignUnit(attacker);
     this.recordCampaignUnit(defender);
 
-    if (defenderDied) this.units = this.units.filter((unit) => unit.id !== defender.id);
-    if (attackerDied) this.units = this.units.filter((unit) => unit.id !== attacker.id);
+    if (defenderDied) this.removeSharedUnit(defender);
+    if (attackerDied) this.removeSharedUnit(attacker);
+    const splitUnit = defenderDied ? undefined : this.splitWaterWarrior(defender);
     this.focusId = this.unit(attackerId) ? attackerId : defenderId;
 
     return {
@@ -633,6 +729,10 @@ export class Stage0Battle {
       defenderDied,
       attackerDied,
       experienceGained,
+      ...(splitUnit ? {
+        splitUnitId: splitUnit.id,
+        splitCount: this.waterWarriorGroup(defender).length,
+      } : {}),
     };
   }
 
@@ -795,22 +895,28 @@ export class Stage0Battle {
     this.rng.state = prepared.rngAfter;
     this.rng.calls = prepared.rngCallsAfter;
     actor.experience = prepared.actorExperienceAfter;
+    this.synchronizeWaterWarriorState(actor);
     actor.acted = true;
     for (const affected of prepared.affectedUnits) {
       const unit = this.unit(affected.unitId);
       if (!unit) throw new Error("stale prepared special action");
       unit.x = affected.positionAfter.x;
       unit.y = affected.positionAfter.y;
-      unit.life = affected.lifeAfter;
+      this.setSharedLife(unit, unit.life + affected.lifeAfter - affected.lifeBefore);
       if (affected.prayerOutcome) unit.experience = affected.experienceAfter;
       unit.actionDisabled = affected.actionDisabledAfter;
       unit.statuses = { ...affected.statusesAfter };
+      this.synchronizeWaterWarriorState(unit);
       this.recordCampaignUnit(unit);
     }
     this.recordCampaignUnit(actor);
-    const deadIds = new Set(
-      prepared.affectedUnits.filter(({ died }) => died).map(({ unitId }) => unitId),
-    );
+    const deadIds = new Set<string>();
+    for (const affected of prepared.affectedUnits) {
+      const unit = this.unit(affected.unitId);
+      if (unit?.life === 0) {
+        for (const member of this.waterWarriorGroup(unit)) deadIds.add(member.id);
+      }
+    }
     if (deadIds.size > 0) this.units = this.units.filter(({ id }) => !deadIds.has(id));
     this.focusId = this.unit(actor.id)?.id
       ?? prepared.result.targetId
@@ -857,9 +963,10 @@ export class Stage0Battle {
     }
     const unit = this.unit(affected.unitId);
     if (!unit) throw new Error("stale prepared prayer action");
-    unit.life = affected.lifeAfter;
+    this.setSharedLife(unit, unit.life + affected.lifeAfter - affected.lifeBefore);
     unit.experience = affected.experienceAfter;
     unit.statuses = { ...affected.statusesAfter };
+    this.synchronizeWaterWarriorState(unit);
     this.recordCampaignUnit(unit);
     this.focusId = unit.id;
     return affected;
@@ -1004,7 +1111,7 @@ export class Stage0Battle {
     if (!unit || unit.acted || unit.actionDisabled) return 0;
     const maximumLife = this.statsFor(unit).maxLife;
     const recovered = Math.max(0, Math.min(Math.floor(maximumLife * 15 / 100), maximumLife - unit.life));
-    unit.life += recovered;
+    this.setSharedLife(unit, unit.life + recovered);
     unit.acted = true;
     this.focusId = id;
     return recovered;
@@ -1155,13 +1262,17 @@ export class Stage0Battle {
     for (const affected of prepared.affectedUnits) {
       const unit = this.unit(affected.unitId);
       if (!unit) throw new Error("stale prepared route pulse");
-      unit.life = affected.lifeAfter;
+      this.setSharedLife(unit, unit.life + affected.lifeAfter - affected.lifeBefore);
       this.recordCampaignUnit(unit);
     }
     this.recordCampaignUnit(actor);
-    const deadIds = new Set(
-      prepared.affectedUnits.filter(({ died }) => died).map(({ unitId }) => unitId),
-    );
+    const deadIds = new Set<string>();
+    for (const affected of prepared.affectedUnits) {
+      const unit = this.unit(affected.unitId);
+      if (unit?.life === 0) {
+        for (const member of this.waterWarriorGroup(unit)) deadIds.add(member.id);
+      }
+    }
     if (deadIds.size > 0) this.units = this.units.filter(({ id }) => !deadIds.has(id));
     this.focusId = this.unit(actor.id)?.id ?? this.units[0]?.id ?? actor.id;
     return prepared;
@@ -1822,10 +1933,16 @@ export class Stage0Battle {
         // REMAKE-004 keeps poisoned units alive. REMAKE-013 skips persistent
         // damage while the unit is still frozen, but the status duration is
         // consumed normally. This must precede side-2 thawing below.
-        if (!unit.actionDisabled) unit.life = Math.max(1, Math.floor(unit.life / 2));
-        unit.statuses.poison = tickTimedStatus(unit.statuses.poison);
+        if (!unit.actionDisabled) this.setSharedLife(unit, Math.max(1, Math.floor(unit.life / 2)));
         this.recordCampaignUnit(unit);
       }
+    }
+    const updatedStateIds = new Set<string>();
+    for (const unit of this.units) {
+      const stateId = waterWarriorRootId(unit) ?? unit.id;
+      if (updatedStateIds.has(stateId)) continue;
+      updatedStateIds.add(stateId);
+      unit.statuses.poison = tickTimedStatus(unit.statuses.poison);
       unit.statuses.attackUp = tickTimedStatus(unit.statuses.attackUp);
       unit.statuses.defenseUp = tickTimedStatus(unit.statuses.defenseUp);
       unit.statuses.magicGuard = tickTimedStatus(unit.statuses.magicGuard);
@@ -1834,6 +1951,7 @@ export class Stage0Battle {
       unit.statuses.defenseDown = tickTimedStatus(unit.statuses.defenseDown);
       unit.statuses.techniqueSeal = tickTimedStatus(unit.statuses.techniqueSeal);
       if (unit.side === 2) unit.actionDisabled = false;
+      this.synchronizeWaterWarriorState(unit);
     }
     if (this.unit("1:0")) this.focusId = "1:0";
   }

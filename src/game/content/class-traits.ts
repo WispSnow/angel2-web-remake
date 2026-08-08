@@ -9,7 +9,8 @@ export type ClassTraitId =
   | "great-axe-no-counter"
   | "magic-sword-defense-down"
   | "evil-sword-confusion"
-  | "jungle-poison";
+  | "jungle-poison"
+  | "water-warrior-split";
 
 export interface ClassTrait {
   readonly id: ClassTraitId;
@@ -62,6 +63,11 @@ const TRAITS_BY_CLASS: Readonly<Partial<Record<ClassId, readonly ClassTrait[]>>>
     id: "jungle-poison",
     shortDescription: "命中施毒",
     description: "普通攻擊命中後施加與技術「施毒」相同的 3 回合狀態；回合結束生命減半。",
+  }],
+  "water-warrior": [{
+    id: "water-warrior-split",
+    shortDescription: "近戰受擊分裂",
+    description: "受到普通近戰攻擊且存活時，會在相鄰合法空格新增一個分裂體；全體共享生命，場上最多 4 個。",
   }],
 };
 

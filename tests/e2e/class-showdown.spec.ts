@@ -13,7 +13,13 @@ interface ClassShowdownBattleState {
   actionRange: Array<{ x: number; y: number }>;
   targets: Array<{ x: number; y: number }>;
   effectPreviewCells: Array<{ x: number; y: number }>;
-  lastCombat?: { attackerId: string; defenderId: string; defenderDied: boolean };
+  lastCombat?: {
+    attackerId: string;
+    defenderId: string;
+    defenderDied: boolean;
+    splitUnitId?: string;
+    splitCount?: number;
+  };
   combatPresentation?: { phase: string };
   specialActionPresentation?: { phase: string };
   specialActionPresentationTrace: Array<{ phase: string }>;
@@ -23,6 +29,7 @@ interface ClassShowdownBattleState {
     x: number;
     y: number;
     acted: boolean;
+    life: number;
     experience: number;
     statuses: Record<string, number>;
   }>;
@@ -225,6 +232,59 @@ test("probability traits show approximate rates in the selected-unit strip", asy
     "aria-label",
     /約 50% 機率.*完全閃避傷害/u,
   );
+  expect(pageErrors).toEqual([]);
+});
+
+test("water warrior splits after defensive melee and all copies show shared life", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  for (let step = 0; step < 12; step += 1) await page.keyboard.press("ArrowRight");
+  for (let step = 0; step < 8; step += 1) await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 29, y: 23 });
+  await page.keyboard.press("Space");
+  await expect(page.locator(".hud-identity-name")).toHaveText("水戰士");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性近戰受擊分裂");
+  await expect(page.getByTestId("unit-traits")).toHaveAttribute(
+    "aria-label",
+    /相鄰合法空格新增一個分裂體.*共享生命.*最多 4 個/u,
+  );
+  await page.getByTestId("unit-command-attack").click();
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState;
+    }).battle;
+    return current?.lastCombat?.splitUnitId === "arena-2-26:split-1"
+      && current.combatPresentation === undefined;
+  });
+  const battle = await classShowdownBattleState(page);
+  expect(battle?.lastCombat).toMatchObject({
+    attackerId: "arena-1-26",
+    defenderId: "arena-2-26",
+    defenderDied: false,
+    splitUnitId: "arena-2-26:split-1",
+    splitCount: 2,
+  });
+  const root = battle?.units.find(({ id }) => id === "arena-2-26");
+  const split = battle?.units.find(({ id }) => id === "arena-2-26:split-1");
+  expect(split).toMatchObject({ classId: "water-warrior", x: 31, y: 23, life: root?.life });
+  await expect(page.getByTestId("status-strip")).toContainText("水戰士分裂為 2 個並共享生命");
+
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 31, y: 23 });
+  await page.keyboard.press("Space");
+  await expect(page.locator(".hud-identity-name")).toHaveText("水戰士");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性近戰受擊分裂");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-unit-life-label-count", "71");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-water-warrior-split.png`,
+  });
   expect(pageErrors).toEqual([]);
 });
 

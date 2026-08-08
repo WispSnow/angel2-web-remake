@@ -16,6 +16,7 @@ import { classTraitsFor } from "../../src/game/content/class-traits";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import { CLASS_SHOWDOWN_ENVIRONMENT } from "../../src/game/class-showdown-session";
 import { ArenaBattle } from "../../src/game/simulation/arena-battle";
+import type { ArenaUnitPlacement } from "../../src/game/arena-session";
 
 function nativeRecord(record: number) {
   const value = unitCatalog.records.find((candidate) => candidate.record === record);
@@ -53,6 +54,52 @@ function expectGeneratedClassToMatchEvidence(classId: ClassId, record: number): 
     movementRules: mapEvidence.movementRules,
     terrainDefensePercents: mapEvidence.terrainDefensePercents,
   });
+}
+
+function createWaterSplitBattle(options: {
+  attackerClassId?: ClassId;
+  attacker?: { x: number; y: number };
+  water?: { x: number; y: number };
+  blockers?: readonly { id: string; x: number; y: number }[];
+  terrainSlotAt?: (position: { x: number; y: number }) => number;
+  rng?: DeterministicRng;
+} = {}): ArenaBattle {
+  const attacker = options.attacker ?? { x: 20, y: 21 };
+  const water = options.water ?? { x: 20, y: 20 };
+  const placements: ArenaUnitPlacement[] = [
+    {
+      id: "attacker",
+      side: 1,
+      slot: 0,
+      classId: options.attackerClassId ?? "magic-armor-warrior",
+      level: 1,
+      ...attacker,
+    },
+    {
+      id: "water",
+      side: 2,
+      slot: 0,
+      classId: "water-warrior",
+      level: 1,
+      ...water,
+    },
+    ...(options.blockers ?? []).map((blocker, index) => ({
+      ...blocker,
+      side: 2 as const,
+      slot: index + 1,
+      classId: "soldier" as const,
+      level: 1 as const,
+    })),
+  ];
+  const environment = options.terrainSlotAt
+    ? { ...CLASS_SHOWDOWN_ENVIRONMENT, terrainSlotAt: options.terrainSlotAt }
+    : CLASS_SHOWDOWN_ENVIRONMENT;
+  return new ArenaBattle(
+    placements,
+    0,
+    options.rng ?? new DeterministicRng(0x0a2e2026),
+    environment,
+  );
 }
 
 describe("native class implementation sequence", () => {
@@ -99,6 +146,172 @@ describe("native class implementation sequence", () => {
       .every(({ description }) => description.length > 0)).toBe(true);
     expect(classTraitsFor("demon-dragon-knight")).toEqual([]);
     expect(classTraitsFor("magic-armor-warrior")).toEqual([]);
+    expect(classTraitsFor("water-warrior")).toEqual([{
+      id: "water-warrior-split",
+      shortDescription: "近戰受擊分裂",
+      description: "受到普通近戰攻擊且存活時，會在相鄰合法空格新增一個分裂體；全體共享生命，場上最多 4 個。",
+    }]);
+  });
+
+  it("record 26 water warrior splits one cell per defensive melee hit up to four", () => {
+    const rng = new DeterministicRng(0x0a2e2026);
+    const battle = createWaterSplitBattle({ rng });
+    const attacker = battle.unit("attacker")!;
+    const callsBefore = rng.calls;
+
+    const expectedPositions = [
+      { x: 20, y: 19 },
+      { x: 19, y: 20 },
+      { x: 21, y: 20 },
+    ];
+    for (let splitCount = 2; splitCount <= 4; splitCount += 1) {
+      const result = battle.attack(attacker.id, "water");
+      expect(result).toMatchObject({
+        splitUnitId: `water:split-${splitCount - 1}`,
+        splitCount,
+        defenderDied: false,
+      });
+      expect(battle.unit(result.splitUnitId!)).toMatchObject(expectedPositions[splitCount - 2]);
+      attacker.acted = false;
+    }
+
+    const capped = battle.attack(attacker.id, "water");
+    expect(capped.splitUnitId).toBeUndefined();
+    expect(capped.splitCount).toBeUndefined();
+    expect(battle.units.filter(({ id }) => id === "water" || id.startsWith("water:split-")))
+      .toHaveLength(4);
+    expect(rng.calls - callsBefore).toBe(12);
+  });
+
+  it("water warrior split skips forbidden terrain and occupied cells in native order", () => {
+    const battle = createWaterSplitBattle({
+      attacker: { x: 19, y: 20 },
+      blockers: [{ id: "down-blocker", x: 20, y: 21 }],
+      terrainSlotAt: ({ x, y }) => x === 20 && y === 19 ? 0 : 2,
+    });
+
+    const result = battle.attack("attacker", "water");
+
+    expect(result).toMatchObject({ splitUnitId: "water:split-1", splitCount: 2 });
+    expect(battle.unit("water:split-1")).toMatchObject({ x: 21, y: 20 });
+  });
+
+  it("water warrior does not split when all four adjacent cells are illegal", () => {
+    const battle = createWaterSplitBattle({
+      attacker: { x: 0, y: 1 },
+      water: { x: 0, y: 0 },
+      blockers: [{ id: "right-blocker", x: 1, y: 0 }],
+    });
+
+    const result = battle.attack("attacker", "water");
+
+    expect(result.splitUnitId).toBeUndefined();
+    expect(battle.units.filter(({ classId }) => classId === "water-warrior")).toHaveLength(1);
+  });
+
+  it("water warrior copies shared state, synchronizes later damage, and dies as one group", () => {
+    const battle = createWaterSplitBattle({ attackerClassId: "jungle-warrior" });
+    const first = battle.attack("attacker", "water");
+    const root = battle.unit("water")!;
+    const split = battle.unit(first.splitUnitId!)!;
+    expect([root, split].map(({ statuses }) => statuses.poison)).toEqual([3, 3]);
+    expect([root.life, split.life]).toEqual([root.life, root.life]);
+
+    const attacker = battle.unit("attacker")!;
+    attacker.classId = "archer";
+    attacker.acted = false;
+    attacker.x = 17;
+    attacker.y = 19;
+    battle.commitPreparedAction(battle.prepareSpecialAction({
+      actionId: "archer-shot",
+      actorId: attacker.id,
+      targetId: split.id,
+      target: { x: split.x, y: split.y },
+    }));
+    expect(battle.units.filter(({ classId }) => classId === "water-warrior")).toHaveLength(2);
+    expect(root.life).toBe(split.life);
+
+    root.acted = false;
+    expect(battle.rest(root.id)).toBeGreaterThan(0);
+    expect(root.life).toBe(split.life);
+
+    attacker.classId = "jungle-warrior";
+    attacker.acted = false;
+    attacker.x = 19;
+    attacker.y = 19;
+    battle.attack(attacker.id, split.id);
+    const sharedGroup = battle.units.filter(({ id }) =>
+      id === "water" || id.startsWith("water:split-"));
+    expect(new Set(sharedGroup.map(({ life }) => life)).size).toBe(1);
+    expect(new Set(sharedGroup.map(({ experience }) => experience)).size).toBe(1);
+    expect(new Set(sharedGroup.map(({ statuses }) => statuses.poison))).toEqual(new Set([3]));
+
+    for (const unit of sharedGroup) unit.life = 1;
+    attacker.acted = false;
+    const target = sharedGroup.find(({ id }) => id !== "water")!;
+    attacker.x = target.x - 1;
+    attacker.y = target.y;
+    const fatal = battle.attack(attacker.id, target.id);
+    expect(fatal.defenderDied).toBe(true);
+    expect(battle.units.some(({ id }) => id === "water" || id.startsWith("water:split-")))
+      .toBe(false);
+  });
+
+  it("counter damage, shooting, and techniques do not create water warrior splits", () => {
+    const counterBattle = new ArenaBattle([
+      { id: "water", side: 1, slot: 0, classId: "water-warrior", level: 1, x: 20, y: 20 },
+      { id: "target", side: 2, slot: 0, classId: "magic-armor-warrior", level: 1, x: 21, y: 20 },
+    ], 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
+    expect(counterBattle.attack("water", "target").splitUnitId).toBeUndefined();
+    expect(counterBattle.units.filter(({ classId }) => classId === "water-warrior")).toHaveLength(1);
+
+    const shootingBattle = new ArenaBattle([
+      { id: "archer", side: 1, slot: 0, classId: "archer", level: 1, x: 20, y: 20 },
+      { id: "water", side: 2, slot: 0, classId: "water-warrior", level: 1, x: 22, y: 20 },
+    ], 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
+    shootingBattle.commitPreparedAction(shootingBattle.prepareSpecialAction({
+      actionId: "archer-shot",
+      actorId: "archer",
+      targetId: "water",
+      target: { x: 22, y: 20 },
+    }));
+    expect(shootingBattle.units.filter(({ classId }) => classId === "water-warrior"))
+      .toHaveLength(1);
+
+    const techniqueBattle = new ArenaBattle([
+      { id: "sister", side: 1, slot: 0, classId: "sister", level: 1, x: 20, y: 20 },
+      { id: "water", side: 2, slot: 0, classId: "water-warrior", level: 1, x: 21, y: 20 },
+    ], 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
+    techniqueBattle.commitPreparedAction(techniqueBattle.prepareSpecialAction({
+      actionId: "fire-1",
+      actorId: "sister",
+      targetId: "water",
+      target: { x: 21, y: 20 },
+    }));
+    expect(techniqueBattle.units.filter(({ classId }) => classId === "water-warrior"))
+      .toHaveLength(1);
+  });
+
+  it("restores water warrior shared state and inherited force from a snapshot", () => {
+    const battle = createWaterSplitBattle();
+    const splitResult = battle.attack("attacker", "water");
+    const splitId = splitResult.splitUnitId!;
+    const snapshot = battle.serializableSnapshot();
+    const restored = createWaterSplitBattle();
+    restored.restore(snapshot);
+
+    expect(restored.forceForUnit(splitId)?.id).toBe(restored.forceForUnit("water")?.id);
+    const attacker = restored.unit("attacker")!;
+    const split = restored.unit(splitId)!;
+    attacker.acted = false;
+    attacker.x = split.x - 1;
+    attacker.y = split.y;
+    restored.attack(attacker.id, split.id);
+    const group = restored.units.filter(({ id }) =>
+      id === "water" || id.startsWith("water:split-"));
+    expect(new Set(group.map(({ life }) => life)).size).toBe(1);
+    expect(group.every(({ id }) => restored.forceForUnit(id)?.id === "arena-enemy-force"))
+      .toBe(true);
   });
 
   it("record 15 flying dragon knight gets one acted-state path at half current movement", () => {

@@ -165,6 +165,17 @@ export class ForceRegistry {
     return this.definitionsById.size > 0;
   }
 
+  inheritUnit(sourceUnitId: string, derivedUnitId: string): void {
+    if (!this.hasExplicitDefinitions()) return;
+    const sourceForceId = this.forceIdByUnitId.get(sourceUnitId);
+    if (!sourceForceId) throw new Error(`Cannot inherit force from unassigned unit ${sourceUnitId}`);
+    const existingForceId = this.forceIdByUnitId.get(derivedUnitId);
+    if (existingForceId && existingForceId !== sourceForceId) {
+      throw new Error(`Unit ${derivedUnitId} already belongs to ${existingForceId}`);
+    }
+    this.forceIdByUnitId.set(derivedUnitId, sourceForceId);
+  }
+
   assertKnownUnits(units: readonly BattleUnit[]): void {
     if (!this.hasExplicitDefinitions()) return;
     const seenIds = new Set<string>();
@@ -186,8 +197,7 @@ export class ForceRegistry {
   membersForUnit(unitId: string, units: readonly BattleUnit[]): BattleUnit[] {
     const force = this.definitionForUnit(unitId);
     if (!force) return [];
-    const memberIds = new Set(force.unitIds);
-    return units.filter((unit) => memberIds.has(unit.id));
+    return units.filter((unit) => this.definitionForUnit(unit.id)?.id === force.id);
   }
 
   targetFilterFor(
@@ -199,15 +209,13 @@ export class ForceRegistry {
     if (!sourceForce || !targeting) return undefined;
 
     const preferredIds = new Set(targeting.preferredForceIds);
-    const preferredUnitIds = new Set<string>();
-    for (const preferredForceId of preferredIds) {
-      for (const preferredUnitId of this.definition(preferredForceId)?.unitIds ?? []) {
-        preferredUnitIds.add(preferredUnitId);
-      }
-    }
-    const hasPreferredSurvivor = units.some((unit) => preferredUnitIds.has(unit.id));
+    const isPreferredUnit = (unit: BattleUnit): boolean => {
+      const forceId = this.forceIdByUnitId.get(unit.id);
+      return forceId !== undefined && preferredIds.has(forceId);
+    };
+    const hasPreferredSurvivor = units.some(isPreferredUnit);
     if (hasPreferredSurvivor) {
-      return (target) => preferredUnitIds.has(target.id);
+      return isPreferredUnit;
     }
     return targeting.fallback === "all-opponents"
       ? (target) => target.side !== sourceForce.side

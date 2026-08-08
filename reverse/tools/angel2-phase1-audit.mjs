@@ -12,6 +12,7 @@ const RESIDUAL_CLASSIFICATIONS = {
   "BAT-009": ["pit_calibration_and_original_name", "反击分支与 PIT 位条件已闭合；只缺业务字段原名和硬件采样分布"],
   "BAT-031": ["native_undefined_lookup", "SM/FM 缺参数行及忽略失败返回已闭合；残留字段结果是原生未定义行为"],
   "BAT-052": ["native_undefined_memory_walk", "场景 9 错误机制已闭合；具体 PIT 轨迹和代码段覆写后表现不构成确定规则"],
+  "BAT-053": ["pit_sampling_distribution", "十一种末端骑士／战士的职业分支与飛龍玩家调用边界已闭合；只缺迅龍／獸骨 PIT 候选的实机频率分布"],
   "PRES-003": ["manual_text_transcription", "资源帧和控制流完整；22 个姓名已完成逐帧转录，其中蘇泓漳另有字形与罗马字交叉验证"],
   "PRES-004": ["vga_substep_and_low_level_names", "普通攻击资源、帧序、声音、native tick 与同步为 C"],
   "PRES-005": ["low_level_renderer_name", "射击/魔弓/闪避资源、帧序、native tick 与规则同步为 C"],
@@ -22,7 +23,9 @@ const RESIDUAL_CLASSIFICATIONS = {
   "PRES-011": ["low_level_renderer_names", "范围输入门、像素明暗和地图特效层为 C"],
   "PRES-012": ["pit_route_and_vga_calibration", "九个特殊逐关表现的操作顺序、资源、native tick 和同步为 C"],
   "PRES-013": ["pit_route_and_internal_name", "WD 与第 26 关效果的规则、资源和 native tick 为 C"],
+  "PRES-014": ["side2_only_counter_reachability", "龍／頭／手的 side 2 普通全屏资源、命令流和编队可达性为 C；只缺其反击组合的实机复验"],
   "SAVE-006": ["unrecoverable_compatibility_names", "兼容字的全部运行时消费者与原样往返策略为 C"],
+  "SAVE-011": ["native_retry_persistence_observation", "失败／撤退保留成长的代码路径与用户原版流程复验均已登记；stableRemake 回滚另有明确偏离决策"],
 };
 
 function evidenceRows(markdown) {

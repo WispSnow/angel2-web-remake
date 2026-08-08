@@ -2077,7 +2077,7 @@ export class GameController {
       const defenderPresentation = { ...defender };
       this.lastCombat = this.battle.attack(attacker.id, defenderId);
       const result = this.lastCombat;
-      this.statusMessage = `造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}。`;
+      this.statusMessage = `造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}${result.splitCount ? `，水戰士分裂為 ${result.splitCount} 個並共享生命` : ""}。`;
       this.resetAction();
       this.markHintSeen();
       await this.presentOrdinaryCombat(attackerPresentation, defenderPresentation, result);
@@ -2609,7 +2609,7 @@ export class GameController {
         const defenderPresentation = { ...defender };
         this.lastCombat = this.battle.attack(unit.id, defender.id);
         const result = this.lastCombat;
-        this.statusMessage = `${unit.name}造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}。`;
+        this.statusMessage = `${unit.name}造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}${result.splitCount ? `，水戰士分裂為 ${result.splitCount} 個並共享生命` : ""}。`;
         await this.presentOrdinaryCombat(attackerPresentation, defenderPresentation, result);
       } else {
         this.battle.spendAction(unit.id);
