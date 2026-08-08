@@ -4,6 +4,7 @@ import {
   classStatsFor,
   isPromotionEligible,
   promotionTargetsFor,
+  usesClassIdentity,
   type ClassId,
 } from "../content/classes";
 import type { BattleUnit, UnitStats } from "../types";
@@ -41,14 +42,14 @@ export function promoteUnit(
   }
 
   const previousClassId = unit.classId;
-  const followsClassPortrait = unit.portrait
-    === classFallbackPortraitFor(previousClassId, unit.side);
+  const followsClassIdentity = usesClassIdentity(unit);
   const previousExperience = unit.experience;
   const previousStats = classStatsFor(unit);
   const life = unit.life;
   unit.classId = targetClassId;
   unit.className = className(targetClassId);
-  if (followsClassPortrait) {
+  if (followsClassIdentity) {
+    unit.name = unit.className;
     unit.portrait = classFallbackPortraitFor(targetClassId, unit.side) ?? unit.portrait;
   }
   unit.experience = 0;

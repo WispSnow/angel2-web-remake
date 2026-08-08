@@ -18,6 +18,7 @@ import {
   classDefinition,
   className,
   promotionTargetsFor,
+  unitDisplayName,
   type PromotionTarget,
 } from "./content/classes";
 import {
@@ -851,7 +852,7 @@ export class GameController {
         this.promotionDialogueIndex += 1;
       } else {
         this.promotionDialogueIndex = undefined;
-        this.statusMessage = `${promotionUnit.name}達到轉職條件；必須選擇下一職業。`;
+        this.statusMessage = `${unitDisplayName(promotionUnit)}達到轉職條件；必須選擇下一職業。`;
       }
       this.emit();
       return;
@@ -1386,7 +1387,7 @@ export class GameController {
     const result = this.battle.promote(unit.id, target.id);
     this.promotionUnitIds.shift();
     this.promotionSelectionIndex = 0;
-    this.statusMessage = `${unit.name}已由${previousClassName}轉職為${unit.className}；經驗歸零，生命保持 ${result.life}。`;
+    this.statusMessage = `${unitDisplayName(unit)}已由${previousClassName}轉職為${unit.className}；經驗歸零，生命保持 ${result.life}。`;
 
     const next = this.promotionUnit;
     if (next) {
@@ -1394,7 +1395,7 @@ export class GameController {
       this.battle.focusId = next.id;
       this.cursor = { x: next.x, y: next.y };
       this.centerCamera(next);
-      this.statusMessage = `${next.name}也達到轉職條件；必須選擇下一職業。`;
+      this.statusMessage = `${unitDisplayName(next)}也達到轉職條件；必須選擇下一職業。`;
       this.emit();
       return;
     }
@@ -2157,7 +2158,7 @@ export class GameController {
     this.battle.focusId = unit.id;
     this.cursor = { x: unit.x, y: unit.y };
     this.centerCamera(unit);
-    this.statusMessage = `${unit.name}達到轉職條件；必須選擇下一職業。`;
+    this.statusMessage = `${unitDisplayName(unit)}達到轉職條件；必須選擇下一職業。`;
     const resumeBusy = this.busy;
     this.busy = false;
     this.emit();

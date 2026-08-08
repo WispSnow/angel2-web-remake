@@ -1,16 +1,22 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CLASS_IDS,
   classDefinition,
+  classFallbackPortraitFor,
+  className,
   classStatsFor,
   isPromotionEligible,
   promotionExperienceThresholdFor,
   promotionTargetsFor,
+  unitDisplayName,
 } from "../../src/game/content/classes";
 import {
   PROMOTION_DIALOGUE_TEXT,
   promotionDialogueFor,
 } from "../../src/game/content/promotion-dialogue";
+import { allyMapUnitAsset } from "../../src/game/content/map-unit-assets";
 import { createStage0Units } from "../../src/game/content/stage0";
 import { promoteUnit, promotionQueue } from "../../src/game/simulation/promotion";
 
@@ -27,6 +33,20 @@ describe("evidence-backed class catalog and promotion", () => {
       "archer",
       "sister",
     ]);
+  });
+
+  it("publishes an allied map figure for every legal promotion target", () => {
+    const targets = new Set(CLASS_IDS.flatMap((id) =>
+      promotionTargetsFor(id).map((target) => target.id)));
+
+    expect(targets.size).toBe(31);
+    for (const classId of targets) {
+      const source = allyMapUnitAsset(classId);
+      expect(source, classId)
+        .toMatch(/^\/assets\/original\/.+\/ally-.+\.png$|^\/assets\/original\/unit-ally-.+\.png$/u);
+      if (!source) throw new Error(`${classId} has no allied map figure`);
+      expect(existsSync(resolve("public", source.slice(1))), classId).toBe(true);
+    }
   });
 
   it("uses each target profession's zero-experience stats and movement profile", () => {
@@ -161,6 +181,31 @@ describe("evidence-backed class catalog and promotion", () => {
     });
   });
 
+  it("labels generic promotion dialogue with the actual current profession", () => {
+    const generic = createStage0Units().find((unit) => unit.id === "1:40");
+    if (!generic) throw new Error("generic promotion fixture is missing");
+    generic.classId = "land-knight";
+    generic.className = className(generic.classId);
+    generic.name = "騎兵";
+    const landKnightPortrait = classFallbackPortraitFor(generic.classId, 1);
+    if (landKnightPortrait === undefined) throw new Error("land knight portrait is missing");
+    generic.portrait = landKnightPortrait;
+
+    expect(unitDisplayName(generic)).toBe("陸戰騎士");
+    expect(promotionDialogueFor(generic)[0]?.lower).toMatchObject({
+      portrait: generic.portrait,
+      speaker: "陸戰騎士",
+    });
+
+    generic.classId = "steel-armor-warrior";
+    generic.className = className(generic.classId);
+    generic.name = "戰士";
+    const steelArmorPortrait = classFallbackPortraitFor(generic.classId, 1);
+    if (steelArmorPortrait === undefined) throw new Error("steel armor portrait is missing");
+    generic.portrait = steelArmorPortrait;
+    expect(promotionDialogueFor(generic)[0]?.lower?.speaker).toBe("鋼甲戰士");
+  });
+
   it("uses the on-field commander when Nia is absent from the battle", () => {
     const units = createStage0Units();
     const himi = units.find((unit) => unit.id === "1:1")!;
@@ -224,8 +269,47 @@ describe("evidence-backed class catalog and promotion", () => {
     promoteUnit(generic, "warrior");
     promoteUnit(nia, "warrior");
 
-    expect(generic).toMatchObject({ classId: "warrior", portrait: 57 });
-    expect(nia).toMatchObject({ classId: "warrior", portrait: 46 });
+    expect(generic).toMatchObject({
+      classId: "warrior",
+      className: "戰士",
+      name: "戰士",
+      portrait: 57,
+    });
+    expect(nia).toMatchObject({
+      classId: "warrior",
+      className: "戰士",
+      name: "妮雅",
+      portrait: 46,
+    });
+  });
+
+  it("keeps generic names synchronized through every promotion edge", () => {
+    const template = createStage0Units().find((candidate) => candidate.id === "1:40");
+    if (!template) throw new Error("generic promotion fixture is missing");
+    for (const sourceClassId of CLASS_IDS) {
+      for (const target of promotionTargetsFor(sourceClassId)) {
+        const threshold = promotionExperienceThresholdFor(sourceClassId);
+        const portrait = classFallbackPortraitFor(sourceClassId, 1);
+        if (portrait === undefined) throw new Error(`${sourceClassId} has no generic portrait`);
+        const unit = {
+          ...template,
+          classId: sourceClassId,
+          className: className(sourceClassId),
+          name: className(sourceClassId),
+          portrait,
+          experience: threshold,
+        };
+
+        promoteUnit(unit, target.id);
+
+        expect(unit, `${sourceClassId} -> ${target.id}`).toMatchObject({
+          classId: target.id,
+          className: className(target.id),
+          name: className(target.id),
+          portrait: classFallbackPortraitFor(target.id, 1),
+        });
+      }
+    }
   });
 
   it("rejects cancellation-by-invalid-target and enemies", () => {

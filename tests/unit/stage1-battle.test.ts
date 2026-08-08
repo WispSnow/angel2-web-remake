@@ -101,7 +101,12 @@ describe("stage 1 battle construction", () => {
     };
 
     const battle = new Stage1Battle(promotedCampaign, deploymentWithMagician());
-    expect(battle.unit("1:40")).toMatchObject({ classId: "warrior", portrait: 57 });
+    expect(battle.unit("1:40")).toMatchObject({
+      classId: "warrior",
+      className: "戰士",
+      name: "戰士",
+      portrait: 57,
+    });
     expect(battle.unit("1:0")).toMatchObject({ classId: "cavalry", portrait: 46 });
   });
 

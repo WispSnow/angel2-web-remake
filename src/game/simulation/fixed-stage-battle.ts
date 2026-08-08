@@ -86,7 +86,7 @@ function createInheritedAlly(
     slot: definition.slot,
     classId,
     className: className(classId),
-    name: definition.name,
+    name: genericIdentity ? className(classId) : definition.name,
     portrait,
     x: definition.position.x,
     y: definition.position.y,

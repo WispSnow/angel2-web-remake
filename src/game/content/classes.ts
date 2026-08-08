@@ -74,6 +74,24 @@ export function classFallbackPortraitFor(
     : CLASS_FALLBACK_SIDE2_PORTRAITS[side1Record] ?? side1Record as PortraitRecord;
 }
 
+/**
+ * Native generic units follow their profession's fallback portrait, while
+ * named actors keep a character portrait across class changes. This identity
+ * boundary is stable even when an older battle snapshot retained a stale
+ * generic `name` from an earlier profession.
+ */
+export function usesClassIdentity(
+  unit: Pick<BattleUnit, "classId" | "side" | "portrait">,
+): boolean {
+  return unit.portrait === classFallbackPortraitFor(unit.classId, unit.side);
+}
+
+export function unitDisplayName(
+  unit: Pick<BattleUnit, "classId" | "side" | "portrait" | "name">,
+): string {
+  return usesClassIdentity(unit) ? className(unit.classId) : unit.name;
+}
+
 type ClassProgressionState = Pick<BattleUnit, "classId" | "experience">
   & Partial<Pick<BattleUnit, "side">>;
 

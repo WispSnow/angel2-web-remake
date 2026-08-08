@@ -12,6 +12,9 @@ interface PromotionLabBattleState {
     id: string;
     side: number;
     classId: string;
+    className: string;
+    name: string;
+    portrait: number;
     experience: number;
     x: number;
     y: number;
@@ -107,6 +110,8 @@ test("promotion lab exposes all twelve threshold pairs and the formal choice UI"
     "promotion",
   );
   await expect(page.getByTestId("dialogue-layer")).toContainText("我的經驗值已達到轉職的目標");
+  await expect(page.getByTestId("dialogue-portrait-name")).toHaveText("妮雅");
+  await expect(page.locator("#dialogue-speaker-upper")).toHaveText("妮雅");
   await finishPromotionDialogue(page);
 
   const promotionLayer = page.getByTestId("promotion-layer");
@@ -134,6 +139,50 @@ test("promotion lab exposes all twelve threshold pairs and the formal choice UI"
     .toMatchObject({ classId: "soldier", experience: 299 });
   await expect(page.getByTestId("promotion-lab-progress"))
     .toHaveText("我方已轉職 1/12 · 敵方等級 4+ 0/12");
+  expect(pageErrors).toEqual([]);
+});
+
+test("generic land knight promotes with its beast figure and canonical profession identity", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/promotion-lab.html?test=1");
+  await page.getByTestId("promotion-lab-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  await clickWorldCell(page, 17, 16);
+  await page.getByTestId("unit-command-attack").click();
+  await clickWorldCell(page, 18, 16);
+
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute(
+    "data-source-record",
+    "promotion",
+  );
+  await expect(page.getByTestId("dialogue-portrait-name")).toHaveText("陸戰騎士");
+  await expect(page.locator("#dialogue-speaker-lower")).toHaveText("陸戰騎士");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/promotion-lab-land-knight-dialogue.png`,
+  });
+  await finishPromotionDialogue(page);
+
+  const promotionLayer = page.getByTestId("promotion-layer");
+  await expect(promotionLayer.locator("h2")).toHaveText("陸戰騎士轉職");
+  await page.getByTestId("promotion-target-beast-knight").click();
+  await expect(promotionLayer).toBeHidden();
+
+  const state = await promotionLabState(page);
+  expect(state.battle?.units.find(({ id }) => id === "promotion-1-2")).toMatchObject({
+    classId: "beast-knight",
+    className: "獸騎士",
+    name: "獸騎士",
+  });
+  await expect(page.getByTestId("hud-identity")).toHaveText("獸騎士");
+  await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute(
+    "data-portrait-record",
+    String(state.battle?.units.find(({ id }) => id === "promotion-1-2")?.portrait),
+  );
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/promotion-lab-beast-knight.png`,
+  });
   expect(pageErrors).toEqual([]);
 });
 

@@ -3,6 +3,7 @@ import {
   NIA_CHARACTER_RECORD,
   PROMOTION_DIALOGUE_TEXT,
 } from "./promotion-dialogue.generated";
+import { unitDisplayName } from "./classes";
 
 export {
   NIA_CHARACTER_RECORD,
@@ -52,7 +53,11 @@ export function promotionDialogueFor(
     return [page(1, "upper", question)];
   }
 
-  const request = state(PROMOTION_DIALOGUE_TEXT.teammateRequest, unit.portrait, unit.name);
+  const request = state(
+    PROMOTION_DIALOGUE_TEXT.teammateRequest,
+    unit.portrait,
+    unitDisplayName(unit),
+  );
   const grant = state(
     PROMOTION_DIALOGUE_TEXT.niaGrant,
     effectiveGrantor.portrait,

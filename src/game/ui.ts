@@ -14,6 +14,8 @@ import {
   classDefinition,
   classIdFromNativeRecord,
   classStatsFor,
+  unitDisplayName,
+  usesClassIdentity,
 } from "./content/classes";
 import { allyMapUnitAsset } from "./content/map-unit-assets";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "./content/technique-lab.generated";
@@ -700,6 +702,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     promotionLayer.hidden = !promotionUnit;
     if (promotionUnit) {
       const currentStats = controller.battle.statsFor(promotionUnit);
+      const promotionDisplayName = unitDisplayName(promotionUnit);
+      const promotionTitle = usesClassIdentity(promotionUnit)
+        ? `${promotionUnit.className}轉職`
+        : `${promotionDisplayName}・${promotionUnit.className}轉職`;
       const actionLabels = {
         ordinary: "普通攻擊",
         shooting: "普通攻擊／射擊方向",
@@ -746,9 +752,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }).join("");
       promotionLayer.innerHTML = `<div class="promotion-panel">
         <span class="panel-kicker">CLASS CHANGE</span>
-        <h2>${promotionUnit.name}・${promotionUnit.className}轉職</h2>
+        <h2>${promotionTitle}</h2>
         <p class="promotion-current">目前：等級 ${currentStats.level}　攻 ${currentStats.attack}　防 ${currentStats.defense}　生命 ${promotionUnit.life}/${currentStats.maxLife}　移動 ${currentStats.movement}</p>
-        <div class="promotion-options" role="menu" aria-label="${promotionUnit.name}的轉職候選">${options}</div>
+        <div class="promotion-options" role="menu" aria-label="${promotionDisplayName}的轉職候選">${options}</div>
         <p class="promotion-warning">選擇後經驗歸零；目前生命不恢復。此選擇不能取消。</p>
       </div>`;
     } else {
@@ -987,8 +993,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           elements.portrait.dataset.testid = active
             ? "dialogue-portrait-composite"
             : `dialogue-portrait-composite-${slot}`;
-          elements.portraitName.textContent =
-            (PORTRAIT_CATALOG[state.portrait].displayName ?? state.speaker ?? "").trim();
+          elements.portraitName.textContent = (
+            controller.promotionDialogueActive
+              ? state.speaker
+              : PORTRAIT_CATALOG[state.portrait].displayName ?? state.speaker
+          )?.trim() ?? "";
           elements.portraitName.hidden = false;
           elements.portraitName.dataset.testid = active
             ? "dialogue-portrait-name"
@@ -1514,9 +1523,10 @@ function renderHud(
   const nextExperience = nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
   const context = unitContextPresentation(controller, unit);
-  const identity = unit.name === unit.className
+  const displayName = unitDisplayName(unit);
+  const identity = usesClassIdentity(unit)
     ? unit.className
-    : `${unit.className}／${unit.name}`;
+    : `${unit.className}／${displayName}`;
   const identityLength = [...identity].length;
   const identityClass = identityLength >= 11
     ? "hud-identity-name is-tight"
@@ -1535,10 +1545,10 @@ function renderHud(
         </li>`).join("")}
     </ul>`;
   return `
-    <div class="unit-detail" data-testid="unit-detail" aria-label="${context.controlSummary}，${unit.className}${unit.name}${context.tacticLabel ? `，戰術${context.tacticLabel}` : ""}${context.traitDescription ? `，職業特性${context.traitDescription}` : ""}${context.routePulseSafetyLabel ? `，力場${context.routePulseSafetyLabel}` : ""}">
+    <div class="unit-detail" data-testid="unit-detail" aria-label="${context.controlSummary}，${unit.className}${displayName}${context.tacticLabel ? `，戰術${context.tacticLabel}` : ""}${context.traitDescription ? `，職業特性${context.traitDescription}` : ""}${context.routePulseSafetyLabel ? `，力場${context.routePulseSafetyLabel}` : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
       ${animatedPortraitMarkup(unit.portrait, {
-        alt: `${unit.name}肖像`,
+        alt: `${displayName}肖像`,
         channel: "hud",
         className: "hud-portrait",
         wrapperTestId: "unit-portrait-composite",
