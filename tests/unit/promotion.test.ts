@@ -167,11 +167,26 @@ describe("evidence-backed class catalog and promotion", () => {
     expect(nia).toMatchObject({
       classId: "cavalry",
       className: "騎兵",
+      portrait: 46,
       experience: 0,
       life: 123,
       acted: true,
       ...originalPosition,
     });
+  });
+
+  it("updates class-fallback portraits on promotion without replacing named portraits", () => {
+    const units = createStage0Units();
+    const generic = units.find((unit) => unit.id === "1:40")!;
+    const nia = units.find((unit) => unit.id === "1:0")!;
+    generic.experience = 300;
+    nia.experience = 300;
+
+    promoteUnit(generic, "warrior");
+    promoteUnit(nia, "warrior");
+
+    expect(generic).toMatchObject({ classId: "warrior", portrait: 57 });
+    expect(nia).toMatchObject({ classId: "warrior", portrait: 46 });
   });
 
   it("rejects cancellation-by-invalid-target and enemies", () => {

@@ -70,6 +70,40 @@ test("arena edits both rosters and starts a formal-rule battle without touching 
   expect(storageAfter).toBe(storageBefore);
 });
 
+test("arena HUD uses each unnamed class's native side portrait", async ({ page }) => {
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("archer");
+    const ally = arena.interact(20, 30);
+    arena.setSide(2);
+    const enemy = arena.interact(21, 30);
+    return [ally, enemy];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  await clickArenaWorldCell(page, 20, 30);
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "59");
+  await expect(page.getByTestId("unit-portrait"))
+    .toHaveAttribute("src", /portraits\/0059\/base\.png$/u);
+
+  await page.keyboard.press("Delete");
+  await clickArenaWorldCell(page, 21, 30);
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "60");
+  await expect(page.getByTestId("unit-portrait"))
+    .toHaveAttribute("src", /portraits\/0060\/base\.png$/u);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-enemy-archer-portrait.png`,
+  });
+});
+
 test("ordinary melee status applies directly and appears in the unit HUD without a technique effect", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

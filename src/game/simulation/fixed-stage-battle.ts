@@ -1,5 +1,9 @@
 import type { ClassId } from "../content/classes";
-import { className, classStatsFor } from "../content/classes";
+import {
+  classFallbackPortraitFor,
+  className,
+  classStatsFor,
+} from "../content/classes";
 import { completeCampaignRoster, initialEnemyExperience, statsFor } from "../content/stage0";
 import type { StageDefinition } from "../content/stages";
 import type {
@@ -21,7 +25,8 @@ export interface FixedStageAlliedUnitDefinition {
   /** Initial class supplied by the native template for an untouched campaign slot. */
   initialClassId?: UnitClassId;
   name: string;
-  portrait: PortraitRecord;
+  /** Omit for a generic class identity; named actors must provide their record. */
+  portrait?: PortraitRecord;
   aiBehavior: number;
   untouchedExperience?: number;
 }
@@ -31,7 +36,8 @@ export interface FixedStageEnemyUnitDefinition {
   position: Position;
   classId: UnitClassId;
   name: string;
-  portrait: PortraitRecord;
+  /** Omit for a generic class identity; named actors must provide their record. */
+  portrait?: PortraitRecord;
   aiBehavior: number;
 }
 
@@ -64,8 +70,12 @@ function createInheritedAlly(
   const classId = untouchedCampaignSlot
     ? definition.initialClassId ?? inherited?.classId ?? inheritance.defaultClassId
     : inherited.classId;
-  const namedBaseline = definition.portrait !== inheritance.genericPortrait
-    && untouchedCampaignSlot;
+  const genericIdentity = definition.portrait === undefined
+    || definition.portrait === inheritance.genericPortrait;
+  const namedBaseline = !genericIdentity && untouchedCampaignSlot;
+  const portrait = genericIdentity
+    ? classFallbackPortraitFor(classId, 1) ?? inheritance.genericPortrait
+    : definition.portrait ?? inheritance.genericPortrait;
   const experience = namedBaseline
     ? definition.untouchedExperience ?? inheritance.untouchedNamedExperience
     : inherited?.experience ?? 0;
@@ -77,7 +87,7 @@ function createInheritedAlly(
     classId,
     className: className(classId),
     name: definition.name,
-    portrait: definition.portrait,
+    portrait,
     x: definition.position.x,
     y: definition.position.y,
     life: namedBaseline ? maximumLife : Math.min(inherited?.life ?? maximumLife, maximumLife),
@@ -100,7 +110,9 @@ function createEnemy(
     classId: definition.classId,
     className: className(definition.classId),
     name: definition.name,
-    portrait: definition.portrait,
+    portrait: definition.portrait
+      ?? classFallbackPortraitFor(definition.classId, 2)
+      ?? 48 as PortraitRecord,
     x: definition.position.x,
     y: definition.position.y,
     life: 0,

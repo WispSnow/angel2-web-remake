@@ -112,7 +112,7 @@ describe("all-class showdown lab", () => {
     });
   });
 
-  it("uses the native class-branch portrait for unnamed showdown units", () => {
+  it("uses native class-branch portraits, including shared 0N/1N records", () => {
     const placements = createClassShowdownPlacements(1);
     const battle = new ArenaBattle(placements, 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
     const expectedSide1 = [
@@ -128,6 +128,13 @@ describe("all-class showdown lab", () => {
       .toEqual(expectedSide1);
     expect(battle.units.filter(({ side }) => side === 2).map(({ portrait }) => portrait))
       .toEqual(expectedSide2);
+
+    expect(battle.units.filter(({ classId }) => classId === "water-warrior")
+      .map(({ side, portrait }) => [side, portrait]))
+      .toEqual([[1, 51], [2, 51]]);
+    expect(battle.units.filter(({ classId }) => classId === "half-dragon-warrior")
+      .map(({ side, portrait }) => [side, portrait]))
+      .toEqual([[1, 64], [2, 64]]);
   });
 
   it("gives only the half-dragon showdown mirror a full-map empty-cell teleport", () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { Stage2Battle } from "../../src/game/simulation/stage2-battle";
+import { createFixedStageUnits } from "../../src/game/simulation/fixed-stage-battle";
 import type { CampaignState } from "../../src/game/types";
 
 const campaign: CampaignState = {
@@ -18,14 +19,52 @@ const campaign: CampaignState = {
 };
 
 describe("stage 2 battle construction and allied automation", () => {
+  it("fills omitted generic portraits for both fixed-stage sides", () => {
+    const units = createFixedStageUnits({
+      alliedUnits: [{
+        slot: 40,
+        position: { x: 20, y: 20 },
+        name: "戰士",
+        aiBehavior: 0,
+      }],
+      enemyUnits: [{
+        slot: 40,
+        position: { x: 21, y: 20 },
+        classId: "archer",
+        name: "弓兵",
+        aiBehavior: 0,
+      }],
+      inheritance: {
+        genericPortrait: 47,
+        defaultClassId: "soldier",
+        untouchedNamedExperience: 299,
+      },
+    }, 0, [{ slot: 40, classId: "warrior", experience: 480, life: 180 }]);
+
+    expect(units).toEqual([
+      expect.objectContaining({ side: 1, classId: "warrior", portrait: 57 }),
+      expect.objectContaining({ side: 2, classId: "archer", portrait: 60 }),
+    ]);
+  });
+
   it("builds the fixed 9 vs 5 roster with inherited classes and the untouched magician baseline", () => {
     const battle = new Stage2Battle(campaign);
     expect(battle.stage.id).toBe("stage-02");
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(9);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(5);
-    expect(battle.unit("1:0")).toMatchObject({ classId: "cavalry", x: 21, y: 35 });
+    expect(battle.unit("1:0")).toMatchObject({
+      classId: "cavalry",
+      portrait: 46,
+      x: 21,
+      y: 35,
+    });
     expect(battle.unit("1:2")).toMatchObject({ classId: "archer", x: 28, y: 35 });
-    expect(battle.unit("1:40")).toMatchObject({ classId: "warrior", x: 27, y: 33 });
+    expect(battle.unit("1:40")).toMatchObject({
+      classId: "warrior",
+      portrait: 57,
+      x: 27,
+      y: 33,
+    });
     expect(battle.unit("1:24")).toMatchObject({
       classId: "magician",
       name: "葛蒂拉斯",

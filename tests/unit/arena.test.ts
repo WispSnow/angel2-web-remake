@@ -131,6 +131,24 @@ describe("all-terrain arena", () => {
     expect(battle.outcome()).toBe("victory");
   });
 
+  it("resolves omitted portraits from each unit's class and side", () => {
+    const battle = new ArenaBattle([
+      { id: "arena-1-0", side: 1, slot: 0, classId: "archer", level: 1, x: 20, y: 30 },
+      { id: "arena-2-0", side: 2, slot: 0, classId: "archer", level: 1, x: 21, y: 30 },
+      { id: "arena-1-1", side: 1, slot: 1, classId: "water-warrior", level: 1, x: 20, y: 31 },
+      { id: "arena-2-1", side: 2, slot: 1, classId: "half-dragon-warrior", level: 1, x: 21, y: 31 },
+      { id: "arena-1-2", side: 1, slot: 2, classId: "warrior", level: 1, portrait: 46, x: 20, y: 32 },
+    ], 0);
+
+    expect(Object.fromEntries(battle.units.map(({ id, portrait }) => [id, portrait]))).toEqual({
+      "arena-1-0": 59,
+      "arena-2-0": 60,
+      "arena-1-1": 51,
+      "arena-2-1": 64,
+      "arena-1-2": 46,
+    });
+  });
+
   it("applies an evil sword warrior's ordinary confusion hit in the arena", () => {
     const battle = new ArenaBattle([
       { id: "arena-1-0", side: 1, slot: 0, classId: "evil-sword-warrior", level: 1, x: 20, y: 30 },

@@ -92,6 +92,19 @@ describe("stage 1 battle construction", () => {
     });
   });
 
+  it("uses inherited class portraits for generic allies and preserves named portraits", () => {
+    const promotedCampaign: CampaignState = {
+      ...campaign,
+      roster: campaign.roster.map((entry) => entry.slot === 40
+        ? { ...entry, classId: "warrior", experience: 480 }
+        : entry),
+    };
+
+    const battle = new Stage1Battle(promotedCampaign, deploymentWithMagician());
+    expect(battle.unit("1:40")).toMatchObject({ classId: "warrior", portrait: 57 });
+    expect(battle.unit("1:0")).toMatchObject({ classId: "cavalry", portrait: 46 });
+  });
+
   it("uses the stage objective contract instead of requiring enemy elimination", () => {
     const battle = new Stage1Battle(campaign, deploymentWithMagician());
     expect(battle.outcome()).toBe("ongoing");

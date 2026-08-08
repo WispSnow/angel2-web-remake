@@ -25,7 +25,8 @@ export interface DeployedStageAllyDefinition {
   slot: number;
   initialClassId?: UnitClassId;
   name: string;
-  portrait: PortraitRecord;
+  /** Omit for a generic class identity; named actors must provide their record. */
+  portrait?: PortraitRecord;
   aiBehavior: number;
   untouchedExperience?: number;
 }

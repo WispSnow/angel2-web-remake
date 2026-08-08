@@ -1,6 +1,7 @@
 import {
   classTierFor,
   classDefinition,
+  classFallbackPortraitFor,
   className,
   killRewardFor,
   ordinaryHitStatusFor,
@@ -323,8 +324,13 @@ export class Stage0Battle {
       if (unit.side !== 1) continue;
       const entry = rosterBySlot.get(unit.slot);
       if (!entry) continue;
+      const followsClassPortrait = unit.portrait
+        === classFallbackPortraitFor(unit.classId, unit.side);
       unit.classId = entry.classId;
       unit.className = className(entry.classId);
+      if (followsClassPortrait) {
+        unit.portrait = classFallbackPortraitFor(entry.classId, unit.side) ?? unit.portrait;
+      }
       unit.experience = entry.experience;
       unit.life = entry.life;
     }

@@ -48,9 +48,9 @@ export function className(classId: ClassId): string {
 
 /**
  * The native generic fallback table is side-1 data. These records are the
- * corresponding side-2 portrait variants where the original asset exists;
- * records 51 and 64 have no confirmed directional counterpart in the current
- * portrait coverage and therefore remain unchanged.
+ * corresponding side-2 portrait variants where the original asset exists.
+ * Native table C deliberately reuses records 51 (0N/水戰士) and 64
+ * (1N/半龍戰士) for both sides; neither has a separate enemy portrait.
  */
 const CLASS_FALLBACK_SIDE2_PORTRAITS = {
   47: 48,

@@ -1,4 +1,5 @@
 import {
+  classFallbackPortraitFor,
   className,
   classStatsFor,
   isPromotionEligible,
@@ -40,11 +41,16 @@ export function promoteUnit(
   }
 
   const previousClassId = unit.classId;
+  const followsClassPortrait = unit.portrait
+    === classFallbackPortraitFor(previousClassId, unit.side);
   const previousExperience = unit.experience;
   const previousStats = classStatsFor(unit);
   const life = unit.life;
   unit.classId = targetClassId;
   unit.className = className(targetClassId);
+  if (followsClassPortrait) {
+    unit.portrait = classFallbackPortraitFor(targetClassId, unit.side) ?? unit.portrait;
+  }
   unit.experience = 0;
   const stats = classStatsFor(unit);
   return {

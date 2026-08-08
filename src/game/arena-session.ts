@@ -44,7 +44,7 @@ export interface ArenaUnitPlacement {
   readonly slot: number;
   readonly classId: ClassId;
   readonly level: ArenaLevel;
-  /** Optional portrait identity for debug rosters with native class fallbacks. */
+  /** Explicit named/debug identity; omitted units use the native class-and-side fallback. */
   readonly portrait?: PortraitRecord;
   readonly x: number;
   readonly y: number;

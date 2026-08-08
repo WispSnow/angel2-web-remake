@@ -15,7 +15,11 @@ import {
   STAGE1_IRON_PLATE_TERRAIN_SLOT,
   STAGE1_OBSTACLE_TERRAIN_SLOT,
 } from "../content/stage1";
-import { classDefinition, className } from "../content/classes";
+import {
+  classDefinition,
+  classFallbackPortraitFor,
+  className,
+} from "../content/classes";
 import { allyMapUnitAsset } from "../content/map-unit-assets";
 import type { StageDefinition } from "../content/stages";
 import { emptyUnitStatuses } from "./status";
@@ -96,7 +100,9 @@ function createArenaUnit(
     // Side remains explicit in simulation state and the map figure. Keep the
     // arena identity short so the right panel does not repeat it in the name.
     name: className(placement.classId),
-    portrait: placement.portrait ?? (placement.side === 1 ? 47 : 48) as PortraitRecord,
+    portrait: placement.portrait
+      ?? classFallbackPortraitFor(placement.classId, placement.side)
+      ?? (placement.side === 1 ? 47 : 48) as PortraitRecord,
     x: placement.x,
     y: placement.y,
     life: 0,
