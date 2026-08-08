@@ -18,6 +18,7 @@ interface ClassShowdownBattleState {
     defenderId: string;
     defenderDied: boolean;
     experienceGained: number;
+    counterExperienceGained: number;
     defenderDeathTargets?: Array<{ id: string; x: number; y: number }>;
     splitUnitId?: string;
     splitCount?: number;
@@ -168,7 +169,7 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
   await clickClassShowdownWorldCell(page, 17, 17);
-  await expect(page.locator(".hud-identity-name")).toHaveText("叢林戰士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("叢林戰士／叢林戰士");
   await page.getByTestId("unit-command-attack").click();
   await clickClassShowdownWorldCell(page, 18, 17);
 
@@ -219,7 +220,7 @@ test("probability traits show approximate rates in the selected-unit strip", asy
   await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
     .toEqual({ x: 17, y: 32 });
   await page.keyboard.press("Space");
-  await expect(page.locator(".hud-identity-name")).toHaveText("獸骨騎士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("獸骨騎士／獸骨騎士");
   await expect(page.getByTestId("unit-traits")).toHaveText("特性約50%強力反擊");
   await expect(page.getByTestId("unit-traits")).toHaveAttribute(
     "aria-label",
@@ -236,7 +237,7 @@ test("probability traits show approximate rates in the selected-unit strip", asy
   await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
     .toEqual({ x: 29, y: 15 });
   await page.keyboard.press("Space");
-  await expect(page.locator(".hud-identity-name")).toHaveText("迅龍騎士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("迅龍騎士／迅龍騎士");
   await expect(page.getByTestId("unit-traits")).toHaveText("特性約50%閃避弓箭");
   await expect(page.getByTestId("unit-traits")).toHaveAttribute(
     "aria-label",
@@ -257,7 +258,7 @@ test("water warrior splits after defensive melee and all copies show shared life
   await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
     .toEqual({ x: 29, y: 23 });
   await page.keyboard.press("Space");
-  await expect(page.locator(".hud-identity-name")).toHaveText("水戰士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("水戰士／水戰士");
   await expect(page.getByTestId("unit-traits")).toHaveText("特性近戰受擊分裂");
   await expect(page.getByTestId("unit-traits")).toHaveAttribute(
     "aria-label",
@@ -289,7 +290,7 @@ test("water warrior splits after defensive melee and all copies show shared life
   await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
     .toEqual({ x: 31, y: 23 });
   await page.keyboard.press("Space");
-  await expect(page.locator(".hud-identity-name")).toHaveText("水戰士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("水戰士／水戰士");
   await expect(page.getByTestId("unit-traits")).toHaveText("特性近戰受擊分裂");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-unit-life-label-count", "71");
   await captureVisualAudit(page.getByTestId("game-screen"), {
@@ -373,7 +374,7 @@ test("flying dragon knight can move once at half range after attacking", async (
   await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
     .toEqual({ x: 17, y: 30 });
   await page.keyboard.press("Space");
-  await expect(page.locator(".hud-identity-name")).toHaveText("飛龍騎士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("飛龍騎士／飛龍騎士");
   await expect(page.getByTestId("unit-traits")).toHaveText("特性攻後再移動");
   await expect(page.getByTestId("unit-traits")).toHaveAttribute(
     "aria-label",
@@ -438,15 +439,18 @@ test("flying dragon knight can move once at half range after attacking", async (
   expect(pageErrors).toEqual([]);
 });
 
-test("ordinary-hit status careers do not apply their status during a counterattack", async ({ page }) => {
+test("counterattacks grant experience without applying ordinary-hit class status", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/class-showdown.html?test=1");
   await page.getByTestId("class-showdown-start").click();
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const before = await classShowdownBattleState(page);
+  const counteringDefenderBefore = before?.units.find(({ id }) => id === "arena-2-1");
+  expect(counteringDefenderBefore).toBeDefined();
 
   await clickClassShowdownWorldCell(page, 17, 16);
-  await expect(page.locator(".hud-identity-name")).toHaveText("魔劍戰士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("魔劍戰士／魔劍戰士");
   await page.getByTestId("unit-command-attack").click();
   await clickClassShowdownWorldCell(page, 18, 16);
 
@@ -466,6 +470,16 @@ test("ordinary-hit status careers do not apply their status during a counteratta
   });
   expect(battle?.units.find(({ id }) => id === "arena-2-1")?.statuses.defenseDown).toBe(3);
   expect(battle?.units.find(({ id }) => id === "arena-1-1")?.statuses.defenseDown).toBe(0);
+  expect(battle?.lastCombat?.counterExperienceGained).toBeGreaterThan(0);
+  expect(battle?.units.find(({ id }) => id === "arena-2-1")?.experience).toBe(
+    counteringDefenderBefore!.experience + battle!.lastCombat!.counterExperienceGained,
+  );
+
+  await clickClassShowdownWorldCell(page, 18, 16);
+  await expect(page.locator(".hud-identity-name")).toHaveText("魔劍戰士／魔劍戰士");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-counter-experience.png`,
+  });
   expect(pageErrors).toEqual([]);
 });
 
@@ -477,8 +491,12 @@ test("unnamed class units use their native branch portrait in the battle HUD", a
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
   await clickClassShowdownWorldCell(page, 17, 15);
+  await expect(page.locator(".hud-identity-name")).toHaveText("士兵／士兵");
   await expect(page.getByTestId("unit-portrait-composite"))
     .toHaveAttribute("data-portrait-record", "47");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-unnamed-soldier-identity.png`,
+  });
 
   await page.keyboard.press("Delete");
   await clickClassShowdownWorldCell(page, 17, 17);
@@ -596,7 +614,7 @@ test("great dragon knight stomp lands on its selected target in the all-class sh
   await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
     .toEqual({ x: 29, y: 16 });
   await page.keyboard.press("Space");
-  await expect(page.locator(".hud-identity-name")).toHaveText("巨龍騎士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("巨龍騎士／巨龍騎士");
   await page.getByTestId("unit-command-technique").click();
   await expect(page.getByTestId("technique-stomp-3")).toContainText("女踏");
   await page.getByTestId("technique-stomp-3").click();
@@ -633,7 +651,7 @@ test("half-dragon warrior can teleport to any empty map cell in the showdown", a
   // The half-dragon warrior is the ninth record, eight rows below the initial focus.
   for (let step = 0; step < 8; step += 1) await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Space");
-  await expect(page.locator(".hud-identity-name")).toHaveText("半龍戰士");
+  await expect(page.locator(".hud-identity-name")).toHaveText("半龍戰士／半龍戰士");
   await expect(page.getByTestId("unit-command-technique")).toBeVisible();
   await page.getByTestId("unit-command-technique").click();
   await expect(page.getByTestId("technique-showdown-teleport")).toHaveText("瞬移");

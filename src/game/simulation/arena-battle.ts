@@ -98,8 +98,8 @@ function createArenaUnit(
     slot: placement.slot,
     classId: placement.classId,
     className: className(placement.classId),
-    // Side remains explicit in simulation state and the map figure. Keep the
-    // arena identity short so the right panel does not repeat it in the name.
+    // Side remains explicit in simulation state and the map figure. Unnamed
+    // units use the native class fallback as their separate unit-name field.
     name: placement.name ?? className(placement.classId),
     portrait: placement.portrait
       ?? classFallbackPortraitFor(placement.classId, placement.side)

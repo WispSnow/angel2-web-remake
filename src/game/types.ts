@@ -92,6 +92,7 @@ export interface AttackResult {
   defenderDied: boolean;
   attackerDied: boolean;
   experienceGained: number;
+  counterExperienceGained: number;
   defenderDeathTargets?: AttackDeathTarget[];
   attackerDeathTargets?: AttackDeathTarget[];
   splitUnitId?: string;

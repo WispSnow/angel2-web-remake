@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { terrainDefensePercentFor } from "../../src/game/content/classes";
+import { killRewardFor, terrainDefensePercentFor } from "../../src/game/content/classes";
 import { STAGE0 } from "../../src/game/content/stage0";
 import { Stage0Battle } from "../../src/game/simulation/battle";
 import { manhattan, movementCost, positionKey, reachableCells, zoneOfControl } from "../../src/game/simulation/grid";
@@ -52,8 +52,12 @@ describe("stage 0 battle simulation", () => {
     expect(hardestResult.damage).toBeLessThan(easyResult.damage);
     expect(hardestResult.counterDamage).toBeGreaterThan(easyResult.counterDamage);
     expect(hardestResult.experienceGained).toBeGreaterThan(easyResult.experienceGained);
-    expect(easy.unit("2:45")).toMatchObject({ experience: 101 });
-    expect(hardest.unit("2:45")).toMatchObject({ experience: 401 });
+    expect(easy.unit("2:45")).toMatchObject({
+      experience: 101 + easyResult.counterExperienceGained,
+    });
+    expect(hardest.unit("2:45")).toMatchObject({
+      experience: 401 + hardestResult.counterExperienceGained,
+    });
   });
 
   it("keeps simulation deterministic for equal seed and commands", () => {
@@ -172,6 +176,7 @@ describe("stage 0 battle simulation", () => {
     const attacker = battle.unit("1:0")!;
     const defender = battle.unit("2:45")!;
     const defenderLife = defender.life;
+    const defenderExperience = defender.experience;
     const attackerStats = battle.effectiveStatsFor(attacker);
     const defenderStats = battle.effectiveStatsFor(defender);
     const defenderTerrainDefense = Math.floor(
@@ -193,13 +198,66 @@ describe("stage 0 battle simulation", () => {
       0,
       defenderStats.attack - attackerStats.defense - attackerTerrainDefense,
     ) / 2);
+    const expectedExperience = defenderStats.level + trial.between(4, 7);
+    const expectedCounterExperience = Math.floor((attackerStats.level + trial.between(4, 7)) / 2);
     const result = battle.attack("1:0", "2:45");
     expect(result.damage).toBe(expectedDamage);
     expect(result.counterDamage).toBe(expectedCounterDamage);
     expect(result.counterOccurred).toBe(true);
+    expect(result.experienceGained).toBe(expectedExperience);
+    expect(result.counterExperienceGained).toBe(expectedCounterExperience);
     expect(battle.unit("2:45")!.life).toBe(defenderLife - result.damage);
     expect(battle.unit("1:0")!.acted).toBe(true);
     expect(battle.unit("1:0")!.experience).toBe(299 + result.experienceGained);
+    expect(battle.unit("2:45")!.experience).toBe(
+      defenderExperience + result.counterExperienceGained,
+    );
+  });
+
+  it("awards the full class kill reward when a counterattack defeats the initiator", () => {
+    const battle = battleAtPlayableOpening(19);
+    expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    const attacker = battle.unit("1:0")!;
+    const defender = battle.unit("2:45")!;
+    attacker.life = 1;
+    const defenderExperience = defender.experience;
+    const trial = battle.rng.clone();
+    trial.between(4, 7);
+    trial.between(4, 7);
+    trial.between(4, 7);
+    const expectedCounterExperience = killRewardFor(attacker.classId, attacker.side)
+      + trial.between(4, 7);
+
+    const result = battle.attack(attacker.id, defender.id);
+
+    expect(result).toMatchObject({
+      counterOccurred: true,
+      attackerDied: true,
+      counterExperienceGained: expectedCounterExperience,
+    });
+    expect(result.counterExperienceGained).toBeGreaterThan(10);
+    expect(defender.experience).toBe(defenderExperience + expectedCounterExperience);
+  });
+
+  it("awards counterattack experience even when the physical counter deals zero damage", () => {
+    const battle = battleAtPlayableOpening(23);
+    expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    const attacker = battle.unit("1:0")!;
+    const defender = battle.unit("2:45")!;
+    attacker.classId = "magic-armor-warrior";
+    const attackerLife = attacker.life;
+    const defenderExperience = defender.experience;
+
+    const result = battle.attack(attacker.id, defender.id);
+
+    expect(result).toMatchObject({
+      counterOccurred: true,
+      counterDamage: 0,
+      counterExperienceGained: expect.any(Number),
+    });
+    expect(result.counterExperienceGained).toBeGreaterThan(0);
+    expect(attacker.life).toBe(attackerLife);
+    expect(defender.experience).toBe(defenderExperience + result.counterExperienceGained);
   });
 
   it("restores fifteen percent of maximum life before consuming the unit action", () => {
@@ -435,6 +493,7 @@ describe("stage 0 battle simulation", () => {
     expect(result.defenderDied).toBe(true);
     expect(result.counterDamage).toBe(0);
     expect(result.counterOccurred).toBe(false);
+    expect(result.counterExperienceGained).toBe(0);
     expect(battle.unit("2:45")).toBeUndefined();
     expect(battle.unit("1:0")!.life).toBe(niaLife);
   });

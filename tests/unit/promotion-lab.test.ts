@@ -71,7 +71,11 @@ describe("promotion trigger lab", () => {
     );
     expect(classStatsFor(enemyAttacker).level).toBe(4);
     expect(enemyAttacker.classId).toBe("soldier");
-    expect(enemyBattle.promotionQueue()).toEqual([]);
+    expect(enemyResult.counterExperienceGained).toBeGreaterThan(0);
+    expect(alliedDefender.experience).toBeGreaterThanOrEqual(
+      promotionExperienceThresholdFor("soldier"),
+    );
+    expect(enemyBattle.promotionQueue()).toEqual([alliedDefender.id]);
   });
 
   it("starts a pure-memory formal battle with Nia as the dialogue grantor", () => {

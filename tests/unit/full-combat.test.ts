@@ -50,6 +50,7 @@ const result = (overrides: Partial<AttackResult> = {}): AttackResult => ({
   defenderDied: false,
   attackerDied: false,
   experienceGained: 12,
+  counterExperienceGained: 4,
   ...overrides,
 });
 

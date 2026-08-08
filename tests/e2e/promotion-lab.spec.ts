@@ -8,6 +8,7 @@ interface PromotionLabBattleState {
   phase: string;
   promotionUnitIds: string[];
   promotionTargets: Array<{ id: string; optionIndex: number }>;
+  lastCombat?: { counterExperienceGained: number };
   units: Array<{
     id: string;
     side: number;
@@ -135,10 +136,14 @@ test("promotion lab exposes all twelve threshold pairs and the formal choice UI"
   const after = await promotionLabState(page);
   expect(after.battle?.units.find(({ id }) => id === "promotion-1-0"))
     .toMatchObject({ classId: "cavalry", experience: 0 });
-  expect(after.battle?.units.find(({ id }) => id === "promotion-2-0"))
-    .toMatchObject({ classId: "soldier", experience: 299 });
+  const counteringEnemy = after.battle?.units.find(({ id }) => id === "promotion-2-0");
+  expect(after.battle?.lastCombat?.counterExperienceGained).toBeGreaterThan(0);
+  expect(counteringEnemy).toMatchObject({ classId: "soldier" });
+  expect(counteringEnemy?.experience).toBe(
+    299 + after.battle!.lastCombat!.counterExperienceGained,
+  );
   await expect(page.getByTestId("promotion-lab-progress"))
-    .toHaveText("我方已轉職 1/12 · 敵方等級 4+ 0/12");
+    .toHaveText("我方已轉職 1/12 · 敵方等級 4+ 1/12");
   expect(pageErrors).toEqual([]);
 });
 
@@ -175,7 +180,7 @@ test("generic land knight promotes with its beast figure and canonical professio
     className: "獸騎士",
     name: "獸騎士",
   });
-  await expect(page.getByTestId("hud-identity")).toHaveText("獸騎士");
+  await expect(page.getByTestId("hud-identity")).toHaveText("獸騎士／獸騎士");
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute(
     "data-portrait-record",
     String(state.battle?.units.find(({ id }) => id === "promotion-1-2")?.portrait),

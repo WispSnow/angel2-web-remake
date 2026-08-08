@@ -129,7 +129,7 @@ test("ordinary melee status applies directly and appears in the unit HUD without
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
   const identity = page.locator(".hud-identity-name");
-  await expect(identity).toHaveText("邪劍戰士");
+  await expect(identity).toHaveText("邪劍戰士／邪劍戰士");
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   const identityMetrics = await identity.evaluate((element) => ({
     clientWidth: element.clientWidth,
@@ -139,7 +139,7 @@ test("ordinary melee status applies directly and appears in the unit HUD without
 
   await clickArenaWorldCell(page, 20, 30);
   await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
-  await expect(page.getByTestId("status-strip")).toHaveText("玩家・可行動");
+  await expect(page.getByTestId("status-strip")).toContainText("玩家・可行動");
   await page.getByTestId("unit-command-attack").click();
   await clickArenaWorldCell(page, 21, 30);
 

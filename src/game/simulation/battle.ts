@@ -730,6 +730,15 @@ export class Stage0Battle {
     const experienceGained = baseExperience * (defenderDied ? defenderGroup.length : 1);
     attacker.experience += experienceGained;
     this.synchronizeWaterWarriorState(attacker);
+    const counterExperienceBase = counterOccurred
+      ? attackerDied
+        ? killRewardFor(attacker.classId, attacker.side) + this.rng.between(4, 7)
+        : Math.floor((attackerStats.level + this.rng.between(4, 7)) / 2)
+      : 0;
+    const counterExperienceGained = counterExperienceBase
+      * (attackerDied ? attackerGroup.length : 1);
+    defender.experience += counterExperienceGained;
+    this.synchronizeWaterWarriorState(defender);
     attacker.acted = true;
     this.recordCampaignUnit(attacker);
     this.recordCampaignUnit(defender);
@@ -748,6 +757,7 @@ export class Stage0Battle {
       defenderDied,
       attackerDied,
       experienceGained,
+      counterExperienceGained,
       ...(defenderDied ? {
         defenderDeathTargets: defenderGroup.map(({ id, x, y }) => ({ id, x, y })),
       } : {}),

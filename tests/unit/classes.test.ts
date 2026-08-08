@@ -234,7 +234,9 @@ describe("native class implementation sequence", () => {
         splitUnitId: `water:split-${splitCount - 1}`,
         splitCount,
         defenderDied: false,
+        counterExperienceGained: expect.any(Number),
       });
+      expect(result.counterExperienceGained).toBeGreaterThan(0);
       expect(battle.unit(result.splitUnitId!)).toMatchObject(expectedPositions[splitCount - 2]);
       attacker.acted = false;
     }
@@ -244,7 +246,7 @@ describe("native class implementation sequence", () => {
     expect(capped.splitCount).toBeUndefined();
     expect(battle.units.filter(({ id }) => id === "water" || id.startsWith("water:split-")))
       .toHaveLength(4);
-    expect(rng.calls - callsBefore).toBe(12);
+    expect(rng.calls - callsBefore).toBe(16);
   });
 
   it("water warrior split skips forbidden terrain and occupied cells in native order", () => {
@@ -671,6 +673,7 @@ describe("native class implementation sequence", () => {
     const result = battle.attack(attacker.id, defender.id);
     expect(result.counterOccurred).toBe(false);
     expect(result.counterDamage).toBe(0);
+    expect(result.counterExperienceGained).toBe(0);
     expect(attacker.life).toBe(attackerLife);
   });
 

@@ -628,6 +628,7 @@ function buildScenario(autoPlay = true): void {
     defenderDied: config.death,
     attackerDied: false,
     experienceGained: 0,
+    counterExperienceGained: 0,
   };
   script = buildFullCombatScript(attacker, defender, result);
   currentTime = 0;

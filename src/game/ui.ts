@@ -1524,9 +1524,9 @@ function renderHud(
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
   const context = unitContextPresentation(controller, unit);
   const displayName = unitDisplayName(unit);
-  const identity = usesClassIdentity(unit)
-    ? unit.className
-    : `${unit.className}／${displayName}`;
+  // Native HUD always draws both fields at fixed positions, including the
+  // generic-identity case where profession and unit name are identical.
+  const identity = `${unit.className}／${displayName}`;
   const identityLength = [...identity].length;
   const identityClass = identityLength >= 11
     ? "hud-identity-name is-tight"
