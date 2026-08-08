@@ -191,6 +191,7 @@ declare global {
       setAllLevels: (nextLevel: ArenaLevel) => void;
       startBattle: () => void;
       returnToSetup: () => void;
+      forceWaterWarriorGroupDeathSetup: () => void;
     };
   }
 }
@@ -205,6 +206,7 @@ window.__ANGEL2_CLASS_SHOWDOWN__ = {
   },
   startBattle,
   returnToSetup: renderSetup,
+  forceWaterWarriorGroupDeathSetup: () => controller?.forceWaterWarriorGroupDeathSetupForTest(),
 };
 
 renderSetup();

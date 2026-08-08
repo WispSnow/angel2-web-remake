@@ -78,6 +78,10 @@ export type ActionMode =
   | "allyPreview"
   | "enemyPreview";
 
+export interface AttackDeathTarget extends Position {
+  id: string;
+}
+
 export interface AttackResult {
   attackerId: string;
   defenderId: string;
@@ -87,6 +91,8 @@ export interface AttackResult {
   defenderDied: boolean;
   attackerDied: boolean;
   experienceGained: number;
+  defenderDeathTargets?: AttackDeathTarget[];
+  attackerDeathTargets?: AttackDeathTarget[];
   splitUnitId?: string;
   splitCount?: number;
 }

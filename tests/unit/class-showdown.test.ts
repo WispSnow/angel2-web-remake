@@ -12,7 +12,7 @@ import {
   classShowdownTerrainSlotAt,
   createClassShowdownPlacements,
 } from "../../src/game/class-showdown-session";
-import { classDefinition, classStatsFor } from "../../src/game/content/classes";
+import { classDefinition, classStatsFor, killRewardFor } from "../../src/game/content/classes";
 import { CLASS_SHOWDOWN_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "../../src/game/content/technique-lab.generated";
 import {
@@ -197,5 +197,65 @@ describe("all-class showdown lab", () => {
     expect(ordinaryArena.additionalActionIdsFor("arena-1-8")).toEqual([]);
     expect(ordinaryArena.actionTargetCells("arena-1-8", CLASS_SHOWDOWN_TELEPORT_ACTION_ID))
       .toEqual([]);
+  });
+
+  it("multiplies a water-warrior kill award by every shared board body", () => {
+    const battle = new ArenaBattle([
+      {
+        id: "arena-1-attacker",
+        side: 1,
+        slot: 0,
+        classId: "great-axe-warrior",
+        level: 3,
+        x: 24,
+        y: 30,
+      },
+      {
+        id: "arena-2-water",
+        side: 2,
+        slot: 26,
+        classId: "water-warrior",
+        level: 3,
+        x: 25,
+        y: 30,
+      },
+    ], 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
+    const attacker = battle.unit("arena-1-attacker")!;
+    const root = battle.unit("arena-2-water")!;
+
+    for (let splitCount = 2; splitCount <= 4; splitCount += 1) {
+      attacker.acted = false;
+      attacker.life = battle.statsFor(attacker).maxLife;
+      for (const unit of battle.units.filter(({ side, slot }) => side === 2 && slot === 26)) {
+        unit.life = battle.statsFor(unit).maxLife;
+      }
+      expect(battle.attack(attacker.id, root.id)).toMatchObject({
+        defenderDied: false,
+        splitCount,
+      });
+    }
+
+    const group = battle.units.filter(({ side, slot }) => side === 2 && slot === 26);
+    expect(group.map(({ id, x, y }) => ({ id, x, y }))).toEqual([
+      { id: "arena-2-water", x: 25, y: 30 },
+      { id: "arena-2-water:split-1", x: 25, y: 29 },
+      { id: "arena-2-water:split-2", x: 25, y: 31 },
+      { id: "arena-2-water:split-3", x: 26, y: 30 },
+    ]);
+    for (const unit of group) unit.life = 1;
+    attacker.acted = false;
+    const experienceBefore = attacker.experience;
+    const rngCallsBefore = battle.rng.calls;
+
+    const result = battle.attack(attacker.id, root.id);
+    const singleBodyAward = result.experienceGained / group.length;
+
+    expect(result.defenderDied).toBe(true);
+    expect(result.defenderDeathTargets).toEqual(group.map(({ id, x, y }) => ({ id, x, y })));
+    expect(singleBodyAward).toBeGreaterThanOrEqual(killRewardFor(root.classId, root.side) + 4);
+    expect(singleBodyAward).toBeLessThanOrEqual(killRewardFor(root.classId, root.side) + 7);
+    expect(attacker.experience).toBe(experienceBefore + result.experienceGained);
+    expect(battle.rng.calls).toBe(rngCallsBefore + 3);
+    expect(battle.units.some(({ side, slot }) => side === 2 && slot === 26)).toBe(false);
   });
 });

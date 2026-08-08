@@ -829,6 +829,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (mapPresentation) {
         if (!displayedUnits.has(mapPresentation.attacker.id)) displayedUnits.set(mapPresentation.attacker.id, mapPresentation.attacker);
         if (!displayedUnits.has(mapPresentation.defender.id)) displayedUnits.set(mapPresentation.defender.id, mapPresentation.defender);
+        for (const unit of [
+          ...(mapPresentation.attackerDeathUnits ?? []),
+          ...(mapPresentation.defenderDeathUnits ?? []),
+        ]) displayedUnits.set(unit.id, unit);
       }
       const active = new Set<string>();
       let visibleCount = 0;
@@ -868,19 +872,29 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         view.sprite.clearTint();
         const routePulseDisplayedLife = routePulsePresentation?.displayedLifeByUnitId[unit.id];
         const specialDisplayedLife = specialPresentation?.displayedLifeByUnitId[unit.id];
+        const isAttackerDeathUnit = mapPresentation?.attackerDeathUnits
+          ?.some(({ id }) => id === unit.id) ?? false;
+        const isDefenderDeathUnit = mapPresentation?.defenderDeathUnits
+          ?.some(({ id }) => id === unit.id) ?? false;
         const displayedLife = routePulseDisplayedLife
           ?? specialDisplayedLife
-          ?? (mapPresentation?.attacker.id === unit.id
+          ?? (mapPresentation && (mapPresentation.attacker.id === unit.id || isAttackerDeathUnit)
             ? mapPresentation.displayedAttackerLife
-            : mapPresentation?.defender.id === unit.id
+            : mapPresentation && (mapPresentation.defender.id === unit.id || isDefenderDeathUnit)
               ? mapPresentation.displayedDefenderLife
               : unit.life);
-        const erasedByDeath = mapPresentation
+        const activeDeathUnits = mapPresentation?.phase === "defenderDeath"
+          ? mapPresentation.defenderDeathUnits
+          : mapPresentation?.phase === "attackerDeath"
+            ? mapPresentation.attackerDeathUnits
+            : undefined;
+        const deathUnitIndex = activeDeathUnits?.findIndex(({ id }) => id === unit.id) ?? -1;
+        const currentDeathTargetIndex = mapPresentation?.deathTargetIndex ?? 0;
+        const erasedByDeath = deathUnitIndex >= 0
           && (
-            (mapPresentation.phase === "defenderDeath" && mapPresentation.defender.id === unit.id)
-            || (mapPresentation.phase === "attackerDeath" && mapPresentation.attacker.id === unit.id)
-          )
-          && mapPresentation.frame >= 6;
+            deathUnitIndex < currentDeathTargetIndex
+            || (deathUnitIndex === currentDeathTargetIndex && mapPresentation!.frame >= 6)
+          );
         view.container.setVisible(!erasedByDeath);
         if (!erasedByDeath) visibleCount += 1;
         this.drawLifeDigits(view, { ...unit, life: displayedLife });
@@ -916,7 +930,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         );
         this.game.canvas.dataset.combatShadowUnitCount = String(
           mapPresentation
-            ? [mapPresentation.attacker, mapPresentation.defender]
+            ? [
+              mapPresentation.attacker,
+              mapPresentation.defender,
+              ...(mapPresentation.attackerDeathUnits ?? []),
+              ...(mapPresentation.defenderDeathUnits ?? []),
+            ]
+              .filter((unit, index, units) => units.findIndex(({ id }) => id === unit.id) === index)
               .filter((unit) => !controller.battle.unit(unit.id))
               .length
             : 0,
@@ -1510,6 +1530,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.mapCombatIceDistance;
           delete canvas.dataset.mapCombatLifeChangeUnit;
           delete canvas.dataset.mapCombatDisplayedLife;
+          delete canvas.dataset.mapCombatDeathTargetIndex;
+          delete canvas.dataset.mapCombatDeathTargetCount;
           delete canvas.dataset.mapCombatPrayerOutcome;
           delete canvas.dataset.mapCombatPrayerRolledAmount;
           delete canvas.dataset.mapCombatStompPhase;
@@ -1533,11 +1555,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         return;
       }
 
-      const target = presentation.phase === "counterHit"
-        || presentation.phase === "counterDamage"
-        || presentation.phase === "attackerDeath"
-        ? presentation.attacker
-        : presentation.defender;
+      const target = presentation.phase === "attackerDeath"
+        ? presentation.attackerDeathUnits?.[presentation.deathTargetIndex ?? 0]
+          ?? presentation.attacker
+        : presentation.phase === "defenderDeath"
+          ? presentation.defenderDeathUnits?.[presentation.deathTargetIndex ?? 0]
+            ?? presentation.defender
+          : presentation.phase === "counterHit" || presentation.phase === "counterDamage"
+            ? presentation.attacker
+            : presentation.defender;
 
       if (presentation.phase === "primaryHit" || presentation.phase === "counterHit") {
         const sourceFrame = MAP_HIT_FRAME_TIMELINE[presentation.frame] ?? 0;
@@ -1571,6 +1597,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
         canvas.dataset.mapCombatAttackerLife = String(presentation.displayedAttackerLife);
         canvas.dataset.mapCombatDefenderLife = String(presentation.displayedDefenderLife);
+        if (presentation.phase === "defenderDeath" || presentation.phase === "attackerDeath") {
+          const deathTargets = presentation.phase === "defenderDeath"
+            ? presentation.defenderDeathUnits
+            : presentation.attackerDeathUnits;
+          canvas.dataset.mapCombatDeathTargetIndex = String(presentation.deathTargetIndex ?? 0);
+          canvas.dataset.mapCombatDeathTargetCount = String(deathTargets?.length ?? 1);
+        } else {
+          delete canvas.dataset.mapCombatDeathTargetIndex;
+          delete canvas.dataset.mapCombatDeathTargetCount;
+        }
       }
     }
 

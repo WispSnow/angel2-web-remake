@@ -17,14 +17,23 @@ interface ClassShowdownBattleState {
     attackerId: string;
     defenderId: string;
     defenderDied: boolean;
+    experienceGained: number;
+    defenderDeathTargets?: Array<{ id: string; x: number; y: number }>;
     splitUnitId?: string;
     splitCount?: number;
   };
   combatPresentation?: { phase: string };
+  combatPresentationTrace: Array<{
+    phase: string;
+    frame: number;
+    deathTargetId?: string;
+  }>;
   specialActionPresentation?: { phase: string };
   specialActionPresentationTrace: Array<{ phase: string }>;
   units: Array<{
     id: string;
+    side: number;
+    slot: number;
     classId: string;
     x: number;
     y: number;
@@ -285,6 +294,70 @@ test("water warrior splits after defensive melee and all copies show shared life
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-water-warrior-split.png`,
   });
+  expect(pageErrors).toEqual([]);
+});
+
+test("water warrior copies die in sequence and multiply the killer's experience", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await page.evaluate(() =>
+    window.__ANGEL2_CLASS_SHOWDOWN__?.forceWaterWarriorGroupDeathSetup());
+
+  const setup = await classShowdownBattleState(page);
+  const attacker = setup?.units.find(({ id }) => id === "arena-1-26");
+  const waterGroup = setup?.units.filter(({ side, slot }) => side === 2 && slot === 26) ?? [];
+  expect(waterGroup).toHaveLength(4);
+  expect(new Set(waterGroup.map(({ life }) => life))).toEqual(new Set([1]));
+  expect(attacker).toBeDefined();
+
+  await page.keyboard.press("Space");
+  await page.getByTestId("unit-command-attack").click();
+  const canvas = page.getByTestId("battle-canvas");
+  await page.waitForFunction(() => {
+    const element = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
+    return element?.dataset.mapCombatPhase === "defenderDeath"
+      && element.dataset.mapCombatTarget === "arena-2-26:split-1"
+      && element.dataset.mapCombatFrame === "3";
+  });
+  await expect(canvas).toHaveAttribute("data-map-combat-death-target-index", "1");
+  await expect(canvas).toHaveAttribute("data-map-combat-death-target-count", "4");
+  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "72");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-water-warrior-sequential-death.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState;
+    }).battle;
+    return current?.lastCombat?.defenderDied === true
+      && current.combatPresentation === undefined;
+  });
+  const resolved = await classShowdownBattleState(page);
+  const deathTargets = resolved?.lastCombat?.defenderDeathTargets ?? [];
+  const deathTrace = resolved?.combatPresentationTrace.filter(
+    ({ phase }) => phase === "defenderDeath",
+  ) ?? [];
+  expect(deathTargets.map(({ id }) => id)).toEqual([
+    "arena-2-26",
+    "arena-2-26:split-1",
+    "arena-2-26:split-2",
+    "arena-2-26:split-3",
+  ]);
+  expect(deathTrace).toHaveLength(60);
+  expect(deathTrace.map(({ deathTargetId }) => deathTargetId)).toEqual(
+    deathTargets.flatMap(({ id }) => Array.from({ length: 15 }, () => id)),
+  );
+  expect((resolved!.lastCombat!.experienceGained) / deathTargets.length)
+    .toBeGreaterThanOrEqual(44);
+  expect((resolved!.lastCombat!.experienceGained) / deathTargets.length)
+    .toBeLessThanOrEqual(47);
+  expect(resolved?.units.some(({ side, slot }) => side === 2 && slot === 26)).toBe(false);
+  expect(resolved?.units.find(({ id }) => id === attacker!.id)?.experience)
+    .toBe(attacker!.experience + resolved!.lastCombat!.experienceGained);
   expect(pageErrors).toEqual([]);
 });
 

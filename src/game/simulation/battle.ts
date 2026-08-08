@@ -402,6 +402,13 @@ export class Stage0Battle {
       && waterWarriorRootId(candidate) === rootId);
   }
 
+  private orderedSharedUnitGroup(unit: BattleUnit): BattleUnit[] {
+    return [
+      unit,
+      ...this.waterWarriorGroup(unit).filter(({ id }) => id !== unit.id),
+    ];
+  }
+
   private synchronizeWaterWarriorState(source: BattleUnit): void {
     for (const unit of this.waterWarriorGroup(source)) {
       if (unit.id === source.id) continue;
@@ -677,6 +684,9 @@ export class Stage0Battle {
     }
     this.onHostileTargeted(attacker, defender);
 
+    const attackerGroup = this.orderedSharedUnitGroup(attacker);
+    const defenderGroup = this.orderedSharedUnitGroup(defender);
+
     const attackerStats = this.effectiveStatsFor(attacker);
     const defenderStats = this.effectiveStatsFor(defender);
     const terrainDefense = Math.floor(
@@ -714,7 +724,10 @@ export class Stage0Battle {
     const defenderDied = defender.life === 0;
     const attackerDied = attacker.life === 0;
     const reward = killRewardFor(defender.classId, defender.side);
-    const experienceGained = defenderDied ? reward + this.rng.between(4, 7) : defenderStats.level + this.rng.between(4, 7);
+    const baseExperience = defenderDied
+      ? reward + this.rng.between(4, 7)
+      : defenderStats.level + this.rng.between(4, 7);
+    const experienceGained = baseExperience * (defenderDied ? defenderGroup.length : 1);
     attacker.experience += experienceGained;
     this.synchronizeWaterWarriorState(attacker);
     attacker.acted = true;
@@ -735,6 +748,12 @@ export class Stage0Battle {
       defenderDied,
       attackerDied,
       experienceGained,
+      ...(defenderDied ? {
+        defenderDeathTargets: defenderGroup.map(({ id, x, y }) => ({ id, x, y })),
+      } : {}),
+      ...(attackerDied ? {
+        attackerDeathTargets: attackerGroup.map(({ id, x, y }) => ({ id, x, y })),
+      } : {}),
       ...(splitUnit ? {
         splitUnitId: splitUnit.id,
         splitCount: this.waterWarriorGroup(defender).length,

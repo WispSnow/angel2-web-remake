@@ -129,11 +129,14 @@ export type CombatPresentationPhase =
 export interface CombatPresentation {
   attacker: BattleUnit;
   defender: BattleUnit;
+  attackerDeathUnits?: readonly BattleUnit[];
+  defenderDeathUnits?: readonly BattleUnit[];
   result: AttackResult;
   phase: CombatPresentationPhase;
   frame: number;
   displayedAttackerLife: number;
   displayedDefenderLife: number;
+  deathTargetIndex?: number;
   fullScene?: FullCombatSceneState;
 }
 
@@ -142,6 +145,7 @@ export interface CombatPresentationTraceEntry {
   frame: number;
   displayedAttackerLife: number;
   displayedDefenderLife: number;
+  deathTargetId?: string;
   fullScene?: FullCombatSceneState;
 }
 
@@ -2668,16 +2672,37 @@ export class GameController {
     result: AttackResult,
   ): Promise<void> {
     this.combatPresentationTrace = [];
+    const finalDefenderLife = Math.max(0, defender.life - result.damage);
+    const finalAttackerLife = Math.max(0, attacker.life - result.counterDamage);
     if (this.battlePresentation === "full") {
       await this.presentFullScreenCombat(attacker, defender, result);
+      if (result.defenderDied && (result.defenderDeathTargets?.length ?? 1) > 1) {
+        await this.presentMapCombatDeaths(
+          attacker,
+          defender,
+          result,
+          "defenderDeath",
+          1,
+          finalAttackerLife,
+          finalDefenderLife,
+        );
+      } else if (result.attackerDied && (result.attackerDeathTargets?.length ?? 1) > 1) {
+        await this.presentMapCombatDeaths(
+          attacker,
+          defender,
+          result,
+          "attackerDeath",
+          1,
+          finalAttackerLife,
+          finalDefenderLife,
+        );
+      }
       this.combatPresentation = undefined;
       return;
     }
 
     let displayedAttackerLife = attacker.life;
     let displayedDefenderLife = defender.life;
-    const finalDefenderLife = Math.max(0, defender.life - result.damage);
-    const finalAttackerLife = Math.max(0, attacker.life - result.counterDamage);
 
     // Native UN/62 timeline: frames 0..7, followed by frame 0 once more.
     const hitFrames = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
@@ -2709,18 +2734,15 @@ export class GameController {
     }
 
     if (result.defenderDied) {
-      for (let frame = 0; frame < 15; frame += 1) {
-        this.setCombatPresentation(
-          attacker,
-          defender,
-          result,
-          "defenderDeath",
-          frame,
-          displayedAttackerLife,
-          displayedDefenderLife,
-        );
-        await pause(this.mapCombatDelay(10));
-      }
+      await this.presentMapCombatDeaths(
+        attacker,
+        defender,
+        result,
+        "defenderDeath",
+        0,
+        displayedAttackerLife,
+        displayedDefenderLife,
+      );
     } else if (result.counterOccurred) {
       for (let frame = 0; frame < hitFrames.length; frame += 1) {
         if (frame === 0 || frame === 4) this.queueAudioCue(38, `map-counter-hit-${frame === 0 ? "first" : "second"}`);
@@ -2749,22 +2771,49 @@ export class GameController {
         await pause(this.mapCombatDelay(1));
       }
       if (result.attackerDied) {
-        for (let frame = 0; frame < 15; frame += 1) {
-          this.setCombatPresentation(
-            attacker,
-            defender,
-            result,
-            "attackerDeath",
-            frame,
-            displayedAttackerLife,
-            displayedDefenderLife,
-          );
-          await pause(this.mapCombatDelay(10));
-        }
+        await this.presentMapCombatDeaths(
+          attacker,
+          defender,
+          result,
+          "attackerDeath",
+          0,
+          displayedAttackerLife,
+          displayedDefenderLife,
+        );
       }
     }
 
     this.combatPresentation = undefined;
+  }
+
+  private async presentMapCombatDeaths(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    result: AttackResult,
+    phase: "defenderDeath" | "attackerDeath",
+    startIndex: number,
+    displayedAttackerLife: number,
+    displayedDefenderLife: number,
+  ): Promise<void> {
+    const targets = phase === "defenderDeath"
+      ? result.defenderDeathTargets
+      : result.attackerDeathTargets;
+    const targetCount = targets?.length ?? 1;
+    for (let deathTargetIndex = startIndex; deathTargetIndex < targetCount; deathTargetIndex += 1) {
+      for (let frame = 0; frame < 15; frame += 1) {
+        this.setCombatPresentation(
+          attacker,
+          defender,
+          result,
+          phase,
+          frame,
+          displayedAttackerLife,
+          displayedDefenderLife,
+          deathTargetIndex,
+        );
+        await pause(this.mapCombatDelay(10));
+      }
+    }
   }
 
   private async presentFullScreenCombat(
@@ -2832,21 +2881,41 @@ export class GameController {
     frame: number,
     displayedAttackerLife: number,
     displayedDefenderLife: number,
+    deathTargetIndex?: number,
   ): void {
+    const deathUnits = (
+      template: BattleUnit,
+      targets: AttackResult["defenderDeathTargets"],
+    ): BattleUnit[] | undefined => targets?.map((target) => ({
+      ...template,
+      ...target,
+      statuses: { ...template.statuses },
+    }));
+    const attackerDeathUnits = deathUnits(attacker, result.attackerDeathTargets);
+    const defenderDeathUnits = deathUnits(defender, result.defenderDeathTargets);
+    const deathTargetId = phase === "defenderDeath"
+      ? defenderDeathUnits?.[deathTargetIndex ?? 0]?.id
+      : phase === "attackerDeath"
+        ? attackerDeathUnits?.[deathTargetIndex ?? 0]?.id
+        : undefined;
     this.combatPresentation = {
       attacker,
       defender,
+      attackerDeathUnits,
+      defenderDeathUnits,
       result,
       phase,
       frame,
       displayedAttackerLife,
       displayedDefenderLife,
+      deathTargetIndex,
     };
     this.combatPresentationTrace.push({
       phase,
       frame,
       displayedAttackerLife,
       displayedDefenderLife,
+      deathTargetId,
     });
     this.emit();
   }
@@ -3920,6 +3989,46 @@ export class GameController {
     this.emit();
   }
 
+  forceWaterWarriorGroupDeathSetupForTest(): void {
+    if (!this.debugMode) return;
+    const attacker = this.battle.units.find(
+      ({ side, classId }) => side === 1 && classId === "water-warrior",
+    );
+    const defender = this.battle.units.find(
+      ({ side, classId }) => side === 2 && classId === "water-warrior",
+    );
+    if (!attacker || !defender) return;
+    attacker.x = 24;
+    attacker.y = 25;
+    defender.x = 25;
+    defender.y = 25;
+    for (let splitCount = 2; splitCount <= 4; splitCount += 1) {
+      attacker.acted = false;
+      attacker.life = this.battle.statsFor(attacker).maxLife;
+      for (const unit of this.battle.units.filter(
+        ({ side, slot }) => side === defender.side && slot === defender.slot,
+      )) unit.life = this.battle.statsFor(unit).maxLife;
+      const result = this.battle.attack(attacker.id, defender.id);
+      if (result.splitCount !== splitCount) {
+        throw new Error(`water-warrior test setup stopped at ${result.splitCount ?? 1} bodies`);
+      }
+    }
+    for (const unit of this.battle.units.filter(
+      ({ side, slot }) => side === defender.side && slot === defender.slot,
+    )) unit.life = 1;
+    attacker.acted = false;
+    attacker.life = this.battle.statsFor(attacker).maxLife;
+    this.battle.focusId = attacker.id;
+    this.phase = "player";
+    this.battlePresentation = "map";
+    this.centerCamera(attacker);
+    this.cursor = { x: attacker.x, y: attacker.y };
+    this.resetAction();
+    this.statusMessage = "自動驗收：四個共享生命的水戰士已置於連續死亡測試位。";
+    this.busy = false;
+    this.emit();
+  }
+
   forceEnemySisterSetupForTest(): void {
     if (!this.debugMode || this.battle.stage.id !== "stage-01") return;
     const nia = this.battle.unit("1:0");
@@ -4204,7 +4313,13 @@ export class GameController {
       edgeScrollEnabled: this.edgeScrollEnabled,
       portraitsEnabled: this.portraitsEnabled,
       aiDialogueEnabled: this.aiDialogueEnabled,
-      lastCombat: this.lastCombat ? { ...this.lastCombat } : undefined,
+      lastCombat: this.lastCombat ? {
+        ...this.lastCombat,
+        defenderDeathTargets: this.lastCombat.defenderDeathTargets
+          ?.map((target) => ({ ...target })),
+        attackerDeathTargets: this.lastCombat.attackerDeathTargets
+          ?.map((target) => ({ ...target })),
+      } : undefined,
       lastSpecialAction: this.lastSpecialAction ? { ...this.lastSpecialAction } : undefined,
       lastConstruction: this.lastConstruction ? {
         ...this.lastConstruction,
@@ -4226,7 +4341,17 @@ export class GameController {
         ...this.combatPresentation,
         attacker: { ...this.combatPresentation.attacker },
         defender: { ...this.combatPresentation.defender },
-        result: { ...this.combatPresentation.result },
+        attackerDeathUnits: this.combatPresentation.attackerDeathUnits
+          ?.map((unit) => ({ ...unit, statuses: { ...unit.statuses } })),
+        defenderDeathUnits: this.combatPresentation.defenderDeathUnits
+          ?.map((unit) => ({ ...unit, statuses: { ...unit.statuses } })),
+        result: {
+          ...this.combatPresentation.result,
+          defenderDeathTargets: this.combatPresentation.result.defenderDeathTargets
+            ?.map((target) => ({ ...target })),
+          attackerDeathTargets: this.combatPresentation.result.attackerDeathTargets
+            ?.map((target) => ({ ...target })),
+        },
         fullScene: this.combatPresentation.fullScene ? { ...this.combatPresentation.fullScene } : undefined,
       } : undefined,
       combatPresentationTrace: this.combatPresentationTrace.map((entry) => ({ ...entry })),
