@@ -125,7 +125,7 @@ describe("all-terrain arena", () => {
     }
     const archer = battle.unit("arena-1-1");
     expect(archer?.experience).toBe(arenaExperienceForLevel("archer", 3));
-    expect(archer && classStatsFor(archer).level).toBe(6);
+    expect(archer && classStatsFor(archer).level).toBe(3);
 
     battle.units = battle.units.filter(({ side }) => side === 1);
     expect(battle.outcome()).toBe("victory");

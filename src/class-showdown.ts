@@ -56,7 +56,7 @@ function updateLevelProjection(statusText: string): void {
     const row = classDefinition(classId).dataRows[level - 1];
     const card = root.querySelector<HTMLElement>(`[data-class-id="${classId}"]`);
     const readout = card?.querySelector<HTMLElement>("[data-pair-level]");
-    if (readout && row) readout.textContent = `職業等級 ${row.level} · 經驗 ${row.experienceThreshold}`;
+    if (readout && row) readout.textContent = `職業等級 ${level} · 經驗 ${row.experienceThreshold}`;
     if (card) card.dataset.level = String(level);
   }
   const status = root.querySelector<HTMLElement>("[data-testid=class-showdown-status]");

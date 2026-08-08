@@ -46,8 +46,9 @@ function pressed(gamepad: Gamepad, button: number): boolean {
 }
 
 /**
- * Technique tiers follow the three directly selected DATA rows. Visible native
- * levels may start at 4, 7, 10, or later and must not be used as tier indices.
+ * Technique tiers follow the three directly selected DATA rows. Native DATA
+ * field6 markers may start at 4, 7, 10, or later and must not be used as tier
+ * indices or as the current-profession level shown to players.
  */
 function actionLabelsFor(
   definition: ReturnType<typeof classDefinition>,

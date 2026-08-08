@@ -119,6 +119,7 @@ test("all-class showdown applies one level to every mirror and enters formal bat
   expect(setupState.level).toBe(2);
   expect(setupState.placements).toHaveLength(70);
   expect(setupState.placements.every(({ level }) => level === 2)).toBe(true);
+  await expect(page.locator("[data-pair-level]").first()).toHaveText("職業等級 2 · 經驗 100");
   await captureVisualAudit(page, {
     path: `${ARTIFACT_DIR}/class-showdown-setup.png`,
     fullPage: true,

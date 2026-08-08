@@ -103,6 +103,14 @@ function createWaterSplitBattle(options: {
 }
 
 describe("native class implementation sequence", () => {
+  it("reports level within the current profession instead of the native cumulative marker", () => {
+    expect(classStatsFor({ classId: "cavalry", experience: 0 }).level).toBe(1);
+    expect(classStatsFor({ classId: "cavalry", experience: 180 }).level).toBe(2);
+    expect(classStatsFor({ classId: "cavalry", experience: 360 }).level).toBe(3);
+    expect(classStatsFor({ classId: "cavalry", experience: 540 }).level).toBe(4);
+    expect(classStatsFor({ classId: "jungle-warrior", experience: 1140 }).level).toBe(3);
+  });
+
   it("catalogs every confirmed terminal knight and warrior trait without inventing missing branches", () => {
     const traitClasses = [
       "swift-dragon-knight",
@@ -408,7 +416,7 @@ describe("native class implementation sequence", () => {
       defense: 54,
       maxLife: 455,
       movement: 9,
-      level: 13,
+      level: 4,
     });
     expect(ordinaryHitStatusFor("magic-sword-warrior")).toEqual({
       key: "defenseDown",
@@ -448,7 +456,7 @@ describe("native class implementation sequence", () => {
       defense: 76,
       maxLife: 540,
       movement: 8,
-      level: 13,
+      level: 4,
     });
     expect(ordinaryHitStatusFor("jungle-warrior")).toEqual({ key: "poison", counter: 3 });
 
@@ -487,7 +495,7 @@ describe("native class implementation sequence", () => {
       defense: 40,
       maxLife: 355,
       movement: 8,
-      level: 13,
+      level: 4,
     });
     expect(definition.technique?.tiers.map((tier) => tier.actions.map(({ actionCode }) => actionCode)))
       .toEqual([
@@ -515,7 +523,7 @@ describe("native class implementation sequence", () => {
       defense: 39,
       maxLife: 372,
       movement: 8,
-      level: 13,
+      level: 4,
     });
     expect(definition.technique?.tiers.map((tier) => tier.actions.map(({ actionCode }) => actionCode)))
       .toEqual([
@@ -539,7 +547,7 @@ describe("native class implementation sequence", () => {
       defense: 40,
       maxLife: 355,
       movement: 8,
-      level: 13,
+      level: 4,
     });
     expect(definition.ordinaryHitStatuses).toEqual([]);
     expect(definition.technique?.tiers.map((tier) => tier.actions.map(({ actionCode }) => actionCode)))
@@ -564,7 +572,7 @@ describe("native class implementation sequence", () => {
       defense: 35,
       maxLife: 280,
       movement: 6,
-      level: 10,
+      level: 4,
     });
     expect(definition.technique?.tiers.map((tier) => tier.actions.map(({ actionCode }) => actionCode)))
       .toEqual([
@@ -588,7 +596,7 @@ describe("native class implementation sequence", () => {
       defense: 48,
       maxLife: 435,
       movement: 8,
-      level: 13,
+      level: 4,
     });
     expect(suppressesOrdinaryCounterFor("great-axe-warrior")).toBe(true);
     expect(ordinaryHitStatusFor("great-axe-warrior")).toBeUndefined();
@@ -624,7 +632,7 @@ describe("native class implementation sequence", () => {
       defense: 42,
       maxLife: 352,
       movement: 7,
-      level: 11,
+      level: 4,
     });
     expect(definition.promotion.targets).toEqual([]);
     expect(definition.ordinaryHitStatuses).toEqual([]);
@@ -646,7 +654,7 @@ describe("native class implementation sequence", () => {
       defense: 84,
       maxLife: 505,
       movement: 8,
-      level: 13,
+      level: 4,
     });
     expect(definition.codes.side1).toBe("1H");
     expect(definition.ordinaryHitStatuses).toEqual([]);
@@ -707,7 +715,7 @@ describe("native class implementation sequence", () => {
       defense: 39,
       maxLife: 372,
       movement: 8,
-      level: 13,
+      level: 4,
     });
     expect(definition.technique?.tiers.map((tier) => tier.actions.map(({ actionCode }) => actionCode)))
       .toEqual([
@@ -731,7 +739,7 @@ describe("native class implementation sequence", () => {
       defense: 38,
       maxLife: 338,
       movement: 8,
-      level: 13,
+      level: 4,
     });
     expect(definition.technique?.tiers.map((tier) => tier.actions.map(({ actionCode }) => actionCode)))
       .toEqual([["2F"], ["3F"], ["4F"]]);
@@ -750,7 +758,7 @@ describe("native class implementation sequence", () => {
       defense: 42,
       maxLife: 328,
       movement: 8,
-      level: 10,
+      level: 4,
     });
     expect(definition.shooting).toMatchObject({
       classCode: "1I",
@@ -827,7 +835,7 @@ describe("native class implementation sequence", () => {
       defense: definition.dataRows[0].defense,
       maxLife: definition.dataRows[0].maxLife,
       movement: definition.dataRows[0].movement,
-      level: definition.dataRows[0].level,
+      level: 1,
     });
     expect(definition.dataRows.length).toBeGreaterThanOrEqual(3);
   });

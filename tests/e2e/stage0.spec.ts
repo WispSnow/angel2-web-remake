@@ -838,7 +838,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     });
   }
   await expect(page.getByTestId("promotion-target-cavalry")).toHaveAccessibleName(
-    /騎兵.*攻擊 55（\+9）.*生命上限 200（\+10）/,
+    /騎兵.*等級 1.*攻擊 55（\+9）.*生命上限 200（\+10）/,
   );
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("promotion-target-warrior")).toHaveAttribute("aria-current", "true");
@@ -2946,6 +2946,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   // The mandatory promotion overlay recenters its queued unit before it opens.
   await page.getByTestId("battle-canvas").hover({ position: { x: 220, y: 177 } });
   await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", "我方・玩家・已行動，修女希蜜");
+  await expect(page.getByTestId("unit-level-stat")).toHaveText(/等級\s*1/);
   await expect(page.getByTestId("hp-bar")).toHaveAttribute("aria-label", new RegExp(`生命 ${ximiLifeAtPromotion}／`));
   await expect(page.getByTestId("exp-bar")).toHaveAttribute("aria-label", /^經驗 0／/);
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-ximi-promoted-map.png" });

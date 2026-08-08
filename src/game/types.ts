@@ -19,6 +19,7 @@ export interface UnitStats {
   defense: number;
   maxLife: number;
   movement: number;
+  /** Current-profession level; promotion resets this marker to 1. */
   level: number;
 }
 

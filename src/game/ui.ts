@@ -1553,7 +1553,7 @@ function renderHud(
         <div class="unit-core-stat"><dt>生命</dt><dd>${unit.life}／${stats.maxLife}</dd></div>
         <div class="unit-core-stat" data-testid="unit-attack-stat"><dt>攻擊</dt><dd>${stats.attack}／${baseStats.attack}</dd></div>
         <div class="unit-core-stat" data-testid="unit-defense-stat"><dt>防禦</dt><dd>${stats.defense}／${baseStats.defense}</dd></div>
-        <div class="unit-core-stat"><dt>等級</dt><dd>${stats.level}</dd></div>
+        <div class="unit-core-stat" data-testid="unit-level-stat"><dt>等級</dt><dd>${stats.level}</dd></div>
         <div class="unit-core-stat"><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
       </dl>
       ${statusMarkup}

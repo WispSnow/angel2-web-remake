@@ -99,7 +99,7 @@ describe("all-class showdown lab", () => {
     for (const unit of battle.units) {
       const expected = classDefinition(unit.classId).dataRows[2];
       expect(unit.experience, unit.classId).toBe(expected.experienceThreshold);
-      expect(classStatsFor(unit).level, unit.classId).toBe(expected.level);
+      expect(classStatsFor(unit).level, unit.classId).toBe(3);
       expect(unit.life, unit.classId).toBe(battle.statsFor(unit).maxLife);
     }
 

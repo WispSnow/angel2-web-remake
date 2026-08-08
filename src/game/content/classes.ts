@@ -96,7 +96,10 @@ export function classStatsFor(
       defense: selected.defense,
       maxLife: selected.maxLife,
       movement: selected.movement,
-      level: selected.level,
+      // DATA field6 is a native table marker (for example, cavalry starts at
+      // 4). The HUD marker is the row within the current profession, so a
+      // freshly promoted unit starts at profession level 1.
+      level: selectedIndex + 1,
     };
   }
 
@@ -107,7 +110,7 @@ export function classStatsFor(
       defense: selected.defense,
       maxLife: selected.maxLife,
       movement: selected.movement,
-      level: selected.level,
+      level: selectedIndex + 1,
     };
   }
   const thirdThreshold = fixedRows[2].experienceThreshold;
@@ -119,7 +122,7 @@ export function classStatsFor(
     defense: selected.defense,
     maxLife: selected.maxLife + postThirdRows * growth.maxLifeIncrement,
     movement: selected.movement,
-    level: selected.level + postThirdRows,
+    level: selectedIndex + 1 + postThirdRows,
   };
 }
 
