@@ -1302,6 +1302,64 @@ describe("Full-screen ordinary combat choreography", () => {
       .toBeUndefined();
   });
 
+  it("centers the great dragon knight guard without moving the shared counter-guard trail", () => {
+    const left = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "great-dragon-knight"),
+      unit(2, 48, "測試守方"),
+      result({ counterDamage: 8 }),
+    );
+    const leftReference = buildFullCombatScript(
+      unit(1, 0, "測試攻方"),
+      unit(2, 48, "測試守方"),
+      result({ counterDamage: 8 }),
+    );
+    const leftCounterImpact = markTime(left, "fullCounterImpact");
+    const leftReferenceCounterImpact = markTime(leftReference, "fullCounterImpact");
+    expect(left.sample(leftCounterImpact).sprites.find(({ channel }) => channel === "victim"))
+      .toMatchObject({
+        side: "left",
+        classId: 19,
+        frame: 3,
+        reaction: "guard",
+        x: 146,
+      });
+    const leftTrail = left.sample(leftCounterImpact + 200).particles;
+    expect(leftTrail).toHaveLength(3);
+    expect(leftTrail).toEqual(leftReference.sample(leftReferenceCounterImpact + 200).particles);
+
+    const right = buildFullCombatScript(
+      unit(2, 48, "測試攻方", "great-dragon-knight"),
+      unit(1, 0, "測試守方"),
+      result({
+        attackerId: "2:48",
+        defenderId: "1:0",
+        counterDamage: 8,
+      }),
+    );
+    const rightReference = buildFullCombatScript(
+      unit(2, 48, "測試攻方"),
+      unit(1, 0, "測試守方"),
+      result({
+        attackerId: "2:48",
+        defenderId: "1:0",
+        counterDamage: 8,
+      }),
+    );
+    const rightCounterImpact = markTime(right, "fullCounterImpact");
+    const rightReferenceCounterImpact = markTime(rightReference, "fullCounterImpact");
+    expect(right.sample(rightCounterImpact).sprites.find(({ channel }) => channel === "victim"))
+      .toMatchObject({
+        side: "right",
+        classId: 19,
+        frame: 3,
+        reaction: "guard",
+        x: 302,
+      });
+    const rightTrail = right.sample(rightCounterImpact + 200).particles;
+    expect(rightTrail).toHaveLength(3);
+    expect(rightTrail).toEqual(rightReference.sample(rightReferenceCounterImpact + 200).particles);
+  });
+
   it("drops the crossbow bolt from above the window onto the native ground anchor", () => {
     const left = buildFullCombatScript(
       unit(1, 0, "測試攻方", "crossbow"),

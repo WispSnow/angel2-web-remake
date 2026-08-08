@@ -140,6 +140,51 @@ test("ordinary melee status applies directly and appears in the unit HUD without
   expect(pageErrors).toEqual([]);
 });
 
+test("great dragon knight counter guard keeps its wide shield centered", async ({ page }) => {
+  await page.goto("/arena.html?test=1&slowFull");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("great-dragon-knight");
+    arena.setLevel(1);
+    const attacker = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const defender = arena.interact(21, 30);
+    return [attacker, defender];
+  });
+  expect(placed).toEqual([true, true]);
+
+  await page.getByTestId("arena-start").click();
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-attack").click();
+  await clickArenaWorldCell(page, 21, 30);
+  await page.waitForFunction(() =>
+    window.__ANGEL2_ARENA__?.getState().battle?.combatPresentation?.phase === "fullCounterImpact");
+
+  const victim = page.getByTestId("full-victim-sprite");
+  await expect(victim).toBeVisible();
+  await expect(victim).toHaveAttribute("data-side", "left");
+  await expect(victim).toHaveAttribute("data-frame", "3");
+  await expect(victim).toHaveAttribute("data-reaction", "guard");
+  await expect(victim).toHaveAttribute("data-x", "146");
+  const particles = page.locator(".full-combat-particles img:not([hidden])");
+  await expect(particles).toHaveCount(3);
+  const particleXs = await particles.evaluateAll((elements) => elements.map((element) => {
+    const match = element.getAttribute("style")?.match(/translate\((-?\d+)px/u);
+    return Number(match?.[1]);
+  }));
+  expect(particleXs[0]).toBeGreaterThanOrEqual(245);
+  expect(particleXs[0]).toBeLessThanOrEqual(269);
+  expect(particleXs[1] - particleXs[0]).toBe(24);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-great-dragon-counter-guard.png`,
+  });
+});
+
 test("arena setup remains usable at a narrow viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/arena.html?test=1");

@@ -32,6 +32,7 @@ const CODE_SIGNATURES = [
   ["0000:A377", "prepare-full-screen-counter", "8b3ebf77e88c003c0274053c017448c3bafa00bb8700e8d10cba8a02bb8700e8640ee87700e88613a180f8be41029a0a"],
   ["0000:A77F", "execute-full-screen-command-stream", "8b1e187c8b073dffff7419a3167c8306187c02e85f00e86202e85f04e8c104e82305ebdcc3"],
   ["0000:A7A4", "execute-full-screen-death-stream", "8b1e187c8b073dffff7413a3167c8306187c02e83a00e83d02e80405ebe2c3"],
+  ["0000:B3BD", "draw-shared-full-screen-trail", "803e487f597416803e487f55742c803e"],
   ["0000:B683", "full-screen-left-death", "833e647a007401c3a105028ec0bf0000b90b00bb0300e8f646e841f1e844f3c706187c4c7dc706847a5a7dc7060a7bae"],
   ["0000:B6BD", "full-screen-right-death", "833eea7a007401c3a105028ec0bf0000b90b00bb0300e8bc46e807f1e80af3c706187c4c7dc7060a7b847dc706847aae"],
   ["0000:B725", "load-class-plus50-left-graphic", "8b1e637c83c332e81900c38b1e9d7c83c332a180f88ec0bf00008bcbbb0600e84b46c3"],
@@ -801,6 +802,25 @@ async function extract(
       sequenceEntry: "0000:A17B",
       strikeEntry: "0000:A1E8",
       commandInterpreter: "0000:A77F",
+      commonTrail: {
+        drawEntry: "0000:B3BD",
+        graphicResource: "A/26",
+        subjectCoordinates: {
+          attacker: "DS:7AAC (main slot DS:7AA6 + 6)",
+          defender: "DS:7B32 (main slot DS:7B2C + 6)",
+          slotEvidence: "0000:A7C0 clears every sprite slot except offset 6",
+        },
+        classOrFrameLookup: "none; B3BD reads no class record, bitmap width, or x-anchor",
+        branches: {
+          attackerY: "subjectX - 40 - phase; particle spacing -24",
+          attackerU: "subjectX + 40 + phase; particle spacing +24",
+          defenderY: "subjectX + 40 + phase; particle spacing +24",
+          defenderU: "subjectX - 40 - phase; particle spacing -24",
+        },
+        phase: "DS:7F4C advances by 4 and wraps to 0 after 24",
+        verticalCoordinates: [124, 120, 115],
+        conclusion: "all class records share the same main-channel coordinate formula; per-frame anchors only project the character bitmap",
+      },
       attackerBlock: "0000:9F74 loads attacker cell DS:77BF, then 0000:9FC4/A01B copies its 58-byte presentation block to DS:7C63 according to side",
       defenderBlock: "0000:9F9C loads defender cell DS:77C1, then 0000:9FC4/A01B copies its 58-byte presentation block to DS:7C9D according to side",
       graphicSelection: {
@@ -940,7 +960,7 @@ async function extract(
       ],
     },
     evidenceBoundary: {
-      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, 210-pixel tiered life-gauge geometry and impact update timing, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
+      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
       preservedUnknown: "the original design names of many embedded full-screen command fields and the host/VGA duration of one full-screen renderer substep; the released nominal native timer tick is 10.000151 ms",
       implementation: "none; this export is phase-1 evidence only",
     },

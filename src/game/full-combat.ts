@@ -224,7 +224,10 @@ interface StrikeSpec {
   actorClass: FullCombatClass;
   victimClass: FullCombatClass;
   actorX: number;
+  /** Shared main-channel x consumed by native movement and common effects. */
   victimX: number;
+  /** Renderer-only correction for unusually wide reaction bitmaps. */
+  victimSpriteX: number;
   cameraFrom: number;
   damage: number;
   victimDies: boolean;
@@ -886,7 +889,7 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
       0,
       0,
     );
-    const x = spec.victimX + pose.x - endPose.x;
+    const x = spec.victimSpriteX + pose.x - endPose.x;
     if (!nativeFrameIntersectsViewport(
       base.side,
       spec.victimClass,
@@ -913,7 +916,7 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
     reactionStream,
     t - times.impact,
     NATIVE_POST_HIT_SUBSTEP,
-    spec.victimX,
+    spec.victimSpriteX,
     0,
   );
   let frame = pose.frame;
@@ -926,7 +929,7 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
       lift = 0;
     }
   }
-  return { ...base, frame, reaction, x: spec.victimX, lift, opacity: 1 };
+  return { ...base, frame, reaction, x: spec.victimSpriteX, lift, opacity: 1 };
 }
 
 function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {
@@ -1416,7 +1419,7 @@ function nativePresentationAt(
 function damageAt(spec: StrikeSpec, times: StrikeTimes, t: number, holdEnd: number): FullCombatSceneState["damage"] {
   if (t < times.impact || t > holdEnd) return undefined;
   const attackDir = spec.actorSide === "left" ? 1 : -1;
-  return { amount: spec.damage, x: spec.victimX + attackDir * DAMAGE_OFFSET };
+  return { amount: spec.damage, x: spec.victimSpriteX + attackDir * DAMAGE_OFFSET };
 }
 
 function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
@@ -1564,6 +1567,24 @@ function victimMark(actorClass: FullCombatClass, actorX: number, dir: 1 | -1, me
   return Math.max(70, Math.min(FULL_SCENE.width - 70, ranged));
 }
 
+/**
+ * The great dragon knight's direct guard frame is a 160 px shield bitmap,
+ * rather than a body-sized reaction frame. Keep its accepted centering as a
+ * renderer-only projection: module 29's common B3BD trail always reads the
+ * shared main-channel x and never applies a class or frame-specific offset.
+ */
+function guardVictimSpriteMark(
+  victimClass: FullCombatClass,
+  victimSide: "left" | "right",
+  damage: number,
+  fallback: number,
+): number {
+  if (victimClass !== 19 || damage > 10) return fallback;
+  return victimSide === "left"
+    ? FULL_SCENE.width - PRIMARY_VICTIM_MARK
+    : PRIMARY_VICTIM_MARK;
+}
+
 function primaryActorMark(actorClass: FullCombatClass, attackerLeft: boolean): number {
   const leftMark = actorClass === 22 ? CAVALRY_ATTACKER_ANCHOR : ATTACKER_ANCHOR;
   return attackerLeft ? leftMark : FULL_SCENE.width - leftMark;
@@ -1579,17 +1600,26 @@ export function buildFullCombatScript(
   const primaryDir: 1 | -1 = attackerLeft ? 1 : -1;
   const primaryClass = fullCombatClass(attacker.classId);
   const primaryActorX = primaryActorMark(primaryClass, attackerLeft);
+  const primaryVictimSide: "left" | "right" = attackerLeft ? "right" : "left";
+  const primaryVictimClass = fullCombatClass(defender.classId);
+  const primaryVictimX = victimMark(
+    primaryClass,
+    primaryActorX,
+    primaryDir,
+    attackerLeft ? PRIMARY_VICTIM_MARK : FULL_SCENE.width - PRIMARY_VICTIM_MARK,
+  );
   const primary: StrikeSpec = {
     start: OPEN.sceneAt,
     actorSide: attackerLeft ? "left" : "right",
     actorClass: primaryClass,
-    victimClass: fullCombatClass(defender.classId),
+    victimClass: primaryVictimClass,
     actorX: primaryActorX,
-    victimX: victimMark(
-      primaryClass,
-      primaryActorX,
-      primaryDir,
-      attackerLeft ? PRIMARY_VICTIM_MARK : FULL_SCENE.width - PRIMARY_VICTIM_MARK,
+    victimX: primaryVictimX,
+    victimSpriteX: guardVictimSpriteMark(
+      primaryVictimClass,
+      primaryVictimSide,
+      result.damage,
+      primaryVictimX,
     ),
     cameraFrom: 0,
     damage: result.damage,
@@ -1604,17 +1634,27 @@ export function buildFullCombatScript(
   if (!primary.final) {
     const counterDir: 1 | -1 = attackerLeft ? -1 : 1;
     const primaryCameraEnd = cameraAt(primary, primaryTimes, primaryTimes.end);
+    const counterVictimSide: "left" | "right" = attackerLeft ? "left" : "right";
+    const counterVictimClass = fullCombatClass(attacker.classId);
+    const counterActorX = primary.victimSpriteX;
+    const counterVictimX = victimMark(
+      fullCombatClass(defender.classId),
+      counterActorX,
+      counterDir,
+      attackerLeft ? COUNTER_VICTIM_MARK : FULL_SCENE.width - COUNTER_VICTIM_MARK,
+    );
     counter = {
       start: primaryTimes.end + FULL_COMBAT_HOLD,
       actorSide: attackerLeft ? "right" : "left",
       actorClass: fullCombatClass(defender.classId),
-      victimClass: fullCombatClass(attacker.classId),
-      actorX: primary.victimX,
-      victimX: victimMark(
-        fullCombatClass(defender.classId),
-        primary.victimX,
-        counterDir,
-        attackerLeft ? COUNTER_VICTIM_MARK : FULL_SCENE.width - COUNTER_VICTIM_MARK,
+      victimClass: counterVictimClass,
+      actorX: counterActorX,
+      victimX: counterVictimX,
+      victimSpriteX: guardVictimSpriteMark(
+        counterVictimClass,
+        counterVictimSide,
+        result.counterDamage,
+        counterVictimX,
       ),
       cameraFrom: primaryCameraEnd,
       damage: result.counterDamage,
