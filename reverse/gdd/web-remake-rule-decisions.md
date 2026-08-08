@@ -2,7 +2,7 @@
 
 日期：2026-07-15  
 状态：设计评审中，`implementationFrozen=true`  
-原版事实基线：`original-gdd.md` Draft 0.46
+原版事实基线：`original-gdd.md` Draft 0.47
 
 ## 规则分层
 

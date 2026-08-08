@@ -15,6 +15,7 @@ import {
   classIdFromNativeRecord,
   classStatsFor,
 } from "./content/classes";
+import { classTraitsFor } from "./content/class-traits";
 import { activeUnitStatusPresentations } from "./content/status-presentations";
 import type { CombatPresentation, GameController } from "./controller";
 import {
@@ -678,7 +679,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       } else {
         actionMenu.dataset.kind = controller.commandMenuKind;
         actionMenu.style.height = `${controller.unitCommands.length * 24 + 28}px`;
-        actionMenu.setAttribute("aria-label", controller.commandMenuKind === "initial" ? "選擇單位行動" : "選擇移動後行動");
+        actionMenu.setAttribute(
+          "aria-label",
+          controller.commandMenuKind === "initial"
+            ? "選擇單位行動"
+            : controller.commandMenuKind === "extraMove"
+              ? "選擇飛龍騎士攻擊後移動或放棄"
+              : "選擇移動後行動",
+        );
         actionMenu.innerHTML = controller.unitCommands.map((command, index) => {
           const action = command.id === "end" ? "end-unit" : command.id === "undo" ? "undo-move" : command.id;
           const selected = index === controller.commandIndex;
@@ -1414,6 +1422,8 @@ interface UnitContextPresentation {
   visibleControlSummary?: string;
   tacticLabel?: string;
   tacticPrefix: string;
+  traitSummary?: string;
+  traitDescription?: string;
   routePulseSafety?: "safe" | "danger";
   routePulseSafetyLabel?: string;
 }
@@ -1438,6 +1448,7 @@ function unitContextPresentation(
     ?? force?.tacticLabel
     ?? (unit.side === 2 ? "主動進攻" : !playerControlled ? "自主作戰" : undefined);
   const routePulseSafety = controller.battle.routePulseSafetyForUnit(unit.id);
+  const classTraits = classTraitsFor(unit.classId);
   return {
     controlSummary: playerControlled
       ? `${affiliationLabel}・${controlLabel}・${actionLabel}`
@@ -1445,6 +1456,12 @@ function unitContextPresentation(
     visibleControlSummary: playerControlled ? `${controlLabel}・${actionLabel}` : undefined,
     tacticLabel,
     tacticPrefix: unit.side === 1 && !playerControlled ? `${affiliationLabel}・` : "",
+    traitSummary: classTraits.length > 0
+      ? classTraits.map(({ shortDescription }) => shortDescription).join("／")
+      : undefined,
+    traitDescription: classTraits.length > 0
+      ? classTraits.map(({ description }) => description).join("；")
+      : undefined,
     routePulseSafety,
     routePulseSafetyLabel: routePulseSafety === "safe"
       ? "安全"
@@ -1468,6 +1485,10 @@ function renderSelectedUnitContext(controller: GameController): string | undefin
         ? `<span class="selected-unit-affiliation">${context.tacticPrefix}</span>`
         : ""}<span class="selected-unit-tactic-pair"><b data-testid="unit-tactic-label">戰術</b><span
           data-testid="unit-tactic-value">${context.tacticLabel}</span></span></span>`
+      : undefined,
+    context.traitSummary && context.traitDescription
+      ? `<span class="selected-unit-traits" data-testid="unit-traits"
+          title="${context.traitDescription}" aria-label="職業特性：${context.traitDescription}"><b>特性</b><span>${context.traitSummary}</span></span>`
       : undefined,
     context.routePulseSafetyLabel
       ? `<span class="selected-unit-safety" data-testid="route-pulse-safety"
@@ -1510,7 +1531,7 @@ function renderHud(
         </li>`).join("")}
     </ul>`;
   return `
-    <div class="unit-detail" data-testid="unit-detail" aria-label="${context.controlSummary}，${unit.className}${unit.name}${context.tacticLabel ? `，戰術${context.tacticLabel}` : ""}${context.routePulseSafetyLabel ? `，力場${context.routePulseSafetyLabel}` : ""}">
+    <div class="unit-detail" data-testid="unit-detail" aria-label="${context.controlSummary}，${unit.className}${unit.name}${context.tacticLabel ? `，戰術${context.tacticLabel}` : ""}${context.traitDescription ? `，職業特性${context.traitDescription}` : ""}${context.routePulseSafetyLabel ? `，力場${context.routePulseSafetyLabel}` : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
       ${animatedPortraitMarkup(unit.portrait, {
         alt: `${unit.name}肖像`,

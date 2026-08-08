@@ -375,6 +375,7 @@ export class GameController {
   private audioCueSequence = 0;
   private pendingOrigin?: Position;
   private pendingPath?: Position[];
+  private pendingExtraMove = false;
   private busy = false;
   private promotionResume?: () => void;
   private prayerHoldSkip?: () => void;
@@ -759,11 +760,15 @@ export class GameController {
     return this.groupLeader !== undefined;
   }
 
-  get commandMenuKind(): "initial" | "postMove" {
+  get commandMenuKind(): "initial" | "postMove" | "extraMove" {
+    if (this.pendingExtraMove) return "extraMove";
     return this.pendingPath ? "postMove" : "initial";
   }
 
   get unitCommands(): readonly UnitCommand[] {
+    if (this.commandMenuKind === "extraMove") {
+      return [BASIC_COMMANDS[0], { id: "end", label: "放棄" }];
+    }
     const selectedClassCommand = this.selectedUnit
       ? CLASS_COMMANDS[this.selectedUnit.classId]
         ?? (this.battle.additionalActionIdsFor(this.selectedUnit.id).length > 0
@@ -1129,18 +1134,27 @@ export class GameController {
     if (
       this.phase !== "player"
       || this.actionMode !== "actionMenu"
-      || this.commandMenuKind !== "initial"
+      || (this.commandMenuKind !== "initial" && this.commandMenuKind !== "extraMove")
       || !unit
     ) return;
-    this.reachable = this.battle.reachableCells(unit.id);
+    this.reachable = this.commandMenuKind === "extraMove"
+      ? this.battle.extraMovementRange(unit.id)
+      : this.battle.reachableCells(unit.id);
     this.actionMode = "move";
-    this.statusMessage = "藍色格為可移動範圍；可選原格保留位置。";
+    this.statusMessage = this.pendingExtraMove
+      ? "藍色格為攻擊後可再次移動的範圍；此次不能再攻擊。"
+      : "藍色格為可移動範圍；可選原格保留位置。";
     this.emit();
   }
 
   chooseAttack(): void {
     const unit = this.selectedUnit;
-    if (this.phase !== "player" || this.actionMode !== "actionMenu" || !unit) return;
+    if (
+      this.phase !== "player"
+      || this.actionMode !== "actionMenu"
+      || this.commandMenuKind === "extraMove"
+      || !unit
+    ) return;
     this.targets = this.battle.units
       .filter((candidate) => candidate.side !== unit.side
         && !candidate.actionDisabled
@@ -1169,6 +1183,7 @@ export class GameController {
   }
 
   chooseShoot(): void {
+    if (this.commandMenuKind === "extraMove") return;
     const actionId = this.selectedUnit?.classId === "archer"
       ? "archer-shot"
       : this.selectedUnit?.classId === "crossbow"
@@ -1294,8 +1309,12 @@ export class GameController {
       !unit
       || this.phase !== "player"
       || this.actionMode !== "actionMenu"
-      || this.commandMenuKind !== "postMove"
+      || (this.commandMenuKind !== "postMove" && this.commandMenuKind !== "extraMove")
     ) return;
+    if (this.commandMenuKind === "extraMove") {
+      this.finishUnitAction("已放棄飛龍騎士的攻擊後移動；單位行動結束。", true);
+      return;
+    }
     this.battle.wait(unit.id);
     this.finishUnitAction("單位行動結束。", true);
   }
@@ -1399,6 +1418,11 @@ export class GameController {
       this.techniqueIndex = 0;
       this.actionMode = "actionMenu";
     } else if (this.actionMode === "actionMenu") {
+      if (this.commandMenuKind === "extraMove") {
+        this.statusMessage = "攻擊已經提交；請選擇額外移動或放棄。";
+        this.emit();
+        return;
+      }
       if (this.commandMenuKind === "postMove") {
         void this.rollbackSelectedMovement();
         return;
@@ -2057,6 +2081,23 @@ export class GameController {
       this.resetAction();
       this.markHintSeen();
       await this.presentOrdinaryCombat(attackerPresentation, defenderPresentation, result);
+      const survivingAttacker = this.battle.unit(result.attackerId);
+      const offersExtraMove = survivingAttacker
+        && this.battle.isPlayerControllableAlly(survivingAttacker.id)
+        && this.battle.canUseFlyingDragonExtraMove(result);
+      if (offersExtraMove) {
+        this.busy = false;
+        this.selectedId = survivingAttacker.id;
+        this.pendingOrigin = { x: survivingAttacker.x, y: survivingAttacker.y };
+        this.pendingPath = undefined;
+        this.pendingExtraMove = true;
+        this.commandIndex = 0;
+        this.cursor = { x: survivingAttacker.x, y: survivingAttacker.y };
+        this.actionMode = "actionMenu";
+        this.statusMessage = "飛龍騎士可用目前移動力的一半再次移動，或放棄並結束行動。";
+        this.emit();
+        return;
+      }
       const promotionPause = this.pauseForPromotions();
       if (promotionPause) await promotionPause;
       this.busy = false;
@@ -2130,6 +2171,7 @@ export class GameController {
     this.commandIndex = 0;
     this.pendingOrigin = undefined;
     this.pendingPath = undefined;
+    this.pendingExtraMove = false;
     this.reachable = [];
     this.targets = [];
     this.actionRange = [];
@@ -4351,16 +4393,27 @@ export class GameController {
   private async moveSelectedUnit(destination: Position): Promise<void> {
     const unit = this.selectedUnit;
     if (!unit || this.busy || this.actionMode !== "move") return;
-    const path = this.battle.movementPath(unit.id, destination);
+    const extraMove = this.pendingExtraMove;
+    const path = extraMove
+      ? this.battle.extraMovementPath(unit.id, destination)
+      : this.battle.movementPath(unit.id, destination);
     if (path.length === 0) return;
     this.busy = true;
     this.actionMode = "moving";
     this.pendingPath = path.map((step) => ({ ...step }));
     const completed = await this.animateUnitPath(unit.id, path, "player");
     this.busy = false;
+    if (completed && extraMove) {
+      this.finishUnitAction("飛龍騎士完成攻擊後移動；單位行動結束。", true);
+      return;
+    }
     this.actionMode = completed ? "actionMenu" : "move";
     this.commandIndex = 0;
-    this.statusMessage = completed ? "選擇攻擊、結束或返悔。" : "移動路徑已失效。";
+    this.statusMessage = completed
+      ? "選擇攻擊、結束或返悔。"
+      : extraMove
+        ? "攻擊後移動路徑已失效；請重新選擇。"
+        : "移動路徑已失效。";
     this.emit();
   }
 

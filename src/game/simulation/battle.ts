@@ -484,6 +484,50 @@ export class Stage0Battle {
     return findMovementPath(unit, destination, this.units, this.dynamicBattlefield);
   }
 
+  canUseFlyingDragonExtraMove(result: AttackResult): boolean {
+    const unit = this.unit(result.attackerId);
+    return unit?.classId === "flying-dragon-knight"
+      && unit.acted
+      && !unit.actionDisabled
+      && !result.attackerDied;
+  }
+
+  /**
+   * Native class 0F clears the spent-action bit while building this second
+   * range map. Keep that exception explicit so ordinary movement still rejects
+   * acted units everywhere else.
+   */
+  extraMovementPath(id: string, destination: Position): Position[] {
+    const unit = this.unit(id);
+    const occupant = this.unitAt(destination);
+    if (
+      !unit
+      || unit.classId !== "flying-dragon-knight"
+      || !unit.acted
+      || unit.actionDisabled
+      || (occupant && occupant.id !== unit.id)
+    ) return [];
+    const movementBudget = Math.floor(this.statsFor(unit).movement / 2);
+    return findMovementPath(
+      unit,
+      destination,
+      this.units,
+      this.dynamicBattlefield,
+      movementBudget,
+    );
+  }
+
+  extraMovementRange(id: string): Position[] {
+    const unit = this.unit(id);
+    if (
+      !unit
+      || unit.classId !== "flying-dragon-knight"
+      || !unit.acted
+      || unit.actionDisabled
+    ) return [];
+    return this.reachableCells(id, Math.floor(this.statsFor(unit).movement / 2));
+  }
+
   moveUnitStep(id: string, destination: Position, allowFriendlyTransit = false): boolean {
     const unit = this.unit(id);
     const occupant = this.unitAt(destination);

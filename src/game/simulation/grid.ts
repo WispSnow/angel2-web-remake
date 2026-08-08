@@ -177,6 +177,7 @@ export function movementPath(
   destination: Position,
   units: readonly BattleUnit[],
   battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+  movementBudget = unitStatsMovement(unit),
 ): Position[] {
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
   if (occupied.has(positionKey(destination))) return [];
@@ -188,7 +189,7 @@ export function movementPath(
   const result = search(
     unit,
     unit.classId,
-    unitStatsMovement(unit),
+    movementBudget,
     blocked,
     zoneOfControl(unit, units, battlefield),
     undefined,

@@ -12,7 +12,10 @@ import {
 } from "../../src/game/content/classes";
 import { Stage0Battle } from "../../src/game/simulation/battle";
 import { techniqueActionIdsFor } from "../../src/game/content/actions";
+import { classTraitsFor } from "../../src/game/content/class-traits";
 import { DeterministicRng } from "../../src/game/simulation/rng";
+import { CLASS_SHOWDOWN_ENVIRONMENT } from "../../src/game/class-showdown-session";
+import { ArenaBattle } from "../../src/game/simulation/arena-battle";
 
 function nativeRecord(record: number) {
   const value = unitCatalog.records.find((candidate) => candidate.record === record);
@@ -53,6 +56,110 @@ function expectGeneratedClassToMatchEvidence(classId: ClassId, record: number): 
 }
 
 describe("native class implementation sequence", () => {
+  it("catalogs every confirmed terminal knight and warrior trait without inventing missing branches", () => {
+    const traitClasses = [
+      "swift-dragon-knight",
+      "beast-knight",
+      "bone-knight",
+      "great-dragon-knight",
+      "flying-dragon-knight",
+      "great-axe-warrior",
+      "magic-sword-warrior",
+      "evil-sword-warrior",
+      "jungle-warrior",
+    ] satisfies readonly ClassId[];
+    expect(Object.fromEntries(traitClasses.map(
+      (classId) => [classId, classTraitsFor(classId).map(({ id }) => id)],
+    )))
+      .toEqual({
+        "swift-dragon-knight": ["swift-dragon-shooting-evasion"],
+        "beast-knight": ["beast-knight-attack-down"],
+        "bone-knight": ["bone-knight-full-counter"],
+        "great-dragon-knight": ["great-dragon-stomp"],
+        "flying-dragon-knight": ["flying-dragon-extra-move"],
+        "great-axe-warrior": ["great-axe-no-counter"],
+        "magic-sword-warrior": ["magic-sword-defense-down"],
+        "evil-sword-warrior": ["evil-sword-confusion"],
+        "jungle-warrior": ["jungle-poison"],
+      });
+    expect(Object.fromEntries(traitClasses.map(
+      (classId) => [classId, classTraitsFor(classId).map(({ shortDescription }) => shortDescription)],
+    ))).toEqual({
+      "swift-dragon-knight": ["閃避弓箭"],
+      "beast-knight": ["命中降攻"],
+      "bone-knight": ["強力反擊"],
+      "great-dragon-knight": ["龍踏技術"],
+      "flying-dragon-knight": ["攻後再移動"],
+      "great-axe-warrior": ["攻擊無反擊"],
+      "magic-sword-warrior": ["命中降防"],
+      "evil-sword-warrior": ["命中混亂"],
+      "jungle-warrior": ["命中施毒"],
+    });
+    expect(traitClasses.flatMap((classId) => classTraitsFor(classId))
+      .every(({ description }) => description.length > 0)).toBe(true);
+    expect(classTraitsFor("demon-dragon-knight")).toEqual([]);
+    expect(classTraitsFor("magic-armor-warrior")).toEqual([]);
+  });
+
+  it("record 15 flying dragon knight gets one acted-state path at half current movement", () => {
+    const battle = new ArenaBattle([
+      {
+        id: "flying-dragon",
+        side: 1,
+        slot: 0,
+        classId: "flying-dragon-knight",
+        level: 1,
+        x: 20,
+        y: 20,
+      },
+      {
+        id: "ordinary-ally",
+        side: 1,
+        slot: 1,
+        classId: "soldier",
+        level: 1,
+        x: 30,
+        y: 30,
+      },
+      {
+        id: "enemy",
+        side: 2,
+        slot: 0,
+        classId: "soldier",
+        level: 1,
+        x: 21,
+        y: 20,
+      },
+    ], 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
+    const unit = battle.unit("flying-dragon")!;
+    const enemy = battle.unit("enemy")!;
+    enemy.life = 1;
+    const attack = battle.attack(unit.id, enemy.id);
+
+    expect(classTraitsFor(unit.classId).map(({ id }) => id))
+      .toContain("flying-dragon-extra-move");
+    expect(attack).toMatchObject({ attackerDied: false, defenderDied: true });
+    expect(battle.outcome()).toBe("victory");
+    expect(battle.canUseFlyingDragonExtraMove(attack)).toBe(true);
+    expect(battle.statsFor(unit).movement).toBe(10);
+    expect(battle.movementPath(unit.id, { x: 24, y: 20 })).toEqual([]);
+    expect(battle.extraMovementRange(unit.id)).toContainEqual({ x: 24, y: 20 });
+    expect(battle.extraMovementRange(unit.id)).not.toContainEqual({ x: 25, y: 20 });
+    expect(battle.extraMovementPath(unit.id, { x: 24, y: 20 })).toEqual([
+      { x: 20, y: 20 },
+      { x: 21, y: 20 },
+      { x: 22, y: 20 },
+      { x: 23, y: 20 },
+      { x: 24, y: 20 },
+    ]);
+    expect(battle.extraMovementPath(unit.id, { x: 25, y: 20 })).toEqual([]);
+
+    const ordinaryAlly = battle.unit("ordinary-ally")!;
+    ordinaryAlly.acted = true;
+    expect(battle.extraMovementRange(ordinaryAlly.id)).toEqual([]);
+    expect(battle.extraMovementPath(ordinaryAlly.id, { x: 29, y: 30 })).toEqual([]);
+  });
+
   it("record 0 soldier reproduces native stats, growth, traits, and actions", () => {
     expectGeneratedClassToMatchEvidence("soldier", 0);
 

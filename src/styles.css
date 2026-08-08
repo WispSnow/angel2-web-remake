@@ -703,6 +703,9 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .selected-unit-tactic-pair { display: inline-flex; min-width: 0; align-items: center; gap: 6px; }
 .selected-unit-tactic-pair b { flex: none; color: var(--gold); }
 .selected-unit-tactic-pair > span { min-width: 0; overflow: hidden; color: #fff8dc; text-overflow: ellipsis; }
+.selected-unit-traits { display: inline-flex; min-width: 0; align-items: center; gap: 4px; color: #dff4c0; }
+.selected-unit-traits b { flex: none; color: #9ee276; }
+.selected-unit-traits > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .hint-toast { position: absolute; z-index: 9; left: 58px; top: 36px; max-width: 360px; padding: 7px 10px; border: 1px solid #f5d665; border-radius: 3px; color: #fff6c8; background: #351b1dea; font: 11px/1.3 system-ui, sans-serif; cursor: var(--native-cursor-hand, pointer); }
 
 .combat-presentation { position: absolute; z-index: 11; pointer-events: none; }

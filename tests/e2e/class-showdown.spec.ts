@@ -7,6 +7,9 @@ interface ClassShowdownBattleState {
   cameraOrigin: { x: number; y: number };
   cursor: { x: number; y: number };
   actionMode: string;
+  commandMenuKind: string;
+  commands: Array<{ id: string; label: string }>;
+  reachable: Array<{ x: number; y: number }>;
   actionRange: Array<{ x: number; y: number }>;
   targets: Array<{ x: number; y: number }>;
   effectPreviewCells: Array<{ x: number; y: number }>;
@@ -172,7 +175,7 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   await clickClassShowdownWorldCell(page, 18, 17);
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveText("戰術主動進攻");
-  await expect(page.getByTestId("status-strip")).toHaveText("戰術主動進攻");
+  await expect(page.getByTestId("status-strip")).toHaveText("戰術主動進攻・特性命中施毒");
   await expect(page.getByTestId("status-strip")).not.toContainText("紅色格");
   await expect(page.getByTestId("hud-identity").locator("span")).toHaveCount(0);
   const poisonIcon = page.getByTestId("status-icon-poison");
@@ -185,6 +188,82 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-jungle-poison-status-icon.png`,
   });
+  expect(pageErrors).toEqual([]);
+});
+
+test("flying dragon knight can move once at half range after attacking", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  for (let step = 0; step < 15; step += 1) await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 17, y: 30 });
+  await page.keyboard.press("Space");
+  await expect(page.locator(".hud-identity-name")).toHaveText("飛龍騎士");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性攻後再移動");
+  await expect(page.getByTestId("unit-traits")).toHaveAttribute(
+    "aria-label",
+    /目前移動力一半（向下取整）.*不能再攻擊/u,
+  );
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-flying-dragon-trait.png`,
+  });
+
+  await page.getByTestId("unit-command-attack").click();
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState;
+    }).battle;
+    return current?.lastCombat?.attackerId === "arena-1-15"
+      && current.combatPresentation === undefined
+      && current.actionMode === "actionMenu"
+      && current.commandMenuKind === "extraMove";
+  });
+
+  const postAttack = await classShowdownBattleState(page);
+  expect(postAttack?.commands).toEqual([
+    { id: "move", label: "移動" },
+    { id: "end", label: "放棄" },
+  ]);
+  expect(postAttack?.units.find(({ id }) => id === "arena-1-15")?.acted).toBe(true);
+  await expect(page.getByTestId("unit-command-attack")).toHaveCount(0);
+  await expect(page.getByTestId("unit-command-move")).toBeVisible();
+  await expect(page.getByTestId("unit-command-end")).toHaveText("放棄");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-flying-dragon-extra-move-menu.png`,
+  });
+
+  await page.getByTestId("unit-command-move").click();
+  const targeting = await classShowdownBattleState(page);
+  expect(targeting?.actionMode).toBe("move");
+  expect(targeting?.reachable.some(({ x, y }) => Math.abs(x - 17) + Math.abs(y - 30) === 4))
+    .toBe(true);
+  expect(targeting?.reachable.every(({ x, y }) => Math.abs(x - 17) + Math.abs(y - 30) <= 4))
+    .toBe(true);
+  const destination = { x: 14, y: 29 };
+  expect(targeting?.reachable).toContainEqual(destination);
+  for (let x = 16; x >= destination.x; x -= 1) {
+    await page.keyboard.press("ArrowLeft");
+    await expect.poll(async () => (await classShowdownBattleState(page))?.cursor.x).toBe(x);
+  }
+  await page.keyboard.press("ArrowUp");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor.y)
+    .toBe(destination.y);
+  await page.keyboard.press("Space");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.actionMode).toBe("idle");
+
+  const moved = await classShowdownBattleState(page);
+  expect(moved?.units.find(({ id }) => id === "arena-1-15")).toMatchObject({
+    x: destination.x,
+    y: destination.y,
+    acted: true,
+  });
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("unit-command-attack")).toHaveCount(0);
+  expect((await classShowdownBattleState(page))?.actionMode).toBe("idle");
   expect(pageErrors).toEqual([]);
 });
 
