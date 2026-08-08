@@ -36,8 +36,8 @@
 | [`00-product-vision.md`](00-product-vision.md) | 复刻为何存在、核心体验是什么 | Draft 0.1 |
 | [`01-ruleset-policy.md`](01-ruleset-policy.md) | 忠实、修复与 Mod 如何分层 | Draft 0.1 |
 | [`02-game-flow.md`](02-game-flow.md) | 从标题到战后、从回合到行动的完整循环 | Draft 0.1 |
-| [`03-battle-rules.md`](03-battle-rules.md) | 战斗规则的产品级合同 | Draft 0.1 |
-| [`04-units-progression-balance.md`](04-units-progression-balance.md) | 兵种、成长、转职与平衡边界 | Draft 0.1 |
+| [`03-battle-rules.md`](03-battle-rules.md) | 战斗规则的产品级合同；含普通攻击公式、射击固定伤害与职业特例 | Draft 0.2 |
+| [`04-units-progression-balance.md`](04-units-progression-balance.md) | 兵种、成长、转职与平衡边界；含 39 职业固定三行与第三行后成长真值表 | Draft 0.2 |
 | [`05-ai-and-difficulty.md`](05-ai-and-difficulty.md) | 敌方意图、AI 修复与难度 | Draft 0.1 |
 | [`06-campaign-and-narrative.md`](06-campaign-and-narrative.md) | 关卡与剧情如何编排 | Draft 0.1 |
 | [`07-ui-ux-and-presentation.md`](07-ui-ux-and-presentation.md) | 原版 UI 如何复现并适配浏览器 | Draft 0.2 |

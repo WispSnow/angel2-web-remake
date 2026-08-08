@@ -154,7 +154,6 @@ function preparePrayer(
 
 function prepareSingleTarget(
   intent: BattleActionIntent,
-  actor: BattleUnit,
   target: BattleUnit,
   trial: DeterministicRng,
   targetMaximumLife: number,
@@ -173,10 +172,9 @@ function prepareSingleTarget(
     } else if (shootingEvaded(target, trial)) {
       damage = 0;
     } else {
-      const minimum = actor.side === 2 && intent.actionId === "crossbow-shot"
-        ? 50
-        : definition.damage.minimum;
-      damage = trial.between(minimum, definition.damage.maximum);
+      // REMAKE-009 uses the player-visible action definition for both sides;
+      // legacyStrict owns the native side-2 50..89 crossbow range.
+      damage = trial.between(definition.damage.minimum, definition.damage.maximum);
     }
   } else if (isFireAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
@@ -393,9 +391,10 @@ function prepareMagicArcher(
     (count) => trial.between(0, count - 1),
   );
   if (path.length === 0) throw new Error("magic archer target is not connected to shooter");
+  // REMAKE-009 likewise excludes the native side-2 50..59 upper bound.
   const roll = trial.between(
     definition.damage.minimum,
-    actor.side === 2 ? 59 : definition.damage.maximum,
+    definition.damage.maximum,
   );
   const halfDamage = Math.floor(roll / 2);
   const lineUnits = path
@@ -740,7 +739,7 @@ export function prepareSpecialAction(
     experienceGained = 0;
   } else {
     if (!target) throw new Error("single-target action requires a target unit");
-    const single = prepareSingleTarget(intent, actor, target, trial, context.statsFor(target).maxLife);
+    const single = prepareSingleTarget(intent, target, trial, context.statsFor(target).maxLife);
     affectedUnits = [single.affected];
     experienceGained = single.experienceGained;
   }

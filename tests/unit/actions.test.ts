@@ -174,6 +174,36 @@ function findPrayerSeed(
 }
 
 describe("Stage-0 class actions", () => {
+  it.each([
+    ["crossbow-shot", "crossbow"],
+    ["magic-archer-shot", "magic-archer"],
+  ] as const)("uses one stable-remake %s damage definition for both sides", (actionId, classId) => {
+    const damageFor = (side: BattleUnit["side"], seed: number): number => {
+      const battle = new Stage0Battle(0, new DeterministicRng(seed));
+      const actor = battle.units.find((unit) => unit.side === side)!;
+      const target = battle.units.find((unit) => unit.side !== side)!;
+      battle.units = [actor, target];
+      actor.classId = classId;
+      actor.className = className(classId);
+      actor.x = 20;
+      actor.y = 20;
+      actor.acted = false;
+      target.x = 23;
+      target.y = 20;
+      target.life = 500;
+      return battle.prepareSpecialAction({
+        actionId,
+        actorId: actor.id,
+        targetId: target.id,
+        target: { x: target.x, y: target.y },
+      }).result.damage;
+    };
+
+    for (let seed = 1; seed <= 32; seed += 1) {
+      expect(damageFor(2, seed), `seed ${seed}`).toBe(damageFor(1, seed));
+    }
+  });
+
   it("binds the five released stage obstacle source tokens to their evidenced logical slots", () => {
     expect([
       STAGE0_OBSTACLE_TERRAIN_SLOT,

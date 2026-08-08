@@ -103,6 +103,62 @@ function createWaterSplitBattle(options: {
 }
 
 describe("native class implementation sequence", () => {
+  it("reproduces all 39 fixed rows and each distinct post-third-row growth step", () => {
+    for (const evidence of unitCatalog.records) {
+      const classId = classIdFromNativeRecord(evidence.record);
+      expect(classId, evidence.name).toBeDefined();
+      if (!classId) continue;
+
+      const fixedRows = evidence.dataRows.slice(0, 3);
+      for (const [index, row] of fixedRows.entries()) {
+        expect(
+          classStatsFor({ classId, experience: row.experienceThreshold }),
+          `${evidence.record} ${evidence.name} fixed row ${index + 1}`,
+        ).toEqual({
+          attack: row.attack,
+          defense: row.defense,
+          maxLife: row.maxLife,
+          movement: row.movement,
+          level: index + 1,
+        });
+      }
+
+      const growth = evidence.postThirdRowGrowth.find(
+        ({ code }) => code === evidence.codes.side1,
+      ) ?? evidence.postThirdRowGrowth[0];
+      expect(growth, `${evidence.record} ${evidence.name} growth entry`).toBeDefined();
+      if (!growth) continue;
+
+      const third = fixedRows[2];
+      expect(
+        classStatsFor({
+          classId,
+          experience: third.experienceThreshold + growth.thresholdIncrement - 1,
+        }),
+        `${evidence.record} ${evidence.name} immediately before profession level 4`,
+      ).toEqual({
+        attack: third.attack,
+        defense: third.defense,
+        maxLife: third.maxLife,
+        movement: third.movement,
+        level: 3,
+      });
+      expect(
+        classStatsFor({
+          classId,
+          experience: third.experienceThreshold + growth.thresholdIncrement,
+        }),
+        `${evidence.record} ${evidence.name} first post-third-row step`,
+      ).toEqual({
+        attack: third.attack + growth.attackIncrement,
+        defense: third.defense,
+        maxLife: third.maxLife + growth.maxLifeIncrement,
+        movement: third.movement,
+        level: 4,
+      });
+    }
+  });
+
   it("reports level within the current profession instead of the native cumulative marker", () => {
     expect(classStatsFor({ classId: "cavalry", experience: 0 }).level).toBe(1);
     expect(classStatsFor({ classId: "cavalry", experience: 180 }).level).toBe(2);

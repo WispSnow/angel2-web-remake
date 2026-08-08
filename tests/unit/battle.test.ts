@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { terrainDefensePercentFor } from "../../src/game/content/classes";
 import { STAGE0 } from "../../src/game/content/stage0";
 import { Stage0Battle } from "../../src/game/simulation/battle";
 import { manhattan, movementCost, positionKey, reachableCells, zoneOfControl } from "../../src/game/simulation/grid";
@@ -168,10 +169,33 @@ describe("stage 0 battle simulation", () => {
   it("resolves ordinary damage, counterattack, experience and action consumption", () => {
     const battle = battleAtPlayableOpening(7);
     expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
-    const defenderLife = battle.unit("2:45")!.life;
+    const attacker = battle.unit("1:0")!;
+    const defender = battle.unit("2:45")!;
+    const defenderLife = defender.life;
+    const attackerStats = battle.effectiveStatsFor(attacker);
+    const defenderStats = battle.effectiveStatsFor(defender);
+    const defenderTerrainDefense = Math.floor(
+      defenderStats.defense
+      * terrainDefensePercentFor(defender.classId, battle.terrainSlotAt(defender))
+      / 100,
+    );
+    const attackerTerrainDefense = Math.floor(
+      attackerStats.defense
+      * terrainDefensePercentFor(attacker.classId, battle.terrainSlotAt(attacker))
+      / 100,
+    );
+    const trial = battle.rng.clone();
+    const expectedDamage = Math.max(
+      0,
+      attackerStats.attack - defenderStats.defense - defenderTerrainDefense,
+    ) + trial.between(4, 7) + trial.between(4, 7);
+    const expectedCounterDamage = Math.floor(Math.max(
+      0,
+      defenderStats.attack - attackerStats.defense - attackerTerrainDefense,
+    ) / 2);
     const result = battle.attack("1:0", "2:45");
-    expect(result.damage).toBeGreaterThanOrEqual(8);
-    expect(result.counterDamage).toBeGreaterThanOrEqual(0);
+    expect(result.damage).toBe(expectedDamage);
+    expect(result.counterDamage).toBe(expectedCounterDamage);
     expect(result.counterOccurred).toBe(true);
     expect(battle.unit("2:45")!.life).toBe(defenderLife - result.damage);
     expect(battle.unit("1:0")!.acted).toBe(true);
