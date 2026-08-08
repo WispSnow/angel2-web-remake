@@ -2,12 +2,12 @@ import * as Phaser from "phaser";
 import {
   ARENA_CLASS_IDS,
   ARENA_MAP,
+  arenaAllyMapAsset,
   arenaClassCanStandAt,
   arenaEnemyMapAsset,
   type ArenaSession,
   type ArenaState,
 } from "../arena-session";
-import { ALLY_MAP_UNIT_ASSETS } from "../content/map-unit-assets";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
@@ -36,7 +36,7 @@ export function startArenaSetupPhaser(
     preload(): void {
       this.load.image("arena-map", ARENA_MAP.source);
       for (const classId of ARENA_CLASS_IDS) {
-        this.load.image(`arena-ally-${classId}`, ALLY_MAP_UNIT_ASSETS[classId]);
+        this.load.image(`arena-ally-${classId}`, arenaAllyMapAsset(classId));
         this.load.image(`arena-enemy-${classId}`, arenaEnemyMapAsset(classId));
       }
     }

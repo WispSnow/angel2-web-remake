@@ -6,14 +6,14 @@ import {
   ARENA_MAP,
   ARENA_TERRAIN_SLOTS,
   ArenaSession,
+  arenaAllyMapAsset,
   arenaClassCanStandAt,
   arenaEnemyMapAsset,
   arenaExperienceForLevel,
   arenaTerrainSlotAt,
 } from "../../src/game/arena-session";
-import { ALLY_MAP_UNIT_ASSETS } from "../../src/game/content/map-unit-assets";
 import { BATTLE_ACTION_DEFINITIONS } from "../../src/game/content/actions";
-import { classStatsFor } from "../../src/game/content/classes";
+import { CLASS_IDS, classDefinition, classStatsFor } from "../../src/game/content/classes";
 import { TECHNIQUE_LAB_CATALOG } from "../../src/game/content/technique-lab.generated";
 import {
   ArenaBattle,
@@ -46,10 +46,12 @@ describe("all-terrain arena", () => {
   });
 
   it("exposes each integrated map class on both sides with real assets", () => {
-    expect(ARENA_CLASS_IDS).toEqual(Object.keys(ALLY_MAP_UNIT_ASSETS));
-    expect(ARENA_CLASS_IDS.length).toBeGreaterThanOrEqual(20);
+    expect(ARENA_CLASS_IDS).toEqual(
+      CLASS_IDS.filter((classId) => classDefinition(classId).recordKind === "ordinary_catalog"),
+    );
+    expect(ARENA_CLASS_IDS).toHaveLength(35);
     for (const classId of ARENA_CLASS_IDS) {
-      const sources = [ALLY_MAP_UNIT_ASSETS[classId], arenaEnemyMapAsset(classId)];
+      const sources = [arenaAllyMapAsset(classId), arenaEnemyMapAsset(classId)];
       for (const source of sources) {
         const file = path.resolve("public", source.replace(/^\/assets\//, "assets/"));
         expect(fs.statSync(file).size, `${classId}: ${source}`).toBeGreaterThan(0);

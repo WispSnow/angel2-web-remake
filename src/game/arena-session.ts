@@ -1,10 +1,12 @@
 import {
+  CLASS_IDS,
   classDefinition,
   className,
   movementRulesFor,
   type ClassId,
 } from "./content/classes";
-import { ALLY_MAP_UNIT_ASSETS } from "./content/map-unit-assets";
+import { allyMapUnitAsset } from "./content/map-unit-assets";
+import { TECHNIQUE_LAB_UNIT_ASSETS } from "./content/technique-lab.generated";
 import { stage1TerrainSlotAt } from "./content/stage1";
 import type { PortraitRecord } from "./types";
 
@@ -23,15 +25,14 @@ export const ARENA_TERRAIN_SLOTS = [1, 2, 3, 5, 6, 10, 11, 12] as const;
 export const ARENA_MAX_UNITS_PER_SIDE = 24;
 
 /**
- * Arena availability is intentionally explicit. Adding a class here means its
- * map figure, ordinary combat presentation and current command set are ready
- * for integrated turn testing; it does not claim that every native ability is
- * already implemented.
+ * The arena exposes every ordinary catalog class with published map figures.
+ * Special runtime records remain outside this editor because they do not share
+ * the ordinary two-sided combat contract.
  */
-export const ARENA_CLASS_IDS = Object.keys(ALLY_MAP_UNIT_ASSETS) as Array<
-  keyof typeof ALLY_MAP_UNIT_ASSETS
->;
-export type ArenaClassId = (typeof ARENA_CLASS_IDS)[number];
+export type ArenaClassId = Exclude<ClassId, "empress" | "dragon" | "head" | "hand">;
+export const ARENA_CLASS_IDS: readonly ArenaClassId[] = CLASS_IDS.filter(
+  (classId): classId is ArenaClassId => classDefinition(classId).recordKind === "ordinary_catalog",
+);
 
 export type ArenaSide = 1 | 2;
 export type ArenaLevel = 1 | 2 | 3;
@@ -88,6 +89,12 @@ export function arenaExperienceForLevel(classId: ClassId, level: ArenaLevel): nu
 
 export function arenaEnemyMapAsset(classId: ClassId): string {
   return `/assets/original/technique-lab/units/enemy-${classId}.png`;
+}
+
+export function arenaAllyMapAsset(classId: ArenaClassId): string {
+  const source = allyMapUnitAsset(classId) ?? TECHNIQUE_LAB_UNIT_ASSETS[classId].ally;
+  if (!source) throw new Error(`${classId} has no allied arena map figure`);
+  return source;
 }
 
 export function arenaClassSupportsCurrentSpecialAction(classId: ArenaClassId): boolean {

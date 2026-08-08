@@ -13,7 +13,9 @@ test("arena edits both rosters and starts a formal-rule battle without touching 
   await expect(page.getByTestId("arena-setup-canvas-root").locator("canvas")).toBeVisible();
   await expect(page.locator("[data-arena-ally-count]")).toHaveText("4 人");
   await expect(page.locator("[data-arena-enemy-count]")).toHaveText("4 人");
-  await expect(page.getByTestId("arena-class").locator("option")).toHaveCount(26);
+  await expect(page.getByTestId("arena-class").locator("option")).toHaveCount(35);
+  await page.getByTestId("arena-class").selectOption("water-warrior");
+  await expect(page.getByTestId("arena-class-readout")).toContainText("水戰士");
   await expect(page.locator("[data-terrain-slot]")).toHaveCount(8);
   const storageBefore = await page.evaluate(() => JSON.stringify(
     Object.keys(localStorage).sort().map((key) => [key, localStorage.getItem(key)]),
