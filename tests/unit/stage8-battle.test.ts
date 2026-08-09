@@ -17,7 +17,7 @@ const campaign: CampaignState = {
 };
 
 describe("stage 8 battle simulation", () => {
-  it("builds the fixed eight-versus-eleven battle and preserves its control split", () => {
+  it("builds the fixed eight-versus-eleven battle with all allies player-controlled", () => {
     expect(createStage8Units(campaign.difficulty, campaign.roster)).toHaveLength(19);
     const battle = new Stage8Battle(campaign);
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(8);
@@ -27,16 +27,14 @@ describe("stage 8 battle simulation", () => {
     });
     expect(battle.unit("1:17")).toMatchObject({ classId: "land-knight", name: "阿曼妮" });
     expect(battle.unit("1:18")).toMatchObject({ classId: "priest", name: "雷伊拉" });
-    expect(["1:8", "1:17", "1:18"].map((id) => battle.isPlayerControllableAlly(id)))
-      .toEqual([true, true, true]);
-    expect(battle.alliedActionOrder(false)).toEqual([
-      "1:40", "1:43", "1:41", "1:42", "1:44",
-    ]);
+    const alliedIds = battle.units.filter(({ side }) => side === 1).map(({ id }) => id);
+    expect(alliedIds.every((id) => battle.isPlayerControllableAlly(id))).toBe(true);
+    expect(battle.alliedActionOrder(false)).toEqual([]);
     expect(battle.forceForUnit("1:8")).toMatchObject({
       id: "sulanda-ranger-command", control: "player",
     });
     expect(battle.forceForUnit("1:40")).toMatchObject({
-      id: "ranger-screening-force", control: "independent-ai",
+      id: "sulanda-ranger-command", control: "player",
     });
     expect(battle.forceForUnit("2:30")).toMatchObject({
       id: "dragon-tower-camp-raiders", control: "independent-ai",
@@ -89,7 +87,7 @@ describe("stage 8 battle simulation", () => {
     });
   });
 
-  it("uses the same expert technique planner for an independent friendly NPC", () => {
+  it("lets a formerly automatic ranger use expert techniques after a free-action handoff", () => {
     const battle = new Stage8Battle(campaign);
     const magician = battle.unit("1:40")!;
     const targets = [battle.unit("2:30")!, battle.unit("2:35")!];
@@ -104,7 +102,7 @@ describe("stage 8 battle simulation", () => {
     Object.assign(targets[0], { x: 26, y: 30 });
     Object.assign(targets[1], { x: 26, y: 31 });
 
-    expect(battle.isPlayerControllableAlly(magician.id)).toBe(false);
+    expect(battle.isPlayerControllableAlly(magician.id)).toBe(true);
     expect(battle.planAlliedAiAction(magician.id)).toMatchObject({
       unitId: magician.id,
       kind: "special",

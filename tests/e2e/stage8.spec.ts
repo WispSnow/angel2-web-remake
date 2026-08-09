@@ -123,19 +123,15 @@ test("S08-A/B/C/D/F: stage 7 completion plays three SAY/21 backgrounds and enter
     "stage-08-opening-story",
   ]);
   await clickUnit(page, "1:42");
-  expect(await state(page)).toMatchObject({ actionMode: "allyPreview", selectedId: "1:42" });
-  await expect(page.getByTestId("unit-tactic")).toHaveText("友軍・戰術牽制龍塔部隊");
-  await expect(page.getByTestId("action-menu")).toBeHidden();
-  await page.keyboard.press("Escape");
-  await clickUnit(page, "1:8");
-  expect(await state(page)).toMatchObject({ actionMode: "actionMenu", selectedId: "1:8" });
+  expect(await state(page)).toMatchObject({ actionMode: "actionMenu", selectedId: "1:42" });
   await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
+  await expect(page.getByTestId("action-menu")).toBeVisible();
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage8-fixed-roster-and-auto-ally.png`,
+    path: `${ARTIFACT_DIR}/stage8-former-auto-ranger-player-control.png`,
   });
 });
 
-test("S08-D: three player units hand off to all five independent rangers before enemies", async ({ page }) => {
+test("S08-D/REMAKE-038: all eight allies are manual and all-rest skips NPC actions", async ({ page }) => {
   await page.goto("/?debugScenario=stage-08-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.evaluate(() => {
@@ -151,18 +147,16 @@ test("S08-D: three player units hand off to all five independent rangers before 
     Object.assign(window, { __stage8Trace: trace, __stage8TraceInterval: interval });
   });
 
+  await clickUnit(page, "1:42");
+  await expect(page.getByTestId("action-menu")).toBeVisible();
+  await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
+  await page.getByTestId("unit-command-rest").click();
+  await expect.poll(async () =>
+    (await state(page)).units.find(({ id }) => id === "1:42")?.acted).toBe(true);
+
   await page.keyboard.press("Tab");
   await page.getByTestId("group-command-allRest").click();
   await page.getByTestId("dialogue-layer").click();
-  await waitForPhase(page, "allyAuto");
-  await page.waitForFunction(() => {
-    const current = window.__ANGEL2__?.getState() as Stage8State | undefined;
-    return current?.phase === "allyAuto"
-      && ["1:40", "1:43", "1:41", "1:42", "1:44"].includes(current.focusId);
-  });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage8-independent-rangers.png`,
-  });
   await waitForPhase(page, "enemy");
 
   const trace = await page.evaluate(() => {
@@ -173,12 +167,7 @@ test("S08-D: three player units hand off to all five independent rangers before 
     if (holder.__stage8TraceInterval !== undefined) window.clearInterval(holder.__stage8TraceInterval);
     return holder.__stage8Trace ?? [];
   });
-  const automaticFocusIds = new Set(
-    trace.filter(({ phase }) => phase === "allyAuto").map(({ focusId }) => focusId),
-  );
-  for (const id of ["1:40", "1:43", "1:41", "1:42", "1:44"]) {
-    expect(automaticFocusIds.has(id), `${id} should receive its independent action`).toBe(true);
-  }
+  expect(trace.some(({ statusMessage }) => statusMessage.includes("友軍 NPC"))).toBe(false);
 });
 
 test("S08-E/F: the last raider triggers the REMAKE-032 SAY/157 victory story", async ({ page }) => {
@@ -225,7 +214,7 @@ test("S08-E/F: the last raider triggers the REMAKE-032 SAY/157 victory story", a
   expect((await state(page)).units.filter(({ side }) => side === 2)).toHaveLength(0);
 });
 
-test("S08-G/H: retry and retreat replay SAY/21, while v25 completion stops at stage 9", async ({ page }) => {
+test("S08-G/H: retry and retreat replay SAY/21, while current completion stops at stage 9", async ({ page }) => {
   await page.goto("/?debugScenario=stage-08-near-defeat&difficulty=0&test=1");
   const entry = await state(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();

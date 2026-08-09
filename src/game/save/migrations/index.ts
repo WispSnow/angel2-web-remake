@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion28Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 28
+    || value.contentVersion !== "shared-automatic-expert-ai-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion27Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 27
@@ -1401,6 +1412,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion28 = migrateVersion28Save(value);
+    if (migratedVersion28) return migratedVersion28;
     const migratedVersion27 = migrateVersion27Save(value);
     if (migratedVersion27) return migratedVersion27;
     const migratedVersion26 = migrateVersion26Save(value);

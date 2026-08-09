@@ -743,7 +743,7 @@ async function createStage8Player(context: DebugScenarioContext): Promise<GameCo
   return controller;
 }
 
-async function createStage8AllyAuto(context: DebugScenarioContext): Promise<GameController> {
+async function createStage8FreeAction(context: DebugScenarioContext): Promise<GameController> {
   const controller = await createStage8Player(context);
   await controller.freeAction();
   controller.advanceDialogue();
@@ -905,7 +905,7 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-08-prebattle": createStage8Prebattle,
   "stage-08-opening": createStage8Opening,
   "stage-08-player": createStage8Player,
-  "stage-08-ally-auto": createStage8AllyAuto,
+  "stage-08-free-action": createStage8FreeAction,
   "stage-08-near-victory": withSetup(createStage8Player, (controller) => {
     controller.forceVictorySetupForTest();
   }),

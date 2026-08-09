@@ -2828,8 +2828,11 @@ export class GameController {
     this.retreatConfirmOpen = false;
     this.resetAction();
     this.phase = "allyAuto";
+    const automaticIds = this.battle.alliedActionOrder(false);
     this.statusMessage = mode === "autonomous"
-      ? "友軍 NPC 軍團獨立行動。"
+      ? automaticIds.length > 0
+        ? "友軍 NPC 軍團獨立行動。"
+        : "玩家軍團已完成本回合行動。"
       : mode === "follow"
         ? "玩家軍團接管：其餘可操控角色跟隨主將。"
         : "玩家軍團接管：其餘可操控角色自由行動。";
@@ -2839,7 +2842,6 @@ export class GameController {
       ? []
       : this.battle.alliedActionOrder(true)
         .filter((id) => this.battle.isPlayerControllableAlly(id));
-    const automaticIds = this.battle.alliedActionOrder(false);
     const runQueue = async (ids: readonly string[], followId?: string): Promise<boolean> => {
       const pendingIds = new Set(ids);
       while (pendingIds.size > 0) {

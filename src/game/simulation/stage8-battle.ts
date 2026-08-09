@@ -32,17 +32,8 @@ const STAGE8_FORCE_DEFINITIONS = [
     label: "蘇蘭達游騎兵指揮隊",
     side: 1,
     control: "player",
-    unitIds: sideUnitIds(1, [8, 17, 18]),
+    unitIds: sideUnitIds(1, [8, 17, 18, 40, 41, 42, 43, 44]),
     commanderId: "1:8",
-    doctrine: { strategy: "expert" },
-  },
-  {
-    id: "ranger-screening-force",
-    label: "游騎兵牽制隊",
-    tacticLabel: "牽制龍塔部隊",
-    side: 1,
-    control: "independent-ai",
-    unitIds: sideUnitIds(1, [40, 41, 42, 43, 44]),
     doctrine: { strategy: "expert" },
   },
   {

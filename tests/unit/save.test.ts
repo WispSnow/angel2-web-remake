@@ -553,7 +553,18 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
-  it("migrates v27 battle and completed saves into the shared automatic expert AI identity", () => {
+  it("migrates v28 battle and completed saves into the stage 8 all-player identity", () => {
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 28,
+        contentVersion: "shared-automatic-expert-ai-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
+  it("migrates v27 battle and completed saves through the shared expert AI identity", () => {
     for (const current of [battleSave(), completedSave()]) {
       const legacy = {
         ...current,
