@@ -458,20 +458,21 @@
   image-rendering: pixelated;
 }
 
-/* Half-second hard toggle between the painted white `FFh` core and the ally
-   blue. Kept in CSS so reduced motion and frozen-animation captures fall back
-   to the static canvas marker instead of a mid-blink frame. */
+/* Half-second hard toggle between ally blue and the white `FFh` open-cell
+   colour. The white base still shows an honest marker if animation support is
+   unavailable. */
 .deployment-map-blink {
   position: absolute;
-  background: #5555ff;
-  opacity: 0;
+  z-index: 1;
+  background: #fff;
   animation: deployment-cell-blink 1s step-end infinite;
+  will-change: background-color;
   pointer-events: none;
 }
 
 @keyframes deployment-cell-blink {
-  0% { opacity: 1; }
-  50% { opacity: 0; }
+  0% { background-color: #5555ff; }
+  50% { background-color: #fff; }
 }
 
 .deployment-open-cells {
@@ -778,5 +779,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .deployment-ui-root *, .deployment-screen * { animation: none !important; transition: none !important; }
+  .deployment-ui-root *:not(.deployment-map-blink),
+  .deployment-screen *:not(.deployment-map-blink) {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* The current landing cell is state feedback rather than decoration. Keep
+     its original hard colour toggle even when the surrounding UI is static. */
+  .deployment-map-blink {
+    animation: deployment-cell-blink 1s step-end infinite !important;
+  }
 }

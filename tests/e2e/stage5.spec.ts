@@ -58,8 +58,34 @@ const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
 );
 
 test("S05-A/B/C/D: stage 5 enters a one-to-six unit deployment and starts SAY/9", async ({ page }) => {
+  // The host Mac used for manual acceptance has Reduce Motion enabled. The
+  // current deployment cell remains essential focus feedback in that mode.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?debugScenario=stage-04-cleared&difficulty=0&test=1");
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
+  const currentCell = page.getByTestId("deployment-minimap-blink");
+  await expect(currentCell).toHaveCSS("animation-name", "deployment-cell-blink");
+  await expect(currentCell).toHaveCSS("animation-duration", "1s");
+  const currentCellColorAt = (milliseconds: number) => currentCell.evaluate(
+    (element, currentTime) => {
+      const animation = element.getAnimations()[0];
+      if (!animation) throw new Error("formal deployment current cell has no blink animation");
+      animation.pause();
+      animation.currentTime = currentTime;
+      return getComputedStyle(element).backgroundColor;
+    },
+    milliseconds,
+  );
+  expect(await currentCellColorAt(250)).toBe("rgb(85, 85, 255)");
+  await captureVisualAudit(page.locator(".deployment-map-frame"), {
+    path: `${ARTIFACT_DIR}/stage5-current-cell-blue-reduced-motion.png`,
+    animations: "allow",
+  });
+  expect(await currentCellColorAt(750)).toBe("rgb(255, 255, 255)");
+  await captureVisualAudit(page.locator(".deployment-map-frame"), {
+    path: `${ARTIFACT_DIR}/stage5-current-cell-white-reduced-motion.png`,
+    animations: "allow",
+  });
   expect(await state(page)).toMatchObject({
     stageId: "stage-05",
     phase: "deployment",

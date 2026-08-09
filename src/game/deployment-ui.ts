@@ -231,9 +231,9 @@ export function mountDeploymentUi(
         aria-label="名單第 ${page + 1} 頁" aria-pressed="${active}">${label}</button>`;
     }).join("");
 
-    // The canvas keeps the steady `FFh` white core; a DOM accent blinks the
-    // ally blue over it so `prefers-reduced-motion` and frozen-animation
-    // screenshots fall back to the honest static marker.
+    // The canvas keeps the steady `FFh` white core; this DOM cell performs the
+    // explicit blue/white toggle. Its white base colour matches the canvas
+    // underneath if CSS animation is unavailable.
     const blinkRect = current && !state.submitted ? minimap.coreRect(current) : undefined;
 
     const landingChips = state.definition.openCells.map((position) => {
@@ -281,6 +281,7 @@ export function mountDeploymentUi(
               width="${minimap.width}" height="${minimap.height}"
               role="img" aria-label="${escapeHtml(presentation.title)}戰場預覽，顯示我方單位、敵方單位、可用落點與首輪結界"></canvas>
             ${blinkRect ? `<span class="deployment-map-blink" data-testid="deployment-minimap-blink"
+              data-current-cell="${current?.x},${current?.y}"
               aria-hidden="true" style="left:${blinkRect.left}px;top:${blinkRect.top}px;
               width:${blinkRect.size}px;height:${blinkRect.size}px"></span>` : ""}
           </div>

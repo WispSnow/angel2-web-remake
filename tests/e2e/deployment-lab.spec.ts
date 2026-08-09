@@ -132,7 +132,7 @@ test("the current landing cell blinks over a static canvas marker", async ({ pag
       size: (element as HTMLElement).offsetWidth,
       duration: style.animationDuration,
       timing: style.animationTimingFunction,
-      color: style.backgroundColor,
+      stacking: style.zIndex,
     };
   })).toEqual({
     left: 36,
@@ -141,13 +141,40 @@ test("the current landing cell blinks over a static canvas marker", async ({ pag
     duration: "1s",
     // `step-end` serialises as `steps(1)`: a hard 0.5 s on / 0.5 s off toggle.
     timing: "steps(1)",
-    color: "rgb(85, 85, 255)",
+    stacking: "1",
+  });
+  await expect(blink).toHaveAttribute("data-current-cell", "21,33");
+
+  const colorAt = (milliseconds: number) => blink.evaluate((element, currentTime) => {
+    const animation = element.getAnimations()[0];
+    if (!animation) throw new Error("current landing cell has no blink animation");
+    animation.pause();
+    animation.currentTime = currentTime;
+    return getComputedStyle(element).backgroundColor;
+  }, milliseconds);
+
+  expect(await colorAt(250)).toBe("rgb(85, 85, 255)");
+  await captureVisualAudit(page.locator(".deployment-map-frame"), {
+    path: "artifacts/playwright/deployment-current-cell-blue.png",
+    animations: "allow",
+  });
+  expect(await colorAt(750)).toBe("rgb(255, 255, 255)");
+  await captureVisualAudit(page.locator(".deployment-map-frame"), {
+    path: "artifacts/playwright/deployment-current-cell-white.png",
+    animations: "allow",
   });
 
-  // Only the accent moves: the canvas keeps painting the honest white `FFh`
-  // core, so reduced motion and frozen captures never lose the marker.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(blink).toHaveCSS("animation-name", "deployment-cell-blink");
+  await expect(blink).toHaveCSS("animation-duration", "1s");
+  expect(await colorAt(250)).toBe("rgb(85, 85, 255)");
+  expect(await colorAt(750)).toBe("rgb(255, 255, 255)");
+
+  // Only the current-cell projection moves: the canvas keeps painting the
+  // honest white `FFh` core, so the marker never disappears between phases.
   await page.locator('[data-open-cell="25,33"]').click();
   expect(await blink.evaluate((element) => (element as HTMLElement).offsetLeft)).toBe(56);
+  await expect(blink).toHaveAttribute("data-current-cell", "25,33");
   expect(await minimapMarkerCounts(page)).toMatchObject({ ally: 80, open: 48 });
 
   await page.getByTestId("deployment-finish").click();
