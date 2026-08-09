@@ -1375,6 +1375,17 @@ export class Stage0Battle {
       return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
     }
     const targetFilter = this.forces.targetFilterFor(id, this.units);
+    const shootingActionId = unit.classId === "archer"
+      ? "archer-shot"
+      : unit.classId === "crossbow"
+        ? "crossbow-shot"
+        : unit.classId === "magic-archer"
+          ? "magic-archer-shot"
+          : undefined;
+    if (shootingActionId) {
+      const special = this.planClassAction(unit, [shootingActionId], { targetFilter });
+      if (special) return special;
+    }
     if (unit.classId === "sister" && unit.statuses.techniqueSeal === 0) {
       const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "fire-1" : "heal-1";
       const special = this.planClassAction(

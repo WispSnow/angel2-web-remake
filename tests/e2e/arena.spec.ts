@@ -104,6 +104,51 @@ test("arena HUD uses each unnamed class's native side portrait", async ({ page }
   });
 });
 
+test("automatic magic-archer shooting never borrows a same-code technique declaration", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("soldier");
+    const target = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("magic-archer");
+    const shooter = arena.interact(23, 30);
+    return [target, shooter];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-rest").click();
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as {
+      battle?: ArenaBattleDebugState;
+    }).battle;
+    return current?.specialActionPresentation?.phase === "shootLineGrow";
+  });
+
+  await expect(page.getByTestId("dialogue-layer")).toBeHidden();
+  await expect(page.getByText(/生命[全單]\./u)).toHaveCount(0);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-magic-archer-ai-without-technique-dialogue.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as {
+      battle?: ArenaBattleDebugState;
+    }).battle;
+    return current?.lastSpecialAction?.actionId === "magic-archer-shot"
+      && current.lastSpecialAction.actorId === "arena-2-0"
+      && current.specialActionPresentation === undefined;
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test("ordinary melee status applies directly and appears in the unit HUD without a technique effect", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

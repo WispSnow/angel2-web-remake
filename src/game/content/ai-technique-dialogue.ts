@@ -24,7 +24,11 @@ export function aiTechniqueDialogueFor(
   actionId: BattleActionId,
 ): DialoguePage | undefined {
   const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-  if (definition.nativeCode == null) return undefined;
+  // Native shooting codes share the same two-byte namespace as techniques:
+  // magic-archer `1I`, for example, collides with recovery `1I`. The module-29
+  // contextual lines belong to the technique dispatcher, not every action that
+  // happens to carry the same bytes.
+  if (definition.kind !== "technique" || definition.nativeCode == null) return undefined;
   const line = nativeAiTechniqueDialogueForCode(definition.nativeCode);
   if (!line) return undefined;
   const window = {

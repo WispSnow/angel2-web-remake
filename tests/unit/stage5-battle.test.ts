@@ -61,6 +61,51 @@ describe("stage 5 battle and portal simulation", () => {
     expect(defeated.outcome()).toBe("defeat");
   });
 
+  it("does not carry the stage 4 force-field pulse into later rounds", () => {
+    const deploymentWithGadirath = {
+      placements: [
+        ...STAGE5_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+          slot, position: { ...position }, fixed: true,
+        })),
+        ...[1, 2, 3, 4, 24].map((slot, index) => {
+          const position = STAGE5_DEFINITION.deployment.openCells[index];
+          if (!position) throw new Error(`missing stage 5 deployment cell ${index}`);
+          return { slot, position: { ...position }, fixed: false };
+        }),
+      ],
+    };
+    const battle = new Stage5Battle(campaign, deploymentWithGadirath);
+    const lifeBefore = battle.units.map(({ id, life }) => [id, life] as const);
+
+    expect(battle.routePulseSafeAreaForUnit("1:0")).toEqual([]);
+    expect(battle.planAlliedAiAction("1:24")?.kind).not.toBe("route-pulse");
+    battle.startNextRound();
+
+    expect(battle.round).toBe(2);
+    expect(battle.units.map(({ id, life }) => [id, life] as const)).toEqual(lifeBefore);
+  });
+
+  it("plans each enemy archer-family class through its shooting action", () => {
+    for (const [classId, actionId] of [
+      ["archer", "archer-shot"],
+      ["crossbow", "crossbow-shot"],
+      ["magic-archer", "magic-archer-shot"],
+    ] as const) {
+      const battle = new Stage5Battle(campaign, deployment);
+      const shooter = battle.unit("2:44");
+      if (!shooter) throw new Error("missing stage 5 enemy archer");
+      shooter.classId = classId;
+      shooter.x = 25;
+      shooter.y = 29;
+
+      expect(battle.planEnemyAiAction(shooter.id)).toMatchObject({
+        unitId: shooter.id,
+        kind: "special",
+        actionId,
+      });
+    }
+  });
+
   it("resolves scripted 4L as five deterministic rings with guard semantics", () => {
     const makeUnit = (slot: number, x: number, statuses = emptyUnitStatuses()): BattleUnit => ({
       id: `1:${slot}`, side: 1, slot, classId: "soldier", className: "士兵",

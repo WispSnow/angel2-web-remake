@@ -157,8 +157,14 @@ describe("native AI technique dialogue", () => {
         },
         source: { record: "ai-technique", wait: 0x16, address: "DS:8648" },
       });
-    expect(aiTechniqueDialogueFor({ name: "弓兵", portrait: 59, side: 2 }, "archer-shot"))
-      .toBeUndefined();
+    for (const [name, actionId] of [
+      ["弓兵", "archer-shot"],
+      ["弩兵", "crossbow-shot"],
+      ["魔弓兵", "magic-archer-shot"],
+    ] as const) {
+      expect(aiTechniqueDialogueFor({ name, portrait: 59, side: 2 }, actionId))
+        .toBeUndefined();
+    }
     expect(aiTechniqueDialogueFor(
       { name: "半龍戰士", portrait: 58, side: 2 },
       CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
