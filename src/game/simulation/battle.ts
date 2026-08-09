@@ -51,9 +51,8 @@ import type {
 import { effectiveAttack, effectiveDefense, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
 import { battleOutcomeForObjective } from "./objectives";
 import {
-  hasModernDamageActionThisTurn,
-  planModernEnemyAction,
-  type ModernEnemyAiContext,
+  hasEnemyDamageActionThisTurn,
+  type EnemyThreatContext,
 } from "./enemy-ai";
 import {
   ForceRegistry,
@@ -75,6 +74,18 @@ import {
   type PreparedRoutePulse,
   type RoutePulseDefinition,
 } from "./route-pulse";
+import {
+  compareExpertAiUtility,
+  expertAiCandidateTrace,
+  expertExposureAt,
+  expertOrdinaryUtility,
+  expertAiScore,
+  expertSpecialUtility,
+  expertUtilityForAction,
+  type ExpertAiDecisionTrace,
+  type ExpertAiEvaluationContext,
+  type ExpertAiUtility,
+} from "./expert-ai";
 
 export type {
   AlliedAiAction,
@@ -275,6 +286,7 @@ export class Stage0Battle {
   protected readonly forces: ForceRegistry;
   private readonly routePulseByActorId: ReadonlyMap<string, RoutePulseDefinition>;
   private readonly terrainOverrideByPosition = new Map<string, DynamicTerrainKind>();
+  private readonly expertAiTraceByUnitId = new Map<string, ExpertAiDecisionTrace>();
 
   constructor(
     public readonly difficulty: Difficulty = 0,
@@ -1382,147 +1394,15 @@ export class Stage0Battle {
     if (unit.statuses.confusion > 0) return this.planConfusedAiAction(unit);
     const doctrine = this.forces.definitionForUnit(id)?.doctrine;
     if (doctrine?.strategy === "terrain-hold") {
-      return this.planTerrainHoldAiAction(unit, doctrine);
-    }
-    const stats = this.statsFor(unit);
-    const tier = classTierFor(unit);
-    const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
-    if (lifePercent < 20) {
-      return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+      const action = this.planTerrainHoldAiAction(unit, doctrine);
+      this.recordExpertDecision(unit, [action], action);
+      return action;
     }
     const targetFilter = this.forces.targetFilterFor(id, this.units);
-    const shootingActionId = unit.classId === "archer"
-      ? "archer-shot"
-      : unit.classId === "crossbow"
-        ? "crossbow-shot"
-        : unit.classId === "magic-archer"
-          ? "magic-archer-shot"
-          : undefined;
-    if (shootingActionId) {
-      const special = this.planClassAction(unit, [shootingActionId], { targetFilter });
-      if (special) return special;
-    }
-    if (unit.classId === "sister" && unit.statuses.techniqueSeal === 0) {
-      const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "fire-1" : "heal-1";
-      const special = this.planClassAction(
-        unit,
-        [actionId],
-        actionId === "fire-1" ? { targetFilter } : undefined,
-      );
-      if (special) return special;
-    }
-    if (unit.classId === "priest" && unit.statuses.techniqueSeal === 0) {
-      const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "fire-1" : "recovery-1";
-      const special = this.planClassAction(
-        unit,
-        [actionId],
-        actionId === "fire-1" ? { targetFilter } : undefined,
-      );
-      if (special) return special;
-    }
-    if (unit.classId === "monk" && unit.statuses.techniqueSeal === 0) {
-      const actionId: BattleActionId = this.rng.between(0, 1) === 0 ? "heal-1" : "recovery-1";
-      const special = this.planSpecialAiAction(id, actionId);
-      if (special) return special;
-    }
-    if ((unit.classId === "prayer-guide" || unit.classId === "magic-guide")
-      && unit.statuses.techniqueSeal === 0) {
-      const available: readonly (BattleActionId | undefined)[] = unit.classId === "prayer-guide"
-        ? tier >= 3
-          // Native slot 4 is SM, not OJ. SM has no action row; keep the slot
-          // so its draw falls through instead of inflating the other odds.
-          ? ["heal-2", "recovery-3", "defense-up", undefined]
-          : tier === 2
-            ? ["heal-1", "recovery-2", "defense-up"]
-            : ["heal-1", "recovery-1", "defense-up"]
-        : tier === 2
-          ? ["heal-2", "recovery-1", "attack-up"]
-          : tier === 1
-            ? ["heal-1", "recovery-1", "attack-up"]
-            : ["heal-3", "recovery-2", "attack-up", "magic-guard"];
-      if (available.length > 0) {
-        const actionId = available[this.rng.between(0, available.length - 1)];
-        const special = actionId
-          ? this.planClassAction(unit, [actionId])
-          : undefined;
-        if (special) return special;
-      }
-    }
-    if (unit.classId === "curse-master" && unit.statuses.techniqueSeal === 0) {
-      const available: readonly BattleActionId[] = tier >= 3
-        ? ["heal-1", "attack-down", "confusion", "poison", "spell-seal"]
-        : tier === 2
-          ? ["heal-1", "attack-down", "confusion", "poison"]
-          : ["heal-1", "attack-down", "confusion"];
-      const actionId = available[this.rng.between(0, available.length - 1)];
-      const special = actionId ? this.planClassAction(unit, [actionId]) : undefined;
-      if (special) return special;
-    }
-    if (unit.classId === "magic-priest" && unit.statuses.techniqueSeal === 0) {
-      const available: readonly BattleActionId[] = tier >= 3
-        ? ["fire-2", "lightning-1", "recovery-1", "defense-down", "dispel"]
-        : tier === 2
-          ? ["fire-1", "lightning-1", "recovery-1", "defense-down"]
-          : ["fire-1", "recovery-1", "defense-down"];
-      const actionId = available[this.rng.between(0, available.length - 1)];
-      const special = actionId ? this.planClassAction(unit, [actionId]) : undefined;
-      if (special) return special;
-    }
-    if (unit.classId === "great-dragon-knight" && unit.statuses.techniqueSeal === 0) {
-      const actionId = tier === 1
-        ? "stomp-1"
-        : tier === 2
-          ? "stomp-2"
-          : "stomp-3";
-      const special = actionId
-        ? this.planClassAction(unit, [actionId], { targetFilter })
-        : undefined;
-      if (special) return special;
-    }
-    if (unit.classId === "wizard" && unit.statuses.techniqueSeal === 0) {
-      const actionId = tier === 1
-        ? "ice-2"
-        : tier === 2
-          ? "ice-3"
-          : "ice-4";
-      const special = actionId
-        ? this.planClassAction(unit, [actionId], { targetFilter })
-        : undefined;
-      if (special) return special;
-    }
-    if (unit.classId === "magic-master" && unit.statuses.techniqueSeal === 0) {
-      const actionId = tier === 1
-        ? "lightning-2"
-        : tier === 2
-          ? "lightning-3"
-          : "lightning-4";
-      const special = actionId
-        ? this.planClassAction(unit, [actionId], { targetFilter })
-        : undefined;
-      if (special) return special;
-    }
-    if ((unit.classId === "magic-priest" || unit.classId === "evil-mage")
-      && unit.statuses.techniqueSeal === 0) {
-      const available = unit.classId === "evil-mage"
-        ? tier === 1
-          ? ["fire-2"] as const
-          : tier === 2
-            ? ["fire-3"] as const
-            : ["fire-4"] as const
-        : tier >= 3
-          ? ["fire-2", "lightning-1", "recovery-1", "dispel"] as const
-          : tier === 2
-            ? ["fire-1", "lightning-1", "recovery-1"] as const
-            : ["fire-1", "recovery-1"] as const;
-      if (available.length > 0) {
-        const actionId = available[this.rng.between(0, available.length - 1)];
-        const special = actionId
-          ? this.planClassAction(unit, [actionId], { targetFilter })
-          : undefined;
-        if (special) return special;
-      }
-    }
-    return this.planOrdinaryAiAction(unit, 1, behavior, { targetFilter });
+    return this.planExpertEnemyCombatAction(unit, behavior !== 1, {
+      targetFilter,
+      behavior,
+    });
   }
 
   private planTerrainHoldAiAction(
@@ -1540,9 +1420,18 @@ export class Stage0Battle {
       alliedBehaviorFor: (unitId) => this.alliedBehaviorFor(unitId),
       enemyBehaviorFor: (unitId) => this.enemyBehaviorFor(unitId),
       planClassAction: (candidate, requestedActionIds, options) =>
-        this.planClassAction(candidate, requestedActionIds, options),
+        this.planClassAction(candidate, requestedActionIds, {
+          ...options,
+          expertRanking: candidate.side === 2,
+        }),
       planOrdinaryAction: (candidate, opponentSide, behavior, options) =>
-        this.planOrdinaryAiAction(candidate, opponentSide, behavior, options),
+        this.planOrdinaryAiAction(candidate, opponentSide, behavior, {
+          ...options,
+          expertRanking: candidate.side === 2,
+        }),
+      expertScore: (candidate, action) => expertAiScore(
+        this.expertUtilityForAction(candidate, action),
+      ),
     }, unit, doctrine);
   }
 
@@ -1554,7 +1443,10 @@ export class Stage0Battle {
     if (unit?.statuses.confusion && !unit.acted && !unit.actionDisabled) {
       return this.planConfusedAiAction(unit);
     }
-    return planModernEnemyAction(this.modernEnemyAiContext(), id, intent);
+    if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
+    return this.planExpertEnemyCombatAction(unit, intent === "pursuit", {
+      behavior: intent === "sentry" ? 1 : 2,
+    });
   }
 
   protected planConfusedAiAction(unit: BattleUnit): AlliedAiAction {
@@ -1598,12 +1490,12 @@ export class Stage0Battle {
 
   protected hasDamageActionThisTurn(id: string): boolean {
     if ((this.unit(id)?.statuses.confusion ?? 0) > 0) return false;
-    return hasModernDamageActionThisTurn(this.modernEnemyAiContext(), id);
+    return hasEnemyDamageActionThisTurn(this.enemyThreatContext(), id);
   }
 
   protected onHostileTargeted(_actor: BattleUnit, _target: BattleUnit): void {}
 
-  private modernEnemyAiContext(): ModernEnemyAiContext {
+  private enemyThreatContext(): EnemyThreatContext {
     return {
       width: this.stage.width,
       battlefield: this.dynamicBattlefield,
@@ -1619,6 +1511,135 @@ export class Stage0Battle {
     };
   }
 
+  protected planExpertEnemyCombatAction(
+    unit: BattleUnit,
+    allowMove: boolean,
+    options: {
+      behavior: number;
+      targetFilter?: (target: BattleUnit) => boolean;
+    },
+  ): AlliedAiAction {
+    const positionFilter = allowMove
+      ? undefined
+      : (position: Position) => positionKey(position) === positionKey(unit);
+    const classAction = this.planClassAction(unit, undefined, {
+      expertRanking: true,
+      positionFilter,
+      targetFilter: (target) => target.side === unit.side
+        || (options.targetFilter?.(target) ?? true),
+    });
+    const ordinary = this.planOrdinaryAiAction(unit, 1, options.behavior, {
+      expertRanking: true,
+      targetFilter: options.targetFilter,
+    });
+    const candidates = [classAction, ordinary]
+      .filter((action): action is AlliedAiAction => action !== undefined)
+      .filter((action, index, actions) => actions.findIndex((candidate) =>
+        candidate.kind === action.kind
+        && candidate.actionId === action.actionId
+        && candidate.targetId === action.targetId
+        && positionKey(candidate.path.at(-1) ?? unit)
+          === positionKey(action.path.at(-1) ?? unit)) === index)
+      .sort((left, right) => compareExpertAiUtility(
+        this.expertUtilityForAction(unit, left),
+        this.expertUtilityForAction(unit, right),
+      ));
+    const selected = candidates[0]
+      ?? { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    const selectedUtility = this.expertUtilityForAction(unit, selected);
+    const criticallyInjured = unit.life * 100 < this.statsFor(unit).maxLife * 40;
+    if (criticallyInjured
+      && selectedUtility.guaranteedKills === 0
+      && selectedUtility.criticalSaves === 0) {
+      const rest: AlliedAiAction = {
+        unitId: unit.id,
+        kind: "rest",
+        path: [{ x: unit.x, y: unit.y }],
+      };
+      this.recordExpertDecision(unit, [...candidates, rest], rest);
+      return rest;
+    }
+    this.recordExpertDecision(unit, candidates, selected);
+    return selected;
+  }
+
+  private expertAiEvaluationContext(): ExpertAiEvaluationContext {
+    return {
+      width: this.stage.width,
+      height: this.stage.height,
+      units: this.units,
+      terrainSlotAt: (position) => this.terrainSlotAt(position),
+      statsFor: (unit) => this.statsFor(unit),
+      effectiveStatsFor: (unit) => this.effectiveStatsFor(unit),
+    };
+  }
+
+  private exposureAt(
+    actor: BattleUnit,
+    position: Position,
+    ignoredTargetId?: string,
+  ): number {
+    return expertExposureAt(
+      this.expertAiEvaluationContext(),
+      actor,
+      position,
+      ignoredTargetId,
+    );
+  }
+
+  private expertOrdinaryUtility(
+    actor: BattleUnit,
+    target: BattleUnit,
+    path: readonly Position[],
+  ): ExpertAiUtility {
+    return expertOrdinaryUtility(this.expertAiEvaluationContext(), actor, target, path);
+  }
+
+  private expertSpecialUtility(
+    actor: BattleUnit,
+    actionId: BattleActionId,
+    target: BattleUnit,
+    path: readonly Position[],
+  ): ExpertAiUtility {
+    return expertSpecialUtility(
+      this.expertAiEvaluationContext(),
+      actor,
+      actionId,
+      target,
+      path,
+    );
+  }
+
+  private expertUtilityForAction(
+    unit: BattleUnit,
+    action: AlliedAiAction,
+  ): ExpertAiUtility {
+    return expertUtilityForAction(this.expertAiEvaluationContext(), unit, action);
+  }
+
+  private recordExpertDecision(
+    unit: BattleUnit,
+    candidates: readonly AlliedAiAction[],
+    chosen: AlliedAiAction,
+  ): void {
+    const traces = candidates.map((action) => expertAiCandidateTrace(
+      action,
+      this.expertUtilityForAction(unit, action),
+    )).sort((left, right) => right.score - left.score);
+    const selected = expertAiCandidateTrace(chosen, this.expertUtilityForAction(unit, chosen));
+    this.expertAiTraceByUnitId.set(unit.id, {
+      unitId: unit.id,
+      policy: "stable-remake-expert",
+      chosen: selected,
+      candidates: traces,
+    });
+  }
+
+  expertAiDecisionTrace(id: string): ExpertAiDecisionTrace | undefined {
+    const trace = this.expertAiTraceByUnitId.get(id);
+    return trace ? structuredClone(trace) : undefined;
+  }
+
   protected planOrdinaryAiAction(
     unit: BattleUnit,
     opponentSide: BattleUnit["side"],
@@ -1627,7 +1648,7 @@ export class Stage0Battle {
   ): AlliedAiAction {
     const stats = this.statsFor(unit);
     const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
-    if (lifePercent < (options.restThresholdPercent ?? 20)) {
+    if (!options.expertRanking && lifePercent < (options.restThresholdPercent ?? 20)) {
       return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
     }
 
@@ -1650,16 +1671,32 @@ export class Stage0Battle {
     let attackPosition: Position | undefined;
     let attackPath: Position[] | undefined;
     let attackPositionDefense = -1;
+    const expertAttackCandidates: Array<{
+      target: BattleUnit;
+      position: Position;
+      path: Position[];
+      utility: ExpertAiUtility;
+    }> = [];
 
     for (const enemy of enemies) {
       for (const offset of nativeCandidateOffsets) {
         const candidate = { x: enemy.x + offset.x, y: enemy.y + offset.y };
         const candidateKey = positionKey(candidate);
         if (!reachableKeys.has(candidateKey) || occupied.has(candidateKey)) continue;
+        if (options.expertRanking && behavior === 1 && candidateKey !== positionKey(unit)) continue;
         const path = candidateKey === positionKey(unit)
           ? [{ x: unit.x, y: unit.y }]
           : this.movementPath(unit.id, candidate);
         if (path.length === 0 || !(options.pathFilter?.(path) ?? true)) continue;
+        if (options.expertRanking) {
+          expertAttackCandidates.push({
+            target: enemy,
+            position: candidate,
+            path,
+            utility: this.expertOrdinaryUtility(unit, enemy, path),
+          });
+          continue;
+        }
         const defense = terrainDefensePercentFor(unit.classId, this.terrainSlotAt(candidate));
         if (defense >= attackPositionDefense) {
           attackTarget = enemy;
@@ -1670,11 +1707,64 @@ export class Stage0Battle {
       }
     }
 
+    if (options.expertRanking && expertAttackCandidates.length > 0) {
+      expertAttackCandidates.sort((left, right) =>
+        compareExpertAiUtility(left.utility, right.utility)
+        || left.target.y * this.stage.width + left.target.x
+          - (right.target.y * this.stage.width + right.target.x)
+        || left.position.y * this.stage.width + left.position.x
+          - (right.position.y * this.stage.width + right.position.x));
+      const selected = expertAttackCandidates[0];
+      return {
+        unitId: unit.id,
+        kind: "attack",
+        path: selected.path,
+        targetId: selected.target.id,
+      };
+    }
+
     if (attackTarget && attackPosition && attackPath) {
       if (behavior === 1 && positionKey(attackPosition) !== positionKey(unit)) {
         return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
       }
       return { unitId: unit.id, kind: "attack", path: attackPath, targetId: attackTarget.id };
+    }
+
+    if (options.expertRanking) {
+      if (lifePercent < (options.restThresholdPercent ?? 40)) {
+        return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+      }
+      if (behavior === 1) {
+        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      }
+      const targets = enemies.flatMap((enemy) => neighbors(enemy, this.dynamicBattlefield));
+      const originDistance = targets.length > 0
+        ? Math.min(...targets.map((target) => manhattan(unit, target)))
+        : Number.MAX_SAFE_INTEGER;
+      const movementCandidates = reachable
+        .filter((position) => positionKey(position) !== positionKey(unit))
+        .map((position) => ({
+          position,
+          path: this.movementPath(unit.id, position),
+          distance: targets.length > 0
+            ? Math.min(...targets.map((target) => manhattan(position, target)))
+            : Number.MAX_SAFE_INTEGER,
+          defense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
+          exposure: this.exposureAt(unit, position),
+        }))
+        .filter(({ path, distance }) => path.length > 1
+          && distance < originDistance
+          && (options.pathFilter?.(path) ?? true))
+        .sort((left, right) => left.distance - right.distance
+          || left.exposure - right.exposure
+          || right.defense - left.defense
+          || left.path.length - right.path.length
+          || left.position.y * this.stage.width + left.position.x
+            - (right.position.y * this.stage.width + right.position.x));
+      const selected = movementCandidates[0];
+      return selected
+        ? { unitId: unit.id, kind: "move", path: selected.path }
+        : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
     }
 
     if (unit.life < stats.maxLife) return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
@@ -1790,6 +1880,8 @@ export class Stage0Battle {
               : tier === 2
                 ? ["heal-1", "attack-down", "confusion", "poison"]
               : ["heal-1", "attack-down", "confusion"]
+          : unit.classId === "magician" && options.expertRanking
+            ? techniqueActionIdsFor(unit)
           : []);
     if (actionIds.length === 0) return undefined;
 
@@ -1801,8 +1893,15 @@ export class Stage0Battle {
       height: this.stage.height,
       terrainSlotAt: (position) => this.terrainSlotAt(position),
     };
+    const expertCandidates: Array<{
+      action: AlliedAiAction;
+      utility: ExpertAiUtility;
+      actionOrder: number;
+      targetOrder: number;
+      positionOrder: number;
+    }> = [];
 
-    for (const actionId of actionIds) {
+    for (const [actionOrder, actionId] of actionIds.entries()) {
       if (!this.canUseSpecialAction(unit, actionId)) continue;
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
       const positions = (actionId === "archer-shot" || actionId === "crossbow-shot"
@@ -1820,6 +1919,7 @@ export class Stage0Battle {
         positionDefense: number;
         lethal: boolean;
         critical: boolean;
+        utility: ExpertAiUtility;
       }> = [];
 
       for (const position of positions) {
@@ -1869,6 +1969,8 @@ export class Stage0Battle {
             * terrainDefensePercentFor(target.classId, this.terrainSlotAt(target))
             / 100,
           );
+          const utility = this.expertSpecialUtility(unit, actionId, target, path);
+          if (options.expertRanking && utility.waste > 0) continue;
           candidates.push({
             position,
             target,
@@ -1892,8 +1994,34 @@ export class Stage0Battle {
               && actionId !== "defense-up"
               && actionId !== "magic-guard"
               && target.life * 100 < targetStats.maxLife * 40,
+            utility,
           });
         }
+      }
+
+      if (options.expertRanking) {
+        candidates.sort((left, right) => compareExpertAiUtility(left.utility, right.utility)
+          || left.target.y * this.stage.width + left.target.x
+            - (right.target.y * this.stage.width + right.target.x)
+          || left.position.y * this.stage.width + left.position.x
+            - (right.position.y * this.stage.width + right.position.x));
+        const selected = candidates[0];
+        if (selected) {
+          expertCandidates.push({
+            action: {
+              unitId: unit.id,
+              kind: "special",
+              path: selected.path,
+              targetId: selected.target.id,
+              actionId,
+            },
+            utility: selected.utility,
+            actionOrder,
+            targetOrder: selected.target.y * this.stage.width + selected.target.x,
+            positionOrder: selected.position.y * this.stage.width + selected.position.x,
+          });
+        }
+        continue;
       }
 
       candidates.sort((left, right) => {
@@ -1939,6 +2067,13 @@ export class Stage0Battle {
           actionId,
         };
       }
+    }
+    if (options.expertRanking) {
+      expertCandidates.sort((left, right) => compareExpertAiUtility(left.utility, right.utility)
+        || left.actionOrder - right.actionOrder
+        || left.targetOrder - right.targetOrder
+        || left.positionOrder - right.positionOrder);
+      return expertCandidates[0]?.action;
     }
     return undefined;
   }
@@ -1993,6 +2128,31 @@ export class Stage0Battle {
         return (left.y * this.stage.width + left.x) - (right.y * this.stage.width + right.x);
       })
       .map((unit) => unit.id);
+  }
+
+  /**
+   * REMAKE-033 chooses one actor from the still-unspent phase queue, then the
+   * controller asks again after that action commits. This is the squad-level
+   * reservation boundary: later units see deaths, healing, statuses and newly
+   * occupied cells instead of following a stale phase-start script.
+   */
+  nextEnemyActionId(candidateIds: readonly string[]): string | undefined {
+    const candidates = new Set(candidateIds);
+    const nativeOrder = this.enemyActionOrder().filter((id) => candidates.has(id));
+    if (nativeOrder.length === 0 || this.hasRouteEnemy()) return nativeOrder[0];
+    return nativeOrder
+      .map((id, stableOrder) => {
+        const unit = this.unit(id);
+        const action = unit?.statuses.confusion
+          ? undefined
+          : this.planEnemyAiAction(id);
+        const score = unit && action
+          ? expertAiScore(this.expertUtilityForAction(unit, action))
+          : Number.MIN_SAFE_INTEGER;
+        return { id, score, stableOrder };
+      })
+      .sort((left, right) => right.score - left.score
+        || left.stableOrder - right.stableOrder)[0]?.id;
   }
 
   planRouteEnemy(id: string): RouteMoveResult | undefined {

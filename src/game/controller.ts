@@ -2776,8 +2776,11 @@ export class GameController {
     if (enemyPhaseUpdate.activatedGroupIds.length > 0) {
       await pause(this.mapCombatDelay(40));
     }
-    const enemyIds = this.battle.enemyActionOrder();
-    for (const id of enemyIds) {
+    const pendingEnemyIds = new Set(this.battle.enemyActionOrder());
+    while (pendingEnemyIds.size > 0) {
+      const id = this.battle.nextEnemyActionId([...pendingEnemyIds]);
+      if (!id) break;
+      pendingEnemyIds.delete(id);
       if (!this.battle.unit(id)) continue;
       if (!this.battle.hasRouteEnemy() || this.battle.unit(id)?.statuses.confusion) {
         const action = this.battle.planEnemyAiAction(id);
@@ -4301,8 +4304,11 @@ export class GameController {
         .map(({ x, y }) => `${x},${y}`),
     );
     const candidateCommanderPositions = [
-      { x: commander.x, y: commander.y },
+      // Keep the debug fixture independent from whichever legal position the
+      // preceding AI sequence left in a save. Browser contracts click the
+      // canonical stage-1 center first, then fall back only when occupied.
       { x: 29, y: 26 },
+      { x: commander.x, y: commander.y },
       ...Array.from({ length: this.battle.stage.width * this.battle.stage.height }, (_, index) => ({
         x: index % this.battle.stage.width,
         y: Math.floor(index / this.battle.stage.width),

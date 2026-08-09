@@ -553,6 +553,24 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v23 battle and completed saves without changing their state", () => {
+    const currentBattle = battleSave();
+    const legacyBattle = {
+      ...currentBattle,
+      version: 23,
+      contentVersion: "stage-08-victory-story-1",
+    };
+    expect(parseSaveData(JSON.stringify(legacyBattle))).toEqual(currentBattle);
+
+    const currentCompleted = completedSave();
+    const legacyCompleted = {
+      ...currentCompleted,
+      version: 23,
+      contentVersion: "stage-08-victory-story-1",
+    };
+    expect(parseSaveData(JSON.stringify(legacyCompleted))).toEqual(currentCompleted);
+  });
+
   it("migrates v22 stage-8 battles and completions into the SAY/157 event identity", () => {
     const currentBattle = stage8BattleSave();
     const legacyBattle = {

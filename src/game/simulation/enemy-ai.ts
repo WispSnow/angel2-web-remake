@@ -1,20 +1,12 @@
-import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
 import { terrainDefensePercentFor } from "../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../types";
-import type { AlliedAiAction, EnemyAiIntent } from "./ai-contracts";
+import type { AlliedAiAction } from "./ai-contracts";
 import { effectiveAttack, effectiveDefense } from "./status";
-import {
-  neighbors,
-  positionKey,
-  reachableCells,
-  routePath,
-  type GridBattlefield,
-} from "./grid";
+import { positionKey, reachableCells, type GridBattlefield } from "./grid";
 
-type ModernIntent = Extract<EnemyAiIntent, "sentry" | "pursuit">;
 type SisterActionId = "fire-1" | "heal-1";
 
-export interface ModernEnemyAiContext {
+export interface EnemyThreatContext {
   width: number;
   battlefield: GridBattlefield;
   units: readonly BattleUnit[];
@@ -28,7 +20,7 @@ export interface ModernEnemyAiContext {
 }
 
 function minimumOrdinaryDamage(
-  context: ModernEnemyAiContext,
+  context: EnemyThreatContext,
   attacker: BattleUnit,
   defender: BattleUnit,
 ): number {
@@ -53,7 +45,7 @@ function minimumOrdinaryDamage(
 }
 
 function planOrdinaryAttack(
-  context: ModernEnemyAiContext,
+  context: EnemyThreatContext,
   unit: BattleUnit,
   allowMove: boolean,
 ): AlliedAiAction | undefined {
@@ -125,88 +117,8 @@ function planOrdinaryAttack(
     : undefined;
 }
 
-function isGuaranteedOrdinaryKill(
-  context: ModernEnemyAiContext,
-  unit: BattleUnit,
-  action: AlliedAiAction,
-): boolean {
-  const target = action.targetId ? context.unit(action.targetId) : undefined;
-  return Boolean(target && minimumOrdinaryDamage(context, unit, target) >= target.life);
-}
-
-function isGuaranteedSpecialKill(
-  context: ModernEnemyAiContext,
-  action: AlliedAiAction,
-): boolean {
-  if (action.actionId !== "fire-1" || !action.targetId) return false;
-  const target = context.unit(action.targetId);
-  if (!target || target.actionDisabled || target.statuses.magicGuard > 0) return false;
-  const definition = BATTLE_ACTION_DEFINITIONS["fire-1"];
-  const damage = Math.min(
-    target.life,
-    definition.damage.cap,
-    Math.floor(context.statsFor(target).maxLife * definition.damage.maxLifePercent / 100),
-  );
-  return damage >= target.life;
-}
-
-function isCriticalHeal(
-  context: ModernEnemyAiContext,
-  action: AlliedAiAction,
-): boolean {
-  if (action.actionId !== "heal-1" || !action.targetId) return false;
-  const target = context.unit(action.targetId);
-  return Boolean(target && target.life * 100 < context.statsFor(target).maxLife * 40);
-}
-
-export function planModernEnemyAction(
-  context: ModernEnemyAiContext,
-  id: string,
-  intent: ModernIntent,
-): AlliedAiAction | undefined {
-  const unit = context.unit(id);
-  if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
-  const allowMove = intent === "pursuit";
-  const fire = unit.classId === "sister" && unit.statuses.techniqueSeal === 0
-    ? context.planSisterAction(unit, "fire-1")
-    : undefined;
-  const heal = unit.classId === "sister" && unit.statuses.techniqueSeal === 0
-    ? context.planSisterAction(unit, "heal-1")
-    : undefined;
-  const ordinary = planOrdinaryAttack(context, unit, allowMove);
-
-  if (fire && isGuaranteedSpecialKill(context, fire)) return fire;
-  if (ordinary && isGuaranteedOrdinaryKill(context, unit, ordinary)) return ordinary;
-  if (heal && isCriticalHeal(context, heal)) return heal;
-
-  const stats = context.statsFor(unit);
-  if (unit.life * 100 < stats.maxLife * 40) {
-    return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
-  }
-
-  if (fire) return fire;
-  if (ordinary) return ordinary;
-  if (heal) return heal;
-  if (intent === "sentry") {
-    return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
-  }
-
-  const pursuitTargets = context.units
-    .filter((candidate) => candidate.side === 1)
-    .flatMap((enemy) => neighbors(enemy, context.battlefield));
-  const pursuitPath = routePath(
-    unit,
-    pursuitTargets,
-    context.units,
-    stats.movement,
-    context.battlefield,
-  );
-  if (pursuitPath.length > 1) return { unitId: unit.id, kind: "move", path: pursuitPath };
-  return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
-}
-
-export function hasModernDamageActionThisTurn(
-  context: ModernEnemyAiContext,
+export function hasEnemyDamageActionThisTurn(
+  context: EnemyThreatContext,
   id: string,
 ): boolean {
   const unit = context.unit(id);

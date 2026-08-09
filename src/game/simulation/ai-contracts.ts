@@ -10,6 +10,8 @@ export interface AlliedAiAction {
 }
 
 export interface OrdinaryAiPlanningOptions {
+  /** Uses REMAKE-033 utility ranking and its 40% rest boundary. */
+  expertRanking?: boolean;
   targetFilter?: (target: BattleUnit) => boolean;
   destinationFilter?: (position: Position) => boolean;
   pathFilter?: (path: readonly Position[]) => boolean;
@@ -18,6 +20,8 @@ export interface OrdinaryAiPlanningOptions {
 
 export interface ClassActionPlanningOptions {
   modernRanking?: boolean;
+  /** Compares every legal action/target pair with the shared expert utility. */
+  expertRanking?: boolean;
   targetFilter?: (target: BattleUnit) => boolean;
   positionFilter?: (position: Position) => boolean;
   pathFilter?: (path: readonly Position[]) => boolean;

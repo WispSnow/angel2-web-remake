@@ -416,7 +416,7 @@ describe("all-terrain arena", () => {
     expect({ state: frozen.rng.state, calls: frozen.rng.calls }).toEqual(rngBefore);
   });
 
-  it("offers player-only OJ at prayer-guide tier three and preserves the native SM AI miss", () => {
+  it("keeps OJ player-only while expert enemy prayer-guides choose deterministic useful support", () => {
     const placements = [
       { id: "arena-1-0", side: 1 as const, slot: 0, classId: "prayer-guide" as const, level: 3 as const, x: 20, y: 21 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 18, y: 18 },
@@ -440,15 +440,15 @@ describe("all-terrain arena", () => {
       expect(wrongTier.actionTargetCells("arena-1-0", "prayer")).toEqual([]);
     }
 
-    // Seed 3 makes the first native four-slot pool draw land on index 3. That
-    // slot is the unresolved SM action, so it falls through to an ordinary
-    // adjacent attack instead of being silently remapped to OJ.
+    // REMAKE-033 no longer rolls the native SM miss. OJ remains player-only,
+    // while the expert planner selects a useful legal action without PRNG.
     const enemyBattle = new ArenaBattle(placements, 0, new DeterministicRng(3));
     expect(enemyBattle.planEnemyAiAction("arena-2-0")).toMatchObject({
-      kind: "attack",
-      targetId: "arena-1-0",
+      kind: "special",
+      actionId: "defense-up",
+      targetId: "arena-2-0",
     });
-    expect(enemyBattle.rng.calls).toBe(1);
+    expect(enemyBattle.rng.calls).toBe(0);
   });
 
   it("offers 2H only at prayer-guide tier three with full-life targets", () => {
@@ -897,7 +897,7 @@ describe("all-terrain arena", () => {
     }
   });
 
-  it("offers exactly one native stomp tier to each great dragon knight level and mirrors it in AI", () => {
+  it("offers exactly one native stomp tier per great dragon tier while expert AI may prefer a stronger adjacent attack", () => {
     const placements = [
       { id: "arena-1-0", side: 1 as const, slot: 0, classId: "great-dragon-knight" as const, level: 1 as const, x: 20, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
@@ -908,9 +908,13 @@ describe("all-terrain arena", () => {
     expect(battle.actionTargetCells("arena-1-0", "stomp-1")).toContainEqual({ x: 23, y: 30 });
     expect(battle.actionTargetCells("arena-1-0", "stomp-2")).toEqual([]);
     expect(battle.actionTargetCells("arena-1-0", "stomp-3")).toEqual([]);
-    expect(battle.planEnemyAiAction("arena-2-1")).toMatchObject({
+    expect(battle.planSpecialAiAction("arena-2-1", "stomp-1")).toMatchObject({
       kind: "special",
       actionId: "stomp-1",
+      targetId: "arena-1-1",
+    });
+    expect(battle.planEnemyAiAction("arena-2-1")).toMatchObject({
+      kind: "attack",
       targetId: "arena-1-1",
     });
 
@@ -919,7 +923,7 @@ describe("all-terrain arena", () => {
     expect(tierTwo.actionTargetCells("arena-1-0", "stomp-1")).toEqual([]);
     expect(tierTwo.actionTargetCells("arena-1-0", "stomp-2")).toContainEqual({ x: 23, y: 30 });
     expect(tierTwo.actionTargetCells("arena-1-0", "stomp-3")).toEqual([]);
-    expect(tierTwo.planEnemyAiAction("arena-2-1")).toMatchObject({
+    expect(tierTwo.planSpecialAiAction("arena-2-1", "stomp-2")).toMatchObject({
       kind: "special",
       actionId: "stomp-2",
       targetId: "arena-1-1",
@@ -930,7 +934,7 @@ describe("all-terrain arena", () => {
     expect(tierThree.actionTargetCells("arena-1-0", "stomp-1")).toEqual([]);
     expect(tierThree.actionTargetCells("arena-1-0", "stomp-2")).toEqual([]);
     expect(tierThree.actionTargetCells("arena-1-0", "stomp-3")).toContainEqual({ x: 23, y: 30 });
-    expect(tierThree.planEnemyAiAction("arena-2-1")).toMatchObject({
+    expect(tierThree.planSpecialAiAction("arena-2-1", "stomp-3")).toMatchObject({
       kind: "special",
       actionId: "stomp-3",
       targetId: "arena-1-1",

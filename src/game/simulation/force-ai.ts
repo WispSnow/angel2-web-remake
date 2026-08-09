@@ -35,6 +35,7 @@ export interface ForceAiPlanningContext {
     behavior: number,
     options?: OrdinaryAiPlanningOptions,
   ) => AlliedAiAction;
+  expertScore?: (unit: BattleUnit, action: AlliedAiAction) => number;
 }
 
 export function planTerrainHoldForceAiAction(
@@ -66,14 +67,16 @@ export function planTerrainHoldForceAiAction(
   const healingActions = doctrine.priorityHealingActionsByClass?.[unit.classId];
   if (healingActions && unit.statuses.techniqueSeal === 0) {
     const criticalHeal = context.planClassAction(unit, healingActions, {
-      modernRanking: true,
+      expertRanking: unit.side === 2,
+      modernRanking: unit.side === 1,
       targetFilter: (target) => forceMemberIds.has(target.id)
         && target.life * 100
           < context.statsFor(target).maxLife * doctrine.criticalHealThresholdPercent,
     });
     if (criticalHeal) return criticalHeal;
     const recoveryHeal = context.planClassAction(unit, healingActions, {
-      modernRanking: true,
+      expertRanking: unit.side === 2,
+      modernRanking: unit.side === 1,
       targetFilter: (target) => forceMemberIds.has(target.id),
     });
     if (recoveryHeal) return recoveryHeal;
@@ -137,13 +140,19 @@ export function planTerrainHoldForceAiAction(
       ? forceMemberIds.has(target.id)
       : (targetFilter?.(target) ?? true),
   });
-  if (classAction) return classAction;
 
   const opponentSide: BattleUnit["side"] = unit.side === 1 ? 2 : 1;
-  return context.planOrdinaryAction(unit, opponentSide, behavior, {
+  const ordinaryAction = context.planOrdinaryAction(unit, opponentSide, behavior, {
     destinationFilter: positionAndPathOptions.positionFilter,
     pathFilter: positionAndPathOptions.pathFilter,
     restThresholdPercent: doctrine.restThresholdPercent,
     targetFilter,
   });
+  if (!classAction) return ordinaryAction;
+  if (unit.side === 2 && context.expertScore) {
+    return context.expertScore(unit, classAction) >= context.expertScore(unit, ordinaryAction)
+      ? classAction
+      : ordinaryAction;
+  }
+  return classAction;
 }

@@ -184,7 +184,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     });
   });
 
-  it("lets the enemy monk select its native healing pool and consumes one planning roll", () => {
+  it("lets the enemy monk select the best healing action without a planning roll", () => {
     const battle = new Stage3Battle(campaign);
     const boss = battle.unit("2:17")!;
     boss.life -= 10;
@@ -194,7 +194,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
       kind: "special",
       targetId: boss.id,
     });
-    expect(battle.rng.calls).toBe(callsBefore + 1);
+    expect(battle.rng.calls).toBe(callsBefore);
   });
 
   it("limits Sha's recovery settlement to enemies inside the effect diamond", () => {
