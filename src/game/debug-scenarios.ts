@@ -134,6 +134,7 @@ const STAGE8_BATTLE_EVENT_IDS = [
 const STAGE8_COMPLETED_EVENT_IDS = [
   ...STAGE8_BATTLE_EVENT_IDS,
   "stage-08-objective-reached",
+  "stage-08-victory-story",
   "stage-08-completed-route",
 ] as const;
 

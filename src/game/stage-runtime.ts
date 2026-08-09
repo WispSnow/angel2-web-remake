@@ -1199,6 +1199,7 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-08-prebattle-story",
         "stage-08-opening-story",
         "stage-08-objective-reached",
+        "stage-08-victory-story",
         "stage-08-completed-route",
       ],
       requiredResumeEventIds: [

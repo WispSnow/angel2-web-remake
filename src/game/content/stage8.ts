@@ -69,6 +69,7 @@ export const STAGE8_DEFINITION = {
     prebattle: "stage-08-prebattle-story",
     opening: "stage-08-opening-story",
     roundStarts: [],
+    victory: "stage-08-victory-story",
   },
   music: {
     story: "stage-08-story-music",
@@ -93,6 +94,12 @@ export const STAGE8_DEFINITION = {
       trigger: { type: "objective-satisfied" },
       simulationEffect: "stage-08-set-victory-999",
       presentation: "none",
+    },
+    {
+      id: "stage-08-victory-story",
+      trigger: { type: "effect-completed", effectId: "stage-08-set-victory-999" },
+      simulationEffect: "none",
+      presentation: "stage-08-victory-story",
     },
     {
       id: "stage-08-completed-route",

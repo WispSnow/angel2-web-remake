@@ -29,7 +29,8 @@ export type StageStoryId =
   | "stage-06-alliance-story"
   | "stage-07-prebattle-story"
   | "stage-08-prebattle-story"
-  | "stage-08-opening-story";
+  | "stage-08-opening-story"
+  | "stage-08-victory-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -116,6 +117,7 @@ export type StageEventId =
   | "stage-08-prebattle-story"
   | "stage-08-opening-story"
   | "stage-08-objective-reached"
+  | "stage-08-victory-story"
   | "stage-08-completed-route";
 
 export type StageSimulationEffectId =

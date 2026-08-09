@@ -37,11 +37,14 @@ describe("stage 8 generated content", () => {
         defeatText: "「蘇蘭達」戰敗",
       },
       deployment: { kind: "fixed" },
+      stories: { victory: "stage-08-victory-story" },
     });
     expect(STAGE8_EVENT_PROGRAM).toEqual({
       prebattleStoryRecord: 21,
       openingStoryRecord: 156,
-      omittedVictoryStoryRecord: 157,
+      nativeOmittedVictoryStoryRecord: 157,
+      stableRemakeVictoryStoryRecord: 157,
+      stableRemakeDecision: "REMAKE-032",
       completedRoute: { module: 27, stage: 9, replayPresentation: false },
     });
   });
@@ -63,7 +66,7 @@ describe("stage 8 generated content", () => {
       .toEqual(new Set([0]));
   });
 
-  it("registers the three-background prebattle story, round-one story, and native music", () => {
+  it("registers the prebattle, round-one, stable-remake victory story, and native music", () => {
     activateStage8Content();
     const prebattle = STAGE8_STORY_PAGES["stage-08-prebattle-story"];
     expect(prebattle).toHaveLength(34);
@@ -75,8 +78,18 @@ describe("stage 8 generated content", () => {
       ...Array.from({ length: 19 }, () => 8),
     ]);
     expect(STAGE8_STORY_PAGES["stage-08-opening-story"]).toHaveLength(2);
+    expect(STAGE8_STORY_PAGES["stage-08-victory-story"]).toEqual([
+      expect.objectContaining({
+        source: expect.objectContaining({ record: 157, wait: 1 }),
+        upper: expect.objectContaining({
+          speaker: "蘇蘭達",
+          text: "「看樣子敵人大軍等一會兒就會趕來，\n  此地不宜久留．\n   我們趕快去與妮雅她們會合吧．」",
+        }),
+      }),
+    ]);
     expect(storyPagesForId("stage-08-prebattle-story")).toBe(prebattle);
-    expect(storyPagesForId("stage-08-victory-story" as never)).toEqual([]);
+    expect(storyPagesForId("stage-08-victory-story"))
+      .toBe(STAGE8_STORY_PAGES["stage-08-victory-story"]);
     expect(STAGE8_MUSIC_PROGRAMS["stage-08-story-music"])
       .toMatchObject({ kind: "loop", track: "MAGIC/72" });
     expect(STAGE8_MUSIC_PROGRAMS["stage-08-player-phase-music"])

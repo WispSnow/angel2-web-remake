@@ -451,9 +451,9 @@ export const DEBUG_SCENARIOS = [
   {
     id: "stage-08-victory-ready",
     stageId: "stage-08",
-    title: "勝利準備",
-    phase: "Victory feedback",
-    description: "全部敵軍已離場，驗證不播放 SAY/0157 的普通勝利回饋與編號保存。",
+    title: "勝利對白",
+    phase: "SAY/0157",
+    description: "全部敵軍已離場，驗證 REMAKE-032 補播的蘇蘭達撤離對白與後續編號保存。",
     fixture: true,
   },
   {

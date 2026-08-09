@@ -136,6 +136,13 @@ describe("stage runtime manifest", () => {
       kind: "exact-slots",
       slots: [8, 17, 18, 40, 41, 42, 43, 44],
     });
+    expect(stage8.save.validEventIds).toEqual([
+      "stage-08-prebattle-story",
+      "stage-08-opening-story",
+      "stage-08-objective-reached",
+      "stage-08-victory-story",
+      "stage-08-completed-route",
+    ]);
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
   });

@@ -133,6 +133,37 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion22Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 22
+    || value.contentVersion !== "stage-08-ranger-defense-1") return undefined;
+  const stage8CompletedEventIds = [
+    "stage-08-prebattle-story",
+    "stage-08-opening-story",
+    "stage-08-objective-reached",
+    "stage-08-completed-route",
+  ];
+  const isStage8Completed = value.kind === "completed"
+    && value.stageId === "stage-09"
+    && Array.isArray(value.consumedEventIds)
+    && value.consumedEventIds.every((id) => typeof id === "string")
+    && hasExactlyTheseValues(value.consumedEventIds, stage8CompletedEventIds);
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    ...(isStage8Completed ? {
+      consumedEventIds: [
+        "stage-08-prebattle-story",
+        "stage-08-opening-story",
+        "stage-08-objective-reached",
+        "stage-08-victory-story",
+        "stage-08-completed-route",
+      ],
+    } : {}),
+  });
+}
+
 function migrateVersion21Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 21
@@ -1315,6 +1346,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion22 = migrateVersion22Save(value);
+    if (migratedVersion22) return migratedVersion22;
     const migratedVersion21 = migrateVersion21Save(value);
     if (migratedVersion21) return migratedVersion21;
     const migratedVersion20 = migrateVersion20Save(value);

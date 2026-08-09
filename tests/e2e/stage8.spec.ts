@@ -181,7 +181,7 @@ test("S08-D: three player units hand off to all five independent rangers before 
   }
 });
 
-test("S08-E/F: the corrected objective requires the last raider and victory omits SAY/157", async ({ page }) => {
+test("S08-E/F: the last raider triggers the REMAKE-032 SAY/157 victory story", async ({ page }) => {
   await page.goto("/?debugScenario=stage-08-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.keyboard.press("o");
@@ -200,13 +200,32 @@ test("S08-E/F: the corrected objective requires the last raider and victory omit
   await page.getByTestId("battle-canvas").focus();
   await page.keyboard.press(" ");
   await page.getByTestId("unit-command-attack").click();
+  await waitForPhase(page, "victoryStory");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "157");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-wait", "1");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText(
+    "看樣子敵人大軍等一會兒就會趕來",
+  );
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText(
+    "我們趕快去與妮雅她們會合吧．」",
+  );
+  expect(await state(page)).toMatchObject({
+    activeStoryId: "stage-08-victory-story",
+    consumedEventIds: expect.arrayContaining([
+      "stage-08-objective-reached",
+      "stage-08-victory-story",
+    ]),
+  });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage8-victory-story.png`,
+  });
+  await skipStoryDialogue(page);
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
   expect((await state(page)).units.filter(({ side }) => side === 2)).toHaveLength(0);
-  expect((await state(page)).consumedEventIds).toContain("stage-08-objective-reached");
 });
 
-test("S08-G/H: retry and retreat replay SAY/21, while v22 completion stops at stage 9", async ({ page }) => {
+test("S08-G/H: retry and retreat replay SAY/21, while v23 completion stops at stage 9", async ({ page }) => {
   await page.goto("/?debugScenario=stage-08-near-defeat&difficulty=0&test=1");
   const entry = await state(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
@@ -230,6 +249,9 @@ test("S08-G/H: retry and retreat replay SAY/21, while v22 completion stops at st
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "21");
 
   await page.goto("/?debugScenario=stage-08-victory-ready&difficulty=0&test=1");
+  await waitForPhase(page, "victoryStory");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "157");
+  await skipStoryDialogue(page);
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
   await page.getByTestId("victory-continue").click();
@@ -262,6 +284,7 @@ test("S08-G/H: retry and retreat replay SAY/21, while v22 completion stops at st
       "stage-08-prebattle-story",
       "stage-08-opening-story",
       "stage-08-objective-reached",
+      "stage-08-victory-story",
       "stage-08-completed-route",
     ],
   });
@@ -302,6 +325,8 @@ test("S08-I: fast and reduced presentation with combat sound off preserves the r
     await page.getByTestId("battle-canvas").focus();
     await page.keyboard.press(" ");
     await page.getByTestId("unit-command-attack").click();
+    await waitForPhase(page, "victoryStory");
+    await skipStoryDialogue(page);
     await waitForPhase(page, "victoryFeedback");
     const resolved = await state(page);
     return {

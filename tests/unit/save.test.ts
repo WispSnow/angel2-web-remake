@@ -553,6 +553,38 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v22 stage-8 battles and completions into the SAY/157 event identity", () => {
+    const currentBattle = stage8BattleSave();
+    const legacyBattle = {
+      ...currentBattle,
+      version: 22,
+      contentVersion: "stage-08-ranger-defense-1",
+    };
+    expect(parseSaveData(JSON.stringify(legacyBattle))).toEqual(currentBattle);
+
+    const currentCompleted: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-09",
+      stageLabel: "找尋傳說中的飛船",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-08-prebattle-story",
+        "stage-08-opening-story",
+        "stage-08-objective-reached",
+        "stage-08-victory-story",
+        "stage-08-completed-route",
+      ],
+    };
+    const legacyCompleted = {
+      ...currentCompleted,
+      version: 22,
+      contentVersion: "stage-08-ranger-defense-1",
+      consumedEventIds: currentCompleted.consumedEventIds
+        .filter((id) => id !== "stage-08-victory-story"),
+    };
+    expect(parseSaveData(JSON.stringify(legacyCompleted))).toEqual(currentCompleted);
+  });
+
   it("migrates v21 saves into the stage-08 content identity", () => {
     const current = battleSave();
     const legacy = {
@@ -848,6 +880,7 @@ describe("Web save validation", () => {
         "stage-08-prebattle-story",
         "stage-08-opening-story",
         "stage-08-objective-reached",
+        "stage-08-victory-story",
         "stage-08-completed-route",
       ],
     };
