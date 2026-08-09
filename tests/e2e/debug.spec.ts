@@ -68,26 +68,81 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "href",
     "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth",
   );
+  await page.getByTestId("debug-per-stage-growth").fill("120");
+  await page.getByTestId("debug-growth-apply").click();
+  await expect(page.locator("[data-debug-growth-status]")).toHaveText(
+    "已套用：每關 +120（第 1 關預算 120／第 5 關預算 600）",
+  );
+  await expect(deployment).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth&growth=120",
+  );
+  await expect(page.getByTestId("debug-scenario-stage-05-player")).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-05-player&difficulty=3&roster=representative-growth&growth=120",
+  );
+  await expect(page.getByTestId("debug-scenario-stage-00-player")).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-00-player&difficulty=3&roster=representative-growth",
+  );
+  await page.getByTestId("debug-growth-reset").click();
+  await expect(deployment).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth",
+  );
+  await page.getByTestId("debug-per-stage-growth").fill("120");
+  await page.getByTestId("debug-growth-apply").click();
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-hub.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await captureVisualAudit(page.locator(".debug-options"), {
+    path: `${ARTIFACT_DIR}/debug-growth-controls-narrow.png`,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await deployment.click();
 
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 5／8");
   await expect(page.getByTestId("debug-toolbar")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  await expect(page.getByTestId("debug-toolbar")).toContainText(
+    "每關成長：120 · 本關成長預算：120",
+  );
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageId: string;
     phase: string;
     difficulty: number;
-    units: Array<{ id: string; classId: string }>;
+    units: Array<{ id: string; classId: string; experience: number }>;
   });
   expect(state).toMatchObject({
     stageId: "stage-01",
     phase: "deployment",
     difficulty: 3,
   });
-  expect(state.units).toContainEqual(expect.objectContaining({ id: "1:0", classId: "cavalry" }));
+  expect(state.units).toContainEqual(expect.objectContaining({
+    id: "1:0",
+    classId: "cavalry",
+    experience: 120,
+  }));
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-stage1-deployment.png` });
+});
+
+test("one per-stage growth budget advances the stage-five profession", async ({ page }) => {
+  await page.goto(
+    "/?debugScenario=stage-05-player&difficulty=2&roster=representative-growth&growth=120",
+  );
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await expect(page.getByTestId("debug-toolbar")).toContainText(
+    "每關成長：120 · 本關成長預算：600",
+  );
+  const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+    units: Array<{ id: string; classId: string; experience: number }>;
+  });
+  expect(state.units).toContainEqual(expect.objectContaining({
+    id: "1:0",
+    classId: "land-knight",
+    experience: 140,
+  }));
 });
 
 test("stage-four debug profiles cover inherited multi-promotion rosters", async ({ page }) => {

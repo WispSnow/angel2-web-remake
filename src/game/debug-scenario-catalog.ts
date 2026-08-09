@@ -310,8 +310,12 @@ export function debugScenarioUrl(
   id: DebugScenarioId,
   difficulty: Difficulty,
   rosterSourceId?: DebugRosterSourceId,
+  perStageGrowth?: number,
 ): string {
   const parameters = new URLSearchParams({ debugScenario: id, difficulty: String(difficulty) });
   if (rosterSourceId) parameters.set("roster", rosterSourceId);
+  if (perStageGrowth !== undefined) {
+    parameters.set("growth", String(perStageGrowth));
+  }
   return `/?${parameters.toString()}`;
 }

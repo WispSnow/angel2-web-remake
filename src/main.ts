@@ -142,13 +142,26 @@ if (debugScenario) {
       renderDebugLoadError("未知成長檔案", parameters.get("roster") ?? "");
       return;
     }
+    const perStageGrowth = debug.parseDebugPerStageGrowth(parameters.get("growth"));
+    if (parameters.has("growth") && perStageGrowth === undefined) {
+      renderDebugLoadError("無效每關成長值", parameters.get("growth") ?? "");
+      return;
+    }
     const controller = await debug.createDebugScenarioController(debugScenario, {
       difficulty,
       rosterSource,
       storage: localStorage,
+      perStageGrowth,
     });
     mountController(controller, false);
-    debug.mountDebugToolbar(controller, debugScenario, difficulty, rosterSource, localStorage);
+    debug.mountDebugToolbar(
+      controller,
+      debugScenario,
+      difficulty,
+      rosterSource,
+      localStorage,
+      perStageGrowth,
+    );
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     renderDebugLoadError("調試場景載入失敗", message);

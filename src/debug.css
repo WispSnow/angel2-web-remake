@@ -97,6 +97,49 @@ body.debug-hub-page {
   background: #2b161b;
 }
 
+.debug-options input,
+.debug-options button {
+  min-height: 36px;
+  color: #fff2d3;
+  border: 1px solid #82524b;
+  background: #2b161b;
+  font: inherit;
+}
+
+.debug-options input {
+  width: 148px;
+  padding: 7px 10px;
+}
+
+.debug-options button {
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.debug-options button[type="submit"] {
+  color: #241014;
+  border-color: #e2b64e;
+  background: #e2b64e;
+  font-weight: 800;
+}
+
+.debug-options button:hover:not(:disabled),
+.debug-options button:focus-visible,
+.debug-options input:focus-visible,
+.debug-options select:focus-visible {
+  border-color: #f2cd6e;
+  outline: 2px solid rgb(239 194 90 / 28%);
+  outline-offset: 2px;
+}
+
+.debug-options button:disabled,
+.debug-options input:disabled {
+  color: #756361;
+  border-color: #4b3537;
+  background: #24181a;
+  cursor: not-allowed;
+}
+
 #debug-roster-source {
   min-width: min(320px, 100%);
 }
@@ -104,6 +147,21 @@ body.debug-hub-page {
 .debug-options span {
   flex: 1 1 300px;
   color: #aa9690;
+  font-size: 13px;
+}
+
+.debug-growth-form {
+  display: grid;
+  grid-template-columns: auto auto auto auto minmax(220px, 1fr);
+  align-items: center;
+  gap: 10px;
+  flex: 1 0 100%;
+  padding-top: 12px;
+  border-top: 1px solid #4f3035;
+}
+
+.debug-growth-form output {
+  color: #c7afa0;
   font-size: 13px;
 }
 
@@ -337,6 +395,20 @@ body.debug-hub-page {
 
   .debug-options span {
     flex-basis: 100%;
+  }
+
+  .debug-growth-form {
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .debug-growth-form label,
+  .debug-growth-form output {
+    grid-column: 1 / -1;
+  }
+
+  .debug-growth-form input {
+    width: 100%;
   }
 
   .debug-scenario-grid {

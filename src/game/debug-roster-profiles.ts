@@ -1,11 +1,14 @@
 import {
   className,
   classStatsFor,
+  promotionExperienceThresholdFor,
   promotionTargetsFor,
   type ClassId,
 } from "./content/classes";
 import { completeCampaignRoster } from "./content/stage0";
 import { readSaveSlot, SAVE_SLOT_COUNT } from "./save";
+import { DeterministicRng } from "./simulation/rng";
+import { STAGE_RUNTIME_MANIFEST } from "./stage-runtime";
 import type {
   CampaignState,
   Difficulty,
@@ -155,8 +158,15 @@ export interface DebugRosterSourceOption {
 
 export const DEFAULT_DEBUG_ROSTER_SOURCE_ID: DebugRosterProfileId = "template-baseline";
 export const DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID: DebugRosterProfileId = "representative-growth";
+export const DEBUG_PER_STAGE_GROWTH_MAX = 9999;
 const DEFAULT_DEBUG_RNG_STATE = 0x0a11ce02;
+const DEBUG_GROWTH_PROFILE_SALTS: Record<DebugRosterProfileId, number> = {
+  "template-baseline": 0x7465_6d70,
+  "representative-growth": 0x7265_7072,
+  "promotion-coverage": 0x636f_7665,
+};
 const SAVE_SOURCE_PATTERN = /^save-(\d+)-(entry|current)$/u;
+const PER_STAGE_GROWTH_PATTERN = /^(?:0|[1-9]\d{0,3})$/u;
 
 function isDebugRosterProfileId(value: string): value is DebugRosterProfileId {
   return DEBUG_ROSTER_PROFILE_SPECS.some(({ id }) => id === value);
@@ -177,10 +187,111 @@ export function parseDebugRosterSourceId(
   return { kind: "save-slot", id: value as DebugRosterSourceId, slot, mode };
 }
 
+export function parseDebugPerStageGrowth(
+  value: string | null | undefined,
+): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (!PER_STAGE_GROWTH_PATTERN.test(value)) return undefined;
+  const growth = Number(value);
+  return growth <= DEBUG_PER_STAGE_GROWTH_MAX ? growth : undefined;
+}
+
 function profileSpec(profileId: DebugRosterProfileId) {
   const profile = DEBUG_ROSTER_PROFILE_SPECS.find(({ id }) => id === profileId);
   if (!profile) throw new Error(`未知成長檔案：${profileId}`);
   return profile;
+}
+
+export function debugRosterProfileSupportsGrowthOverride(
+  profileId: DebugRosterProfileId,
+  stageId: StageId,
+): boolean {
+  const stages: Partial<Record<StageId, readonly DebugRosterEntrySpec[]>> =
+    profileSpec(profileId).stages;
+  return (stages[stageId]?.length ?? 0) > 0;
+}
+
+function assertDebugPerStageGrowth(perStageGrowth: number): void {
+  if (
+    !Number.isInteger(perStageGrowth)
+    || perStageGrowth < 0
+    || perStageGrowth > DEBUG_PER_STAGE_GROWTH_MAX
+  ) {
+    throw new Error(`每關成長值必須是 0–${DEBUG_PER_STAGE_GROWTH_MAX} 的整數`);
+  }
+}
+
+export function debugGrowthBudgetForStage(stageId: StageId, perStageGrowth: number): number {
+  assertDebugPerStageGrowth(perStageGrowth);
+  return STAGE_RUNTIME_MANIFEST[stageId].ordinal * perStageGrowth;
+}
+
+function debugGrowthRng(
+  profileId: DebugRosterProfileId,
+  slot: number,
+): DeterministicRng {
+  const seed = (
+    DEFAULT_DEBUG_RNG_STATE
+    ^ DEBUG_GROWTH_PROFILE_SALTS[profileId]
+    ^ Math.imul(slot + 1, 0x9e37_79b1)
+  ) >>> 0;
+  return new DeterministicRng(seed || DEFAULT_DEBUG_RNG_STATE);
+}
+
+function randomPromotionTarget(classId: ClassId, rng: DeterministicRng): ClassId {
+  const targets = promotionTargetsFor(classId);
+  if (targets.length === 0) throw new Error(`${className(classId)}沒有合法轉職候選`);
+  const target = targets[rng.between(0, targets.length - 1)];
+  if (!target) throw new Error(`${className(classId)}的隨機轉職候選不存在`);
+  return target.id;
+}
+
+export interface DebugGrowthProgression {
+  classId: ClassId;
+  experience: number;
+  promotions: readonly ClassId[];
+}
+
+function debugGrowthProgression(
+  profileId: DebugRosterProfileId,
+  entry: DebugRosterEntrySpec,
+  growthBudget: number,
+): DebugGrowthProgression {
+  const campaignEntryClass = entry.classPath[0];
+  if (!campaignEntryClass) throw new Error(`成長檔案槽 ${entry.slot} 缺少入隊職業`);
+  const rng = debugGrowthRng(profileId, entry.slot);
+  let classId = campaignEntryClass === "soldier"
+    ? randomPromotionTarget(campaignEntryClass, rng)
+    : campaignEntryClass;
+  let experience = growthBudget;
+  const promotions: ClassId[] = [classId];
+
+  while (promotionTargetsFor(classId).length > 0) {
+    const threshold = promotionExperienceThresholdFor(classId);
+    if (experience < threshold) break;
+    experience -= threshold;
+    classId = randomPromotionTarget(classId, rng);
+    promotions.push(classId);
+  }
+  return { classId, experience, promotions };
+}
+
+export function debugGrowthProgressionForSlot(
+  profileId: DebugRosterProfileId,
+  stageId: StageId,
+  slot: number,
+  perStageGrowth: number,
+): DebugGrowthProgression {
+  const stages: Partial<Record<StageId, readonly DebugRosterEntrySpec[]>> =
+    profileSpec(profileId).stages;
+  const entry = stages[stageId]?.find((candidate) => candidate.slot === slot);
+  if (!entry) throw new Error(`成長檔案 ${profileId} 在 ${stageId} 沒有角色槽 ${slot}`);
+  assertPromotionPath(entry);
+  return debugGrowthProgression(
+    profileId,
+    entry,
+    debugGrowthBudgetForStage(stageId, perStageGrowth),
+  );
 }
 
 function assertPromotionPath(entry: DebugRosterEntrySpec): ClassId {
@@ -206,11 +317,19 @@ function assertPromotionPath(entry: DebugRosterEntrySpec): ClassId {
 export function debugRosterForProfile(
   profileId: DebugRosterProfileId,
   stageId: StageId,
+  perStageGrowth?: number,
 ): SaveRosterEntry[] {
   const roster = completeCampaignRoster();
   const stages: Partial<Record<StageId, readonly DebugRosterEntrySpec[]>> =
     profileSpec(profileId).stages;
   const entries = stages[stageId] ?? [];
+  if (perStageGrowth !== undefined) assertDebugPerStageGrowth(perStageGrowth);
+  if (perStageGrowth !== undefined && entries.length === 0) {
+    throw new Error(`成長檔案 ${profileId} 在 ${stageId} 沒有可覆蓋的友軍`);
+  }
+  const growthBudget = perStageGrowth === undefined
+    ? undefined
+    : debugGrowthBudgetForStage(stageId, perStageGrowth);
   const slots = new Set<number>();
   for (const entry of entries) {
     if (!Number.isInteger(entry.slot) || entry.slot < 0 || entry.slot >= roster.length) {
@@ -221,12 +340,16 @@ export function debugRosterForProfile(
       throw new Error(`成長檔案槽 ${entry.slot} 含非法經驗值`);
     }
     slots.add(entry.slot);
-    const classId = assertPromotionPath(entry);
+    const configuredClassId = assertPromotionPath(entry);
+    const progression = growthBudget === undefined
+      ? { classId: configuredClassId, experience: entry.experience }
+      : debugGrowthProgression(profileId, entry, growthBudget);
+    const { classId, experience } = progression;
     roster[entry.slot] = {
       slot: entry.slot,
       classId,
-      experience: entry.experience,
-      life: classStatsFor({ classId, experience: entry.experience }).maxLife,
+      experience,
+      life: classStatsFor({ classId, experience }).maxLife,
     };
   }
   return roster;
@@ -259,16 +382,20 @@ export function createDebugCampaignState(
   difficulty: Difficulty,
   source: DebugRosterSource,
   storage: Pick<Storage, "getItem">,
+  perStageGrowth?: number,
 ): CampaignState {
   if (source.kind === "profile") {
     return {
       stageId,
       ruleset: "stableRemake",
       difficulty,
-      roster: debugRosterForProfile(source.id, stageId),
+      roster: debugRosterForProfile(source.id, stageId, perStageGrowth),
       rngState: DEFAULT_DEBUG_RNG_STATE,
       rngCalls: 0,
     };
+  }
+  if (perStageGrowth !== undefined) {
+    throw new Error("正式記錄來源不接受每關成長覆蓋");
   }
   const result = readSaveSlot(storage, source.slot);
   if (result.kind === "empty") throw new Error(`記錄 ${source.slot} 是空的`);

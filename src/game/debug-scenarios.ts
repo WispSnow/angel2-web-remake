@@ -4,6 +4,7 @@ import { GameController } from "./controller";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "./save";
 import {
   createDebugCampaignState,
+  debugGrowthBudgetForStage,
   debugRosterSourceOption,
   type DebugRosterSource,
 } from "./debug-roster-profiles";
@@ -29,6 +30,7 @@ export {
   type DebugScenarioId,
 } from "./debug-scenario-catalog";
 export {
+  parseDebugPerStageGrowth,
   parseDebugRosterSourceId,
   type DebugRosterSource,
 } from "./debug-roster-profiles";
@@ -101,6 +103,7 @@ export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
   storage: Pick<Storage, "getItem">;
+  perStageGrowth?: number;
 }
 
 function debugCampaign(
@@ -112,6 +115,7 @@ function debugCampaign(
     context.difficulty,
     context.rosterSource,
     context.storage,
+    context.perStageGrowth,
   );
 }
 
@@ -605,6 +609,7 @@ const DEBUG_SCENARIO_FACTORIES = {
 export interface Angel2DeveloperApi {
   scenarioId: DebugScenarioId;
   rosterSourceId: string;
+  perStageGrowth?: number;
   getState: () => object;
   completeCurrentStage: () => Promise<void>;
   prepareVictory: () => void;
@@ -624,6 +629,7 @@ export function mountDebugToolbar(
   difficulty: Difficulty,
   rosterSource: DebugRosterSource,
   storage: Pick<Storage, "getItem">,
+  perStageGrowth?: number,
 ): () => void {
   document.body.classList.add("debug-session-page");
   const toolbar = document.createElement("aside");
@@ -635,6 +641,7 @@ export function mountDebugToolbar(
       <div class="debug-toolbar-heading"><b>開發調試</b><a href="/debug.html">場景選擇</a></div>
       <p data-debug-scenario></p>
       <p data-debug-roster></p>
+      <p data-debug-experience></p>
       <p data-debug-state></p>
       <div class="debug-toolbar-actions">
         <button type="button" data-debug-victory>一擊勝利</button>
@@ -649,12 +656,13 @@ export function mountDebugToolbar(
   const toggle = toolbar.querySelector<HTMLButtonElement>("[data-debug-toggle]");
   const scenarioLabel = toolbar.querySelector<HTMLElement>("[data-debug-scenario]");
   const rosterLabel = toolbar.querySelector<HTMLElement>("[data-debug-roster]");
+  const experienceLabel = toolbar.querySelector<HTMLElement>("[data-debug-experience]");
   const stateLabel = toolbar.querySelector<HTMLElement>("[data-debug-state]");
   const victory = toolbar.querySelector<HTMLButtonElement>("[data-debug-victory]");
   const complete = toolbar.querySelector<HTMLButtonElement>("[data-debug-complete]");
   const defeat = toolbar.querySelector<HTMLButtonElement>("[data-debug-defeat]");
   if (
-    !panel || !toggle || !scenarioLabel || !rosterLabel || !stateLabel
+    !panel || !toggle || !scenarioLabel || !rosterLabel || !experienceLabel || !stateLabel
     || !victory || !complete || !defeat
   ) {
     throw new Error("debug toolbar controls are missing");
@@ -662,10 +670,16 @@ export function mountDebugToolbar(
 
   const scenario = DEBUG_SCENARIOS.find(({ id }) => id === scenarioId);
   const rosterOption = debugRosterSourceOption(rosterSource, storage);
+  const growthBudget = scenario && perStageGrowth !== undefined
+    ? debugGrowthBudgetForStage(scenario.stageId, perStageGrowth)
+    : undefined;
 
   const render = () => {
     scenarioLabel.textContent = `${debugStageLabel(controller.battle.stage.id)} · ${scenario?.title ?? scenarioId}`;
     rosterLabel.textContent = `成長：${rosterOption.label}`;
+    experienceLabel.textContent = perStageGrowth === undefined || growthBudget === undefined
+      ? "每關成長：沿用成長檔案"
+      : `每關成長：${perStageGrowth} · 本關成長預算：${growthBudget}`;
     stateLabel.textContent = `${controller.battle.stage.id} · ${controller.phase}`;
     const battleActive = controller.phase === "player";
     victory.disabled = !battleActive;
@@ -687,13 +701,14 @@ export function mountDebugToolbar(
   window.__ANGEL2_DEBUG__ = {
     scenarioId,
     rosterSourceId: rosterSource.id,
+    perStageGrowth,
     getState: () => controller.debugState(),
     completeCurrentStage: () => controller.completeCurrentStageForDebug(),
     prepareVictory: () => controller.forceVictorySetupForTest(),
     forceDefeat: () => controller.forceDefeatForTest(),
     openScenario: (id) => {
       if (isDebugScenarioId(id)) {
-        location.assign(debugScenarioUrl(id, difficulty, rosterSource.id));
+        location.assign(debugScenarioUrl(id, difficulty, rosterSource.id, perStageGrowth));
       }
     },
   };

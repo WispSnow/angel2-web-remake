@@ -9,7 +9,12 @@ import type { Difficulty } from "./game/types";
 import { STAGE_RUNTIME_MANIFEST } from "./game/stage-runtime";
 import {
   debugRosterSourceOptions,
+  debugGrowthBudgetForStage,
+  debugRosterProfileSupportsGrowthOverride,
+  DEBUG_PER_STAGE_GROWTH_MAX,
   DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID,
+  parseDebugPerStageGrowth,
+  parseDebugRosterSourceId,
   type DebugRosterSourceId,
 } from "./game/debug-roster-profiles";
 
@@ -48,6 +53,17 @@ root.innerHTML = `
         }>${option.label}</option>`).join("")}
       </select>
       <span data-debug-roster-description></span>
+      <form class="debug-growth-form" data-debug-growth-form>
+        <label for="debug-per-stage-growth">每關成長</label>
+        <input id="debug-per-stage-growth" data-testid="debug-per-stage-growth" type="number"
+          min="0" max="${DEBUG_PER_STAGE_GROWTH_MAX}" step="10" inputmode="numeric"
+          placeholder="沿用檔案值">
+        <button type="submit" data-testid="debug-growth-apply">套用設定值</button>
+        <button type="button" data-testid="debug-growth-reset" data-debug-growth-reset>
+          使用檔案值
+        </button>
+        <output data-debug-growth-status aria-live="polite">目前沿用成長檔案經驗</output>
+      </form>
     </section>
     <nav class="debug-tool-links" aria-label="專項實驗室">
       <a href="/arena.html" data-testid="debug-arena-link"><b>全地形競技場</b><span>自由配置目前可用職業，使用正式規則與 AI 開戰</span></a>
@@ -95,18 +111,69 @@ if (!difficultySelect) throw new Error("debug difficulty selector not found");
 const rosterSelect = root.querySelector<HTMLSelectElement>("#debug-roster-source");
 const rosterDescription = root.querySelector<HTMLElement>("[data-debug-roster-description]");
 if (!rosterSelect || !rosterDescription) throw new Error("debug roster selector not found");
+const growthForm = root.querySelector<HTMLFormElement>("[data-debug-growth-form]");
+const growthInput = root.querySelector<HTMLInputElement>("#debug-per-stage-growth");
+const growthApply = root.querySelector<HTMLButtonElement>("[data-testid='debug-growth-apply']");
+const growthReset = root.querySelector<HTMLButtonElement>("[data-debug-growth-reset]");
+const growthStatus = root.querySelector<HTMLOutputElement>("[data-debug-growth-status]");
+if (
+  !growthForm || !growthInput || !growthApply || !growthReset || !growthStatus
+) throw new Error("debug per-stage growth controls not found");
+
+let perStageGrowth: number | undefined;
 
 const updateLinks = () => {
   const difficulty = Number(difficultySelect.value) as Difficulty;
   const rosterSourceId = rosterSelect.value as DebugRosterSourceId;
   const rosterOption = rosterOptions.find(({ id }) => id === rosterSourceId);
+  const rosterSource = parseDebugRosterSourceId(rosterSourceId);
+  const supportsAnyStage = rosterSource?.kind === "profile"
+    && stageGroups.some(({ stageId }) =>
+      debugRosterProfileSupportsGrowthOverride(rosterSource.id, stageId));
   rosterDescription.textContent = rosterOption?.description ?? "未知成長檔案";
+  growthInput.disabled = !supportsAnyStage;
+  growthApply.disabled = !supportsAnyStage;
+  growthReset.disabled = !supportsAnyStage || perStageGrowth === undefined;
+  growthStatus.textContent = !supportsAnyStage
+    ? "此來源保留原有經驗"
+    : perStageGrowth === undefined
+      ? "目前沿用成長檔案經驗"
+      : `已套用：每關 +${perStageGrowth}（第 1 關預算 ${
+        debugGrowthBudgetForStage("stage-01", perStageGrowth)
+      }／第 5 關預算 ${debugGrowthBudgetForStage("stage-05", perStageGrowth)}）`;
   root.querySelectorAll<HTMLAnchorElement>("[data-debug-scenario-id]").forEach((link) => {
     const id = link.dataset.debugScenarioId as DebugScenarioId | undefined;
-    if (id) link.href = debugScenarioUrl(id, difficulty, rosterSourceId);
+    if (!id) return;
+    const scenario = DEBUG_SCENARIOS.find((candidate) => candidate.id === id);
+    const scenarioGrowth = perStageGrowth !== undefined
+      && rosterSource?.kind === "profile"
+      && scenario
+      && debugRosterProfileSupportsGrowthOverride(rosterSource.id, scenario.stageId)
+      ? perStageGrowth
+      : undefined;
+    link.href = debugScenarioUrl(id, difficulty, rosterSourceId, scenarioGrowth);
   });
 };
 
 difficultySelect.addEventListener("change", updateLinks);
 rosterSelect.addEventListener("change", updateLinks);
+growthInput.addEventListener("input", () => growthInput.setCustomValidity(""));
+growthForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const nextGrowth = parseDebugPerStageGrowth(growthInput.value);
+  if (nextGrowth === undefined) {
+    growthInput.setCustomValidity(`請輸入 0–${DEBUG_PER_STAGE_GROWTH_MAX} 的整數`);
+    growthInput.reportValidity();
+    return;
+  }
+  growthInput.setCustomValidity("");
+  perStageGrowth = nextGrowth;
+  updateLinks();
+});
+growthReset.addEventListener("click", () => {
+  perStageGrowth = undefined;
+  growthInput.value = "";
+  growthInput.setCustomValidity("");
+  updateLinks();
+});
 updateLinks();
