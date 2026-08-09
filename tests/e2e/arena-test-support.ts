@@ -7,6 +7,7 @@ type ArenaDebugWindow = Window & {
 export const ARTIFACT_DIR = "artifacts/playwright";
 
 export interface ArenaBattleDebugState {
+  round: number;
   phase: string;
   actionMode: string;
   cameraOrigin: { x: number; y: number };

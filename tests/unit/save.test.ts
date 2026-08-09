@@ -553,6 +553,17 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v24 battle and completed saves into the ranged/control AI identity", () => {
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 24,
+        contentVersion: "expert-enemy-ai-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v23 battle and completed saves without changing their state", () => {
     const currentBattle = battleSave();
     const legacyBattle = {

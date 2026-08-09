@@ -90,6 +90,19 @@ export function techniqueActionIdsFor(
   });
 }
 
+export type IceActionId = Extract<BattleActionId, "ice-1" | "ice-2" | "ice-3" | "ice-4">;
+
+export function isIceActionId(actionId: BattleActionId | undefined): actionId is IceActionId {
+  return actionId === "ice-1" || actionId === "ice-2"
+    || actionId === "ice-3" || actionId === "ice-4";
+}
+
+export function hasIceTechnique(
+  unit: Pick<BattleUnit, "classId" | "experience">,
+): boolean {
+  return techniqueActionIdsFor(unit).some(isIceActionId);
+}
+
 export const BATTLE_ACTION_AUDIO_ASSETS = {
   ...STAGE0_ACTION_AUDIO_ASSETS,
 } as unknown as BattleActionAudioAssets;

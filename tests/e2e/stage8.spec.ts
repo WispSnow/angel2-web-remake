@@ -225,7 +225,7 @@ test("S08-E/F: the last raider triggers the REMAKE-032 SAY/157 victory story", a
   expect((await state(page)).units.filter(({ side }) => side === 2)).toHaveLength(0);
 });
 
-test("S08-G/H: retry and retreat replay SAY/21, while v24 completion stops at stage 9", async ({ page }) => {
+test("S08-G/H: retry and retreat replay SAY/21, while v25 completion stops at stage 9", async ({ page }) => {
   await page.goto("/?debugScenario=stage-08-near-defeat&difficulty=0&test=1");
   const entry = await state(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();

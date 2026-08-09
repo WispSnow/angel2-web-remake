@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion24Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 24
+    || value.contentVersion !== "expert-enemy-ai-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion23Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 23
@@ -1357,6 +1368,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion24 = migrateVersion24Save(value);
+    if (migratedVersion24) return migratedVersion24;
     const migratedVersion23 = migrateVersion23Save(value);
     if (migratedVersion23) return migratedVersion23;
     const migratedVersion22 = migrateVersion22Save(value);

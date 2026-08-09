@@ -177,8 +177,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 24;
-  contentVersion: "expert-enemy-ai-1";
+  version: 25;
+  contentVersion: "expert-ranged-control-ai-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -1,4 +1,7 @@
-import { BATTLE_ACTION_DEFINITIONS } from "../content/actions";
+import {
+  BATTLE_ACTION_DEFINITIONS,
+  techniqueActionIdsFor,
+} from "../content/actions";
 import {
   classDefinition,
   suppressesOrdinaryCounterFor,
@@ -7,7 +10,10 @@ import {
 import type { BattleUnit, Position, UnitStats } from "../types";
 import type { AlliedAiAction } from "./ai-contracts";
 import type { BattleActionId } from "./actions/types";
-import { techniqueEffectRange } from "./actions/range-map";
+import {
+  shootingLineVisitProbabilities,
+  techniqueEffectRange,
+} from "./actions/range-map";
 import { manhattan } from "./grid";
 
 export interface ExpertAiEvaluationContext {
@@ -34,6 +40,7 @@ export interface ExpertAiUtility {
   targetThreat: number;
   counterRisk: number;
   exposure: number;
+  firingDistance: number;
   terrainDefense: number;
   objectiveProgress: number;
   pathLength: number;
@@ -64,6 +71,7 @@ export function emptyExpertAiUtility(): ExpertAiUtility {
     targetThreat: 0,
     counterRisk: 0,
     exposure: 0,
+    firingDistance: 0,
     terrainDefense: 0,
     objectiveProgress: 0,
     pathLength: 0,
@@ -87,6 +95,7 @@ export function expertAiScore(utility: ExpertAiUtility): number {
     + utility.targetThreat * 10
     - utility.counterRisk * 90
     - utility.exposure * 1_200
+    + utility.firingDistance * 100
     + utility.terrainDefense * 15
     + utility.objectiveProgress * 300
     - utility.pathLength * 3
@@ -111,6 +120,7 @@ export function expertAiReasons(utility: ExpertAiUtility): string[] {
   if (utility.targetThreat > 0) reasons.push(`目標威脅 ${utility.targetThreat}`);
   if (utility.counterRisk > 0) reasons.push(`反擊風險 ${utility.counterRisk}`);
   if (utility.exposure > 0) reasons.push(`暴露 ${utility.exposure}`);
+  if (utility.firingDistance > 0) reasons.push(`射距 ${utility.firingDistance}`);
   if (utility.terrainDefense > 0) reasons.push(`地形防禦 ${utility.terrainDefense}%`);
   if (utility.objectiveProgress > 0) reasons.push(`目標推進 ${utility.objectiveProgress}`);
   if (utility.waste > 0) reasons.push(`無效／重複 ${utility.waste}`);
@@ -148,8 +158,57 @@ export function expertExposureAt(
     if (candidate.side === actor.side
       || candidate.id === ignoredTargetId
       || candidate.actionDisabled) return false;
-    return manhattan(position, candidate) <= context.statsFor(candidate).movement + 1;
+    const stats = context.statsFor(candidate);
+    let maximumReach = stats.movement + 1;
+    const shootingActionId = candidate.classId === "archer"
+      ? "archer-shot"
+      : candidate.classId === "crossbow"
+        ? "crossbow-shot"
+        : candidate.classId === "magic-archer"
+          ? "magic-archer-shot"
+          : undefined;
+    if (shootingActionId) {
+      maximumReach = Math.max(
+        maximumReach,
+        stats.movement + BATTLE_ACTION_DEFINITIONS[shootingActionId].range.maximumDistance,
+      );
+    }
+    if (candidate.statuses.techniqueSeal === 0) {
+      for (const actionId of techniqueActionIdsFor(candidate)) {
+        const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+        if (definition.target !== "enemy" && definition.target !== "self-area") continue;
+        if (actionId === "archer-shot" || actionId === "crossbow-shot"
+          || actionId === "magic-archer-shot") continue;
+        const selectionRadius = "aiCandidateSelectionRadius" in definition.range
+          ? definition.range.aiCandidateSelectionRadius
+          : "selectionRadius" in definition.range
+            ? definition.range.selectionRadius
+            : 0;
+        const effectExtension = "effectRadius" in definition.range
+          ? Math.max(0, definition.range.effectRadius - 1)
+          : 0;
+        maximumReach = Math.max(
+          maximumReach,
+          definition.target === "self-area"
+            ? effectExtension
+            : selectionRadius + effectExtension,
+        );
+      }
+    }
+    return manhattan(position, candidate) <= maximumReach;
   }).length;
+}
+
+export function expertTacticalScore(utility: ExpertAiUtility): number {
+  return utility.guaranteedKills * 1_000_000
+    + utility.criticalSaves * 600_000
+    + utility.effectiveDamage * 100
+    + utility.effectiveHealing * 80
+    + utility.control * 100
+    + utility.support * 60
+    + utility.targetThreat * 10
+    - utility.counterRisk * 90
+    - utility.waste * 50_000;
 }
 
 export function expertOrdinaryUtility(
@@ -249,7 +308,36 @@ export function expertSpecialUtility(
       swiftEvasion ? Math.floor(selectedDamage / 2) : selectedDamage,
     );
     utility.guaranteedKills = !swiftEvasion && minimumDamage >= target.life ? 1 : 0;
+    if (utility.guaranteedKills > 0) {
+      utility.exposure = expertExposureAt(context, actor, position, target.id);
+    }
     utility.targetThreat = targetThreat(context, target);
+    utility.firingDistance = manhattan(position, target);
+    if (actionId === "magic-archer-shot") {
+      const lineProbabilities = shootingLineVisitProbabilities(
+        { ...position, classId: actor.classId },
+        target,
+        context,
+        definition.range.nativeSeed,
+      );
+      const expectedHalfDamage = Math.floor(expectedRoll / 2);
+      const minimumHalfDamage = Math.floor(definition.damage.minimum / 2);
+      for (const affected of context.units) {
+        if (affected.side === actor.side || affected.id === target.id || affected.actionDisabled) continue;
+        const probability = lineProbabilities.get(`${affected.x},${affected.y}`) ?? 0;
+        if (probability === 0) continue;
+        if (affected.statuses.magicGuard > 0) {
+          utility.support += Math.floor(20 * probability);
+          continue;
+        }
+        const expectedDamage = Math.min(affected.life, expectedHalfDamage);
+        utility.effectiveDamage += Math.floor(expectedDamage * probability);
+        utility.targetThreat += Math.floor(targetThreat(context, affected) * probability);
+        if (probability === 1 && minimumHalfDamage >= affected.life) {
+          utility.guaranteedKills += 1;
+        }
+      }
+    }
     return utility;
   }
 

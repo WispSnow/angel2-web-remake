@@ -11,8 +11,9 @@
 玩家控制权。通用字段、验证、排程、目标兜底和 Mod 边界见
 [`systems/force-ai-groups.md`](systems/force-ai-groups.md)。
 
-`REMAKE-033` 在此基础上把 side 2 常规战斗统一为唯一的“专家”规划器；完整效用、重规划、
-PRNG 与调试合同见 [`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.md)。
+`REMAKE-033` 在此基础上把 side 2 常规战斗统一为唯一的“专家”规划器；`REMAKE-034` 又收口
+射手安全射程边缘与冰雪末位／残军门禁。完整效用、重规划、PRNG 与调试合同见
+[`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.md)。
 
 ## 原版 AI 基线
 
@@ -145,6 +146,10 @@ PRNG 与调试合同见 [`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.m
   冲突的动态预留职责。
 - `[DD]` 剧情路线、守卫／警戒、军团目标和地形教义优先于通用效用，专家评分不得越权离开
   已批准的关卡任务。
+- `[DD]` 敌方射手同一战术收益下先减少普通／射击／技术威胁覆盖，再扩大有效射距；魔弓
+  用全部合法线路的均匀概率估算副目标，不读取未来线路随机。
+- `[DD]` 只有当前实际选择冰雪的敌军才延后到非冰雪单位之后；纯冰雪职业残军禁用冰雪。
+  不增加近期冰封衰减，冰雪技能与解封规则本身不变。
 
 ### 回合时序
 

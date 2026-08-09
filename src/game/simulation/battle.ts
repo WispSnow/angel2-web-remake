@@ -11,6 +11,8 @@ import {
 import {
   BATTLE_ACTION_DEFINITIONS,
   CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+  hasIceTechnique,
+  isIceActionId,
   techniqueActionIdsFor,
 } from "../content/actions";
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
@@ -81,6 +83,7 @@ import {
   expertOrdinaryUtility,
   expertAiScore,
   expertSpecialUtility,
+  expertTacticalScore,
   expertUtilityForAction,
   type ExpertAiDecisionTrace,
   type ExpertAiEvaluationContext,
@@ -552,6 +555,11 @@ export class Stage0Battle {
     return this.units
       .filter(({ id }) => this.isPlayerControllableAlly(id))
       .every(({ acted, actionDisabled }) => acted || actionDisabled);
+  }
+
+  allPlayerControllableAlliesFrozen(): boolean {
+    const controllable = this.units.filter(({ id }) => this.isPlayerControllableAlly(id));
+    return controllable.length > 0 && controllable.every(({ actionDisabled }) => actionDisabled);
   }
 
   enemyAiIntentFor(_id: string): EnemyAiIntent | undefined {
@@ -1522,8 +1530,10 @@ export class Stage0Battle {
     const positionFilter = allowMove
       ? undefined
       : (position: Position) => positionKey(position) === positionKey(unit);
+    const iceIsForbidden = this.onlyIceCapableEnemiesRemain();
     const classAction = this.planClassAction(unit, undefined, {
       expertRanking: true,
+      actionFilter: (actionId) => !iceIsForbidden || !isIceActionId(actionId),
       positionFilter,
       targetFilter: (target) => target.side === unit.side
         || (options.targetFilter?.(target) ?? true),
@@ -1561,6 +1571,11 @@ export class Stage0Battle {
     }
     this.recordExpertDecision(unit, candidates, selected);
     return selected;
+  }
+
+  private onlyIceCapableEnemiesRemain(): boolean {
+    const survivingEnemies = this.units.filter((candidate) => candidate.side === 2);
+    return survivingEnemies.length > 0 && survivingEnemies.every(hasIceTechnique);
   }
 
   private expertAiEvaluationContext(): ExpertAiEvaluationContext {
@@ -1902,6 +1917,7 @@ export class Stage0Battle {
     }> = [];
 
     for (const [actionOrder, actionId] of actionIds.entries()) {
+      if (!(options.actionFilter?.(actionId) ?? true)) continue;
       if (!this.canUseSpecialAction(unit, actionId)) continue;
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
       const positions = (actionId === "archer-shot" || actionId === "crossbow-shot"
@@ -2000,7 +2016,15 @@ export class Stage0Battle {
       }
 
       if (options.expertRanking) {
-        candidates.sort((left, right) => compareExpertAiUtility(left.utility, right.utility)
+        const shootingAction = actionId === "archer-shot" || actionId === "crossbow-shot"
+          || actionId === "magic-archer-shot";
+        candidates.sort((left, right) => (shootingAction
+          ? expertTacticalScore(right.utility) - expertTacticalScore(left.utility)
+            || left.utility.exposure - right.utility.exposure
+            || right.utility.firingDistance - left.utility.firingDistance
+            || right.utility.terrainDefense - left.utility.terrainDefense
+            || left.utility.pathLength - right.utility.pathLength
+          : compareExpertAiUtility(left.utility, right.utility))
           || left.target.y * this.stage.width + left.target.x
             - (right.target.y * this.stage.width + right.target.x)
           || left.position.y * this.stage.width + left.position.x
@@ -2140,7 +2164,7 @@ export class Stage0Battle {
     const candidates = new Set(candidateIds);
     const nativeOrder = this.enemyActionOrder().filter((id) => candidates.has(id));
     if (nativeOrder.length === 0 || this.hasRouteEnemy()) return nativeOrder[0];
-    return nativeOrder
+    const planned = nativeOrder
       .map((id, stableOrder) => {
         const unit = this.unit(id);
         const action = unit?.statuses.confusion
@@ -2149,8 +2173,10 @@ export class Stage0Battle {
         const score = unit && action
           ? expertAiScore(this.expertUtilityForAction(unit, action))
           : Number.MIN_SAFE_INTEGER;
-        return { id, score, stableOrder };
-      })
+        return { id, score, stableOrder, action };
+      });
+    const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
+    return (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
       .sort((left, right) => right.score - left.score
         || left.stableOrder - right.stableOrder)[0]?.id;
   }

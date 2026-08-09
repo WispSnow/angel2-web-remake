@@ -2834,6 +2834,19 @@ export class GameController {
     }
     this.busy = false;
     this.emit();
+    this.scheduleFrozenPlayerPhaseSkip();
+  }
+
+  private scheduleFrozenPlayerPhaseSkip(): void {
+    if (this.phase !== "player" || !this.battle.allPlayerControllableAlliesFrozen()) return;
+    this.statusMessage = `第 ${this.battle.round} 回合：我方可控單位均被冰封，自動跳過玩家階段。`;
+    this.emit();
+    queueMicrotask(() => {
+      if (this.phase === "player" && !this.busy
+        && this.battle.allPlayerControllableAlliesFrozen()) {
+        void this.runTurnPhases("autonomous");
+      }
+    });
   }
 
   private async runAlliedAiAction(
@@ -4023,6 +4036,7 @@ export class GameController {
     this.busy = false;
     this.resetAction();
     this.statusMessage = message;
+    this.scheduleFrozenPlayerPhaseSkip();
   }
 
   requestQuit(): void {

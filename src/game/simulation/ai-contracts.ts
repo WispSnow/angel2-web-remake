@@ -22,6 +22,7 @@ export interface ClassActionPlanningOptions {
   modernRanking?: boolean;
   /** Compares every legal action/target pair with the shared expert utility. */
   expertRanking?: boolean;
+  actionFilter?: (actionId: BattleActionId) => boolean;
   targetFilter?: (target: BattleUnit) => boolean;
   positionFilter?: (position: Position) => boolean;
   pathFilter?: (path: readonly Position[]) => boolean;

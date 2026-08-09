@@ -170,7 +170,7 @@ test("S07-D/E: the objective names Laili and removing slot 18 ends the battle", 
   expect((await state(page)).units.some(({ id }) => id === "2:18")).toBe(false);
 });
 
-test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v24, and enters stage 8", async ({ page }) => {
+test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v25, and enters stage 8", async ({ page }) => {
   await page.goto("/?debugScenario=stage-07-near-defeat&difficulty=0&test=1");
   const entry = await state(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();

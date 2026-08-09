@@ -154,6 +154,60 @@ export function shootingLinePath(
   return reversed.reverse();
 }
 
+/**
+ * Returns the probability that the native uniformly selected predecessor walk
+ * visits each line cell. This evaluates every legal line without reading the
+ * gameplay PRNG and is used only by deterministic AI estimates.
+ */
+export function shootingLineVisitProbabilities(
+  actor: Pick<BattleUnit, "x" | "y" | "classId">,
+  target: Position,
+  battlefield: ActionBattlefield,
+  nativeSeed: number,
+): ReadonlyMap<string, number> {
+  const gradient = buildUniformRange(
+    actor,
+    battlefield,
+    nativeSeed,
+    (movementRule) => movementRule === 0 || movementRule === 99,
+  );
+  if (gradient.valueAt(target) === 0) return new Map();
+
+  const probabilities = new Map<string, number>();
+  let frontier = new Map<string, { position: Position; probability: number }>([[
+    `${target.x},${target.y}`,
+    { position: copyPosition(target), probability: 1 },
+  ]]);
+  probabilities.set(`${target.x},${target.y}`, 1);
+
+  while (frontier.size > 0) {
+    const nextFrontier = new Map<string, { position: Position; probability: number }>();
+    for (const { position, probability } of frontier.values()) {
+      if (position.x === actor.x && position.y === actor.y) continue;
+      const nextValue = gradient.valueAt(position) + 1;
+      const predecessors = OFFSETS
+        .map((offset) => ({ x: position.x + offset.x, y: position.y + offset.y }))
+        .filter((candidate) => gradient.valueAt(candidate) === nextValue);
+      if (predecessors.length === 0) return new Map();
+      const branchProbability = probability / predecessors.length;
+      for (const predecessor of predecessors) {
+        const key = `${predecessor.x},${predecessor.y}`;
+        probabilities.set(key, (probabilities.get(key) ?? 0) + branchProbability);
+        const pending = nextFrontier.get(key);
+        nextFrontier.set(key, {
+          position: predecessor,
+          probability: (pending?.probability ?? 0) + branchProbability,
+        });
+      }
+    }
+    if (nextFrontier.size === 0) break;
+    frontier = nextFrontier;
+  }
+
+  probabilities.delete(`${actor.x},${actor.y}`);
+  return probabilities;
+}
+
 export function techniqueSelectionRange(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,
   battlefield: ActionBattlefield,

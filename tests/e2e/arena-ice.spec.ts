@@ -93,7 +93,65 @@ test("tier-one wizard performs native self-centered 2C through the formal techni
   expect(pageErrors).toEqual([]);
 });
 
-test("enemy tier-one wizard uses 2C with its own cell as the formal effect center", async ({ page }) => {
+test("enemy wizard waits for a non-ice ally and the frozen player phase advances", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const ally = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("wizard");
+    const wizard = arena.interact(22, 30);
+    arena.setClass("warrior");
+    const warrior = arena.interact(30, 30);
+    return [ally, wizard, warrior];
+  });
+  expect(placed).toEqual([true, true, true]);
+  await page.getByTestId("arena-start").click();
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-rest").click();
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
+  await expect(dialogue).toHaveAttribute("data-action-id", "ice-2");
+  await expect(dialogue).toHaveAttribute("data-effect-center", "22,30");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
+  await expect(page.getByText("看我的冰魔法.", { exact: true })).toBeVisible();
+  expect((await arenaBattleState(page))?.units.find(({ id }) => id === "arena-2-1")?.acted)
+    .toBe(true);
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as {
+      battle?: ArenaBattleDebugState;
+    }).battle;
+    return current?.lastSpecialAction?.actionId === "ice-2"
+      && current.lastSpecialAction.actorId === "arena-2-0"
+      && current.specialActionPresentation === undefined;
+  });
+  const after = await arenaBattleState(page);
+  expect(after?.lastSpecialAction).toMatchObject({
+    actionId: "ice-2",
+    actorId: "arena-2-0",
+    target: { x: 22, y: 30 },
+    affectedUnits: [expect.objectContaining({ unitId: "arena-1-0" })],
+  });
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as {
+      battle?: ArenaBattleDebugState;
+    }).battle;
+    return (current?.round ?? 0) >= 2
+      && current?.units.find(({ id }) => id === "arena-2-1")?.acted === true;
+  });
+  expect(pageErrors).toEqual([]);
+});
+
+test("enemy wizard does not use ice when every surviving enemy can freeze", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -115,28 +173,17 @@ test("enemy tier-one wizard uses 2C with its own cell as the formal effect cente
   await clickArenaWorldCell(page, 20, 30);
   await page.getByTestId("unit-command-rest").click();
 
-  const dialogue = page.getByTestId("dialogue-layer");
-  await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
-  await expect(dialogue).toHaveAttribute("data-action-id", "ice-2");
-  await expect(dialogue).toHaveAttribute("data-effect-center", "22,30");
-  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
-  await expect(page.getByText("看我的冰魔法.", { exact: true })).toBeVisible();
-
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
       battle?: ArenaBattleDebugState;
     }).battle;
-    return current?.lastSpecialAction?.actionId === "ice-2"
-      && current.lastSpecialAction.actorId === "arena-2-0"
-      && current.specialActionPresentation === undefined;
+    return current?.round === 2
+      && current.phase === "player"
+      && current.combatPresentation === undefined;
   });
   const after = await arenaBattleState(page);
-  expect(after?.lastSpecialAction).toMatchObject({
-    actionId: "ice-2",
-    actorId: "arena-2-0",
-    target: { x: 22, y: 30 },
-    affectedUnits: [expect.objectContaining({ unitId: "arena-1-0" })],
-  });
+  expect(after?.lastSpecialAction?.actionId).not.toBe("ice-2");
+  expect(after?.units.find(({ id }) => id === "arena-1-0")?.actionDisabled).toBe(false);
   expect(pageErrors).toEqual([]);
 });
 
