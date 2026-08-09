@@ -992,7 +992,9 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   top: var(--dialogue-window-top);
   width: 400px;
   height: 86px;
-  padding: 12px;
+  /* A native 23-glyph row reaches the frame edge with the browser font and
+     its shadow. Keep the same text width while biasing its safe area left. */
+  padding: 12px 16px 12px 8px;
   border: 0;
   background: transparent var(--dialogue-text-window) 0 0 / 400px 86px no-repeat;
   box-shadow: none;

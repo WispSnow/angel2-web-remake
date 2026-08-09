@@ -62,6 +62,40 @@ test("S07-A/B/C: accepted stage-6 completion plays SAY/17 and enters two-plus-fi
   for (let wait = 2; wait <= 14; wait += 1) {
     await page.evaluate(() => window.__ANGEL2__?.advanceDialogue());
     await expect(dialogue).toHaveAttribute("data-source-wait", String(wait));
+    if (wait === 11) {
+      const upperText = page.getByTestId("dialogue-window-upper").locator(".dialogue-copy p");
+      await expect(upperText).toHaveText(
+        "「所以為了妳們的安全，我只能留妳們過今晚，等天\n  一亮妳們就得離開。」",
+      );
+      const firstLineLayout = await upperText.evaluate((text) => {
+        const copy = text.parentElement;
+        const textNode = text.firstChild;
+        const lineBreak = text.textContent?.indexOf("\n") ?? -1;
+        if (!copy || !textNode || lineBreak < 0) throw new Error("missing upper-dialogue first line");
+        const range = document.createRange();
+        range.setStart(textNode, 0);
+        range.setEnd(textNode, lineBreak);
+        const lineBounds = range.getBoundingClientRect();
+        const copyBounds = copy.getBoundingClientRect();
+        const copyStyle = getComputedStyle(copy);
+        return {
+          clearance: {
+            left: lineBounds.left - copyBounds.left,
+            right: copyBounds.right - lineBounds.right,
+          },
+          padding: {
+            left: Number.parseFloat(copyStyle.paddingLeft),
+            right: Number.parseFloat(copyStyle.paddingRight),
+          },
+        };
+      });
+      expect(firstLineLayout.clearance.left).toBeGreaterThanOrEqual(8);
+      expect(firstLineLayout.clearance.right).toBeGreaterThanOrEqual(8);
+      expect(firstLineLayout.padding.right - firstLineLayout.padding.left).toBe(8);
+      await captureVisualAudit(page.getByTestId("dialogue-window-upper"), {
+        path: `${ARTIFACT_DIR}/stage7-long-upper-dialogue.png`,
+      });
+    }
   }
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "7");
   await expect(page.locator("#story-background")).toHaveCSS(
