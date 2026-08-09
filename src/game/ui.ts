@@ -576,6 +576,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (dialogueSkipChoice) {
       controller.selectDialogueSkipChoice(Number(dialogueSkipChoice.dataset.dialogueSkipIndex));
     }
+    const savePromptChoice = (event.target as Element).closest<HTMLElement>("[data-save-prompt-index]");
+    if (savePromptChoice) {
+      controller.selectSavePromptChoice(Number(savePromptChoice.dataset.savePromptIndex));
+    }
     const postSaveSlot = (event.target as Element).closest<HTMLElement>("[data-post-save-index]");
     if (postSaveSlot) controller.selectPostSaveSlot(Number(postSaveSlot.dataset.postSaveIndex));
     const promotionTarget = (event.target as Element).closest<HTMLElement>("[data-promotion-index]");
@@ -1679,9 +1683,9 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
     layer.innerHTML = `${nativeFeedbackMarkup(text)}
       <div class="native-confirm-menu action-menu native-command-menu" data-testid="save-confirm-menu"
         data-kind="confirmation" role="menu" aria-label="是否儲存">
-        <button type="button" role="menuitem" data-action="save-yes" data-testid="save-yes"
+        <button type="button" role="menuitem" data-action="save-yes" data-save-prompt-index="0" data-testid="save-yes"
           class="${controller.savePromptIndex === 0 ? "is-selected" : ""}" aria-current="${controller.savePromptIndex === 0}"><span class="native-command-label">確 定</span></button>
-        <button type="button" role="menuitem" data-action="save-no" data-testid="save-no"
+        <button type="button" role="menuitem" data-action="save-no" data-save-prompt-index="1" data-testid="save-no"
           class="${controller.savePromptIndex === 1 ? "is-selected" : ""}" aria-current="${controller.savePromptIndex === 1}"><span class="native-command-label">取 消</span></button>
       </div>`;
   } else if (phase === "saveSlots") {

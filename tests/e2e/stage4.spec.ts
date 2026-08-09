@@ -13,6 +13,7 @@ interface Stage4State {
   actionMode: string;
   activeStoryId?: string;
   campaignRoute?: string;
+  savePromptIndex: number;
   statusMessage: string;
   cameraOrigin: { x: number; y: number };
   rngCalls: number;
@@ -350,7 +351,17 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-save-prompt-portrait-alignment.png`,
   });
-  await page.locator("[data-action=save-no]").click();
+  const saveYes = page.getByTestId("save-yes");
+  const saveNo = page.getByTestId("save-no");
+  await expect(saveYes).toHaveAttribute("aria-current", "true");
+  await saveNo.hover();
+  await expect(saveNo).toHaveAttribute("aria-current", "true");
+  await expect(saveYes).toHaveAttribute("aria-current", "false");
+  expect((await state(page)).savePromptIndex).toBe(1);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage4-save-prompt-hover-cancel.png`,
+  });
+  await saveNo.click();
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
   expect(await state(page)).toMatchObject({
     stageId: "stage-05",
@@ -358,7 +369,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
     campaignRoute: "stage-05",
   });
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／6");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
     path: `${ARTIFACT_DIR}/stage4-stage5-deployment.png`,
   });
 });

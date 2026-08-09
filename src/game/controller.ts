@@ -3707,6 +3707,17 @@ export class GameController {
     this.emit();
   }
 
+  selectSavePromptChoice(index: number): void {
+    if (
+      this.phase !== "savePrompt"
+      || index < 0
+      || index > 1
+      || index === this.savePromptIndex
+    ) return;
+    this.savePromptIndex = index;
+    this.emit();
+  }
+
   skipSave(): void {
     if (this.phase === "savePrompt") this.completeVictoryFlow();
   }
