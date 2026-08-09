@@ -70,6 +70,12 @@ const REPRESENTATIVE_STAGE6 = [
   { slot: 14, classPath: ["soldier", "warrior", "steel-armor-warrior"], experience: 540 },
 ] as const satisfies readonly DebugRosterEntrySpec[];
 
+const REPRESENTATIVE_STAGE8 = [
+  ...REPRESENTATIVE_STAGE6,
+  { slot: 17, classPath: ["soldier", "cavalry"], experience: 520 },
+  { slot: 18, classPath: ["soldier", "warrior"], experience: 500 },
+] as const satisfies readonly DebugRosterEntrySpec[];
+
 const PROMOTION_COVERAGE_STAGE4 = [
   {
     slot: 0,
@@ -114,6 +120,12 @@ const PROMOTION_COVERAGE_STAGE6 = [
   { slot: 14, classPath: ["soldier", "warrior", "steel-armor-warrior"], experience: 640 },
 ] as const satisfies readonly DebugRosterEntrySpec[];
 
+const PROMOTION_COVERAGE_STAGE8 = [
+  ...PROMOTION_COVERAGE_STAGE6,
+  { slot: 17, classPath: ["soldier", "cavalry", "land-knight"], experience: 620 },
+  { slot: 18, classPath: ["soldier", "warrior", "steel-armor-warrior"], experience: 590 },
+] as const satisfies readonly DebugRosterEntrySpec[];
+
 const DEBUG_ROSTER_PROFILE_SPECS = [
   {
     id: "template-baseline",
@@ -134,6 +146,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-42-portal": REPRESENTATIVE_STAGE4,
       "stage-06": REPRESENTATIVE_STAGE6,
       "stage-07": REPRESENTATIVE_STAGE6,
+      "stage-08": REPRESENTATIVE_STAGE8,
     },
   },
   {
@@ -149,6 +162,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-42-portal": PROMOTION_COVERAGE_STAGE4,
       "stage-06": PROMOTION_COVERAGE_STAGE6,
       "stage-07": PROMOTION_COVERAGE_STAGE6,
+      "stage-08": PROMOTION_COVERAGE_STAGE8,
     },
   },
 ] as const satisfies readonly {

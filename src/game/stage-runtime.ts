@@ -531,6 +531,28 @@ async function loadStage7Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage8Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage8"),
+    import("./simulation/stage8-battle"),
+  ]);
+  content.activateStage8Content();
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, _preparation, rng) =>
+    new battleModule.Stage8Battle(campaign, rng);
+  return {
+    definition: content.STAGE8_DEFINITION,
+    assets: {
+      map: content.STAGE8_ASSETS.map,
+      minimap: content.STAGE8_ASSETS.minimap,
+      storyBackground: content.STAGE8_ASSETS.storyBackgrounds[7],
+      storyBackgrounds: content.STAGE8_ASSETS.storyBackgrounds,
+      unitSprites: content.STAGE8_ASSETS.unitSprites,
+    },
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(createBattle, campaign, snapshot),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -1147,6 +1169,55 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage7Module,
+  },
+  "stage-08": {
+    id: "stage-08",
+    ordinal: 8,
+    label: "營地遭到偷襲",
+    nextStageId: "stage-09",
+    focusUnitId: "1:8",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "蘇蘭達與游騎兵準備牽制龍塔襲擊隊。",
+      campaignRoute: "stage-08",
+    },
+    enemyPhaseStatusText: "敵方階段：龍塔營地襲擊隊開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始第 8 關關前流程。",
+      retreatStatusText: "全面撤退：返回第 8 關關前流程並重新建立固定編隊。",
+    },
+    completion: {
+      destinationLabel: "找尋傳說中的飛船",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-08-prebattle-story",
+        "stage-08-opening-story",
+        "stage-08-objective-reached",
+        "stage-08-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-08-prebattle-story",
+        "stage-08-opening-story",
+      ],
+      alliedUnits: {
+        kind: "exact-slots",
+        slots: [8, 17, 18, 40, 41, 42, 43, 44],
+      },
+      enemyClassById: [
+        ["2:45", "cavalry"], ["2:46", "cavalry"], ["2:36", "cavalry"],
+        ["2:30", "magician"], ["2:40", "soldier"], ["2:41", "soldier"],
+        ["2:35", "soldier"], ["2:38", "cavalry"], ["2:44", "cavalry"],
+        ["2:42", "soldier"], ["2:39", "cavalry"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage8Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

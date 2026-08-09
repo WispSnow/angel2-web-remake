@@ -4,10 +4,10 @@
 
 日期：2026-08-09
 
-阶段：第 0–6 关已接受；M12 第 7 关已实现并等待人工接受
+阶段：第 0–7 关已接受；M14 第 8 关已实现并等待人工接受
 
-开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–6 关已获用户接受，第 7 关
-作为 M12 有界实现例外完成自动与视觉门禁；第 8 关及后续运行时仍冻结
+开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–7 关已获用户接受，第 8 关
+作为 M14 有界实现例外已完成自动／视觉门禁；第 9 关及后续运行时仍冻结
 
 ## 文档目的
 
@@ -50,7 +50,8 @@
 | [`vertical-slices/stage-04.md`](vertical-slices/stage-04.md) | 交互部署、独立结界引导者、外圈减半与到达区胜利 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-05.md`](vertical-slices/stage-05.md) | 双首领任一击破、普通战后保存与场景 42 传送门桥接 | Draft 0.2 / 已接受 |
 | [`vertical-slices/stage-06.md`](vertical-slices/stage-06.md) | 反向关前流程、西艾蕾首领目标、动态游骑兵台阵与第 7 关边界 | Draft 0.1 / 已接受 |
-| [`vertical-slices/stage-07.md`](vertical-slices/stage-07.md) | 双背景营地剧情、双固定部署、萊莉首领目标与第 8 关边界 | Draft 0.1 / 已实现，待人工接受 |
+| [`vertical-slices/stage-07.md`](vertical-slices/stage-07.md) | 双背景营地剧情、双固定部署、萊莉首领目标与第 8 关边界 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-08.md`](vertical-slices/stage-08.md) | 三背景营地剧情、固定三名玩家／五名自动友军、全灭目标与第 9 关边界 | Draft 0.1 / 已实现，待接受 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
@@ -109,5 +110,6 @@
 - 第 3 关已由用户明确授权作为有界 M04 实现例外；只解除其合同列出的固定阵容、行为
   `2/3/4` 友军、双保护目标、僧侣 `1H/1I`、剧情/音乐、v14 和 `stage-04` 路由。
 - 第 4、5 关已于 2026-08-08 获用户接受；第 6 关、`REMAKE-028` 与 v20 随后作为有界例外
-  实现，并于 2026-08-09 获用户接受。第 7 关 M12 已实现 `REMAKE-030` 与 v21 并完成自动／
-  视觉门禁，等待用户人工接受；第 8 关及其余战役继续冻结。
+  实现，并于 2026-08-09 获用户接受。第 7 关 M12 已实现 `REMAKE-030` 与 v21 并于同日获
+  用户试玩接受；第 8 关 M14 已按 `REMAKE-031` 与 v22 实现并通过自动／视觉门禁，等待
+  用户试玩接受；第 9 关及其余战役继续冻结。

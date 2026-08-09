@@ -15,7 +15,8 @@ export type StageId =
   | "stage-05"
   | "stage-42-portal"
   | "stage-06"
-  | "stage-07";
+  | "stage-07"
+  | "stage-08";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -25,7 +26,8 @@ export type CampaignRouteId =
   | "stage-42-portal"
   | "stage-06"
   | "stage-07"
-  | "stage-08";
+  | "stage-08"
+  | "stage-09";
 
 export interface Position {
   x: number;
@@ -175,8 +177,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 21;
-  contentVersion: "stage-07-camp-raid-1";
+  version: 22;
+  contentVersion: "stage-08-ranger-defense-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

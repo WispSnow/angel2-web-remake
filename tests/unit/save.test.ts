@@ -27,6 +27,7 @@ import { STAGE6_DEFINITION } from "../../src/game/content/stage6";
 import { Stage6Battle } from "../../src/game/simulation/stage6-battle";
 import { STAGE7_DEFINITION } from "../../src/game/content/stage7";
 import { Stage7Battle } from "../../src/game/simulation/stage7-battle";
+import { Stage8Battle } from "../../src/game/simulation/stage8-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -449,6 +450,53 @@ const stage7BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage8BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-08" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x6070_8090,
+    rngCalls: 21,
+    roster: completeCampaignRoster([
+      { slot: 17, classId: "land-knight", experience: 620, life: 220 },
+      { slot: 18, classId: "priest", experience: 580, life: 180 },
+    ]),
+  };
+  const battle = new Stage8Battle(source);
+  const campaign = battle.campaignSnapshot();
+  const sulanda = battle.unit("1:8")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-09T14:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-08",
+    stageLabel: "營地遭到偷襲",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: {
+      ...source,
+      roster: source.roster.map((entry) => ({ ...entry })),
+    },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-08-prebattle-story",
+      "stage-08-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: sulanda.x, y: sulanda.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -505,6 +553,16 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v21 saves into the stage-08 content identity", () => {
+    const current = battleSave();
+    const legacy = {
+      ...current,
+      version: 21,
+      contentVersion: "stage-07-camp-raid-1",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
   it("migrates v20 saves into the stage-07 content identity", () => {
     const current = battleSave();
     const legacy = {
@@ -665,6 +723,25 @@ describe("Web save validation", () => {
     expect(isSaveData(wrongLaili)).toBe(false);
   });
 
+  it("round-trips stage-8 fixed forces and rejects a missing ranger or wrong enemy class", () => {
+    const save = stage8BattleSave();
+    expect(parseSaveData(JSON.stringify(save))).toEqual(save);
+
+    const missingRanger = stage8BattleSave();
+    missingRanger.battle.units = missingRanger.battle.units.filter(({ id }) => id !== "1:40");
+    expect(isSaveData(missingRanger)).toBe(false);
+
+    const wrongEnemy = stage8BattleSave();
+    const magician = wrongEnemy.battle.units.find(({ id }) => id === "2:30")!;
+    magician.classId = "cavalry";
+    magician.className = className("cavalry");
+    expect(isSaveData(wrongEnemy)).toBe(false);
+
+    const missingOpening = stage8BattleSave();
+    missingOpening.consumedEventIds.pop();
+    expect(isSaveData(missingOpening)).toBe(false);
+  });
+
   it("accepts the stage-05 boundary only with the complete stage-4 route identity", () => {
     const current: CompletedSaveData = {
       ...completedSave(),
@@ -760,6 +837,24 @@ describe("Web save validation", () => {
     expect(isSaveData({
       ...stage7Completed,
       consumedEventIds: stage7Completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+
+    const stage8Completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-09",
+      stageLabel: "找尋傳說中的飛船",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-08-prebattle-story",
+        "stage-08-opening-story",
+        "stage-08-objective-reached",
+        "stage-08-completed-route",
+      ],
+    };
+    expect(isSaveData(stage8Completed)).toBe(true);
+    expect(isSaveData({
+      ...stage8Completed,
+      consumedEventIds: stage8Completed.consumedEventIds.slice(0, -1),
     })).toBe(false);
   });
 

@@ -4274,7 +4274,12 @@ export class GameController {
       this.emit();
       return;
     }
+    const focusedPlayer = this.battle.focus
+      && this.battle.isPlayerControllableAlly(this.battle.focus.id)
+      ? this.battle.focus
+      : undefined;
     const commander = this.battle.unit("1:0")
+      ?? focusedPlayer
       ?? this.battle.units.find((unit) => this.battle.isPlayerControllableAlly(unit.id));
     const finalEnemy = victory.type === "unit-removed"
       ? this.battle.units.find((unit) => unit.side === victory.side && unit.slot === victory.slot)
@@ -4287,11 +4292,50 @@ export class GameController {
       ? this.battle.units.filter((unit) => unit.side === victory.side
         && victory.slots.some((slot) => slot === unit.slot))
       : [finalEnemy];
-    commander.x = 29;
-    commander.y = 26;
+    const requiredVictoryTargetIds = new Set(requiredVictoryTargets.map(({ id }) => id));
+    const occupiedPositions = new Set(
+      this.battle.units
+        .filter((unit) => unit.id !== commander.id
+          && unit.id !== finalEnemy.id
+          && (unit.side === 1 || requiredVictoryTargetIds.has(unit.id)))
+        .map(({ x, y }) => `${x},${y}`),
+    );
+    const candidateCommanderPositions = [
+      { x: commander.x, y: commander.y },
+      { x: 29, y: 26 },
+      ...Array.from({ length: this.battle.stage.width * this.battle.stage.height }, (_, index) => ({
+        x: index % this.battle.stage.width,
+        y: Math.floor(index / this.battle.stage.width),
+      })),
+    ];
+    const adjacentOffsets = [
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+      { x: 0, y: -1 },
+    ];
+    const victoryPair = candidateCommanderPositions.flatMap((position) =>
+      adjacentOffsets.map((offset) => ({
+        commander: position,
+        target: { x: position.x + offset.x, y: position.y + offset.y },
+      })))
+      .find(({ commander: actor, target }) =>
+        actor.x >= 0
+        && actor.y >= 0
+        && actor.x < this.battle.stage.width
+        && actor.y < this.battle.stage.height
+        && target.x >= 0
+        && target.y >= 0
+        && target.x < this.battle.stage.width
+        && target.y < this.battle.stage.height
+        && !occupiedPositions.has(`${actor.x},${actor.y}`)
+        && !occupiedPositions.has(`${target.x},${target.y}`));
+    if (!victoryPair) return;
+    commander.x = victoryPair.commander.x;
+    commander.y = victoryPair.commander.y;
     commander.acted = false;
-    finalEnemy.x = 30;
-    finalEnemy.y = 26;
+    finalEnemy.x = victoryPair.target.x;
+    finalEnemy.y = victoryPair.target.y;
     finalEnemy.life = 1;
     for (const target of requiredVictoryTargets) {
       if (target.id === finalEnemy.id) continue;
@@ -4299,7 +4343,6 @@ export class GameController {
       target.y = Math.max(0, this.battle.stage.height - 2);
       target.acted = true;
     }
-    const requiredVictoryTargetIds = new Set(requiredVictoryTargets.map(({ id }) => id));
     this.battle.units = this.battle.units.filter(
       (unit) => unit.side === 1 || requiredVictoryTargetIds.has(unit.id),
     );
@@ -4318,6 +4361,12 @@ export class GameController {
   forceVictoryForTest(targetIndex = 0): void {
     if (!this.debugMode) return;
     const victory = this.battle.stage.objective.victory;
+    if (victory.type === "eliminate-side") {
+      this.battle.units = this.battle.units.filter(({ side }) => side !== victory.side);
+      this.resolveOutcome();
+      this.emit();
+      return;
+    }
     const target = victory.type === "unit-removed"
       ? this.battle.units.find(({ side, slot }) => side === victory.side && slot === victory.slot)
       : victory.type === "any-unit-removed"

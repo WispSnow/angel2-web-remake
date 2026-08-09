@@ -170,7 +170,7 @@ test("S07-D/E: the objective names Laili and removing slot 18 ends the battle", 
   expect((await state(page)).units.some(({ id }) => id === "2:18")).toBe(false);
 });
 
-test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v21, and stage 8 stays frozen", async ({ page }) => {
+test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v22, and enters stage 8", async ({ page }) => {
   await page.goto("/?debugScenario=stage-07-near-defeat&difficulty=0&test=1");
   const entry = await state(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
@@ -210,7 +210,7 @@ test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v21, and stage 
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -237,21 +237,24 @@ test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v21, and stage 
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-07",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-08",
+    stageProgress: 0,
+    phase: "prebattleStory",
+    activeStoryId: "stage-08-prebattle-story",
     campaignRoute: "stage-08",
   });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "21");
 
   await page.goto("/?debugScenario=stage-07-cleared&difficulty=0&test=1");
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-07",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-08",
+    stageProgress: 0,
+    phase: "prebattleStory",
+    activeStoryId: "stage-08-prebattle-story",
     campaignRoute: "stage-08",
   });
-  await expect(page.getByTestId("dialogue-layer")).toBeHidden();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "21");
 });
 
 test("S07-I: fast and reduced presentation with combat sound off preserves the result", async ({ page }) => {

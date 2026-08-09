@@ -34,6 +34,7 @@ const stageIds = [
   "stage-42-portal",
   "stage-06",
   "stage-07",
+  "stage-08",
 ] as const satisfies readonly StageId[];
 const workspace = path.resolve(import.meta.dirname, "../..");
 
@@ -124,9 +125,11 @@ describe("debug roster profiles", () => {
     expect(debugGrowthBudgetForStage("stage-42-portal", perStageGrowth)).toBe(stage5Budget);
     expect(debugGrowthBudgetForStage("stage-06", perStageGrowth)).toBe(720);
     expect(debugGrowthBudgetForStage("stage-07", perStageGrowth)).toBe(840);
+    expect(debugGrowthBudgetForStage("stage-08", perStageGrowth)).toBe(960);
     expect(debugGrowthBudgetForStage("stage-05", DEFAULT_DEBUG_PER_STAGE_GROWTH)).toBe(500);
     expect(debugGrowthBudgetForStage("stage-06", DEFAULT_DEBUG_PER_STAGE_GROWTH)).toBe(600);
     expect(debugGrowthBudgetForStage("stage-07", DEFAULT_DEBUG_PER_STAGE_GROWTH)).toBe(700);
+    expect(debugGrowthBudgetForStage("stage-08", DEFAULT_DEBUG_PER_STAGE_GROWTH)).toBe(800);
 
     const soldierTargets = promotionTargetsFor("soldier").map(({ id }) => id);
     const stage1Progressions = [0, 1, 2, 4].map((slot) =>
@@ -197,6 +200,12 @@ describe("debug roster profiles", () => {
     for (const slot of [0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24]) {
       expect(stage7Roster[slot]?.classId).not.toBe("soldier");
     }
+    const stage8Roster = debugRosterForProfile(
+      "representative-growth",
+      "stage-08",
+      DEFAULT_DEBUG_PER_STAGE_GROWTH,
+    );
+    for (const slot of [17, 18]) expect(stage8Roster[slot]?.classId).not.toBe("soldier");
     expect(debugRosterProfileSupportsGrowthOverride(
       "representative-growth",
       "stage-05",
