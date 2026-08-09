@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify project documentation contracts
+        run: pnpm docs:check
+
       - name: Verify reverse-engineering evidence baseline
         run: node reverse/tools/angel2-phase1-verify.mjs
 

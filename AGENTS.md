@@ -86,6 +86,7 @@ pnpm test
 pnpm test:coverage
 pnpm build
 pnpm test:e2e
+pnpm docs:check
 pnpm check
 node reverse/tools/angel2-phase1-verify.mjs
 ```
@@ -224,7 +225,7 @@ pnpm exec playwright install ffmpeg
 
 | 改动 | 最低验证 |
 | --- | --- |
-| 文档、规格或逆向结论 | 检查本地链接；涉及证据基线时运行 `node reverse/tools/angel2-phase1-verify.mjs` |
+| 文档、规格或逆向结论 | 运行 `pnpm docs:check`；涉及证据基线时再运行 `node reverse/tools/angel2-phase1-verify.mjs` |
 | 模拟、数值、移动、AI、PRNG | 添加/更新对应 Vitest；只运行相关测试文件或用例；影响类型或生产打包时再运行 `pnpm build` |
 | UI、输入、剧情、存档流程 | 添加/更新并运行对应 Playwright 文件或用例，不默认追加全量 `pnpm test:e2e` |
 | Phaser、动画、HUD、响应式布局 | Playwright 断言加代表性截图，并人工查看截图 |

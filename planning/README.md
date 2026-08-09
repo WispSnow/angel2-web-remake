@@ -31,12 +31,19 @@
 - [`RISKS.md`](RISKS.md)：跨里程碑风险和缓解动作；
 - [`milestones/M00-stage-00-acceptance.md`](milestones/M00-stage-00-acceptance.md)：第 0 关人工接受；
 - [`milestones/M00.5-promotion-and-architecture.md`](milestones/M00.5-promotion-and-architecture.md)：第 0 关转职与多关架构准备；
+- [`milestones/M00.6-stage0-class-actions.md`](milestones/M00.6-stage0-class-actions.md)：第 0 关首层职业行动闭环；
+- [`milestones/M00.7-full-combat-profession-animations.md`](milestones/M00.7-full-combat-profession-animations.md)：全职业普通全屏战斗动画；
 - [`milestones/M01-stage-01-enablement.md`](milestones/M01-stage-01-enablement.md)：第 1 关实施准备；
 - [`milestones/M02-stage-01-implementation.md`](milestones/M02-stage-01-implementation.md)：第 1 关有界实现；
 - [`milestones/M03-stage-02-implementation.md`](milestones/M03-stage-02-implementation.md)：第 2 关有界实现；
 - [`milestones/M04-stage-03-implementation.md`](milestones/M04-stage-03-implementation.md)：第 3 关有界实现；
 - [`milestones/M04.5-stage-04-framework-consolidation.md`](milestones/M04.5-stage-04-framework-consolidation.md)：第 4 关前框架收口；
 - [`milestones/M05-stage-04-specification.md`](milestones/M05-stage-04-specification.md)：第 4 关纸面合同；
+- [`milestones/M06-stage-04-implementation.md`](milestones/M06-stage-04-implementation.md)：第 4 关有界实现；
+- [`milestones/M07-stage-05-specification.md`](milestones/M07-stage-05-specification.md)：第 5 关纸面合同；
+- [`milestones/M08-stage-05-implementation.md`](milestones/M08-stage-05-implementation.md)：第 5 关有界实现；
+- [`milestones/M09-stage-06-specification.md`](milestones/M09-stage-06-specification.md)：第 6 关纸面合同；
+- [`milestones/M10-stage-06-implementation.md`](milestones/M10-stage-06-implementation.md)：第 6 关有界实现；
 - [`work-items/M00-native-side-panel-hotspots.md`](work-items/M00-native-side-panel-hotspots.md)：原版右栏战术桌 12 个鼠标热点的实现顺序与验收边界。
 
 ## 维护规则
@@ -48,7 +55,28 @@
 5. 里程碑完成后保留最终验收摘要；详细过程由 Git 历史和测试报告承担。
 6. 外部任务系统启用后，在这里链接对应任务，不再维护一份重复的全量 backlog。
 7. 玩法修复仍记录在 `reverse/gdd/web-remake-rule-decisions.md`；本目录只记录执行决定。
+8. 每个里程碑文件头的 `状态` 是该里程碑的状态真值；`STATUS.md`、`ROADMAP.md` 和本页索引
+   必须与之同步，并由 `pnpm docs:check` 校验，不再新增平行状态清单。
+
+## 自动合同检查
+
+```bash
+pnpm docs:check
+```
+
+该命令只读检查：
+
+- 里程碑 ID、文件名和允许的状态值；
+- 里程碑文件头与 `STATUS.md`、`ROADMAP.md` 的状态一致性；
+- 本页是否索引全部里程碑；
+- 同时最多一个 `authorized / in-progress / implemented` 实施里程碑；
+- 规划、设计、逆向说明和项目入口中的相对 Markdown 文档链接。
+
+机器 JSON、渲染图和其他被忽略的本地逆向产物不属于链接检查范围；它们继续由证据校验器、
+生成器及各专题测试负责。
 
 ## 使用方式
 
-开始推进项目前，先阅读 [`STATUS.md`](STATUS.md) 和其中指向的当前里程碑，再按里程碑的“输入 → 工作包 → 验证 → 退出条件”执行。完成任务时同步更新状态、风险和直接相关的设计验收文档。
+开始推进项目前，先阅读 [`STATUS.md`](STATUS.md) 和其中指向的当前里程碑，再按里程碑的
+“输入 → 工作包 → 验证 → 退出条件”执行。完成任务时同步更新状态、风险和直接相关的设计
+验收文档，并运行 `pnpm docs:check`。

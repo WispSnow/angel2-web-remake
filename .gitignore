@@ -10,7 +10,9 @@ Icon[
 # Resource forks
 ._*
 
-ref/
+ref/*
+!ref/next-project/
+!ref/next-project/**
 .obsidian/
 .agents/
 .claude/
