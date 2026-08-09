@@ -61,12 +61,17 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(promotionLabLink).toContainText("12 組可轉職來源職業只差 1 經驗");
   await expect(page.getByTestId("debug-roster-source")).toHaveValue("representative-growth");
   await expect(page.locator("[data-debug-roster-description]")).toContainText("合法轉職混編");
+  await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
+  await expect(page.getByTestId("debug-growth-reset")).toHaveText("恢復預設（每關 100）");
+  await expect(page.locator("[data-debug-growth-status]")).toHaveText(
+    "目前使用預設：每關 +100（第 1 關預算 100／第 5 關預算 500）",
+  );
 
   await page.getByTestId("debug-difficulty").selectOption("3");
   const deployment = page.getByTestId("debug-scenario-stage-01-deployment");
   await expect(deployment).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth",
+    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth&growth=100",
   );
   await page.getByTestId("debug-per-stage-growth").fill("120");
   await page.getByTestId("debug-growth-apply").click();
@@ -86,12 +91,14 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "/?debugScenario=stage-00-player&difficulty=3&roster=representative-growth",
   );
   await page.getByTestId("debug-growth-reset").click();
+  await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
+  await expect(page.locator("[data-debug-growth-status]")).toHaveText(
+    "目前使用預設：每關 +100（第 1 關預算 100／第 5 關預算 500）",
+  );
   await expect(deployment).toHaveAttribute(
     "href",
-    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth",
+    "/?debugScenario=stage-01-deployment&difficulty=3&roster=representative-growth&growth=100",
   );
-  await page.getByTestId("debug-per-stage-growth").fill("120");
-  await page.getByTestId("debug-growth-apply").click();
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-hub.png`, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -106,7 +113,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-toolbar")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
-    "每關成長：120 · 本關成長預算：120",
+    "每關成長：100 · 本關成長預算：100",
   );
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageId: string;
@@ -122,7 +129,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   expect(state.units).toContainEqual(expect.objectContaining({
     id: "1:0",
     classId: "cavalry",
-    experience: 120,
+    experience: 100,
   }));
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-stage1-deployment.png` });
 });

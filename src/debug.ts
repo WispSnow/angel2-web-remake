@@ -13,6 +13,7 @@ import {
   debugRosterProfileSupportsGrowthOverride,
   DEBUG_PER_STAGE_GROWTH_MAX,
   DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID,
+  DEFAULT_DEBUG_PER_STAGE_GROWTH,
   parseDebugPerStageGrowth,
   parseDebugRosterSourceId,
   type DebugRosterSourceId,
@@ -57,12 +58,12 @@ root.innerHTML = `
         <label for="debug-per-stage-growth">每關成長</label>
         <input id="debug-per-stage-growth" data-testid="debug-per-stage-growth" type="number"
           min="0" max="${DEBUG_PER_STAGE_GROWTH_MAX}" step="10" inputmode="numeric"
-          placeholder="沿用檔案值">
+          value="${DEFAULT_DEBUG_PER_STAGE_GROWTH}">
         <button type="submit" data-testid="debug-growth-apply">套用設定值</button>
         <button type="button" data-testid="debug-growth-reset" data-debug-growth-reset>
-          使用檔案值
+          恢復預設（每關 ${DEFAULT_DEBUG_PER_STAGE_GROWTH}）
         </button>
-        <output data-debug-growth-status aria-live="polite">目前沿用成長檔案經驗</output>
+        <output data-debug-growth-status aria-live="polite"></output>
       </form>
     </section>
     <nav class="debug-tool-links" aria-label="專項實驗室">
@@ -120,7 +121,7 @@ if (
   !growthForm || !growthInput || !growthApply || !growthReset || !growthStatus
 ) throw new Error("debug per-stage growth controls not found");
 
-let perStageGrowth: number | undefined;
+let perStageGrowth = DEFAULT_DEBUG_PER_STAGE_GROWTH;
 
 const updateLinks = () => {
   const difficulty = Number(difficultySelect.value) as Difficulty;
@@ -133,12 +134,12 @@ const updateLinks = () => {
   rosterDescription.textContent = rosterOption?.description ?? "未知成長檔案";
   growthInput.disabled = !supportsAnyStage;
   growthApply.disabled = !supportsAnyStage;
-  growthReset.disabled = !supportsAnyStage || perStageGrowth === undefined;
+  growthReset.disabled = !supportsAnyStage;
   growthStatus.textContent = !supportsAnyStage
     ? "此來源保留原有經驗"
-    : perStageGrowth === undefined
-      ? "目前沿用成長檔案經驗"
-      : `已套用：每關 +${perStageGrowth}（第 1 關預算 ${
+    : `${perStageGrowth === DEFAULT_DEBUG_PER_STAGE_GROWTH ? "目前使用預設" : "已套用"}：每關 +${
+      perStageGrowth
+    }（第 1 關預算 ${
         debugGrowthBudgetForStage("stage-01", perStageGrowth)
       }／第 5 關預算 ${debugGrowthBudgetForStage("stage-05", perStageGrowth)}）`;
   root.querySelectorAll<HTMLAnchorElement>("[data-debug-scenario-id]").forEach((link) => {
@@ -171,8 +172,8 @@ growthForm.addEventListener("submit", (event) => {
   updateLinks();
 });
 growthReset.addEventListener("click", () => {
-  perStageGrowth = undefined;
-  growthInput.value = "";
+  perStageGrowth = DEFAULT_DEBUG_PER_STAGE_GROWTH;
+  growthInput.value = String(DEFAULT_DEBUG_PER_STAGE_GROWTH);
   growthInput.setCustomValidity("");
   updateLinks();
 });

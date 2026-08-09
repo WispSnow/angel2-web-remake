@@ -158,6 +158,7 @@ export interface DebugRosterSourceOption {
 
 export const DEFAULT_DEBUG_ROSTER_SOURCE_ID: DebugRosterProfileId = "template-baseline";
 export const DEFAULT_DEBUG_HUB_ROSTER_SOURCE_ID: DebugRosterProfileId = "representative-growth";
+export const DEFAULT_DEBUG_PER_STAGE_GROWTH = 100;
 export const DEBUG_PER_STAGE_GROWTH_MAX = 9999;
 const DEFAULT_DEBUG_RNG_STATE = 0x0a11ce02;
 const DEBUG_GROWTH_PROFILE_SALTS: Record<DebugRosterProfileId, number> = {

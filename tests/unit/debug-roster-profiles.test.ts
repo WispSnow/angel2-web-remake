@@ -16,6 +16,7 @@ import {
   debugRosterForProfile,
   debugRosterProfileSupportsGrowthOverride,
   debugRosterSourceOptions,
+  DEFAULT_DEBUG_PER_STAGE_GROWTH,
   parseDebugPerStageGrowth,
   parseDebugRosterSourceId,
 } from "../../src/game/debug-roster-profiles";
@@ -119,6 +120,7 @@ describe("debug roster profiles", () => {
     expect(debugGrowthBudgetForStage("stage-02", perStageGrowth)).toBe(240);
     expect(debugGrowthBudgetForStage("stage-05", perStageGrowth)).toBe(stage5Budget);
     expect(debugGrowthBudgetForStage("stage-42-portal", perStageGrowth)).toBe(stage5Budget);
+    expect(debugGrowthBudgetForStage("stage-05", DEFAULT_DEBUG_PER_STAGE_GROWTH)).toBe(500);
 
     const soldierTargets = promotionTargetsFor("soldier").map(({ id }) => id);
     const stage1Progressions = [0, 1, 2, 4].map((slot) =>

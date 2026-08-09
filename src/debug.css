@@ -411,6 +411,10 @@ body.debug-hub-page {
     width: 100%;
   }
 
+  .debug-growth-form [data-debug-growth-reset] {
+    grid-column: 1 / -1;
+  }
+
   .debug-scenario-grid {
     grid-template-columns: 1fr;
   }
