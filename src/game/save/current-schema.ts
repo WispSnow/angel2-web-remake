@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 26 as const;
-export const SAVE_CONTENT_VERSION = "directed-magic-arrow-1" as const;
+export const SAVE_VERSION = 27 as const;
+export const SAVE_CONTENT_VERSION = "ice-counterplay-wizard-focus-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_ROUND = 9_999;

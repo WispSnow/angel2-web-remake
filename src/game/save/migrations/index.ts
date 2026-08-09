@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion26Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 26
+    || value.contentVersion !== "directed-magic-arrow-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion25Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 25
@@ -1379,6 +1390,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion26 = migrateVersion26Save(value);
+    if (migratedVersion26) return migratedVersion26;
     const migratedVersion25 = migrateVersion25Save(value);
     if (migratedVersion25) return migratedVersion25;
     const migratedVersion24 = migrateVersion24Save(value);

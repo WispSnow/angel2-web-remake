@@ -553,6 +553,17 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v26 battle and completed saves into the ice counterplay identity", () => {
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 26,
+        contentVersion: "directed-magic-arrow-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v25 battle and completed saves into the directed magic-arrow identity", () => {
     for (const current of [battleSave(), completedSave()]) {
       const legacy = {

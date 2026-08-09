@@ -2515,14 +2515,15 @@ describe("Stage-0 class actions", () => {
     expect(outer.result.affectedUnits).toEqual([
       expect.objectContaining({
         unitId: outerTarget.id,
-        positionAfter: { x: 5, y: 6 },
-        moved: false,
+        positionAfter: { x: 5, y: 7 },
+        moved: true,
         blocked: false,
         actionDisabledAfter: true,
       }),
     ]);
-    expect(outer.result.experienceGained).toBe(0);
-    expect(outer.rngAfter).toBe(outer.rngBefore);
+    expect(outer.result.experienceGained).toBeGreaterThanOrEqual(8);
+    expect(outer.result.experienceGained).toBeLessThanOrEqual(9);
+    expect(outer.rngCallsAfter).toBe(outer.rngCallsBefore + 1);
 
     const blockedRng = new DeterministicRng(0x5678);
     const guarded = {
@@ -2574,6 +2575,8 @@ describe("Stage-0 class actions", () => {
       blocked: false,
       actionDisabledAfter: true,
     }));
+    expect(noMove.result.experienceGained).toBe(0);
+    expect(noMove.rngCallsAfter).toBe(noMove.rngCallsBefore);
   });
 
   it("does not stack, refresh, move, or consume guard when ice hits an already frozen target", () => {
@@ -2667,8 +2670,8 @@ describe("Stage-0 class actions", () => {
       }),
       expect.objectContaining({
         unitId: outer.id,
-        positionAfter: { x: 5, y: 8 },
-        moved: false,
+        positionAfter: { x: 5, y: 9 },
+        moved: true,
         lifeAfter: outer.life,
         actionDisabledAfter: true,
       }),
@@ -2677,7 +2680,7 @@ describe("Stage-0 class actions", () => {
     expect(prepared.result.experienceGained).toBeLessThanOrEqual(11);
     expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
 
-    const noMove = prepareSpecialAction(
+    const outerOnly = prepareSpecialAction(
       { actionId: "ice-2", actorId: actor.id },
       actor,
       undefined,
@@ -2689,8 +2692,16 @@ describe("Stage-0 class actions", () => {
       },
       actor,
     );
-    expect(noMove.result).toMatchObject({ experienceGained: 0 });
-    expect(noMove.rngCallsAfter).toBe(noMove.rngCallsBefore);
+    expect(outerOnly.result).toMatchObject({
+      affectedUnits: [expect.objectContaining({
+        unitId: outer.id,
+        positionAfter: { x: 5, y: 9 },
+        moved: true,
+      })],
+    });
+    expect(outerOnly.result.experienceGained).toBeGreaterThanOrEqual(10);
+    expect(outerOnly.result.experienceGained).toBeLessThanOrEqual(11);
+    expect(outerOnly.rngCallsAfter).toBe(outerOnly.rngCallsBefore + 1);
 
     const alreadyFrozen = prepareSpecialAction(
       { actionId: "ice-2", actorId: actor.id },
@@ -2722,7 +2733,7 @@ describe("Stage-0 class actions", () => {
     expect(alreadyFrozen.rngCallsAfter).toBe(alreadyFrozen.rngCallsBefore);
   });
 
-  it("uses four rings for advanced ice while the stable-remake outer ring only freezes", () => {
+  it("uses four rings for advanced ice and pushes the outer ring beyond the effect", () => {
     const battle = new Stage0Battle(0);
     const actor = {
       ...battle.unit("1:0")!,
@@ -2784,8 +2795,8 @@ describe("Stage-0 class actions", () => {
       }),
       expect.objectContaining({
         unitId: outer.id,
-        positionAfter: { x: 5, y: 9 },
-        moved: false,
+        positionAfter: { x: 5, y: 10 },
+        moved: true,
         lifeAfter: outer.life,
         actionDisabledAfter: true,
       }),
@@ -2794,7 +2805,7 @@ describe("Stage-0 class actions", () => {
     expect(prepared.result.experienceGained).toBeLessThanOrEqual(14);
     expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
 
-    const noMove = prepareSpecialAction(
+    const outerOnly = prepareSpecialAction(
       { actionId: "ice-3", actorId: actor.id },
       actor,
       undefined,
@@ -2806,11 +2817,19 @@ describe("Stage-0 class actions", () => {
       },
       actor,
     );
-    expect(noMove.result).toMatchObject({ experienceGained: 0 });
-    expect(noMove.rngCallsAfter).toBe(noMove.rngCallsBefore);
+    expect(outerOnly.result).toMatchObject({
+      affectedUnits: [expect.objectContaining({
+        unitId: outer.id,
+        positionAfter: { x: 5, y: 10 },
+        moved: true,
+      })],
+    });
+    expect(outerOnly.result.experienceGained).toBeGreaterThanOrEqual(12);
+    expect(outerOnly.result.experienceGained).toBeLessThanOrEqual(14);
+    expect(outerOnly.rngCallsAfter).toBe(outerOnly.rngCallsBefore + 1);
   });
 
-  it("uses five rings for ultimate ice with 15..17 move experience and no outer-ring push", () => {
+  it("uses five rings for ultimate ice with 15..17 move experience and outer-ring push", () => {
     const battle = new Stage0Battle(0);
     const actor = {
       ...battle.unit("1:0")!,
@@ -2856,8 +2875,8 @@ describe("Stage-0 class actions", () => {
     expect(prepared.result.affectedUnits).toEqual([
       expect.objectContaining({
         unitId: outer.id,
-        positionAfter: { x: 5, y: 0 },
-        moved: false,
+        positionAfter: { x: 4, y: 0 },
+        moved: true,
         lifeAfter: outer.life,
         actionDisabledAfter: true,
       }),
@@ -2883,7 +2902,7 @@ describe("Stage-0 class actions", () => {
     expect(prepared.result.experienceGained).toBeLessThanOrEqual(17);
     expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
 
-    const noMove = prepareSpecialAction(
+    const outerOnly = prepareSpecialAction(
       { actionId: "ice-4", actorId: actor.id },
       actor,
       undefined,
@@ -2895,8 +2914,16 @@ describe("Stage-0 class actions", () => {
       },
       actor,
     );
-    expect(noMove.result).toMatchObject({ experienceGained: 0 });
-    expect(noMove.rngCallsAfter).toBe(noMove.rngCallsBefore);
+    expect(outerOnly.result).toMatchObject({
+      affectedUnits: [expect.objectContaining({
+        unitId: outer.id,
+        positionAfter: { x: 4, y: 0 },
+        moved: true,
+      })],
+    });
+    expect(outerOnly.result.experienceGained).toBeGreaterThanOrEqual(15);
+    expect(outerOnly.result.experienceGained).toBeLessThanOrEqual(17);
+    expect(outerOnly.rngCallsAfter).toBe(outerOnly.rngCallsBefore + 1);
   });
 
   it("offers OJ only to tier-three prayer guides and locks it to the actor cell", () => {

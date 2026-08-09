@@ -8,6 +8,7 @@
 [`techniques-stage1.md`](techniques-stage1.md)、
 [`web-remake-rule-decisions.md#remake-009同一动作不因阵营或控制方式改变规则参数`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-009同一动作不因阵营或控制方式改变规则参数)、
 [`web-remake-rule-decisions.md#remake-013冰封不可被攻治外圈不外推破邪可解除`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-013冰封不可被攻治外圈不外推破邪可解除)、
+[`web-remake-rule-decisions.md#remake-036冰雪外圈稳定外推专家-ai-次优先命中巫師`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-036冰雪外圈稳定外推专家-ai-次优先命中巫師)、
 [`shooting-and-technique-system.md`](../../../reverse/notes/shooting-and-technique-system.md)、
 [`technique-rules.json`](../../../reverse/parsed/native/technique-rules.json)、
 [`technique-presentations.json`](../../../reverse/parsed/native/technique-presentations.json)、
@@ -16,8 +17,8 @@
 ## 玩家目的
 
 巫師第一层用一次行动以自身为中心释放中級冰雪。范围比初級冰雪多一圈，范围内敌军
-不受生命伤害，但会被按固定方向向外推一格并冰封；位于默认复刻最外圈的敌军只冰封、
-不再被推出范围。
+不受生命伤害，但会被按固定方向向外推一格并冰封；最外圈也会尝试进入值 0 格并离开
+本次效果范围，四向都无合法退格时才留在原位。
 
 ## 证据与决策
 
@@ -31,8 +32,8 @@
 - `[OF]` 已有冰封、防魔或职业为龍／頭／手的目标不位移；防魔在该目标结算后消费。
   其他目标即使无合法退格也写行动禁用位。至少一名单位成功位移才取一次
   `10 + randomBelow(2)`；无人位移时经验为 0 且不推进模拟 PRNG。
-- `[SR]` 延续 `REMAKE-013`：已冰封目标不刷新、不消费防魔；位于范围值 1 的最外圈目标
-  不能移到值 0 的范围外格，只冰封。冰封期间不可行动或被攻治，破邪可以解除。
+- `[SR]` 延续 `REMAKE-013` 的冰封门禁，并依 `REMAKE-036` 允许范围值 1 的最外圈目标
+  移到合法值 0 格。冰封期间不可行动或被攻治，破邪可以解除。
 - `[OF]` AI 的巫師第一层池只有 `2C`；第二、三层分别只有 `3C/4C`。AI 先要求当前位置
   距离 3 内有合法敌军候选，但技能中心仍固定为行动者格；候选按有效防御最低、当前生命
   最低、线性格等原版顺序破平。无候选时回退普通移动／攻击／休息。
@@ -60,8 +61,8 @@
 2. 以行动者格建立半径 4 效果图，按线性格升序收集范围内敌军；
 3. 对每个目标依次检查已冰封、防魔、龍／頭／手免疫；已冰封不消费防魔，其他防魔目标
    在准备结果中记录提交后清除；
-4. 对未阻挡目标按下、上、左、右查找第一格合法目的地；`stableRemake` 额外要求目的格
-   范围值大于 0，成功后立刻更新准备态占格；无合法目的地仍写冰封；
+4. 对未阻挡目标按下、上、左、右查找第一格在地图内、可通行、无人占用且范围值更低的
+   目的地；值 0 合法，成功后立刻更新准备态占格；无合法目的地仍写冰封；
 5. 若位移数大于 0，只调用一次版本化模拟 PRNG 得到 `10..11` 经验；否则经验与 PRNG
    调用均为 0；生命、普通八槽状态和地形不变；
 6. 播放三轮各六帧的离散扩散，并在每轮开始请求 `UN/50`；墙钟期间模拟仍保持准备前值；
@@ -84,8 +85,8 @@ ordinary AI，不消费冰雪经验随机。
 
 | 配置 | 行为 |
 | --- | --- |
-| `stableRemake` | 固定施法者中心；AI 候选门 3；冰封不可攻治、不可叠加，最外圈不外推，破邪可解除；实际冰雪动作延后且纯冰雪残军禁用冰雪 |
-| `legacyStrict` | 固定施法者中心；最外圈可移到值 0 格，冰封仍可受攻治且破邪不解冰 |
+| `stableRemake` | 固定施法者中心；AI 候选门 3；冰封不可攻治、不可叠加，最外圈可外推到值 0，破邪可解除；实际冰雪动作延后且纯冰雪残军禁用冰雪 |
+| `legacyStrict` | 固定施法者中心；最外圈同样可移到值 0 格，冰封仍可受攻治且破邪不解冰 |
 | 可开放 Mod 字段 | 职业层级菜单、AI 候选距离、效果半径、位移顺序、经验、表现 ID；修改后必须改变规则身份 |
 
 ## 表现与可访问性
@@ -101,8 +102,8 @@ ordinary AI，不消费冰雪经验随机。
 1. Given 巫師第一层，When 打开技术菜单，Then 只显示 `2C`；第二／三层不显示 `2C`；
 2. Given 距行动者 1/2/3 格各有敌军，When 准备 `2C`，Then 效果值分别为 3/2/1，生命
    均不变，按线性格与下上左右顺序准备位移和冰封；
-3. Given 内圈目标有合法更低正值邻格且外圈目标只有值 0 邻格，When `stableRemake` 提交，
-   Then 内圈目标外移、外圈目标留格，二者都冰封；只取一次 `10..11` 经验随机；
+3. Given 内圈目标有合法更低正值邻格且外圈目标有合法值 0 邻格，When `stableRemake` 提交，
+   Then 两者都按固定方向外移并冰封；整次动作只取一次 `10..11` 经验随机；
 4. Given 所有目标均被阻挡或无合法退格，When 提交，Then 未免疫目标仍冰封，经验为 0，
    PRNG state/calls 不变；防魔目标不冰封且防魔消费，龍／頭／手保持不变；
 5. Given AI 巫師第一层距离 3 内有合法敌军，When 规划并执行，Then 选择 `2C`、显示组 12
@@ -117,10 +118,10 @@ ordinary AI，不消费冰雪经验随机。
 - 内容生成：`pnpm content:actions`，生成器直接断言 `2C` 的选择字 3、效果半径 4、经验
   `10..11`、三圈／18 draw／180 tick 和三次声音证据；
 - 定向规则：`tests/unit/actions.test.ts` 与 `tests/unit/arena.test.ts` 覆盖三层菜单门禁、
-  三圈值、下上左右位移、最外圈不外推、单次 PRNG、AI 距离 3 候选门和自身中心；
+  三圈值、下上左右位移、最外圈外推到值 0、单次 PRNG、AI 距离 3 候选门和自身中心；
 - 定向浏览器：`tests/e2e/arena.spec.ts` 覆盖正式玩家菜单及敌方 AI 自中心执行／组 12 对话，
   `tests/e2e/technique-lab.spec.ts` 覆盖逐圈 seek 和末态冰壳；
 - 完整门禁：386 项 Vitest、覆盖率门禁、生产构建与 138 项 Chromium 全量回归通过；
 - 证据基线：`node reverse/tools/angel2-phase1-verify.mjs` 通过；
-- 人工截图：`arena-ice-2-outer-ring.png` 与 `technique-lab-ice-2-outer-ring.png` 已确认
-  第三圈 12 格、像素边缘、格心、单位层级与原版战场视口裁切正确。
+- 人工截图：`arena-ice-2-outer-ring.png` 与 `technique-lab-ice-2-outer-ring.png` 确认
+  第三圈 12 格表现；`arena-ice-2-outer-pushed.png` 确认提交后最外圈目标位于值 0 格。

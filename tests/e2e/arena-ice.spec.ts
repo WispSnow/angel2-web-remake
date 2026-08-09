@@ -7,7 +7,7 @@ import {
 } from "./arena-test-support";
 import { captureVisualAudit } from "./visual-audit";
 
-test("tier-one wizard performs native self-centered 2C through the formal technique menu", async ({ page }) => {
+test("tier-one wizard pushes the outer ring beyond 2C through the formal technique menu", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -62,6 +62,9 @@ test("tier-one wizard performs native self-centered 2C through the formal techni
       && current.specialActionPresentation === undefined;
   });
   const after = await arenaBattleState(page);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-ice-2-outer-pushed.png`,
+  });
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "ice-2",
     actorId: "arena-1-0",
@@ -77,10 +80,10 @@ test("tier-one wizard performs native self-centered 2C through the formal techni
       }),
       expect.objectContaining({
         unitId: "arena-2-1",
-        positionAfter: { x: 23, y: 30 },
+        positionAfter: { x: 23, y: 31 },
         lifeAfter: outerBefore?.life,
         actionDisabledAfter: true,
-        moved: false,
+        moved: true,
       }),
     ],
   });
@@ -187,7 +190,7 @@ test("enemy wizard does not use ice when every surviving enemy can freeze", asyn
   expect(pageErrors).toEqual([]);
 });
 
-test("tier-two wizard performs four-ring 3C while the stable-remake outer ring only freezes", async ({ page }) => {
+test("tier-two wizard pushes the fourth ring beyond 3C", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -258,10 +261,10 @@ test("tier-two wizard performs four-ring 3C while the stable-remake outer ring o
       }),
       expect.objectContaining({
         unitId: "arena-2-1",
-        positionAfter: { x: 24, y: 30 },
+        positionAfter: { x: 24, y: 31 },
         lifeAfter: outerBefore?.life,
         actionDisabledAfter: true,
-        moved: false,
+        moved: true,
       }),
     ],
   });
@@ -274,7 +277,7 @@ test("tier-two wizard performs four-ring 3C while the stable-remake outer ring o
   expect(pageErrors).toEqual([]);
 });
 
-test("tier-three wizard performs five-ring 4C while the stable-remake fifth ring only freezes", async ({ page }) => {
+test("tier-three wizard pushes the fifth ring beyond 4C", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -345,10 +348,10 @@ test("tier-three wizard performs five-ring 4C while the stable-remake fifth ring
       }),
       expect.objectContaining({
         unitId: "arena-2-1",
-        positionAfter: { x: 25, y: 30 },
+        positionAfter: { x: 25, y: 31 },
         lifeAfter: outerBefore?.life,
         actionDisabledAfter: true,
-        moved: false,
+        moved: true,
       }),
     ],
   });

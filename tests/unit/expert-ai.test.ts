@@ -57,6 +57,54 @@ describe("REMAKE-033 stable-remake expert enemy AI", () => {
       .toContain("緊急救援×1");
   });
 
+  it("hits a wizard before making an otherwise critical save", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-wizard", side: 1 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "enemy-caster", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 1, classId: "warrior" as const, level: 1 as const, x: 24, y: 30 },
+    ], 0, new DeterministicRng(0x335f));
+    battle.unit("enemy-front")!.life = 1;
+
+    expect(battle.planEnemyAiAction("enemy-caster")).toMatchObject({
+      kind: "special",
+      actionId: "fire-1",
+      targetId: "ally-wizard",
+    });
+    expect(battle.expertAiDecisionTrace("enemy-caster")?.chosen?.reasons)
+      .toContain("巫師仇恨×1");
+  });
+
+  it("treats an effective hit on a wizard as the second-highest strategy", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-wizard", side: 1 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "ally-elite", side: 1 as const, slot: 1, classId: "magic-master" as const, level: 3 as const, x: 26, y: 30 },
+      { id: "enemy-warrior", side: 2 as const, slot: 0, classId: "warrior" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3360));
+
+    expect(battle.planEnemyAiAction("enemy-warrior", 1)).toMatchObject({
+      kind: "attack",
+      targetId: "ally-wizard",
+    });
+    expect(battle.expertAiDecisionTrace("enemy-warrior")?.chosen?.reasons)
+      .toContain("巫師仇恨×1");
+  });
+
+  it("takes any guaranteed kill before a nonlethal wizard hit", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-wizard", side: 1 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "ally-fatal", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
+      { id: "enemy-warrior", side: 2 as const, slot: 0, classId: "warrior" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3361));
+    battle.unit("ally-fatal")!.life = 1;
+
+    expect(battle.planEnemyAiAction("enemy-warrior", 1)).toMatchObject({
+      kind: "attack",
+      targetId: "ally-fatal",
+    });
+    expect(battle.expertAiDecisionTrace("enemy-warrior")?.chosen?.reasons)
+      .toContain("確定擊殺×1");
+  });
+
   it("values clustered area damage over weaker single-target fire", () => {
     const battle = new ArenaBattle([
       { id: "ally-a", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },

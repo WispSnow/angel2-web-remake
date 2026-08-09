@@ -31,6 +31,7 @@ export interface ExpertAiEvaluationContext {
  */
 export interface ExpertAiUtility {
   guaranteedKills: number;
+  wizardHits: number;
   criticalSaves: number;
   effectiveDamage: number;
   effectiveHealing: number;
@@ -62,6 +63,7 @@ export interface ExpertAiDecisionTrace {
 export function emptyExpertAiUtility(): ExpertAiUtility {
   return {
     guaranteedKills: 0,
+    wizardHits: 0,
     criticalSaves: 0,
     effectiveDamage: 0,
     effectiveHealing: 0,
@@ -78,14 +80,28 @@ export function emptyExpertAiUtility(): ExpertAiUtility {
   };
 }
 
+function expertPriorityBand(utility: ExpertAiUtility): number {
+  if (utility.guaranteedKills > 0) return 2_000_000_000;
+  if (utility.wizardHits > 0) return 1_000_000_000;
+  return 0;
+}
+
+function countEffectiveWizardHit(
+  utility: ExpertAiUtility,
+  target: BattleUnit,
+  effective: boolean,
+): void {
+  if (effective && target.classId === "wizard") utility.wizardHits += 1;
+}
+
 /**
- * Kills and emergency saves are intentionally separated by a wide margin from
- * ordinary value. The remaining weights compare real HP swing, control and
- * positioning without allowing a long path or terrain tie-break to eclipse a
- * tactically decisive action.
+ * Kills and effective pressure on a Wizard are strict priority bands. The
+ * remaining weights compare real HP swing, saves, control and positioning
+ * without allowing additive tie-break value to cross either tactical band.
  */
 export function expertAiScore(utility: ExpertAiUtility): number {
-  return utility.guaranteedKills * 1_000_000
+  return expertPriorityBand(utility)
+    + utility.guaranteedKills * 1_000_000
     + utility.criticalSaves * 600_000
     + utility.effectiveDamage * 100
     + utility.effectiveHealing * 80
@@ -111,6 +127,7 @@ export function compareExpertAiUtility(
 export function expertAiReasons(utility: ExpertAiUtility): string[] {
   const reasons: string[] = [];
   if (utility.guaranteedKills > 0) reasons.push(`確定擊殺×${utility.guaranteedKills}`);
+  if (utility.wizardHits > 0) reasons.push(`巫師仇恨×${utility.wizardHits}`);
   if (utility.criticalSaves > 0) reasons.push(`緊急救援×${utility.criticalSaves}`);
   if (utility.effectiveDamage > 0) reasons.push(`有效傷害 ${utility.effectiveDamage}`);
   if (utility.effectiveHealing > 0) reasons.push(`有效治療 ${utility.effectiveHealing}`);
@@ -202,7 +219,8 @@ export function expertExposureAt(
 }
 
 export function expertTacticalScore(utility: ExpertAiUtility): number {
-  return utility.guaranteedKills * 1_000_000
+  return expertPriorityBand(utility)
+    + utility.guaranteedKills * 1_000_000
     + utility.criticalSaves * 600_000
     + utility.effectiveDamage * 100
     + utility.effectiveHealing * 80
@@ -234,6 +252,7 @@ export function expertOrdinaryUtility(
   const guaranteedKill = minimumDamage >= target.life;
   utility.guaranteedKills = guaranteedKill ? 1 : 0;
   utility.effectiveDamage = Math.min(target.life, expectedDamage);
+  countEffectiveWizardHit(utility, target, utility.effectiveDamage > 0);
   utility.targetThreat = targetThreat(context, target);
   utility.terrainDefense = terrainDefensePercentFor(actor.classId, context.terrainSlotAt(position));
   utility.pathLength = Math.max(0, path.length - 1);
@@ -285,6 +304,7 @@ export function expertSpecialUtility(
     utility.guaranteedKills = damage >= target.life && damage > 0 ? 1 : 0;
     utility.effectiveDamage = damage;
     utility.support = target.statuses.magicGuard > 0 && !target.actionDisabled ? 20 : 0;
+    countEffectiveWizardHit(utility, target, damage > 0 || utility.support > 0);
     utility.targetThreat = targetThreat(context, target);
     if (damage === 0 && utility.support === 0) utility.waste = 1;
     return utility;
@@ -314,6 +334,7 @@ export function expertSpecialUtility(
       target.life,
       swiftEvasion ? Math.floor(selectedDamage / 2) : selectedDamage,
     );
+    countEffectiveWizardHit(utility, target, utility.effectiveDamage > 0);
     utility.guaranteedKills = !swiftEvasion && minimumDamage >= target.life ? 1 : 0;
     if (utility.guaranteedKills > 0) {
       utility.exposure = expertExposureAt(context, actor, position, target.id);
@@ -329,10 +350,12 @@ export function expertSpecialUtility(
         if (!lineCells.has(`${affected.x},${affected.y}`)) continue;
         if (affected.statuses.magicGuard > 0) {
           utility.support += 20;
+          countEffectiveWizardHit(utility, affected, true);
           continue;
         }
         const expectedDamage = Math.min(affected.life, expectedHalfDamage);
         utility.effectiveDamage += expectedDamage;
+        countEffectiveWizardHit(utility, affected, expectedDamage > 0);
         utility.targetThreat += targetThreat(context, affected);
         if (minimumHalfDamage >= affected.life) {
           utility.guaranteedKills += 1;
@@ -359,6 +382,11 @@ export function expertSpecialUtility(
         ? 0
         : Math.min(affected.life, damageByRangeValue[rangeValue] ?? 0);
       utility.effectiveDamage += damage;
+      countEffectiveWizardHit(
+        utility,
+        affected,
+        damage > 0 || (affected.statuses.magicGuard > 0 && !affected.actionDisabled),
+      );
       if (damage >= affected.life && damage > 0) utility.guaranteedKills += 1;
       utility.targetThreat += targetThreat(context, affected);
       if (affected.statuses.magicGuard > 0 && !affected.actionDisabled) utility.support += 20;
@@ -386,9 +414,11 @@ export function expertSpecialUtility(
       if (affected.statuses.magicGuard > 0) {
         utility.support += 20;
         utility.targetThreat += threat;
+        countEffectiveWizardHit(utility, affected, true);
         continue;
       }
       utility.control += 120 + threat;
+      countEffectiveWizardHit(utility, affected, true);
       utility.targetThreat += threat;
     }
     if (utility.control === 0) utility.waste = 1;
@@ -443,6 +473,7 @@ export function expertSpecialUtility(
       && !candidate.actionDisabled
       && conservativeEffect.valueAt(candidate) > 0)) {
       utility.effectiveDamage += Math.min(affected.life, expectedDamage);
+      countEffectiveWizardHit(utility, affected, expectedDamage > 0);
       if (definition.damage.base >= affected.life) utility.guaranteedKills += 1;
       utility.targetThreat += targetThreat(context, affected);
     }
@@ -513,6 +544,7 @@ export function expertSpecialUtility(
             : 20
           : 40 + Math.floor(threat / 4);
     utility.targetThreat = threat;
+    countEffectiveWizardHit(utility, target, true);
     return utility;
   }
 
