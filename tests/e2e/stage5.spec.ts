@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
+import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -179,7 +180,7 @@ test("S05-E/F: either named boss ends the battle while the other remains", async
   }
 });
 
-test("S05-G/H: battle saves use v20 and victory saves enter the live portal scene", async ({ page }) => {
+test("S05-G/H: battle saves use the current schema and victory saves enter the live portal scene", async ({ page }) => {
   await page.goto("/?debugScenario=stage-05-player&difficulty=0&test=1");
   const before = await state(page);
   await page.keyboard.press("Escape");
@@ -195,8 +196,8 @@ test("S05-G/H: battle saves use v20 and victory saves enter the live portal scen
       rngCalls: number;
     });
   expect(battleSave).toMatchObject({
-    version: 20,
-    contentVersion: "stage-06-rangers-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
     kind: "battle",
     stageId: "stage-05",
     rngState: before.rngState,
@@ -224,8 +225,8 @@ test("S05-G/H: battle saves use v20 and victory saves enter the live portal scen
       stageProgress: number;
     });
   expect(completedSave).toMatchObject({
-    version: 20,
-    contentVersion: "stage-06-rangers-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
     kind: "completed",
     stageId: "stage-42-portal",
     stageProgress: 1000,

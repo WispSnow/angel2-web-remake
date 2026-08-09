@@ -133,6 +133,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-05": REPRESENTATIVE_STAGE4,
       "stage-42-portal": REPRESENTATIVE_STAGE4,
       "stage-06": REPRESENTATIVE_STAGE6,
+      "stage-07": REPRESENTATIVE_STAGE6,
     },
   },
   {
@@ -147,6 +148,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-05": PROMOTION_COVERAGE_STAGE4,
       "stage-42-portal": PROMOTION_COVERAGE_STAGE4,
       "stage-06": PROMOTION_COVERAGE_STAGE6,
+      "stage-07": PROMOTION_COVERAGE_STAGE6,
     },
   },
 ] as const satisfies readonly {

@@ -19,6 +19,7 @@
 | `specified` | 纸面范围已形成，但不等于获得代码实施授权 |
 | `authorized` | 用户已经明确授权指定范围，可以开始实施 |
 | `in-progress` | 已授权范围正在实施，尚未满足全部退出条件 |
+| `implemented` | 实现与约定自动／视觉门禁已完成，等待必要的人工试玩或产品确认 |
 | `verified` | 约定的自动检查和技术验收已通过 |
 | `accepted` | 必要的人工试玩或产品确认也已完成 |
 
@@ -44,6 +45,8 @@
 - [`milestones/M08-stage-05-implementation.md`](milestones/M08-stage-05-implementation.md)：第 5 关有界实现；
 - [`milestones/M09-stage-06-specification.md`](milestones/M09-stage-06-specification.md)：第 6 关纸面合同；
 - [`milestones/M10-stage-06-implementation.md`](milestones/M10-stage-06-implementation.md)：第 6 关有界实现；
+- [`milestones/M11-stage-07-specification.md`](milestones/M11-stage-07-specification.md)：第 7 关纸面合同；
+- [`milestones/M12-stage-07-implementation.md`](milestones/M12-stage-07-implementation.md)：第 7 关有界实现；
 - [`work-items/M00-native-side-panel-hotspots.md`](work-items/M00-native-side-panel-hotspots.md)：原版右栏战术桌 12 个鼠标热点的实现顺序与验收边界。
 
 ## 维护规则

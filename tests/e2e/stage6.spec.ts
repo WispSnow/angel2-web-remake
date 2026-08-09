@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
+import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -132,7 +133,7 @@ test("S06-D/E: the stable-remake objective names Xielei and her removal starts S
   expect((await state(page)).units.some(({ id }) => id === "2:19")).toBe(false);
 });
 
-test("S06-F/G/H/I/J: live victory builds the ranger tableau, saves v20, and routes to stage 7", async ({ page }) => {
+test("S06-F/G/H/I/J: live victory builds the ranger tableau, saves the current schema, and enters stage 7", async ({ page }) => {
   await page.goto("/?debugScenario=stage-06-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "scriptedStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "16");
@@ -174,7 +175,7 @@ test("S06-F/G/H/I/J: live victory builds the ranger tableau, saves v20, and rout
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -187,8 +188,8 @@ test("S06-F/G/H/I/J: live victory builds the ranger tableau, saves v20, and rout
       consumedEventIds: string[];
     });
   expect(completedSave).toMatchObject({
-    version: 20,
-    contentVersion: "stage-06-rangers-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
     kind: "completed",
     stageId: "stage-07",
     stageLabel: "來到異世界",
@@ -196,24 +197,25 @@ test("S06-F/G/H/I/J: live victory builds the ranger tableau, saves v20, and rout
   });
   expect(completedSave.consumedEventIds).toContain("stage-06-ranger-leader-move");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-06",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-07",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-07",
   });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "17");
 });
 
-test("S06-K/L: loaded completion stops at the frozen stage-7 boundary without replay", async ({ page }) => {
+test("S06-K/L: loaded completion enters stage 7 without replaying stage-6 presentation", async ({ page }) => {
   await page.goto("/?debugScenario=stage-06-cleared&difficulty=0&test=1");
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
   const completed = await state(page);
   expect(completed).toMatchObject({
-    stageId: "stage-06",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-07",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-07",
   });
-  expect(completed.activeStoryId).toBeUndefined();
+  expect(completed.activeStoryId).toBe("stage-07-prebattle-story");
   expect(completed.units.some(({ id }) => id.startsWith("story:ranger"))).toBe(false);
-  await expect(page.getByTestId("dialogue-layer")).toBeHidden();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "17");
 });

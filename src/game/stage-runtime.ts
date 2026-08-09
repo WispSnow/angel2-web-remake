@@ -481,6 +481,56 @@ async function loadStage6Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage7Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage7"),
+    import("./simulation/stage7-battle"),
+  ]);
+  content.activateStage7Content();
+  const definition = content.STAGE7_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 07",
+      title: content.STAGE7.name,
+      objective: content.STAGE7_DEFINITION.objective.victoryText,
+      minimap: content.STAGE7_ASSETS.minimap,
+      terrain: content.STAGE7_TERRAIN_TOKENS,
+      gridWidth: content.STAGE7.width,
+      gridHeight: content.STAGE7.height,
+      enemies: content.STAGE7_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅與希蜜固定出場；十一名候選最多選五人。擊敗萊莉即可。",
+    },
+    ["stage-07-prebattle-story", "stage-07-enter-deployment"],
+    (campaign) => battleModule.createStage7DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 7 requires a deployment result");
+    return new battleModule.Stage7Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE7_DEFINITION,
+    assets: {
+      map: content.STAGE7_ASSETS.map,
+      minimap: content.STAGE7_ASSETS.minimap,
+      storyBackground: content.STAGE7_ASSETS.storyBackgrounds[6],
+      storyBackgrounds: content.STAGE7_ASSETS.storyBackgrounds,
+      unitSprites: content.STAGE7_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -1044,6 +1094,59 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage6Module,
+  },
+  "stage-07": {
+    id: "stage-07",
+    ordinal: 7,
+    label: "來到異世界",
+    nextStageId: "stage-08",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "妮雅一行在游騎兵營地暫時落腳。",
+      campaignRoute: "stage-07",
+    },
+    enemyPhaseStatusText: "敵方階段：死亡之谷奇襲隊開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始第 7 關關前流程。",
+      retreatStatusText: "全面撤退：返回第 7 關關前流程並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "營地遭到偷襲",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-07-prebattle-story",
+        "stage-07-enter-deployment",
+        "stage-07-objective-reached",
+        "stage-07-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-07-prebattle-story",
+        "stage-07-enter-deployment",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
+        fixedSlots: [0, 1],
+        optionalSlots: [2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
+        maximumUnits: 7,
+        openCellCount: 5,
+      },
+      enemyClassById: [
+        ["2:44", "magician"], ["2:45", "priest"], ["2:40", "magician"],
+        ["2:53", "soldier"], ["2:18", "land-knight"], ["2:52", "soldier"],
+        ["2:42", "magician"], ["2:50", "priest"], ["2:41", "soldier"],
+        ["2:49", "soldier"], ["2:47", "soldier"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage7Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

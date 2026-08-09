@@ -93,6 +93,7 @@ function extractLocalDocumentTargets(markdown) {
 async function checkMarkdownLinks() {
   const roots = [
     "README.md",
+    "WORKFLOW.md",
     "AGENTS.md",
     "tests/README.md",
     "planning",

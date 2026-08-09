@@ -25,6 +25,8 @@ import { STAGE4_DEFINITION } from "../../src/game/content/stage4";
 import { Stage4Battle } from "../../src/game/simulation/stage4-battle";
 import { STAGE6_DEFINITION } from "../../src/game/content/stage6";
 import { Stage6Battle } from "../../src/game/simulation/stage6-battle";
+import { STAGE7_DEFINITION } from "../../src/game/content/stage7";
+import { Stage7Battle } from "../../src/game/simulation/stage7-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -390,6 +392,63 @@ const stage6BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage7BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-07" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x5060_7080,
+    rngCalls: 18,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 620, life: 220 },
+      { slot: 1, classId: "priest", experience: 580, life: 180 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE7_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE7_DEFINITION.deployment.optionalSlots.slice(0, 5).map((slot, index) => ({
+        slot, position: { ...STAGE7_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+  const battle = new Stage7Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-09T12:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-07",
+    stageLabel: "來到異世界",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: {
+      ...source,
+      roster: source.roster.map((entry) => ({ ...entry })),
+    },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-07-prebattle-story",
+      "stage-07-enter-deployment",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -446,7 +505,17 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
-  it("migrates v19 saves into the stage-06 content identity", () => {
+  it("migrates v20 saves into the stage-07 content identity", () => {
+    const current = battleSave();
+    const legacy = {
+      ...current,
+      version: 20,
+      contentVersion: "stage-06-rangers-1",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+  });
+
+  it("migrates v19 saves through the current stage-07 content identity", () => {
     const current = battleSave();
     const legacy = {
       ...current,
@@ -456,7 +525,7 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
   });
 
-  it("migrates v18 saves through the current stage-06 identity", () => {
+  it("migrates v18 saves through the current stage-07 identity", () => {
     const current = battleSave();
     const legacy = {
       ...current,
@@ -581,6 +650,21 @@ describe("Web save validation", () => {
     expect(isSaveData(wrongEnemy)).toBe(false);
   });
 
+  it("round-trips stage-7 deployments and rejects a missing fixed ally or wrong Laili class", () => {
+    const save = stage7BattleSave();
+    expect(parseSaveData(JSON.stringify(save))).toEqual(save);
+
+    const missingHimi = stage7BattleSave();
+    missingHimi.battle.units = missingHimi.battle.units.filter(({ id }) => id !== "1:1");
+    expect(isSaveData(missingHimi)).toBe(false);
+
+    const wrongLaili = stage7BattleSave();
+    const laili = wrongLaili.battle.units.find(({ id }) => id === "2:18")!;
+    laili.classId = "cavalry";
+    laili.className = className("cavalry");
+    expect(isSaveData(wrongLaili)).toBe(false);
+  });
+
   it("accepts the stage-05 boundary only with the complete stage-4 route identity", () => {
     const current: CompletedSaveData = {
       ...completedSave(),
@@ -659,6 +743,24 @@ describe("Web save validation", () => {
     };
     expect(isSaveData(stage6Completed)).toBe(true);
     expect(isSaveData({ ...stage6Completed, stageLabel: "下一關" })).toBe(false);
+
+    const stage7Completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-08",
+      stageLabel: "營地遭到偷襲",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-07-prebattle-story",
+        "stage-07-enter-deployment",
+        "stage-07-objective-reached",
+        "stage-07-completed-route",
+      ],
+    };
+    expect(isSaveData(stage7Completed)).toBe(true);
+    expect(isSaveData({
+      ...stage7Completed,
+      consumedEventIds: stage7Completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
   });
 
   it("migrates the v19 stage-06 boundary label into its playable title", () => {

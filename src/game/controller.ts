@@ -558,6 +558,7 @@ export class GameController {
     );
     this.difficulty = campaign.difficulty;
     this.campaignRoute = runtime.entry.campaignRoute;
+    this.stageProgress = 0;
     this.activeStoryId = undefined;
     this.dialogueSkipConfirmOpen = false;
     this.dialogueSkipConfirmIndex = 1;
@@ -607,6 +608,7 @@ export class GameController {
     this.resetAction();
     this.statusMessage = `部署完成：${deployment.placements.length} 人編隊已建立。`;
     const events = this.consumeStageTrigger({ type: "battle-started" });
+    if (events.length === 0) this.phase = "player";
     void this.processStageEvents(events).then(() => this.emit());
   }
 
@@ -4922,8 +4924,15 @@ export class GameController {
         }
       }
       const victoryEvents = this.consumeStageTrigger({ type: "objective-satisfied" });
-      void this.processStageEvents(victoryEvents).then(() => this.emit());
-      if (victoryEvents.length === 0) this.phase = "victoryFeedback";
+      if (victoryEvents.length === 0) {
+        this.phase = "victoryFeedback";
+      } else {
+        const phaseBeforeVictoryEvents = this.phase;
+        void this.processStageEvents(victoryEvents).then(() => {
+          if (this.phase === phaseBeforeVictoryEvents) this.phase = "victoryFeedback";
+          this.emit();
+        });
+      }
       this.statusMessage = this.battle.stage.objective.victoryStatusText;
       this.resetAction();
       return true;
