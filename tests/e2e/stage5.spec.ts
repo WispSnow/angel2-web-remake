@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -130,7 +131,7 @@ test("S05-A/B/C/D: stage 5 enters a one-to-six unit deployment and starts SAY/9"
     path: `${ARTIFACT_DIR}/stage5-opening-story.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   expect((await state(page)).consumedEventIds).toEqual([
     "stage-05-enter-deployment",
@@ -205,7 +206,7 @@ test("S05-G/H: battle saves use v20 and victory saves enter the live portal scen
   await page.goto("/?debugScenario=stage-05-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "10");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "victoryFeedback");
   await page.getByTestId("victory-continue").click();
   if ((await state(page)).phase === "victoryFeedback") {
@@ -250,13 +251,13 @@ async function advancePortalToLightning(page: Page): Promise<Stage5State> {
   expect(initial.units).toContainEqual(expect.objectContaining({ id: "1:23", classId: "empress" }));
   expect(initial.units).toContainEqual(expect.objectContaining({ id: "1:7", classId: "magic-priest" }));
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "18");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "20");
   expect((await state(page)).units.find(({ id }) => id === "1:24"))
     .toMatchObject({ x: 25, y: 24 });
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByTestId("battle-canvas"))
     .toHaveAttribute("data-map-combat-phase", "lightningMain");
   return initial;
@@ -295,7 +296,7 @@ test("S05-I/J: scene 42 commits native 4L, story departures, and the stage-06 ro
     path: `${ARTIFACT_DIR}/stage42-portal-departure-story.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "deployment");
   expect(await state(page)).toMatchObject({
     stageId: "stage-06",
@@ -338,7 +339,7 @@ test("S05-K/L: completed and reduced-motion portal paths preserve deterministic 
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage42-portal-reduced-motion-departure.png`,
   });
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "deployment");
   const reducedFinal = await state(page);
   expect(reducedFinal).toMatchObject({
@@ -346,32 +347,6 @@ test("S05-K/L: completed and reduced-motion portal paths preserve deterministic 
     phase: "deployment",
     campaignRoute: "stage-06",
   });
-
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/?debugScenario=stage-42-portal-live&difficulty=0&test=1");
-  await waitForPhase(page, "scriptedStory");
-  await expect(page.getByTestId("skip-scripted-sequence")).toBeVisible();
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage42-portal-skip-control.png`,
-  });
-  const beforeSkip = await state(page);
-  await page.getByTestId("skip-scripted-sequence").click();
-  await waitForPhase(page, "deployment");
-  const skipped = await state(page);
-  expect(skipped).toMatchObject({
-    stageId: "stage-06",
-    stageProgress: 0,
-    phase: "deployment",
-    campaignRoute: "stage-06",
-    rngState: beforeSkip.rngState,
-    rngCalls: beforeSkip.rngCalls,
-  });
-  expect(skipped.units.map(({ id, x, y, life }) => ({ id, x, y, life })))
-    .toEqual(reducedFinal.units.map(({ id, x, y, life }) => ({ id, x, y, life })));
-  expect(skipped.lastSpecialAction).toEqual(reducedFinal.lastSpecialAction);
-  expect(skipped.consumedEventIds).toEqual(reducedFinal.consumedEventIds);
-  expect(skipped.specialActionPresentationTrace).toEqual([]);
-  await expect(page.getByTestId("dialogue-layer")).toBeHidden();
 });
 
 test("S05-L: fast presentation and disabled combat sound preserve the portal result", async ({ page }) => {
@@ -409,7 +384,7 @@ test("S05-L: fast presentation and disabled combat sound preserve the portal res
     await page.locator("#app").getAttribute("data-combat-effect-request-count"),
   )).toBeGreaterThan(0);
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "deployment");
   expect(await state(page)).toMatchObject({
     stageId: "stage-06",

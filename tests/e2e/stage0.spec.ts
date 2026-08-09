@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const EDGE_PAN_SETTLE_MS = 180;
@@ -25,6 +27,8 @@ interface DebugState {
   recordMenuMode?: "load" | "save";
   recordMenuReturn?: "battle" | "system";
   recordMenuIndex: number;
+  dialogueSkipConfirmOpen: boolean;
+  dialogueSkipConfirmIndex: number;
   quitConfirmOpen: boolean;
   quitConfirmIndex: number;
   groupCommandOpen: boolean;
@@ -205,9 +209,9 @@ const finishGroupCommandDialogue = async (page: Page) => {
   await expect(layer).toBeVisible();
   await expect(layer).toHaveAttribute("data-source-record", "battle-command");
   const command = (await debugState(page)).groupCommandDialogueId;
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   if ((await debugState(page)).groupCommandDialogueId === command) {
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
   }
   await expect.poll(async () => (await debugState(page)).groupCommandDialogueId).toBeUndefined();
 };
@@ -215,13 +219,13 @@ const finishPromotionDialogue = async (page: Page) => {
   const layer = page.getByTestId("dialogue-layer");
   while (await layer.isVisible() && await layer.getAttribute("data-source-record") === "promotion") {
     const before = await layer.getAttribute("data-source-wait");
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
     if (
       await layer.isVisible()
       && await layer.getAttribute("data-source-record") === "promotion"
       && await layer.getAttribute("data-source-wait") === before
     ) {
-      await page.getByTestId("advance-dialogue").click();
+      await page.getByTestId("dialogue-layer").click();
     }
     await expect.poll(async () =>
       !await layer.isVisible() || await layer.getAttribute("data-source-wait") !== before,
@@ -354,40 +358,48 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     activeStoryId: "stage-00-prebattle-story",
     consumedEventIds: ["stage-00-prebattle-story"],
   });
-  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
-  const skipDialogue = page.getByTestId("skip-dialogue");
-  await expect(skipDialogue).toBeVisible();
-  await expect(skipDialogue).toHaveText("跳過");
-  const activeDialogueCopy = page.getByTestId("dialogue-window-lower").locator(".dialogue-copy");
-  const [copyBounds, skipBounds] = await Promise.all([
-    activeDialogueCopy.boundingBox(),
-    skipDialogue.boundingBox(),
-  ]);
-  expect(copyBounds).not.toBeNull();
-  expect(skipBounds).not.toBeNull();
-  expect(skipBounds!.x).toBeGreaterThan(copyBounds!.x + copyBounds!.width / 2);
-  expect(skipBounds!.x + skipBounds!.width).toBeLessThanOrEqual(copyBounds!.x + copyBounds!.width);
-  expect(skipBounds!.y).toBeGreaterThan(copyBounds!.y + copyBounds!.height / 2);
-  expect(skipBounds!.y + skipBounds!.height).toBeLessThanOrEqual(copyBounds!.y + copyBounds!.height);
-  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-dialogue-skip.png" });
-  for (let action = 0; action < 4; action += 1) await page.getByTestId("advance-dialogue").click();
+  const dialogueLayer = page.getByTestId("dialogue-layer");
+  await expect(dialogueLayer).toBeVisible();
+  await expect(dialogueLayer.getByRole("button")).toHaveCount(0);
+  await dialogueLayer.click({ button: "right" });
+  const skipConfirm = page.getByTestId("dialogue-skip-confirm");
+  await expect(skipConfirm).toBeVisible();
+  await expect(skipConfirm).toContainText("是否跳過劇情對話？");
+  await expect(page.getByTestId("dialogue-skip-no")).toHaveAttribute("aria-current", "true");
+  expect((await debugState(page))).toMatchObject({
+    dialogueIndex: 0,
+    dialogueSkipConfirmOpen: true,
+    dialogueSkipConfirmIndex: 1,
+  });
+  await page.locator("#dialogue-skip-question").click();
+  expect((await debugState(page))).toMatchObject({
+    dialogueIndex: 0,
+    dialogueSkipConfirmOpen: true,
+  });
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("dialogue-skip-yes")).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("dialogue-skip-no")).toHaveAttribute("aria-current", "true");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-dialogue-skip-confirm.png",
+  });
+  await page.keyboard.press("Escape");
+  await expect(skipConfirm).toBeHidden();
+  await dialogueLayer.click({ button: "right" });
+  await expect(skipConfirm).toBeVisible();
+  await page.getByTestId("dialogue-skip-no").click();
+  await expect(skipConfirm).toBeHidden();
+  expect((await debugState(page))).toMatchObject({
+    dialogueIndex: 0,
+    dialogueSkipConfirmOpen: false,
+  });
+  for (let action = 0; action < 4; action += 1) await page.getByTestId("dialogue-layer").click();
   expect((await debugState(page)).dialogueIndex).toBe(2);
-  await expect(skipDialogue).toBeVisible();
-  expect(await skipDialogue.evaluate((button) =>
-    button.parentElement?.parentElement?.id)).toBe("dialogue-copy-upper");
   await page.waitForTimeout(130);
-  const [upperCopyBounds, upperSkipBounds] = await Promise.all([
-    page.getByTestId("dialogue-window-upper").locator(".dialogue-copy").boundingBox(),
-    skipDialogue.boundingBox(),
-  ]);
-  expect(upperCopyBounds).not.toBeNull();
-  expect(upperSkipBounds).not.toBeNull();
-  expect(upperSkipBounds!.x + upperSkipBounds!.width)
-    .toBeLessThanOrEqual(upperCopyBounds!.x + upperCopyBounds!.width);
-  expect(upperSkipBounds!.y + upperSkipBounds!.height)
-    .toBeLessThanOrEqual(upperCopyBounds!.y + upperCopyBounds!.height);
   await expectNativeDialogueGeometry(page, "upper");
-  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-dialogue-skip-upper.png" });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-dialogue-buttonless-upper.png",
+  });
   const dialoguePortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(dialoguePortrait).toBeVisible();
   const dialoguePortraitName = page.getByTestId("dialogue-portrait-name");
@@ -439,7 +451,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-dialogue-portrait-talk.png" });
   await captureVisualAudit(dialoguePortrait, { path: "artifacts/playwright/stage0-dialogue-portrait-talk-detail.png" });
   if (await dialoguePortrait.getAttribute("data-speaking") === "true") {
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
   }
   await expect(dialoguePortrait).toHaveAttribute("data-speaking", "false");
   await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-mouth-frame"); });
@@ -489,7 +501,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-dialogue-portrait-blink.png" });
   await dialoguePortrait.evaluate((portrait) => { portrait.removeAttribute("data-force-blink-frame"); });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await page.waitForFunction(() => window.__ANGEL2__?.getState().movementPresentation?.kind === "scripted");
   const openingMovement = (await debugState(page)).movementPresentation!;
   expect((await debugState(page)).consumedEventIds).toEqual([
@@ -522,7 +534,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     ],
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   // Empty terrain keeps the live minimap and adds the remake terrain card in
@@ -799,7 +811,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(promotionDialogue).toHaveAttribute("data-source-address", "0000:0487");
   await expect(promotionDialogue).toHaveAttribute("data-source-wait", "1");
   await expect(page.getByTestId("promotion-layer")).toBeHidden();
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await expect(page.locator("#dialogue-text")).toHaveText(
     "我的經驗值已達到轉職的目標，\n應該選擇甚麼職業？",
   );
@@ -811,7 +823,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-nia-promotion-dialogue.png",
   });
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
   expect((await debugState(page))).toMatchObject({
     phase: "player",
@@ -957,7 +969,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
 
   // Units that begin round 2 inside an enemy control zone may leave their
   // origin; only control-zone cells entered during the move stop expansion.
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await clickCanvas(page, 220, 177);
   expect((await debugState(page)).actionMode).toBe("actionMenu");
@@ -987,7 +999,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(state.units.filter((unit) => unit.side === 2)).toHaveLength(10);
 
   // S00-D: leave one legal target, finish it through the real attack UI, then save.
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await setBattlePresentation(page, "full");
   await expect(page.getByTestId("presentation-button")).toHaveText("戰鬥 全景");
@@ -1007,7 +1019,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       "stage-00-victory-story",
     ],
   });
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("save-yes").click();
@@ -1031,8 +1043,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 19,
-    contentVersion: "stage-05-portal-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
     kind: "completed",
     stageId: "stage-01",
     stageLabel: "騎士城堡前",
@@ -1050,9 +1062,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
 
 test("REMAKE-015: clicking empty terrain shows class-specific traits in the side panel", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   const baseline = await debugState(page);
@@ -1120,9 +1132,9 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await expect(page.locator("#dialogue-text")).toContainText("寬廣走廊");
   await page.keyboard.press(" ");
   expect((await debugState(page)).dialogueIndex).toBe(1);
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   const reducedMotionPortrait = page.getByTestId("unit-portrait-composite");
@@ -1234,9 +1246,9 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
 
 test("S00-F: named cavalry identity and route evacuation are visible end to end", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowLeft");
@@ -1262,9 +1274,9 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
 
 test("turn handoff replays the native A/19 runners, hops, shadow and A/26 edge dust", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   await page.keyboard.press("Tab");
@@ -1359,9 +1371,9 @@ test("turn handoff replays the native A/19 runners, hops, shadow and A/26 edge d
 test("S00-G: group commands provide allied AI handoff and confirmed retreat", async ({ page }) => {
   const enterPlayerPhase = async () => {
     await page.goto("/?test=1&skipStartup=1");
-    await page.getByTestId("skip-dialogue").click();
+    await skipStoryDialogue(page);
     await waitForPhase(page, "openingStory");
-    await page.getByTestId("skip-dialogue").click();
+    await skipStoryDialogue(page);
     await waitForPhase(page, "player");
   };
 
@@ -1402,7 +1414,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   expect(retreated.units.filter((unit) => unit.side === 2)).toHaveLength(10);
   expect(retreated.units.find((unit) => unit.id === "1:0")).toMatchObject({ x: 29, y: 26 });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.keyboard.press("Tab");
   await page.keyboard.press("F3");
@@ -1445,9 +1457,9 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
 
 test("REMAKE-014: side-1 autonomous techniques use the upper native dialogue window", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("sister"));
@@ -1496,9 +1508,9 @@ test("REMAKE-014: side-1 autonomous techniques use the upper native dialogue win
 
 test("S00-H: minimap hover previews and primary click relocates the native viewport", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await clickCanvas(page, 420, 45);
   await expect(page.getByTestId("tactical-minimap")).toBeVisible();
@@ -1532,9 +1544,9 @@ test("S00-H: minimap hover previews and primary click relocates the native viewp
 
 test("RHP-01: native side-panel hitboxes share one gated coordinate layer", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   const screen = page.getByTestId("game-screen");
@@ -1625,9 +1637,9 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
 
 test("RHP-02: objective and battle-animation objects reuse canonical presentation actions", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
 
@@ -1675,9 +1687,9 @@ test("RHP-02: objective and battle-animation objects reuse canonical presentatio
 test("RHP-03: desk save and load objects preserve record data and return origin", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => window.__ANGEL2__?.clearSaves());
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
 
@@ -1706,8 +1718,8 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.20") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 19,
-    contentVersion: "stage-05-portal-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
     kind: "battle",
     stageId: "stage-00",
     rngState: initial.rngState,
@@ -1761,9 +1773,9 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => localStorage.removeItem("angel2.preferences.presentation.v1"));
   await page.reload();
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   const canvas = page.getByTestId("battle-canvas");
   await canvas.hover({ position: { x: 420, y: 45 } });
@@ -1936,9 +1948,9 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   await expect(app).toHaveAttribute("data-combat-effect-count", "0");
   await expect(app).toHaveAttribute("data-key-effect-count", "0");
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
 
@@ -2025,9 +2037,9 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   await expect(app).toHaveAttribute("data-key-effect-count", "0");
   await expect.poll(async () => Number(await app.getAttribute("data-speech-effect-request-count"))).toBeGreaterThan(0);
   await expect(app).toHaveAttribute("data-speech-effect-count", "0");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   expect(Number(await app.getAttribute("data-key-effect-request-count"))).toBeGreaterThan(0);
   expect(Number(await app.getAttribute("data-movement-effect-count"))).toBeGreaterThan(0);
@@ -2061,9 +2073,9 @@ test("RHP-06: music desk object selects five persistent levels without restartin
   await expect(app).toHaveAttribute("data-music-volume-level", "4");
   await expect(app).toHaveAttribute("data-music-volume", "0.32");
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await expect(app).toHaveAttribute("data-music-track", "MUSIC/6", { timeout: 10_000 });
   await expect(app).toHaveAttribute("data-music-part", "loop");
@@ -2126,9 +2138,9 @@ test("RHP-06: music desk object selects five persistent levels without restartin
   expect((await debugState(page)).musicVolume).toBe(3);
   await expect(app).toHaveAttribute("data-music-volume-level", "3");
   await expect(app).toHaveAttribute("data-music-volume", "0.24");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.keyboard.press("m");
   await expect(page.getByTestId("music-settings-menu")).toBeVisible();
@@ -2138,9 +2150,9 @@ test("RHP-06: music desk object selects five persistent levels without restartin
 test("RHP-07: all twelve desk objects are discoverable, accessible and coordinate-operable", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => window.__ANGEL2__?.clearSaves());
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
 
@@ -2303,9 +2315,9 @@ test("RHP-07: all twelve desk objects are discoverable, accessible and coordinat
 
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   // Nia has no adjacent target at the untouched opening: remain in the
@@ -2351,9 +2363,9 @@ test("S00-I: native range dither and ordinary attack target-count branches", asy
 
 test("S00-J: native map hit, point-drain and death descriptors preserve the board erase boundary", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await setBattlePresentation(page, "map");
@@ -2427,9 +2439,9 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   // speed instead of the compressed test-mode rate.
   const enterPlayableBattle = async ({ nativeSpeed = false } = {}) => {
     await page.goto(`/?test=1&skipStartup=1${nativeSpeed ? "&slowFull=1" : ""}`);
-    await page.getByTestId("skip-dialogue").click();
+    await skipStoryDialogue(page);
     await waitForPhase(page, "openingStory");
-    await page.getByTestId("skip-dialogue").click();
+    await skipStoryDialogue(page);
     await waitForPhase(page, "player");
   };
   const attackFirstForcedTarget = async () => {
@@ -2666,17 +2678,17 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
 
   // Primary input first fast-forwards the current typewriter, then advances on
   // the following press, matching the native input-clear behavior after KY.
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   expect((await debugState(page)).dialogueIndex).toBe(0);
   await expect(page.locator("#dialogue-text")).toContainText("寬廣走廊");
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   expect((await debugState(page)).dialogueIndex).toBe(1);
 
   // Reach SAY0/KY5, where the prior upper window remains open while the
   // wounded soldier starts speaking in the lower window.
   for (let checkpoint = 1; checkpoint < 4; checkpoint += 1) {
-    await page.getByTestId("advance-dialogue").click();
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
+    await page.getByTestId("dialogue-layer").click();
   }
   expect((await debugState(page)).dialogueIndex).toBe(4);
   await expect(layer).toHaveAttribute("data-source-wait", "5");
@@ -2688,23 +2700,23 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   await expectNativeDialogueGeometry(page, "upper");
   await expectNativeDialogueGeometry(page, "lower");
 
-  await page.getByTestId("advance-dialogue").click();
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
+  await page.getByTestId("dialogue-layer").click();
   expect((await debugState(page)).dialogueIndex).toBe(5);
   await expect(layer).toHaveAttribute("data-source-wait", "6");
   await expect(layer).toHaveAttribute("data-reveal-start", /^[1-9][0-9]*$/);
   const appendedDialogue = page.locator("#dialogue-text");
   await expect(appendedDialogue).toContainText("不好了");
   if (!(await appendedDialogue.textContent())?.includes("騎士團的軍隊")) {
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
   }
   await expect(appendedDialogue).toContainText("騎士團的軍隊");
   await page.waitForTimeout(130);
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-dual-dialogue.png" });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await clickCanvas(page, 220, 177);
@@ -2714,9 +2726,9 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
 
   const advanceOneCheckpoint = async () => {
     const before = (await debugState(page)).dialogueIndex;
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
     if ((await debugState(page)).dialogueIndex === before) {
-      await page.getByTestId("advance-dialogue").click();
+      await page.getByTestId("dialogue-layer").click();
     }
     expect((await debugState(page)).dialogueIndex).toBe(before + 1);
   };
@@ -2727,16 +2739,16 @@ test("S00-L: native KY checkpoints preserve dual windows, appended text and the 
   await expect(layer).toHaveAttribute("data-active-slot", "none");
   await expect(page.getByTestId("dialogue-window-upper")).toBeHidden();
   await expect(page.getByTestId("dialogue-window-lower")).toBeHidden();
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   expect((await debugState(page)).dialogueIndex).toBe(3);
 });
 
 test("S00-M: native system records restore battle state and combat cues follow presentation events", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => window.__ANGEL2__?.clearSaves());
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   const initial = await debugState(page);
@@ -2769,8 +2781,8 @@ test("S00-M: native system records restore battle state and combat cues follow p
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null"));
   expect(saved).toMatchObject({
     format: "ANGEL2-web-save",
-    version: 19,
-    contentVersion: "stage-05-portal-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
     kind: "battle",
     stageId: "stage-00",
     stageLabel: "瓦爾克麗宮",
@@ -2836,9 +2848,9 @@ test("S00-M: native system records restore battle state and combat cues follow p
 test("S00-N: defeat and victory use native feedback text, portrait and two-step input", async ({ page }) => {
   const enterPlayerPhase = async () => {
     await page.goto("/?test=1&skipStartup=1");
-    await page.getByTestId("skip-dialogue").click();
+    await skipStoryDialogue(page);
     await waitForPhase(page, "openingStory");
-    await page.getByTestId("skip-dialogue").click();
+    await skipStoryDialogue(page);
     await waitForPhase(page, "player");
   };
 
@@ -2858,7 +2870,7 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await page.getByTestId("unit-command-attack").click();
   await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await page.getByTestId("victory-continue").click();
   expect((await debugState(page)).phase).toBe("victoryFeedback");
   await expect(page.getByTestId("feedback-text")).toHaveText("哦！．．\n這次的戰役結束了，是否要記錄下來．");
@@ -2880,10 +2892,10 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("difficulty-menu")).toBeVisible();
   await page.keyboard.press("Enter");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible({ timeout: 10_000 });
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByTestId("game-screen")).toHaveAttribute("data-phase", "player");
 
   await page.keyboard.press("Escape");
@@ -2904,7 +2916,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   await expect(promotionDialogue).toHaveAttribute("data-source-record", "promotion");
   await expect(promotionDialogue).toHaveAttribute("data-source-wait", "1");
   await expect(page.getByTestId("promotion-layer")).toBeHidden();
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await expect(page.locator("#dialogue-text")).toHaveText(
     "我的經驗值已達到轉職的目標，\n請主將授我新的職業．",
   );
@@ -2916,9 +2928,9 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-ximi-promotion-request.png",
   });
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await expect(promotionDialogue).toHaveAttribute("data-source-wait", "2");
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await expect(page.locator("#dialogue-text")).toHaveText(
     "現在我在水神「愛西斯」的面前，\n授予妳新的職業．",
   );
@@ -2932,7 +2944,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-ximi-promotion-grant.png",
   });
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
   await expect(page.getByTestId("promotion-layer").locator("h2")).toContainText("希蜜・士兵轉職");
   await expect(page.getByTestId("promotion-layer").locator(".promotion-option")).toHaveCount(4);
@@ -2992,7 +3004,7 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them
   await expect(app).toHaveAttribute("data-music-seamless-loop", "true");
   expect(Number(await app.getAttribute("data-music-boundary-dbfs"))).toBeLessThan(-30);
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
   await expect(app).toHaveAttribute("data-music-track", "MUSIC/7");
   await expect(app).toHaveAttribute("data-music-playing", "true");
@@ -3013,7 +3025,7 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them
   expect(battleRequests.has("battle-stage0-player-loop-seamless.wav")).toBe(true);
   expect((await debugState(page)).phase).toBe("openingStory");
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   const loopPlayRequests = await app.getAttribute("data-music-play-request-count");
   await page.keyboard.press("m");

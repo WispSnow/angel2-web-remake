@@ -447,7 +447,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .minimap-unit.side-2 { background: #ef2024; }
 .minimap-preview { position: absolute; z-index: 3; width: 30px; height: 21px; border: 1px solid #fff; box-shadow: 0 0 0 1px #222, inset 0 0 0 1px #cfcfcf; pointer-events: none; }
 
-.system-menu button, .settings-menu button, .sound-settings-menu button, .music-settings-menu button, .action-menu button, .modal-panel button, .dialogue-controls button {
+.system-menu button, .settings-menu button, .sound-settings-menu button, .music-settings-menu button, .action-menu button, .modal-panel button {
   border: 1px solid #d4a62d;
   border-radius: 2px;
   color: #fff8d3;
@@ -1013,9 +1013,8 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   line-height: 20px;
   text-shadow: 1px 1px #000;
 }
-.continue-mark { position: absolute; right: 108px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
+.continue-mark { position: absolute; right: 8px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
 .dialogue-box:not(.is-active) .continue-mark { display: none; }
-.dialogue-layer.ai-technique-dialogue .dialogue-controls,
 .dialogue-layer.ai-technique-dialogue .continue-mark { display: none; }
 .dialogue-layer.ai-technique-dialogue .dialogue-speaker {
   position: static;
@@ -1032,30 +1031,34 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   text-shadow: 1px 1px #000;
 }
 .dialogue-layer.ai-technique-dialogue .dialogue-copy p { color: #fff6d7; }
-.dialogue-controls {
+.dialogue-skip-confirm {
+  --dialogue-skip-shade: rgb(4 2 5 / 72%);
   position: absolute;
-  z-index: 3;
-  right: 6px;
-  bottom: 5px;
-  display: flex;
-  gap: 4px;
+  z-index: 6;
+  inset: 0;
+  background: var(--dialogue-skip-shade);
   pointer-events: auto;
 }
-.dialogue-controls button {
-  min-width: 46px;
-  height: 22px;
-  padding: 1px 7px;
-  border-color: #e4b934;
-  color: #fff4c7;
-  background: linear-gradient(#75323b, #40151c);
-  box-shadow: inset 0 0 0 1px #9d4d45, 1px 1px #000a;
-  font: 700 11px/18px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
-  text-shadow: 1px 1px #000;
-}
-.dialogue-controls button:hover,
-.dialogue-controls button:focus-visible {
+.dialogue-skip-question {
+  position: absolute;
+  left: 120px;
+  top: 80px;
+  width: 400px;
+  height: 86px;
+  margin: 0;
+  padding: 27px 22px;
   color: #fff;
-  background: linear-gradient(#9a4948, #5a2025);
+  background: transparent var(--dialogue-text-window) 0 0 / 400px 86px no-repeat;
+  font: 700 18px/24px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+  text-align: center;
+  text-shadow: 1px 1px #000;
+  image-rendering: pixelated;
+}
+.action-menu.native-command-menu.dialogue-skip-menu {
+  z-index: 7;
+  left: 248px;
+  top: 154px;
+  height: 76px;
 }
 @keyframes bob { 50% { transform: translateY(3px); } }
 @keyframes dialogue-window-open {

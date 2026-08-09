@@ -329,6 +329,8 @@ export class GameController {
   recordMenuMode?: RecordMenuMode;
   recordMenuReturn?: "battle" | "system";
   recordMenuIndex = 0;
+  dialogueSkipConfirmOpen = false;
+  dialogueSkipConfirmIndex = 1;
   quitConfirmOpen = false;
   quitConfirmIndex = 1;
   groupCommandOpen = false;
@@ -557,6 +559,8 @@ export class GameController {
     this.difficulty = campaign.difficulty;
     this.campaignRoute = runtime.entry.campaignRoute;
     this.activeStoryId = undefined;
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
     this.stageEventState = createStageEventState(this.battle.stage);
     this.resetAction();
     this.cameraOrigin = clampCameraOrigin(this.battle.stage, this.battle.stage.viewport.initialOrigin);
@@ -648,6 +652,12 @@ export class GameController {
       && !this.skippingScriptedSequence;
   }
 
+  get canRequestDialogueSkip(): boolean {
+    return isStoryPhase(this.phase)
+      && this.activeStoryId !== undefined
+      && this.currentDialogue !== undefined;
+  }
+
   get focusedUnit(): BattleUnit | undefined {
     if (this.phase === "player") return this.selectedUnit ?? this.battle.unitAt(this.cursor);
     return this.battle.focus;
@@ -730,6 +740,7 @@ export class GameController {
       || this.soundSettingsOpen
       || this.musicSettingsOpen
       || this.recordMenuMode !== undefined
+      || this.dialogueSkipConfirmOpen
       || this.quitConfirmOpen
       || this.objectiveOpen
       || this.groupCommandOpen
@@ -846,6 +857,7 @@ export class GameController {
   }
 
   advanceDialogue(): void {
+    if (this.dialogueSkipConfirmOpen) return;
     if (this.groupCommandDialogueId) {
       const command = this.groupCommandDialogueId;
       const leaderId = this.groupCommandLeaderId;
@@ -879,12 +891,58 @@ export class GameController {
   }
 
   skipDialogue(): void {
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
     if (this.groupCommandDialogueActive) this.advanceDialogue();
     else if (isStoryPhase(this.phase)) this.completeDialogue();
   }
 
+  requestDialogueSkip(): void {
+    if (!this.canRequestDialogueSkip || this.dialogueSkipConfirmOpen) return;
+    this.dialogueSkipConfirmOpen = true;
+    this.dialogueSkipConfirmIndex = 1;
+    this.emit();
+  }
+
+  moveDialogueSkipSelection(delta: number): void {
+    if (!this.dialogueSkipConfirmOpen || delta === 0) return;
+    this.dialogueSkipConfirmIndex = this.dialogueSkipConfirmIndex === 0 ? 1 : 0;
+    this.emit();
+  }
+
+  selectDialogueSkipChoice(index: number): void {
+    if (!this.dialogueSkipConfirmOpen
+      || index < 0
+      || index > 1
+      || index === this.dialogueSkipConfirmIndex) return;
+    this.dialogueSkipConfirmIndex = index;
+    this.emit();
+  }
+
+  activateDialogueSkipSelection(): void {
+    if (!this.dialogueSkipConfirmOpen) return;
+    if (this.dialogueSkipConfirmIndex === 0) this.confirmDialogueSkip();
+    else this.cancelDialogueSkip();
+  }
+
+  confirmDialogueSkip(): void {
+    if (!this.dialogueSkipConfirmOpen) return;
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
+    this.skipDialogue();
+  }
+
+  cancelDialogueSkip(): void {
+    if (!this.dialogueSkipConfirmOpen) return;
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
+    this.emit();
+  }
+
   skipScriptedSequence(): void {
     if (!this.canSkipScriptedSequence || !this.activeStoryId) return;
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
     const storyId = this.activeStoryId;
     this.activeStoryId = undefined;
     this.dialogueIndex = 0;
@@ -909,6 +967,8 @@ export class GameController {
     const completed = this.phase;
     const storyId = this.activeStoryId;
     if (!storyId || !isStoryPhase(completed)) return;
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
     this.activeStoryId = undefined;
     this.dialogueIndex = 0;
     const events = this.consumeStageTrigger({ type: "story-completed", storyId });
@@ -3394,7 +3454,8 @@ export class GameController {
 
   systemAction(): void {
     if (this.promotionUnitIds.length > 0 || this.groupCommandDialogueActive) return;
-    if (this.recordMenuMode) this.closeRecordMenu();
+    if (this.dialogueSkipConfirmOpen) this.cancelDialogueSkip();
+    else if (this.recordMenuMode) this.closeRecordMenu();
     else if (this.quitConfirmOpen) this.cancelQuit();
     else if (this.soundSettingsOpen) this.closeSoundSettings();
     else if (this.musicSettingsOpen) this.closeMusicSettings();
@@ -3408,6 +3469,14 @@ export class GameController {
   secondaryAction(): boolean {
     if (this.prayerHoldSkip) {
       this.prayerHoldSkip();
+      return true;
+    }
+    if (this.dialogueSkipConfirmOpen) {
+      this.cancelDialogueSkip();
+      return true;
+    }
+    if (this.canRequestDialogueSkip) {
+      this.requestDialogueSkip();
       return true;
     }
     if (this.promotionUnitIds.length > 0) return true;
@@ -3555,6 +3624,8 @@ export class GameController {
       this.soundSettingsOpen = false;
       this.musicSettingsOpen = false;
       this.recordMenuMode = undefined;
+      this.dialogueSkipConfirmOpen = false;
+      this.dialogueSkipConfirmIndex = 1;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
       this.retreatConfirmOpen = false;
@@ -3586,6 +3657,8 @@ export class GameController {
     this.musicSettingsReturn = undefined;
     this.recordMenuMode = undefined;
     this.recordMenuIndex = 0;
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
     this.quitConfirmOpen = false;
     this.quitConfirmIndex = 1;
     this.groupCommandOpen = false;
@@ -3855,6 +3928,8 @@ export class GameController {
           destinationLabel: source.completion.destinationLabel,
         } : undefined;
         this.activeStoryId = undefined;
+        this.dialogueSkipConfirmOpen = false;
+        this.dialogueSkipConfirmIndex = 1;
         this.campaignRoute = save.stageId;
         this.stageProgress = 1000;
         this.phase = "nextStage";
@@ -3910,6 +3985,8 @@ export class GameController {
     this.soundSettingsReturn = undefined;
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
     this.quitConfirmOpen = false;
     this.groupCommandOpen = false;
     this.groupCommandDialogueId = undefined;
@@ -3974,6 +4051,12 @@ export class GameController {
   }
 
   moveCursor(delta: Position): void {
+    if (this.dialogueSkipConfirmOpen) {
+      if (delta.x !== 0 || delta.y !== 0) {
+        this.moveDialogueSkipSelection(delta.x || delta.y);
+      }
+      return;
+    }
     if (this.promotionUnitIds.length > 0) {
       if (this.promotionDialogueActive) return;
       if (delta.x !== 0 || delta.y !== 0) {
@@ -4084,6 +4167,7 @@ export class GameController {
 
   primaryAtCursor(): void {
     if (this.prayerHoldSkip) this.prayerHoldSkip();
+    else if (this.dialogueSkipConfirmOpen) this.activateDialogueSkipSelection();
     else if (this.groupCommandDialogueActive) this.advanceDialogue();
     else if (this.promotionDialogueActive) this.advanceDialogue();
     else if (this.promotionUnitIds.length > 0) this.confirmPromotion();
@@ -4112,6 +4196,8 @@ export class GameController {
     this.busy = false;
     this.resetAction();
     this.activeStoryId = undefined;
+    this.dialogueSkipConfirmOpen = false;
+    this.dialogueSkipConfirmIndex = 1;
     this.movementPresentation = undefined;
     this.combatPresentation = undefined;
     this.specialActionPresentation = undefined;
@@ -4631,6 +4717,8 @@ export class GameController {
       recordMenuMode: this.recordMenuMode,
       recordMenuReturn: this.recordMenuReturn,
       recordMenuIndex: this.recordMenuIndex,
+      dialogueSkipConfirmOpen: this.dialogueSkipConfirmOpen,
+      dialogueSkipConfirmIndex: this.dialogueSkipConfirmIndex,
       quitConfirmOpen: this.quitConfirmOpen,
       quitConfirmIndex: this.quitConfirmIndex,
       savePromptIndex: this.savePromptIndex,
@@ -4771,6 +4859,8 @@ export class GameController {
       this.musicSettingsOpen = false;
       this.musicSettingsReturn = undefined;
       this.recordMenuMode = undefined;
+      this.dialogueSkipConfirmOpen = false;
+      this.dialogueSkipConfirmIndex = 1;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
       this.groupCommandDialogueId = undefined;
@@ -4791,6 +4881,8 @@ export class GameController {
       this.musicSettingsOpen = false;
       this.musicSettingsReturn = undefined;
       this.recordMenuMode = undefined;
+      this.dialogueSkipConfirmOpen = false;
+      this.dialogueSkipConfirmIndex = 1;
       this.quitConfirmOpen = false;
       this.groupCommandOpen = false;
       this.groupCommandDialogueId = undefined;

@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -89,7 +91,7 @@ async function endManualPhase(page: Page): Promise<void> {
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
 }
 
 test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment hazard map", async ({ page }) => {
@@ -106,7 +108,7 @@ test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment 
     path: `${ARTIFACT_DIR}/stage4-prebattle-story.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 2／8");
   await expect(page.getByTestId("deployment-guidance"))
@@ -240,7 +242,7 @@ test("S04-K: reduced motion keeps one readable damage impact outside the shield"
   }
 });
 
-test("S04-G: the active deployment round-trips through save format v19", async ({ page }) => {
+test("S04-G: the active deployment round-trips through the current save format", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const before = await state(page);
@@ -254,8 +256,8 @@ test("S04-G: the active deployment round-trips through save format v19", async (
     battle: { units: Stage4State["units"] };
   });
   expect(saved).toMatchObject({
-    version: 19,
-    contentVersion: "stage-05-portal-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
     stageId: "stage-04",
   });
   expect(saved.battle.units).toHaveLength(before.units.length);
@@ -292,7 +294,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
     path: `${ARTIFACT_DIR}/stage4-victory-story.png`,
   });
 
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("謝謝妳！葛蒂拉斯");
   const regularNiaPortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(regularNiaPortrait).toHaveAttribute("data-portrait-record", "46");
@@ -316,7 +318,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
     path: `${ARTIFACT_DIR}/stage4-victory-story-nia-upper.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "victoryFeedback");
   const feedbackPortrait = page.getByTestId("feedback-portrait");
   await expect(feedbackPortrait).toHaveAttribute("data-portrait-record", "46");

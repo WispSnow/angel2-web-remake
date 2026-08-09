@@ -473,7 +473,7 @@ test("stage-one dialogue uses generated animation layers for its portrait record
   await page.goto("/?debugScenario=stage-01-prebattle&difficulty=0&test=1");
   for (let input = 0; input < 8; input += 1) {
     if (await page.locator('[data-portrait-record="42"]:visible').count() > 0) break;
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
     await page.waitForTimeout(30);
   }
   const portrait = page.locator('[data-portrait-record="42"]:visible');

@@ -204,13 +204,18 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                   <p id="dialogue-text-lower"></p><span class="continue-mark">▼</span>
                 </div>
               </div>
-              <div class="dialogue-controls" id="dialogue-controls" role="group" aria-label="劇情對話控制">
-                <button type="button" data-action="advance-dialogue" data-testid="advance-dialogue">繼續</button>
-                <button type="button" data-action="skip-dialogue" data-testid="skip-dialogue"
-                  aria-label="跳過本輪劇情對話">跳過</button>
-                <button type="button" data-action="skip-scripted-sequence"
-                  data-testid="skip-scripted-sequence" aria-label="跳過整段過場" hidden>跳過過場</button>
-              </div>
+              <section class="dialogue-skip-confirm" id="dialogue-skip-confirm"
+                data-testid="dialogue-skip-confirm" role="dialog" aria-modal="true"
+                aria-labelledby="dialogue-skip-question" hidden>
+                <p class="dialogue-skip-question" id="dialogue-skip-question">是否跳過劇情對話？</p>
+                <div class="action-menu native-command-menu dialogue-skip-menu"
+                  role="menu" aria-label="跳過劇情對話選擇">
+                  <button type="button" role="menuitem" data-action="dialogue-skip-confirm"
+                    data-dialogue-skip-index="0" data-testid="dialogue-skip-yes"><span class="native-command-label">是</span></button>
+                  <button type="button" role="menuitem" data-action="dialogue-skip-cancel"
+                    data-dialogue-skip-index="1" data-testid="dialogue-skip-no"><span class="native-command-label">否</span></button>
+                </div>
+              </section>
             </section>
             <section class="objective-panel modal-panel" id="objective-panel" data-testid="objective-panel" hidden>
               <span class="panel-kicker">${stage.name}</span>
@@ -254,12 +259,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       text: required(root, "#dialogue-text-lower"),
     },
   };
-  const dialogueControls = required(root, "#dialogue-controls");
-  const skipDialogueButton = required<HTMLButtonElement>(root, "[data-action=skip-dialogue]");
-  const skipScriptedSequenceButton = required<HTMLButtonElement>(
-    root,
-    "[data-action=skip-scripted-sequence]",
-  );
+  const dialogueSkipConfirm = required(root, "#dialogue-skip-confirm");
   const storyBackground = required(root, "#story-background");
   const defaultStoryBackgroundSource = stageAssets?.storyBackground ?? ASSETS.storyBackground;
   storyBackground.style.backgroundImage = `url("${defaultStoryBackgroundSource}")`;
@@ -467,7 +467,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const button = (event.target as Element).closest<HTMLElement>("[data-action]");
     if (!button) {
       if ((event.target as Element).closest("#dialogue-layer")) {
-        if (!finishDialogueTyping()) controller.advanceDialogue();
+        if (!controller.dialogueSkipConfirmOpen && !finishDialogueTyping()) {
+          controller.advanceDialogue();
+        }
       } else if ((event.target as Element).closest("#result-layer")) {
         if (!finishFeedbackTyping()) controller.primaryAtCursor();
       }
@@ -475,11 +477,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     if (button.matches("[data-side-panel-hotspot]")) hideSidePanelHint();
     const action = button.dataset.action;
-    if (action === "advance-dialogue") {
-      if (!finishDialogueTyping()) controller.advanceDialogue();
-    }
-    else if (action === "skip-dialogue") controller.skipDialogue();
-    else if (action === "skip-scripted-sequence") controller.skipScriptedSequence();
+    if (action === "dialogue-skip-confirm") controller.confirmDialogueSkip();
+    else if (action === "dialogue-skip-cancel") controller.cancelDialogueSkip();
     else if (action === "open-system-menu") controller.openSystemMenu();
     else if (action === "close-system-menu") controller.closeSystemMenu();
     else if (action === "system-settings") controller.openSettings();
@@ -573,6 +572,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (recordSlot) controller.selectRecordMenuSlot(Number(recordSlot.dataset.recordIndex));
     const quitChoice = (event.target as Element).closest<HTMLElement>("[data-quit-index]");
     if (quitChoice) controller.selectQuitChoice(Number(quitChoice.dataset.quitIndex));
+    const dialogueSkipChoice = (event.target as Element).closest<HTMLElement>("[data-dialogue-skip-index]");
+    if (dialogueSkipChoice) {
+      controller.selectDialogueSkipChoice(Number(dialogueSkipChoice.dataset.dialogueSkipIndex));
+    }
     const postSaveSlot = (event.target as Element).closest<HTMLElement>("[data-post-save-index]");
     if (postSaveSlot) controller.selectPostSaveSlot(Number(postSaveSlot.dataset.postSaveIndex));
     const promotionTarget = (event.target as Element).closest<HTMLElement>("[data-promotion-index]");
@@ -646,7 +649,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (delta) controller.moveCursor(delta);
     else if (event.repeat) return;
     else if (key === "Control" || key === "Insert" || key === " ") {
-      if (!finishDialogueTyping() && !finishFeedbackTyping()) controller.primaryAtCursor();
+      if (controller.dialogueSkipConfirmOpen
+        || (!finishDialogueTyping() && !finishFeedbackTyping())) controller.primaryAtCursor();
     }
     else if (key === "Alt" || key === "Delete" || key === "Enter") controller.secondaryAction();
     else if (key === "Escape") controller.systemAction();
@@ -850,6 +854,17 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         button.setAttribute("aria-current", String(selected));
       }
     }
+    dialogueSkipConfirm.hidden = !controller.dialogueSkipConfirmOpen;
+    if (!dialogueSkipConfirm.hidden) {
+      for (const button of dialogueSkipConfirm.querySelectorAll<HTMLButtonElement>(
+        "[data-dialogue-skip-index]",
+      )) {
+        const selected = Number(button.dataset.dialogueSkipIndex)
+          === controller.dialogueSkipConfirmIndex;
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-current", String(selected));
+      }
+    }
     const speed = root.querySelector<HTMLElement>("[data-testid=speed-button]");
     if (speed) speed.textContent = controller.presentationFast ? "動畫 ×4" : "動畫 ×1";
     const presentation = root.querySelector<HTMLElement>("[data-testid=presentation-button]");
@@ -962,20 +977,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       dialogueLayer.classList.toggle("promotion-dialogue", controller.promotionDialogueActive);
       dialogueLayer.classList.toggle("group-command-dialogue", controller.groupCommandDialogueActive);
       dialogueLayer.classList.toggle("ai-technique-dialogue", controller.aiTechniqueDialogueActive);
-      skipDialogueButton.hidden = controller.promotionDialogueActive
-        || controller.groupCommandDialogueActive
-        || controller.aiTechniqueDialogueActive;
-      skipScriptedSequenceButton.hidden = !controller.canSkipScriptedSequence;
-      dialogueControls.setAttribute(
-        "aria-label",
-        controller.aiTechniqueDialogueActive
-          ? "自動施術提示"
-          : controller.groupCommandDialogueActive
-          ? "集體命令對話控制"
-          : controller.promotionDialogueActive
-            ? "轉職對話控制"
-            : "劇情對話控制",
-      );
       for (const slot of ["upper", "lower"] as const) {
         const elements = dialogueWindows[slot];
         const state = page[slot];
@@ -1024,10 +1025,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           elements.portraitName.textContent = "";
         }
       }
-      const controlsParent = page.activeSlot
-        ? dialogueWindows[page.activeSlot].copy
-        : dialogueLayer;
-      if (dialogueControls.parentElement !== controlsParent) controlsParent.append(dialogueControls);
       if (page.activeSlot) {
         const activeState = page[page.activeSlot];
         const target = dialogueWindows[page.activeSlot].text;
@@ -1051,8 +1048,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       dialogueLayer.classList.remove("ai-technique-dialogue");
       delete dialogueLayer.dataset.actionId;
       delete dialogueLayer.dataset.effectCenter;
-      skipDialogueButton.hidden = false;
-      skipScriptedSequenceButton.hidden = true;
       stopDialogueTimer();
       stopSpeaking(activeDialoguePortrait);
       activeDialogueKey = "";

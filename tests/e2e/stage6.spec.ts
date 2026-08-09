@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -91,10 +92,10 @@ test("S06-A/B/C: portal completion enters nine-unit deployment and switches SAY/
     path: `${ARTIFACT_DIR}/stage6-prebattle-background-31.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(dialogue).toHaveAttribute("data-source-record", "15");
   await expect(dialogue).toContainText("遊騎兵");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   expect((await state(page)).consumedEventIds).toEqual([
     "stage-06-enter-deployment",
@@ -136,7 +137,7 @@ test("S06-F/G/H/I/J: live victory builds the ranger tableau, saves v20, and rout
   await waitForPhase(page, "scriptedStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "16");
   const before = await state(page);
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "115");
 
@@ -164,7 +165,7 @@ test("S06-F/G/H/I/J: live victory builds the ranger tableau, saves v20, and rout
     path: `${ARTIFACT_DIR}/stage6-ranger-tableau.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "victoryFeedback");
   await page.getByTestId("victory-continue").click();
   if ((await state(page)).phase === "victoryFeedback") {

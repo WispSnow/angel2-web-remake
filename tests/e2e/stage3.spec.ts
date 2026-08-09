@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { stage3TerrainSlotAt } from "../../src/game/content/stage3";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -79,7 +80,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
     path: `${ARTIFACT_DIR}/stage3-opening-story.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toContainText("打敗敵人首領「莎」");
@@ -184,7 +185,7 @@ test("S03-D/E/H/I: Sha defeat plays SAY/13 once and enters stage 4", async ({ pa
     path: `${ARTIFACT_DIR}/stage3-victory-story.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("victory-continue").click();
   await page.locator("[data-action=save-no]").click();
@@ -246,7 +247,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
   });
   await page.keyboard.press("F3");
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("希蜜");
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await page.waitForFunction(() => {
     const playerUnitIds = new Set(["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"]);
     const traceHost = window as typeof window & {
@@ -294,7 +295,7 @@ test("S03-C/L: hard-mode automatic allies finish their first phase inside the de
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.keyboard.press("Tab");
   await page.getByTestId("group-command-allRest").click();
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await waitForPhase(page, "enemy");
 
   const current = await state(page);

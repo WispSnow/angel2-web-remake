@@ -51,13 +51,13 @@ async function finishPromotionDialogue(page: Page): Promise<void> {
   const layer = page.getByTestId("dialogue-layer");
   while (await layer.isVisible() && await layer.getAttribute("data-source-record") === "promotion") {
     const before = await layer.getAttribute("data-source-wait");
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
     if (
       await layer.isVisible()
       && await layer.getAttribute("data-source-record") === "promotion"
       && await layer.getAttribute("data-source-wait") === before
     ) {
-      await page.getByTestId("advance-dialogue").click();
+      await page.getByTestId("dialogue-layer").click();
     }
     await expect.poll(async () =>
       !await layer.isVisible() || await layer.getAttribute("data-source-wait") !== before,

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -123,7 +125,7 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-prebattle.png`,
   });
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
 
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 5／8");
@@ -160,7 +162,7 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
     x: 21,
     y: 33,
   }));
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 }
 
@@ -169,9 +171,29 @@ async function completeBattleCommandDialogue(page: Page): Promise<void> {
     const dialogue = page.getByTestId("dialogue-layer");
     if (!await dialogue.isVisible()
       || await dialogue.getAttribute("data-source-record") !== "battle-command") return;
-    await page.keyboard.press("Enter");
+    await dialogue.click();
     await page.waitForTimeout(20);
   }
+}
+
+async function finishPendingPromotions(page: Page): Promise<void> {
+  for (let input = 0; input < 800; input += 1) {
+    const current = await state(page);
+    if (current.phase === "player" && current.round === 2) return;
+    const dialogue = page.getByTestId("dialogue-layer");
+    if (await dialogue.isVisible()
+      && await dialogue.getAttribute("data-source-record") === "promotion") {
+      await dialogue.click();
+      continue;
+    }
+    const promotion = page.getByTestId("promotion-layer");
+    if (await promotion.isVisible()) {
+      await promotion.locator("[data-action=promotion-target]").first().click();
+      continue;
+    }
+    await page.waitForTimeout(50);
+  }
+  throw new Error("stage-1 automatic phase did not finish after resolving promotions");
 }
 
 test("stage-1 low-life enemy rest plays the same silent MAGIC/0 finish", async ({ page }) => {
@@ -241,7 +263,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
 
   for (let step = 0; step < 20; step += 1) await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByText("修女／騎士團修女", { exact: true })).toBeVisible();
+  await expect(page.getByText("修女／修女", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "49");
   await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0049\/base\.png$/u);
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
@@ -266,8 +288,8 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.getByTestId("record-slot-2").click();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.2") ?? "null"));
   expect(saved).toMatchObject({
-    version: 19,
-    contentVersion: "stage-05-portal-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
     kind: "battle",
     stageId: "stage-01",
     stageLabel: "騎士城堡前",
@@ -315,7 +337,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.getByTestId("deployment-roster-4").click();
   await page.getByTestId("deployment-finish").click();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "5");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
   await page.evaluate(() => window.__ANGEL2__?.forceEnemySisterSetup());
@@ -553,12 +575,12 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     id: "1:48",
   }));
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "6");
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("就在妮雅等人準備進入騎士團堡時");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-victory-story.png`,
   });
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("victory-continue").click();
   await page.locator("[data-action=save-no]").click();
@@ -730,10 +752,7 @@ test("S01-I: move-plus-technique and Fang pursuit reach do not wake the second a
     "battle-command",
   );
   await completeBattleCommandDialogue(page);
-  await page.waitForFunction(() => {
-    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
-    return current?.phase === "player" && current.round === 2;
-  });
+  await finishPendingPromotions(page);
 
   const nextRound = await state(page);
   expect(nextRound.round).toBe(2);

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -36,11 +37,11 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toBeVisible();
   await expect(dialogue).toHaveAttribute("data-source-record", "0");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(dialogue).toBeHidden();
   await expect(dialogue).toBeVisible({ timeout: 10_000 });
   await expect(dialogue).toHaveAttribute("data-source-record", "1");
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
 
   // Use the shipping settings surface to speed up presentation. This changes
   // only timing; the simulation and enemy route are the normal production path.
@@ -83,7 +84,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
     await expect(dialogue).toBeVisible();
     await expect(dialogue).toHaveAttribute("data-source-record", "battle-command");
     await expect(dialogue).toHaveAttribute("data-source-address", "DS:86E4");
-    await page.getByTestId("advance-dialogue").click();
+    await page.getByTestId("dialogue-layer").click();
     if (round === 1) {
       await expect(page.getByTestId("dialogue-window-upper")).toContainText(
         "大家聽著！\n所有還未行動的人在原地休息，補充體力．",
@@ -94,7 +95,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
     }
     if (await dialogue.isVisible() && await dialogue.getAttribute("data-source-record") === "battle-command") {
       try {
-        await page.getByTestId("advance-dialogue").click({ timeout: 1_000 });
+        await page.getByTestId("dialogue-layer").click({ timeout: 1_000 });
       } catch (error) {
         const commandStillVisible = await dialogue.isVisible()
           && await dialogue.getAttribute("data-source-record") === "battle-command";
@@ -112,23 +113,23 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
     }
     expect(record).toBe("2");
     if (!capturedRoundTwo) {
-      await page.getByTestId("advance-dialogue").click();
+      await page.getByTestId("dialogue-layer").click();
       await captureVisualAudit(page.getByTestId("game-screen"), {
         path: `${ARTIFACT_DIR}/stage0-real-round2-story.png`,
       });
       capturedRoundTwo = true;
     }
-    await page.getByTestId("skip-dialogue").click();
+    await skipStoryDialogue(page);
   }
 
   expect(reachedVictoryStory).toBe(true);
   await expect(dialogue).toHaveAttribute("data-source-record", "3");
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage0-real-victory-story.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByTestId("victory-continue")).toBeVisible();
   await page.getByTestId("victory-continue").click();
   await expect(page.getByTestId("feedback-text")).toHaveText(

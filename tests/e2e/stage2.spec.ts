@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -64,7 +66,7 @@ test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as aut
     path: `${ARTIFACT_DIR}/stage2-opening-story.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await clickUnit(page, "1:44");
   expect(await state(page)).toMatchObject({ actionMode: "allyPreview", selectedId: "1:44" });
@@ -106,7 +108,7 @@ test("S02-C/D: all-rest spends only manual units, then every automatic ally acts
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
-  await page.getByTestId("advance-dialogue").click();
+  await page.getByTestId("dialogue-layer").click();
   await waitForPhase(page, "enemy");
 
   const trace = await page.evaluate(() => {
@@ -146,7 +148,7 @@ test("S02-E/H: defeating Lan plays SAY/175 once and enters stage 3", async ({ pa
     path: `${ARTIFACT_DIR}/stage2-victory-story.png`,
   });
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await page.getByTestId("victory-continue").click();
   await page.getByTestId("victory-continue").click();
   await page.locator("[data-action=save-no]").click();
@@ -211,8 +213,8 @@ test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign"
     };
   });
   expect(baseline).toMatchObject({
-    version: 19,
-    contentVersion: "stage-05-portal-1",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
   });
 
   const loadMutatedBattle = async () => {
@@ -252,7 +254,7 @@ test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign"
   await page.locator("[data-action=retreat-confirm]").click();
   await expectEntryCampaign();
 
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await loadMutatedBattle();
   await page.evaluate(() => window.__ANGEL2__?.forceDefeat());

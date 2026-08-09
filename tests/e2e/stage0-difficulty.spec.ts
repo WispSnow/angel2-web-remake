@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 async function enterStage0FromOrdinaryStartup(page: Page, difficulty: 0 | 3): Promise<void> {
@@ -10,10 +11,10 @@ async function enterStage0FromOrdinaryStartup(page: Page, difficulty: 0 | 3): Pr
   await page.getByTestId(`difficulty-${difficulty}`).click();
 
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
-  await page.getByTestId("skip-dialogue").click();
+  await skipStoryDialogue(page);
   await expect(page.getByText("士兵／妮雅", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.__ANGEL2__)).toBeUndefined();
 }
@@ -53,11 +54,11 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
     const namedAlly = ["180／180", "45／45", "27／27", "3", "299／300"] as const;
     const genericAlly = ["160／160", "39／39", "21／21", "1", "0／100"] as const;
     const allyCycle = [
-      { identity: "士兵", values: genericAlly },
-      { identity: "士兵", values: genericAlly },
+      { identity: "士兵／士兵", values: genericAlly },
+      { identity: "士兵／士兵", values: genericAlly },
       { identity: "士兵／希蜜", values: namedAlly },
-      { identity: "士兵", values: genericAlly },
-      { identity: "士兵", values: genericAlly },
+      { identity: "士兵／士兵", values: genericAlly },
+      { identity: "士兵／士兵", values: genericAlly },
       { identity: "士兵／妮雅", values: namedAlly },
     ] as const;
     for (const [index, ally] of allyCycle.entries()) {
@@ -72,7 +73,7 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
 
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("ArrowLeft");
-    await expectHudValues(page, "士兵／騎士團士兵", scenario.soldier);
+    await expectHudValues(page, "士兵／士兵", scenario.soldier);
 
     for (let step = 0; step < 4; step += 1) await page.keyboard.press("ArrowLeft");
     for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
@@ -85,7 +86,7 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
       await page.locator("[data-action=retreat-confirm]").click();
       await page.locator("[data-action=retreat-confirm]").click();
       await expect(page.getByTestId("dialogue-layer")).toBeVisible();
-      await page.getByTestId("skip-dialogue").click();
+      await skipStoryDialogue(page);
       await expect(page.getByText("士兵／妮雅", { exact: true })).toBeVisible();
       for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowLeft");
       for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
