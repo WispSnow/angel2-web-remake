@@ -987,14 +987,14 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   top: calc(var(--dialogue-portrait-top) + 111px);
 }
 .dialogue-copy {
+  --dialogue-text-inset-x: 12px;
+  --dialogue-text-inset-y: 12px;
   position: absolute;
   left: var(--dialogue-window-left);
   top: var(--dialogue-window-top);
   width: 400px;
   height: 86px;
-  /* A native 23-glyph row reaches the frame edge with the browser font and
-     its shadow. Keep the same text width while biasing its safe area left. */
-  padding: 12px 16px 12px 8px;
+  padding: var(--dialogue-text-inset-y) 0 0 var(--dialogue-text-inset-x);
   border: 0;
   background: transparent var(--dialogue-text-window) 0 0 / 400px 86px no-repeat;
   box-shadow: none;
@@ -1010,11 +1010,18 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 .dialogue-copy p {
   margin: 0;
-  white-space: pre-wrap;
+  white-space: pre;
+  font-family: "Songti TC", "PMingLiU", "MingLiU", serif;
   font-size: 16px;
   line-height: 20px;
   text-shadow: 1px 1px #000;
 }
+.dialogue-glyph {
+  display: inline-block;
+  width: 8px;
+  text-align: center;
+}
+.dialogue-glyph.big5 { width: 16px; }
 .continue-mark { position: absolute; right: 8px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
 .dialogue-box:not(.is-active) .continue-mark { display: none; }
 .dialogue-layer.ai-technique-dialogue .continue-mark { display: none; }
@@ -1185,9 +1192,11 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .native-feedback-copy {
   --dialogue-window-left: 153px;
   --dialogue-window-top: 10px;
+  --dialogue-text-inset-x: 27px;
+  --dialogue-text-inset-y: 20px;
   color: #fff;
 }
-.native-feedback-copy span { position: absolute; right: 5px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
+.native-feedback-copy > .continue-mark { right: 5px; }
 .feedback-primary { position: absolute; inset: 0; width: 640px; height: 350px; padding: 0; border: 0; opacity: 0; pointer-events: auto; }
 .action-menu.native-command-menu.native-confirm-menu {
   z-index: 2;

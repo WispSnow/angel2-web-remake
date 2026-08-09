@@ -131,11 +131,19 @@ const promotionDialogue = promotionTable.runtimeEvidence?.promotionDialogue;
 const niaQuestion = promotionDialogue?.niaSequence?.[0]?.lines;
 const teammateRequest = promotionDialogue?.teammateSequence?.[0]?.lines;
 const niaGrant = promotionDialogue?.teammateSequence?.[1]?.lines;
+const upperTextInset = promotionDialogue?.textInsets?.upper?.inset;
+const lowerTextInset = promotionDialogue?.textInsets?.lower?.inset;
 if (
   promotionDialogue?.niaCharacterRecord !== 0x2e
   || !Array.isArray(niaQuestion)
   || !Array.isArray(teammateRequest)
   || !Array.isArray(niaGrant)
+  || !Array.isArray(upperTextInset)
+  || !Array.isArray(lowerTextInset)
+  || upperTextInset.length !== 2
+  || lowerTextInset.length !== 2
+  || !upperTextInset.every(Number.isInteger)
+  || !lowerTextInset.every(Number.isInteger)
 ) {
   throw new Error("promotion dialogue generation requires the verified 0000:0487 evidence");
 }
@@ -147,6 +155,10 @@ const promotionDialogueSource =
     niaQuestion: niaQuestion.join("\n"),
     niaGrant: niaGrant.join("\n"),
     teammateRequest: teammateRequest.join("\n"),
+  }, null, 2)} as const;\n\n` +
+  `export const PROMOTION_DIALOGUE_TEXT_INSETS = ${JSON.stringify({
+    upper: { x: upperTextInset[0], y: upperTextInset[1] },
+    lower: { x: lowerTextInset[0], y: lowerTextInset[1] },
   }, null, 2)} as const;\n`;
 await writeFile(promotionDialogueOutputPath, promotionDialogueSource, "utf8");
 

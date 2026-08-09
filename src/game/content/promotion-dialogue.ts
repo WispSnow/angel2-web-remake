@@ -2,19 +2,22 @@ import type { BattleUnit, DialoguePage, DialogueWindowState } from "../types";
 import {
   NIA_CHARACTER_RECORD,
   PROMOTION_DIALOGUE_TEXT,
+  PROMOTION_DIALOGUE_TEXT_INSETS,
 } from "./promotion-dialogue.generated";
 import { unitDisplayName } from "./classes";
 
 export {
   NIA_CHARACTER_RECORD,
   PROMOTION_DIALOGUE_TEXT,
+  PROMOTION_DIALOGUE_TEXT_INSETS,
 };
 
 const state = (
   text: string,
   portrait: BattleUnit["portrait"],
   speaker: string,
-): DialogueWindowState => ({ text, portrait, speaker });
+  textInset: DialogueWindowState["textInset"],
+): DialogueWindowState => ({ text, portrait, speaker, textInset });
 
 const page = (
   wait: number,
@@ -49,6 +52,7 @@ export function promotionDialogueFor(
       PROMOTION_DIALOGUE_TEXT.niaQuestion,
       effectiveGrantor.portrait,
       effectiveGrantor.name,
+      PROMOTION_DIALOGUE_TEXT_INSETS.upper,
     );
     return [page(1, "upper", question)];
   }
@@ -57,11 +61,13 @@ export function promotionDialogueFor(
     PROMOTION_DIALOGUE_TEXT.teammateRequest,
     unit.portrait,
     unitDisplayName(unit),
+    PROMOTION_DIALOGUE_TEXT_INSETS.lower,
   );
   const grant = state(
     PROMOTION_DIALOGUE_TEXT.niaGrant,
     effectiveGrantor.portrait,
     effectiveGrantor.name,
+    PROMOTION_DIALOGUE_TEXT_INSETS.upper,
   );
   return [
     page(1, "lower", undefined, request),

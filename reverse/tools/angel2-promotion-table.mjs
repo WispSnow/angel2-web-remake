@@ -99,6 +99,18 @@ function extractPromotionDialogue(buffer) {
     niaCharacterRecord: 0x2e,
     branchPredicate: "DS:3192h == 002Eh",
     renderer: "0000:08DD",
+    textInsets: {
+      upper: {
+        cursor: [180, 30],
+        windowAnchor: [153, 10],
+        inset: [27, 20],
+      },
+      lower: {
+        cursor: [140, 270],
+        windowAnchor: [97, 250],
+        inset: [43, 20],
+      },
+    },
     inputWait: "none; each renderer call returns after its timed glyph loop",
     niaSequence: [byRole["nia-self-question"]],
     teammateSequence: [

@@ -14,6 +14,7 @@ import {
 } from "../../src/game/content/classes";
 import {
   PROMOTION_DIALOGUE_TEXT,
+  PROMOTION_DIALOGUE_TEXT_INSETS,
   promotionDialogueFor,
 } from "../../src/game/content/promotion-dialogue";
 import { allyMapUnitAsset } from "../../src/game/content/map-unit-assets";
@@ -155,6 +156,7 @@ describe("evidence-backed class catalog and promotion", () => {
           text: PROMOTION_DIALOGUE_TEXT.niaQuestion,
           portrait: 46,
           speaker: "妮雅",
+          textInset: PROMOTION_DIALOGUE_TEXT_INSETS.upper,
         },
         source: { record: "promotion", wait: 1, address: "0000:0487" },
       }),
@@ -168,6 +170,7 @@ describe("evidence-backed class catalog and promotion", () => {
         text: PROMOTION_DIALOGUE_TEXT.teammateRequest,
         portrait: 45,
         speaker: "希蜜",
+        textInset: PROMOTION_DIALOGUE_TEXT_INSETS.lower,
       },
     });
     expect(teammatePages[1]).toMatchObject({
@@ -176,6 +179,7 @@ describe("evidence-backed class catalog and promotion", () => {
         text: PROMOTION_DIALOGUE_TEXT.niaGrant,
         portrait: 46,
         speaker: "妮雅",
+        textInset: PROMOTION_DIALOGUE_TEXT_INSETS.upper,
       },
       lower: teammatePages[0]?.lower,
     });
@@ -218,6 +222,7 @@ describe("evidence-backed class catalog and promotion", () => {
           text: PROMOTION_DIALOGUE_TEXT.niaQuestion,
           portrait: 45,
           speaker: "希蜜",
+          textInset: PROMOTION_DIALOGUE_TEXT_INSETS.upper,
         },
       }),
     ]);
@@ -228,6 +233,7 @@ describe("evidence-backed class catalog and promotion", () => {
       text: PROMOTION_DIALOGUE_TEXT.niaGrant,
       portrait: 45,
       speaker: "希蜜",
+      textInset: PROMOTION_DIALOGUE_TEXT_INSETS.upper,
     });
   });
 

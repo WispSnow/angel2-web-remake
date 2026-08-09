@@ -75,6 +75,16 @@ async function boundsInLogicalScreen(page: Page, element: Locator) {
   };
 }
 
+async function insetWithinParent(element: Locator) {
+  return element.evaluate((node) => {
+    const parent = node.parentElement;
+    if (!parent) throw new Error("missing text-window parent");
+    const bounds = node.getBoundingClientRect();
+    const parentBounds = parent.getBoundingClientRect();
+    return { x: bounds.left - parentBounds.left, y: bounds.top - parentBounds.top };
+  });
+}
+
 async function clickUnit(page: Page, id: string): Promise<void> {
   const current = await state(page);
   const unit = current.units.find((candidate) => candidate.id === id);
@@ -329,8 +339,11 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
     page.getByTestId("native-feedback").locator(".native-feedback-copy"),
   ))
     .toEqual(regularUpperCopyBounds);
-  await expect(page.getByTestId("feedback-text"))
+  const feedbackText = page.getByTestId("feedback-text");
+  await expect(feedbackText)
     .toHaveText("哦！．．\n這次的戰役結束了，是否要記錄下來．");
+  await expect(feedbackText.locator(".dialogue-glyph")).toHaveCount(21);
+  expect(await insetWithinParent(feedbackText)).toEqual({ x: 27, y: 20 });
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-victory-save-offer-portrait.png`,
   });

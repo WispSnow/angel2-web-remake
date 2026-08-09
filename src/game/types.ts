@@ -122,6 +122,8 @@ export interface DialogueWindowState {
   portrait?: PortraitRecord;
   speaker?: string;
   text: string;
+  /** Native text cursor inset from the A/18 text-window origin. */
+  textInset?: Readonly<{ x: number; y: number }>;
 }
 
 export interface DialoguePage {

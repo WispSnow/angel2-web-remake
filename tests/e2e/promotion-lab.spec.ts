@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -67,6 +67,16 @@ async function finishPromotionDialogue(page: Page): Promise<void> {
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
 }
 
+async function dialogueTextInset(text: Locator) {
+  return text.evaluate((node) => {
+    const copy = node.parentElement;
+    if (!copy) throw new Error("missing dialogue-copy parent");
+    const bounds = node.getBoundingClientRect();
+    const copyBounds = copy.getBoundingClientRect();
+    return { x: bounds.left - copyBounds.left, y: bounds.top - copyBounds.top };
+  });
+}
+
 test("promotion lab exposes all twelve threshold pairs and the formal choice UI", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -113,6 +123,10 @@ test("promotion lab exposes all twelve threshold pairs and the formal choice UI"
   await expect(page.getByTestId("dialogue-layer")).toContainText("我的經驗值已達到轉職的目標");
   await expect(page.getByTestId("dialogue-portrait-name")).toHaveText("妮雅");
   await expect(page.locator("#dialogue-speaker-upper")).toHaveText("妮雅");
+  expect(await dialogueTextInset(page.locator("#dialogue-text"))).toEqual({ x: 27, y: 20 });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/promotion-lab-nia-dialogue.png`,
+  });
   await finishPromotionDialogue(page);
 
   const promotionLayer = page.getByTestId("promotion-layer");
@@ -164,6 +178,7 @@ test("generic land knight promotes with its beast figure and canonical professio
   );
   await expect(page.getByTestId("dialogue-portrait-name")).toHaveText("陸戰騎士");
   await expect(page.locator("#dialogue-speaker-lower")).toHaveText("陸戰騎士");
+  expect(await dialogueTextInset(page.locator("#dialogue-text"))).toEqual({ x: 43, y: 20 });
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/promotion-lab-land-knight-dialogue.png`,
   });

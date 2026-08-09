@@ -69,29 +69,29 @@ test("S07-A/B/C: accepted stage-6 completion plays SAY/17 and enters two-plus-fi
       );
       const firstLineLayout = await upperText.evaluate((text) => {
         const copy = text.parentElement;
-        const textNode = text.firstChild;
-        const lineBreak = text.textContent?.indexOf("\n") ?? -1;
-        if (!copy || !textNode || lineBreak < 0) throw new Error("missing upper-dialogue first line");
-        const range = document.createRange();
-        range.setStart(textNode, 0);
-        range.setEnd(textNode, lineBreak);
-        const lineBounds = range.getBoundingClientRect();
+        const glyphs = Array.from(text.querySelectorAll<HTMLElement>(".dialogue-glyph"));
+        const firstLine = glyphs.slice(0, 23);
+        if (!copy || firstLine.length !== 23) throw new Error("missing upper-dialogue first line");
         const copyBounds = copy.getBoundingClientRect();
-        const copyStyle = getComputedStyle(copy);
+        const textBounds = text.getBoundingClientRect();
+        const firstGlyphBounds = firstLine[0].getBoundingClientRect();
+        const lastGlyphBounds = firstLine.at(-1)!.getBoundingClientRect();
         return {
-          clearance: {
-            left: lineBounds.left - copyBounds.left,
-            right: copyBounds.right - lineBounds.right,
+          inset: {
+            x: textBounds.left - copyBounds.left,
+            y: textBounds.top - copyBounds.top,
           },
-          padding: {
-            left: Number.parseFloat(copyStyle.paddingLeft),
-            right: Number.parseFloat(copyStyle.paddingRight),
-          },
+          lineWidth: lastGlyphBounds.right - firstGlyphBounds.left,
+          rightClearance: copyBounds.right - lastGlyphBounds.right,
+          glyphWidths: firstLine.map((glyph) => glyph.getBoundingClientRect().width),
+          leadingSpaceWidths: glyphs.slice(23, 25).map((glyph) => glyph.getBoundingClientRect().width),
         };
       });
-      expect(firstLineLayout.clearance.left).toBeGreaterThanOrEqual(8);
-      expect(firstLineLayout.clearance.right).toBeGreaterThanOrEqual(8);
-      expect(firstLineLayout.padding.right - firstLineLayout.padding.left).toBe(8);
+      expect(firstLineLayout.inset).toEqual({ x: 12, y: 12 });
+      expect(firstLineLayout.lineWidth).toBe(368);
+      expect(firstLineLayout.rightClearance).toBe(20);
+      expect(new Set(firstLineLayout.glyphWidths)).toEqual(new Set([16]));
+      expect(firstLineLayout.leadingSpaceWidths).toEqual([8, 8]);
       await captureVisualAudit(page.getByTestId("dialogue-window-upper"), {
         path: `${ARTIFACT_DIR}/stage7-long-upper-dialogue.png`,
       });

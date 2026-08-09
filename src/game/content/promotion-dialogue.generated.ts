@@ -6,3 +6,14 @@ export const PROMOTION_DIALOGUE_TEXT = {
   "niaGrant": "現在我在水神「愛西斯」的面前，\n授予妳新的職業．",
   "teammateRequest": "我的經驗值已達到轉職的目標，\n請主將授我新的職業．"
 } as const;
+
+export const PROMOTION_DIALOGUE_TEXT_INSETS = {
+  "upper": {
+    "x": 27,
+    "y": 20
+  },
+  "lower": {
+    "x": 43,
+    "y": 20
+  }
+} as const;
