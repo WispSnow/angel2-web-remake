@@ -155,9 +155,49 @@ export function shootingLinePath(
 }
 
 /**
+ * Enumerates every native-valid predecessor walk in stable native direction
+ * order. REMAKE-035 uses these paths for explicit player and AI selection;
+ * unlike the original PIT walk, enumeration never reads gameplay PRNG.
+ */
+export function shootingLinePaths(
+  actor: Pick<BattleUnit, "x" | "y" | "classId">,
+  target: Position,
+  battlefield: ActionBattlefield,
+  nativeSeed: number,
+): Position[][] {
+  const gradient = buildUniformRange(
+    actor,
+    battlefield,
+    nativeSeed,
+    (movementRule) => movementRule === 0 || movementRule === 99,
+  );
+  if (gradient.valueAt(target) === 0) return [];
+
+  const paths: Position[][] = [];
+  const reversed = [copyPosition(target)];
+  const visit = (current: Position): void => {
+    if (current.x === actor.x && current.y === actor.y) {
+      paths.push([...reversed].reverse().map(copyPosition));
+      return;
+    }
+    const nextValue = gradient.valueAt(current) + 1;
+    for (const offset of OFFSETS) {
+      const predecessor = { x: current.x + offset.x, y: current.y + offset.y };
+      if (gradient.valueAt(predecessor) !== nextValue) continue;
+      reversed.push(predecessor);
+      visit(predecessor);
+      reversed.pop();
+    }
+  };
+  visit(copyPosition(target));
+  return paths;
+}
+
+/**
  * Returns the probability that the native uniformly selected predecessor walk
  * visits each line cell. This evaluates every legal line without reading the
- * gameplay PRNG and is used only by deterministic AI estimates.
+ * gameplay PRNG. It remains as executable evidence for the original random
+ * walk and for a future legacyStrict ruleset; REMAKE-035 does not use it.
  */
 export function shootingLineVisitProbabilities(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,

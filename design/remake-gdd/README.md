@@ -57,14 +57,14 @@
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
 | [`systems/action-resolution.md`](systems/action-resolution.md) | 普通、射击、技术共享的预览、准备、表现与提交边界 | M00.6 / 已接受 |
-| [`systems/shooting.md`](systems/shooting.md) | 弓兵射程、伤害、经验、AI 与棋盘表现 | M00.6 / 已接受 |
+| [`systems/shooting.md`](systems/shooting.md) | 弓兵射程、伤害、经验、魔弓完整箭道控制、AI 与棋盘表现 | M00.6/M14.7 / 已验证 |
 | [`systems/techniques-stage0.md`](systems/techniques-stage0.md) | 修女初級炎暴与初級治療 | M00.6 / 已接受 |
 | [`systems/status-foundation.md`](systems/status-foundation.md) | 防魔消费与 v6 最小状态边界 | M00.6 / 已接受 |
 | [`systems/deployment-stage1.md`](systems/deployment-stage1.md) | 第 1 关固定/可选单位与部署提交 | M02 / 已实现并通过自动验收 |
 | [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M02 / 已实现并通过自动验收 |
 | [`systems/techniques-stage3.md`](systems/techniques-stage3.md) | 僧侣 `1H/1I`、范围回復、AI 与 255 tick 表现 | M04 / 已接受 |
 | [`systems/force-ai-groups.md`](systems/force-ai-groups.md) | 显式军团控制权、独立友军 AI、策略与跨军团目标 | M04 框架提取 / 已验证 |
-| [`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.md) | 唯一专家敌方效用、射手安全射程边缘、冰雪排程、PRNG 与追踪边界 | M14.5/M14.6 / 已验证 |
+| [`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.md) | 唯一专家敌方效用、射手安全射程边缘、魔弓确定线路、冰雪排程、PRNG 与追踪边界 | M14.5/M14.6/M14.7 / 已验证 |
 | [`systems/force-field-escort.md`](systems/force-field-escort.md) | 路线尝试、移动安全区、生命减半与表现边界 | M06 / 已实现并通过自动验收 |
 | [`systems/technique-implementation-sequence.md`](systems/technique-implementation-sequence.md) | 33 项技术的机器顺序、逐项门禁与完成状态 | 系统例外 / 已验证 |
 | [`systems/technique-aa-attack-up.md`](systems/technique-aa-attack-up.md) | 攻击提升、完整轮计数、双方 AI、原版双格光柱与冰封例外 | 已实现并通过完整门禁 |
@@ -114,5 +114,6 @@
 - 第 4、5 关已于 2026-08-08 获用户接受；第 6 关、`REMAKE-028` 与 v20 随后作为有界例外
   实现，并于 2026-08-09 获用户接受。第 7 关 M12 已实现 `REMAKE-030` 与 v21 并于同日获
   用户试玩接受；第 8 关 M14 按 `REMAKE-032` 补播 SAY 157、升级 v23 后也已获用户接受；
-  `REMAKE-033/034` 专家敌方 AI 已获授权并适用于全部已开放关卡；射手安全射程边缘与冰雪
-  排程使用 v25 保存身份并无损迁移 v24；第 9 关及其余战役继续冻结。
+  `REMAKE-033/034/035` 专家敌方 AI 与魔弓完整箭道控制已获授权并适用于全部已开放关卡；
+  玩家在主目标后指定魔弓线路，专家 AI 提交最高价值确切线路；当前使用 v26 保存身份并
+  无损迁移 v25；第 9 关及其余战役继续冻结。

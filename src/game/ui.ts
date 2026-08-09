@@ -545,6 +545,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "move") controller.chooseMove();
     else if (action === "attack") controller.chooseAttack();
     else if (action === "shoot") controller.chooseShoot();
+    else if (action === "shot-route-previous") controller.cycleMagicArcherRoute(-1);
+    else if (action === "shot-route-next") controller.cycleMagicArcherRoute(1);
+    else if (action === "shot-route-confirm") controller.confirmMagicArcherRoute();
     else if (action === "technique") controller.chooseTechnique();
     else if (action === "technique-action") {
       controller.selectTechnique(Number(button.dataset.techniqueIndex));
@@ -572,6 +575,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "overwrite-confirm") controller.confirmOverwrite();
     else if (action === "overwrite-cancel") controller.cancelOverwrite();
   }, { signal: eventController.signal });
+
+  root.addEventListener("wheel", (event) => {
+    if (controller.actionMode !== "shotRoute" || event.deltaY === 0) return;
+    event.preventDefault();
+    controller.cycleMagicArcherRoute(event.deltaY > 0 ? 1 : -1);
+  }, { signal: eventController.signal, passive: false });
 
   root.addEventListener("pointermove", (event) => {
     const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
@@ -660,14 +669,18 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       PageDown: { x: 1, y: 1 },
     };
     const delta = navigation[key] ?? navigation[lower];
+    const routeCycle = controller.actionMode === "shotRoute"
+      && (lower === "q" || lower === "e");
     const handled = Boolean(delta)
       || ["Control", "Insert", " ", "Alt", "Delete", "Enter", "Escape", "Tab", "F1", "F2", "F3", "F4"].includes(key)
       || lower === "e"
+      || routeCycle
       || lower === "m"
       || lower === "o";
     if (handled) event.preventDefault();
     if (delta) controller.moveCursor(delta);
     else if (event.repeat) return;
+    else if (routeCycle) controller.cycleMagicArcherRoute(lower === "q" ? -1 : 1);
     else if (key === "Control" || key === "Insert" || key === " ") {
       if (controller.dialogueSkipConfirmOpen
         || (!finishDialogueTyping() && !finishFeedbackTyping())) controller.primaryAtCursor();
@@ -689,8 +702,30 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     screen.dataset.actionMode = controller.actionMode;
     round.textContent = `第 ${controller.battle.round} 回合`;
     const selectedUnitContext = renderSelectedUnitContext(controller);
-    if (selectedUnitContext) status.innerHTML = selectedUnitContext;
-    else status.textContent = controller.statusMessage;
+    const selectedRoute = controller.selectedMagicArcherRoute;
+    const routeTarget = controller.magicArcherRouteTarget;
+    const routePickerVisible = controller.actionMode === "shotRoute"
+      && selectedRoute !== undefined
+      && routeTarget !== undefined;
+    status.classList.toggle("is-shot-route-picker", routePickerVisible);
+    if (routePickerVisible) {
+      const collateralCount = selectedRoute.affectedUnitIds
+        .filter((id) => id !== routeTarget.id).length;
+      status.dataset.routeIndex = String(controller.magicArcherRouteIndex);
+      status.dataset.routeCount = String(controller.magicArcherRouteOptions.length);
+      status.innerHTML = `<button type="button" data-action="shot-route-previous"
+          data-testid="shot-route-previous" aria-label="上一條箭道">◀</button>
+        <span data-testid="shot-route-summary">箭道 ${controller.magicArcherRouteIndex + 1}/${controller.magicArcherRouteOptions.length} · 副目標 ${collateralCount}</span>
+        <button type="button" data-action="shot-route-next"
+          data-testid="shot-route-next" aria-label="下一條箭道">▶</button>
+        <button type="button" data-action="shot-route-confirm"
+          data-testid="shot-route-confirm">發射</button>`;
+    } else {
+      delete status.dataset.routeIndex;
+      delete status.dataset.routeCount;
+      if (selectedUnitContext) status.innerHTML = selectedUnitContext;
+      else status.textContent = controller.statusMessage;
+    }
     const actionMenuVisible = controller.phase === "player"
       && (controller.actionMode === "actionMenu" || controller.actionMode === "techniqueMenu");
     actionMenu.hidden = !actionMenuVisible;
@@ -1776,7 +1811,10 @@ function bindGamepad(controller: GameController): () => void {
       const pressed = pad.buttons.map((button) => button.pressed);
       if (pressed[0] && !priorButtons[0]) controller.primaryAtCursor();
       if (pressed[1] && !priorButtons[1]) controller.secondaryAction();
-      if (pressed[4] && !priorButtons[4]) controller.openObjectives();
+      if (controller.actionMode === "shotRoute") {
+        if (pressed[4] && !priorButtons[4]) controller.cycleMagicArcherRoute(-1);
+        if (pressed[5] && !priorButtons[5]) controller.cycleMagicArcherRoute(1);
+      } else if (pressed[4] && !priorButtons[4]) controller.openObjectives();
       if (pressed[9] && !priorButtons[9]) controller.openGroupCommands();
       const x = pad.axes[0] ?? 0;
       const y = pad.axes[1] ?? 0;

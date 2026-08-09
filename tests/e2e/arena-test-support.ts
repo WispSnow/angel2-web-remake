@@ -10,6 +10,15 @@ export interface ArenaBattleDebugState {
   round: number;
   phase: string;
   actionMode: string;
+  magicArcherRouteIndex: number;
+  magicArcherRouteTargetId?: string;
+  magicArcherRoutes: Array<{
+    path: Array<{ x: number; y: number }>;
+    affectedUnitIds: string[];
+    guaranteedKills: number;
+    expectedDamage: number;
+    targetThreat: number;
+  }>;
   cameraOrigin: { x: number; y: number };
   rngState: number;
   rngCalls: number;

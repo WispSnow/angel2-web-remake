@@ -11,6 +11,8 @@ export interface BattleActionIntent {
   actorId: string;
   targetId?: string;
   target?: Position;
+  /** REMAKE-035: explicit actor-to-target path for magic-archer line damage. */
+  linePath?: readonly Position[];
   /** Rules-significant only for native actions whose effect unions the current 10x7 view. */
   viewportOrigin?: Position;
 }

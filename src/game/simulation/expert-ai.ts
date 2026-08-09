@@ -11,7 +11,6 @@ import type { BattleUnit, Position, UnitStats } from "../types";
 import type { AlliedAiAction } from "./ai-contracts";
 import type { BattleActionId } from "./actions/types";
 import {
-  shootingLineVisitProbabilities,
   techniqueEffectRange,
 } from "./actions/range-map";
 import { manhattan } from "./grid";
@@ -136,6 +135,9 @@ export function expertAiCandidateTrace(
     action: {
       ...action,
       path: action.path.map((position) => ({ ...position })),
+      ...(action.linePath ? {
+        linePath: action.linePath.map((position) => ({ ...position })),
+      } : {}),
     },
     score: expertAiScore(utility),
     reasons: expertAiReasons(utility),
@@ -262,6 +264,7 @@ export function expertSpecialUtility(
   actionId: BattleActionId,
   target: BattleUnit,
   path: readonly Position[],
+  linePath?: readonly Position[],
 ): ExpertAiUtility {
   const utility = emptyExpertAiUtility();
   const position = path.at(-1) ?? actor;
@@ -289,6 +292,10 @@ export function expertSpecialUtility(
 
   if (actionId === "archer-shot" || actionId === "crossbow-shot"
     || actionId === "magic-archer-shot") {
+    if (actionId === "magic-archer-shot" && !linePath) {
+      utility.waste = 1;
+      return utility;
+    }
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     const swiftEvasion = target.classId === "swift-dragon-knight";
     const expectedRoll = Math.floor((definition.damage.minimum + definition.damage.maximum) / 2);
@@ -314,26 +321,20 @@ export function expertSpecialUtility(
     utility.targetThreat = targetThreat(context, target);
     utility.firingDistance = manhattan(position, target);
     if (actionId === "magic-archer-shot") {
-      const lineProbabilities = shootingLineVisitProbabilities(
-        { ...position, classId: actor.classId },
-        target,
-        context,
-        definition.range.nativeSeed,
-      );
+      const lineCells = new Set(linePath?.map((cell) => `${cell.x},${cell.y}`) ?? []);
       const expectedHalfDamage = Math.floor(expectedRoll / 2);
       const minimumHalfDamage = Math.floor(definition.damage.minimum / 2);
       for (const affected of context.units) {
         if (affected.side === actor.side || affected.id === target.id || affected.actionDisabled) continue;
-        const probability = lineProbabilities.get(`${affected.x},${affected.y}`) ?? 0;
-        if (probability === 0) continue;
+        if (!lineCells.has(`${affected.x},${affected.y}`)) continue;
         if (affected.statuses.magicGuard > 0) {
-          utility.support += Math.floor(20 * probability);
+          utility.support += 20;
           continue;
         }
         const expectedDamage = Math.min(affected.life, expectedHalfDamage);
-        utility.effectiveDamage += Math.floor(expectedDamage * probability);
-        utility.targetThreat += Math.floor(targetThreat(context, affected) * probability);
-        if (probability === 1 && minimumHalfDamage >= affected.life) {
+        utility.effectiveDamage += expectedDamage;
+        utility.targetThreat += targetThreat(context, affected);
+        if (minimumHalfDamage >= affected.life) {
           utility.guaranteedKills += 1;
         }
       }
@@ -531,7 +532,14 @@ export function expertUtilityForAction(
     return expertOrdinaryUtility(context, unit, target, action.path);
   }
   if (action.kind === "special" && action.actionId && target) {
-    return expertSpecialUtility(context, unit, action.actionId, target, action.path);
+    return expertSpecialUtility(
+      context,
+      unit,
+      action.actionId,
+      target,
+      action.path,
+      action.linePath,
+    );
   }
   const utility = emptyExpertAiUtility();
   const destination = action.path.at(-1) ?? unit;

@@ -553,6 +553,17 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v25 battle and completed saves into the directed magic-arrow identity", () => {
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 25,
+        contentVersion: "expert-ranged-control-ai-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v24 battle and completed saves into the ranged/control AI identity", () => {
     for (const current of [battleSave(), completedSave()]) {
       const legacy = {

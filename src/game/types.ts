@@ -97,6 +97,7 @@ export type ActionMode =
   | "techniqueMenu"
   | "target"
   | "specialTarget"
+  | "shotRoute"
   | "allyPreview"
   | "enemyPreview";
 
@@ -177,8 +178,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 25;
-  contentVersion: "expert-ranged-control-ai-1";
+  version: 26;
+  contentVersion: "directed-magic-arrow-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -7,6 +7,8 @@ export interface AlliedAiAction {
   path: Position[];
   targetId?: string;
   actionId?: BattleActionId;
+  /** Rules-significant magic-archer effect path, separate from movement path. */
+  linePath?: Position[];
 }
 
 export interface OrdinaryAiPlanningOptions {

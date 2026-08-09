@@ -7,7 +7,7 @@ import {
 } from "../content/actions";
 import { ALLY_MAP_UNIT_ASSETS, allyMapUnitAsset } from "../content/map-unit-assets";
 import type { GameController } from "../controller";
-import type { BattleUnit } from "../types";
+import type { BattleUnit, Position } from "../types";
 import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-technique-presentation";
 import { TURN_TRANSITION_DUST } from "../turn-transition-presentation";
 import { buildStompPresentationSteps } from "../stomp-presentation";
@@ -174,6 +174,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private gridGraphics!: Phaser.GameObjects.Graphics;
     private rangeGraphics!: Phaser.GameObjects.Graphics;
     private effectPreviewGraphics!: Phaser.GameObjects.Graphics;
+    private shotRouteGraphics!: Phaser.GameObjects.Graphics;
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
     private combatEffects: Phaser.GameObjects.GameObject[] = [];
@@ -330,6 +331,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.gridGraphics = this.add.graphics().setDepth(1);
       this.rangeGraphics = this.add.graphics().setDepth(2);
       this.effectPreviewGraphics = this.add.graphics().setDepth(3);
+      this.shotRouteGraphics = this.add.graphics().setDepth(6);
       this.cursorGraphics = this.add.graphics().setDepth(10);
       if (!this.textures.exists("native-range-dither")) {
         const texture = this.textures.createCanvas("native-range-dither", 8, 2);
@@ -594,6 +596,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private drawRanges(): void {
       this.rangeGraphics.clear();
       this.effectPreviewGraphics.clear();
+      this.shotRouteGraphics.clear();
       for (const tile of this.rangeMaskTiles) tile.destroy();
       this.rangeMaskTiles = [];
 
@@ -694,6 +697,87 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           );
         }
       }
+      const magicArcherRoutes = controller.magicArcherRouteOptions;
+      const selectedMagicArcherRoute = controller.selectedMagicArcherRoute;
+      if (controller.actionMode === "shotRoute" && selectedMagicArcherRoute) {
+        const cellCenter = (position: Position) => ({
+          x: position.x * TILE_WIDTH + TILE_WIDTH / 2,
+          y: position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+        });
+        const drawDashedPath = (
+          path: readonly Position[],
+          width: number,
+          color: number,
+          alpha: number,
+        ): void => {
+          this.effectPreviewGraphics.lineStyle(width, color, alpha);
+          for (let index = 1; index < path.length; index += 1) {
+            const fromPosition = path[index - 1];
+            const toPosition = path[index];
+            if (!fromPosition || !toPosition) continue;
+            const from = cellCenter(fromPosition);
+            const to = cellCenter(toPosition);
+            const length = Math.hypot(to.x - from.x, to.y - from.y);
+            for (let distance = 0; distance < length; distance += 9) {
+              const start = distance / length;
+              const end = Math.min(length, distance + 5) / length;
+              this.effectPreviewGraphics.beginPath();
+              this.effectPreviewGraphics.moveTo(
+                from.x + (to.x - from.x) * start,
+                from.y + (to.y - from.y) * start,
+              );
+              this.effectPreviewGraphics.lineTo(
+                from.x + (to.x - from.x) * end,
+                from.y + (to.y - from.y) * end,
+              );
+              this.effectPreviewGraphics.strokePath();
+            }
+          }
+        };
+        const drawSolidPath = (
+          path: readonly Position[],
+          width: number,
+          color: number,
+          alpha: number,
+        ): void => {
+          const first = path[0];
+          if (!first) return;
+          const start = cellCenter(first);
+          this.effectPreviewGraphics.lineStyle(width, color, alpha);
+          this.effectPreviewGraphics.beginPath();
+          this.effectPreviewGraphics.moveTo(start.x, start.y);
+          for (const position of path.slice(1)) {
+            const point = cellCenter(position);
+            this.effectPreviewGraphics.lineTo(point.x, point.y);
+          }
+          this.effectPreviewGraphics.strokePath();
+        };
+        for (const [index, route] of magicArcherRoutes.entries()) {
+          if (index === controller.magicArcherRouteIndex) continue;
+          drawDashedPath(route.path, 4, 0x1a0904, 0.55);
+          drawDashedPath(route.path, 2, 0xffdc78, 0.72);
+        }
+        drawSolidPath(selectedMagicArcherRoute.path, 6, 0x1a0904, 0.9);
+        drawSolidPath(selectedMagicArcherRoute.path, 3, 0xffd34f, 1);
+        this.shotRouteGraphics.fillStyle(0xffe58b, 1);
+        for (const position of selectedMagicArcherRoute.path.slice(1, -1)) {
+          const point = cellCenter(position);
+          this.shotRouteGraphics.fillRect(point.x - 3, point.y - 3, 6, 6);
+        }
+        const targetId = controller.magicArcherRouteTarget?.id;
+        for (const unitId of selectedMagicArcherRoute.affectedUnitIds) {
+          const unit = controller.battle.unit(unitId);
+          if (!unit) continue;
+          const primary = unitId === targetId;
+          this.shotRouteGraphics.lineStyle(primary ? 3 : 2, primary ? 0xff5a48 : 0xffb05d, 1);
+          this.shotRouteGraphics.strokeRect(
+            unit.x * TILE_WIDTH + (primary ? 1 : 3),
+            unit.y * TILE_HEIGHT + (primary ? 1 : 3),
+            TILE_WIDTH - (primary ? 2 : 6),
+            TILE_HEIGHT - (primary ? 2 : 6),
+          );
+        }
+      }
       if (controller.isTestMode) {
         this.game.canvas.dataset.nativeDitherCellCount = String(this.rangeMaskTiles.length);
         this.game.canvas.dataset.nativeDitherRetainedFraction = this.rangeMaskTiles.length > 0 ? "0.25" : "1";
@@ -712,6 +796,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               && !routePulseSafeArea.some((cell) => cell.x === x && cell.y === y))
             .map(({ id }) => id)
             .join(",")
+          : "";
+        this.game.canvas.dataset.shotRouteCount = String(magicArcherRoutes.length);
+        this.game.canvas.dataset.shotRouteIndex = String(controller.magicArcherRouteIndex);
+        this.game.canvas.dataset.shotRoutePath = selectedMagicArcherRoute
+          ? selectedMagicArcherRoute.path.map(({ x, y }) => `${x},${y}`).join(";")
+          : "";
+        this.game.canvas.dataset.shotRouteAffectedUnitIds = selectedMagicArcherRoute
+          ? selectedMagicArcherRoute.affectedUnitIds.join(",")
           : "";
       }
     }

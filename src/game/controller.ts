@@ -53,7 +53,10 @@ import {
   type TurnTransitionPresentation,
   type TurnTransitionSide,
 } from "./turn-transition-presentation";
-import { Stage0Battle } from "./simulation/battle";
+import {
+  Stage0Battle,
+  type MagicArcherLineOption,
+} from "./simulation/battle";
 import type { AlliedAiAction } from "./simulation/ai-contracts";
 import type { PreparedRoutePulse } from "./simulation/route-pulse";
 import type {
@@ -387,6 +390,9 @@ export class GameController {
   private pendingOrigin?: Position;
   private pendingPath?: Position[];
   private pendingExtraMove = false;
+  private magicArcherRoutes: MagicArcherLineOption[] = [];
+  private magicArcherRouteTargetId?: string;
+  private selectedMagicArcherRouteIndex = 0;
   private busy = false;
   private promotionResume?: () => void;
   private prayerHoldSkip?: () => void;
@@ -530,6 +536,24 @@ export class GameController {
       this.battle.stage.height,
       definition.range.effectRadius,
     ).cells();
+  }
+
+  get magicArcherRouteOptions(): readonly MagicArcherLineOption[] {
+    return this.magicArcherRoutes;
+  }
+
+  get magicArcherRouteIndex(): number {
+    return this.selectedMagicArcherRouteIndex;
+  }
+
+  get selectedMagicArcherRoute(): MagicArcherLineOption | undefined {
+    return this.magicArcherRoutes[this.selectedMagicArcherRouteIndex];
+  }
+
+  get magicArcherRouteTarget(): BattleUnit | undefined {
+    return this.magicArcherRouteTargetId
+      ? this.battle.unit(this.magicArcherRouteTargetId)
+      : undefined;
   }
 
   get currentStageProgressMetadata() {
@@ -1366,6 +1390,13 @@ export class GameController {
       || this.hasBlockingOverlay
       || this.busy
     ) return;
+    if (this.actionMode === "shotRoute") {
+      const target = this.magicArcherRouteTarget;
+      if (target && positionKey(position) === positionKey(target)) {
+        this.confirmMagicArcherRoute();
+      }
+      return;
+    }
     this.cursor = { ...position };
     const unit = this.battle.unitAt(position);
 
@@ -1381,7 +1412,11 @@ export class GameController {
         this.selectedActionId
         && this.targets.some((target) => positionKey(target) === positionKey(position))
       ) {
-        void this.commitSpecialAction(position);
+        if (this.selectedActionId === "magic-archer-shot" && unit) {
+          this.beginMagicArcherRouteSelection(unit.id);
+        } else {
+          void this.commitSpecialAction(position);
+        }
       }
       return;
     }
@@ -1719,10 +1754,73 @@ export class GameController {
     resume?.();
   }
 
+  private beginMagicArcherRouteSelection(targetId: string): void {
+    const actor = this.selectedUnit;
+    const target = this.battle.unit(targetId);
+    if (!actor || !target || this.selectedActionId !== "magic-archer-shot") return;
+    const routes = this.battle.magicArcherLineOptions(actor.id, target.id);
+    if (routes.length === 0) {
+      this.statusMessage = "目前沒有可連接主目標的合法箭道。";
+      this.emit();
+      return;
+    }
+    if (routes.length === 1) {
+      void this.commitSpecialAction(target, routes[0]?.path);
+      return;
+    }
+    this.magicArcherRoutes = routes.map((route) => ({
+      ...route,
+      path: route.path.map((position) => ({ ...position })),
+      affectedUnitIds: [...route.affectedUnitIds],
+    }));
+    this.magicArcherRouteTargetId = target.id;
+    this.selectedMagicArcherRouteIndex = 0;
+    this.cursor = { x: target.x, y: target.y };
+    this.actionMode = "shotRoute";
+    this.updateMagicArcherRouteStatus();
+    this.emit();
+  }
+
+  cycleMagicArcherRoute(delta: number): void {
+    if (this.actionMode !== "shotRoute" || this.magicArcherRoutes.length < 2 || delta === 0) return;
+    this.selectedMagicArcherRouteIndex = (
+      this.selectedMagicArcherRouteIndex + delta + this.magicArcherRoutes.length
+    ) % this.magicArcherRoutes.length;
+    this.updateMagicArcherRouteStatus();
+    this.emit();
+  }
+
+  confirmMagicArcherRoute(): void {
+    const target = this.magicArcherRouteTarget;
+    const route = this.selectedMagicArcherRoute;
+    if (this.actionMode !== "shotRoute" || !target || !route) return;
+    void this.commitSpecialAction(target, route.path);
+  }
+
+  private updateMagicArcherRouteStatus(): void {
+    const route = this.selectedMagicArcherRoute;
+    const target = this.magicArcherRouteTarget;
+    if (!route || !target) return;
+    const collateralCount = route.affectedUnitIds.filter((id) => id !== target.id).length;
+    this.statusMessage = `箭道 ${this.selectedMagicArcherRouteIndex + 1}/${this.magicArcherRoutes.length}：主目標 1，沿線敵軍 ${collateralCount}；切換後確認發射。`;
+  }
+
+  private clearMagicArcherRoutes(): void {
+    this.magicArcherRoutes = [];
+    this.magicArcherRouteTargetId = undefined;
+    this.selectedMagicArcherRouteIndex = 0;
+  }
+
   cancelAction(): void {
     if (this.actionMode === "target") {
       this.actionMode = "actionMenu";
       this.targets = [];
+    } else if (this.actionMode === "shotRoute") {
+      this.clearMagicArcherRoutes();
+      this.actionMode = "specialTarget";
+      this.statusMessage = "已返回魔弓主目標選擇。";
+      this.emit();
+      return;
     } else if (this.actionMode === "specialTarget") {
       const returnToTechnique = this.selectedActionId !== "archer-shot"
         && this.selectedActionId !== "crossbow-shot"
@@ -1756,7 +1854,10 @@ export class GameController {
     this.emit();
   }
 
-  private async commitSpecialAction(position: Position): Promise<void> {
+  private async commitSpecialAction(
+    position: Position,
+    linePath?: readonly Position[],
+  ): Promise<void> {
     const actor = this.selectedUnit;
     const actionId = this.selectedActionId;
     const definition = actionId ? BATTLE_ACTION_DEFINITIONS[actionId] : undefined;
@@ -1774,6 +1875,7 @@ export class GameController {
         actorId: actor.id,
         targetId: target?.id,
         target: definition.target === "self-area" ? undefined : position,
+        ...(linePath ? { linePath: linePath.map((cell) => ({ ...cell })) } : {}),
         ...(actionId === "stomp-1" || actionId === "stomp-2" || actionId === "stomp-3"
           ? { viewportOrigin: { ...this.cameraOrigin } }
           : {}),
@@ -2528,6 +2630,7 @@ export class GameController {
     this.actionRange = [];
     this.selectedActionId = undefined;
     this.techniqueIndex = 0;
+    this.clearMagicArcherRoutes();
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
   }
@@ -2894,6 +2997,9 @@ export class GameController {
             actionId: action.actionId,
             actorId: unit.id,
             ...(definition.target === "self-area" ? {} : { targetId: target.id }),
+            ...(action.linePath ? {
+              linePath: action.linePath.map((position) => ({ ...position })),
+            } : {}),
             ...(action.actionId === "stomp-1"
               || action.actionId === "stomp-2"
               || action.actionId === "stomp-3"
@@ -4143,6 +4249,11 @@ export class GameController {
       if (delta.y !== 0) this.moveTechniqueSelection(delta.y);
       return;
     }
+    if (this.actionMode === "shotRoute") {
+      const direction = delta.x !== 0 ? delta.x : delta.y;
+      if (direction !== 0) this.cycleMagicArcherRoute(direction);
+      return;
+    }
     this.minimapPreviewOrigin = undefined;
     this.cursor = clampCameraFocus(this.battle.stage, {
       x: this.cursor.x + delta.x,
@@ -4218,6 +4329,7 @@ export class GameController {
     else if (this.objectiveOpen) return;
     else if (this.actionMode === "actionMenu") this.activateCommandSelection();
     else if (this.actionMode === "techniqueMenu") this.activateTechniqueSelection();
+    else if (this.actionMode === "shotRoute") this.confirmMagicArcherRoute();
     else this.selectCell(this.cursor);
   }
 
@@ -4777,6 +4889,13 @@ export class GameController {
       commandIndex: this.commandIndex,
       commands: this.unitCommands.map((command) => ({ ...command })),
       selectedActionId: this.selectedActionId,
+      magicArcherRouteIndex: this.selectedMagicArcherRouteIndex,
+      magicArcherRoutes: this.magicArcherRoutes.map((route) => ({
+        ...route,
+        path: route.path.map((position) => ({ ...position })),
+        affectedUnitIds: [...route.affectedUnitIds],
+      })),
+      magicArcherRouteTargetId: this.magicArcherRouteTargetId,
       techniqueIndex: this.techniqueIndex,
       techniques: this.techniqueActions.map((actionId) => ({
         actionId,

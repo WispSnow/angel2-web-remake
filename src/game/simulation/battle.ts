@@ -28,6 +28,7 @@ import {
 import type { ClassId } from "../content/classes";
 import {
   shootingRange,
+  shootingLinePaths,
   fullMapRange,
   NumericRangeMap,
   techniqueSelectionRange,
@@ -97,6 +98,24 @@ export type {
   EnemyPhaseUpdate,
   OrdinaryAiPlanningOptions,
 } from "./ai-contracts";
+
+export interface MagicArcherLineOption {
+  path: Position[];
+  affectedUnitIds: string[];
+  guaranteedKills: number;
+  expectedDamage: number;
+  targetThreat: number;
+}
+
+const linePathKey = (path: readonly Position[]): string =>
+  path.map(positionKey).join(";");
+
+const sameLinePath = (left: readonly Position[], right: readonly Position[]): boolean =>
+  left.length === right.length
+  && left.every((position, index) => {
+    const other = right[index];
+    return other !== undefined && positionKey(position) === positionKey(other);
+  });
 
 const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "archer-shot": ["archer"],
@@ -859,6 +878,51 @@ export class Stage0Battle {
       && (canTargetFrozenUnit(actionId) || !target.actionDisabled));
   }
 
+  magicArcherLineOptions(actorId: string, targetId: string): MagicArcherLineOption[] {
+    const actor = this.unit(actorId);
+    const target = this.unit(targetId);
+    if (!actor || !target
+      || actor.classId !== "magic-archer"
+      || actor.side === target.side
+      || target.actionDisabled
+      || this.actionRange(actor.id, "magic-archer-shot").valueAt(target) === 0) return [];
+    const context = this.expertAiEvaluationContext();
+    const movementPath = [{ x: actor.x, y: actor.y }];
+    const definition = BATTLE_ACTION_DEFINITIONS["magic-archer-shot"];
+    return shootingLinePaths(
+      actor,
+      target,
+      this.dynamicBattlefield,
+      definition.range.nativeSeed,
+    ).map((path) => {
+      const utility = expertSpecialUtility(
+        context,
+        actor,
+        "magic-archer-shot",
+        target,
+        movementPath,
+        path,
+      );
+      const affectedUnitIds = path.slice(1).flatMap((position) => {
+        const unit = this.unitAt(position);
+        return unit && unit.side !== actor.side && !unit.actionDisabled ? [unit.id] : [];
+      });
+      return {
+        path,
+        affectedUnitIds,
+        guaranteedKills: utility.guaranteedKills,
+        expectedDamage: utility.effectiveDamage,
+        targetThreat: utility.targetThreat,
+        support: utility.support,
+      };
+    }).sort((left, right) => right.guaranteedKills - left.guaranteedKills
+      || right.expectedDamage - left.expectedDamage
+      || right.targetThreat - left.targetThreat
+      || right.support - left.support
+      || linePathKey(left.path).localeCompare(linePathKey(right.path)))
+      .map(({ support: _support, ...option }) => option);
+  }
+
   prepareSpecialAction(intent: BattleActionIntent): PreparedBattleAction {
     if (isConstructionAction(intent.actionId)) throw new Error("construction uses its own prepare path");
     const actor = this.unit(intent.actorId);
@@ -891,11 +955,23 @@ export class Stage0Battle {
       x: Math.max(originBounds.min.x, Math.min(originBounds.max.x, requestedViewportOrigin.x)),
       y: Math.max(originBounds.min.y, Math.min(originBounds.max.y, requestedViewportOrigin.y)),
     };
-    const resolvedIntent = intent.actionId === "stomp-1"
+    let resolvedIntent: BattleActionIntent = intent.actionId === "stomp-1"
       || intent.actionId === "stomp-2"
       || intent.actionId === "stomp-3"
       ? { ...intent, viewportOrigin }
       : intent;
+    if (intent.actionId === "magic-archer-shot") {
+      if (!target) throw new Error("magic archer action requires a target unit");
+      const options = this.magicArcherLineOptions(actor.id, target.id);
+      const selected = intent.linePath
+        ? options.find((option) => sameLinePath(option.path, intent.linePath ?? []))
+        : options[0];
+      if (!selected) throw new Error("illegal magic archer line path");
+      resolvedIntent = {
+        ...resolvedIntent,
+        linePath: selected.path.map((position) => ({ ...position })),
+      };
+    }
     return resolveSpecialAction(
       resolvedIntent,
       actor,
@@ -1615,6 +1691,7 @@ export class Stage0Battle {
     actionId: BattleActionId,
     target: BattleUnit,
     path: readonly Position[],
+    linePath?: readonly Position[],
   ): ExpertAiUtility {
     return expertSpecialUtility(
       this.expertAiEvaluationContext(),
@@ -1622,6 +1699,7 @@ export class Stage0Battle {
       actionId,
       target,
       path,
+      linePath,
     );
   }
 
@@ -1930,6 +2008,7 @@ export class Stage0Battle {
         position: Position;
         target: BattleUnit;
         path: Position[];
+        linePath?: Position[];
         missingLife: number;
         effectiveDefense: number;
         positionDefense: number;
@@ -1985,33 +2064,44 @@ export class Stage0Battle {
             * terrainDefensePercentFor(target.classId, this.terrainSlotAt(target))
             / 100,
           );
-          const utility = this.expertSpecialUtility(unit, actionId, target, path);
-          if (options.expertRanking && utility.waste > 0) continue;
-          candidates.push({
-            position,
-            target,
-            path,
-            missingLife,
-            effectiveDefense,
-            positionDefense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
-            lethal: (actionId === "fire-1" || actionId === "fire-2" || actionId === "fire-3"
-              || actionId === "fire-4")
-              && target.life <= Math.min(
-                BATTLE_ACTION_DEFINITIONS[actionId].damage.cap,
-                Math.floor(
-                  targetStats.maxLife
-                  * BATTLE_ACTION_DEFINITIONS[actionId].damage.maxLifePercent
-                  / 100,
+          const linePaths: Array<Position[] | undefined> = actionId === "magic-archer-shot"
+            ? shootingLinePaths(
+              rangeActor,
+              target,
+              battlefield,
+              BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed,
+            )
+            : [undefined];
+          for (const linePath of linePaths) {
+            const utility = this.expertSpecialUtility(unit, actionId, target, path, linePath);
+            if (options.expertRanking && utility.waste > 0) continue;
+            candidates.push({
+              position,
+              target,
+              path,
+              linePath,
+              missingLife,
+              effectiveDefense,
+              positionDefense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
+              lethal: (actionId === "fire-1" || actionId === "fire-2" || actionId === "fire-3"
+                || actionId === "fire-4")
+                && target.life <= Math.min(
+                  BATTLE_ACTION_DEFINITIONS[actionId].damage.cap,
+                  Math.floor(
+                    targetStats.maxLife
+                    * BATTLE_ACTION_DEFINITIONS[actionId].damage.maxLifePercent
+                    / 100,
+                  ),
                 ),
-              ),
-            critical: definition.target === "ally"
-              && actionId !== "dispel"
-              && actionId !== "attack-up"
-              && actionId !== "defense-up"
-              && actionId !== "magic-guard"
-              && target.life * 100 < targetStats.maxLife * 40,
-            utility,
-          });
+              critical: definition.target === "ally"
+                && actionId !== "dispel"
+                && actionId !== "attack-up"
+                && actionId !== "defense-up"
+                && actionId !== "magic-guard"
+                && target.life * 100 < targetStats.maxLife * 40,
+              utility,
+            });
+          }
         }
       }
 
@@ -2028,7 +2118,8 @@ export class Stage0Battle {
           || left.target.y * this.stage.width + left.target.x
             - (right.target.y * this.stage.width + right.target.x)
           || left.position.y * this.stage.width + left.position.x
-            - (right.position.y * this.stage.width + right.position.x));
+            - (right.position.y * this.stage.width + right.position.x)
+          || linePathKey(left.linePath ?? []).localeCompare(linePathKey(right.linePath ?? [])));
         const selected = candidates[0];
         if (selected) {
           expertCandidates.push({
@@ -2038,6 +2129,7 @@ export class Stage0Battle {
               path: selected.path,
               targetId: selected.target.id,
               actionId,
+              linePath: selected.linePath?.map((position) => ({ ...position })),
             },
             utility: selected.utility,
             actionOrder,
@@ -2089,6 +2181,7 @@ export class Stage0Battle {
           path: selected.path,
           targetId: selected.target.id,
           actionId,
+          linePath: selected.linePath?.map((position) => ({ ...position })),
         };
       }
     }

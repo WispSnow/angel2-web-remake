@@ -15,6 +15,7 @@ import { STAGE4_OBSTACLE_TERRAIN_SLOT } from "../../src/game/content/stage4";
 import { Stage0Battle } from "../../src/game/simulation/battle";
 import {
   archerShootingRange,
+  shootingLinePaths,
   techniqueSelectionRange,
 } from "../../src/game/simulation/actions/range-map";
 import { prepareSpecialAction } from "../../src/game/simulation/actions/resolve";
@@ -334,6 +335,70 @@ describe("Stage-0 class actions", () => {
     const technique = techniqueSelectionRange(actor, openBattlefield, 5);
     expect(technique.valueAt(actor)).toBe(6);
     expect(technique.valueAt({ x: 5, y: 0 })).toBe(1);
+  });
+
+  it("enumerates every shortest magic-arrow line in stable native direction order", () => {
+    const paths = shootingLinePaths(
+      { x: 0, y: 0, classId: "magic-archer" },
+      { x: 2, y: 2 },
+      { width: 5, height: 5, terrainSlotAt: () => 1 },
+      BATTLE_ACTION_DEFINITIONS["magic-archer-shot"].range.nativeSeed,
+    );
+
+    expect(paths).toHaveLength(6);
+    expect(new Set(paths.map((path) => path.map(({ x, y }) => `${x},${y}`).join(";"))).size)
+      .toBe(6);
+    for (const path of paths) {
+      expect(path).toHaveLength(5);
+      expect(path[0]).toEqual({ x: 0, y: 0 });
+      expect(path.at(-1)).toEqual({ x: 2, y: 2 });
+    }
+  });
+
+  it("commits the player-selected magic-arrow line without consuming path randomness", () => {
+    const battle = new Stage0Battle(0, new DeterministicRng(0x3501));
+    const actor = battle.unit("1:0")!;
+    const enemies = battle.units.filter((unit) => unit.side === 2).slice(0, 3);
+    const [target, rightBranch, downBranch] = enemies;
+    if (!target || !rightBranch || !downBranch) throw new Error("missing magic-arrow fixtures");
+    actor.classId = "magic-archer";
+    actor.className = className(actor.classId);
+    actor.x = 20;
+    actor.y = 20;
+    actor.acted = false;
+    target.x = 22;
+    target.y = 22;
+    rightBranch.x = 21;
+    rightBranch.y = 20;
+    downBranch.x = 20;
+    downBranch.y = 21;
+    battle.units = [actor, target, rightBranch, downBranch];
+
+    const routes = battle.magicArcherLineOptions(actor.id, target.id);
+    expect(routes.length).toBeGreaterThan(1);
+    const selected = routes.find((route) => route.affectedUnitIds.includes(rightBranch.id)
+      && !route.affectedUnitIds.includes(downBranch.id));
+    if (!selected) throw new Error("missing right-branch route");
+
+    const prepared = battle.prepareSpecialAction({
+      actionId: "magic-archer-shot",
+      actorId: actor.id,
+      targetId: target.id,
+      linePath: selected.path,
+    });
+    expect(prepared.result.effectCells.map(({ position }) => position)).toEqual(selected.path);
+    expect(prepared.result.affectedUnits.map(({ unitId }) => unitId)).toEqual([
+      rightBranch.id,
+      target.id,
+    ]);
+    expect(prepared.rngCallsAfter - prepared.rngCallsBefore).toBe(2);
+    expect(() => battle.prepareSpecialAction({
+      actionId: "magic-archer-shot",
+      actorId: actor.id,
+      targetId: target.id,
+      linePath: [{ x: actor.x, y: actor.y }, { x: target.x, y: target.y }],
+    })).toThrow("illegal magic archer line path");
+    expect(battle.rng.calls).toBe(0);
   });
 
   it("prepares shooting deterministically without mutating battle state, then commits atomically", () => {

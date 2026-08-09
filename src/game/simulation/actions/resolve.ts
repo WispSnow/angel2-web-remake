@@ -8,7 +8,6 @@ import type { DeterministicRng } from "../rng";
 import { cloneUnitStatuses } from "../status";
 import {
   stompEffectRange,
-  shootingLinePath,
   techniqueEffectRange,
   type ActionBattlefield,
   type ActionViewport,
@@ -37,10 +36,6 @@ const isHealAction = (actionId: BattleActionId): actionId is "heal-1" | "heal-2"
   actionId === "heal-1" || actionId === "heal-2" || actionId === "heal-3";
 const isShootingAction = (actionId: BattleActionId): actionId is "archer-shot" | "crossbow-shot" =>
   actionId === "archer-shot" || actionId === "crossbow-shot";
-
-function shootingSeed(actionId: "archer-shot" | "crossbow-shot" | "magic-archer-shot"): number {
-  return BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed;
-}
 
 function shootingEvaded(target: BattleUnit, trial: DeterministicRng): boolean {
   return target.classId === "swift-dragon-knight" && (trial.nextUint() & 1) === 1;
@@ -379,18 +374,13 @@ function prepareSingleTarget(
 function prepareMagicArcher(
   actor: BattleUnit,
   target: BattleUnit,
+  linePath: readonly Position[] | undefined,
   trial: DeterministicRng,
   context: SpecialActionResolutionContext,
 ): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
   const definition = BATTLE_ACTION_DEFINITIONS["magic-archer-shot"];
-  const path = shootingLinePath(
-    actor,
-    target,
-    context.battlefield,
-    shootingSeed("magic-archer-shot"),
-    (count) => trial.between(0, count - 1),
-  );
-  if (path.length === 0) throw new Error("magic archer target is not connected to shooter");
+  if (!linePath) throw new Error("magic archer action requires an explicit line path");
+  const path = linePath.map(copyPosition);
   // REMAKE-009 likewise excludes the native side-2 50..59 upper bound.
   const roll = trial.between(
     definition.damage.minimum,
@@ -688,6 +678,7 @@ export function prepareSpecialAction(
     ({ affectedUnits, experienceGained, effectCells } = prepareMagicArcher(
       actor,
       target,
+      intent.linePath,
       trial,
       context,
     ));

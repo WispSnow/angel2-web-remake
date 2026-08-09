@@ -695,6 +695,41 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   background: transparent;
 }
 .status-strip { position: absolute; z-index: 7; left: 45px; top: 306px; width: 386px; min-height: 20px; padding: 3px 8px; overflow: hidden; color: #fff6c8; background: #120b0bcc; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
+.status-strip.is-shot-route-picker {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px 48px;
+  min-height: 20px;
+  padding: 1px 3px;
+  border: 1px solid #d7aa2d;
+  align-items: center;
+  gap: 2px;
+  color: #fff8cf;
+  background: #1d0d08e8;
+  pointer-events: auto;
+  text-shadow: 1px 1px #000;
+}
+.status-strip.is-shot-route-picker span {
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+}
+.status-strip.is-shot-route-picker button {
+  height: 16px;
+  padding: 0 3px;
+  border: 1px solid #8e6620;
+  color: #fff3ad;
+  background: #3b2112;
+  font: 700 10px/14px system-ui, sans-serif;
+  cursor: var(--native-cursor-hand);
+}
+.status-strip.is-shot-route-picker button:hover,
+.status-strip.is-shot-route-picker button:focus-visible {
+  border-color: #ffe27d;
+  color: #fff;
+  background: #684017;
+  outline: none;
+}
 .selected-unit-context { display: flex; width: 100%; align-items: center; justify-content: center; overflow: hidden; color: #fff1b0; font-weight: 700; text-shadow: 1px 1px #000; }
 .selected-unit-context > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .selected-unit-separator { flex: none; color: #d7aa2d; font-style: normal; }

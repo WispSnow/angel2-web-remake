@@ -128,26 +128,30 @@ describe("REMAKE-033 stable-remake expert enemy AI", () => {
     expect(battle.expertAiDecisionTrace("enemy-archer")?.chosen?.reasons).toContain("射距 4");
   });
 
-  it("counts deterministic magic-arrow line value without reading the planning RNG", () => {
+  it("chooses the highest-value exact magic-arrow line without reading the planning RNG", () => {
     const rng = new DeterministicRng(0x3307);
     const battle = new ArenaBattle([
-      { id: "ally-far", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
-      { id: "ally-line", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
-      { id: "enemy-magic-archer", side: 2 as const, slot: 0, classId: "magic-archer" as const, level: 1 as const, x: 27, y: 30 },
+      { id: "ally-main", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 23, y: 31 },
+      { id: "ally-high-line", side: 1 as const, slot: 1, classId: "magic-master" as const, level: 1 as const, x: 21, y: 30 },
+      { id: "ally-low-line", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "enemy-magic-archer", side: 2 as const, slot: 0, classId: "magic-archer" as const, level: 1 as const, x: 20, y: 30 },
     ], 0, rng);
     const before = { state: rng.state, calls: rng.calls };
 
-    expect(battle.planEnemyAiAction("enemy-magic-archer")).toMatchObject({
+    const action = battle.planEnemyAiAction("enemy-magic-archer", 1);
+    expect(action).toMatchObject({
       kind: "special",
       actionId: "magic-archer-shot",
-      targetId: "ally-far",
+      targetId: "ally-main",
     });
+    expect(action?.linePath).toContainEqual({ x: 21, y: 30 });
+    expect(action?.linePath).not.toContainEqual({ x: 20, y: 31 });
     expect(battle.expertAiDecisionTrace("enemy-magic-archer")?.chosen?.reasons)
       .toContain("有效傷害 88");
     expect({ state: rng.state, calls: rng.calls }).toEqual(before);
   });
 
-  it("weights every legal magic-arrow predecessor branch uniformly", () => {
+  it("retains the original random-route branch probabilities as reverse evidence", () => {
     const probabilities = shootingLineVisitProbabilities(
       { x: 0, y: 0, classId: "magic-archer" },
       { x: 2, y: 2 },
