@@ -1007,6 +1007,22 @@ export class Stage0Battle {
     return removed;
   }
 
+  appendStoryUnits(units: readonly BattleUnit[]): readonly string[] {
+    const existingIds = new Set(this.units.map(({ id }) => id));
+    const appendedIds = new Set<string>();
+    for (const unit of units) {
+      if (existingIds.has(unit.id) || appendedIds.has(unit.id)) {
+        throw new Error(`duplicate story unit id ${unit.id}`);
+      }
+      appendedIds.add(unit.id);
+    }
+    this.units.push(...units.map((unit) => ({
+      ...unit,
+      statuses: { ...unit.statuses },
+    })));
+    return [...appendedIds];
+  }
+
   commitPreparedPrayerOutcome(
     prepared: PreparedBattleAction,
     index: number,

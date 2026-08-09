@@ -178,7 +178,7 @@ test("S05-E/F: either named boss ends the battle while the other remains", async
   }
 });
 
-test("S05-G/H: battle saves use v19 and victory saves enter the live portal scene", async ({ page }) => {
+test("S05-G/H: battle saves use v20 and victory saves enter the live portal scene", async ({ page }) => {
   await page.goto("/?debugScenario=stage-05-player&difficulty=0&test=1");
   const before = await state(page);
   await page.keyboard.press("Escape");
@@ -194,8 +194,8 @@ test("S05-G/H: battle saves use v19 and victory saves enter the live portal scen
       rngCalls: number;
     });
   expect(battleSave).toMatchObject({
-    version: 19,
-    contentVersion: "stage-05-portal-1",
+    version: 20,
+    contentVersion: "stage-06-rangers-1",
     kind: "battle",
     stageId: "stage-05",
     rngState: before.rngState,
@@ -223,8 +223,8 @@ test("S05-G/H: battle saves use v19 and victory saves enter the live portal scen
       stageProgress: number;
     });
   expect(completedSave).toMatchObject({
-    version: 19,
-    contentVersion: "stage-05-portal-1",
+    version: 20,
+    contentVersion: "stage-06-rangers-1",
     kind: "completed",
     stageId: "stage-42-portal",
     stageProgress: 1000,
@@ -296,23 +296,23 @@ test("S05-I/J: scene 42 commits native 4L, story departures, and the stage-06 ro
   });
 
   await page.getByTestId("skip-dialogue").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-42-portal",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-06",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-06",
   });
 });
 
 test("S05-K/L: completed and reduced-motion portal paths preserve deterministic routing", async ({ page }) => {
   await page.goto("/?debugScenario=stage-42-completed-route&difficulty=0&test=1");
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
   const completed = await state(page);
   expect(completed).toMatchObject({
-    stageId: "stage-42-portal",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-06",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-06",
   });
   expect(completed.activeStoryId).toBeUndefined();
@@ -339,9 +339,13 @@ test("S05-K/L: completed and reduced-motion portal paths preserve deterministic 
     path: `${ARTIFACT_DIR}/stage42-portal-reduced-motion-departure.png`,
   });
   await page.getByTestId("skip-dialogue").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
   const reducedFinal = await state(page);
-  expect(reducedFinal.campaignRoute).toBe("stage-06");
+  expect(reducedFinal).toMatchObject({
+    stageId: "stage-06",
+    phase: "deployment",
+    campaignRoute: "stage-06",
+  });
 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/?debugScenario=stage-42-portal-live&difficulty=0&test=1");
@@ -352,12 +356,12 @@ test("S05-K/L: completed and reduced-motion portal paths preserve deterministic 
   });
   const beforeSkip = await state(page);
   await page.getByTestId("skip-scripted-sequence").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
   const skipped = await state(page);
   expect(skipped).toMatchObject({
-    stageId: "stage-42-portal",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-06",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-06",
     rngState: beforeSkip.rngState,
     rngCalls: beforeSkip.rngCalls,
@@ -406,6 +410,10 @@ test("S05-L: fast presentation and disabled combat sound preserve the portal res
   )).toBeGreaterThan(0);
 
   await page.getByTestId("skip-dialogue").click();
-  await waitForPhase(page, "nextStage");
-  expect((await state(page)).campaignRoute).toBe("stage-06");
+  await waitForPhase(page, "deployment");
+  expect(await state(page)).toMatchObject({
+    stageId: "stage-06",
+    phase: "deployment",
+    campaignRoute: "stage-06",
+  });
 });

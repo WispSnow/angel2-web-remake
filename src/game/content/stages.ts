@@ -22,7 +22,11 @@ export type StageStoryId =
   | "stage-42-portal-arrival-story"
   | "stage-42-portal-confrontation-story"
   | "stage-42-portal-intervention-story"
-  | "stage-42-portal-departure-story";
+  | "stage-42-portal-departure-story"
+  | "stage-06-prebattle-story"
+  | "stage-06-opening-story"
+  | "stage-06-retreat-story"
+  | "stage-06-alliance-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -41,7 +45,10 @@ export type StageMusicId =
   | "stage-05-player-phase-music"
   | "stage-05-enemy-phase-music"
   | "stage-42-player-phase-music"
-  | "stage-42-enemy-phase-music";
+  | "stage-42-enemy-phase-music"
+  | "stage-06-story-music"
+  | "stage-06-player-phase-music"
+  | "stage-06-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -83,7 +90,16 @@ export type StageEventId =
   | "stage-42-lightning"
   | "stage-42-departures"
   | "stage-42-departure-story"
-  | "stage-42-completed-route";
+  | "stage-42-completed-route"
+  | "stage-06-enter-deployment"
+  | "stage-06-prebattle-story"
+  | "stage-06-opening-story"
+  | "stage-06-objective-reached"
+  | "stage-06-retreat-story"
+  | "stage-06-reinforcements"
+  | "stage-06-ranger-leader-move"
+  | "stage-06-alliance-story"
+  | "stage-06-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -108,7 +124,12 @@ export type StageSimulationEffectId =
   | "stage-42-gadirath-move"
   | "stage-42-lightning-4"
   | "stage-42-story-departures"
-  | "stage-42-route-to-stage-06";
+  | "stage-42-route-to-stage-06"
+  | "stage-06-enter-deployment"
+  | "stage-06-set-victory-999"
+  | "stage-06-reinforcement-tableau"
+  | "stage-06-ranger-leader-move"
+  | "stage-06-route-to-stage-07";
 
 export type StagePresentationId =
   | "none"

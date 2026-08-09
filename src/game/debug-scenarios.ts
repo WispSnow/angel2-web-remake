@@ -99,6 +99,22 @@ const STAGE42_COMPLETED_EVENT_IDS = [
   "stage-42-completed-route",
 ] as const;
 
+const STAGE6_BATTLE_EVENT_IDS = [
+  "stage-06-enter-deployment",
+  "stage-06-prebattle-story",
+  "stage-06-opening-story",
+] as const;
+
+const STAGE6_COMPLETED_EVENT_IDS = [
+  ...STAGE6_BATTLE_EVENT_IDS,
+  "stage-06-objective-reached",
+  "stage-06-retreat-story",
+  "stage-06-reinforcements",
+  "stage-06-ranger-leader-move",
+  "stage-06-alliance-story",
+  "stage-06-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -500,7 +516,7 @@ async function createStage42Completed(context: DebugScenarioContext): Promise<Ga
     savedAt: "2000-01-01T00:00:00.000Z",
     saveCount: 1,
     stageId: "stage-06",
-    stageLabel: "第 6 關",
+    stageLabel: "過異世界之門",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
     rngState: campaign.rngState,
@@ -508,6 +524,83 @@ async function createStage42Completed(context: DebugScenarioContext): Promise<Ga
     roster: completeCampaignRoster(campaign.roster),
     stageProgress: 1000,
     consumedEventIds: [...STAGE42_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
+async function createStage6Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-06",
+    debugCampaign(context, "stage-06"),
+    { preparation: true, statusMessage: "調試場景：第 6 關異世界部署。" },
+  );
+  return controller;
+}
+
+async function stage6FullDeployment() {
+  const { STAGE6_DEFINITION } = await import("./content/stage6");
+  return {
+    placements: [
+      ...STAGE6_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE6_DEFINITION.deployment.optionalSlots.slice(0, 8).map((slot, index) => ({
+        slot, position: { ...STAGE6_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage6Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage6Deployment(context);
+  controller.completeDeployment(await stage6FullDeployment());
+  return controller;
+}
+
+async function createStage6Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-06");
+  const { Stage6Battle } = await import("./simulation/stage6-battle");
+  const battle = new Stage6Battle(campaign, await stage6FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 6 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-06"),
+    stageLabel: "過異世界之門",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE6_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：第 6 關九人編隊玩家回合。";
+  return controller;
+}
+
+async function createStage6Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-06");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-07",
+    stageLabel: "來到異世界",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(campaign.roster),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE6_COMPLETED_EVENT_IDS],
   };
   return GameController.fromSave(save, 1);
 }
@@ -604,6 +697,25 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-05-cleared": createStage5Completed,
   "stage-42-portal-live": createStage5Completed,
   "stage-42-completed-route": createStage42Completed,
+  "stage-06-deployment": createStage6Deployment,
+  "stage-06-prebattle": createStage6Prebattle,
+  "stage-06-player": createStage6Player,
+  "stage-06-near-xielei": withSetup(createStage6Player, (controller) => {
+    controller.forceVictorySetupForTest();
+  }),
+  "stage-06-near-defeat": withSetup(createStage6Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const enemy = controller.battle.units.find(({ side }) => side === 2);
+    if (!nia || !enemy) return;
+    nia.life = 1;
+    enemy.x = nia.x + 1;
+    enemy.y = nia.y;
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，敵兵位於相鄰格。";
+  }),
+  "stage-06-victory-ready": withSetup(createStage6Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-06-cleared": createStage6Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

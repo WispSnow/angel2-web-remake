@@ -56,6 +56,25 @@ export type StageSimulationEffectDefinition =
     type: "story-departures";
     actors: readonly { side: Side; slot: number }[];
     statusText: string;
+  }
+  | {
+    type: "story-reinforcements";
+    actors: readonly {
+      id: string;
+      source: { side: Side; slot: number };
+      position: Position;
+      name: string;
+      portrait: PortraitRecord;
+      forcedClassId?: UnitClassId;
+    }[];
+    statusText: string;
+  }
+  | {
+    type: "scripted-unit-arrival";
+    actorId: string;
+    target: { side: Side; portrait: PortraitRecord };
+    movementBudget: number;
+    statusText: string;
   };
 
 export const STAGE_SIMULATION_EFFECTS:

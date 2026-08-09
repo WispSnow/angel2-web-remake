@@ -66,6 +66,7 @@ import { techniqueEffectRange } from "./simulation/actions/range-map";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
 import { prepareScriptedLightning4 } from "./simulation/scripted-actions";
+import { emptyUnitStatuses } from "./simulation/status";
 import {
   createStageEventState,
   dispatchStageEvents,
@@ -1000,6 +1001,14 @@ export class GameController {
       }
       return;
     }
+    if (definition.type === "story-reinforcements") {
+      await this.runStoryReinforcements(definition);
+      return;
+    }
+    if (definition.type === "scripted-unit-arrival") {
+      await this.runScriptedUnitArrival(definition);
+      return;
+    }
     this.campaignRoute = definition.destination;
     if (isPlayableStageId(definition.destination)) {
       await this.enterStage(definition.destination, {
@@ -1108,6 +1117,117 @@ export class GameController {
     const path = this.battle.scriptedPath(messenger.id, target, definition.movementBudget);
     this.emit();
     await this.animateUnitPath(messenger.id, path, "scripted");
+    this.battle.focusId = target.id;
+    this.cursor = { x: target.x, y: target.y };
+    this.centerCamera(target);
+    this.busy = false;
+  }
+
+  private async runStoryReinforcements(
+    definition: Extract<
+      NonNullable<ReturnType<typeof stageSimulationEffectFor>>,
+      { type: "story-reinforcements" }
+    >,
+  ): Promise<void> {
+    const campaignRoster = this.battle.campaignSnapshot().roster;
+    const units = definition.actors.map((actor): BattleUnit => {
+      const sourceUnit = this.battle.unit(`${actor.source.side}:${actor.source.slot}`);
+      const rosterEntry = campaignRoster.find(({ slot }) => slot === actor.source.slot);
+      const classId = actor.forcedClassId
+        ?? sourceUnit?.classId
+        ?? rosterEntry?.classId
+        ?? "soldier";
+      const experience = sourceUnit?.experience ?? rosterEntry?.experience ?? 0;
+      const unit: BattleUnit = {
+        id: actor.id,
+        side: actor.source.side,
+        slot: actor.source.slot,
+        classId,
+        className: className(classId),
+        name: actor.name,
+        portrait: actor.portrait,
+        x: actor.position.x,
+        y: actor.position.y,
+        life: sourceUnit?.life ?? rosterEntry?.life ?? 1,
+        experience,
+        acted: true,
+        actionDisabled: sourceUnit?.actionDisabled ?? false,
+        statuses: sourceUnit ? { ...sourceUnit.statuses } : emptyUnitStatuses(),
+      };
+      const maximumLife = this.battle.statsFor(unit).maxLife;
+      unit.life = Math.max(0, Math.min(unit.life, maximumLife));
+      if (!sourceUnit && !rosterEntry) unit.life = maximumLife;
+      return unit;
+    });
+
+    this.phase = "scriptedMove";
+    this.statusMessage = definition.statusText;
+    if (this.skippingScriptedSequence) {
+      this.battle.appendStoryUnits(units);
+      const finalUnit = units.at(-1);
+      if (finalUnit) {
+        this.battle.focusId = finalUnit.id;
+        this.cursor = { x: finalUnit.x, y: finalUnit.y };
+        this.centerCamera(finalUnit);
+      }
+      return;
+    }
+
+    this.busy = true;
+    for (const unit of units) {
+      // Native 1000:533E focuses/redraws before writing each cell. That means
+      // the next focus reveals the previous reinforcement rather than the
+      // current write appearing immediately.
+      this.cursor = { x: unit.x, y: unit.y };
+      this.centerCamera(unit);
+      this.emit();
+      await pause(this.mapCombatDelay(3));
+      this.battle.appendStoryUnits([unit]);
+    }
+    const finalUnit = units.at(-1);
+    if (finalUnit) {
+      this.battle.focusId = finalUnit.id;
+      this.cursor = { x: finalUnit.x, y: finalUnit.y };
+      this.centerCamera(finalUnit);
+    }
+    this.emit();
+    await pause(this.mapCombatDelay(3));
+    this.busy = false;
+  }
+
+  private async runScriptedUnitArrival(
+    definition: Extract<
+      NonNullable<ReturnType<typeof stageSimulationEffectFor>>,
+      { type: "scripted-unit-arrival" }
+    >,
+  ): Promise<void> {
+    const actor = this.battle.unit(definition.actorId);
+    const target = this.battle.units.find(
+      (unit) => unit.side === definition.target.side
+        && unit.portrait === definition.target.portrait
+        && !unit.id.startsWith("story:"),
+    );
+    if (!actor || !target) throw new Error("scripted arrival actor or target is missing");
+    this.phase = "scriptedMove";
+    this.statusMessage = definition.statusText;
+    this.battle.focusId = actor.id;
+    this.cursor = { x: actor.x, y: actor.y };
+    this.centerCamera(actor);
+    const path = this.battle.scriptedPath(actor.id, target, definition.movementBudget);
+    if (this.skippingScriptedSequence) {
+      const destination = path.at(-1);
+      if (destination) {
+        actor.x = destination.x;
+        actor.y = destination.y;
+      }
+      this.battle.focusId = target.id;
+      this.cursor = { x: target.x, y: target.y };
+      this.centerCamera(target);
+      return;
+    }
+    this.busy = true;
+    this.emit();
+    await this.animateUnitPath(actor.id, path, "scripted");
     this.battle.focusId = target.id;
     this.cursor = { x: target.x, y: target.y };
     this.centerCamera(target);

@@ -61,6 +61,15 @@ const REPRESENTATIVE_STAGE4 = [
   { slot: 24, classPath: ["magician", "evil-mage"], experience: 540 },
 ] as const satisfies readonly DebugRosterEntrySpec[];
 
+const REPRESENTATIVE_STAGE6 = [
+  ...REPRESENTATIVE_STAGE4,
+  { slot: 5, classPath: ["soldier", "cavalry", "land-knight"], experience: 620 },
+  { slot: 6, classPath: ["soldier", "warrior", "divine-sword-warrior"], experience: 560 },
+  { slot: 12, classPath: ["soldier", "archer", "crossbow"], experience: 520 },
+  { slot: 13, classPath: ["soldier", "sister", "priest"], experience: 590 },
+  { slot: 14, classPath: ["soldier", "warrior", "steel-armor-warrior"], experience: 540 },
+] as const satisfies readonly DebugRosterEntrySpec[];
+
 const PROMOTION_COVERAGE_STAGE4 = [
   {
     slot: 0,
@@ -96,6 +105,15 @@ const PROMOTION_COVERAGE_STAGE4 = [
   { slot: 24, classPath: ["magician", "wizard"], experience: 660 },
 ] as const satisfies readonly DebugRosterEntrySpec[];
 
+const PROMOTION_COVERAGE_STAGE6 = [
+  ...PROMOTION_COVERAGE_STAGE4,
+  { slot: 5, classPath: ["soldier", "cavalry", "land-knight"], experience: 720 },
+  { slot: 6, classPath: ["soldier", "warrior", "divine-sword-warrior"], experience: 680 },
+  { slot: 12, classPath: ["soldier", "archer", "magic-archer"], experience: 650 },
+  { slot: 13, classPath: ["soldier", "sister", "monk"], experience: 620 },
+  { slot: 14, classPath: ["soldier", "warrior", "steel-armor-warrior"], experience: 640 },
+] as const satisfies readonly DebugRosterEntrySpec[];
+
 const DEBUG_ROSTER_PROFILE_SPECS = [
   {
     id: "template-baseline",
@@ -114,6 +132,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-04": REPRESENTATIVE_STAGE4,
       "stage-05": REPRESENTATIVE_STAGE4,
       "stage-42-portal": REPRESENTATIVE_STAGE4,
+      "stage-06": REPRESENTATIVE_STAGE6,
     },
   },
   {
@@ -127,6 +146,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-04": PROMOTION_COVERAGE_STAGE4,
       "stage-05": PROMOTION_COVERAGE_STAGE4,
       "stage-42-portal": PROMOTION_COVERAGE_STAGE4,
+      "stage-06": PROMOTION_COVERAGE_STAGE6,
     },
   },
 ] as const satisfies readonly {

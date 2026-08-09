@@ -22,6 +22,7 @@ export interface StageRuntimeAssets {
   map: string;
   minimap: string;
   storyBackground?: string;
+  storyBackgrounds?: Readonly<Partial<Record<number, string>>>;
   unitSprites: Readonly<Partial<Record<MapUnitSpriteKey, string>>>;
   routePulsePresentations?: readonly RoutePulsePresentationDefinition[];
 }
@@ -427,6 +428,56 @@ async function loadStage42PortalModule(): Promise<StageRuntimeModule> {
     },
     createBattle,
     restoreBattle: (campaign, snapshot) => restoreBattle(createBattle, campaign, snapshot),
+  };
+}
+
+async function loadStage6Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage6"),
+    import("./simulation/stage6-battle"),
+  ]);
+  content.activateStage6Content();
+  const definition = content.STAGE6_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 06",
+      title: content.STAGE6.name,
+      objective: content.STAGE6_DEFINITION.objective.victoryText,
+      minimap: content.STAGE6_ASSETS.minimap,
+      terrain: content.STAGE6_TERRAIN_TOKENS,
+      gridWidth: content.STAGE6.width,
+      gridHeight: content.STAGE6.height,
+      enemies: content.STAGE6_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；十二名候選最多選八人。擊敗西艾蕾即可。",
+    },
+    ["stage-06-enter-deployment"],
+    (campaign) => battleModule.createStage6DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 6 requires a deployment result");
+    return new battleModule.Stage6Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE6_DEFINITION,
+    assets: {
+      map: content.STAGE6_ASSETS.map,
+      minimap: content.STAGE6_ASSETS.minimap,
+      storyBackground: content.STAGE6_ASSETS.storyBackgrounds[5],
+      storyBackgrounds: content.STAGE6_ASSETS.storyBackgrounds,
+      unitSprites: content.STAGE6_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
   };
 }
 
@@ -911,7 +962,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "傳送門過場不可撤退。",
     },
     completion: {
-      destinationLabel: "第 6 關",
+      destinationLabel: "過異世界之門",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -935,6 +986,64 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage42PortalModule,
+  },
+  "stage-06": {
+    id: "stage-06",
+    ordinal: 6,
+    label: "過異世界之門",
+    nextStageId: "stage-07",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅率領第一軍團抵達異世界。",
+      campaignRoute: "stage-06",
+    },
+    enemyPhaseStatusText: "敵方階段：西艾蕾追擊隊開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始第 6 關部署。",
+      retreatStatusText: "全面撤退：返回第 6 關部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "來到異世界",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-06-enter-deployment",
+        "stage-06-prebattle-story",
+        "stage-06-opening-story",
+        "stage-06-objective-reached",
+        "stage-06-retreat-story",
+        "stage-06-reinforcements",
+        "stage-06-ranger-leader-move",
+        "stage-06-alliance-story",
+        "stage-06-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-06-enter-deployment",
+        "stage-06-prebattle-story",
+        "stage-06-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
+        maximumUnits: 9,
+        openCellCount: 8,
+      },
+      enemyClassById: [
+        ["2:46", "soldier"], ["2:47", "soldier"], ["2:43", "soldier"],
+        ["2:41", "archer"], ["2:40", "archer"], ["2:42", "cavalry"],
+        ["2:44", "soldier"], ["2:45", "soldier"], ["2:19", "land-knight"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage6Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

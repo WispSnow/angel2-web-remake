@@ -133,6 +133,23 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion19Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 19
+    || value.contentVersion !== "stage-05-portal-1") return undefined;
+  const stageLabel = value.kind === "completed"
+    && value.stageId === "stage-06"
+    && value.stageLabel === "第 6 關"
+    ? "過異世界之門"
+    : value.stageLabel;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    stageLabel,
+  });
+}
+
 function migrateVersion18Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 18
@@ -1276,6 +1293,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion19 = migrateVersion19Save(value);
+    if (migratedVersion19) return migratedVersion19;
     const migratedVersion18 = migrateVersion18Save(value);
     if (migratedVersion18) return migratedVersion18;
     const migratedVersion17 = migrateVersion17Save(value);

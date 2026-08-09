@@ -41,6 +41,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 4 關 · 通過力場",
     "第 5 關 · 遭遇丁塔琪",
     "第 5 關 · 異世界之門",
+    "第 6 關 · 過異世界之門",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -64,7 +65,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.getByTestId("debug-growth-reset")).toHaveText("恢復預設（每關 100）");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／第 5 關預算 500）",
+    "目前使用預設：每關 +100（第 1 關預算 100／第 6 關預算 600）",
   );
 
   await page.getByTestId("debug-difficulty").selectOption("3");
@@ -76,7 +77,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-per-stage-growth").fill("120");
   await page.getByTestId("debug-growth-apply").click();
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "已套用：每關 +120（第 1 關預算 120／第 5 關預算 600）",
+    "已套用：每關 +120（第 1 關預算 120／第 6 關預算 720）",
   );
   await expect(deployment).toHaveAttribute(
     "href",
@@ -86,6 +87,10 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "href",
     "/?debugScenario=stage-05-player&difficulty=3&roster=representative-growth&growth=120",
   );
+  await expect(page.getByTestId("debug-scenario-stage-06-player")).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-06-player&difficulty=3&roster=representative-growth&growth=120",
+  );
   await expect(page.getByTestId("debug-scenario-stage-00-player")).toHaveAttribute(
     "href",
     "/?debugScenario=stage-00-player&difficulty=3&roster=representative-growth",
@@ -93,7 +98,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-growth-reset").click();
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／第 5 關預算 500）",
+    "目前使用預設：每關 +100（第 1 關預算 100／第 6 關預算 600）",
   );
   await expect(deployment).toHaveAttribute(
     "href",

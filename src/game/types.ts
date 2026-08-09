@@ -13,7 +13,8 @@ export type StageId =
   | "stage-03"
   | "stage-04"
   | "stage-05"
-  | "stage-42-portal";
+  | "stage-42-portal"
+  | "stage-06";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -21,7 +22,8 @@ export type CampaignRouteId =
   | "stage-04"
   | "stage-05"
   | "stage-42-portal"
-  | "stage-06";
+  | "stage-06"
+  | "stage-07";
 
 export interface Position {
   x: number;
@@ -132,6 +134,8 @@ export interface DialoguePage {
     record: number | "promotion" | "battle-command" | "ai-technique";
     wait: number;
     address?: string;
+    /** Native PP background record active at this KY checkpoint. */
+    backgroundId?: number;
   };
 }
 
@@ -167,8 +171,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 19;
-  contentVersion: "stage-05-portal-1";
+  version: 20;
+  contentVersion: "stage-06-rangers-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -261,8 +261,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     "[data-action=skip-scripted-sequence]",
   );
   const storyBackground = required(root, "#story-background");
-  const storyBackgroundSource = stageAssets?.storyBackground ?? ASSETS.storyBackground;
-  storyBackground.style.backgroundImage = `url("${storyBackgroundSource}")`;
+  const defaultStoryBackgroundSource = stageAssets?.storyBackground ?? ASSETS.storyBackground;
+  storyBackground.style.backgroundImage = `url("${defaultStoryBackgroundSource}")`;
   const objectivePanel = required(root, "#objective-panel");
   const systemMenu = required(root, "#system-menu");
   const settingsMenu = required(root, "#settings-menu");
@@ -929,6 +929,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const dialogueVisible = page !== undefined;
     dialogueLayer.hidden = !dialogueVisible;
     storyBackground.hidden = controller.phase !== "prebattleStory";
+    const storyBackgroundSource = page?.source.backgroundId === undefined
+      ? defaultStoryBackgroundSource
+      : stageAssets?.storyBackgrounds?.[page.source.backgroundId] ?? defaultStoryBackgroundSource;
+    storyBackground.style.backgroundImage = `url("${storyBackgroundSource}")`;
+    if (page?.source.backgroundId === undefined) delete storyBackground.dataset.backgroundId;
+    else storyBackground.dataset.backgroundId = String(page.source.backgroundId);
     if (page) {
       const pageKey = controller.aiTechniqueDialogue
         ? `ai-technique:${controller.aiTechniqueDialogue.actor.id}:${controller.aiTechniqueDialogue.actionId}`
