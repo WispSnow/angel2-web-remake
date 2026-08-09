@@ -149,6 +149,60 @@ test("automatic magic-archer shooting never borrows a same-code technique declar
   expect(pageErrors).toEqual([]);
 });
 
+test("free action gives an allied magician the shared expert technique planner", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("magician");
+    const magician = arena.interact(24, 30);
+    arena.setClass("warrior");
+    const reserve = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    const firstTarget = arena.interact(26, 30);
+    const secondTarget = arena.interact(26, 31);
+    return [magician, reserve, firstTarget, secondTarget];
+  });
+  expect(placed).toEqual([true, true, true, true]);
+  await page.getByTestId("arena-start").click();
+
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.getByTestId("group-command-freeAction").click();
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "battle-command");
+  await dialogue.click();
+  if (await dialogue.getAttribute("data-source-record") === "battle-command") {
+    await dialogue.click();
+  }
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2_ARENA__?.getState().battle as
+      | ArenaBattleDebugState
+      | undefined;
+    return current?.specialActionPresentation !== undefined
+      || current?.lastSpecialAction?.actorId === "arena-1-0";
+  });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-allied-magician-free-action-technique.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2_ARENA__?.getState().battle as
+      | ArenaBattleDebugState
+      | undefined;
+    return current?.lastSpecialAction?.actorId === "arena-1-0";
+  });
+  const state = await arenaBattleState(page);
+  expect(["fire-1", "lightning-1", "ice-1"]).toContain(state?.lastSpecialAction?.actionId);
+  expect(pageErrors).toEqual([]);
+});
+
 test("ordinary melee status applies directly and appears in the unit HUD without a technique effect", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

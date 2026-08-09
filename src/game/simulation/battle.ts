@@ -1342,36 +1342,6 @@ export class Stage0Battle {
     }
 
     const behavior = this.alliedBehaviorFor(id);
-    const forceMembers = this.forces.membersForUnit(id, this.units);
-    const automaticLeader = behavior >= 4 && behavior % 2 === 0
-      ? (forceMembers.length > 0 ? forceMembers : this.units).find((candidate) =>
-        candidate.side === unit.side
-        && this.alliedBehaviorFor(candidate.id) === behavior - 1)
-      : undefined;
-    if (automaticLeader && automaticLeader.id !== unit.id) {
-      const leaderPath = shortestPath(
-        unit,
-        automaticLeader,
-        unit.classId,
-        this.statsFor(unit).movement,
-        this.units.filter((candidate) => candidate.id !== unit.id),
-        this.dynamicBattlefield,
-      );
-      if (leaderPath.length === 0) {
-        const path = routePath(
-          unit,
-          neighbors(automaticLeader, this.dynamicBattlefield),
-          this.units,
-          this.statsFor(unit).movement,
-          this.dynamicBattlefield,
-        );
-        if (path.length > 1) return { unitId: id, kind: "move", path };
-      }
-    }
-
-    const classAction = this.planClassAction(unit);
-    if (classAction) return classAction;
-
     const leader = leaderId && this.isPlayerControllableAlly(id)
       ? this.unit(leaderId)
       : undefined;
@@ -1396,7 +1366,11 @@ export class Stage0Battle {
       }
     }
 
-    return this.planOrdinaryAiAction(unit, 2, behavior);
+    const targetFilter = this.forces.targetFilterFor(id, this.units);
+    return this.planExpertCombatAction(unit, behavior !== 1, {
+      targetFilter,
+      behavior,
+    });
   }
 
   routePulseSafeArea(id: string): Position[] {
@@ -1483,7 +1457,7 @@ export class Stage0Battle {
       return action;
     }
     const targetFilter = this.forces.targetFilterFor(id, this.units);
-    return this.planExpertEnemyCombatAction(unit, behavior !== 1, {
+    return this.planExpertCombatAction(unit, behavior !== 1, {
       targetFilter,
       behavior,
     });
@@ -1506,12 +1480,12 @@ export class Stage0Battle {
       planClassAction: (candidate, requestedActionIds, options) =>
         this.planClassAction(candidate, requestedActionIds, {
           ...options,
-          expertRanking: candidate.side === 2,
+          expertRanking: true,
         }),
       planOrdinaryAction: (candidate, opponentSide, behavior, options) =>
         this.planOrdinaryAiAction(candidate, opponentSide, behavior, {
           ...options,
-          expertRanking: candidate.side === 2,
+          expertRanking: true,
         }),
       expertScore: (candidate, action) => expertAiScore(
         this.expertUtilityForAction(candidate, action),
@@ -1528,7 +1502,7 @@ export class Stage0Battle {
       return this.planConfusedAiAction(unit);
     }
     if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
-    return this.planExpertEnemyCombatAction(unit, intent === "pursuit", {
+    return this.planExpertCombatAction(unit, intent === "pursuit", {
       behavior: intent === "sentry" ? 1 : 2,
     });
   }
@@ -1595,7 +1569,7 @@ export class Stage0Battle {
     };
   }
 
-  protected planExpertEnemyCombatAction(
+  protected planExpertCombatAction(
     unit: BattleUnit,
     allowMove: boolean,
     options: {
@@ -1606,7 +1580,7 @@ export class Stage0Battle {
     const positionFilter = allowMove
       ? undefined
       : (position: Position) => positionKey(position) === positionKey(unit);
-    const iceIsForbidden = this.onlyIceCapableEnemiesRemain();
+    const iceIsForbidden = this.onlyIceCapableSideRemains(unit.side);
     const classAction = this.planClassAction(unit, undefined, {
       expertRanking: true,
       actionFilter: (actionId) => !iceIsForbidden || !isIceActionId(actionId),
@@ -1614,7 +1588,8 @@ export class Stage0Battle {
       targetFilter: (target) => target.side === unit.side
         || (options.targetFilter?.(target) ?? true),
     });
-    const ordinary = this.planOrdinaryAiAction(unit, 1, options.behavior, {
+    const opponentSide: BattleUnit["side"] = unit.side === 1 ? 2 : 1;
+    const ordinary = this.planOrdinaryAiAction(unit, opponentSide, options.behavior, {
       expertRanking: true,
       targetFilter: options.targetFilter,
     });
@@ -1636,6 +1611,7 @@ export class Stage0Battle {
     const criticallyInjured = unit.life * 100 < this.statsFor(unit).maxLife * 40;
     if (criticallyInjured
       && selectedUtility.guaranteedKills === 0
+      && selectedUtility.wizardHits === 0
       && selectedUtility.criticalSaves === 0) {
       const rest: AlliedAiAction = {
         unitId: unit.id,
@@ -1649,9 +1625,9 @@ export class Stage0Battle {
     return selected;
   }
 
-  private onlyIceCapableEnemiesRemain(): boolean {
-    const survivingEnemies = this.units.filter((candidate) => candidate.side === 2);
-    return survivingEnemies.length > 0 && survivingEnemies.every(hasIceTechnique);
+  private onlyIceCapableSideRemains(side: BattleUnit["side"]): boolean {
+    const survivors = this.units.filter((candidate) => candidate.side === side);
+    return survivors.length > 0 && survivors.every(hasIceTechnique);
   }
 
   private expertAiEvaluationContext(): ExpertAiEvaluationContext {
@@ -2233,6 +2209,35 @@ export class Stage0Battle {
       .sort((left, right) =>
         (left.y * this.stage.width + left.x) - (right.y * this.stage.width + right.x))
       .map(({ id }) => id);
+  }
+
+  /**
+   * REMAKE-037 gives default side-1 automatic actions the same squad-level
+   * reservation boundary as side 2. Explicit route, terrain-hold and follow
+   * strategies keep their authored row-major order.
+   */
+  nextAlliedActionId(candidateIds: readonly string[], leaderId?: string): string | undefined {
+    const candidates = new Set(candidateIds);
+    const stableOrder = this.alliedActionOrder(true).filter((id) => candidates.has(id));
+    if (stableOrder.length === 0) return undefined;
+    const hasExplicitStrategy = leaderId !== undefined || stableOrder.some((id) =>
+      this.routePulseByActorId.has(id)
+      || this.forces.definitionForUnit(id)?.doctrine.strategy === "terrain-hold");
+    if (hasExplicitStrategy) return stableOrder[0];
+
+    const planned = stableOrder.map((id, order) => {
+      const unit = this.unit(id);
+      const action = unit?.statuses.confusion
+        ? undefined
+        : this.planAlliedAiAction(id);
+      const score = unit && action
+        ? expertAiScore(this.expertUtilityForAction(unit, action))
+        : Number.MIN_SAFE_INTEGER;
+      return { id, score, order, action };
+    });
+    const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
+    return (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
+      .sort((left, right) => right.score - left.score || left.order - right.order)[0]?.id;
   }
 
   enemyActionOrder(): string[] {

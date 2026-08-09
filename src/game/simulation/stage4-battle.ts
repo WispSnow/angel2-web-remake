@@ -54,7 +54,7 @@ function stage4Forces(deployment: DeploymentResult): readonly ForceDefinition[] 
       control: "player",
       unitIds: playerUnitIds,
       commanderId: "1:0",
-      doctrine: { strategy: "native" },
+      doctrine: { strategy: "expert" },
     },
     {
       id: "barrier-guide",
@@ -64,7 +64,7 @@ function stage4Forces(deployment: DeploymentResult): readonly ForceDefinition[] 
       control: "independent-ai",
       unitIds: ["1:24"],
       commanderId: "1:24",
-      doctrine: { strategy: "native" },
+      doctrine: { strategy: "expert" },
     },
     {
       id: "castle-sentries",
@@ -73,7 +73,7 @@ function stage4Forces(deployment: DeploymentResult): readonly ForceDefinition[] 
       side: 2,
       control: "independent-ai",
       unitIds: ["2:40", "2:41"],
-      doctrine: { strategy: "native" },
+      doctrine: { strategy: "expert" },
       targeting: { preferredForceIds: ["nia-escort"], fallback: "all-opponents" },
     },
   ];

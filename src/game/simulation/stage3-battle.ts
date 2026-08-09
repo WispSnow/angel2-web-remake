@@ -41,7 +41,7 @@ const STAGE3_FORCE_DEFINITIONS = [
     control: "player",
     unitIds: sideUnitIds(1, [54, 53, 52, 51, 1, 4]),
     commanderId: "1:1",
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
   },
   {
     id: "fourth-corps",
@@ -67,7 +67,7 @@ const STAGE3_FORCE_DEFINITIONS = [
     side: 2,
     control: "independent-ai",
     unitIds: sideUnitIds(2, [42, 41, 40, 43, 17]),
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
     targeting: {
       preferredForceIds: ["fourth-corps"],
       fallback: "all-opponents",
@@ -80,7 +80,7 @@ const STAGE3_FORCE_DEFINITIONS = [
     side: 2,
     control: "independent-ai",
     unitIds: sideUnitIds(2, [44, 45, 47, 46, 50, 48, 49]),
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
     targeting: {
       preferredForceIds: ["himi-rescue-force"],
       fallback: "all-opponents",

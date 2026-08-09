@@ -65,4 +65,49 @@ describe("stage 8 battle simulation", () => {
     expect(battle.round).toBe(2);
     expect(battle.units.map(({ id, life }) => [id, life] as const)).toEqual(lifeBefore);
   });
+
+  it("lets a player magician handed to free action select an expert technique", () => {
+    const battle = new Stage8Battle({
+      ...campaign,
+      roster: completeCampaignRoster([
+        { slot: 8, classId: "cavalry", experience: 500, life: 180 },
+        { slot: 17, classId: "magician", experience: 620, life: 180 },
+        { slot: 18, classId: "priest", experience: 580, life: 180 },
+      ]),
+    });
+    const magician = battle.unit("1:17")!;
+    const targets = [battle.unit("2:30")!, battle.unit("2:35")!];
+    battle.units = battle.units.filter((unit) =>
+      unit.side === 1 || targets.some(({ id }) => id === unit.id));
+    Object.assign(magician, { x: 24, y: 30 });
+    Object.assign(targets[0], { x: 26, y: 30 });
+    Object.assign(targets[1], { x: 26, y: 31 });
+
+    expect(battle.planAlliedAiAction(magician.id)).toMatchObject({
+      unitId: magician.id,
+      kind: "special",
+    });
+  });
+
+  it("uses the same expert technique planner for an independent friendly NPC", () => {
+    const battle = new Stage8Battle(campaign);
+    const magician = battle.unit("1:40")!;
+    const targets = [battle.unit("2:30")!, battle.unit("2:35")!];
+    Object.assign(magician, {
+      classId: "magician",
+      className: "魔術士",
+      x: 24,
+      y: 30,
+    });
+    battle.units = battle.units.filter((unit) =>
+      unit.side === 1 || targets.some(({ id }) => id === unit.id));
+    Object.assign(targets[0], { x: 26, y: 30 });
+    Object.assign(targets[1], { x: 26, y: 31 });
+
+    expect(battle.isPlayerControllableAlly(magician.id)).toBe(false);
+    expect(battle.planAlliedAiAction(magician.id)).toMatchObject({
+      unitId: magician.id,
+      kind: "special",
+    });
+  });
 });

@@ -44,7 +44,7 @@ export class Stage42PortalBattle extends Stage0Battle {
         side: 1,
         control: "independent-ai",
         unitIds: STAGE42_SEMANTIC_ALLIED_UNITS.map(({ slot }) => `1:${slot}`),
-        doctrine: { strategy: "native" },
+        doctrine: { strategy: "expert" },
       }],
     } satisfies FixedStageScenarioConfig, campaign.roster);
     super(campaign.difficulty, rng, {

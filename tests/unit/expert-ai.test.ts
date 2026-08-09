@@ -10,7 +10,39 @@ const placements = () => [
   { id: "enemy-front", side: 2 as const, slot: 1, classId: "warrior" as const, level: 1 as const, x: 24, y: 30 },
 ];
 
-describe("REMAKE-033 stable-remake expert enemy AI", () => {
+describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
+  it("uses the same expert technique planner for free-action allies without planning RNG", () => {
+    const rng = new DeterministicRng(0x3701);
+    const battle = new ArenaBattle([
+      { id: "ally-magician", side: 1 as const, slot: 0, classId: "magician" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "ally-warrior", side: 1 as const, slot: 1, classId: "warrior" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-a", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
+      { id: "enemy-b", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 31 },
+    ], 0, rng);
+    const before = { state: rng.state, calls: rng.calls };
+
+    expect(battle.planAlliedAiAction("ally-magician")).toMatchObject({
+      kind: "special",
+      unitId: "ally-magician",
+    });
+    expect(battle.expertAiDecisionTrace("ally-magician")?.policy)
+      .toBe("stable-remake-expert");
+    expect({ state: rng.state, calls: rng.calls }).toEqual(before);
+  });
+
+  it("re-evaluates free-action ally priority from the current squad state", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-caster", side: 1 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "ally-front", side: 1 as const, slot: 1, classId: "warrior" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-a", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "enemy-b", side: 2 as const, slot: 1, classId: "warrior" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, new DeterministicRng(0x3702));
+    battle.unit("ally-front")!.life = 1;
+
+    expect(battle.nextAlliedActionId(["ally-caster", "ally-front"]))
+      .toBe("ally-caster");
+  });
+
   it("uses one deterministic policy at every campaign difficulty without planning RNG", () => {
     for (const difficulty of [0, 1, 2, 3] as const) {
       const rng = new DeterministicRng(0x3300 + difficulty);

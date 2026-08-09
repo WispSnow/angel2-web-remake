@@ -146,7 +146,7 @@ function arenaForces(units: readonly BattleUnit[]): readonly ForceDefinition[] {
       control: "player",
       unitIds: allies,
       commanderId: allies[0],
-      doctrine: { strategy: "native" },
+      doctrine: { strategy: "expert" },
     },
     {
       id: "arena-enemy-force",
@@ -155,7 +155,7 @@ function arenaForces(units: readonly BattleUnit[]): readonly ForceDefinition[] {
       side: 2,
       control: "independent-ai",
       unitIds: enemies,
-      doctrine: { strategy: "native" },
+      doctrine: { strategy: "expert" },
     },
   ];
 }

@@ -34,7 +34,7 @@ const STAGE8_FORCE_DEFINITIONS = [
     control: "player",
     unitIds: sideUnitIds(1, [8, 17, 18]),
     commanderId: "1:8",
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
   },
   {
     id: "ranger-screening-force",
@@ -43,7 +43,7 @@ const STAGE8_FORCE_DEFINITIONS = [
     side: 1,
     control: "independent-ai",
     unitIds: sideUnitIds(1, [40, 41, 42, 43, 44]),
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
   },
   {
     id: "dragon-tower-camp-raiders",
@@ -51,7 +51,7 @@ const STAGE8_FORCE_DEFINITIONS = [
     side: 2,
     control: "independent-ai",
     unitIds: sideUnitIds(2, [30, 35, 36, 38, 39, 40, 41, 42, 44, 45, 46]),
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
   },
 ] as const satisfies readonly ForceDefinition[];
 

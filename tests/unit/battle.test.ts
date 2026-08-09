@@ -289,7 +289,7 @@ describe("stage 0 battle simulation", () => {
     expect(battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)).toBe(true);
   });
 
-  it("plans ordinary allied AI attacks and leader-cohesion movement", () => {
+  it("plans expert allied AI attacks and explicit leader-cohesion movement", () => {
     const battle = battleAtPlayableOpening();
     const adjacentAlly = battle.unit("1:43")!;
     const freeAction = battle.planAlliedAiAction(adjacentAlly.id);

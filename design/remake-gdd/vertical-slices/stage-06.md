@@ -103,7 +103,7 @@ SAY 14 先用 `PP/5` 描述众人穿过异世界之门，再在军队逼近时�
 | 军团 ID | 阵营／控制 | 成员 | 策略／目标 |
 | --- | --- | --- | --- |
 | `nia-otherworld-vanguard` | side 1 / `player` | 槽 `0` 与当次选中的十二名候选 | 既有玩家命令；主将槽 `0` |
-| `xielei-pursuit-force` | side 2 / `independent-ai` | 槽 `19/40/41/42/43/44/45/46/47` | `native`；目标为全部 side 1 |
+| `xielei-pursuit-force` | side 2 / `independent-ai` | 槽 `19/40/41/42/43/44/45/46/47` | `expert`；目标为全部 side 1 |
 
 行为值只配置逐单位原版 AI 分派，不用于推断军团或控制权。动态胜利台阵属于不可操作的
 剧情投影，不追加到玩家军团，也不写回战役 roster。

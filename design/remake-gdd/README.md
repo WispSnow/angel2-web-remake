@@ -64,7 +64,7 @@
 | [`systems/techniques-stage1.md`](systems/techniques-stage1.md) | 复用 `1F/1H`，新增 `1L/1C` 与敌方修女调度 | M02 / 已实现并通过自动验收 |
 | [`systems/techniques-stage3.md`](systems/techniques-stage3.md) | 僧侣 `1H/1I`、范围回復、AI 与 255 tick 表现 | M04 / 已接受 |
 | [`systems/force-ai-groups.md`](systems/force-ai-groups.md) | 显式军团控制权、独立友军 AI、策略与跨军团目标 | M04 框架提取 / 已验证 |
-| [`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.md) | 唯一专家敌方效用、射手安全射程边缘、魔弓确定线路、冰雪排程、PRNG 与追踪边界 | M14.5/M14.6/M14.7 / 已验证 |
+| [`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.md) | 双方共享自动行动专家效用、射手／魔弓、冰雪排程、PRNG 与显式策略边界 | M14.5–M14.9 / 已验证 |
 | [`systems/force-field-escort.md`](systems/force-field-escort.md) | 路线尝试、移动安全区、生命减半与表现边界 | M06 / 已实现并通过自动验收 |
 | [`systems/technique-implementation-sequence.md`](systems/technique-implementation-sequence.md) | 33 项技术的机器顺序、逐项门禁与完成状态 | 系统例外 / 已验证 |
 | [`systems/technique-aa-attack-up.md`](systems/technique-aa-attack-up.md) | 攻击提升、完整轮计数、双方 AI、原版双格光柱与冰封例外 | 已实现并通过完整门禁 |
@@ -114,6 +114,7 @@
 - 第 4、5 关已于 2026-08-08 获用户接受；第 6 关、`REMAKE-028` 与 v20 随后作为有界例外
   实现，并于 2026-08-09 获用户接受。第 7 关 M12 已实现 `REMAKE-030` 与 v21 并于同日获
   用户试玩接受；第 8 关 M14 按 `REMAKE-032` 补播 SAY 157、升级 v23 后也已获用户接受；
-  `REMAKE-033/034/035/036` 专家敌方 AI、魔弓完整箭道与冰雪反制已获授权并适用于全部
-  已开放关卡；玩家在主目标后指定魔弓线路，冰雪最外圈外推到值 0，敌方仅在无击杀时
-  次优先有效命中巫師；当前使用 v27 保存身份并无损迁移 v26；第 9 关及其余战役继续冻结。
+  `REMAKE-033–037` 专家 AI、魔弓完整箭道、冰雪反制与双方共享默认自动规划已获授权并
+  适用于全部已开放关卡；玩家在主目标后指定魔弓线路，冰雪最外圈外推到值 0，无击杀时
+  次优先有效命中巫師；友军 NPC／“自由行动”与敌军共享专家规则，但防区、路线和跟随
+  保持显式覆盖。当前使用 v28 保存身份并无损迁移 v27；第 9 关及其余战役继续冻结。

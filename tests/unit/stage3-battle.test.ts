@@ -43,7 +43,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     expect(battle.forceForUnit("1:1")).toMatchObject({
       id: "himi-rescue-force",
       control: "player",
-      doctrine: { strategy: "native" },
+      doctrine: { strategy: "expert" },
     });
     expect(battle.forceForUnit("1:46")).toMatchObject({
       id: "fourth-corps",

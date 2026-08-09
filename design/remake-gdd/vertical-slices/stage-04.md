@@ -94,7 +94,7 @@
 | --- | --- | --- | --- |
 | `nia-escort` | side 1 / `player` | 槽 `0` 与当次选中的 `1/2/3/4/20/21` | 既有玩家命令；主将槽 `0` |
 | `barrier-guide` | side 1 / `independent-ai` | 槽 `24` | `native` 行为 `12` + `route-pulse` |
-| `castle-sentries` | side 2 / `independent-ai` | 槽 `40/41` | `native`；目标为全部 side 1 |
+| `castle-sentries` | side 2 / `independent-ai` | 槽 `40/41` | `expert`；目标为全部 side 1 |
 
 构造时由 [`force-ai-groups.md`](../systems/force-ai-groups.md) 验证每名已出场单位恰好属于一个
 军团。集团命令只作用于 `nia-escort`，不能接管葛蒂拉斯；独立引导者阶段完成后才进入敌方阶段。

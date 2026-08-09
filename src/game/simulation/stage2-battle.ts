@@ -35,7 +35,7 @@ const STAGE2_FORCE_DEFINITIONS = [
     side: 1,
     control: "player",
     unitIds: ["1:0", "1:2", "1:24"],
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
   },
   {
     id: "stage2-allied-corps",
@@ -44,7 +44,7 @@ const STAGE2_FORCE_DEFINITIONS = [
     side: 1,
     control: "independent-ai",
     unitIds: ["1:40", "1:41", "1:42", "1:43", "1:44", "1:45"],
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
   },
   {
     id: "stage2-enemy-force",
@@ -53,7 +53,7 @@ const STAGE2_FORCE_DEFINITIONS = [
     side: 2,
     control: "independent-ai",
     unitIds: STAGE2_SEMANTIC_ENEMY_UNITS.map(({ slot }) => `2:${slot}`),
-    doctrine: { strategy: "native" },
+    doctrine: { strategy: "expert" },
   },
 ] as const satisfies readonly ForceDefinition[];
 

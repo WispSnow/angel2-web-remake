@@ -91,7 +91,7 @@
 | 军团 ID | 阵营／控制 | 成员 | 策略／目标 |
 | --- | --- | --- | --- |
 | `nia-ranger-camp-defense` | side 1 / `player` | 槽 `0/1` 与当次选中的十一名候选 | 既有玩家命令；主将槽 `0` |
-| `death-valley-camp-raiders` | side 2 / `independent-ai` | 槽 `18/40/41/42/44/45/47/49/50/52/53` | `native`；目标为全部 side 1 |
+| `death-valley-camp-raiders` | side 2 / `independent-ai` | 槽 `18/40/41/42/44/45/47/49/50/52/53` | `expert`；目标为全部 side 1 |
 
 行为值只配置逐单位原版 AI 分派，不用于推断军团或控制权。
 

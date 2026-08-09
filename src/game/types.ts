@@ -178,8 +178,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 27;
-  contentVersion: "ice-counterplay-wizard-focus-1";
+  version: 28;
+  contentVersion: "shared-automatic-expert-ai-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

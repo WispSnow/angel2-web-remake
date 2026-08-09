@@ -2841,7 +2841,11 @@ export class GameController {
         .filter((id) => this.battle.isPlayerControllableAlly(id));
     const automaticIds = this.battle.alliedActionOrder(false);
     const runQueue = async (ids: readonly string[], followId?: string): Promise<boolean> => {
-      for (const id of ids) {
+      const pendingIds = new Set(ids);
+      while (pendingIds.size > 0) {
+        const id = this.battle.nextAlliedActionId([...pendingIds], followId);
+        if (!id) break;
+        pendingIds.delete(id);
         const action = this.battle.planAlliedAiAction(id, followId);
         if (!action) continue;
         if (await this.runAlliedAiAction(action)) return true;

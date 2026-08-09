@@ -91,11 +91,12 @@
 
 | 军团 ID | 阵营／控制 | 成员 | 策略／目标 |
 | --- | --- | --- | --- |
-| `sulanda-ranger-command` | side 1 / `player` | 槽 `8/17/18` | 既有玩家命令；主将槽 `8` |
-| `ranger-screening-force` | side 1 / `independent-ai` | 槽 `40/41/42/43/44` | `native`；保持行为 `2` 自动阶段 |
-| `dragon-tower-camp-raiders` | side 2 / `independent-ai` | 全部十一名敌军 | `native`；目标为全部 side 1 |
+| `sulanda-ranger-command` | side 1 / `player` | 槽 `8/17/18` | `expert` 自动教义；主将槽 `8` |
+| `ranger-screening-force` | side 1 / `independent-ai` | 槽 `40/41/42/43/44` | `expert`；保持独立友军自动阶段 |
+| `dragon-tower-camp-raiders` | side 2 / `independent-ai` | 全部十一名敌军 | `expert`；目标为全部 side 1 |
 
-行为值只配置逐单位原版 AI 分派，不在控制器或 UI 中推断军团。
+行为值保留原版内容证据和移动／警戒输入，不在控制器或 UI 中推断军团；`REMAKE-037`
+规定“自由行动”、独立友军与敌军默认共享同一专家动作候选和评分。
 
 ## 7. 胜负条件
 

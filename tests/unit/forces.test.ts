@@ -34,7 +34,7 @@ const unit = (id: string, side: Side): BattleUnit => ({
   statuses: emptyUnitStatuses(),
 });
 
-const nativeForce = (
+const expertForce = (
   id: string,
   side: Side,
   unitIds: readonly string[],
@@ -43,7 +43,7 @@ const nativeForce = (
   side,
   control: side === 1 ? "player" : "independent-ai",
   unitIds,
-  doctrine: { strategy: "native" },
+  doctrine: { strategy: "expert" },
 });
 
 describe("force registry", () => {
@@ -67,12 +67,12 @@ describe("force registry", () => {
       enemyClassPriority: {},
       alliedBehaviorById: new Map([["1:43", 0]]),
       forces: [
-        nativeForce("player-force", 1, ["1:0", "1:1", "1:40", "1:41", "1:42"]),
+        expertForce("player-force", 1, ["1:0", "1:1", "1:40", "1:41", "1:42"]),
         {
-          ...nativeForce("allied-npc", 1, ["1:43"]),
+          ...expertForce("allied-npc", 1, ["1:43"]),
           control: "independent-ai",
         },
-        nativeForce(
+        expertForce(
           "enemy-force",
           2,
           createStage0Units(0).filter(({ side }) => side === 2).map(({ id }) => id),
@@ -94,9 +94,9 @@ describe("force registry", () => {
   it("resolves each corps doctrine and preferred target independently, then uses its fallback", () => {
     const units = [unit("1:1", 1), unit("1:2", 1), unit("2:1", 2), unit("2:2", 2)];
     const definitions: ForceDefinition[] = [
-      nativeForce("left-allies", 1, ["1:1"]),
+      expertForce("left-allies", 1, ["1:1"]),
       {
-        ...nativeForce("right-allies", 1, ["1:2"]),
+        ...expertForce("right-allies", 1, ["1:2"]),
         control: "independent-ai",
         doctrine: {
           strategy: "terrain-hold",
@@ -108,11 +108,11 @@ describe("force registry", () => {
         },
       },
       {
-        ...nativeForce("first-enemies", 2, ["2:1"]),
+        ...expertForce("first-enemies", 2, ["2:1"]),
         targeting: { preferredForceIds: ["left-allies"], fallback: "all-opponents" },
       },
       {
-        ...nativeForce("second-enemies", 2, ["2:2"]),
+        ...expertForce("second-enemies", 2, ["2:2"]),
         targeting: { preferredForceIds: ["right-allies"], fallback: "wait" },
       },
     ];
@@ -123,7 +123,7 @@ describe("force registry", () => {
       return availableUnits.filter(targetFilter);
     };
 
-    expect(registry.definitionForUnit("1:1")?.doctrine.strategy).toBe("native");
+    expect(registry.definitionForUnit("1:1")?.doctrine.strategy).toBe("expert");
     expect(registry.definitionForUnit("1:2")?.doctrine.strategy).toBe("terrain-hold");
     expect(targetsFor("2:1", units)).toEqual([units[0]]);
     expect(targetsFor("2:2", units)).toEqual([units[1]]);
@@ -139,29 +139,29 @@ describe("force registry", () => {
   it("rejects duplicate membership, invalid commanders, friendly targets and invalid doctrine data", () => {
     const units = [unit("1:1", 1), unit("1:2", 1), unit("2:1", 2)];
     expect(() => new ForceRegistry([
-      nativeForce("one", 1, ["1:1"]),
-      nativeForce("two", 1, ["1:1"]),
+      expertForce("one", 1, ["1:1"]),
+      expertForce("two", 1, ["1:1"]),
     ], units)).toThrow(/belongs to both/);
 
     expect(() => new ForceRegistry([{
-      ...nativeForce("one", 1, ["1:1"]),
+      ...expertForce("one", 1, ["1:1"]),
       commanderId: "1:2",
     }], units)).toThrow(/not a member/);
 
     expect(() => new ForceRegistry([
-      nativeForce("one", 1, ["1:1"]),
+      expertForce("one", 1, ["1:1"]),
     ], units.filter(({ side }) => side === 1))).toThrow(/missing an explicit force assignment/);
 
     expect(() => new ForceRegistry([
-      nativeForce("one", 1, ["1:1"]),
+      expertForce("one", 1, ["1:1"]),
       {
-        ...nativeForce("two", 1, ["1:2"]),
+        ...expertForce("two", 1, ["1:2"]),
         targeting: { preferredForceIds: ["one"], fallback: "wait" },
       },
     ], units.filter(({ side }) => side === 1))).toThrow(/cannot target friendly force/);
 
     expect(() => new ForceRegistry([{
-      ...nativeForce("one", 1, ["1:1"]),
+      ...expertForce("one", 1, ["1:1"]),
       doctrine: {
         strategy: "terrain-hold",
         allowedTerrainSlots: [3],

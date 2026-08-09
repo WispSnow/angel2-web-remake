@@ -44,7 +44,7 @@ function stage5Forces(deployment: DeploymentResult): readonly ForceDefinition[] 
       control: "player",
       unitIds: deployment.placements.map(({ slot }) => `1:${slot}`),
       commanderId: "1:0",
-      doctrine: { strategy: "native" },
+      doctrine: { strategy: "expert" },
     },
     {
       id: "knight-elite",
@@ -52,7 +52,7 @@ function stage5Forces(deployment: DeploymentResult): readonly ForceDefinition[] 
       side: 2,
       control: "independent-ai",
       unitIds: STAGE5_SEMANTIC_ENEMY_UNITS.map(({ slot }) => `2:${slot}`),
-      doctrine: { strategy: "native" },
+      doctrine: { strategy: "expert" },
     },
   ];
 }

@@ -53,6 +53,7 @@
 - [`milestones/M14.6-ranged-and-ice-ai.md`](milestones/M14.6-ranged-and-ice-ai.md)：专家射手与冰雪排程；
 - [`milestones/M14.7-directed-magic-arrow.md`](milestones/M14.7-directed-magic-arrow.md)：魔弓完整箭道控制；
 - [`milestones/M14.8-ice-counterplay-wizard-focus.md`](milestones/M14.8-ice-counterplay-wizard-focus.md)：冰雪反制与巫師仇恨；
+- [`milestones/M14.9-shared-automatic-expert-ai.md`](milestones/M14.9-shared-automatic-expert-ai.md)：双方共享自动行动专家 AI；
 - [`work-items/M00-native-side-panel-hotspots.md`](work-items/M00-native-side-panel-hotspots.md)：原版右栏战术桌 12 个鼠标热点的实现顺序与验收边界。
 
 ## 维护规则

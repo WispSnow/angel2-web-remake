@@ -553,6 +553,17 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v27 battle and completed saves into the shared automatic expert AI identity", () => {
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 27,
+        contentVersion: "ice-counterplay-wizard-focus-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v26 battle and completed saves into the ice counterplay identity", () => {
     for (const current of [battleSave(), completedSave()]) {
       const legacy = {

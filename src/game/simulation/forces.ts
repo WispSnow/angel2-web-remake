@@ -4,8 +4,8 @@ import type { BattleUnit, Side } from "../types";
 
 export type ForceControl = "player" | "independent-ai";
 
-export interface NativeForceAiDoctrine {
-  strategy: "native";
+export interface ExpertForceAiDoctrine {
+  strategy: "expert";
 }
 
 export interface TerrainHoldForceAiDoctrine {
@@ -20,7 +20,7 @@ export interface TerrainHoldForceAiDoctrine {
   preserveNativeFormation: boolean;
 }
 
-export type ForceAiDoctrine = NativeForceAiDoctrine | TerrainHoldForceAiDoctrine;
+export type ForceAiDoctrine = ExpertForceAiDoctrine | TerrainHoldForceAiDoctrine;
 
 export interface ForceTargetingPolicy {
   preferredForceIds: readonly string[];

@@ -1612,7 +1612,7 @@ describe("Stage-0 class actions", () => {
     });
   });
 
-  it("makes allied sister AI heal real missing life before selecting fire", () => {
+  it("makes allied expert sister AI rescue critical life before selecting fire", () => {
     const battle = new Stage0Battle(0);
     const actor = battle.unit("1:0")!;
     const ally = battle.units.find((unit) => unit.side === 1 && unit.id !== actor.id)!;
@@ -1620,7 +1620,7 @@ describe("Stage-0 class actions", () => {
     promoteForAction(actor, "heal-1");
     battle.units = [actor, ally, enemy];
     actor.life = battle.statsFor(actor).maxLife;
-    ally.life = Math.max(1, battle.statsFor(ally).maxLife - 80);
+    ally.life = 1;
     const destinations = battle.actionRange(actor.id, "heal-1").cells();
     const allyCell = destinations.find((cell) =>
       cell.x !== actor.x || cell.y !== actor.y)!;
