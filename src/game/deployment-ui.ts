@@ -19,6 +19,8 @@ import type { StageDeploymentPresentation } from "./stage-runtime";
 
 /** Longest preview side that still leaves the rail room for the read-out. */
 const MINIMAP_MAX_PIXELS = 128;
+/** Keeps a wrapped 9+ cell picker and the character read-out inside 350 px. */
+const DENSE_MINIMAP_MAX_PIXELS = 96;
 
 const ACTION_CATEGORY_LABEL = {
   ordinary: "普通",
@@ -173,6 +175,7 @@ export function mountDeploymentUi(
   root.setAttribute("role", "application");
   root.setAttribute("aria-label", `${presentation.title}出擊準備；方向鍵移動，Control、Insert 或空白鍵主操作，Alt、Delete 或 Enter 次操作，Tab 切換落點焦點`);
 
+  const denseOpenCells = session.state.definition.openCells.length > 8;
   const minimap = new DeploymentMinimap({
     source: presentation.minimap,
     viewBox: terrainContentBounds(
@@ -180,7 +183,7 @@ export function mountDeploymentUi(
       presentation.gridWidth,
       presentation.gridHeight,
     ),
-    maxPixels: MINIMAP_MAX_PIXELS,
+    maxPixels: denseOpenCells ? DENSE_MINIMAP_MAX_PIXELS : MINIMAP_MAX_PIXELS,
   });
   const deploymentZone = (() => {
     const cells = [
@@ -285,7 +288,7 @@ export function mountDeploymentUi(
               aria-hidden="true" style="left:${blinkRect.left}px;top:${blinkRect.top}px;
               width:${blinkRect.size}px;height:${blinkRect.size}px"></span>` : ""}
           </div>
-          <div class="deployment-open-cells" aria-label="可選部署落點">${landingChips}</div>
+          <div class="deployment-open-cells${denseOpenCells ? " is-dense" : ""}" aria-label="可選部署落點">${landingChips}</div>
           <p class="visually-hidden" aria-live="polite">
             ${current ? `下一落點 ${current.x},${current.y}` : "部署格已用完"}
           </p>

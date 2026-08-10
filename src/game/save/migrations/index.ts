@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion32Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 32
+    || value.contentVersion !== "stage-11-ranger-reinforcements-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion31Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 31
@@ -1451,6 +1462,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion32 = migrateVersion32Save(value);
+    if (migratedVersion32) return migratedVersion32;
     const migratedVersion31 = migrateVersion31Save(value);
     if (migratedVersion31) return migratedVersion31;
     const migratedVersion30 = migrateVersion30Save(value);

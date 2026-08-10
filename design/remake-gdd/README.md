@@ -2,13 +2,14 @@
 
 版本：Draft 0.7
 
-日期：2026-08-09
+日期：2026-08-10
 
-阶段：第 0–9 关已接受；内部第 11 关“拯救蘇蘭達”已验证、等待用户试玩；内部第 10 关及后续内容冻结
+阶段：第 0–9 关与内部第 11 关已接受；内部第 10 关“飛船上遭遇敵人”已验证待试玩；stage 12 及后续内容冻结
 
-开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关已获用户接受；用户随后
-授权内部第 11 关作为 M18 有界实现例外，`REMAKE-041` 已闭合并通过自动与视觉门禁；
-内部第 10 关及后续运行时仍冻结
+开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关与内部第 11 关已获用户
+接受；用户随后授权内部第 10 关作为 M20 有界实现例外，`REMAKE-042` 与自动／视觉门禁
+已闭合，等待用户试玩；内部
+stage 12 及后续运行时仍冻结
 
 ## 文档目的
 
@@ -54,7 +55,8 @@
 | [`vertical-slices/stage-07.md`](vertical-slices/stage-07.md) | 双背景营地剧情、双固定部署、萊莉首领目标与第 8 关边界 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-08.md`](vertical-slices/stage-08.md) | 三背景营地剧情、固定八名玩家、全灭目标、SAY 157 与第 9 关边界 | Draft 0.3 / 已接受后优化 |
 | [`vertical-slices/stage-09.md`](vertical-slices/stage-09.md) | 多莉引路、双胜利／双保护、行为 12 安全终点与非连续 stage 11 路由 | Draft 0.1 / 已接受 |
-| [`vertical-slices/stage-11.md`](vertical-slices/stage-11.md) | 固定撤离战、每轮南端增援、多莉剧情离场、蘇蘭達登船目标与 stage 10 路由 | Draft 0.2 / 已验证待试玩 |
+| [`vertical-slices/stage-11.md`](vertical-slices/stage-11.md) | 固定撤离战、每轮南端增援、多莉剧情离场、蘇蘭達登船目标与 stage 10 路由 | Draft 0.2 / 已接受 |
+| [`vertical-slices/stage-10.md`](vertical-slices/stage-10.md) | BK/10 关前剧情、1–13 人飞船部署、五名追兵、全灭／妮雅保护与 stage 12 路由 | Draft 0.1 / 已验证待试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
@@ -123,5 +125,6 @@
   NPC 友军；v29 保存身份无损迁移 v28。用户随后接受第 8 关并授权推进第 9 关；M15 已闭合
   B/0019、SAY `22/23/91`、`REMAKE-039/040` 与 stage 11 路由；M16 通过门禁后获用户接受。
   M17/M18 又按 B/0023、SAY `24–27/93/128/129` 与 `REMAKE-041` 实现内部第 11 关
-  “拯救蘇蘭達”、每轮南端无限可复用增援、多莉剧情离场、蘇蘭達登船和 v32；自动与视觉
-  门禁通过，等待用户试玩。
+  “拯救蘇蘭達”、每轮南端无限可复用增援、多莉剧情离场、蘇蘭達登船和 v32；用户于
+  2026-08-10 试玩接受。M19/M20 随后解冻内部 stage 10“飛船上遭遇敵人”，闭合 B/0021、
+  SAY `28/94/129/130`、`REMAKE-042`、v33 与 stage 12 冻结边界。

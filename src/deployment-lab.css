@@ -413,10 +413,14 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 4px;
+  min-width: 0;
   min-height: 0;
 }
 
-.deployment-map-panel { padding: 0 3px 3px; }
+.deployment-map-panel {
+  min-width: 0;
+  padding: 0 3px 3px;
+}
 
 .deployment-legend {
   display: flex;
@@ -478,7 +482,17 @@
 .deployment-open-cells {
   display: flex;
   gap: 2px;
+  min-width: 0;
   margin-top: 3px;
+}
+
+/* Stage 10 exposes twelve landing cells. Keeping them in one flex row gives
+   the panel a 300 px min-content width and pushes the centred minimap beyond
+   the fixed 142 px rail. Wrap dense pickers without changing the 3–8 cell
+   presentation used by earlier stages. */
+.deployment-open-cells.is-dense {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .deployment-open-cell {

@@ -162,6 +162,17 @@ const STAGE11_COMPLETED_EVENT_IDS = [
   "stage-11-completed-route",
 ] as const;
 
+const STAGE10_BATTLE_EVENT_IDS = [
+  "stage-10-prebattle-story",
+  "stage-10-enter-deployment",
+] as const;
+
+const STAGE10_COMPLETED_EVENT_IDS = [
+  ...STAGE10_BATTLE_EVENT_IDS,
+  "stage-10-objective-reached",
+  "stage-10-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -927,6 +938,83 @@ async function createStage11Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage10Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-10", debugCampaign(context, "stage-10"));
+  return controller;
+}
+
+async function createStage10Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-10",
+    debugCampaign(context, "stage-10"),
+    { preparation: true, statusMessage: "調試場景：飛船甲板部署。" },
+  );
+  return controller;
+}
+
+async function stage10FullDeployment() {
+  const { STAGE10_DEFINITION } = await import("./content/stage10");
+  return {
+    placements: [
+      ...STAGE10_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE10_DEFINITION.deployment.optionalSlots.slice(0, 12).map((slot, index) => ({
+        slot, position: { ...STAGE10_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage10Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-10");
+  const { Stage10Battle } = await import("./simulation/stage10-battle");
+  const battle = new Stage10Battle(campaign, await stage10FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 10 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-10"),
+    stageLabel: "飛船上遭遇敵人",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE10_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：飛船防衛隊十三人玩家回合。";
+  return controller;
+}
+
+async function createStage10Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-10");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-12",
+    stageLabel: "落入沼澤",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(campaign.roster),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE10_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -1137,6 +1225,45 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-11-cleared": createStage11Completed,
+  "stage-10-prebattle": createStage10Prebattle,
+  "stage-10-deployment": createStage10Deployment,
+  "stage-10-player": createStage10Player,
+  "stage-10-near-victory": withSetup(createStage10Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const finalEnemy = controller.battle.unit("2:20");
+    if (!nia || !finalEnemy) return;
+    nia.x = 26;
+    nia.y = 20;
+    nia.experience = 0;
+    nia.life = controller.battle.statsFor(nia).maxLife;
+    nia.acted = false;
+    finalEnemy.x = 27;
+    finalEnemy.y = 20;
+    finalEnemy.life = 1;
+    controller.battle.units = controller.battle.units.filter(
+      ({ side, id }) => side === 1 || id === finalEnemy.id,
+    );
+    for (const ally of controller.battle.units.filter(({ side, id }) => side === 1 && id !== nia.id)) {
+      ally.acted = true;
+    }
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 22, y: 17 };
+    controller.statusMessage = "調試場景：最後一名飛船追兵只剩 1 點生命。";
+  }),
+  "stage-10-near-defeat": withSetup(createStage10Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const kenosi = controller.battle.unit("2:20");
+    if (!nia || !kenosi) return;
+    nia.life = 1;
+    kenosi.x = nia.x + 1;
+    kenosi.y = nia.y;
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，克諾絲位於相鄰格。";
+  }),
+  "stage-10-victory-ready": withSetup(createStage10Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-10-cleared": createStage10Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

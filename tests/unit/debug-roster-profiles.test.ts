@@ -37,6 +37,7 @@ const stageIds = [
   "stage-08",
   "stage-09",
   "stage-11",
+  "stage-10",
 ] as const satisfies readonly StageId[];
 const workspace = path.resolve(import.meta.dirname, "../..");
 
@@ -228,7 +229,7 @@ describe("debug roster profiles", () => {
       .toThrow("沒有可覆蓋的友軍");
   });
 
-  it("carries Sulanda's mandatory stage-eight cavalry baseline into direct stage-eleven profiles", () => {
+  it("carries Sulanda's mandatory stage-eight cavalry baseline into later direct-entry profiles", () => {
     const profiles = [
       ["template-baseline", undefined],
       ["representative-growth", undefined],
@@ -237,14 +238,16 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const [profileId, perStageGrowth] of profiles) {
-      const roster = debugRosterForProfile(profileId, "stage-11", perStageGrowth);
-      expect(roster[8], `${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
-        slot: 8,
-        classId: "cavalry",
-        experience: 299,
-        life: classStatsFor({ classId: "cavalry", experience: 299 }).maxLife,
-      });
+    for (const stageId of ["stage-11", "stage-10"] as const) {
+      for (const [profileId, perStageGrowth] of profiles) {
+        const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
+        expect(roster[8], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
+          slot: 8,
+          classId: "cavalry",
+          experience: 299,
+          life: classStatsFor({ classId: "cavalry", experience: 299 }).maxLife,
+        });
+      }
     }
   });
 

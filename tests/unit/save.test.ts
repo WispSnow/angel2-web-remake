@@ -31,6 +31,8 @@ import { Stage8Battle } from "../../src/game/simulation/stage8-battle";
 import { STAGE9_DEFINITION } from "../../src/game/content/stage9";
 import { Stage9Battle } from "../../src/game/simulation/stage9-battle";
 import { Stage11Battle } from "../../src/game/simulation/stage11-battle";
+import { STAGE10_DEFINITION } from "../../src/game/content/stage10";
+import { Stage10Battle } from "../../src/game/simulation/stage10-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -597,6 +599,59 @@ const stage11BattleSave = (reinforcementCount = 1): BattleSaveData => {
   };
 };
 
+const stage10BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-10" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x90a0_b0c0,
+    rngCalls: 47,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 620, life: 220 },
+      { slot: 8, classId: "cavalry", experience: 299, life: 200 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE10_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      {
+        slot: STAGE10_DEFINITION.deployment.optionalSlots[0],
+        position: { ...STAGE10_DEFINITION.deployment.openCells[0] },
+        fixed: false,
+      },
+    ],
+  };
+  const battle = new Stage10Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-10T12:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-10",
+    stageLabel: "飛船上遭遇敵人",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: ["stage-10-prebattle-story", "stage-10-enter-deployment"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -653,6 +708,15 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v32 saves to the stage 10 airship identity", () => {
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 32,
+      contentVersion: "stage-11-ranger-reinforcements-1",
+    }))).toEqual(current);
+  });
+
   it("migrates v31 saves to the stage 11 reinforcement identity", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
@@ -1146,6 +1210,21 @@ describe("Web save validation", () => {
       ...stage11Completed,
       consumedEventIds: stage11Completed.consumedEventIds.slice(0, -1),
     })).toBe(false);
+
+    const stage10Completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-12",
+      stageLabel: "落入沼澤",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-10-prebattle-story",
+        "stage-10-enter-deployment",
+        "stage-10-objective-reached",
+        "stage-10-completed-route",
+      ],
+    };
+    expect(isSaveData(stage10Completed)).toBe(true);
+    expect(isSaveData({ ...stage10Completed, stageLabel: "下一關" })).toBe(false);
   });
 
   it("validates stage 9 battle saves with Dori's template class in the live roster", () => {
@@ -1196,6 +1275,27 @@ describe("Web save validation", () => {
     expect(saturated.battle.units.find(({ id }) => id === "2:79"))
       .toMatchObject({ classId: "soldier" });
     expect(isSaveData(saturated)).toBe(true);
+  });
+
+  it("validates stage 10 deployment saves and all five fixed enemy classes", () => {
+    const save = stage10BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual(["1:0", "1:1"]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(5);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: ["stage-10-prebattle-story"],
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:20"
+          ? { ...unit, classId: "pegasus-warrior" as const, className: "飛馬戰士" }
+          : unit),
+      },
+    })).toBe(false);
   });
 
   it("migrates the v19 stage-06 boundary label into its playable title", () => {

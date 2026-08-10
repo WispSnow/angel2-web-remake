@@ -40,6 +40,7 @@
     "content:stage7": "node scripts/generate-stage7-runtime.mjs",
     "content:stage8": "node scripts/generate-stage8-runtime.mjs",
     "content:stage9": "node scripts/generate-stage9-runtime.mjs",
+    "content:stage10": "node scripts/generate-stage10-runtime.mjs",
     "content:stage11": "node scripts/generate-stage11-runtime.mjs",
     "content:actions": "node scripts/generate-stage0-actions.mjs && node scripts/generate-stage1-actions.mjs",
     "content:terrain-actions": "node scripts/generate-dynamic-terrain-assets.mjs",

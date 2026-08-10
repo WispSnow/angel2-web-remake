@@ -32,9 +32,10 @@ describe("stage runtime manifest", () => {
       "stage-08",
       "stage-09",
       "stage-11",
+      "stage-10",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ ordinal }) => ordinal))
-      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10]);
+      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ nextStageId }) => nextStageId)).toEqual([
       "stage-01",
       "stage-02",
@@ -48,6 +49,7 @@ describe("stage runtime manifest", () => {
       "stage-09",
       "stage-11",
       "stage-10",
+      "stage-12",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ label }) => label)).toEqual([
       "瓦爾克麗宮",
@@ -62,6 +64,7 @@ describe("stage runtime manifest", () => {
       "營地遭到偷襲",
       "找尋傳說中的飛船",
       "拯救蘇蘭達",
+      "飛船上遭遇敵人",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ completion }) => completion.destinationLabel))
       .toEqual([
@@ -71,6 +74,7 @@ describe("stage runtime manifest", () => {
         "找尋傳說中的飛船",
         "拯救蘇蘭達",
         "飛船上遭遇敵人",
+        "落入沼澤",
       ]);
     expect(isPlayableStageId("stage-03")).toBe(true);
     expect(isPlayableStageId("stage-04")).toBe(true);
@@ -81,6 +85,7 @@ describe("stage runtime manifest", () => {
     expect(isPlayableStageId("stage-08")).toBe(true);
     expect(isPlayableStageId("stage-09")).toBe(true);
     expect(isPlayableStageId("stage-11")).toBe(true);
+    expect(isPlayableStageId("stage-10")).toBe(true);
     expect(stageRuntimeSourceForDestination("stage-04")?.id).toBe("stage-03");
     expect(stageRuntimeSourceForDestination("stage-05")?.id).toBe("stage-04");
     expect(stageRuntimeSourceForDestination("stage-42-portal")?.id).toBe("stage-05");
@@ -88,6 +93,8 @@ describe("stage runtime manifest", () => {
     expect(stageRuntimeSourceForDestination("stage-07")?.id).toBe("stage-06");
     expect(stageRuntimeSourceForDestination("stage-08")?.id).toBe("stage-07");
     expect(stageRuntimeSourceForDestination("stage-09")?.id).toBe("stage-08");
+    expect(stageRuntimeSourceForDestination("stage-10")?.id).toBe("stage-11");
+    expect(stageRuntimeSourceForDestination("stage-12")?.id).toBe("stage-10");
     expect(stageRuntimeSourceForDestination("stage-11")?.id).toBe("stage-09");
     expect(stageRuntimeSourceForDestination("stage-10")?.id).toBe("stage-11");
     expect(STAGE_RUNTIME_MANIFEST["stage-03"].mapPresentationActionIds).toContain("recovery-1");

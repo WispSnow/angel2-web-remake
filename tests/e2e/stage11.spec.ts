@@ -200,7 +200,7 @@ test("S11-F/G: defeat rebuilds the opening and completion routes to internal sta
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -228,13 +228,19 @@ test("S11-F/G: defeat rebuilds the opening and completion routes to internal sta
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-11",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-10",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-10",
+    activeStoryId: "stage-10-prebattle-story",
   });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "28");
 
   await page.goto("/?debugScenario=stage-11-cleared&difficulty=0&test=1");
-  await waitForPhase(page, "nextStage");
-  expect(await state(page)).toMatchObject({ campaignRoute: "stage-10" });
+  await waitForPhase(page, "prebattleStory");
+  expect(await state(page)).toMatchObject({
+    stageId: "stage-10",
+    campaignRoute: "stage-10",
+    activeStoryId: "stage-10-prebattle-story",
+  });
 });

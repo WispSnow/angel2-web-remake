@@ -621,6 +621,56 @@ async function loadStage11Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage10Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage10"),
+    import("./simulation/stage10-battle"),
+  ]);
+  content.activateStage10Content();
+  const definition = content.STAGE10_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 10",
+      title: content.STAGE10.name,
+      objective: content.STAGE10_DEFINITION.objective.victoryText,
+      minimap: content.STAGE10_ASSETS.minimap,
+      terrain: content.STAGE10_TERRAIN_TOKENS,
+      gridWidth: content.STAGE10.width,
+      gridHeight: content.STAGE10.height,
+      enemies: content.STAGE10_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；十九名候選最多選十二人。擊退全部飛船追兵並保護妮雅。",
+    },
+    ["stage-10-prebattle-story", "stage-10-enter-deployment"],
+    (campaign) => battleModule.createStage10DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 10 requires a deployment result");
+    return new battleModule.Stage10Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE10_DEFINITION,
+    assets: {
+      map: content.STAGE10_ASSETS.map,
+      minimap: content.STAGE10_ASSETS.minimap,
+      storyBackground: content.STAGE10_ASSETS.storyBackgrounds[10],
+      storyBackgrounds: content.STAGE10_ASSETS.storyBackgrounds,
+      unitSprites: content.STAGE10_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -1405,6 +1455,60 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage11Module,
+  },
+  "stage-10": {
+    id: "stage-10",
+    ordinal: 11,
+    label: "飛船上遭遇敵人",
+    nextStageId: "stage-12",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "追兵已追上飛船，妮雅一行準備迎戰。",
+      campaignRoute: "stage-10",
+    },
+    enemyPhaseStatusText: "敵方階段：克諾絲飛船追擊隊開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始飛船甲板關前流程。",
+      retreatStatusText: "全面撤退：返回飛船甲板關前流程並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "落入沼澤",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-10-prebattle-story",
+        "stage-10-enter-deployment",
+        "stage-10-objective-reached",
+        "stage-10-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-10-prebattle-story",
+        "stage-10-enter-deployment",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        maximumUnits: 13,
+        openCellCount: 12,
+      },
+      enemyClassById: [
+        ["2:43", "pegasus-warrior"],
+        ["2:42", "half-dragon-warrior"],
+        ["2:20", "half-dragon-warrior"],
+        ["2:40", "pegasus-warrior"],
+        ["2:41", "pegasus-warrior"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage10Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 
