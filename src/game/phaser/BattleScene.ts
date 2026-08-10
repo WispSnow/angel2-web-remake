@@ -1261,13 +1261,17 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ? { kind: "wave" as const, frame: special.frame, durationNativeTicks: 2 }
               : { kind: "cleanup" as const, frame: special.frame, durationNativeTicks: 10 };
           if (frame) {
+            // `1000:6DE8` gates the MAGIC/6 cleanup on the same two maps as the
+            // damage pass at `1000:7181`: range value non-zero and the occupant
+            // on the targeted side. Only the wave at `1000:6E46` adds the sweep
+            // band, so cleanup covers the effect area, not the whole board.
+            const hitPositions = special.result.affectedUnits
+              .map(({ positionBefore }) => positionBefore);
             const rendered = renderLightningFrame(this, definition, frame, {
               center,
               effectCells: special.result.effectCells,
-              wavePositions: special.result.affectedUnits.map(({ positionBefore }) => positionBefore),
-              cleanupPositions: controller.battle.units
-                .filter(({ side }) => side !== special.actor.side)
-                .map(({ x, y }) => ({ x, y })),
+              wavePositions: hitPositions,
+              cleanupPositions: hitPositions,
             });
             this.combatEffects.push(...rendered.images);
             mapAnchorOffset = rendered.anchorOffset;

@@ -55,7 +55,9 @@ test("tier-one magic master performs native 2L with its two-stage lightning colu
     }).battle;
     return current?.specialActionPresentation?.phase === "lightningCleanup";
   });
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "3");
+  // Only the two enemies inside the effect diamond receive MAGIC/6; the one
+  // five cells out has range value 0 and is skipped by `1000:6DE8`.
+  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "2");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-lightning-2-cleanup.png`,
   });
@@ -312,7 +314,7 @@ test("tier-three magic master descends native 4L before planting its inherited-a
   expect(pageErrors).toEqual([]);
 });
 
-test("reduced motion keeps every native 1L draw and the all-enemy cleanup", async ({ page }) => {
+test("reduced motion keeps every native 1L draw and the in-range cleanup", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -363,9 +365,9 @@ test("reduced motion keeps every native 1L draw and the all-enemy cleanup", asyn
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-lightning-1-reduced-motion-cleanup.png`,
   });
-  // `MAGIC/6` is drawn on every enemy-occupied cell, including the one outside
-  // the effect radius; only the wave is limited to the damaged band.
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "2");
+  // Native `1000:6DE8` requires a non-zero effect-range value, so the enemy
+  // seven cells away never receives the MAGIC/6 cleanup sprite.
+  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "1");
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {

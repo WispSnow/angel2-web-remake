@@ -469,10 +469,13 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
     return current?.specialActionPresentation?.phase === "lightningCleanup";
   });
-  await expect(battleCanvas).toHaveAttribute(
-    "data-map-combat-effect-tile-count",
-    String(lightningBefore.units.filter(({ side }) => side === 2).length),
+  // `1000:6DE8` skips cells whose effect-range value is 0, so the cleanup
+  // covers the units the action reports as affected, not every side-2 unit.
+  const cleanupTileCount = Number(
+    await battleCanvas.getAttribute("data-map-combat-effect-tile-count"),
   );
+  expect(cleanupTileCount)
+    .toBeLessThanOrEqual(lightningBefore.units.filter(({ side }) => side === 2).length);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-lightning-cleanup.png`,
   });
@@ -484,6 +487,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   const lightningAfter = await state(page);
   expect(lightningAfter.units.find(({ id }) => id === "2:16")?.life)
     .toBeLessThan(bossBeforeLightning.life);
+  expect(cleanupTileCount).toBe(lightningAfter.lastSpecialAction!.affectedUnits.length);
   expect(lightningAfter.specialActionPresentationTrace.filter(({ phase }) => phase === "lightningMain"))
     .toHaveLength(32);
   expect(lightningAfter.specialActionPresentationTrace.filter(({ phase }) => phase === "lightningHit"))

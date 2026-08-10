@@ -45,11 +45,7 @@ const HEIGHT = TECHNIQUE_LAB_MAP.height * TILE_HEIGHT;
 
 export type TechniqueLabVisualFrame =
   | { readonly kind: "none" }
-  | {
-    readonly kind: "lightning";
-    readonly frame: LightningPresentationFrame;
-    readonly cleanupScope: "affected" | "original-all-enemies";
-  }
+  | { readonly kind: "lightning"; readonly frame: LightningPresentationFrame }
   | { readonly kind: "poison"; readonly phase: 0 | 1; readonly frame: number }
   | {
     readonly kind: "prayer";
@@ -166,16 +162,14 @@ export function startTechniqueLabPhaser(
         const actionCode = this.state.actionCode as keyof typeof TECHNIQUE_LAB_LIGHTNING;
         const definition = TECHNIQUE_LAB_LIGHTNING[actionCode];
         if (definition) {
-          const actorSide = session.actor()?.side ?? 1;
+          // Native `1000:6DE8` draws MAGIC/6 on the same cells the damage pass
+          // scans: effect-range value non-zero and occupied by the target side.
+          const hitPositions = session.affectedUnits().map(({ x, y }) => ({ x, y }));
           const rendered = renderLightningFrame(this, definition, frame.frame, {
             center,
             effectCells: session.effectCells(),
-            wavePositions: session.affectedUnits().map(({ x, y }) => ({ x, y })),
-            cleanupPositions: frame.cleanupScope === "original-all-enemies"
-              ? this.state.units
-                .filter(({ side }) => side !== actorSide)
-                .map(({ x, y }) => ({ x, y }))
-              : session.affectedUnits().map(({ x, y }) => ({ x, y })),
+            wavePositions: hitPositions,
+            cleanupPositions: hitPositions,
           });
           this.effectObjects.push(...rendered.images);
           mapAnchorOffset = rendered.anchorOffset;
@@ -535,9 +529,6 @@ export function startTechniqueLabPhaser(
       canvas.dataset.constructionCompleted = frame.kind === "construction"
         ? String(frame.completed)
         : "false";
-      canvas.dataset.lightningCleanupScope = frame.kind === "lightning"
-        ? frame.cleanupScope
-        : "";
       canvas.dataset.mapCombatAnchorOffset = mapAnchorOffset
         ? `${mapAnchorOffset.x},${mapAnchorOffset.y}`
         : "";

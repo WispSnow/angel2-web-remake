@@ -64,7 +64,6 @@ interface LabPlaybackState {
   readonly durationMs: number;
   readonly speed: number;
   readonly sound: boolean;
-  readonly originalCleanup: boolean;
   readonly terminalHoldMs: number;
   readonly phase: string;
   readonly frame: number;
@@ -144,10 +143,6 @@ root.innerHTML = `
           </select>
         </label>
         <label class="technique-lab-check"><input id="technique-lab-sound" type="checkbox" /> 技能原聲音效</label>
-        <label class="technique-lab-check">
-          <input id="technique-lab-original-cleanup" data-testid="technique-lab-original-cleanup" type="checkbox" />
-          原版全敵收尾 <span>（非額外傷害）</span>
-        </label>
         <div class="technique-lab-actions">
           <button type="button" data-command="reset">恢復示例配置</button>
           <button type="button" data-command="clear">清空全部單位</button>
@@ -169,13 +164,9 @@ const sideSelectCandidate = root.querySelector<HTMLSelectElement>("#technique-la
 const classSelectCandidate = root.querySelector<HTMLSelectElement>("#technique-lab-class");
 const speedSelectCandidate = root.querySelector<HTMLSelectElement>("#technique-lab-speed");
 const soundInputCandidate = root.querySelector<HTMLInputElement>("#technique-lab-sound");
-const originalCleanupInputCandidate = root.querySelector<HTMLInputElement>(
-  "#technique-lab-original-cleanup",
-);
 const timelineInputCandidate = root.querySelector<HTMLInputElement>('[data-testid="technique-lab-timeline"]');
 if (!canvasRootCandidate || !actionSelectCandidate || !sideSelectCandidate || !classSelectCandidate
-  || !speedSelectCandidate || !soundInputCandidate || !originalCleanupInputCandidate
-  || !timelineInputCandidate) {
+  || !speedSelectCandidate || !soundInputCandidate || !timelineInputCandidate) {
   throw new Error("technique laboratory controls missing");
 }
 const canvasRoot: HTMLElement = canvasRootCandidate;
@@ -184,7 +175,6 @@ const sideSelect: HTMLSelectElement = sideSelectCandidate;
 const classSelect: HTMLSelectElement = classSelectCandidate;
 const speedSelect: HTMLSelectElement = speedSelectCandidate;
 const soundInput: HTMLInputElement = soundInputCandidate;
-const originalCleanupInput: HTMLInputElement = originalCleanupInputCandidate;
 const timelineInput: HTMLInputElement = timelineInputCandidate;
 
 const session = new TechniqueLabSession();
@@ -207,7 +197,6 @@ const renderer = startTechniqueLabPhaser(session, canvasRoot);
 let playing = true;
 let speed = 1;
 let sound = false;
-let originalCleanup = false;
 let timeMs = 0;
 let lastAnimationTime = performance.now();
 let lightningTimeline: readonly TimedLightningFrame[] = [];
@@ -316,11 +305,7 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
     const frame = lightningFrameAtTime(lightningTimeline, currentTimeMs / 10);
     phase = frame.kind;
     visibleFrame = frame.kind === "main" ? frame.globalDrawIndex : frame.frame;
-    return {
-      kind: "lightning",
-      frame,
-      cleanupScope: originalCleanup ? "original-all-enemies" : "affected",
-    };
+    return { kind: "lightning", frame };
   }
   if (isStompCode(code)) {
     const step = stompPresentationStepAtTime(stompTimeline, currentTimeMs / 10);
@@ -658,7 +643,6 @@ function playbackState(): LabPlaybackState {
     durationMs,
     speed,
     sound,
-    originalCleanup,
     terminalHoldMs: terminalHoldMs(),
     phase,
     frame: visibleFrame,
@@ -717,9 +701,7 @@ function render(): void {
     : timeMs >= durationMs - terminalHoldMs()
       ? `${phase} · 末幀保持 ${terminalHoldMs()} ms`
     : phase === "cleanup"
-      ? originalCleanup
-        ? "共同收尾 · 原版全敵投影（非命中）"
-        : "共同收尾 · 實際命中範圍"
+      ? "共同收尾 · 效果範圍內敵軍"
       : phase === "wave"
         ? `逐格錯相命中 · ${visibleFrame}`
       : `${phase} · ${visibleFrame}`;
@@ -1010,10 +992,6 @@ soundInput.addEventListener("change", () => {
   sound = soundInput.checked;
   playedAudioCues = new Set();
   if (sound) playAudioBetween(-1, timeMs);
-  render();
-});
-originalCleanupInput.addEventListener("change", () => {
-  originalCleanup = originalCleanupInput.checked;
   render();
 });
 timelineInput.addEventListener("input", () => seek(Number(timelineInput.value)));

@@ -43,7 +43,6 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     await expect(canvas).toHaveAttribute("data-technique-phase", "cleanup");
     await expect(page.locator('[data-readout="phase"]')).toContainText("共同收尾");
     await expect(canvas).toHaveAttribute("data-effect-tile-count", String(contract.affected));
-    await expect(canvas).toHaveAttribute("data-lightning-cleanup-scope", "affected");
     if (contract.code === "1L") {
       await captureVisualAudit(page, {
         path: "artifacts/playwright/technique-lab-lightning-range-cleanup.png",
@@ -78,14 +77,14 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     }
   }
 
+  // `1000:6DE8` gates MAGIC/6 on a non-zero effect-range value, so an enemy
+  // outside the diamond never receives the cleanup sprite.
   await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("1L"));
-  await page.getByTestId("technique-lab-original-cleanup").check();
   await seek(page, 3640);
-  await expect(canvas).toHaveAttribute("data-lightning-cleanup-scope", "original-all-enemies");
-  await expect(canvas).toHaveAttribute("data-effect-tile-count", "3");
-  await expect(page.locator('[data-readout="phase"]')).toContainText("非命中");
+  await expect(canvas).toHaveAttribute("data-effect-tile-count", "2");
+  await expect(page.locator('[data-readout="phase"]')).toContainText("效果範圍內敵軍");
   await captureVisualAudit(page, {
-    path: "artifacts/playwright/technique-lab-lightning-original-cleanup.png",
+    path: "artifacts/playwright/technique-lab-lightning-range-only-cleanup.png",
     fullPage: true,
   });
 
