@@ -34,10 +34,14 @@ test("all four native lightning scripts expose their main, wave and cleanup phas
     await expect(page.locator('[data-readout="phase"]')).toContainText("逐格錯相命中");
     expect(Number(await canvas.getAttribute("data-effect-tile-count"))).toBeGreaterThan(0);
     if (contract.code === "4L") {
+      // Mid-sweep, where every ring of the radius-5 diamond is showing its own
+      // frame — the first wave draw only lights the centre cell.
+      await seek(page, contract.waveAt + 200);
       await captureVisualAudit(page, {
         path: "artifacts/playwright/technique-lab-lightning-4-wave.png",
         fullPage: true,
       });
+      await seek(page, contract.waveAt);
     }
     await seek(page, contract.cleanupAt);
     await expect(canvas).toHaveAttribute("data-technique-phase", "cleanup");
@@ -130,10 +134,36 @@ test("lightning hit waves advance one range threshold after every native draw", 
   await expect(canvas).toBeVisible();
   await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("2L"));
 
-  for (const [time, visibleCells] of [[1750, 1], [1770, 2], [1790, 3]] as const) {
-    await seek(page, time);
+  // REMAKE-049: the wave is two layers over the same band. The sweep layer
+  // (`MAGIC/24` frames 0..4) draws one frame per cell keyed to that cell's own
+  // `rangeValue - threshold`, so the radius-4 diamond's 1/4/8/12 rings enter one
+  // draw apart and each keeps advancing. The marker layer alternates frames 5/6
+  // — the resource's two "unit electrocuted" frames — on enemy cells only.
+  const waveLayers = async () => {
+    const keys = (await canvas.getAttribute("data-effect-texture-keys")) ?? "";
+    const frames = keys.split(",").filter(Boolean)
+      .map((key) => Number(key.split("-").at(-1)));
+    const sweep: Record<number, number> = {};
+    for (const frame of frames.filter((frame) => frame <= 4)) {
+      sweep[frame] = (sweep[frame] ?? 0) + 1;
+    }
+    return { sweep, markers: frames.filter((frame) => frame >= 5).length };
+  };
+
+  const expected = [
+    { time: 1750, sweep: { 0: 1 }, markers: 1 },
+    { time: 1770, sweep: { 0: 4, 1: 1 }, markers: 2 },
+    { time: 1790, sweep: { 0: 8, 1: 4, 2: 1 }, markers: 3 },
+    { time: 1810, sweep: { 0: 12, 1: 8, 2: 4, 3: 1 }, markers: 3 },
+    { time: 1830, sweep: { 1: 12, 2: 8, 3: 4, 4: 1 }, markers: 3 },
+    // Every range value has passed beyond the sweep width; the band leaves the
+    // diamond well before the 16 native draws are spent.
+    { time: 1930, sweep: {}, markers: 0 },
+  ] as const;
+  for (const step of expected) {
+    await seek(page, step.time);
     await expect(canvas).toHaveAttribute("data-technique-phase", "wave");
-    await expect(canvas).toHaveAttribute("data-effect-tile-count", String(visibleCells));
+    await expect.poll(waveLayers).toEqual({ sweep: step.sweep, markers: step.markers });
   }
 
   await seek(page, 1770);

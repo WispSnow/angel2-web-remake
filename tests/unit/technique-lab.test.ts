@@ -13,6 +13,7 @@ import {
   TECHNIQUE_LAB_CATALOG,
   TECHNIQUE_LAB_DISPEL,
   TECHNIQUE_LAB_FIRE,
+  TECHNIQUE_LAB_GRAPHIC_ASSETS,
   TECHNIQUE_LAB_HEAL,
   TECHNIQUE_LAB_ICE,
   TECHNIQUE_LAB_IRON_PLATE,
@@ -33,6 +34,44 @@ import { buildStompPresentationSteps } from "../../src/game/stomp-presentation";
 import { STAGE1_ACTION_PRESENTATION } from "../../src/game/content/stage1-actions.generated";
 
 describe("map technique laboratory evidence", () => {
+  it("splits every lightning tier's hit resource into a sweep range and two marker frames", () => {
+    // REMAKE-049: `0000:65A5` paints frames `0..sweepWidth - 1` across the band
+    // and `1000:6E46` overlays the two `runtimeTileCodes` frames on enemy cells.
+    // 2L/3L/4L therefore budget exactly `sweepWidth + 2` frames, with the marker
+    // codes pointing at the resource's last two "unit electrocuted" frames. 1L's
+    // MAGIC/31 has no character art and reuses two mid-sequence spark frames, so
+    // it is the one tier whose markers are not the final pair.
+    expect(Object.values(TECHNIQUE_LAB_LIGHTNING).map((definition) => {
+      const { resource, sweepWidth, runtimeTileCodes } = definition.commonHit;
+      const frames = TECHNIQUE_LAB_GRAPHIC_ASSETS[
+        resource as keyof typeof TECHNIQUE_LAB_GRAPHIC_ASSETS
+      ].length;
+      return {
+        code: definition.code,
+        frames,
+        sweepWidth,
+        markerFrames: runtimeTileCodes.map((tileCode) => tileCode - 1),
+        markersAreFinalPair: runtimeTileCodes.at(-1) === frames,
+      };
+    })).toEqual([
+      { code: "1L", frames: 12, sweepWidth: 9, markerFrames: [4, 5], markersAreFinalPair: false },
+      { code: "2L", frames: 7, sweepWidth: 5, markerFrames: [5, 6], markersAreFinalPair: true },
+      { code: "3L", frames: 6, sweepWidth: 4, markerFrames: [4, 5], markersAreFinalPair: true },
+      { code: "4L", frames: 13, sweepWidth: 11, markerFrames: [11, 12], markersAreFinalPair: true },
+    ]);
+    for (const definition of Object.values(TECHNIQUE_LAB_LIGHTNING)) {
+      const { resource, sweepWidth, runtimeTileCodes } = definition.commonHit;
+      const frames = TECHNIQUE_LAB_GRAPHIC_ASSETS[
+        resource as keyof typeof TECHNIQUE_LAB_GRAPHIC_ASSETS
+      ].length;
+      for (const tileCode of runtimeTileCodes) {
+        expect(tileCode - 1).toBeGreaterThanOrEqual(0);
+        expect(tileCode - 1).toBeLessThan(frames);
+      }
+      expect(sweepWidth).toBeLessThanOrEqual(frames);
+    }
+  });
+
   it("builds every lightning tier at its exact native duration", () => {
     expect(Object.values(TECHNIQUE_LAB_LIGHTNING).map((definition) => {
       const timeline = buildLightningTimeline(definition);

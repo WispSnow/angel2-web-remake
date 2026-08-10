@@ -458,7 +458,7 @@ function buildPresentations(buffer) {
 
   const lightningCleanup = stage(buffer, "MAGIC/6", lightningCleanupPointers, 10, {
     pointerTable: "DS:6B79",
-    drawScope: "each descriptor is drawn on all occupied enemy-side cells, then flushed/waited once",
+    drawScope: "each descriptor is drawn on enemy-side cells whose effect-range value is non-zero (1000:6DE8), then flushed/waited once",
   });
   const lightningCommon = (resource, effectRadius, sweepWidth, firstTileCode, secondTileCode) => {
     const rangeMapMaximumMinusOne = effectRadius - 1;
@@ -472,6 +472,7 @@ function buildPresentations(buffer) {
       iterations,
       descriptors: descriptorSequence(buffer, [0x6bf3, 0x6bfd]),
       runtimeTileCodes: [firstTileCode, secondTileCode],
+      drawScope: "two layers per draw: 0000:65A5 writes `rangeValue - threshold` as the sprite code for every in-band effect cell (frame = code - 1, code 0 draws nothing, no side or occupancy filter), then 1000:6E46 overlays runtimeTileCodes on in-band enemy-side cells. The 1000:6E46 band test compares AX while AH still holds the range-map segment's high byte, so the shipped build never admits the overlay; REMAKE-049 restores it",
       waitPerWaveDrawNativeTicks: 2,
       waveDrawsPerIteration: 2,
       rangeWaveFixedGraphicWaitNativeTicks: iterations * 4,

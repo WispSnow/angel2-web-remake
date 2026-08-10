@@ -70,15 +70,10 @@ export function renderLightningFrame(
 
   if (frame.kind === "wave") {
     const hit = definition.commonHit;
-    const runtimeTileCode = hit.runtimeTileCodes[frame.frame % hit.runtimeTileCodes.length];
-    const sourceFrame = runtimeTileCode === undefined ? undefined : runtimeTileCode - 1;
-    const rangeValueByPosition = new Map(
-      context.effectCells.map(({ position, value }) => [`${position.x},${position.y}`, value]),
-    );
-    for (const position of context.wavePositions) {
-      const rangeValue = rangeValueByPosition.get(`${position.x},${position.y}`) ?? 0;
-      const waveDistance = lightningWaveDistance(hit, frame.frame, rangeValue);
-      if (sourceFrame === undefined || waveDistance < 0 || waveDistance > hit.sweepWidth) continue;
+    const drawAtCell = (
+      position: { readonly x: number; readonly y: number },
+      sourceFrame: number,
+    ): void => {
       images.push(
         scene.add.image(
           position.x * TILE_WIDTH + TILE_WIDTH / 2,
@@ -86,6 +81,34 @@ export function renderLightningFrame(
           mapTechniqueTextureKey(hit.resource, sourceFrame),
         ).setOrigin(.5).setDepth(8),
       );
+    };
+
+    // Sweep layer (`0000:65A5`): every effect cell inside the band writes its own
+    // `rangeValue - threshold` as the sprite code, so the burst starts at the
+    // highest-value centre and radiates outward with each cell one draw behind
+    // the last. Code 0 is "no sprite" and `0000:7EDD` renders frame `code - 1`.
+    // Neither side nor occupancy is consulted.
+    for (const { position, value } of context.effectCells) {
+      if (value < 1) continue;
+      const code = lightningWaveDistance(hit, frame.frame, value);
+      if (code < 1 || code > hit.sweepWidth) continue;
+      drawAtCell(position, code - 1);
+    }
+
+    // Marker layer (`1000:6E46`): the two per-tier frames alternate on top of the
+    // sweep for enemy-occupied cells in the same band. 2L/3L/4L point at their
+    // resource's dedicated "unit being electrocuted" frames; 1L, whose MAGIC/31
+    // has no character art, reuses the two fullest spark frames. See REMAKE-049
+    // for why the native band test never admitted this layer.
+    const runtimeTileCode = hit.runtimeTileCodes[frame.frame % hit.runtimeTileCodes.length];
+    const rangeValueByPosition = new Map(
+      context.effectCells.map(({ position, value }) => [`${position.x},${position.y}`, value]),
+    );
+    for (const position of context.wavePositions) {
+      const rangeValue = rangeValueByPosition.get(`${position.x},${position.y}`) ?? 0;
+      const code = lightningWaveDistance(hit, frame.frame, rangeValue);
+      if (runtimeTileCode === undefined || code < 0 || code > hit.sweepWidth) continue;
+      drawAtCell(position, runtimeTileCode - 1);
     }
     return { images };
   }
