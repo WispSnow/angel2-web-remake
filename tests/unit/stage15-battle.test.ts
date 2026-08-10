@@ -71,17 +71,34 @@ describe("stage 15 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1).map(({ id }) => id)).toEqual(["1:0"]);
   });
 
-  it("keeps exactly ten enemies through and beyond the native round-six AI reset", () => {
+  it("keeps six central sentries through round five and releases them on round six, including restore", () => {
     const battle = new Stage15Battle(campaign, fullDeployment);
     const enemies = battle.units.filter(({ side }) => side === 2).map(({ id }) => id);
+    const sentries = ["2:47", "2:9", "2:48", "2:44", "2:45", "2:49"];
     expect(enemies).toEqual([
       "2:52", "2:51", "2:40", "2:47", "2:9",
       "2:41", "2:48", "2:44", "2:45", "2:49",
     ]);
-    for (let round = 2; round <= 7; round += 1) battle.startNextRound();
-    expect(battle.round).toBe(7);
+    expect(sentries.map((id) => battle.enemyBehaviorFor(id))).toEqual(Array(6).fill(1));
+    expect(sentries.map((id) => battle.enemyAiIntentFor(id))).toEqual(Array(6).fill("sentry"));
+    expect(["2:52", "2:51", "2:40", "2:41"].map((id) => battle.enemyAiIntentFor(id)))
+      .toEqual(Array(4).fill("pursuit"));
+
+    for (let round = 2; round <= 5; round += 1) battle.startNextRound();
+    expect(battle.round).toBe(5);
+    expect(sentries.map((id) => battle.enemyBehaviorFor(id))).toEqual(Array(6).fill(1));
+
+    battle.startNextRound();
+    expect(battle.round).toBe(6);
+    expect(enemies.map((id) => battle.enemyBehaviorFor(id))).toEqual(Array(10).fill(0));
+    expect(enemies.map((id) => battle.enemyAiIntentFor(id))).toEqual(Array(10).fill("pursuit"));
     expect(battle.units.filter(({ side }) => side === 2).map(({ id }) => id)).toEqual(enemies);
-    expect(battle.forceForUnit("2:9")).toMatchObject({ doctrine: { strategy: "expert" } });
+
+    const restored = new Stage15Battle(campaign, fullDeployment);
+    restored.restore(battle.serializableSnapshot());
+    expect(restored.round).toBe(6);
+    expect(enemies.map((id) => restored.enemyBehaviorFor(id))).toEqual(Array(10).fill(0));
+    expect(enemies.map((id) => restored.enemyAiIntentFor(id))).toEqual(Array(10).fill("pursuit"));
   });
 
   it("wins when Lan leaves while nine guards remain and prioritizes Nia's defeat", () => {

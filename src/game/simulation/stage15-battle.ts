@@ -1,6 +1,7 @@
 import {
   activateStage15Content,
   STAGE15_DEFINITION,
+  STAGE15_EVENT_PROGRAM,
   STAGE15_IRON_PLATE_TERRAIN_SLOT,
   STAGE15_OBSTACLE_TERRAIN_SLOT,
   STAGE15_SEMANTIC_ALLIED_UNITS,
@@ -17,6 +18,7 @@ import {
 } from "./deployed-stage-battle";
 import { validateDeploymentResult, type DeploymentResult } from "./deployment";
 import type { ForceDefinition } from "./forces";
+import type { EnemyAiIntent } from "./ai-contracts";
 import { DeterministicRng } from "./rng";
 
 const STAGE15_UNIT_CONFIG: DeployedStageUnitConfig = {
@@ -85,5 +87,17 @@ export class Stage15Battle extends Stage0Battle {
       forces: stage15Forces(deployment),
     }, campaign.roster, deployment));
     this.focusId = "1:0";
+  }
+
+  override enemyBehaviorFor(id: string): number {
+    return this.round >= STAGE15_EVENT_PROGRAM.nativeDelayedAiReset.firstRound
+      ? STAGE15_EVENT_PROGRAM.nativeDelayedAiReset.value
+      : super.enemyBehaviorFor(id);
+  }
+
+  override enemyAiIntentFor(id: string): EnemyAiIntent | undefined {
+    const unit = this.unit(id);
+    if (!unit || unit.side !== 2) return undefined;
+    return this.enemyBehaviorFor(id) === 1 ? "sentry" : "pursuit";
   }
 }

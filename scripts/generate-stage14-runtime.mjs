@@ -245,7 +245,7 @@ const eventProgram = {
     operation: "fillSide2PerSlotAiBehavior",
     slots: 75,
     value: 0,
-    stableRemakeEffect: "none-shared-expert-ai-already-active",
+    stableRemakeEffect: "release-native-sentries-to-shared-expert-pursuit",
   },
   enemyReinforcements,
   completedRoute: { module: 27, stage: 15, replayPresentation: false },

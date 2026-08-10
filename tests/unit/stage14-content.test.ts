@@ -50,7 +50,7 @@ describe("stage 14 generated content", () => {
         operation: "fillSide2PerSlotAiBehavior",
         slots: 75,
         value: 0,
-        stableRemakeEffect: "none-shared-expert-ai-already-active",
+        stableRemakeEffect: "release-native-sentries-to-shared-expert-pursuit",
       },
       enemyReinforcements: {
         kind: "none",

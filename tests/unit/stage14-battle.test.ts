@@ -71,14 +71,29 @@ describe("stage 14 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1).map(({ id }) => id)).toEqual(["1:0"]);
   });
 
-  it("keeps exactly seven enemies through and beyond the native round-six AI reset", () => {
+  it("keeps Fang on sentry through round five and releases her on round six, including restore", () => {
     const battle = new Stage14Battle(campaign, fullDeployment);
     const enemies = battle.units.filter(({ side }) => side === 2).map(({ id }) => id);
     expect(enemies).toEqual(["2:41", "2:8", "2:49", "2:47", "2:48", "2:42", "2:46"]);
-    for (let round = 2; round <= 7; round += 1) battle.startNextRound();
-    expect(battle.round).toBe(7);
+    expect(battle.enemyBehaviorFor("2:8")).toBe(1);
+    expect(battle.enemyAiIntentFor("2:8")).toBe("sentry");
+
+    for (let round = 2; round <= 5; round += 1) battle.startNextRound();
+    expect(battle.round).toBe(5);
+    expect(battle.enemyBehaviorFor("2:8")).toBe(1);
+    expect(battle.enemyAiIntentFor("2:8")).toBe("sentry");
+
+    battle.startNextRound();
+    expect(battle.round).toBe(6);
+    expect(battle.enemyBehaviorFor("2:8")).toBe(0);
+    expect(battle.enemyAiIntentFor("2:8")).toBe("pursuit");
     expect(battle.units.filter(({ side }) => side === 2).map(({ id }) => id)).toEqual(enemies);
-    expect(battle.forceForUnit("2:8")).toMatchObject({ doctrine: { strategy: "expert" } });
+
+    const restored = new Stage14Battle(campaign, fullDeployment);
+    restored.restore(battle.serializableSnapshot());
+    expect(restored.round).toBe(6);
+    expect(restored.enemyBehaviorFor("2:8")).toBe(0);
+    expect(restored.enemyAiIntentFor("2:8")).toBe("pursuit");
   });
 
   it("wins when Fang leaves while six guards remain and prioritizes Nia's defeat", () => {

@@ -138,6 +138,18 @@ test("S14-H: SAY/33 keeps Fang's first line visible while appending the order to
   });
 });
 
+test("S14-J: Fang is visibly identified as a sentry before the round-six release", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-14-near-victory&difficulty=0&test=1");
+  const battle = await state(page);
+  await page.getByTestId("battle-canvas").click({
+    position: {
+      x: 40 + (25 - battle.cameraOrigin.x) * 40 + 20,
+      y: 23 + (13 - battle.cameraOrigin.y) * 44 + 22,
+    },
+  });
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術守衛");
+});
+
 test("S14-D/E: the corrected objective defeats Fang without requiring the other six guards", async ({ page }) => {
   await page.goto("/?debugScenario=stage-14-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();

@@ -130,6 +130,21 @@ test("S15-H: SAY/34 keeps Lan's question visible while appending the line about 
   });
 });
 
+test("S15-J: Lan is visibly identified as a sentry before the round-six release", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-15-near-victory&difficulty=0&test=1");
+  const battle = await state(page);
+  await page.getByTestId("battle-canvas").click({
+    position: {
+      x: 40 + (25 - battle.cameraOrigin.x) * 40 + 20,
+      y: 23 + (28 - battle.cameraOrigin.y) * 44 + 22,
+    },
+  });
+  await expect(page.getByTestId("unit-tactic")).toHaveText("戰術守衛");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage15-lan-sentry-tactic.png`,
+  });
+});
+
 test("S15-D/E: the corrected objective defeats Lan without requiring the other nine guards", async ({ page }) => {
   await page.goto("/?debugScenario=stage-15-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
