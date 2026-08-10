@@ -26,8 +26,8 @@
     "nativeTimerNominalMilliseconds": 10.00015085711987,
     "webLogicalTickMilliseconds": 10,
     "nativeTimerAllReleasedModulesClosed": true,
-    "phase1EvidenceRows": 144,
-    "phase1ConfirmedRows": 123,
+    "phase1EvidenceRows": 147,
+    "phase1ConfirmedRows": 126,
     "phase1MixedRows": 21,
     "phase1ImplementationRequiredUnknowns": 0,
     "nativeUnitDisplayNames": 39,
@@ -44,7 +44,7 @@
     "defeatObjectiveEntries": 42,
     "victoryObjectiveEntries": 42,
     "classifiedObjectiveEntries": 84,
-    "verifiedStageEventCodeAndDataRanges": 41,
+    "verifiedStageEventCodeAndDataRanges": 46,
     "nativePerStageBattleEventHandlers": 38,
     "structurallyClosedPerStageBattleEventHandlers": 38,
     "handlerDialogueRecordCount": 72,
@@ -494,7 +494,7 @@
         },
         "perStageBattleEvents": {
           "dispatcherHandlers": 38,
-          "verifiedCodeAndDataRanges": 41,
+          "verifiedCodeAndDataRanges": 46,
           "structurallyClosedHandlers": 38,
           "handlerDialogueRecords": 72,
           "closedStages": [

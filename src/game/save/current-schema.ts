@@ -28,10 +28,11 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 30 as const;
-export const SAVE_CONTENT_VERSION = "stage-09-death-valley-1" as const;
+export const SAVE_VERSION = 32 as const;
+export const SAVE_CONTENT_VERSION = "stage-11-ranger-reinforcements-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
+export const MAX_BATTLE_UNIT_SLOT = 79;
 export const MAX_ROUND = 9_999;
 export const MAX_EXPERIENCE = 0x7fff_ffff;
 export const MAX_LIFE = 0x7fff_ffff;
@@ -120,7 +121,7 @@ function isBattleUnit(
   if (
     !isRecord(value)
     || !isSide(value.side)
-    || !isIntegerBetween(value.slot, 0, MAX_UNIT_SLOT)
+    || !isIntegerBetween(value.slot, 0, MAX_BATTLE_UNIT_SLOT)
     || !isClassId(value.classId)
     || typeof value.id !== "string"
     || value.id !== `${value.side}:${value.slot}`

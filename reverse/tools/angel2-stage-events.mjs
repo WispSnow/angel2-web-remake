@@ -16,6 +16,7 @@ const VERIFIED_RANGES = [
   { module: 27, address: "0000:056E", start: 0x056e, end: 0x062a, role: "prepare a stage template, run deployment when FF cells exist, and write JUST.TST", sha256: "254f9230d9e61b70589b3dc8af11186393ff8d061004d31149543443b3c6ebd1" },
   { module: 29, address: "0000:009C", start: 0x009c, end: 0x00d3, role: "when nextStage is 6, force module 27 before copying the transition to the parent", sha256: "63155530fe87cdde349aafea1cdce90fdadcc9058c9261339d7bdf35462ed242" },
   { module: 29, address: "0000:4DCD", start: 0x04dcd, end: 0x04e03, role: "begin a round, increment the round counter, tick statuses, and dispatch stage events", sha256: "77824c7a7d6b90161031e5e8139cef720c5d25f6db5078eb06d4fed1a8e39175" },
+  { module: 29, address: "0000:4E03", start: 0x04e03, end: 0x04e25, role: "finish the side-1 phase, invoke full-round special spawns, refresh battle state, and prepare side-2 AI", sha256: "c5b7394c1a64445452732bae3e6ba53e4b9f466d6cf4f5a08446d0b8959ba098" },
   { module: 29, address: "1000:42A8", start: 0x142a8, end: 0x14328, role: "seed the default transition and call all 38 per-stage battle-event handlers", sha256: "eba7ea30d43c3357155ae5cd80158e26f51d2ac9ca779a5bb59377566fee0cfe" },
   { module: 29, address: "1000:4328-51E5", start: 0x14328, end: 0x151e5, role: "all 38 guarded per-stage battle-event handlers", sha256: "4359decc7af6e2bfdd08c436c15ec75d2aeb10675906e6b61a2ae79fbc8a71e1" },
   { module: 29, address: "1000:457F", start: 0x1457f, end: 0x1466b, role: "stage-42 outcome presentation, scripted movement, portal disappearance, and stage-6 redirect", sha256: "07c70c3eacf4aeb530598e73ac2f89d1a1c0dc0f396964c91ae4a4f2343b8c58" },
@@ -24,6 +25,10 @@ const VERIFIED_RANGES = [
   { module: 29, address: "1000:515C", start: 0x1515c, end: 0x15197, role: "stage-37 round-1 boss dialogue and victory redirect to internal stage 49", sha256: "62678f3776aa9e9a8cb9480f4aed580943017edb3f2f8bc2a945cfb4ff062be3" },
   { module: 29, address: "1000:5197", start: 0x15197, end: 0x151e5, role: "stage-38 rematch opening, live-victory dialogue, and module-46 redirect", sha256: "ef488a6451dc9ea34d06a0b3fc1cc961db1225f880a0ddc23e7f3ef36d805b3a" },
   { module: 29, address: "1000:51E5", start: 0x151e5, end: 0x151f4, role: "write CH to the side map and CL to the unit-slot map at cell BX", sha256: "b615cb66304ec56f3d2b02b0a5deb121f5428a9b154fc23188bbac0c01a4c091" },
+  { module: 29, address: "1000:5207", start: 0x15207, end: 0x15211, role: "dispatch stage 4, stage 11, and stage 27 full-round special spawns", sha256: "f93872bbe0029d3627e6cae31d13df6fcc6a1c47364e38d96e7350b5e0317530" },
+  { module: 29, address: "1000:5240", start: 0x15240, end: 0x1525f, role: "on stage 11, scan backward from cell 0980h and request one reinforcement at the first empty cell", sha256: "42e9175ae81988e6c7cd4438dd6115fbfba1576627a6948279be18636c042950" },
+  { module: 29, address: "1000:52B8", start: 0x152b8, end: 0x152f9, role: "select the first absent side-2 slot in 40..79, place it, and rebuild its unit state", sha256: "a3c3b05721f211c63c47445a0f19b74001eec9c22559014ace582bdf659854c6" },
+  { module: 29, address: "1000:52F9", start: 0x152f9, end: 0x15319, role: "scan all 2500 cells and report whether side-2 already occupies candidate slot DL", sha256: "15d4e4df34a623aa269390353b88b180c789c38fbc8d47a86f6547cc8ef11a13" },
   { module: 29, address: "1000:5319", start: 0x15319, end: 0x1533e, role: "remove every side-2 cell from both battle maps", sha256: "1ddd61af9885b893de39f9f1773d50ada5948b38070bcc7c639f946b73b2362d" },
   { module: 29, address: "1000:533E", start: 0x1533e, end: 0x1536a, role: "spawn sequential side-1 slots at a sentinel-terminated cell list", sha256: "3bf5f982a163efe30c7c7ecc256235680360cb7e31e2b146bffbdfe1725db2cc" },
   { module: 29, address: "1000:536A", start: 0x1536a, end: 0x15385, role: "from round 6 onward, reset all 75 side-2 per-slot AI behavior words to zero", sha256: "2b82330ce0e614c0e1a101da93fe7891ecb24da1d9fb641464030d442d920904" },
@@ -166,6 +171,53 @@ function parseStageEventDispatcher(module29) {
     stagesWithHandlers: handlers.map((handler) => handler.stage).sort((a, b) => a - b),
     stagesWithoutHandlersIn0To43: Array.from({ length: 44 }, (_, stage) => stage).filter((stage) => !handlers.some((handler) => handler.stage === stage)),
     handlers,
+  };
+}
+
+function parseFullRoundSpecials(module29) {
+  assert(
+    module29.subarray(0x4e08, 0x4e0d).equals(Buffer.from("9a670f2a14", "hex")),
+    "module 29 full-round-special invocation changed",
+  );
+  assert(
+    module29.subarray(0x15240, 0x1525f).equals(Buffer.from(
+      "a1772e3d0b007401c3a124008ec0bb8009268a073c0074034bebf6e85a00c3",
+      "hex",
+    )),
+    "module 29 stage-11 reinforcement handler changed",
+  );
+  assert(module29[0x152c5] === 0xb2 && module29[0x152c6] === 0x28, "stage-11 first reinforcement slot changed");
+  assert(module29[0x152c7] === 0xb9 && module29.readUInt16LE(0x152c8) === 0x28, "stage-11 reinforcement slot count changed");
+  assert(module29.readUInt16LE(0x152fa) === 0x09c4, "stage-11 active-slot scan no longer covers 2500 cells");
+
+  return {
+    invocation: {
+      address: "0000:4E08",
+      timing: "after all side-1 manual and autonomous actions, immediately before side-2 AI scheduling",
+      frequency: "once per full round, including round 1",
+    },
+    stages: [
+      {
+        stage: 11,
+        handler: "1000:5240",
+        behavior: "spawn one side-2 reinforcement per full round",
+        spawnCellSearch: {
+          start: cell(0x0980),
+          direction: -1,
+          selection: "first cell whose side-map byte is zero",
+        },
+        candidateSlots: {
+          minimum: 40,
+          maximum: 79,
+          selection: "first slot not currently present as side 2 anywhere on the 2500-cell board",
+          reuseAfterRemoval: true,
+          simultaneousLimit: 40,
+          lifetimeLimit: null,
+        },
+        immediateSide2Activation: true,
+        prngCalls: 0,
+      },
+    ],
   };
 }
 
@@ -863,6 +915,7 @@ async function extract(module25Path, module27Path, module29Path, module33Path, m
   const stageMagicRecords = parseStageMagicRecords(module25);
   const stageStoryRecords = parseStageStoryRecords(module25);
   const dispatcher = parseStageEventDispatcher(module29);
+  const fullRoundSpecials = parseFullRoundSpecials(module29);
   const handlerBehaviorCatalog = parseStageHandlerCatalog(module29, dispatcher);
   const stage30MultiClassSequence = buildStage30MultiClassSequence(templates, objectives, descriptors, titleFlow);
   const scenes = buildScenes(templates, objectives, descriptors, stageStoryRecords);
@@ -878,7 +931,7 @@ async function extract(module25Path, module27Path, module29Path, module33Path, m
 
   const output = {
     format: "ANGEL2 native per-stage battle events and campaign routing",
-    semanticVersion: 4,
+    semanticVersion: 5,
     sources: [
       { module: 25, path: module25Path, bytes: module25.length, sha256: sha256(module25) },
       { module: 27, path: module27Path, bytes: module27.length, sha256: sha256(module27) },
@@ -914,6 +967,7 @@ async function extract(module25Path, module27Path, module29Path, module33Path, m
       currentStage: "DS:2E77",
       roundOrOutcome: "DS:2F83",
       dispatcher,
+      fullRoundSpecials,
       handlerBehaviorCatalog,
       stage30MultiClassSequence,
       stage6ReturnBridge: "after battle return, nextStage 6 forces nextModule 27 regardless of DS:0006",

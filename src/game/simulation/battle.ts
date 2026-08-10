@@ -423,6 +423,7 @@ export class Stage0Battle {
       ) throw new Error("invalid saved dynamic terrain override");
       this.terrainOverrideByPosition.set(positionKey(override), override.kind);
     }
+    this.restoreDerivedForceMemberships();
     this.forces.assertKnownUnits(this.units);
     if (campaignRoster) {
       this.campaignRoster.splice(
@@ -432,6 +433,9 @@ export class Stage0Battle {
       );
     }
   }
+
+  /** Rebuild force membership for stage-owned units created after battle setup. */
+  protected restoreDerivedForceMemberships(): void {}
 
   get focus(): BattleUnit | undefined {
     return this.unit(this.focusId);

@@ -17,7 +17,8 @@ export type StageId =
   | "stage-06"
   | "stage-07"
   | "stage-08"
-  | "stage-09";
+  | "stage-09"
+  | "stage-11";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -29,7 +30,8 @@ export type CampaignRouteId =
   | "stage-07"
   | "stage-08"
   | "stage-09"
-  | "stage-11";
+  | "stage-11"
+  | "stage-10";
 
 export interface Position {
   x: number;
@@ -180,8 +182,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 30;
-  contentVersion: "stage-09-death-valley-1";
+  version: 32;
+  contentVersion: "stage-11-ranger-reinforcements-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -150,6 +150,18 @@ const STAGE9_COMPLETED_EVENT_IDS = [
   "stage-09-completed-route",
 ] as const;
 
+const STAGE11_BATTLE_EVENT_IDS = [
+  "stage-11-opening-story",
+  "stage-11-dori-departure",
+] as const;
+
+const STAGE11_COMPLETED_EVENT_IDS = [
+  ...STAGE11_BATTLE_EVENT_IDS,
+  "stage-11-objective-reached",
+  "stage-11-victory-story",
+  "stage-11-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -849,7 +861,7 @@ async function createStage9Completed(context: DebugScenarioContext): Promise<Gam
     savedAt: "2000-01-01T00:00:00.000Z",
     saveCount: 1,
     stageId: "stage-11",
-    stageLabel: "飛船上遭遇敵人",
+    stageLabel: "拯救蘇蘭達",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
     rngState: campaign.rngState,
@@ -857,6 +869,60 @@ async function createStage9Completed(context: DebugScenarioContext): Promise<Gam
     roster: completeCampaignRoster(campaign.roster),
     stageProgress: 1000,
     consumedEventIds: [...STAGE9_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
+async function createStage11Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-11", debugCampaign(context, "stage-11"));
+  return controller;
+}
+
+async function createStage11Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-11");
+  const { Stage11Battle } = await import("./simulation/stage11-battle");
+  const battle = new Stage11Battle(campaign);
+  battle.removeStoryUnits([{ side: 1, slot: 9 }]);
+  const sulanda = battle.unit("1:8");
+  if (!sulanda) throw new Error("stage 11 debug scenario is missing Sulanda");
+  battle.focusId = sulanda.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-11"),
+    stageLabel: "拯救蘇蘭達",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE11_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: sulanda.x, y: sulanda.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：蘇蘭達游騎兵撤離隊玩家回合。";
+  return controller;
+}
+
+async function createStage11Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-11");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-10",
+    stageLabel: "飛船上遭遇敵人",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(campaign.roster),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE11_COMPLETED_EVENT_IDS],
   };
   return GameController.fromSave(save, 1);
 }
@@ -1052,6 +1118,25 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-09-cleared": createStage9Completed,
+  "stage-11-opening": createStage11Opening,
+  "stage-11-player": createStage11Player,
+  "stage-11-near-route": withSetup(createStage11Player, (controller) => {
+    controller.forceVictorySetupForTest();
+    controller.statusMessage = "調試場景：蘇蘭達距飛船登船區一步。";
+  }),
+  "stage-11-near-defeat": withSetup(createStage11Player, (controller) => {
+    const sulanda = controller.battle.unit("1:8");
+    const enemy = controller.battle.unit("2:21");
+    if (!sulanda || !enemy) return;
+    sulanda.life = 1;
+    enemy.x = sulanda.x + 1;
+    enemy.y = sulanda.y;
+    controller.statusMessage = "調試場景：蘇蘭達只剩 1 點生命，飛馬追擊兵位於相鄰格。";
+  }),
+  "stage-11-victory-ready": withSetup(createStage11Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-11-cleared": createStage11Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

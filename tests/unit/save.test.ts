@@ -30,6 +30,7 @@ import { Stage7Battle } from "../../src/game/simulation/stage7-battle";
 import { Stage8Battle } from "../../src/game/simulation/stage8-battle";
 import { STAGE9_DEFINITION } from "../../src/game/content/stage9";
 import { Stage9Battle } from "../../src/game/simulation/stage9-battle";
+import { Stage11Battle } from "../../src/game/simulation/stage11-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -547,6 +548,55 @@ const stage9BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage11BattleSave = (reinforcementCount = 1): BattleSaveData => {
+  const source = {
+    stageId: "stage-11" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x8090_a0b0,
+    rngCalls: 41,
+    roster: completeCampaignRoster([
+      { slot: 8, classId: "land-knight", experience: 620, life: 220 },
+      { slot: 9, classId: "curse-master", experience: 500, life: 170 },
+    ]),
+  };
+  const battle = new Stage11Battle(source);
+  battle.removeStoryUnits([{ side: 1, slot: 9 }]);
+  for (let index = 0; index < reinforcementCount; index += 1) {
+    battle.beginEnemyPhase();
+    battle.startNextRound();
+  }
+  const campaign = battle.campaignSnapshot();
+  const sulanda = battle.unit("1:8")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-09T20:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-11",
+    stageLabel: "拯救蘇蘭達",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: {
+      ...source,
+      roster: source.roster.map((entry) => ({ ...entry })),
+    },
+    stageProgress: 0,
+    consumedEventIds: ["stage-11-opening-story", "stage-11-dori-departure"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: sulanda.x, y: sulanda.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -603,6 +653,44 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v31 saves to the stage 11 reinforcement identity", () => {
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 31,
+      contentVersion: "stage-11-ranger-evacuation-1",
+    }))).toEqual(current);
+  });
+
+  it("migrates v30 saves and corrects the stage 11 route title", () => {
+    const currentBattle = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...currentBattle,
+      version: 30,
+      contentVersion: "stage-09-death-valley-1",
+    }))).toEqual(currentBattle);
+
+    const currentCompleted: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-11",
+      stageLabel: "拯救蘇蘭達",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-09-enter-deployment",
+        "stage-09-opening-story",
+        "stage-09-objective-reached",
+        "stage-09-victory-story",
+        "stage-09-completed-route",
+      ],
+    };
+    expect(parseSaveData(JSON.stringify({
+      ...currentCompleted,
+      version: 30,
+      contentVersion: "stage-09-death-valley-1",
+      stageLabel: "飛船上遭遇敵人",
+    }))).toEqual(currentCompleted);
+  });
+
   it("migrates v29 battle and completed saves into the stage 9 identity", () => {
     for (const current of [battleSave(), completedSave()]) {
       const legacy = {
@@ -1027,7 +1115,7 @@ describe("Web save validation", () => {
     const stage9Completed: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-11",
-      stageLabel: "飛船上遭遇敵人",
+      stageLabel: "拯救蘇蘭達",
       stageProgress: 1000,
       consumedEventIds: [
         "stage-09-enter-deployment",
@@ -1039,6 +1127,25 @@ describe("Web save validation", () => {
     };
     expect(isSaveData(stage9Completed)).toBe(true);
     expect(isSaveData({ ...stage9Completed, stageLabel: "第 10 關" })).toBe(false);
+
+    const stage11Completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-10",
+      stageLabel: "飛船上遭遇敵人",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-11-opening-story",
+        "stage-11-dori-departure",
+        "stage-11-objective-reached",
+        "stage-11-victory-story",
+        "stage-11-completed-route",
+      ],
+    };
+    expect(isSaveData(stage11Completed)).toBe(true);
+    expect(isSaveData({
+      ...stage11Completed,
+      consumedEventIds: stage11Completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
   });
 
   it("validates stage 9 battle saves with Dori's template class in the live roster", () => {
@@ -1053,6 +1160,42 @@ describe("Web save validation", () => {
         ? { ...entry, classId: "soldier" as const }
         : entry),
     })).toBe(false);
+  });
+
+  it("validates stage 11 battle saves only after Dori's story departure", () => {
+    const save = stage11BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.some(({ id }) => id === "1:9")).toBe(false);
+    expect(save.battle.units.find(({ id }) => id === "2:40")).toMatchObject({
+      classId: "cavalry",
+      x: 32,
+      y: 48,
+    });
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: ["stage-11-opening-story"],
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.filter(({ id }) => id !== "1:8"),
+      },
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:40"
+          ? { ...unit, classId: "soldier" as const, className: "士兵" }
+          : unit),
+      },
+    })).toBe(false);
+
+    const saturated = stage11BattleSave(40);
+    expect(saturated.battle.units.find(({ id }) => id === "2:79"))
+      .toMatchObject({ classId: "soldier" });
+    expect(isSaveData(saturated)).toBe(true);
   });
 
   it("migrates the v19 stage-06 boundary label into its playable title", () => {

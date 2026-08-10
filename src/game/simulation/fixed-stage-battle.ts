@@ -100,7 +100,7 @@ function createInheritedAlly(
   };
 }
 
-function createEnemy(
+export function createFixedStageEnemy(
   definition: FixedStageEnemyUnitDefinition,
   difficulty: Difficulty,
 ): BattleUnit {
@@ -135,7 +135,7 @@ export function createFixedStageUnits(
   return [
     ...config.alliedUnits.map((definition) =>
       createInheritedAlly(definition, campaignRoster, config.inheritance)),
-    ...config.enemyUnits.map((definition) => createEnemy(definition, difficulty)),
+    ...config.enemyUnits.map((definition) => createFixedStageEnemy(definition, difficulty)),
   ];
 }
 

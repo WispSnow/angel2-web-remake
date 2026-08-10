@@ -174,7 +174,7 @@ test("S09-F/G: defeat retries deployment and completion saves the non-linear sta
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "openingStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -191,7 +191,7 @@ test("S09-F/G: defeat retries deployment and completion saves the non-linear sta
     contentVersion: SAVE_CONTENT_VERSION,
     kind: "completed",
     stageId: "stage-11",
-    stageLabel: "飛船上遭遇敵人",
+    stageLabel: "拯救蘇蘭達",
     stageProgress: 1000,
     consumedEventIds: [
       "stage-09-enter-deployment",
@@ -202,13 +202,19 @@ test("S09-F/G: defeat retries deployment and completion saves the non-linear sta
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-09",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-11",
+    stageProgress: 0,
+    phase: "openingStory",
     campaignRoute: "stage-11",
   });
 
   await page.goto("/?debugScenario=stage-09-cleared&difficulty=0&test=1");
-  await waitForPhase(page, "nextStage");
-  expect(await state(page)).toMatchObject({ campaignRoute: "stage-11" });
+  await waitForPhase(page, "openingStory");
+  expect(await state(page)).toMatchObject({
+    stageId: "stage-11",
+    phase: "openingStory",
+    campaignRoute: "stage-11",
+    activeStoryId: "stage-11-opening-story",
+  });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "24");
 });

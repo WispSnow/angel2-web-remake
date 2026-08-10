@@ -601,6 +601,26 @@ async function loadStage9Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage11Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage11"),
+    import("./simulation/stage11-battle"),
+  ]);
+  content.activateStage11Content();
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, _preparation, rng) =>
+    new battleModule.Stage11Battle(campaign, rng);
+  return {
+    definition: content.STAGE11_DEFINITION,
+    assets: {
+      map: content.STAGE11_ASSETS.map,
+      minimap: content.STAGE11_ASSETS.minimap,
+      unitSprites: content.STAGE11_ASSETS.unitSprites,
+    },
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(createBattle, campaign, snapshot),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -617,6 +637,24 @@ function createStage0SaveEnemyClasses(): readonly (readonly [string, UnitClassId
   return createStage0Units()
     .filter(({ side }) => side === 2)
     .map(({ id, classId }) => [id, classId] as const);
+}
+
+function createStage11SaveEnemyClasses(): readonly (readonly [string, UnitClassId])[] {
+  const exceptionalClasses = new Map<number, UnitClassId>([
+    [40, "cavalry"],
+    [41, "pegasus-warrior"],
+    [42, "cavalry"],
+    [43, "pegasus-warrior"],
+    [44, "cavalry"],
+    [45, "half-dragon-warrior"],
+  ]);
+  return [
+    ["2:21", "pegasus-warrior"],
+    ...Array.from({ length: 40 }, (_, index) => {
+      const slot = 40 + index;
+      return [`2:${slot}`, exceptionalClasses.get(slot) ?? "soldier"] as const;
+    }),
+  ];
 }
 
 export const STAGE_RUNTIME_MANIFEST = {
@@ -1288,7 +1326,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "全面撤退：返回第 9 關部署並重新編隊。",
     },
     completion: {
-      destinationLabel: "飛船上遭遇敵人",
+      destinationLabel: "拯救蘇蘭達",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -1322,6 +1360,51 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage9Module,
+  },
+  "stage-11": {
+    id: "stage-11",
+    ordinal: 10,
+    label: "拯救蘇蘭達",
+    nextStageId: "stage-10",
+    focusUnitId: "1:8",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "battle-started",
+      phase: "player",
+      statusText: "蘇蘭達帶領游騎兵向飛船登船區撤離。",
+      campaignRoute: "stage-11",
+    },
+    enemyPhaseStatusText: "敵方階段：追擊增援隊開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新建立拯救蘇蘭達固定編隊。",
+      retreatStatusText: "全面撤退：重新建立拯救蘇蘭達固定編隊。",
+    },
+    completion: {
+      destinationLabel: "飛船上遭遇敵人",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-11-opening-story",
+        "stage-11-dori-departure",
+        "stage-11-objective-reached",
+        "stage-11-victory-story",
+        "stage-11-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-11-opening-story",
+        "stage-11-dori-departure",
+      ],
+      alliedUnits: {
+        kind: "exact-slots",
+        slots: [8, 16, 17, 18, 19, 40, 41, 42],
+      },
+      enemyClassById: createStage11SaveEnemyClasses(),
+      enemyAi: "none",
+    },
+    load: loadStage11Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

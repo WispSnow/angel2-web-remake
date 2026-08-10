@@ -45,6 +45,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 7 關 · 來到異世界",
     "第 8 關 · 營地遭到偷襲",
     "第 9 關 · 找尋傳說中的飛船",
+    "第 10 關 · 拯救蘇蘭達",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -73,6 +74,12 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-09-near-defeat",
     "stage-09-victory-ready",
     "stage-09-cleared",
+    "stage-11-opening",
+    "stage-11-player",
+    "stage-11-near-route",
+    "stage-11-near-defeat",
+    "stage-11-victory-ready",
+    "stage-11-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -95,7 +102,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.getByTestId("debug-growth-reset")).toHaveText("恢復預設（每關 100）");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／第 9 關預算 900）",
+    "目前使用預設：每關 +100（第 1 關預算 100／下一場「拯救蘇蘭達」預算 1000）",
   );
 
   await page.getByTestId("debug-difficulty").selectOption("3");
@@ -107,7 +114,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-per-stage-growth").fill("120");
   await page.getByTestId("debug-growth-apply").click();
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "已套用：每關 +120（第 1 關預算 120／第 9 關預算 1080）",
+    "已套用：每關 +120（第 1 關預算 120／下一場「拯救蘇蘭達」預算 1200）",
   );
   await expect(deployment).toHaveAttribute(
     "href",
@@ -133,6 +140,10 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "href",
     "/?debugScenario=stage-09-player&difficulty=3&roster=representative-growth&growth=120",
   );
+  await expect(page.getByTestId("debug-scenario-stage-11-player")).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-11-player&difficulty=3&roster=representative-growth&growth=120",
+  );
   await expect(page.getByTestId("debug-scenario-stage-00-player")).toHaveAttribute(
     "href",
     "/?debugScenario=stage-00-player&difficulty=3&roster=representative-growth",
@@ -140,7 +151,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-growth-reset").click();
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／第 9 關預算 900）",
+    "目前使用預設：每關 +100（第 1 關預算 100／下一場「拯救蘇蘭達」預算 1000）",
   );
   await expect(deployment).toHaveAttribute(
     "href",

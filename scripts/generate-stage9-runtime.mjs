@@ -20,7 +20,7 @@ const inputPaths = {
   behavior12: reversePath("parsed/native/behavior12-effects.json"),
   music: reversePath("parsed/native/music-catalog.json"),
   title: reversePath("parsed/dialogue/0127.json"),
-  nextTitle: reversePath("parsed/dialogue/0129.json"),
+  nextTitle: reversePath("parsed/dialogue/0128.json"),
   objectiveText: reversePath("parsed/dialogue/0091.json"),
   openingStory: reversePath("parsed/dialogue/0022.json"),
   victoryStory: reversePath("parsed/dialogue/0023.json"),
@@ -185,7 +185,7 @@ const dialogueText = (id) => parseInput(id).actions.filter(({ op }) => op === "t
 const titleText = dialogueText("title");
 const nextTitleText = dialogueText("nextTitle");
 if (titleText !== "找尋傳說中的飛船") throw new Error(`stage 9 title changed: ${titleText}`);
-if (nextTitleText !== "飛船上遭遇敵人") throw new Error(`stage 11 title changed: ${nextTitleText}`);
+if (nextTitleText !== "拯救蘇蘭達") throw new Error(`stage 11 title changed: ${nextTitleText}`);
 
 const stageHandler = requireEntry(
   eventsDocument.module29BattleRuntime.handlerBehaviorCatalog.handlers,

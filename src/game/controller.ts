@@ -1005,7 +1005,21 @@ export class GameController {
     this.dialogueIndex = 0;
     const events = this.consumeStageTrigger({ type: "story-completed", storyId });
     if (events.length > 0) {
-      void this.processStageEvents(events).then(() => this.emit());
+      void this.processStageEvents(events).then(() => {
+        if (
+          (completed === "openingStory" || completed === "round2Story")
+          && this.phase === completed
+          && this.activeStoryId === undefined
+        ) {
+          this.phase = "player";
+          this.statusMessage = completed === "openingStory"
+            ? "我方回合：選擇一名尚未行動的單位。"
+            : "第 2 回合開始。";
+        } else if (completed === "victoryStory" && this.phase === completed) {
+          this.phase = "victoryFeedback";
+        }
+        this.emit();
+      });
     } else if (completed === "openingStory" || completed === "round2Story") {
       this.phase = "player";
       this.statusMessage = completed === "openingStory" ? "我方回合：選擇一名尚未行動的單位。" : "第 2 回合開始。";
@@ -4515,6 +4529,20 @@ export class GameController {
     if (!victory) return;
     if (victory.type === "eliminate-side") {
       this.battle.units = this.battle.units.filter(({ side }) => side !== victory.side);
+      this.resolveOutcome();
+      this.emit();
+      return;
+    }
+    if (victory.type === "unit-in-cell-range") {
+      const target = this.battle.units.find(
+        ({ side, slot }) => side === victory.side && slot === victory.slot,
+      );
+      if (!target) return;
+      target.x = victory.maximum % victory.width;
+      target.y = Math.floor(victory.maximum / victory.width);
+      this.battle.focusId = target.id;
+      this.cursor = { x: target.x, y: target.y };
+      this.centerCamera(target);
       this.resolveOutcome();
       this.emit();
       return;

@@ -133,6 +133,34 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion31Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 31
+    || value.contentVersion !== "stage-11-ranger-evacuation-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
+function migrateVersion30Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 30
+    || value.contentVersion !== "stage-09-death-valley-1") return undefined;
+  const stageLabel = value.kind === "completed"
+    && value.stageId === "stage-11"
+    && value.stageLabel === "飛船上遭遇敵人"
+    ? "拯救蘇蘭達"
+    : value.stageLabel;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    stageLabel,
+  });
+}
+
 function migrateVersion29Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 29
@@ -1423,6 +1451,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion31 = migrateVersion31Save(value);
+    if (migratedVersion31) return migratedVersion31;
+    const migratedVersion30 = migrateVersion30Save(value);
+    if (migratedVersion30) return migratedVersion30;
     const migratedVersion29 = migrateVersion29Save(value);
     if (migratedVersion29) return migratedVersion29;
     const migratedVersion28 = migrateVersion28Save(value);
