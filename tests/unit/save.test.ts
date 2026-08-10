@@ -37,6 +37,8 @@ import { STAGE12_DEFINITION } from "../../src/game/content/stage12";
 import { Stage12Battle } from "../../src/game/simulation/stage12-battle";
 import { STAGE14_DEFINITION } from "../../src/game/content/stage14";
 import { Stage14Battle } from "../../src/game/simulation/stage14-battle";
+import { STAGE15_DEFINITION } from "../../src/game/content/stage15";
+import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -775,6 +777,61 @@ const stage14BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage15BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-15" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x15a0_b0c0,
+    rngCalls: 67,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 720, life: 240 },
+      { slot: 1, classId: "soldier", experience: 299, life: 120 },
+      { slot: 10, classId: "water-warrior", experience: 299, life: 250 },
+      { slot: 11, classId: "water-warrior", experience: 299, life: 250 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE15_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      {
+        slot: 1,
+        position: { ...STAGE15_DEFINITION.deployment.openCells[0] },
+        fixed: false,
+      },
+    ],
+  };
+  const battle = new Stage15Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-10T20:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-15",
+    stageLabel: "龍塔第二層",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: ["stage-15-enter-deployment", "stage-15-opening-story"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -1483,6 +1540,42 @@ describe("Web save validation", () => {
           : unit),
       },
     })).toBe(false);
+  });
+
+  it("validates stage 15 deployment, opening event, and all ten enemy classes", () => {
+    const save = stage15BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual(["1:0", "1:1"]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(10);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: ["stage-15-enter-deployment"],
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:9"
+          ? { ...unit, classId: "great-axe-warrior" as const, className: "巨斧戰士" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("migrates v36 saves to the stage 15 content identity", () => {
+    const current = stage14BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 36,
+      contentVersion: "stage-14-dragon-tower-fang-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-14",
+    });
   });
 
   it("migrates v35 saves to the stage 14 content identity", () => {

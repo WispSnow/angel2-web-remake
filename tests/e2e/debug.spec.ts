@@ -50,10 +50,15 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 12 關 · 落入沼澤",
     "第 13 關 · 龍塔外",
     "第 14 關 · 龍塔第一層",
+    "第 15 關 · 龍塔第二層",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
   expect(new Set(titleOffsets).size).toBe(1);
+  const scenarioRows = await page.locator(".debug-scenario-grid").evaluateAll((grids) =>
+    grids.map((grid) => new Set(Array.from(grid.children, (card) =>
+      Math.round(card.getBoundingClientRect().top))).size));
+  expect(Math.max(...scenarioRows)).toBeLessThanOrEqual(2);
   for (const scenarioId of [
     "stage-07-prebattle",
     "stage-07-deployment",
@@ -114,9 +119,28 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-14-near-defeat",
     "stage-14-victory-ready",
     "stage-14-cleared",
+    "stage-15-deployment",
+    "stage-15-opening",
+    "stage-15-player",
+    "stage-15-near-victory",
+    "stage-15-near-defeat",
+    "stage-15-victory-ready",
+    "stage-15-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
+  const prebattleCard = page.getByTestId("debug-scenario-stage-00-prebattle");
+  await expect(prebattleCard.locator(".debug-scenario-title")).toHaveText("關前劇情");
+  await expect(prebattleCard.getByText("進入場景", { exact: true })).toHaveCount(0);
+  const prebattleTooltip = prebattleCard.getByRole("tooltip");
+  await expect(prebattleTooltip).toBeHidden();
+  await prebattleCard.hover();
+  await expect(prebattleTooltip).toBeVisible();
+  await expect(prebattleTooltip).toContainText("SAY/0000 · 場景初態");
+  await expect(prebattleTooltip).toContainText("保留劇情、腳本移動和開戰對白");
+  await captureVisualAudit(page, {
+    path: `${ARTIFACT_DIR}/debug-hub-compact-hover.png`,
+  });
   expect(await page.evaluate(() => window.__ANGEL2_DEBUG__)).toBeUndefined();
   await expect(page.getByTestId("debug-technique-lab-link")).toHaveAttribute(
     "href",
@@ -578,6 +602,7 @@ test("debug hub remains usable at a narrow reduced-motion viewport", async ({ pa
   await page.goto("/debug.html");
   await expect(page.getByTestId("debug-hub")).toBeVisible();
   await expect(page.getByTestId("debug-scenario-stage-01-near-victory")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-hub-narrow.png`, fullPage: true });
 });
 

@@ -44,7 +44,9 @@
 | M23 | 内部第 13 关纸面合同 | `specified` | BK/15、1–12 人部署、两名水戰士新成员、九名守军、无增援、REMAKE-046 与 stage 14 边界闭合 |
 | M24 | 内部第 13 关有界实现 | `accepted` | SAY 32、瑪西爾目标、v35/v34、调试与自动／视觉门禁及用户试玩通过 |
 | M25 | 内部第 14 关纸面合同 | `specified` | B/0029、1–10 人部署、SAY 33、芳率七敌、无增援、REMAKE-047 与 stage 15 边界闭合 |
-| M26 | 内部第 14 关有界实现 | `verified` | SAY 33、芳目标、v36/v35、调试与自动／视觉门禁通过，待用户试玩 |
+| M26 | 内部第 14 关有界实现 | `accepted` | SAY 33、芳目标、v36/v35、调试、自动／视觉及用户试玩通过 |
+| M27 | 内部第 15 关纸面合同 | `specified` | B/0031、1–10 人部署、SAY 34、蘭率十敌、无增援、REMAKE-048 与 stage 16 边界闭合 |
+| M28 | 内部第 15 关有界实现 | `verified` | SAY 34、蘭目标、v37/v36、调试与自动／视觉门禁通过，待用户试玩 |
 | M04+ | 职业与技术能力切片 | `verified` | 33 项玩家技术、常规职业、终阶特性、水戰士分裂与三类组合实验表面完成自动门禁 |
 | Campaign | 全战役扩展 | `frozen` | 在通用边界稳定后逐关固化内容与验收 |
 
@@ -247,6 +249,12 @@ M25/M26 记录见 [`milestones/M25-stage-14-specification.md`](milestones/M25-st
 与 [`milestones/M26-stage-14-implementation.md`](milestones/M26-stage-14-implementation.md)。内部
 第 14 关按 B/0029、SAY `33/97/132/133` 与 `REMAKE-047` 接入固定妮雅、二十一候选九格、
 最多十人、芳率领的七名守军、无增援、第 6 回合起原版行为清零、v36/v35 与 stage 15
+路由；自动、Chromium、视觉、构建、证据、文档与用户试玩门禁已通过。
+
+M27/M28 记录见 [`milestones/M27-stage-15-specification.md`](milestones/M27-stage-15-specification.md)
+与 [`milestones/M28-stage-15-implementation.md`](milestones/M28-stage-15-implementation.md)。内部
+第 15 关按 B/0031、SAY `34/98/133/134` 与 `REMAKE-048` 接入固定妮雅、二十一候选九格、
+最多十人、蘭率领的十名守军、无增援、第 6 回合起原版行为清零、v37/v36 与 stage 16
 冻结路由；自动、Chromium、视觉、构建、证据和文档门禁已通过，等待用户试玩。
 
 用户于 2026-08-04 将顺序调整为“先逐个实现职业，再继续推进关卡”。原版玩家目录 33 项
@@ -254,8 +262,8 @@ M25/M26 记录见 [`milestones/M25-stage-14-specification.md`](milestones/M25-st
 全职业对阵场现均已完成自动门禁；这些表面继续承接可选人工组合反馈。
 
 M14/M14.10 第 8 关、M15/M16 第 9 关与 M17/M18 内部第 11 关均获用户接受；M19/M20
-内部第 10、12、13 关已获用户接受；内部第 14 关已验证、等待用户试玩。stage 15 及后续
-内容仍需独立纸面合同和用户授权。
+内部第 10、12、13、14 关已获用户接受；内部第 15 关已验证、等待用户试玩。stage 16 及
+后续内容仍需独立纸面合同和用户授权。
 
 ## 全战役入口
 

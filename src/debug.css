@@ -1,4 +1,8 @@
 :root {
+  --debug-gold: #e6b642;
+  --debug-gold-bright: #efc25a;
+  --debug-card-border: #57343b;
+  --debug-card-background: linear-gradient(145deg, rgb(43 22 28 / 96%), rgb(21 13 17 / 98%));
   color: #f4e8cf;
   background: #090608;
   font-family: "Noto Serif TC", "PingFang TC", serif;
@@ -38,7 +42,7 @@ body.debug-hub-page {
 .debug-kicker,
 .debug-stage-heading p {
   margin: 0 0 8px;
-  color: #e6b642;
+  color: var(--debug-gold);
   font-family: ui-monospace, "SFMono-Regular", monospace;
   font-size: 12px;
   font-weight: 800;
@@ -60,7 +64,7 @@ body.debug-hub-page {
 }
 
 .debug-back-link,
-.debug-scenario-card a,
+.debug-scenario-card,
 .debug-toolbar a,
 .debug-toolbar button {
   color: #ffe8ad;
@@ -195,86 +199,130 @@ body.debug-hub-page {
 }
 
 .debug-stage-group {
-  margin-top: 34px;
+  position: relative;
+  margin-top: 22px;
+}
+
+.debug-stage-group:hover,
+.debug-stage-group:focus-within {
+  z-index: 40;
 }
 
 .debug-stage-heading {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 76px minmax(0, 1fr);
   align-items: baseline;
-  column-gap: 18px;
-  margin-bottom: 14px;
+  column-gap: 12px;
+  margin-bottom: 8px;
 }
 
 .debug-stage-heading p {
   margin: 0;
+  white-space: nowrap;
 }
 
 .debug-stage-heading h2 {
   margin: 0;
   color: #f8e9ce;
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .debug-scenario-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 7px;
 }
 
 .debug-scenario-card {
-  min-height: 220px;
-  padding: 18px;
-  border: 1px solid #57343b;
-  background: linear-gradient(145deg, rgb(43 22 28 / 96%), rgb(21 13 17 / 98%));
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  color: #fff0ce;
+  border: 1px solid var(--debug-card-border);
+  background: var(--debug-card-background);
+  text-align: center;
+  text-decoration: none;
 }
 
 .debug-scenario-card.is-fixture {
   border-color: #79582d;
 }
 
-.debug-card-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  color: #b89f92;
+.debug-scenario-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.debug-scenario-tooltip {
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 7px);
+  left: 0;
+  visibility: hidden;
+  width: min(320px, calc(100vw - 40px));
+  padding: 10px 12px;
+  color: #d5c0b2;
+  border: 1px solid #b17c3a;
+  background: rgb(25 12 17 / 98%);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 55%);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transform: translateY(4px);
+  transition: opacity 100ms ease, transform 100ms ease, visibility 100ms;
+}
+
+.debug-scenario-tooltip b,
+.debug-scenario-tooltip span {
+  display: block;
+}
+
+.debug-scenario-tooltip b {
+  margin-bottom: 4px;
+  color: var(--debug-gold);
   font-family: ui-monospace, "SFMono-Regular", monospace;
   font-size: 11px;
 }
 
-.debug-card-meta em {
-  color: #dfb34f;
-  font-style: normal;
+.debug-scenario-card:nth-last-child(-n + 2) .debug-scenario-tooltip {
+  right: 0;
+  left: auto;
 }
 
-.debug-scenario-card h3 {
-  margin: 18px 0 8px;
-  color: #fff0ce;
-  font-size: 20px;
+.debug-scenario-card:hover,
+.debug-scenario-card:focus-visible {
+  z-index: 20;
 }
 
-.debug-scenario-card p {
-  min-height: 68px;
-  margin: 0 0 18px;
-  color: #bca8a0;
-  line-height: 1.65;
-}
-
-.debug-scenario-card a {
-  display: inline-block;
-  padding: 8px 13px;
+.debug-scenario-card:hover .debug-scenario-tooltip,
+.debug-scenario-card:focus-visible .debug-scenario-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .debug-back-link:hover,
-.debug-scenario-card a:hover,
+.debug-scenario-card:hover,
 .debug-back-link:focus-visible,
-.debug-scenario-card a:focus-visible,
+.debug-scenario-card:focus-visible,
 .debug-toolbar a:hover,
 .debug-toolbar button:hover:not(:disabled),
 .debug-toolbar a:focus-visible,
 .debug-toolbar button:focus-visible {
   color: #fff;
-  border-color: #efc25a;
+  border-color: var(--debug-gold-bright);
   outline: 2px solid rgb(239 194 90 / 28%);
   outline-offset: 2px;
 }
@@ -416,19 +464,16 @@ body.debug-hub-page {
   }
 
   .debug-scenario-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .debug-tool-links {
     grid-template-columns: 1fr;
   }
 
-  .debug-scenario-card {
-    min-height: auto;
-  }
-
-  .debug-scenario-card p {
-    min-height: auto;
+  .debug-scenario-card:nth-child(even) .debug-scenario-tooltip {
+    right: 0;
+    left: auto;
   }
 }
 

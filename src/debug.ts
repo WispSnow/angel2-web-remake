@@ -28,6 +28,11 @@ const stageGroups = stageOrder.map((stageId) => ({
   scenarios: DEBUG_SCENARIOS.filter((scenario) => scenario.stageId === stageId),
 })).filter(({ scenarios }) => scenarios.length > 0);
 const rosterOptions = debugRosterSourceOptions(localStorage);
+const escapeAttribute = (value: string) => value
+  .replaceAll("&", "&amp;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;");
 
 root.innerHTML = `
   <div class="debug-hub-shell">
@@ -85,18 +90,20 @@ root.innerHTML = `
           <div class="debug-scenario-grid">
             ${scenarios.map((scenario) => {
               const fixture = "fixture" in scenario && scenario.fixture;
+              const tooltipId = `debug-tooltip-${scenario.id}`;
               return `
-              <article class="debug-scenario-card${fixture ? " is-fixture" : ""}">
-                <div class="debug-card-meta">
-                  <span>${scenario.phase}</span>
-                  ${fixture ? "<em>階段夾具</em>" : "<em>場景初態</em>"}
-                </div>
-                <h3>${scenario.title}</h3>
-                <p>${scenario.description}</p>
-                <a href="${debugScenarioUrl(scenario.id, 0)}"
-                  data-debug-scenario-id="${scenario.id}"
-                  data-testid="debug-scenario-${scenario.id}">進入場景</a>
-              </article>`;
+              <a class="debug-scenario-card${fixture ? " is-fixture" : ""}"
+                href="${debugScenarioUrl(scenario.id, 0)}"
+                aria-label="${escapeAttribute(`進入場景：${scenario.title}`)}"
+                aria-describedby="${tooltipId}"
+                data-debug-scenario-id="${scenario.id}"
+                data-testid="debug-scenario-${scenario.id}">
+                <span class="debug-scenario-title">${scenario.title}</span>
+                <span class="debug-scenario-tooltip" id="${tooltipId}" role="tooltip">
+                  <b>${scenario.phase} · ${fixture ? "階段夾具" : "場景初態"}</b>
+                  <span>${scenario.description}</span>
+                </span>
+              </a>`;
             }).join("")}
           </div>
         </section>`).join("")}

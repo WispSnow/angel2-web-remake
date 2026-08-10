@@ -40,6 +40,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 内部第 12 关内容、BK/10–14 三段剧情、1–9 人部署、五个水戰士根槽、职业分裂、共享生命显示时序、全景右侧详情快照与无关卡增援 | `stage12-content.test.ts`、`stage12-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage12.spec.ts` 的地图／全景分身扣血与右侧详情回归；`stage0.spec.ts` S00-K 的普通职业全景详情回归 |
 | 内部第 13 关内容、BK/15 关前剧情、1–12 人部署、两名水戰士新成员、九名守军、瑪西爾首领目标与无增援 | `stage13-content.test.ts`、`stage13-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage13.spec.ts` |
 | 内部第 14 关内容、1–10 人部署、SAY/33 开战对白、芳率七敌、首领目标、回合 6 行为清零证据与无增援 | `stage14-content.test.ts`、`stage14-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage14.spec.ts` |
+| 内部第 15 关内容、1–10 人部署、SAY/34 开战对白、蘭率十敌、首领目标、回合 6 行为清零证据与无增援 | `stage15-content.test.ts`、`stage15-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage15.spec.ts` |
 | 第 0–6 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
 | 剧情对话 DOM、逐字推进、右键跳过确认与输入阻断 | 无独立模拟数值测试 | `stage0.spec.ts` 的剧情对话用例；各关卡通过 `dialogue-controls.ts` 复用真实跳过路径 |
 | 部署 | `deployment*.test.ts` | `deployment-lab.spec.ts` 或对应关卡部署用例 |

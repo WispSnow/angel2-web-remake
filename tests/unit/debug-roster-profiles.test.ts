@@ -41,6 +41,7 @@ const stageIds = [
   "stage-12",
   "stage-13",
   "stage-14",
+  "stage-15",
 ] as const satisfies readonly StageId[];
 const workspace = path.resolve(import.meta.dirname, "../..");
 
@@ -241,7 +242,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14"] as const) {
+    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14", "stage-15"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(roster[8], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
@@ -263,7 +264,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14"] as const) {
+    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14", "stage-15"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(roster[9], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
@@ -275,16 +276,18 @@ describe("debug roster profiles", () => {
       }
     }
 
-    for (const [profileId, perStageGrowth] of profiles) {
-      const roster = debugRosterForProfile(profileId, "stage-14", perStageGrowth);
-      for (const [slot, classId] of [[10, "water-warrior"], [11, "water-warrior"]] as const) {
-        expect(roster[slot], `stage-14/${profileId}/${perStageGrowth ?? "configured"}/${slot}`)
-          .toEqual({
-            slot,
-            classId,
-            experience: 299,
-            life: classStatsFor({ classId, experience: 299 }).maxLife,
-          });
+    for (const stageId of ["stage-14", "stage-15"] as const) {
+      for (const [profileId, perStageGrowth] of profiles) {
+        const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
+        for (const [slot, classId] of [[10, "water-warrior"], [11, "water-warrior"]] as const) {
+          expect(roster[slot], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}/${slot}`)
+            .toEqual({
+              slot,
+              classId,
+              experience: 299,
+              life: classStatsFor({ classId, experience: 299 }).maxLife,
+            });
+        }
       }
     }
   });
