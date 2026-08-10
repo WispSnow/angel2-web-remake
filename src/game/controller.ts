@@ -2213,8 +2213,6 @@ export class GameController {
           : presentation.lightning1;
       let elapsedNativeTicks = 0;
       let audioRequestIndex = 0;
-      const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-        ?? false;
       const queueDueLightningAudio = (): void => {
         while (audioRequestIndex < lightning.audioRequests.length) {
           const request = lightning.audioRequests[audioRequestIndex];
@@ -2230,54 +2228,25 @@ export class GameController {
       };
       let draw = 0;
       queueDueLightningAudio();
-      if (reducedMotion) {
-        const mainDrawCount = lightning.phases.reduce(
-          (total, phase) => total + phase.descriptorSequence.length,
-          0,
-        );
-        const mainNativeTicks = lightning.phases.reduce(
-          (total, phase) => total + phase.descriptorSequence.length * phase.waitPerDrawNativeTicks,
-          0,
-        );
-        const representativeDraw = Math.max(0, Math.floor(mainDrawCount * 2 / 3));
-        await present("lightningMain", representativeDraw, mainNativeTicks, undefined, 12);
-        elapsedNativeTicks += mainNativeTicks;
-        queueDueLightningAudio();
-      } else {
-        for (const phase of lightning.phases) {
-          for (const _descriptor of phase.descriptorSequence) {
-            await present("lightningMain", draw, phase.waitPerDrawNativeTicks);
-            draw += 1;
-            elapsedNativeTicks += phase.waitPerDrawNativeTicks;
-            queueDueLightningAudio();
-          }
+      // Every lightning tier's system contract keeps its native draw counts and
+      // tick total under speed, sound and reduced-motion options; only the wall
+      // clock may change, through the player-visible presentation speed toggle.
+      for (const phase of lightning.phases) {
+        for (const _descriptor of phase.descriptorSequence) {
+          await present("lightningMain", draw, phase.waitPerDrawNativeTicks);
+          draw += 1;
+          elapsedNativeTicks += phase.waitPerDrawNativeTicks;
+          queueDueLightningAudio();
         }
       }
       const hit = lightning.commonHit;
-      if (reducedMotion) {
-        await present(
-          "lightningHit",
-          0,
-          hit.iterations * hit.waveDrawsPerIteration * hit.waitPerWaveDrawNativeTicks,
-          undefined,
-          12,
-        );
-        await present(
-          "lightningCleanup",
-          0,
-          hit.cleanup.drawCount * hit.cleanup.waitPerDrawNativeTicks,
-          undefined,
-          12,
-        );
-      } else {
-        for (let iteration = 0; iteration < hit.iterations; iteration += 1) {
-          for (let wave = 0; wave < hit.waveDrawsPerIteration; wave += 1) {
-            await present("lightningHit", iteration * hit.waveDrawsPerIteration + wave, hit.waitPerWaveDrawNativeTicks);
-          }
+      for (let iteration = 0; iteration < hit.iterations; iteration += 1) {
+        for (let wave = 0; wave < hit.waveDrawsPerIteration; wave += 1) {
+          await present("lightningHit", iteration * hit.waveDrawsPerIteration + wave, hit.waitPerWaveDrawNativeTicks);
         }
-        for (let frame = 0; frame < hit.cleanup.drawCount; frame += 1) {
-          await present("lightningCleanup", frame, hit.cleanup.waitPerDrawNativeTicks);
-        }
+      }
+      for (let frame = 0; frame < hit.cleanup.drawCount; frame += 1) {
+        await present("lightningCleanup", frame, hit.cleanup.waitPerDrawNativeTicks);
       }
     } else if (result.actionId === "ice-1"
       || result.actionId === "ice-2"

@@ -327,11 +327,15 @@ test("S05-K/L: completed and reduced-motion portal paths preserve deterministic 
   });
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "19");
   const reduced = await state(page);
-  expect(reduced.specialActionPresentationTrace.map(({ phase }) => phase)).toEqual([
-    "lightningMain",
-    "lightningHit",
-    "lightningCleanup",
-  ]);
+  // Reduced motion may shorten waits but never drops a native draw: the portal
+  // 4L keeps its 32 body draws, 30 staggered waves and 5 all-enemy cleanups.
+  const reducedDraws = (phase: string) =>
+    reduced.specialActionPresentationTrace.filter((entry) => entry.phase === phase).length;
+  expect({
+    main: reducedDraws("lightningMain"),
+    hit: reducedDraws("lightningHit"),
+    cleanup: reducedDraws("lightningCleanup"),
+  }).toEqual({ main: 32, hit: 30, cleanup: 5 });
   expect(reduced.specialActionPresentationTrace
     .reduce((total, entry) => total + entry.nativeTicks, 0)).toBe(304);
   expect(reduced.rngState).toBe(initial.rngState);

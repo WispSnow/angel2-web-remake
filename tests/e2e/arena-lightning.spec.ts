@@ -312,6 +312,84 @@ test("tier-three magic master descends native 4L before planting its inherited-a
   expect(pageErrors).toEqual([]);
 });
 
+test("reduced motion keeps every native 1L draw and the all-enemy cleanup", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("magician");
+    arena.setLevel(1);
+    const actor = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const center = arena.interact(22, 30);
+    const outside = arena.interact(27, 30);
+    return [actor, center, outside];
+  });
+  expect(placed).toEqual([true, true, true]);
+  await page.getByTestId("arena-start").click();
+  const before = await arenaBattleState(page);
+  const centerBefore = before?.units.find(({ id }) => id === "arena-2-0")?.life;
+  const outsideBefore = before?.units.find(({ id }) => id === "arena-2-1")?.life;
+
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-lightning-1").click();
+  await clickArenaWorldCell(page, 22, 30);
+
+  const canvas = page.getByTestId("battle-canvas");
+  await page.waitForFunction(() => {
+    const dataset = document.querySelector<HTMLCanvasElement>(
+      "[data-testid='battle-canvas']",
+    )?.dataset;
+    return dataset?.mapCombatPhase === "lightningMain" && dataset.mapCombatFrame === "12";
+  }, undefined, { polling: "raf" });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-lightning-1-reduced-motion-main.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const dataset = document.querySelector<HTMLCanvasElement>(
+      "[data-testid='battle-canvas']",
+    )?.dataset;
+    return dataset?.mapCombatPhase === "lightningCleanup";
+  }, undefined, { polling: "raf" });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-lightning-1-reduced-motion-cleanup.png`,
+  });
+  // `MAGIC/6` is drawn on every enemy-occupied cell, including the one outside
+  // the effect radius; only the wave is limited to the damaged band.
+  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "2");
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as {
+      battle?: ArenaBattleDebugState;
+    }).battle;
+    return current?.lastSpecialAction?.actionId === "lightning-1"
+      && current.specialActionPresentation === undefined;
+  });
+  const after = await arenaBattleState(page);
+  const drawsFor = (phase: string) =>
+    after?.specialActionPresentationTrace.filter((entry) => entry.phase === phase).length;
+  expect({
+    main: drawsFor("lightningMain"),
+    hit: drawsFor("lightningHit"),
+    cleanup: drawsFor("lightningCleanup"),
+  }).toEqual({ main: 32, hit: 22, cleanup: 5 });
+  expect(after?.specialActionPresentationTrace
+    .filter(({ phase }) => phase.startsWith("lightning"))
+    .reduce((total, entry) => total + entry.nativeTicks, 0)).toBe(414);
+  expect(after?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(centerBefore! - 50);
+  expect(after?.units.find(({ id }) => id === "arena-2-1")?.life).toBe(outsideBefore);
+  expect(pageErrors).toEqual([]);
+});
+
 test("formal 4L skips an ice-frozen covered enemy and keeps its shell above the full column", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
