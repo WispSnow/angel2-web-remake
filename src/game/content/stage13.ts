@@ -133,7 +133,12 @@ export const STAGE13_SEMANTIC_ENEMY_UNITS = STAGE13_ENEMY_UNITS.map((unit) => {
     position: unit.position,
     classId,
     name: "name" in unit ? unit.name : className(classId),
-    portrait: ("portraitRecord" in unit ? unit.portraitRecord : 47) as PortraitRecord,
+    // Generic FFh actor descriptors inherit both portrait and display name
+    // from the current class. Leave the portrait absent so the shared fixed-
+    // stage constructor resolves the correct side-2 class variant.
+    ...("portraitRecord" in unit
+      ? { portrait: unit.portraitRecord as PortraitRecord }
+      : {}),
     aiBehavior: unit.aiBehavior,
   };
 });

@@ -53,6 +53,18 @@ describe("stage 13 battle simulation", () => {
     expect(battle.unit("2:24")).toMatchObject({
       classId: "divine-sword-warrior", name: "瑪西爾", portrait: 31, x: 19, y: 17,
     });
+    expect(battle.units.filter(({ side }) => side === 2).map(({ id, portrait }) => ({ id, portrait })))
+      .toEqual([
+        { id: "2:24", portrait: 31 },
+        { id: "2:43", portrait: 53 },
+        { id: "2:46", portrait: 53 },
+        { id: "2:47", portrait: 49 },
+        { id: "2:41", portrait: 49 },
+        { id: "2:42", portrait: 58 },
+        { id: "2:45", portrait: 53 },
+        { id: "2:48", portrait: 60 },
+        { id: "2:49", portrait: 49 },
+      ]);
     const alliedIds = battle.units.filter(({ side }) => side === 1).map(({ id }) => id);
     expect(alliedIds.every((id) => battle.isPlayerControllableAlly(id))).toBe(true);
     expect(battle.alliedActionOrder(false)).toEqual([]);

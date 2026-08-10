@@ -46,6 +46,16 @@ async function clickCell(page: Page, x: number, y: number): Promise<void> {
   });
 }
 
+async function moveCursor(page: Page, deltaX: number, deltaY: number): Promise<void> {
+  const horizontal = deltaX < 0 ? "ArrowLeft" : "ArrowRight";
+  const vertical = deltaY < 0 ? "ArrowUp" : "ArrowDown";
+  for (let step = 0; step < Math.abs(deltaY); step += 1) await page.keyboard.press(vertical);
+  for (let step = 0; step < Math.abs(deltaX); step += 1) await page.keyboard.press(horizontal);
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+}
+
 test("S13-A/B/C: stage 12 completion plays SAY/32, deploys 1–12, and starts with nine guards", async ({ page }) => {
   await page.goto("/?debugScenario=stage-12-cleared&difficulty=0&test=1");
   await waitForPhase(page, "prebattleStory");
@@ -138,6 +148,43 @@ test("S13-H: mouse input keeps the first half visible and types only the text ap
     path: `${ARTIFACT_DIR}/stage13-appended-dialogue.png`,
   });
   await expect(dialogueText).toHaveText(fullLine);
+});
+
+test("S13-I: unnamed Dragon Tower guards use their native enemy class portraits in the HUD", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-13-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  const portrait = page.getByTestId("unit-portrait-composite");
+  const identity = page.locator(".hud-identity-name");
+
+  // Nia starts at (36,37); move to the pegasus warrior at (22,17).
+  await moveCursor(page, -14, -20);
+  await expect(identity).toHaveText("飛馬戰士／飛馬戰士");
+  await expect(portrait).toHaveAttribute("data-portrait-record", "53");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage13-generic-pegasus-portrait.png`,
+  });
+
+  // Magician at (28,18), archer at (23,22), steel armor warrior at (17,21).
+  await moveCursor(page, 6, 1);
+  await expect(identity).toHaveText("魔術士／魔術士");
+  await expect(portrait).toHaveAttribute("data-portrait-record", "49");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage13-generic-magician-portrait.png`,
+  });
+
+  await moveCursor(page, -5, 4);
+  await expect(identity).toHaveText("弓兵／弓兵");
+  await expect(portrait).toHaveAttribute("data-portrait-record", "60");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage13-generic-archer-portrait.png`,
+  });
+
+  await moveCursor(page, -6, -1);
+  await expect(identity).toHaveText("鋼甲戰士／鋼甲戰士");
+  await expect(portrait).toHaveAttribute("data-portrait-record", "58");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage13-generic-steel-armor-portrait.png`,
+  });
 });
 
 test("S13-D/E: the corrected objective defeats Marsiel without requiring the other eight guards", async ({ page }) => {

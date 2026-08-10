@@ -75,6 +75,8 @@ describe("stage 13 generated content", () => {
       "divine-sword-warrior", "pegasus-warrior", "land-knight", "magician",
       "magic-guide", "steel-armor-warrior", "cavalry", "archer", "monk",
     ]);
+    expect(STAGE13_SEMANTIC_ENEMY_UNITS.slice(1)
+      .every((unit) => !("portrait" in unit))).toBe(true);
   });
 
   it("registers SAY/32, BK/15, and the original stage music", () => {
