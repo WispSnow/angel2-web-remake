@@ -36,6 +36,7 @@ const stageIds = [
   "stage-07",
   "stage-08",
   "stage-09",
+  "stage-11",
 ] as const satisfies readonly StageId[];
 const workspace = path.resolve(import.meta.dirname, "../..");
 
@@ -225,6 +226,26 @@ describe("debug roster profiles", () => {
     )).toBe(false);
     expect(() => debugRosterForProfile("template-baseline", "stage-04", perStageGrowth))
       .toThrow("沒有可覆蓋的友軍");
+  });
+
+  it("carries Sulanda's mandatory stage-eight cavalry baseline into direct stage-eleven profiles", () => {
+    const profiles = [
+      ["template-baseline", undefined],
+      ["representative-growth", undefined],
+      ["representative-growth", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+      ["promotion-coverage", undefined],
+      ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+    ] as const;
+
+    for (const [profileId, perStageGrowth] of profiles) {
+      const roster = debugRosterForProfile(profileId, "stage-11", perStageGrowth);
+      expect(roster[8], `${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
+        slot: 8,
+        classId: "cavalry",
+        experience: 299,
+        life: classStatsFor({ classId: "cavalry", experience: 299 }).maxLife,
+      });
+    }
   });
 
   it("keeps battle-entry and current save rosters separate while overriding only difficulty and stage", () => {

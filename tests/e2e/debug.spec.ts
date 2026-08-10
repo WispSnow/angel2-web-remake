@@ -210,6 +210,27 @@ test("one per-stage growth budget advances the stage-five profession", async ({ 
   }));
 });
 
+test("stage-eleven debug profiles preserve Sulanda's stage-eight cavalry baseline", async ({ page }) => {
+  for (const query of [
+    "roster=template-baseline",
+    "roster=representative-growth",
+    "roster=representative-growth&growth=120",
+    "roster=promotion-coverage&growth=120",
+  ]) {
+    await page.goto(`/?debugScenario=stage-11-player&difficulty=2&${query}`);
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+      units: Array<{ id: string; classId: string; experience: number; life: number }>;
+    });
+    expect(state.units, query).toContainEqual(expect.objectContaining({
+      id: "1:8",
+      classId: "cavalry",
+      experience: 299,
+      life: classStatsFor({ classId: "cavalry", experience: 299 }).maxLife,
+    }));
+  }
+});
+
 test("stage-four debug profiles cover inherited multi-promotion rosters", async ({ page }) => {
   await page.goto(
     "/?debugScenario=stage-04-player&difficulty=2&roster=promotion-coverage&test=1",

@@ -24,6 +24,22 @@ interface DebugRosterEntrySpec {
   experience: number;
 }
 
+interface DebugStageBaselineSpec {
+  slot: number;
+  classId: ClassId;
+  experience: number;
+}
+
+/**
+ * Direct debug entry skips earlier battles, so reproduce only campaign changes that every valid route
+ * must already have committed. Stage 8 forces Sulanda to cavalry before stage 11 inherits her class.
+ */
+const DEBUG_STAGE_PROFILE_BASELINES: Readonly<
+  Partial<Record<StageId, readonly DebugStageBaselineSpec[]>>
+> = {
+  "stage-11": [{ slot: 8, classId: "cavalry", experience: 299 }],
+};
+
 const REPRESENTATIVE_STAGE1 = [
   { slot: 0, classPath: ["soldier", "cavalry"], experience: 180 },
   { slot: 1, classPath: ["soldier", "sister"], experience: 160 },
@@ -360,7 +376,12 @@ export function debugRosterForProfile(
   stageId: StageId,
   perStageGrowth?: number,
 ): SaveRosterEntry[] {
-  const roster = completeCampaignRoster();
+  const roster = completeCampaignRoster(
+    (DEBUG_STAGE_PROFILE_BASELINES[stageId] ?? []).map((entry) => ({
+      ...entry,
+      life: classStatsFor(entry).maxLife,
+    })),
+  );
   const stages: Partial<Record<StageId, readonly DebugRosterEntrySpec[]>> =
     profileSpec(profileId).stages;
   const entries = stages[stageId] ?? [];
