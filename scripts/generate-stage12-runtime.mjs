@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { compileNativeStory } from "./lib/compile-native-story.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reversePath = (...parts) => path.join(root, "reverse", ...parts);
@@ -177,36 +178,7 @@ assertEqual(musicRecords, { player: { entry: 9, loop: 8 }, enemy: { entry: 25, l
 
 const portraitSpeakers = { 0: "葛蒂拉斯", 10: "蘇蘭達", 13: "多莉", 42: "蒙欣曼", 45: "希蜜", 46: "妮雅" };
 function compileStory(document, record) {
-  const windows = { upper: { open: false, text: "", portrait: undefined }, lower: { open: false, text: "", portrait: undefined } };
-  let activeSlot;
-  let backgroundId;
-  let wait = 0;
-  const pages = [];
-  for (const action of document.actions) {
-    if (action.op === "set_background") backgroundId = action.backgroundId;
-    else if (action.op === "show_portrait") windows[action.slot].portrait = action.portraitId;
-    else if (action.op === "hide_portrait") windows[action.slot].portrait = undefined;
-    else if (action.op === "open_window") {
-      windows[action.slot].open = true;
-      if (action.replaceText) windows[action.slot].text = "";
-      activeSlot = action.slot;
-    } else if (action.op === "close_window") windows[action.slot].open = false;
-    else if (action.op === "text") { windows[action.slot].text += action.text; activeSlot = action.slot; }
-    else if (action.op === "line_break") {
-      if (!activeSlot) throw new Error(`SAY/${record} line break has no active window`);
-      windows[activeSlot].text += "\n";
-    } else if (action.op === "wait_for_input") {
-      wait += 1;
-      const page = { activeSlot, source: { record, wait, address: `SAY/${String(record).padStart(4, "0")}:${action.line}`, ...(backgroundId === undefined ? {} : { backgroundId }) } };
-      for (const slot of ["upper", "lower"]) {
-        const state = windows[slot];
-        if (!state.open) continue;
-        page[slot] = { text: state.text, ...(state.portrait === undefined ? {} : { portrait: state.portrait, speaker: portraitSpeakers[state.portrait] }) };
-      }
-      pages.push(page);
-    }
-  }
-  return pages;
+  return compileNativeStory(document, record, portraitSpeakers, { includeBackground: true });
 }
 const storyPages = {
   "stage-12-prebattle-story": compileStory(parseInput("prebattleStory"), 29),

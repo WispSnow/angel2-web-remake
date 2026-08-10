@@ -721,6 +721,56 @@ async function loadStage12Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage13Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage13"),
+    import("./simulation/stage13-battle"),
+  ]);
+  content.activateStage13Content();
+  const definition = content.STAGE13_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 13",
+      title: content.STAGE13.name,
+      objective: content.STAGE13_DEFINITION.objective.victoryText,
+      minimap: content.STAGE13_ASSETS.minimap,
+      terrain: content.STAGE13_TERRAIN_TOKENS,
+      gridWidth: content.STAGE13.width,
+      gridHeight: content.STAGE13.height,
+      enemies: content.STAGE13_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十一名候選最多選十一人。擊敗神劍戰士瑪西爾即可獲勝。",
+    },
+    ["stage-13-prebattle-story", "stage-13-enter-deployment"],
+    (campaign) => battleModule.createStage13DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 13 requires a deployment result");
+    return new battleModule.Stage13Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE13_DEFINITION,
+    assets: {
+      map: content.STAGE13_ASSETS.map,
+      minimap: content.STAGE13_ASSETS.minimap,
+      storyBackground: content.STAGE13_ASSETS.storyBackgrounds[15],
+      storyBackgrounds: content.STAGE13_ASSETS.storyBackgrounds,
+      unitSprites: content.STAGE13_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -1616,6 +1666,64 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage12Module,
+  },
+  "stage-13": {
+    id: "stage-13",
+    ordinal: 13,
+    label: "龍塔外",
+    nextStageId: "stage-14",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "妮雅一行離開沼澤，準備以精銳小隊突襲龍塔。",
+      campaignRoute: "stage-13",
+    },
+    enemyPhaseStatusText: "敵方階段：瑪西爾龍塔守軍開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始龍塔外關前流程。",
+      retreatStatusText: "全面撤退：返回龍塔外關前流程並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "龍塔第一層",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-13-prebattle-story",
+        "stage-13-enter-deployment",
+        "stage-13-objective-reached",
+        "stage-13-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-13-prebattle-story",
+        "stage-13-enter-deployment",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        maximumUnits: 12,
+        openCellCount: 11,
+      },
+      enemyClassById: [
+        ["2:24", "divine-sword-warrior"],
+        ["2:43", "pegasus-warrior"],
+        ["2:46", "land-knight"],
+        ["2:47", "magician"],
+        ["2:41", "magic-guide"],
+        ["2:42", "steel-armor-warrior"],
+        ["2:45", "cavalry"],
+        ["2:48", "archer"],
+        ["2:49", "monk"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage13Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

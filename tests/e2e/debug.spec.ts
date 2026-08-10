@@ -48,6 +48,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 10 關 · 拯救蘇蘭達",
     "第 11 關 · 飛船上遭遇敵人",
     "第 12 關 · 落入沼澤",
+    "第 13 關 · 龍塔外",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -98,6 +99,13 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-12-near-defeat",
     "stage-12-victory-ready",
     "stage-12-cleared",
+    "stage-13-prebattle",
+    "stage-13-deployment",
+    "stage-13-player",
+    "stage-13-near-victory",
+    "stage-13-near-defeat",
+    "stage-13-victory-ready",
+    "stage-13-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -120,7 +128,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.getByTestId("debug-growth-reset")).toHaveText("恢復預設（每關 100）");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／下一場「飛船上遭遇敵人」預算 1100）",
+    "目前使用預設：每關 +100（第 1 關預算 100／下一場「龍塔外」預算 1300）",
   );
 
   await page.getByTestId("debug-difficulty").selectOption("3");
@@ -132,7 +140,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-per-stage-growth").fill("120");
   await page.getByTestId("debug-growth-apply").click();
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "已套用：每關 +120（第 1 關預算 120／下一場「飛船上遭遇敵人」預算 1320）",
+    "已套用：每關 +120（第 1 關預算 120／下一場「龍塔外」預算 1560）",
   );
   await expect(deployment).toHaveAttribute(
     "href",
@@ -173,7 +181,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-growth-reset").click();
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／下一場「飛船上遭遇敵人」預算 1100）",
+    "目前使用預設：每關 +100（第 1 關預算 100／下一場「龍塔外」預算 1300）",
   );
   await expect(deployment).toHaveAttribute(
     "href",

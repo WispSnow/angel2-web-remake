@@ -1407,7 +1407,22 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("migrates v33 stage 10 saves to the stage 12 content identity", () => {
+  it("migrates v34 stage 12 saves to the stage 13 content identity", () => {
+    const current = stage12BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 34,
+      contentVersion: "stage-12-swamp-water-warriors-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-12",
+    });
+  });
+
+  it("migrates v33 stage 10 saves through to the stage 13 content identity", () => {
     const current = stage10BattleSave();
     const migrated = parseSaveData(JSON.stringify({
       ...current,

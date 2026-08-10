@@ -40,6 +40,7 @@ const DEBUG_STAGE_PROFILE_BASELINES: Readonly<
   "stage-11": [{ slot: 8, classId: "cavalry", experience: 299 }],
   "stage-10": [{ slot: 8, classId: "cavalry", experience: 299 }],
   "stage-12": [{ slot: 8, classId: "cavalry", experience: 299 }],
+  "stage-13": [{ slot: 8, classId: "cavalry", experience: 299 }],
 };
 
 const REPRESENTATIVE_STAGE1 = [
@@ -169,6 +170,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-11": REPRESENTATIVE_STAGE8,
       "stage-10": REPRESENTATIVE_STAGE8,
       "stage-12": REPRESENTATIVE_STAGE8,
+      "stage-13": REPRESENTATIVE_STAGE8,
     },
   },
   {
@@ -189,6 +191,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-11": PROMOTION_COVERAGE_STAGE8,
       "stage-10": PROMOTION_COVERAGE_STAGE8,
       "stage-12": PROMOTION_COVERAGE_STAGE8,
+      "stage-13": PROMOTION_COVERAGE_STAGE8,
     },
   },
 ] as const satisfies readonly {

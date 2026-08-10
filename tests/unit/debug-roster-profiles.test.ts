@@ -238,7 +238,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-11", "stage-10", "stage-12"] as const) {
+    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(roster[8], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({

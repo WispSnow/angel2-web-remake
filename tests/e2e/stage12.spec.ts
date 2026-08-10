@@ -259,7 +259,7 @@ test("S12-D3: full combat keeps every shared body at pre-battle life until retur
   );
 });
 
-test("S12-E/F: victory plays SAY/31, defeat retries SAY/29, and completion freezes at stage 13", async ({ page }) => {
+test("S12-E/F: victory plays SAY/31, defeat retries SAY/29, and completion enters playable stage 13", async ({ page }) => {
   await page.goto("/?debugScenario=stage-12-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "31");
@@ -284,7 +284,8 @@ test("S12-E/F: victory plays SAY/31, defeat retries SAY/29, and completion freez
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "32");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -313,9 +314,9 @@ test("S12-E/F: victory plays SAY/31, defeat retries SAY/29, and completion freez
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-12",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-13",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-13",
   });
 });

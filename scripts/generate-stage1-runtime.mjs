@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { compileNativeStory } from "./lib/compile-native-story.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reversePath = (...parts) => path.join(root, "reverse", ...parts);
@@ -289,62 +290,7 @@ const portraitSpeakers = {
 };
 
 function compileStory(document, record) {
-  const windows = {
-    upper: { open: false, text: "", portrait: undefined },
-    lower: { open: false, text: "", portrait: undefined },
-  };
-  let activeSlot;
-  let wait = 0;
-  const pages = [];
-
-  for (const action of document.actions) {
-    if (action.op === "show_portrait") {
-      windows[action.slot].portrait = action.portraitId;
-    }
-    else if (action.op === "hide_portrait") {
-      windows[action.slot].portrait = undefined;
-    }
-    else if (action.op === "open_window") {
-      windows[action.slot].open = true;
-      if (action.replaceText) windows[action.slot].text = "";
-      activeSlot = action.slot;
-    }
-    else if (action.op === "close_window") {
-      windows[action.slot].open = false;
-    }
-    else if (action.op === "text") {
-      windows[action.slot].text += action.text;
-      activeSlot = action.slot;
-    }
-    else if (action.op === "line_break") {
-      if (!activeSlot) throw new Error(`SAY/${String(record).padStart(4, "0")} has a line break without an active window`);
-      windows[activeSlot].text += "\n";
-    }
-    else if (action.op === "wait_for_input") {
-      wait += 1;
-      const page = {
-        activeSlot,
-        source: {
-          record,
-          wait,
-          address: `SAY/${String(record).padStart(4, "0")}:${action.line}`,
-        },
-      };
-      for (const slot of ["upper", "lower"]) {
-        const state = windows[slot];
-        if (!state.open) continue;
-        page[slot] = {
-          text: state.text,
-          ...(state.portrait === undefined ? {} : {
-            portrait: state.portrait,
-            speaker: portraitSpeakers[state.portrait],
-          }),
-        };
-      }
-      pages.push(page);
-    }
-  }
-  return pages;
+  return compileNativeStory(document, record, portraitSpeakers);
 }
 
 const storyRecords = {

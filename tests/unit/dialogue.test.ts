@@ -13,7 +13,38 @@ import {
   GROUP_COMMAND_DIALOGUE,
   groupCommandDialogueFor,
 } from "../../src/game/content/group-command-dialogue";
+import { STAGE1_STORY_PAGES } from "../../src/game/content/stage1-runtime.generated";
+import { STAGE2_STORY_PAGES } from "../../src/game/content/stage2-runtime.generated";
+import { STAGE3_STORY_PAGES } from "../../src/game/content/stage3-runtime.generated";
+import { STAGE4_STORY_PAGES } from "../../src/game/content/stage4-runtime.generated";
+import { STAGE5_STORY_PAGES } from "../../src/game/content/stage5-runtime.generated";
+import { STAGE6_STORY_PAGES } from "../../src/game/content/stage6-runtime.generated";
+import { STAGE7_STORY_PAGES } from "../../src/game/content/stage7-runtime.generated";
+import { STAGE8_STORY_PAGES } from "../../src/game/content/stage8-runtime.generated";
+import { STAGE9_STORY_PAGES } from "../../src/game/content/stage9-runtime.generated";
+import { STAGE10_STORY_PAGES } from "../../src/game/content/stage10-runtime.generated";
+import { STAGE11_STORY_PAGES } from "../../src/game/content/stage11-runtime.generated";
+import { STAGE12_STORY_PAGES } from "../../src/game/content/stage12-runtime.generated";
+import { STAGE13_STORY_PAGES } from "../../src/game/content/stage13-runtime.generated";
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
+import type { DialoguePage } from "../../src/game/types";
+
+const GENERATED_STORIES = Object.assign(
+  {},
+  STAGE1_STORY_PAGES,
+  STAGE2_STORY_PAGES,
+  STAGE3_STORY_PAGES,
+  STAGE4_STORY_PAGES,
+  STAGE5_STORY_PAGES,
+  STAGE6_STORY_PAGES,
+  STAGE7_STORY_PAGES,
+  STAGE8_STORY_PAGES,
+  STAGE9_STORY_PAGES,
+  STAGE10_STORY_PAGES,
+  STAGE11_STORY_PAGES,
+  STAGE12_STORY_PAGES,
+  STAGE13_STORY_PAGES,
+) as Readonly<Record<string, readonly DialoguePage[]>>;
 
 describe("native stage-zero dialogue checkpoints", () => {
   it("preserves every module 25 and module 29 KY wait", () => {
@@ -122,5 +153,32 @@ describe("native stage-zero dialogue checkpoints", () => {
       portrait: 46,
       speaker: "妮雅",
     });
+  });
+});
+
+describe("generated native dialogue continuations", () => {
+  it("starts appended text after the characters already visible at the previous KY", () => {
+    const continuations: Array<{ storyId: string; wait: number }> = [];
+
+    for (const [storyId, pages] of Object.entries(GENERATED_STORIES)) {
+      for (let index = 1; index < pages.length; index += 1) {
+        const previous = pages[index - 1];
+        const current = pages[index];
+        const slot = current.activeSlot;
+        if (!slot) continue;
+        const previousText = previous[slot]?.text;
+        const currentText = current[slot]?.text;
+        if (current.revealStart !== undefined) {
+          expect(currentText?.startsWith(previousText ?? ""), `${storyId} KY ${current.source.wait}`).toBe(true);
+          expect(current.revealStart, `${storyId} KY ${current.source.wait}`).toBe(previousText?.length);
+        }
+        if (!previousText || !currentText?.startsWith(previousText)) continue;
+
+        expect(current.revealStart, `${storyId} KY ${current.source.wait}`).toBe(previousText.length);
+        continuations.push({ storyId, wait: current.source.wait });
+      }
+    }
+
+    expect(continuations).toContainEqual({ storyId: "stage-13-prebattle-story", wait: 6 });
   });
 });

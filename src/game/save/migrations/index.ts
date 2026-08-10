@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion34Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 34
+    || value.contentVersion !== "stage-12-swamp-water-warriors-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion33Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 33
@@ -1473,6 +1484,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion34 = migrateVersion34Save(value);
+    if (migratedVersion34) return migratedVersion34;
     const migratedVersion33 = migrateVersion33Save(value);
     if (migratedVersion33) return migratedVersion33;
     const migratedVersion32 = migrateVersion32Save(value);

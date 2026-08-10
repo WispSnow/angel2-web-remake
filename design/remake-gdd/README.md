@@ -4,11 +4,11 @@
 
 日期：2026-08-10
 
-阶段：第 0–11 场战斗已接受；内部第 12 关“落入沼澤”已验证、等待试玩；stage 13 及后续内容冻结
+阶段：第 0–12 场战斗已接受；内部第 13 关“龍塔外”已验证、等待试玩；stage 14 及后续内容冻结
 
 开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关与内部第 11 关已获用户
-接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；用户随后授权内部
-第 12 关作为 M22 有界实现例外，`REMAKE-043` 与自动／视觉门禁已完成；内部 stage 13 及后续运行时仍冻结
+接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12 关已获
+用户接受；M23/M24 已按 `REMAKE-046` 实现内部第 13 关，内部 stage 14 及后续运行时仍冻结
 
 ## 文档目的
 
@@ -56,7 +56,8 @@
 | [`vertical-slices/stage-09.md`](vertical-slices/stage-09.md) | 多莉引路、双胜利／双保护、行为 12 安全终点与非连续 stage 11 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-11.md`](vertical-slices/stage-11.md) | 固定撤离战、每轮南端增援、多莉剧情离场、蘇蘭達登船目标与 stage 10 路由 | Draft 0.2 / 已接受 |
 | [`vertical-slices/stage-10.md`](vertical-slices/stage-10.md) | BK/10 关前剧情、1–13 人飞船部署、五名追兵、全灭／妮雅保护与 stage 12 路由 | Draft 0.1 / 已接受；平衡待办不阻塞 |
-| [`vertical-slices/stage-12.md`](vertical-slices/stage-12.md) | BK/10–14 坠船剧情、1–9 人沼泽部署、五个水戰士根槽、职业分裂与 stage 13 路由 | Draft 0.1 / 已验证待试玩 |
+| [`vertical-slices/stage-12.md`](vertical-slices/stage-12.md) | BK/10–14 坠船剧情、1–9 人沼泽部署、五个水戰士根槽、职业分裂与 stage 13 路由 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-13.md`](vertical-slices/stage-13.md) | BK/15 突击会议、1–12 人部署、两名水戰士新成员、九名守军、瑪西爾目标与 stage 14 路由 | Draft 0.1 / 已验证待试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
@@ -129,4 +130,5 @@
   2026-08-10 试玩接受。M19/M20 随后解冻内部 stage 10“飛船上遭遇敵人”，闭合 B/0021、
   SAY `28/94/129/130`、`REMAKE-042`、v33 与 stage 12 冻结边界。
   用户接受后另登记 `M20-BAL-01`；M21/M22 随后闭合 B/0025、SAY `29–31/95/130/131`、
-  `REMAKE-043`、水戰士正式战役分裂、v34 与 stage 13 冻结边界。
+  `REMAKE-043`、水戰士正式战役分裂、v34 与 stage 13 路由；用户已接受。M23/M24 随后
+  闭合 B/0027、SAY `32/96/131/132`、`REMAKE-046`、v35 与 stage 14 冻结边界。
