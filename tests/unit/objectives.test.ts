@@ -59,4 +59,30 @@ describe("stage objective evaluation", () => {
     expect(objectiveConditionSatisfied([{ side: 1, slot: 0, x: 24, y: 3 }], condition))
       .toBe(false);
   });
+
+  it("supports an ordered any-of objective without changing defeat precedence", () => {
+    const objective = {
+      victory: {
+        type: "any-of",
+        conditions: [
+          { type: "unit-in-cell-range", side: 1, slot: 9, width: 50, minimum: 0, maximum: 933 },
+          { type: "eliminate-side", side: 2 },
+        ],
+      },
+      defeat: { type: "any-unit-removed", side: 1, slots: [0, 9] },
+      victoryText: "護送或全滅",
+      defeatText: "護送角色戰敗",
+      victoryStatusText: "完成",
+    } as const satisfies StageObjectiveDefinition;
+    expect(battleOutcomeForObjective([
+      { side: 1, slot: 0, x: 10, y: 20 },
+      { side: 1, slot: 9, x: 34, y: 17 },
+      { side: 2, slot: 48 },
+    ], objective)).toBe("victory");
+    expect(battleOutcomeForObjective([
+      { side: 1, slot: 0 },
+      { side: 1, slot: 9, x: 34, y: 18 },
+    ], objective)).toBe("victory");
+    expect(battleOutcomeForObjective([], objective)).toBe("defeat");
+  });
 });

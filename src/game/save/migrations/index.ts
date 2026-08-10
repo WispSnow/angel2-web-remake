@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion29Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 29
+    || value.contentVersion !== "stage8-all-player-control-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion28Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 28
@@ -1412,6 +1423,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion29 = migrateVersion29Save(value);
+    if (migratedVersion29) return migratedVersion29;
     const migratedVersion28 = migrateVersion28Save(value);
     if (migratedVersion28) return migratedVersion28;
     const migratedVersion27 = migrateVersion27Save(value);

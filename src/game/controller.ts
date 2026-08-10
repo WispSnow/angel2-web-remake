@@ -33,6 +33,7 @@ import {
 import type {
   StageEventDefinition,
   StageEventTrigger,
+  StageObjectiveCondition,
   StagePresentationId,
   StageSimulationEffectId,
   StageStoryId,
@@ -302,6 +303,11 @@ const STORY_PHASES = new Set<GamePhase>([
 ]);
 const isStoryPhase = (phase: GamePhase): phase is StageStoryPhase => STORY_PHASES.has(phase);
 const pause = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
+const atomicObjectiveConditions = (
+  condition: StageObjectiveCondition,
+): readonly Exclude<StageObjectiveCondition, { type: "any-of" }>[] => condition.type === "any-of"
+  ? condition.conditions.flatMap(atomicObjectiveConditions)
+  : [condition];
 
 export class GameController {
   battle: Stage0Battle;
@@ -4371,10 +4377,12 @@ export class GameController {
 
   forceDefeatForTest(): void {
     if (!this.debugMode) return;
-    const defeat = this.battle.stage.objective.defeat;
+    const defeat = atomicObjectiveConditions(this.battle.stage.objective.defeat)
+      .find(({ type }) => type === "unit-removed" || type === "any-unit-removed");
+    if (!defeat || (defeat.type !== "unit-removed" && defeat.type !== "any-unit-removed")) return;
     const slot = defeat.type === "unit-removed"
       ? defeat.slot
-      : defeat.type === "any-unit-removed" ? defeat.slots[0] : undefined;
+      : defeat.slots[0];
     const target = this.battle.units.find(
       (unit) => unit.side === defeat.side && (slot === undefined || unit.slot === slot),
     );
@@ -4386,7 +4394,10 @@ export class GameController {
 
   forceVictorySetupForTest(targetIndex = 0): void {
     if (!this.debugMode) return;
-    const victory = this.battle.stage.objective.victory;
+    const victory = atomicObjectiveConditions(this.battle.stage.objective.victory)
+      .find(({ type }) => type === "unit-in-cell-range")
+      ?? atomicObjectiveConditions(this.battle.stage.objective.victory)[0];
+    if (!victory) return;
     if (victory.type === "unit-in-cell-range") {
       const protectedUnit = this.battle.units.find(
         ({ side, slot }) => side === victory.side && slot === victory.slot,
@@ -4498,7 +4509,10 @@ export class GameController {
 
   forceVictoryForTest(targetIndex = 0): void {
     if (!this.debugMode) return;
-    const victory = this.battle.stage.objective.victory;
+    const victory = atomicObjectiveConditions(this.battle.stage.objective.victory)
+      .find(({ type }) => type === "eliminate-side")
+      ?? atomicObjectiveConditions(this.battle.stage.objective.victory)[0];
+    if (!victory) return;
     if (victory.type === "eliminate-side") {
       this.battle.units = this.battle.units.filter(({ side }) => side !== victory.side);
       this.resolveOutcome();

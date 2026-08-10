@@ -12,6 +12,9 @@ export function objectiveConditionSatisfied(
   units: readonly ObjectiveUnitIdentity[],
   condition: StageObjectiveCondition,
 ): boolean {
+  if (condition.type === "any-of") {
+    return condition.conditions.some((candidate) => objectiveConditionSatisfied(units, candidate));
+  }
   if (condition.type === "eliminate-side") {
     return !units.some((unit) => unit.side === condition.side);
   }

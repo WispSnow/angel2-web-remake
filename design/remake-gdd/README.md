@@ -4,11 +4,11 @@
 
 日期：2026-08-09
 
-阶段：第 0–8 关已接受；第 9 关及后续内容冻结
+阶段：第 0–8 关已接受；第 9 关有界实现已验证、等待用户试玩；第 11 关及后续内容冻结
 
-开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–8 关已获用户接受，第 8 关
-作为 M14 有界实现例外已按 `REMAKE-032` 补播胜利对白并通过自动／视觉／人工门禁；
-第 9 关及后续运行时仍冻结
+开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–8 关已获用户接受；用户随后
+授权第 9 关作为 M16 有界实现例外，`REMAKE-039/040` 已闭合并通过自动与视觉门禁；
+第 11 关及后续运行时仍冻结
 
 ## 文档目的
 
@@ -53,6 +53,7 @@
 | [`vertical-slices/stage-06.md`](vertical-slices/stage-06.md) | 反向关前流程、西艾蕾首领目标、动态游骑兵台阵与第 7 关边界 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-07.md`](vertical-slices/stage-07.md) | 双背景营地剧情、双固定部署、萊莉首领目标与第 8 关边界 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-08.md`](vertical-slices/stage-08.md) | 三背景营地剧情、固定八名玩家、全灭目标、SAY 157 与第 9 关边界 | Draft 0.3 / 已接受后优化 |
+| [`vertical-slices/stage-09.md`](vertical-slices/stage-09.md) | 多莉引路、双胜利／双保护、行为 12 安全终点与非连续 stage 11 路由 | Draft 0.1 / 已验证待试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
@@ -118,4 +119,6 @@
   适用于全部已开放关卡；玩家在主目标后指定魔弓线路，冰雪最外圈外推到值 0，无击杀时
   次优先有效命中巫師；友军 NPC／“自由行动”与敌军共享专家规则，但防区、路线和跟随
   保持显式覆盖。`REMAKE-038` 进一步把第 8 关八名 side 1 全部改为玩家控制，取消本关
-  NPC 友军；当前使用 v29 保存身份并无损迁移 v28；第 9 关及其余战役继续冻结。
+  NPC 友军；v29 保存身份无损迁移 v28。用户随后接受第 8 关并授权推进第 9 关；M15 已闭合
+  B/0019、SAY `22/23/91`、`REMAKE-039/040` 与 stage 11 冻结路由；M16 已通过定向模拟、
+  Chromium、视觉、构建和文档门禁，等待用户试玩。

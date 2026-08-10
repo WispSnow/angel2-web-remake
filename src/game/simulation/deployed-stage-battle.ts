@@ -1,5 +1,4 @@
 import type { ClassId } from "../content/classes";
-import { completeCampaignRoster } from "../content/stage0";
 import type { StageDefinition } from "../content/stages";
 import type { DeploymentRosterUnit } from "../deployment-session";
 import type {
@@ -13,6 +12,7 @@ import type {
 } from "../types";
 import type { DeploymentResult } from "./deployment";
 import {
+  createFixedStageCampaignRoster,
   createFixedStageUnits,
   type FixedStageEnemyUnitDefinition,
   type FixedStageUnitConfig,
@@ -20,6 +20,7 @@ import {
 import type { BattleScenario } from "./battle";
 import type { ForceDefinition } from "./forces";
 import type { RoutePulseDefinition } from "./route-pulse";
+import type { EscortRouteDefinition } from "./escort-route";
 
 export interface DeployedStageAllyDefinition {
   slot: number;
@@ -44,6 +45,7 @@ export interface DeployedStageScenarioConfig extends DeployedStageUnitConfig {
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   forces: readonly ForceDefinition[];
   routePulses?: readonly RoutePulseDefinition[];
+  escortRoutes?: readonly EscortRouteDefinition[];
 }
 
 function alliedUnitConfig(
@@ -115,7 +117,11 @@ export function createDeployedStageScenario(
       campaignRoster,
       deployment,
     ),
-    createCampaignRoster: () => completeCampaignRoster(campaignRoster),
+    createCampaignRoster: (difficulty) => createFixedStageCampaignRoster(
+      alliedUnitConfig(config, deployment),
+      difficulty,
+      campaignRoster,
+    ),
     enemyClassPriority: config.enemyClassPriority,
     alliedBehaviorById: new Map(
       config.alliedUnits.map(({ slot, aiBehavior }) => [`1:${slot}`, aiBehavior]),
@@ -125,5 +131,6 @@ export function createDeployedStageScenario(
     ),
     forces: config.forces,
     routePulses: config.routePulses,
+    escortRoutes: config.escortRoutes,
   };
 }

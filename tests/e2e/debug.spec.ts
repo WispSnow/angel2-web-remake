@@ -44,6 +44,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 6 關 · 過異世界之門",
     "第 7 關 · 來到異世界",
     "第 8 關 · 營地遭到偷襲",
+    "第 9 關 · 找尋傳說中的飛船",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -64,6 +65,14 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-08-near-defeat",
     "stage-08-victory-ready",
     "stage-08-cleared",
+    "stage-09-deployment",
+    "stage-09-opening",
+    "stage-09-player",
+    "stage-09-near-route",
+    "stage-09-near-elimination",
+    "stage-09-near-defeat",
+    "stage-09-victory-ready",
+    "stage-09-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -86,7 +95,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.getByTestId("debug-growth-reset")).toHaveText("恢復預設（每關 100）");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／第 8 關預算 800）",
+    "目前使用預設：每關 +100（第 1 關預算 100／第 9 關預算 900）",
   );
 
   await page.getByTestId("debug-difficulty").selectOption("3");
@@ -98,7 +107,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-per-stage-growth").fill("120");
   await page.getByTestId("debug-growth-apply").click();
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "已套用：每關 +120（第 1 關預算 120／第 8 關預算 960）",
+    "已套用：每關 +120（第 1 關預算 120／第 9 關預算 1080）",
   );
   await expect(deployment).toHaveAttribute(
     "href",
@@ -120,6 +129,10 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "href",
     "/?debugScenario=stage-08-player&difficulty=3&roster=representative-growth&growth=120",
   );
+  await expect(page.getByTestId("debug-scenario-stage-09-player")).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-09-player&difficulty=3&roster=representative-growth&growth=120",
+  );
   await expect(page.getByTestId("debug-scenario-stage-00-player")).toHaveAttribute(
     "href",
     "/?debugScenario=stage-00-player&difficulty=3&roster=representative-growth",
@@ -127,7 +140,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-growth-reset").click();
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／第 8 關預算 800）",
+    "目前使用預設：每關 +100（第 1 關預算 100／第 9 關預算 900）",
   );
   await expect(deployment).toHaveAttribute(
     "href",
@@ -324,7 +337,7 @@ test("a completed stage-three save enters the playable stage-four prebattle", as
   expect(resources.some((url) => url.includes("stage4-map.png"))).toBe(true);
 });
 
-test("the magician range fixture releases its pursuing target after exactly one enemy phase", async ({ page }) => {
+test("the magician outer-ring fixture pushes once and releases after one enemy phase", async ({ page }) => {
   await page.goto("/?debugScenario=stage-01-magician&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
@@ -390,15 +403,15 @@ test("the magician range fixture releases its pursuing target after exactly one 
   const frozenTarget = frozen.units.find(({ id }) => id === "2:45");
   expect(frozenTarget).toMatchObject({
     x: initialTarget?.x,
-    y: initialTarget?.y,
+    y: (initialTarget?.y ?? 0) + 1,
     actionDisabled: true,
   });
   expect(frozen.lastSpecialAction).toMatchObject({
     actionId: "ice-1",
-    experienceGained: 0,
-    affectedUnits: [expect.objectContaining({ unitId: "2:45", moved: false })],
+    experienceGained: 8,
+    affectedUnits: [expect.objectContaining({ unitId: "2:45", moved: true })],
   });
-  expect(frozen.rngCalls).toBe(initial.rngCalls);
+  expect(frozen.rngCalls).toBe(initial.rngCalls + 1);
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
     "data-ice-disabled-unit-ids",
     /2:45/u,

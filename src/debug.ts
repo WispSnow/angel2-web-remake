@@ -141,7 +141,7 @@ const updateLinks = () => {
       perStageGrowth
     }（第 1 關預算 ${
         debugGrowthBudgetForStage("stage-01", perStageGrowth)
-      }／第 8 關預算 ${debugGrowthBudgetForStage("stage-08", perStageGrowth)}）`;
+      }／第 9 關預算 ${debugGrowthBudgetForStage("stage-09", perStageGrowth)}）`;
   root.querySelectorAll<HTMLAnchorElement>("[data-debug-scenario-id]").forEach((link) => {
     const id = link.dataset.debugScenarioId as DebugScenarioId | undefined;
     if (!id) return;

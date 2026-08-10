@@ -30,9 +30,10 @@ describe("stage runtime manifest", () => {
       "stage-06",
       "stage-07",
       "stage-08",
+      "stage-09",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ ordinal }) => ordinal))
-      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8]);
+      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ nextStageId }) => nextStageId)).toEqual([
       "stage-01",
       "stage-02",
@@ -44,6 +45,7 @@ describe("stage runtime manifest", () => {
       "stage-07",
       "stage-08",
       "stage-09",
+      "stage-11",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ label }) => label)).toEqual([
       "瓦爾克麗宮",
@@ -56,6 +58,7 @@ describe("stage runtime manifest", () => {
       "過異世界之門",
       "來到異世界",
       "營地遭到偷襲",
+      "找尋傳說中的飛船",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ completion }) => completion.destinationLabel))
       .toEqual([
@@ -63,6 +66,7 @@ describe("stage runtime manifest", () => {
         "遭遇丁塔琪", "異世界之門", "過異世界之門", "來到異世界",
         "營地遭到偷襲",
         "找尋傳說中的飛船",
+        "飛船上遭遇敵人",
       ]);
     expect(isPlayableStageId("stage-03")).toBe(true);
     expect(isPlayableStageId("stage-04")).toBe(true);
@@ -71,7 +75,8 @@ describe("stage runtime manifest", () => {
     expect(isPlayableStageId("stage-06")).toBe(true);
     expect(isPlayableStageId("stage-07")).toBe(true);
     expect(isPlayableStageId("stage-08")).toBe(true);
-    expect(isPlayableStageId("stage-09")).toBe(false);
+    expect(isPlayableStageId("stage-09")).toBe(true);
+    expect(isPlayableStageId("stage-11")).toBe(false);
     expect(stageRuntimeSourceForDestination("stage-04")?.id).toBe("stage-03");
     expect(stageRuntimeSourceForDestination("stage-05")?.id).toBe("stage-04");
     expect(stageRuntimeSourceForDestination("stage-42-portal")?.id).toBe("stage-05");
@@ -79,6 +84,7 @@ describe("stage runtime manifest", () => {
     expect(stageRuntimeSourceForDestination("stage-07")?.id).toBe("stage-06");
     expect(stageRuntimeSourceForDestination("stage-08")?.id).toBe("stage-07");
     expect(stageRuntimeSourceForDestination("stage-09")?.id).toBe("stage-08");
+    expect(stageRuntimeSourceForDestination("stage-11")?.id).toBe("stage-09");
     expect(STAGE_RUNTIME_MANIFEST["stage-03"].mapPresentationActionIds).toContain("recovery-1");
   });
 
@@ -91,6 +97,7 @@ describe("stage runtime manifest", () => {
     const stage6 = await loadStageRuntime("stage-06");
     const stage7 = await loadStageRuntime("stage-07");
     const stage8 = await loadStageRuntime("stage-08");
+    const stage9 = await loadStageRuntime("stage-09");
     expect(stage2.createBattle(campaign).stage.id).toBe("stage-02");
     expect(stage3.createBattle({ ...campaign, stageId: "stage-03" }).stage.id).toBe("stage-03");
     expect(stage3.assets?.unitSprites["enemy-monk"]).toContain("unit-enemy-monk.png");
@@ -143,6 +150,14 @@ describe("stage runtime manifest", () => {
       "stage-08-victory-story",
       "stage-08-completed-route",
     ]);
+    expect(stage9.preparation?.definition).toMatchObject({
+      fixedPlacements: [
+        { slot: 9, position: { x: 16, y: 38 } },
+        { slot: 0, position: { x: 17, y: 39 } },
+      ],
+      maximumUnits: 9,
+    });
+    expect(stage9.nextStageId).toBe("stage-11");
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
   });

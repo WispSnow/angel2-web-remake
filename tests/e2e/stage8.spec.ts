@@ -214,7 +214,7 @@ test("S08-E/F: the last raider triggers the REMAKE-032 SAY/157 victory story", a
   expect((await state(page)).units.filter(({ side }) => side === 2)).toHaveLength(0);
 });
 
-test("S08-G/H: retry and retreat replay SAY/21, while current completion stops at stage 9", async ({ page }) => {
+test("S08-G/H: retry and retreat replay SAY/21, while completion enters stage 9 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-08-near-defeat&difficulty=0&test=1");
   const entry = await state(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
@@ -250,7 +250,7 @@ test("S08-G/H: retry and retreat replay SAY/21, while current completion stops a
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -278,18 +278,19 @@ test("S08-G/H: retry and retreat replay SAY/21, while current completion stops a
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-08",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-09",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-09",
   });
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 2／9");
 
   await page.goto("/?debugScenario=stage-08-cleared&difficulty=0&test=1");
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-08",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-09",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-09",
   });
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();

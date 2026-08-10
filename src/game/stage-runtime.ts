@@ -553,6 +553,54 @@ async function loadStage8Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage9Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage9"),
+    import("./simulation/stage9-battle"),
+  ]);
+  content.activateStage9Content();
+  const definition = content.STAGE9_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 09",
+      title: content.STAGE9.name,
+      objective: content.STAGE9_DEFINITION.objective.victoryText,
+      minimap: content.STAGE9_ASSETS.minimap,
+      terrain: content.STAGE9_TERRAIN_TOKENS,
+      gridWidth: content.STAGE9.width,
+      gridHeight: content.STAGE9.height,
+      enemies: content.STAGE9_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "多莉與妮雅固定出場；十二名候選最多選七人。多莉會自行引路，請保護她抵達谷頂，或擊退全部敵軍。",
+    },
+    ["stage-09-enter-deployment"],
+    (campaign) => battleModule.createStage9DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 9 requires a deployment result");
+    return new battleModule.Stage9Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE9_DEFINITION,
+    assets: {
+      map: content.STAGE9_ASSETS.map,
+      minimap: content.STAGE9_ASSETS.minimap,
+      unitSprites: content.STAGE9_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -1219,6 +1267,61 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage8Module,
+  },
+  "stage-09": {
+    id: "stage-09",
+    ordinal: 9,
+    label: "找尋傳說中的飛船",
+    nextStageId: "stage-11",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅護送多莉穿越死亡之谷，尋找傳說中的飛船。",
+      campaignRoute: "stage-09",
+    },
+    enemyPhaseStatusText: "敵方階段：西艾蕾死亡之谷封鎖隊開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始第 9 關部署。",
+      retreatStatusText: "全面撤退：返回第 9 關部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "飛船上遭遇敵人",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-09-enter-deployment",
+        "stage-09-opening-story",
+        "stage-09-objective-reached",
+        "stage-09-victory-story",
+        "stage-09-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-09-enter-deployment",
+        "stage-09-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 9, 12, 13, 14, 20, 21, 24],
+        fixedSlots: [9, 0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
+        maximumUnits: 9,
+        openCellCount: 7,
+      },
+      enemyClassById: [
+        ["2:48", "soldier"], ["2:49", "soldier"], ["2:44", "steel-armor-warrior"],
+        ["2:50", "monk"], ["2:52", "cavalry"], ["2:19", "land-knight"],
+        ["2:51", "soldier"], ["2:42", "soldier"], ["2:40", "sister"],
+        ["2:41", "soldier"], ["2:46", "land-knight"], ["2:43", "sister"],
+        ["2:45", "soldier"], ["2:47", "soldier"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage9Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

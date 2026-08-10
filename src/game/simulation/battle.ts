@@ -78,6 +78,11 @@ import {
   type RoutePulseDefinition,
 } from "./route-pulse";
 import {
+  assertEscortRouteDefinition,
+  planEscortRoutePath,
+  type EscortRouteDefinition,
+} from "./escort-route";
+import {
   compareExpertAiUtility,
   expertAiCandidateTrace,
   expertExposureAt,
@@ -268,6 +273,7 @@ export interface BattleScenario {
   additionalClassActions?: Readonly<Partial<Record<ClassId, readonly BattleActionId[]>>>;
   forces?: readonly ForceDefinition[];
   routePulses?: readonly RoutePulseDefinition[];
+  escortRoutes?: readonly EscortRouteDefinition[];
   routeEnemy?: {
     target: Position;
     movement: number;
@@ -307,6 +313,7 @@ export class Stage0Battle {
   private readonly campaignUnitSlots: ReadonlySet<number>;
   protected readonly forces: ForceRegistry;
   private readonly routePulseByActorId: ReadonlyMap<string, RoutePulseDefinition>;
+  private readonly escortRouteByActorId: ReadonlyMap<string, EscortRouteDefinition>;
   private readonly terrainOverrideByPosition = new Map<string, DynamicTerrainKind>();
   private readonly expertAiTraceByUnitId = new Map<string, ExpertAiDecisionTrace>();
 
@@ -331,6 +338,19 @@ export class Stage0Battle {
       routePulseByActorId.set(definition.actorId, definition);
     }
     this.routePulseByActorId = routePulseByActorId;
+    const escortRouteByActorId = new Map<string, EscortRouteDefinition>();
+    for (const definition of scenario.escortRoutes ?? []) {
+      if (escortRouteByActorId.has(definition.actorId)) {
+        throw new Error(`Duplicate escort route actor ${definition.actorId}`);
+      }
+      assertEscortRouteDefinition(definition, this.units, scenario);
+      const force = this.forces.definitionForUnit(definition.actorId);
+      if (!force || force.control !== "independent-ai") {
+        throw new Error(`Escort route actor ${definition.actorId} must use independent AI control`);
+      }
+      escortRouteByActorId.set(definition.actorId, definition);
+    }
+    this.escortRouteByActorId = escortRouteByActorId;
     this.campaignRoster = scenario.createCampaignRoster(difficulty);
     this.campaignUnitSlots = new Set(
       scenario.campaignUnitSlots
@@ -1336,6 +1356,12 @@ export class Stage0Battle {
       };
     }
 
+    const escortRoute = this.escortRouteByActorId.get(id);
+    if (escortRoute) {
+      const path = planEscortRoutePath(escortRoute, unit, this.units, this.dynamicBattlefield);
+      return { unitId: id, kind: path.length > 1 ? "move" : "wait", path };
+    }
+
     const doctrine = this.forces.definitionForUnit(id)?.doctrine;
     if (doctrine?.strategy === "terrain-hold") {
       return this.planTerrainHoldAiAction(unit, doctrine);
@@ -2222,6 +2248,7 @@ export class Stage0Battle {
     if (stableOrder.length === 0) return undefined;
     const hasExplicitStrategy = leaderId !== undefined || stableOrder.some((id) =>
       this.routePulseByActorId.has(id)
+      || this.escortRouteByActorId.has(id)
       || this.forces.definitionForUnit(id)?.doctrine.strategy === "terrain-hold");
     if (hasExplicitStrategy) return stableOrder[0];
 

@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 29 as const;
-export const SAVE_CONTENT_VERSION = "stage8-all-player-control-1" as const;
+export const SAVE_VERSION = 30 as const;
+export const SAVE_CONTENT_VERSION = "stage-09-death-valley-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_ROUND = 9_999;

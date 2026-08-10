@@ -30,7 +30,9 @@ export type StageStoryId =
   | "stage-07-prebattle-story"
   | "stage-08-prebattle-story"
   | "stage-08-opening-story"
-  | "stage-08-victory-story";
+  | "stage-08-victory-story"
+  | "stage-09-opening-story"
+  | "stage-09-victory-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -58,7 +60,9 @@ export type StageMusicId =
   | "stage-07-enemy-phase-music"
   | "stage-08-story-music"
   | "stage-08-player-phase-music"
-  | "stage-08-enemy-phase-music";
+  | "stage-08-enemy-phase-music"
+  | "stage-09-player-phase-music"
+  | "stage-09-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -118,7 +122,12 @@ export type StageEventId =
   | "stage-08-opening-story"
   | "stage-08-objective-reached"
   | "stage-08-victory-story"
-  | "stage-08-completed-route";
+  | "stage-08-completed-route"
+  | "stage-09-enter-deployment"
+  | "stage-09-opening-story"
+  | "stage-09-objective-reached"
+  | "stage-09-victory-story"
+  | "stage-09-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -153,7 +162,10 @@ export type StageSimulationEffectId =
   | "stage-07-set-victory-999"
   | "stage-07-route-to-stage-08"
   | "stage-08-set-victory-999"
-  | "stage-08-route-to-stage-09";
+  | "stage-08-route-to-stage-09"
+  | "stage-09-enter-deployment"
+  | "stage-09-set-victory-999"
+  | "stage-09-route-to-stage-11";
 
 export type StagePresentationId =
   | "none"
@@ -178,6 +190,7 @@ export interface StageEventDefinition {
 }
 
 export type StageObjectiveCondition =
+  | { type: "any-of"; conditions: readonly StageObjectiveCondition[] }
   | { type: "eliminate-side"; side: Side }
   | { type: "unit-removed"; side: Side; slot: number }
   | { type: "any-unit-removed"; side: Side; slots: readonly number[] }

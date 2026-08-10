@@ -28,6 +28,8 @@ import { Stage6Battle } from "../../src/game/simulation/stage6-battle";
 import { STAGE7_DEFINITION } from "../../src/game/content/stage7";
 import { Stage7Battle } from "../../src/game/simulation/stage7-battle";
 import { Stage8Battle } from "../../src/game/simulation/stage8-battle";
+import { STAGE9_DEFINITION } from "../../src/game/content/stage9";
+import { Stage9Battle } from "../../src/game/simulation/stage9-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -497,6 +499,54 @@ const stage8BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage9BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-09" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x7080_90a0,
+    rngCalls: 34,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 620, life: 220 },
+    ]),
+  };
+  const deployment = {
+    placements: STAGE9_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+      slot, position: { ...position }, fixed: true,
+    })),
+  };
+  const battle = new Stage9Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-09T16:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-09",
+    stageLabel: "找尋傳說中的飛船",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: {
+      ...source,
+      roster: source.roster.map((entry) => ({ ...entry })),
+    },
+    stageProgress: 0,
+    consumedEventIds: ["stage-09-enter-deployment", "stage-09-opening-story"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -553,6 +603,17 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v29 battle and completed saves into the stage 9 identity", () => {
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 29,
+        contentVersion: "stage8-all-player-control-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v28 battle and completed saves into the stage 8 all-player identity", () => {
     for (const current of [battleSave(), completedSave()]) {
       const legacy = {
@@ -961,6 +1022,36 @@ describe("Web save validation", () => {
     expect(isSaveData({
       ...stage8Completed,
       consumedEventIds: stage8Completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+
+    const stage9Completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-11",
+      stageLabel: "飛船上遭遇敵人",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-09-enter-deployment",
+        "stage-09-opening-story",
+        "stage-09-objective-reached",
+        "stage-09-victory-story",
+        "stage-09-completed-route",
+      ],
+    };
+    expect(isSaveData(stage9Completed)).toBe(true);
+    expect(isSaveData({ ...stage9Completed, stageLabel: "第 10 關" })).toBe(false);
+  });
+
+  it("validates stage 9 battle saves with Dori's template class in the live roster", () => {
+    const save = stage9BattleSave();
+    expect(save.roster.find(({ slot }) => slot === 9)).toMatchObject({
+      classId: "curse-master", experience: 299,
+    });
+    expect(isSaveData(save)).toBe(true);
+    expect(isSaveData({
+      ...save,
+      roster: save.roster.map((entry) => entry.slot === 9
+        ? { ...entry, classId: "soldier" as const }
+        : entry),
     })).toBe(false);
   });
 
