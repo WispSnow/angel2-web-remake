@@ -19,11 +19,14 @@ interface Stage4State {
   rngCalls: number;
   routePulsePresentation?: {
     frame: number;
+    sweepFrame?: number;
     draw: number;
     nativeTicks: number;
+    result: { safeCells: Array<{ x: number; y: number }> };
   };
   routePulsePresentationTrace: Array<{
     frame: number;
+    sweepFrame?: number;
     draw: number;
     nativeTicks: number;
     visible: boolean;
@@ -97,6 +100,17 @@ async function clickUnit(page: Page, id: string): Promise<void> {
   });
 }
 
+// `slowMap` only stretches the presentation wall clock, so a screenshot can land on a chosen
+// sweep draw instead of racing the 22-draw wave.
+const SLOW_PULSE_QUERY = "&slowMap=1";
+
+const waitForSweepFrame = (page: Page, frame: string) => page.waitForFunction(
+  (expected) => document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")
+    ?.dataset.routePulseSweepFrame === expected,
+  frame,
+  { polling: 16 },
+);
+
 async function endManualPhase(page: Page): Promise<void> {
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
@@ -142,7 +156,7 @@ test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment 
 });
 
 test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the full pulse", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-04-first-pulse&difficulty=0&test=1");
+  await page.goto(`/?debugScenario=stage-04-first-pulse&difficulty=0&test=1${SLOW_PULSE_QUERY}`);
   const canvas = page.getByTestId("battle-canvas");
   await expect(canvas).toBeVisible();
   await page.waitForFunction(() => performance.getEntriesByType("resource")
@@ -176,18 +190,33 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   await expect(canvas).toHaveAttribute("data-route-pulse-safe-cell-count", "13");
   await page.keyboard.press("Enter");
   await endManualPhase(page);
-  await page.waitForFunction(() => {
-    const element = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
-    return element?.dataset.mapCombatPhase === "route-pulse"
-      && ["11", "12"].includes(element.dataset.mapCombatFrame ?? "")
-      && element.dataset.routePulseVisible === "true"
-      && Number(element.dataset.mapCombatEffectTileCount) > 0;
-  });
+  await waitForSweepFrame(page, "4");
+  await expect(canvas).toHaveAttribute("data-map-combat-phase", "route-pulse");
+  await expect(canvas).toHaveAttribute("data-route-pulse-visible", "true");
+  await expect(canvas).toHaveAttribute("data-map-combat-frame", /^1[12]$/u);
   await expect(canvas).toHaveAttribute("data-route-pulse-native-ticks", "2");
   await expect(canvas).toHaveAttribute(
     "data-route-pulse-visible-unit-ids",
     "1:1,1:2,1:3,1:4,1:20,1:21",
   );
+  // The sweep layer covers the whole camera window outside the barrier: `0000:97DC` walks
+  // the same 10x7 screen array the remake viewport renders, and only the safe area is skipped.
+  const sweepSample = await page.evaluate(() => {
+    const element = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
+    const current = window.__ANGEL2__?.getState() as Stage4State;
+    return {
+      sweepCells: Number(element?.dataset.routePulseSweepCellCount),
+      tileCount: Number(element?.dataset.mapCombatEffectTileCount),
+      cameraOrigin: current.cameraOrigin,
+      safeCells: current.routePulsePresentation?.result.safeCells ?? [],
+    };
+  });
+  const safeInWindow = sweepSample.safeCells.filter(({ x, y }) =>
+    x >= sweepSample.cameraOrigin.x && x < sweepSample.cameraOrigin.x + 10
+    && y >= sweepSample.cameraOrigin.y && y < sweepSample.cameraOrigin.y + 7).length;
+  expect(safeInWindow).toBeGreaterThan(0);
+  expect(sweepSample.sweepCells).toBe(70 - safeInWindow);
+  expect(sweepSample.tileCount).toBe(sweepSample.sweepCells + 6);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-force-field-pulse.png`,
   });
@@ -203,6 +232,11 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   expect(resolved.routePulsePresentationTrace).toHaveLength(22);
   expect(resolved.routePulsePresentationTrace.map(({ frame }) => frame))
     .toEqual(Array.from({ length: 22 }, (_, index) => index % 2 === 0 ? 11 : 12));
+  expect(resolved.routePulsePresentationTrace.map(({ sweepFrame }) => sweepFrame))
+    .toEqual([
+      ...Array.from({ length: 11 }, (_, index) => index),
+      ...Array<undefined>(11).fill(undefined),
+    ]);
   expect(resolved.routePulsePresentationTrace.map(({ visible }) => visible))
     .toEqual([...Array<boolean>(11).fill(true), ...Array<boolean>(11).fill(false)]);
   expect(resolved.routePulsePresentationTrace.every(({ nativeTicks }) => nativeTicks === 2)).toBe(true);
@@ -215,9 +249,9 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   }
 });
 
-test("S04-K: reduced motion keeps one readable damage impact outside the shield", async ({ page }) => {
+test("S04-K: reduced motion keeps every native draw of the force-field pulse", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/?debugScenario=stage-04-first-pulse&difficulty=0&test=1");
+  await page.goto(`/?debugScenario=stage-04-first-pulse&difficulty=0&test=1${SLOW_PULSE_QUERY}`);
   const canvas = page.getByTestId("battle-canvas");
   await expect(canvas).toBeVisible();
   const initial = await state(page);
@@ -225,12 +259,12 @@ test("S04-K: reduced motion keeps one readable damage impact outside the shield"
   await endManualPhase(page);
   await expect(canvas).toHaveAttribute("data-map-combat-phase", "route-pulse");
   await expect(canvas).toHaveAttribute("data-route-pulse-visible", "true");
-  await expect(canvas).toHaveAttribute("data-route-pulse-native-ticks", "15");
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "6");
+  await expect(canvas).toHaveAttribute("data-route-pulse-native-ticks", "2");
   await expect(canvas).toHaveAttribute(
     "data-route-pulse-visible-unit-ids",
     "1:1,1:2,1:3,1:4,1:20,1:21",
   );
+  await waitForSweepFrame(page, "4");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage4-force-field-pulse-reduced-motion.png`,
   });
@@ -240,12 +274,15 @@ test("S04-K: reduced motion keeps one readable damage impact outside the shield"
     return current?.lastRoutePulse !== undefined && current.routePulsePresentation === undefined;
   });
   const resolved = await state(page);
-  expect(resolved.routePulsePresentationTrace).toEqual([{
-    frame: 12,
-    draw: 0,
-    nativeTicks: 15,
-    visible: true,
-  }]);
+  // The shared lightning wave keeps its native draw count under every presentation option;
+  // only the player-visible speed toggle may change the wall clock.
+  expect(resolved.routePulsePresentationTrace).toHaveLength(22);
+  expect(resolved.routePulsePresentationTrace.map(({ sweepFrame }) => sweepFrame))
+    .toEqual([
+      ...Array.from({ length: 11 }, (_, index) => index),
+      ...Array<undefined>(11).fill(undefined),
+    ]);
+  expect(resolved.routePulsePresentationTrace.every(({ nativeTicks }) => nativeTicks === 2)).toBe(true);
   expect(resolved.rngCalls).toBe(initial.rngCalls);
   for (const affected of resolved.lastRoutePulse!.affectedUnits) {
     expect(resolved.units.find(({ id }) => id === affected.unitId)?.life)

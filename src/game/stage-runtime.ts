@@ -39,7 +39,6 @@ export interface RoutePulsePresentationDefinition {
   iterations: number;
   drawsPerIteration: number;
   waitPerDrawNativeTicks: number;
-  minimumStaticFeedbackNativeTicks: number;
   fixedGraphicWaitNativeTicks: number;
 }
 

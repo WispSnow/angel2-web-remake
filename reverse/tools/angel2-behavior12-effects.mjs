@@ -20,6 +20,10 @@ const CODE_SIGNATURES = [
   ["1000:3A8C", 0x13a8c, 0x13af5, "range propagation and presentation tail", "52fb564ee72e54956a516dcec3d7a088b5814707b5396f681f5b3efb6981deb2"],
   ["0000:633D", 0x0633d, 0x06392, "prepare stage-4 range effect", "57c332650e986295fa8161aa15028208637865821f6d1a148b91f4778bb0e946"],
   ["0000:63CF", 0x063cf, 0x06410, "finalize effect and remove zero-life units", "7a90c7afbe41f173b7330cd142b5adb42c0938d46f710e56ddd2d47305d1fff2"],
+  ["0000:6599", 0x06599, 0x065a5, "clear effect layer and run the sweep writer over the window", "b37a3e5958dd34678bec7e286bbb102ce228e0cab81cccbc7d84eb03efdc4544"],
+  ["0000:65A5", 0x065a5, 0x065cd, "sweep writer: range value minus threshold, no side or occupancy test", "37c5a5d84317f20d975f308923cfcb495361656ca920d242abae0e872b691486"],
+  ["0000:97DC", 0x097dc, 0x09821, "10x7 camera-window iterator", "0aca5c7ceceb1ed2f0761221e52554b2e686018417c99b64a417b302c5c4fd71"],
+  ["0000:9821", 0x09821, 0x09851, "per-cell dispatch with BL = range byte", "6c39636a0118b57843f0973f02155c1d8a19db3cb373d46b00cda233ddd7c8f7"],
   ["1000:6CF8", 0x16cf8, 0x16d39, "load and run stage-4 life-halving effect", "d48875ed31ab3d378b733dbe4584662232175bc7a3bfee735ba7b9328dd8c010"],
   ["1000:6D40", 0x16d40, 0x16d4c, "stage-4 wave, halve, finalize", "40ff2c902ef61a30cbd371d12bbe3e26b17d26c7276225b58670a5e3c5c11346"],
   ["1000:6D4C", 0x16d4c, 0x16d94, "lightning range wave", "5a560aea86334493894db590984fcc90597625a5e1c6bf7c49ed36ce00e3df5e"],
@@ -300,6 +304,43 @@ async function extract(modulePath, decodedRoot, battleTemplatesPath, terrainMapP
   for (const call of [Buffer.from([0x9a, 0x20, 0x02, 0x00, 0x00]), Buffer.from([0x9a, 0x24, 0x02, 0x00, 0x00])]) {
     assert(effectCode.indexOf(call) < 0, "stage-4 effect unexpectedly makes a direct VOC request");
   }
+  // The wave at 1000:6D4C is shared with every lightning technique: each of the two
+  // draws per iteration calls the sweep writer far (0000:6599) and then the marker
+  // writer near (1000:6E46). Locking the call sites keeps the two-layer claim byte-checked
+  // here instead of relying on the technique audit alone.
+  const waveCode = checkedSlice(buffer, 0x16d4c, 0x16d94, "shared lightning wave");
+  const sweepCall = Buffer.from([0x9a, 0x99, 0x65, 0x00, 0x00]);
+  const markerCalls = [
+    [0x16d6d, Buffer.from([0xe8, 0xd6, 0x00])],
+    [0x16d84, Buffer.from([0xe8, 0xbf, 0x00])],
+  ];
+  assert(waveCode.indexOf(sweepCall) === 0x16d62 - 0x16d4c
+    && waveCode.indexOf(sweepCall, 0x16d63 - 0x16d4c) === 0x16d79 - 0x16d4c,
+    "shared wave no longer calls the sweep writer twice per iteration");
+  for (const [offset, opcode] of markerCalls) {
+    assert(checkedSlice(buffer, offset, offset + opcode.length, "marker call").equals(opcode)
+      && offset + opcode.length + opcode.readInt16LE(1) === 0x16e46,
+      `shared wave marker call at ${offset.toString(16)} no longer targets 1000:6E46`);
+  }
+  // 1000:6E46 filters on DS:1EF6h, but nothing on the behavior-12 path writes it, so the
+  // marker side is whatever the previous attack or technique left behind. The damage pass
+  // at 1000:6EC4 hardcodes side 1 instead.
+  const targetedSideWrites = [
+    [0x0633d, 0x06392], [0x06599, 0x065cd], [0x097dc, 0x09851],
+    [0x064a1, 0x064ac], [0x063cf, 0x06410], [0x16cf8, 0x16edf], [0x11bbe, 0x11bd9],
+  ].flatMap(([start, end]) => {
+    const region = checkedSlice(buffer, start, end, "behavior-12 chain");
+    return [
+      Buffer.from([0xa3, 0xf6, 0x1e]), Buffer.from([0xc6, 0x06, 0xf6, 0x1e]),
+      Buffer.from([0xc7, 0x06, 0xf6, 0x1e]), Buffer.from([0x88, 0x06, 0xf6, 0x1e]),
+      Buffer.from([0x88, 0x16, 0xf6, 0x1e]), Buffer.from([0x88, 0x1e, 0xf6, 0x1e]),
+      Buffer.from([0x88, 0x26, 0xf6, 0x1e]),
+    ].filter((pattern) => region.indexOf(pattern) >= 0).map(() => start);
+  });
+  assert(targetedSideWrites.length === 0,
+    "the behavior-12 chain now writes DS:1EF6h; the marker side is no longer stale");
+  assert(checkedSlice(buffer, 0x16ec4, 0x16ec6, "damage side test").equals(Buffer.from([0x3c, 0x01])),
+    "stage-4 damage pass no longer hardcodes side 1");
   const stage4Wave = {
     invertedRangeMaximum: 1,
     rangeMaximumMinusOne: 0,
@@ -368,7 +409,11 @@ async function extract(modulePath, decodedRoot, battleTemplatesPath, terrainMapP
         fixedGraphicWaitNativeTicks: stage4WaveDraws * stage4Wave.waitPerDrawNativeTicks,
         directVocRequest: null,
         cleanupGraphicResource: null,
-        drawFilter: "occupied cells on side 1 whose inverted range byte is nonzero",
+        sharedWaveRoutine: "1000:6D4C, the same routine every lightning technique uses",
+        drawLayers: {
+          sweep: "0000:6599 -> 0000:97DC -> 0000:65A5 clears the DS:58A5h 10x7 effect layer and writes `rangeValue - threshold` as the sprite code for every cell of the visible camera window whose inverted range byte is nonzero; 0000:7EDD renders frame `code - 1` and draws nothing for code 0. No side and no occupancy test, so the whole on-screen area outside the barrier flashes. Every inverted cell holds 1, so all of them advance through frames 0..10 in lockstep",
+          marker: "1000:6E46 overlays runtimeTileCodes 12/13 (frames 11/12, the MAGIC/26 electrocuted-character art) on cells inside the same band whose side byte equals DS:1EF6h. Two independent reasons keep it off screen in the shipped build: the band test at 1000:6E5F compares AX while AH still holds the range-map segment's high byte, and nothing on the behavior-12 path ever writes DS:1EF6h",
+        },
       },
       resolution: {
         targetFilter: "side map byte exactly 1 and inverted range byte nonzero",

@@ -219,7 +219,6 @@ const forceFieldPresentation = {
   iterations: behavior12.presentation.iterations,
   drawsPerIteration: behavior12.presentation.drawsPerIteration,
   waitPerDrawNativeTicks: behavior12.presentation.waitPerDrawNativeTicks,
-  minimumStaticFeedbackNativeTicks: 15,
   fixedGraphicWaitNativeTicks: behavior12.presentation.fixedGraphicWaitNativeTicks,
 };
 assertEqual({

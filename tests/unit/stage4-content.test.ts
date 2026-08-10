@@ -127,7 +127,6 @@ describe("stage 4 generated content", () => {
       iterations: 11,
       drawsPerIteration: 2,
       waitPerDrawNativeTicks: 2,
-      minimumStaticFeedbackNativeTicks: 15,
       fixedGraphicWaitNativeTicks: 44,
     });
     expect(STAGE4_FORCE_FIELD_PRESENTATION.frames).toHaveLength(13);

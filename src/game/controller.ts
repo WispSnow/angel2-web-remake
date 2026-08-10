@@ -201,6 +201,7 @@ export interface SpecialActionPresentation {
 export interface RoutePulsePresentation {
   result: PreparedRoutePulse;
   frame: number;
+  sweepFrame: number | undefined;
   draw: number;
   nativeTicks: number;
   visible: boolean;
@@ -373,7 +374,9 @@ export class GameController {
   combatPresentationTrace: CombatPresentationTraceEntry[] = [];
   specialActionPresentation?: SpecialActionPresentation;
   routePulsePresentation?: RoutePulsePresentation;
-  routePulsePresentationTrace: Array<Pick<RoutePulsePresentation, "frame" | "draw" | "nativeTicks" | "visible">> = [];
+  routePulsePresentationTrace: Array<
+    Pick<RoutePulsePresentation, "frame" | "sweepFrame" | "draw" | "nativeTicks" | "visible">
+  > = [];
   specialActionPresentationTrace: Array<{
     phase: SpecialActionPresentationPhase;
     frame: number;
@@ -3128,8 +3131,10 @@ export class GameController {
       result.affectedUnits.map(({ unitId, lifeBefore }) => [unitId, lifeBefore]),
     );
     this.routePulsePresentationTrace = [];
-    const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const timeline = routePulsePresentationTimeline(definition, reducedMotion);
+    // The force-field pulse runs the shared lightning wave (`1000:6D4C`), so it keeps its
+    // native draw count and 44-tick total under every presentation option, exactly like the
+    // map techniques; only the player-visible speed toggle may change the wall clock.
+    const timeline = routePulsePresentationTimeline(definition);
     for (const frame of timeline) {
       this.routePulsePresentation = {
         result,
@@ -3140,11 +3145,7 @@ export class GameController {
         ...frame,
       });
       this.emit();
-      await pause(
-        reducedMotion
-          ? this.testMode ? 240 : frame.nativeTicks * 10
-          : this.mapCombatDelay(frame.nativeTicks),
-      );
+      await pause(this.mapCombatDelay(frame.nativeTicks));
     }
     this.routePulsePresentation = undefined;
   }

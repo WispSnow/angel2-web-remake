@@ -1049,15 +1049,40 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const rest = controller.restPresentation;
       const canvas = this.game.canvas;
       if (routePulse) {
+        const presentationId = routePulse.result.definition.presentationId;
+        const drawPulseCell = (position: Position, frame: number): void => {
+          this.combatEffects.push(
+            this.add.image(
+              position.x * TILE_WIDTH + TILE_WIDTH / 2,
+              position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+              routePulseTextureKey(presentationId, frame),
+            ).setOrigin(.5).setDepth(8),
+          );
+        };
+        // Sweep layer (`0000:6599 → 0000:97DC → 0000:65A5`): `1000:6E88` inverts the barrier
+        // map, so every cell outside the safe area shares one sprite code and the whole
+        // effect area flashes together. The native effect layer is the 10x7 screen window,
+        // so the sweep follows the camera rather than the 2500-cell board.
+        let sweepCells = 0;
+        if (routePulse.sweepFrame !== undefined) {
+          const safe = new Set(routePulse.result.safeCells.map(({ x, y }) => `${x},${y}`));
+          const { width, height } = controller.battle.stage.viewport;
+          const origin = controller.cameraOrigin;
+          for (let row = 0; row < height; row += 1) {
+            for (let column = 0; column < width; column += 1) {
+              const position = { x: origin.x + column, y: origin.y + row };
+              if (safe.has(`${position.x},${position.y}`)) continue;
+              drawPulseCell(position, routePulse.sweepFrame);
+              sweepCells += 1;
+            }
+          }
+        }
+        // Marker layer (`1000:6E46`): the electrocuted-character frames on the units the
+        // damage pass actually halves. `REMAKE-050` covers why the native side filter is a
+        // stale `DS:1EF6h` and the remake follows `1000:6EC4`'s hardcoded side instead.
         if (routePulse.visible) {
           for (const affected of routePulse.result.affectedUnits) {
-            this.combatEffects.push(
-              this.add.image(
-                affected.position.x * TILE_WIDTH + TILE_WIDTH / 2,
-                affected.position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-                routePulseTextureKey(routePulse.result.definition.presentationId, routePulse.frame),
-              ).setOrigin(.5).setDepth(8),
-            );
+            drawPulseCell(affected.position, routePulse.frame);
           }
         }
         if (controller.isTestMode) {
@@ -1070,6 +1095,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.routePulseDraw = String(routePulse.draw);
           canvas.dataset.routePulseNativeTicks = String(routePulse.nativeTicks);
           canvas.dataset.routePulseVisible = String(routePulse.visible);
+          canvas.dataset.routePulseSweepFrame = routePulse.sweepFrame === undefined
+            ? ""
+            : String(routePulse.sweepFrame);
+          canvas.dataset.routePulseSweepCellCount = String(sweepCells);
           canvas.dataset.routePulseVisibleUnitIds = routePulse.visible
             ? routePulse.result.affectedUnits.map(({ unitId }) => unitId).join(",")
             : "";
@@ -1124,6 +1153,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.routePulseNativeTicks;
           delete canvas.dataset.routePulseVisible;
           delete canvas.dataset.routePulseVisibleUnitIds;
+          delete canvas.dataset.routePulseSweepFrame;
+          delete canvas.dataset.routePulseSweepCellCount;
           delete canvas.dataset.mapCombatAnchorOffset;
           delete canvas.dataset.mapCombatIceRangeValue;
           delete canvas.dataset.mapCombatIceDistance;
@@ -1649,6 +1680,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.routePulseNativeTicks;
           delete canvas.dataset.routePulseVisible;
           delete canvas.dataset.routePulseVisibleUnitIds;
+          delete canvas.dataset.routePulseSweepFrame;
+          delete canvas.dataset.routePulseSweepCellCount;
           canvas.dataset.mapCombatEffectTileCount = "0";
           delete canvas.dataset.mapCombatEffectTextureKeys;
         }
