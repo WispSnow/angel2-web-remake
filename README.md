@@ -238,6 +238,6 @@ AI 与 ZOC、部署、独立友军阶段、多军团目标、落雷/冰雪/回�
 
 当前开发状态与下一步见 [`planning/STATUS.md`](planning/STATUS.md)。玩法合同见
 [`design/remake-gdd/vertical-slices/`](design/remake-gdd/vertical-slices/)，原版证据基线见
-[`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 0–5 关与场景 42 已通过
-用户人工验收；第 6 关已实现并完成自动与视觉门禁，等待普通入口最终人工接受。第 7 关及
-未获独立授权的后续战役内容继续冻结。
+[`reverse/gdd/original-gdd.md`](reverse/gdd/original-gdd.md)。第 0–13 场战斗已获用户接受；
+内部第 14 关“龍塔第一層”已完成自动与视觉门禁，等待普通入口试玩。stage 15 及未获独立
+授权的后续战役内容继续冻结。

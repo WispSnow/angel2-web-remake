@@ -38,6 +38,9 @@ const stageIds = [
   "stage-09",
   "stage-11",
   "stage-10",
+  "stage-12",
+  "stage-13",
+  "stage-14",
 ] as const satisfies readonly StageId[];
 const workspace = path.resolve(import.meta.dirname, "../..");
 
@@ -238,7 +241,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13"] as const) {
+    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(roster[8], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
@@ -249,6 +252,47 @@ describe("debug roster profiles", () => {
         });
       }
     }
+  });
+
+  it("carries mandatory Dori and water-warrior classes into later direct-entry profiles", () => {
+    const profiles = [
+      ["template-baseline", undefined],
+      ["representative-growth", undefined],
+      ["representative-growth", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+      ["promotion-coverage", undefined],
+      ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+    ] as const;
+
+    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14"] as const) {
+      for (const [profileId, perStageGrowth] of profiles) {
+        const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
+        expect(roster[9], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
+          slot: 9,
+          classId: "curse-master",
+          experience: 299,
+          life: classStatsFor({ classId: "curse-master", experience: 299 }).maxLife,
+        });
+      }
+    }
+
+    for (const [profileId, perStageGrowth] of profiles) {
+      const roster = debugRosterForProfile(profileId, "stage-14", perStageGrowth);
+      for (const [slot, classId] of [[10, "water-warrior"], [11, "water-warrior"]] as const) {
+        expect(roster[slot], `stage-14/${profileId}/${perStageGrowth ?? "configured"}/${slot}`)
+          .toEqual({
+            slot,
+            classId,
+            experience: 299,
+            life: classStatsFor({ classId, experience: 299 }).maxLife,
+          });
+      }
+    }
+  });
+
+  it("ships the original ally map figure for the water-warrior baseline", async () => {
+    const source = ALLY_MAP_UNIT_ASSETS["water-warrior"];
+    expect(source).toBe("/assets/original/technique-lab/units/ally-water-warrior.png");
+    expect((await readFile(path.join(workspace, "public", source))).length).toBeGreaterThan(0);
   });
 
   it("keeps battle-entry and current save rosters separate while overriding only difficulty and stage", () => {

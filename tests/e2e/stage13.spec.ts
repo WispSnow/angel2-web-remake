@@ -209,7 +209,7 @@ test("S13-D/E: the corrected objective defeats Marsiel without requiring the oth
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
 });
 
-test("S13-F/G: defeat retries SAY/32 and completion freezes at Dragon Tower Floor One", async ({ page }) => {
+test("S13-F/G: defeat retries SAY/32 and completion enters playable Dragon Tower Floor One", async ({ page }) => {
   await page.goto("/?debugScenario=stage-13-near-defeat&difficulty=0&test=1");
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
@@ -226,7 +226,8 @@ test("S13-F/G: defeat retries SAY/32 and completion freezes at Dragon Tower Floo
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
+  await expect(page.getByRole("heading", { name: "龍塔第一層 · 出擊準備" })).toBeVisible();
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -253,9 +254,9 @@ test("S13-F/G: defeat retries SAY/32 and completion freezes at Dragon Tower Floo
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-13",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-14",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-14",
   });
 });

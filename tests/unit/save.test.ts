@@ -35,6 +35,8 @@ import { STAGE10_DEFINITION } from "../../src/game/content/stage10";
 import { Stage10Battle } from "../../src/game/simulation/stage10-battle";
 import { STAGE12_DEFINITION } from "../../src/game/content/stage12";
 import { Stage12Battle } from "../../src/game/simulation/stage12-battle";
+import { STAGE14_DEFINITION } from "../../src/game/content/stage14";
+import { Stage14Battle } from "../../src/game/simulation/stage14-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -709,6 +711,61 @@ const stage12BattleSave = (): BattleSaveData => {
       "stage-12-enter-deployment",
       "stage-12-opening-story",
     ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
+const stage14BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-14" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x14a0_b0c0,
+    rngCalls: 61,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 720, life: 240 },
+      { slot: 1, classId: "soldier", experience: 299, life: 120 },
+      { slot: 10, classId: "water-warrior", experience: 299, life: 250 },
+      { slot: 11, classId: "water-warrior", experience: 299, life: 250 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE14_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      {
+        slot: 1,
+        position: { ...STAGE14_DEFINITION.deployment.openCells[0] },
+        fixed: false,
+      },
+    ],
+  };
+  const battle = new Stage14Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-10T18:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-14",
+    stageLabel: "龍塔第一層",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: ["stage-14-enter-deployment", "stage-14-opening-story"],
     battle: {
       phase: "player",
       ...battle.serializableSnapshot(),
@@ -1405,6 +1462,42 @@ describe("Web save validation", () => {
         ],
       },
     })).toBe(false);
+  });
+
+  it("validates stage 14 deployment, opening event, and all seven enemy classes", () => {
+    const save = stage14BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual(["1:0", "1:1"]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(7);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: ["stage-14-enter-deployment"],
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:8"
+          ? { ...unit, classId: "divine-sword-warrior" as const, className: "神劍戰士" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("migrates v35 saves to the stage 14 content identity", () => {
+    const current = stage12BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 35,
+      contentVersion: "stage-13-dragon-tower-marsiel-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-12",
+    });
   });
 
   it("migrates v34 stage 12 saves to the stage 13 content identity", () => {

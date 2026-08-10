@@ -1,4 +1,5 @@
 import type { ClassId } from "../content/classes";
+import { completeCampaignRoster } from "../content/stage0";
 import type { StageDefinition } from "../content/stages";
 import type { DeploymentRosterUnit } from "../deployment-session";
 import type {
@@ -100,6 +101,20 @@ export function createDeployedStageRoster(
   });
 }
 
+function campaignRosterWithEligibleBaselines(
+  config: DeployedStageUnitConfig,
+  difficulty: Difficulty,
+  campaignRoster: readonly SaveRosterEntry[],
+): SaveRosterEntry[] {
+  const eligibleRoster = createDeployedStageRoster(config, difficulty, campaignRoster).map((unit) => ({
+    slot: unit.slot,
+    classId: unit.classId,
+    experience: unit.experience,
+    life: unit.life,
+  }));
+  return completeCampaignRoster([...campaignRoster, ...eligibleRoster]);
+}
+
 export function createDeployedStageScenario(
   config: DeployedStageScenarioConfig,
   campaignRoster: readonly SaveRosterEntry[],
@@ -117,11 +132,16 @@ export function createDeployedStageScenario(
       campaignRoster,
       deployment,
     ),
-    createCampaignRoster: (difficulty) => createFixedStageCampaignRoster(
-      alliedUnitConfig(config, deployment),
-      difficulty,
-      campaignRoster,
-    ),
+    createCampaignRoster: (difficulty) => {
+      // Native template class baselines belong to the campaign roster when a character becomes
+      // deployable, even if the player leaves that character on the bench for this battle.
+      const roster = campaignRosterWithEligibleBaselines(config, difficulty, campaignRoster);
+      return createFixedStageCampaignRoster(
+        alliedUnitConfig(config, deployment),
+        difficulty,
+        roster,
+      );
+    },
     enemyClassPriority: config.enemyClassPriority,
     alliedBehaviorById: new Map(
       config.alliedUnits.map(({ slot, aiBehavior }) => [`1:${slot}`, aiBehavior]),

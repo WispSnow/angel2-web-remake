@@ -25,6 +25,7 @@ export const ALLY_MAP_UNIT_ASSETS = {
   "magic-priest": "/assets/original/unit-ally-magic-priest.png",
   "prayer-guide": "/assets/original/technique-lab/units/ally-prayer-guide.png",
   "curse-master": "/assets/original/technique-lab/units/ally-curse-master.png",
+  "water-warrior": "/assets/original/technique-lab/units/ally-water-warrior.png",
   "magic-guide": "/assets/original/technique-lab/units/ally-magic-guide.png",
   "magic-armor-warrior": "/assets/original/technique-lab/units/ally-magic-armor-warrior.png",
   "magic-sword-warrior": "/assets/original/technique-lab/units/ally-magic-sword-warrior.png",

@@ -84,6 +84,12 @@ describe("stage 13 battle simulation", () => {
     };
     const battle = new Stage13Battle(campaign, deployment);
     expect(battle.units.filter(({ side }) => side === 1).map(({ id }) => id)).toEqual(["1:0"]);
+    expect(battle.campaignSnapshot().roster[10]).toMatchObject({
+      classId: "water-warrior", experience: 299,
+    });
+    expect(battle.campaignSnapshot().roster[11]).toMatchObject({
+      classId: "water-warrior", experience: 299,
+    });
   });
 
   it("uses water warrior only as an untouched newcomer baseline", () => {
@@ -96,6 +102,16 @@ describe("stage 13 battle simulation", () => {
     expect(createStage13DeploymentRoster(inheritedCampaign).find(({ slot }) => slot === 10))
       .toMatchObject({ classId: "land-knight", experience: 640, life: 210 });
     expect(createStage13DeploymentRoster(inheritedCampaign).find(({ slot }) => slot === 11))
+      .toMatchObject({ classId: "water-warrior", experience: 299 });
+    const deployment = {
+      placements: STAGE13_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+    };
+    const inheritedBattle = new Stage13Battle(inheritedCampaign, deployment);
+    expect(inheritedBattle.campaignSnapshot().roster[10])
+      .toMatchObject({ classId: "land-knight", experience: 640, life: 210 });
+    expect(inheritedBattle.campaignSnapshot().roster[11])
       .toMatchObject({ classId: "water-warrior", experience: 299 });
   });
 

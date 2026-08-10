@@ -32,15 +32,27 @@ interface DebugStageBaselineSpec {
 
 /**
  * Direct debug entry skips earlier battles, so reproduce only campaign changes that every valid route
- * must already have committed. Stage 8 forces Sulanda to cavalry before stage 11 inherits her class.
+ * must already have committed: Sulanda's stage-8 cavalry, Dori's stage-9 curse-master, and the two
+ * stage-13 water-warrior newcomers.
  */
+const SULANDA_CAVALRY_BASELINE = { slot: 8, classId: "cavalry", experience: 299 } as const;
+const DORI_CURSE_MASTER_BASELINE = { slot: 9, classId: "curse-master", experience: 299 } as const;
+const MARLIN_WATER_WARRIOR_BASELINE = { slot: 10, classId: "water-warrior", experience: 299 } as const;
+const MOLINA_WATER_WARRIOR_BASELINE = { slot: 11, classId: "water-warrior", experience: 299 } as const;
+
 const DEBUG_STAGE_PROFILE_BASELINES: Readonly<
   Partial<Record<StageId, readonly DebugStageBaselineSpec[]>>
 > = {
-  "stage-11": [{ slot: 8, classId: "cavalry", experience: 299 }],
-  "stage-10": [{ slot: 8, classId: "cavalry", experience: 299 }],
-  "stage-12": [{ slot: 8, classId: "cavalry", experience: 299 }],
-  "stage-13": [{ slot: 8, classId: "cavalry", experience: 299 }],
+  "stage-11": [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
+  "stage-10": [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
+  "stage-12": [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
+  "stage-13": [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
+  "stage-14": [
+    SULANDA_CAVALRY_BASELINE,
+    DORI_CURSE_MASTER_BASELINE,
+    MARLIN_WATER_WARRIOR_BASELINE,
+    MOLINA_WATER_WARRIOR_BASELINE,
+  ],
 };
 
 const REPRESENTATIVE_STAGE1 = [
@@ -171,6 +183,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-10": REPRESENTATIVE_STAGE8,
       "stage-12": REPRESENTATIVE_STAGE8,
       "stage-13": REPRESENTATIVE_STAGE8,
+      "stage-14": REPRESENTATIVE_STAGE8,
     },
   },
   {
@@ -192,6 +205,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-10": PROMOTION_COVERAGE_STAGE8,
       "stage-12": PROMOTION_COVERAGE_STAGE8,
       "stage-13": PROMOTION_COVERAGE_STAGE8,
+      "stage-14": PROMOTION_COVERAGE_STAGE8,
     },
   },
 ] as const satisfies readonly {
