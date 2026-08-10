@@ -25,8 +25,19 @@ describe("stage 8 battle simulation", () => {
     expect(battle.unit("1:8")).toMatchObject({
       classId: "cavalry", name: "蘇蘭達", portrait: 10, x: 23, y: 30,
     });
-    expect(battle.unit("1:17")).toMatchObject({ classId: "land-knight", name: "阿曼妮" });
-    expect(battle.unit("1:18")).toMatchObject({ classId: "priest", name: "雷伊拉" });
+    expect(battle.unit("1:17")).toMatchObject({
+      classId: "land-knight", name: "阿曼妮", life: 220,
+    });
+    expect(battle.unit("1:18")).toMatchObject({
+      classId: "priest", name: "雷伊拉", life: 180,
+    });
+    for (const id of ["1:8", "1:40", "1:41", "1:42", "1:43", "1:44"]) {
+      const unit = battle.unit(id)!;
+      expect(unit.life, id).toBe(battle.statsFor(unit).maxLife);
+    }
+    expect(battle.unit("1:40")).toMatchObject({
+      classId: "cavalry", experience: 0, life: 200,
+    });
     const alliedIds = battle.units.filter(({ side }) => side === 1).map(({ id }) => id);
     expect(alliedIds.every((id) => battle.isPlayerControllableAlly(id))).toBe(true);
     expect(battle.alliedActionOrder(false)).toEqual([]);

@@ -82,6 +82,8 @@ function createInheritedAlly(
     ? definition.untouchedExperience ?? inheritance.untouchedNamedExperience
     : inherited?.experience ?? 0;
   const maximumLife = classStatsFor({ classId, experience }).maxLife;
+  const templateLifeBaseline = definition.forcedClassId !== undefined
+    || (untouchedCampaignSlot && definition.initialClassId !== undefined);
   return {
     id: `1:${definition.slot}`,
     side: 1,
@@ -92,7 +94,9 @@ function createInheritedAlly(
     portrait,
     x: definition.position.x,
     y: definition.position.y,
-    life: namedBaseline ? maximumLife : Math.min(inherited?.life ?? maximumLife, maximumLife),
+    life: namedBaseline || templateLifeBaseline
+      ? maximumLife
+      : Math.min(inherited?.life ?? maximumLife, maximumLife),
     experience,
     acted: false,
     actionDisabled: false,

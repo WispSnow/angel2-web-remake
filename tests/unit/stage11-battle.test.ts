@@ -27,9 +27,15 @@ describe("stage 11 battle simulation", () => {
       classId: "curse-master", name: "多莉", portrait: 13, x: 26, y: 2,
     });
     expect(battle.unit("1:8")).toMatchObject({
-      classId: "land-knight", name: "蘇蘭達", portrait: 10, x: 26, y: 35,
+      classId: "land-knight", name: "蘇蘭達", portrait: 10, x: 26, y: 35, life: 220,
     });
-    expect(battle.unit("1:42")).toMatchObject({ classId: "cavalry", x: 22, y: 35 });
+    for (const id of ["1:40", "1:41", "1:42"]) {
+      const unit = battle.unit(id)!;
+      expect(unit.life, id).toBe(battle.statsFor(unit).maxLife);
+    }
+    expect(battle.unit("1:42")).toMatchObject({
+      classId: "cavalry", experience: 0, life: 200, x: 22, y: 35,
+    });
     expect(battle.unit("2:21")).toMatchObject({
       classId: "pegasus-warrior", x: 36, y: 48,
     });
