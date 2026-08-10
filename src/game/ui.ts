@@ -998,7 +998,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const page = controller.currentDialogue;
     const dialogueVisible = page !== undefined;
     dialogueLayer.hidden = !dialogueVisible;
-    storyBackground.hidden = controller.phase !== "prebattleStory";
+    // Module 29 can invoke the same PP background renderer from an in-battle
+    // opening story (stage 12 / SAY 30 uses BK/14). An explicit page background
+    // therefore takes precedence over the phase label.
+    storyBackground.hidden = controller.phase !== "prebattleStory"
+      && page?.source.backgroundId === undefined;
     const storyBackgroundSource = page?.source.backgroundId === undefined
       ? defaultStoryBackgroundSource
       : stageAssets?.storyBackgrounds?.[page.source.backgroundId] ?? defaultStoryBackgroundSource;

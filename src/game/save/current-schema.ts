@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 33 as const;
-export const SAVE_CONTENT_VERSION = "stage-10-airship-pursuit-1" as const;
+export const SAVE_VERSION = 34 as const;
+export const SAVE_CONTENT_VERSION = "stage-12-swamp-water-warriors-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -113,6 +113,19 @@ function isUnitStatuses(value: unknown): value is BattleUnit["statuses"] {
     && UNIT_STATUS_KEYS.every((key) => isIntegerBetween(value[key], 0, MAX_STATUS));
 }
 
+const WATER_WARRIOR_SPLIT_ID = /^(1|2):(\d+):split-([1-3])$/u;
+
+function waterWarriorRootId(value: Pick<BattleUnit, "id" | "side" | "slot" | "classId">): string | undefined {
+  const expectedRootId = `${value.side}:${value.slot}`;
+  if (value.id === expectedRootId) return expectedRootId;
+  const match = WATER_WARRIOR_SPLIT_ID.exec(value.id);
+  return value.classId === "water-warrior"
+    && match?.[1] === String(value.side)
+    && Number(match[2]) === value.slot
+    ? expectedRootId
+    : undefined;
+}
+
 function isBattleUnit(
   value: unknown,
   stageId: StageId,
@@ -124,7 +137,6 @@ function isBattleUnit(
     || !isIntegerBetween(value.slot, 0, MAX_BATTLE_UNIT_SLOT)
     || !isClassId(value.classId)
     || typeof value.id !== "string"
-    || value.id !== `${value.side}:${value.slot}`
     || typeof value.className !== "string"
     || value.className !== className(value.classId)
     || typeof value.name !== "string"
@@ -140,12 +152,51 @@ function isBattleUnit(
     || !isPosition(value)
   ) return false;
 
+  const rootId = waterWarriorRootId({
+    id: value.id,
+    side: value.side,
+    slot: value.slot,
+    classId: value.classId,
+  });
+  if (!rootId) return false;
+
   const schema: StageSaveSchema = STAGE_RUNTIME_MANIFEST[stageId].save;
   if (value.side === 1) {
     return schema.alliedUnits.kind !== "allowed-classes"
       || schema.alliedUnits.classIds.includes(value.classId);
   }
-  return new Map(schema.enemyClassById).get(value.id) === value.classId;
+  return new Map(schema.enemyClassById).get(rootId) === value.classId;
+}
+
+function hasValidWaterWarriorGroups(units: readonly BattleUnit[]): boolean {
+  const groups = new Map<string, BattleUnit[]>();
+  for (const unit of units) {
+    if (unit.classId !== "water-warrior") continue;
+    const rootId = waterWarriorRootId(unit);
+    if (!rootId) return false;
+    const group = groups.get(rootId) ?? [];
+    group.push(unit);
+    groups.set(rootId, group);
+  }
+  for (const [rootId, group] of groups) {
+    const root = group.find(({ id }) => id === rootId);
+    if (!root || group.length > 4) return false;
+    const expectedIds = Array.from({ length: group.length }, (_, index) => index === 0
+      ? rootId
+      : `${rootId}:split-${index}`);
+    if (!hasExactlyTheseValues(group.map(({ id }) => id), expectedIds)) return false;
+    if (group.some((unit) => unit.side !== root.side
+      || unit.slot !== root.slot
+      || unit.classId !== root.classId
+      || unit.className !== root.className
+      || unit.name !== root.name
+      || unit.portrait !== root.portrait
+      || unit.life !== root.life
+      || unit.experience !== root.experience
+      || unit.actionDisabled !== root.actionDisabled
+      || UNIT_STATUS_KEYS.some((key) => unit.statuses[key] !== root.statuses[key]))) return false;
+  }
+  return true;
 }
 
 export function hasUniqueValues<T>(values: readonly T[]): boolean {
@@ -214,6 +265,7 @@ export function isSavedBattleState(
   if (
     !hasUniqueValues(units.map((unit) => unit.id))
     || !hasUniqueValues(units.map((unit) => `${unit.x},${unit.y}`))
+    || !hasValidWaterWarriorGroups(units)
     || !hasUniqueValues(terrainOverrides.map(({ x, y }) => `${x},${y}`))
     || terrainOverrides.some((override, index) => index > 0
       && terrainOverrides[index - 1].y * STAGE_WIDTH + terrainOverrides[index - 1].x
@@ -223,26 +275,27 @@ export function isSavedBattleState(
       (unit.side === 1 && !hasNamedAllyExperienceFloor(unit))
       || (unit.side === 2
         && (unit.life > statsFor(unit, difficulty).maxLife
-          || unit.experience !== initialEnemyExperience(unit.classId, difficulty))))
+          || unit.experience < initialEnemyExperience(unit.classId, difficulty))))
   ) return false;
 
   const allies = units.filter((unit) => unit.side === 1);
+  const alliedRoots = allies.filter((unit) => unit.id === `${unit.side}:${unit.slot}`);
   const alliedRule = saveSchema.alliedUnits;
   if (alliedRule.kind === "deployment") {
     const eligibleSlots = new Set<number>(alliedRule.eligibleSlots);
     const fixedSlots = new Set<number>(alliedRule.fixedSlots);
     const optionalSlots = new Set<number>(alliedRule.optionalSlots);
-    const alliedSlots = new Set(allies.map(({ slot }) => slot));
-    if (allies.length < fixedSlots.size
-      || allies.length > alliedRule.maximumUnits
-      || allies.some(({ slot }) => !eligibleSlots.has(slot))
+    const alliedSlots = new Set(alliedRoots.map(({ slot }) => slot));
+    if (alliedRoots.length < fixedSlots.size
+      || alliedRoots.length > alliedRule.maximumUnits
+      || alliedRoots.some(({ slot }) => !eligibleSlots.has(slot))
       || [...fixedSlots].some((slot) => !alliedSlots.has(slot))
-      || allies.filter(({ slot }) => optionalSlots.has(slot)).length
+      || alliedRoots.filter(({ slot }) => optionalSlots.has(slot)).length
         > alliedRule.openCellCount) {
       return false;
     }
   } else if (alliedRule.kind === "exact-slots") {
-    const alliedSlots = allies.map(({ slot }) => slot).sort((left, right) => left - right);
+    const alliedSlots = alliedRoots.map(({ slot }) => slot).sort((left, right) => left - right);
     if (alliedSlots.length !== alliedRule.slots.length
       || !alliedSlots.every((slot, index) => slot === alliedRule.slots[index])) {
       return false;

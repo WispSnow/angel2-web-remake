@@ -2450,11 +2450,18 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
     await page.getByTestId("unit-command-attack").click();
     const targeting = await debugState(page);
     const target = targeting.targets[0];
+    const targetUnit = targeting.units.find(({ x, y }) => x === target.x && y === target.y);
+    if (!targetUnit) throw new Error("forced ordinary-combat target is missing");
     await clickCanvas(
       page,
       40 + (target.x - targeting.cameraOrigin.x) * 40 + 20,
       23 + (target.y - targeting.cameraOrigin.y) * 44 + 22,
     );
+    return {
+      id: targetUnit.id,
+      life: targetUnit.life,
+      experience: targetUnit.experience,
+    };
   };
 
   await enterPlayableBattle();
@@ -2469,7 +2476,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
 
   await enterPlayableBattle({ nativeSpeed: true });
   await setBattlePresentation(page, "full");
-  await attackFirstForcedTarget();
+  const fullTargetBefore = await attackFirstForcedTarget();
 
   const fullLayer = page.getByTestId("combat-presentation");
   // The window opens before the scene: panels first, then the framed stage.
@@ -2498,6 +2505,14 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   const primaryImpactActor = primaryImpact?.sprites.find(({ set }) => set === "plus50");
   expect(primaryImpactActor).toMatchObject({ frame: 4, mirror: false });
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "12");
+  await expect(page.getByTestId("hp-bar")).toHaveAttribute(
+    "aria-label",
+    new RegExp(`生命 ${fullTargetBefore.life}／`),
+  );
+  await expect(page.getByTestId("exp-bar")).toHaveAttribute(
+    "aria-label",
+    new RegExp(`經驗 ${fullTargetBefore.experience}／`),
+  );
   // The 10 ms return frame can fall entirely between two browser rAF samples
   // under parallel load. Its frame/x path is covered deterministically by the
   // full-combat unit test; this browser gate uses the frozen impact trace and

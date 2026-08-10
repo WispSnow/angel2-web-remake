@@ -589,6 +589,10 @@ function renderFrame(): void {
     frame: 0,
     displayedAttackerLife: attacker.life,
     displayedDefenderLife: defender.life,
+    displayedLifeByUnitId: {
+      [attacker.id]: attacker.life,
+      [defender.id]: defender.life,
+    },
     fullScene: scene,
   };
   renderSource.combatPresentation = presentation;

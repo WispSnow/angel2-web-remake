@@ -143,6 +143,12 @@ export interface CombatPresentation {
   frame: number;
   displayedAttackerLife: number;
   displayedDefenderLife: number;
+  /**
+   * Map-unit life frozen at combat entry. The directly participating body
+   * still uses the two scalar fields above for its native point drain; shared
+   * water-warrior copies keep these values until the whole presentation ends.
+   */
+  displayedLifeByUnitId: Readonly<Record<string, number>>;
   deathTargetIndex?: number;
   fullScene?: FullCombatSceneState;
 }
@@ -420,6 +426,7 @@ export class GameController {
     || new URLSearchParams(location.search).has("debugScenario");
   // Keeps the measured full-screen timing under ?test=1 for visual review.
   private readonly fullCombatRealTime = new URLSearchParams(location.search).has("slowFull");
+  private readonly mapCombatRealTime = new URLSearchParams(location.search).has("slowMap");
 
   constructor(difficulty: Difficulty = 0) {
     this.difficulty = difficulty;
@@ -2546,14 +2553,20 @@ export class GameController {
     if (!attacker || !defender || this.busy) return;
     try {
       this.busy = true;
-      const attackerPresentation = { ...attacker };
-      const defenderPresentation = { ...defender };
+      const attackerPresentation = { ...attacker, statuses: { ...attacker.statuses } };
+      const defenderPresentation = { ...defender, statuses: { ...defender.statuses } };
+      const displayedLifeByUnitId = this.combatEntryLifeByUnitId();
       this.lastCombat = this.battle.attack(attacker.id, defenderId);
       const result = this.lastCombat;
       this.statusMessage = `造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}${result.splitCount ? `，水戰士分裂為 ${result.splitCount} 個並共享生命` : ""}。`;
       this.resetAction();
       this.markHintSeen();
-      await this.presentOrdinaryCombat(attackerPresentation, defenderPresentation, result);
+      await this.presentOrdinaryCombat(
+        attackerPresentation,
+        defenderPresentation,
+        result,
+        displayedLifeByUnitId,
+      );
       const survivingAttacker = this.battle.unit(result.attackerId);
       const offersExtraMove = survivingAttacker
         && this.battle.isPlayerControllableAlly(survivingAttacker.id)
@@ -3104,12 +3117,18 @@ export class GameController {
     } else if (action.kind === "attack" && action.targetId) {
       const defender = this.battle.unit(action.targetId);
       if (defender && manhattan(unit, defender) === 1) {
-        const attackerPresentation = { ...unit };
-        const defenderPresentation = { ...defender };
+        const attackerPresentation = { ...unit, statuses: { ...unit.statuses } };
+        const defenderPresentation = { ...defender, statuses: { ...defender.statuses } };
+        const displayedLifeByUnitId = this.combatEntryLifeByUnitId();
         this.lastCombat = this.battle.attack(unit.id, defender.id);
         const result = this.lastCombat;
         this.statusMessage = `${unit.name}造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}${result.splitCount ? `，水戰士分裂為 ${result.splitCount} 個並共享生命` : ""}。`;
-        await this.presentOrdinaryCombat(attackerPresentation, defenderPresentation, result);
+        await this.presentOrdinaryCombat(
+          attackerPresentation,
+          defenderPresentation,
+          result,
+          displayedLifeByUnitId,
+        );
       } else {
         this.battle.spendAction(unit.id);
       }
@@ -3165,12 +3184,13 @@ export class GameController {
     attacker: BattleUnit,
     defender: BattleUnit,
     result: AttackResult,
+    displayedLifeByUnitId: Readonly<Record<string, number>>,
   ): Promise<void> {
     this.combatPresentationTrace = [];
     const finalDefenderLife = Math.max(0, defender.life - result.damage);
     const finalAttackerLife = Math.max(0, attacker.life - result.counterDamage);
     if (this.battlePresentation === "full") {
-      await this.presentFullScreenCombat(attacker, defender, result);
+      await this.presentFullScreenCombat(attacker, defender, result, displayedLifeByUnitId);
       if (result.defenderDied && (result.defenderDeathTargets?.length ?? 1) > 1) {
         await this.presentMapCombatDeaths(
           attacker,
@@ -3180,6 +3200,7 @@ export class GameController {
           1,
           finalAttackerLife,
           finalDefenderLife,
+          displayedLifeByUnitId,
         );
       } else if (result.attackerDied && (result.attackerDeathTargets?.length ?? 1) > 1) {
         await this.presentMapCombatDeaths(
@@ -3190,6 +3211,7 @@ export class GameController {
           1,
           finalAttackerLife,
           finalDefenderLife,
+          displayedLifeByUnitId,
         );
       }
       this.combatPresentation = undefined;
@@ -3211,6 +3233,7 @@ export class GameController {
         frame,
         displayedAttackerLife,
         displayedDefenderLife,
+        displayedLifeByUnitId,
       );
       await pause(this.mapCombatDelay(10));
     }
@@ -3224,6 +3247,7 @@ export class GameController {
         applied,
         displayedAttackerLife,
         displayedDefenderLife,
+        displayedLifeByUnitId,
       );
       await pause(this.mapCombatDelay(1));
     }
@@ -3237,6 +3261,7 @@ export class GameController {
         0,
         displayedAttackerLife,
         displayedDefenderLife,
+        displayedLifeByUnitId,
       );
     } else if (result.counterOccurred) {
       for (let frame = 0; frame < hitFrames.length; frame += 1) {
@@ -3249,6 +3274,7 @@ export class GameController {
           frame,
           displayedAttackerLife,
           displayedDefenderLife,
+          displayedLifeByUnitId,
         );
         await pause(this.mapCombatDelay(10));
       }
@@ -3262,6 +3288,7 @@ export class GameController {
           applied,
           displayedAttackerLife,
           displayedDefenderLife,
+          displayedLifeByUnitId,
         );
         await pause(this.mapCombatDelay(1));
       }
@@ -3274,6 +3301,7 @@ export class GameController {
           0,
           displayedAttackerLife,
           displayedDefenderLife,
+          displayedLifeByUnitId,
         );
       }
     }
@@ -3289,6 +3317,7 @@ export class GameController {
     startIndex: number,
     displayedAttackerLife: number,
     displayedDefenderLife: number,
+    displayedLifeByUnitId: Readonly<Record<string, number>>,
   ): Promise<void> {
     const targets = phase === "defenderDeath"
       ? result.defenderDeathTargets
@@ -3304,6 +3333,7 @@ export class GameController {
           frame,
           displayedAttackerLife,
           displayedDefenderLife,
+          displayedLifeByUnitId,
           deathTargetIndex,
         );
         await pause(this.mapCombatDelay(10));
@@ -3315,10 +3345,12 @@ export class GameController {
     attacker: BattleUnit,
     defender: BattleUnit,
     result: AttackResult,
+    displayedLifeByUnitId: Readonly<Record<string, number>>,
   ): Promise<void> {
-    // The native full-screen battle freezes the status-bar values at their
-    // pre-strike numbers; life only changes back on the map. The whole
-    // presentation is a single measured timeline sampled against a clock.
+    // The native full-screen battle freezes the status-panel values at their
+    // pre-strike numbers while its bottom gauges update at impact. The Web
+    // side HUD mirrors the frozen entry snapshot through describeFocus(). The
+    // whole presentation is a single measured timeline sampled against a clock.
     // Camera and panel timing remain wall-clock driven, while profession poses
     // and projectile positions preserve the original discrete renderer steps.
     const script = buildFullCombatScript(attacker, defender, result);
@@ -3359,6 +3391,7 @@ export class GameController {
         frame: 0,
         displayedAttackerLife: attacker.life,
         displayedDefenderLife: defender.life,
+        displayedLifeByUnitId,
         fullScene: scene,
       };
       this.emit();
@@ -3376,6 +3409,7 @@ export class GameController {
     frame: number,
     displayedAttackerLife: number,
     displayedDefenderLife: number,
+    displayedLifeByUnitId: Readonly<Record<string, number>>,
     deathTargetIndex?: number,
   ): void {
     const deathUnits = (
@@ -3403,6 +3437,7 @@ export class GameController {
       frame,
       displayedAttackerLife,
       displayedDefenderLife,
+      displayedLifeByUnitId,
       deathTargetIndex,
     };
     this.combatPresentationTrace.push({
@@ -3413,6 +3448,10 @@ export class GameController {
       deathTargetId,
     });
     this.emit();
+  }
+
+  private combatEntryLifeByUnitId(): Readonly<Record<string, number>> {
+    return Object.fromEntries(this.battle.units.map(({ id, life }) => [id, life]));
   }
 
   private queueAudioCue(
@@ -3426,7 +3465,7 @@ export class GameController {
   }
 
   private mapCombatDelay(nativeTicks: number): number {
-    if (this.testMode) return Math.max(4, nativeTicks * 4);
+    if (this.testMode && !this.mapCombatRealTime) return Math.max(4, nativeTicks * 4);
     if (this.presentationFast) return Math.max(3, Math.round(nativeTicks * 2.5));
     return nativeTicks * 10;
   }
@@ -5028,6 +5067,7 @@ export class GameController {
           ?.map((unit) => ({ ...unit, statuses: { ...unit.statuses } })),
         defenderDeathUnits: this.combatPresentation.defenderDeathUnits
           ?.map((unit) => ({ ...unit, statuses: { ...unit.statuses } })),
+        displayedLifeByUnitId: { ...this.combatPresentation.displayedLifeByUnitId },
         result: {
           ...this.combatPresentation.result,
           defenderDeathTargets: this.combatPresentation.result.defenderDeathTargets
@@ -5354,8 +5394,33 @@ export class GameController {
   }
 
   describeFocus(): { stats: UnitStats; unit: BattleUnit } | undefined {
-    const unit = this.focusedUnit;
-    return unit ? { unit, stats: this.unitStats(unit) } : undefined;
+    const focusedUnit = this.focusedUnit;
+    if (!focusedUnit) return undefined;
+
+    const presentation = this.combatPresentation;
+    if (this.battlePresentation === "full" && presentation?.phase.startsWith("full")) {
+      const entrySnapshot = presentation.attacker.id === focusedUnit.id
+        ? presentation.attacker
+        : presentation.defender.id === focusedUnit.id
+          ? presentation.defender
+          : undefined;
+      if (entrySnapshot) {
+        const unit = { ...entrySnapshot, statuses: { ...entrySnapshot.statuses } };
+        return { unit, stats: this.unitStats(unit) };
+      }
+
+      const displayedLife = presentation.displayedLifeByUnitId[focusedUnit.id];
+      if (displayedLife !== undefined) {
+        const unit = {
+          ...focusedUnit,
+          life: displayedLife,
+          statuses: { ...focusedUnit.statuses },
+        };
+        return { unit, stats: this.unitStats(unit) };
+      }
+    }
+
+    return { unit: focusedUnit, stats: this.unitStats(focusedUnit) };
   }
 
   portraitUrl(portrait: BattleUnit["portrait"]): string {

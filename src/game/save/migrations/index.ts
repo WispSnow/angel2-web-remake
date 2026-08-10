@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion33Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 33
+    || value.contentVersion !== "stage-10-airship-pursuit-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion32Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 32
@@ -1462,6 +1473,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion33 = migrateVersion33Save(value);
+    if (migratedVersion33) return migratedVersion33;
     const migratedVersion32 = migrateVersion32Save(value);
     if (migratedVersion32) return migratedVersion32;
     const migratedVersion31 = migrateVersion31Save(value);

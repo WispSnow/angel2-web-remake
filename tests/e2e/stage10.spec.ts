@@ -164,7 +164,7 @@ test("S10-D/E: the corrected objective requires eliminating every pursuer and pr
   expect((await state(page)).units.filter(({ side }) => side === 2)).toHaveLength(0);
 });
 
-test("S10-F/G: defeat replays SAY/28 and completion saves the frozen stage-12 route", async ({ page }) => {
+test("S10-F/G: defeat replays SAY/28 and completion enters playable stage 12", async ({ page }) => {
   await page.goto("/?debugScenario=stage-10-near-defeat&difficulty=0&test=1");
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
@@ -181,7 +181,8 @@ test("S10-F/G: defeat replays SAY/28 and completion saves the frozen stage-12 ro
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "29");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -208,9 +209,9 @@ test("S10-F/G: defeat replays SAY/28 and completion saves the frozen stage-12 ro
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-10",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-12",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-12",
   });
 });

@@ -47,6 +47,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 9 關 · 找尋傳說中的飛船",
     "第 10 關 · 拯救蘇蘭達",
     "第 11 關 · 飛船上遭遇敵人",
+    "第 12 關 · 落入沼澤",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -88,6 +89,15 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-10-near-defeat",
     "stage-10-victory-ready",
     "stage-10-cleared",
+    "stage-12-prebattle",
+    "stage-12-deployment",
+    "stage-12-opening",
+    "stage-12-player",
+    "stage-12-split",
+    "stage-12-near-victory",
+    "stage-12-near-defeat",
+    "stage-12-victory-ready",
+    "stage-12-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }

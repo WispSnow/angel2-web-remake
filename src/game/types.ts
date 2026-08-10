@@ -19,7 +19,8 @@ export type StageId =
   | "stage-08"
   | "stage-09"
   | "stage-11"
-  | "stage-10";
+  | "stage-10"
+  | "stage-12";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -33,7 +34,8 @@ export type CampaignRouteId =
   | "stage-09"
   | "stage-11"
   | "stage-10"
-  | "stage-12";
+  | "stage-12"
+  | "stage-13";
 
 export interface Position {
   x: number;
@@ -184,8 +186,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 33;
-  contentVersion: "stage-10-airship-pursuit-1";
+  version: 34;
+  contentVersion: "stage-12-swamp-water-warriors-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -927,6 +927,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         ]) displayedUnits.set(unit.id, unit);
       }
       const active = new Set<string>();
+      const renderedLifeByUnitId: Record<string, number> = {};
       let visibleCount = 0;
       for (const unit of displayedUnits.values()) {
         active.add(unit.id);
@@ -964,6 +965,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         view.sprite.clearTint();
         const routePulseDisplayedLife = routePulsePresentation?.displayedLifeByUnitId[unit.id];
         const specialDisplayedLife = specialPresentation?.displayedLifeByUnitId[unit.id];
+        const ordinaryCombatEntryLife = presentation?.displayedLifeByUnitId[unit.id];
         const isAttackerDeathUnit = mapPresentation?.attackerDeathUnits
           ?.some(({ id }) => id === unit.id) ?? false;
         const isDefenderDeathUnit = mapPresentation?.defenderDeathUnits
@@ -974,7 +976,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             ? mapPresentation.displayedAttackerLife
             : mapPresentation && (mapPresentation.defender.id === unit.id || isDefenderDeathUnit)
               ? mapPresentation.displayedDefenderLife
-              : unit.life);
+              : ordinaryCombatEntryLife ?? unit.life);
         const activeDeathUnits = mapPresentation?.phase === "defenderDeath"
           ? mapPresentation.defenderDeathUnits
           : mapPresentation?.phase === "attackerDeath"
@@ -989,6 +991,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           );
         view.container.setVisible(!erasedByDeath);
         if (!erasedByDeath) visibleCount += 1;
+        renderedLifeByUnitId[unit.id] = displayedLife;
         this.drawLifeDigits(view, { ...unit, life: displayedLife });
         // Frozen units are state-driven and untargetable; keep the shell visible
         // while unrelated area techniques play until dispel or phase cleanup.
@@ -1003,6 +1006,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
       if (controller.isTestMode) {
         this.game.canvas.dataset.unitLifeLabelCount = String(visibleCount);
+        this.game.canvas.dataset.unitDisplayedLifeById = JSON.stringify(renderedLifeByUnitId);
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);
         this.game.canvas.dataset.iceDisabledCount = String(
           controller.battle.units.filter((unit) => unit.actionDisabled).length,

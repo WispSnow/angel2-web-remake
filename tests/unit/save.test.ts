@@ -33,6 +33,8 @@ import { Stage9Battle } from "../../src/game/simulation/stage9-battle";
 import { Stage11Battle } from "../../src/game/simulation/stage11-battle";
 import { STAGE10_DEFINITION } from "../../src/game/content/stage10";
 import { Stage10Battle } from "../../src/game/simulation/stage10-battle";
+import { STAGE12_DEFINITION } from "../../src/game/content/stage12";
+import { Stage12Battle } from "../../src/game/simulation/stage12-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -643,6 +645,70 @@ const stage10BattleSave = (): BattleSaveData => {
     stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-10-prebattle-story", "stage-10-enter-deployment"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
+const stage12BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-12" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x12a0_b0c0,
+    rngCalls: 53,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 620, life: 220 },
+      { slot: 1, classId: "soldier", experience: 299, life: 120 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE12_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      {
+        slot: 1,
+        position: { ...STAGE12_DEFINITION.deployment.openCells[0] },
+        fixed: false,
+      },
+    ],
+  };
+  const battle = new Stage12Battle(source, deployment);
+  const attacker = battle.unit("1:1")!;
+  attacker.x = 38;
+  attacker.y = 17;
+  expect(battle.attack("1:1", "2:40")).toMatchObject({
+    splitUnitId: "2:40:split-1",
+    splitCount: 2,
+  });
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-10T16:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-12",
+    stageLabel: "落入沼澤",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-12-prebattle-story",
+      "stage-12-enter-deployment",
+      "stage-12-opening-story",
+    ],
     battle: {
       phase: "player",
       ...battle.serializableSnapshot(),
@@ -1296,6 +1362,64 @@ describe("Web save validation", () => {
           : unit),
       },
     })).toBe(false);
+  });
+
+  it("validates stage 12 water-warrior split groups and rejects forged shared state", () => {
+    const save = stage12BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ id }) => id.startsWith("2:40"))).toHaveLength(2);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.filter(({ id }) => id !== "2:40"),
+      },
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:40:split-1"
+          ? { ...unit, life: unit.life - 1 }
+          : unit),
+      },
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: [
+          ...save.battle.units,
+          ...[2, 3].map((index) => ({
+            ...save.battle.units.find(({ id }) => id === "2:40:split-1")!,
+            id: `2:40:split-${index}`,
+            x: 36 + index,
+            y: 16,
+          })),
+          {
+            ...save.battle.units.find(({ id }) => id === "2:40:split-1")!,
+            id: "2:40:split-4",
+            x: 40,
+            y: 16,
+          },
+        ],
+      },
+    })).toBe(false);
+  });
+
+  it("migrates v33 stage 10 saves to the stage 12 content identity", () => {
+    const current = stage10BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 33,
+      contentVersion: "stage-10-airship-pursuit-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-10",
+    });
   });
 
   it("migrates the v19 stage-06 boundary label into its playable title", () => {
