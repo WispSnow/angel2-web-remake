@@ -169,11 +169,21 @@ test("S18-F/G: defeat retries deployment and completion freezes at Dragon Tower 
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
   await page.getByTestId("victory-continue").click();
-  if ((await state(page)).phase === "victoryFeedback") await page.getByTestId("victory-continue").click();
-  await waitForPhase(page, "savePrompt");
+  // The first click can land while the feedback panel is still animating, so
+  // the retry has to re-read the phase each attempt. An unconditional second
+  // click lands on the save prompt instead and dismisses it.
+  await expect(async () => {
+    if ((await state(page)).phase === "victoryFeedback") {
+      await page.getByTestId("victory-continue").click();
+    }
+    expect((await state(page)).phase).toBe("savePrompt");
+  }).toPass();
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  // Stage 19 is playable and has no prebattle story, so the completed route
+  // runs straight into its deployment instead of parking on a next-stage card.
+  await waitForPhase(page, "deployment");
+  await expect(page.getByRole("heading", { name: "龍塔第六層 · 出擊準備" })).toBeVisible();
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -200,9 +210,7 @@ test("S18-F/G: defeat retries deployment and completion freezes at Dragon Tower 
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-18",
-    stageProgress: 1000,
-    phase: "nextStage",
-    campaignRoute: "stage-19",
+    stageId: "stage-19",
+    phase: "deployment",
   });
 });

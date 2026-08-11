@@ -1650,18 +1650,14 @@ export class Stage0Battle {
       ?? { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
     const selectedUtility = this.expertUtilityForAction(unit, selected);
     const maximumLife = this.statsFor(unit).maxLife;
-    const rest: AlliedAiAction = {
-      unitId: unit.id,
-      kind: "rest",
-      path: [{ x: unit.x, y: unit.y }],
-    };
     // A named victory target is the AI's own loss condition, so below 20% it
     // always breaks contact: trading itself for one player unit hands the
     // stage over. Everyone else keeps taking a guaranteed kill at any life,
     // because for them an even trade costs the player more than the AI.
     if (unit.life * 100 < maximumLife * 20 && this.isEnemyCommander(unit)) {
-      this.recordExpertDecision(unit, [...candidates, rest], rest);
-      return rest;
+      const recovery = this.planSelfRecoveryAction(unit);
+      this.recordExpertDecision(unit, [...candidates, recovery], recovery);
+      return recovery;
     }
     if (selectedUtility.guaranteedKills === 0 && usesEmpressOrDragonAi(unit.classId)) {
       const banded = this.planEmpressOrDragonLifeBand(unit, options);
@@ -1674,11 +1670,45 @@ export class Stage0Battle {
       && selectedUtility.guaranteedKills === 0
       && selectedUtility.wizardHits === 0
       && selectedUtility.criticalSaves === 0) {
-      this.recordExpertDecision(unit, [...candidates, rest], rest);
-      return rest;
+      const recovery = this.planSelfRecoveryAction(unit);
+      this.recordExpertDecision(unit, [...candidates, recovery], recovery);
+      return recovery;
     }
     this.recordExpertDecision(unit, candidates, selected);
     return selected;
+  }
+
+  /**
+   * Rest restores `floor(maxLife * 15 / 100)`, which a healer's own pool often
+   * beats — `1H` alone returns 24% of max life. Whenever the policy decides a
+   * unit should spend its action recovering, it should therefore spend it on
+   * the largest restore the unit can put on itself, not on rest by reflex.
+   * Area recovery is measured by what lands on the caster; whatever it also
+   * gives the squad is upside the ordinary utility path already ranks.
+   */
+  private planSelfRecoveryAction(unit: BattleUnit): AlliedAiAction {
+    const path = [{ x: unit.x, y: unit.y }];
+    const maximumLife = this.statsFor(unit).maxLife;
+    const missingLife = maximumLife - unit.life;
+    let best: AlliedAiAction = { unitId: unit.id, kind: "rest", path };
+    let bestHealing = Math.min(missingLife, Math.floor(maximumLife * 15 / 100));
+    if (missingLife <= 0 || unit.statuses.techniqueSeal > 0) return best;
+
+    for (const actionId of techniqueActionIdsFor(unit)) {
+      const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+      if (definition.target !== "ally" || !("healing" in definition)) continue;
+      if (!this.canUseSpecialAction(unit, actionId)) continue;
+      // The caster sits at the centre of its own area recovery, so it takes
+      // the highest ring value the effect map can hold.
+      const centreValue = "effectRadius" in definition.range ? definition.range.effectRadius : 0;
+      const healing = Math.min(missingLife, "maxLifePercent" in definition.healing
+        ? Math.floor(maximumLife * definition.healing.maxLifePercent / 100)
+        : (definition.healing.byRangeValue as Readonly<Record<number, number>>)[centreValue] ?? 0);
+      if (healing <= bestHealing) continue;
+      best = { unitId: unit.id, kind: "special", actionId, targetId: unit.id, path };
+      bestHealing = healing;
+    }
+    return best;
   }
 
   /** Side-2 slots the stage victory condition names outright. */
@@ -1704,17 +1734,13 @@ export class Stage0Battle {
   ): AlliedAiAction | undefined {
     const lifePercent = Math.floor(unit.life * 100 / this.statsFor(unit).maxLife);
     if (lifePercent >= 40 || lifePercent < 20) return undefined;
-    const rest: AlliedAiAction = {
-      unitId: unit.id,
-      kind: "rest",
-      path: [{ x: unit.x, y: unit.y }],
-    };
     const retreat = options.behavior !== 1 && this.hasAdjacentOpponent(unit)
       ? this.defensiveRetreatPath(unit)
       : undefined;
     if (!retreat) {
-      this.recordExpertDecision(unit, [rest], rest);
-      return rest;
+      const recovery = this.planSelfRecoveryAction(unit);
+      this.recordExpertDecision(unit, [recovery], recovery);
+      return recovery;
     }
     const selected = this.planClassAction(unit, undefined, {
       expertRanking: true,

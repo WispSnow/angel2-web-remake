@@ -5,6 +5,7 @@ import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
+import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
 import type { CampaignState } from "../../src/game/types";
 
 /** Stage 19 names side-2 slot 13 as the victory target; every other enemy is rank and file. */
@@ -26,6 +27,16 @@ const stage19Deployment = {
       slot, position: { ...STAGE19_DEFINITION.deployment.openCells[index] }, fixed: false,
     })),
   ],
+};
+
+/** Stage 3 names side-2 slot 17, a monk, as the victory target. */
+const stage3Campaign: CampaignState = {
+  stageId: "stage-03",
+  ruleset: "stableRemake",
+  difficulty: 0,
+  roster: completeCampaignRoster([]),
+  rngState: 0x1234_5678,
+  rngCalls: 0,
 };
 
 const placements = () => [
@@ -143,6 +154,40 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       kind: "attack",
       targetId: "1:1",
     });
+  });
+
+  /**
+   * Rest restores 15% of max life; a monk's own `1H` restores 24%. When the
+   * policy spends the action on recovery it should spend it on the larger
+   * restore, so stage 3's monk commander heals itself instead of resting.
+   */
+  it("heals itself instead of resting when its own technique restores more", () => {
+    const battle = new Stage3Battle(stage3Campaign);
+    const commander = battle.unit("2:17");
+    if (!commander) throw new Error("commander missing");
+    expect(commander.classId).toBe("monk");
+    const maximumLife = battle.statsFor(commander).maxLife;
+    commander.life = Math.floor(maximumLife * 0.15);
+
+    expect(battle.planEnemyAiAction("2:17")).toMatchObject({
+      kind: "special",
+      actionId: "heal-1",
+      targetId: "2:17",
+    });
+  });
+
+  it("rests when no technique of its own beats the native 15% recovery", () => {
+    const battle = new Stage3Battle(stage3Campaign);
+    const trooper = battle.units.find(({ side, classId }) =>
+      side === 2 && classId !== "monk");
+    if (!trooper) throw new Error("trooper missing");
+    trooper.life = Math.floor(battle.statsFor(trooper).maxLife * 0.15);
+    for (const other of battle.units.filter(({ id }) => id !== trooper.id)) {
+      if (other.side === 1) other.x = 49;
+      if (other.side === 1) other.y = 49;
+    }
+
+    expect(battle.planEnemyAiAction(trooper.id)).toMatchObject({ kind: "rest" });
   });
 
   it("keeps the named victory target fighting at or above 20% life", () => {
