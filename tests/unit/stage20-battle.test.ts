@@ -95,7 +95,7 @@ describe("stage 20 battle", () => {
    * selector, so melee is a stableRemake improvement rather than an original
    * behavior. It stays available because a lone adjacent ally is a kill the
    * 90-per-cell WD path cannot reach; the expert kill band decides, and only
-   * the life bands below may override it.
+   * the commander rest below 20% may override it.
    */
   it("prefers a melee kill over a WD cast that cannot kill", () => {
     const battle = new Stage20Battle(campaign(), fullDeployment());
@@ -114,6 +114,11 @@ describe("stage 20 battle", () => {
     });
   });
 
+  /**
+   * The demon dragon is the slot the stage-20 victory condition names, so its
+   * own death ends the battle. Below 20% it breaks contact even when a kill
+   * is on the table — a one-for-one trade would hand the stage to the player.
+   */
   it("rests below 20% life even when a melee kill is available", () => {
     const battle = new Stage20Battle(campaign(), fullDeployment());
     replaceTableauWithDragon(battle);
@@ -132,12 +137,7 @@ describe("stage 20 battle", () => {
     });
   });
 
-  /**
-   * `1000:2233` answers a successful `1000:1D67` retreat with `M`, and only
-   * the `0P/1P` dispatcher reacts to that code by running the technique chain
-   * again — from the cell it just retreated to.
-   */
-  it("retreats out of contact and still casts WD between 20% and 39% life", () => {
+  it("still takes a guaranteed kill between 20% and 39% life", () => {
     const battle = new Stage20Battle(campaign(), fullDeployment());
     replaceTableauWithDragon(battle);
     keepAllies(battle, [0]);
@@ -148,8 +148,37 @@ describe("stage 20 battle", () => {
     nia.y = 17;
     dragon.life = 720; // 30% of 2,400
 
+    expect(battle.planEnemyAiAction("2:28")).toMatchObject({
+      kind: "attack",
+      targetId: "1:0",
+      path: [{ x: 29, y: 16 }],
+    });
+  });
+
+  /**
+   * `1000:2233` answers a successful `1000:1D67` retreat with `M`, and only
+   * the `0P/1P` dispatcher reacts to that code by running the technique chain
+   * again — from the cell it just retreated to.
+   */
+  it("retreats out of contact and still casts WD between 20% and 39% life", () => {
+    const battle = new Stage20Battle(campaign(), fullDeployment());
+    replaceTableauWithDragon(battle);
+    keepAllies(battle, [0, 1]);
+    const nia = battle.unit("1:0");
+    const shield = battle.unit("1:1");
+    const dragon = battle.unit("2:28");
+    if (!nia || !shield || !dragon) throw new Error("units missing");
+    // Two adjacent allies out of melee-kill reach, so the band decides.
+    nia.x = 29;
+    nia.y = 17;
+    nia.life = 900;
+    shield.x = 28;
+    shield.y = 16;
+    shield.life = 900;
+    dragon.life = 720; // 30% of 2,400
+
     const action = battle.planEnemyAiAction("2:28");
-    expect(action).toMatchObject({ kind: "special", actionId: "wd", targetId: "1:0" });
+    expect(action).toMatchObject({ kind: "special", actionId: "wd" });
     const destination = action?.path.at(-1);
     expect(destination).not.toEqual({ x: 29, y: 16 });
     expect(battle.units.some((unit) => unit.side === 1

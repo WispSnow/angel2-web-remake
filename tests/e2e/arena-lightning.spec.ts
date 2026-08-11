@@ -100,7 +100,7 @@ test("enemy tier-one magic master uses 2L and the native group-11 dialogue", asy
     arena.setSide(2);
     arena.setClass("magic-master");
     arena.setLevel(1);
-    const enemy = arena.interact(30, 30);
+    const enemy = arena.interact(29, 30);
     return [ally, enemy];
   });
   expect(placed).toEqual([true, true]);

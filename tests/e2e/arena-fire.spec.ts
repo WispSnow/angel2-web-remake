@@ -99,7 +99,7 @@ test("enemy tier-one evil mage uses stable radius-six 2F and group-10 dialogue",
     arena.setSide(2);
     arena.setClass("evil-mage");
     arena.setLevel(1);
-    const enemy = arena.interact(25, 30);
+    const enemy = arena.interact(24, 30);
     return [ally, enemy];
   });
   expect(placed).toEqual([true, true]);

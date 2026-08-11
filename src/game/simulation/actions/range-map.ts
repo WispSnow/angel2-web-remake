@@ -248,15 +248,24 @@ export function shootingLineVisitProbabilities(
   return probabilities;
 }
 
+/**
+ * The native action tables store a propagation seed, not a cell count. Mode
+ * `0` at `1000:3BB0` writes `current - 1` into each neighbour and refuses to
+ * store zero, so a seed of `n` reaches `n - 1` cells. Both the player entry
+ * `1000:40C2` and the AI entry `1000:1E51` write the table word straight into
+ * DS:`1F18` without adjusting it, which is why shooting already passes its
+ * own seed through unchanged. Content still carries the raw table word under
+ * `range.selectionRadius`; reach is one less than that number.
+ */
 export function techniqueSelectionRange(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,
   battlefield: ActionBattlefield,
-  selectionRadius: number,
+  selectionSeed: number,
 ): NumericRangeMap {
   return buildUniformRange(
     actor,
     battlefield,
-    selectionRadius + 1,
+    selectionSeed,
     (movementRule) => movementRule >= 99,
   );
 }
@@ -270,13 +279,13 @@ export function techniqueSelectionPath(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,
   target: Position,
   battlefield: ActionBattlefield,
-  selectionRadius: number,
+  selectionSeed: number,
   choosePredecessor: (candidateCount: number) => number = () => 0,
 ): Position[] {
   const gradient = buildUniformRange(
     actor,
     battlefield,
-    selectionRadius + 1,
+    selectionSeed,
     (movementRule) => movementRule >= 99,
   );
   if (gradient.valueAt(target) === 0) return [];

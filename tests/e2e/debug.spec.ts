@@ -55,6 +55,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 17 關 · 龍塔第四層",
     "第 18 關 · 龍塔第五層",
     "第 19 關 · 龍塔第六層",
+    "第 20 關 · 龍塔頂部",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));

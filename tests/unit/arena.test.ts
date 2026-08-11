@@ -204,7 +204,7 @@ describe("all-terrain arena", () => {
       { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magician" as const, level: 1 as const, x: 20, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "magic-priest" as const, level: 3 as const, x: 20, y: 32 },
       { id: "arena-1-2", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 21, y: 32 },
-      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magician" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magician" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "magic-priest" as const, level: 3 as const, x: 24, y: 32 },
       { id: "arena-2-2", side: 2 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 23, y: 32 },
     ];
@@ -214,7 +214,7 @@ describe("all-terrain arena", () => {
 
     expect(battle.actionTargetCells("arena-1-0", "ice-1")).toEqual([{ x: 20, y: 30 }]);
     expect(battle.actionTargetCells("arena-1-0", "lightning-1"))
-      .toContainEqual({ x: 22, y: 30 });
+      .toContainEqual({ x: 21, y: 30 });
     expect(battle.actionTargetCells("arena-1-1", "dispel"))
       .toContainEqual({ x: 21, y: 32 });
 
@@ -238,9 +238,9 @@ describe("all-terrain arena", () => {
 
   it("offers 2L only to tier-one magic masters and unifies both sides to selection radius five", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-master" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-master" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
-      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "magic-master" as const, level: 1 as const, x: 30, y: 31 },
+      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "magic-master" as const, level: 1 as const, x: 29, y: 31 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 25, y: 31 },
     ];
     const battle = new ArenaBattle(placements, 0);
@@ -274,9 +274,9 @@ describe("all-terrain arena", () => {
 
   it("offers 3L only to tier-two magic masters and unifies both sides to selection radius six", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-master" as const, level: 2 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-master" as const, level: 2 as const, x: 21, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
-      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "magic-master" as const, level: 2 as const, x: 32, y: 31 },
+      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "magic-master" as const, level: 2 as const, x: 31, y: 31 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 31 },
     ];
     const battle = new ArenaBattle(placements, 0);
@@ -310,9 +310,9 @@ describe("all-terrain arena", () => {
 
   it("offers 4L only to tier-three magic masters and unifies both sides to selection radius seven", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-master" as const, level: 3 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-master" as const, level: 3 as const, x: 21, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
-      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "magic-master" as const, level: 3 as const, x: 34, y: 31 },
+      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "magic-master" as const, level: 3 as const, x: 33, y: 31 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 27, y: 31 },
     ];
     const battle = new ArenaBattle(placements, 0);
@@ -382,7 +382,7 @@ describe("all-terrain arena", () => {
 
   it("offers 3I only at prayer-guide tier three with radius-six full-life centers", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "prayer-guide" as const, level: 3 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "prayer-guide" as const, level: 3 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "prayer-guide" as const, level: 3 as const, x: 27, y: 31 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 28, y: 31 },
@@ -453,9 +453,9 @@ describe("all-terrain arena", () => {
 
   it("offers 2H only at prayer-guide tier three with full-life targets", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "prayer-guide" as const, level: 3 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "prayer-guide" as const, level: 3 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
-      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "prayer-guide" as const, level: 3 as const, x: 26, y: 31 },
+      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "prayer-guide" as const, level: 3 as const, x: 25, y: 31 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
     ];
     const battle = new ArenaBattle(placements, 0);
@@ -479,9 +479,9 @@ describe("all-terrain arena", () => {
 
   it("offers 3H only at magic-guide tier three with radius-seven full-life targeting", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-guide" as const, level: 3 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-guide" as const, level: 3 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
-      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magic-guide" as const, level: 3 as const, x: 27, y: 31 },
+      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magic-guide" as const, level: 3 as const, x: 26, y: 31 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
     ];
     const battle = new ArenaBattle(placements, 0);
@@ -501,7 +501,7 @@ describe("all-terrain arena", () => {
 
   it("offers AA at every magic-guide tier and lets AI prefer the later full-life frozen ally", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-guide" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-guide" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
       { id: "arena-1-2", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magic-guide" as const, level: 1 as const, x: 30, y: 30 },
@@ -535,10 +535,10 @@ describe("all-terrain arena", () => {
 
   it("offers FM only at magic-guide tier three with radius seven and the repaired ally AI selector", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-guide" as const, level: 3 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-guide" as const, level: 3 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
       { id: "arena-1-2", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 28, y: 30 },
-      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magic-guide" as const, level: 3 as const, x: 30, y: 32 },
+      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magic-guide" as const, level: 3 as const, x: 29, y: 32 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 32 },
       { id: "arena-2-2", side: 2 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 24, y: 33 },
     ];
@@ -573,8 +573,8 @@ describe("all-terrain arena", () => {
 
   it("offers IP to tier-two and tier-three curse-masters, including frozen enemies", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "curse-master" as const, level: 2 as const, x: 20, y: 30 },
-      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "curse-master" as const, level: 3 as const, x: 30, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "curse-master" as const, level: 2 as const, x: 21, y: 30 },
+      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "curse-master" as const, level: 3 as const, x: 29, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
     ];
@@ -606,10 +606,10 @@ describe("all-terrain arena", () => {
 
   it("offers LA at every curse-master tier and applies native FF confusion only to automatic planning", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "curse-master" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "curse-master" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
-      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "curse-master" as const, level: 2 as const, x: 30, y: 30 },
+      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "curse-master" as const, level: 2 as const, x: 28, y: 30 },
     ];
     const battle = new ArenaBattle(placements, 0, new DeterministicRng(0x1234));
     battle.unit("arena-2-0")!.actionDisabled = true;
@@ -646,10 +646,10 @@ describe("all-terrain arena", () => {
 
   it("offers SA at every curse-master tier, accepts frozen enemies, and ranks lowest defense then life", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "curse-master" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "curse-master" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
       { id: "arena-1-2", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
-      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "curse-master" as const, level: 3 as const, x: 30, y: 30 },
+      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "curse-master" as const, level: 3 as const, x: 29, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
     ];
 
@@ -691,10 +691,10 @@ describe("all-terrain arena", () => {
 
   it("offers SD at every magic-priest tier, accepts frozen enemies, and ranks lowest defense then life", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-priest" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-priest" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
       { id: "arena-1-2", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
-      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magic-priest" as const, level: 3 as const, x: 30, y: 30 },
+      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magic-priest" as const, level: 3 as const, x: 29, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
     ];
 
@@ -783,7 +783,7 @@ describe("all-terrain arena", () => {
 
   it("offers AD at every prayer-guide tier and lets AI prefer the later full-life frozen ally", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "prayer-guide" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "prayer-guide" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
       { id: "arena-1-2", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "prayer-guide" as const, level: 1 as const, x: 30, y: 30 },
@@ -817,10 +817,10 @@ describe("all-terrain arena", () => {
 
   it("offers 2F at the native class tiers and unifies both AI sides to selection radius six", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "evil-mage" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "evil-mage" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "evil-mage" as const, level: 1 as const, x: 26, y: 31 },
-      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 21, y: 31 },
     ];
     const battle = new ArenaBattle(placements, 0);
     expect(battle.actionTargetCells("arena-1-0", "fire-2")).toContainEqual({ x: 26, y: 30 });
@@ -851,10 +851,10 @@ describe("all-terrain arena", () => {
 
   it("offers 3F only to tier-two evil mages and unifies both AI sides to selection radius seven", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "evil-mage" as const, level: 2 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "evil-mage" as const, level: 2 as const, x: 21, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "evil-mage" as const, level: 2 as const, x: 27, y: 31 },
-      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 21, y: 31 },
     ];
     const battle = new ArenaBattle(placements, 0);
     expect(battle.actionTargetCells("arena-1-0", "fire-3"))
@@ -875,10 +875,10 @@ describe("all-terrain arena", () => {
 
   it("offers 4F only to tier-three evil mages and unifies both AI sides to selection radius seven", () => {
     const placements = [
-      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "evil-mage" as const, level: 3 as const, x: 20, y: 30 },
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "evil-mage" as const, level: 3 as const, x: 21, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "evil-mage" as const, level: 3 as const, x: 27, y: 31 },
-      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 21, y: 31 },
     ];
     const battle = new ArenaBattle(placements, 0);
     expect(battle.actionTargetCells("arena-1-0", "fire-4"))
@@ -979,7 +979,7 @@ describe("all-terrain arena", () => {
     const placements = [
       { id: "arena-1-0", side: 1 as const, slot: 0, classId: "wizard" as const, level: 2 as const, x: 20, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
-      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "wizard" as const, level: 2 as const, x: 30, y: 30 },
+      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "wizard" as const, level: 2 as const, x: 29, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
     ];
     const battle = new ArenaBattle(placements, 0);
@@ -1021,7 +1021,7 @@ describe("all-terrain arena", () => {
     const placements = [
       { id: "arena-1-0", side: 1 as const, slot: 0, classId: "wizard" as const, level: 3 as const, x: 20, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
-      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "wizard" as const, level: 3 as const, x: 30, y: 30 },
+      { id: "arena-2-1", side: 2 as const, slot: 1, classId: "wizard" as const, level: 3 as const, x: 29, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
     ];
     const battle = new ArenaBattle(placements, 0);

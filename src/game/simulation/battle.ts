@@ -54,7 +54,7 @@ import type {
   SpecialActionResult,
 } from "./actions/types";
 import { effectiveAttack, effectiveDefense, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
-import { battleOutcomeForObjective } from "./objectives";
+import { battleOutcomeForObjective, slotsNamedByCondition } from "./objectives";
 import {
   hasEnemyDamageActionThisTurn,
   type EnemyThreatContext,
@@ -1618,10 +1618,6 @@ export class Stage0Battle {
       targetFilter?: (target: BattleUnit) => boolean;
     },
   ): AlliedAiAction {
-    if (usesEmpressOrDragonAi(unit.classId)) {
-      const banded = this.planEmpressOrDragonLifeBand(unit, options);
-      if (banded) return banded;
-    }
     const positionFilter = allowMove
       ? undefined
       : (position: Position) => positionKey(position) === positionKey(unit);
@@ -1653,16 +1649,31 @@ export class Stage0Battle {
     const selected = candidates[0]
       ?? { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
     const selectedUtility = this.expertUtilityForAction(unit, selected);
-    const criticallyInjured = unit.life * 100 < this.statsFor(unit).maxLife * 40;
-    if (criticallyInjured
+    const maximumLife = this.statsFor(unit).maxLife;
+    const rest: AlliedAiAction = {
+      unitId: unit.id,
+      kind: "rest",
+      path: [{ x: unit.x, y: unit.y }],
+    };
+    // A named victory target is the AI's own loss condition, so below 20% it
+    // always breaks contact: trading itself for one player unit hands the
+    // stage over. Everyone else keeps taking a guaranteed kill at any life,
+    // because for them an even trade costs the player more than the AI.
+    if (unit.life * 100 < maximumLife * 20 && this.isEnemyCommander(unit)) {
+      this.recordExpertDecision(unit, [...candidates, rest], rest);
+      return rest;
+    }
+    if (selectedUtility.guaranteedKills === 0 && usesEmpressOrDragonAi(unit.classId)) {
+      const banded = this.planEmpressOrDragonLifeBand(unit, options);
+      if (banded) {
+        this.recordExpertDecision(unit, [...candidates, banded], banded);
+        return banded;
+      }
+    }
+    if (unit.life * 100 < maximumLife * 40
       && selectedUtility.guaranteedKills === 0
       && selectedUtility.wizardHits === 0
       && selectedUtility.criticalSaves === 0) {
-      const rest: AlliedAiAction = {
-        unitId: unit.id,
-        kind: "rest",
-        path: [{ x: unit.x, y: unit.y }],
-      };
       this.recordExpertDecision(unit, [...candidates, rest], rest);
       return rest;
     }
@@ -1670,14 +1681,19 @@ export class Stage0Battle {
     return selected;
   }
 
+  /** Side-2 slots the stage victory condition names outright. */
+  private isEnemyCommander(unit: BattleUnit): boolean {
+    return unit.side === 2
+      && slotsNamedByCondition(this.stage.objective.victory, 2).includes(unit.slot);
+  }
+
   /**
-   * Native `1000:2233` life bands as reached from the `0P/1P` dispatcher.
-   * Below 20% the original always rests, so the shared expert kill/save
-   * override must not run here. The 20..39% branch is the one native case
-   * where this class both moves and acts: `1000:2233` answers a successful
-   * `1000:1D67` retreat with `M`, and `1000:1A68` reacts to that code by
-   * running the technique chain again from the cell just retreated to.
-   * Returns undefined at 40% and above so the shared expert flow continues.
+   * The 20..39% band of native `1000:2233` as reached from the `0P/1P`
+   * dispatcher. It is the one native case where a class both moves and acts:
+   * `1000:2233` answers a successful `1000:1D67` retreat with `M`, and
+   * `1000:1A68` reacts to that code by running the technique chain again from
+   * the cell just retreated to. Callers apply it only when no guaranteed kill
+   * is on the table; the bands outside 20..39% belong to the shared flow.
    */
   private planEmpressOrDragonLifeBand(
     unit: BattleUnit,
@@ -1687,15 +1703,13 @@ export class Stage0Battle {
     },
   ): AlliedAiAction | undefined {
     const lifePercent = Math.floor(unit.life * 100 / this.statsFor(unit).maxLife);
-    if (lifePercent >= 40) return undefined;
+    if (lifePercent >= 40 || lifePercent < 20) return undefined;
     const rest: AlliedAiAction = {
       unitId: unit.id,
       kind: "rest",
       path: [{ x: unit.x, y: unit.y }],
     };
-    const retreat = lifePercent >= 20
-      && options.behavior !== 1
-      && this.hasAdjacentOpponent(unit)
+    const retreat = options.behavior !== 1 && this.hasAdjacentOpponent(unit)
       ? this.defensiveRetreatPath(unit)
       : undefined;
     if (!retreat) {

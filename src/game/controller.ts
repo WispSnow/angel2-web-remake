@@ -4786,7 +4786,9 @@ export class GameController {
     nia.y = 26;
     nia.life = this.battle.statsFor(nia).maxLife;
     nia.acted = false;
-    sister.x = 29;
+    // Native 1F seeds its range map with 5 and reaches four cells, so this is
+    // the boundary the shared player/AI definition actually allows.
+    sister.x = 30;
     sister.y = 26;
     sister.life = this.battle.statsFor(sister).maxLife;
     sister.acted = false;

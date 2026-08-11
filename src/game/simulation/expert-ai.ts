@@ -193,6 +193,10 @@ export function expertExposureAt(
         stats.movement + BATTLE_ACTION_DEFINITIONS[shootingActionId].range.maximumDistance,
       );
     }
+    // Threat reach is a remake-only estimate, so it keeps the raw table words
+    // rather than the seed-minus-one cell counts the range maps use. Reading
+    // one cell wide here only makes the AI more cautious about standing in a
+    // caster's shadow; it never widens a real action.
     if (candidate.statuses.techniqueSeal === 0) {
       if (candidate.classId === "dragon" || candidate.classId === "empress") {
         maximumReach = Math.max(maximumReach, BATTLE_ACTION_DEFINITIONS.wd.range.selectionRadius);

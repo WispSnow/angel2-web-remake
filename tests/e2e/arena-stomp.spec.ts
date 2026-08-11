@@ -29,7 +29,7 @@ async function placeStompScenario(
     arena.setSide(2);
     arena.setClass("great-dragon-knight");
     arena.setLevel(enemyLevel);
-    return [...placed, arena.interact(26, 30)];
+    return [...placed, arena.interact(25, 30)];
   }, [STOMP_SQUAD, level] as const);
 }
 

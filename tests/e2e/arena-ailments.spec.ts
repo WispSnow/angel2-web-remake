@@ -179,7 +179,7 @@ test("tier-one curse-master commits SA after its formal presentation", async ({ 
     arena.setClass("soldier");
     const reserve = arena.interact(20, 32);
     arena.setSide(2);
-    const target = arena.interact(24, 30);
+    const target = arena.interact(23, 30);
     return [caster, reserve, target];
   });
   expect(placed).toEqual([true, true, true]);
@@ -193,7 +193,7 @@ test("tier-one curse-master commits SA after its formal presentation", async ({ 
   await expect(page.getByTestId("technique-heal-1")).toContainText("初級治療");
   await expect(page.getByTestId("technique-attack-down")).toContainText("攻擊下降");
   await page.getByTestId("technique-attack-down").click();
-  await clickArenaWorldCell(page, 24, 30);
+  await clickArenaWorldCell(page, 23, 30);
 
   await page.waitForFunction(() => {
     const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
@@ -254,7 +254,7 @@ test("enemy tier-one curse-master selects SA once LA is redundant and announces 
     arena.setClass("curse-master");
     arena.setLevel(1);
     const first = arena.interact(23, 30);
-    const second = arena.interact(24, 30);
+    const second = arena.interact(22, 30);
     return [player, first, second];
   });
   expect(placed).toEqual([true, true, true]);
@@ -313,7 +313,7 @@ test("tier-one magic-priest commits SD after its formal presentation", async ({ 
     arena.setClass("soldier");
     const reserve = arena.interact(20, 32);
     arena.setSide(2);
-    const target = arena.interact(24, 30);
+    const target = arena.interact(23, 30);
     return [caster, reserve, target];
   });
   expect(placed).toEqual([true, true, true]);
@@ -328,7 +328,7 @@ test("tier-one magic-priest commits SD after its formal presentation", async ({ 
   await expect(page.getByTestId("technique-recovery-1")).toContainText("初級回復");
   await expect(page.getByTestId("technique-defense-down")).toContainText("防禦下降");
   await page.getByTestId("technique-defense-down").click();
-  await clickArenaWorldCell(page, 24, 30);
+  await clickArenaWorldCell(page, 23, 30);
 
   await page.waitForFunction(() => {
     const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
@@ -383,7 +383,7 @@ test("enemy tier-two magic-priest selects SD from native slot four and announces
     arena.setSide(2);
     arena.setClass("magic-priest");
     arena.setLevel(2);
-    const caster = arena.interact(24, 30);
+    const caster = arena.interact(23, 30);
     return [player, caster];
   });
   expect(placed).toEqual([true, true]);

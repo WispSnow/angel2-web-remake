@@ -332,9 +332,12 @@ describe("Stage-0 class actions", () => {
     expect(shooting.valueAt({ x: 5, y: 1 })).toBeGreaterThan(0);
     expect(shooting.valueAt({ x: 5, y: 0 })).toBe(0);
 
+    // The native tables hold a propagation seed, so seed 5 writes 5 at the
+    // origin and reaches four cells; the fifth ring stays out of range.
     const technique = techniqueSelectionRange(actor, openBattlefield, 5);
-    expect(technique.valueAt(actor)).toBe(6);
-    expect(technique.valueAt({ x: 5, y: 0 })).toBe(1);
+    expect(technique.valueAt(actor)).toBe(5);
+    expect(technique.valueAt({ x: 5, y: 1 })).toBe(1);
+    expect(technique.valueAt({ x: 5, y: 0 })).toBe(0);
   });
 
   it("enumerates every shortest magic-arrow line in stable native direction order", () => {
@@ -1559,8 +1562,11 @@ describe("Stage-0 class actions", () => {
     }
     actor.experience = rows[2].experienceThreshold;
     const cells = battle.actionRange(actor.id, "heal-3").cells();
-    expect(cells.some(({ x, y }) => Math.abs(x - actor.x) + Math.abs(y - actor.y) === 7))
+    // Native seed 7 reaches six cells.
+    expect(cells.some(({ x, y }) => Math.abs(x - actor.x) + Math.abs(y - actor.y) === 6))
       .toBe(true);
+    expect(cells.some(({ x, y }) => Math.abs(x - actor.x) + Math.abs(y - actor.y) === 7))
+      .toBe(false);
     Object.assign(target, cells.find(({ x, y }) => x !== actor.x || y !== actor.y));
     expect(battle.actionTargets(actor.id, "heal-3")).toContain(target);
   });

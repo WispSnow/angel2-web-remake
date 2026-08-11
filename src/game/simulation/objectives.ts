@@ -36,6 +36,27 @@ export function objectiveConditionSatisfied(
   );
 }
 
+/**
+ * Slots the victory condition names outright, i.e. the units whose removal is
+ * itself the win. Wipe-out and escort conditions name nobody, so their rank
+ * and file stay ordinary even when one of them happens to be the last alive.
+ */
+export function slotsNamedByCondition(
+  condition: StageObjectiveCondition,
+  side: Side,
+): readonly number[] {
+  if (condition.type === "any-of") {
+    return condition.conditions.flatMap((candidate) => slotsNamedByCondition(candidate, side));
+  }
+  if (condition.type === "any-unit-removed") {
+    return condition.side === side ? [...condition.slots] : [];
+  }
+  if (condition.type === "unit-removed") {
+    return condition.side === side ? [condition.slot] : [];
+  }
+  return [];
+}
+
 export function battleOutcomeForObjective(
   units: readonly ObjectiveUnitIdentity[],
   objective: StageObjectiveDefinition,

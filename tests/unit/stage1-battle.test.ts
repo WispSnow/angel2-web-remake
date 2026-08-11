@@ -123,8 +123,9 @@ describe("stage 1 battle construction", () => {
     const sister = battle.unit("2:43")!;
     const fire = battle.actionRange(sister.id, "fire-1");
     const heal = battle.actionRange(sister.id, "heal-1");
-    expect(fire.valueAt(sister)).toBe(6);
-    expect(heal.valueAt(sister)).toBe(6);
+    // Native seed 5 at the caster cell; the map reaches four cells.
+    expect(fire.valueAt(sister)).toBe(5);
+    expect(heal.valueAt(sister)).toBe(5);
     expect(fire.cells()).toEqual(heal.cells());
   });
 
@@ -328,7 +329,7 @@ describe("stage 1 battle construction", () => {
     const player = battle.unit("1:0")!;
     const sister = battle.unit("2:43")!;
     player.x = sister.x;
-    player.y = sister.y + 5;
+    player.y = sister.y + 4;
 
     expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: ["castle-guard"] });
     for (const id of ["2:40", "2:41", "2:42", "2:43"]) {
@@ -350,7 +351,7 @@ describe("stage 1 battle construction", () => {
     const player = battle.unit("1:0")!;
     const sister = battle.unit("2:43")!;
     player.x = sister.x;
-    player.y = sister.y + 5;
+    player.y = sister.y + 4;
     player.actionDisabled = true;
 
     expect(battle.actionRange(sister.id, "fire-1").valueAt(player)).toBeGreaterThan(0);

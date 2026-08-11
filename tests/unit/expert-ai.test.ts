@@ -1,7 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { ArenaBattle } from "../../src/game/simulation/arena-battle";
 import { shootingLineVisitProbabilities } from "../../src/game/simulation/actions/range-map";
+import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
 import { DeterministicRng } from "../../src/game/simulation/rng";
+import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
+import type { CampaignState } from "../../src/game/types";
+
+/** Stage 19 names side-2 slot 13 as the victory target; every other enemy is rank and file. */
+const stage19Campaign: CampaignState = {
+  stageId: "stage-19",
+  ruleset: "stableRemake",
+  difficulty: 0,
+  roster: completeCampaignRoster([]),
+  rngState: 0x1234_5678,
+  rngCalls: 0,
+};
+
+const stage19Deployment = {
+  placements: [
+    ...STAGE19_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+      slot, position: { ...position }, fixed: true,
+    })),
+    ...STAGE19_DEFINITION.deployment.optionalSlots.slice(0, 9).map((slot, index) => ({
+      slot, position: { ...STAGE19_DEFINITION.deployment.openCells[index] }, fixed: false,
+    })),
+  ],
+};
 
 const placements = () => [
   { id: "ally-a", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
@@ -76,6 +101,66 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       .toContain("確定擊殺×1");
   });
 
+  /**
+   * A stage whose victory condition names no slot has no commander, so every
+   * enemy keeps trading: one of theirs for one of the player's is a bargain
+   * the AI should always take, however badly hurt it is.
+   */
+  it("takes a guaranteed kill at any life when the stage names no victory slot", () => {
+    const battle = new ArenaBattle(placements(), 0, new DeterministicRng(0x3303));
+    battle.unit("ally-b")!.life = 1;
+    battle.unit("enemy-front")!.life = 1;
+
+    expect(battle.planEnemyAiAction("enemy-front")).toMatchObject({
+      kind: "attack",
+      targetId: "ally-b",
+    });
+  });
+
+  /**
+   * The named victory target is the AI's own loss condition, so below 20% it
+   * breaks contact even with a kill in reach — that trade ends the stage.
+   * Its rank and file keep taking the same kill.
+   */
+  it("rests a named victory target below 20% life but not its rank and file", () => {
+    const battle = new Stage19Battle(stage19Campaign, stage19Deployment);
+    const commander = battle.unit("2:13");
+    const trooper = battle.unit("2:30");
+    const commanderBait = battle.unit("1:0");
+    const trooperBait = battle.unit("1:1");
+    if (!commander || !trooper || !commanderBait || !trooperBait) throw new Error("units missing");
+    commanderBait.x = 25;
+    commanderBait.y = 11;
+    commanderBait.life = 1;
+    trooperBait.x = 29;
+    trooperBait.y = 11;
+    trooperBait.life = 1;
+    commander.life = 30; // 9% of 320
+    trooper.life = 20; // 8% of 240
+
+    expect(battle.planEnemyAiAction("2:13")).toMatchObject({ kind: "rest" });
+    expect(battle.planEnemyAiAction("2:30")).toMatchObject({
+      kind: "attack",
+      targetId: "1:1",
+    });
+  });
+
+  it("keeps the named victory target fighting at or above 20% life", () => {
+    const battle = new Stage19Battle(stage19Campaign, stage19Deployment);
+    const commander = battle.unit("2:13");
+    const bait = battle.unit("1:0");
+    if (!commander || !bait) throw new Error("units missing");
+    bait.x = 25;
+    bait.y = 11;
+    bait.life = 1;
+    commander.life = 80; // 25% of 320
+
+    expect(battle.planEnemyAiAction("2:13")).toMatchObject({
+      kind: "attack",
+      targetId: "1:0",
+    });
+  });
+
   it("uses emergency healing before nonlethal damage", () => {
     const battle = new ArenaBattle(placements(), 0, new DeterministicRng(0x3302));
     battle.unit("enemy-front")!.life = 1;
@@ -141,7 +226,7 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     const battle = new ArenaBattle([
       { id: "ally-a", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
       { id: "ally-b", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
-      { id: "enemy-priest", side: 2 as const, slot: 0, classId: "magic-priest" as const, level: 2 as const, x: 27, y: 30 },
+      { id: "enemy-priest", side: 2 as const, slot: 0, classId: "magic-priest" as const, level: 2 as const, x: 26, y: 30 },
     ], 0, new DeterministicRng(0x3303));
 
     expect(battle.planEnemyAiAction("enemy-priest")).toMatchObject({

@@ -20,7 +20,7 @@ test("magic guide commits AA through the formal technique flow", async ({ page }
     arena.setLevel(1);
     const caster = arena.interact(20, 30);
     arena.setClass("soldier");
-    const ally = arena.interact(24, 30);
+    const ally = arena.interact(23, 30);
     arena.setSide(2);
     const enemy = arena.interact(30, 30);
     return [caster, ally, enemy];
@@ -37,7 +37,7 @@ test("magic guide commits AA through the formal technique flow", async ({ page }
   await expect(page.getByTestId("technique-recovery-1")).toContainText("初級回復");
   await expect(page.getByTestId("technique-attack-up")).toContainText("攻擊提昇");
   await page.getByTestId("technique-attack-up").click();
-  await clickArenaWorldCell(page, 24, 30);
+  await clickArenaWorldCell(page, 23, 30);
 
   await page.waitForFunction(() => {
     const dataset = document.querySelector<HTMLCanvasElement>(
@@ -66,7 +66,7 @@ test("magic guide commits AA through the formal technique flow", async ({ page }
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "attack-up",
     actorId: "arena-1-0",
-    target: { x: 24, y: 30 },
+    target: { x: 23, y: 30 },
     damage: 0,
     healing: 0,
     affectedUnits: [expect.objectContaining({
@@ -79,7 +79,7 @@ test("magic guide commits AA through the formal technique flow", async ({ page }
   expect(after!.lastSpecialAction!.experienceGained).toBeGreaterThanOrEqual(10);
   expect(after!.lastSpecialAction!.experienceGained).toBeLessThanOrEqual(13);
   expect(after?.rngCalls).toBe(before!.rngCalls + 1);
-  await clickArenaWorldCell(page, 24, 30);
+  await clickArenaWorldCell(page, 23, 30);
   await expect(page.getByTestId("unit-attack-stat")).toContainText("／");
   const attackReadout = await page.getByTestId("unit-attack-stat").textContent();
   const values = attackReadout?.match(/\d+/gu)?.map(Number) ?? [];
@@ -177,7 +177,7 @@ test("AA buffs an ice-frozen ally while the persistent shell stays above the eff
     arena.setSide(2);
     arena.setClass("wizard");
     arena.setLevel(1);
-    const wizard = arena.interact(23, 30);
+    const wizard = arena.interact(22, 30);
     arena.setClass("soldier");
     const escort = arena.interact(26, 30);
     return [guide, frozenTarget, wizard, escort];
@@ -261,7 +261,7 @@ test("prayer guide commits AD through the formal technique flow", async ({ page 
     arena.setLevel(1);
     const caster = arena.interact(20, 30);
     arena.setClass("soldier");
-    const ally = arena.interact(24, 30);
+    const ally = arena.interact(23, 30);
     arena.setSide(2);
     const enemy = arena.interact(30, 30);
     return [caster, ally, enemy];
@@ -278,7 +278,7 @@ test("prayer guide commits AD through the formal technique flow", async ({ page 
   await expect(page.getByTestId("technique-recovery-1")).toContainText("初級回復");
   await expect(page.getByTestId("technique-defense-up")).toContainText("防禦提昇");
   await page.getByTestId("technique-defense-up").click();
-  await clickArenaWorldCell(page, 24, 30);
+  await clickArenaWorldCell(page, 23, 30);
 
   await page.waitForFunction(() => {
     const dataset = document.querySelector<HTMLCanvasElement>(
@@ -307,7 +307,7 @@ test("prayer guide commits AD through the formal technique flow", async ({ page 
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "defense-up",
     actorId: "arena-1-0",
-    target: { x: 24, y: 30 },
+    target: { x: 23, y: 30 },
     damage: 0,
     healing: 0,
     affectedUnits: [expect.objectContaining({
@@ -320,7 +320,7 @@ test("prayer guide commits AD through the formal technique flow", async ({ page 
   expect(after!.lastSpecialAction!.experienceGained).toBeGreaterThanOrEqual(10);
   expect(after!.lastSpecialAction!.experienceGained).toBeLessThanOrEqual(13);
   expect(after?.rngCalls).toBe(before!.rngCalls + 1);
-  await clickArenaWorldCell(page, 24, 30);
+  await clickArenaWorldCell(page, 23, 30);
   await expect(page.getByTestId("unit-defense-stat")).toContainText("／");
   const defenseReadout = await page.getByTestId("unit-defense-stat").textContent();
   const values = defenseReadout?.match(/\d+/gu)?.map(Number) ?? [];
@@ -414,7 +414,7 @@ test("AD buffs an ice-frozen ally while the persistent shell stays above the shi
     arena.setSide(2);
     arena.setClass("wizard");
     arena.setLevel(1);
-    const wizard = arena.interact(23, 30);
+    const wizard = arena.interact(22, 30);
     arena.setClass("soldier");
     const escort = arena.interact(26, 30);
     return [guide, frozenTarget, wizard, escort];
