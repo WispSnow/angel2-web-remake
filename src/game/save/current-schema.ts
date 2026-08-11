@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 37 as const;
-export const SAVE_CONTENT_VERSION = "stage-15-dragon-tower-lan-1" as const;
+export const SAVE_VERSION = 38 as const;
+export const SAVE_CONTENT_VERSION = "stage-16-dragon-tower-sha-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

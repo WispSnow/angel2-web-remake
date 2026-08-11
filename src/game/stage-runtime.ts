@@ -866,6 +866,54 @@ async function loadStage15Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage16Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage16"),
+    import("./simulation/stage16-battle"),
+  ]);
+  content.activateStage16Content();
+  const definition = content.STAGE16_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 16",
+      title: content.STAGE16.name,
+      objective: content.STAGE16_DEFINITION.objective.victoryText,
+      minimap: content.STAGE16_ASSETS.minimap,
+      terrain: content.STAGE16_TERRAIN_TOKENS,
+      gridWidth: content.STAGE16.width,
+      gridHeight: content.STAGE16.height,
+      enemies: content.STAGE16_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十一名候選最多選九人。擊敗半龍戰士莎即可獲勝。",
+    },
+    ["stage-16-enter-deployment"],
+    (campaign) => battleModule.createStage16DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 16 requires a deployment result");
+    return new battleModule.Stage16Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE16_DEFINITION,
+    assets: {
+      map: content.STAGE16_ASSETS.map,
+      minimap: content.STAGE16_ASSETS.minimap,
+      unitSprites: content.STAGE16_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -1934,6 +1982,68 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage15Module,
+  },
+  "stage-16": {
+    id: "stage-16",
+    ordinal: 16,
+    label: "龍塔第三層",
+    nextStageId: "stage-17",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅攻略隊進入龍塔第三層。",
+      campaignRoute: "stage-16",
+    },
+    enemyPhaseStatusText: "敵方階段：莎的龍塔第三層守軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始龍塔第三層部署。",
+      retreatStatusText: "全面撤退：返回龍塔第三層部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "龍塔第四層",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-16-enter-deployment",
+        "stage-16-opening-story",
+        "stage-16-objective-reached",
+        "stage-16-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-16-enter-deployment",
+        "stage-16-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        maximumUnits: 10,
+        openCellCount: 9,
+      },
+      enemyClassById: [
+        ["2:37", "steel-armor-warrior"],
+        ["2:50", "archer"],
+        ["2:10", "half-dragon-warrior"],
+        ["2:49", "archer"],
+        ["2:35", "steel-armor-warrior"],
+        ["2:38", "steel-armor-warrior"],
+        ["2:51", "magician"],
+        ["2:36", "steel-armor-warrior"],
+        ["2:34", "steel-armor-warrior"],
+        ["2:43", "divine-sword-warrior"],
+        ["2:42", "divine-sword-warrior"],
+        ["2:41", "divine-sword-warrior"],
+        ["2:40", "divine-sword-warrior"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage16Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 
