@@ -20,7 +20,8 @@ const inputPaths = {
   events: reversePath("parsed/native/stage-events.json"),
   music: reversePath("parsed/native/music-catalog.json"),
   title: reversePath("parsed/dialogue/0125.json"),
-  objectiveText: reversePath("parsed/dialogue/0089.json"),
+  objectiveText: reversePath("parsed/dialogue/0109.json"),
+  storyPresentations: reversePath("parsed/native/story-presentations.json"),
   prebattleStory: reversePath("parsed/dialogue/0017.json"),
   map: reversePath("renders/battle-maps/confirmed/07.png"),
   minimap: reversePath("renders/battle-maps/minimap/07.png"),
@@ -148,8 +149,18 @@ assertEqual(generatedObjective.victory, { type: "unit-removed", side: 2, slot: 1
 assertEqual(generatedObjective.defeat, { type: "unit-removed", side: 1, slot: 0 }, "stage 7 defeat");
 const originalObjectiveText = parseInput("objectiveText").actions
   .filter(({ op }) => op === "text").map(({ text }) => text).join("");
-if (!originalObjectiveText.includes("打敗妖龍") || !originalObjectiveText.includes("「妮雅」戰敗")) {
-  throw new Error("SAY/0089 objective conflict changed");
+if (!originalObjectiveText.includes("打敗入侵的敵首領「萊莉」")
+  || !originalObjectiveText.includes("「妮雅」戰敗")) {
+  throw new Error("SAY/0109 objective wording changed");
+}
+// REMAKE-051: the victory-condition record comes from the module-29 `DS:1273`
+// stage table, not from a stage-number formula. Lock the lookup so this stage
+// cannot silently quote another stage's text again.
+const objectiveRecordEntries = parseInput("storyPresentations")
+  .globalReachabilityAudit.tables.alternate.entries
+  .filter(({ key, enabled }) => key === 7 && enabled);
+if (objectiveRecordEntries.length !== 1 || objectiveRecordEntries[0].dialogueRecord !== 109) {
+  throw new Error(`stage 7 objective record changed: ${JSON.stringify(objectiveRecordEntries)}`);
 }
 const titleText = parseInput("title").actions.filter(({ op }) => op === "text")
   .map(({ text }) => text).join("").replace(/[\t$]/gu, "").trim();

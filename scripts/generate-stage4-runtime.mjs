@@ -23,7 +23,8 @@ const inputPaths = {
   music: reversePath("parsed/native/music-catalog.json"),
   behavior12: reversePath("parsed/native/behavior12-effects.json"),
   title: reversePath("parsed/dialogue/0122.json"),
-  objectiveText: reversePath("parsed/dialogue/0086.json"),
+  objectiveText: reversePath("parsed/dialogue/0107.json"),
+  storyPresentations: reversePath("parsed/native/story-presentations.json"),
   prebattleStory: reversePath("parsed/dialogue/0007.json"),
   openingStory: reversePath("parsed/dialogue/0008.json"),
   victoryStory: reversePath("parsed/dialogue/0174.json"),
@@ -157,8 +158,18 @@ const generatedObjective = {
 assertEqual(generatedObjective.victory, { type: "unit-in-cell-range", side: 1, slot: 24, width: 50, minimum: 0, maximum: 174 }, "stage 4 victory condition");
 assertEqual(generatedObjective.defeat, { type: "any-unit-removed", side: 1, slots: [0, 24] }, "stage 4 defeat condition");
 const originalObjective = parseInput("objectiveText").actions.filter(({ op }) => op === "text").map(({ text }) => text).join("");
-if (!originalObjective.includes("打敗敵人首領「倩」") || !originalObjective.includes("「妮雅」戰敗")) {
-  throw new Error("SAY/0086 no longer contains the documented stage 4 objective conflict");
+if (!originalObjective.includes("護送「葛帝拉斯」走到長廊的頂端")
+  || !originalObjective.includes("「葛帝拉斯」戰敗")) {
+  throw new Error("SAY/0107 no longer contains the stage 4 objective text");
+}
+// REMAKE-051: the victory-condition record comes from the module-29 `DS:1273`
+// stage table, not from a stage-number formula. Lock the lookup so this stage
+// cannot silently quote another stage's text again.
+const objectiveRecordEntries = parseInput("storyPresentations")
+  .globalReachabilityAudit.tables.alternate.entries
+  .filter(({ key, enabled }) => key === 4 && enabled);
+if (objectiveRecordEntries.length !== 1 || objectiveRecordEntries[0].dialogueRecord !== 107) {
+  throw new Error(`stage 4 objective record changed: ${JSON.stringify(objectiveRecordEntries)}`);
 }
 
 const titleText = parseInput("title").actions.filter(({ op }) => op === "text").map(({ text }) => text)

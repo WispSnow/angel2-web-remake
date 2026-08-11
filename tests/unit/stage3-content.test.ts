@@ -46,7 +46,7 @@ describe("stage 3 generated content", () => {
       objective: {
         victory: { type: "unit-removed", side: 2, slot: 17 },
         defeat: { type: "any-unit-removed", side: 1, slots: [1, 3] },
-        victoryText: "打敗敵人首領「莎」",
+        victoryText: "打敗敵將領「梅蒂」",
         defeatText: "「希蜜」或「黛西」戰敗",
       },
     });
@@ -91,8 +91,8 @@ describe("stage 3 generated content", () => {
     });
     expect(STAGE3_SEMANTIC_ENEMY_UNITS.find(({ slot }) => slot === 17)).toMatchObject({
       classId: "monk",
-      name: "莎",
-      portrait: 36,
+      name: "梅蒂",
+      portrait: 16,
       position: { x: 18, y: 15 },
     });
   });

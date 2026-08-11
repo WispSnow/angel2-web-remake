@@ -94,7 +94,7 @@ describe("stage 1 generated content", () => {
       objective: {
         victory: { type: "unit-removed", side: 2, slot: 16 },
         defeat: { type: "unit-removed", side: 1, slot: 0 },
-        victoryText: "打敗敵人首領「芳」",
+        victoryText: "打敗敵將領「娜米」",
         defeatText: "「妮雅」戰敗",
       },
       music: {
@@ -182,7 +182,7 @@ describe("stage 1 generated content", () => {
       { slot: 40, classId: "soldier", name: "騎士團士兵", portrait: 48, aiBehavior: 2, position: { x: 22, y: 14 } },
       { slot: 41, classId: "soldier", name: "騎士團士兵", portrait: 48, aiBehavior: 2, position: { x: 28, y: 14 } },
       { slot: 43, classId: "sister", name: "騎士團修女", portrait: 49, aiBehavior: 2, position: { x: 23, y: 16 } },
-      { slot: 16, classId: "cavalry", name: "芳", portrait: 34, aiBehavior: 1, position: { x: 25, y: 16 } },
+      { slot: 16, classId: "cavalry", name: "娜米", portrait: 20, aiBehavior: 1, position: { x: 25, y: 16 } },
       { slot: 42, classId: "sister", name: "騎士團修女", portrait: 49, aiBehavior: 2, position: { x: 27, y: 16 } },
       { slot: 45, classId: "soldier", name: "騎士團士兵", portrait: 48, aiBehavior: 0, position: { x: 24, y: 18 } },
       { slot: 46, classId: "soldier", name: "騎士團士兵", portrait: 48, aiBehavior: 0, position: { x: 26, y: 18 } },

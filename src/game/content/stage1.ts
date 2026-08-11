@@ -8,6 +8,7 @@ import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
 import { registerStageMusicPrograms } from "./music";
 import {
+  STAGE1_BOSS,
   STAGE1_CONTENT_IDENTITY,
   STAGE1_DEPLOYMENT,
   STAGE1_DEPLOYMENT_ACTORS as STAGE1_GENERATED_DEPLOYMENT_ACTORS,
@@ -188,7 +189,11 @@ function stage1EnemyIdentity(
   slot: number,
   classId: UnitClassId,
 ): { name: string; portrait: PortraitRecord } {
-  if (slot === 16) return { name: "芳", portrait: 34 };
+  // REMAKE-051: the boss identity is generated from the machine enemy-actor table
+  // for the slot the victory handler scans; it is never hand-written here.
+  if (slot === STAGE1_BOSS.slot) {
+    return { name: STAGE1_BOSS.name, portrait: STAGE1_BOSS.portraitRecord as PortraitRecord };
+  }
   switch (classId) {
     case "soldier":
       return { name: "騎士團士兵", portrait: 48 };

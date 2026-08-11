@@ -83,8 +83,11 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   await skipStoryDialogue(page);
   await waitForPhase(page, "player");
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("打敗敵人首領「莎」");
+  // REMAKE-051: the machine victory slot is side-2 slot 17, whose enemy actor is
+  // 梅蒂. The earlier 莎 came from quoting the wrong SAY record.
+  await expect(page.getByTestId("objective-panel")).toContainText("打敗敵將領「梅蒂」");
   await expect(page.getByTestId("objective-panel")).toContainText("「希蜜」或「黛西」戰敗");
+  await expect(page.getByTestId("objective-panel")).not.toContainText("莎");
   await captureVisualAudit(page.getByTestId("objective-panel"), {
     path: `${ARTIFACT_DIR}/stage3-corrected-objective.png`,
   });
@@ -169,14 +172,20 @@ test("S03-F/G: monk recovery exposes the native menu and marks only allies insid
   }));
 });
 
-test("S03-D/E/H/I: Sha defeat plays SAY/13 once and enters stage 4", async ({ page }) => {
+test("S03-D/E/H/I: Meidi's defeat plays SAY/13 once and enters stage 4", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const commander = (await state(page)).units.find(({ side, acted }) => side === 1 && !acted);
   if (!commander) throw new Error("missing stage-3 victory commander");
   await clickUnit(page, commander.id);
   await page.getByTestId("unit-command-attack").click();
+  // The finishing blow can push Himi over a promotion threshold, and the modal
+  // only appears after the battle presentation finishes. Polling isVisible()
+  // right after the click raced the animation and left the modal waiting.
   const promotion = page.getByTestId("promotion-layer");
+  await expect(async () => {
+    expect(await promotion.isVisible() || (await state(page)).phase === "victoryStory").toBe(true);
+  }).toPass();
   if (await promotion.isVisible()) await page.getByTestId("promotion-target-cavalry").click();
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "13");

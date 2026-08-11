@@ -9,6 +9,7 @@ import { registerStageMusicPrograms } from "./music";
 import {
   STAGE2_ALLIED_ACTORS,
   STAGE2_ALLIED_UNITS,
+  STAGE2_BOSS,
   STAGE2_CONTENT_IDENTITY,
   STAGE2_DEPLOYMENT,
   STAGE2_ENEMY_UNITS,
@@ -138,12 +139,16 @@ export const STAGE2_SEMANTIC_ALLIED_UNITS = STAGE2_ALLIED_UNITS.map((unit) => {
 
 export const STAGE2_SEMANTIC_ENEMY_UNITS = STAGE2_ENEMY_UNITS.map((unit) => {
   const classId = semanticClassId(unit.nativeClassRecord);
-  const leader = unit.slot === 18;
+  // REMAKE-051: the leader identity is generated from the machine enemy-actor
+  // table for the slot the victory handler scans; it is never hand-written here.
+  const leader = unit.slot === STAGE2_BOSS.slot;
   return {
     ...unit,
     classId,
-    name: leader ? "蘭" : classId === "cavalry" ? "騎士團騎兵" : "騎士團士兵",
-    portrait: (leader ? 35 : classId === "cavalry" ? 53 : 48) as PortraitRecord,
+    name: leader ? STAGE2_BOSS.name : classId === "cavalry" ? "騎士團騎兵" : "騎士團士兵",
+    portrait: (leader
+      ? STAGE2_BOSS.portraitRecord
+      : classId === "cavalry" ? 53 : 48) as PortraitRecord,
   };
 });
 

@@ -26,7 +26,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     expect(battle.unit("1:1")).toMatchObject({ classId: "monk", name: "希蜜", x: 16, y: 36 });
     expect(battle.unit("1:3")).toMatchObject({ classId: "warrior", name: "黛西", x: 28, y: 18 });
     expect(battle.unit("1:4")).toMatchObject({ classId: "archer", name: "拉朵那", x: 18, y: 36 });
-    expect(battle.unit("2:17")).toMatchObject({ classId: "monk", name: "莎", x: 18, y: 15 });
+    expect(battle.unit("2:17")).toMatchObject({ classId: "monk", name: "梅蒂", x: 18, y: 15 });
     expect(battle.focusId).toBe("1:1");
   });
 

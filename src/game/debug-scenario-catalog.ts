@@ -95,9 +95,9 @@ export const DEBUG_SCENARIOS = [
   {
     id: "stage-01-near-victory",
     stageId: "stage-01",
-    title: "一擊擊敗芳",
+    title: "一擊擊敗娜米",
     phase: "Victory 999",
-    description: "芳只剩 1 點生命且位於妮雅身邊，攻擊一次進入傳令兵流程。",
+    description: "娜米只剩 1 點生命且位於妮雅身邊，攻擊一次進入傳令兵流程。",
     fixture: true,
   },
   {
@@ -132,9 +132,9 @@ export const DEBUG_SCENARIOS = [
   {
     id: "stage-02-near-victory",
     stageId: "stage-02",
-    title: "一擊擊敗蘭",
+    title: "一擊擊敗萊莉",
     phase: "Victory 999",
-    description: "蘭只剩 1 點生命且位於妮雅身邊，攻擊一次進入 SAY/0175。",
+    description: "萊莉只剩 1 點生命且位於妮雅身邊，攻擊一次進入 SAY/0175。",
     fixture: true,
   },
   {
@@ -169,9 +169,9 @@ export const DEBUG_SCENARIOS = [
   {
     id: "stage-03-near-victory",
     stageId: "stage-03",
-    title: "一擊擊敗莎",
+    title: "一擊擊敗梅蒂",
     phase: "Victory 999",
-    description: "莎只剩 1 點生命且位於可控主將身邊，攻擊一次進入 SAY/0013。",
+    description: "梅蒂只剩 1 點生命且位於可控主將身邊，攻擊一次進入 SAY/0013。",
     fixture: true,
   },
   {

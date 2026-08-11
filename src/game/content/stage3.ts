@@ -9,6 +9,7 @@ import { registerStageMusicPrograms } from "./music";
 import {
   STAGE3_ALLIED_ACTORS,
   STAGE3_ALLIED_UNITS,
+  STAGE3_BOSS,
   STAGE3_CONTENT_IDENTITY,
   STAGE3_DEPLOYMENT,
   STAGE3_ENEMY_UNITS,
@@ -140,7 +141,11 @@ function enemyIdentity(
   slot: number,
   classId: UnitClassId,
 ): { name: string; portrait: PortraitRecord } {
-  if (slot === 17) return { name: "莎", portrait: 36 };
+  // REMAKE-051: the boss identity is generated from the machine enemy-actor table
+  // for the slot the victory handler scans; it is never hand-written here.
+  if (slot === STAGE3_BOSS.slot) {
+    return { name: STAGE3_BOSS.name, portrait: STAGE3_BOSS.portraitRecord as PortraitRecord };
+  }
   if (classId === "sister") return { name: "騎士團修女", portrait: 49 };
   if (classId === "cavalry") return { name: "騎士團騎兵", portrait: 53 };
   return { name: "騎士團士兵", portrait: 48 };

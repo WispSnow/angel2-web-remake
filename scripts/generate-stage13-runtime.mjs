@@ -22,7 +22,8 @@ const inputPaths = {
   techniqueRules: reversePath("parsed/native/technique-rules.json"),
   title: reversePath("parsed/dialogue/0131.json"),
   nextTitle: reversePath("parsed/dialogue/0132.json"),
-  objectiveText: reversePath("parsed/dialogue/0096.json"),
+  objectiveText: reversePath("parsed/dialogue/0159.json"),
+  storyPresentations: reversePath("parsed/native/story-presentations.json"),
   prebattleStory: reversePath("parsed/dialogue/0032.json"),
   map: reversePath("renders/battle-maps/confirmed/13.png"),
   minimap: reversePath("renders/battle-maps/minimap/13.png"),
@@ -140,8 +141,18 @@ const generatedObjective = {
 const dialogueText = (id) => parseInput(id).actions.filter(({ op }) => op === "text")
   .map(({ text }) => text).join("").replace(/[\t$]/gu, "").trim();
 const originalObjectiveText = dialogueText("objectiveText");
-if (!originalObjectiveText.includes("打敗所有的敵人") || !originalObjectiveText.includes("「妮雅」戰敗")) {
-  throw new Error("SAY/0096 objective wording changed");
+if (!originalObjectiveText.includes("打敗敵人首領「瑪西爾」")
+  || !originalObjectiveText.includes("「妮雅」戰敗")) {
+  throw new Error("SAY/0159 objective wording changed");
+}
+// REMAKE-051: the victory-condition record comes from the module-29 `DS:1273`
+// stage table, not from a stage-number formula. Lock the lookup so this stage
+// cannot silently quote another stage's text again.
+const objectiveRecordEntries = parseInput("storyPresentations")
+  .globalReachabilityAudit.tables.alternate.entries
+  .filter(({ key, enabled }) => key === 13 && enabled);
+if (objectiveRecordEntries.length !== 1 || objectiveRecordEntries[0].dialogueRecord !== 159) {
+  throw new Error(`stage 13 objective record changed: ${JSON.stringify(objectiveRecordEntries)}`);
 }
 const titleText = dialogueText("title");
 const nextTitleText = dialogueText("nextTitle");

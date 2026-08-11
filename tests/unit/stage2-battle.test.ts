@@ -73,8 +73,8 @@ describe("stage 2 battle construction and allied automation", () => {
     });
     expect(battle.unit("2:18")).toMatchObject({
       classId: "cavalry",
-      name: "蘭",
-      portrait: 35,
+      name: "萊莉",
+      portrait: 19,
       x: 25,
       y: 21,
     });

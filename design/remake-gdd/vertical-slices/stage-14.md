@@ -22,7 +22,7 @@
 
 - 标题／下一标题／目标原文：[SAY/0132](../../../reverse/parsed/dialogue/0132.json)、
   [SAY/0133](../../../reverse/parsed/dialogue/0133.json)、
-  [SAY/0097](../../../reverse/parsed/dialogue/0097.json)；
+  [SAY/0083](../../../reverse/parsed/dialogue/0083.json)；
 - 地图／模板：[battle-templates.json](../../../reverse/parsed/native/battle-templates.json) 的
   stage 14 / B/0029，地图图形配对记录 B/0028；
 - 胜负与部署：[battle-objectives.json](../../../reverse/parsed/native/battle-objectives.json)、
@@ -85,8 +85,9 @@
 
 - 胜利：[OF] side 2 槽 8 芳离开棋盘；其余六名守军不必全灭；
 - 失败：[OF] side 1 槽 0 妮雅离开棋盘；失败优先；
-- 原文冲突：[OF] SAY/0097 写“叫醒沉睡中的維絲塔／妮雅战败”，但机器处理器只扫描
-  敌方槽 8；[SR] `REMAKE-047` 显示“击败芳／妮雅战败”，不实现不存在的维丝塔唤醒条件。
+- 原文与机器条件一致：[OF] `REMAKE-051` 更正取值来源后，本关原文是 `DS:1273` 键 14 的
+  SAY/0083“打敗敵人首領「芳」／「妮雅」戰敗”，与机器只扫描敌方槽 8 逐项吻合。此前
+  `REMAKE-047` 记录的“原文写叫醒維絲塔”来自误用 SAY/0097，该冲突不存在。
 
 ## 8. 回合与事件时间轴
 

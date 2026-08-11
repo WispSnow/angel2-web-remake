@@ -46,7 +46,7 @@ describe("stage 2 generated content", () => {
       objective: {
         victory: { type: "unit-removed", side: 2, slot: 18 },
         defeat: { type: "unit-removed", side: 1, slot: 0 },
-        victoryText: "打敗敵人首領「蘭」",
+        victoryText: "打敗敵人首領「萊莉」",
         defeatText: "「妮雅」戰敗",
       },
       music: {
@@ -109,7 +109,7 @@ describe("stage 2 generated content", () => {
       aiBehavior,
     }))).toEqual([
       { slot: 47, classId: "cavalry", name: "騎士團騎兵", portrait: 53, aiBehavior: 0 },
-      { slot: 18, classId: "cavalry", name: "蘭", portrait: 35, aiBehavior: 2 },
+      { slot: 18, classId: "cavalry", name: "萊莉", portrait: 19, aiBehavior: 2 },
       { slot: 46, classId: "cavalry", name: "騎士團騎兵", portrait: 53, aiBehavior: 0 },
       { slot: 51, classId: "soldier", name: "騎士團士兵", portrait: 48, aiBehavior: 2 },
       { slot: 50, classId: "soldier", name: "騎士團士兵", portrait: 48, aiBehavior: 2 },

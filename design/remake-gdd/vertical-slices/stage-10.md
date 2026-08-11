@@ -21,7 +21,7 @@
 ## 3. 证据入口
 
 - 标题/目标：[SAY/0129](../../../reverse/parsed/dialogue/0129.json)、
-  [SAY/0094](../../../reverse/parsed/dialogue/0094.json)；
+  [SAY/0111](../../../reverse/parsed/dialogue/0111.json)；
 - 地图/模板：[battle-templates.json](../../../reverse/parsed/native/battle-templates.json) 的
   stage 10 / B/0021；
 - 胜负：[battle-objectives.json](../../../reverse/parsed/native/battle-objectives.json)；
@@ -80,8 +80,9 @@
 
 - 胜利：[OF] side 2 全部离开棋盘；
 - 失败：[OF] side 1 槽 0 妮雅离开棋盘；失败优先；
-- 原文冲突：[OF] SAY/0094 写“妮雅回到瓦爾克麗城／妮雅戰敗”，但本关没有返回城堡的
-  地图目标，机器处理器只检查全灭；[SR] `REMAKE-042` 显示“击退全部追兵／妮雅战败”。
+- 原文与机器条件一致：[OF] `REMAKE-051` 更正取值来源后，本关原文是 `DS:1273` 键 10 的
+  SAY/0111“敵全滅／「妮雅」戰敗”，与机器条件逐项吻合。此前 `REMAKE-042` 记录的“原文写
+  回到瓦爾克麗城”来自误用 SAY/0094，该冲突不存在；复刻仍显示“击退全部追兵”以点明敌军身份。
 
 ## 8. 回合、结算与路由
 

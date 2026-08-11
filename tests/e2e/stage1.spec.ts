@@ -274,9 +274,11 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
 
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByText("騎兵／芳", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "34");
-  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0034\/base\.png$/u);
+  // REMAKE-051: side-2 slot 16 is the enemy actor 娜米 (portrait 20); the earlier
+  // 芳/34 came from quoting another stage's SAY record.
+  await expect(page.getByText("騎兵／娜米", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "20");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0020\/base\.png$/u);
   await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-fang-portrait.png`,
@@ -735,7 +737,7 @@ test("S01-K: enemy movement preview follows the current stage-1 AI intent", asyn
   });
 });
 
-test("S01-I: move-plus-technique and Fang pursuit reach do not wake the second army", async ({ page }) => {
+test("S01-I: move-plus-technique and Nami pursuit reach do not wake the second army", async ({ page }) => {
   await enterStage1PlayerPhase(page);
   await page.evaluate(() => window.__ANGEL2__?.forceEnemyAlertBoundarySetup());
   const setup = await state(page);

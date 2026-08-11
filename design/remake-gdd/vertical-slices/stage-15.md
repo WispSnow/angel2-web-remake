@@ -22,7 +22,7 @@
 
 - 标题／下一标题／目标原文：[SAY/0133](../../../reverse/parsed/dialogue/0133.json)、
   [SAY/0134](../../../reverse/parsed/dialogue/0134.json)、
-  [SAY/0098](../../../reverse/parsed/dialogue/0098.json)；
+  [SAY/0084](../../../reverse/parsed/dialogue/0084.json)；
 - 地图／模板：[battle-templates.json](../../../reverse/parsed/native/battle-templates.json) 的
   stage 15 / B/0031，地图图形配对记录 B/0030；
 - 胜负与部署：[battle-objectives.json](../../../reverse/parsed/native/battle-objectives.json)、
@@ -88,9 +88,9 @@
 
 - 胜利：[OF] side 2 槽 9 蘭离开棋盘；其余九名守军不必全灭；
 - 失败：[OF] side 1 槽 0 妮雅离开棋盘；失败优先；
-- 原文冲突：[OF] SAY/0098 写“打败敌将领娜米／妮雅战败”，但机器处理器只扫描敌方
-  槽 9，而 B/0031 与 SAY/0034 都把该槽识别为蘭；[SR] `REMAKE-048` 显示“击败蘭／
-  妮雅战败”，不把目标错名反向写入规则。
+- 原文与机器条件一致：[OF] `REMAKE-051` 更正取值来源后，本关原文是 `DS:1273` 键 15 的
+  SAY/0084“打敗敵人首領「蘭」／「妮雅」戰敗”，与机器只扫描敌方槽 9 逐项吻合。此前
+  `REMAKE-048` 记录的“原文错名娜米”来自误用 SAY/0098，该冲突不存在。
 
 ## 8. 回合与事件时间轴
 

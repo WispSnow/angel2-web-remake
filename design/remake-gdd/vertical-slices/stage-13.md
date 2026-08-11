@@ -21,7 +21,7 @@
 ## 3. 证据入口
 
 - 标题/目标：[SAY/0131](../../../reverse/parsed/dialogue/0131.json)、
-  [SAY/0096](../../../reverse/parsed/dialogue/0096.json)；
+  [SAY/0159](../../../reverse/parsed/dialogue/0159.json)；
 - 地图/模板：[battle-templates.json](../../../reverse/parsed/native/battle-templates.json) 的
   stage 13 / B/0027，地图图形配对记录 B/0026；
 - 胜负与部署：[battle-objectives.json](../../../reverse/parsed/native/battle-objectives.json)、
@@ -86,8 +86,9 @@
 
 - 胜利：[OF] side 2 槽 24 瑪西爾离开棋盘；其余八名守军不必全灭；
 - 失败：[OF] side 1 槽 0 妮雅离开棋盘；失败优先；
-- 原文冲突：[OF] SAY/0096 写“打败所有的敌人”，但机器处理器明确只扫描敌方槽 24；
-  [SR] `REMAKE-046` 显示“击败瑪西爾／妮雅战败”，不改变机器条件。
+- 原文与机器条件一致：[OF] `REMAKE-051` 更正取值来源后，本关原文是 `DS:1273` 键 13 的
+  SAY/0159“打敗敵人首領「瑪西爾」／「妮雅」戰敗”，与机器只扫描敌方槽 24 逐项吻合。
+  此前 `REMAKE-046` 记录的“原文写全灭”来自误用 SAY/0096，该冲突不存在。
 
 ## 8. 回合与事件时间轴
 

@@ -22,7 +22,7 @@
 ## 3. 证据入口
 
 - 标题/目标：[SAY/0130](../../../reverse/parsed/dialogue/0130.json)、
-  [SAY/0095](../../../reverse/parsed/dialogue/0095.json)；
+  [SAY/0114](../../../reverse/parsed/dialogue/0114.json)；
 - 地图/模板：[battle-templates.json](../../../reverse/parsed/native/battle-templates.json) 的
   stage 12 / B/0025；
 - 胜负与部署：[battle-objectives.json](../../../reverse/parsed/native/battle-objectives.json)、
@@ -85,8 +85,10 @@
 
 - 胜利：[OF] side 2 全部离开棋盘，包括所有水戰士分裂身体；
 - 失败：[OF] side 1 槽 0 妮雅离开棋盘；失败优先；
-- 原文冲突：[OF] SAY/0095 错写“打败攻击瓦尔克丽城的敌人”，与本关沼泽地点不符；
-  [SR] `REMAKE-043` 显示“击退全部水戰士／妮雅战败”，不改变机器胜负条件。
+- 原文与机器条件一致：[OF] `REMAKE-051` 更正取值来源后，本关原文是 `DS:1273` 键 12 的
+  SAY/0114“打敗所有敵人／「妮雅」戰敗”，与机器的全灭胜利逐项吻合。此前 `REMAKE-043`
+  记录的“原文错写攻击瓦尔克丽城”来自误用 SAY/0095，该冲突不存在；复刻仍显示“击退全部
+  水戰士”以点明敌军身份。
 
 ## 8. 回合与事件时间轴
 
