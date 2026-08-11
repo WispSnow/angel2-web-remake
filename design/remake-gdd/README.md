@@ -1,15 +1,14 @@
 # 《天使帝国 II》Web 复刻版设计文档
 
-版本：Draft 0.7
+版本：Draft 0.8
 
-日期：2026-08-10
+日期：2026-08-11
 
-阶段：第 0–14 场战斗已接受；内部第 15 关“龍塔第二層”已验证、等待试玩；stage 16 及后续内容冻结
+阶段：第 0–16 关及既有非连续战斗已接受；内部第 17 关“龍塔第四層”已验证、等待试玩；stage 18 及后续内容冻结
 
 开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关与内部第 11 关已获用户
-接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12/13 关已获
-用户接受；M25/M26 已按 `REMAKE-047` 实现并接受内部第 14 关；M27/M28 已按
-`REMAKE-048` 实现内部第 15 关，内部 stage 16 及后续运行时仍冻结
+接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–16 关已获
+用户接受；M32/M33 已按 `REMAKE-051` 实现内部第 17 关，内部 stage 18 及后续运行时仍冻结
 
 ## 文档目的
 
@@ -60,7 +59,9 @@
 | [`vertical-slices/stage-12.md`](vertical-slices/stage-12.md) | BK/10–14 坠船剧情、1–9 人沼泽部署、五个水戰士根槽、职业分裂与 stage 13 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-13.md`](vertical-slices/stage-13.md) | BK/15 突击会议、1–12 人部署、两名水戰士新成员、九名守军、瑪西爾目标与 stage 14 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-14.md`](vertical-slices/stage-14.md) | 1–10 人部署、SAY 33 开战对白、芳率七敌、首领目标、无增援与 stage 15 路由 | Draft 0.1 / 已接受 |
-| [`vertical-slices/stage-15.md`](vertical-slices/stage-15.md) | 1–10 人部署、SAY 34 开战对白、蘭率十敌、首领目标、无增援与 stage 16 路由 | Draft 0.1 / 已验证待试玩 |
+| [`vertical-slices/stage-15.md`](vertical-slices/stage-15.md) | 1–10 人部署、SAY 34 开战对白、蘭率十敌、首领目标、无增援与 stage 16 路由 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-16.md`](vertical-slices/stage-16.md) | 1–10 人部署、SAY 35 开战对白、莎率十三敌、首领目标、无增援与 stage 17 路由 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-17.md`](vertical-slices/stage-17.md) | 1–10 人部署、SAY 36 开战对白、倩率十二敌、首领目标、无增援与 stage 18 路由 | Draft 0.1 / 已验证待试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |

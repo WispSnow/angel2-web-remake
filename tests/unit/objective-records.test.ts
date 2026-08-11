@@ -151,12 +151,19 @@ const STAGES: StageUnderTest[] = [
       return { sources: m.STAGE16_SOURCES, objective: m.STAGE16_DEFINITION.objective, enemyUnits: m.STAGE16_SEMANTIC_ENEMY_UNITS };
     },
   },
+  {
+    nativeStage: 17,
+    load: async () => {
+      const m = await import("../../src/game/content/stage17");
+      return { sources: m.STAGE17_SOURCES, objective: m.STAGE17_DEFINITION.objective, enemyUnits: m.STAGE17_SEMANTIC_ENEMY_UNITS };
+    },
+  },
 ];
 
 describe("per-stage victory-condition records (REMAKE-051)", () => {
   it("resolves the module-29 objective table to the machine-confirmed records", () => {
     expect(STAGES.map(({ nativeStage }) => recordFor(objectiveRecordTable, nativeStage))).toEqual([
-      98, 172, 106, 107, 108, 160, 109, 162, 110, 111, 113, 114, 159, 83, 84, 85,
+      98, 172, 106, 107, 108, 160, 109, 162, 110, 111, 113, 114, 159, 83, 84, 85, 86,
     ]);
     // The title table is keyed the same way; stages 10 and 11 are the visible proof
     // that neither table is a stage-number formula.
