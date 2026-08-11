@@ -837,10 +837,14 @@ describe("native class implementation sequence", () => {
     attacker.y = 20;
     lineUnit.x = 22;
     lineUnit.y = 20;
-    lineUnit.life = 200;
+    // 生命上限由職業成長決定，提交時 setSharedLife 會夾回 maxLife；夾在上限內才能檢驗
+    // 「準備值即提交值」，否則超過 maxLife 的假資料會讓小額傷害被上限吃掉。
+    const lineLifeBefore = battle.statsFor(lineUnit).maxLife;
+    lineUnit.life = lineLifeBefore;
     selected.x = 23;
     selected.y = 20;
-    selected.life = 200;
+    const selectedLifeBefore = battle.statsFor(selected).maxLife;
+    selected.life = selectedLifeBefore;
     const prepared = battle.prepareSpecialAction({
       actionId: "magic-archer-shot",
       actorId: attacker.id,
@@ -855,8 +859,8 @@ describe("native class implementation sequence", () => {
     expect(targetDamage?.damage).toBeLessThanOrEqual(68);
     expect(prepared.result.effectCells.length).toBe(4);
     battle.commitPreparedAction(prepared);
-    expect(battle.unit(lineUnit.id)?.life).toBe(200 - (lineDamage?.damage ?? 0));
-    expect(battle.unit(selected.id)?.life).toBe(200 - (targetDamage?.damage ?? 0));
+    expect(battle.unit(lineUnit.id)?.life).toBe(lineLifeBefore - (lineDamage?.damage ?? 0));
+    expect(battle.unit(selected.id)?.life).toBe(selectedLifeBefore - (targetDamage?.damage ?? 0));
   });
 
   it.each([
