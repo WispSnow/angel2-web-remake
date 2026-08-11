@@ -74,6 +74,8 @@
 - [`milestones/M31-objective-record-correction.md`](milestones/M31-objective-record-correction.md)：第 1–15 关胜利条件原文取值更正；
 - [`milestones/M32-stage-17-specification.md`](milestones/M32-stage-17-specification.md)：内部第 17 关纸面合同；
 - [`milestones/M33-stage-17-implementation.md`](milestones/M33-stage-17-implementation.md)：内部第 17 关有界实现；
+- [`milestones/M34-stage-18-specification.md`](milestones/M34-stage-18-specification.md)：内部第 18 关纸面合同；
+- [`milestones/M35-stage-18-implementation.md`](milestones/M35-stage-18-implementation.md)：内部第 18 关有界实现；
 - [`work-items/M00-native-side-panel-hotspots.md`](work-items/M00-native-side-panel-hotspots.md)：原版右栏战术桌 12 个鼠标热点的实现顺序与验收边界。
 
 ## 维护规则

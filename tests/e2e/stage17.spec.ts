@@ -171,7 +171,7 @@ test("S17-D/E: the machine objective defeats Qian without requiring the other el
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
 });
 
-test("S17-F/G: defeat retries deployment and completion freezes at Dragon Tower Floor Five", async ({ page }) => {
+test("S17-F/G: defeat retries deployment and completion enters Dragon Tower Floor Five", async ({ page }) => {
   await page.goto("/?debugScenario=stage-17-near-defeat&difficulty=0&test=1");
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
@@ -188,7 +188,8 @@ test("S17-F/G: defeat retries deployment and completion freezes at Dragon Tower 
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
+  await expect(page.getByRole("heading", { name: "龍塔第五層 · 出擊準備" })).toBeVisible();
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -215,9 +216,10 @@ test("S17-F/G: defeat retries deployment and completion freezes at Dragon Tower 
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-17",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-18",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-18",
+    consumedEventIds: ["stage-18-enter-deployment"],
   });
 });

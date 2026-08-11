@@ -43,7 +43,8 @@ export type StageStoryId =
   | "stage-14-opening-story"
   | "stage-15-opening-story"
   | "stage-16-opening-story"
-  | "stage-17-opening-story";
+  | "stage-17-opening-story"
+  | "stage-18-opening-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -92,7 +93,9 @@ export type StageMusicId =
   | "stage-16-player-phase-music"
   | "stage-16-enemy-phase-music"
   | "stage-17-player-phase-music"
-  | "stage-17-enemy-phase-music";
+  | "stage-17-enemy-phase-music"
+  | "stage-18-player-phase-music"
+  | "stage-18-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -192,7 +195,11 @@ export type StageEventId =
   | "stage-17-enter-deployment"
   | "stage-17-opening-story"
   | "stage-17-objective-reached"
-  | "stage-17-completed-route";
+  | "stage-17-completed-route"
+  | "stage-18-enter-deployment"
+  | "stage-18-opening-story"
+  | "stage-18-objective-reached"
+  | "stage-18-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -254,7 +261,10 @@ export type StageSimulationEffectId =
   | "stage-16-route-to-stage-17"
   | "stage-17-enter-deployment"
   | "stage-17-set-victory-999"
-  | "stage-17-route-to-stage-18";
+  | "stage-17-route-to-stage-18"
+  | "stage-18-enter-deployment"
+  | "stage-18-set-victory-999"
+  | "stage-18-route-to-stage-19";
 
 export type StagePresentationId =
   | "none"

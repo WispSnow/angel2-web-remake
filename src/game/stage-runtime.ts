@@ -962,6 +962,54 @@ async function loadStage17Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage18Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage18"),
+    import("./simulation/stage18-battle"),
+  ]);
+  content.activateStage18Content();
+  const definition = content.STAGE18_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 18",
+      title: content.STAGE18.name,
+      objective: content.STAGE18_DEFINITION.objective.victoryText,
+      minimap: content.STAGE18_ASSETS.minimap,
+      terrain: content.STAGE18_TERRAIN_TOKENS,
+      gridWidth: content.STAGE18.width,
+      gridHeight: content.STAGE18.height,
+      enemies: content.STAGE18_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十一名候選最多選七人。擊敗半龍戰士麗即可獲勝。",
+    },
+    ["stage-18-enter-deployment"],
+    (campaign) => battleModule.createStage18DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 18 requires a deployment result");
+    return new battleModule.Stage18Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE18_DEFINITION,
+    assets: {
+      map: content.STAGE18_ASSETS.map,
+      minimap: content.STAGE18_ASSETS.minimap,
+      unitSprites: content.STAGE18_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -2153,6 +2201,71 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage17Module,
+  },
+  "stage-18": {
+    id: "stage-18",
+    ordinal: 18,
+    label: "龍塔第五層",
+    nextStageId: "stage-19",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅攻略隊進入龍塔第五層。",
+      campaignRoute: "stage-18",
+    },
+    enemyPhaseStatusText: "敵方階段：麗的龍塔第五層守軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始龍塔第五層部署。",
+      retreatStatusText: "全面撤退：返回龍塔第五層部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "龍塔第六層",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-18-enter-deployment",
+        "stage-18-opening-story",
+        "stage-18-objective-reached",
+        "stage-18-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-18-enter-deployment",
+        "stage-18-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        maximumUnits: 8,
+        openCellCount: 7,
+      },
+      enemyClassById: [
+        ["2:39", "monk"],
+        ["2:12", "half-dragon-warrior"],
+        ["2:30", "archer"],
+        ["2:31", "magic-archer"],
+        ["2:32", "archer"],
+        ["2:35", "archer"],
+        ["2:36", "crossbow"],
+        ["2:37", "archer"],
+        ["2:34", "steel-armor-warrior"],
+        ["2:33", "steel-armor-warrior"],
+        ["2:46", "divine-sword-warrior"],
+        ["2:47", "divine-sword-warrior"],
+        ["2:48", "divine-sword-warrior"],
+        ["2:51", "divine-sword-warrior"],
+        ["2:52", "divine-sword-warrior"],
+        ["2:53", "divine-sword-warrior"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage18Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 
