@@ -1576,6 +1576,12 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-03-prebattle": createStage3Opening,
   "stage-03-preparation": createStage3Opening,
   "stage-03-player": createStage3Player,
+  "stage-03-himi-defeat": withSetup(createStage3Player, (controller) => {
+    controller.forceDefeatForTest(0);
+  }),
+  "stage-03-daisy-defeat": withSetup(createStage3Player, (controller) => {
+    controller.forceDefeatForTest(1);
+  }),
   "stage-03-near-victory": withSetup(createStage3Player, (controller) => {
     controller.forceVictorySetupForTest();
   }),

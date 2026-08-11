@@ -4404,16 +4404,17 @@ export class GameController {
     this.emit();
   }
 
-  forceDefeatForTest(): void {
+  forceDefeatForTest(targetIndex = 0): void {
     if (!this.debugMode) return;
     const defeat = atomicObjectiveConditions(this.battle.stage.objective.defeat)
       .find(({ type }) => type === "unit-removed" || type === "any-unit-removed");
     if (!defeat || (defeat.type !== "unit-removed" && defeat.type !== "any-unit-removed")) return;
     const slot = defeat.type === "unit-removed"
       ? defeat.slot
-      : defeat.slots[0];
+      : defeat.slots[targetIndex];
+    if (slot === undefined) return;
     const target = this.battle.units.find(
-      (unit) => unit.side === defeat.side && (slot === undefined || unit.slot === slot),
+      (unit) => unit.side === defeat.side && unit.slot === slot,
     );
     if (!target) return;
     this.battle.units = this.battle.units.filter((unit) => unit.id !== target.id);

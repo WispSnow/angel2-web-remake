@@ -210,13 +210,20 @@ test("S03-D/E/H/I: Meidi's defeat plays SAY/13 once and enters stage 4", async (
   });
 });
 
-test("S03-E: either protected commander triggers defeat", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await page.evaluate(() => window.__ANGEL2__?.forceDefeat());
-  await waitForPhase(page, "defeat");
-  await expect(page.locator("#status-strip")).toHaveText("「希蜜」或「黛西」戰敗");
-  await expect(page.getByTestId("feedback-text")).toContainText("竟然失敗了");
+test("S03-F: debug fixtures prove that either protected commander triggers defeat", async ({ page }) => {
+  for (const [scenarioId, removedId, survivingId] of [
+    ["stage-03-himi-defeat", "1:1", "1:3"],
+    ["stage-03-daisy-defeat", "1:3", "1:1"],
+  ] as const) {
+    await page.goto(`/?debugScenario=${scenarioId}&difficulty=0&test=1`);
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    await waitForPhase(page, "defeat");
+    const current = await state(page);
+    expect(current.units.some(({ id }) => id === removedId)).toBe(false);
+    expect(current.units.some(({ id }) => id === survivingId)).toBe(true);
+    await expect(page.locator("#status-strip")).toHaveText("「希蜜」或「黛西」戰敗");
+    await expect(page.getByTestId("feedback-text")).toContainText("竟然失敗了");
+  }
 });
 
 test("stage 3 group commands use Himi as the fixed commander while Nia is absent", async ({ page }) => {

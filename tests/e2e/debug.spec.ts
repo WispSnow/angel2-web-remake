@@ -61,6 +61,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
       Math.round(card.getBoundingClientRect().top))).size));
   expect(Math.max(...scenarioRows)).toBeLessThanOrEqual(2);
   for (const scenarioId of [
+    "stage-03-himi-defeat",
+    "stage-03-daisy-defeat",
     "stage-07-prebattle",
     "stage-07-deployment",
     "stage-07-player",
@@ -137,6 +139,11 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
+  await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
+  await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");
+  await captureVisualAudit(page.locator('[data-debug-stage-id="stage-03"]'), {
+    path: `${ARTIFACT_DIR}/debug-stage3-dual-defeat-fixtures.png`,
+  });
   const prebattleCard = page.getByTestId("debug-scenario-stage-00-prebattle");
   await expect(prebattleCard.locator(".debug-scenario-title")).toHaveText("關前劇情");
   await expect(prebattleCard.getByText("進入場景", { exact: true })).toHaveCount(0);

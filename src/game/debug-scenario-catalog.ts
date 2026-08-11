@@ -167,6 +167,22 @@ export const DEBUG_SCENARIOS = [
     description: "跳過開場敘事，直接驗證希蜜軍團與第四軍團的手動／自動分工。",
   },
   {
+    id: "stage-03-himi-defeat",
+    stageId: "stage-03",
+    title: "希蜜戰敗",
+    phase: "Defeat slot 1",
+    description: "直接移除救援主將希蜜，驗證本關第一個特殊保護目標與戰敗回饋。",
+    fixture: true,
+  },
+  {
+    id: "stage-03-daisy-defeat",
+    stageId: "stage-03",
+    title: "黛西戰敗",
+    phase: "Defeat slot 3",
+    description: "直接移除第四軍團領隊黛西，驗證自動友軍同樣是本關特殊保護目標。",
+    fixture: true,
+  },
+  {
     id: "stage-03-near-victory",
     stageId: "stage-03",
     title: "一擊擊敗梅蒂",
