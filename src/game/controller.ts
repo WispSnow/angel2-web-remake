@@ -515,7 +515,13 @@ export class GameController {
     return this.stageRuntime.mapPresentationActionIds;
   }
 
-  get routePulseGuidance(): string | undefined {
+  /**
+   * The same deployment guidance the preparation screen shows, republished in
+   * the in-battle objective panel so the player can re-read it after the
+   * deployment surface is gone. It is stage-generic guidance, not force-field
+   * state; only stage 4 happens to describe a force field in its own text.
+   */
+  get deploymentGuidance(): string | undefined {
     return this.stageRuntime.preparation?.presentation.guidanceText;
   }
 

@@ -194,6 +194,11 @@ test("S13-D/E: the corrected objective defeats Marsiel without requiring the oth
   await expect(page.getByTestId("objective-panel")).toContainText("擊敗「瑪西爾」");
   await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
   await expect(page.getByTestId("objective-panel")).not.toContainText("打敗所有的敵人");
+  // The guidance line republishes the deployment hint, so its heading must stay
+  // stage-generic; stage 4's force field is the only stage that owns one.
+  await expect(page.getByTestId("objective-guidance")).toContainText("擊敗神劍戰士瑪西爾");
+  await expect(page.getByTestId("objective-panel")).toContainText("出擊提示");
+  await expect(page.getByTestId("objective-panel")).not.toContainText("力場提示");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage13-objective-and-map.png`,
   });
