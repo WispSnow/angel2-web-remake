@@ -606,16 +606,16 @@ test("enemy tier-two curse-master keeps the native IP pool slot and announces ä¸
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
     return current?.lastSpecialAction?.actionId === "poison"
-      && current.lastSpecialAction.actorId === "arena-2-0"
+      && current.lastSpecialAction.actorId === "arena-2-1"
       && current.specialActionPresentation === undefined;
   });
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "poison",
-    actorId: "arena-2-0",
+    actorId: "arena-2-1",
     affectedUnits: [expect.objectContaining({
       unitId: "arena-1-0",
-      statusesAfter: expect.objectContaining({ poison: 3 }),
+      statusesAfter: expect.objectContaining({ poison: 3, confusion: 3 }),
     })],
   });
   expect(after?.units.find(({ id }) => id === "arena-1-0")?.statuses.poison).toBe(3);

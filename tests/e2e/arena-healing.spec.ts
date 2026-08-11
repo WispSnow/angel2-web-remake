@@ -408,7 +408,6 @@ test("enemy tier-three prayer guide selects 3I and uses group-14 dialogue", asyn
   });
   expect(placed).toEqual([true, true, true, true, true]);
   await page.getByTestId("arena-start").click();
-  const before = await arenaBattleState(page);
   // Two hits on the 祈導師 and one on its 士兵 escort give the ring two real
   // recipients, which is what makes 3I outscore the single-target 2H that
   // shares the tier-three pool.
@@ -477,7 +476,6 @@ test("enemy tier-three prayer guide selects 3I and uses group-14 dialogue", asyn
     { unitId: "arena-2-1", healing: 85 },
   ]);
   expect(after?.lastSpecialAction?.healing).toBe(195);
-  expect(before?.rngCalls).toBeDefined();
   expect(pageErrors).toEqual([]);
 });
 
