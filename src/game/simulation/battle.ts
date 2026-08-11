@@ -8,6 +8,7 @@ import {
   ordinaryHitStatusFor,
   suppressesOrdinaryCounterFor,
   terrainDefensePercentFor,
+  usesEmpressOrDragonAi,
 } from "../content/classes";
 import {
   BATTLE_ACTION_DEFINITIONS,
@@ -1617,6 +1618,10 @@ export class Stage0Battle {
       targetFilter?: (target: BattleUnit) => boolean;
     },
   ): AlliedAiAction {
+    if (usesEmpressOrDragonAi(unit.classId)) {
+      const banded = this.planEmpressOrDragonLifeBand(unit, options);
+      if (banded) return banded;
+    }
     const positionFilter = allowMove
       ? undefined
       : (position: Position) => positionKey(position) === positionKey(unit);
@@ -1663,6 +1668,86 @@ export class Stage0Battle {
     }
     this.recordExpertDecision(unit, candidates, selected);
     return selected;
+  }
+
+  /**
+   * Native `1000:2233` life bands as reached from the `0P/1P` dispatcher.
+   * Below 20% the original always rests, so the shared expert kill/save
+   * override must not run here. The 20..39% branch is the one native case
+   * where this class both moves and acts: `1000:2233` answers a successful
+   * `1000:1D67` retreat with `M`, and `1000:1A68` reacts to that code by
+   * running the technique chain again from the cell just retreated to.
+   * Returns undefined at 40% and above so the shared expert flow continues.
+   */
+  private planEmpressOrDragonLifeBand(
+    unit: BattleUnit,
+    options: {
+      behavior: number;
+      targetFilter?: (target: BattleUnit) => boolean;
+    },
+  ): AlliedAiAction | undefined {
+    const lifePercent = Math.floor(unit.life * 100 / this.statsFor(unit).maxLife);
+    if (lifePercent >= 40) return undefined;
+    const rest: AlliedAiAction = {
+      unitId: unit.id,
+      kind: "rest",
+      path: [{ x: unit.x, y: unit.y }],
+    };
+    const retreat = lifePercent >= 20
+      && options.behavior !== 1
+      && this.hasAdjacentOpponent(unit)
+      ? this.defensiveRetreatPath(unit)
+      : undefined;
+    if (!retreat) {
+      this.recordExpertDecision(unit, [rest], rest);
+      return rest;
+    }
+    const selected = this.planClassAction(unit, undefined, {
+      expertRanking: true,
+      casterPosition: retreat.at(-1),
+      targetFilter: (target) => target.side === unit.side
+        || (options.targetFilter?.(target) ?? true),
+    }) ?? { unitId: unit.id, kind: "move", path: retreat };
+    this.recordExpertDecision(unit, [selected], selected);
+    return selected;
+  }
+
+  /** Native `1070:0583`: an orthogonal neighbour holding an opposing unit. */
+  private hasAdjacentOpponent(unit: BattleUnit): boolean {
+    return neighbors(unit, this.dynamicBattlefield).some((cell) =>
+      this.units.some((candidate) => candidate.side !== unit.side
+        && candidate.x === cell.x && candidate.y === cell.y));
+  }
+
+  /**
+   * Native `1000:1D67` with the `1000:0CF0` candidate rule: an empty cell in
+   * the movement range with no orthogonal opponent, highest terrain defense,
+   * later scan cell on a tie. The actor's own cell is never a candidate
+   * because the native scan requires an empty side-map byte, so a successful
+   * retreat always relocates.
+   */
+  private defensiveRetreatPath(unit: BattleUnit): Position[] | undefined {
+    const occupied = new Set(this.units.filter(({ id }) => id !== unit.id).map(positionKey));
+    let destination: Position | undefined;
+    let bestDefense = -1;
+    const candidates = reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
+      .filter((position) => positionKey(position) !== positionKey(unit)
+        && !occupied.has(positionKey(position)))
+      .sort((left, right) => left.y * this.stage.width + left.x
+        - (right.y * this.stage.width + right.x));
+    for (const candidate of candidates) {
+      if (neighbors(candidate, this.dynamicBattlefield).some((cell) =>
+        this.units.some((other) => other.side !== unit.side
+          && other.x === cell.x && other.y === cell.y))) continue;
+      const defense = terrainDefensePercentFor(unit.classId, this.terrainSlotAt(candidate));
+      if (defense >= bestDefense) {
+        destination = candidate;
+        bestDefense = defense;
+      }
+    }
+    if (!destination) return undefined;
+    const path = this.movementPath(unit.id, destination);
+    return path.length > 1 ? path : undefined;
   }
 
   private onlyIceCapableSideRemains(side: BattleUnit["side"]): boolean {
@@ -2019,7 +2104,7 @@ export class Stage0Battle {
       const positions = (actionId === "archer-shot" || actionId === "crossbow-shot"
         || actionId === "magic-archer-shot"
         ? reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
-        : [{ x: unit.x, y: unit.y }])
+        : [options.casterPosition ?? { x: unit.x, y: unit.y }])
         .filter((position) => !occupied.has(positionKey(position))
           && (options.positionFilter?.(position) ?? true));
       const candidates: Array<{

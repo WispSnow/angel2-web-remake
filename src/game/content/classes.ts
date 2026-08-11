@@ -65,6 +65,15 @@ export function className(classId: ClassId): string {
 }
 
 /**
+ * `0P/1P` are the only classes the native dispatcher sends to `1000:1A68`.
+ * That routine owns a WD-only skill pool and its own life bands, including
+ * the one native case where a class both retreats and still casts.
+ */
+export function usesEmpressOrDragonAi(classId: ClassId): boolean {
+  return classDefinition(classId).aiClassDispatch.side2 === "empressOrDragonTechnique";
+}
+
+/**
  * The native generic fallback table is side-1 data. These records are the
  * corresponding side-2 portrait variants where the original asset exists.
  * Native table C deliberately reuses records 51 (0N/水戰士) and 64

@@ -24,6 +24,12 @@ export interface ClassActionPlanningOptions {
   modernRanking?: boolean;
   /** Compares every legal action/target pair with the shared expert utility. */
   expertRanking?: boolean;
+  /**
+   * Plans a non-shooting action as if the actor already stood here. Only the
+   * native `0P/1P` retreat-then-cast branch needs it; every other technique
+   * entry keeps casting from the actor's current cell.
+   */
+  casterPosition?: Position;
   actionFilter?: (actionId: BattleActionId) => boolean;
   targetFilter?: (target: BattleUnit) => boolean;
   positionFilter?: (position: Position) => boolean;

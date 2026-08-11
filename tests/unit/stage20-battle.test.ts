@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BATTLE_ACTION_DEFINITIONS } from "../../src/game/content/actions";
 import {
   STAGE20_DEFINITION,
   STAGE20_SEMANTIC_DRAGON,
@@ -47,6 +48,12 @@ function replaceTableauWithDragon(battle: Stage20Battle): void {
   battle.appendStoryUnits([dragon], [{ sourceUnitId: "2:55", derivedUnitId: dragon.id }]);
 }
 
+function keepAllies(battle: Stage20Battle, keptSlots: readonly number[]): void {
+  battle.removeStoryUnits(battle.units
+    .filter(({ side, slot }) => side === 1 && !keptSlots.includes(slot))
+    .map(({ slot }) => ({ side: 1 as const, slot })));
+}
+
 describe("stage 20 battle", () => {
   it("builds three fixed allies, fourteen optional allies, and the 16-unit narrative tableau", () => {
     const state = campaign();
@@ -81,6 +88,83 @@ describe("stage 20 battle", () => {
       kind: "special",
       actionId: "wd",
     });
+  });
+
+  /**
+   * The native `1000:1A68` dispatcher never reaches the ordinary attack
+   * selector, so melee is a stableRemake improvement rather than an original
+   * behavior. It stays available because a lone adjacent ally is a kill the
+   * 90-per-cell WD path cannot reach; the expert kill band decides, and only
+   * the life bands below may override it.
+   */
+  it("prefers a melee kill over a WD cast that cannot kill", () => {
+    const battle = new Stage20Battle(campaign(), fullDeployment());
+    replaceTableauWithDragon(battle);
+    keepAllies(battle, [0]);
+    const nia = battle.unit("1:0");
+    if (!nia) throw new Error("nia missing");
+    nia.x = 29;
+    nia.y = 17;
+
+    expect(nia.life).toBeGreaterThan(BATTLE_ACTION_DEFINITIONS.wd.damage.perEligibleLineCell);
+    expect(battle.planEnemyAiAction("2:28")).toMatchObject({
+      kind: "attack",
+      targetId: "1:0",
+      path: [{ x: 29, y: 16 }],
+    });
+  });
+
+  it("rests below 20% life even when a melee kill is available", () => {
+    const battle = new Stage20Battle(campaign(), fullDeployment());
+    replaceTableauWithDragon(battle);
+    keepAllies(battle, [0]);
+    const nia = battle.unit("1:0");
+    const dragon = battle.unit("2:28");
+    if (!nia || !dragon) throw new Error("units missing");
+    nia.x = 29;
+    nia.y = 17;
+    nia.life = 40;
+    dragon.life = 400; // 16% of 2,400
+
+    expect(battle.planEnemyAiAction("2:28")).toMatchObject({
+      kind: "rest",
+      path: [{ x: 29, y: 16 }],
+    });
+  });
+
+  /**
+   * `1000:2233` answers a successful `1000:1D67` retreat with `M`, and only
+   * the `0P/1P` dispatcher reacts to that code by running the technique chain
+   * again — from the cell it just retreated to.
+   */
+  it("retreats out of contact and still casts WD between 20% and 39% life", () => {
+    const battle = new Stage20Battle(campaign(), fullDeployment());
+    replaceTableauWithDragon(battle);
+    keepAllies(battle, [0]);
+    const nia = battle.unit("1:0");
+    const dragon = battle.unit("2:28");
+    if (!nia || !dragon) throw new Error("units missing");
+    nia.x = 29;
+    nia.y = 17;
+    dragon.life = 720; // 30% of 2,400
+
+    const action = battle.planEnemyAiAction("2:28");
+    expect(action).toMatchObject({ kind: "special", actionId: "wd", targetId: "1:0" });
+    const destination = action?.path.at(-1);
+    expect(destination).not.toEqual({ x: 29, y: 16 });
+    expect(battle.units.some((unit) => unit.side === 1
+      && Math.abs(unit.x - (destination?.x ?? 0)) + Math.abs(unit.y - (destination?.y ?? 0)) === 1))
+      .toBe(false);
+  });
+
+  it("rests between 20% and 39% life when no opponent is adjacent", () => {
+    const battle = new Stage20Battle(campaign(), fullDeployment());
+    replaceTableauWithDragon(battle);
+    const dragon = battle.unit("2:28");
+    if (!dragon) throw new Error("dragon missing");
+    dragon.life = 720;
+
+    expect(battle.planEnemyAiAction("2:28")).toMatchObject({ kind: "rest" });
   });
 
   it("rebuilds the dragon force membership before validating a restored player save", () => {
