@@ -1,4 +1,4 @@
-import { STAGE0 } from "./content/stage0";
+import { STAGE0, initialEnemyExperience } from "./content/stage0";
 import {
   cameraFocusForOrigin,
   cameraOriginForFocus,
@@ -167,6 +167,8 @@ export type SpecialActionPresentationPhase =
   | "shootHit"
   | "shootLineGrow"
   | "shootLineFinish"
+  | "wdGrowth"
+  | "wdFinish"
   | "fireEffect"
   | "healPrimary"
   | "healBlank"
@@ -1254,12 +1256,23 @@ export class GameController {
     const campaignRoster = this.battle.campaignSnapshot().roster;
     const units = definition.actors.map((actor): BattleUnit => {
       const sourceUnit = this.battle.unit(`${actor.source.side}:${actor.source.slot}`);
-      const rosterEntry = campaignRoster.find(({ slot }) => slot === actor.source.slot);
+      // Campaign roster slots describe side 1 only. Looking them up for a side-2
+      // reinforcement can collide with an unrelated ally that shares the same
+      // numeric slot (Stage 20's dragon slot 28 otherwise inherited 160 life).
+      const rosterEntry = actor.source.side === 1
+        ? campaignRoster.find(({ slot }) => slot === actor.source.slot)
+        : undefined;
       const classId = actor.forcedClassId
         ?? sourceUnit?.classId
         ?? rosterEntry?.classId
         ?? "soldier";
-      const experience = sourceUnit?.experience ?? rosterEntry?.experience ?? 0;
+      const experience = actor.forcedExperience
+        ?? (actor.forcedClassId && actor.source.side === 2
+          ? initialEnemyExperience(actor.forcedClassId, this.battle.difficulty)
+          : undefined)
+        ?? sourceUnit?.experience
+        ?? rosterEntry?.experience
+        ?? 0;
       const unit: BattleUnit = {
         id: actor.id,
         side: actor.source.side,
@@ -1284,8 +1297,11 @@ export class GameController {
 
     this.phase = "scriptedMove";
     this.statusMessage = definition.statusText;
+    const forceInheritance = definition.actors.flatMap((actor) => actor.forceSourceId
+      ? [{ sourceUnitId: actor.forceSourceId, derivedUnitId: actor.id }]
+      : []);
     if (this.skippingScriptedSequence) {
-      this.battle.appendStoryUnits(units);
+      this.battle.appendStoryUnits(units, forceInheritance);
       const finalUnit = units.at(-1);
       if (finalUnit) {
         this.battle.focusId = finalUnit.id;
@@ -1296,6 +1312,19 @@ export class GameController {
     }
 
     this.busy = true;
+    if (definition.revealTiming === "after-write") {
+      this.battle.appendStoryUnits(units, forceInheritance);
+      const finalUnit = units.at(-1);
+      if (finalUnit) {
+        this.battle.focusId = finalUnit.id;
+        this.cursor = { x: finalUnit.x, y: finalUnit.y };
+        this.centerCamera(finalUnit);
+      }
+      this.emit();
+      await pause(this.mapCombatDelay(3));
+      this.busy = false;
+      return;
+    }
     for (const unit of units) {
       // Native 1000:533E focuses/redraws before writing each cell. That means
       // the next focus reveals the previous reinforcement rather than the
@@ -1304,7 +1333,10 @@ export class GameController {
       this.centerCamera(unit);
       this.emit();
       await pause(this.mapCombatDelay(3));
-      this.battle.appendStoryUnits([unit]);
+      this.battle.appendStoryUnits(
+        [unit],
+        forceInheritance.filter(({ derivedUnitId }) => derivedUnitId === unit.id),
+      );
     }
     const finalUnit = units.at(-1);
     if (finalUnit) {
@@ -2111,6 +2143,26 @@ export class GameController {
       }
       for (let frame = 0; frame < 8; frame += 1) {
         await present("shootLineFinish", frame, 20);
+      }
+    } else if (result.actionId === "wd") {
+      const wd = actionPresentationCatalog().wd;
+      for (let step = 0; step < result.effectCells.length; step += 1) {
+        const cell = result.effectCells[result.effectCells.length - step - 1];
+        if (cell) {
+          const affected = result.affectedUnits.find(({ positionBefore }) =>
+            positionBefore.x === cell.position.x && positionBefore.y === cell.position.y);
+          if (affected) displayedLifeByUnitId[affected.unitId] = affected.lifeAfter;
+        }
+        await present(
+          "wdGrowth",
+          step,
+          wd.waitPerGrowthOrFinishStepNativeTicks,
+          result.affectedUnits.find(({ positionBefore }) =>
+            positionBefore.x === cell?.position.x && positionBefore.y === cell?.position.y)?.unitId,
+        );
+      }
+      for (let frame = 0; frame < wd.finishSteps; frame += 1) {
+        await present("wdFinish", frame, wd.waitPerGrowthOrFinishStepNativeTicks);
       }
     } else if (result.actionId === "fire-1"
       || result.actionId === "fire-2"

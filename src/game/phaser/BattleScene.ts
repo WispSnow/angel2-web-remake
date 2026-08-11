@@ -133,6 +133,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     "stomp-1",
     "stomp-2",
     "stomp-3",
+    "wd",
   ] as const)
     .some((actionId) => presentationActionIds.has(actionId));
   const stageAssets = controller.currentStageAssets;
@@ -306,6 +307,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           presentationAssets.stomp3.side2.forEach((source, frame) =>
             this.load.image(`map-stomp-3-side2-${frame}`, source));
         }
+        if (presentationActionIds.has("wd")) presentationAssets.wd.effect.forEach((source, frame) =>
+          this.load.image(`map-wd-${frame}`, source));
       }
       for (const presentation of stageAssets?.routePulsePresentations ?? []) {
         presentation.frames.forEach((source, frame) =>
@@ -1184,6 +1187,24 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
                 cell.position.x * TILE_WIDTH + TILE_WIDTH / 2,
                 cell.position.y * TILE_HEIGHT + TILE_HEIGHT,
                 `map-shoot-${frame}`,
+              ).setOrigin(.5, 1).setDepth(8),
+            );
+          }
+        }
+        else if (special.phase === "wdGrowth" || special.phase === "wdFinish") {
+          const path = special.result.effectCells;
+          const visible = special.phase === "wdGrowth"
+            ? path.slice(Math.max(0, path.length - special.frame - 1))
+            : path;
+          for (const [visibleIndex, cell] of visible.entries()) {
+            const frame = special.phase === "wdGrowth"
+              ? Math.min(9, visible.length - visibleIndex - 1)
+              : Math.min(9, special.frame);
+            this.combatEffects.push(
+              this.add.image(
+                cell.position.x * TILE_WIDTH + TILE_WIDTH / 2,
+                cell.position.y * TILE_HEIGHT + TILE_HEIGHT,
+                `map-wd-${frame}`,
               ).setOrigin(.5, 1).setDepth(8),
             );
           }

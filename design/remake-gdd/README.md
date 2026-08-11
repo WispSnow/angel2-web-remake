@@ -4,11 +4,11 @@
 
 日期：2026-08-11
 
-阶段：第 0–18 关及既有非连续战斗已接受；内部第 19 关“龍塔第六層”已验证、等待试玩；stage 20 及后续内容冻结
+阶段：第 0–19 关及既有非连续战斗已接受；内部第 20 关“龍塔頂部”已验证、等待试玩；stage 21 及后续内容冻结
 
 开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关与内部第 11 关已获用户
-接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–18 关已获
-用户接受；M36/M37 已按 `REMAKE-051` 实现内部第 19 关，内部 stage 20 及后续运行时仍冻结
+接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–19 关已获
+用户接受；M38/M39 已按 `REMAKE-052` 实现内部第 20 关，内部 stage 21 及后续运行时仍冻结
 
 ## 文档目的
 
@@ -63,7 +63,8 @@
 | [`vertical-slices/stage-16.md`](vertical-slices/stage-16.md) | 1–10 人部署、SAY 35 开战对白、莎率十三敌、首领目标、无增援与 stage 17 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-17.md`](vertical-slices/stage-17.md) | 1–10 人部署、SAY 36 开战对白、倩率十二敌、首领目标、无增援与 stage 18 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-18.md`](vertical-slices/stage-18.md) | 1–8 人部署、SAY 37 开战对白、麗率十六敌、首领目标、无增援与 stage 19 路由 | Draft 0.1 / 已接受 |
-| [`vertical-slices/stage-19.md`](vertical-slices/stage-19.md) | 1–10 人部署、SAY 38 愛／蘇蘭達双窗对白、愛率二十一敌、首领目标、无增援与 stage 20 路由 | Draft 0.1 / 已验证待试玩 |
+| [`vertical-slices/stage-19.md`](vertical-slices/stage-19.md) | 1–10 人部署、SAY 38 愛／蘇蘭達双窗对白、愛率二十一敌、首领目标、无增援与 stage 20 路由 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-20.md`](vertical-slices/stage-20.md) | 3–17 人部署、十六人叙事阵形替换、妖龍／WD、琴斯与龍王胜利链及 stage 21 路由 | Draft 0.1 / 已验证待试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
@@ -76,6 +77,7 @@
 | [`systems/techniques-stage3.md`](systems/techniques-stage3.md) | 僧侣 `1H/1I`、范围回復、AI 与 255 tick 表现 | M04 / 已接受 |
 | [`systems/force-ai-groups.md`](systems/force-ai-groups.md) | 显式军团控制权、独立友军 AI、策略与跨军团目标 | M04 框架提取 / 已验证 |
 | [`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.md) | 双方共享自动行动专家效用、射手／魔弓、冰雪排程、PRNG 与显式策略边界 | M14.5–M14.9 / 已验证 |
+| [`systems/wd-path-attack.md`](systems/wd-path-attack.md) | 女帝／龍专用路径攻击、等价前驱 PRNG、防魔／冰封与原版十帧表现 | M38/M39 / 已验证 |
 | [`systems/force-field-escort.md`](systems/force-field-escort.md) | 路线尝试、移动安全区、生命减半与表现边界 | M06 / 已实现并通过自动验收 |
 | [`systems/technique-implementation-sequence.md`](systems/technique-implementation-sequence.md) | 33 项技术的机器顺序、逐项门禁与完成状态 | 系统例外 / 已验证 |
 | [`systems/technique-aa-attack-up.md`](systems/technique-aa-attack-up.md) | 攻击提升、完整轮计数、双方 AI、原版双格光柱与冰封例外 | 已实现并通过完整门禁 |

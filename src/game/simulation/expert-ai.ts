@@ -12,6 +12,7 @@ import type { AlliedAiAction } from "./ai-contracts";
 import type { BattleActionId } from "./actions/types";
 import {
   techniqueEffectRange,
+  techniqueSelectionPath,
 } from "./actions/range-map";
 import { manhattan } from "./grid";
 
@@ -193,6 +194,9 @@ export function expertExposureAt(
       );
     }
     if (candidate.statuses.techniqueSeal === 0) {
+      if (candidate.classId === "dragon" || candidate.classId === "empress") {
+        maximumReach = Math.max(maximumReach, BATTLE_ACTION_DEFINITIONS.wd.range.selectionRadius);
+      }
       for (const actionId of techniqueActionIdsFor(candidate)) {
         const definition = BATTLE_ACTION_DEFINITIONS[actionId];
         if (definition.target !== "enemy" && definition.target !== "self-area") continue;
@@ -307,6 +311,39 @@ export function expertSpecialUtility(
     countEffectiveWizardHit(utility, target, damage > 0 || utility.support > 0);
     utility.targetThreat = targetThreat(context, target);
     if (damage === 0 && utility.support === 0) utility.waste = 1;
+    return utility;
+  }
+
+  if (actionId === "wd") {
+    // REMAKE-052: expert ranking uses the stable first predecessor at every
+    // tie. Only the committed action consumes gameplay PRNG for the native
+    // PIT-influenced walk, so planning cannot peek at or advance randomness.
+    const line = techniqueSelectionPath(
+      { ...actor, x: position.x, y: position.y },
+      target,
+      {
+        width: context.width,
+        height: context.height,
+        terrainSlotAt: context.terrainSlotAt,
+      },
+      BATTLE_ACTION_DEFINITIONS.wd.range.selectionRadius,
+    );
+    const lineCells = new Set(line.map((cell) => `${cell.x},${cell.y}`));
+    for (const affected of context.units) {
+      if (affected.side !== target.side
+        || affected.actionDisabled
+        || affected.statuses.magicGuard > 0
+        || !lineCells.has(`${affected.x},${affected.y}`)) continue;
+      const damage = Math.min(
+        affected.life,
+        BATTLE_ACTION_DEFINITIONS.wd.damage.perEligibleLineCell,
+      );
+      utility.effectiveDamage += damage;
+      utility.targetThreat += targetThreat(context, affected);
+      countEffectiveWizardHit(utility, affected, damage > 0);
+      if (damage >= affected.life && damage > 0) utility.guaranteedKills += 1;
+    }
+    if (utility.effectiveDamage === 0) utility.waste = 1;
     return utility;
   }
 

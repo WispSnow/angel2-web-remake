@@ -261,6 +261,45 @@ export function techniqueSelectionRange(
   );
 }
 
+/**
+ * Reconstructs the native WD target-to-source predecessor walk. Equal-gradient
+ * predecessors stay injectable because the release orders them from the PIT;
+ * stableRemake supplies its serialized gameplay PRNG at commit time.
+ */
+export function techniqueSelectionPath(
+  actor: Pick<BattleUnit, "x" | "y" | "classId">,
+  target: Position,
+  battlefield: ActionBattlefield,
+  selectionRadius: number,
+  choosePredecessor: (candidateCount: number) => number = () => 0,
+): Position[] {
+  const gradient = buildUniformRange(
+    actor,
+    battlefield,
+    selectionRadius + 1,
+    (movementRule) => movementRule >= 99,
+  );
+  if (gradient.valueAt(target) === 0) return [];
+
+  const path = [copyPosition(target)];
+  let current = copyPosition(target);
+  while (current.x !== actor.x || current.y !== actor.y) {
+    const nextValue = gradient.valueAt(current) + 1;
+    const candidates = OFFSETS
+      .map((offset) => ({ x: current.x + offset.x, y: current.y + offset.y }))
+      .filter((position) => gradient.valueAt(position) === nextValue);
+    if (candidates.length === 0) return [];
+    const selected = candidates[Math.max(0, Math.min(
+      candidates.length - 1,
+      choosePredecessor(candidates.length),
+    ))];
+    if (!selected) return [];
+    current = selected;
+    path.push(copyPosition(current));
+  }
+  return path;
+}
+
 export function techniqueEffectRange(
   center: Position,
   width: number,

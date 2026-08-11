@@ -724,7 +724,12 @@ for (const [record, classId] of classIds.entries()) {
   const allyFilename = `ally-${classId}.png`;
   const enemyFilename = `enemy-${classId}.png`;
   const allySource = path.join(planarRoot, "0002", frame);
-  const enemySource = path.join(planarRoot, "0003", frame);
+  // A/0003/36 contains the Dragon's native side-2 colors but stores palette
+  // index zero as an opaque background. A/0011/36 has identical visible RGB
+  // and carries the transparent silhouette used on the map. Records 37/38 are
+  // different-sized boss-part resources in A/0011, so keep this correction
+  // specific to record 36.
+  const enemySource = path.join(planarRoot, record === 36 ? "0011" : "0003", frame);
   const allyOutput = path.join(unitDirectory, allyFilename);
   const enemyOutput = path.join(unitDirectory, enemyFilename);
   const ally = record <= 35

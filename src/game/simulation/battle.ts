@@ -3,6 +3,7 @@ import {
   classDefinition,
   classFallbackPortraitFor,
   className,
+  isClassImmuneToOrdinaryHitStatus,
   killRewardFor,
   ordinaryHitStatusFor,
   suppressesOrdinaryCounterFor,
@@ -159,6 +160,7 @@ const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "stomp-3": ["great-dragon-knight"],
   "iron-plate": ["engineer"],
   "obstacle": ["engineer"],
+  wd: ["dragon", "empress"],
   [CLASS_SHOWDOWN_TELEPORT_ACTION_ID]: [],
 };
 
@@ -186,7 +188,9 @@ function waterWarriorRootId(unit: Pick<BattleUnit, "id" | "classId">): string | 
 
 function applyActiveOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit): void {
   const status = ordinaryHitStatusFor(attacker.classId);
-  if (status) defender.statuses[status.key] = status.counter;
+  if (status && !isClassImmuneToOrdinaryHitStatus(defender.classId, status.key)) {
+    defender.statuses[status.key] = status.counter;
+  }
 }
 
 function canUseSpecialAction(
@@ -1127,7 +1131,10 @@ export class Stage0Battle {
     return removed;
   }
 
-  appendStoryUnits(units: readonly BattleUnit[]): readonly string[] {
+  appendStoryUnits(
+    units: readonly BattleUnit[],
+    forceInheritance: readonly { sourceUnitId: string; derivedUnitId: string }[] = [],
+  ): readonly string[] {
     const existingIds = new Set(this.units.map(({ id }) => id));
     const appendedIds = new Set<string>();
     for (const unit of units) {
@@ -1135,6 +1142,9 @@ export class Stage0Battle {
         throw new Error(`duplicate story unit id ${unit.id}`);
       }
       appendedIds.add(unit.id);
+    }
+    for (const inheritance of forceInheritance) {
+      this.forces.inheritUnit(inheritance.sourceUnitId, inheritance.derivedUnitId);
     }
     this.units.push(...units.map((unit) => ({
       ...unit,
@@ -1979,6 +1989,8 @@ export class Stage0Battle {
               : tier === 2
                 ? ["heal-1", "attack-down", "confusion", "poison"]
               : ["heal-1", "attack-down", "confusion"]
+          : unit.classId === "dragon" || unit.classId === "empress"
+            ? ["wd"]
           : unit.classId === "magician" && options.expertRanking
             ? techniqueActionIdsFor(unit)
           : []);

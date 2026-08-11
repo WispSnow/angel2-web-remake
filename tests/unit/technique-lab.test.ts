@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   TECHNIQUE_LAB_AUDIO_ASSETS,
@@ -816,6 +819,12 @@ describe("map technique laboratory evidence", () => {
     expect(TECHNIQUE_LAB_UNIT_ASSETS.head).toMatchObject({ nativeRecord: 37, ally: null });
     expect(TECHNIQUE_LAB_UNIT_ASSETS.hand).toMatchObject({ nativeRecord: 38, ally: null });
     expect(TECHNIQUE_LAB_UNIT_ASSETS.dragon.enemy).toMatch(/enemy-dragon\.png$/u);
+    const dragonFigure = fs.readFileSync(path.resolve(
+      "public",
+      TECHNIQUE_LAB_UNIT_ASSETS.dragon.enemy.slice(1),
+    ));
+    expect(createHash("sha256").update(dragonFigure).digest("hex"))
+      .toBe("b6afd8336cffb56b933a1e3a1099c302bee292c817c4296331d97ef41d4bb3e4");
   });
 });
 

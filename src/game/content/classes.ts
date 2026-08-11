@@ -22,6 +22,24 @@ export interface OrdinaryHitStatus {
   counter: number;
 }
 
+const STABLE_REMAKE_ORDINARY_HIT_STATUS_IMMUNITIES = {
+  confusion: ["dragon", "head", "hand"],
+  poison: ["dragon", "head", "hand"],
+} as const satisfies Readonly<Partial<Record<OrdinaryHitStatusKey, readonly ClassId[]>>>;
+
+/**
+ * REMAKE-053 closes the native split where LA/IP techniques honor 1P/2P/3P
+ * immunity but ordinary-hit writes to the same status slots bypass it.
+ */
+export function isClassImmuneToOrdinaryHitStatus(
+  classId: ClassId,
+  status: OrdinaryHitStatusKey,
+): boolean {
+  const immuneClasses = STABLE_REMAKE_ORDINARY_HIT_STATUS_IMMUNITIES[status as
+    keyof typeof STABLE_REMAKE_ORDINARY_HIT_STATUS_IMMUNITIES];
+  return immuneClasses?.some((immuneClass) => immuneClass === classId) ?? false;
+}
+
 export interface PromotionTarget {
   id: ClassId;
   nativeRecord: number;

@@ -66,8 +66,12 @@ export type StageSimulationEffectDefinition =
       name: string;
       portrait: PortraitRecord;
       forcedClassId?: UnitClassId;
+      forcedExperience?: number;
+      /** Dynamic actors inherit ownership/control from this existing force member. */
+      forceSourceId?: string;
     }[];
     statusText: string;
+    revealTiming?: "native-before-write" | "after-write";
   }
   | {
     type: "scripted-unit-arrival";

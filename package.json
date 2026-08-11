@@ -50,6 +50,7 @@
     "content:stage17": "node scripts/generate-stage17-runtime.mjs",
     "content:stage18": "node scripts/generate-stage18-runtime.mjs",
     "content:stage19": "node scripts/generate-stage19-runtime.mjs",
+    "content:stage20": "node scripts/generate-stage20-runtime.mjs",
     "content:actions": "node scripts/generate-stage0-actions.mjs && node scripts/generate-stage1-actions.mjs",
     "content:terrain-actions": "node scripts/generate-dynamic-terrain-assets.mjs",
     "content:ai-dialogue": "node scripts/generate-ai-technique-dialogue.mjs",

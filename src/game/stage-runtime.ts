@@ -1058,6 +1058,55 @@ async function loadStage19Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage20Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage20"),
+    import("./simulation/stage20-battle"),
+  ]);
+  content.activateStage20Content();
+  const definition = content.STAGE20_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 20",
+      title: content.STAGE20.name,
+      objective: content.STAGE20_DEFINITION.objective.victoryText,
+      minimap: content.STAGE20_ASSETS.minimap,
+      terrain: content.STAGE20_TERRAIN_TOKENS,
+      gridWidth: content.STAGE20.width,
+      gridHeight: content.STAGE20.height,
+      enemies: content.STAGE20_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "守護者、妮雅與葛蒂拉斯固定出場；二十名候選最多選十四人。開戰後守軍將由妖龍取代。",
+    },
+    ["stage-20-prebattle-story", "stage-20-enter-deployment"],
+    (campaign) => battleModule.createStage20DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 20 requires a deployment result");
+    return new battleModule.Stage20Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE20_DEFINITION,
+    assets: {
+      map: content.STAGE20_ASSETS.map,
+      minimap: content.STAGE20_ASSETS.minimap,
+      storyBackground: content.STAGE20_ASSETS.storyBackground,
+      unitSprites: content.STAGE20_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -1068,6 +1117,11 @@ const RELEASED_MAP_ACTION_IDS = [
   "attack-up", "defense-up", "magic-guard", "poison", "confusion",
   "attack-down", "defense-down", "spell-seal", "prayer", "dispel",
   "stomp-1", "stomp-2", "stomp-3", "iron-plate", "obstacle",
+] as const satisfies readonly BattleActionId[];
+
+const STAGE20_MAP_ACTION_IDS = [
+  ...RELEASED_MAP_ACTION_IDS,
+  "wd",
 ] as const satisfies readonly BattleActionId[];
 
 function createStage0SaveEnemyClasses(): readonly (readonly [string, UnitClassId])[] {
@@ -2384,6 +2438,72 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage19Module,
+  },
+  "stage-20": {
+    id: "stage-20",
+    ordinal: 20,
+    label: "龍塔頂部",
+    nextStageId: "stage-21",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: STAGE20_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "妮雅攻略隊抵達龍塔頂部。",
+      campaignRoute: "stage-20",
+    },
+    enemyPhaseStatusText: "敵方階段：妖龍開始行動。",
+    retry: {
+      mode: "skip-entry-story",
+      statusText: "重新開始龍塔頂部部署。",
+      retreatStatusText: "全面撤退：返回龍塔頂部部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "焦土森林村莊外",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-20-prebattle-story",
+        "stage-20-enter-deployment",
+        "stage-20-contact-story",
+        "stage-20-guardian-move",
+        "stage-20-guardian-story",
+        "stage-20-tableau-departure",
+        "stage-20-dragon-arrival",
+        "stage-20-opening-story",
+        "stage-20-objective-reached",
+        "stage-20-kins-arrival",
+        "stage-20-kins-move",
+        "stage-20-victory-1-story",
+        "stage-20-victory-2-story",
+        "stage-20-victory-3-story",
+        "stage-20-victory-story",
+        "stage-20-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-20-prebattle-story",
+        "stage-20-enter-deployment",
+        "stage-20-contact-story",
+        "stage-20-guardian-move",
+        "stage-20-guardian-story",
+        "stage-20-tableau-departure",
+        "stage-20-dragon-arrival",
+        "stage-20-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24, 32],
+        fixedSlots: [32, 0, 24],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+        maximumUnits: 17,
+        openCellCount: 14,
+      },
+      enemyClassById: [["2:28", "dragon"]],
+      enemyAi: "none",
+    },
+    load: loadStage20Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

@@ -801,6 +801,28 @@ export const STAGE1_ACTION_DEFINITIONS = {
       "fixed": 0
     },
     "presentationId": null
+  },
+  "wd": {
+    "id": "wd",
+    "nativeCode": "WD",
+    "label": "WD",
+    "kind": "technique",
+    "target": "enemy",
+    "range": {
+      "mode": 0,
+      "selectionRadius": 10
+    },
+    "damage": {
+      "type": "path",
+      "perEligibleLineCell": 90,
+      "blockedByMagicGuard": true,
+      "clearsMagicGuard": false,
+      "ignoresAttackDefenseAndTerrain": true
+    },
+    "experience": {
+      "fixed": 0
+    },
+    "presentationId": "wd"
   }
 } as const;
 
@@ -12487,6 +12509,158 @@ export const STAGE1_ACTION_PRESENTATION = {
         "side2": "MAGIC/53"
       }
     }
+  },
+  "wd": {
+    "pathOrder": "selected target at list index 0, followed by predecessor cells through the source/caster",
+    "growthOrder": "walk backward from the last nonzero list entry/source to index 0/selected target",
+    "descriptors": [
+      {
+        "address": "DS:17CA",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          1
+        ],
+        "low7BitFrameIndices": [
+          0
+        ]
+      },
+      {
+        "address": "DS:17D4",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          2
+        ],
+        "low7BitFrameIndices": [
+          1
+        ]
+      },
+      {
+        "address": "DS:17DE",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          3
+        ],
+        "low7BitFrameIndices": [
+          2
+        ]
+      },
+      {
+        "address": "DS:17E8",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          4
+        ],
+        "low7BitFrameIndices": [
+          3
+        ]
+      },
+      {
+        "address": "DS:17F2",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          5
+        ],
+        "low7BitFrameIndices": [
+          4
+        ]
+      },
+      {
+        "address": "DS:17FC",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          6
+        ],
+        "low7BitFrameIndices": [
+          5
+        ]
+      },
+      {
+        "address": "DS:1806",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          7
+        ],
+        "low7BitFrameIndices": [
+          6
+        ]
+      },
+      {
+        "address": "DS:1810",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          8
+        ],
+        "low7BitFrameIndices": [
+          7
+        ]
+      },
+      {
+        "address": "DS:181A",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          9
+        ],
+        "low7BitFrameIndices": [
+          8
+        ]
+      },
+      {
+        "address": "DS:68BE",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          10
+        ],
+        "low7BitFrameIndices": [
+          9
+        ]
+      },
+      {
+        "address": "DS:1824",
+        "xOffset": 0,
+        "yOffset": 0,
+        "width": 1,
+        "height": 1,
+        "tileCodes": [
+          130
+        ],
+        "low7BitFrameIndices": [
+          1
+        ]
+      }
+    ],
+    "waitPerGrowthOrFinishStepNativeTicks": 20,
+    "finishSteps": 10,
+    "directAudioRequest": null
   }
 } as const;
 
@@ -13617,6 +13791,20 @@ export const STAGE1_ACTION_PRESENTATION_ASSETS = {
     "side2": [
       "/assets/original/map-actions/stomp-3/side-2/00.png",
       "/assets/original/map-actions/stomp-3/side-2/01.png"
+    ]
+  },
+  "wd": {
+    "effect": [
+      "/assets/original/map-actions/wd/effect/00.png",
+      "/assets/original/map-actions/wd/effect/01.png",
+      "/assets/original/map-actions/wd/effect/02.png",
+      "/assets/original/map-actions/wd/effect/03.png",
+      "/assets/original/map-actions/wd/effect/04.png",
+      "/assets/original/map-actions/wd/effect/05.png",
+      "/assets/original/map-actions/wd/effect/06.png",
+      "/assets/original/map-actions/wd/effect/07.png",
+      "/assets/original/map-actions/wd/effect/08.png",
+      "/assets/original/map-actions/wd/effect/09.png"
     ]
   }
 } as const;

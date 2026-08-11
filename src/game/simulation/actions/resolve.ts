@@ -9,6 +9,7 @@ import { cloneUnitStatuses } from "../status";
 import {
   stompEffectRange,
   techniqueEffectRange,
+  techniqueSelectionPath,
   type ActionBattlefield,
   type ActionViewport,
 } from "./range-map";
@@ -427,6 +428,49 @@ function prepareMagicArcher(
   };
 }
 
+function prepareWd(
+  actor: BattleUnit,
+  target: BattleUnit,
+  trial: DeterministicRng,
+  context: SpecialActionResolutionContext,
+): {
+  affectedUnits: SpecialActionAffectedUnit[];
+  experienceGained: number;
+  effectCells: PreparedBattleAction["result"]["effectCells"];
+} {
+  const definition = BATTLE_ACTION_DEFINITIONS.wd;
+  const path = techniqueSelectionPath(
+    actor,
+    target,
+    context.battlefield,
+    definition.range.selectionRadius,
+    (candidateCount) => candidateCount === 1 ? 0 : trial.between(0, candidateCount - 1),
+  );
+  if (path.length === 0) throw new Error("WD target has no valid predecessor path");
+  const pathKeys = new Set(path.map(positionKey));
+  const affectedUnits = context.units
+    .filter((unit) => unit.side === target.side
+      && !unit.actionDisabled
+      && pathKeys.has(positionKey(unit)))
+    .sort((left, right) => path.findIndex((cell) => positionKey(cell) === positionKey(left))
+      - path.findIndex((cell) => positionKey(cell) === positionKey(right)))
+    .map((unit) => {
+      const guarded = unit.statuses.magicGuard > 0;
+      const damage = guarded ? 0 : Math.min(unit.life, definition.damage.perEligibleLineCell);
+      return affectedUnit(unit, {
+        lifeAfter: unit.life - damage,
+        damage,
+        blocked: guarded,
+        blockReason: guarded ? "magicGuard" : undefined,
+      });
+    });
+  return {
+    affectedUnits,
+    experienceGained: definition.experience.fixed,
+    effectCells: path.map((position) => ({ position, value: 1 })),
+  };
+}
+
 function prepareLightning(
   actionId: Extract<BattleActionId, "lightning-1" | "lightning-2" | "lightning-3" | "lightning-4">,
   actor: BattleUnit,
@@ -678,6 +722,15 @@ export function prepareSpecialAction(
       actor,
       target,
       intent.linePath,
+      trial,
+      context,
+    ));
+  } else if (intent.actionId === "wd") {
+    if (!target) throw new Error("WD action requires a target unit");
+    if (target.actionDisabled) throw new Error("WD cannot target a frozen unit");
+    ({ affectedUnits, experienceGained, effectCells } = prepareWd(
+      actor,
+      target,
       trial,
       context,
     ));

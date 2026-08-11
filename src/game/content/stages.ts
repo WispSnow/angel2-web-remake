@@ -45,7 +45,15 @@ export type StageStoryId =
   | "stage-16-opening-story"
   | "stage-17-opening-story"
   | "stage-18-opening-story"
-  | "stage-19-opening-story";
+  | "stage-19-opening-story"
+  | "stage-20-prebattle-story"
+  | "stage-20-contact-story"
+  | "stage-20-guardian-story"
+  | "stage-20-opening-story"
+  | "stage-20-victory-1-story"
+  | "stage-20-victory-2-story"
+  | "stage-20-victory-3-story"
+  | "stage-20-victory-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -98,7 +106,10 @@ export type StageMusicId =
   | "stage-18-player-phase-music"
   | "stage-18-enemy-phase-music"
   | "stage-19-player-phase-music"
-  | "stage-19-enemy-phase-music";
+  | "stage-19-enemy-phase-music"
+  | "stage-20-story-music"
+  | "stage-20-player-phase-music"
+  | "stage-20-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -206,7 +217,23 @@ export type StageEventId =
   | "stage-19-enter-deployment"
   | "stage-19-opening-story"
   | "stage-19-objective-reached"
-  | "stage-19-completed-route";
+  | "stage-19-completed-route"
+  | "stage-20-prebattle-story"
+  | "stage-20-enter-deployment"
+  | "stage-20-contact-story"
+  | "stage-20-guardian-move"
+  | "stage-20-guardian-story"
+  | "stage-20-tableau-departure"
+  | "stage-20-dragon-arrival"
+  | "stage-20-opening-story"
+  | "stage-20-objective-reached"
+  | "stage-20-kins-arrival"
+  | "stage-20-kins-move"
+  | "stage-20-victory-1-story"
+  | "stage-20-victory-2-story"
+  | "stage-20-victory-3-story"
+  | "stage-20-victory-story"
+  | "stage-20-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -274,7 +301,15 @@ export type StageSimulationEffectId =
   | "stage-18-route-to-stage-19"
   | "stage-19-enter-deployment"
   | "stage-19-set-victory-999"
-  | "stage-19-route-to-stage-20";
+  | "stage-19-route-to-stage-20"
+  | "stage-20-enter-deployment"
+  | "stage-20-guardian-move"
+  | "stage-20-tableau-departure"
+  | "stage-20-dragon-arrival"
+  | "stage-20-set-victory-999"
+  | "stage-20-kins-arrival"
+  | "stage-20-kins-move"
+  | "stage-20-route-to-stage-21";
 
 export type StagePresentationId =
   | "none"

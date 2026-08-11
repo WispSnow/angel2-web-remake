@@ -159,7 +159,7 @@ test("S19-D/E: the machine objective defeats Ai without requiring the other twen
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
 });
 
-test("S19-F/G: defeat retries deployment and completion freezes at Dragon Tower Summit", async ({ page }) => {
+test("S19-F/G: defeat retries deployment and completion enters the playable Dragon Tower Summit", async ({ page }) => {
   await page.goto("/?debugScenario=stage-19-near-defeat&difficulty=0&test=1");
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");
@@ -176,7 +176,8 @@ test("S19-F/G: defeat retries deployment and completion freezes at Dragon Tower 
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "39");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -203,9 +204,9 @@ test("S19-F/G: defeat retries deployment and completion freezes at Dragon Tower 
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-19",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-20",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-20",
   });
 });

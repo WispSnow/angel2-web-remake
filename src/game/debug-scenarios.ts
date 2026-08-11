@@ -263,6 +263,29 @@ const STAGE19_COMPLETED_EVENT_IDS = [
   "stage-19-completed-route",
 ] as const;
 
+const STAGE20_BATTLE_EVENT_IDS = [
+  "stage-20-prebattle-story",
+  "stage-20-enter-deployment",
+  "stage-20-contact-story",
+  "stage-20-guardian-move",
+  "stage-20-guardian-story",
+  "stage-20-tableau-departure",
+  "stage-20-dragon-arrival",
+  "stage-20-opening-story",
+] as const;
+
+const STAGE20_COMPLETED_EVENT_IDS = [
+  ...STAGE20_BATTLE_EVENT_IDS,
+  "stage-20-objective-reached",
+  "stage-20-kins-arrival",
+  "stage-20-kins-move",
+  "stage-20-victory-1-story",
+  "stage-20-victory-2-story",
+  "stage-20-victory-3-story",
+  "stage-20-victory-story",
+  "stage-20-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -1803,6 +1826,116 @@ async function createStage19Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage20Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-20", debugCampaign(context, "stage-20"));
+  return controller;
+}
+
+async function createStage20Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-20",
+    debugCampaign(context, "stage-20"),
+    { preparation: true, statusMessage: "調試場景：龍塔頂部部署。" },
+  );
+  return controller;
+}
+
+async function stage20FullDeployment() {
+  const { STAGE20_DEFINITION } = await import("./content/stage20");
+  return {
+    placements: [
+      ...STAGE20_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE20_DEFINITION.deployment.optionalSlots.slice(0, 14).map((slot, index) => ({
+        slot, position: { ...STAGE20_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage20Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage20Deployment(context);
+  controller.completeDeployment(await stage20FullDeployment());
+  return controller;
+}
+
+async function createStage20Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-20");
+  const [{ Stage20Battle }, { STAGE20_SEMANTIC_DRAGON }, { createFixedStageEnemy }] = await Promise.all([
+    import("./simulation/stage20-battle"),
+    import("./content/stage20"),
+    import("./simulation/fixed-stage-battle"),
+  ]);
+  const battle = new Stage20Battle(campaign, await stage20FullDeployment());
+  const guardian = battle.unit("1:32");
+  if (guardian) {
+    guardian.x = 28;
+    guardian.y = 17;
+  }
+  battle.removeStoryUnits(battle.units.filter(({ side }) => side === 2).map(({ side, slot }) => ({ side, slot })));
+  const dragon = createFixedStageEnemy({
+    slot: STAGE20_SEMANTIC_DRAGON.slot,
+    position: STAGE20_SEMANTIC_DRAGON.position,
+    classId: STAGE20_SEMANTIC_DRAGON.classId,
+    name: STAGE20_SEMANTIC_DRAGON.name,
+    portrait: STAGE20_SEMANTIC_DRAGON.portrait,
+    aiBehavior: STAGE20_SEMANTIC_DRAGON.aiBehavior,
+  }, campaign.difficulty);
+  battle.appendStoryUnits([dragon], [{ sourceUnitId: "2:55", derivedUnitId: dragon.id }]);
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 20 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-20"),
+    stageLabel: "龍塔頂部",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE20_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：龍塔頂部十七人攻略隊玩家回合。";
+  return controller;
+}
+
+async function createStage20Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-20");
+  const { createStage20DeploymentRoster } = await import("./simulation/stage20-battle");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-21",
+    stageLabel: "焦土森林村莊外",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(createStage20DeploymentRoster(campaign)
+      .filter(({ slot }) => slot !== 32)
+      .map((unit) => ({
+        slot: unit.slot,
+        classId: unit.classId,
+        experience: unit.experience,
+        life: unit.life,
+      }))),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE20_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -2349,6 +2482,40 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-19-cleared": createStage19Completed,
+  "stage-20-prebattle": createStage20Prebattle,
+  "stage-20-deployment": createStage20Deployment,
+  "stage-20-opening": createStage20Opening,
+  "stage-20-player": createStage20Player,
+  "stage-20-near-victory": withSetup(createStage20Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const dragon = controller.battle.unit("2:28");
+    if (!nia || !dragon) return;
+    nia.x = 28;
+    nia.y = 16;
+    nia.acted = false;
+    dragon.x = 29;
+    dragon.y = 16;
+    dragon.life = 1;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 25, y: 14 };
+    controller.statusMessage = "調試場景：妖龍只剩 1 點生命，擊退後進入琴斯勝利演出。";
+  }),
+  "stage-20-near-defeat": withSetup(createStage20Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const dragon = controller.battle.unit("2:28");
+    if (!nia || !dragon) return;
+    nia.life = 1;
+    dragon.x = 29;
+    dragon.y = 16;
+    nia.x = 29;
+    nia.y = 18;
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，位於妖龍 WD 範圍內。";
+  }),
+  "stage-20-victory-ready": withSetup(createStage20Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-20-cleared": createStage20Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

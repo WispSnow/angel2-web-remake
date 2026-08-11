@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion41Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 41
+    || value.contentVersion !== "stage-19-dragon-tower-ai-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion40Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 40
@@ -1550,6 +1561,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion41 = migrateVersion41Save(value);
+    if (migratedVersion41) return migratedVersion41;
     const migratedVersion40 = migrateVersion40Save(value);
     if (migratedVersion40) return migratedVersion40;
     const migratedVersion39 = migrateVersion39Save(value);

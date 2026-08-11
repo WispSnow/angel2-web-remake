@@ -45,6 +45,8 @@ export interface DeployedStageScenarioConfig extends DeployedStageUnitConfig {
   dynamicTerrainSlots?: Readonly<Partial<Record<DynamicTerrainKind, number>>>;
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   forces: readonly ForceDefinition[];
+  /** Side-1 stage-only guests remain controllable but never write to the campaign roster. */
+  campaignUnitSlots?: readonly number[];
   routePulses?: readonly RoutePulseDefinition[];
   escortRoutes?: readonly EscortRouteDefinition[];
 }
@@ -102,16 +104,21 @@ export function createDeployedStageRoster(
 }
 
 function campaignRosterWithEligibleBaselines(
-  config: DeployedStageUnitConfig,
+  config: DeployedStageUnitConfig & { campaignUnitSlots?: readonly number[] },
   difficulty: Difficulty,
   campaignRoster: readonly SaveRosterEntry[],
 ): SaveRosterEntry[] {
-  const eligibleRoster = createDeployedStageRoster(config, difficulty, campaignRoster).map((unit) => ({
-    slot: unit.slot,
-    classId: unit.classId,
-    experience: unit.experience,
-    life: unit.life,
-  }));
+  const campaignSlots = config.campaignUnitSlots
+    ? new Set(config.campaignUnitSlots)
+    : undefined;
+  const eligibleRoster = createDeployedStageRoster(config, difficulty, campaignRoster)
+    .filter((unit) => !campaignSlots || campaignSlots.has(unit.slot))
+    .map((unit) => ({
+      slot: unit.slot,
+      classId: unit.classId,
+      experience: unit.experience,
+      life: unit.life,
+    }));
   return completeCampaignRoster([...campaignRoster, ...eligibleRoster]);
 }
 
@@ -136,11 +143,19 @@ export function createDeployedStageScenario(
       // Native template class baselines belong to the campaign roster when a character becomes
       // deployable, even if the player leaves that character on the bench for this battle.
       const roster = campaignRosterWithEligibleBaselines(config, difficulty, campaignRoster);
-      return createFixedStageCampaignRoster(
+      const projected = createFixedStageCampaignRoster(
         alliedUnitConfig(config, deployment),
         difficulty,
         roster,
       );
+      if (!config.campaignUnitSlots) return projected;
+      const campaignSlots = new Set(config.campaignUnitSlots);
+      const baselineBySlot = new Map(
+        completeCampaignRoster(campaignRoster).map((entry) => [entry.slot, entry]),
+      );
+      return projected.map((entry) => campaignSlots.has(entry.slot)
+        ? entry
+        : { ...(baselineBySlot.get(entry.slot) ?? entry) });
     },
     enemyClassPriority: config.enemyClassPriority,
     alliedBehaviorById: new Map(
@@ -150,6 +165,7 @@ export function createDeployedStageScenario(
       config.enemyUnits.map(({ slot, aiBehavior }) => [`2:${slot}`, aiBehavior]),
     ),
     forces: config.forces,
+    campaignUnitSlots: config.campaignUnitSlots,
     routePulses: config.routePulses,
     escortRoutes: config.escortRoutes,
   };

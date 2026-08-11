@@ -12,14 +12,16 @@ const remainingPresentationsPath = path.join(
   root,
   "reverse/parsed/native/remaining-technique-presentations.json",
 );
+const wdPath = path.join(root, "reverse/parsed/native/wd-stage26.json");
 const outputPath = path.join(root, "src/game/content/stage1-actions.generated.ts");
 const publicRoot = path.join(root, "public/assets/original");
 
-const [rules, aiRules, presentations, remainingPresentations] = await Promise.all([
+const [rules, aiRules, presentations, remainingPresentations, wdDocument] = await Promise.all([
   readFile(rulesPath, "utf8").then(JSON.parse),
   readFile(aiRulesPath, "utf8").then(JSON.parse),
   readFile(presentationsPath, "utf8").then(JSON.parse),
   readFile(remainingPresentationsPath, "utf8").then(JSON.parse),
+  readFile(wdPath, "utf8").then(JSON.parse),
 ]);
 
 const requireEntry = (entries, predicate, label) => {
@@ -1525,6 +1527,33 @@ assertEqual({
   experience: "none; the construction route spends the action after movement without a casting-experience write",
 }, "reachable player construction route contract");
 
+assertEqual({
+  actionCode: wdDocument.wd.actionCode,
+  users: wdDocument.wd.users,
+  targetGroup: wdDocument.wd.aiBinding.targetGroup,
+  selectionRadius: wdDocument.wd.aiBinding.selectionRadius,
+  requestedPerEligibleLineCell: wdDocument.wd.damage.requestedPerEligibleLineCell,
+  graphicResource: wdDocument.wd.presentation.graphicResource,
+  directAudioRequest: wdDocument.wd.presentation.directAudioRequest,
+  rawTileCodes: wdDocument.wd.presentation.rawTileCodes,
+  waitPerStep: wdDocument.wd.presentation.waitPerGrowthOrFinishStepNativeTicks,
+  finishSteps: wdDocument.wd.presentation.finishSteps,
+}, {
+  actionCode: "WD",
+  users: [
+    { classCode: "0P", className: "女帝" },
+    { classCode: "1P", className: "龍" },
+  ],
+  targetGroup: "enemy",
+  selectionRadius: 10,
+  requestedPerEligibleLineCell: 90,
+  graphicResource: "MAGIC/19",
+  directAudioRequest: null,
+  rawTileCodes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 130],
+  waitPerStep: 20,
+  finishSteps: 10,
+}, "WD path-action contract");
+
 const graphicEntries = presentations.resourceCatalog.graphicEntries;
 const copyGraphicFrom = async (entries, key, outputDirectory) => {
   const entry = requireEntry(entries, (candidate) => candidate.key === key, `${key} graphic`);
@@ -1702,6 +1731,13 @@ const assets = {
       remainingPresentations.resourceCatalog.graphicEntries,
       stomp3Action.graphicByTargetSide.side2,
       "stomp-3/side-2",
+    ),
+  },
+  wd: {
+    effect: await copyGraphicFrom(
+      wdDocument.resourceCatalog.graphicEntries,
+      "MAGIC/19",
+      "wd/effect",
     ),
   },
 };
@@ -2459,6 +2495,26 @@ const definitions = {
     experience: { fixed: 0 },
     presentationId: null,
   },
+  wd: {
+    id: "wd",
+    nativeCode: wdDocument.wd.actionCode,
+    label: "WD",
+    kind: "technique",
+    target: "enemy",
+    range: {
+      mode: 0,
+      selectionRadius: wdDocument.wd.aiBinding.selectionRadius,
+    },
+    damage: {
+      type: "path",
+      perEligibleLineCell: wdDocument.wd.damage.requestedPerEligibleLineCell,
+      blockedByMagicGuard: true,
+      clearsMagicGuard: false,
+      ignoresAttackDefenseAndTerrain: true,
+    },
+    experience: { fixed: 0 },
+    presentationId: "wd",
+  },
 };
 
 const timeline = {
@@ -2515,6 +2571,15 @@ const timeline = {
   stomp3: {
     ...stompPresentation,
     action: stomp3Action,
+  },
+  wd: {
+    pathOrder: wdDocument.wd.path.order,
+    growthOrder: wdDocument.wd.path.growthOrder,
+    descriptors: wdDocument.wd.presentation.descriptors,
+    waitPerGrowthOrFinishStepNativeTicks:
+      wdDocument.wd.presentation.waitPerGrowthOrFinishStepNativeTicks,
+    finishSteps: wdDocument.wd.presentation.finishSteps,
+    directAudioRequest: wdDocument.wd.presentation.directAudioRequest,
   },
 };
 

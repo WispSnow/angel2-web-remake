@@ -46,6 +46,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 内部第 17 关内容、1–10 人部署、SAY/36 开战对白、倩率十二敌、首领目标、回合 6 行为清零证据与无增援 | `stage17-content.test.ts`、`stage17-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage17.spec.ts` |
 | 内部第 18 关内容、1–8 人部署、SAY/37 双窗开战对白、麗率十六敌、首领目标、回合 6 行为清零证据与无增援 | `stage18-content.test.ts`、`stage18-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage18.spec.ts` |
 | 内部第 19 关内容、1–10 人部署、SAY/38 愛／蘇蘭達双窗开战对白、愛率二十一敌、首领目标、回合 6 行为清零证据与无增援 | `stage19-content.test.ts`、`stage19-battle.test.ts`、`objective-records.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage19.spec.ts` |
+| 内部第 20 关内容、3–17 人部署、十六人叙事阵形替换、妖龍／WD、琴斯／龍王胜利链与 stage 21 路由 | `stage20-content.test.ts`、`stage20-battle.test.ts`、`wd-action.test.ts`、`expert-ai.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage20.spec.ts` |
 | 第 0–6 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
 | 剧情对话 DOM、逐字推进、右键跳过确认与输入阻断 | 无独立模拟数值测试 | `stage0.spec.ts` 的剧情对话用例；各关卡通过 `dialogue-controls.ts` 复用真实跳过路径 |
 | 部署 | `deployment*.test.ts` | `deployment-lab.spec.ts` 或对应关卡部署用例 |
