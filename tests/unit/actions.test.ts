@@ -401,6 +401,61 @@ describe("Stage-0 class actions", () => {
     expect(battle.rng.calls).toBe(0);
   });
 
+  // REMAKE-006/009：魔弓的兩次半傷必須來自同一次 PRNG 取樣，提交不得重擲。
+  // 沿線格與選中目標的傷害都由 floor(baseRoll/2) 推出，因此 selected === 2 * line；
+  // 任何在提交階段重新取樣或重複套用的回歸都會打破這條關係或造成準備／提交不一致。
+  it.each([0, 0x3501, 1, 7, 4242])(
+    "applies the exact prepared magic-arrow damage on commit without re-rolling (seed %i)",
+    (seed) => {
+      const battle = new Stage0Battle(0, new DeterministicRng(seed));
+      const actor = battle.unit("1:0")!;
+      const enemies = battle.units.filter((unit) => unit.side === 2).slice(0, 2);
+      const [target, lineUnit] = enemies;
+      if (!target || !lineUnit) throw new Error("missing magic-arrow fixtures");
+      actor.classId = "magic-archer";
+      actor.className = className(actor.classId);
+      actor.experience = 0;
+      actor.x = 20;
+      actor.y = 20;
+      actor.acted = false;
+      lineUnit.x = 22;
+      lineUnit.y = 20;
+      const lineLifeBefore = battle.statsFor(lineUnit).maxLife;
+      lineUnit.life = lineLifeBefore;
+      target.x = 23;
+      target.y = 20;
+      const targetLifeBefore = battle.statsFor(target).maxLife;
+      target.life = targetLifeBefore;
+      battle.units = [actor, lineUnit, target];
+
+      const prepared = battle.prepareSpecialAction({
+        actionId: "magic-archer-shot",
+        actorId: actor.id,
+        targetId: target.id,
+        target: { x: target.x, y: target.y },
+      });
+      const lineAffected = prepared.affectedUnits.find(({ unitId }) => unitId === lineUnit.id);
+      const targetAffected = prepared.affectedUnits.find(({ unitId }) => unitId === target.id);
+      if (!lineAffected || !targetAffected) throw new Error("missing prepared magic-arrow damage");
+
+      // 單次取樣：兩者同時落在原版帶寬且互為兩倍，重擲會同時破壞兩項。
+      expect(lineAffected.damage).toBeGreaterThanOrEqual(25);
+      expect(lineAffected.damage).toBeLessThanOrEqual(34);
+      expect(targetAffected.damage).toBeGreaterThanOrEqual(50);
+      expect(targetAffected.damage).toBeLessThanOrEqual(68);
+      expect(targetAffected.damage).toBe(lineAffected.damage * 2);
+
+      battle.commitPreparedAction(prepared);
+
+      expect(battle.unit(lineUnit.id)?.life).toBe(lineLifeBefore - lineAffected.damage);
+      expect(battle.unit(target.id)?.life).toBe(targetLifeBefore - targetAffected.damage);
+      // 提交只搬運準備好的 PRNG 結果，不得額外推進亂數。
+      expect(battle.rng.state).toBe(prepared.rngAfter);
+      expect(battle.rng.calls).toBe(prepared.rngCallsAfter);
+      expect(prepared.rngCallsAfter - prepared.rngCallsBefore).toBe(2);
+    },
+  );
+
   it("prepares shooting deterministically without mutating battle state, then commits atomically", () => {
     const battle = new Stage0Battle(0);
     const { actor, target } = arrangeTarget(battle, "archer-shot", 2);
