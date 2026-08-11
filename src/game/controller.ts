@@ -1273,6 +1273,9 @@ export class GameController {
         ?? sourceUnit?.experience
         ?? rosterEntry?.experience
         ?? 0;
+      const inheritedLife = actor.forcedClassId === undefined
+        ? sourceUnit?.life ?? rosterEntry?.life
+        : undefined;
       const unit: BattleUnit = {
         id: actor.id,
         side: actor.source.side,
@@ -1283,7 +1286,10 @@ export class GameController {
         portrait: actor.portrait,
         x: actor.position.x,
         y: actor.position.y,
-        life: sourceUnit?.life ?? rosterEntry?.life ?? 1,
+        // A forced profession rebuilds native derived attributes. Do not carry
+        // a current-life value from a different class that happened to occupy
+        // the same campaign slot (for example Kins's stale soldier fallback).
+        life: inheritedLife ?? 1,
         experience,
         acted: true,
         actionDisabled: sourceUnit?.actionDisabled ?? false,
@@ -1291,7 +1297,7 @@ export class GameController {
       };
       const maximumLife = this.battle.statsFor(unit).maxLife;
       unit.life = Math.max(0, Math.min(unit.life, maximumLife));
-      if (!sourceUnit && !rosterEntry) unit.life = maximumLife;
+      if (inheritedLife === undefined) unit.life = maximumLife;
       return unit;
     });
 

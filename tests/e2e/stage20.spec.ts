@@ -171,8 +171,9 @@ test("S20-F/G: boss victory plays Kins and Dragon King, then freezes at stage 21
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "72");
   expect((await state(page)).units.find(({ id }) => id === "1:7")).toMatchObject({
-    name: "琴斯", portrait: 14, x: 33, y: 15,
+    classId: "magic-priest", name: "琴斯", portrait: 14, x: 33, y: 15, life: 305,
   });
+  await expect(page.getByTestId("hud-identity")).toHaveText("魔祭師／琴斯");
   await settleBattleCanvas(page);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage20-kins-victory-arrival.png`,

@@ -306,7 +306,10 @@ export function activateStage20Content(): void {
         position: STAGE20_KINS.position,
         name: STAGE20_KINS.name,
         portrait: STAGE20_KINS.portraitRecord as PortraitRecord,
-        forcedClassId: "soldier",
+        // REMAKE-054: the native stage-20 event only writes side-1 slot 7;
+        // stableRemake keeps Kins's explicit stage-42/22 profession instead of
+        // exposing the otherwise stale campaign-slot fallback as a soldier.
+        forcedClassId: semanticClassId(STAGE20_KINS.nativeClassRecord),
         forcedExperience: 0,
         forceSourceId: "1:0",
       }],

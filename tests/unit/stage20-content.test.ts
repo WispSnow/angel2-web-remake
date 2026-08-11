@@ -51,6 +51,12 @@ describe("stage 20 content", () => {
     expect(STAGE20_EVENT_PROGRAM.completedRoute).toEqual({
       module: 25, stage: 21, replayPresentation: false,
     });
+    expect(STAGE20_EVENT_PROGRAM.stableRemakeDecisions).toEqual([
+      "REMAKE-052", "REMAKE-054",
+    ]);
+    expect(STAGE20_EVENT_PROGRAM.victory.actor).toMatchObject({
+      side: 1, slot: 7, nativeClassRecord: 3, name: "琴斯",
+    });
     expect(STAGE20_EVENT_PROGRAM.reinforcementAudit).toMatchObject({
       kind: "round-1-tableau-replacement-only",
       laterReinforcements: false,
@@ -83,7 +89,13 @@ describe("stage 20 content", () => {
     });
     expect(stageSimulationEffectFor("stage-20-kins-arrival")).toMatchObject({
       type: "story-reinforcements",
-      actors: [{ id: "1:7", name: "琴斯", forceSourceId: "1:0" }],
+      actors: [{
+        id: "1:7",
+        name: "琴斯",
+        forcedClassId: "magic-priest",
+        forcedExperience: 0,
+        forceSourceId: "1:0",
+      }],
     });
     expect(stageSimulationEffectFor("stage-20-route-to-stage-21")).toEqual({
       type: "campaign-route", destination: "stage-21",
