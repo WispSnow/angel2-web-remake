@@ -1010,6 +1010,54 @@ async function loadStage18Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage19Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage19"),
+    import("./simulation/stage19-battle"),
+  ]);
+  content.activateStage19Content();
+  const definition = content.STAGE19_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 19",
+      title: content.STAGE19.name,
+      objective: content.STAGE19_DEFINITION.objective.victoryText,
+      minimap: content.STAGE19_ASSETS.minimap,
+      terrain: content.STAGE19_TERRAIN_TOKENS,
+      gridWidth: content.STAGE19.width,
+      gridHeight: content.STAGE19.height,
+      enemies: content.STAGE19_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十一名候選最多選九人。擊敗半龍戰士愛即可獲勝。",
+    },
+    ["stage-19-enter-deployment"],
+    (campaign) => battleModule.createStage19DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 19 requires a deployment result");
+    return new battleModule.Stage19Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE19_DEFINITION,
+    assets: {
+      map: content.STAGE19_ASSETS.map,
+      minimap: content.STAGE19_ASSETS.minimap,
+      unitSprites: content.STAGE19_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -2266,6 +2314,76 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage18Module,
+  },
+  "stage-19": {
+    id: "stage-19",
+    ordinal: 19,
+    label: "龍塔第六層",
+    nextStageId: "stage-20",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅攻略隊進入龍塔第六層。",
+      campaignRoute: "stage-19",
+    },
+    enemyPhaseStatusText: "敵方階段：愛的龍塔第六層守軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始龍塔第六層部署。",
+      retreatStatusText: "全面撤退：返回龍塔第六層部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "龍塔頂部",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-19-enter-deployment",
+        "stage-19-opening-story",
+        "stage-19-objective-reached",
+        "stage-19-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-19-enter-deployment",
+        "stage-19-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
+        maximumUnits: 10,
+        openCellCount: 9,
+      },
+      enemyClassById: [
+        ["2:31", "warrior"],
+        ["2:13", "half-dragon-warrior"],
+        ["2:30", "warrior"],
+        ["2:52", "divine-sword-warrior"],
+        ["2:46", "steel-armor-warrior"],
+        ["2:38", "priest"],
+        ["2:36", "monk"],
+        ["2:40", "steel-armor-warrior"],
+        ["2:47", "divine-sword-warrior"],
+        ["2:51", "divine-sword-warrior"],
+        ["2:45", "steel-armor-warrior"],
+        ["2:35", "magician"],
+        ["2:41", "steel-armor-warrior"],
+        ["2:48", "divine-sword-warrior"],
+        ["2:55", "great-axe-warrior"],
+        ["2:50", "great-axe-warrior"],
+        ["2:44", "steel-armor-warrior"],
+        ["2:43", "steel-armor-warrior"],
+        ["2:42", "steel-armor-warrior"],
+        ["2:49", "great-axe-warrior"],
+        ["2:54", "great-axe-warrior"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage19Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

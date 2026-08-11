@@ -54,6 +54,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 16 關 · 龍塔第三層",
     "第 17 關 · 龍塔第四層",
     "第 18 關 · 龍塔第五層",
+    "第 19 關 · 龍塔第六層",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -152,6 +153,13 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-18-near-defeat",
     "stage-18-victory-ready",
     "stage-18-cleared",
+    "stage-19-deployment",
+    "stage-19-opening",
+    "stage-19-player",
+    "stage-19-near-victory",
+    "stage-19-near-defeat",
+    "stage-19-victory-ready",
+    "stage-19-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }

@@ -26,7 +26,8 @@ export type StageId =
   | "stage-15"
   | "stage-16"
   | "stage-17"
-  | "stage-18";
+  | "stage-18"
+  | "stage-19";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -47,7 +48,8 @@ export type CampaignRouteId =
   | "stage-16"
   | "stage-17"
   | "stage-18"
-  | "stage-19";
+  | "stage-19"
+  | "stage-20";
 
 export interface Position {
   x: number;
@@ -198,8 +200,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 40;
-  contentVersion: "stage-18-dragon-tower-li-1";
+  version: 41;
+  contentVersion: "stage-19-dragon-tower-ai-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

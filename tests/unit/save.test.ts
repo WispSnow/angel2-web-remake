@@ -41,10 +41,12 @@ import { STAGE15_DEFINITION } from "../../src/game/content/stage15";
 import { STAGE16_DEFINITION } from "../../src/game/content/stage16";
 import { STAGE17_DEFINITION } from "../../src/game/content/stage17";
 import { STAGE18_DEFINITION } from "../../src/game/content/stage18";
+import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
 import { Stage18Battle } from "../../src/game/simulation/stage18-battle";
+import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -1003,6 +1005,61 @@ const stage18BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage19BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-19" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x19a0_b0c0,
+    rngCalls: 75,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 720, life: 240 },
+      { slot: 1, classId: "soldier", experience: 299, life: 120 },
+      { slot: 10, classId: "water-warrior", experience: 299, life: 250 },
+      { slot: 11, classId: "water-warrior", experience: 299, life: 250 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE19_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      {
+        slot: 1,
+        position: { ...STAGE19_DEFINITION.deployment.openCells[0] },
+        fixed: false,
+      },
+    ],
+  };
+  const battle = new Stage19Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-11T22:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-19",
+    stageLabel: "龍塔第六層",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: ["stage-19-enter-deployment", "stage-19-opening-story"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -1795,6 +1852,42 @@ describe("Web save validation", () => {
           : unit),
       },
     })).toBe(false);
+  });
+
+  it("validates stage 19 deployment, opening event, and all twenty-one enemy classes", () => {
+    const save = stage19BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual(["1:0", "1:1"]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(21);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: ["stage-19-enter-deployment"],
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:13"
+          ? { ...unit, classId: "great-axe-warrior" as const, className: "巨斧戰士" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("migrates v40 saves to the stage 19 content identity", () => {
+    const current = stage18BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 40,
+      contentVersion: "stage-18-dragon-tower-li-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-18",
+    });
   });
 
   it("migrates v39 saves to the stage 18 content identity", () => {

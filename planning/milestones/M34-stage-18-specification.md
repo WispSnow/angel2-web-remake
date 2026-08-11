@@ -20,7 +20,7 @@
 
 ## 遗留
 
-- 内部 stage 19“龍塔第六層”及后续运行时保持冻结；
+- 内部 stage 19“龍塔第六層”已由 M36/M37 获得有界授权；stage 20 及后续运行时保持冻结；
 - M34 不解冻新的职业、技术、AI 规则、部署语义或存档 Mod 兼容层。
 
 纸面合同见 [`stage-18.md`](../../design/remake-gdd/vertical-slices/stage-18.md)。
