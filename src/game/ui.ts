@@ -221,8 +221,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               <span class="panel-kicker">${stage.name}</span>
               <h2>勝利條件</h2><p>${stage.objective.victoryText}</p>
               <h2>失敗條件</h2><p>${stage.objective.defeatText}</p>
-              ${controller.routePulseGuidance
-                ? `<h2>力場提示</h2><p data-testid="route-pulse-guidance">${controller.routePulseGuidance}</p>`
+              ${controller.deploymentGuidance
+                ? `<h2>出擊提示</h2><p data-testid="objective-guidance">${controller.deploymentGuidance}</p>`
                 : ""}
               <button data-action="close-objectives">返回戰場</button>
             </section>

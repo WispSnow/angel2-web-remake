@@ -323,7 +323,7 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toContainText("護送葛蒂拉斯進入力場出口");
   await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」或「葛蒂拉斯」戰敗");
-  await expect(page.getByTestId("route-pulse-guidance")).toContainText("防魔無效");
+  await expect(page.getByTestId("objective-guidance")).toContainText("防魔無效");
   await page.locator("[data-action=close-objectives]").click();
 
   await endManualPhase(page);
