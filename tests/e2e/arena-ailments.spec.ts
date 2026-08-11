@@ -234,7 +234,12 @@ test("tier-one curse-master commits SA after its formal presentation", async ({ 
   expect(pageErrors).toEqual([]);
 });
 
-test("enemy tier-one curse-master selects SA from native slot two and announces the original typo", async ({ page }) => {
+// LA outranks SA on any target the expert planner can still confuse: its
+// control term is `100 + threat/2` against SA's `40 + threat/4`, so no board
+// makes SA win first. A second 咒術師 therefore carries the SA audit — once the
+// first has landed 混亂, LA is redundant and SA becomes the best remaining
+// entry in the same native tier-one pool.
+test("enemy tier-one curse-master selects SA once LA is redundant and announces the original typo", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -248,13 +253,20 @@ test("enemy tier-one curse-master selects SA from native slot two and announces 
     arena.setSide(2);
     arena.setClass("curse-master");
     arena.setLevel(1);
-    const caster = arena.interact(24, 30);
-    return [player, caster];
+    const first = arena.interact(23, 30);
+    const second = arena.interact(24, 30);
+    return [player, first, second];
   });
-  expect(placed).toEqual([true, true]);
+  expect(placed).toEqual([true, true, true]);
   await page.getByTestId("arena-start").click();
   await clickArenaWorldCell(page, 20, 30);
   await page.getByTestId("unit-command-rest").click();
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.lastSpecialAction?.actionId === "confusion"
+      && current.lastSpecialAction.actorId === "arena-2-0"
+      && current.specialActionPresentation === undefined;
+  });
 
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
@@ -270,16 +282,16 @@ test("enemy tier-one curse-master selects SA from native slot two and announces 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
     return current?.lastSpecialAction?.actionId === "attack-down"
-      && current.lastSpecialAction.actorId === "arena-2-0"
+      && current.lastSpecialAction.actorId === "arena-2-1"
       && current.specialActionPresentation === undefined;
   });
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "attack-down",
-    actorId: "arena-2-0",
+    actorId: "arena-2-1",
     affectedUnits: [expect.objectContaining({
       unitId: "arena-1-0",
-      statusesAfter: expect.objectContaining({ attackDown: 3 }),
+      statusesAfter: expect.objectContaining({ attackDown: 3, confusion: 3 }),
     })],
   });
   expect(after?.units.find(({ id }) => id === "arena-1-0")?.statuses.attackDown).toBe(3);
@@ -548,6 +560,9 @@ test("enemy tier-three curse-master selects native SN after two deterministic ro
   expect(pageErrors).toEqual([]);
 });
 
+// Same LA-first ordering as the tier-one SA case: once 混亂 is on the board,
+// IP's `80 + life/4` beats SA's `40 + threat/4` and becomes the tier-two pool's
+// best remaining entry.
 test("enemy tier-two curse-master keeps the native IP pool slot and announces 中毒.", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -562,13 +577,20 @@ test("enemy tier-two curse-master keeps the native IP pool slot and announces �
     arena.setSide(2);
     arena.setClass("curse-master");
     arena.setLevel(2);
-    const caster = arena.interact(25, 30);
-    return [player, caster];
+    const first = arena.interact(23, 30);
+    const second = arena.interact(24, 30);
+    return [player, first, second];
   });
-  expect(placed).toEqual([true, true]);
+  expect(placed).toEqual([true, true, true]);
   await page.getByTestId("arena-start").click();
   await clickArenaWorldCell(page, 20, 30);
   await page.getByTestId("unit-command-rest").click();
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.lastSpecialAction?.actionId === "confusion"
+      && current.lastSpecialAction.actorId === "arena-2-0"
+      && current.specialActionPresentation === undefined;
+  });
 
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");

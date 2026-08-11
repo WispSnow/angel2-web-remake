@@ -24,18 +24,23 @@ async function expectHudValues(page: Page, identity: string, values: readonly st
   await expect(page.getByTestId("unit-hud").locator(".unit-core-stat dd")).toHaveText([...values]);
 }
 
+// The 等級 column is the profession-internal growth row, not the native
+// `DATA.field6` all-class-tree level. 騎兵 is the only stage-0 class where the
+// two disagree: its three fixed rows carry `field6` 4/5/6, so 哈釘 reads 2 at
+// difficulty 0 and 5 at difficulty 3. See `04-units-progression-balance.md`
+// `[DD]` and `systems/promotion.md`.
 test("S00-Q: ordinary startup exposes the native lowest and highest difficulty stats", async ({ page }) => {
   const cases = [
     {
       difficulty: 0 as const,
       soldier: ["170／170", "42／42", "24／24", "2", "101／200"],
-      hading: ["230／230", "60／60", "33／33", "5", "181／360"],
+      hading: ["230／230", "60／60", "33／33", "2", "181／360"],
       screenshot: "artifacts/playwright/stage0-difficulty-0-hading.png",
     },
     {
       difficulty: 3 as const,
       soldier: ["300／300", "70／70", "40／40", "5", "401／500"],
-      hading: ["420／420", "100／100", "54／54", "8", "561／660"],
+      hading: ["420／420", "100／100", "54／54", "5", "561／660"],
       screenshot: "artifacts/playwright/stage0-difficulty-3-hading.png",
     },
   ] as const;

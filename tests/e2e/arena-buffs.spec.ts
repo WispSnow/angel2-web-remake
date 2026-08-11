@@ -87,6 +87,10 @@ test("magic guide commits AA through the formal technique flow", async ({ page }
   expect(pageErrors).toEqual([]);
 });
 
+// `REMAKE-037` replaced the native AA pool roll with the shared expert planner,
+// so AA now goes to whichever reachable ally gains the most attack. The
+// 巨斧戰士 escort outranks the caster itself, which is what makes AA — rather
+// than a self-buff — the enemy's best action here.
 test("enemy magic guide uses AA with the original group-17 typo", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -103,33 +107,30 @@ test("enemy magic guide uses AA with the original group-17 typo", async ({ page 
     arena.setSide(2);
     arena.setClass("magic-guide");
     const guide = arena.interact(26, 30);
-    arena.setClass("soldier");
+    arena.setClass("great-axe-warrior");
+    arena.setLevel(1);
     const ally = arena.interact(28, 30);
     return [first, second, guide, ally];
   });
   expect(placed).toEqual([true, true, true, true]);
   await page.getByTestId("arena-start").click();
-  // Two successful full-life 1H casts consume exactly two presentation-neutral
-  // experience rolls, so the enemy's next original three-entry pool roll selects AA.
   for (const [x, actorId] of [[18, "arena-1-0"], [20, "arena-1-1"]] as const) {
     await clickArenaWorldCell(page, x, 30);
-    await page.getByTestId("unit-command-technique").click();
-    await page.getByTestId("technique-heal-1").click();
-    await clickArenaWorldCell(page, x, 30);
+    await page.getByTestId("unit-command-rest").click();
     await page.waitForFunction((expectedActorId) => {
       const current = (window.__ANGEL2_ARENA__?.getState() as {
         battle?: ArenaBattleDebugState;
       }).battle;
-      return current?.lastSpecialAction?.actionId === "heal-1"
-        && current.lastSpecialAction.actorId === expectedActorId
-        && current.specialActionPresentation === undefined;
+      const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
+      return current?.units.find(({ id }) => id === expectedActorId)?.acted === true
+        && canvas?.dataset.mapCombatPhase === undefined;
     }, actorId);
   }
 
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
   await expect(dialogue).toHaveAttribute("data-action-id", "attack-up");
-  await expect(dialogue).toHaveAttribute("data-effect-center", "26,31");
+  await expect(dialogue).toHaveAttribute("data-effect-center", "28,30");
   await expect(page.getByText("功擊提昇.", { exact: true })).toBeVisible();
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-attack-up-ai.png`,
@@ -147,7 +148,7 @@ test("enemy magic guide uses AA with the original group-17 typo", async ({ page 
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "attack-up",
     actorId: "arena-2-0",
-    target: { x: 26, y: 31 },
+    target: { x: 28, y: 30 },
     affectedUnits: [expect.objectContaining({
       unitId: "arena-2-1",
       statusesAfter: expect.objectContaining({ attackUp: 3 }),
@@ -156,6 +157,9 @@ test("enemy magic guide uses AA with the original group-17 typo", async ({ page 
   expect(pageErrors).toEqual([]);
 });
 
+// The 巫師 needs a non-ice companion: `REMAKE-034`'s pure-ice remnant gate
+// filters every ice candidate while all surviving side-2 units are ice classes,
+// so a lone 巫師 would fall back to an ordinary attack and never freeze anyone.
 test("AA buffs an ice-frozen ally while the persistent shell stays above the effect", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -174,9 +178,11 @@ test("AA buffs an ice-frozen ally while the persistent shell stays above the eff
     arena.setClass("wizard");
     arena.setLevel(1);
     const wizard = arena.interact(23, 30);
-    return [guide, frozenTarget, wizard];
+    arena.setClass("soldier");
+    const escort = arena.interact(26, 30);
+    return [guide, frozenTarget, wizard, escort];
   });
-  expect(placed).toEqual([true, true, true]);
+  expect(placed).toEqual([true, true, true, true]);
   await page.getByTestId("arena-start").click();
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-rest").click();
@@ -198,11 +204,15 @@ test("AA buffs an ice-frozen ally while the persistent shell stays above the eff
       && current.lastSpecialAction?.actionId === "ice-2"
       && current.units.find(({ id }) => id === "arena-1-1")?.actionDisabled === true;
   });
+  // `REMAKE-036` pushes every unblocked receiver one cell outward, trying
+  // down/up/left/right in that order, so the ally is buffed on (20,31).
+  const frozen = (await arenaBattleState(page))?.units.find(({ id }) => id === "arena-1-1");
+  expect({ x: frozen?.x, y: frozen?.y }).toEqual({ x: 20, y: 31 });
 
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-attack-up").click();
-  await clickArenaWorldCell(page, 20, 30);
+  await clickArenaWorldCell(page, 20, 31);
   const canvas = page.getByTestId("battle-canvas");
   await page.waitForFunction(() => {
     const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
@@ -399,14 +409,17 @@ test("AD buffs an ice-frozen ally while the persistent shell stays above the shi
     arena.setLevel(1);
     const guide = arena.interact(18, 30);
     arena.setClass("soldier");
+    // Same pure-ice remnant gate as the AA case above.
     const frozenTarget = arena.interact(20, 30);
     arena.setSide(2);
     arena.setClass("wizard");
     arena.setLevel(1);
     const wizard = arena.interact(23, 30);
-    return [guide, frozenTarget, wizard];
+    arena.setClass("soldier");
+    const escort = arena.interact(26, 30);
+    return [guide, frozenTarget, wizard, escort];
   });
-  expect(placed).toEqual([true, true, true]);
+  expect(placed).toEqual([true, true, true, true]);
   await page.getByTestId("arena-start").click();
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-rest").click();
@@ -428,11 +441,14 @@ test("AD buffs an ice-frozen ally while the persistent shell stays above the shi
       && current.lastSpecialAction?.actionId === "ice-2"
       && current.units.find(({ id }) => id === "arena-1-1")?.actionDisabled === true;
   });
+  // Same `REMAKE-036` pushback as the AA case above.
+  const frozen = (await arenaBattleState(page))?.units.find(({ id }) => id === "arena-1-1");
+  expect({ x: frozen?.x, y: frozen?.y }).toEqual({ x: 20, y: 31 });
 
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-defense-up").click();
-  await clickArenaWorldCell(page, 20, 30);
+  await clickArenaWorldCell(page, 20, 31);
   const canvas = page.getByTestId("battle-canvas");
   await page.waitForFunction(() => {
     const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
@@ -672,6 +688,10 @@ test("tier-three magic guide commits FM through the formal technique flow", asyn
   expect(pageErrors).toEqual([]);
 });
 
+// FM's support value is the flat 120 the expert planner gives every recipient,
+// so the tie breaks on target threat and the 魔導師 shields itself rather than
+// the 士兵 escort. AA cannot outrank it here because the escort's attack is
+// below the FM constant.
 test("enemy tier-three magic guide uses stable FM without inventing native dialogue", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -723,10 +743,11 @@ test("enemy tier-three magic guide uses stable FM without inventing native dialo
     actionId: "magic-guard",
     actorId: "arena-2-0",
     affectedUnits: [expect.objectContaining({
-      unitId: "arena-2-1",
+      unitId: "arena-2-0",
       statusesAfter: expect.objectContaining({ magicGuard: 1 }),
     })],
   });
-  expect(after?.units.find(({ id }) => id === "arena-2-1")?.statuses.magicGuard).toBe(1);
+  expect(after?.units.find(({ id }) => id === "arena-2-0")?.statuses.magicGuard).toBe(1);
+  expect(after?.units.find(({ id }) => id === "arena-2-1")?.statuses.magicGuard).toBe(0);
   expect(pageErrors).toEqual([]);
 });
