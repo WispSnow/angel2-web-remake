@@ -12,7 +12,7 @@ import {
 } from "../content/classes";
 import {
   BATTLE_ACTION_DEFINITIONS,
-  CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+  HALF_DRAGON_TELEPORT_ACTION_ID,
   hasIceTechnique,
   isIceActionId,
   techniqueActionIdsFor,
@@ -31,8 +31,8 @@ import type { ClassId } from "../content/classes";
 import {
   shootingRange,
   shootingLinePaths,
-  fullMapRange,
   NumericRangeMap,
+  techniqueSelectionPath,
   techniqueSelectionRange,
 } from "./actions/range-map";
 import { prepareSpecialAction as resolveSpecialAction } from "./actions/resolve";
@@ -162,7 +162,7 @@ const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "iron-plate": ["engineer"],
   "obstacle": ["engineer"],
   wd: ["dragon", "empress"],
-  [CLASS_SHOWDOWN_TELEPORT_ACTION_ID]: [],
+  [HALF_DRAGON_TELEPORT_ACTION_ID]: ["half-dragon-warrior"],
 };
 
 const isConstructionAction = (actionId: BattleActionId): actionId is ConstructionActionId =>
@@ -197,7 +197,6 @@ function applyActiveOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit
 function canUseSpecialAction(
   actor: BattleUnit,
   actionId: BattleActionId,
-  additionalClassAction: boolean,
 ): boolean {
   const tier = classTierFor(actor);
   const nativeTechniqueAction = techniqueActionIdsFor(actor).includes(actionId);
@@ -244,9 +243,7 @@ function canUseSpecialAction(
   if (actionId === "stomp-3" && tier !== 3) return false;
   return !actor.acted
     && !actor.actionDisabled
-    && (additionalClassAction
-      || nativeTechniqueAction
-      || ACTION_CLASSES[actionId].includes(actor.classId))
+    && (nativeTechniqueAction || ACTION_CLASSES[actionId].includes(actor.classId))
     && (actionId === "archer-shot" || actionId === "crossbow-shot"
       || actionId === "magic-archer-shot" || actor.statuses.techniqueSeal === 0);
 }
@@ -275,7 +272,6 @@ export interface BattleScenario {
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   alliedBehaviorById?: ReadonlyMap<string, number>;
   enemyBehaviorById?: ReadonlyMap<string, number>;
-  additionalClassActions?: Readonly<Partial<Record<ClassId, readonly BattleActionId[]>>>;
   forces?: readonly ForceDefinition[];
   routePulses?: readonly RoutePulseDefinition[];
   escortRoutes?: readonly EscortRouteDefinition[];
@@ -364,16 +360,7 @@ export class Stage0Battle {
   }
 
   private canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
-    return canUseSpecialAction(
-      actor,
-      actionId,
-      this.scenario.additionalClassActions?.[actor.classId]?.includes(actionId) ?? false,
-    );
-  }
-
-  additionalActionIdsFor(actorId: string): readonly BattleActionId[] {
-    const actor = this.unit(actorId);
-    return actor ? this.scenario.additionalClassActions?.[actor.classId] ?? [] : [];
+    return canUseSpecialAction(actor, actionId);
   }
 
   static fromCampaignEntry(campaign: CampaignState): Stage0Battle {
@@ -848,9 +835,6 @@ export class Stage0Battle {
       return new NumericRangeMap(this.stage.width, this.stage.height);
     }
     const battlefield = this.dynamicBattlefield;
-    if (actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID) {
-      return fullMapRange(this.stage.width, this.stage.height);
-    }
     if (isConstructionAction(actionId)) {
       const result = new NumericRangeMap(this.stage.width, this.stage.height);
       for (const position of constructionReachableCells(actor, this.units, battlefield)) {
@@ -860,6 +844,16 @@ export class Stage0Battle {
     }
     if (actionId === "archer-shot" || actionId === "crossbow-shot" || actionId === "magic-archer-shot") {
       return shootingRange(actor, battlefield, BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed);
+    }
+    // The native `1N` handler writes seed 200 into the same mode-`0` builder
+    // the tiered techniques use, so it shares this propagation and only differs
+    // in reach.
+    if (actionId === HALF_DRAGON_TELEPORT_ACTION_ID) {
+      return techniqueSelectionRange(
+        actor,
+        battlefield,
+        BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed,
+      );
     }
     if (BATTLE_ACTION_DEFINITIONS[actionId].target === "self-area") {
       const result = new NumericRangeMap(this.stage.width, this.stage.height);
@@ -871,6 +865,25 @@ export class Stage0Battle {
       battlefield,
       BATTLE_ACTION_DEFINITIONS[actionId].range.selectionRadius,
     );
+  }
+
+  /**
+   * The native handler hands the chosen cell to the ordinary movement
+   * predecessor walk, so the actor flies a real path instead of blinking. The
+   * walk follows the same mode-`0` gradient and may cross occupied cells.
+   * `techniqueSelectionPath` builds it target-first the way the native buffer
+   * does; the release replays that buffer backwards, so this returns the
+   * actor-first order the movement presentation consumes.
+   */
+  directTechniquePath(actorId: string, destination: Position): Position[] {
+    const actor = this.unit(actorId);
+    if (!actor || !this.canUseSpecialAction(actor, HALF_DRAGON_TELEPORT_ACTION_ID)) return [];
+    return techniqueSelectionPath(
+      actor,
+      destination,
+      this.dynamicBattlefield,
+      BATTLE_ACTION_DEFINITIONS[HALF_DRAGON_TELEPORT_ACTION_ID].range.nativeSeed,
+    ).reverse();
   }
 
   actionTargetCells(actorId: string, actionId: BattleActionId): Position[] {

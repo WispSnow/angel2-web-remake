@@ -304,6 +304,26 @@ async function build(inputPaths, outputJsonPath, outputCsvPath) {
     entry.descriptorMatches[0].record,
     normalizeTechniqueClass(entry),
   ]));
+  // The inline classifier chains, not the DS:41CE tier table, decide which
+  // action menu a class gets. 1N reaches 技術 through a dedicated handler and
+  // therefore has no tiered menu, so the two sources must stay separate.
+  const menuByCode = new Map(Object.entries(techniques.actionMenuClassifier.groups)
+    .flatMap(([menu, group]) => group.classCodes.map((code) => [code, menu])));
+  const directTechniqueByCode = new Map(techniques.techniqueMenu.directHandlerClasses
+    .map((entry) => [entry.classCode, entry]));
+  const MENU_CATEGORY = { basic: "ordinary", ranged: "shooting", technique: "technique" };
+  const menuOf = (record, classCode) => {
+    const menu = menuByCode.get(classCode);
+    assert(menu !== undefined, `record ${record}: ${classCode} is absent from every action-menu chain`);
+    const category = MENU_CATEGORY[menu];
+    assert(shootingByRecord.has(record) === (category === "shooting"),
+      `record ${record}: shooting table and action-menu chain disagree`);
+    const hasTechniqueSource = techniqueByRecord.has(record)
+      || directTechniqueByCode.has(classCode);
+    assert(hasTechniqueSource === (category === "technique"),
+      `record ${record}: technique sources and action-menu chain disagree`);
+    return category;
+  };
 
   const promotionSourcesByTarget = new Map();
   for (const edge of promotions.edges) {
@@ -355,13 +375,9 @@ async function build(inputPaths, outputJsonPath, outputCsvPath) {
       recordKind: record < ORDINARY_RECORD_COUNT ? "ordinary_catalog" : "special_runtime",
       codes,
       codeDetails,
-      playerActionCategory: shootingByRecord.has(record)
-        ? "shooting"
-        : techniqueByRecord.has(record)
-          ? "technique"
-          : record < ORDINARY_RECORD_COUNT
-            ? "ordinary"
-            : "special_runtime",
+      playerActionCategory: record < ORDINARY_RECORD_COUNT
+        ? menuOf(record, codes.side1)
+        : "special_runtime",
       aiClassDispatch: {
         side1: classDispatch.byCode.get(codes.side1),
         side2: classDispatch.byCode.get(codes.side2),
@@ -391,6 +407,7 @@ async function build(inputPaths, outputJsonPath, outputCsvPath) {
       ordinaryHitStatuses: statusByRecord.get(record) ?? [],
       shooting: shootingByRecord.get(record) ?? null,
       technique: techniqueByRecord.get(record) ?? null,
+      directTechnique: directTechniqueByCode.get(codes.side1) ?? null,
       mapRules: {
         movementProfile: movementProfiles.byRecord.get(record),
         terrainDefenseProfile: defenseProfiles.byRecord.get(record),

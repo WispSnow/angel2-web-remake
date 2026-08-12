@@ -995,13 +995,20 @@ describe("native class implementation sequence", () => {
       const classId = classIdFromRecord(record);
       const definition = classDefinition(classId);
       const actions = techniqueActionIdsFor({ classId, experience: 0 });
-      expect(actions).toHaveLength(definition.technique?.tiers[0]?.actions.length ?? 0);
+      // `1N` reaches 技術 from a hard-coded class-code branch instead of a
+      // DS:41CE tier table, so it contributes one action and no tiers.
+      expect(actions).toHaveLength(definition.directTechnique
+        ? 1
+        : definition.technique?.tiers[0]?.actions.length ?? 0);
       expect(actions.length).toBeGreaterThan(0);
+      expect(definition.directTechnique !== null && definition.technique !== null).toBe(false);
     }
     expect(techniqueActionIdsFor({ classId: "priest", experience: 0 })).toEqual([
       "fire-1",
       "recovery-1",
     ]);
+    expect(techniqueActionIdsFor({ classId: "half-dragon-warrior", experience: 0 }))
+      .toEqual(["half-dragon-teleport"]);
   });
 
   it("record 21 crossbow uses the native long shooting range and damage", () => {

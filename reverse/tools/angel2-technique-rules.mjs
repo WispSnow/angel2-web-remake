@@ -11,6 +11,26 @@ const CLASS_MENU_TABLE = 0x41ce;
 const SPECIAL_DISPATCH_TABLE = 0x52a2;
 const SENTINEL = 0xffff;
 
+/**
+ * The action-menu classifier compares the acting unit's class code against
+ * three inline chains. Which menu a class gets is decided here, not by the
+ * tiered table at DS:41CE, so the chains are the authority for
+ * `basic/ranged/technique` and DS:41CE only supplies tier contents.
+ */
+const MENU_CLASSIFIER_CHAINS = {
+  basic: { compareOffset: 0x6773, loadAddress: "0000:6770" },
+  ranged: { compareOffset: 0x67d2, loadAddress: "0000:67D2" },
+  technique: { compareOffset: 0x67f2, loadAddress: "0000:67EF" },
+};
+
+const EXPECTED_MENU_CLASSIFIER = {
+  basic: ["0A", "1A", "2A", "0B", "1B", "0C", "1C", "0E", "1E", "2E",
+    "0F", "1F", "0G", "1G", "2G", "0H", "1H", "0N"],
+  ranged: ["3A", "0I", "1I"],
+  technique: ["4A", "5A", "0D", "1D", "2D", "0J", "1J", "0K", "1K", "0L",
+    "1L", "2L", "3E", "1N"],
+};
+
 const CODE_SIGNATURES = [
   { address: "0000:719B", offset: 0x719b, hex: "833e4a3d537401c3e89408a1161fa3bf77e8beff" },
   { address: "0000:722B", offset: 0x722b, hex: "e440a801740f8b1ec177e8f2dda19d313d30457404e82100" },
@@ -50,6 +70,18 @@ const CODE_SIGNATURES = [
   { address: "1000:7C92", offset: 0x17c92, hex: "8bd8a1a7018ec0a1792e268807402688470140268847" },
   { address: "1000:7CB4", offset: 0x17cb4, hex: "8bd8a1a7018ec0a17b2e268807402688470140268847" },
   { address: "1000:8D94", offset: 0x18d94, hex: "81fb314c7503e9a60081fb324c7503e99d0081fb334c" },
+  { address: "0000:702D", offset: 0x702d, hex: "813e430d314e741f" },
+  { address: "0000:7054", offset: 0x7054, hex: "e81e04c3" },
+  { address: "0000:7475", offset: 0x7475, hex: "a1430d3d314e7401c38b1e161fe8a5dbb8c800a3181fc7060f1f30009a04009d13" },
+  { address: "0000:74C9", offset: 0x74c9, hex: "e892033c0074dce8ad033c0075d5" },
+  { address: "0000:74D7", offset: 0x74d7, hex: "8b36161f8b3e095a9a2900de179a4201de17891e5052" },
+  { address: "0000:74ED", offset: 0x74ed, hex: "c7064a3d5359a122008ec08b1e5052268a070c80268807891e161fc3" },
+  { address: "0000:7318", offset: 0x7318, hex: "8b1e161fe80bdda1c531a3181f" },
+  { address: "0000:7336", offset: 0x7336, hex: "813e430d304e7407c7060f1f4d00c3c7060f1f3000c3" },
+  { address: "0000:7379", offset: 0x7379, hex: "e8e2043c0074d9e8fd043c0075d2" },
+  { address: "1000:3BB0", offset: 0x13bb0, hex: "833e0f1f307401c38bdf031e111fe88901e802033d63007416268a078acdfec9740d3ac1730926880fc606131f59c3" },
+  { address: "1000:3C5C", offset: 0x13c5c, hex: "8bdf031e111fe8f2002e3a06890074043c00751b" },
+  { address: "1000:3C70", offset: 0x13c70, hex: "e8d700e850023d630074103d6200740b" },
 ];
 
 const EXPECTED_CLASS_MENUS = {
@@ -150,6 +182,125 @@ function parseMenu(buffer, menuOffset) {
   throw new Error(`menu DS:${hex(menuOffset)} has no sentinel`);
 }
 
+/**
+ * Reads one inline classifier chain. `cmp ax,imm16 / je rel8` (0x6773, 0x67F2)
+ * and `cmp word [0D43],imm16 / je rel8` (0x67D2) are the two encodings the
+ * release uses; both terminate at the `ret` that follows the last comparison.
+ */
+function parseClassCodeChain(buffer, offset) {
+  const codes = [];
+  let cursor = offset;
+  for (let index = 0; index < 64; index += 1) {
+    let classWord;
+    if (buffer[cursor] === 0x3d) {
+      classWord = buffer.readUInt16LE(cursor + 1);
+      cursor += 3;
+    } else if (buffer[cursor] === 0x81 && buffer[cursor + 1] === 0x3e
+      && buffer.readUInt16LE(cursor + 2) === 0x0d43) {
+      classWord = buffer.readUInt16LE(cursor + 4);
+      cursor += 6;
+    } else {
+      break;
+    }
+    if (buffer[cursor] !== 0x74) {
+      throw new Error(`0000:${hex(cursor)}: classifier comparison is not followed by je`);
+    }
+    cursor += 2;
+    codes.push(decodeCode(classWord));
+  }
+  if (codes.length === 0) throw new Error(`0000:${hex(offset)}: empty classifier chain`);
+  if (buffer[cursor] !== 0xc3) {
+    throw new Error(`0000:${hex(cursor)}: classifier chain does not end in ret`);
+  }
+  return { codes, endOffset: cursor };
+}
+
+/**
+ * `1N/半龍戰士` reaches the 技術 menu through the classifier chain but has no
+ * DS:41CE tier table. `0000:702D` tests the class code before any table lookup
+ * and routes it to a dedicated handler, so the class has exactly one technique
+ * with no submenu, no action code and no dispatch-table entry.
+ */
+function parseMenuClassifier(buffer, descriptorsByCode) {
+  const groups = Object.fromEntries(Object.entries(MENU_CLASSIFIER_CHAINS)
+    .map(([menu, { compareOffset, loadAddress }]) => {
+      const { codes, endOffset } = parseClassCodeChain(buffer, compareOffset);
+      const expected = EXPECTED_MENU_CLASSIFIER[menu];
+      if (codes.join(",") !== expected.join(",")) {
+        throw new Error(`${menu} action-menu chain differs from the recovered runtime: ${codes.join(" ")}`);
+      }
+      return [menu, {
+        loadAddress,
+        chainAddress: `0000:${hex(compareOffset)}`,
+        endAddress: `0000:${hex(endOffset)}`,
+        classCodes: codes,
+        descriptorMatches: codes.map((code) => ({
+          classCode: code,
+          matches: descriptorsByCode.get(code) ?? [],
+        })),
+      }];
+    }));
+  const overlap = groups.basic.classCodes
+    .filter((code) => groups.ranged.classCodes.includes(code)
+      || groups.technique.classCodes.includes(code));
+  if (overlap.length > 0) {
+    throw new Error(`action-menu chains overlap on ${overlap.join(",")}`);
+  }
+  return groups;
+}
+
+function halfDragonDirectTechnique(buffer, techniqueClassCodes, tieredClassCodes) {
+  const directCodes = techniqueClassCodes.filter((code) => !tieredClassCodes.includes(code));
+  if (directCodes.join(",") !== "1N") {
+    throw new Error(`expected 1N as the only direct-handler technique class, got ${directCodes.join(",")}`);
+  }
+  const branchWord = buffer.readUInt16LE(0x702d + 4);
+  const propagationSeed = buffer.readUInt16LE(0x7485 + 1);
+  const propagationMode = buffer.readUInt16LE(0x748b + 4);
+  if (decodeCode(branchWord) !== "1N") {
+    throw new Error("0000:702D no longer branches on the 1N class code");
+  }
+  return {
+    classCode: "1N",
+    branch: "0000:702D",
+    handler: "0000:7475",
+    boundary: "tested before the DS:41CE lookup at 0000:7066, so 1N never reads a tier table, the DS:524C tier selector or the DS:52A2 dispatch table",
+    visibleActionCode: null,
+    submenu: null,
+    range: {
+      seedWrite: "0000:7485",
+      seed: propagationSeed,
+      modeWrite: "0000:748B",
+      mode: String.fromCharCode(propagationMode & 0xff),
+      builder: "139D:0004",
+      semantics: "propagation mode '0' at 1000:3BB0 subtracts a flat 1 per step, rejects only movement rule 99, and never reads the side map, so the flood crosses occupied cells",
+      gridCells: 2500,
+      note: "the 50x50 grid has a maximum Manhattan distance of 98, so a seed of 200 reaches every cell the terrain permits",
+    },
+    landing: {
+      rangeValidator: "0000:785E",
+      occupancyValidator: "0000:7880",
+      rule: "range-map value must be non-zero and the unit-slot map DS:0022 byte must be 0",
+      sharedWith: "0000:7379, the identical pair used by the ordinary 移動 confirm path",
+    },
+    commit: {
+      presentation: ["17DE:0029", "17DE:0142"],
+      presentationNote: "reuses the ordinary movement predecessor walk and step animation rather than an instant blink",
+      address: "0000:74ED",
+      effect: "moves the actor to the selected cell and sets bit 7 (0x80) immediately",
+      followUpAttack: false,
+      followUpNote: "the ordinary 移動 path calls 139D:0527 and offers 攻擊 when an enemy is adjacent; the 1N technique path returns with the action already spent",
+      damage: null,
+      experience: null,
+    },
+    ai: {
+      dispatch: "ordinary",
+      producer: null,
+      boundary: "1N sits in the 1000:171F ordinary AI chain and no AI entry tests the 1N class code, so the original never lets an enemy 半龍戰士 use it",
+    },
+  };
+}
+
 function parseClassMenus(buffer, descriptorsByCode) {
   const classes = [];
   let cursor = CLASS_MENU_TABLE;
@@ -178,7 +329,7 @@ function parseClassMenus(buffer, descriptorsByCode) {
       tiers,
     });
   }
-  if (classes.length !== 13) throw new Error(`expected 13 technique-menu classes, got ${classes.length}`);
+  if (classes.length !== 13) throw new Error(`expected 13 tiered technique-menu classes, got ${classes.length}`);
   return classes;
 }
 
@@ -460,6 +611,12 @@ async function extract(runtimePath, descriptorPath, battleTemplatePath, battleDi
   ]);
   const descriptorsByCode = descriptorIndex(descriptors);
   const classMenus = parseClassMenus(buffer, descriptorsByCode);
+  const menuClassifier = parseMenuClassifier(buffer, descriptorsByCode);
+  const directTechnique = halfDragonDirectTechnique(
+    buffer,
+    menuClassifier.technique.classCodes,
+    classMenus.map((entry) => entry.classCode),
+  );
   const dispatchTable = parseDispatchTable(buffer);
   const menuCodes = new Set(classMenus.flatMap((entry) => entry.tiers.flatMap((tier) => tier.entries.map((item) => item.actionCode))));
   const dispatchCodes = new Set(dispatchTable.map((entry) => entry.actionCode));
@@ -495,11 +652,17 @@ async function extract(runtimePath, descriptorPath, battleTemplatePath, battleDi
       cancelCode: "X",
     },
     shooting: shootingRules(descriptorsByCode),
+    actionMenuClassifier: {
+      recordFormat: "inline cmp/je chains; the matching menu is chosen before any table lookup",
+      groups: menuClassifier,
+      boundary: "the technique chain holds 14 classes while DS:41CE holds 13; 1N reaches 技術 through a dedicated handler instead of a tier table",
+    },
     techniqueMenu: {
       classTable: `${hex(DATA_SEGMENT)}:${hex(CLASS_MENU_TABLE)}`,
       tierSelector: "DS:524C minus one, clamped to 0..2",
       classes: classMenus,
       uniqueVisibleActionCodes: [...menuCodes].sort(),
+      directHandlerClasses: [directTechnique],
     },
     dispatchTable: {
       address: `${hex(DATA_SEGMENT)}:${hex(SPECIAL_DISPATCH_TABLE)}`,

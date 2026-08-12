@@ -13,7 +13,7 @@ import {
   createClassShowdownPlacements,
 } from "../../src/game/class-showdown-session";
 import { classDefinition, classStatsFor, killRewardFor } from "../../src/game/content/classes";
-import { CLASS_SHOWDOWN_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
+import { HALF_DRAGON_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
 import { ALLY_MAP_UNIT_ASSETS } from "../../src/game/content/map-unit-assets";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "../../src/game/content/technique-lab.generated";
 import {
@@ -140,16 +140,17 @@ describe("all-class showdown lab", () => {
       .toEqual([[1, 64], [2, 64]]);
   });
 
-  it("gives only the half-dragon showdown mirror a full-map empty-cell teleport", () => {
+  it("reaches every unoccupied plains cell with the native half-dragon teleport", () => {
     const placements = createClassShowdownPlacements(1);
     const battle = new ArenaBattle(placements, 0, undefined, CLASS_SHOWDOWN_ENVIRONMENT);
     const actor = battle.unit("arena-1-8")!;
     const destination = { x: 0, y: 0 };
-    const targetCells = battle.actionTargetCells(actor.id, CLASS_SHOWDOWN_TELEPORT_ACTION_ID);
+    const targetCells = battle.actionTargetCells(actor.id, HALF_DRAGON_TELEPORT_ACTION_ID);
 
     expect(actor.classId).toBe("half-dragon-warrior");
-    expect(battle.additionalActionIdsFor(actor.id)).toEqual([CLASS_SHOWDOWN_TELEPORT_ACTION_ID]);
-    expect(battle.actionRange(actor.id, CLASS_SHOWDOWN_TELEPORT_ACTION_ID).cells())
+    // Every showdown cell is plains, so the native mode-`0` flood with seed 200
+    // covers the whole 50x50 grid and only the 70 occupied cells drop out.
+    expect(battle.actionRange(actor.id, HALF_DRAGON_TELEPORT_ACTION_ID).cells())
       .toHaveLength(50 * 50);
     expect(targetCells).toHaveLength(50 * 50 - placements.length);
     expect(targetCells).toContainEqual(destination);
@@ -157,14 +158,12 @@ describe("all-class showdown lab", () => {
       expect(targetCells).not.toContainEqual({ x: placement.x, y: placement.y });
     }
     expect(() => battle.prepareSpecialAction({
-      actionId: CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+      actionId: HALF_DRAGON_TELEPORT_ACTION_ID,
       actorId: actor.id,
       target: { x: 18, y: 23 },
     })).toThrow("illegal special action");
-    expect(battle.additionalActionIdsFor("arena-2-8"))
-      .toEqual([CLASS_SHOWDOWN_TELEPORT_ACTION_ID]);
     expect(battle.planEnemyAiAction("arena-2-8")?.actionId)
-      .not.toBe(CLASS_SHOWDOWN_TELEPORT_ACTION_ID);
+      .not.toBe(HALF_DRAGON_TELEPORT_ACTION_ID);
 
     const before = {
       position: { x: actor.x, y: actor.y },
@@ -173,7 +172,7 @@ describe("all-class showdown lab", () => {
       rng: { state: battle.rng.state, calls: battle.rng.calls },
     };
     const prepared = battle.prepareSpecialAction({
-      actionId: CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+      actionId: HALF_DRAGON_TELEPORT_ACTION_ID,
       actorId: actor.id,
       target: destination,
     });
@@ -194,12 +193,15 @@ describe("all-class showdown lab", () => {
     expect({ x: actor.x, y: actor.y, acted: actor.acted, experience: actor.experience })
       .toEqual({ x: destination.x, y: destination.y, acted: true, experience: before.experience });
     expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(before.rng);
-    expect(battle.actionTargetCells(actor.id, CLASS_SHOWDOWN_TELEPORT_ACTION_ID)).toEqual([]);
+    expect(battle.actionTargetCells(actor.id, HALF_DRAGON_TELEPORT_ACTION_ID)).toEqual([]);
 
+    // REMAKE-062 promotes the action to a native class rule, so the ordinary
+    // arena grants it too; its varied terrain is what narrows the reach.
     const ordinaryArena = new ArenaBattle(placements, 0, undefined, ALL_TERRAIN_ARENA_ENVIRONMENT);
-    expect(ordinaryArena.additionalActionIdsFor("arena-1-8")).toEqual([]);
-    expect(ordinaryArena.actionTargetCells("arena-1-8", CLASS_SHOWDOWN_TELEPORT_ACTION_ID))
-      .toEqual([]);
+    const ordinaryTargets = ordinaryArena
+      .actionTargetCells("arena-1-8", HALF_DRAGON_TELEPORT_ACTION_ID);
+    expect(ordinaryTargets.length).toBeGreaterThan(0);
+    expect(ordinaryTargets.length).toBeLessThanOrEqual(50 * 50 - placements.length);
   });
 
   it("multiplies a water-warrior kill award by every shared board body", () => {

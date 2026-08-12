@@ -50,14 +50,6 @@ export class NumericRangeMap {
   }
 }
 
-export function fullMapRange(width: number, height: number): NumericRangeMap {
-  const result = new NumericRangeMap(width, height);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) result.set({ x, y }, 1);
-  }
-  return result;
-}
-
 const OFFSETS = [
   { x: 0, y: -1 },
   { x: -1, y: 0 },

@@ -4,38 +4,54 @@ import {
   STAGE0_ACTION_PRESENTATION_ASSETS,
   STAGE0_REST_PRESENTATION,
 } from "./stage0-actions.generated";
-import { classDefinition, classTierFor } from "./classes";
+import { classDefinition, classTierFor, type ClassId } from "./classes";
 import type { BattleUnit } from "../types";
 
 type ExtendedActionContent = typeof import("./stage1-actions.generated");
-export const CLASS_SHOWDOWN_TELEPORT_ACTION_ID = "showdown-teleport" as const;
+export const HALF_DRAGON_TELEPORT_ACTION_ID = "half-dragon-teleport" as const;
 
-const CLASS_SHOWDOWN_ACTION_DEFINITIONS = {
-  [CLASS_SHOWDOWN_TELEPORT_ACTION_ID]: {
-    id: CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+const halfDragonTeleport = classDefinition("half-dragon-warrior").directTechnique;
+if (!halfDragonTeleport) {
+  throw new Error("half-dragon-warrior lost its native direct technique in the class catalog");
+}
+
+/**
+ * The native `1N` technique is reached straight from the class code at
+ * `0000:702D`, so it has no action code, no tier menu and no dispatch-table
+ * entry. REMAKE-062 gives it a remake-only id and label so the 技術 menu can
+ * name it; every rule-bearing number still comes from the class catalog.
+ */
+const DIRECT_TECHNIQUE_ACTION_DEFINITIONS = {
+  [HALF_DRAGON_TELEPORT_ACTION_ID]: {
+    id: HALF_DRAGON_TELEPORT_ACTION_ID,
     nativeCode: null,
-    label: "瞬移",
+    label: "傳送",
     kind: "technique",
-    target: "empty-cell",
+    target: halfDragonTeleport.target,
     range: {
-      mode: "full-map",
+      nativeSeed: halfDragonTeleport.rangeSeed,
+      propagationMode: halfDragonTeleport.rangePropagationMode,
     },
     experience: {
       fixed: 0,
     },
-    presentationId: "class-showdown-teleport",
+    presentationId: "half-dragon-teleport",
   },
 } as const;
 
+const DIRECT_TECHNIQUE_ACTION_BY_CLASS = {
+  "half-dragon-warrior": HALF_DRAGON_TELEPORT_ACTION_ID,
+} as const satisfies Readonly<Partial<Record<ClassId, string>>>;
+
 type BattleActionDefinitions = typeof STAGE0_ACTION_DEFINITIONS
   & ExtendedActionContent["STAGE1_ACTION_DEFINITIONS"]
-  & typeof CLASS_SHOWDOWN_ACTION_DEFINITIONS;
+  & typeof DIRECT_TECHNIQUE_ACTION_DEFINITIONS;
 type BattleActionAudioAssets = typeof STAGE0_ACTION_AUDIO_ASSETS
   & ExtendedActionContent["STAGE1_ACTION_AUDIO_ASSETS"];
 
 export const BATTLE_ACTION_DEFINITIONS = {
   ...STAGE0_ACTION_DEFINITIONS,
-  ...CLASS_SHOWDOWN_ACTION_DEFINITIONS,
+  ...DIRECT_TECHNIQUE_ACTION_DEFINITIONS,
 } as unknown as BattleActionDefinitions;
 
 export type BattleActionId = keyof typeof BATTLE_ACTION_DEFINITIONS;
@@ -79,8 +95,16 @@ const TECHNIQUE_ACTION_BY_NATIVE_CODE = {
 export function techniqueActionIdsFor(
   unit: Pick<BattleUnit, "classId" | "experience">,
 ): readonly BattleActionId[] {
+  const definition = classDefinition(unit.classId);
+  if (definition.directTechnique) {
+    const directActionId = DIRECT_TECHNIQUE_ACTION_BY_CLASS[
+      unit.classId as keyof typeof DIRECT_TECHNIQUE_ACTION_BY_CLASS
+    ];
+    if (!directActionId) throw new Error(`missing direct technique action for ${unit.classId}`);
+    return [directActionId as BattleActionId];
+  }
   const tier = classTierFor(unit);
-  const actions = classDefinition(unit.classId).technique?.tiers[tier - 1]?.actions ?? [];
+  const actions = definition.technique?.tiers[tier - 1]?.actions ?? [];
   return actions.map(({ actionCode }) => {
     const actionId = TECHNIQUE_ACTION_BY_NATIVE_CODE[
       actionCode as keyof typeof TECHNIQUE_ACTION_BY_NATIVE_CODE

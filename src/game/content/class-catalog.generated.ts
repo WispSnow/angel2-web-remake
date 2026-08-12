@@ -134,6 +134,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 0,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -315,6 +316,7 @@ export const CLASS_CATALOG = {
     ],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 1,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -471,6 +473,7 @@ export const CLASS_CATALOG = {
     ],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 2,
     "terrainDefenseProfile": 1,
     "movementRules": [
@@ -699,6 +702,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -917,6 +921,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -1145,6 +1150,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -1358,6 +1364,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -1526,6 +1533,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 1,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -1600,7 +1608,7 @@ export const CLASS_CATALOG = {
       "agreement": true
     },
     "genericPortraitRecord": 64,
-    "actionCategory": "ordinary",
+    "actionCategory": "technique",
     "aiClassDispatch": {
       "side1": "ordinary",
       "side2": "ordinary"
@@ -1675,6 +1683,14 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": {
+      "classCode": "1N",
+      "rangeSeed": 200,
+      "rangePropagationMode": "0",
+      "target": "empty-cell",
+      "endsActivation": true,
+      "grantsExperience": false
+    },
     "movementProfile": 4,
     "terrainDefenseProfile": 2,
     "movementRules": [
@@ -1824,6 +1840,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 1,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -2042,6 +2059,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -2225,6 +2243,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -2380,6 +2399,7 @@ export const CLASS_CATALOG = {
       "experience": "kill reward + 13..17"
     },
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 5,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -2529,6 +2549,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 6,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -2703,6 +2724,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 4,
     "terrainDefenseProfile": 2,
     "movementRules": [
@@ -2852,6 +2874,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 4,
     "terrainDefenseProfile": 2,
     "movementRules": [
@@ -3008,6 +3031,7 @@ export const CLASS_CATALOG = {
     ],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 7,
     "terrainDefenseProfile": 3,
     "movementRules": [
@@ -3157,6 +3181,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 6,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -3306,6 +3331,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 6,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -3489,6 +3515,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 6,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -3644,6 +3671,7 @@ export const CLASS_CATALOG = {
       "experience": "kill reward + 8..11"
     },
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -3812,6 +3840,7 @@ export const CLASS_CATALOG = {
       "experience": "kill reward + 13..17"
     },
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -3961,6 +3990,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 6,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -4123,6 +4153,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 4,
     "terrainDefenseProfile": 2,
     "movementRules": [
@@ -4334,6 +4365,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -4551,6 +4583,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -4713,6 +4746,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 8,
     "terrainDefenseProfile": 4,
     "movementRules": [
@@ -4862,6 +4896,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 1,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -5030,6 +5065,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 1,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -5204,6 +5240,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 1,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -5415,6 +5452,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -5611,6 +5649,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -5794,6 +5833,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 3,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -5950,6 +5990,7 @@ export const CLASS_CATALOG = {
     ],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 1,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -6148,6 +6189,7 @@ export const CLASS_CATALOG = {
         }
       ]
     },
+    "directTechnique": null,
     "movementProfile": 9,
     "terrainDefenseProfile": 0,
     "movementRules": [
@@ -6292,6 +6334,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 10,
     "terrainDefenseProfile": 5,
     "movementRules": [
@@ -6436,6 +6479,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 4,
     "terrainDefenseProfile": 6,
     "movementRules": [
@@ -6580,6 +6624,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 11,
     "terrainDefenseProfile": 7,
     "movementRules": [
@@ -6724,6 +6769,7 @@ export const CLASS_CATALOG = {
     "ordinaryHitStatuses": [],
     "shooting": null,
     "technique": null,
+    "directTechnique": null,
     "movementProfile": 12,
     "terrainDefenseProfile": 8,
     "movementRules": [

@@ -1,6 +1,6 @@
 import {
   BATTLE_ACTION_DEFINITIONS,
-  CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+  HALF_DRAGON_TELEPORT_ACTION_ID,
 } from "../../content/actions";
 import { killRewardFor, movementRulesFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
@@ -777,7 +777,7 @@ export function prepareSpecialAction(
       context,
       trial,
     ));
-  } else if (intent.actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID) {
+  } else if (intent.actionId === HALF_DRAGON_TELEPORT_ACTION_ID) {
     affectedUnits = [affectedUnit(actor, { positionAfter: center })];
     experienceGained = 0;
   } else {

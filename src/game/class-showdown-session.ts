@@ -12,7 +12,6 @@ import type {
   ArenaLevel,
   ArenaUnitPlacement,
 } from "./arena-session";
-import { CLASS_SHOWDOWN_TELEPORT_ACTION_ID } from "./content/actions";
 
 export const CLASS_SHOWDOWN_CLASS_IDS = CLASS_IDS.filter(
   (classId) => classDefinition(classId).recordKind === "ordinary_catalog",
@@ -107,9 +106,6 @@ export const CLASS_SHOWDOWN_ENVIRONMENT: ArenaBattleEnvironment = {
   retryStatusText: "以目前統一等級重新開始全職業對陣。",
   retreatStatusText: "退出本場交戰並以目前統一等級重置。",
   enemyPhaseStatusText: "敵方階段：各職業測試 AI 開始行動。",
-  additionalClassActions: {
-    "half-dragon-warrior": [CLASS_SHOWDOWN_TELEPORT_ACTION_ID],
-  },
 };
 
 export function classShowdownPair(

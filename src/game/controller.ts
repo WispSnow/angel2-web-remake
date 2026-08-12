@@ -8,7 +8,7 @@ import {
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import {
   BATTLE_ACTION_DEFINITIONS,
-  CLASS_SHOWDOWN_TELEPORT_ACTION_ID,
+  HALF_DRAGON_TELEPORT_ACTION_ID,
   STAGE0_REST_PRESENTATION,
   actionPresentationCatalog,
   techniqueActionIdsFor,
@@ -185,7 +185,6 @@ export type SpecialActionPresentationPhase =
   | "dispelEffect"
   | "stompEffect"
   | "stompPageToggle"
-  | "teleportEffect"
   | "lifeDrain"
   | "specialDeath";
 
@@ -256,24 +255,17 @@ const POST_MOVE_COMMANDS: readonly UnitCommand[] = [
   { id: "undo", label: "返悔" },
 ];
 
-const CLASS_COMMANDS: Readonly<Partial<Record<BattleUnit["classId"], UnitCommand>>> = {
-  archer: { id: "shoot", label: "射擊" },
-  crossbow: { id: "shoot", label: "射擊" },
-  "magic-archer": { id: "shoot", label: "射擊" },
-  sister: { id: "technique", label: "技術" },
-  priest: { id: "technique", label: "技術" },
-  magician: { id: "technique", label: "技術" },
-  "evil-mage": { id: "technique", label: "技術" },
-  monk: { id: "technique", label: "技術" },
-  "magic-priest": { id: "technique", label: "技術" },
-  "prayer-guide": { id: "technique", label: "技術" },
-  "magic-guide": { id: "technique", label: "技術" },
-  "curse-master": { id: "technique", label: "技術" },
-  "great-dragon-knight": { id: "technique", label: "技術" },
-  "magic-master": { id: "technique", label: "技術" },
-  wizard: { id: "technique", label: "技術" },
-  engineer: { id: "technique", label: "技術" },
-};
+/**
+ * The native action-menu chains at `0000:6770/67D2/67EF` decide which extra
+ * command a class gets; the generated catalog already carries that split as
+ * `actionCategory`, so this reads it instead of restating the 21 classes.
+ */
+function classCommandFor(classId: BattleUnit["classId"]): UnitCommand | undefined {
+  const category = classDefinition(classId).actionCategory;
+  if (category === "shooting") return { id: "shoot", label: "射擊" };
+  if (category === "technique") return { id: "technique", label: "技術" };
+  return undefined;
+}
 
 const MAGIC_PRIEST_TIER3_EXPERIENCE = classDefinition("magic-priest").dataRows[2].experienceThreshold;
 
@@ -855,10 +847,7 @@ export class GameController {
       return [BASIC_COMMANDS[0], { id: "end", label: "放棄" }];
     }
     const selectedClassCommand = this.selectedUnit
-      ? CLASS_COMMANDS[this.selectedUnit.classId]
-        ?? (this.battle.additionalActionIdsFor(this.selectedUnit.id).length > 0
-          ? { id: "technique", label: "技術" }
-          : undefined)
+      ? classCommandFor(this.selectedUnit.classId)
       : undefined;
     const classCommand = selectedClassCommand?.id === "technique"
       && this.selectedUnit?.statuses.techniqueSeal
@@ -876,10 +865,7 @@ export class GameController {
 
   get techniqueActions(): readonly BattleActionId[] {
     if (!this.selectedUnit) return [];
-    return [...new Set([
-      ...techniqueActionIdsFor(this.selectedUnit),
-      ...this.battle.additionalActionIdsFor(this.selectedUnit.id),
-    ])];
+    return techniqueActionIdsFor(this.selectedUnit);
   }
 
   get commandMenuPosition(): Position {
@@ -1721,8 +1707,8 @@ export class GameController {
     }
     this.actionMode = "specialTarget";
     this.statusMessage = definition.target === "empty-cell"
-      ? actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID
-        ? "選擇半龍戰士要瞬移到的空格。"
+      ? actionId === HALF_DRAGON_TELEPORT_ACTION_ID
+        ? "選擇半龍戰士要傳送到的空格。"
         : "選擇工兵移動並鋪設鐵板的空格。"
       : `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
@@ -2066,8 +2052,8 @@ export class GameController {
           ? result.blockReason === "classImmune"
             ? `${targetPresentation.name}完整承受禁咒演出，但龍職業免疫狀態寫入。`
             : `${targetPresentation.name}遭到禁咒，狀態重置為 3。`
-        : actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID
-          ? `${actorPresentation.name}已瞬移至（${result.target.x}, ${result.target.y}）。`
+        : actionId === HALF_DRAGON_TELEPORT_ACTION_ID
+          ? `${actorPresentation.name}已傳送至（${result.target.x}, ${result.target.y}）。`
         : actionId === "lightning-1" || actionId === "lightning-2" || actionId === "lightning-3"
           || actionId === "lightning-4"
           ? `落雷對 ${result.affectedUnits.filter(({ blockReason }) => blockReason !== "frozen").length} 名敵人造成共 ${result.damage} 點傷害。`
@@ -2457,10 +2443,14 @@ export class GameController {
           this.queueAudioCue(82, `${result.actionId}-impact-${step.index}`, "magic");
         }
       }
-    } else if (result.actionId === CLASS_SHOWDOWN_TELEPORT_ACTION_ID) {
-      for (let frame = 0; frame < 8; frame += 1) {
-        await present("teleportEffect", frame, 3);
-      }
+    } else if (result.actionId === HALF_DRAGON_TELEPORT_ACTION_ID) {
+      // The native handler hands the chosen cell to the ordinary movement
+      // presentation, so this flies the predecessor walk instead of playing a
+      // dedicated effect. The actor only moves when the prepared result commits.
+      await this.presentPreparedUnitPath(
+        result.actorId,
+        this.battle.directTechniquePath(result.actorId, result.target),
+      );
     } else {
       const dispel = actionPresentationCatalog().dispel;
       let frame = 0;

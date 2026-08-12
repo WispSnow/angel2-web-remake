@@ -36,8 +36,6 @@ import type {
   SavedBattleState,
   SaveRosterEntry,
 } from "../types";
-import type { BattleActionId } from "../content/actions";
-import type { ClassId } from "../content/classes";
 
 const ARENA_RNG_STATE = 0x0a2e2026;
 
@@ -71,7 +69,6 @@ export interface ArenaBattleEnvironment {
   readonly retryStatusText: string;
   readonly retreatStatusText: string;
   readonly enemyPhaseStatusText: string;
-  readonly additionalClassActions?: Readonly<Partial<Record<ClassId, readonly BattleActionId[]>>>;
 }
 
 export const ALL_TERRAIN_ARENA_ENVIRONMENT: ArenaBattleEnvironment = {
@@ -182,7 +179,6 @@ function arenaScenario(
     ),
     alliedBehaviorById: new Map(units.filter(({ side }) => side === 1).map(({ id }) => [id, 0])),
     enemyBehaviorById: new Map(units.filter(({ side }) => side === 2).map(({ id }) => [id, 0])),
-    additionalClassActions: environment.additionalClassActions,
     forces: arenaForces(units),
   };
 }
@@ -225,9 +221,6 @@ export function createArenaRuntime(
   environment: ArenaBattleEnvironment = ALL_TERRAIN_ARENA_ENVIRONMENT,
 ): LoadedStageRuntime {
   const frozenPlacements = placements.map((placement) => ({ ...placement }));
-  const additionalMapPresentationActionIds = Object.values(
-    environment.additionalClassActions ?? {},
-  ).flatMap((actionIds) => actionIds ?? []);
   const createBattle: LoadedStageRuntime["createBattle"] = (
     campaign,
     _preparation,
@@ -274,7 +267,6 @@ export function createArenaRuntime(
       "stomp-3",
       "iron-plate",
       "obstacle",
-      ...additionalMapPresentationActionIds,
     ],
     entry: {
       trigger: "battle-started",

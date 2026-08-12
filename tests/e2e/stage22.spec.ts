@@ -306,3 +306,113 @@ test("S22-H/I: Dragon victory saves the exact boundary and routes to stage 23", 
   });
   await expect(page.getByRole("heading", { name: "死亡之谷中 · 出擊準備" })).toBeVisible();
 });
+
+test("S22-J: a deployed half-dragon warrior flies the native teleport across the map", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/?debugScenario=stage-22-deployment&difficulty=0&test=1");
+
+  // Scene 22 overwrites deployable slots 25–31, so the half-dragon candidates
+  // sit on the second roster page. Deploy one of them and nothing else.
+  await page.getByTestId("deployment-page-1").click();
+  await expect(page.getByTestId("deployment-roster-6")).toContainText("半龍戰士");
+  await page.getByTestId("deployment-roster-6").click();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 2／19");
+  await page.getByTestId("deployment-finish").click();
+  if ((await state(page)).phase === "deployment") await page.getByTestId("deployment-finish").click();
+
+  for (let story = 0; story < 4; story += 1) {
+    await page.waitForFunction(() =>
+      (window.__ANGEL2__?.getState() as Stage22State | undefined)?.phase === "scriptedStory");
+    await skipStoryDialogue(page);
+  }
+  await waitForPhase(page, "player");
+
+  const actor = (await state(page)).units.find(({ classId }) =>
+    classId === "half-dragon-warrior");
+  expect(actor).toMatchObject({ id: "1:25", acted: false });
+
+  const cursor = await page.evaluate(() =>
+    (window.__ANGEL2__?.getState() as { cursor: { x: number; y: number } }).cursor);
+  await moveCursor(page, actor!.x - cursor.x, actor!.y - cursor.y);
+  await page.keyboard.press("Space");
+
+  // BAT-068: `1N` is a technique-menu class, and REMAKE-062 names its single
+  // hard-coded action instead of jumping straight into target selection.
+  await expect(page.getByTestId("unit-command-technique")).toBeVisible();
+  await page.getByTestId("unit-command-technique").click();
+  await expect(page.getByTestId("technique-half-dragon-teleport")).toHaveText("傳送");
+  await page.getByTestId("technique-half-dragon-teleport").click();
+
+  const targeting = await page.evaluate(() => {
+    const current = window.__ANGEL2__?.getState() as {
+      actionMode: string;
+      statusMessage: string;
+      actionRange: Array<{ x: number; y: number }>;
+      targets: Array<{ x: number; y: number }>;
+      units: unknown[];
+    };
+    return {
+      actionMode: current.actionMode,
+      statusMessage: current.statusMessage,
+      rangeCells: current.actionRange.length,
+      targets: current.targets.length,
+      unitCount: current.units.length,
+    };
+  });
+  expect(targeting.actionMode).toBe("specialTarget");
+  expect(targeting.statusMessage).toBe("選擇半龍戰士要傳送到的空格。");
+  // Seed 200 covers the grid, but scene 22 terrain the class may not enter is
+  // excluded, so this is never the unconditional 2,500-cell map.
+  expect(targeting.rangeCells).toBeGreaterThan(1000);
+  expect(targeting.rangeCells).toBeLessThan(50 * 50);
+  expect(targeting.targets).toBe(targeting.rangeCells - targeting.unitCount);
+  await settleBattleCanvas(page);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage22-half-dragon-teleport-targeting.png`,
+  });
+
+  const destination = await page.evaluate((from) => {
+    const current = window.__ANGEL2__?.getState() as {
+      targets: Array<{ x: number; y: number }>;
+    };
+    return current.targets.find((cell) =>
+      Math.abs(cell.x - from.x) + Math.abs(cell.y - from.y) > 25)!;
+  }, { x: actor!.x, y: actor!.y });
+  await moveCursor(page, destination.x - actor!.x, destination.y - actor!.y);
+  await page.keyboard.press("Space");
+
+  // The native handler replays the ordinary movement walk, so a real multi-step
+  // flight runs before the actor commits to the far cell.
+  await page.waitForFunction(() =>
+    (window.__ANGEL2__?.getState() as {
+      movementPresentation?: { unitId: string };
+    }).movementPresentation?.unitId === "1:25", undefined, { polling: "raf" });
+  const flight = await page.evaluate(() => (window.__ANGEL2__?.getState() as {
+    movementPresentation?: { kind: string; path: Array<{ x: number; y: number }> };
+  }).movementPresentation);
+  expect(flight?.kind).toBe("player");
+  expect(flight?.path[0]).toEqual({ x: actor!.x, y: actor!.y });
+  expect(flight?.path.at(-1)).toEqual(destination);
+  expect(flight!.path.length).toBeGreaterThan(25);
+
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage22State & {
+      movementPresentation?: unknown;
+    };
+    return current.movementPresentation === undefined
+      && current.units.some(({ id, acted }) => id === "1:25" && acted);
+  });
+  const after = await state(page);
+  expect(after.units.find(({ id }) => id === "1:25")).toMatchObject({
+    x: destination.x,
+    y: destination.y,
+    acted: true,
+    life: actor!.life,
+  });
+  await expect(page.getByTestId("status-strip"))
+    .toContainText(`已傳送至（${destination.x}, ${destination.y}）`);
+  // Spending the technique ends the activation; no post-move 攻擊 menu appears.
+  await expect(page.getByTestId("unit-command-attack")).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
+});

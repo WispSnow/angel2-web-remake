@@ -31,6 +31,12 @@ interface ClassShowdownBattleState {
   }>;
   specialActionPresentation?: { phase: string };
   specialActionPresentationTrace: Array<{ phase: string }>;
+  movementPresentation?: {
+    unitId: string;
+    kind: string;
+    path: Array<{ x: number; y: number }>;
+    stepIndex: number;
+  };
   units: Array<{
     id: string;
     side: number;
@@ -654,8 +660,9 @@ test("half-dragon warrior can teleport to any empty map cell in the showdown", a
   await expect(page.locator(".hud-identity-name")).toHaveText("半龍戰士／半龍戰士");
   await expect(page.getByTestId("unit-command-technique")).toBeVisible();
   await page.getByTestId("unit-command-technique").click();
-  await expect(page.getByTestId("technique-showdown-teleport")).toHaveText("瞬移");
-  await page.getByTestId("technique-showdown-teleport").click();
+  // REMAKE-062 keeps the named one-item submenu the native handler skips.
+  await expect(page.getByTestId("technique-half-dragon-teleport")).toHaveText("傳送");
+  await page.getByTestId("technique-half-dragon-teleport").click();
 
   const selection = await classShowdownBattleState(page);
   expect(selection?.actionMode).toBe("specialTarget");
@@ -678,12 +685,17 @@ test("half-dragon warrior can teleport to any empty map cell in the showdown", a
   expect(actorBefore).toMatchObject({ x: 17, y: 23, acted: false });
 
   await page.keyboard.press("Space");
+  // The native handler replays the ordinary movement walk instead of a
+  // dedicated effect, so the actor flies a real path to the chosen cell.
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
       battle?: ClassShowdownBattleState;
     }).battle;
-    return current?.specialActionPresentation?.phase === "teleportEffect";
+    return current?.movementPresentation?.unitId === "arena-1-8";
   }, undefined, { polling: "raf" });
+  const flight = await classShowdownBattleState(page);
+  expect(flight?.movementPresentation?.path[0]).toEqual({ x: 17, y: 23 });
+  expect(flight?.movementPresentation?.path.at(-1)).toEqual({ x: 20, y: 24 });
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-half-dragon-teleport-effect.png`,
   });
@@ -692,7 +704,7 @@ test("half-dragon warrior can teleport to any empty map cell in the showdown", a
       battle?: ClassShowdownBattleState;
     }).battle;
     const actor = current?.units.find(({ id }) => id === "arena-1-8");
-    return current?.specialActionPresentation === undefined && actor?.x === 20 && actor?.y === 24;
+    return current?.movementPresentation === undefined && actor?.x === 20 && actor?.y === 24;
   });
   const after = await classShowdownBattleState(page);
   expect(after?.units.find(({ id }) => id === "arena-1-8")).toMatchObject({
@@ -701,7 +713,7 @@ test("half-dragon warrior can teleport to any empty map cell in the showdown", a
     acted: true,
     experience: actorBefore?.experience,
   });
-  expect(after?.specialActionPresentationTrace.map(({ phase }) => phase))
-    .toEqual(Array.from({ length: 8 }, () => "teleportEffect"));
+  // No dedicated technique presentation runs; the movement walk is the effect.
+  expect(after?.specialActionPresentationTrace).toEqual([]);
   expect(pageErrors).toEqual([]);
 });

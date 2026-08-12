@@ -83,7 +83,8 @@
 | [`systems/expert-enemy-ai.md`](systems/expert-enemy-ai.md) | 双方共享自动行动专家效用、射手／魔弓、冰雪排程、PRNG 与显式策略边界 | M14.5–M14.9 / 已验证 |
 | [`systems/wd-path-attack.md`](systems/wd-path-attack.md) | 女帝／龍专用路径攻击、等价前驱 PRNG、防魔／冰封与原版十帧表现 | M38/M39 / 已验证 |
 | [`systems/force-field-escort.md`](systems/force-field-escort.md) | 路线尝试、移动安全区、生命减半与表现边界 | M06 / 已实现并通过自动验收 |
-| [`systems/technique-implementation-sequence.md`](systems/technique-implementation-sequence.md) | 33 项技术的机器顺序、逐项门禁与完成状态 | 系统例外 / 已验证 |
+| [`systems/technique-implementation-sequence.md`](systems/technique-implementation-sequence.md) | 33 项分层技术的机器顺序、逐项门禁与完成状态 | 系统例外 / 已验证 |
+| [`systems/technique-1n-teleport.md`](systems/technique-1n-teleport.md) | `1N/半龍戰士` 直连技術「傳送」：全图模式 `0` 传播、空格落点与移動路径表现 | `BAT-068` / `REMAKE-062` 已实现 |
 | [`systems/technique-aa-attack-up.md`](systems/technique-aa-attack-up.md) | 攻击提升、完整轮计数、双方 AI、原版双格光柱与冰封例外 | 已实现并通过完整门禁 |
 | [`systems/technique-ad-defense-up.md`](systems/technique-ad-defense-up.md) | 防御提升、完整轮计数、双方 AI、原版四格盾牌与冰封例外 | 已实现并通过完整门禁 |
 | [`systems/technique-fm-magic-guard.md`](systems/technique-fm-magic-guard.md) | 防魔、一次性魔法保护、原版 AI 孤项安全修复、AA 共用光焰与冰封例外 | 已实现并通过完整门禁 |

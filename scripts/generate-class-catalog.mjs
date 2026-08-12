@@ -75,6 +75,27 @@ const fallbackPortraitByCode = new Map(
   ]),
 );
 const idByRecord = Object.fromEntries(CLASS_IDS.map((id, record) => [record, id]));
+
+/**
+ * `1N/半龍戰士` is in the native 技術 menu chain but has no DS:41CE tier table;
+ * its single technique lives in a dedicated handler with no action code and no
+ * submenu. Project only the rule-bearing numbers so native addresses stay in
+ * the evidence layer.
+ */
+function normalizeDirectTechnique(direct) {
+  if (!direct) return null;
+  if (direct.visibleActionCode !== null || direct.submenu !== null) {
+    throw new Error(`${direct.classCode}: direct technique unexpectedly carries menu content`);
+  }
+  return {
+    classCode: direct.classCode,
+    rangeSeed: direct.range.seed,
+    rangePropagationMode: direct.range.mode,
+    target: "empty-cell",
+    endsActivation: direct.commit.followUpAttack === false,
+    grantsExperience: direct.commit.experience !== null,
+  };
+}
 const catalog = Object.fromEntries(unitCatalog.records.map((record, expectedRecord) => {
   if (record.record !== expectedRecord) {
     throw new Error(`unit catalog record ${record.record} is out of order at ${expectedRecord}`);
@@ -99,6 +120,7 @@ const catalog = Object.fromEntries(unitCatalog.records.map((record, expectedReco
     ordinaryHitStatuses: record.ordinaryHitStatuses,
     shooting: record.shooting,
     technique: record.technique,
+    directTechnique: normalizeDirectTechnique(record.directTechnique),
     movementProfile: record.mapRules.movementProfile,
     terrainDefenseProfile: record.mapRules.terrainDefenseProfile,
     movementRules: mapRule.movementRules,
