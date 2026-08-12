@@ -158,6 +158,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion46Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 46
+    || value.contentVersion !== "stage-23-death-valley-breakthrough-2") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion45Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 45
@@ -1630,6 +1641,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion46 = migrateVersion46Save(value);
+    if (migratedVersion46) return migratedVersion46;
     const migratedVersion45 = migrateVersion45Save(value);
     if (migratedVersion45) return migratedVersion45;
     const migratedVersion44 = migrateVersion44Save(value);

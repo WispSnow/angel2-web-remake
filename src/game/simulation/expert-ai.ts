@@ -44,6 +44,9 @@ export interface ExpertAiUtility {
   firingDistance: number;
   terrainDefense: number;
   objectiveProgress: number;
+  queueAdvance: number;
+  trafficRelease: number;
+  trafficProgress: number;
   pathLength: number;
   waste: number;
 }
@@ -76,6 +79,9 @@ export function emptyExpertAiUtility(): ExpertAiUtility {
     firingDistance: 0,
     terrainDefense: 0,
     objectiveProgress: 0,
+    queueAdvance: 0,
+    trafficRelease: 0,
+    trafficProgress: 0,
     pathLength: 0,
     waste: 0,
   };
@@ -140,6 +146,9 @@ export function expertAiReasons(utility: ExpertAiUtility): string[] {
   if (utility.firingDistance > 0) reasons.push(`射距 ${utility.firingDistance}`);
   if (utility.terrainDefense > 0) reasons.push(`地形防禦 ${utility.terrainDefense}%`);
   if (utility.objectiveProgress > 0) reasons.push(`目標推進 ${utility.objectiveProgress}`);
+  if (utility.queueAdvance > 0) reasons.push("隊列推進");
+  if (utility.trafficRelease > 0) reasons.push(`讓路×${utility.trafficRelease}`);
+  if (utility.trafficProgress > 0) reasons.push(`通路縮短 ${utility.trafficProgress}`);
   if (utility.waste > 0) reasons.push(`無效／重複 ${utility.waste}`);
   if (reasons.length === 0) reasons.push("穩定待命");
   return reasons;
@@ -602,7 +611,10 @@ export function expertUtilityForAction(
     ? context.units.find((candidate) => candidate.id === action.targetId)
     : undefined;
   if (action.kind === "attack" && target) {
-    return expertOrdinaryUtility(context, unit, target, action.path);
+    const utility = expertOrdinaryUtility(context, unit, target, action.path);
+    utility.trafficRelease = action.trafficRelease ?? 0;
+    utility.trafficProgress = action.trafficProgress ?? 0;
+    return utility;
   }
   if (action.kind === "special" && action.actionId && target) {
     return expertSpecialUtility(
@@ -627,11 +639,16 @@ export function expertUtilityForAction(
     );
     utility.criticalSaves = unit.life * 100 < maximumLife * 40 ? 1 : 0;
   } else if (action.kind === "move") {
-    const opponents = context.units.filter((candidate) => candidate.side !== unit.side);
-    if (opponents.length > 0) {
-      const before = Math.min(...opponents.map((candidate) => manhattan(unit, candidate)));
-      const after = Math.min(...opponents.map((candidate) => manhattan(destination, candidate)));
-      utility.objectiveProgress = Math.max(0, before - after);
+    utility.queueAdvance = action.queueAdvance ? 1 : 0;
+    if (action.pursuitProgress !== undefined) {
+      utility.objectiveProgress = action.pursuitProgress;
+    } else {
+      const opponents = context.units.filter((candidate) => candidate.side !== unit.side);
+      if (opponents.length > 0) {
+        const before = Math.min(...opponents.map((candidate) => manhattan(unit, candidate)));
+        const after = Math.min(...opponents.map((candidate) => manhattan(destination, candidate)));
+        utility.objectiveProgress = Math.max(0, before - after);
+      }
     }
   } else if (action.kind === "route-pulse") {
     utility.objectiveProgress = Math.max(1, action.path.length - 1);

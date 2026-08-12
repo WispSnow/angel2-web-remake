@@ -1252,6 +1252,17 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v46 saves through the traversable-path expert AI identity", () => {
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 46,
+        contentVersion: "stage-23-death-valley-breakthrough-2",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v32 saves to the stage 10 airship identity", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({

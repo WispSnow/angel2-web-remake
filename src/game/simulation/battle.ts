@@ -21,7 +21,7 @@ import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, Position, SaveRosterEntry, SavedBattleState, Side, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
-import { constructionPath, constructionReachableCells, manhattan, movementCost, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield } from "./grid";
+import { constructionPath, constructionReachableCells, manhattan, movementCost, movementCostsToNearestTarget, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield } from "./grid";
 import {
   promoteUnit,
   promotionQueue,
@@ -1851,6 +1851,72 @@ export class Stage0Battle {
     return expertUtilityForAction(this.expertAiEvaluationContext(), unit, action);
   }
 
+  private vacantEngagementRouteCost(
+    unit: BattleUnit,
+    units: readonly BattleUnit[],
+  ): number | undefined {
+    const targetFilter = this.forces.targetFilterFor(unit.id, units);
+    const targets = units
+      .filter((candidate) => candidate.side !== unit.side
+        && !candidate.actionDisabled
+        && (targetFilter?.(candidate) ?? true))
+      .flatMap((candidate) => neighbors(candidate, this.dynamicBattlefield));
+    return movementCostsToNearestTarget(
+      unit,
+      targets,
+      units,
+      this.dynamicBattlefield,
+    ).get(positionKey(unit));
+  }
+
+  /**
+   * Bounded one-action counterfactual for REMAKE-060. It does not reserve a
+   * future squad script: it only measures whether vacating the actor's current
+   * attack cell gives still-unspent ordinary members of the same expert force
+   * a real engagement route. The phase controller replans after the attack.
+   */
+  private expertTrafficRelief(
+    actor: BattleUnit,
+    destination: Position,
+  ): { release: number; progress: number } {
+    const force = this.forces.definitionForUnit(actor.id);
+    if (force?.doctrine.strategy !== "expert"
+      || positionKey(destination) === positionKey(actor)) {
+      return { release: 0, progress: 0 };
+    }
+    const followers = this.forces.membersForUnit(actor.id, this.units)
+      .filter((candidate) => candidate.id !== actor.id
+        && !candidate.acted
+        && !candidate.actionDisabled
+        && classDefinition(candidate.classId).actionCategory === "ordinary"
+        && (candidate.side === 1
+          ? this.alliedBehaviorFor(candidate.id)
+          : this.enemyBehaviorFor(candidate.id)) !== 1
+        && !this.routePulseByActorId.has(candidate.id)
+        && !this.escortRouteByActorId.has(candidate.id));
+    if (followers.length === 0) return { release: 0, progress: 0 };
+
+    const projectedUnits = this.units.map((candidate) => candidate.id === actor.id
+      ? { ...candidate, x: destination.x, y: destination.y }
+      : candidate);
+    let release = 0;
+    let progress = 0;
+    for (const follower of followers) {
+      const before = this.vacantEngagementRouteCost(follower, this.units);
+      const projectedFollower = projectedUnits.find((candidate) => candidate.id === follower.id);
+      if (!projectedFollower) continue;
+      const after = this.vacantEngagementRouteCost(projectedFollower, projectedUnits);
+      if (before === undefined && after !== undefined) {
+        release += 1;
+      } else if (before !== undefined && after === undefined) {
+        release -= 1;
+      } else if (before !== undefined && after !== undefined) {
+        progress += before - after;
+      }
+    }
+    return { release, progress };
+  }
+
   private recordExpertDecision(
     unit: BattleUnit,
     candidates: readonly AlliedAiAction[],
@@ -1910,6 +1976,8 @@ export class Stage0Battle {
       position: Position;
       path: Position[];
       utility: ExpertAiUtility;
+      trafficRelease: number;
+      trafficProgress: number;
     }> = [];
 
     for (const enemy of enemies) {
@@ -1928,6 +1996,8 @@ export class Stage0Battle {
             position: candidate,
             path,
             utility: this.expertOrdinaryUtility(unit, enemy, path),
+            trafficRelease: 0,
+            trafficProgress: 0,
           });
           continue;
         }
@@ -1948,12 +2018,45 @@ export class Stage0Battle {
           - (right.target.y * this.stage.width + right.target.x)
         || left.position.y * this.stage.width + left.position.x
           - (right.position.y * this.stage.width + right.position.x));
-      const selected = expertAttackCandidates[0];
+      const baseline = expertAttackCandidates[0];
+      let selected = baseline;
+      const stationary = expertAttackCandidates.find((candidate) =>
+        candidate.target.id === baseline.target.id
+        && positionKey(candidate.position) === positionKey(unit));
+      if (stationary && stationary.utility.guaranteedKills === 0) {
+        const stationaryTacticalScore = expertTacticalScore(stationary.utility);
+        const comparable = expertAttackCandidates.filter((candidate) =>
+          candidate.target.id === stationary.target.id
+          && expertTacticalScore(candidate.utility) === stationaryTacticalScore
+          && candidate.utility.exposure <= stationary.utility.exposure);
+        for (const candidate of comparable) {
+          const relief = this.expertTrafficRelief(unit, candidate.position);
+          candidate.trafficRelease = relief.release;
+          candidate.trafficProgress = relief.progress;
+        }
+        if (comparable.some((candidate) =>
+          candidate.trafficRelease > 0 || candidate.trafficProgress > 0)) {
+          comparable.sort((left, right) => left.utility.exposure - right.utility.exposure
+            || right.trafficRelease - left.trafficRelease
+            || right.trafficProgress - left.trafficProgress
+            || right.utility.terrainDefense - left.utility.terrainDefense
+            || left.utility.pathLength - right.utility.pathLength
+            || left.position.y * this.stage.width + left.position.x
+              - (right.position.y * this.stage.width + right.position.x));
+          selected = comparable[0];
+        }
+      }
       return {
         unitId: unit.id,
         kind: "attack",
         path: selected.path,
         targetId: selected.target.id,
+        ...(selected.trafficRelease > 0
+          ? { trafficRelease: selected.trafficRelease }
+          : {}),
+        ...(selected.trafficProgress > 0
+          ? { trafficProgress: selected.trafficProgress }
+          : {}),
       };
     }
 
@@ -1972,24 +2075,58 @@ export class Stage0Battle {
         return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
       }
       const targets = enemies.flatMap((enemy) => neighbors(enemy, this.dynamicBattlefield));
-      const originDistance = targets.length > 0
-        ? Math.min(...targets.map((target) => manhattan(unit, target)))
-        : Number.MAX_SAFE_INTEGER;
+      const pursuitPositionFilter = options.destinationFilter && options.pathFilter
+        ? options.destinationFilter
+        : undefined;
+      let pursuitCosts = movementCostsToNearestTarget(
+        unit,
+        targets,
+        this.units,
+        this.dynamicBattlefield,
+        { positionFilter: pursuitPositionFilter },
+      );
+      let originCost = pursuitCosts.get(positionKey(unit));
+      let queueAdvance = false;
+      if (originCost === undefined) {
+        pursuitCosts = movementCostsToNearestTarget(
+          unit,
+          targets,
+          this.units,
+          this.dynamicBattlefield,
+          {
+            positionFilter: pursuitPositionFilter,
+            allowFriendlyOccupiedTargets: true,
+          },
+        );
+        originCost = pursuitCosts.get(positionKey(unit));
+        queueAdvance = originCost !== undefined;
+      }
+      if (originCost === undefined) {
+        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      }
       const movementCandidates = reachable
         .filter((position) => positionKey(position) !== positionKey(unit))
-        .map((position) => ({
-          position,
-          path: this.movementPath(unit.id, position),
-          distance: targets.length > 0
-            ? Math.min(...targets.map((target) => manhattan(position, target)))
-            : Number.MAX_SAFE_INTEGER,
-          defense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
-          exposure: this.exposureAt(unit, position),
-        }))
-        .filter(({ path, distance }) => path.length > 1
-          && distance < originDistance
-          && (options.pathFilter?.(path) ?? true))
-        .sort((left, right) => left.distance - right.distance
+        .map((position) => {
+          const path = this.movementPath(unit.id, position);
+          const traveledCost = path.slice(1).reduce(
+            (total, step) => total + movementCost(unit.classId, step, this.dynamicBattlefield),
+            0,
+          );
+          return {
+            position,
+            path,
+            traveledCost,
+            remainingCost: pursuitCosts.get(positionKey(position)),
+            defense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
+            exposure: this.exposureAt(unit, position),
+          };
+        })
+        .filter((candidate): candidate is typeof candidate & { remainingCost: number } =>
+          candidate.remainingCost !== undefined
+          && candidate.path.length > 1
+          && candidate.traveledCost + candidate.remainingCost === originCost
+          && (options.pathFilter?.(candidate.path) ?? true))
+        .sort((left, right) => left.remainingCost - right.remainingCost
           || left.exposure - right.exposure
           || right.defense - left.defense
           || left.path.length - right.path.length
@@ -1997,7 +2134,13 @@ export class Stage0Battle {
             - (right.position.y * this.stage.width + right.position.x));
       const selected = movementCandidates[0];
       return selected
-        ? { unitId: unit.id, kind: "move", path: selected.path }
+        ? {
+            unitId: unit.id,
+            kind: "move",
+            path: selected.path,
+            pursuitProgress: originCost - selected.remainingCost,
+            ...(queueAdvance ? { queueAdvance: true } : {}),
+          }
         : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
     }
 

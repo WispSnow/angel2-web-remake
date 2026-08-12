@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ArenaBattle } from "../../src/game/simulation/arena-battle";
+import {
+  ALL_TERRAIN_ARENA_ENVIRONMENT,
+  ArenaBattle,
+  type ArenaBattleEnvironment,
+} from "../../src/game/simulation/arena-battle";
 import { shootingLineVisitProbabilities } from "../../src/game/simulation/actions/range-map";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
@@ -321,6 +325,184 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     const destination = action!.path.at(-1)!;
     expect(Math.abs(destination.x - 22) + Math.abs(destination.y - 30)).toBe(4);
     expect(battle.expertAiDecisionTrace("enemy-archer")?.chosen?.reasons).toContain("射距 4");
+  });
+
+  it("pursues the nearest target by traversable movement cost instead of screen geometry", () => {
+    const environment: ArenaBattleEnvironment = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x, y }) => x === 25 && y < 40 ? 0 : 2,
+    };
+    const battle = new ArenaBattle([
+      { id: "ally-behind-wall", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
+      { id: "ally-open-route", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 36 },
+      { id: "enemy-pursuer", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+    ], 0, new DeterministicRng(0x3312), environment);
+
+    expect(battle.planEnemyAiAction("enemy-pursuer")).toMatchObject({
+      kind: "move",
+      pursuitProgress: 3,
+      path: [
+        { x: 24, y: 30 },
+        { x: 24, y: 31 },
+        { x: 24, y: 32 },
+        { x: 24, y: 33 },
+      ],
+    });
+    expect(battle.expertAiDecisionTrace("enemy-pursuer")?.chosen?.reasons)
+      .toContain("目標推進 3");
+
+    const alliedBattle = new ArenaBattle([
+      { id: "ally-pursuer", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-behind-wall", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
+      { id: "enemy-open-route", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 36 },
+    ], 0, new DeterministicRng(0x3313), environment);
+
+    expect(alliedBattle.planAlliedAiAction("ally-pursuer")).toMatchObject({
+      kind: "move",
+      pursuitProgress: 3,
+      path: [
+        { x: 24, y: 30 },
+        { x: 24, y: 31 },
+        { x: 24, y: 32 },
+        { x: 24, y: 33 },
+      ],
+    });
+
+    const weightedTerrainBattle = new ArenaBattle([
+      { id: "ally-near-costly", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "ally-far-cheap", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 36 },
+      { id: "enemy-weighted-pursuer", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3314), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x, y }) => x >= 21 && x <= 24 && y >= 29 && y <= 31 ? 1 : 2,
+    });
+
+    expect(weightedTerrainBattle.planEnemyAiAction("enemy-weighted-pursuer")).toMatchObject({
+      kind: "move",
+      path: [
+        { x: 20, y: 30 },
+        { x: 20, y: 31 },
+        { x: 20, y: 32 },
+        { x: 20, y: 33 },
+      ],
+    });
+  });
+
+  it("queues behind an occupied melee frontage when no vacant engagement route exists", () => {
+    const corridorEnvironment: ArenaBattleEnvironment = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x, y }) => y === 30 && x >= 21 && x <= 25 ? 2 : 0,
+    };
+    const queueRng = new DeterministicRng(0x3315);
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-rear", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
+    ], 0, queueRng, corridorEnvironment);
+    const queueRngBefore = { state: queueRng.state, calls: queueRng.calls };
+
+    expect(battle.planEnemyAiAction("enemy-rear")).toMatchObject({
+      kind: "move",
+      pursuitProgress: 1,
+      queueAdvance: true,
+      path: [
+        { x: 22, y: 30 },
+        { x: 23, y: 30 },
+      ],
+    });
+    expect(battle.expertAiDecisionTrace("enemy-rear")?.chosen?.reasons)
+      .toContain("目標推進 1");
+    expect(battle.expertAiDecisionTrace("enemy-rear")?.chosen?.reasons)
+      .toContain("隊列推進");
+    expect({ state: queueRng.state, calls: queueRng.calls }).toEqual(queueRngBefore);
+
+    const bypassCells = new Set([
+      "23,30", "24,30", "23,29", "24,29", "25,29", "25,30",
+    ]);
+    const bypassBattle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-rear", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, new DeterministicRng(0x3318), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: (position) => bypassCells.has(`${position.x},${position.y}`) ? 2 : 0,
+    });
+
+    expect(bypassBattle.planEnemyAiAction("enemy-rear")).toMatchObject({
+      kind: "attack",
+      targetId: "ally-target",
+      path: [
+        { x: 23, y: 30 },
+        { x: 23, y: 29 },
+        { x: 24, y: 29 },
+        { x: 25, y: 29 },
+      ],
+    });
+  });
+
+  it("vacates an equivalent melee choke attack position for an unacted squadmate", () => {
+    const openCells = new Set(["23,30", "24,30", "24,29", "25,29", "25,30"]);
+    const chokeEnvironment: ArenaBattleEnvironment = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: (position) => openCells.has(`${position.x},${position.y}`) ? 2 : 0,
+    };
+    const reliefRng = new DeterministicRng(0x3316);
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-rear", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, reliefRng, chokeEnvironment);
+    const reliefRngBefore = { state: reliefRng.state, calls: reliefRng.calls };
+
+    const frontAction = battle.planEnemyAiAction("enemy-front");
+    expect(frontAction).toMatchObject({
+      kind: "attack",
+      targetId: "ally-target",
+      trafficRelease: 1,
+      path: [
+        { x: 24, y: 30 },
+        { x: 24, y: 29 },
+        { x: 25, y: 29 },
+      ],
+    });
+    expect(battle.expertAiDecisionTrace("enemy-front")?.chosen?.reasons)
+      .toContain("讓路×1");
+    expect(battle.nextEnemyActionId(["enemy-front", "enemy-rear"]))
+      .toBe("enemy-front");
+    expect({ state: reliefRng.state, calls: reliefRng.calls }).toEqual(reliefRngBefore);
+
+    expect(battle.moveUnit("enemy-front", frontAction!.path.at(-1)!)).toBe(true);
+    battle.attack("enemy-front", "ally-target");
+    expect(battle.planEnemyAiAction("enemy-rear")).toMatchObject({
+      kind: "attack",
+      targetId: "ally-target",
+      path: [
+        { x: 23, y: 30 },
+        { x: 24, y: 30 },
+      ],
+    });
+
+    const noFollower = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+    ], 0, new DeterministicRng(0x3317), chokeEnvironment);
+
+    expect(noFollower.planEnemyAiAction("enemy-front")).toMatchObject({
+      kind: "attack",
+      path: [{ x: 24, y: 30 }],
+    });
+
+    const unsafeSideStep = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "ally-distant-threat", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 25, y: 24 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-rear", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, new DeterministicRng(0x3319), chokeEnvironment);
+
+    expect(unsafeSideStep.planEnemyAiAction("enemy-front")).toMatchObject({
+      kind: "attack",
+      path: [{ x: 24, y: 30 }],
+    });
   });
 
   it("values full ranged threat exposure before stretching to maximum range", () => {

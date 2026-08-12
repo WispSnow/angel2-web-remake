@@ -8,6 +8,16 @@ export interface GridBattlefield {
   terrainSlotAt: (position: Position) => number;
 }
 
+export interface MovementCostTargetOptions {
+  positionFilter?: (position: Position) => boolean;
+  /**
+   * Permits a same-side occupant to seed a virtual target cost. The occupied
+   * cell remains an illegal movement destination; this is only used to build
+   * a deterministic queue behind a temporarily full melee frontage.
+   */
+  allowFriendlyOccupiedTargets?: boolean;
+}
+
 const STAGE0_BATTLEFIELD: GridBattlefield = {
   width: STAGE0.width,
   height: STAGE0.height,
@@ -292,6 +302,67 @@ export function routePath(
     }
   }
   return reconstructPath(unit, best, routeResult);
+}
+
+/**
+ * Maps every traversable cell to the cheapest forward entry cost needed to
+ * reach any legal target. Reverse propagation adds the cost of entering the
+ * current cell, which preserves the asymmetric native terrain-cost rule.
+ */
+export function movementCostsToNearestTarget(
+  unit: BattleUnit,
+  targets: readonly Position[],
+  units: readonly BattleUnit[],
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+  options: MovementCostTargetOptions = {},
+): ReadonlyMap<string, number> {
+  const occupants = new Map(units
+    .filter((candidate) => candidate.id !== unit.id)
+    .map((candidate) => [positionKey(candidate), candidate]));
+  const blocked = new Set(
+    units
+      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
+      .map(positionKey),
+  );
+  const targetKeys = new Set(targets
+    .filter((target) => target.x >= 0
+      && target.y >= 0
+      && target.x < battlefield.width
+      && target.y < battlefield.height
+      && (!occupants.has(positionKey(target))
+        || (options.allowFriendlyOccupiedTargets
+          && occupants.get(positionKey(target))?.side === unit.side))
+      && movementCost(unit.classId, target, battlefield) < 98
+      && (options.positionFilter?.(target) ?? true))
+    .map(positionKey));
+  const costs = new Map<string, number>([...targetKeys].map((key) => [key, 0]));
+  const pending = [...targetKeys].map((key) => ({ position: parsePositionKey(key), cost: 0 }));
+  const controlZone = zoneOfControl(unit, units, battlefield);
+  const startKey = positionKey(unit);
+
+  while (pending.length > 0) {
+    pending.sort((left, right) => left.cost - right.cost
+      || left.position.y * battlefield.width + left.position.x
+        - (right.position.y * battlefield.width + right.position.x));
+    const current = pending.shift();
+    if (!current) continue;
+    const currentKey = positionKey(current.position);
+    if (current.cost !== costs.get(currentKey)) continue;
+    const reverseStepCost = movementCost(unit.classId, current.position, battlefield);
+
+    for (const predecessor of neighbors(current.position, battlefield)) {
+      const key = positionKey(predecessor);
+      if (blocked.has(key)
+        || movementCost(unit.classId, predecessor, battlefield) >= 98
+        || !(options.positionFilter?.(predecessor) ?? true)
+        || (controlZone.has(key) && !targetKeys.has(key) && key !== startKey)) continue;
+      const cost = current.cost + reverseStepCost;
+      if (cost >= (costs.get(key) ?? Number.POSITIVE_INFINITY)) continue;
+      costs.set(key, cost);
+      pending.push({ position: predecessor, cost });
+    }
+  }
+  return costs;
 }
 
 export function routeStep(

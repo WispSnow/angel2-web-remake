@@ -5,6 +5,14 @@ export interface AlliedAiAction {
   unitId: string;
   kind: "attack" | "special" | "route-pulse" | "move" | "rest" | "wait";
   path: Position[];
+  /** Traversable movement-cost reduction toward the selected engagement cell. */
+  pursuitProgress?: number;
+  /** The pursuit goal is a same-side occupied melee frontage, never a legal landing. */
+  queueAdvance?: true;
+  /** Net number of unacted squadmates given a vacant engagement route by this attack move. */
+  trafficRelease?: number;
+  /** Net traversable route-cost reduction for squadmates that already had a route. */
+  trafficProgress?: number;
   targetId?: string;
   actionId?: BattleActionId;
   /** Rules-significant magic-archer effect path, separate from movement path. */
