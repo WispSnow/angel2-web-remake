@@ -346,6 +346,18 @@ const STAGE24_COMPLETED_EVENT_IDS = [
   "stage-24-completed-route",
 ] as const;
 
+const STAGE26_BATTLE_EVENT_IDS = [
+  "stage-26-enter-deployment",
+  "stage-26-opening-story",
+] as const;
+
+const STAGE26_COMPLETED_EVENT_IDS = [
+  ...STAGE26_BATTLE_EVENT_IDS,
+  "stage-26-objective-reached",
+  "stage-26-victory-story",
+  "stage-26-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -2283,6 +2295,89 @@ async function createStage24Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage26Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-26",
+    debugCampaign(context, "stage-26"),
+    { preparation: true, statusMessage: "調試場景：碧娜維姬戰部署。" },
+  );
+  return controller;
+}
+
+async function stage26FullDeployment() {
+  const { STAGE26_DEFINITION } = await import("./content/stage26");
+  return {
+    placements: [
+      ...STAGE26_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE26_DEFINITION.deployment.optionalSlots.slice(0, 18).map((slot, index) => ({
+        slot, position: { ...STAGE26_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage26Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage26Deployment(context);
+  controller.completeDeployment(await stage26FullDeployment());
+  return controller;
+}
+
+async function createStage26Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-26");
+  const { Stage26Battle } = await import("./simulation/stage26-battle");
+  const battle = new Stage26Battle(campaign, await stage26FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 26 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-26"),
+    stageLabel: "遭遇碧娜維姬",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE26_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：二十二人討伐隊迎戰碧娜維姬與七名魔法祭司。";
+  return controller;
+}
+
+async function createStage26Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-26");
+  const { createStage26DeploymentRoster } = await import("./simulation/stage26-battle");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-27",
+    stageLabel: "趕回瓦爾克麗城",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(createStage26DeploymentRoster(campaign).map((unit) => ({
+      slot: unit.slot,
+      classId: unit.classId,
+      experience: unit.experience,
+      life: unit.life,
+    }))),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE26_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -2952,6 +3047,52 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-24-cleared": createStage24Completed,
+  "stage-26-deployment": createStage26Deployment,
+  "stage-26-opening": createStage26Opening,
+  "stage-26-player": createStage26Player,
+  "stage-26-enemy-tail": withSetup(createStage26Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    if (!nia) return;
+    nia.x = 22;
+    nia.y = 20;
+    nia.acted = false;
+    for (const enemy of controller.battle.units.filter(({ side }) => side === 2)) {
+      enemy.acted = true;
+    }
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 18, y: 16 };
+    controller.statusMessage = "調試場景：結束回合後，妮雅將被列推移效果連續向下推移兩次。";
+  }),
+  "stage-26-near-victory": withSetup(createStage26Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const binaweiji = controller.battle.unit("2:1");
+    if (!nia || !binaweiji) return;
+    nia.x = 22;
+    nia.y = 17;
+    nia.experience = 0;
+    nia.acted = false;
+    binaweiji.x = 22;
+    binaweiji.y = 16;
+    binaweiji.life = 1;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 18, y: 13 };
+    controller.statusMessage = "調試場景：碧娜維姬只剩 1 點生命，位於妮雅相鄰格。";
+  }),
+  "stage-26-near-defeat": withSetup(createStage26Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const enemy = controller.battle.unit("2:40");
+    if (!nia || !enemy) return;
+    nia.life = 1;
+    enemy.x = nia.x + 1;
+    enemy.y = nia.y;
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，魔法祭司位於相鄰格。";
+  }),
+  "stage-26-victory-ready": withSetup(createStage26Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-26-cleared": createStage26Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

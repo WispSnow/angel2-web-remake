@@ -53,6 +53,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 内部第 22 关 1–19 人部署、女帝／琴斯临时剧情、六敌延迟伏击、妖龍／妮雅胜负、SAY 45 关后整顿／对话后存档与 stage 23 路由 | `stage22-content.test.ts`、`stage22-battle.test.ts`、`stage-events.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage22.spec.ts` |
 | 内部第 23 关直接 1–15 人部署、SAY 46、二十一名静态守军、9 守卫／12 追击、妮雅线性到达区、无增援与 stage 24 路由 | `stage23-content.test.ts`、`stage23-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage23.spec.ts` |
 | 内部第 24 关 1–15 人部署、SAY 47/48、二十二名静态守军、12 哨戒／10 追击、妮雅线性城堡到达区、无增援与直接 stage 26 路由 | `stage24-content.test.ts`、`stage24-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage24.spec.ts` |
+| 第 25 个可玩关卡（内部第 26 关）4–22 人部署、SAY 49/50、碧娜維姬与七祭司、7 哨戒／1 追击、无增援、敌方阶段尾双次纵列下推与 stage 27 路由 | `stage26-content.test.ts`、`stage26-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage26.spec.ts` |
 | 原生“肖像不随文字窗关闭而消失”的检查点（SAY/0043 点名段、SAY/0074 龍王石像） | `stage21-content.test.ts`、`stage20-content.test.ts` | `stage21.spec.ts` |
 | 第 0–6 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
 | 剧情对话 DOM、逐字推进、右键跳过确认与输入阻断 | 无独立模拟数值测试 | `stage0.spec.ts` 的剧情对话用例；各关卡通过 `dialogue-controls.ts` 复用真实跳过路径 |

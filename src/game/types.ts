@@ -32,7 +32,8 @@ export type StageId =
   | "stage-21"
   | "stage-22"
   | "stage-23"
-  | "stage-24";
+  | "stage-24"
+  | "stage-26";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -59,7 +60,8 @@ export type CampaignRouteId =
   | "stage-22"
   | "stage-23"
   | "stage-24"
-  | "stage-26";
+  | "stage-26"
+  | "stage-27";
 
 export interface Position {
   x: number;
@@ -215,8 +217,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 49;
-  contentVersion: "stage-23-campaign-class-baseline-1";
+  version: 50;
+  contentVersion: "stage-26-column-push-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

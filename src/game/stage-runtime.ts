@@ -1,5 +1,6 @@
 import { STAGE0_DEFINITION, type InteractiveDeploymentDefinition, type StageDefinition } from "./content/stages";
 import type { CampaignRouteId } from "./content/stage-effects";
+import type { EnemyPhaseTailPresentationDefinition } from "./enemy-phase-tail-presentation";
 import { createStage0Units } from "./content/stage0";
 import type { BattleActionId } from "./content/actions";
 import type { DeploymentRosterUnit } from "./deployment-session";
@@ -25,6 +26,7 @@ export interface StageRuntimeAssets {
   storyBackgrounds?: Readonly<Partial<Record<number, string>>>;
   unitSprites: Readonly<Partial<Record<MapUnitSpriteKey, string>>>;
   routePulsePresentations?: readonly RoutePulsePresentationDefinition[];
+  enemyPhaseTailPresentations?: readonly EnemyPhaseTailPresentationDefinition[];
 }
 
 export interface RoutePulsePresentationDefinition {
@@ -1262,6 +1264,55 @@ async function loadStage24Module(): Promise<StageRuntimeModule> {
       map: content.STAGE24_ASSETS.map,
       minimap: content.STAGE24_ASSETS.minimap,
       unitSprites: content.STAGE24_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
+async function loadStage26Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage26"),
+    import("./simulation/stage26-battle"),
+  ]);
+  content.activateStage26Content();
+  const definition = content.STAGE26_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 25",
+      title: content.STAGE26.name,
+      objective: content.STAGE26_DEFINITION.objective.victoryText,
+      minimap: content.STAGE26_ASSETS.minimap,
+      terrain: content.STAGE26_TERRAIN_TOKENS,
+      gridWidth: content.STAGE26.width,
+      gridHeight: content.STAGE26.height,
+      enemies: content.STAGE26_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "希蜜、妮雅、蘇蘭達與琴斯固定出場；二十五名候選最多選十八人。擊敗碧娜維姬即可獲勝。",
+    },
+    ["stage-26-enter-deployment"],
+    (campaign) => battleModule.createStage26DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 26 requires a deployment result");
+    return new battleModule.Stage26Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE26_DEFINITION,
+    assets: {
+      map: content.STAGE26_ASSETS.map,
+      minimap: content.STAGE26_ASSETS.minimap,
+      unitSprites: content.STAGE26_ASSETS.unitSprites,
+      enemyPhaseTailPresentations: content.STAGE26_ASSETS.enemyPhaseTailPresentations,
     },
     preparation,
     createBattle,
@@ -2937,6 +2988,64 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage24Module,
+  },
+  "stage-26": {
+    id: "stage-26",
+    ordinal: 25,
+    label: "遭遇碧娜維姬",
+    nextStageId: "stage-27",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "deployment",
+      statusText: "死亡之谷城堡已突破；編成討伐碧娜維姬的部隊。",
+      campaignRoute: "stage-26",
+    },
+    enemyPhaseStatusText: "敵方階段：碧娜維姬的守軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始碧娜維姬戰部署。",
+      retreatStatusText: "全面撤退：返回碧娜維姬戰部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "趕回瓦爾克麗城",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-26-enter-deployment",
+        "stage-26-opening-story",
+        "stage-26-objective-reached",
+        "stage-26-victory-story",
+        "stage-26-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-26-enter-deployment",
+        "stage-26-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0, 1, 7, 8],
+        optionalSlots: [2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 22,
+        openCellCount: 18,
+      },
+      enemyClassById: [
+        ["2:1", "magic-master"],
+        ["2:35", "magic-priest"],
+        ["2:36", "magic-priest"],
+        ["2:37", "magic-priest"],
+        ["2:38", "magic-priest"],
+        ["2:39", "magic-priest"],
+        ["2:40", "magic-priest"],
+        ["2:41", "magic-priest"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage26Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

@@ -85,6 +85,11 @@ import {
   type EscortRouteDefinition,
 } from "./escort-route";
 import {
+  commitEnemyPhaseTail,
+  type EnemyPhaseTailDefinition,
+  type PreparedEnemyPhaseTail,
+} from "./enemy-phase-tail";
+import {
   compareExpertAiUtility,
   expertAiCandidateTrace,
   expertExposureAt,
@@ -275,6 +280,7 @@ export interface BattleScenario {
   forces?: readonly ForceDefinition[];
   routePulses?: readonly RoutePulseDefinition[];
   escortRoutes?: readonly EscortRouteDefinition[];
+  enemyPhaseTail?: EnemyPhaseTailDefinition;
   routeEnemy?: {
     target: Position;
     movement: number;
@@ -2620,6 +2626,26 @@ export class Stage0Battle {
 
   hasRouteEnemy(): boolean {
     return this.scenario.routeEnemy !== undefined;
+  }
+
+  enemyPhaseTailExecutionCount(): number {
+    return this.scenario.enemyPhaseTail?.executions ?? 0;
+  }
+
+  prepareEnemyPhaseTail(): PreparedEnemyPhaseTail | undefined {
+    return this.scenario.enemyPhaseTail?.prepare(
+      this.units,
+      this.scenario.width,
+      this.scenario.height,
+    );
+  }
+
+  commitEnemyPhaseTail(prepared: PreparedEnemyPhaseTail): void {
+    const definition = this.scenario.enemyPhaseTail;
+    if (!definition || definition.id !== prepared.definitionId) {
+      throw new Error(`Unknown enemy phase tail ${prepared.definitionId}`);
+    }
+    commitEnemyPhaseTail(prepared, this.units);
   }
 
   moveRouteEnemy(id: string): RouteMoveResult | undefined {

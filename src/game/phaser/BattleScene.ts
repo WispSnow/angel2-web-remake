@@ -38,6 +38,11 @@ const OBJECTIVE_DESTINATION_STROKE = 0xf2c4ec;
 
 const routePulseTextureKey = (presentationId: string, frame: number): string =>
   `route-pulse-${presentationId}-${frame}`;
+const enemyPhaseTailTextureKey = (
+  presentationId: string,
+  resource: "phase1" | "phase2",
+  frame: number,
+): string => `enemy-phase-tail-${presentationId}-${resource}-${frame}`;
 
 type NativePointerCursor = "hand" | "up" | "down" | "left" | "right";
 
@@ -317,6 +322,18 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       for (const presentation of stageAssets?.routePulsePresentations ?? []) {
         presentation.frames.forEach((source, frame) =>
           this.load.image(routePulseTextureKey(presentation.id, frame), source));
+      }
+      for (const presentation of stageAssets?.enemyPhaseTailPresentations ?? []) {
+        presentation.phase1.frames.forEach((source, frame) =>
+          this.load.image(
+            enemyPhaseTailTextureKey(presentation.id, "phase1", frame),
+            source,
+          ));
+        presentation.phase2.frames.forEach((source, frame) =>
+          this.load.image(
+            enemyPhaseTailTextureKey(presentation.id, "phase2", frame),
+            source,
+          ));
       }
     }
 
@@ -1086,8 +1103,41 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const presentation = controller.combatPresentation;
       const special = controller.specialActionPresentation;
       const routePulse = controller.routePulsePresentation;
+      const enemyPhaseTail = controller.enemyPhaseTailPresentation;
       const rest = controller.restPresentation;
       const canvas = this.game.canvas;
+      if (enemyPhaseTail) {
+        const { descriptor, origin, prepared } = enemyPhaseTail;
+        descriptor.low7BitFrameIndices.forEach((sourceFrame, index) => {
+          if (sourceFrame === null) return;
+          const column = index % descriptor.width;
+          const row = Math.floor(index / descriptor.width);
+          this.combatEffects.push(
+            this.add.image(
+              (origin.x + descriptor.xOffset + column) * TILE_WIDTH,
+              (origin.y + descriptor.yOffset + row) * TILE_HEIGHT,
+              enemyPhaseTailTextureKey(
+                prepared.presentationId,
+                enemyPhaseTail.resource,
+                sourceFrame,
+              ),
+            ).setOrigin(0).setDepth(8),
+          );
+        });
+        if (controller.isTestMode) {
+          canvas.dataset.mapCombatPhase = `enemy-phase-tail-${enemyPhaseTail.phase}`;
+          canvas.dataset.mapCombatFrame = String(enemyPhaseTail.draw);
+          canvas.dataset.mapCombatTarget = prepared.selectedUnitId;
+          canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
+          canvas.dataset.mapCombatEffectTextureKeys = this.combatEffects.flatMap((effect) =>
+            effect instanceof Phaser.GameObjects.Image ? [effect.texture.key] : []).join(",");
+          canvas.dataset.enemyPhaseTailExecution = String(enemyPhaseTail.execution);
+          canvas.dataset.enemyPhaseTailNativeTicks = String(enemyPhaseTail.nativeTicks);
+          canvas.dataset.enemyPhaseTailOrigin = `${origin.x},${origin.y}`;
+          canvas.dataset.enemyPhaseTailMoveCount = String(prepared.moves.length);
+        }
+        return;
+      }
       if (routePulse) {
         const presentationId = routePulse.result.definition.presentationId;
         const drawPulseCell = (position: Position, frame: number): void => {
@@ -1726,6 +1776,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.routePulseSweepCellCount;
           canvas.dataset.mapCombatEffectTileCount = "0";
           delete canvas.dataset.mapCombatEffectTextureKeys;
+          delete canvas.dataset.enemyPhaseTailExecution;
+          delete canvas.dataset.enemyPhaseTailNativeTicks;
+          delete canvas.dataset.enemyPhaseTailOrigin;
+          delete canvas.dataset.enemyPhaseTailMoveCount;
         }
         return;
       }

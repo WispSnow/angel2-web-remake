@@ -35,6 +35,8 @@ ref/*
 !public/assets/original/status-icons/*.png
 !public/assets/original/stage4-force-field-pulse/
 !public/assets/original/stage4-force-field-pulse/*.png
+!public/assets/original/stage26-column-push/
+!public/assets/original/stage26-column-push/**/*.png
 artifacts/
 test-results/
 playwright-report/

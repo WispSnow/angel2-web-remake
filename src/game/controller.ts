@@ -60,11 +60,17 @@ import {
 } from "./simulation/battle";
 import type { AlliedAiAction } from "./simulation/ai-contracts";
 import type { PreparedRoutePulse } from "./simulation/route-pulse";
+import type { PreparedEnemyPhaseTail } from "./simulation/enemy-phase-tail";
 import type {
   ConstructionActionId,
   ConstructionResult,
 } from "./simulation/actions/construction";
 import { routePulsePresentationTimeline } from "./route-pulse-presentation";
+import {
+  enemyPhaseTailPresentationTimeline,
+  type EnemyPhaseTailPresentation,
+  type EnemyPhaseTailPresentationStep,
+} from "./enemy-phase-tail-presentation";
 import { buildStompPresentationSteps } from "./stomp-presentation";
 import { techniqueEffectRange } from "./simulation/actions/range-map";
 import type { DeploymentResult } from "./simulation/deployment";
@@ -372,6 +378,8 @@ export class GameController {
   routePulsePresentationTrace: Array<
     Pick<RoutePulsePresentation, "frame" | "sweepFrame" | "draw" | "nativeTicks" | "visible">
   > = [];
+  enemyPhaseTailPresentation?: EnemyPhaseTailPresentation;
+  enemyPhaseTailPresentationTrace: Array<EnemyPhaseTailPresentationStep & { execution: number }> = [];
   specialActionPresentationTrace: Array<{
     phase: SpecialActionPresentationPhase;
     frame: number;
@@ -2978,6 +2986,7 @@ export class GameController {
       await pause(this.mapCombatDelay(40));
     }
     const pendingEnemyIds = new Set(this.battle.enemyActionOrder());
+    const deferEnemyOutcome = this.battle.enemyPhaseTailExecutionCount() > 0;
     while (pendingEnemyIds.size > 0) {
       const id = this.battle.nextEnemyActionId([...pendingEnemyIds]);
       if (!id) break;
@@ -2985,7 +2994,7 @@ export class GameController {
       if (!this.battle.unit(id)) continue;
       if (!this.battle.hasRouteEnemy() || this.battle.unit(id)?.statuses.confusion) {
         const action = this.battle.planEnemyAiAction(id);
-        if (action && await this.runAlliedAiAction(action, "enemy")) {
+        if (action && await this.runAlliedAiAction(action, "enemy", deferEnemyOutcome)) {
           this.busy = false;
           this.emit();
           return;
@@ -3008,11 +3017,28 @@ export class GameController {
         this.statusMessage = `${enemyName}已撤離戰場。`;
         this.emit();
       }
-      if (this.resolveOutcome()) {
+      if (!deferEnemyOutcome && this.resolveOutcome()) {
         this.busy = false;
         this.emit();
         return;
       }
+    }
+    this.enemyPhaseTailPresentationTrace = [];
+    for (let execution = 1; execution <= this.battle.enemyPhaseTailExecutionCount(); execution += 1) {
+      const prepared = this.battle.prepareEnemyPhaseTail();
+      if (!prepared) continue;
+      this.statusMessage = `敵方階段尾魔法第 ${execution} 次發動；棋盤位移將在演出後結算。`;
+      await this.presentEnemyPhaseTail(prepared, execution);
+      this.battle.commitEnemyPhaseTail(prepared);
+      this.statusMessage = prepared.moves.length > 0
+        ? `第 ${execution} 次魔法向下推動 ${prepared.moves.length} 名我方。`
+        : `第 ${execution} 次魔法完成；此縱列沒有可下推的我方。`;
+      this.emit();
+    }
+    if (this.resolveOutcome()) {
+      this.busy = false;
+      this.emit();
+      return;
     }
     await this.presentTurnTransition("player");
     this.battle.startNextRound();
@@ -3053,9 +3079,10 @@ export class GameController {
   private async runAlliedAiAction(
     action: AlliedAiAction,
     movementKind: Extract<MovementKind, "allyAuto" | "enemy"> = "allyAuto",
+    deferOutcome = false,
   ): Promise<boolean> {
     let unit = this.battle.unit(action.unitId);
-    if (!unit) return this.resolveOutcome();
+    if (!unit) return deferOutcome ? false : this.resolveOutcome();
     this.battle.focusId = unit.id;
     this.cursor = { x: unit.x, y: unit.y };
     this.centerCamera(unit);
@@ -3073,7 +3100,7 @@ export class GameController {
     ) {
       await this.animateUnitPath(unit.id, action.path, movementKind);
       unit = this.battle.unit(action.unitId);
-      if (!unit) return this.resolveOutcome();
+      if (!unit) return deferOutcome ? false : this.resolveOutcome();
     }
 
     if (action.kind === "route-pulse") {
@@ -3203,7 +3230,7 @@ export class GameController {
 
     const promotionPause = this.pauseForPromotions();
     if (promotionPause) await promotionPause;
-    const ended = this.resolveOutcome();
+    const ended = deferOutcome ? false : this.resolveOutcome();
     this.emit();
     return ended;
   }
@@ -3235,6 +3262,25 @@ export class GameController {
       await pause(this.mapCombatDelay(frame.nativeTicks));
     }
     this.routePulsePresentation = undefined;
+  }
+
+  private async presentEnemyPhaseTail(
+    prepared: PreparedEnemyPhaseTail,
+    execution: number,
+  ): Promise<void> {
+    const definition = this.stageRuntime.assets?.enemyPhaseTailPresentations
+      ?.find(({ id }) => id === prepared.presentationId);
+    if (!definition) {
+      throw new Error(`Missing enemy-phase-tail presentation ${prepared.presentationId}`);
+    }
+    for (const step of enemyPhaseTailPresentationTimeline(definition, prepared.origin)) {
+      this.centerCamera(step.origin);
+      this.enemyPhaseTailPresentation = { prepared, execution, ...step };
+      this.enemyPhaseTailPresentationTrace.push({ execution, ...step });
+      this.emit();
+      await pause(this.mapCombatDelay(step.nativeTicks));
+    }
+    this.enemyPhaseTailPresentation = undefined;
   }
 
   private async presentOrdinaryCombat(
@@ -4261,6 +4307,8 @@ export class GameController {
     this.combatPresentation = undefined;
     this.specialActionPresentation = undefined;
     this.specialActionPresentationTrace = [];
+    this.enemyPhaseTailPresentation = undefined;
+    this.enemyPhaseTailPresentationTrace = [];
     this.restPresentation = undefined;
     this.restPresentationTrace = [];
     this.aiTechniqueDialogue = undefined;
@@ -5163,6 +5211,31 @@ export class GameController {
         displayedLifeByUnitId: { ...this.routePulsePresentation.displayedLifeByUnitId },
       } : undefined,
       routePulsePresentationTrace: this.routePulsePresentationTrace.map((entry) => ({ ...entry })),
+      enemyPhaseTailPresentation: this.enemyPhaseTailPresentation ? {
+        ...this.enemyPhaseTailPresentation,
+        origin: { ...this.enemyPhaseTailPresentation.origin },
+        descriptor: {
+          ...this.enemyPhaseTailPresentation.descriptor,
+          low7BitFrameIndices: [...this.enemyPhaseTailPresentation.descriptor.low7BitFrameIndices],
+        },
+        prepared: {
+          ...this.enemyPhaseTailPresentation.prepared,
+          origin: { ...this.enemyPhaseTailPresentation.prepared.origin },
+          moves: this.enemyPhaseTailPresentation.prepared.moves.map((move) => ({
+            ...move,
+            from: { ...move.from },
+            to: { ...move.to },
+          })),
+        },
+      } : undefined,
+      enemyPhaseTailPresentationTrace: this.enemyPhaseTailPresentationTrace.map((entry) => ({
+        ...entry,
+        origin: { ...entry.origin },
+        descriptor: {
+          ...entry.descriptor,
+          low7BitFrameIndices: [...entry.descriptor.low7BitFrameIndices],
+        },
+      })),
       restPresentation: this.restPresentation ? {
         ...this.restPresentation,
         unit: {

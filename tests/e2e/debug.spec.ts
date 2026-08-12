@@ -60,6 +60,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 22 關 · 焦土森林村莊中",
     "第 23 關 · 死亡之谷中",
     "第 24 關 · 死亡之谷城堡前",
+    "第 25 關 · 遭遇碧娜維姬",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -188,6 +189,14 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-24-near-defeat",
     "stage-24-victory-ready",
     "stage-24-cleared",
+    "stage-26-deployment",
+    "stage-26-opening",
+    "stage-26-player",
+    "stage-26-enemy-tail",
+    "stage-26-near-victory",
+    "stage-26-near-defeat",
+    "stage-26-victory-ready",
+    "stage-26-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }

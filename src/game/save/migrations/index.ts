@@ -199,6 +199,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restoredKins) ? restoredKins : undefined;
 }
 
+function migrateVersion49Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 49
+    || value.contentVersion !== "stage-23-campaign-class-baseline-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion48Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 48
@@ -1704,6 +1715,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion49 = migrateVersion49Save(value);
+    if (migratedVersion49) return migratedVersion49;
     const migratedVersion48 = migrateVersion48Save(value);
     if (migratedVersion48) return migratedVersion48;
     const migratedVersion47 = migrateVersion47Save(value);

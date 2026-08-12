@@ -22,6 +22,7 @@ import type { BattleScenario } from "./battle";
 import type { ForceDefinition } from "./forces";
 import type { RoutePulseDefinition } from "./route-pulse";
 import type { EscortRouteDefinition } from "./escort-route";
+import type { EnemyPhaseTailDefinition } from "./enemy-phase-tail";
 
 export interface DeployedStageAllyDefinition {
   slot: number;
@@ -49,6 +50,7 @@ export interface DeployedStageScenarioConfig extends DeployedStageUnitConfig {
   campaignUnitSlots?: readonly number[];
   routePulses?: readonly RoutePulseDefinition[];
   escortRoutes?: readonly EscortRouteDefinition[];
+  enemyPhaseTail?: EnemyPhaseTailDefinition;
 }
 
 function alliedUnitConfig(
@@ -168,5 +170,6 @@ export function createDeployedStageScenario(
     campaignUnitSlots: config.campaignUnitSlots,
     routePulses: config.routePulses,
     escortRoutes: config.escortRoutes,
+    enemyPhaseTail: config.enemyPhaseTail,
   };
 }
