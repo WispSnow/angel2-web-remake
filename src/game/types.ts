@@ -28,7 +28,8 @@ export type StageId =
   | "stage-17"
   | "stage-18"
   | "stage-19"
-  | "stage-20";
+  | "stage-20"
+  | "stage-21";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -51,7 +52,8 @@ export type CampaignRouteId =
   | "stage-18"
   | "stage-19"
   | "stage-20"
-  | "stage-21";
+  | "stage-21"
+  | "stage-22";
 
 export interface Position {
   x: number;
@@ -148,7 +150,12 @@ export interface AttackResult {
 export interface DialogueWindowState {
   portrait?: PortraitRecord;
   speaker?: string;
-  text: string;
+  /**
+   * Native window text. Absent when the script keeps a portrait on screen with
+   * its text window closed — `HD`/`HU` without `WD`/`WU`, as in SAY/0043 where
+   * Nia names each scout and only their portrait answers.
+   */
+  text?: string;
   /** Native text cursor inset from the A/18 text-window origin. */
   textInset?: Readonly<{ x: number; y: number }>;
 }
@@ -202,8 +209,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 42;
-  contentVersion: "stage-20-dragon-wd-1";
+  version: 43;
+  contentVersion: "stage-21-scout-interlude-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

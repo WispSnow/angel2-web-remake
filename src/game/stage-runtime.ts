@@ -1107,6 +1107,27 @@ async function loadStage20Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage21Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage21"),
+    import("./simulation/stage21-battle"),
+  ]);
+  content.activateStage21Content();
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, _preparation, rng) =>
+    new battleModule.Stage21Battle(campaign, rng);
+  return {
+    definition: content.STAGE21_DEFINITION,
+    assets: {
+      map: content.STAGE21_ASSETS.map,
+      minimap: content.STAGE21_ASSETS.minimap,
+      storyBackgrounds: content.STAGE21_ASSETS.storyBackgrounds,
+      unitSprites: content.STAGE21_ASSETS.unitSprites,
+    },
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(createBattle, campaign, snapshot),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -2504,6 +2525,48 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage20Module,
+  },
+  "stage-21": {
+    id: "stage-21",
+    ordinal: 21,
+    label: "焦土森林村莊外",
+    nextStageId: "stage-22",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "守護者準備將妮雅攻略隊傳送到琴斯所在之處。",
+      campaignRoute: "stage-21",
+    },
+    enemyPhaseStatusText: "偵察過場中沒有敵方階段。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始焦土森林偵察過場。",
+      retreatStatusText: "焦土森林偵察過場不可撤退。",
+    },
+    completion: {
+      destinationLabel: "焦土森林村莊中",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-21-prebattle-story",
+        "stage-21-scouts-arrive",
+        "stage-21-scouting-story",
+        "stage-21-nia-move",
+        "stage-21-himi-move",
+        "stage-21-gadirath-move",
+        "stage-21-sulanda-move",
+        "stage-21-discovery-story",
+        "stage-21-completed-route",
+      ],
+      alliedUnits: { kind: "exact-slots", slots: [0, 1, 24, 8] },
+      enemyClassById: [],
+      enemyAi: "none",
+    },
+    load: loadStage21Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

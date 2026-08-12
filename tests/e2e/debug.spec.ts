@@ -56,6 +56,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 18 關 · 龍塔第五層",
     "第 19 關 · 龍塔第六層",
     "第 20 關 · 龍塔頂部",
+    "第 21 關 · 焦土森林村莊外",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -161,6 +162,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-19-near-defeat",
     "stage-19-victory-ready",
     "stage-19-cleared",
+    "stage-21-prebattle",
+    "stage-21-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -245,6 +248,10 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-scenario-stage-10-player")).toHaveAttribute(
     "href",
     "/?debugScenario=stage-10-player&difficulty=3&roster=representative-growth&growth=120",
+  );
+  await expect(page.getByTestId("debug-scenario-stage-21-prebattle")).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-21-prebattle&difficulty=3&roster=representative-growth&growth=120",
   );
   await expect(page.getByTestId("debug-scenario-stage-00-player")).toHaveAttribute(
     "href",

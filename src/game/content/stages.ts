@@ -53,7 +53,10 @@ export type StageStoryId =
   | "stage-20-victory-1-story"
   | "stage-20-victory-2-story"
   | "stage-20-victory-3-story"
-  | "stage-20-victory-story";
+  | "stage-20-victory-story"
+  | "stage-21-prebattle-story"
+  | "stage-21-scouting-story"
+  | "stage-21-discovery-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -109,7 +112,10 @@ export type StageMusicId =
   | "stage-19-enemy-phase-music"
   | "stage-20-story-music"
   | "stage-20-player-phase-music"
-  | "stage-20-enemy-phase-music";
+  | "stage-20-enemy-phase-music"
+  | "stage-21-story-music"
+  | "stage-21-player-phase-music"
+  | "stage-21-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -233,7 +239,16 @@ export type StageEventId =
   | "stage-20-victory-2-story"
   | "stage-20-victory-3-story"
   | "stage-20-victory-story"
-  | "stage-20-completed-route";
+  | "stage-20-completed-route"
+  | "stage-21-prebattle-story"
+  | "stage-21-scouts-arrive"
+  | "stage-21-scouting-story"
+  | "stage-21-nia-move"
+  | "stage-21-himi-move"
+  | "stage-21-gadirath-move"
+  | "stage-21-sulanda-move"
+  | "stage-21-discovery-story"
+  | "stage-21-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -309,7 +324,13 @@ export type StageSimulationEffectId =
   | "stage-20-set-victory-999"
   | "stage-20-kins-arrival"
   | "stage-20-kins-move"
-  | "stage-20-route-to-stage-21";
+  | "stage-20-route-to-stage-21"
+  | "stage-21-scouts-arrive"
+  | "stage-21-nia-move"
+  | "stage-21-himi-move"
+  | "stage-21-gadirath-move"
+  | "stage-21-sulanda-move"
+  | "stage-21-route-to-stage-22";
 
 export type StagePresentationId =
   | "none"

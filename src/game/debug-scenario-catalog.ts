@@ -1136,7 +1136,22 @@ export const DEBUG_SCENARIOS = [
     stageId: "stage-20",
     title: "完成路由",
     phase: "Route to stage 21",
-    description: "視為龍塔頂部戰鬥已完成，停在「焦土森林村莊外」內部第 21 關凍結邊界。",
+    description: "視為龍塔頂部戰鬥已完成，直接進入「焦土森林村莊外」第 21 關關前劇情。",
+    fixture: true,
+  },
+  {
+    id: "stage-21-prebattle",
+    stageId: "stage-21",
+    title: "焦土森林傳送前劇情",
+    phase: "SAY/0042",
+    description: "守護者請攻略隊整隊，隨後將眾人傳送到焦土森林村莊外。",
+  },
+  {
+    id: "stage-21-cleared",
+    stageId: "stage-21",
+    title: "完成偵察路由",
+    phase: "Route to stage 22",
+    description: "視為四人偵察過場已完成，停在「焦土森林村莊中」內部第 22 關凍結邊界。",
     fixture: true,
   },
 ] as const satisfies readonly DebugScenarioDefinition[];

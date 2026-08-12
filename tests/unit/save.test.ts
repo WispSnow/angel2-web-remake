@@ -1875,7 +1875,22 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("migrates v41 saves to the stage 20 content identity", () => {
+  it("migrates v42 saves to the stage 21 content identity", () => {
+    const current = stage19BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 42,
+      contentVersion: "stage-20-dragon-wd-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-19",
+    });
+  });
+
+  it("migrates v41 saves to the stage 21 content identity", () => {
     const current = stage19BattleSave();
     const migrated = parseSaveData(JSON.stringify({
       ...current,

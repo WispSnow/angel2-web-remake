@@ -286,6 +286,18 @@ const STAGE20_COMPLETED_EVENT_IDS = [
   "stage-20-completed-route",
 ] as const;
 
+const STAGE21_COMPLETED_EVENT_IDS = [
+  "stage-21-prebattle-story",
+  "stage-21-scouts-arrive",
+  "stage-21-scouting-story",
+  "stage-21-nia-move",
+  "stage-21-himi-move",
+  "stage-21-gadirath-move",
+  "stage-21-sulanda-move",
+  "stage-21-discovery-story",
+  "stage-21-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -1936,6 +1948,34 @@ async function createStage20Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage21Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-21", debugCampaign(context, "stage-21"));
+  return controller;
+}
+
+async function createStage21Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-21");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-22",
+    stageLabel: "焦土森林村莊中",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(campaign.roster),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE21_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -2516,6 +2556,8 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-20-cleared": createStage20Completed,
+  "stage-21-prebattle": createStage21Prebattle,
+  "stage-21-cleared": createStage21Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

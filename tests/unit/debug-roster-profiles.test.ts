@@ -46,6 +46,8 @@ const stageIds = [
   "stage-17",
   "stage-18",
   "stage-19",
+  "stage-20",
+  "stage-21",
 ] as const satisfies readonly StageId[];
 const workspace = path.resolve(import.meta.dirname, "../..");
 
@@ -246,7 +248,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14", "stage-15", "stage-16", "stage-17", "stage-18", "stage-19"] as const) {
+    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14", "stage-15", "stage-16", "stage-17", "stage-18", "stage-19", "stage-20", "stage-21"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(roster[8], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
@@ -268,7 +270,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14", "stage-15", "stage-16", "stage-17", "stage-18", "stage-19"] as const) {
+    for (const stageId of ["stage-11", "stage-10", "stage-12", "stage-13", "stage-14", "stage-15", "stage-16", "stage-17", "stage-18", "stage-19", "stage-20", "stage-21"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(roster[9], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
@@ -280,7 +282,7 @@ describe("debug roster profiles", () => {
       }
     }
 
-    for (const stageId of ["stage-14", "stage-15", "stage-16", "stage-17", "stage-18", "stage-19"] as const) {
+    for (const stageId of ["stage-14", "stage-15", "stage-16", "stage-17", "stage-18", "stage-19", "stage-20", "stage-21"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         for (const [slot, classId] of [[10, "water-warrior"], [11, "water-warrior"]] as const) {
@@ -293,6 +295,18 @@ describe("debug roster profiles", () => {
             });
         }
       }
+    }
+  });
+
+  it("inherits the stage-twenty debug professions into the stage-twenty-one interlude", () => {
+    for (const profileId of ["representative-growth", "promotion-coverage"] as const) {
+      const stage20 = debugRosterForProfile(profileId, "stage-20");
+      const stage21 = debugRosterForProfile(profileId, "stage-21");
+      expect(stage21).toEqual(stage20);
+      for (const slot of [0, 1, 24, 8]) {
+        expect(stage21[slot]?.classId, `${profileId}/${slot}`).not.toBe("soldier");
+      }
+      expect(debugRosterProfileSupportsGrowthOverride(profileId, "stage-21")).toBe(true);
     }
   });
 

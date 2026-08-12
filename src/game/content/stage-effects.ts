@@ -72,6 +72,18 @@ export type StageSimulationEffectDefinition =
     }[];
     statusText: string;
     revealTiming?: "native-before-write" | "after-write";
+    /**
+     * Native cell writes carry the `80h` action bit of the unit-slot map. Scenes
+     * that hand the board back to a side phase leave it set (the default);
+     * a noninteractive interlude that never reaches one must not paint every
+     * actor with the 已行動 badge.
+     */
+    actionSpent?: boolean;
+    /**
+     * Native `focusPortraitResource`: the side panel this event settles on once
+     * every write is done. Defaults to the last actor written.
+     */
+    focusPortrait?: PortraitRecord;
   }
   | {
     type: "scripted-unit-arrival";

@@ -70,8 +70,8 @@ describe("native stage-zero dialogue checkpoints", () => {
     expect(firstHalf.activeSlot).toBe("lower");
     expect(firstHalf.upper?.speaker).toBe("妮雅");
     expect(appended.upper).toEqual(firstHalf.upper);
-    expect(appended.lower?.text.startsWith(firstHalf.lower?.text ?? "")).toBe(true);
-    expect(appended.revealStart).toBe(firstHalf.lower?.text.length);
+    expect(appended.lower?.text?.startsWith(firstHalf.lower?.text ?? "")).toBe(true);
+    expect(appended.revealStart).toBe(firstHalf.lower?.text?.length);
     expect(appended.lower?.text).toContain("騎士團的軍隊");
   });
 

@@ -9,9 +9,10 @@ import {
   STAGE20_STORY_PAGES,
 } from "../../src/game/content/stage20";
 import { stageSimulationEffectFor } from "../../src/game/content/stage-effects";
+import type { DialoguePage } from "../../src/game/types";
 
 describe("stage 20 content", () => {
-  it("publishes the tower-top deployment, boss objective, and frozen stage-21 route", () => {
+  it("publishes the tower-top deployment, boss objective, and stage-21 route", () => {
     expect(STAGE20_DEFINITION).toMatchObject({
       id: "stage-20",
       nativeStage: 20,
@@ -105,5 +106,18 @@ describe("stage 20 content", () => {
       minimap: "/assets/original/stage20-minimap.png",
       storyBackground: "/assets/original/story-stage20-background.svg",
     });
+  });
+
+  it("shows the Dragon King statue while SAY/0074 narrates its transformation", () => {
+    // SAY/0074 lines 5–19 raise records 56 and 67 with HU and never open WU, so
+    // the statue must stay on screen above the narration window.
+    const victory: readonly DialoguePage[] = STAGE20_STORY_PAGES["stage-20-victory-3-story"];
+    expect(victory.slice(0, 4).map(({ upper }) => upper))
+      .toEqual([
+        { portrait: 56, speaker: "龍王" },
+        { portrait: 56, speaker: "龍王" },
+        { portrait: 67, speaker: "龍王" },
+        { portrait: 67, speaker: "龍王" },
+      ]);
   });
 });

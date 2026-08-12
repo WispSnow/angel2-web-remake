@@ -162,7 +162,7 @@ test("S20-E: demon dragon casts the native-timed WD path and defeats Nia", async
   expect((await state(page)).lastSpecialAction).toMatchObject({ actionId: "wd" });
 });
 
-test("S20-F/G: boss victory plays Kins and Dragon King, then freezes at stage 21", async ({ page }) => {
+test("S20-F/G: boss victory plays Kins and Dragon King, then enters stage 21", async ({ page }) => {
   await page.goto("/?debugScenario=stage-20-victory-ready&difficulty=0&test=1");
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage20State | undefined;
@@ -213,7 +213,7 @@ test("S20-F/G: boss victory plays Kins and Dragon King, then freezes at stage 21
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -252,9 +252,10 @@ test("S20-F/G: boss victory plays Kins and Dragon King, then freezes at stage 21
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-20",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-21",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-21",
   });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "42");
 });

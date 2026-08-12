@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion42Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 42
+    || value.contentVersion !== "stage-20-dragon-wd-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion41Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 41
@@ -1561,6 +1572,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion42 = migrateVersion42Save(value);
+    if (migratedVersion42) return migratedVersion42;
     const migratedVersion41 = migrateVersion41Save(value);
     if (migratedVersion41) return migratedVersion41;
     const migratedVersion40 = migrateVersion40Save(value);

@@ -1048,13 +1048,25 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         elements.portraitName.removeAttribute("data-testid");
         if (!state) {
           stopSpeaking(elements.portrait);
+          elements.copy.hidden = false;
           elements.portraitName.hidden = true;
           elements.portraitName.textContent = "";
           continue;
         }
         elements.speaker.textContent = state.speaker ?? "";
-        elements.box.setAttribute("aria-label", state.speaker ? `${state.speaker}對話` : "旁白");
-        if (!active || pageChanged) renderDialogueText(elements.text, state.text);
+        // A slot with no text is a portrait the script left on screen after
+        // closing its window; only .dialogue-copy carries the A/18 text panel,
+        // so hiding it leaves the framed portrait and nameplate alone.
+        elements.copy.hidden = state.text === undefined;
+        elements.box.setAttribute(
+          "aria-label",
+          state.text === undefined
+            ? `${state.speaker ?? "角色"}在場`
+            : state.speaker ? `${state.speaker}對話` : "旁白",
+        );
+        if (state.text !== undefined && (!active || pageChanged)) {
+          renderDialogueText(elements.text, state.text);
+        }
         if (state.textInset) {
           elements.copy.style.setProperty("--dialogue-text-inset-x", `${state.textInset.x}px`);
           elements.copy.style.setProperty("--dialogue-text-inset-y", `${state.textInset.y}px`);
@@ -1091,14 +1103,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           elements.portraitName.textContent = "";
         }
       }
-      if (page.activeSlot) {
-        const activeState = page[page.activeSlot];
+      const activeState = page.activeSlot ? page[page.activeSlot] : undefined;
+      if (page.activeSlot && activeState?.text !== undefined) {
         const target = dialogueWindows[page.activeSlot].text;
-        const portrait = activeState?.portrait !== undefined
+        const portrait = activeState.portrait !== undefined
           ? dialogueWindows[page.activeSlot].portrait
           : undefined;
         target.id = "dialogue-text";
-        if (pageChanged && activeState) revealDialogue(activeState.text, pageKey, target, page.revealStart, portrait);
+        if (pageChanged) revealDialogue(activeState.text, pageKey, target, page.revealStart, portrait);
       } else if (pageChanged) {
         stopDialogueTimer();
         stopSpeaking(activeDialoguePortrait);

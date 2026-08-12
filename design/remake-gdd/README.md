@@ -4,11 +4,11 @@
 
 日期：2026-08-11
 
-阶段：第 0–19 关及既有非连续战斗已接受；内部第 20 关“龍塔頂部”已验证、等待试玩；stage 21 及后续内容冻结
+阶段：第 0–20 关及既有非连续战斗已接受；内部第 21 关“焦土森林村莊外”已验证、等待试玩；stage 22 及后续内容冻结
 
 开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关与内部第 11 关已获用户
-接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–19 关已获
-用户接受；M38/M39 已按 `REMAKE-052` 实现内部第 20 关，内部 stage 21 及后续运行时仍冻结
+接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–20 关已获
+用户接受；M40/M41 已按 `REMAKE-055` 实现内部第 21 关，内部 stage 22 及后续运行时仍冻结
 
 ## 文档目的
 
@@ -64,7 +64,8 @@
 | [`vertical-slices/stage-17.md`](vertical-slices/stage-17.md) | 1–10 人部署、SAY 36 开战对白、倩率十二敌、首领目标、无增援与 stage 18 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-18.md`](vertical-slices/stage-18.md) | 1–8 人部署、SAY 37 开战对白、麗率十六敌、首领目标、无增援与 stage 19 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-19.md`](vertical-slices/stage-19.md) | 1–10 人部署、SAY 38 愛／蘇蘭達双窗对白、愛率二十一敌、首领目标、无增援与 stage 20 路由 | Draft 0.1 / 已接受 |
-| [`vertical-slices/stage-20.md`](vertical-slices/stage-20.md) | 3–17 人部署、十六人叙事阵形替换、妖龍／WD、琴斯与龍王胜利链及 stage 21 路由 | Draft 0.1 / 已验证待试玩 |
+| [`vertical-slices/stage-20.md`](vertical-slices/stage-20.md) | 3–17 人部署、十六人叙事阵形替换、妖龍／WD、琴斯与龍王胜利链及 stage 21 路由 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-21.md`](vertical-slices/stage-21.md) | 空模板、四名斥候生成／移动、非交互侦察、跳过普通结算与 stage 22 路由 | Draft 0.1 / 已验证待试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |

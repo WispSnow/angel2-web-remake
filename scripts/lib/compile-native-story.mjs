@@ -68,9 +68,12 @@ export function compileNativeStory(
       };
       for (const slot of ["upper", "lower"]) {
         const state = windows[slot];
-        if (!state.open) continue;
+        // A portrait outlives its window: HD/HU without WD/WU keeps the face and
+        // nameplate on screen with no text panel. Emitting the slot without
+        // `text` reproduces that instead of dropping the portrait entirely.
+        if (!state.open && state.portrait === undefined) continue;
         page[slot] = {
-          text: state.text,
+          ...(state.open ? { text: state.text } : {}),
           ...(state.portrait === undefined ? {} : {
             portrait: state.portrait,
             speaker: portraitSpeakers[state.portrait],

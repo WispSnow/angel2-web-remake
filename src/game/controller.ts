@@ -1291,7 +1291,7 @@ export class GameController {
         // the same campaign slot (for example Kins's stale soldier fallback).
         life: inheritedLife ?? 1,
         experience,
-        acted: true,
+        acted: definition.actionSpent ?? true,
         actionDisabled: sourceUnit?.actionDisabled ?? false,
         statuses: sourceUnit ? { ...sourceUnit.statuses } : emptyUnitStatuses(),
       };
@@ -1306,26 +1306,28 @@ export class GameController {
     const forceInheritance = definition.actors.flatMap((actor) => actor.forceSourceId
       ? [{ sourceUnitId: actor.forceSourceId, derivedUnitId: actor.id }]
       : []);
+    // Native `focusPortraitResource` selects the side panel for the whole write
+    // sequence; without it the panel simply follows the last cell written.
+    const settleFocus = (): void => {
+      const target = (definition.focusPortrait === undefined
+        ? undefined
+        : units.find(({ portrait }) => portrait === definition.focusPortrait))
+        ?? units.at(-1);
+      if (!target) return;
+      this.battle.focusId = target.id;
+      this.cursor = { x: target.x, y: target.y };
+      this.centerCamera(target);
+    };
     if (this.skippingScriptedSequence) {
       this.battle.appendStoryUnits(units, forceInheritance);
-      const finalUnit = units.at(-1);
-      if (finalUnit) {
-        this.battle.focusId = finalUnit.id;
-        this.cursor = { x: finalUnit.x, y: finalUnit.y };
-        this.centerCamera(finalUnit);
-      }
+      settleFocus();
       return;
     }
 
     this.busy = true;
     if (definition.revealTiming === "after-write") {
       this.battle.appendStoryUnits(units, forceInheritance);
-      const finalUnit = units.at(-1);
-      if (finalUnit) {
-        this.battle.focusId = finalUnit.id;
-        this.cursor = { x: finalUnit.x, y: finalUnit.y };
-        this.centerCamera(finalUnit);
-      }
+      settleFocus();
       this.emit();
       await pause(this.mapCombatDelay(3));
       this.busy = false;
@@ -1344,12 +1346,7 @@ export class GameController {
         forceInheritance.filter(({ derivedUnitId }) => derivedUnitId === unit.id),
       );
     }
-    const finalUnit = units.at(-1);
-    if (finalUnit) {
-      this.battle.focusId = finalUnit.id;
-      this.cursor = { x: finalUnit.x, y: finalUnit.y };
-      this.centerCamera(finalUnit);
-    }
+    settleFocus();
     this.emit();
     await pause(this.mapCombatDelay(3));
     this.busy = false;
