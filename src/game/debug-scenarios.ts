@@ -322,6 +322,18 @@ const STAGE22_COMPLETED_EVENT_IDS = [
   "stage-22-completed-route",
 ] as const;
 
+const STAGE23_BATTLE_EVENT_IDS = [
+  "stage-23-prebattle-story",
+  "stage-23-enter-deployment",
+  "stage-23-opening-story",
+] as const;
+
+const STAGE23_COMPLETED_EVENT_IDS = [
+  ...STAGE23_BATTLE_EVENT_IDS,
+  "stage-23-objective-reached",
+  "stage-23-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -2093,6 +2105,95 @@ async function createStage22Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage23Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-23", debugCampaign(context, "stage-23"));
+  return controller;
+}
+
+async function createStage23Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-23",
+    debugCampaign(context, "stage-23"),
+    { preparation: true, statusMessage: "調試場景：死亡之谷部署。" },
+  );
+  return controller;
+}
+
+async function stage23FullDeployment() {
+  const { STAGE23_DEFINITION } = await import("./content/stage23");
+  return {
+    placements: [
+      ...STAGE23_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE23_DEFINITION.deployment.optionalSlots.slice(0, 14).map((slot, index) => ({
+        slot, position: { ...STAGE23_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage23Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage23Deployment(context);
+  controller.completeDeployment(await stage23FullDeployment());
+  return controller;
+}
+
+async function createStage23Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-23");
+  const { Stage23Battle } = await import("./simulation/stage23-battle");
+  const battle = new Stage23Battle(campaign, await stage23FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 23 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-23"),
+    stageLabel: "死亡之谷中",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE23_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：十五人攻略隊突圍死亡之谷；二十一名守軍仍在場。";
+  return controller;
+}
+
+async function createStage23Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-23");
+  const { createStage23DeploymentRoster } = await import("./simulation/stage23-battle");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-24",
+    stageLabel: "死亡之谷城堡前",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(createStage23DeploymentRoster(campaign).map((unit) => ({
+      slot: unit.slot,
+      classId: unit.classId,
+      experience: unit.experience,
+      life: unit.life,
+    }))),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE23_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -2706,6 +2807,34 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-22-cleared": createStage22Completed,
+  "stage-23-prebattle": createStage23Prebattle,
+  "stage-23-deployment": createStage23Deployment,
+  "stage-23-opening": createStage23Opening,
+  "stage-23-player": createStage23Player,
+  "stage-23-near-victory": withSetup(createStage23Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    if (!nia) return;
+    nia.x = 24;
+    nia.y = 11;
+    nia.acted = false;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 20, y: 7 };
+    controller.statusMessage = "調試場景：妮雅向上一步即可進入頂端目標區，守軍仍全員在場。";
+  }),
+  "stage-23-near-defeat": withSetup(createStage23Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const enemy = controller.battle.unit("2:30");
+    if (!nia || !enemy) return;
+    nia.life = 1;
+    enemy.x = nia.x + 1;
+    enemy.y = nia.y;
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，半龍戰士位於相鄰格。";
+  }),
+  "stage-23-victory-ready": withSetup(createStage23Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-23-cleared": createStage23Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

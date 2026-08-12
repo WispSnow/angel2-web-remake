@@ -48,7 +48,8 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 内部第 19 关内容、1–10 人部署、SAY/38 愛／蘇蘭達双窗开战对白、愛率二十一敌、首领目标、回合 6 行为清零证据与无增援 | `stage19-content.test.ts`、`stage19-battle.test.ts`、`objective-records.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage19.spec.ts` |
 | 内部第 20 关内容、3–17 人部署、十六人叙事阵形替换、妖龍／WD、魔祭師琴斯／龍王胜利链与 stage 21 路由 | `stage20-content.test.ts`、`stage20-battle.test.ts`、`wd-action.test.ts`、`expert-ai.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage20.spec.ts` |
 | 内部第 21 关空模板、四名斥候继承／生成／移动、非交互即时胜利与 stage 22 路由 | `stage21-content.test.ts`、`stage21-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage21.spec.ts` |
-| 内部第 22 关 1–19 人部署、女帝／琴斯临时剧情、六敌延迟伏击、妖龍／妮雅胜负与 stage 23 冻结路由 | `stage22-content.test.ts`、`stage22-battle.test.ts`、`stage-events.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage22.spec.ts` |
+| 内部第 22 关 1–19 人部署、女帝／琴斯临时剧情、六敌延迟伏击、妖龍／妮雅胜负与 stage 23 路由 | `stage22-content.test.ts`、`stage22-battle.test.ts`、`stage-events.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage22.spec.ts` |
+| 内部第 23 关 SAY 45/46、1–15 人部署、二十一名静态守军、9 守卫／12 追击、妮雅线性到达区、无增援与 stage 24 冻结路由 | `stage23-content.test.ts`、`stage23-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage23.spec.ts` |
 | 原生“肖像不随文字窗关闭而消失”的检查点（SAY/0043 点名段、SAY/0074 龍王石像） | `stage21-content.test.ts`、`stage20-content.test.ts` | `stage21.spec.ts` |
 | 第 0–6 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
 | 剧情对话 DOM、逐字推进、右键跳过确认与输入阻断 | 无独立模拟数值测试 | `stage0.spec.ts` 的剧情对话用例；各关卡通过 `dialogue-controls.ts` 复用真实跳过路径 |

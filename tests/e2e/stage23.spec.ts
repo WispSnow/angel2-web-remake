@@ -1,0 +1,210 @@
+import { expect, test, type Page } from "@playwright/test";
+import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { skipStoryDialogue } from "./dialogue-controls";
+import { captureVisualAudit } from "./visual-audit";
+
+const ARTIFACT_DIR = "artifacts/playwright";
+
+interface Stage23State {
+  stageId: string;
+  stageProgress: number;
+  phase: string;
+  activeStoryId?: string;
+  focusId: string;
+  campaignRoute?: string;
+  cameraOrigin: { x: number; y: number };
+  consumedEventIds: string[];
+  units: Array<{
+    id: string;
+    side: number;
+    slot: number;
+    classId: string;
+    name: string;
+    portrait: number;
+    x: number;
+    y: number;
+    life: number;
+    acted: boolean;
+  }>;
+}
+
+const state = (page: Page) => page.evaluate(
+  () => window.__ANGEL2__?.getState() as Stage23State,
+);
+
+const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
+  (expected) => (window.__ANGEL2__?.getState() as Stage23State | undefined)?.phase === expected,
+  phase,
+);
+
+const settleBattleCanvas = async (page: Page) => {
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-unit-life-label-count",
+    /^\d+$/u,
+  );
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+};
+
+test("S23-A/B: stage 22 completion plays SAY/45 and opens the 1–15 deployment", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-22-cleared&difficulty=0&test=1");
+  await waitForPhase(page, "prebattleStory");
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "45");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("還好吧");
+  await expect(page.locator("#story-background")).toBeVisible();
+  await expect(page.locator("#story-background")).toHaveCSS(
+    "background-image",
+    /story-stage23-background\.svg/u,
+  );
+  expect(await state(page)).toMatchObject({
+    stageId: "stage-23",
+    stageProgress: 0,
+    phase: "prebattleStory",
+    campaignRoute: "stage-23",
+    consumedEventIds: ["stage-23-prebattle-story"],
+  });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage23-prebattle-story.png`,
+  });
+
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "deployment");
+  await expect(page.getByRole("heading", { name: "死亡之谷中 · 出擊準備" })).toBeVisible();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／15");
+  await expect(page.locator(".deployment-open-cell")).toHaveCount(14);
+  await expect(page.getByTestId("deployment-minimap")).toBeVisible();
+  await expect(page.getByTestId("deployment-guidance")).toContainText("不必全滅守軍");
+  expect(await state(page)).toMatchObject({
+    phase: "deployment",
+    consumedEventIds: ["stage-23-prebattle-story", "stage-23-enter-deployment"],
+  });
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
+    path: `${ARTIFACT_DIR}/stage23-deployment.png`,
+  });
+});
+
+test("S23-C–E: opening story hands 15 allies to the 21-guard battlefield", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-23-deployment&difficulty=0&test=1");
+  for (let rosterIndex = 1; rosterIndex <= 14; rosterIndex += 1) {
+    await page.getByTestId(`deployment-roster-${rosterIndex}`).click();
+  }
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 15／15");
+  await page.getByTestId("deployment-finish").click();
+  if ((await state(page)).phase === "deployment") await page.getByTestId("deployment-finish").click();
+
+  await waitForPhase(page, "openingStory");
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "46");
+  await expect(page.locator("#story-background")).toBeHidden();
+  const opening = await state(page);
+  expect(opening.units.filter(({ side }) => side === 1)).toHaveLength(15);
+  expect(opening.units.filter(({ side }) => side === 2)).toHaveLength(21);
+  expect(opening.units).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: "1:0", name: "妮雅", portrait: 46, x: 25, y: 38 }),
+    expect.objectContaining({ id: "2:45", classId: "half-dragon-warrior", x: 16, y: 10 }),
+    expect.objectContaining({ id: "2:36", classId: "flying-dragon-knight", x: 24, y: 10 }),
+    expect.objectContaining({ id: "2:34", classId: "magic-archer", x: 22, y: 19 }),
+    expect.objectContaining({ id: "2:43", classId: "crossbow", x: 32, y: 14 }),
+    expect.objectContaining({ id: "2:48", classId: "steel-armor-warrior", x: 24, y: 29 }),
+  ]));
+  await settleBattleCanvas(page);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage23-opening-story.png`,
+  });
+
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+  const player = await state(page);
+  expect(player).toMatchObject({
+    focusId: "1:0",
+    cameraOrigin: { x: 21, y: 33 },
+    consumedEventIds: [
+      "stage-23-prebattle-story",
+      "stage-23-enter-deployment",
+      "stage-23-opening-story",
+    ],
+  });
+  await page.keyboard.press("o");
+  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」到達死亡之谷的頂端");
+  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
+  await expect(page.getByTestId("objective-panel")).not.toContainText("打敗所有");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage23-objective-and-map.png`,
+  });
+});
+
+test("S23-F: Nia defeat returns to deployment without replaying SAY/45", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-23-near-defeat&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await page.getByRole("button", { name: "戰敗測試" }).click();
+  await waitForPhase(page, "defeat");
+  await expect(page.getByTestId("status-strip")).toContainText("妮雅");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage23-defeat.png`,
+  });
+
+  await page.getByTestId("retry-button").click();
+  if ((await state(page)).phase === "defeat") await page.getByTestId("retry-button").click();
+  await waitForPhase(page, "deployment");
+  await expect(page.getByRole("heading", { name: "死亡之谷中 · 出擊準備" })).toBeVisible();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／15");
+  expect(await state(page)).toMatchObject({
+    stageId: "stage-23",
+    phase: "deployment",
+    campaignRoute: "stage-23",
+    consumedEventIds: ["stage-23-prebattle-story", "stage-23-enter-deployment"],
+  });
+});
+
+test("S23-G/H: Nia reaches the top with every guard alive and saves the stage-24 boundary", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-23-victory-ready&difficulty=0&test=1");
+  await waitForPhase(page, "victoryFeedback");
+  const victory = await state(page);
+  expect(victory.units.filter(({ side }) => side === 2)).toHaveLength(21);
+  expect(victory.units.find(({ id }) => id === "1:0")).toMatchObject({ x: 24, y: 10 });
+  await expect(page.getByTestId("status-strip")).toContainText("妮雅已抵達死亡之谷頂端");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage23-victory-with-guards.png`,
+  });
+
+  await page.getByTestId("victory-continue").click();
+  if ((await state(page)).phase === "victoryFeedback") await page.getByTestId("victory-continue").click();
+  await waitForPhase(page, "savePrompt");
+  await page.getByTestId("save-yes").click();
+  await page.getByTestId("save-slot-1").click();
+  await waitForPhase(page, "nextStage");
+
+  const completedSave = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
+      version: number;
+      contentVersion: string;
+      kind: string;
+      stageId: string;
+      stageLabel: string;
+      stageProgress: number;
+      consumedEventIds: string[];
+    });
+  expect(completedSave).toMatchObject({
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    stageId: "stage-24",
+    stageLabel: "死亡之谷城堡前",
+    stageProgress: 1000,
+    consumedEventIds: [
+      "stage-23-prebattle-story",
+      "stage-23-enter-deployment",
+      "stage-23-opening-story",
+      "stage-23-objective-reached",
+      "stage-23-completed-route",
+    ],
+  });
+  expect(await state(page)).toMatchObject({
+    stageId: "stage-23",
+    stageProgress: 1000,
+    phase: "nextStage",
+    campaignRoute: "stage-24",
+  });
+});

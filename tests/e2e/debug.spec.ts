@@ -58,6 +58,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 20 關 · 龍塔頂部",
     "第 21 關 · 焦土森林村莊外",
     "第 22 關 · 焦土森林村莊中",
+    "第 23 關 · 死亡之谷中",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -172,6 +173,14 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-22-near-defeat",
     "stage-22-victory-ready",
     "stage-22-cleared",
+    "stage-23-prebattle",
+    "stage-23-deployment",
+    "stage-23-opening",
+    "stage-23-player",
+    "stage-23-near-victory",
+    "stage-23-near-defeat",
+    "stage-23-victory-ready",
+    "stage-23-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }

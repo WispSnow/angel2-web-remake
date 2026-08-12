@@ -233,7 +233,7 @@ test("S22-G: Nia defeat returns to a clean stage 22 deployment", async ({ page }
   });
 });
 
-test("S22-H/I: Dragon victory saves the exact boundary and routes to frozen stage 23", async ({ page }) => {
+test("S22-H/I: Dragon victory saves the exact boundary and routes to stage 23", async ({ page }) => {
   await page.goto("/?debugScenario=stage-22-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("status-strip")).toContainText("妖龍已被擊退");
@@ -243,7 +243,7 @@ test("S22-H/I: Dragon victory saves the exact boundary and routes to frozen stag
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -283,9 +283,10 @@ test("S22-H/I: Dragon victory saves the exact boundary and routes to frozen stag
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-22",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-23",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-23",
   });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "45");
 });
