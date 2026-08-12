@@ -362,6 +362,7 @@ describe("stage runtime manifest", () => {
       maximumUnits: 15,
     });
     expect(stage23.preparation?.presentation.enemies).toHaveLength(21);
+    expect(stage23.entry).toMatchObject({ phase: "deployment", trigger: "campaign-entered" });
     expect(stage23.save.enemyClassById).toHaveLength(21);
     expect(stage23.save.enemyClassById).toContainEqual(["2:34", "magic-archer"]);
     expect(stage23.save.enemyClassById).toContainEqual(["2:48", "steel-armor-warrior"]);

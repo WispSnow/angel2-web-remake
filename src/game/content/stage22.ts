@@ -70,6 +70,7 @@ export const STAGE22_DEFINITION = {
   deployment: STAGE22_DEPLOYMENT,
   stories: {
     roundStarts: [],
+    victory: "stage-22-postbattle-story",
     scripted: [
       "stage-22-search-story",
       "stage-22-reunion-story",
@@ -177,6 +178,12 @@ export const STAGE22_DEFINITION = {
       trigger: { type: "objective-satisfied" },
       simulationEffect: "stage-22-set-victory-999",
       presentation: "none",
+    },
+    {
+      id: "stage-22-postbattle-story",
+      trigger: { type: "effect-completed", effectId: "stage-22-set-victory-999" },
+      simulationEffect: "none",
+      presentation: "stage-22-postbattle-story",
     },
     {
       id: "stage-22-completed-route",

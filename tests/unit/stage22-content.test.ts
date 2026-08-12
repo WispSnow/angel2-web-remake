@@ -54,6 +54,7 @@ describe("stage 22 generated content", () => {
     ]);
     expect(STAGE22_EVENT_PROGRAM).toMatchObject({
       roundOneStoryRecords: [76, 77, 78, 79],
+      postbattleStoryRecord: 45,
       focusPortraitRecord: 46,
       reinforcementAudit: {
         kind: "round-1-six-enemy-ambush",
@@ -64,7 +65,7 @@ describe("stage 22 generated content", () => {
         laterReinforcements: false,
       },
       completedRoute: { module: 25, stage: 23, replayPresentation: false },
-      stableRemakeDecisions: ["REMAKE-056"],
+      stableRemakeDecisions: ["REMAKE-056", "REMAKE-059"],
     });
     expect(STAGE22_EVENT_PROGRAM.reinforcementAudit.auditedSources).toEqual([
       "initial-template", "round-event-handler", "dynamic-board-catalog",
@@ -72,14 +73,17 @@ describe("stage 22 generated content", () => {
     ]);
   });
 
-  it("registers all 35 dialogue checkpoints and the exact board-write choreography", () => {
+  it("registers the 35 opening and 15 postbattle checkpoints with the exact board-write choreography", () => {
     activateStage22Content();
     expect(Object.fromEntries(Object.entries(STAGE22_STORY_PAGES).map(([id, pages]) => [id, pages.length]))).toEqual({
       "stage-22-search-story": 1,
       "stage-22-reunion-story": 19,
       "stage-22-betrayal-story": 11,
       "stage-22-dragon-story": 4,
+      "stage-22-postbattle-story": 15,
     });
+    expect(STAGE22_STORY_PAGES["stage-22-postbattle-story"][0]?.upper?.text)
+      .toContain("還好吧");
     expect(stageSimulationEffectFor("stage-22-empress-arrival")).toMatchObject({
       type: "story-reinforcements",
       revealTiming: "native-before-write-deferred-refresh",

@@ -47,29 +47,8 @@ const settleBattleCanvas = async (page: Page) => {
   }));
 };
 
-test("S23-A/B: stage 22 completion plays SAY/45 and opens the 1–15 deployment", async ({ page }) => {
+test("S23-A/B: stage 22 postbattle save opens the 1–15 deployment directly", async ({ page }) => {
   await page.goto("/?debugScenario=stage-22-cleared&difficulty=0&test=1");
-  await waitForPhase(page, "prebattleStory");
-  const dialogue = page.getByTestId("dialogue-layer");
-  await expect(dialogue).toHaveAttribute("data-source-record", "45");
-  await expect(page.getByTestId("dialogue-window-upper")).toContainText("還好吧");
-  await expect(page.locator("#story-background")).toBeVisible();
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage23-background\.svg/u,
-  );
-  expect(await state(page)).toMatchObject({
-    stageId: "stage-23",
-    stageProgress: 0,
-    phase: "prebattleStory",
-    campaignRoute: "stage-23",
-    consumedEventIds: ["stage-23-prebattle-story"],
-  });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage23-prebattle-story.png`,
-  });
-
-  await skipStoryDialogue(page);
   await waitForPhase(page, "deployment");
   await expect(page.getByRole("heading", { name: "死亡之谷中 · 出擊準備" })).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／15");
@@ -77,8 +56,10 @@ test("S23-A/B: stage 22 completion plays SAY/45 and opens the 1–15 deployment"
   await expect(page.getByTestId("deployment-minimap")).toBeVisible();
   await expect(page.getByTestId("deployment-guidance")).toContainText("不必全滅守軍");
   expect(await state(page)).toMatchObject({
+    stageId: "stage-23",
     phase: "deployment",
-    consumedEventIds: ["stage-23-prebattle-story", "stage-23-enter-deployment"],
+    campaignRoute: "stage-23",
+    consumedEventIds: ["stage-23-enter-deployment"],
   });
   await captureVisualAudit(page.getByTestId("deployment-screen"), {
     path: `${ARTIFACT_DIR}/stage23-deployment.png`,
@@ -121,7 +102,6 @@ test("S23-C–E: opening story hands 15 allies to the 21-guard battlefield", asy
     focusId: "1:0",
     cameraOrigin: { x: 21, y: 33 },
     consumedEventIds: [
-      "stage-23-prebattle-story",
       "stage-23-enter-deployment",
       "stage-23-opening-story",
     ],
@@ -135,7 +115,7 @@ test("S23-C–E: opening story hands 15 allies to the 21-guard battlefield", asy
   });
 });
 
-test("S23-F: Nia defeat returns to deployment without replaying SAY/45", async ({ page }) => {
+test("S23-F: Nia defeat returns directly to deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-23-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");
   await page.getByRole("button", { name: "戰敗測試" }).click();
@@ -154,7 +134,7 @@ test("S23-F: Nia defeat returns to deployment without replaying SAY/45", async (
     stageId: "stage-23",
     phase: "deployment",
     campaignRoute: "stage-23",
-    consumedEventIds: ["stage-23-prebattle-story", "stage-23-enter-deployment"],
+    consumedEventIds: ["stage-23-enter-deployment"],
   });
 });
 
@@ -194,7 +174,6 @@ test("S23-G/H: Nia reaches the top with every guard alive and saves the stage-24
     stageLabel: "死亡之谷城堡前",
     stageProgress: 1000,
     consumedEventIds: [
-      "stage-23-prebattle-story",
       "stage-23-enter-deployment",
       "stage-23-opening-story",
       "stage-23-objective-reached",

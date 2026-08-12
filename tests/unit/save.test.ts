@@ -1184,7 +1184,6 @@ const stage23BattleSave = (): BattleSaveData => {
     stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
-      "stage-23-prebattle-story",
       "stage-23-enter-deployment",
       "stage-23-opening-story",
     ],
@@ -2043,6 +2042,7 @@ describe("Web save validation", () => {
       consumedEventIds: [
         ...stage22BattleSave().consumedEventIds,
         "stage-22-objective-reached",
+        "stage-22-postbattle-story",
         "stage-22-completed-route",
       ],
     };
@@ -2105,6 +2105,75 @@ describe("Web save validation", () => {
       contentVersion: SAVE_CONTENT_VERSION,
       kind: "battle",
       stageId: "stage-22",
+    });
+  });
+
+  it("migrates v45 stage 22→23 saves across the postbattle-story boundary", () => {
+    const currentBattle = stage23BattleSave();
+    const migratedBattle = parseSaveData(JSON.stringify({
+      ...currentBattle,
+      version: 45,
+      contentVersion: "stage-23-death-valley-breakthrough-1",
+      consumedEventIds: ["stage-23-prebattle-story", ...currentBattle.consumedEventIds],
+    }));
+    expect(migratedBattle).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-23",
+      consumedEventIds: ["stage-23-enter-deployment", "stage-23-opening-story"],
+    });
+
+    const currentCompleted: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-23",
+      stageLabel: "死亡之谷中",
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage22BattleSave().consumedEventIds,
+        "stage-22-objective-reached",
+        "stage-22-postbattle-story",
+        "stage-22-completed-route",
+      ],
+    };
+    const migratedCompleted = parseSaveData(JSON.stringify({
+      ...currentCompleted,
+      version: 45,
+      contentVersion: "stage-23-death-valley-breakthrough-1",
+      consumedEventIds: currentCompleted.consumedEventIds
+        .filter((id) => id !== "stage-22-postbattle-story"),
+    }));
+    expect(migratedCompleted).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "completed",
+      stageId: "stage-23",
+      consumedEventIds: currentCompleted.consumedEventIds,
+    });
+
+    const currentStage24: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-24",
+      stageLabel: "死亡之谷城堡前",
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage23BattleSave().consumedEventIds,
+        "stage-23-objective-reached",
+        "stage-23-completed-route",
+      ],
+    };
+    const migratedStage24 = parseSaveData(JSON.stringify({
+      ...currentStage24,
+      version: 45,
+      contentVersion: "stage-23-death-valley-breakthrough-1",
+      consumedEventIds: ["stage-23-prebattle-story", ...currentStage24.consumedEventIds],
+    }));
+    expect(migratedStage24).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "completed",
+      stageId: "stage-24",
+      consumedEventIds: currentStage24.consumedEventIds,
     });
   });
 

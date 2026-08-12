@@ -235,6 +235,20 @@ test("S22-G: Nia defeat returns to a clean stage 22 deployment", async ({ page }
 
 test("S22-H/I: Dragon victory saves the exact boundary and routes to stage 23", async ({ page }) => {
   await page.goto("/?debugScenario=stage-22-victory-ready&difficulty=0&test=1");
+  await waitForPhase(page, "victoryStory");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "45");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("還好吧");
+  await expect(page.locator("#story-background")).toBeHidden();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  expect(await state(page)).toMatchObject({
+    stageId: "stage-22",
+    phase: "victoryStory",
+    activeStoryId: "stage-22-postbattle-story",
+  });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage22-postbattle-story.png`,
+  });
+  await skipStoryDialogue(page);
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("status-strip")).toContainText("妖龍已被擊退");
   await expect(page.getByTestId("native-feedback")).toBeVisible();
@@ -243,7 +257,7 @@ test("S22-H/I: Dragon victory saves the exact boundary and routes to stage 23", 
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "prebattleStory");
+  await waitForPhase(page, "deployment");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -279,14 +293,16 @@ test("S22-H/I: Dragon victory saves the exact boundary and routes to stage 23", 
       "stage-22-ambush-arrivals",
       "stage-22-player-ready",
       "stage-22-objective-reached",
+      "stage-22-postbattle-story",
       "stage-22-completed-route",
     ],
   });
   expect(await state(page)).toMatchObject({
     stageId: "stage-23",
     stageProgress: 0,
-    phase: "prebattleStory",
+    phase: "deployment",
     campaignRoute: "stage-23",
+    consumedEventIds: ["stage-23-enter-deployment"],
   });
-  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "45");
+  await expect(page.getByRole("heading", { name: "死亡之谷中 · 出擊準備" })).toBeVisible();
 });

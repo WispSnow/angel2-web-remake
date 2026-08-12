@@ -126,11 +126,47 @@ function addEmptyTerrainOverrides(value: unknown): unknown {
   };
 }
 
+function normalizeStage22PostbattleTransition(value: unknown): unknown {
+  if (!isRecord(value)
+    || !Array.isArray(value.consumedEventIds)
+    || !value.consumedEventIds.every((id) => typeof id === "string")) return value;
+  const consumedEventIds = value.consumedEventIds as string[];
+  if ((value.kind === "battle" && value.stageId === "stage-23")
+    || (value.kind === "completed" && value.stageId === "stage-24")) {
+    return {
+      ...value,
+      consumedEventIds: consumedEventIds.filter((id) => id !== "stage-23-prebattle-story"),
+    };
+  }
+  if (value.kind !== "completed" || value.stageId !== "stage-23") return value;
+  const routeIndex = consumedEventIds.indexOf("stage-22-completed-route");
+  if (routeIndex < 0 || consumedEventIds.includes("stage-22-postbattle-story")) return value;
+  return {
+    ...value,
+    consumedEventIds: [
+      ...consumedEventIds.slice(0, routeIndex),
+      "stage-22-postbattle-story",
+      ...consumedEventIds.slice(routeIndex),
+    ],
+  };
+}
+
 function finalizeDirectMigration(value: unknown): SaveData | undefined {
-  const normalized = addEmptyTerrainOverrides(value);
+  const normalized = normalizeStage22PostbattleTransition(addEmptyTerrainOverrides(value));
   if (!isSaveData(normalized)) return undefined;
   const restored = restoreGadirathClassFromEntrySnapshot(normalized);
   return isSaveData(restored) ? restored : undefined;
+}
+
+function migrateVersion45Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 45
+    || value.contentVersion !== "stage-23-death-valley-breakthrough-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
 }
 
 function migrateVersion44Save(value: unknown): SaveData | undefined {
@@ -1594,6 +1630,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion45 = migrateVersion45Save(value);
+    if (migratedVersion45) return migratedVersion45;
     const migratedVersion44 = migrateVersion44Save(value);
     if (migratedVersion44) return migratedVersion44;
     const migratedVersion43 = migrateVersion43Save(value);

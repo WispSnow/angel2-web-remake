@@ -29,6 +29,7 @@ const inputPaths = {
   reunionStory: reversePath("parsed/dialogue/0077.json"),
   betrayalStory: reversePath("parsed/dialogue/0078.json"),
   dragonStory: reversePath("parsed/dialogue/0079.json"),
+  postbattleStory: reversePath("parsed/dialogue/0045.json"),
   map: reversePath("renders/battle-maps/confirmed/22.png"),
   minimap: reversePath("renders/battle-maps/minimap/22.png"),
   playerEntryMusic: reversePath("converted/audio/rix-wav/MUSIC/0035.wav"),
@@ -211,15 +212,29 @@ const musicRecords = {
   enemy: { entry: musicEntry("enemyPhase").entryRecord, loop: musicEntry("enemyPhase").loopRecord },
 };
 assertEqual(musicRecords, { player: { entry: 35, loop: 34 }, enemy: { entry: 13, loop: 12 } }, "stage 22 music");
-const portraitSpeakers = { 0: "葛蒂拉斯", 14: "琴斯", 41: "維絲塔", 45: "希蜜", 46: "妮雅", 66: "妖龍" };
+const portraitSpeakers = {
+  0: "葛蒂拉斯",
+  10: "蘇蘭達",
+  14: "琴斯",
+  41: "維絲塔",
+  43: "黛西",
+  45: "希蜜",
+  46: "妮雅",
+  66: "妖龍",
+};
 const storyPages = {
   "stage-22-search-story": compileNativeStory(parseInput("searchStory"), 76, portraitSpeakers, { includeBackground: true }),
   "stage-22-reunion-story": compileNativeStory(parseInput("reunionStory"), 77, portraitSpeakers, { includeBackground: true }),
   "stage-22-betrayal-story": compileNativeStory(parseInput("betrayalStory"), 78, portraitSpeakers, { includeBackground: true }),
   "stage-22-dragon-story": compileNativeStory(parseInput("dragonStory"), 79, portraitSpeakers, { includeBackground: true }),
+  "stage-22-postbattle-story": compileNativeStory(parseInput("postbattleStory"), 45, portraitSpeakers, { includeBackground: true }),
 };
 assertEqual(Object.fromEntries(Object.entries(storyPages).map(([id, pages]) => [id, pages.length])), {
-  "stage-22-search-story": 1, "stage-22-reunion-story": 19, "stage-22-betrayal-story": 11, "stage-22-dragon-story": 4,
+  "stage-22-search-story": 1,
+  "stage-22-reunion-story": 19,
+  "stage-22-betrayal-story": 11,
+  "stage-22-dragon-story": 4,
+  "stage-22-postbattle-story": 15,
 }, "stage 22 story waits");
 const constructionTokens = requireEntry(techniqueRules.terrainConstructionTokens.stages, ({ stage }) => stage === 22, "stage 22 construction tokens");
 assertEqual({ ironPlate: constructionTokens.ironPlateSourceToken, obstacle: constructionTokens.obstacleSourceToken }, { ironPlate: 65, obstacle: 69 }, "stage 22 construction tokens");
@@ -229,17 +244,18 @@ const tokenToSlot = new Uint8Array(128).fill(0);
 for (const mapping of stageTerrain.configuredMappings) tokenToSlot[mapping.token] = mapping.logicalSlot;
 const sources = Object.entries(inputPaths).map(([id, file]) => ({ id, path: path.relative(root, file), sha256: sha256(inputBuffers[id]), bytes: inputBuffers[id].length }));
 const identityHash = createHash("sha256");
-identityHash.update("stableRemake\0REMAKE-056\0");
+identityHash.update("stableRemake\0REMAKE-056\0REMAKE-059\0");
 for (const source of sources) identityHash.update(`${source.path}\0${source.sha256}\n`);
 const contentIdentity = `stage-22/evidence-${identityHash.digest("hex")}`;
 const eventProgram = {
   roundOneStoryRecords: [76, 77, 78, 79],
+  postbattleStoryRecord: 45,
   focusPortraitRecord: 46,
   temporaryActors,
   enemies,
   reinforcementAudit,
   completedRoute: { module: 25, stage: 23, replayPresentation: false },
-  stableRemakeDecisions: ["REMAKE-056"],
+  stableRemakeDecisions: ["REMAKE-056", "REMAKE-059"],
 };
 const deployment = {
   kind: "interactive", eligibleSlots, fixedPlacements: [{ slot: 0, position: { x: 23, y: 34 } }],

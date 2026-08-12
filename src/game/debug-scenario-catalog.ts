@@ -1194,9 +1194,9 @@ export const DEBUG_SCENARIOS = [
   {
     id: "stage-22-victory-ready",
     stageId: "stage-22",
-    title: "勝利準備",
-    phase: "Victory feedback",
-    description: "妖龍已離場，直接驗證無戰後 SAY 的普通勝利回饋、編號保存與第 23 關路由。",
+    title: "關後整頓",
+    phase: "SAY/0045",
+    description: "妖龍已離場，在第 22 關戰場上播放傷員整頓對話，完成後才進入勝利回饋與存檔。",
     fixture: true,
   },
   {
@@ -1204,15 +1204,8 @@ export const DEBUG_SCENARIOS = [
     stageId: "stage-22",
     title: "完成路由",
     phase: "Route to stage 23",
-    description: "視為焦土森林村莊戰鬥已完成，直接進入「死亡之谷中」關前劇情。",
+    description: "視為焦土森林村莊的關後整頓與存檔已完成，直接進入「死亡之谷中」部署。",
     fixture: true,
-  },
-  {
-    id: "stage-23-prebattle",
-    stageId: "stage-23",
-    title: "谷前整頓劇情",
-    phase: "SAY/0045",
-    description: "播放村莊戰後的傷員整頓與進入死亡之谷前劇情，隨後進入部署。",
   },
   {
     id: "stage-23-deployment",

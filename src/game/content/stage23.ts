@@ -68,7 +68,6 @@ export const STAGE23_DEFINITION = {
   objective: STAGE23_OBJECTIVE,
   deployment: STAGE23_DEPLOYMENT,
   stories: {
-    prebattle: "stage-23-prebattle-story",
     opening: "stage-23-opening-story",
     roundStarts: [],
   },
@@ -78,14 +77,8 @@ export const STAGE23_DEFINITION = {
   },
   events: [
     {
-      id: "stage-23-prebattle-story",
-      trigger: { type: "campaign-entered" },
-      simulationEffect: "none",
-      presentation: "stage-23-prebattle-story",
-    },
-    {
       id: "stage-23-enter-deployment",
-      trigger: { type: "story-completed", storyId: "stage-23-prebattle-story" },
+      trigger: { type: "campaign-entered" },
       simulationEffect: "stage-23-enter-deployment",
       presentation: "none",
     },
@@ -144,7 +137,6 @@ export const STAGE23_SEMANTIC_ENEMY_UNITS = STAGE23_ENEMY_UNITS.map((unit) => {
 export const STAGE23_ASSETS = {
   map: "/assets/original/stage23-map.png",
   minimap: "/assets/original/stage23-minimap.png",
-  storyBackground: "/assets/original/story-stage23-background.svg",
   unitSprites: {
     "enemy-half-dragon-warrior": "/assets/original/technique-lab/units/enemy-half-dragon-warrior.png",
     "enemy-magic-archer": "/assets/original/technique-lab/units/enemy-magic-archer.png",

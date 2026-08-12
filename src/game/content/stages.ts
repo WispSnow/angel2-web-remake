@@ -61,7 +61,7 @@ export type StageStoryId =
   | "stage-22-reunion-story"
   | "stage-22-betrayal-story"
   | "stage-22-dragon-story"
-  | "stage-23-prebattle-story"
+  | "stage-22-postbattle-story"
   | "stage-23-opening-story";
 
 export type StageMusicId =
@@ -275,8 +275,8 @@ export type StageEventId =
   | "stage-22-ambush-arrivals"
   | "stage-22-player-ready"
   | "stage-22-objective-reached"
+  | "stage-22-postbattle-story"
   | "stage-22-completed-route"
-  | "stage-23-prebattle-story"
   | "stage-23-enter-deployment"
   | "stage-23-opening-story"
   | "stage-23-objective-reached"

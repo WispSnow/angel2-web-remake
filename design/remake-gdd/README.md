@@ -66,8 +66,8 @@
 | [`vertical-slices/stage-19.md`](vertical-slices/stage-19.md) | 1–10 人部署、SAY 38 愛／蘇蘭達双窗对白、愛率二十一敌、首领目标、无增援与 stage 20 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-20.md`](vertical-slices/stage-20.md) | 3–17 人部署、十六人叙事阵形替换、妖龍／WD、琴斯与龍王胜利链及 stage 21 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-21.md`](vertical-slices/stage-21.md) | 空模板、四名斥候生成／移动、非交互侦察、跳过普通结算与 stage 22 路由 | Draft 0.1 / 已接受 |
-| [`vertical-slices/stage-22.md`](vertical-slices/stage-22.md) | 1–19 人部署、女帝／琴斯临时剧情、六敌伏击、妖龍目标与 stage 23 路由 | Draft 0.1 / 已接受 |
-| [`vertical-slices/stage-23.md`](vertical-slices/stage-23.md) | SAY 45/46、1–15 人部署、二十一敌、妮雅到达区、无增援与 stage 24 路由 | Draft 0.1 / 已验证，待用户试玩 |
+| [`vertical-slices/stage-22.md`](vertical-slices/stage-22.md) | 1–19 人部署、女帝／琴斯临时剧情、六敌伏击、妖龍目标、SAY 45 关后整顿与 stage 23 路由 | Draft 0.2 / 已接受后优化 |
+| [`vertical-slices/stage-23.md`](vertical-slices/stage-23.md) | 直接 1–15 人部署、SAY 46、二十一敌、妮雅到达区、无增援与 stage 24 路由 | Draft 0.2 / 已验证，待用户试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |

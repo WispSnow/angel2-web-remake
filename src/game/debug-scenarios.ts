@@ -319,11 +319,11 @@ const STAGE22_BATTLE_EVENT_IDS = [
 const STAGE22_COMPLETED_EVENT_IDS = [
   ...STAGE22_BATTLE_EVENT_IDS,
   "stage-22-objective-reached",
+  "stage-22-postbattle-story",
   "stage-22-completed-route",
 ] as const;
 
 const STAGE23_BATTLE_EVENT_IDS = [
-  "stage-23-prebattle-story",
   "stage-23-enter-deployment",
   "stage-23-opening-story",
 ] as const;
@@ -2105,12 +2105,6 @@ async function createStage22Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
-async function createStage23Prebattle(context: DebugScenarioContext): Promise<GameController> {
-  const controller = new GameController(context.difficulty);
-  await controller.enterStage("stage-23", debugCampaign(context, "stage-23"));
-  return controller;
-}
-
 async function createStage23Deployment(context: DebugScenarioContext): Promise<GameController> {
   const controller = new GameController(context.difficulty);
   await controller.enterStage(
@@ -2807,7 +2801,6 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-22-cleared": createStage22Completed,
-  "stage-23-prebattle": createStage23Prebattle,
   "stage-23-deployment": createStage23Deployment,
   "stage-23-opening": createStage23Opening,
   "stage-23-player": createStage23Player,

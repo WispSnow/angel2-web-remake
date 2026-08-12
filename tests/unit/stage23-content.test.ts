@@ -76,11 +76,10 @@ describe("stage 23 generated content", () => {
     });
   });
 
-  it("registers the 19 native dialogue checkpoints and route effects", () => {
+  it("registers the four opening checkpoints and route effects", () => {
     activateStage23Content();
     expect(Object.fromEntries(Object.entries(STAGE23_STORY_PAGES)
       .map(([id, pages]) => [id, pages.length]))).toEqual({
-      "stage-23-prebattle-story": 15,
       "stage-23-opening-story": 4,
     });
     expect(STAGE23_STORY_PAGES["stage-23-opening-story"][2]?.upper?.text)
@@ -95,14 +94,13 @@ describe("stage 23 generated content", () => {
 
   it("records the five-channel no-reinforcement audit and native route", () => {
     expect(STAGE23_EVENT_PROGRAM).toMatchObject({
-      prebattleStoryRecord: 45,
       openingStoryRecord: 46,
       enemyReinforcements: {
         kind: "none",
         initialSide2: 21,
       },
       completedRoute: { module: 27, stage: 24, replayPresentation: false },
-      stableRemakeDecision: "REMAKE-058",
+      stableRemakeDecisions: ["REMAKE-058", "REMAKE-059"],
     });
     expect(STAGE23_EVENT_PROGRAM.enemyReinforcements.auditedSources).toEqual([
       "initial-template", "round-event-handler", "dynamic-board-catalog",
@@ -129,7 +127,6 @@ describe("stage 23 generated content", () => {
     for (const source of [
       STAGE23_ASSETS.map,
       STAGE23_ASSETS.minimap,
-      STAGE23_ASSETS.storyBackground,
       ...Object.values(STAGE23_ASSETS.unitSprites),
       ...Object.values(STAGE23_ASSETS.audio),
     ]) {

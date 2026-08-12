@@ -114,7 +114,7 @@ export interface StageRuntimeManifestEntry {
   mapPresentationActionIds: readonly BattleActionId[];
   entry: {
     trigger: "campaign-entered" | "battle-started";
-    phase: Extract<GamePhase, "prebattleStory" | "player" | "scriptedMove">;
+    phase: Extract<GamePhase, "prebattleStory" | "deployment" | "player" | "scriptedMove">;
     statusText: string;
     campaignRoute?: CampaignRouteId;
   };
@@ -1201,7 +1201,7 @@ async function loadStage23Module(): Promise<StageRuntimeModule> {
       minimumUnits: definition.fixedPlacements.length,
       guidanceText: "妮雅固定出場；二十八名候選最多選十四人。讓妮雅抵達死亡之谷頂端即可獲勝，不必全滅守軍。",
     },
-    ["stage-23-prebattle-story", "stage-23-enter-deployment"],
+    ["stage-23-enter-deployment"],
     (campaign) => battleModule.createStage23DeploymentRoster(campaign),
   );
   const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
@@ -1213,7 +1213,6 @@ async function loadStage23Module(): Promise<StageRuntimeModule> {
     assets: {
       map: content.STAGE23_ASSETS.map,
       minimap: content.STAGE23_ASSETS.minimap,
-      storyBackground: content.STAGE23_ASSETS.storyBackground,
       unitSprites: content.STAGE23_ASSETS.unitSprites,
     },
     preparation,
@@ -2709,6 +2708,7 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-22-ambush-arrivals",
         "stage-22-player-ready",
         "stage-22-objective-reached",
+        "stage-22-postbattle-story",
         "stage-22-completed-route",
       ],
       requiredResumeEventIds: [
@@ -2757,8 +2757,8 @@ export const STAGE_RUNTIME_MANIFEST = {
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
     entry: {
       trigger: "campaign-entered",
-      phase: "prebattleStory",
-      statusText: "妮雅一行整頓傷員，準備進入死亡之谷。",
+      phase: "deployment",
+      statusText: "整頓完畢；編成突破死亡之谷的部隊。",
       campaignRoute: "stage-23",
     },
     enemyPhaseStatusText: "敵方階段：死亡之谷守軍開始行動。",
@@ -2774,14 +2774,12 @@ export const STAGE_RUNTIME_MANIFEST = {
     },
     save: {
       validEventIds: [
-        "stage-23-prebattle-story",
         "stage-23-enter-deployment",
         "stage-23-opening-story",
         "stage-23-objective-reached",
         "stage-23-completed-route",
       ],
       requiredResumeEventIds: [
-        "stage-23-prebattle-story",
         "stage-23-enter-deployment",
         "stage-23-opening-story",
       ],

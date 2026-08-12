@@ -213,8 +213,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 45;
-  contentVersion: "stage-23-death-valley-breakthrough-1";
+  version: 46;
+  contentVersion: "stage-23-death-valley-breakthrough-2";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
