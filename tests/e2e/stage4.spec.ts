@@ -319,7 +319,9 @@ test("S04-G: the active deployment round-trips through the current save format",
 
 test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-near-victory&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-objective-destination-cell-count", "175");
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toContainText("護送葛蒂拉斯進入力場出口");
   await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」或「葛蒂拉斯」戰敗");

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { StageObjectiveDefinition } from "../../src/game/content/stages";
 import {
   battleOutcomeForObjective,
+  objectiveDestinationCells,
   objectiveConditionSatisfied,
 } from "../../src/game/simulation/objectives";
 
@@ -58,6 +59,38 @@ describe("stage objective evaluation", () => {
       .toBe(false);
     expect(objectiveConditionSatisfied([{ side: 1, slot: 0, x: 24, y: 3 }], condition))
       .toBe(false);
+  });
+
+  it("projects exact destination cells from positional and compound objectives", () => {
+    expect(objectiveDestinationCells({
+      type: "unit-in-cell-range",
+      side: 1,
+      slot: 0,
+      width: 4,
+      minimum: 0,
+      maximum: 5,
+    }, { width: 4, height: 3 })).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 3, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ]);
+
+    expect(objectiveDestinationCells({
+      type: "any-of",
+      conditions: [
+        { type: "eliminate-side", side: 2 },
+        { type: "unit-in-cell-range", side: 1, slot: 9, width: 4, minimum: 4, maximum: 6 },
+        { type: "unit-in-cell-range", side: 1, slot: 9, width: 4, minimum: 6, maximum: 7 },
+      ],
+    }, { width: 4, height: 3 })).toEqual([
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 3, y: 1 },
+    ]);
   });
 
   it("supports an ordered any-of objective without changing defeat precedence", () => {

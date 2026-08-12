@@ -47,6 +47,16 @@ const settleBattleCanvas = async (page: Page) => {
   }));
 };
 
+async function clickCell(page: Page, x: number, y: number): Promise<void> {
+  const current = await state(page);
+  await page.getByTestId("battle-canvas").click({
+    position: {
+      x: 40 + (x - current.cameraOrigin.x) * 40 + 20,
+      y: 23 + (y - current.cameraOrigin.y) * 44 + 22,
+    },
+  });
+}
+
 test("S23-A/B: stage 22 postbattle save opens the 1–15 deployment directly", async ({ page }) => {
   await page.goto("/?debugScenario=stage-22-cleared&difficulty=0&test=1");
   await waitForPhase(page, "deployment");
@@ -113,6 +123,36 @@ test("S23-C–E: opening story hands 15 allies to the 21-guard battlefield", asy
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage23-objective-and-map.png`,
   });
+});
+
+test("S23-E: the marked destination and one-step fixture reach victory without a detour", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-23-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toHaveAttribute("data-objective-destination-cell-count", "525");
+  await expect(canvas).toHaveAttribute("data-objective-destination-visible-cell-count", "25");
+  await expect(canvas).toHaveAttribute(
+    "data-objective-destination-style",
+    "magenta-fill-inset-outline",
+  );
+
+  const prepared = await state(page);
+  expect(prepared.units.find(({ id }) => id === "1:0")).toMatchObject({ x: 25, y: 10 });
+  expect(prepared.units.filter(({ side }) => side === 2)).toHaveLength(21);
+
+  await clickCell(page, 25, 10);
+  await page.getByTestId("unit-command-move").click();
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage23-destination-highlight.png`,
+  });
+  await clickCell(page, 25, 9);
+  await expect(page.getByTestId("unit-command-end")).toBeVisible();
+  await page.getByTestId("unit-command-end").click();
+  await waitForPhase(page, "victoryFeedback");
+
+  const victory = await state(page);
+  expect(victory.units.find(({ id }) => id === "1:0")).toMatchObject({ x: 25, y: 9 });
+  expect(victory.units.filter(({ side }) => side === 2)).toHaveLength(21);
 });
 
 test("S23-F: Nia defeat returns directly to deployment", async ({ page }) => {

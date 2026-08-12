@@ -109,7 +109,9 @@ test("S09-A/B/C: stage 8 completion enters deployment, then SAY/22 opens the esc
 
 test("S09-D/E: the corrected objective and Dori route trigger SAY/23 without stale movement", async ({ page }) => {
   await page.goto("/?debugScenario=stage-09-near-route&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-objective-destination-cell-count", "934");
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toContainText(
     "護送「多莉」抵達死亡之谷頂端，或擊退全部敵軍",

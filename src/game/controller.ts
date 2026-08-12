@@ -70,6 +70,7 @@ import { techniqueEffectRange } from "./simulation/actions/range-map";
 import type { DeploymentResult } from "./simulation/deployment";
 import { manhattan, positionKey } from "./simulation/grid";
 import { prepareScriptedLightning4 } from "./simulation/scripted-actions";
+import { objectiveDestinationCells } from "./simulation/objectives";
 import { emptyUnitStatuses } from "./simulation/status";
 import {
   createStageEventState,
@@ -533,6 +534,13 @@ export class GameController {
     }
     const unit = this.focusedUnit;
     return unit ? this.battle.routePulseSafeAreaForUnit(unit.id) : [];
+  }
+
+  get currentObjectiveDestinationCells(): Position[] {
+    return objectiveDestinationCells(
+      this.battle.stage.objective.victory,
+      this.battle.stage,
+    );
   }
 
   /**

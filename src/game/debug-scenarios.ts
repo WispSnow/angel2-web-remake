@@ -2807,13 +2807,15 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-23-near-victory": withSetup(createStage23Player, (controller) => {
     const nia = controller.battle.unit("1:0");
     if (!nia) return;
-    nia.x = 24;
-    nia.y = 11;
+    // (24,10) is a winning cell but is occupied by flying dragon knight 2:36.
+    // This open pair keeps the fixture literally one orthogonal step away.
+    nia.x = 25;
+    nia.y = 10;
     nia.acted = false;
     controller.battle.focusId = nia.id;
     controller.cursor = { x: nia.x, y: nia.y };
-    controller.cameraOrigin = { x: 20, y: 7 };
-    controller.statusMessage = "調試場景：妮雅向上一步即可進入頂端目標區，守軍仍全員在場。";
+    controller.cameraOrigin = { x: 20, y: 8 };
+    controller.statusMessage = "調試場景：妮雅上移一格即可進入紫紅輪廓的頂端目標區，守軍仍全員在場。";
   }),
   "stage-23-near-defeat": withSetup(createStage23Player, (controller) => {
     const nia = controller.battle.unit("1:0");

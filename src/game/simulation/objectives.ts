@@ -1,11 +1,54 @@
 import type { StageObjectiveCondition, StageObjectiveDefinition } from "../content/stages";
-import type { BattleOutcome, Side } from "../types";
+import type { BattleOutcome, Position, Side } from "../types";
 
 export interface ObjectiveUnitIdentity {
   side: Side;
   slot: number;
   x?: number;
   y?: number;
+}
+
+/**
+ * Expands only the positional branches of a stage objective into their exact
+ * board cells. The renderer consumes this read-only projection for destination
+ * guidance; objective evaluation remains the sole source of victory truth.
+ */
+export function objectiveDestinationCells(
+  condition: StageObjectiveCondition,
+  battlefield: Readonly<{ width: number; height: number }>,
+): Position[] {
+  if (condition.type === "any-of") {
+    const unique = new Map<string, Position>();
+    for (const candidate of condition.conditions) {
+      for (const position of objectiveDestinationCells(candidate, battlefield)) {
+        unique.set(`${position.x},${position.y}`, position);
+      }
+    }
+    return [...unique.values()];
+  }
+  if (
+    condition.type !== "unit-in-cell-range"
+    || condition.width <= 0
+    || battlefield.width <= 0
+    || battlefield.height <= 0
+  ) return [];
+
+  const minimum = Math.max(0, condition.minimum);
+  const maximum = Math.min(
+    condition.maximum,
+    condition.width * battlefield.height - 1,
+  );
+  if (maximum < minimum) return [];
+
+  const cells: Position[] = [];
+  for (let cell = minimum; cell <= maximum; cell += 1) {
+    const position = {
+      x: cell % condition.width,
+      y: Math.floor(cell / condition.width),
+    };
+    if (position.x < battlefield.width) cells.push(position);
+  }
+  return cells;
 }
 
 export function objectiveConditionSatisfied(

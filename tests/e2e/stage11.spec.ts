@@ -95,7 +95,9 @@ test("S11-A/B/C: SAY/24–26 keeps Dori aboard until the dialogue finishes", asy
 
 test("S11-D/E: the corrected objective uses Sulanda's native boarding cells", async ({ page }) => {
   await page.goto("/?debugScenario=stage-11-near-route&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-objective-destination-cell-count", "280");
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toContainText("護送「蘇蘭達」登上飛船");
   await expect(page.getByTestId("objective-panel")).toContainText("「蘇蘭達」戰敗");

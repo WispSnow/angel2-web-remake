@@ -33,6 +33,8 @@ const EDGE_PAN_INTERVAL_MS = 110;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 const NATIVE_CURSOR_SHADOW = 0x000000;
 const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
+const OBJECTIVE_DESTINATION_FILL = 0x9b2fae;
+const OBJECTIVE_DESTINATION_STROKE = 0xffa8f4;
 
 const routePulseTextureKey = (presentationId: string, frame: number): string =>
   `route-pulse-${presentationId}-${frame}`;
@@ -137,6 +139,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
   ] as const)
     .some((actionId) => presentationActionIds.has(actionId));
   const stageAssets = controller.currentStageAssets;
+  const objectiveDestinationCells = controller.currentObjectiveDestinationCells;
   const mapTextureKey = `${controller.battle.stage.id}-map`;
   const presentationCatalog = hasExtendedActions ? actionPresentationCatalog() : undefined;
   const presentationAssets = hasExtendedActions ? actionPresentationAssetCatalog() : undefined;
@@ -175,6 +178,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private gridGraphics!: Phaser.GameObjects.Graphics;
     private rangeGraphics!: Phaser.GameObjects.Graphics;
     private effectPreviewGraphics!: Phaser.GameObjects.Graphics;
+    private objectiveDestinationGraphics!: Phaser.GameObjects.Graphics;
     private shotRouteGraphics!: Phaser.GameObjects.Graphics;
     private cursorGraphics!: Phaser.GameObjects.Graphics;
     private rangeMaskTiles: Phaser.GameObjects.TileSprite[] = [];
@@ -334,8 +338,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.gridGraphics = this.add.graphics().setDepth(1);
       this.rangeGraphics = this.add.graphics().setDepth(2);
       this.effectPreviewGraphics = this.add.graphics().setDepth(3);
+      this.objectiveDestinationGraphics = this.add.graphics().setDepth(4);
       this.shotRouteGraphics = this.add.graphics().setDepth(6);
       this.cursorGraphics = this.add.graphics().setDepth(10);
+      this.drawObjectiveDestinations();
       if (!this.textures.exists("native-range-dither")) {
         const texture = this.textures.createCanvas("native-range-dither", 8, 2);
         const context = texture?.getContext();
@@ -526,6 +532,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.drawTerrainOverrides();
       this.drawGrid();
       this.drawRanges();
+      this.publishObjectiveDestinationMetadata();
       this.drawUnits();
       this.drawCombatEffects();
       this.drawTurnTransition();
@@ -567,6 +574,33 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       canvas.dataset.gridEnabled = String(controller.gridEnabled);
       canvas.dataset.gridLineCount = String(lineCount);
       canvas.dataset.edgeScrollEnabled = String(controller.edgeScrollEnabled);
+    }
+
+    private drawObjectiveDestinations(): void {
+      this.objectiveDestinationGraphics.clear();
+      if (objectiveDestinationCells.length === 0) return;
+      this.objectiveDestinationGraphics.fillStyle(OBJECTIVE_DESTINATION_FILL, 0.18);
+      this.objectiveDestinationGraphics.lineStyle(2, OBJECTIVE_DESTINATION_STROKE, 0.95);
+      for (const cell of objectiveDestinationCells) {
+        const x = cell.x * TILE_WIDTH + 3;
+        const y = cell.y * TILE_HEIGHT + 3;
+        this.objectiveDestinationGraphics.fillRect(x, y, TILE_WIDTH - 6, TILE_HEIGHT - 6);
+        this.objectiveDestinationGraphics.strokeRect(x, y, TILE_WIDTH - 6, TILE_HEIGHT - 6);
+      }
+    }
+
+    private publishObjectiveDestinationMetadata(): void {
+      if (!controller.isTestMode) return;
+      const visibleCount = objectiveDestinationCells.filter(({ x, y }) =>
+        x >= controller.cameraOrigin.x
+        && x < controller.cameraOrigin.x + controller.battle.stage.viewport.width
+        && y >= controller.cameraOrigin.y
+        && y < controller.cameraOrigin.y + controller.battle.stage.viewport.height,
+      ).length;
+      const canvas = this.game.canvas;
+      canvas.dataset.objectiveDestinationCellCount = String(objectiveDestinationCells.length);
+      canvas.dataset.objectiveDestinationVisibleCellCount = String(visibleCount);
+      canvas.dataset.objectiveDestinationStyle = "magenta-fill-inset-outline";
     }
 
     private movementTweenDuration(): number {
