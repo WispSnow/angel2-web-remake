@@ -3250,24 +3250,27 @@ export class GameController {
     const finalAttackerLife = Math.max(0, attacker.life - result.counterDamage);
     if (this.battlePresentation === "full") {
       await this.presentFullScreenCombat(attacker, defender, result, displayedLifeByUnitId);
-      if (result.defenderDied && (result.defenderDeathTargets?.length ?? 1) > 1) {
+      // REMAKE-057 keeps the native full-screen death, then returns to the
+      // board for the complete MAGIC/12 clear instead of silently skipping
+      // the directly struck body.
+      if (result.defenderDied) {
         await this.presentMapCombatDeaths(
           attacker,
           defender,
           result,
           "defenderDeath",
-          1,
+          0,
           finalAttackerLife,
           finalDefenderLife,
           displayedLifeByUnitId,
         );
-      } else if (result.attackerDied && (result.attackerDeathTargets?.length ?? 1) > 1) {
+      } else if (result.attackerDied) {
         await this.presentMapCombatDeaths(
           attacker,
           defender,
           result,
           "attackerDeath",
-          1,
+          0,
           finalAttackerLife,
           finalDefenderLife,
           displayedLifeByUnitId,

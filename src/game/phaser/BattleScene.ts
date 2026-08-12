@@ -921,12 +921,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const routePulsePresentation = controller.routePulsePresentation;
       const displayedUnits = new Map(controller.battle.units.map((unit) => [unit.id, unit]));
       if (presentation?.result.splitUnitId) displayedUnits.delete(presentation.result.splitUnitId);
-      if (mapPresentation) {
-        if (!displayedUnits.has(mapPresentation.attacker.id)) displayedUnits.set(mapPresentation.attacker.id, mapPresentation.attacker);
-        if (!displayedUnits.has(mapPresentation.defender.id)) displayedUnits.set(mapPresentation.defender.id, mapPresentation.defender);
+      // Combat commits atomically before presentation. Keep its read-only
+      // entry snapshots on the board even during full-screen opening beats,
+      // when the dimmed map remains visible behind the staged window.
+      if (presentation) {
+        if (!displayedUnits.has(presentation.attacker.id)) displayedUnits.set(presentation.attacker.id, presentation.attacker);
+        if (!displayedUnits.has(presentation.defender.id)) displayedUnits.set(presentation.defender.id, presentation.defender);
         for (const unit of [
-          ...(mapPresentation.attackerDeathUnits ?? []),
-          ...(mapPresentation.defenderDeathUnits ?? []),
+          ...(presentation.attackerDeathUnits ?? []),
+          ...(presentation.defenderDeathUnits ?? []),
         ]) displayedUnits.set(unit.id, unit);
       }
       const active = new Set<string>();
@@ -1028,12 +1031,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               : controller.reachable.length,
         );
         this.game.canvas.dataset.combatShadowUnitCount = String(
-          mapPresentation
+          presentation
             ? [
-              mapPresentation.attacker,
-              mapPresentation.defender,
-              ...(mapPresentation.attackerDeathUnits ?? []),
-              ...(mapPresentation.defenderDeathUnits ?? []),
+              presentation.attacker,
+              presentation.defender,
+              ...(presentation.attackerDeathUnits ?? []),
+              ...(presentation.defenderDeathUnits ?? []),
             ]
               .filter((unit, index, units) => units.findIndex(({ id }) => id === unit.id) === index)
               .filter((unit) => !controller.battle.unit(unit.id))

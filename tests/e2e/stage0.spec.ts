@@ -2655,6 +2655,16 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await setBattlePresentation(page, "full");
   await clickCanvas(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();
+  const canvas = page.getByTestId("battle-canvas");
+  await page.waitForFunction(() => {
+    const presentation = window.__ANGEL2__?.getState().combatPresentation;
+    return presentation?.phase === "fullOpen" && presentation.fullScene?.showScene === false;
+  });
+  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "7");
+  await expect(canvas).toHaveAttribute("data-combat-shadow-unit-count", "1");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-full-fatal-map-snapshot.png",
+  });
   await page.waitForFunction(() =>
     window.__ANGEL2__?.getState().combatPresentation?.phase === "fullImpact");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
@@ -2668,6 +2678,26 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "2");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "0");
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-full-native-death.png" });
+  await page.waitForFunction(() => {
+    const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
+    return canvasElement?.dataset.mapCombatPhase === "defenderDeath"
+      && canvasElement.dataset.mapCombatFrame === "3";
+  });
+  await expect(fullLayer).toBeHidden();
+  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "7");
+  await expect(canvas).toHaveAttribute("data-combat-shadow-unit-count", "1");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-full-map-death-before-erase.png",
+  });
+  await page.waitForFunction(() => {
+    const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
+    return canvasElement?.dataset.mapCombatPhase === "defenderDeath"
+      && Number(canvasElement.dataset.mapCombatFrame) >= 6;
+  });
+  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "6");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-full-map-death-after-erase.png",
+  });
   await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
   const deathResolved = await debugState(page);
@@ -2679,6 +2709,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
     "fullCharge",
     "fullImpact",
     "fullDefenderDeath",
+    ...Array.from({ length: 15 }, () => "defenderDeath" as const),
   ]);
   expect(deathResolved.audioCueLog.filter(({ record }) => record === 11)).toHaveLength(1);
   expect(deathResolved.audioCueLog.some(({ record, reason }) => record === 2 && reason === "full-primary-hurt")).toBe(true);
