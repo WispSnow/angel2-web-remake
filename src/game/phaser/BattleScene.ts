@@ -33,8 +33,8 @@ const EDGE_PAN_INTERVAL_MS = 110;
 const MAP_HIT_FRAME_TIMELINE = [0, 1, 2, 3, 4, 5, 6, 7, 0] as const;
 const NATIVE_CURSOR_SHADOW = 0x000000;
 const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
-const OBJECTIVE_DESTINATION_FILL = 0x9b2fae;
-const OBJECTIVE_DESTINATION_STROKE = 0xffa8f4;
+const OBJECTIVE_DESTINATION_FILL = 0xc08bc5;
+const OBJECTIVE_DESTINATION_STROKE = 0xf2c4ec;
 
 const routePulseTextureKey = (presentationId: string, frame: number): string =>
   `route-pulse-${presentationId}-${frame}`;
@@ -579,8 +579,8 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private drawObjectiveDestinations(): void {
       this.objectiveDestinationGraphics.clear();
       if (objectiveDestinationCells.length === 0) return;
-      this.objectiveDestinationGraphics.fillStyle(OBJECTIVE_DESTINATION_FILL, 0.18);
-      this.objectiveDestinationGraphics.lineStyle(2, OBJECTIVE_DESTINATION_STROKE, 0.95);
+      this.objectiveDestinationGraphics.fillStyle(OBJECTIVE_DESTINATION_FILL, 0.07);
+      this.objectiveDestinationGraphics.lineStyle(1.5, OBJECTIVE_DESTINATION_STROKE, 0.6);
       for (const cell of objectiveDestinationCells) {
         const x = cell.x * TILE_WIDTH + 3;
         const y = cell.y * TILE_HEIGHT + 3;
@@ -600,7 +600,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const canvas = this.game.canvas;
       canvas.dataset.objectiveDestinationCellCount = String(objectiveDestinationCells.length);
       canvas.dataset.objectiveDestinationVisibleCellCount = String(visibleCount);
-      canvas.dataset.objectiveDestinationStyle = "magenta-fill-inset-outline";
+      canvas.dataset.objectiveDestinationStyle = "soft-magenta-fill-inset-outline";
     }
 
     private movementTweenDuration(): number {

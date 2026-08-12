@@ -133,7 +133,7 @@ test("S23-E: the marked destination and one-step fixture reach victory without a
   await expect(canvas).toHaveAttribute("data-objective-destination-visible-cell-count", "25");
   await expect(canvas).toHaveAttribute(
     "data-objective-destination-style",
-    "magenta-fill-inset-outline",
+    "soft-magenta-fill-inset-outline",
   );
 
   const prepared = await state(page);
