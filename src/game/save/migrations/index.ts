@@ -151,11 +151,63 @@ function normalizeStage22PostbattleTransition(value: unknown): unknown {
   };
 }
 
+const KINS_SLOT = 7;
+const KINS_CAMPAIGN_STAGES = new Set(["stage-23", "stage-24", "stage-26"]);
+
+function restoreKinsCampaignClass(save: SaveData): SaveData {
+  if (!KINS_CAMPAIGN_STAGES.has(save.stageId)) return save;
+
+  const restoreEntry = (entry: SaveRosterEntry): SaveRosterEntry => {
+    if (entry.slot !== KINS_SLOT || entry.classId !== "soldier") return entry;
+    const previousMaximum = classStatsFor(entry).maxLife;
+    const classId = "magic-priest" as const;
+    const maximumLife = classStatsFor({ classId, experience: entry.experience }).maxLife;
+    const damage = Math.max(0, previousMaximum - Math.min(entry.life, previousMaximum));
+    return { ...entry, classId, life: Math.max(0, maximumLife - damage) };
+  };
+
+  const roster = save.roster.map(restoreEntry);
+  if (save.kind !== "battle") return { ...save, roster };
+  return {
+    ...save,
+    roster,
+    stageEntrySnapshot: {
+      ...save.stageEntrySnapshot,
+      roster: save.stageEntrySnapshot.roster.map(restoreEntry),
+    },
+    battle: {
+      ...save.battle,
+      units: save.battle.units.map((unit) => {
+        if (unit.side !== 1 || unit.slot !== KINS_SLOT || unit.classId !== "soldier") return unit;
+        const restored = restoreEntry(unit);
+        return {
+          ...unit,
+          classId: restored.classId,
+          className: className(restored.classId),
+          life: restored.life,
+        };
+      }),
+    },
+  };
+}
+
 function finalizeDirectMigration(value: unknown): SaveData | undefined {
   const normalized = normalizeStage22PostbattleTransition(addEmptyTerrainOverrides(value));
   if (!isSaveData(normalized)) return undefined;
   const restored = restoreGadirathClassFromEntrySnapshot(normalized);
-  return isSaveData(restored) ? restored : undefined;
+  const restoredKins = restoreKinsCampaignClass(restored);
+  return isSaveData(restoredKins) ? restoredKins : undefined;
+}
+
+function migrateVersion48Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 48
+    || value.contentVersion !== "stage-24-castle-approach-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
 }
 
 function migrateVersion47Save(value: unknown): SaveData | undefined {
@@ -1652,6 +1704,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion48 = migrateVersion48Save(value);
+    if (migratedVersion48) return migratedVersion48;
     const migratedVersion47 = migrateVersion47Save(value);
     if (migratedVersion47) return migratedVersion47;
     const migratedVersion46 = migrateVersion46Save(value);

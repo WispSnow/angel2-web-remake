@@ -48,6 +48,9 @@ const stageIds = [
   "stage-19",
   "stage-20",
   "stage-21",
+  "stage-22",
+  "stage-23",
+  "stage-24",
 ] as const satisfies readonly StageId[];
 const workspace = path.resolve(import.meta.dirname, "../..");
 
@@ -313,6 +316,35 @@ describe("debug roster profiles", () => {
   it("ships the original ally map figure for the water-warrior baseline", async () => {
     const source = ALLY_MAP_UNIT_ASSETS["water-warrior"];
     expect(source).toBe("/assets/original/technique-lab/units/ally-water-warrior.png");
+    expect((await readFile(path.join(workspace, "public", source))).length).toBeGreaterThan(0);
+  });
+
+  it("carries Kins and the seven half-dragon sisters into late direct-entry profiles", async () => {
+    const profiles = [
+      ["template-baseline", undefined],
+      ["representative-growth", undefined],
+      ["representative-growth", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+      ["promotion-coverage", undefined],
+      ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+    ] as const;
+
+    for (const stageId of ["stage-23", "stage-24"] as const) {
+      for (const [profileId, perStageGrowth] of profiles) {
+        const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
+        expect(roster[7], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
+          slot: 7,
+          classId: "magic-priest",
+          experience: 0,
+          life: classStatsFor({ classId: "magic-priest", experience: 0 }).maxLife,
+        });
+        for (const slot of [25, 26, 27, 28, 29, 30, 31]) {
+          expect(roster[slot]?.classId).toBe("half-dragon-warrior");
+        }
+      }
+    }
+
+    const source = ALLY_MAP_UNIT_ASSETS["half-dragon-warrior"];
+    expect(source).toBe("/assets/original/technique-lab/units/ally-half-dragon-warrior.png");
     expect((await readFile(path.join(workspace, "public", source))).length).toBeGreaterThan(0);
   });
 

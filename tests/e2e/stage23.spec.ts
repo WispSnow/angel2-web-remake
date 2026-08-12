@@ -65,6 +65,12 @@ test("S23-A/B: stage 22 postbattle save opens the 1–15 deployment directly", a
   await expect(page.locator(".deployment-open-cell")).toHaveCount(14);
   await expect(page.getByTestId("deployment-minimap")).toBeVisible();
   await expect(page.getByTestId("deployment-guidance")).toContainText("不必全滅守軍");
+  await expect(page.getByTestId("deployment-roster-7")).toContainText("琴斯");
+  await expect(page.getByTestId("deployment-roster-7")).toContainText("魔祭師");
+  await expect(page.getByTestId("deployment-roster-7").locator("img")).toHaveAttribute(
+    "src",
+    "/assets/original/unit-ally-magic-priest.png",
+  );
   expect(await state(page)).toMatchObject({
     stageId: "stage-23",
     phase: "deployment",
@@ -73,6 +79,15 @@ test("S23-A/B: stage 22 postbattle save opens the 1–15 deployment directly", a
   });
   await captureVisualAudit(page.getByTestId("deployment-screen"), {
     path: `${ARTIFACT_DIR}/stage23-deployment.png`,
+  });
+  await page.getByTestId("deployment-page-1").click();
+  await expect(page.getByTestId("deployment-roster-7")).toContainText("半龍戰士");
+  await expect(page.getByTestId("deployment-roster-7").locator("img")).toHaveAttribute(
+    "src",
+    "/assets/original/technique-lab/units/ally-half-dragon-warrior.png",
+  );
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
+    path: `${ARTIFACT_DIR}/stage23-deployment-half-dragons.png`,
   });
 });
 

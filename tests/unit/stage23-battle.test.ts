@@ -33,6 +33,33 @@ const fullDeployment = {
 };
 
 describe("stage 23 battle simulation", () => {
+  it("commits Kins's magic-priest entry class for an untouched roster slot", () => {
+    const untouchedCampaign: CampaignState = {
+      ...campaign,
+      roster: completeCampaignRoster([
+        { slot: 0, classId: "land-knight", experience: 720, life: 240 },
+      ]),
+    };
+    const roster = createStage23DeploymentRoster(untouchedCampaign);
+    expect(roster.find(({ slot }) => slot === 7)).toMatchObject({
+      name: "琴斯",
+      classId: "magic-priest",
+      experience: 0,
+      life: 305,
+    });
+    const battle = new Stage23Battle(untouchedCampaign, {
+      placements: STAGE23_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+    });
+    expect(battle.campaignSnapshot().roster[7]).toMatchObject({
+      slot: 7,
+      classId: "magic-priest",
+      experience: 0,
+      life: 305,
+    });
+  });
+
   it("builds the 15-unit deployment and all 21 static guards", () => {
     const roster = createStage23DeploymentRoster(campaign);
     expect(roster).toHaveLength(29);

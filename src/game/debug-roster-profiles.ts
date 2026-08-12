@@ -39,6 +39,7 @@ const SULANDA_CAVALRY_BASELINE = { slot: 8, classId: "cavalry", experience: 299 
 const DORI_CURSE_MASTER_BASELINE = { slot: 9, classId: "curse-master", experience: 299 } as const;
 const MARLIN_WATER_WARRIOR_BASELINE = { slot: 10, classId: "water-warrior", experience: 299 } as const;
 const MOLINA_WATER_WARRIOR_BASELINE = { slot: 11, classId: "water-warrior", experience: 299 } as const;
+const KINS_MAGIC_PRIEST_BASELINE = { slot: 7, classId: "magic-priest", experience: 0 } as const;
 const HALF_DRAGON_SISTER_BASELINES = [25, 26, 27, 28, 29, 30, 31].map((slot) => ({
   slot,
   classId: "half-dragon-warrior" as const,
@@ -112,6 +113,7 @@ const DEBUG_STAGE_PROFILE_BASELINES: Readonly<
     DORI_CURSE_MASTER_BASELINE,
     MARLIN_WATER_WARRIOR_BASELINE,
     MOLINA_WATER_WARRIOR_BASELINE,
+    KINS_MAGIC_PRIEST_BASELINE,
     ...HALF_DRAGON_SISTER_BASELINES,
   ],
   "stage-24": [
@@ -119,6 +121,7 @@ const DEBUG_STAGE_PROFILE_BASELINES: Readonly<
     DORI_CURSE_MASTER_BASELINE,
     MARLIN_WATER_WARRIOR_BASELINE,
     MOLINA_WATER_WARRIOR_BASELINE,
+    KINS_MAGIC_PRIEST_BASELINE,
     ...HALF_DRAGON_SISTER_BASELINES,
   ],
 };

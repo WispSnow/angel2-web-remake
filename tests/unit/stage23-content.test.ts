@@ -50,6 +50,8 @@ describe("stage 23 generated content", () => {
     expect(STAGE23_SEMANTIC_ALLIED_UNITS.find(({ slot }) => slot === 7)).toMatchObject({
       name: "琴斯",
       portrait: 14,
+      initialClassId: "magic-priest",
+      untouchedExperience: 0,
     });
     expect(STAGE23_SEMANTIC_ENEMY_UNITS).toHaveLength(21);
     expect(STAGE23_SEMANTIC_ENEMY_UNITS).toEqual(expect.arrayContaining([
@@ -100,7 +102,7 @@ describe("stage 23 generated content", () => {
         initialSide2: 21,
       },
       completedRoute: { module: 27, stage: 24, replayPresentation: false },
-      stableRemakeDecisions: ["REMAKE-058", "REMAKE-059"],
+      stableRemakeDecisions: ["REMAKE-054", "REMAKE-058", "REMAKE-059"],
     });
     expect(STAGE23_EVENT_PROGRAM.enemyReinforcements.auditedSources).toEqual([
       "initial-template", "round-event-handler", "dynamic-board-catalog",

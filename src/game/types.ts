@@ -215,8 +215,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 48;
-  contentVersion: "stage-24-castle-approach-1";
+  version: 49;
+  contentVersion: "stage-23-campaign-class-baseline-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

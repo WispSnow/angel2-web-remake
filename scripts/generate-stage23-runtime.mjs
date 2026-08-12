@@ -67,6 +67,11 @@ const musicDocument = parseInput("music");
 const techniqueRules = parseInput("techniqueRules");
 const storyPresentations = parseInput("storyPresentations");
 const template = requireEntry(battleTemplates.stages, ({ stage }) => stage === 23, "stage 23 template");
+const precedingTemplate = requireEntry(
+  battleTemplates.stages,
+  ({ stage }) => stage === 22,
+  "stage 22 template",
+);
 const stageTerrain = requireEntry(terrainDocument.stages, ({ stage }) => stage === 23, "stage 23 terrain");
 const stageLifecycle = requireEntry(lifecycle.deployment.stages, ({ stage }) => stage === 23, "stage 23 lifecycle");
 
@@ -92,9 +97,16 @@ const actorFor = (slot) => requireEntry(
   (actor) => actor.slot === slot,
   `campaign actor ${slot}`,
 );
+const kinsNativeClassRecord = precedingTemplate.classArrays.side1SparseOverrides[7];
+assertEqual(kinsNativeClassRecord, 3, "Kins stage 22 campaign-entry class");
 const deploymentActors = eligibleSlots.map((slot) => {
   const actor = actorFor(slot);
-  return { slot, portraitRecord: actor.portraitRecord, normalizedName: actor.normalizedName };
+  return {
+    slot,
+    portraitRecord: actor.portraitRecord,
+    normalizedName: actor.normalizedName,
+    ...(slot === 7 ? { campaignEntryNativeClassRecord: kinsNativeClassRecord } : {}),
+  };
 });
 
 const nativeObjective = requireEntry(
@@ -255,14 +267,14 @@ const sources = Object.entries(inputPaths).map(([id, file]) => ({
   bytes: inputBuffers[id].length,
 }));
 const identityHash = createHash("sha256");
-identityHash.update("stableRemake\0REMAKE-058\0REMAKE-059\0");
+identityHash.update("stableRemake\0REMAKE-054\0REMAKE-058\0REMAKE-059\0");
 for (const source of sources) identityHash.update(`${source.path}\0${source.sha256}\n`);
 const contentIdentity = `stage-23/evidence-${identityHash.digest("hex")}`;
 const eventProgram = {
   openingStoryRecord: 46,
   enemyReinforcements,
   completedRoute: { module: 27, stage: 24, replayPresentation: false },
-  stableRemakeDecisions: ["REMAKE-058", "REMAKE-059"],
+  stableRemakeDecisions: ["REMAKE-054", "REMAKE-058", "REMAKE-059"],
 };
 const deployment = {
   kind: "interactive",

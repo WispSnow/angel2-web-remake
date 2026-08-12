@@ -2218,6 +2218,54 @@ describe("Web save validation", () => {
     });
   });
 
+  it("migrates v48 stage 23+ saves by restoring Kins's magic-priest class", () => {
+    const current = stage24BattleSave();
+    const soldierLife = classStatsFor({ classId: "soldier", experience: 0 }).maxLife;
+    const legacyRoster = current.roster.map((entry) => entry.slot === 7
+      ? { ...entry, classId: "soldier" as const, experience: 0, life: soldierLife - 23 }
+      : entry);
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 48,
+      contentVersion: "stage-24-castle-approach-1",
+      roster: legacyRoster,
+      stageEntrySnapshot: {
+        ...current.stageEntrySnapshot,
+        roster: current.stageEntrySnapshot.roster.map((entry) => entry.slot === 7
+          ? { ...entry, classId: "soldier", experience: 0, life: soldierLife }
+          : entry),
+      },
+      battle: {
+        ...current.battle,
+        units: current.battle.units.map((unit) => unit.side === 1 && unit.slot === 7
+          ? {
+            ...unit,
+            classId: "soldier",
+            className: "士兵",
+            experience: 0,
+            life: soldierLife - 23,
+          }
+          : unit),
+      },
+    }));
+
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-24",
+    });
+    if (migrated?.kind !== "battle") throw new Error("expected migrated stage 24 battle");
+    expect(migrated.stageEntrySnapshot.roster[7]).toMatchObject({
+      classId: "magic-priest", experience: 0, life: 305,
+    });
+    expect(migrated.roster[7]).toMatchObject({
+      classId: "magic-priest", experience: 0, life: 282,
+    });
+    expect(migrated.battle.units.find(({ side, slot }) => side === 1 && slot === 7))
+      .toMatchObject({ classId: "magic-priest", experience: 0, life: 282 });
+  });
+
   it("migrates v44 saves to the stage 23 content identity", () => {
     const current = stage22BattleSave();
     const migrated = parseSaveData(JSON.stringify({

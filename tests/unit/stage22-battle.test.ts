@@ -53,6 +53,12 @@ describe("stage 22 battle simulation", () => {
       });
     }
     const battle = new Stage22Battle(campaign, fullDeployment);
+    for (const slot of [25, 26, 27, 28, 29, 30, 31]) {
+      expect(battle.campaignSnapshot().roster[slot]).toMatchObject({
+        classId: "half-dragon-warrior",
+        experience: 299,
+      });
+    }
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(19);
     expect(battle.units.filter(({ side }) => side === 2)).toEqual([]);
     expect(battle.unit("1:0")).toMatchObject({
