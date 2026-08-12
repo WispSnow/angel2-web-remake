@@ -22,7 +22,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | --- | --- | --- |
 | `src/game/simulation/actions/`、动作数值与 PRNG | `actions.test.ts` | 对应 `arena-*.spec.ts` 技能族文件；魔弓线路见 `arena-magic-archer-route.spec.ts` |
 | `src/game/simulation/battle.ts` 的普通伤害、地形防御、反击与经验 | `battle.test.ts`，职业特例另见 `classes.test.ts` | 对应关卡或 `class-showdown.spec.ts` |
-| `src/game/simulation/objectives.ts` 的胜负条件、到达区展开与 Phaser 目的地标记 | `objectives.test.ts` | 到达型关卡 `stage4.spec.ts`、`stage9.spec.ts`、`stage11.spec.ts`、`stage23.spec.ts` |
+| `src/game/simulation/objectives.ts` 的胜负条件、到达区展开与 Phaser 目的地标记 | `objectives.test.ts` | 到达型关卡 `stage4.spec.ts`、`stage9.spec.ts`、`stage11.spec.ts`、`stage23.spec.ts`、`stage24.spec.ts` |
 | `src/game/simulation/expert-ai.ts`、共享统一效用评分、完整通路追击、虚拟前线排队、近身让路、行动者重规划与决策追踪 | `expert-ai.test.ts`，职业动作覆盖另见 `arena.test.ts` | `arena.spec.ts`、`arena-magic-archer-route.spec.ts` 或当前开放关卡的自动阶段用例 |
 | `src/game/content/technique-*`、地图技术时间轴 | `technique-lab.test.ts` | `technique-lab.spec.ts`；只在正式接入变化时追加对应竞技场文件 |
 | `src/game/content/classes.ts`、职业固定行／第三行后成长、`class-traits.ts`、终阶职业特性、飛龍攻后移动与水戰士受击分裂／共享状态 | `classes.test.ts` | `class-showdown.spec.ts` 的职业说明、飛龍流程和水戰士分裂用例 |
@@ -50,7 +50,8 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 内部第 20 关内容、3–17 人部署、十六人叙事阵形替换、妖龍／WD、魔祭師琴斯／龍王胜利链与 stage 21 路由 | `stage20-content.test.ts`、`stage20-battle.test.ts`、`wd-action.test.ts`、`expert-ai.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage20.spec.ts` |
 | 内部第 21 关空模板、四名斥候继承／生成／移动、非交互即时胜利与 stage 22 路由 | `stage21-content.test.ts`、`stage21-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage21.spec.ts` |
 | 内部第 22 关 1–19 人部署、女帝／琴斯临时剧情、六敌延迟伏击、妖龍／妮雅胜负、SAY 45 关后整顿／对话后存档与 stage 23 路由 | `stage22-content.test.ts`、`stage22-battle.test.ts`、`stage-events.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage22.spec.ts` |
-| 内部第 23 关直接 1–15 人部署、SAY 46、二十一名静态守军、9 守卫／12 追击、妮雅线性到达区、无增援与 stage 24 冻结路由 | `stage23-content.test.ts`、`stage23-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage23.spec.ts` |
+| 内部第 23 关直接 1–15 人部署、SAY 46、二十一名静态守军、9 守卫／12 追击、妮雅线性到达区、无增援与 stage 24 路由 | `stage23-content.test.ts`、`stage23-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage23.spec.ts` |
+| 内部第 24 关 1–15 人部署、SAY 47/48、二十二名静态守军、12 哨戒／10 追击、妮雅线性城堡到达区、无增援与直接 stage 26 路由 | `stage24-content.test.ts`、`stage24-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage24.spec.ts` |
 | 原生“肖像不随文字窗关闭而消失”的检查点（SAY/0043 点名段、SAY/0074 龍王石像） | `stage21-content.test.ts`、`stage20-content.test.ts` | `stage21.spec.ts` |
 | 第 0–6 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
 | 剧情对话 DOM、逐字推进、右键跳过确认与输入阻断 | 无独立模拟数值测试 | `stage0.spec.ts` 的剧情对话用例；各关卡通过 `dialogue-controls.ts` 复用真实跳过路径 |

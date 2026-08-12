@@ -158,6 +158,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion47Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 47
+    || value.contentVersion !== "expert-path-distance-ai-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion46Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 46
@@ -1641,6 +1652,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion47 = migrateVersion47Save(value);
+    if (migratedVersion47) return migratedVersion47;
     const migratedVersion46 = migrateVersion46Save(value);
     if (migratedVersion46) return migratedVersion46;
     const migratedVersion45 = migrateVersion45Save(value);

@@ -1226,6 +1226,54 @@ async function loadStage23Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage24Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage24"),
+    import("./simulation/stage24-battle"),
+  ]);
+  content.activateStage24Content();
+  const definition = content.STAGE24_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 24",
+      title: content.STAGE24.name,
+      objective: content.STAGE24_DEFINITION.objective.victoryText,
+      minimap: content.STAGE24_ASSETS.minimap,
+      terrain: content.STAGE24_TERRAIN_TOKENS,
+      gridWidth: content.STAGE24.width,
+      gridHeight: content.STAGE24.height,
+      enemies: content.STAGE24_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十八名候選最多選十四人。讓妮雅抵達死亡之谷城堡即可獲勝，不必全滅守軍。",
+    },
+    ["stage-24-enter-deployment"],
+    (campaign) => battleModule.createStage24DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 24 requires a deployment result");
+    return new battleModule.Stage24Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE24_DEFINITION,
+    assets: {
+      map: content.STAGE24_ASSETS.map,
+      minimap: content.STAGE24_ASSETS.minimap,
+      unitSprites: content.STAGE24_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -2817,6 +2865,78 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage23Module,
+  },
+  "stage-24": {
+    id: "stage-24",
+    ordinal: 24,
+    label: "死亡之谷城堡前",
+    nextStageId: "stage-26",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "deployment",
+      statusText: "死亡之谷已突破；編成攻向城堡的部隊。",
+      campaignRoute: "stage-24",
+    },
+    enemyPhaseStatusText: "敵方階段：城堡守軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始死亡之谷城堡前部署。",
+      retreatStatusText: "全面撤退：返回城堡前部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "遭遇碧娜維姬",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-24-enter-deployment",
+        "stage-24-opening-story",
+        "stage-24-objective-reached",
+        "stage-24-victory-story",
+        "stage-24-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-24-enter-deployment",
+        "stage-24-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 15,
+        openCellCount: 14,
+      },
+      enemyClassById: [
+        ["2:31", "bone-knight"],
+        ["2:33", "demon-dragon-knight"],
+        ["2:34", "demon-dragon-knight"],
+        ["2:35", "demon-dragon-knight"],
+        ["2:36", "half-dragon-warrior"],
+        ["2:37", "half-dragon-warrior"],
+        ["2:38", "half-dragon-warrior"],
+        ["2:39", "jungle-warrior"],
+        ["2:40", "crossbow"],
+        ["2:41", "crossbow"],
+        ["2:42", "crossbow"],
+        ["2:43", "crossbow"],
+        ["2:44", "crossbow"],
+        ["2:48", "steel-armor-warrior"],
+        ["2:49", "steel-armor-warrior"],
+        ["2:50", "steel-armor-warrior"],
+        ["2:51", "crossbow"],
+        ["2:52", "crossbow"],
+        ["2:53", "crossbow"],
+        ["2:54", "crossbow"],
+        ["2:55", "crossbow"],
+        ["2:56", "crossbow"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage24Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

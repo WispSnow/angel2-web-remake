@@ -44,6 +44,7 @@ import { STAGE18_DEFINITION } from "../../src/game/content/stage18";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
 import { STAGE22_DEFINITION, STAGE22_SEMANTIC_ENEMIES } from "../../src/game/content/stage22";
 import { STAGE23_DEFINITION } from "../../src/game/content/stage23";
+import { STAGE24_DEFINITION } from "../../src/game/content/stage24";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
@@ -51,6 +52,7 @@ import { Stage18Battle } from "../../src/game/simulation/stage18-battle";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
 import { Stage22Battle } from "../../src/game/simulation/stage22-battle";
 import { Stage23Battle } from "../../src/game/simulation/stage23-battle";
+import { Stage24Battle } from "../../src/game/simulation/stage24-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
@@ -1196,6 +1198,62 @@ const stage23BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage24BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-24" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x24a0_b0c0,
+    rngCalls: 84,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 760, life: 240 },
+      { slot: 7, classId: "magic-priest", experience: 660, life: 180 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE24_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      {
+        slot: 7,
+        position: { ...STAGE24_DEFINITION.deployment.openCells[0] },
+        fixed: false,
+      },
+    ],
+  };
+  const battle = new Stage24Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-12T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-24",
+    stageLabel: "死亡之谷城堡前",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-24-enter-deployment",
+      "stage-24-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -2102,6 +2160,62 @@ describe("Web save validation", () => {
       ...completed,
       consumedEventIds: completed.consumedEventIds.slice(0, -1),
     })).toBe(false);
+  });
+
+  it("validates stage 24 only with its opening identity and exact static guard roster", () => {
+    const save = stage24BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual(["1:0", "1:7"]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(22);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: save.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:31"
+          ? { ...unit, classId: "crossbow" as const, className: "連弩兵" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("accepts the stage-26 boundary only with the complete stage-24 identity", () => {
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-26",
+      stageLabel: "遭遇碧娜維姬",
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage24BattleSave().consumedEventIds,
+        "stage-24-objective-reached",
+        "stage-24-victory-story",
+        "stage-24-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+  });
+
+  it("migrates v47 saves to the stage 24 content identity", () => {
+    const current = stage24BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 47,
+      contentVersion: "expert-path-distance-ai-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-24",
+    });
   });
 
   it("migrates v44 saves to the stage 23 content identity", () => {

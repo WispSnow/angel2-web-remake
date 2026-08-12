@@ -31,7 +31,8 @@ export type StageId =
   | "stage-20"
   | "stage-21"
   | "stage-22"
-  | "stage-23";
+  | "stage-23"
+  | "stage-24";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -57,7 +58,8 @@ export type CampaignRouteId =
   | "stage-21"
   | "stage-22"
   | "stage-23"
-  | "stage-24";
+  | "stage-24"
+  | "stage-26";
 
 export interface Position {
   x: number;
@@ -213,8 +215,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 47;
-  contentVersion: "expert-path-distance-ai-1";
+  version: 48;
+  contentVersion: "stage-24-castle-approach-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

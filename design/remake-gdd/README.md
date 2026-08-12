@@ -4,11 +4,11 @@
 
 日期：2026-08-12
 
-阶段：第 0–22 关及既有非连续战斗已接受；内部第 23 关“死亡之谷中”已通过自动验收、等待用户试玩；stage 24 及后续内容冻结
+阶段：第 0–23 关及既有非连续战斗已接受；内部第 24 关“死亡之谷城堡前”已通过自动验收、等待用户试玩；stage 26 及后续内容冻结
 
 开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关与内部第 11 关已获用户
-接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–22 关已获
-用户接受；M44/M45 已按 `REMAKE-058` 授权并实现内部第 23 关；内部 stage 24 及后续运行时仍冻结
+接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–23 关已获
+用户接受；M46/M47 已按 `REMAKE-061` 授权内部第 24 关；内部 stage 26 及后续运行时仍冻结
 
 ## 文档目的
 
@@ -67,7 +67,8 @@
 | [`vertical-slices/stage-20.md`](vertical-slices/stage-20.md) | 3–17 人部署、十六人叙事阵形替换、妖龍／WD、琴斯与龍王胜利链及 stage 21 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-21.md`](vertical-slices/stage-21.md) | 空模板、四名斥候生成／移动、非交互侦察、跳过普通结算与 stage 22 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-22.md`](vertical-slices/stage-22.md) | 1–19 人部署、女帝／琴斯临时剧情、六敌伏击、妖龍目标、SAY 45 关后整顿与 stage 23 路由 | Draft 0.2 / 已接受后优化 |
-| [`vertical-slices/stage-23.md`](vertical-slices/stage-23.md) | 直接 1–15 人部署、SAY 46、二十一敌、妮雅到达区、无增援与 stage 24 路由 | Draft 0.2 / 已验证，待用户试玩 |
+| [`vertical-slices/stage-23.md`](vertical-slices/stage-23.md) | 直接 1–15 人部署、SAY 46、二十一敌、妮雅到达区、无增援与 stage 24 路由 | Draft 0.4 / 已接受 |
+| [`vertical-slices/stage-24.md`](vertical-slices/stage-24.md) | 1–15 人部署、SAY 47/48、二十二敌、妮雅城堡到达区、无增援与直接 stage 26 路由 | Draft 0.1 / 已验证，待用户试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
