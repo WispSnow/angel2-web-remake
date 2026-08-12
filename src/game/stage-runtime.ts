@@ -1128,6 +1128,56 @@ async function loadStage21Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage22Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage22"),
+    import("./simulation/stage22-battle"),
+  ]);
+  content.activateStage22Content();
+  const definition = content.STAGE22_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 22",
+      title: content.STAGE22.name,
+      objective: content.STAGE22_DEFINITION.objective.victoryText,
+      minimap: content.STAGE22_ASSETS.minimap,
+      terrain: content.STAGE22_TERRAIN_TOKENS,
+      gridWidth: content.STAGE22.width,
+      gridHeight: content.STAGE22.height,
+      // B/0045 has no static side-2 cells; exposing the ambush positions here
+      // would leak information the original deployment screen withheld.
+      enemies: [],
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十七名候選最多選十八人。村莊內暫時看不見敵軍。",
+    },
+    ["stage-22-enter-deployment"],
+    (campaign) => battleModule.createStage22DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 22 requires a deployment result");
+    return new battleModule.Stage22Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE22_DEFINITION,
+    assets: {
+      map: content.STAGE22_ASSETS.map,
+      minimap: content.STAGE22_ASSETS.minimap,
+      unitSprites: content.STAGE22_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -2567,6 +2617,87 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage21Module,
+  },
+  "stage-22": {
+    id: "stage-22",
+    ordinal: 22,
+    label: "焦土森林村莊中",
+    nextStageId: "stage-23",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅一行進入焦土森林村莊。",
+      campaignRoute: "stage-22",
+    },
+    enemyPhaseStatusText: "敵方階段：妖龍與魔祭師開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始焦土森林村莊部署。",
+      retreatStatusText: "全面撤退：返回焦土森林村莊部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "死亡之谷中",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-22-enter-deployment",
+        "stage-22-empress-arrival",
+        "stage-22-empress-move",
+        "stage-22-kins-arrival",
+        "stage-22-kins-move",
+        "stage-22-search-story",
+        "stage-22-focus-nia",
+        "stage-22-reunion-story",
+        "stage-22-gadirath-arrival",
+        "stage-22-betrayal-story",
+        "stage-22-dragon-arrival",
+        "stage-22-dragon-story",
+        "stage-22-story-departures",
+        "stage-22-ambush-arrivals",
+        "stage-22-player-ready",
+        "stage-22-objective-reached",
+        "stage-22-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-22-enter-deployment",
+        "stage-22-empress-arrival",
+        "stage-22-empress-move",
+        "stage-22-kins-arrival",
+        "stage-22-kins-move",
+        "stage-22-search-story",
+        "stage-22-focus-nia",
+        "stage-22-reunion-story",
+        "stage-22-gadirath-arrival",
+        "stage-22-betrayal-story",
+        "stage-22-dragon-arrival",
+        "stage-22-dragon-story",
+        "stage-22-story-departures",
+        "stage-22-ambush-arrivals",
+        "stage-22-player-ready",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 19,
+        openCellCount: 18,
+      },
+      enemyClassById: [
+        ["2:2", "magic-priest"],
+        ["2:28", "dragon"],
+        ["2:40", "magic-priest"],
+        ["2:41", "magic-priest"],
+        ["2:42", "magic-priest"],
+        ["2:43", "magic-priest"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage22Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

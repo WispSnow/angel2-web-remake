@@ -298,6 +298,30 @@ const STAGE21_COMPLETED_EVENT_IDS = [
   "stage-21-completed-route",
 ] as const;
 
+const STAGE22_BATTLE_EVENT_IDS = [
+  "stage-22-enter-deployment",
+  "stage-22-empress-arrival",
+  "stage-22-empress-move",
+  "stage-22-kins-arrival",
+  "stage-22-kins-move",
+  "stage-22-search-story",
+  "stage-22-focus-nia",
+  "stage-22-reunion-story",
+  "stage-22-gadirath-arrival",
+  "stage-22-betrayal-story",
+  "stage-22-dragon-arrival",
+  "stage-22-dragon-story",
+  "stage-22-story-departures",
+  "stage-22-ambush-arrivals",
+  "stage-22-player-ready",
+] as const;
+
+const STAGE22_COMPLETED_EVENT_IDS = [
+  ...STAGE22_BATTLE_EVENT_IDS,
+  "stage-22-objective-reached",
+  "stage-22-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -1976,6 +2000,99 @@ async function createStage21Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage22Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-22",
+    debugCampaign(context, "stage-22"),
+    { preparation: true, statusMessage: "調試場景：焦土森林村莊部署。" },
+  );
+  return controller;
+}
+
+async function stage22FullDeployment() {
+  const { STAGE22_DEFINITION } = await import("./content/stage22");
+  return {
+    placements: [
+      ...STAGE22_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE22_DEFINITION.deployment.optionalSlots.slice(0, 18).map((slot, index) => ({
+        slot, position: { ...STAGE22_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage22Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage22Deployment(context);
+  controller.completeDeployment(await stage22FullDeployment());
+  return controller;
+}
+
+async function createStage22Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-22");
+  const [{ Stage22Battle }, { STAGE22_SEMANTIC_ENEMIES }, { createFixedStageEnemy }] = await Promise.all([
+    import("./simulation/stage22-battle"),
+    import("./content/stage22"),
+    import("./simulation/fixed-stage-battle"),
+  ]);
+  const battle = new Stage22Battle(campaign, await stage22FullDeployment());
+  battle.appendStoryUnits(STAGE22_SEMANTIC_ENEMIES.map((enemy) => createFixedStageEnemy(
+    enemy,
+    campaign.difficulty,
+  )));
+  const dragon = battle.unit("2:28");
+  if (!dragon) throw new Error("stage 22 debug scenario is missing the Dragon");
+  // The round-one handler returns immediately after the Dragon-focused SAY/79
+  // and memory-only ambush writes, so the real player handoff stays here.
+  battle.focusId = dragon.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-22"),
+    stageLabel: "焦土森林村莊中",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE22_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: dragon.x, y: dragon.y },
+      cameraOrigin: { x: 18, y: 21 },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：十九人攻略隊迎戰妖龍與五名魔祭師。";
+  return controller;
+}
+
+async function createStage22Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-22");
+  const { createStage22DeploymentRoster } = await import("./simulation/stage22-battle");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-23",
+    stageLabel: "死亡之谷中",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(createStage22DeploymentRoster(campaign).map((unit) => ({
+      slot: unit.slot,
+      classId: unit.classId,
+      experience: unit.experience,
+      life: unit.life,
+    }))),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE22_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -2558,6 +2675,37 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-20-cleared": createStage20Completed,
   "stage-21-prebattle": createStage21Prebattle,
   "stage-21-cleared": createStage21Completed,
+  "stage-22-deployment": createStage22Deployment,
+  "stage-22-opening": createStage22Opening,
+  "stage-22-player": createStage22Player,
+  "stage-22-near-victory": withSetup(createStage22Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const dragon = controller.battle.unit("2:28");
+    if (!nia || !dragon) return;
+    nia.x = 22;
+    nia.y = 25;
+    nia.acted = false;
+    dragon.x = 22;
+    dragon.y = 24;
+    dragon.life = 1;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 18, y: 21 };
+    controller.statusMessage = "調試場景：妖龍只剩 1 點生命，擊敗後直接進入普通勝利流程。";
+  }),
+  "stage-22-near-defeat": withSetup(createStage22Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const gadirath = controller.battle.unit("2:2");
+    if (!nia || !gadirath) return;
+    nia.life = 1;
+    gadirath.x = nia.x + 1;
+    gadirath.y = nia.y;
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，葛蒂拉斯位於相鄰格。";
+  }),
+  "stage-22-victory-ready": withSetup(createStage22Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-22-cleared": createStage22Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

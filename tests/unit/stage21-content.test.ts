@@ -11,7 +11,7 @@ import { stageSimulationEffectFor } from "../../src/game/content/stage-effects";
 import type { DialoguePage } from "../../src/game/types";
 
 describe("stage 21 content", () => {
-  it("publishes the noninteractive four-scout interlude and frozen stage-22 route", () => {
+  it("publishes the noninteractive four-scout interlude and stage-22 route", () => {
     expect(STAGE21_DEFINITION).toMatchObject({
       id: "stage-21",
       nativeStage: 21,

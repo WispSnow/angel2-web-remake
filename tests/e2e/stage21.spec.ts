@@ -136,24 +136,15 @@ test("S21-A–D: four scouts enter, cross the forest, discover the dolls, and ro
   });
 
   await skipStoryDialogue(page);
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-21",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-22",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-22",
-    consumedEventIds: [
-      "stage-21-prebattle-story",
-      "stage-21-scouts-arrive",
-      "stage-21-scouting-story",
-      "stage-21-nia-move",
-      "stage-21-himi-move",
-      "stage-21-gadirath-move",
-      "stage-21-sulanda-move",
-      "stage-21-discovery-story",
-      "stage-21-completed-route",
-    ],
+    consumedEventIds: ["stage-22-enter-deployment"],
   });
+  await expect(page.getByRole("heading", { name: "焦土森林村莊中 · 出擊準備" })).toBeVisible();
   expect(seenPhases).not.toContain("player");
   expect(seenPhases).not.toContain("victoryFeedback");
   expect(seenPhases).not.toContain("savePrompt");

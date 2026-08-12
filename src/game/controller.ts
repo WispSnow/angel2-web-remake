@@ -1103,6 +1103,21 @@ export class GameController {
       this.statusMessage = `${this.stageRuntime.label}：選擇出場編隊。`;
       return;
     }
+    if (definition.type === "enter-player-phase") {
+      this.phase = "player";
+      this.statusMessage = definition.statusText;
+      return;
+    }
+    if (definition.type === "focus-actor") {
+      const actor = this.battle.units.find(
+        (unit) => unit.side === definition.actor.side && unit.slot === definition.actor.slot,
+      );
+      if (!actor) throw new Error(`Missing focus actor ${definition.actor.side}:${definition.actor.slot}`);
+      this.battle.focusId = actor.id;
+      this.cursor = { x: actor.x, y: actor.y };
+      this.centerCamera(actor);
+      return;
+    }
     if (definition.type === "victory-state") {
       this.stageProgress = definition.value;
       return;
@@ -1308,28 +1323,35 @@ export class GameController {
       : []);
     // Native `focusPortraitResource` selects the side panel for the whole write
     // sequence; without it the panel simply follows the last cell written.
-    const settleFocus = (): void => {
+    const applyPortraitFocus = (): void => {
       const target = (definition.focusPortrait === undefined
         ? undefined
-        : units.find(({ portrait }) => portrait === definition.focusPortrait))
+        : [...units, ...this.battle.units].find(({ portrait }) => portrait === definition.focusPortrait))
         ?? units.at(-1);
       if (!target) return;
       this.battle.focusId = target.id;
       this.cursor = { x: target.x, y: target.y };
       this.centerCamera(target);
     };
+    const focusBeforeWrite = definition.focusPortraitTiming === "before-write";
+    if (focusBeforeWrite) applyPortraitFocus();
     if (this.skippingScriptedSequence) {
       this.battle.appendStoryUnits(units, forceInheritance);
-      settleFocus();
+      if (!focusBeforeWrite) applyPortraitFocus();
       return;
     }
 
     this.busy = true;
     if (definition.revealTiming === "after-write") {
       this.battle.appendStoryUnits(units, forceInheritance);
-      settleFocus();
+      applyPortraitFocus();
       this.emit();
       await pause(this.mapCombatDelay(3));
+      this.busy = false;
+      return;
+    }
+    if (definition.revealTiming === "deferred-refresh") {
+      this.battle.appendStoryUnits(units, forceInheritance);
       this.busy = false;
       return;
     }
@@ -1337,8 +1359,10 @@ export class GameController {
       // Native 1000:533E focuses/redraws before writing each cell. That means
       // the next focus reveals the previous reinforcement rather than the
       // current write appearing immediately.
-      this.cursor = { x: unit.x, y: unit.y };
-      this.centerCamera(unit);
+      const actor = definition.actors.find(({ id }) => id === unit.id);
+      const focusPosition = actor?.focusPosition ?? unit;
+      this.cursor = { x: focusPosition.x, y: focusPosition.y };
+      this.centerCamera(focusPosition);
       this.emit();
       await pause(this.mapCombatDelay(3));
       this.battle.appendStoryUnits(
@@ -1346,7 +1370,11 @@ export class GameController {
         forceInheritance.filter(({ derivedUnitId }) => derivedUnitId === unit.id),
       );
     }
-    settleFocus();
+    if (definition.revealTiming === "native-before-write-deferred-refresh") {
+      this.busy = false;
+      return;
+    }
+    if (!focusBeforeWrite) applyPortraitFocus();
     this.emit();
     await pause(this.mapCombatDelay(3));
     this.busy = false;

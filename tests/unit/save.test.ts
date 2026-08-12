@@ -42,11 +42,14 @@ import { STAGE16_DEFINITION } from "../../src/game/content/stage16";
 import { STAGE17_DEFINITION } from "../../src/game/content/stage17";
 import { STAGE18_DEFINITION } from "../../src/game/content/stage18";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
+import { STAGE22_DEFINITION, STAGE22_SEMANTIC_ENEMIES } from "../../src/game/content/stage22";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
 import { Stage18Battle } from "../../src/game/simulation/stage18-battle";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
+import { Stage22Battle } from "../../src/game/simulation/stage22-battle";
+import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
@@ -1060,6 +1063,81 @@ const stage19BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage22BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-22" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x22a0_b0c0,
+    rngCalls: 79,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 720, life: 240 },
+      { slot: 1, classId: "soldier", experience: 299, life: 120 },
+      { slot: 10, classId: "water-warrior", experience: 299, life: 250 },
+      { slot: 11, classId: "water-warrior", experience: 299, life: 250 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE22_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      {
+        slot: 1,
+        position: { ...STAGE22_DEFINITION.deployment.openCells[0] },
+        fixed: false,
+      },
+    ],
+  };
+  const battle = new Stage22Battle(source, deployment);
+  battle.appendStoryUnits(STAGE22_SEMANTIC_ENEMIES.map((enemy) => createFixedStageEnemy(
+    enemy,
+    source.difficulty,
+  )));
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-11T23:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-22",
+    stageLabel: "焦土森林村莊中",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-22-enter-deployment",
+      "stage-22-empress-arrival",
+      "stage-22-empress-move",
+      "stage-22-kins-arrival",
+      "stage-22-kins-move",
+      "stage-22-search-story",
+      "stage-22-focus-nia",
+      "stage-22-reunion-story",
+      "stage-22-gadirath-arrival",
+      "stage-22-betrayal-story",
+      "stage-22-dragon-arrival",
+      "stage-22-dragon-story",
+      "stage-22-story-departures",
+      "stage-22-ambush-arrivals",
+      "stage-22-player-ready",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -1875,7 +1953,63 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("migrates v42 saves to the stage 21 content identity", () => {
+  it("validates stage 22 only after the complete six-enemy ambush", () => {
+    const save = stage22BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual(["1:0", "1:1"]);
+    expect(save.battle.units.filter(({ side }) => side === 2).map(({ id }) => id))
+      .toEqual(["2:2", "2:28", "2:40", "2:41", "2:42", "2:43"]);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: save.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:28"
+          ? { ...unit, classId: "magic-priest" as const, className: "魔祭師" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("accepts the stage-23 boundary only with the complete stage-22 identity", () => {
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-23",
+      stageLabel: "死亡之谷中",
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage22BattleSave().consumedEventIds,
+        "stage-22-objective-reached",
+        "stage-22-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+  });
+
+  it("migrates v43 saves to the stage 22 content identity", () => {
+    const current = stage19BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 43,
+      contentVersion: "stage-21-scout-interlude-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-19",
+    });
+  });
+
+  it("migrates v42 saves to the stage 22 content identity", () => {
     const current = stage19BattleSave();
     const migrated = parseSaveData(JSON.stringify({
       ...current,
@@ -1890,7 +2024,7 @@ describe("Web save validation", () => {
     });
   });
 
-  it("migrates v41 saves to the stage 21 content identity", () => {
+  it("migrates v41 saves to the stage 22 content identity", () => {
     const current = stage19BattleSave();
     const migrated = parseSaveData(JSON.stringify({
       ...current,

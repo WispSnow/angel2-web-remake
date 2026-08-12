@@ -39,6 +39,11 @@ const SULANDA_CAVALRY_BASELINE = { slot: 8, classId: "cavalry", experience: 299 
 const DORI_CURSE_MASTER_BASELINE = { slot: 9, classId: "curse-master", experience: 299 } as const;
 const MARLIN_WATER_WARRIOR_BASELINE = { slot: 10, classId: "water-warrior", experience: 299 } as const;
 const MOLINA_WATER_WARRIOR_BASELINE = { slot: 11, classId: "water-warrior", experience: 299 } as const;
+const HALF_DRAGON_SISTER_BASELINES = [25, 26, 27, 28, 29, 30, 31].map((slot) => ({
+  slot,
+  classId: "half-dragon-warrior" as const,
+  experience: 299,
+}));
 
 const DEBUG_STAGE_PROFILE_BASELINES: Readonly<
   Partial<Record<StageId, readonly DebugStageBaselineSpec[]>>
@@ -94,6 +99,13 @@ const DEBUG_STAGE_PROFILE_BASELINES: Readonly<
     DORI_CURSE_MASTER_BASELINE,
     MARLIN_WATER_WARRIOR_BASELINE,
     MOLINA_WATER_WARRIOR_BASELINE,
+  ],
+  "stage-22": [
+    SULANDA_CAVALRY_BASELINE,
+    DORI_CURSE_MASTER_BASELINE,
+    MARLIN_WATER_WARRIOR_BASELINE,
+    MOLINA_WATER_WARRIOR_BASELINE,
+    ...HALF_DRAGON_SISTER_BASELINES,
   ],
 };
 
@@ -233,6 +245,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-19": REPRESENTATIVE_STAGE8,
       "stage-20": REPRESENTATIVE_STAGE8,
       "stage-21": REPRESENTATIVE_STAGE8,
+      "stage-22": REPRESENTATIVE_STAGE8,
     },
   },
   {
@@ -262,6 +275,7 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
       "stage-19": PROMOTION_COVERAGE_STAGE8,
       "stage-20": PROMOTION_COVERAGE_STAGE8,
       "stage-21": PROMOTION_COVERAGE_STAGE8,
+      "stage-22": PROMOTION_COVERAGE_STAGE8,
     },
   },
 ] as const satisfies readonly {

@@ -133,6 +133,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restored) ? restored : undefined;
 }
 
+function migrateVersion43Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 43
+    || value.contentVersion !== "stage-21-scout-interlude-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion42Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 42
@@ -1572,6 +1583,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion43 = migrateVersion43Save(value);
+    if (migratedVersion43) return migratedVersion43;
     const migratedVersion42 = migrateVersion42Save(value);
     if (migratedVersion42) return migratedVersion42;
     const migratedVersion41 = migrateVersion41Save(value);

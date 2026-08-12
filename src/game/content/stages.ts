@@ -56,7 +56,11 @@ export type StageStoryId =
   | "stage-20-victory-story"
   | "stage-21-prebattle-story"
   | "stage-21-scouting-story"
-  | "stage-21-discovery-story";
+  | "stage-21-discovery-story"
+  | "stage-22-search-story"
+  | "stage-22-reunion-story"
+  | "stage-22-betrayal-story"
+  | "stage-22-dragon-story";
 
 export type StageMusicId =
   | "stage-00-story-music"
@@ -115,7 +119,9 @@ export type StageMusicId =
   | "stage-20-enemy-phase-music"
   | "stage-21-story-music"
   | "stage-21-player-phase-music"
-  | "stage-21-enemy-phase-music";
+  | "stage-21-enemy-phase-music"
+  | "stage-22-player-phase-music"
+  | "stage-22-enemy-phase-music";
 
 export type StageEventId =
   | "stage-00-prebattle-story"
@@ -248,7 +254,24 @@ export type StageEventId =
   | "stage-21-gadirath-move"
   | "stage-21-sulanda-move"
   | "stage-21-discovery-story"
-  | "stage-21-completed-route";
+  | "stage-21-completed-route"
+  | "stage-22-enter-deployment"
+  | "stage-22-empress-arrival"
+  | "stage-22-empress-move"
+  | "stage-22-kins-arrival"
+  | "stage-22-kins-move"
+  | "stage-22-search-story"
+  | "stage-22-focus-nia"
+  | "stage-22-reunion-story"
+  | "stage-22-gadirath-arrival"
+  | "stage-22-betrayal-story"
+  | "stage-22-dragon-arrival"
+  | "stage-22-dragon-story"
+  | "stage-22-story-departures"
+  | "stage-22-ambush-arrivals"
+  | "stage-22-player-ready"
+  | "stage-22-objective-reached"
+  | "stage-22-completed-route";
 
 export type StageSimulationEffectId =
   | "none"
@@ -330,7 +353,20 @@ export type StageSimulationEffectId =
   | "stage-21-himi-move"
   | "stage-21-gadirath-move"
   | "stage-21-sulanda-move"
-  | "stage-21-route-to-stage-22";
+  | "stage-21-route-to-stage-22"
+  | "stage-22-enter-deployment"
+  | "stage-22-empress-arrival"
+  | "stage-22-empress-move"
+  | "stage-22-kins-arrival"
+  | "stage-22-kins-move"
+  | "stage-22-focus-nia"
+  | "stage-22-gadirath-arrival"
+  | "stage-22-dragon-arrival"
+  | "stage-22-story-departures"
+  | "stage-22-ambush-arrivals"
+  | "stage-22-player-ready"
+  | "stage-22-set-victory-999"
+  | "stage-22-route-to-stage-23";
 
 export type StagePresentationId =
   | "none"

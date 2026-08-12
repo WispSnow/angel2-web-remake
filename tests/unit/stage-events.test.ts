@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
+import { STAGE22_DEFINITION } from "../../src/game/content/stage22";
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
 import {
   consumedEventIdsForBattleResume,
@@ -107,5 +108,36 @@ describe("stage event simulation", () => {
     expect(dispatched.events.map(({ id, simulationEffect }) => ({ id, simulationEffect }))).toEqual([
       { id: "stage-01-completed-route", simulationEffect: "stage-01-route-to-stage-02" },
     ]);
+  });
+
+  it("chains the stage 22 entrance, betrayal, six-enemy ambush, and player handoff", () => {
+    let state = createStageEventState(STAGE22_DEFINITION);
+    const expectEvent = (
+      trigger: Parameters<typeof dispatchStageEvents>[2],
+      id: string,
+      effect: string,
+    ) => {
+      const dispatched = dispatchStageEvents(STAGE22_DEFINITION, state, trigger);
+      expect(dispatched.events.map((event) => ({ id: event.id, effect: event.simulationEffect })))
+        .toEqual([{ id, effect }]);
+      state = dispatched.state;
+    };
+    expectEvent({ type: "campaign-entered" }, "stage-22-enter-deployment", "stage-22-enter-deployment");
+    expectEvent({ type: "battle-started" }, "stage-22-empress-arrival", "stage-22-empress-arrival");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-empress-arrival" }, "stage-22-empress-move", "stage-22-empress-move");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-empress-move" }, "stage-22-kins-arrival", "stage-22-kins-arrival");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-kins-arrival" }, "stage-22-kins-move", "stage-22-kins-move");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-kins-move" }, "stage-22-search-story", "none");
+    expectEvent({ type: "story-completed", storyId: "stage-22-search-story" }, "stage-22-focus-nia", "stage-22-focus-nia");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-focus-nia" }, "stage-22-reunion-story", "none");
+    expectEvent({ type: "story-completed", storyId: "stage-22-reunion-story" }, "stage-22-gadirath-arrival", "stage-22-gadirath-arrival");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-gadirath-arrival" }, "stage-22-betrayal-story", "none");
+    expectEvent({ type: "story-completed", storyId: "stage-22-betrayal-story" }, "stage-22-dragon-arrival", "stage-22-dragon-arrival");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-dragon-arrival" }, "stage-22-dragon-story", "none");
+    expectEvent({ type: "story-completed", storyId: "stage-22-dragon-story" }, "stage-22-story-departures", "stage-22-story-departures");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-story-departures" }, "stage-22-ambush-arrivals", "stage-22-ambush-arrivals");
+    expectEvent({ type: "effect-completed", effectId: "stage-22-ambush-arrivals" }, "stage-22-player-ready", "stage-22-player-ready");
+    expectEvent({ type: "objective-satisfied" }, "stage-22-objective-reached", "stage-22-set-victory-999");
+    expectEvent({ type: "victory-flow-completed" }, "stage-22-completed-route", "stage-22-route-to-stage-23");
   });
 });

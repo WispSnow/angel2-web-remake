@@ -26,6 +26,14 @@ export type StageSimulationEffectDefinition =
     type: "enter-deployment";
   }
   | {
+    type: "enter-player-phase";
+    statusText: string;
+  }
+  | {
+    type: "focus-actor";
+    actor: { side: Side; slot: number };
+  }
+  | {
     type: "victory-state";
     value: 999;
   }
@@ -63,6 +71,8 @@ export type StageSimulationEffectDefinition =
       id: string;
       source: { side: Side; slot: number };
       position: Position;
+      /** Native focus may intentionally differ from the cell subsequently written. */
+      focusPosition?: Position;
       name: string;
       portrait: PortraitRecord;
       forcedClassId?: UnitClassId;
@@ -71,7 +81,11 @@ export type StageSimulationEffectDefinition =
       forceSourceId?: string;
     }[];
     statusText: string;
-    revealTiming?: "native-before-write" | "after-write";
+    revealTiming?:
+      | "native-before-write"
+      | "native-before-write-deferred-refresh"
+      | "after-write"
+      | "deferred-refresh";
     /**
      * Native cell writes carry the `80h` action bit of the unit-slot map. Scenes
      * that hand the board back to a side phase leave it set (the default);
@@ -79,11 +93,13 @@ export type StageSimulationEffectDefinition =
      * actor with the 已行動 badge.
      */
     actionSpent?: boolean;
-    /**
-     * Native `focusPortraitResource`: the side panel this event settles on once
-     * every write is done. Defaults to the last actor written.
-     */
+    /** Native `focusPortraitResource`; defaults to the last actor written. */
     focusPortrait?: PortraitRecord;
+    /**
+     * Native stage 22 selects Nia before the first memory-only board write.
+     * Other reinforcement sequences keep the existing post-write default.
+     */
+    focusPortraitTiming?: "before-write" | "after-write";
   }
   | {
     type: "scripted-unit-arrival";

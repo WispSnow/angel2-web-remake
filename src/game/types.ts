@@ -29,7 +29,8 @@ export type StageId =
   | "stage-18"
   | "stage-19"
   | "stage-20"
-  | "stage-21";
+  | "stage-21"
+  | "stage-22";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -53,7 +54,8 @@ export type CampaignRouteId =
   | "stage-19"
   | "stage-20"
   | "stage-21"
-  | "stage-22";
+  | "stage-22"
+  | "stage-23";
 
 export interface Position {
   x: number;
@@ -209,8 +211,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 43;
-  contentVersion: "stage-21-scout-interlude-1";
+  version: 44;
+  contentVersion: "stage-22-village-ambush-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
