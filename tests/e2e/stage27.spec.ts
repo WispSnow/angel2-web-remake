@@ -144,6 +144,69 @@ test("S27-F/REMAKE-064: seven city defenders act as independent allied AI", asyn
   });
 });
 
+test("S27-K: engineers pave and barricade with the original stage 27 tiles", async ({ page }) => {
+  const failedAssets: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && message.text().includes("Failed to process file")) {
+      failedAssets.push(message.text());
+    }
+  });
+  await page.goto("/?debugScenario=stage-27-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toHaveAttribute("data-terrain-override-count", "0");
+
+  await clickCell(page, 35, 35);
+  await page.getByTestId("unit-command-technique").click();
+  await expect(page.getByTestId("technique-iron-plate")).toContainText("鐵板");
+  await expect(page.getByTestId("technique-obstacle")).toContainText("障礙");
+  await page.getByTestId("technique-obstacle").click();
+  await expect(page.getByTestId("status-strip")).toContainText("設置障礙");
+  await page.keyboard.press("Delete");
+  await page.getByTestId("technique-iron-plate").click();
+  await expect(page.getByTestId("status-strip")).toContainText("鋪設鐵板");
+
+  // (35,33) sits on logical slot 7, which only the engineer can enter, so its
+  // four neighbours become iron plate the rest of the army can cross.
+  await clickCell(page, 35, 33);
+  await expect(canvas).toHaveAttribute(
+    "data-terrain-overrides",
+    "35,32:iron-plate|34,33:iron-plate|36,33:iron-plate|35,34:iron-plate",
+  );
+  expect((await state(page)).units.find(({ id }) => id === "1:57"))
+    .toMatchObject({ x: 35, y: 33, acted: true });
+  await clickCell(page, 35, 32);
+  await expect(page.getByTestId("terrain-name")).toHaveText("鐵板");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage27-iron-plate-terrain.png`,
+  });
+  await page.getByTestId("close-terrain-detail").click();
+  await settleBattleCanvas(page);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage27-iron-plate.png`,
+  });
+
+  await clickCell(page, 38, 35);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-obstacle").click();
+  await clickCell(page, 38, 34);
+  await expect(canvas).toHaveAttribute(
+    "data-terrain-overrides",
+    "35,32:iron-plate|34,33:iron-plate|36,33:iron-plate|38,33:obstacle"
+    + "|35,34:iron-plate|37,34:obstacle|39,34:obstacle|38,35:obstacle",
+  );
+  await clickCell(page, 38, 33);
+  await expect(page.getByTestId("terrain-name")).toHaveText("障礙");
+  await page.getByTestId("close-terrain-detail").click();
+  await settleBattleCanvas(page);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage27-obstacle.png`,
+  });
+  // A missing tile resolves to the SPA HTML fallback instead of a 404, so the
+  // only signal is Phaser refusing to decode it.
+  expect(failedAssets).toEqual([]);
+});
+
 test("S27-G: one move into the exact city range starts SAY/0052 with all rebels alive", async ({ page }) => {
   await page.goto("/?debugScenario=stage-27-near-victory&difficulty=0&test=1");
   await waitForPhase(page, "player");

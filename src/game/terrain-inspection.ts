@@ -87,6 +87,20 @@ const STAGE_TERRAIN_DISPLAY_NAMES: Readonly<
     3: "森林",
     5: "山地",
   },
+  // Valkyrie's coastal city. Slots 9 and 21 exist on the base board only as the
+  // engineer's two construction source cells `(16,26)` and `(16,25)`, so their
+  // labels double as the names of whatever `2K` and `1K` build.
+  "stage-27": {
+    0: "地圖邊界",
+    1: "岸邊沙地",
+    2: "草地",
+    7: "淺水",
+    9: "障礙",
+    10: "石砌街道",
+    11: "城牆",
+    12: "深水",
+    21: "鐵板",
+  },
 };
 
 export function terrainDisplayNameForSlot(

@@ -1717,7 +1717,7 @@ export class GameController {
     this.statusMessage = definition.target === "empty-cell"
       ? actionId === HALF_DRAGON_TELEPORT_ACTION_ID
         ? "選擇半龍戰士要傳送到的空格。"
-        : "選擇工兵移動並鋪設鐵板的空格。"
+        : `選擇工兵移動並${actionId === "obstacle" ? "設置障礙" : "鋪設鐵板"}的空格。`
       : `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
   }

@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  STAGE27_IRON_PLATE_TERRAIN_SLOT,
+  STAGE27_OBSTACLE_TERRAIN_SLOT,
+  STAGE27_TERRAIN_TOKENS,
+  STAGE27_TOKEN_TO_TERRAIN_SLOT,
+} from "../../src/game/content/stage27";
+import {
   inspectTerrain,
   terrainDisplayNameForSlot,
 } from "../../src/game/terrain-inspection";
 import type { BattleUnit, UnitStats } from "../../src/game/types";
+
+const STAGE27_USED_TERRAIN_SLOTS = [...new Set(
+  [...STAGE27_TERRAIN_TOKENS].map((token) => STAGE27_TOKEN_TO_TERRAIN_SLOT[token]),
+)].sort((left, right) => left - right);
 
 const soldier: BattleUnit = {
   id: "1:0",
@@ -97,5 +107,17 @@ describe("terrain inspection", () => {
     expect(terrainDisplayNameForSlot(23)).toBe("未分類地形");
     expect(Array.from({ length: 23 }, (_, slot) => terrainDisplayNameForSlot(slot)))
       .not.toContainEqual(expect.stringMatching(/槽\s*\d+/));
+  });
+
+  it("names every logical slot stage 27 actually places on its board", () => {
+    // The generic table would call the paved 鐵板 slot 冰面 and the 障礙 slot
+    // 流沙與陷阱, which reads wrong the moment an engineer builds one.
+    expect(STAGE27_USED_TERRAIN_SLOTS.map((slot) => terrainDisplayNameForSlot(slot, "stage-27")))
+      .toEqual([
+        "地圖邊界", "岸邊沙地", "草地", "淺水", "障礙",
+        "石砌街道", "城牆", "深水", "鐵板",
+      ]);
+    expect(terrainDisplayNameForSlot(STAGE27_IRON_PLATE_TERRAIN_SLOT, "stage-27")).toBe("鐵板");
+    expect(terrainDisplayNameForSlot(STAGE27_OBSTACLE_TERRAIN_SLOT, "stage-27")).toBe("障礙");
   });
 });
