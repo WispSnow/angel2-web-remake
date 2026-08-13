@@ -176,13 +176,14 @@ export function classFallbackPortraitFor(
  * generic `name` from an earlier profession.
  */
 export function usesClassIdentity(
-  unit: Pick<BattleUnit, "classId" | "side" | "portrait">,
+  unit: Pick<BattleUnit, "classId" | "side" | "portrait" | "displayIdentity">,
 ): boolean {
+  if (unit.displayIdentity === "named-class-portrait") return false;
   return unit.portrait === classFallbackPortraitFor(unit.classId, unit.side);
 }
 
 export function unitDisplayName(
-  unit: Pick<BattleUnit, "classId" | "side" | "portrait" | "name">,
+  unit: Pick<BattleUnit, "classId" | "side" | "portrait" | "name" | "displayIdentity">,
 ): string {
   return usesClassIdentity(unit) ? className(unit.classId) : unit.name;
 }

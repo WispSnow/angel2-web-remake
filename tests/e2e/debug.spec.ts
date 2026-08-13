@@ -63,6 +63,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 25 關 · 遭遇碧娜維姬",
     "第 26 關 · 趕回瓦爾克麗城",
     "第 27 關 · 保衛瓦爾克麗城",
+    "第 28 關 · 騎士城堡前",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -207,11 +208,20 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-28-near-defeat",
     "stage-28-victory-ready",
     "stage-28-cleared",
+    "stage-29-prebattle",
+    "stage-29-deployment",
+    "stage-29-player",
+    "stage-29-near-victory",
+    "stage-29-near-defeat",
+    "stage-29-victory-ready",
+    "stage-29-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
   await expect(page.locator('[data-debug-stage-id="stage-28"] [data-debug-scenario-id]'))
     .toHaveCount(8);
+  await expect(page.locator('[data-debug-stage-id="stage-29"] [data-debug-scenario-id]'))
+    .toHaveCount(7);
   await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
   await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");
   await captureVisualAudit(page.locator('[data-debug-stage-id="stage-03"]'), {
@@ -450,6 +460,61 @@ test("stage-twenty-eight debug entry uses the configured campaign professions", 
   expect(classes.get("1:11")).toBe("water-warrior");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage28-representative-growth.png`,
+  });
+});
+
+test("stage-twenty-nine debug deployment preserves the inherited great-axe defender", async ({ page }) => {
+  await page.goto("/debug.html");
+  await page.getByTestId("debug-difficulty").selectOption("2");
+  const deploymentScenario = page.getByTestId("debug-scenario-stage-29-deployment");
+  await expect(deploymentScenario).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-29-deployment&difficulty=2&roster=representative-growth&growth=100",
+  );
+  await deploymentScenario.click();
+  await expect(page.getByTestId("deployment-screen")).toBeVisible();
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  await expect(page.getByTestId("debug-toolbar")).toContainText(
+    "每關成長：100 · 本關成長預算：2800",
+  );
+  await page.getByTestId("deployment-page-1").click();
+  await expect(page.getByTestId("deployment-roster-7")).toContainText("愛莉歐拉");
+  await expect(page.getByTestId("deployment-roster-7")).toContainText("巨斧戰士");
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
+    path: `${ARTIFACT_DIR}/debug-stage29-great-axe-roster.png`,
+  });
+
+  await page.goto(
+    "/?debugScenario=stage-29-player&difficulty=2&roster=representative-growth&growth=100",
+  );
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  const battle = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+    phase: string;
+    units: Array<{ id: string; side: number; classId: string; name: string }>;
+  });
+  expect(battle.phase).toBe("player");
+  expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(15);
+  expect(battle.units).toContainEqual(expect.objectContaining({
+    id: "1:22",
+    classId: "great-axe-warrior",
+    name: "愛莉歐拉",
+  }));
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+  // Slot 22 occupies the final configured deployment cell at (43,27). Focusing
+  // its rendered piece proves the canvas projection keeps the named actor while
+  // the profession and generic portrait continue to follow the current class.
+  await page.getByTestId("battle-canvas").click({ position: { x: 340, y: 221 } });
+  await expect(page.locator(".hud-identity-name")).toHaveText("巨斧戰士／愛莉歐拉");
+  await page.getByTestId("battle-canvas").click({
+    button: "right",
+    position: { x: 340, y: 221 },
+  });
+  await expect(page.getByTestId("action-menu")).toBeHidden();
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/debug-stage29-great-axe-battle.png`,
   });
 });
 

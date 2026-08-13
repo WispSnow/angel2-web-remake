@@ -1,15 +1,15 @@
 # 《天使帝国 II》Web 复刻版设计文档
 
-版本：Draft 0.10
+版本：Draft 0.11
 
 日期：2026-08-13
 
-阶段：第 0–24 关及内部第 26/27 关已接受；第 27 个可玩关卡（内部第 28 关）“保衛瓦爾克麗城”已通过自动／视觉门禁并等待用户试玩；stage 29 及后续内容冻结
+阶段：第 0–24 关及内部第 26–28 关已接受；第 28 个可玩关卡（内部第 29 关）“騎士城堡前”已按试玩反馈修复愛莉歐拉姓名并等待复验；stage 30 及后续内容冻结
 
 开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关与内部第 11 关已获用户
 接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–24、26、
-27 关已获用户接受；M52/M53 已按 `REMAKE-068` 完成内部第 28 关有界实现与验证；内部
-stage 29 及后续运行时仍冻结
+27/28 关已获用户接受；M54 已按 `REMAKE-069/070` 闭合内部第 29 关纸面合同，M55 实现、
+试玩姓名修复、定向自动与代表性视觉门禁已验证，等待用户复验；内部 stage 30 及后续运行时仍冻结
 
 ## 文档目的
 
@@ -72,7 +72,8 @@ stage 29 及后续运行时仍冻结
 | [`vertical-slices/stage-24.md`](vertical-slices/stage-24.md) | 1–15 人部署、SAY 47/48、二十二敌、妮雅城堡到达区、无增援与直接 stage 26 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-26.md`](vertical-slices/stage-26.md) | 4–22 人部署、SAY 49/50、碧娜維姬与七祭司、敌方阶段尾双次纵列下推及 stage 27 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-27.md`](vertical-slices/stage-27.md) | 11–31 人部署、七名独立城防友军、五名叛军、四段妮雅到达区及 stage 28 路由 | Draft 0.2 / 已接受 |
-| [`vertical-slices/stage-28.md`](vertical-slices/stage-28.md) | SAY 53/54/55、1–29 人部署、十七敌全灭、无增援与 stage 29 冻结路由 | Draft 0.1 / 已验证，待用户试玩 |
+| [`vertical-slices/stage-28.md`](vertical-slices/stage-28.md) | SAY 53/54/55、1–29 人部署、十七敌全灭、无增援与 stage 29 路由 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-29.md`](vertical-slices/stage-29.md) | SAY 56、1–15 人部署、艾西柯羅与十四敌全灭、无战场剧情／增援及 stage 30 冻结路由 | Draft 0.1 / 姓名修复已验证，等待用户复验 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |
@@ -152,3 +153,8 @@ stage 29 及后续运行时仍冻结
   M25/M26 随后闭合 B/0029、SAY `33/97/132/133`、`REMAKE-047`、v36 与 stage 15 路由；
   用户已接受。M27/M28 随后闭合 B/0031、SAY `34/98/133/134`、`REMAKE-048`、v37 与
   stage 16 冻结边界。
+
+  后续逐关有界例外已推进至内部 stage 29。用户于 2026-08-13 接受 M53 的内部 stage 28；
+  M54/M55 随后按 B/0059、SAY `56/96/146/147`、`REMAKE-069/070` 与 v57/v56/v55 闭合并实现内部
+  stage 29“騎士城堡前”。七类调试场景、镜头钳制 `(36,23)`、槽 22 姓名反馈修复与自动／视觉
+  门禁均已验证，等待用户普通入口复验。该例外只覆盖本关合同；stage 30 及后续运行时继续冻结。

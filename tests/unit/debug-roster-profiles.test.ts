@@ -313,7 +313,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-23", "stage-24", "stage-26", "stage-27", "stage-28"] as const) {
+    for (const stageId of ["stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(roster[7], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
@@ -331,6 +331,29 @@ describe("debug roster profiles", () => {
     const source = ALLY_MAP_UNIT_ASSETS["half-dragon-warrior"];
     expect(source).toBe("/assets/original/technique-lab/units/ally-half-dragon-warrior.png");
     expect((await readFile(path.join(workspace, "public", source))).length).toBeGreaterThan(0);
+  });
+
+  it("carries stage 27's mandatory great-axe defender into stage 28 and 29 profiles", () => {
+    const profiles = [
+      ["template-baseline", undefined],
+      ["representative-growth", undefined],
+      ["representative-growth", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+      ["promotion-coverage", undefined],
+      ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+    ] as const;
+
+    for (const stageId of ["stage-28", "stage-29"] as const) {
+      for (const [profileId, perStageGrowth] of profiles) {
+        const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
+        expect(roster[22], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`)
+          .toEqual({
+            slot: 22,
+            classId: "great-axe-warrior",
+            experience: 0,
+            life: classStatsFor({ classId: "great-axe-warrior", experience: 0 }).maxLife,
+          });
+      }
+    }
   });
 
   it("keeps battle-entry and current save rosters separate while overriding only difficulty and stage", () => {

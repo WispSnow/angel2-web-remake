@@ -1,4 +1,4 @@
-import { className, isClassId } from "../content/classes";
+import { classFallbackPortraitFor, className, isClassId } from "../content/classes";
 import {
   STAGE0_ALLY_INITIAL_EXPERIENCE,
   initialEnemyExperience,
@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 55 as const;
-export const SAVE_CONTENT_VERSION = "stage-28-valkyrie-defense-1" as const;
+export const SAVE_VERSION = 57 as const;
+export const SAVE_CONTENT_VERSION = "stage-29-eliola-display-name-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -142,6 +142,8 @@ function isBattleUnit(
     || typeof value.name !== "string"
     || value.name.length === 0
     || !isPortrait(value.portrait)
+    || (value.displayIdentity !== undefined
+      && value.displayIdentity !== "named-class-portrait")
     || !isIntegerBetween(value.life, 0, MAX_LIFE)
     || !isIntegerBetween(value.experience, 0, MAX_EXPERIENCE)
     || typeof value.acted !== "boolean"
@@ -191,12 +193,29 @@ function hasValidWaterWarriorGroups(units: readonly BattleUnit[]): boolean {
       || unit.className !== root.className
       || unit.name !== root.name
       || unit.portrait !== root.portrait
+      || unit.displayIdentity !== root.displayIdentity
       || unit.life !== root.life
       || unit.experience !== root.experience
       || unit.actionDisabled !== root.actionDisabled
       || UNIT_STATUS_KEYS.some((key) => unit.statuses[key] !== root.statuses[key]))) return false;
   }
   return true;
+}
+
+function hasValidNamedClassPortraits(
+  units: readonly BattleUnit[],
+  stageId: StageId,
+): boolean {
+  return units.every((unit) => {
+    const isStage29Eliola = stageId === "stage-29"
+      && unit.id === "1:22"
+      && unit.side === 1
+      && unit.slot === 22;
+    if (!isStage29Eliola) return unit.displayIdentity === undefined;
+    return unit.displayIdentity === "named-class-portrait"
+      && unit.name === "愛莉歐拉"
+      && unit.portrait === classFallbackPortraitFor(unit.classId, 1);
+  });
 }
 
 export function hasUniqueValues<T>(values: readonly T[]): boolean {
@@ -266,6 +285,7 @@ export function isSavedBattleState(
     !hasUniqueValues(units.map((unit) => unit.id))
     || !hasUniqueValues(units.map((unit) => `${unit.x},${unit.y}`))
     || !hasValidWaterWarriorGroups(units)
+    || !hasValidNamedClassPortraits(units, stageId)
     || !hasUniqueValues(terrainOverrides.map(({ x, y }) => `${x},${y}`))
     || terrainOverrides.some((override, index) => index > 0
       && terrainOverrides[index - 1].y * STAGE_WIDTH + terrainOverrides[index - 1].x

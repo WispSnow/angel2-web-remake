@@ -29,6 +29,8 @@ export interface FixedStageAlliedUnitDefinition {
   name: string;
   /** Omit for a generic class identity; named actors must provide their record. */
   portrait?: PortraitRecord;
+  /** Preserve the actor name while resolving the portrait from the current class. */
+  displayIdentity?: "named-class-portrait";
   aiBehavior: number;
   untouchedExperience?: number;
 }
@@ -72,10 +74,12 @@ function createInheritedAlly(
   const classId = definition.forcedClassId ?? (untouchedCampaignSlot
     ? definition.initialClassId ?? inherited?.classId ?? inheritance.defaultClassId
     : inherited.classId);
-  const genericIdentity = definition.portrait === undefined
+  const usesClassPortrait = definition.portrait === undefined
     || definition.portrait === inheritance.genericPortrait;
+  const genericIdentity = usesClassPortrait
+    && definition.displayIdentity !== "named-class-portrait";
   const namedBaseline = !genericIdentity && untouchedCampaignSlot;
-  const portrait = genericIdentity
+  const portrait = usesClassPortrait
     ? classFallbackPortraitFor(classId, 1) ?? inheritance.genericPortrait
     : definition.portrait ?? inheritance.genericPortrait;
   const experience = namedBaseline
@@ -92,6 +96,7 @@ function createInheritedAlly(
     className: className(classId),
     name: genericIdentity ? className(classId) : definition.name,
     portrait,
+    ...(definition.displayIdentity ? { displayIdentity: definition.displayIdentity } : {}),
     x: definition.position.x,
     y: definition.position.y,
     life: namedBaseline || templateLifeBaseline

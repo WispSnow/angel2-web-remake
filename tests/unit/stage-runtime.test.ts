@@ -49,9 +49,10 @@ describe("stage runtime manifest", () => {
       "stage-26",
       "stage-27",
       "stage-28",
+      "stage-29",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ ordinal }) => ordinal))
-      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ nextStageId }) => nextStageId)).toEqual([
       "stage-01",
       "stage-02",
@@ -82,6 +83,7 @@ describe("stage runtime manifest", () => {
       "stage-27",
       "stage-28",
       "stage-29",
+      "stage-30",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ label }) => label)).toEqual([
       "瓦爾克麗宮",
@@ -113,6 +115,7 @@ describe("stage runtime manifest", () => {
       "遭遇碧娜維姬",
       "趕回瓦爾克麗城",
       "保衛瓦爾克麗城",
+      "騎士城堡前",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ completion }) => completion.destinationLabel))
       .toEqual([
@@ -139,6 +142,7 @@ describe("stage runtime manifest", () => {
         "趕回瓦爾克麗城",
         "保衛瓦爾克麗城",
         "騎士城堡前",
+        "治癒維斯塔女帝",
       ]);
     expect(isPlayableStageId("stage-03")).toBe(true);
     expect(isPlayableStageId("stage-04")).toBe(true);
@@ -166,6 +170,7 @@ describe("stage runtime manifest", () => {
     expect(isPlayableStageId("stage-26")).toBe(true);
     expect(isPlayableStageId("stage-27")).toBe(true);
     expect(isPlayableStageId("stage-28")).toBe(true);
+    expect(isPlayableStageId("stage-29")).toBe(true);
     expect(stageRuntimeSourceForDestination("stage-04")?.id).toBe("stage-03");
     expect(stageRuntimeSourceForDestination("stage-05")?.id).toBe("stage-04");
     expect(stageRuntimeSourceForDestination("stage-42-portal")?.id).toBe("stage-05");
@@ -191,6 +196,7 @@ describe("stage runtime manifest", () => {
     expect(stageRuntimeSourceForDestination("stage-27")?.id).toBe("stage-26");
     expect(stageRuntimeSourceForDestination("stage-28")?.id).toBe("stage-27");
     expect(stageRuntimeSourceForDestination("stage-29")?.id).toBe("stage-28");
+    expect(stageRuntimeSourceForDestination("stage-30")?.id).toBe("stage-29");
     expect(stageRuntimeSourceForDestination("stage-11")?.id).toBe("stage-09");
     expect(stageRuntimeSourceForDestination("stage-10")?.id).toBe("stage-11");
     expect(STAGE_RUNTIME_MANIFEST["stage-03"].mapPresentationActionIds).toContain("recovery-1");
@@ -223,6 +229,7 @@ describe("stage runtime manifest", () => {
     const stage26 = await loadStageRuntime("stage-26");
     const stage27 = await loadStageRuntime("stage-27");
     const stage28 = await loadStageRuntime("stage-28");
+    const stage29 = await loadStageRuntime("stage-29");
     expect(stage2.createBattle(campaign).stage.id).toBe("stage-02");
     expect(stage3.createBattle({ ...campaign, stageId: "stage-03" }).stage.id).toBe("stage-03");
     expect(stage3.assets?.unitSprites["enemy-monk"]).toContain("unit-enemy-monk.png");
@@ -459,6 +466,38 @@ describe("stage runtime manifest", () => {
       .toBe("/assets/original/story-stage28-background-22.png");
     expect(stage28.retry.mode).toBe("entry");
     expect(stage28.nextStageId).toBe("stage-29");
+    expect(stage29.preparation?.definition).toMatchObject({
+      fixedPlacements: [{ slot: 0, position: { x: 41, y: 26 } }],
+      maximumUnits: 15,
+    });
+    expect(stage29.preparation?.definition.openCells).toHaveLength(14);
+    expect(stage29.preparation?.definition.optionalSlots).toHaveLength(29);
+    expect(stage29.preparation?.definition.optionalSlots).toContain(22);
+    expect(stage29.preparation?.presentation.enemies).toHaveLength(15);
+    expect(stage29.entry).toMatchObject({
+      phase: "prebattleStory",
+      trigger: "campaign-entered",
+    });
+    expect(stage29.save.validEventIds).toEqual([
+      "stage-29-prebattle-story",
+      "stage-29-enter-deployment",
+      "stage-29-objective-reached",
+      "stage-29-completed-route",
+    ]);
+    expect(stage29.save.requiredResumeEventIds).toEqual([
+      "stage-29-prebattle-story",
+      "stage-29-enter-deployment",
+    ]);
+    expect(stage29.save.enemyClassById).toHaveLength(15);
+    expect(stage29.save.enemyClassById).toContainEqual(["2:4", "demon-dragon-knight"]);
+    expect(stage29.save.enemyClassById.filter(([, classId]) => classId === "magic-archer"))
+      .toHaveLength(5);
+    expect(stage29.assets?.storyBackground)
+      .toBe("/assets/original/story-stage29-background-23.png");
+    expect(stage29.assets?.map).toBe("/assets/original/stage29-map.png");
+    expect(stage29.assets?.minimap).toBe("/assets/original/stage29-minimap.png");
+    expect(stage29.retry.mode).toBe("entry");
+    expect(stage29.nextStageId).toBe("stage-30");
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
   });

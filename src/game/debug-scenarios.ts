@@ -383,6 +383,17 @@ const STAGE28_COMPLETED_EVENT_IDS = [
   "stage-28-completed-route",
 ] as const;
 
+const STAGE29_BATTLE_EVENT_IDS = [
+  "stage-29-prebattle-story",
+  "stage-29-enter-deployment",
+] as const;
+
+const STAGE29_COMPLETED_EVENT_IDS = [
+  ...STAGE29_BATTLE_EVENT_IDS,
+  "stage-29-objective-reached",
+  "stage-29-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -2460,7 +2471,9 @@ async function createStage27Player(context: DebugScenarioContext): Promise<GameC
 
 async function createStage27Completed(context: DebugScenarioContext): Promise<GameController> {
   const campaign = debugCampaign(context, "stage-27");
-  const { createStage27DeploymentRoster } = await import("./simulation/stage27-battle");
+  const { Stage27Battle } = await import("./simulation/stage27-battle");
+  const completedCampaign = new Stage27Battle(campaign, await stage27FullDeployment())
+    .campaignSnapshot();
   const save: CompletedSaveData = {
     format: "ANGEL2-web-save",
     version: SAVE_VERSION,
@@ -2472,14 +2485,9 @@ async function createStage27Completed(context: DebugScenarioContext): Promise<Ga
     stageLabel: "保衛瓦爾克麗城",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
-    rngState: campaign.rngState,
-    rngCalls: campaign.rngCalls,
-    roster: completeCampaignRoster(createStage27DeploymentRoster(campaign).map((unit) => ({
-      slot: unit.slot,
-      classId: unit.classId,
-      experience: unit.experience,
-      life: unit.life,
-    }))),
+    rngState: completedCampaign.rngState,
+    rngCalls: completedCampaign.rngCalls,
+    roster: completedCampaign.roster,
     stageProgress: 1000,
     consumedEventIds: [...STAGE27_COMPLETED_EVENT_IDS],
   };
@@ -2549,7 +2557,9 @@ async function createStage28Player(context: DebugScenarioContext): Promise<GameC
 
 async function createStage28Completed(context: DebugScenarioContext): Promise<GameController> {
   const campaign = debugCampaign(context, "stage-28");
-  const { createStage28DeploymentRoster } = await import("./simulation/stage28-battle");
+  const { Stage28Battle } = await import("./simulation/stage28-battle");
+  const completedCampaign = new Stage28Battle(campaign, await stage28FullDeployment())
+    .campaignSnapshot();
   const save: CompletedSaveData = {
     format: "ANGEL2-web-save",
     version: SAVE_VERSION,
@@ -2561,16 +2571,95 @@ async function createStage28Completed(context: DebugScenarioContext): Promise<Ga
     stageLabel: "騎士城堡前",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
-    rngState: campaign.rngState,
-    rngCalls: campaign.rngCalls,
-    roster: completeCampaignRoster(createStage28DeploymentRoster(campaign).map((unit) => ({
-      slot: unit.slot,
-      classId: unit.classId,
-      experience: unit.experience,
-      life: unit.life,
-    }))),
+    rngState: completedCampaign.rngState,
+    rngCalls: completedCampaign.rngCalls,
+    roster: completedCampaign.roster,
     stageProgress: 1000,
     consumedEventIds: [...STAGE28_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
+async function createStage29Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-29", debugCampaign(context, "stage-29"));
+  return controller;
+}
+
+async function createStage29Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-29",
+    debugCampaign(context, "stage-29"),
+    { preparation: true, statusMessage: "調試場景：騎士城堡前部署。" },
+  );
+  return controller;
+}
+
+async function stage29FullDeployment() {
+  const { STAGE29_DEFINITION } = await import("./content/stage29");
+  const optionalSlots = [
+    ...STAGE29_DEFINITION.deployment.optionalSlots.slice(0, 13),
+    22,
+  ];
+  return {
+    placements: [
+      ...STAGE29_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...optionalSlots.map((slot, index) => ({
+        slot, position: { ...STAGE29_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage29Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-29");
+  const { Stage29Battle } = await import("./simulation/stage29-battle");
+  const battle = new Stage29Battle(campaign, await stage29FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 29 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-29"),
+    stageLabel: "騎士城堡前",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE29_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：十五人進攻隊迎戰騎士城堡十五名守軍。";
+  return controller;
+}
+
+async function createStage29Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-29");
+  const { Stage29Battle } = await import("./simulation/stage29-battle");
+  const completedCampaign = new Stage29Battle(campaign, await stage29FullDeployment())
+    .campaignSnapshot();
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-30",
+    stageLabel: "治癒維斯塔女帝",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: completedCampaign.rngState,
+    rngCalls: completedCampaign.rngCalls,
+    roster: completedCampaign.roster,
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE29_COMPLETED_EVENT_IDS],
   };
   return GameController.fromSave(save, 1);
 }
@@ -3373,6 +3462,50 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-28-cleared": createStage28Completed,
+  "stage-29-prebattle": createStage29Prebattle,
+  "stage-29-deployment": createStage29Deployment,
+  "stage-29-player": createStage29Player,
+  "stage-29-near-victory": withSetup(createStage29Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const finalEnemy = controller.battle.unit("2:47");
+    if (!nia || !finalEnemy) return;
+    nia.x = 44;
+    nia.y = 26;
+    nia.experience = 0;
+    nia.life = controller.battle.statsFor(nia).maxLife;
+    nia.acted = false;
+    finalEnemy.x = 45;
+    finalEnemy.y = 26;
+    finalEnemy.life = 1;
+    controller.battle.units = controller.battle.units.filter(
+      ({ side, id }) => side === 1 || id === finalEnemy.id,
+    );
+    for (const ally of controller.battle.units.filter(({ side, id }) => side === 1 && id !== nia.id)) {
+      ally.acted = true;
+    }
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 36, y: 23 };
+    controller.statusMessage = "調試場景：最後一名魔弓兵只剩 1 點生命。";
+  }),
+  "stage-29-near-defeat": withSetup(createStage29Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const enemy = controller.battle.unit("2:4");
+    if (!nia || !enemy) return;
+    nia.x = 44;
+    nia.y = 26;
+    nia.life = 1;
+    enemy.x = 45;
+    enemy.y = 26;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 36, y: 23 };
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，艾西柯羅位於相鄰格。";
+  }),
+  "stage-29-victory-ready": withSetup(createStage29Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-29-cleared": createStage29Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

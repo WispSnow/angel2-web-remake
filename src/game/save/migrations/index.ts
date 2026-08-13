@@ -193,12 +193,130 @@ function restoreKinsCampaignClass(save: SaveData): SaveData {
   };
 }
 
+const STAGE27_DEFENDER_SLOT = 22;
+const STAGE27_DEFENDER_CLASS = "great-axe-warrior" as const;
+const POST_STAGE27_CAMPAIGN_STAGES = new Set(["stage-28", "stage-29", "stage-30"]);
+
+/** Stage 27 necessarily commits its fixed slot-22 class before any later-stage entry. */
+function restoreStage27DefenderClass(save: SaveData): SaveData {
+  if (!POST_STAGE27_CAMPAIGN_STAGES.has(save.stageId)) return save;
+
+  const restoreEntry = (entry: SaveRosterEntry): SaveRosterEntry => {
+    if (entry.slot !== STAGE27_DEFENDER_SLOT || entry.classId !== "soldier") return entry;
+    const previousMaximum = classStatsFor(entry).maxLife;
+    const maximumLife = classStatsFor({
+      classId: STAGE27_DEFENDER_CLASS,
+      experience: entry.experience,
+    }).maxLife;
+    const damage = Math.max(0, previousMaximum - Math.min(entry.life, previousMaximum));
+    return {
+      ...entry,
+      classId: STAGE27_DEFENDER_CLASS,
+      life: Math.max(0, maximumLife - damage),
+    };
+  };
+
+  const roster = save.roster.map(restoreEntry);
+  if (save.kind !== "battle") return { ...save, roster };
+  return {
+    ...save,
+    roster,
+    stageEntrySnapshot: {
+      ...save.stageEntrySnapshot,
+      roster: save.stageEntrySnapshot.roster.map(restoreEntry),
+    },
+    battle: {
+      ...save.battle,
+      units: save.battle.units.map((unit) => {
+        if (unit.side !== 1
+          || unit.slot !== STAGE27_DEFENDER_SLOT
+          || unit.classId !== "soldier") return unit;
+        const restored = restoreEntry(unit);
+        return {
+          ...unit,
+          classId: restored.classId,
+          className: className(restored.classId),
+          name: className(restored.classId),
+          life: restored.life,
+        };
+      }),
+    },
+  };
+}
+
+/** REMAKE-070 preserves Eliola's actor name while retaining her class portrait. */
+function restoreStage29EliolaDisplayIdentity(save: SaveData): SaveData {
+  if (save.kind !== "battle" || save.stageId !== "stage-29") return save;
+  return {
+    ...save,
+    battle: {
+      ...save.battle,
+      units: save.battle.units.map((unit) => unit.side === 1 && unit.slot === 22
+        ? {
+            ...unit,
+            name: "愛莉歐拉",
+            displayIdentity: "named-class-portrait" as const,
+          }
+        : unit),
+    },
+  };
+}
+
+function addStage29EliolaDisplayIdentity(value: unknown): unknown {
+  if (!isRecord(value)
+    || value.kind !== "battle"
+    || value.stageId !== "stage-29"
+    || !isRecord(value.battle)
+    || !Array.isArray(value.battle.units)) return value;
+  return {
+    ...value,
+    battle: {
+      ...value.battle,
+      units: value.battle.units.map((unit) => isRecord(unit)
+        && unit.side === 1
+        && unit.slot === 22
+        ? {
+            ...unit,
+            name: "愛莉歐拉",
+            displayIdentity: "named-class-portrait",
+          }
+        : unit),
+    },
+  };
+}
+
 function finalizeDirectMigration(value: unknown): SaveData | undefined {
   const normalized = normalizeStage22PostbattleTransition(addEmptyTerrainOverrides(value));
   if (!isSaveData(normalized)) return undefined;
   const restored = restoreGadirathClassFromEntrySnapshot(normalized);
   const restoredKins = restoreKinsCampaignClass(restored);
-  return isSaveData(restoredKins) ? restoredKins : undefined;
+  const restoredStage27Defender = restoreStage27DefenderClass(restoredKins);
+  const restoredEliola = restoreStage29EliolaDisplayIdentity(restoredStage27Defender);
+  return isSaveData(restoredEliola) ? restoredEliola : undefined;
+}
+
+function migrateVersion56Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 56
+    || value.contentVersion !== "stage-29-knight-castle-front-1") return undefined;
+  return finalizeDirectMigration(addStage29EliolaDisplayIdentity({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  }));
+}
+
+function migrateVersion55Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 55
+    || value.contentVersion !== "stage-28-valkyrie-defense-1"
+    // v55 could route a completed stage-28 save to this id, but never shipped a stage-29 battle.
+    || (value.kind === "battle" && value.stageId === "stage-29")) return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
 }
 
 function migrateVersion54Save(value: unknown): SaveData | undefined {
@@ -1772,6 +1890,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion56 = migrateVersion56Save(value);
+    if (migratedVersion56) return migratedVersion56;
+    const migratedVersion55 = migrateVersion55Save(value);
+    if (migratedVersion55) return migratedVersion55;
     const migratedVersion54 = migrateVersion54Save(value);
     if (migratedVersion54) return migratedVersion54;
     const migratedVersion53 = migrateVersion53Save(value);

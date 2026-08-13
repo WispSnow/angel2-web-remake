@@ -1422,6 +1422,55 @@ async function loadStage28Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage29Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage29"),
+    import("./simulation/stage29-battle"),
+  ]);
+  content.activateStage29Content();
+  const definition = content.STAGE29_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 28",
+      title: content.STAGE29.name,
+      objective: content.STAGE29_DEFINITION.objective.victoryText,
+      minimap: content.STAGE29_ASSETS.minimap,
+      terrain: content.STAGE29_TERRAIN_TOKENS,
+      gridWidth: content.STAGE29.width,
+      gridHeight: content.STAGE29.height,
+      enemies: content.STAGE29_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十九名候選最多再選十四人。擊敗全部騎士城堡守軍並保護妮雅。",
+    },
+    ["stage-29-prebattle-story", "stage-29-enter-deployment"],
+    (campaign) => battleModule.createStage29DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 29 requires a deployment result");
+    return new battleModule.Stage29Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE29_DEFINITION,
+    assets: {
+      map: content.STAGE29_ASSETS.map,
+      minimap: content.STAGE29_ASSETS.minimap,
+      storyBackground: content.STAGE29_ASSETS.storyBackground,
+      unitSprites: content.STAGE29_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -3267,6 +3316,70 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage28Module,
+  },
+  "stage-29": {
+    id: "stage-29",
+    ordinal: 28,
+    label: "騎士城堡前",
+    nextStageId: "stage-30",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "瓦爾克麗城包圍已破；妮雅率軍進攻騎士城堡。",
+      campaignRoute: "stage-29",
+    },
+    enemyPhaseStatusText: "敵方階段：騎士城堡守軍開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始騎士城堡關前流程。",
+      retreatStatusText: "全面撤退：返回騎士城堡關前流程並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "治癒維斯塔女帝",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-29-prebattle-story",
+        "stage-29-enter-deployment",
+        "stage-29-objective-reached",
+        "stage-29-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-29-prebattle-story",
+        "stage-29-enter-deployment",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 15,
+        openCellCount: 14,
+      },
+      enemyClassById: [
+        ["2:47", "magic-archer"],
+        ["2:52", "evil-mage"],
+        ["2:4", "demon-dragon-knight"],
+        ["2:51", "evil-mage"],
+        ["2:53", "evil-mage"],
+        ["2:50", "evil-mage"],
+        ["2:56", "swift-dragon-knight"],
+        ["2:42", "swift-dragon-knight"],
+        ["2:55", "swift-dragon-knight"],
+        ["2:54", "evil-mage"],
+        ["2:43", "swift-dragon-knight"],
+        ["2:48", "magic-archer"],
+        ["2:46", "magic-archer"],
+        ["2:45", "magic-archer"],
+        ["2:49", "magic-archer"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage29Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

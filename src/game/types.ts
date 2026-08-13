@@ -35,7 +35,8 @@ export type StageId =
   | "stage-24"
   | "stage-26"
   | "stage-27"
-  | "stage-28";
+  | "stage-28"
+  | "stage-29";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -65,7 +66,8 @@ export type CampaignRouteId =
   | "stage-26"
   | "stage-27"
   | "stage-28"
-  | "stage-29";
+  | "stage-29"
+  | "stage-30";
 
 export interface Position {
   x: number;
@@ -100,6 +102,8 @@ export interface BattleUnit extends Position {
   className: string;
   name: string;
   portrait: PortraitRecord;
+  /** Named actor whose portrait still follows the current profession's generic record. */
+  displayIdentity?: "named-class-portrait";
   life: number;
   experience: number;
   acted: boolean;
@@ -221,8 +225,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 55;
-  contentVersion: "stage-28-valkyrie-defense-1";
+  version: 57;
+  contentVersion: "stage-29-eliola-display-name-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

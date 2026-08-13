@@ -48,6 +48,7 @@ import { STAGE24_DEFINITION } from "../../src/game/content/stage24";
 import { STAGE26_DEFINITION } from "../../src/game/content/stage26";
 import { STAGE27_DEFINITION } from "../../src/game/content/stage27";
 import { STAGE28_DEFINITION } from "../../src/game/content/stage28";
+import { STAGE29_DEFINITION } from "../../src/game/content/stage29";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
@@ -59,6 +60,7 @@ import { Stage24Battle } from "../../src/game/simulation/stage24-battle";
 import { Stage26Battle } from "../../src/game/simulation/stage26-battle";
 import { Stage27Battle } from "../../src/game/simulation/stage27-battle";
 import { Stage28Battle } from "../../src/game/simulation/stage28-battle";
+import { Stage29Battle } from "../../src/game/simulation/stage29-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
@@ -1369,6 +1371,12 @@ const stage28BattleSave = (): BattleSaveData => {
     roster: completeCampaignRoster([
       { slot: 0, classId: "land-knight", experience: 840, life: 250 },
       { slot: 7, classId: "magic-priest", experience: 0, life: 140 },
+      {
+        slot: 22,
+        classId: "great-axe-warrior",
+        experience: 0,
+        life: classStatsFor({ classId: "great-axe-warrior", experience: 0 }).maxLife,
+      },
       { slot: 25, classId: "half-dragon-warrior", experience: 319, life: 260 },
     ]),
   };
@@ -1400,6 +1408,62 @@ const stage28BattleSave = (): BattleSaveData => {
       "stage-28-prebattle-story",
       "stage-28-enter-deployment",
       "stage-28-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
+const stage29BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-29" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x29a0_b0c0,
+    rngCalls: 104,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 880, life: 260 },
+      { slot: 7, classId: "magic-priest", experience: 0, life: 140 },
+      {
+        slot: 22,
+        classId: "great-axe-warrior",
+        experience: 0,
+        life: classStatsFor({ classId: "great-axe-warrior", experience: 0 }).maxLife,
+      },
+      { slot: 25, classId: "half-dragon-warrior", experience: 319, life: 260 },
+    ]),
+  };
+  const deployment = {
+    placements: STAGE29_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+      slot, position: { ...position }, fixed: true,
+    })),
+  };
+  const battle = new Stage29Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-13T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-29",
+    stageLabel: "騎士城堡前",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-29-prebattle-story",
+      "stage-29-enter-deployment",
     ],
     battle: {
       phase: "player",
@@ -2483,6 +2547,165 @@ describe("Web save validation", () => {
       ...completed,
       consumedEventIds: completed.consumedEventIds.slice(0, -1),
     })).toBe(false);
+  });
+
+  it("validates stage 29 with only its prebattle/deployment identity and exact static defenders", () => {
+    const save = stage29BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual(["1:0"]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(15);
+    expect(save.battle.units.find(({ id }) => id === "1:22")).toBeUndefined();
+    expect(save.consumedEventIds).toEqual([
+      "stage-29-prebattle-story",
+      "stage-29-enter-deployment",
+    ]);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: [...save.consumedEventIds, "stage-29-opening-story"],
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:4"
+          ? { ...unit, classId: "swift-dragon-knight" as const, className: "迅龍騎士" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("migrates v56 stage-29 battle identity to Eliola's named class portrait", () => {
+    const current = stage29BattleSave();
+    const slot22 = {
+      slot: 22,
+      position: STAGE29_DEFINITION.deployment.openCells[0]!,
+      fixed: false,
+    };
+    const source = {
+      stageId: "stage-29" as const,
+      ruleset: "stableRemake" as const,
+      difficulty: current.difficulty,
+      rngState: current.rngState,
+      rngCalls: current.rngCalls,
+      roster: current.roster,
+    };
+    const battle = new Stage29Battle(source, {
+      placements: [
+        ...STAGE29_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+          slot, position: { ...position }, fixed: true,
+        })),
+        slot22,
+      ],
+    });
+    const legacyUnits = battle.serializableSnapshot().units.map((unit) => {
+      if (unit.id !== "1:22") return unit;
+      const { displayIdentity: _displayIdentity, ...legacy } = unit;
+      return { ...legacy, name: "巨斧戰士" };
+    });
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 56,
+      contentVersion: "stage-29-knight-castle-front-1",
+      battle: { ...current.battle, units: legacyUnits },
+    }));
+
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-29",
+    });
+    if (migrated?.kind !== "battle") throw new Error("expected migrated stage 29 battle");
+    expect(migrated.battle.units.find(({ id }) => id === "1:22")).toMatchObject({
+      name: "愛莉歐拉",
+      portrait: 57,
+      displayIdentity: "named-class-portrait",
+    });
+
+    const currentWithoutIdentity = {
+      ...migrated,
+      battle: {
+        ...migrated.battle,
+        units: migrated.battle.units.map((unit) => unit.id === "1:22"
+          ? { ...unit, displayIdentity: undefined }
+          : unit),
+      },
+    };
+    expect(isSaveData(currentWithoutIdentity)).toBe(false);
+    expect(parseSaveData(JSON.stringify(currentWithoutIdentity))).toBeUndefined();
+  });
+
+  it("accepts the stage-30 boundary only with stage 29's story-free completion identity", () => {
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-30",
+      stageLabel: "治癒維斯塔女帝",
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage29BattleSave().consumedEventIds,
+        "stage-29-objective-reached",
+        "stage-29-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: [
+        ...completed.consumedEventIds.slice(0, -1),
+        "stage-29-victory-story",
+        "stage-29-completed-route",
+      ],
+    })).toBe(false);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+  });
+
+  it("migrates v55 stage-28 saves and repairs the mandatory post-stage-27 defender class", () => {
+    const current = stage28BattleSave();
+    const soldierMaximumLife = classStatsFor({ classId: "soldier", experience: 0 }).maxLife;
+    const legacyRoster = current.roster.map((entry) => entry.slot === 22
+      ? { ...entry, classId: "soldier" as const, life: soldierMaximumLife - 17 }
+      : entry);
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 55,
+      contentVersion: "stage-28-valkyrie-defense-1",
+      roster: legacyRoster,
+      stageEntrySnapshot: {
+        ...current.stageEntrySnapshot,
+        roster: current.stageEntrySnapshot.roster.map((entry) => entry.slot === 22
+          ? { ...entry, classId: "soldier", life: soldierMaximumLife }
+          : entry),
+      },
+    }));
+
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-28",
+    });
+    if (migrated?.kind !== "battle") throw new Error("expected migrated stage 28 battle");
+    expect(migrated.roster[22]).toMatchObject({
+      classId: "great-axe-warrior",
+      life: classStatsFor({ classId: "great-axe-warrior", experience: 0 }).maxLife - 17,
+    });
+    expect(migrated.stageEntrySnapshot.roster[22]).toMatchObject({
+      classId: "great-axe-warrior",
+      life: classStatsFor({ classId: "great-axe-warrior", experience: 0 }).maxLife,
+    });
+  });
+
+  it("rejects a forged v55 stage-29 battle that the old content identity never shipped", () => {
+    const current = stage29BattleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 55,
+      contentVersion: "stage-28-valkyrie-defense-1",
+    }))).toBeUndefined();
   });
 
   it("migrates v54 saves to the stage 28 Valkyrie-defense identity", () => {

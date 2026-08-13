@@ -210,6 +210,29 @@ describe("evidence-backed class catalog and promotion", () => {
     expect(promotionDialogueFor(generic)[0]?.lower?.speaker).toBe("鋼甲戰士");
   });
 
+  it("keeps a named actor visible while her portrait follows the current profession", () => {
+    const actor = createStage0Units().find((unit) => unit.id === "1:40");
+    if (!actor) throw new Error("named class-portrait fixture is missing");
+    actor.classId = "cavalry";
+    actor.className = className(actor.classId);
+    actor.name = "愛莉歐拉";
+    actor.displayIdentity = "named-class-portrait";
+    const portrait = classFallbackPortraitFor(actor.classId, 1);
+    if (portrait === undefined) throw new Error("cavalry portrait is missing");
+    actor.portrait = portrait;
+    actor.experience = promotionExperienceThresholdFor(actor.classId);
+
+    expect(unitDisplayName(actor)).toBe("愛莉歐拉");
+    promoteUnit(actor, "land-knight");
+    expect(actor).toMatchObject({
+      classId: "land-knight",
+      className: "陸戰騎士",
+      name: "愛莉歐拉",
+      portrait: classFallbackPortraitFor("land-knight", 1),
+      displayIdentity: "named-class-portrait",
+    });
+  });
+
   it("uses the on-field commander when Nia is absent from the battle", () => {
     const units = createStage0Units();
     const himi = units.find((unit) => unit.id === "1:1")!;

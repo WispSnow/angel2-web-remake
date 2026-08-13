@@ -32,6 +32,8 @@ export interface DeployedStageAllyDefinition {
   name: string;
   /** Omit for a generic class identity; named actors must provide their record. */
   portrait?: PortraitRecord;
+  /** Preserve the actor name while resolving the portrait from the current class. */
+  displayIdentity?: "named-class-portrait";
   aiBehavior: number;
   untouchedExperience?: number;
 }

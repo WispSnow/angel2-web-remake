@@ -199,7 +199,7 @@ test("S28-G: Nia defeat retries from SAY/0053", async ({ page }) => {
   });
 });
 
-test("S28-H/I: SAY/0055 saves v55 and routes to the frozen stage-29 boundary", async ({ page }) => {
+test("S28-H/I: SAY/0055 saves v57 and enters the playable stage-29 prebattle", async ({ page }) => {
   await page.goto("/?debugScenario=stage-28-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryStory");
   const dialogue = page.getByTestId("dialogue-layer");
@@ -219,7 +219,7 @@ test("S28-H/I: SAY/0055 saves v55 and routes to the frozen stage-29 boundary", a
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -247,13 +247,16 @@ test("S28-H/I: SAY/0055 saves v55 and routes to the frozen stage-29 boundary", a
       "stage-28-completed-route",
     ],
   });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "56");
+  await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "23");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-28",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-29",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-29",
+    activeStoryId: "stage-29-prebattle-story",
   });
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage28-stage29-boundary.png`,
+    path: `${ARTIFACT_DIR}/stage28-stage29-prebattle.png`,
   });
 });

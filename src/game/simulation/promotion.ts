@@ -43,6 +43,8 @@ export function promoteUnit(
 
   const previousClassId = unit.classId;
   const followsClassIdentity = usesClassIdentity(unit);
+  const followsClassPortrait = followsClassIdentity
+    || unit.displayIdentity === "named-class-portrait";
   const previousExperience = unit.experience;
   const previousStats = classStatsFor(unit);
   const life = unit.life;
@@ -50,6 +52,8 @@ export function promoteUnit(
   unit.className = className(targetClassId);
   if (followsClassIdentity) {
     unit.name = unit.className;
+  }
+  if (followsClassPortrait) {
     unit.portrait = classFallbackPortraitFor(targetClassId, unit.side) ?? unit.portrait;
   }
   unit.experience = 0;

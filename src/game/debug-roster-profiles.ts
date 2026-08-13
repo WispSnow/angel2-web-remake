@@ -40,6 +40,11 @@ const DORI_CURSE_MASTER_BASELINE = { slot: 9, classId: "curse-master", experienc
 const MARLIN_WATER_WARRIOR_BASELINE = { slot: 10, classId: "water-warrior", experience: 299 } as const;
 const MOLINA_WATER_WARRIOR_BASELINE = { slot: 11, classId: "water-warrior", experience: 299 } as const;
 const KINS_MAGIC_PRIEST_BASELINE = { slot: 7, classId: "magic-priest", experience: 0 } as const;
+const STAGE27_GREAT_AXE_DEFENDER_BASELINE = {
+  slot: 22,
+  classId: "great-axe-warrior",
+  experience: 0,
+} as const;
 const HALF_DRAGON_SISTER_BASELINES = [25, 26, 27, 28, 29, 30, 31].map((slot) => ({
   slot,
   classId: "half-dragon-warrior" as const,
@@ -66,6 +71,10 @@ const DEBUG_STAGE_PROFILE_BASELINE_TRANSITIONS = [
   {
     firstStageId: "stage-23",
     entries: [KINS_MAGIC_PRIEST_BASELINE],
+  },
+  {
+    firstStageId: "stage-28",
+    entries: [STAGE27_GREAT_AXE_DEFENDER_BASELINE],
   },
 ] as const satisfies readonly {
   firstStageId: StageId;
@@ -216,6 +225,7 @@ const REPRESENTATIVE_PROFILE_STAGES = {
   "stage-26": REPRESENTATIVE_STAGE8,
   "stage-27": REPRESENTATIVE_STAGE8,
   "stage-28": REPRESENTATIVE_STAGE8,
+  "stage-29": REPRESENTATIVE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
 const PROMOTION_COVERAGE_PROFILE_STAGES = {
@@ -247,6 +257,7 @@ const PROMOTION_COVERAGE_PROFILE_STAGES = {
   "stage-26": PROMOTION_COVERAGE_STAGE8,
   "stage-27": PROMOTION_COVERAGE_STAGE8,
   "stage-28": PROMOTION_COVERAGE_STAGE8,
+  "stage-29": PROMOTION_COVERAGE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
 const DEBUG_ROSTER_PROFILE_SPECS = [
