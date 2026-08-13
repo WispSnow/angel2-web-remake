@@ -69,4 +69,11 @@ describe("original engineer construction tiles", () => {
     );
     expect(ironPlate.equals(obstacle)).toBe(true);
   });
+
+  it("keeps the stage 32 pair distinct for native tokens 3 and 101", async () => {
+    const [ironPlate, obstacle] = await Promise.all(
+      kinds.map((kind) => readFile(tileFile(kind, "stage-32"))),
+    );
+    expect(ironPlate.equals(obstacle)).toBe(false);
+  });
 });

@@ -356,7 +356,7 @@ describe("debug roster profiles", () => {
     }
   });
 
-  it("carries Vesta's mandatory stage 30 recruitment into every stage 31 profile", () => {
+  it("carries Vesta's mandatory stage 30 recruitment into every stage 31 and 32 profile", () => {
     const profiles = [
       ["template-baseline", undefined],
       ["representative-growth", undefined],
@@ -365,14 +365,19 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const [profileId, perStageGrowth] of profiles) {
-      const roster = debugRosterForProfile(profileId, "stage-31", perStageGrowth);
-      expect(roster[23], `${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
-        slot: 23,
-        classId: "empress",
-        experience: 0,
-        life: classStatsFor({ classId: "empress", experience: 0 }).maxLife,
-      });
+    for (const stageId of ["stage-31", "stage-32"] as const) {
+      for (const [profileId, perStageGrowth] of profiles) {
+        const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
+        expect(
+          roster[23],
+          `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`,
+        ).toEqual({
+          slot: 23,
+          classId: "empress",
+          experience: 0,
+          life: classStatsFor({ classId: "empress", experience: 0 }).maxLife,
+        });
+      }
     }
   });
 

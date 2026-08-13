@@ -1546,6 +1546,54 @@ async function loadStage31Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage32Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage32"),
+    import("./simulation/stage32-battle"),
+  ]);
+  content.activateStage32Content();
+  const definition = content.STAGE32_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 31",
+      title: content.STAGE32.name,
+      objective: content.STAGE32_DEFINITION.objective.victoryText,
+      minimap: content.STAGE32_ASSETS.minimap,
+      terrain: content.STAGE32_TERRAIN_TOKENS,
+      gridWidth: content.STAGE32.width,
+      gridHeight: content.STAGE32.height,
+      enemies: content.STAGE32_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十八名候選最多再選十五人。擊敗菲伊魯茵、芙瑪羅妮及全部聯軍並保護妮雅。",
+    },
+    ["stage-32-enter-deployment"],
+    (campaign) => battleModule.createStage32DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 32 requires a deployment result");
+    return new battleModule.Stage32Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE32_DEFINITION,
+    assets: {
+      map: content.STAGE32_ASSETS.map,
+      minimap: content.STAGE32_ASSETS.minimap,
+      unitSprites: content.STAGE32_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -3575,6 +3623,74 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage31Module,
+  },
+  "stage-32": {
+    id: "stage-32",
+    ordinal: 31,
+    label: "斯德林海峽",
+    nextStageId: "stage-33",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅繼續追擊菲伊魯茵，並在斯德林海峽遭遇芙瑪羅妮聯軍。",
+      campaignRoute: "stage-32",
+    },
+    enemyPhaseStatusText: "敵方階段：菲伊魯茵與芙瑪羅妮聯軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始斯德林海峽部署。",
+      retreatStatusText: "全面撤退：返回斯德林海峽部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "拉那洛城外",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-32-enter-deployment",
+        "stage-32-opening-story",
+        "stage-32-objective-reached",
+        "stage-32-victory-story",
+        "stage-32-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-32-enter-deployment",
+        "stage-32-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 16,
+        openCellCount: 15,
+      },
+      enemyClassById: [
+        ["2:56", "flying-dragon-knight"],
+        ["2:6", "demon-dragon-knight"],
+        ["2:37", "beast-knight"],
+        ["2:38", "bone-knight"],
+        ["2:43", "great-axe-warrior"],
+        ["2:42", "evil-sword-warrior"],
+        ["2:41", "magic-sword-warrior"],
+        ["2:40", "great-axe-warrior"],
+        ["2:39", "swift-dragon-knight"],
+        ["2:31", "magic-priest"],
+        ["2:30", "prayer-guide"],
+        ["2:44", "magic-armor-warrior"],
+        ["2:34", "evil-mage"],
+        ["2:32", "curse-master"],
+        ["2:36", "wizard"],
+        ["2:35", "magic-master"],
+        ["2:33", "magic-guide"],
+        ["2:5", "demon-dragon-knight"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage32Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 
