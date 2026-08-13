@@ -1195,9 +1195,24 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   background: #160c10;
 }
 .promotion-warning { margin: 5px 0 0; color: #ffcf72; font: 700 10px/1.2 system-ui, sans-serif; }
-.objective-panel { position: absolute; z-index: 14; left: 126px; top: 61px; width: 388px; padding: 22px 30px; }
-.objective-panel h2 { margin: 10px 0 3px; color: #f3d466; font-size: 18px; }
-.objective-panel p { margin: 0 0 11px; font-size: 14px; }
+.objective-panel {
+  position: absolute;
+  z-index: 14;
+  left: 126px;
+  top: 50%;
+  width: 388px;
+  max-height: calc(100% - 16px);
+  padding: 14px 30px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #d4a62d #170d10;
+  scrollbar-width: thin;
+  transform: translateY(-50%);
+}
+.objective-panel h2 { margin: 6px 0 2px; color: #f3d466; font-size: 18px; line-height: 1.2; }
+.objective-panel p { margin: 0 0 7px; overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; }
+.objective-panel button { margin-top: 2px; }
 .modal-panel button { min-width: 90px; padding: 7px 14px; }
 .result-layer { position: absolute; z-index: 16; inset: 0; background: transparent; }
 .result-card { position: absolute; left: 130px; top: 70px; width: 380px; padding: 27px 34px; }
