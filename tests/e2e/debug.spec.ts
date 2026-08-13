@@ -66,6 +66,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 27 關 · 保衛瓦爾克麗城",
     "第 28 關 · 騎士城堡前",
     "第 29 關 · 治癒維斯塔女帝",
+    "第 30 關 · 前往斯德林海峽",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -223,6 +224,13 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-30-near-defeat",
     "stage-30-victory-ready",
     "stage-30-cleared",
+    "stage-31-prebattle",
+    "stage-31-deployment",
+    "stage-31-player",
+    "stage-31-near-victory",
+    "stage-31-near-defeat",
+    "stage-31-victory-ready",
+    "stage-31-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -232,6 +240,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     .toHaveCount(7);
   await expect(page.locator('[data-debug-stage-id="stage-30"] [data-debug-scenario-id]'))
     .toHaveCount(6);
+  await expect(page.locator('[data-debug-stage-id="stage-31"] [data-debug-scenario-id]'))
+    .toHaveCount(7);
   await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
   await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");
   await captureVisualAudit(page.locator('[data-debug-stage-id="stage-03"]'), {
@@ -559,6 +569,43 @@ test("stage-thirty debug entry preserves both growth profiles and the magic-swor
     }));
     await captureVisualAudit(page.getByTestId("game-screen"), {
       path: `${ARTIFACT_DIR}/debug-stage30-${profile}.png`,
+    });
+  }
+});
+
+test("stage-thirty-one debug entry preserves both growth profiles in the full crossing force", async ({ page }) => {
+  for (const profile of ["representative-growth", "promotion-coverage"] as const) {
+    const nia = debugRosterForProfile(profile, "stage-31", 100)[0]!;
+    await page.goto(
+      `/?debugScenario=stage-31-player&difficulty=2&roster=${profile}&growth=100`,
+    );
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    await expect(page.getByTestId("debug-toolbar")).toContainText(
+      profile === "representative-growth" ? "成長：逐關代表性成長" : "成長：深層轉職分支覆蓋",
+    );
+    await expect(page.getByTestId("debug-toolbar")).toContainText(
+      "每關成長：100 · 本關成長預算：3000",
+    );
+    await expect(page.locator(".hud-identity-name")).toHaveText(`${className(nia.classId)}／妮雅`);
+    const battle = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+      phase: string;
+      units: Array<{ id: string; side: number; classId: string; name: string }>;
+    });
+    expect(battle.phase).toBe("player");
+    expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(17);
+    expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(15);
+    expect(battle.units).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "1:0", classId: nia.classId, name: "妮雅" }),
+      expect.objectContaining({ id: "1:1", name: "希蜜" }),
+      expect.objectContaining({ id: "1:4", name: "拉朵那" }),
+      expect.objectContaining({ id: "1:7", classId: "magic-priest", name: "琴斯" }),
+      expect.objectContaining({ id: "2:5", classId: "demon-dragon-knight", name: "菲伊魯茵" }),
+    ]));
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    await captureVisualAudit(page.getByTestId("game-screen"), {
+      path: `${ARTIFACT_DIR}/debug-stage31-${profile}.png`,
     });
   }
 });

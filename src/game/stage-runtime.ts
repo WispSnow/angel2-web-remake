@@ -1497,6 +1497,55 @@ async function loadStage30Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage31Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage31"),
+    import("./simulation/stage31-battle"),
+  ]);
+  content.activateStage31Content();
+  const definition = content.STAGE31_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 30",
+      title: content.STAGE31.name,
+      objective: content.STAGE31_DEFINITION.objective.victoryText,
+      minimap: content.STAGE31_ASSETS.minimap,
+      terrain: content.STAGE31_TERRAIN_TOKENS,
+      gridWidth: content.STAGE31.width,
+      gridHeight: content.STAGE31.height,
+      enemies: content.STAGE31_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅、希蜜、蒙欣曼、黛西與拉朵那固定出場；二十四名候選最多再選十二人。擊退斯德林海峽伏兵並保護妮雅。",
+    },
+    ["stage-31-prebattle-story", "stage-31-enter-deployment"],
+    (campaign) => battleModule.createStage31DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 31 requires a deployment result");
+    return new battleModule.Stage31Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE31_DEFINITION,
+    assets: {
+      map: content.STAGE31_ASSETS.map,
+      minimap: content.STAGE31_ASSETS.minimap,
+      storyBackground: content.STAGE31_ASSETS.storyBackground,
+      unitSprites: content.STAGE31_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -3459,6 +3508,73 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage30Module,
+  },
+  "stage-31": {
+    id: "stage-31",
+    ordinal: 30,
+    label: "前往斯德林海峽",
+    nextStageId: "stage-32",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "妮雅返回騎士團堡，率軍前往斯德林海峽迎擊菲伊魯茵。",
+      campaignRoute: "stage-31",
+    },
+    enemyPhaseStatusText: "敵方階段：斯德林海峽伏兵開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始斯德林海峽關前流程。",
+      retreatStatusText: "全面撤退：返回斯德林海峽關前流程並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "斯德林海峽",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-31-prebattle-story",
+        "stage-31-enter-deployment",
+        "stage-31-opening-story",
+        "stage-31-objective-reached",
+        "stage-31-victory-story",
+        "stage-31-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-31-prebattle-story",
+        "stage-31-enter-deployment",
+        "stage-31-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0, 1, 2, 3, 4],
+        optionalSlots: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 17,
+        openCellCount: 12,
+      },
+      enemyClassById: [
+        ["2:5", "demon-dragon-knight"],
+        ["2:55", "demon-dragon-knight"],
+        ["2:42", "demon-dragon-knight"],
+        ["2:51", "half-dragon-warrior"],
+        ["2:54", "half-dragon-warrior"],
+        ["2:53", "half-dragon-warrior"],
+        ["2:52", "half-dragon-warrior"],
+        ["2:50", "half-dragon-warrior"],
+        ["2:56", "demon-dragon-knight"],
+        ["2:43", "demon-dragon-knight"],
+        ["2:49", "beast-knight"],
+        ["2:48", "bone-knight"],
+        ["2:47", "swift-dragon-knight"],
+        ["2:46", "beast-knight"],
+        ["2:45", "swift-dragon-knight"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage31Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 59 as const;
-export const SAVE_CONTENT_VERSION = "stage-30-vesta-fixed-portrait-1" as const;
+export const SAVE_VERSION = 60 as const;
+export const SAVE_CONTENT_VERSION = "stage-31-sterling-strait-ambush-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

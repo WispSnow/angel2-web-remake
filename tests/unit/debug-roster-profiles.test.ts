@@ -356,6 +356,26 @@ describe("debug roster profiles", () => {
     }
   });
 
+  it("carries Vesta's mandatory stage 30 recruitment into every stage 31 profile", () => {
+    const profiles = [
+      ["template-baseline", undefined],
+      ["representative-growth", undefined],
+      ["representative-growth", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+      ["promotion-coverage", undefined],
+      ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
+    ] as const;
+
+    for (const [profileId, perStageGrowth] of profiles) {
+      const roster = debugRosterForProfile(profileId, "stage-31", perStageGrowth);
+      expect(roster[23], `${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
+        slot: 23,
+        classId: "empress",
+        experience: 0,
+        life: classStatsFor({ classId: "empress", experience: 0 }).maxLife,
+      });
+    }
+  });
+
   it("keeps battle-entry and current save rosters separate while overriding only difficulty and stage", () => {
     const entryRoster = completeCampaignRoster([
       { slot: 0, classId: "cavalry", experience: 410, life: 210 },

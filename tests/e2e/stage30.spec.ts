@@ -147,7 +147,7 @@ test("S30-A–E: SAY/0057 and SAY/0058 lead through the Empress mutation into th
   });
 });
 
-test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves v59, and routes to stage 31", async ({ page }) => {
+test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves v60, and enters stage 31", async ({ page }) => {
   await page.goto("/?debugScenario=stage-30-near-victory&difficulty=3&test=1");
   await waitForPhase(page, "player");
   const prepared = await state(page);
@@ -211,7 +211,7 @@ test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves 
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -244,13 +244,15 @@ test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves 
     experience: 0,
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-30",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-31",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-31",
+    activeStoryId: "stage-31-prebattle-story",
   });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "60");
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage30-stage31-boundary.png`,
+    path: `${ARTIFACT_DIR}/stage30-stage31-prebattle.png`,
   });
 
   await page.goto("/?test=1");
@@ -260,16 +262,15 @@ test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves 
   await expect(page.getByTestId("title-record-slot-1"))
     .toHaveAttribute("aria-label", /前往斯德林海峽/u);
   await page.getByTestId("title-record-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-30",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-31",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-31",
-    activeStoryId: undefined,
+    activeStoryId: "stage-31-prebattle-story",
   });
-  await expect(page.getByTestId("dialogue-layer")).toBeHidden();
-  await expect(page.getByText(/stage-31/u)).toBeVisible();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "60");
 });
 
 test("S30-G: Nia defeat retries from SAY/0057", async ({ page }) => {

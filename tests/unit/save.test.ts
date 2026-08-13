@@ -53,6 +53,7 @@ import {
   STAGE30_EVENT_PROGRAM,
   STAGE30_FORM_CLASS_IDS_BY_DIFFICULTY,
 } from "../../src/game/content/stage30";
+import { STAGE31_DEFINITION } from "../../src/game/content/stage31";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
@@ -66,6 +67,7 @@ import { Stage27Battle } from "../../src/game/simulation/stage27-battle";
 import { Stage28Battle } from "../../src/game/simulation/stage28-battle";
 import { Stage29Battle } from "../../src/game/simulation/stage29-battle";
 import { Stage30Battle } from "../../src/game/simulation/stage30-battle";
+import { Stage31Battle } from "../../src/game/simulation/stage31-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
 import type { BattleSaveData, CompletedSaveData, Difficulty } from "../../src/game/types";
 
@@ -1532,6 +1534,63 @@ const stage30BattleSave = (difficulty: Difficulty = 0): BattleSaveData => {
   };
 };
 
+const stage31BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-31" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x31a0_b0c0,
+    rngCalls: 109,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 920, life: 280 },
+      { slot: 7, classId: "magic-priest", experience: 0, life: 190 },
+      { slot: 23, classId: "empress", experience: 0, life: 380 },
+      { slot: 40, classId: "magic-sword-warrior", experience: 0, life: 150 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE31_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE31_DEFINITION.deployment.optionalSlots.slice(0, 12).map((slot, index) => ({
+        slot, position: { ...STAGE31_DEFINITION.deployment.openCells[index]! }, fixed: false,
+      })),
+    ],
+  };
+  const battle = new Stage31Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-13T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-31",
+    stageLabel: "前往斯德林海峽",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-31-prebattle-story",
+      "stage-31-enter-deployment",
+      "stage-31-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -2792,10 +2851,12 @@ describe("Web save validation", () => {
   });
 
   it("accepts the stage-31 boundary only with stage 30's complete event identity", () => {
+    const stage31Roster = stage31BattleSave().roster;
     const completed: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-31",
       stageLabel: "前往斯德林海峽",
+      roster: stage31Roster,
       stageProgress: 1000,
       consumedEventIds: [
         ...stage30BattleSave().consumedEventIds,
@@ -2808,6 +2869,117 @@ describe("Web save validation", () => {
       ...completed,
       consumedEventIds: completed.consumedEventIds.slice(0, -1),
     })).toBe(false);
+  });
+
+  it("validates stage 31's deployment, fixed allies, ambushers, and resume identity", () => {
+    const save = stage31BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1)).toHaveLength(17);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(15);
+    expect(save.battle.units.find(({ id }) => id === "2:5")).toMatchObject({
+      classId: "demon-dragon-knight",
+      name: "菲伊魯茵",
+      portrait: 25,
+    });
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: save.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.filter(({ id }) => id !== "1:4"),
+      },
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:5"
+          ? { ...unit, classId: "half-dragon-warrior" as const, className: "半龍戰士" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("accepts the stage-32 boundary only with stage 31's complete event identity", () => {
+    const current = stage31BattleSave();
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-32",
+      stageLabel: "斯德林海峽",
+      roster: current.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...current.consumedEventIds,
+        "stage-31-objective-reached",
+        "stage-31-victory-story",
+        "stage-31-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.filter(
+        (id) => id !== "stage-31-victory-story",
+      ),
+    })).toBe(false);
+  });
+
+  it("migrates v59 stage 31 boundaries but rejects forged stage 31 battles", () => {
+    const currentStage31 = stage31BattleSave();
+    const boundary: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-31",
+      stageLabel: "前往斯德林海峽",
+      roster: currentStage31.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage30BattleSave().consumedEventIds,
+        "stage-30-objective-reached",
+        "stage-30-completed-route",
+      ],
+    };
+    const migrated = parseSaveData(JSON.stringify({
+      ...boundary,
+      version: 59,
+      contentVersion: "stage-30-vesta-fixed-portrait-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "completed",
+      stageId: "stage-31",
+    });
+    expect(migrated?.roster[23]).toMatchObject({
+      classId: "empress",
+      experience: 0,
+    });
+    expect(parseSaveData(JSON.stringify({
+      ...currentStage31,
+      version: 59,
+      contentVersion: "stage-30-vesta-fixed-portrait-1",
+    }))).toBeUndefined();
+
+    const forgedStage32: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-32",
+      stageLabel: "斯德林海峽",
+      roster: currentStage31.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...currentStage31.consumedEventIds,
+        "stage-31-objective-reached",
+        "stage-31-victory-story",
+        "stage-31-completed-route",
+      ],
+    };
+    expect(parseSaveData(JSON.stringify({
+      ...forgedStage32,
+      version: 59,
+      contentVersion: "stage-30-vesta-fixed-portrait-1",
+    }))).toBeUndefined();
   });
 
   it("migrates v57 completed stage 30 boundaries but rejects forged stage 30 battles", () => {

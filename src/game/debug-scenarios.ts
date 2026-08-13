@@ -406,6 +406,19 @@ const STAGE30_COMPLETED_EVENT_IDS = [
   "stage-30-completed-route",
 ] as const;
 
+const STAGE31_BATTLE_EVENT_IDS = [
+  "stage-31-prebattle-story",
+  "stage-31-enter-deployment",
+  "stage-31-opening-story",
+] as const;
+
+const STAGE31_COMPLETED_EVENT_IDS = [
+  ...STAGE31_BATTLE_EVENT_IDS,
+  "stage-31-objective-reached",
+  "stage-31-victory-story",
+  "stage-31-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -2796,6 +2809,86 @@ async function createStage30Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage31Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-31", debugCampaign(context, "stage-31"));
+  return controller;
+}
+
+async function createStage31Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-31",
+    debugCampaign(context, "stage-31"),
+    { preparation: true, statusMessage: "調試場景：前往斯德林海峽部署。" },
+  );
+  return controller;
+}
+
+async function stage31FullDeployment() {
+  const { STAGE31_DEFINITION } = await import("./content/stage31");
+  return {
+    placements: [
+      ...STAGE31_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE31_DEFINITION.deployment.optionalSlots.slice(0, 12).map((slot, index) => ({
+        slot, position: { ...STAGE31_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage31Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-31");
+  const { Stage31Battle } = await import("./simulation/stage31-battle");
+  const battle = new Stage31Battle(campaign, await stage31FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 31 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-31"),
+    stageLabel: "前往斯德林海峽",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE31_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：十七人渡海隊迎戰菲伊魯茵十五名伏兵。";
+  return controller;
+}
+
+async function createStage31Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-31");
+  const { Stage31Battle } = await import("./simulation/stage31-battle");
+  const completedCampaign = new Stage31Battle(campaign, await stage31FullDeployment())
+    .campaignSnapshot();
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-32",
+    stageLabel: "斯德林海峽",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: completedCampaign.rngState,
+    rngCalls: completedCampaign.rngCalls,
+    roster: completedCampaign.roster,
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE31_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -3669,6 +3762,49 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-30-cleared": createStage30Completed,
+  "stage-31-prebattle": createStage31Prebattle,
+  "stage-31-deployment": createStage31Deployment,
+  "stage-31-player": createStage31Player,
+  "stage-31-near-victory": withSetup(createStage31Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const feiluyin = controller.battle.unit("2:5");
+    if (!nia || !feiluyin) return;
+    nia.x = 25;
+    nia.y = 24;
+    nia.life = controller.battle.statsFor(nia).maxLife;
+    nia.acted = false;
+    feiluyin.x = 26;
+    feiluyin.y = 24;
+    feiluyin.life = 1;
+    controller.battle.units = controller.battle.units.filter(
+      ({ side, id }) => side === 1 || id === feiluyin.id,
+    );
+    for (const ally of controller.battle.units.filter(({ side, id }) => side === 1 && id !== nia.id)) {
+      ally.acted = true;
+    }
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 21, y: 21 };
+    controller.statusMessage = "調試場景：最後的菲伊魯茵只剩 1 點生命。";
+  }),
+  "stage-31-near-defeat": withSetup(createStage31Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const feiluyin = controller.battle.unit("2:5");
+    if (!nia || !feiluyin) return;
+    nia.x = 25;
+    nia.y = 24;
+    nia.life = 1;
+    feiluyin.x = 26;
+    feiluyin.y = 24;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 21, y: 21 };
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，菲伊魯茵位於相鄰格。";
+  }),
+  "stage-31-victory-ready": withSetup(createStage31Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-31-cleared": createStage31Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

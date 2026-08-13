@@ -32,8 +32,8 @@ interface DebugStageBaselineSpec {
 
 /**
  * Direct debug entry skips earlier battles, so reproduce only campaign changes that every valid route
- * must already have committed: Sulanda's stage-8 cavalry, Dori's stage-9 curse-master, and the two
- * stage-13 water-warrior newcomers.
+ * must already have committed: Sulanda's stage-8 cavalry, Dori's stage-9 curse-master, the two
+ * stage-13 water-warrior newcomers, and later fixed story recruits/profession changes.
  */
 const SULANDA_CAVALRY_BASELINE = { slot: 8, classId: "cavalry", experience: 299 } as const;
 const DORI_CURSE_MASTER_BASELINE = { slot: 9, classId: "curse-master", experience: 299 } as const;
@@ -48,6 +48,11 @@ const STAGE27_GREAT_AXE_DEFENDER_BASELINE = {
 const STAGE27_MAGIC_SWORD_DEFENDER_BASELINE = {
   slot: 40,
   classId: "magic-sword-warrior",
+  experience: 0,
+} as const;
+const STAGE30_VESTA_EMPRESS_BASELINE = {
+  slot: 23,
+  classId: "empress",
   experience: 0,
 } as const;
 const HALF_DRAGON_SISTER_BASELINES = [25, 26, 27, 28, 29, 30, 31].map((slot) => ({
@@ -84,6 +89,10 @@ const DEBUG_STAGE_PROFILE_BASELINE_TRANSITIONS = [
   {
     firstStageId: "stage-30",
     entries: [STAGE27_MAGIC_SWORD_DEFENDER_BASELINE],
+  },
+  {
+    firstStageId: "stage-31",
+    entries: [STAGE30_VESTA_EMPRESS_BASELINE],
   },
 ] as const satisfies readonly {
   firstStageId: StageId;
@@ -236,6 +245,7 @@ const REPRESENTATIVE_PROFILE_STAGES = {
   "stage-28": REPRESENTATIVE_STAGE8,
   "stage-29": REPRESENTATIVE_STAGE8,
   "stage-30": REPRESENTATIVE_STAGE8,
+  "stage-31": REPRESENTATIVE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
 const PROMOTION_COVERAGE_PROFILE_STAGES = {
@@ -269,6 +279,7 @@ const PROMOTION_COVERAGE_PROFILE_STAGES = {
   "stage-28": PROMOTION_COVERAGE_STAGE8,
   "stage-29": PROMOTION_COVERAGE_STAGE8,
   "stage-30": PROMOTION_COVERAGE_STAGE8,
+  "stage-31": PROMOTION_COVERAGE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
 const DEBUG_ROSTER_PROFILE_SPECS = [

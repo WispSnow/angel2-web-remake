@@ -37,7 +37,8 @@ export type StageId =
   | "stage-27"
   | "stage-28"
   | "stage-29"
-  | "stage-30";
+  | "stage-30"
+  | "stage-31";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -69,7 +70,8 @@ export type CampaignRouteId =
   | "stage-28"
   | "stage-29"
   | "stage-30"
-  | "stage-31";
+  | "stage-31"
+  | "stage-32";
 
 export interface Position {
   x: number;
@@ -227,8 +229,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 59;
-  contentVersion: "stage-30-vesta-fixed-portrait-1";
+  version: 60;
+  contentVersion: "stage-31-sterling-strait-ambush-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
