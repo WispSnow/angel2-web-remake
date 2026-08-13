@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { classStatsFor } from "../../src/game/content/classes";
+import { className, classStatsFor } from "../../src/game/content/classes";
+import { debugRosterForProfile } from "../../src/game/debug-roster-profiles";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
@@ -64,6 +65,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 26 關 · 趕回瓦爾克麗城",
     "第 27 關 · 保衛瓦爾克麗城",
     "第 28 關 · 騎士城堡前",
+    "第 29 關 · 治癒維斯塔女帝",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -215,6 +217,12 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-29-near-defeat",
     "stage-29-victory-ready",
     "stage-29-cleared",
+    "stage-30-prebattle",
+    "stage-30-player",
+    "stage-30-near-victory",
+    "stage-30-near-defeat",
+    "stage-30-victory-ready",
+    "stage-30-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -222,6 +230,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     .toHaveCount(8);
   await expect(page.locator('[data-debug-stage-id="stage-29"] [data-debug-scenario-id]'))
     .toHaveCount(7);
+  await expect(page.locator('[data-debug-stage-id="stage-30"] [data-debug-scenario-id]'))
+    .toHaveCount(6);
   await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
   await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");
   await captureVisualAudit(page.locator('[data-debug-stage-id="stage-03"]'), {
@@ -516,6 +526,41 @@ test("stage-twenty-nine debug deployment preserves the inherited great-axe defen
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage29-great-axe-battle.png`,
   });
+});
+
+test("stage-thirty debug entry preserves both growth profiles and the magic-sword defender", async ({ page }) => {
+  for (const profile of ["representative-growth", "promotion-coverage"] as const) {
+    const nia = debugRosterForProfile(profile, "stage-30", 100)[0]!;
+    await page.goto(
+      `/?debugScenario=stage-30-player&difficulty=2&roster=${profile}&growth=100`,
+    );
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    await expect(page.getByTestId("debug-toolbar")).toContainText(
+      profile === "representative-growth" ? "成長：逐關代表性成長" : "成長：深層轉職分支覆蓋",
+    );
+    await expect(page.getByTestId("debug-toolbar")).toContainText(
+      "每關成長：100 · 本關成長預算：2900",
+    );
+    await expect(page.locator(".hud-identity-name")).toHaveText(`${className(nia.classId)}／妮雅`);
+    const battle = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+      phase: string;
+      units: Array<{ id: string; side: number; classId: string; name: string }>;
+    });
+    expect(battle.phase).toBe("player");
+    expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(3);
+    expect(battle.units).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "1:0", classId: nia.classId, name: "妮雅" }),
+      expect.objectContaining({ id: "1:7", classId: "magic-priest", name: "琴斯" }),
+      expect.objectContaining({ id: "1:40", classId: "magic-sword-warrior" }),
+      expect.objectContaining({ id: "2:27", classId: "soldier", name: "維絲塔" }),
+    ]));
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    await captureVisualAudit(page.getByTestId("game-screen"), {
+      path: `${ARTIFACT_DIR}/debug-stage30-${profile}.png`,
+    });
+  }
 });
 
 test("stage-four debug profiles cover inherited multi-promotion rosters", async ({ page }) => {

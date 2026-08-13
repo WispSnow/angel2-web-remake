@@ -36,7 +36,8 @@ export type StageId =
   | "stage-26"
   | "stage-27"
   | "stage-28"
-  | "stage-29";
+  | "stage-29"
+  | "stage-30";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -67,7 +68,8 @@ export type CampaignRouteId =
   | "stage-27"
   | "stage-28"
   | "stage-29"
-  | "stage-30";
+  | "stage-30"
+  | "stage-31";
 
 export interface Position {
   x: number;
@@ -185,7 +187,7 @@ export interface DialoguePage {
   /** Characters already present before an appended line starts typing. */
   revealStart?: number;
   source: {
-    record: number | "promotion" | "battle-command" | "ai-technique";
+    record: number | "promotion" | "battle-command" | "ai-technique" | "battle-context";
     wait: number;
     address?: string;
     /** Native PP background record active at this KY checkpoint. */
@@ -225,8 +227,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 57;
-  contentVersion: "stage-29-eliola-display-name-1";
+  version: 59;
+  contentVersion: "stage-30-vesta-fixed-portrait-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

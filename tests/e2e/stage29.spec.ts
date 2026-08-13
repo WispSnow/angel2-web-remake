@@ -222,7 +222,7 @@ test("S29-G: Nia defeat retries from SAY/0056", async ({ page }) => {
   });
 });
 
-test("S29-H/I: ordinary victory saves v57 and routes to the frozen stage-30 boundary", async ({ page }) => {
+test("S29-H/I: ordinary victory saves v59 and enters the playable stage-30 prebattle", async ({ page }) => {
   await page.goto("/?debugScenario=stage-29-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
@@ -232,7 +232,7 @@ test("S29-H/I: ordinary victory saves v57 and routes to the frozen stage-30 boun
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -258,13 +258,41 @@ test("S29-H/I: ordinary victory saves v57 and routes to the frozen stage-30 boun
       "stage-29-completed-route",
     ],
   });
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "57");
+  await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "23");
   expect(await state(page)).toMatchObject({
-    stageId: "stage-29",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-30",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-30",
+    activeStoryId: "stage-30-prebattle-story",
   });
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage29-stage30-boundary.png`,
+    path: `${ARTIFACT_DIR}/stage29-stage30-prebattle.png`,
+  });
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  for (let wait = 2; wait <= 17; wait += 1) {
+    await advanceDialogueCheckpoint(page, wait);
+    await expect(dialogue).toHaveAttribute("data-source-record", "57");
+    expect(await state(page)).toMatchObject({
+      stageId: "stage-30",
+      stageProgress: 0,
+      phase: "prebattleStory",
+      campaignRoute: "stage-30",
+      activeStoryId: "stage-30-prebattle-story",
+    });
+  }
+  await dialogue.click();
+  if ((await state(page)).phase === "prebattleStory") await dialogue.click();
+  await waitForPhase(page, "openingStory");
+  await expect(dialogue).toHaveAttribute("data-source-record", "58");
+  await expect(dialogue).toHaveAttribute("data-source-wait", "1");
+  expect(await state(page)).toMatchObject({
+    stageId: "stage-30",
+    stageProgress: 0,
+    phase: "openingStory",
+    campaignRoute: "stage-30",
+    activeStoryId: "stage-30-opening-story",
   });
 });

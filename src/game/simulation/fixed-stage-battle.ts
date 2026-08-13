@@ -61,6 +61,7 @@ export interface FixedStageScenarioConfig extends FixedStageUnitConfig {
   dynamicTerrainSlots?: Readonly<Partial<Record<DynamicTerrainKind, number>>>;
   enemyClassPriority: Readonly<Partial<Record<ClassId, number>>>;
   forces: readonly ForceDefinition[];
+  campaignUnitSlots?: readonly number[];
 }
 
 function createInheritedAlly(
@@ -189,5 +190,6 @@ export function createFixedStageScenario(
       config.enemyUnits.map(({ slot, aiBehavior }) => [`2:${slot}`, aiBehavior]),
     ),
     forces: config.forces,
+    campaignUnitSlots: config.campaignUnitSlots,
   };
 }

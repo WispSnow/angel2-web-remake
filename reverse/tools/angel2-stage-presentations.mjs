@@ -254,9 +254,9 @@ function buildTimelines() {
     {
       stage: 30, handler: "1000:4F1E plus 0000:9733", classification: "repeating contextual line and form transition",
       events: [
-        event("round 1", [focusPortrait(0x2e), say(58), focus(0x036e), { op: "contextualBattleLine", selector: 0x22, textAddress: "DS:8762" }, { op: "setSide2ClassRecord", unitSlot: 27, from: 35, to: 0, immediateRedraw: false }, { op: "rebuildAllSide2UnitStates", slots: 57, immediateRedraw: false }]),
-        event("each side-2 form defeat before the limit", [{ op: "contextualBattleLine", selector: 0x22, textAddress: "DS:8762", portrait: "current defeated form" }, { op: "incrementSide2ClassRecordAndRebuild", immediateRedraw: false }]),
-        event("final side-2 form defeat", [{ op: "contextualBattleLine", selector: 0x22, textAddress: "DS:8762", portrait: "current defeated form" }, { op: "convertCellToSide1Slot23Empress", classRecord: 35, immediateRedraw: false }]),
+        event("round 1", [focusPortrait(0x2e), say(58), focus(0x036e), { op: "contextualBattleLine", selector: 0x22, textAddress: "DS:8762", portrait: "side-2 slot-27 actor descriptor D/41" }, { op: "setSide2ClassRecord", unitSlot: 27, from: 35, to: 0, immediateRedraw: false }, { op: "rebuildAllSide2UnitStates", slots: 57, immediateRedraw: false }]),
+        event("each side-2 form defeat before the limit", [{ op: "contextualBattleLine", selector: 0x22, textAddress: "DS:8762", portrait: "side-2 slot-27 actor descriptor D/41; class-record rebuild does not trigger FFh portrait fallback" }, { op: "incrementSide2ClassRecordAndRebuild", immediateRedraw: false }]),
+        event("final side-2 form defeat", [{ op: "contextualBattleLine", selector: 0x22, textAddress: "DS:8762", portrait: "side-2 slot-27 actor descriptor D/41; class-record rebuild does not trigger FFh portrait fallback" }, { op: "convertCellToSide1Slot23Empress", classRecord: 35, immediateRedraw: false }]),
         event("live victory 999", [focusPortrait(0x2e), say(59)]),
       ],
     },
@@ -290,7 +290,7 @@ async function extract(module29Path, stageEventsPath, feedbackPath, storyPath, t
   const transitionLine = contextualLine(module29);
   const timelines = buildTimelines();
 
-  assert.equal(stageEvents.semanticVersion, 4, "stage-events semantic version changed");
+  assert.equal(stageEvents.semanticVersion, 5, "stage-events semantic version changed");
   assert.equal(stageEvents.validation.dispatcherHandlerCount, 38, "stage-event handler coverage changed");
   assert.deepEqual(stageEvents.validation.dynamicBoardScenesClosed, [0, 1, 6, 11, 20, 21, 22, 42]);
   assert.equal(stageEvents.validation.stage30DifficultyUiLabelsClosed, true);

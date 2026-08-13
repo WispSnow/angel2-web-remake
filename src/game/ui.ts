@@ -1014,9 +1014,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         ? `ai-technique:${controller.aiTechniqueDialogue.actor.id}:${controller.aiTechniqueDialogue.actionId}`
         : controller.groupCommandDialogueId
         ? `group-command:${controller.groupCommandDialogueId}`
-        : controller.promotionDialogueActive
+          : controller.promotionDialogueActive
           ? `promotion:${controller.promotionUnit?.id}:${controller.promotionDialogueIndex}`
-          : `${controller.phase}:${controller.dialogueIndex}`;
+          : `${controller.phase}:${controller.dialogueIndex}:${page.source.record}:${page.source.wait}:${page.source.address ?? ""}`;
       const pageChanged = activeDialogueKey !== pageKey;
       dialogueLayer.dataset.sourceRecord = String(page.source.record);
       dialogueLayer.dataset.sourceWait = String(page.source.wait);

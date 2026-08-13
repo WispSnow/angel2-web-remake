@@ -392,6 +392,7 @@ export class GameController {
   turnTransitionPresentation?: TurnTransitionPresentation;
   turnTransitionPresentationTrace: TurnTransitionPresentation[] = [];
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
+  private battleContextDialogue?: { page: DialoguePage; resume: () => void };
   movementPresentation?: MovementPresentation;
   statusMessage = "";
   pendingSaveSlot?: number;
@@ -616,6 +617,7 @@ export class GameController {
     this.campaignRoute = runtime.entry.campaignRoute;
     this.stageProgress = 0;
     this.activeStoryId = undefined;
+    this.battleContextDialogue = undefined;
     this.dialogueSkipConfirmOpen = false;
     this.dialogueSkipConfirmIndex = 1;
     this.stageEventState = createStageEventState(this.battle.stage);
@@ -688,6 +690,7 @@ export class GameController {
   }
 
   get currentDialogue(): DialoguePage | undefined {
+    if (this.battleContextDialogue) return this.battleContextDialogue.page;
     if (this.aiTechniqueDialogue) return this.aiTechniqueDialogue.page;
     if (this.groupCommandDialogueId) {
       return groupCommandDialogueFor(this.groupCommandDialogueId, this.groupCommandSpeaker);
@@ -803,6 +806,7 @@ export class GameController {
       || this.objectiveOpen
       || this.groupCommandOpen
       || this.retreatConfirmOpen
+      || this.battleContextDialogue !== undefined
       || this.aiTechniqueDialogueActive
       || this.groupCommandDialogueActive
       || this.promotionUnitIds.length > 0;
@@ -910,6 +914,13 @@ export class GameController {
 
   advanceDialogue(): void {
     if (this.dialogueSkipConfirmOpen) return;
+    if (this.battleContextDialogue) {
+      const { resume } = this.battleContextDialogue;
+      this.battleContextDialogue = undefined;
+      this.emit();
+      resume();
+      return;
+    }
     if (this.groupCommandDialogueId) {
       const command = this.groupCommandDialogueId;
       const leaderId = this.groupCommandLeaderId;
@@ -945,7 +956,8 @@ export class GameController {
   skipDialogue(): void {
     this.dialogueSkipConfirmOpen = false;
     this.dialogueSkipConfirmIndex = 1;
-    if (this.groupCommandDialogueActive) this.advanceDialogue();
+    if (this.battleContextDialogue) this.advanceDialogue();
+    else if (this.groupCommandDialogueActive) this.advanceDialogue();
     else if (isStoryPhase(this.phase)) this.completeDialogue();
   }
 
@@ -1148,6 +1160,22 @@ export class GameController {
     }
     if (definition.type === "scripted-unit-arrival") {
       await this.runScriptedUnitArrival(definition);
+      return;
+    }
+    if (definition.type === "unit-form-transition") {
+      this.battle.queueUnitFormTransition(definition.actorId, {
+        classId: definition.targetClassId,
+        name: definition.targetName,
+        ...(definition.targetDisplayIdentity
+          ? { displayIdentity: definition.targetDisplayIdentity }
+          : {}),
+        ...(definition.targetPortrait !== undefined
+          ? { portrait: definition.targetPortrait }
+          : {}),
+        experience: definition.targetExperience,
+      }, definition.context);
+      await this.presentPendingUnitTransformations();
+      this.statusMessage = definition.statusText;
       return;
     }
     this.campaignRoute = definition.destination;
@@ -2025,6 +2053,7 @@ export class GameController {
         const presentation = affectedPresentations.find(({ id }) => id === affected.unitId);
         if (presentation) await this.presentSpecialDeath(actorPresentation, presentation, result);
       }
+      await this.presentPendingUnitTransformations();
       const moved = result.affectedUnits.filter(({ moved }) => moved).length;
       const frozen = result.affectedUnits.filter(({ actionDisabledBefore, actionDisabledAfter }) =>
         !actionDisabledBefore && actionDisabledAfter).length;
@@ -2582,6 +2611,53 @@ export class GameController {
     this.specialActionPresentation = undefined;
   }
 
+  private async presentPendingUnitTransformations(): Promise<number> {
+    let committed = 0;
+    while (this.battle.pendingUnitTransformations.length > 0) {
+      const pending = this.battle.pendingUnitTransformations[0];
+      if (!pending) break;
+      this.battle.focusId = pending.before.id;
+      this.cursor = { x: pending.before.x, y: pending.before.y };
+      this.centerCamera(pending.before);
+      if (!this.skippingScriptedSequence) {
+        this.battleContextDialogue = {
+          page: {
+            activeSlot: "lower",
+            lower: {
+              text: pending.context.text,
+              portrait: pending.before.portrait,
+              speaker: unitDisplayName(pending.before),
+            },
+            source: {
+              record: "battle-context",
+              wait: pending.context.selector,
+              address: pending.context.address,
+            },
+          },
+          resume: () => undefined,
+        };
+        this.statusMessage = `${unitDisplayName(pending.before)}的形態正在變化……`;
+        this.emit();
+        await new Promise<void>((resolve) => {
+          if (!this.battleContextDialogue) {
+            resolve();
+            return;
+          }
+          this.battleContextDialogue.resume = resolve;
+        });
+      }
+      const result = this.battle.commitNextUnitTransformation();
+      this.cursor = { x: result.after.x, y: result.after.y };
+      this.centerCamera(result.after);
+      this.statusMessage = result.after.side === 1
+        ? "維絲塔恢復女帝身分並加入我方。"
+        : `維絲塔轉為${result.after.className}形態。`;
+      committed += 1;
+      this.emit();
+    }
+    return committed;
+  }
+
   private async presentRest(unit: BattleUnit): Promise<void> {
     this.restPresentationTrace = [];
     const present = async (
@@ -2634,6 +2710,12 @@ export class GameController {
         result,
         displayedLifeByUnitId,
       );
+      const transformations = await this.presentPendingUnitTransformations();
+      if (transformations > 0 && this.resolveOutcome()) {
+        this.busy = false;
+        this.emit();
+        return;
+      }
       const survivingAttacker = this.battle.unit(result.attackerId);
       const offersExtraMove = survivingAttacker
         && this.battle.isPlayerControllableAlly(survivingAttacker.id)
@@ -3110,6 +3192,7 @@ export class GameController {
         : `${unit.name}的結界未前進；力場仍然發動。`;
       await this.presentRoutePulse(prepared);
       this.lastRoutePulse = this.battle.commitRoutePulse(prepared);
+      await this.presentPendingUnitTransformations();
       this.statusMessage = prepared.affectedUnits.length > 0
         ? `力場命中 ${prepared.affectedUnits.length} 名結界外我方；目前生命減半。`
         : "所有我方都在結界安全區內。";
@@ -3153,6 +3236,7 @@ export class GameController {
             const presentation = affectedPresentations.find(({ id }) => id === affected.unitId);
             if (presentation) await this.presentSpecialDeath(actorPresentation, presentation, result);
           }
+          await this.presentPendingUnitTransformations();
           const moved = result.affectedUnits.filter(({ moved }) => moved).length;
           const frozen = result.affectedUnits.filter(({ actionDisabledBefore, actionDisabledAfter }) =>
             !actionDisabledBefore && actionDisabledAfter).length;
@@ -3215,6 +3299,7 @@ export class GameController {
           result,
           displayedLifeByUnitId,
         );
+        await this.presentPendingUnitTransformations();
       } else {
         this.battle.spendAction(unit.id);
       }

@@ -1,4 +1,5 @@
 import {
+  classFallbackPortraitFor,
   classIdFromNativeRecord,
   className,
   classStatsFor,
@@ -153,7 +154,7 @@ function normalizeStage22PostbattleTransition(value: unknown): unknown {
 
 const KINS_SLOT = 7;
 const KINS_CAMPAIGN_STAGES = new Set([
-  "stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29",
+  "stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29", "stage-30", "stage-31",
 ]);
 
 function restoreKinsCampaignClass(save: SaveData): SaveData {
@@ -195,7 +196,7 @@ function restoreKinsCampaignClass(save: SaveData): SaveData {
 
 const STAGE27_DEFENDER_SLOT = 22;
 const STAGE27_DEFENDER_CLASS = "great-axe-warrior" as const;
-const POST_STAGE27_CAMPAIGN_STAGES = new Set(["stage-28", "stage-29", "stage-30"]);
+const POST_STAGE27_CAMPAIGN_STAGES = new Set(["stage-28", "stage-29", "stage-30", "stage-31"]);
 
 /** Stage 27 necessarily commits its fixed slot-22 class before any later-stage entry. */
 function restoreStage27DefenderClass(save: SaveData): SaveData {
@@ -293,6 +294,55 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   const restoredStage27Defender = restoreStage27DefenderClass(restoredKins);
   const restoredEliola = restoreStage29EliolaDisplayIdentity(restoredStage27Defender);
   return isSaveData(restoredEliola) ? restoredEliola : undefined;
+}
+
+/** M57-FB-01 replaces v58's mistaken profession portrait with Vesta's D/41 actor portrait. */
+function migrateVersion58Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 58
+    || value.contentVersion !== "stage-30-empress-purification-1") return undefined;
+  let migrated: Record<string, unknown> = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  if (value.kind === "battle" && value.stageId === "stage-30") {
+    if (!isRecord(value.battle) || !Array.isArray(value.battle.units)) return undefined;
+    const vestaUnits = value.battle.units.filter((unit) => isRecord(unit)
+      && unit.side === 2
+      && unit.slot === 27);
+    if (vestaUnits.length === 0 || vestaUnits.some((unit) => !isRecord(unit)
+      || !isClassId(unit.classId)
+      || unit.name !== "維絲塔"
+      || unit.displayIdentity !== "named-class-portrait"
+      || unit.portrait !== classFallbackPortraitFor(unit.classId, 2))) return undefined;
+    migrated = {
+      ...migrated,
+      battle: {
+        ...value.battle,
+        units: value.battle.units.map((unit) => {
+          if (!isRecord(unit) || unit.side !== 2 || unit.slot !== 27) return unit;
+          const { displayIdentity: _legacyIdentity, ...rest } = unit;
+          return { ...rest, portrait: 41 };
+        }),
+      },
+    };
+  }
+  return finalizeDirectMigration(migrated);
+}
+
+function migrateVersion57Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 57
+    || value.contentVersion !== "stage-29-eliola-display-name-1"
+    // v57 could route a completed stage-29 save here, but never shipped a
+    // stage-30 battle runtime or a stable mid-form save contract.
+    || (value.kind === "battle" && value.stageId === "stage-30")) return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
 }
 
 function migrateVersion56Save(value: unknown): SaveData | undefined {
@@ -1890,6 +1940,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion58 = migrateVersion58Save(value);
+    if (migratedVersion58) return migratedVersion58;
+    const migratedVersion57 = migrateVersion57Save(value);
+    if (migratedVersion57) return migratedVersion57;
     const migratedVersion56 = migrateVersion56Save(value);
     if (migratedVersion56) return migratedVersion56;
     const migratedVersion55 = migrateVersion55Save(value);

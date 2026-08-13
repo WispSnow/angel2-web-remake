@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 57 as const;
-export const SAVE_CONTENT_VERSION = "stage-29-eliola-display-name-1" as const;
+export const SAVE_VERSION = 59 as const;
+export const SAVE_CONTENT_VERSION = "stage-30-vesta-fixed-portrait-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -163,11 +163,16 @@ function isBattleUnit(
   if (!rootId) return false;
 
   const schema: StageSaveSchema = STAGE_RUNTIME_MANIFEST[stageId].save;
+  const classId = value.classId;
   if (value.side === 1) {
     return schema.alliedUnits.kind !== "allowed-classes"
-      || schema.alliedUnits.classIds.includes(value.classId);
+      || schema.alliedUnits.classIds.includes(classId);
   }
-  return new Map(schema.enemyClassById).get(rootId) === value.classId;
+  const fixedClass = new Map(schema.enemyClassById).get(rootId);
+  if (fixedClass === classId) return true;
+  const formSequence = schema.enemyFormSequences?.find(({ unitId }) => unitId === rootId);
+  return formSequence?.classIdsByDifficulty.some((classIds) =>
+    classIds.includes(classId)) ?? false;
 }
 
 function hasValidWaterWarriorGroups(units: readonly BattleUnit[]): boolean {
@@ -211,10 +216,19 @@ function hasValidNamedClassPortraits(
       && unit.id === "1:22"
       && unit.side === 1
       && unit.slot === 22;
-    if (!isStage29Eliola) return unit.displayIdentity === undefined;
-    return unit.displayIdentity === "named-class-portrait"
-      && unit.name === "愛莉歐拉"
-      && unit.portrait === classFallbackPortraitFor(unit.classId, 1);
+    if (isStage29Eliola) {
+      return unit.displayIdentity === "named-class-portrait"
+        && unit.name === "愛莉歐拉"
+        && unit.portrait === classFallbackPortraitFor(unit.classId, 1);
+    }
+    const isStage30Vesta = stageId === "stage-30"
+      && waterWarriorRootId(unit) === "2:27";
+    if (isStage30Vesta) {
+      return unit.displayIdentity === undefined
+        && unit.name === "維絲塔"
+        && unit.portrait === 41;
+    }
+    return unit.displayIdentity === undefined;
   });
 }
 
@@ -291,12 +305,25 @@ export function isSavedBattleState(
       && terrainOverrides[index - 1].y * STAGE_WIDTH + terrainOverrides[index - 1].x
         >= override.y * STAGE_WIDTH + override.x)
     || !units.some((unit) => unit.id === value.focusId)
-    || units.some((unit) =>
-      (unit.side === 1 && !hasNamedAllyExperienceFloor(unit))
-      || (unit.side === 2
-        && (unit.life > statsFor(unit, difficulty).maxLife
-          || unit.experience < initialEnemyExperience(unit.classId, difficulty))))
+    || units.some((unit) => {
+      if (unit.side === 1) return !hasNamedAllyExperienceFloor(unit);
+      const formSequence = saveSchema.enemyFormSequences?.find(
+        ({ unitId }) => unitId === waterWarriorRootId(unit),
+      );
+      return unit.life > statsFor(unit, difficulty).maxLife
+        || (formSequence
+          ? unit.experience !== formSequence.experience
+            || !formSequence.classIdsByDifficulty[difficulty]?.includes(unit.classId)
+          : unit.experience < initialEnemyExperience(unit.classId, difficulty));
+    })
   ) return false;
+
+  for (const formSequence of saveSchema.enemyFormSequences ?? []) {
+    const matching = units.filter((unit) => waterWarriorRootId(unit) === formSequence.unitId);
+    if (matching.length === 0
+      || !matching.some(({ id }) => id === formSequence.unitId)
+      || matching.some(({ side }) => side !== 2)) return false;
+  }
 
   const allies = units.filter((unit) => unit.side === 1);
   const alliedRoots = allies.filter((unit) => unit.id === `${unit.side}:${unit.slot}`);

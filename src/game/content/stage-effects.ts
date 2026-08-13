@@ -107,6 +107,21 @@ export type StageSimulationEffectDefinition =
     target: { side: Side; portrait: PortraitRecord };
     movementBudget: number;
     statusText: string;
+  }
+  | {
+    type: "unit-form-transition";
+    actorId: string;
+    targetClassId: UnitClassId;
+    targetName: string;
+    targetDisplayIdentity?: "named-class-portrait";
+    targetPortrait?: PortraitRecord;
+    targetExperience: number;
+    context: {
+      selector: number;
+      address: string;
+      text: string;
+    };
+    statusText: string;
   };
 
 export const STAGE_SIMULATION_EFFECTS:

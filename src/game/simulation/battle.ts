@@ -21,7 +21,7 @@ import {
 } from "../content/actions";
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
-import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, Position, SaveRosterEntry, SavedBattleState, Side, UnitStats, UnitStatuses } from "../types";
+import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, PortraitRecord, Position, SaveRosterEntry, SavedBattleState, Side, UnitClassId, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
 import { constructionPath, constructionReachableCells, manhattan, movementCost, movementCostsToNearestTarget, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield } from "./grid";
 import {
@@ -55,7 +55,7 @@ import type {
   PreparedBattleAction,
   SpecialActionResult,
 } from "./actions/types";
-import { effectiveAttack, effectiveDefense, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
+import { effectiveAttack, effectiveDefense, emptyUnitStatuses, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
 import { battleOutcomeForObjective, slotsNamedByCondition } from "./objectives";
 import {
   hasEnemyDamageActionThisTurn,
@@ -120,6 +120,46 @@ export interface MagicArcherLineOption {
   expectedDamage: number;
   targetThreat: number;
 }
+
+export interface UnitTransformationContext {
+  selector: number;
+  address: string;
+  text: string;
+}
+
+export interface UnitTransformationTarget {
+  classId: UnitClassId;
+  name: string;
+  displayIdentity?: "named-class-portrait";
+  portrait?: PortraitRecord;
+  experience: number;
+  side?: Side;
+  slot?: number;
+  forceSourceId?: string;
+}
+
+export interface PendingUnitTransformation {
+  before: BattleUnit;
+  after: BattleUnit;
+  context: UnitTransformationContext;
+  reason: "scripted" | "defeat";
+  retainsBeforeUntilCommit: boolean;
+  forceSourceId?: string;
+}
+
+const cloneBattleUnit = (unit: BattleUnit): BattleUnit => ({
+  ...unit,
+  statuses: { ...unit.statuses },
+});
+
+const clonePendingUnitTransformation = (
+  pending: PendingUnitTransformation,
+): PendingUnitTransformation => ({
+  ...pending,
+  before: cloneBattleUnit(pending.before),
+  after: cloneBattleUnit(pending.after),
+  context: { ...pending.context },
+});
 
 interface RangedPositionRisk {
   adjacentEnemyCount: number;
@@ -331,6 +371,7 @@ export class Stage0Battle {
   private readonly escortRouteByActorId: ReadonlyMap<string, EscortRouteDefinition>;
   private readonly terrainOverrideByPosition = new Map<string, DynamicTerrainKind>();
   private readonly expertAiTraceByUnitId = new Map<string, ExpertAiDecisionTrace>();
+  private readonly pendingTransformations: PendingUnitTransformation[] = [];
 
   constructor(
     public readonly difficulty: Difficulty = 0,
@@ -409,6 +450,7 @@ export class Stage0Battle {
     snapshot: RestorableBattleSnapshot,
     campaignRoster?: readonly SaveRosterEntry[],
   ): void {
+    this.pendingTransformations.splice(0);
     this.round = snapshot.round;
     this.focusId = snapshot.focusId;
     this.units = snapshot.units.map((unit) => ({
@@ -492,8 +534,102 @@ export class Stage0Battle {
   }
 
   private removeSharedUnit(unit: BattleUnit): void {
+    const replacement = this.replacementForDefeatedUnit(unit);
     const ids = new Set(this.waterWarriorGroup(unit).map(({ id }) => id));
     this.units = this.units.filter((candidate) => !ids.has(candidate.id));
+    if (replacement) {
+      this.pendingTransformations.push({
+        ...replacement,
+        before: cloneBattleUnit(unit),
+        reason: "defeat",
+        retainsBeforeUntilCommit: false,
+      });
+    }
+  }
+
+  protected replacementForDefeatedUnit(
+    _unit: BattleUnit,
+  ): Omit<PendingUnitTransformation, "before" | "reason" | "retainsBeforeUntilCommit"> | undefined {
+    return undefined;
+  }
+
+  protected transformedUnit(source: BattleUnit, target: UnitTransformationTarget): BattleUnit {
+    const side = target.side ?? source.side;
+    const slot = target.slot ?? source.slot;
+    const portrait = target.portrait
+      ?? classFallbackPortraitFor(target.classId, side)
+      ?? source.portrait;
+    const unit: BattleUnit = {
+      id: `${side}:${slot}`,
+      side,
+      slot,
+      classId: target.classId,
+      className: className(target.classId),
+      name: target.name,
+      portrait,
+      ...(target.displayIdentity ? { displayIdentity: target.displayIdentity } : {}),
+      x: source.x,
+      y: source.y,
+      life: 0,
+      experience: target.experience,
+      acted: source.acted,
+      actionDisabled: false,
+      statuses: emptyUnitStatuses(),
+    };
+    unit.life = this.statsFor(unit).maxLife;
+    return unit;
+  }
+
+  queueUnitFormTransition(
+    actorId: string,
+    target: UnitTransformationTarget,
+    context: UnitTransformationContext,
+  ): PendingUnitTransformation {
+    if (this.pendingTransformations.length > 0) {
+      throw new Error("another unit transformation is already pending");
+    }
+    const before = this.unit(actorId);
+    if (!before) throw new Error(`missing unit transformation actor ${actorId}`);
+    const pending: PendingUnitTransformation = {
+      before: cloneBattleUnit(before),
+      after: this.transformedUnit(before, target),
+      context: { ...context },
+      reason: "scripted",
+      retainsBeforeUntilCommit: true,
+      ...(target.forceSourceId ? { forceSourceId: target.forceSourceId } : {}),
+    };
+    this.pendingTransformations.push(pending);
+    return clonePendingUnitTransformation(pending);
+  }
+
+  get pendingUnitTransformations(): readonly PendingUnitTransformation[] {
+    return this.pendingTransformations.map(clonePendingUnitTransformation);
+  }
+
+  commitNextUnitTransformation(): PendingUnitTransformation {
+    const pending = this.pendingTransformations.shift();
+    if (!pending) throw new Error("no unit transformation is pending");
+    if (pending.retainsBeforeUntilCommit) {
+      const index = this.units.findIndex(({ id }) => id === pending.before.id);
+      const current = index >= 0 ? this.units[index] : undefined;
+      if (!current
+        || current.classId !== pending.before.classId
+        || current.x !== pending.before.x
+        || current.y !== pending.before.y) {
+        throw new Error("stale scripted unit transformation");
+      }
+      this.units.splice(index, 1);
+    }
+    if (this.unit(pending.after.id) || this.unitAt(pending.after)) {
+      throw new Error("unit transformation destination is occupied");
+    }
+    if (pending.forceSourceId && pending.after.id !== pending.before.id) {
+      this.forces.inheritUnit(pending.forceSourceId, pending.after.id);
+    }
+    this.units.push(cloneBattleUnit(pending.after));
+    this.recordCampaignUnit(pending.after);
+    this.focusId = pending.after.id;
+    return clonePendingUnitTransformation(pending);
   }
 
   private restoreWaterWarriorGroups(): void {
@@ -1107,7 +1243,10 @@ export class Stage0Battle {
         for (const member of this.waterWarriorGroup(unit)) deadIds.add(member.id);
       }
     }
-    if (deadIds.size > 0) this.units = this.units.filter(({ id }) => !deadIds.has(id));
+    for (const id of deadIds) {
+      const dead = this.unit(id);
+      if (dead) this.removeSharedUnit(dead);
+    }
     this.focusId = this.unit(actor.id)?.id
       ?? prepared.result.targetId
       ?? this.units[0]?.id
@@ -1147,7 +1286,10 @@ export class Stage0Battle {
         for (const member of this.waterWarriorGroup(unit)) deadIds.add(member.id);
       }
     }
-    if (deadIds.size > 0) this.units = this.units.filter(({ id }) => !deadIds.has(id));
+    for (const id of deadIds) {
+      const dead = this.unit(id);
+      if (dead) this.removeSharedUnit(dead);
+    }
     return result;
   }
 
@@ -1509,7 +1651,10 @@ export class Stage0Battle {
         for (const member of this.waterWarriorGroup(unit)) deadIds.add(member.id);
       }
     }
-    if (deadIds.size > 0) this.units = this.units.filter(({ id }) => !deadIds.has(id));
+    for (const id of deadIds) {
+      const dead = this.unit(id);
+      if (dead) this.removeSharedUnit(dead);
+    }
     this.focusId = this.unit(actor.id)?.id ?? this.units[0]?.id ?? actor.id;
     return prepared;
   }
@@ -3094,6 +3239,7 @@ export class Stage0Battle {
   }
 
   outcome(): BattleOutcome {
+    if (this.pendingTransformations.length > 0) return "ongoing";
     return battleOutcomeForObjective(this.units, this.stage.objective);
   }
 
@@ -3110,6 +3256,9 @@ export class Stage0Battle {
   }
 
   serializableSnapshot(): Pick<SavedBattleState, "round" | "focusId" | "units" | "enemyAi" | "terrainOverrides"> {
+    if (this.pendingTransformations.length > 0) {
+      throw new Error("cannot save while a unit transformation is pending");
+    }
     return {
       round: this.round,
       focusId: this.focusId,

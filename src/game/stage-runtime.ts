@@ -79,6 +79,11 @@ export interface StageSaveSchema {
   requiredResumeEventIds?: readonly string[];
   alliedUnits: StageSaveAlliedUnitRule;
   enemyClassById: readonly (readonly [string, UnitClassId])[];
+  enemyFormSequences?: readonly {
+    unitId: string;
+    classIdsByDifficulty: readonly (readonly UnitClassId[])[];
+    experience: number;
+  }[];
   enemyAi: "none" | "stage-01-castle-guard";
 }
 
@@ -1468,6 +1473,27 @@ async function loadStage29Module(): Promise<StageRuntimeModule> {
       snapshot,
       preparation.createResultFromSavedUnits(snapshot.units),
     ),
+  };
+}
+
+async function loadStage30Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage30"),
+    import("./simulation/stage30-battle"),
+  ]);
+  content.activateStage30Content();
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, _deployment, rng) =>
+    new battleModule.Stage30Battle(campaign, rng);
+  return {
+    definition: content.STAGE30_DEFINITION,
+    assets: {
+      map: content.STAGE30_ASSETS.map,
+      minimap: content.STAGE30_ASSETS.minimap,
+      storyBackground: content.STAGE30_ASSETS.storyBackground,
+      unitSprites: content.STAGE30_ASSETS.unitSprites,
+    },
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(createBattle, campaign, snapshot),
   };
 }
 
@@ -3380,6 +3406,59 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage29Module,
+  },
+  "stage-30": {
+    id: "stage-30",
+    ordinal: 29,
+    label: "治癒維斯塔女帝",
+    nextStageId: "stage-31",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "妮雅與琴斯趕回瓦爾克麗城，準備救治失控的維絲塔女帝。",
+      campaignRoute: "stage-30",
+    },
+    enemyPhaseStatusText: "敵方階段：失控的維絲塔開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始救治維絲塔的關前流程。",
+      retreatStatusText: "全面撤退：返回救治維絲塔的關前流程。",
+    },
+    completion: {
+      destinationLabel: "前往斯德林海峽",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-30-prebattle-story",
+        "stage-30-opening-story",
+        "stage-30-opening-form-transition",
+        "stage-30-objective-reached",
+        "stage-30-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-30-prebattle-story",
+        "stage-30-opening-story",
+        "stage-30-opening-form-transition",
+      ],
+      alliedUnits: { kind: "exact-slots", slots: [0, 7, 40] },
+      enemyClassById: [],
+      enemyFormSequences: [{
+        unitId: "2:27",
+        classIdsByDifficulty: [
+          ["soldier", "magic-sword-warrior", "jungle-warrior", "magic-priest", "prayer-guide", "curse-master", "magician", "great-axe-warrior"],
+          ["soldier", "magic-sword-warrior", "jungle-warrior", "magic-priest", "prayer-guide", "curse-master", "magician", "great-axe-warrior", "half-dragon-warrior", "magic-armor-warrior", "magic-guide", "evil-mage", "magic-archer", "land-knight", "demon-dragon-knight", "flying-dragon-knight"],
+          ["soldier", "magic-sword-warrior", "jungle-warrior", "magic-priest", "prayer-guide", "curse-master", "magician", "great-axe-warrior", "half-dragon-warrior", "magic-armor-warrior", "magic-guide", "evil-mage", "magic-archer", "land-knight", "demon-dragon-knight", "flying-dragon-knight", "beast-knight", "bone-knight", "swift-dragon-knight", "great-dragon-knight", "archer", "crossbow", "cavalry", "pegasus-warrior"],
+          ["soldier", "magic-sword-warrior", "jungle-warrior", "magic-priest", "prayer-guide", "curse-master", "magician", "great-axe-warrior", "half-dragon-warrior", "magic-armor-warrior", "magic-guide", "evil-mage", "magic-archer", "land-knight", "demon-dragon-knight", "flying-dragon-knight", "beast-knight", "bone-knight", "swift-dragon-knight", "great-dragon-knight", "archer", "crossbow", "cavalry", "pegasus-warrior", "sister", "monk", "water-warrior", "divine-sword-warrior", "warrior", "steel-armor-warrior", "priest", "wizard"],
+        ],
+        experience: 0,
+      }],
+      enemyAi: "none",
+    },
+    load: loadStage30Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

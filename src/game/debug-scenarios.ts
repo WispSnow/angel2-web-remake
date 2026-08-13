@@ -394,6 +394,18 @@ const STAGE29_COMPLETED_EVENT_IDS = [
   "stage-29-completed-route",
 ] as const;
 
+const STAGE30_BATTLE_EVENT_IDS = [
+  "stage-30-prebattle-story",
+  "stage-30-opening-story",
+  "stage-30-opening-form-transition",
+] as const;
+
+const STAGE30_COMPLETED_EVENT_IDS = [
+  ...STAGE30_BATTLE_EVENT_IDS,
+  "stage-30-objective-reached",
+  "stage-30-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -2664,6 +2676,126 @@ async function createStage29Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage30Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-30", debugCampaign(context, "stage-30"));
+  return controller;
+}
+
+async function createStage30PlayerWithForm(
+  context: DebugScenarioContext,
+  useFinalForm = false,
+): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-30");
+  const [{ Stage30Battle }, stage30] = await Promise.all([
+    import("./simulation/stage30-battle"),
+    import("./content/stage30"),
+  ]);
+  const battle = new Stage30Battle(campaign);
+  const classId = useFinalForm
+    ? stage30.STAGE30_FORM_CLASS_IDS_BY_DIFFICULTY[context.difficulty].at(-1)
+    : "soldier";
+  if (!classId) throw new Error("stage 30 debug scenario is missing a difficulty form");
+  battle.queueUnitFormTransition("2:27", {
+    classId,
+    name: "維絲塔",
+    portrait: 41,
+    experience: 0,
+  }, stage30.STAGE30_EVENT_PROGRAM.contextualLine);
+  battle.commitNextUnitTransformation();
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 30 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-30"),
+    stageLabel: "治癒維斯塔女帝",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE30_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  return GameController.fromSave(save, 1);
+}
+
+const createStage30Player = (context: DebugScenarioContext): Promise<GameController> =>
+  createStage30PlayerWithForm(context);
+
+async function createStage30NearVictory(
+  context: DebugScenarioContext,
+): Promise<GameController> {
+  const controller = await createStage30PlayerWithForm(context, true);
+  const nia = controller.battle.unit("1:0");
+  const vesta = controller.battle.unit("2:27");
+  if (!nia || !vesta) throw new Error("stage 30 near-victory fixture is incomplete");
+  nia.x = 27;
+  nia.y = 23;
+  nia.acted = false;
+  nia.life = controller.battle.statsFor(nia).maxLife;
+  vesta.x = 28;
+  vesta.y = 23;
+  vesta.life = 1;
+  for (const ally of controller.battle.units.filter(({ side, id }) => side === 1 && id !== nia.id)) {
+    ally.acted = true;
+  }
+  controller.battle.focusId = nia.id;
+  controller.cursor = { x: nia.x, y: nia.y };
+  controller.cameraOrigin = { x: 24, y: 20 };
+  controller.statusMessage = `調試場景：${vesta.className}是本難度最後形態，只剩 1 點生命。`;
+  return controller;
+}
+
+async function createStage30Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-30");
+  const [{ Stage30Battle }, stage30] = await Promise.all([
+    import("./simulation/stage30-battle"),
+    import("./content/stage30"),
+  ]);
+  const battle = new Stage30Battle(campaign);
+  const finalClassId = stage30.STAGE30_FORM_CLASS_IDS_BY_DIFFICULTY[context.difficulty].at(-1);
+  if (!finalClassId) throw new Error("stage 30 completed fixture is missing a final form");
+  battle.queueUnitFormTransition("2:27", {
+    classId: finalClassId,
+    name: "維絲塔",
+    portrait: 41,
+    experience: 0,
+  }, stage30.STAGE30_EVENT_PROGRAM.contextualLine);
+  battle.commitNextUnitTransformation();
+  const nia = battle.unit("1:0");
+  const vesta = battle.unit("2:27");
+  if (!nia || !vesta) throw new Error("stage 30 completed fixture is incomplete");
+  nia.x = vesta.x;
+  nia.y = vesta.y + 1;
+  nia.acted = false;
+  vesta.life = 1;
+  battle.attack(nia.id, vesta.id);
+  battle.commitNextUnitTransformation();
+  if (battle.outcome() !== "victory") throw new Error("stage 30 completed fixture did not convert Vesta");
+  const completedCampaign = battle.campaignSnapshot();
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-31",
+    stageLabel: "前往斯德林海峽",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: completedCampaign.rngState,
+    rngCalls: completedCampaign.rngCalls,
+    roster: completedCampaign.roster,
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE30_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -3506,6 +3638,37 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-29-cleared": createStage29Completed,
+  "stage-30-prebattle": createStage30Prebattle,
+  "stage-30-player": createStage30Player,
+  "stage-30-near-victory": createStage30NearVictory,
+  "stage-30-near-defeat": withSetup(createStage30Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const vesta = controller.battle.unit("2:27");
+    if (!nia || !vesta) return;
+    nia.x = 27;
+    nia.y = 23;
+    nia.life = 1;
+    vesta.x = 28;
+    vesta.y = 23;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 24, y: 20 };
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，維絲塔士兵形態位於相鄰格。";
+  }),
+  "stage-30-victory-ready": withSetup(createStage30Player, (controller) => {
+    controller.battle.queueUnitFormTransition("2:27", {
+      classId: "empress",
+      name: "維絲塔",
+      portrait: 41,
+      experience: 0,
+      side: 1,
+      slot: 23,
+      forceSourceId: "1:0",
+    }, { selector: 34, address: "DS:8762", text: "我．．．我好難過．．．\n頭好痛啊！" });
+    controller.battle.commitNextUnitTransformation();
+    controller.forceVictoryForTest();
+  }),
+  "stage-30-cleared": createStage30Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

@@ -59,6 +59,7 @@
     "content:stage27": "node scripts/generate-stage27-runtime.mjs",
     "content:stage28": "node scripts/generate-stage28-runtime.mjs",
     "content:stage29": "node scripts/generate-stage29-runtime.mjs",
+    "content:stage30": "node scripts/generate-stage30-runtime.mjs",
     "content:actions": "node scripts/generate-stage0-actions.mjs && node scripts/generate-stage1-actions.mjs",
     "content:terrain-actions": "node scripts/generate-dynamic-terrain-assets.mjs",
     "content:ai-dialogue": "node scripts/generate-ai-technique-dialogue.mjs",

@@ -15,7 +15,7 @@ import {
   saveSlotKey,
 } from "../../src/game/save";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
-import { className, classStatsFor } from "../../src/game/content/classes";
+import { classFallbackPortraitFor, className, classStatsFor } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
 import { Stage1Battle } from "../../src/game/simulation/stage1-battle";
@@ -49,6 +49,10 @@ import { STAGE26_DEFINITION } from "../../src/game/content/stage26";
 import { STAGE27_DEFINITION } from "../../src/game/content/stage27";
 import { STAGE28_DEFINITION } from "../../src/game/content/stage28";
 import { STAGE29_DEFINITION } from "../../src/game/content/stage29";
+import {
+  STAGE30_EVENT_PROGRAM,
+  STAGE30_FORM_CLASS_IDS_BY_DIFFICULTY,
+} from "../../src/game/content/stage30";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
@@ -61,8 +65,9 @@ import { Stage26Battle } from "../../src/game/simulation/stage26-battle";
 import { Stage27Battle } from "../../src/game/simulation/stage27-battle";
 import { Stage28Battle } from "../../src/game/simulation/stage28-battle";
 import { Stage29Battle } from "../../src/game/simulation/stage29-battle";
+import { Stage30Battle } from "../../src/game/simulation/stage30-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
-import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
+import type { BattleSaveData, CompletedSaveData, Difficulty } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
   format: "ANGEL2-web-save",
@@ -1474,6 +1479,59 @@ const stage29BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage30BattleSave = (difficulty: Difficulty = 0): BattleSaveData => {
+  const source = {
+    stageId: "stage-30" as const,
+    ruleset: "stableRemake" as const,
+    difficulty,
+    rngState: 0x30a0_b0c0,
+    rngCalls: 108,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 920, life: 280 },
+      { slot: 7, classId: "magic-priest", experience: 700, life: 190 },
+      { slot: 40, classId: "magic-sword-warrior", experience: 0, life: 150 },
+    ]),
+  };
+  const battle = new Stage30Battle(source);
+  battle.queueUnitFormTransition("2:27", {
+    classId: "soldier",
+    name: "維絲塔",
+    portrait: 41,
+    experience: 0,
+  }, STAGE30_EVENT_PROGRAM.contextualLine);
+  battle.commitNextUnitTransformation();
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-13T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-30",
+    stageLabel: "治癒維斯塔女帝",
+    ruleset: "stableRemake",
+    difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-30-prebattle-story",
+      "stage-30-opening-story",
+      "stage-30-opening-form-transition",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -2661,6 +2719,166 @@ describe("Web save validation", () => {
       ...completed,
       consumedEventIds: completed.consumedEventIds.slice(0, -1),
     })).toBe(false);
+  });
+
+  it("validates stage 30 only after its opening mutation and with a legal Vesta form", () => {
+    const save = stage30BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual(["1:40", "1:7", "1:0"]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toEqual([
+      expect.objectContaining({
+        id: "2:27",
+        classId: "soldier",
+        name: "維絲塔",
+        portrait: 41,
+        experience: 0,
+      }),
+    ]);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: save.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+    for (const patch of [
+      { experience: 1 },
+      { name: "士兵" },
+      { displayIdentity: "named-class-portrait" as const },
+      { portrait: classFallbackPortraitFor("soldier", 2) },
+      {
+        classId: "wizard" as const,
+        className: className("wizard"),
+        portrait: 41,
+      },
+    ]) {
+      expect(isSaveData({
+        ...save,
+        battle: {
+          ...save.battle,
+          units: save.battle.units.map((unit) => unit.id === "2:27"
+            ? { ...unit, ...patch }
+            : unit),
+        },
+      })).toBe(false);
+    }
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.filter(({ id }) => id !== "2:27"),
+      },
+    })).toBe(false);
+  });
+
+  it("accepts every difficulty's last resumable stage 30 form", () => {
+    for (const difficulty of [0, 1, 2, 3] as const) {
+      const save = stage30BattleSave(difficulty);
+      const classId = STAGE30_FORM_CLASS_IDS_BY_DIFFICULTY[difficulty].at(-1)!;
+      expect(isSaveData({
+        ...save,
+        battle: {
+          ...save.battle,
+          units: save.battle.units.map((unit) => unit.id === "2:27"
+            ? {
+                ...unit,
+                classId,
+                className: className(classId),
+                portrait: 41,
+                life: 1,
+              }
+            : unit),
+        },
+      }), `difficulty ${difficulty}, ${classId}`).toBe(true);
+    }
+  });
+
+  it("accepts the stage-31 boundary only with stage 30's complete event identity", () => {
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-31",
+      stageLabel: "前往斯德林海峽",
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage30BattleSave().consumedEventIds,
+        "stage-30-objective-reached",
+        "stage-30-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+  });
+
+  it("migrates v57 completed stage 30 boundaries but rejects forged stage 30 battles", () => {
+    const boundary: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-30",
+      stageLabel: "治癒維斯塔女帝",
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage29BattleSave().consumedEventIds,
+        "stage-29-objective-reached",
+        "stage-29-completed-route",
+      ],
+    };
+    expect(parseSaveData(JSON.stringify({
+      ...boundary,
+      version: 57,
+      contentVersion: "stage-29-eliola-display-name-1",
+    }))).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "completed",
+      stageId: "stage-30",
+    });
+    expect(parseSaveData(JSON.stringify({
+      ...stage30BattleSave(),
+      version: 57,
+      contentVersion: "stage-29-eliola-display-name-1",
+    }))).toBeUndefined();
+  });
+
+  it("migrates v58 stage 30 battles from the mistaken profession portrait to Vesta D/41", () => {
+    const current = stage30BattleSave();
+    const legacy = {
+      ...current,
+      version: 58,
+      contentVersion: "stage-30-empress-purification-1",
+      battle: {
+        ...current.battle,
+        units: current.battle.units.map((unit) => unit.side === 2 && unit.slot === 27
+          ? {
+              ...unit,
+              portrait: classFallbackPortraitFor(unit.classId, 2),
+              displayIdentity: "named-class-portrait",
+            }
+          : unit),
+      },
+    };
+    const migrated = parseSaveData(JSON.stringify(legacy));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-30",
+    });
+    if (migrated?.kind !== "battle") throw new Error("expected migrated stage 30 battle");
+    expect(migrated.battle.units.find(({ id }) => id === "2:27")).toMatchObject({
+      name: "維絲塔",
+      portrait: 41,
+    });
+    expect(migrated.battle.units.find(({ id }) => id === "2:27")?.displayIdentity).toBeUndefined();
+
+    expect(parseSaveData(JSON.stringify({
+      ...legacy,
+      battle: {
+        ...legacy.battle,
+        units: legacy.battle.units.map((unit) => unit.id === "2:27"
+          ? { ...unit, portrait: 41 }
+          : unit),
+      },
+    }))).toBeUndefined();
   });
 
   it("migrates v55 stage-28 saves and repairs the mandatory post-stage-27 defender class", () => {

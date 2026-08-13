@@ -45,6 +45,11 @@ const STAGE27_GREAT_AXE_DEFENDER_BASELINE = {
   classId: "great-axe-warrior",
   experience: 0,
 } as const;
+const STAGE27_MAGIC_SWORD_DEFENDER_BASELINE = {
+  slot: 40,
+  classId: "magic-sword-warrior",
+  experience: 0,
+} as const;
 const HALF_DRAGON_SISTER_BASELINES = [25, 26, 27, 28, 29, 30, 31].map((slot) => ({
   slot,
   classId: "half-dragon-warrior" as const,
@@ -75,6 +80,10 @@ const DEBUG_STAGE_PROFILE_BASELINE_TRANSITIONS = [
   {
     firstStageId: "stage-28",
     entries: [STAGE27_GREAT_AXE_DEFENDER_BASELINE],
+  },
+  {
+    firstStageId: "stage-30",
+    entries: [STAGE27_MAGIC_SWORD_DEFENDER_BASELINE],
   },
 ] as const satisfies readonly {
   firstStageId: StageId;
@@ -226,6 +235,7 @@ const REPRESENTATIVE_PROFILE_STAGES = {
   "stage-27": REPRESENTATIVE_STAGE8,
   "stage-28": REPRESENTATIVE_STAGE8,
   "stage-29": REPRESENTATIVE_STAGE8,
+  "stage-30": REPRESENTATIVE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
 const PROMOTION_COVERAGE_PROFILE_STAGES = {
@@ -258,6 +268,7 @@ const PROMOTION_COVERAGE_PROFILE_STAGES = {
   "stage-27": PROMOTION_COVERAGE_STAGE8,
   "stage-28": PROMOTION_COVERAGE_STAGE8,
   "stage-29": PROMOTION_COVERAGE_STAGE8,
+  "stage-30": PROMOTION_COVERAGE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
 const DEBUG_ROSTER_PROFILE_SPECS = [
