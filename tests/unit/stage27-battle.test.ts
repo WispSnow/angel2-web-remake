@@ -57,8 +57,11 @@ describe("stage 27 battle simulation", () => {
     expect(battle.unit("1:0")).toMatchObject({
       classId: "land-knight", name: "妮雅", portrait: 46, x: 39, y: 37, life: 250,
     });
+    // 槽 22 的原版角色描述符肖像是 FFh，玩家向身份按职业回退成「巨斧戰士」加通用戰士
+    // 肖像 57。全景战斗状态面板与地形参照行直接读 `name`，因此这里不能留描述符姓名。
     expect(battle.unit("1:22")).toMatchObject({
-      classId: "great-axe-warrior", name: "愛莉歐拉", x: 20, y: 11,
+      classId: "great-axe-warrior", className: "巨斧戰士", name: "巨斧戰士", portrait: 57,
+      x: 20, y: 11,
     });
     expect(battle.unit("1:45")).toMatchObject({ classId: "crossbow", x: 21, y: 14 });
     expect(battle.units.filter(({ side, classId }) => side === 1 && classId === "engineer"))

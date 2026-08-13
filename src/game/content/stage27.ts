@@ -128,20 +128,16 @@ const campaignActors = STAGE27_DEPLOYMENT_ACTORS.map((actor) => ({
 
 export const STAGE27_SEMANTIC_DEPLOYMENT_ROSTER_UNITS = campaignActors;
 
+// 十名固定棋盘单位的 side-1 角色描述符肖像都是 FFh，因此原版 `0000:51B9` 用职业回退
+// 同时替换肖像与单位名：槽 22 描述符虽然写着「愛莉歐拉」，玩家向身份仍是「巨斧戰士」
+// 加通用戰士肖像，与其余六名城防军和三名工兵一致。这里不得登记逐单位姓名或肖像。
 const fixedAllies = STAGE27_FIXED_ALLIED_UNITS.map((unit) => {
   const classId = unit.nativeClassRecord === null
     ? undefined
     : semanticClassId(unit.nativeClassRecord);
-  const namedPortrait = unit.slot === 22 && classId
-    ? classFallbackPortraitFor(classId, 1)
-    : undefined;
-  if (unit.slot === 22 && namedPortrait === undefined) {
-    throw new Error("Missing stage 27 portrait for Ai Liora");
-  }
   return {
     slot: unit.slot,
-    name: "name" in unit ? unit.name : classId ? className(classId) : "士兵",
-    ...(namedPortrait === undefined ? {} : { portrait: namedPortrait }),
+    name: classId ? className(classId) : "士兵",
     aiBehavior: unit.aiBehavior,
     untouchedExperience: 0,
     ...(classId === undefined ? {} : { forcedClassId: classId }),

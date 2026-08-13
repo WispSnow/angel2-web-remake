@@ -107,7 +107,6 @@ const fixedAlliedUnits = template.activeUnitInstances
     nativeClassRecord: unit.effectiveClass,
     position: { x: unit.x, y: unit.y },
     aiBehavior: unit.perSlotBehavior,
-    ...(unit.unitSlot === 22 ? { name: "愛莉歐拉" } : {}),
   }));
 assertEqual(fixedAlliedUnits.filter(({ aiBehavior }) => aiBehavior === 2).length, 7, "stage 27 automatic ally count");
 assertEqual(fixedAlliedUnits.filter(({ aiBehavior }) => aiBehavior === 0).length, 3, "stage 27 engineer count");
@@ -116,6 +115,16 @@ const actorFor = (slot) => requireEntry(
   campaignRoster.displayResolution.actors,
   (actor) => actor.slot === slot,
   `campaign actor ${slot}`,
+);
+
+// 十名固定棋盘单位的 side-1 角色描述符肖像字节全是 FFh。模块 29 `0000:51B9` 在这种
+// 情况下按职业短码查 DS:39A6 回退表，先覆写肖像记录（DS:3192），再把单位名指针
+// （DS:3190）改写为职业名指针（DS:31BB）。所以槽 22 描述符里的「愛莉歐拉」与槽
+// 40..45/56..58 的 `xxxxNN` 一样，从不是玩家向显示名，运行时不得登记逐单位姓名。
+assertEqual(
+  fixedAlliedUnits.map(({ slot }) => actorFor(slot).portraitRecord),
+  fixedAlliedUnits.map(() => 0xff),
+  "stage 27 fixed board-only actors use the class visual fallback",
 );
 const deploymentActors = campaignSlots.map((slot) => {
   const actor = actorFor(slot);

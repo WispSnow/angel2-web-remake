@@ -100,7 +100,7 @@ test("S27-C–E: opening story preserves the mixed 31-allied-unit force and five
   expect(opening.units.filter(({ side }) => side === 1)).toHaveLength(31);
   expect(opening.units.filter(({ side }) => side === 2)).toHaveLength(5);
   expect(opening.units).toEqual(expect.arrayContaining([
-    expect.objectContaining({ id: "1:22", name: "愛莉歐拉", classId: "great-axe-warrior", x: 20, y: 11 }),
+    expect.objectContaining({ id: "1:22", name: "巨斧戰士", portrait: 57, classId: "great-axe-warrior", x: 20, y: 11 }),
     expect.objectContaining({ id: "1:57", classId: "engineer", x: 35, y: 35 }),
     expect.objectContaining({ id: "1:0", name: "妮雅", x: 39, y: 37 }),
     expect.objectContaining({ id: "2:40", classId: "magic-sword-warrior", x: 33, y: 11 }),

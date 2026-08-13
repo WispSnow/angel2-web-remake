@@ -63,8 +63,19 @@ describe("stage 27 generated content", () => {
       .toHaveLength(7);
     expect(STAGE27_SEMANTIC_ALLIED_UNITS.filter(({ aiBehavior }) => aiBehavior === 0))
       .toHaveLength(32);
+    // 十名固定棋盘单位的 side-1 角色描述符肖像都是 FFh，原版 `0000:51B9` 因此把肖像和
+    // 单位名一起换成职业回退。槽 22 描述符里的「愛莉歐拉」全战役没有肖像记录，也从不是
+    // 玩家向显示名，不得作为城防军主将登记。
+    const fixedBoardOnly = STAGE27_SEMANTIC_ALLIED_UNITS
+      .filter(({ slot }) => [22, 40, 41, 42, 43, 44, 45, 56, 57, 58].includes(slot));
+    expect(fixedBoardOnly).toHaveLength(10);
+    expect(fixedBoardOnly.filter((unit) => "portrait" in unit)).toEqual([]);
+    expect(fixedBoardOnly.map(({ name }) => name)).toEqual([
+      "巨斧戰士", "魔祭師", "魔術士", "咒術師", "士兵", "祈導師", "魔劍戰士",
+      "工兵", "工兵", "工兵",
+    ]);
     expect(STAGE27_SEMANTIC_ALLIED_UNITS.find(({ slot }) => slot === 22)).toMatchObject({
-      name: "愛莉歐拉",
+      name: "巨斧戰士",
       forcedClassId: "great-axe-warrior",
       aiBehavior: 2,
       untouchedExperience: 0,
