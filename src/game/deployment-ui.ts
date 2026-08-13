@@ -100,7 +100,7 @@ function rosterEntryHtml(view: RosterEntryView): string {
   const label = `${unit.name}，${unit.className}，等級 ${stats.level}，生命 ${unit.life}／${stats.maxLife}，`
     + `${fixed ? "固定出場" : "可選"}，${deployed ? "已出場" : "未出場"}`;
   return `<button class="${classes.join(" ")}" type="button" tabindex="-1"
-    data-roster-index="${index}" data-testid="deployment-roster-${index}"
+    data-roster-index="${index}" data-unit-slot="${unit.slot}" data-testid="deployment-roster-${index}"
     aria-label="${escapeHtml(label)}" aria-pressed="${deployed}">
     <span class="deployment-entry-figure">
       <img src="${figureSourceFor(unit.classId)}" alt="" aria-hidden="true" />

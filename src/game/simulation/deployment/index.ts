@@ -83,8 +83,11 @@ function assertValidDefinition(
   if (eligible.size !== fixed.size + optional.size) {
     throw new Error("every eligible slot must be fixed or optional");
   }
-  if ([...fixed].some((slot) => !roster.has(slot))) {
-    throw new Error("every fixed slot must exist in the prepared roster");
+  if ([...roster].some((slot) => !eligible.has(slot))) {
+    throw new Error("every prepared roster slot must be eligible");
+  }
+  if ([...optional].some((slot) => !roster.has(slot))) {
+    throw new Error("every optional slot must exist in the prepared roster");
   }
 
   const fixedPositions = definition.fixedPlacements.map(({ position }) => positionKey(position));

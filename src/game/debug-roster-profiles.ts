@@ -46,93 +46,40 @@ const HALF_DRAGON_SISTER_BASELINES = [25, 26, 27, 28, 29, 30, 31].map((slot) => 
   experience: 299,
 }));
 
-const DEBUG_STAGE_PROFILE_BASELINES: Readonly<
-  Partial<Record<StageId, readonly DebugStageBaselineSpec[]>>
-> = {
-  "stage-11": [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
-  "stage-10": [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
-  "stage-12": [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
-  "stage-13": [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
-  "stage-14": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-  ],
-  "stage-15": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-  ],
-  "stage-16": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-  ],
-  "stage-17": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-  ],
-  "stage-18": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-  ],
-  "stage-19": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-  ],
-  "stage-20": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-  ],
-  "stage-21": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-  ],
-  "stage-22": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-    ...HALF_DRAGON_SISTER_BASELINES,
-  ],
-  "stage-23": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-    KINS_MAGIC_PRIEST_BASELINE,
-    ...HALF_DRAGON_SISTER_BASELINES,
-  ],
-  "stage-24": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-    KINS_MAGIC_PRIEST_BASELINE,
-    ...HALF_DRAGON_SISTER_BASELINES,
-  ],
-  "stage-26": [
-    SULANDA_CAVALRY_BASELINE,
-    DORI_CURSE_MASTER_BASELINE,
-    MARLIN_WATER_WARRIOR_BASELINE,
-    MOLINA_WATER_WARRIOR_BASELINE,
-    KINS_MAGIC_PRIEST_BASELINE,
-    ...HALF_DRAGON_SISTER_BASELINES,
-  ],
-};
+/**
+ * Mandatory campaign changes are cumulative route milestones, not per-stage fixtures. Keeping them
+ * ordinal-based prevents a newly implemented late stage from silently dropping earlier professions.
+ */
+const DEBUG_STAGE_PROFILE_BASELINE_TRANSITIONS = [
+  {
+    firstStageId: "stage-11",
+    entries: [SULANDA_CAVALRY_BASELINE, DORI_CURSE_MASTER_BASELINE],
+  },
+  {
+    firstStageId: "stage-14",
+    entries: [MARLIN_WATER_WARRIOR_BASELINE, MOLINA_WATER_WARRIOR_BASELINE],
+  },
+  {
+    firstStageId: "stage-22",
+    entries: HALF_DRAGON_SISTER_BASELINES,
+  },
+  {
+    firstStageId: "stage-23",
+    entries: [KINS_MAGIC_PRIEST_BASELINE],
+  },
+] as const satisfies readonly {
+  firstStageId: StageId;
+  entries: readonly DebugStageBaselineSpec[];
+}[];
+
+function debugStageProfileBaselines(stageId: StageId): readonly DebugStageBaselineSpec[] {
+  const ordinal = STAGE_RUNTIME_MANIFEST[stageId].ordinal;
+  const baselines: DebugStageBaselineSpec[] = [];
+  for (const { firstStageId, entries } of DEBUG_STAGE_PROFILE_BASELINE_TRANSITIONS) {
+    if (ordinal >= STAGE_RUNTIME_MANIFEST[firstStageId].ordinal) baselines.push(...entries);
+  }
+  return baselines;
+}
 
 const REPRESENTATIVE_STAGE1 = [
   { slot: 0, classPath: ["soldier", "cavalry"], experience: 180 },
@@ -236,6 +183,70 @@ const PROMOTION_COVERAGE_STAGE8 = [
   { slot: 18, classPath: ["soldier", "warrior", "steel-armor-warrior"], experience: 590 },
 ] as const satisfies readonly DebugRosterEntrySpec[];
 
+type DebugGrowthStageId = Exclude<StageId, "stage-00">;
+
+// This is intentionally total rather than Partial: extending StageId for a playable stage must fail
+// type-checking until both direct-entry growth profiles receive an explicit profession fixture.
+const REPRESENTATIVE_PROFILE_STAGES = {
+  "stage-01": REPRESENTATIVE_STAGE1,
+  "stage-02": REPRESENTATIVE_STAGE2,
+  "stage-03": REPRESENTATIVE_STAGE3,
+  "stage-04": REPRESENTATIVE_STAGE4,
+  "stage-05": REPRESENTATIVE_STAGE4,
+  "stage-42-portal": REPRESENTATIVE_STAGE4,
+  "stage-06": REPRESENTATIVE_STAGE6,
+  "stage-07": REPRESENTATIVE_STAGE6,
+  "stage-08": REPRESENTATIVE_STAGE8,
+  "stage-09": REPRESENTATIVE_STAGE8,
+  "stage-11": REPRESENTATIVE_STAGE8,
+  "stage-10": REPRESENTATIVE_STAGE8,
+  "stage-12": REPRESENTATIVE_STAGE8,
+  "stage-13": REPRESENTATIVE_STAGE8,
+  "stage-14": REPRESENTATIVE_STAGE8,
+  "stage-15": REPRESENTATIVE_STAGE8,
+  "stage-16": REPRESENTATIVE_STAGE8,
+  "stage-17": REPRESENTATIVE_STAGE8,
+  "stage-18": REPRESENTATIVE_STAGE8,
+  "stage-19": REPRESENTATIVE_STAGE8,
+  "stage-20": REPRESENTATIVE_STAGE8,
+  "stage-21": REPRESENTATIVE_STAGE8,
+  "stage-22": REPRESENTATIVE_STAGE8,
+  "stage-23": REPRESENTATIVE_STAGE8,
+  "stage-24": REPRESENTATIVE_STAGE8,
+  "stage-26": REPRESENTATIVE_STAGE8,
+  "stage-27": REPRESENTATIVE_STAGE8,
+} as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
+
+const PROMOTION_COVERAGE_PROFILE_STAGES = {
+  "stage-01": REPRESENTATIVE_STAGE1,
+  "stage-02": REPRESENTATIVE_STAGE2,
+  "stage-03": REPRESENTATIVE_STAGE3,
+  "stage-04": PROMOTION_COVERAGE_STAGE4,
+  "stage-05": PROMOTION_COVERAGE_STAGE4,
+  "stage-42-portal": PROMOTION_COVERAGE_STAGE4,
+  "stage-06": PROMOTION_COVERAGE_STAGE6,
+  "stage-07": PROMOTION_COVERAGE_STAGE6,
+  "stage-08": PROMOTION_COVERAGE_STAGE8,
+  "stage-09": PROMOTION_COVERAGE_STAGE8,
+  "stage-11": PROMOTION_COVERAGE_STAGE8,
+  "stage-10": PROMOTION_COVERAGE_STAGE8,
+  "stage-12": PROMOTION_COVERAGE_STAGE8,
+  "stage-13": PROMOTION_COVERAGE_STAGE8,
+  "stage-14": PROMOTION_COVERAGE_STAGE8,
+  "stage-15": PROMOTION_COVERAGE_STAGE8,
+  "stage-16": PROMOTION_COVERAGE_STAGE8,
+  "stage-17": PROMOTION_COVERAGE_STAGE8,
+  "stage-18": PROMOTION_COVERAGE_STAGE8,
+  "stage-19": PROMOTION_COVERAGE_STAGE8,
+  "stage-20": PROMOTION_COVERAGE_STAGE8,
+  "stage-21": PROMOTION_COVERAGE_STAGE8,
+  "stage-22": PROMOTION_COVERAGE_STAGE8,
+  "stage-23": PROMOTION_COVERAGE_STAGE8,
+  "stage-24": PROMOTION_COVERAGE_STAGE8,
+  "stage-26": PROMOTION_COVERAGE_STAGE8,
+  "stage-27": PROMOTION_COVERAGE_STAGE8,
+} as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
+
 const DEBUG_ROSTER_PROFILE_SPECS = [
   {
     id: "template-baseline",
@@ -247,67 +258,13 @@ const DEBUG_ROSTER_PROFILE_SPECS = [
     id: "representative-growth",
     label: "逐關代表性成長",
     description: "按關卡入口提供確定性的合法轉職混編；這是調試夾具，不是唯一標準答案。",
-    stages: {
-      "stage-01": REPRESENTATIVE_STAGE1,
-      "stage-02": REPRESENTATIVE_STAGE2,
-      "stage-03": REPRESENTATIVE_STAGE3,
-      "stage-04": REPRESENTATIVE_STAGE4,
-      "stage-05": REPRESENTATIVE_STAGE4,
-      "stage-42-portal": REPRESENTATIVE_STAGE4,
-      "stage-06": REPRESENTATIVE_STAGE6,
-      "stage-07": REPRESENTATIVE_STAGE6,
-      "stage-08": REPRESENTATIVE_STAGE8,
-      "stage-09": REPRESENTATIVE_STAGE8,
-      "stage-11": REPRESENTATIVE_STAGE8,
-      "stage-10": REPRESENTATIVE_STAGE8,
-      "stage-12": REPRESENTATIVE_STAGE8,
-      "stage-13": REPRESENTATIVE_STAGE8,
-      "stage-14": REPRESENTATIVE_STAGE8,
-      "stage-15": REPRESENTATIVE_STAGE8,
-      "stage-16": REPRESENTATIVE_STAGE8,
-      "stage-17": REPRESENTATIVE_STAGE8,
-      "stage-18": REPRESENTATIVE_STAGE8,
-      "stage-19": REPRESENTATIVE_STAGE8,
-      "stage-20": REPRESENTATIVE_STAGE8,
-      "stage-21": REPRESENTATIVE_STAGE8,
-      "stage-22": REPRESENTATIVE_STAGE8,
-      "stage-23": REPRESENTATIVE_STAGE8,
-      "stage-24": REPRESENTATIVE_STAGE8,
-      "stage-26": REPRESENTATIVE_STAGE8,
-    },
+    stages: REPRESENTATIVE_PROFILE_STAGES,
   },
   {
     id: "promotion-coverage",
     label: "深層轉職分支覆蓋",
     description: "前幾關沿用代表成長，第 4 關覆蓋多次轉職後的不同職業分支。",
-    stages: {
-      "stage-01": REPRESENTATIVE_STAGE1,
-      "stage-02": REPRESENTATIVE_STAGE2,
-      "stage-03": REPRESENTATIVE_STAGE3,
-      "stage-04": PROMOTION_COVERAGE_STAGE4,
-      "stage-05": PROMOTION_COVERAGE_STAGE4,
-      "stage-42-portal": PROMOTION_COVERAGE_STAGE4,
-      "stage-06": PROMOTION_COVERAGE_STAGE6,
-      "stage-07": PROMOTION_COVERAGE_STAGE6,
-      "stage-08": PROMOTION_COVERAGE_STAGE8,
-      "stage-09": PROMOTION_COVERAGE_STAGE8,
-      "stage-11": PROMOTION_COVERAGE_STAGE8,
-      "stage-10": PROMOTION_COVERAGE_STAGE8,
-      "stage-12": PROMOTION_COVERAGE_STAGE8,
-      "stage-13": PROMOTION_COVERAGE_STAGE8,
-      "stage-14": PROMOTION_COVERAGE_STAGE8,
-      "stage-15": PROMOTION_COVERAGE_STAGE8,
-      "stage-16": PROMOTION_COVERAGE_STAGE8,
-      "stage-17": PROMOTION_COVERAGE_STAGE8,
-      "stage-18": PROMOTION_COVERAGE_STAGE8,
-      "stage-19": PROMOTION_COVERAGE_STAGE8,
-      "stage-20": PROMOTION_COVERAGE_STAGE8,
-      "stage-21": PROMOTION_COVERAGE_STAGE8,
-      "stage-22": PROMOTION_COVERAGE_STAGE8,
-      "stage-23": PROMOTION_COVERAGE_STAGE8,
-      "stage-24": PROMOTION_COVERAGE_STAGE8,
-      "stage-26": PROMOTION_COVERAGE_STAGE8,
-    },
+    stages: PROMOTION_COVERAGE_PROFILE_STAGES,
   },
 ] as const satisfies readonly {
   id: string;
@@ -501,7 +458,7 @@ export function debugRosterForProfile(
   perStageGrowth?: number,
 ): SaveRosterEntry[] {
   const roster = completeCampaignRoster(
-    (DEBUG_STAGE_PROFILE_BASELINES[stageId] ?? []).map((entry) => ({
+    debugStageProfileBaselines(stageId).map((entry) => ({
       ...entry,
       life: classStatsFor(entry).maxLife,
     })),

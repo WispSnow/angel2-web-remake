@@ -1325,6 +1325,54 @@ async function loadStage26Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage27Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage27"),
+    import("./simulation/stage27-battle"),
+  ]);
+  content.activateStage27Content();
+  const definition = content.STAGE27_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 26",
+      title: content.STAGE27.name,
+      objective: content.STAGE27_DEFINITION.objective.victoryText,
+      minimap: content.STAGE27_ASSETS.minimap,
+      terrain: content.STAGE27_TERRAIN_TOKENS,
+      gridWidth: content.STAGE27.width,
+      gridHeight: content.STAGE27.height,
+      enemies: content.STAGE27_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "地圖已有妮雅、三名工兵與七名城防友軍；出擊名單僅列妮雅與二十八名候選，工兵和城防友軍不列入名單。最多再選二十人；讓妮雅進入瓦爾克麗城區即可獲勝，不必全滅叛軍。",
+    },
+    ["stage-27-enter-deployment"],
+    (campaign) => battleModule.createStage27DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 27 requires a deployment result");
+    return new battleModule.Stage27Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE27_DEFINITION,
+    assets: {
+      map: content.STAGE27_ASSETS.map,
+      minimap: content.STAGE27_ASSETS.minimap,
+      unitSprites: content.STAGE27_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -3046,6 +3094,61 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage26Module,
+  },
+  "stage-27": {
+    id: "stage-27",
+    ordinal: 26,
+    label: "趕回瓦爾克麗城",
+    nextStageId: "stage-28",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "deployment",
+      statusText: "碧娜維姬已敗；編成趕回瓦爾克麗城的部隊。",
+      campaignRoute: "stage-27",
+    },
+    enemyPhaseStatusText: "敵方階段：瓦爾克麗叛軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始瓦爾克麗回城戰部署。",
+      retreatStatusText: "全面撤退：返回瓦爾克麗回城戰部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "保衛瓦爾克麗城",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-27-enter-deployment",
+        "stage-27-opening-story",
+        "stage-27-objective-reached",
+        "stage-27-victory-story",
+        "stage-27-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-27-enter-deployment",
+        "stage-27-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [22, 41, 44, 43, 45, 42, 40, 57, 56, 58, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [22, 41, 44, 43, 45, 42, 40, 57, 56, 58, 0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 31,
+        openCellCount: 20,
+      },
+      enemyClassById: [
+        ["2:40", "magic-sword-warrior"],
+        ["2:41", "magic-priest"],
+        ["2:44", "magic-archer"],
+        ["2:43", "magic-armor-warrior"],
+        ["2:42", "curse-master"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage27Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

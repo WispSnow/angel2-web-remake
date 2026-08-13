@@ -46,7 +46,7 @@ export class DeploymentSession {
   }
 
   rosterSlotAt(index: number, page = this.currentState.rosterPage): number | undefined {
-    return this.currentState.definition.eligibleSlots[page * 15 + index];
+    return this.currentState.rosterSlots[page * 15 + index];
   }
 
   rosterUnitFor(slot: number | undefined): DeploymentRosterUnit | undefined {

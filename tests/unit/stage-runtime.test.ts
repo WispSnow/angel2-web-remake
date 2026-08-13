@@ -47,9 +47,10 @@ describe("stage runtime manifest", () => {
       "stage-23",
       "stage-24",
       "stage-26",
+      "stage-27",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ ordinal }) => ordinal))
-      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
+      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ nextStageId }) => nextStageId)).toEqual([
       "stage-01",
       "stage-02",
@@ -78,6 +79,7 @@ describe("stage runtime manifest", () => {
       "stage-24",
       "stage-26",
       "stage-27",
+      "stage-28",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ label }) => label)).toEqual([
       "瓦爾克麗宮",
@@ -107,6 +109,7 @@ describe("stage runtime manifest", () => {
       "死亡之谷中",
       "死亡之谷城堡前",
       "遭遇碧娜維姬",
+      "趕回瓦爾克麗城",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ completion }) => completion.destinationLabel))
       .toEqual([
@@ -131,6 +134,7 @@ describe("stage runtime manifest", () => {
         "死亡之谷城堡前",
         "遭遇碧娜維姬",
         "趕回瓦爾克麗城",
+        "保衛瓦爾克麗城",
       ]);
     expect(isPlayableStageId("stage-03")).toBe(true);
     expect(isPlayableStageId("stage-04")).toBe(true);
@@ -156,6 +160,7 @@ describe("stage runtime manifest", () => {
     expect(isPlayableStageId("stage-23")).toBe(true);
     expect(isPlayableStageId("stage-24")).toBe(true);
     expect(isPlayableStageId("stage-26")).toBe(true);
+    expect(isPlayableStageId("stage-27")).toBe(true);
     expect(stageRuntimeSourceForDestination("stage-04")?.id).toBe("stage-03");
     expect(stageRuntimeSourceForDestination("stage-05")?.id).toBe("stage-04");
     expect(stageRuntimeSourceForDestination("stage-42-portal")?.id).toBe("stage-05");
@@ -179,6 +184,7 @@ describe("stage runtime manifest", () => {
     expect(stageRuntimeSourceForDestination("stage-24")?.id).toBe("stage-23");
     expect(stageRuntimeSourceForDestination("stage-26")?.id).toBe("stage-24");
     expect(stageRuntimeSourceForDestination("stage-27")?.id).toBe("stage-26");
+    expect(stageRuntimeSourceForDestination("stage-28")?.id).toBe("stage-27");
     expect(stageRuntimeSourceForDestination("stage-11")?.id).toBe("stage-09");
     expect(stageRuntimeSourceForDestination("stage-10")?.id).toBe("stage-11");
     expect(STAGE_RUNTIME_MANIFEST["stage-03"].mapPresentationActionIds).toContain("recovery-1");
@@ -209,6 +215,7 @@ describe("stage runtime manifest", () => {
     const stage23 = await loadStageRuntime("stage-23");
     const stage24 = await loadStageRuntime("stage-24");
     const stage26 = await loadStageRuntime("stage-26");
+    const stage27 = await loadStageRuntime("stage-27");
     expect(stage2.createBattle(campaign).stage.id).toBe("stage-02");
     expect(stage3.createBattle({ ...campaign, stageId: "stage-03" }).stage.id).toBe("stage-03");
     expect(stage3.assets?.unitSprites["enemy-monk"]).toContain("unit-enemy-monk.png");
@@ -414,6 +421,20 @@ describe("stage runtime manifest", () => {
     });
     expect(stage26.retry.mode).toBe("preparation");
     expect(stage26.nextStageId).toBe("stage-27");
+    expect(stage27.preparation?.definition).toMatchObject({
+      fixedPlacements: expect.arrayContaining([
+        { slot: 0, position: { x: 39, y: 37 } },
+        { slot: 22, position: { x: 20, y: 11 } },
+        { slot: 57, position: { x: 35, y: 35 } },
+      ]),
+      maximumUnits: 31,
+    });
+    expect(stage27.preparation?.presentation.enemies).toHaveLength(5);
+    expect(stage27.entry).toMatchObject({ phase: "deployment", trigger: "campaign-entered" });
+    expect(stage27.save.enemyClassById).toHaveLength(5);
+    expect(stage27.save.enemyClassById).toContainEqual(["2:40", "magic-sword-warrior"]);
+    expect(stage27.retry.mode).toBe("preparation");
+    expect(stage27.nextStageId).toBe("stage-28");
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
   });

@@ -207,7 +207,7 @@ test("S26-H: Nia defeat returns directly to the same deployment", async ({ page 
   });
 });
 
-test("S26-I/J: victory story saves the stage-27 boundary", async ({ page }) => {
+test("S26-I/J: victory story saves and enters the stage-27 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-26-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "50");
@@ -226,7 +226,7 @@ test("S26-I/J: victory story saves the stage-27 boundary", async ({ page }) => {
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -254,9 +254,10 @@ test("S26-I/J: victory story saves the stage-27 boundary", async ({ page }) => {
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-26",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-27",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-27",
+    consumedEventIds: ["stage-27-enter-deployment"],
   });
 });

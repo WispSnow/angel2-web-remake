@@ -22,37 +22,10 @@ import {
 } from "../../src/game/debug-roster-profiles";
 import { debugScenarioUrl } from "../../src/game/debug-scenario-catalog";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION, saveSlotKey } from "../../src/game/save";
+import { STAGE_RUNTIME_MANIFEST } from "../../src/game/stage-runtime";
 import type { BattleSaveData, CompletedSaveData, StageId } from "../../src/game/types";
 
-const stageIds = [
-  "stage-00",
-  "stage-01",
-  "stage-02",
-  "stage-03",
-  "stage-04",
-  "stage-05",
-  "stage-42-portal",
-  "stage-06",
-  "stage-07",
-  "stage-08",
-  "stage-09",
-  "stage-11",
-  "stage-10",
-  "stage-12",
-  "stage-13",
-  "stage-14",
-  "stage-15",
-  "stage-16",
-  "stage-17",
-  "stage-18",
-  "stage-19",
-  "stage-20",
-  "stage-21",
-  "stage-22",
-  "stage-23",
-  "stage-24",
-  "stage-26",
-] as const satisfies readonly StageId[];
+const stageIds = Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[];
 const workspace = path.resolve(import.meta.dirname, "../..");
 
 const completedStage3Save = (): CompletedSaveData => ({
@@ -102,6 +75,17 @@ describe("debug roster profiles", () => {
             classStatsFor({ classId: entry.classId, experience: entry.experience }).maxLife,
           );
         }
+      }
+    }
+  });
+
+  it("registers both growth profiles for every implemented stage after stage zero", () => {
+    for (const stageId of stageIds.filter((candidate) => candidate !== "stage-00")) {
+      for (const profileId of ["representative-growth", "promotion-coverage"] as const) {
+        expect(
+          debugRosterProfileSupportsGrowthOverride(profileId, stageId),
+          `${stageId}/${profileId}`,
+        ).toBe(true);
       }
     }
   });
@@ -329,7 +313,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-23", "stage-24", "stage-26"] as const) {
+    for (const stageId of ["stage-23", "stage-24", "stage-26", "stage-27"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(roster[7], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({

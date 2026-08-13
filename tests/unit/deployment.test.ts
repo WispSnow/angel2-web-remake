@@ -31,6 +31,27 @@ const definition = {
 const roster = definition.eligibleSlots;
 
 describe("stage 1 deployment simulation", () => {
+  it("keeps fixed board-only allies out of the prepared roster", () => {
+    const boardOnlyDefinition = {
+      kind: "interactive",
+      eligibleSlots: [42, 0, 1],
+      fixedPlacements: [
+        { slot: 42, position: { x: 10, y: 10 } },
+        { slot: 0, position: { x: 11, y: 10 } },
+      ],
+      optionalSlots: [1],
+      openCells: [{ x: 12, y: 10 }],
+      maximumUnits: 3,
+    } as const satisfies InteractiveDeploymentDefinition;
+    const state = createDeploymentState(boardOnlyDefinition, [0, 1]);
+
+    expect(state.rosterSlots).toEqual([0, 1]);
+    expect(state.placements).toEqual([
+      { slot: 42, position: { x: 10, y: 10 }, fixed: true },
+      { slot: 0, position: { x: 11, y: 10 }, fixed: true },
+    ]);
+  });
+
   it("starts with five fixed units and permits an immediate five-unit finish", () => {
     const state = createDeploymentState(definition, roster);
     expect(state.placements).toHaveLength(5);

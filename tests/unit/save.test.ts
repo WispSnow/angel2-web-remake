@@ -46,6 +46,7 @@ import { STAGE22_DEFINITION, STAGE22_SEMANTIC_ENEMIES } from "../../src/game/con
 import { STAGE23_DEFINITION } from "../../src/game/content/stage23";
 import { STAGE24_DEFINITION } from "../../src/game/content/stage24";
 import { STAGE26_DEFINITION } from "../../src/game/content/stage26";
+import { STAGE27_DEFINITION } from "../../src/game/content/stage27";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
@@ -55,6 +56,7 @@ import { Stage22Battle } from "../../src/game/simulation/stage22-battle";
 import { Stage23Battle } from "../../src/game/simulation/stage23-battle";
 import { Stage24Battle } from "../../src/game/simulation/stage24-battle";
 import { Stage26Battle } from "../../src/game/simulation/stage26-battle";
+import { Stage27Battle } from "../../src/game/simulation/stage27-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
 import type { BattleSaveData, CompletedSaveData } from "../../src/game/types";
 
@@ -1306,6 +1308,55 @@ const stage26BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage27BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-27" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x27a0_b0c0,
+    rngCalls: 96,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 800, life: 240 },
+      { slot: 7, classId: "magic-priest", experience: 700, life: 180 },
+    ]),
+  };
+  const deployment = {
+    placements: STAGE27_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+      slot, position: { ...position }, fixed: true,
+    })),
+  };
+  const battle = new Stage27Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-12T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-27",
+    stageLabel: "趕回瓦爾克麗城",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-27-enter-deployment",
+      "stage-27-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -2294,6 +2345,65 @@ describe("Web save validation", () => {
       ...completed,
       consumedEventIds: completed.consumedEventIds.slice(0, -1),
     })).toBe(false);
+  });
+
+  it("validates stage 27 only with its opening identity and exact fixed forces", () => {
+    const save = stage27BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ id }) => id))
+      .toEqual([
+        "1:22", "1:41", "1:44", "1:43", "1:45", "1:42", "1:40",
+        "1:57", "1:56", "1:58", "1:0",
+      ]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(5);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: save.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:40"
+          ? { ...unit, classId: "magic-priest" as const, className: "魔祭師" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("accepts the stage-28 boundary only with the complete stage-27 identity", () => {
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-28",
+      stageLabel: "保衛瓦爾克麗城",
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage27BattleSave().consumedEventIds,
+        "stage-27-objective-reached",
+        "stage-27-victory-story",
+        "stage-27-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+  });
+
+  it("migrates v50 saves to the stage 27 content identity", () => {
+    const current = stage26BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 50,
+      contentVersion: "stage-26-column-push-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-26",
+    });
   });
 
   it("migrates v49 saves to the stage 26 content identity", () => {

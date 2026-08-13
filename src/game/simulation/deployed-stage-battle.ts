@@ -27,6 +27,8 @@ import type { EnemyPhaseTailDefinition } from "./enemy-phase-tail";
 export interface DeployedStageAllyDefinition {
   slot: number;
   initialClassId?: UnitClassId;
+  /** Native sparse class override applied even when the campaign slot has prior growth. */
+  forcedClassId?: UnitClassId;
   name: string;
   /** Omit for a generic class identity; named actors must provide their record. */
   portrait?: PortraitRecord;

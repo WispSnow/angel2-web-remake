@@ -15,6 +15,24 @@ describe("deployment semantic input session", () => {
     expect(session.rosterSlotAt(0)).toBeUndefined();
   });
 
+  it("pages the prepared roster rather than hidden fixed board occupants", () => {
+    const definition = {
+      ...STAGE1_DEFINITION.deployment,
+      eligibleSlots: [99, ...STAGE1_DEFINITION.deployment.eligibleSlots],
+      fixedPlacements: [
+        { slot: 99, position: { x: 20, y: 20 } },
+        ...STAGE1_DEFINITION.deployment.fixedPlacements,
+      ],
+      maximumUnits: STAGE1_DEFINITION.deployment.maximumUnits + 1,
+    } as const;
+    const session = new DeploymentSession(definition, STAGE1_DEPLOYMENT_PREVIEW_ROSTER);
+
+    expect(session.rosterSlotAt(0)).toBe(0);
+    expect(session.rosterSlotAt(8)).toBe(43);
+    expect(session.rosterSlotAt(9)).toBeUndefined();
+    expect(session.state.placements.some(({ slot }) => slot === 99)).toBe(true);
+  });
+
   it("maps keyboard-style and pointer-style primaries through the same reducer", () => {
     const keyboard = new DeploymentSession(
       STAGE1_DEFINITION.deployment,

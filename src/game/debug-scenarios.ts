@@ -358,6 +358,18 @@ const STAGE26_COMPLETED_EVENT_IDS = [
   "stage-26-completed-route",
 ] as const;
 
+const STAGE27_BATTLE_EVENT_IDS = [
+  "stage-27-enter-deployment",
+  "stage-27-opening-story",
+] as const;
+
+const STAGE27_COMPLETED_EVENT_IDS = [
+  ...STAGE27_BATTLE_EVENT_IDS,
+  "stage-27-objective-reached",
+  "stage-27-victory-story",
+  "stage-27-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -2378,6 +2390,89 @@ async function createStage26Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage27Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-27",
+    debugCampaign(context, "stage-27"),
+    { preparation: true, statusMessage: "調試場景：瓦爾克麗回城戰部署。" },
+  );
+  return controller;
+}
+
+async function stage27FullDeployment() {
+  const { STAGE27_DEFINITION } = await import("./content/stage27");
+  return {
+    placements: [
+      ...STAGE27_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE27_DEFINITION.deployment.optionalSlots.slice(0, 20).map((slot, index) => ({
+        slot, position: { ...STAGE27_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage27Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage27Deployment(context);
+  controller.completeDeployment(await stage27FullDeployment());
+  return controller;
+}
+
+async function createStage27Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-27");
+  const { Stage27Battle } = await import("./simulation/stage27-battle");
+  const battle = new Stage27Battle(campaign, await stage27FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 27 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-27"),
+    stageLabel: "趕回瓦爾克麗城",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE27_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：回城隊與七名自動城防友軍迎戰五名叛軍。";
+  return controller;
+}
+
+async function createStage27Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-27");
+  const { createStage27DeploymentRoster } = await import("./simulation/stage27-battle");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-28",
+    stageLabel: "保衛瓦爾克麗城",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(createStage27DeploymentRoster(campaign).map((unit) => ({
+      slot: unit.slot,
+      classId: unit.classId,
+      experience: unit.experience,
+      life: unit.life,
+    }))),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE27_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -3093,6 +3188,44 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-26-cleared": createStage26Completed,
+  "stage-27-deployment": createStage27Deployment,
+  "stage-27-opening": createStage27Opening,
+  "stage-27-player": createStage27Player,
+  "stage-27-ally-auto": withSetup(createStage27Player, (controller) => {
+    for (const unit of controller.battle.units) {
+      if (controller.battle.forceForUnit(unit.id)?.control === "player") unit.acted = true;
+    }
+    controller.statusMessage = "調試場景：玩家隊已全部行動，接著由七名瓦爾克麗城防友軍自動行動。";
+  }),
+  "stage-27-near-victory": withSetup(createStage27Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    if (!nia) return;
+    nia.x = 20;
+    nia.y = 15;
+    nia.acted = false;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 15, y: 11 };
+    controller.statusMessage = "調試場景：妮雅上移一格即可進入紫紅輪廓的瓦爾克麗城區，五名叛軍仍在場。";
+  }),
+  "stage-27-near-defeat": withSetup(createStage27Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const enemy = controller.battle.unit("2:40");
+    if (!nia || !enemy) return;
+    nia.x = 30;
+    nia.y = 30;
+    nia.life = 1;
+    enemy.x = 31;
+    enemy.y = 30;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 25, y: 27 };
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，魔劍戰士位於相鄰格。";
+  }),
+  "stage-27-victory-ready": withSetup(createStage27Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-27-cleared": createStage27Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

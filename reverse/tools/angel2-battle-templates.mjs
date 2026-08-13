@@ -119,6 +119,13 @@ function parseTemplate(buffer, stage, unitNames = [], record = STAGE_RECORD_MAP[
     .filter((instance) => instance.side === 1)
     .map((instance) => instance.unitSlot);
   const fixedPlayerUnitSlotSet = new Set(fixedPlayerUnitSlots);
+  const eligibleDeploymentUnitSlotSet = new Set(
+    eligibleDeploymentUnitSlots.map((entry) => entry.unitSlot),
+  );
+  const fixedRosterUnitSlots = fixedPlayerUnitSlots
+    .filter((unitSlot) => eligibleDeploymentUnitSlotSet.has(unitSlot));
+  const fixedBoardOnlyUnitSlots = fixedPlayerUnitSlots
+    .filter((unitSlot) => !eligibleDeploymentUnitSlotSet.has(unitSlot));
   const optionalDeploymentUnitSlots = eligibleDeploymentUnitSlots
     .filter((entry) => !fixedPlayerUnitSlotSet.has(entry.unitSlot))
     .map((entry) => entry.unitSlot);
@@ -155,10 +162,13 @@ function parseTemplate(buffer, stage, unitNames = [], record = STAGE_RECORD_MAP[
       eligibleUnitSlots: eligibleDeploymentUnitSlots.map((entry) => entry.unitSlot),
       eligibleFlagValues: [...new Set(eligibleDeploymentUnitSlots.map((entry) => entry.value))],
       fixedPlayerUnitSlots,
+      fixedRosterUnitSlots,
+      fixedBoardOnlyUnitSlots,
       fixedPlayerUnitsCannotBeRemoved: true,
       optionalUnitSlots: optionalDeploymentUnitSlots,
       openCellCount: deploymentCells.length,
       initialPlayerUnitCount: fixedPlayerUnitSlots.length,
+      initialRosterSelectedCount: fixedRosterUnitSlots.length,
       maximumPlayerUnitCount:
         fixedPlayerUnitSlots.length + Math.min(
           deploymentCells.length,
@@ -224,7 +234,7 @@ async function extract(decodedBDirectory, outputFile, unitDescriptorFile) {
       terrainTokenMap: "module29 DS:01A7 addresses this map; the same raw token directly selects a 40x44 tile from the paired even B record and indexes DS:2E7D, whose offset into UN/0056 page 0 yields one of the 23 logical movement/defense profile slots",
       class39: "stage 37 uses stored class 39 for the second hand; runtime descriptor lookup falls back to native record 38 (手)",
       perSlotBehavior: "the two 75-word arrays are AI behavior assignments, not generic unit state and not DATA.SWF descriptor field 5; module29 copies the acting unit's value to DS:0D3F before decision dispatch",
-      deployment: "FF in the side map marks each open deployment cell. A nonzero scenarioUnitFlag includes that campaign slot in the roster. Units already on side 1 are selected and locked; optional roster units can fill FF cells or be removed before the player presses 結束. The battle loader turns every unfilled FF marker into an ordinary empty cell.",
+      deployment: "FF in the side map marks each open deployment cell. A nonzero scenarioUnitFlag includes that campaign slot in the roster. Side-1 board occupants are selected and locked for battle, but an occupant with a zero scenarioUnitFlag remains board-only and has no roster entry. Optional roster units can fill FF cells or be removed before the player presses 結束. The battle loader turns every unfilled FF marker into an ordinary empty cell.",
       specialMappings: "stages 39..41 reuse normal odd templates 1,49,65 while module29 derives even tilesets 78,80,82 from the stage number; stages 42 and 43 use records 85 and 87; odd 79/81/83 are not selected and exactly duplicate odd 21/49/65",
       unselectedOddRecordAudit: "reverse/parsed/native/b-record-audit.json enumerates all three runtime B.SWF read producers and proves odd 79/81/83 have no released read path",
     },
