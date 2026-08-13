@@ -1,6 +1,7 @@
 import {
   activateStage27Content,
   STAGE27_DEFINITION,
+  STAGE27_EVENT_PROGRAM,
   STAGE27_IRON_PLATE_TERRAIN_SLOT,
   STAGE27_OBSTACLE_TERRAIN_SLOT,
   STAGE27_SEMANTIC_ALLIED_UNITS,
@@ -72,7 +73,6 @@ function stage27Forces(deployment: DeploymentResult): readonly ForceDefinition[]
       side: 1,
       control: "independent-ai",
       unitIds: automaticIds,
-      commanderId: "1:22",
       doctrine: { strategy: "expert" },
     },
     {
@@ -112,6 +112,21 @@ export class Stage27Battle extends Stage0Battle {
       forces: stage27Forces(deployment),
     }, campaign.roster, deployment));
     this.focusId = "1:0";
+  }
+
+  /** REMAKE-067 keeps the city defenders stationary only during round 1. */
+  override alliedBehaviorFor(id: string): number {
+    const behavior = super.alliedBehaviorFor(id);
+    const unit = this.unit(id);
+    const control = STAGE27_EVENT_PROGRAM.alliedControl;
+    if (control.firstRoundAutomaticPosture === "sentry"
+      && this.round < control.normalPostureFromRound
+      && behavior === 2
+      && unit?.side === 1
+      && control.automaticBehavior2Slots.some((slot) => slot === unit.slot)) {
+      return 1;
+    }
+    return behavior;
   }
 
   override enemyAiIntentFor(id: string): EnemyAiIntent | undefined {

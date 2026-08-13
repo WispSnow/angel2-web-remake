@@ -38,6 +38,8 @@ const fullDeployment = {
   ],
 };
 
+const cityDefenderIds = ["1:22", "1:41", "1:44", "1:43", "1:45", "1:42", "1:40"];
+
 describe("stage 27 battle simulation", () => {
   it("builds 31 allies, five static rebels, and inherited campaign units", () => {
     const roster = createStage27DeploymentRoster(campaign);
@@ -82,6 +84,7 @@ describe("stage 27 battle simulation", () => {
     expect(battle.forceForUnit("1:22")).toMatchObject({
       id: "valkyrie-city-defense", control: "independent-ai",
     });
+    expect(battle.forceForUnit("1:22")?.commanderId).toBeUndefined();
     expect(battle.forceForUnit("1:41")?.unitIds).toHaveLength(7);
     expect(battle.forceForUnit("1:0")).toMatchObject({
       id: "nia-valkyrie-return-team", control: "player", commanderId: "1:0",
@@ -91,6 +94,35 @@ describe("stage 27 battle simulation", () => {
     expect(battle.forceForUnit("2:40")).toMatchObject({
       id: "valkyrie-rebels", control: "independent-ai",
     });
+  });
+
+  it("holds every city defender in sentry posture on round 1 and pursues from round 2", () => {
+    const battle = new Stage27Battle(campaign, fullDeployment);
+
+    expect(cityDefenderIds.map((id) => battle.alliedBehaviorFor(id)))
+      .toEqual([1, 1, 1, 1, 1, 1, 1]);
+    for (const id of cityDefenderIds) {
+      const unit = battle.unit(id);
+      if (!unit) throw new Error(`stage 27 test is missing city defender ${id}`);
+      expect(battle.planAlliedAiAction(id)?.path).toEqual([{ x: unit.x, y: unit.y }]);
+    }
+
+    battle.round = 2;
+    expect(cityDefenderIds.map((id) => battle.alliedBehaviorFor(id)))
+      .toEqual([2, 2, 2, 2, 2, 2, 2]);
+    expect(cityDefenderIds.map((id) => battle.planAlliedAiAction(id))
+      .some((action) => (action?.path.length ?? 0) > 1)).toBe(true);
+  });
+
+  it("keeps the battle ongoing when the named defender or all seven defenders are removed", () => {
+    const namedDefenderBattle = new Stage27Battle(campaign, fullDeployment);
+    namedDefenderBattle.units = namedDefenderBattle.units.filter(({ id }) => id !== "1:22");
+    expect(namedDefenderBattle.outcome()).toBe("ongoing");
+
+    const allDefendersBattle = new Stage27Battle(campaign, fullDeployment);
+    const defenderSet = new Set(cityDefenderIds);
+    allDefendersBattle.units = allDefendersBattle.units.filter(({ id }) => !defenderSet.has(id));
+    expect(allDefendersBattle.outcome()).toBe("ongoing");
   });
 
   it("uses all four exact destination ranges without requiring rebel elimination", () => {

@@ -2391,7 +2391,24 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("migrates v52 saves to the class-role ranged-tactics identity", () => {
+  it("migrates v53 saves to the stage 27 defender-delay identity", () => {
+    const current = stage27BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 53,
+      contentVersion: "class-role-ranged-tactics-ai-1",
+      battle: { ...current.battle, round: 2 },
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-27",
+      battle: { round: 2 },
+    });
+  });
+
+  it("migrates v52 saves through the class-role ranged-tactics identity", () => {
     const current = stage27BattleSave();
     const migrated = parseSaveData(JSON.stringify({
       ...current,

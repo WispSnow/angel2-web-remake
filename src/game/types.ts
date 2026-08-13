@@ -219,8 +219,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 53;
-  contentVersion: "class-role-ranged-tactics-ai-1";
+  version: 54;
+  contentVersion: "stage-27-first-round-sentry-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

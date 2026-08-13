@@ -280,8 +280,9 @@ const sources = Object.entries(inputPaths).map(([id, file]) => ({
   sha256: sha256(inputBuffers[id]),
   bytes: inputBuffers[id].length,
 }));
+const stableRemakeDecisions = ["REMAKE-064", "REMAKE-067"];
 const identityHash = createHash("sha256");
-identityHash.update("stableRemake\0REMAKE-064\0");
+identityHash.update(`stableRemake\0${stableRemakeDecisions.join("\0")}\0`);
 for (const source of sources) identityHash.update(`${source.path}\0${source.sha256}\n`);
 const contentIdentity = `stage-27/evidence-${identityHash.digest("hex")}`;
 const eventProgram = {
@@ -292,10 +293,12 @@ const eventProgram = {
     automaticBehavior2Slots: fixedAlliedUnits.filter(({ aiBehavior }) => aiBehavior === 2).map(({ slot }) => slot),
     playerBehavior0FixedSlots: fixedSlots.filter((slot) => slot === 0
       || fixedAlliedUnits.some((unit) => unit.slot === slot && unit.aiBehavior === 0)),
+    firstRoundAutomaticPosture: "sentry",
+    normalPostureFromRound: 2,
   },
   enemyReinforcements,
   completedRoute: { module: 25, stage: 28, replayPresentation: false },
-  stableRemakeDecisions: ["REMAKE-064"],
+  stableRemakeDecisions,
 };
 const deployment = {
   kind: "interactive",

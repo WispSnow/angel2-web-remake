@@ -113,10 +113,12 @@ describe("stage 27 generated content", () => {
       alliedControl: {
         automaticBehavior2Slots: [22, 41, 44, 43, 45, 42, 40],
         playerBehavior0FixedSlots: [57, 56, 58, 0],
+        firstRoundAutomaticPosture: "sentry",
+        normalPostureFromRound: 2,
       },
       enemyReinforcements: { kind: "none", initialSide2: 5 },
       completedRoute: { module: 25, stage: 28, replayPresentation: false },
-      stableRemakeDecisions: ["REMAKE-064"],
+      stableRemakeDecisions: ["REMAKE-064", "REMAKE-067"],
     });
     expect(STAGE27_EVENT_PROGRAM.enemyReinforcements.auditedSources).toEqual([
       "initial-template", "round-event-handler", "dynamic-board-catalog",

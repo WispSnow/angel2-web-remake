@@ -199,6 +199,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restoredKins) ? restoredKins : undefined;
 }
 
+function migrateVersion53Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 53
+    || value.contentVersion !== "class-role-ranged-tactics-ai-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion52Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 52
@@ -1748,6 +1759,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion53 = migrateVersion53Save(value);
+    if (migratedVersion53) return migratedVersion53;
     const migratedVersion52 = migrateVersion52Save(value);
     if (migratedVersion52) return migratedVersion52;
     const migratedVersion51 = migrateVersion51Save(value);
