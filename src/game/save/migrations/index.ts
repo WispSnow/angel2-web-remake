@@ -152,7 +152,9 @@ function normalizeStage22PostbattleTransition(value: unknown): unknown {
 }
 
 const KINS_SLOT = 7;
-const KINS_CAMPAIGN_STAGES = new Set(["stage-23", "stage-24", "stage-26", "stage-27", "stage-28"]);
+const KINS_CAMPAIGN_STAGES = new Set([
+  "stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29",
+]);
 
 function restoreKinsCampaignClass(save: SaveData): SaveData {
   if (!KINS_CAMPAIGN_STAGES.has(save.stageId)) return save;
@@ -197,6 +199,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   const restored = restoreGadirathClassFromEntrySnapshot(normalized);
   const restoredKins = restoreKinsCampaignClass(restored);
   return isSaveData(restoredKins) ? restoredKins : undefined;
+}
+
+function migrateVersion54Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 54
+    || value.contentVersion !== "stage-27-first-round-sentry-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
 }
 
 function migrateVersion53Save(value: unknown): SaveData | undefined {
@@ -1759,6 +1772,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion54 = migrateVersion54Save(value);
+    if (migratedVersion54) return migratedVersion54;
     const migratedVersion53 = migrateVersion53Save(value);
     if (migratedVersion53) return migratedVersion53;
     const migratedVersion52 = migrateVersion52Save(value);

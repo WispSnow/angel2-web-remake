@@ -62,6 +62,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 24 關 · 死亡之谷城堡前",
     "第 25 關 · 遭遇碧娜維姬",
     "第 26 關 · 趕回瓦爾克麗城",
+    "第 27 關 · 保衛瓦爾克麗城",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -198,9 +199,19 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-26-near-defeat",
     "stage-26-victory-ready",
     "stage-26-cleared",
+    "stage-28-prebattle",
+    "stage-28-deployment",
+    "stage-28-opening",
+    "stage-28-player",
+    "stage-28-near-victory",
+    "stage-28-near-defeat",
+    "stage-28-victory-ready",
+    "stage-28-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
+  await expect(page.locator('[data-debug-stage-id="stage-28"] [data-debug-scenario-id]'))
+    .toHaveCount(8);
   await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
   await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");
   await captureVisualAudit(page.locator('[data-debug-stage-id="stage-03"]'), {
@@ -407,6 +418,38 @@ test("stage-twenty-seven debug entry uses the configured campaign professions", 
   expect(classes.get("1:57")).toBe("engineer");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/debug-stage27-representative-growth.png`,
+  });
+});
+
+test("stage-twenty-eight debug entry uses the configured campaign professions", async ({ page }) => {
+  await page.goto("/debug.html");
+  await page.getByTestId("debug-difficulty").selectOption("2");
+  const playerScenario = page.getByTestId("debug-scenario-stage-28-player");
+  await expect(playerScenario).toHaveAttribute(
+    "href",
+    "/?debugScenario=stage-28-player&difficulty=2&roster=representative-growth&growth=100",
+  );
+  await playerScenario.click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
+  await expect(page.getByTestId("debug-toolbar")).toContainText(
+    "每關成長：100 · 本關成長預算：2700",
+  );
+  await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", /巨龍騎士妮雅/u);
+  const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
+    units: Array<{ id: string; side: number; classId: string }>;
+  });
+  expect(state.units.filter(({ side }) => side === 1)).toHaveLength(29);
+  const classes = new Map(state.units.map(({ id, classId }) => [id, classId]));
+  for (const id of ["1:0", "1:1", "1:2", "1:3", "1:4", "1:5", "1:6", "1:12", "1:13", "1:14", "1:17", "1:18"]) {
+    expect(classes.get(id), id).not.toBe("soldier");
+  }
+  expect(classes.get("1:7")).toBe("magic-priest");
+  expect(classes.get("1:8")).toBe("cavalry");
+  expect(classes.get("1:10")).toBe("water-warrior");
+  expect(classes.get("1:11")).toBe("water-warrior");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/debug-stage28-representative-growth.png`,
   });
 });
 

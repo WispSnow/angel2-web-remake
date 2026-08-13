@@ -256,7 +256,7 @@ test("S27-H: Nia defeat returns directly to the same deployment", async ({ page 
   });
 });
 
-test("S27-I/J: victory story saves the frozen stage-28 boundary", async ({ page }) => {
+test("S27-I/J: victory story saves and enters the stage-28 prebattle", async ({ page }) => {
   await page.goto("/?debugScenario=stage-27-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "52");
@@ -274,7 +274,8 @@ test("S27-I/J: victory story saves the frozen stage-28 boundary", async ({ page 
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "prebattleStory");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "53");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -302,9 +303,10 @@ test("S27-I/J: victory story saves the frozen stage-28 boundary", async ({ page 
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-27",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-28",
+    stageProgress: 0,
+    phase: "prebattleStory",
     campaignRoute: "stage-28",
+    consumedEventIds: ["stage-28-prebattle-story"],
   });
 });

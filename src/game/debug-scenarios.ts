@@ -370,6 +370,19 @@ const STAGE27_COMPLETED_EVENT_IDS = [
   "stage-27-completed-route",
 ] as const;
 
+const STAGE28_BATTLE_EVENT_IDS = [
+  "stage-28-prebattle-story",
+  "stage-28-enter-deployment",
+  "stage-28-opening-story",
+] as const;
+
+const STAGE28_COMPLETED_EVENT_IDS = [
+  ...STAGE28_BATTLE_EVENT_IDS,
+  "stage-28-objective-reached",
+  "stage-28-victory-story",
+  "stage-28-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -2473,6 +2486,95 @@ async function createStage27Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage28Prebattle(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage("stage-28", debugCampaign(context, "stage-28"));
+  return controller;
+}
+
+async function createStage28Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-28",
+    debugCampaign(context, "stage-28"),
+    { preparation: true, statusMessage: "調試場景：瓦爾克麗守城戰部署。" },
+  );
+  return controller;
+}
+
+async function stage28FullDeployment() {
+  const { STAGE28_DEFINITION } = await import("./content/stage28");
+  return {
+    placements: [
+      ...STAGE28_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE28_DEFINITION.deployment.optionalSlots.map((slot, index) => ({
+        slot, position: { ...STAGE28_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage28Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage28Deployment(context);
+  controller.completeDeployment(await stage28FullDeployment());
+  return controller;
+}
+
+async function createStage28Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-28");
+  const { Stage28Battle } = await import("./simulation/stage28-battle");
+  const battle = new Stage28Battle(campaign, await stage28FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 28 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-28"),
+    stageLabel: "保衛瓦爾克麗城",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE28_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：二十九人瓦爾克麗守城隊迎戰十七名攻城敵軍。";
+  return controller;
+}
+
+async function createStage28Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-28");
+  const { createStage28DeploymentRoster } = await import("./simulation/stage28-battle");
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-29",
+    stageLabel: "騎士城堡前",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: completeCampaignRoster(createStage28DeploymentRoster(campaign).map((unit) => ({
+      slot: unit.slot,
+      classId: unit.classId,
+      experience: unit.experience,
+      life: unit.life,
+    }))),
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE28_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -3226,6 +3328,51 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-27-cleared": createStage27Completed,
+  "stage-28-prebattle": createStage28Prebattle,
+  "stage-28-deployment": createStage28Deployment,
+  "stage-28-opening": createStage28Opening,
+  "stage-28-player": createStage28Player,
+  "stage-28-near-victory": withSetup(createStage28Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const finalEnemy = controller.battle.unit("2:55");
+    if (!nia || !finalEnemy) return;
+    nia.x = 28;
+    nia.y = 24;
+    nia.experience = 0;
+    nia.life = controller.battle.statsFor(nia).maxLife;
+    nia.acted = false;
+    finalEnemy.x = 29;
+    finalEnemy.y = 24;
+    finalEnemy.life = 1;
+    controller.battle.units = controller.battle.units.filter(
+      ({ side, id }) => side === 1 || id === finalEnemy.id,
+    );
+    for (const ally of controller.battle.units.filter(({ side, id }) => side === 1 && id !== nia.id)) {
+      ally.acted = true;
+    }
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 23, y: 21 };
+    controller.statusMessage = "調試場景：最後一名攻城魔劍戰士只剩 1 點生命。";
+  }),
+  "stage-28-near-defeat": withSetup(createStage28Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const enemy = controller.battle.unit("2:55");
+    if (!nia || !enemy) return;
+    nia.x = 28;
+    nia.y = 24;
+    nia.life = 1;
+    enemy.x = 29;
+    enemy.y = 24;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 23, y: 21 };
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，魔劍戰士位於相鄰格。";
+  }),
+  "stage-28-victory-ready": withSetup(createStage28Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-28-cleared": createStage28Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

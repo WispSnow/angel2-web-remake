@@ -1373,6 +1373,55 @@ async function loadStage27Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage28Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage28"),
+    import("./simulation/stage28-battle"),
+  ]);
+  content.activateStage28Content();
+  const definition = content.STAGE28_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 27",
+      title: content.STAGE28.name,
+      objective: content.STAGE28_DEFINITION.objective.victoryText,
+      minimap: content.STAGE28_ASSETS.minimap,
+      terrain: content.STAGE28_TERRAIN_TOKENS,
+      gridWidth: content.STAGE28.width,
+      gridHeight: content.STAGE28.height,
+      enemies: content.STAGE28_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十八名候選最多再選二十八人。擊退全部攻城敵軍並保護妮雅。",
+    },
+    ["stage-28-prebattle-story", "stage-28-enter-deployment"],
+    (campaign) => battleModule.createStage28DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 28 requires a deployment result");
+    return new battleModule.Stage28Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE28_DEFINITION,
+    assets: {
+      map: content.STAGE28_ASSETS.map,
+      minimap: content.STAGE28_ASSETS.minimap,
+      storyBackground: content.STAGE28_ASSETS.storyBackground,
+      unitSprites: content.STAGE28_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -3149,6 +3198,75 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage27Module,
+  },
+  "stage-28": {
+    id: "stage-28",
+    ordinal: 27,
+    label: "保衛瓦爾克麗城",
+    nextStageId: "stage-29",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "prebattleStory",
+      statusText: "瓦爾克麗城暫時脫險；眾人開始商議迎擊城外敵軍。",
+      campaignRoute: "stage-28",
+    },
+    enemyPhaseStatusText: "敵方階段：包圍瓦爾克麗城的敵軍開始行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新開始瓦爾克麗守城關前流程。",
+      retreatStatusText: "全面撤退：返回瓦爾克麗守城關前流程並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "騎士城堡前",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-28-prebattle-story",
+        "stage-28-enter-deployment",
+        "stage-28-opening-story",
+        "stage-28-objective-reached",
+        "stage-28-victory-story",
+        "stage-28-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-28-prebattle-story",
+        "stage-28-enter-deployment",
+        "stage-28-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 29,
+        openCellCount: 34,
+      },
+      enemyClassById: [
+        ["2:41", "demon-dragon-knight"],
+        ["2:42", "demon-dragon-knight"],
+        ["2:55", "magic-sword-warrior"],
+        ["2:56", "magic-sword-warrior"],
+        ["2:57", "magic-sword-warrior"],
+        ["2:50", "evil-sword-warrior"],
+        ["2:54", "magic-sword-warrior"],
+        ["2:51", "evil-sword-warrior"],
+        ["2:52", "evil-sword-warrior"],
+        ["2:53", "evil-sword-warrior"],
+        ["2:49", "magic-master"],
+        ["2:46", "crossbow"],
+        ["2:47", "magic-master"],
+        ["2:45", "crossbow"],
+        ["2:48", "magic-master"],
+        ["2:43", "pegasus-warrior"],
+        ["2:44", "pegasus-warrior"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage28Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

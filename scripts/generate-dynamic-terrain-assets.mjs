@@ -51,6 +51,7 @@ const stages = [
   { stage: 24, stageId: "stage-24", ironPlateToken: 3, obstacleToken: 3 },
   { stage: 26, stageId: "stage-26", ironPlateToken: 23, obstacleToken: 23 },
   { stage: 27, stageId: "stage-27", ironPlateToken: 3, obstacleToken: 57 },
+  { stage: 28, stageId: "stage-28", ironPlateToken: 16, obstacleToken: 16 },
   { stage: 42, stageId: "stage-42-portal", ironPlateToken: 1, obstacleToken: 1 },
 ];
 const constructions = [

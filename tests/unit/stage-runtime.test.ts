@@ -48,9 +48,10 @@ describe("stage runtime manifest", () => {
       "stage-24",
       "stage-26",
       "stage-27",
+      "stage-28",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ ordinal }) => ordinal))
-      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]);
+      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ nextStageId }) => nextStageId)).toEqual([
       "stage-01",
       "stage-02",
@@ -80,6 +81,7 @@ describe("stage runtime manifest", () => {
       "stage-26",
       "stage-27",
       "stage-28",
+      "stage-29",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ label }) => label)).toEqual([
       "瓦爾克麗宮",
@@ -110,6 +112,7 @@ describe("stage runtime manifest", () => {
       "死亡之谷城堡前",
       "遭遇碧娜維姬",
       "趕回瓦爾克麗城",
+      "保衛瓦爾克麗城",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ completion }) => completion.destinationLabel))
       .toEqual([
@@ -135,6 +138,7 @@ describe("stage runtime manifest", () => {
         "遭遇碧娜維姬",
         "趕回瓦爾克麗城",
         "保衛瓦爾克麗城",
+        "騎士城堡前",
       ]);
     expect(isPlayableStageId("stage-03")).toBe(true);
     expect(isPlayableStageId("stage-04")).toBe(true);
@@ -161,6 +165,7 @@ describe("stage runtime manifest", () => {
     expect(isPlayableStageId("stage-24")).toBe(true);
     expect(isPlayableStageId("stage-26")).toBe(true);
     expect(isPlayableStageId("stage-27")).toBe(true);
+    expect(isPlayableStageId("stage-28")).toBe(true);
     expect(stageRuntimeSourceForDestination("stage-04")?.id).toBe("stage-03");
     expect(stageRuntimeSourceForDestination("stage-05")?.id).toBe("stage-04");
     expect(stageRuntimeSourceForDestination("stage-42-portal")?.id).toBe("stage-05");
@@ -185,6 +190,7 @@ describe("stage runtime manifest", () => {
     expect(stageRuntimeSourceForDestination("stage-26")?.id).toBe("stage-24");
     expect(stageRuntimeSourceForDestination("stage-27")?.id).toBe("stage-26");
     expect(stageRuntimeSourceForDestination("stage-28")?.id).toBe("stage-27");
+    expect(stageRuntimeSourceForDestination("stage-29")?.id).toBe("stage-28");
     expect(stageRuntimeSourceForDestination("stage-11")?.id).toBe("stage-09");
     expect(stageRuntimeSourceForDestination("stage-10")?.id).toBe("stage-11");
     expect(STAGE_RUNTIME_MANIFEST["stage-03"].mapPresentationActionIds).toContain("recovery-1");
@@ -216,6 +222,7 @@ describe("stage runtime manifest", () => {
     const stage24 = await loadStageRuntime("stage-24");
     const stage26 = await loadStageRuntime("stage-26");
     const stage27 = await loadStageRuntime("stage-27");
+    const stage28 = await loadStageRuntime("stage-28");
     expect(stage2.createBattle(campaign).stage.id).toBe("stage-02");
     expect(stage3.createBattle({ ...campaign, stageId: "stage-03" }).stage.id).toBe("stage-03");
     expect(stage3.assets?.unitSprites["enemy-monk"]).toContain("unit-enemy-monk.png");
@@ -435,6 +442,23 @@ describe("stage runtime manifest", () => {
     expect(stage27.save.enemyClassById).toContainEqual(["2:40", "magic-sword-warrior"]);
     expect(stage27.retry.mode).toBe("preparation");
     expect(stage27.nextStageId).toBe("stage-28");
+    expect(stage28.preparation?.definition).toMatchObject({
+      fixedPlacements: [{ slot: 0, position: { x: 28, y: 24 } }],
+      maximumUnits: 29,
+    });
+    expect(stage28.preparation?.definition.openCells).toHaveLength(34);
+    expect(stage28.preparation?.presentation.enemies).toHaveLength(17);
+    expect(stage28.entry).toMatchObject({
+      phase: "prebattleStory",
+      trigger: "campaign-entered",
+    });
+    expect(stage28.save.enemyClassById).toHaveLength(17);
+    expect(stage28.save.enemyClassById).toContainEqual(["2:41", "demon-dragon-knight"]);
+    expect(stage28.save.enemyClassById).toContainEqual(["2:50", "evil-sword-warrior"]);
+    expect(stage28.assets?.storyBackground)
+      .toBe("/assets/original/story-stage28-background-22.png");
+    expect(stage28.retry.mode).toBe("entry");
+    expect(stage28.nextStageId).toBe("stage-29");
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
   });

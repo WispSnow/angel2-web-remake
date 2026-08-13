@@ -34,7 +34,8 @@ export type StageId =
   | "stage-23"
   | "stage-24"
   | "stage-26"
-  | "stage-27";
+  | "stage-27"
+  | "stage-28";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -63,7 +64,8 @@ export type CampaignRouteId =
   | "stage-24"
   | "stage-26"
   | "stage-27"
-  | "stage-28";
+  | "stage-28"
+  | "stage-29";
 
 export interface Position {
   x: number;
@@ -219,8 +221,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 54;
-  contentVersion: "stage-27-first-round-sentry-1";
+  version: 55;
+  contentVersion: "stage-28-valkyrie-defense-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
