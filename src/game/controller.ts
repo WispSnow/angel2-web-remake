@@ -2818,18 +2818,12 @@ export class GameController {
   }
 
   openGroupCommands(): void {
-    if (
-      this.phase !== "player"
-      || this.busy
-      || this.hasBlockingOverlay
-      || this.objectiveOpen
-      || this.recordMenuMode !== undefined
-      || this.quitConfirmOpen
-      || this.retreatConfirmOpen
-      || this.soundSettingsOpen
-      || this.musicSettingsOpen
-      || this.actionMode !== "idle"
-    ) return;
+    const fromSettings = this.settingsOpen;
+    const fromBattle = this.phase === "player"
+      && !this.busy
+      && !this.hasBlockingOverlay
+      && this.actionMode === "idle";
+    if (!fromSettings && !fromBattle) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
     this.soundSettingsOpen = false;
