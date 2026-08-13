@@ -7,6 +7,7 @@ import {
 import { shootingLineVisitProbabilities } from "../../src/game/simulation/actions/range-map";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
+import { manhattan } from "../../src/game/simulation/grid";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
@@ -388,6 +389,236 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     });
   });
 
+  it("falls back to geometric approach when an impassable sea splits every engagement route", () => {
+    const splitBySea: ArenaBattleEnvironment = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x }) => x === 25 ? 0 : 2,
+    };
+    const enemyBattle = new ArenaBattle([
+      { id: "ally-across-sea", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 30, y: 30 },
+      { id: "enemy-pursuer", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x331a), splitBySea);
+
+    expect(enemyBattle.planEnemyAiAction("enemy-pursuer")).toMatchObject({
+      kind: "move",
+      path: [
+        { x: 20, y: 30 },
+        { x: 21, y: 30 },
+        { x: 22, y: 30 },
+        { x: 23, y: 30 },
+      ],
+    });
+    expect(enemyBattle.expertAiDecisionTrace("enemy-pursuer")?.chosen?.reasons)
+      .toContain("目標推進 3");
+
+    const alliedBattle = new ArenaBattle([
+      { id: "ally-pursuer", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-across-sea", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 30, y: 30 },
+    ], 0, new DeterministicRng(0x331b), splitBySea);
+
+    expect(alliedBattle.planAlliedAiAction("ally-pursuer")).toMatchObject({
+      kind: "move",
+      path: [
+        { x: 20, y: 30 },
+        { x: 21, y: 30 },
+        { x: 22, y: 30 },
+        { x: 23, y: 30 },
+      ],
+    });
+  });
+
+  it("keeps next-turn caster safety ahead of a closer superior terrain cell", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "enemy-sister", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 27, y: 30 },
+    ], 0, new DeterministicRng(0x331c), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      // The closer casting cell has better class-adjusted defense, but lets
+      // the target establish melee contact on its next phase.
+      terrainSlotAt: ({ x, y }) => x === 25 && y === 30 ? 1 : 2,
+    });
+
+    expect(battle.planEnemyAiAction("enemy-sister")).toMatchObject({
+      kind: "move",
+      path: [
+        { x: 27, y: 30 },
+        { x: 26, y: 30 },
+      ],
+      setupActionId: "fire-1",
+      setupTargetId: "ally-target",
+    });
+  });
+
+  it("keeps a technique caster at maximum casting distance when terrain defense ties", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "enemy-sister", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 27, y: 30 },
+    ], 0, new DeterministicRng(0x331d), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    });
+
+    expect(battle.planEnemyAiAction("enemy-sister")).toMatchObject({
+      kind: "move",
+      path: [
+        { x: 27, y: 30 },
+        { x: 26, y: 30 },
+      ],
+      setupActionId: "fire-1",
+      setupTargetId: "ally-target",
+    });
+  });
+
+  it("keeps one forecast target fixed before maximizing that target's casting distance", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-priority", side: 1 as const, slot: 0, classId: "archer" as const, level: 1 as const, x: 21, y: 30 },
+      { id: "ally-alternate", side: 1 as const, slot: 1, classId: "archer" as const, level: 1 as const, x: 24, y: 28 },
+      { id: "enemy-sister", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 28, y: 30 },
+    ], 0, new DeterministicRng(0x3328), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    });
+    battle.unit("ally-priority")!.life = 1;
+
+    const action = battle.planEnemyAiAction("enemy-sister", 2);
+    expect(action).toMatchObject({
+      kind: "move",
+      setupActionId: "fire-1",
+      setupTargetId: "ally-priority",
+    });
+    expect(manhattan(action!.path.at(-1)!, battle.unit("ally-priority")!)).toBe(4);
+  });
+
+  it("chooses a safe next-turn casting position before a riskier superior terrain cell", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 21, y: 30 },
+      { id: "ally-immobile-melee", side: 1 as const, slot: 1, classId: "head" as const, level: 1 as const, x: 24, y: 29 },
+      { id: "enemy-sister", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 28, y: 30 },
+    ], 0, new DeterministicRng(0x3321), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x, y }) => x === 24 && y === 30 ? 1 : 2,
+    });
+    battle.unit("ally-target")!.life = 1;
+
+    expect(battle.planEnemyAiAction("enemy-sister", 2)).toMatchObject({
+      kind: "move",
+      path: [
+        { x: 28, y: 30 },
+        { x: 27, y: 30 },
+        { x: 26, y: 30 },
+        { x: 25, y: 30 },
+      ],
+      setupActionId: "fire-1",
+      setupTargetId: "ally-target",
+    });
+  });
+
+  it("keeps a pure support caster with its friendly front instead of pursuing an enemy", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-front", side: 2 as const, slot: 1, classId: "warrior" as const, level: 1 as const, x: 30, y: 30 },
+      { id: "enemy-flank", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 15, y: 30 },
+      { id: "enemy-monk", side: 2 as const, slot: 0, classId: "monk" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3322), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    });
+
+    const action = battle.planEnemyAiAction("enemy-monk", 2);
+    expect(action).toMatchObject({ kind: "move" });
+    expect(action!.path.at(-1)!.x).toBeGreaterThan(20);
+    expect(action).not.toHaveProperty("targetId", "enemy-flank");
+  });
+
+  it("keeps a prayer-capable support career anchored to its friendly front", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-front", side: 2 as const, slot: 1, classId: "warrior" as const, level: 1 as const, x: 30, y: 30 },
+      { id: "enemy-flank", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 15, y: 30 },
+      { id: "enemy-prayer-guide", side: 2 as const, slot: 0, classId: "prayer-guide" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3327), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    });
+    battle.unit("enemy-prayer-guide")!.experience = 10_000;
+    battle.unit("enemy-prayer-guide")!.statuses.techniqueSeal = 3;
+
+    const action = battle.planEnemyAiAction("enemy-prayer-guide", 2);
+    expect(action).toMatchObject({ kind: "move" });
+    expect(action!.path.at(-1)!.x).toBeGreaterThan(20);
+  });
+
+  it("does not turn a ranged sentry into an adjacent ordinary attacker", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-adjacent", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-archer", side: 2 as const, slot: 0, classId: "archer" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3323));
+
+    expect(battle.planEnemyAiAction("enemy-archer", 1)).toEqual({
+      unitId: "enemy-archer",
+      kind: "wait",
+      path: [{ x: 25, y: 30 }],
+    });
+  });
+
+  it("positions a free-action sister for next-turn healing instead of chasing melee", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-sister", side: 1 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 27, y: 30 },
+      { id: "ally-wounded", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "enemy-distant", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 40, y: 30 },
+    ], 0, new DeterministicRng(0x331e), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    });
+    battle.unit("ally-wounded")!.life -= 20;
+
+    expect(battle.planAlliedAiAction("ally-sister")).toMatchObject({
+      kind: "move",
+      path: [
+        { x: 27, y: 30 },
+        { x: 26, y: 30 },
+      ],
+      setupActionId: "heal-1",
+      setupTargetId: "ally-wounded",
+    });
+  });
+
+  it("returns a caster to its expert pursuit when no reachable cell enables a next-turn action", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-distant", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 40, y: 30 },
+      { id: "enemy-sister", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3320), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    });
+
+    const action = battle.planEnemyAiAction("enemy-sister", 2);
+    expect(action).toMatchObject({
+      kind: "move",
+      pursuitProgress: 4,
+      path: [
+        { x: 20, y: 30 },
+        { x: 21, y: 30 },
+        { x: 22, y: 30 },
+        { x: 23, y: 30 },
+        { x: 24, y: 30 },
+      ],
+    });
+    expect(action).not.toHaveProperty("setupActionId");
+    expect(action).not.toHaveProperty("setupTargetId");
+  });
+
+  it("never falls back to melee when a fixed technique guard cannot cast", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-sister", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x331f));
+    battle.unit("enemy-sister")!.statuses.techniqueSeal = 3;
+
+    expect(battle.planEnemyAiAction("enemy-sister", 1)).toMatchObject({
+      kind: "wait",
+      path: [{ x: 25, y: 30 }],
+    });
+  });
+
   it("queues behind an occupied melee frontage when no vacant engagement route exists", () => {
     const corridorEnvironment: ArenaBattleEnvironment = {
       ...ALL_TERRAIN_ARENA_ENVIRONMENT,
@@ -524,8 +755,8 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     const rng = new DeterministicRng(0x3307);
     const battle = new ArenaBattle([
       { id: "ally-main", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 23, y: 31 },
-      { id: "ally-high-line", side: 1 as const, slot: 1, classId: "magic-master" as const, level: 1 as const, x: 21, y: 30 },
-      { id: "ally-low-line", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "ally-high-line", side: 1 as const, slot: 1, classId: "magic-master" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "ally-low-line", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 21, y: 31 },
       { id: "enemy-magic-archer", side: 2 as const, slot: 0, classId: "magic-archer" as const, level: 1 as const, x: 20, y: 30 },
     ], 0, rng);
     const before = { state: rng.state, calls: rng.calls };
@@ -536,11 +767,59 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       actionId: "magic-archer-shot",
       targetId: "ally-main",
     });
-    expect(action?.linePath).toContainEqual({ x: 21, y: 30 });
-    expect(action?.linePath).not.toContainEqual({ x: 20, y: 31 });
+    expect(action?.linePath).toContainEqual({ x: 22, y: 30 });
+    expect(action?.linePath).not.toContainEqual({ x: 21, y: 31 });
     expect(battle.expertAiDecisionTrace("enemy-magic-archer")?.chosen?.reasons)
       .toContain("有效傷害 88");
     expect({ state: rng.state, calls: rng.calls }).toEqual(before);
+  });
+
+  it("maximizes magic-arrow total damage before the default ranged tie-breaks", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-line", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "ally-high-damage", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "ally-one-life", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 20, y: 34 },
+      { id: "enemy-magic-archer", side: 2 as const, slot: 0, classId: "magic-archer" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3324));
+    battle.unit("ally-one-life")!.life = 1;
+
+    expect(battle.planEnemyAiAction("enemy-magic-archer", 1)).toMatchObject({
+      kind: "special",
+      actionId: "magic-archer-shot",
+      targetId: "ally-high-damage",
+    });
+  });
+
+  it("does not let a magic archer act adjacent to any enemy, even one currently disabled", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-adjacent", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "ally-ranged-target", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "enemy-magic-archer", side: 2 as const, slot: 0, classId: "magic-archer" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3325));
+    battle.unit("ally-adjacent")!.actionDisabled = true;
+
+    expect(battle.planEnemyAiAction("enemy-magic-archer", 1)).toEqual({
+      unitId: "enemy-magic-archer",
+      kind: "wait",
+      path: [{ x: 20, y: 30 }],
+    });
+  });
+
+  it("moves a pursuing magic archer out of contact before selecting a damage line", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-adjacent", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "ally-ranged-target", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-magic-archer", side: 2 as const, slot: 0, classId: "magic-archer" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3326));
+
+    const action = battle.planEnemyAiAction("enemy-magic-archer", 2);
+    expect(action).toMatchObject({
+      kind: "special",
+      actionId: "magic-archer-shot",
+    });
+    const destination = action!.path.at(-1)!;
+    expect(manhattan(destination, battle.unit("ally-adjacent")!)).toBeGreaterThan(1);
+    expect(manhattan(destination, battle.unit("ally-ranged-target")!)).toBeGreaterThan(1);
   });
 
   it("retains the original random-route branch probabilities as reverse evidence", () => {
@@ -570,7 +849,7 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       .toBe("enemy-warrior");
   });
 
-  it("keeps a wizard in normal priority when it chooses a kill instead of ice", () => {
+  it("keeps a wizard out of melee and defers its ice action behind ordinary attackers", () => {
     const battle = new ArenaBattle([
       { id: "ally", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
       { id: "enemy-wizard", side: 2 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 26, y: 30 },
@@ -578,9 +857,12 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     ], 0, new DeterministicRng(0x3309));
     battle.unit("ally")!.life = 1;
 
-    expect(battle.planEnemyAiAction("enemy-wizard")).toMatchObject({ kind: "attack" });
+    expect(battle.planEnemyAiAction("enemy-wizard")).toMatchObject({
+      kind: "special",
+      actionId: "ice-2",
+    });
     expect(battle.nextEnemyActionId(["enemy-wizard", "enemy-warrior"]))
-      .toBe("enemy-wizard");
+      .toBe("enemy-warrior");
   });
 
   it("forbids ice when every surviving enemy has an ice technique", () => {

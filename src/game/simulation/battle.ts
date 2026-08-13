@@ -1,4 +1,5 @@
 import {
+  classCombatRole,
   classTierFor,
   classDefinition,
   classFallbackPortraitFor,
@@ -9,6 +10,7 @@ import {
   suppressesOrdinaryCounterFor,
   terrainDefensePercentFor,
   usesEmpressOrDragonAi,
+  usesTechniqueAi,
 } from "../content/classes";
 import {
   BATTLE_ACTION_DEFINITIONS,
@@ -117,6 +119,12 @@ export interface MagicArcherLineOption {
   guaranteedKills: number;
   expectedDamage: number;
   targetThreat: number;
+}
+
+interface RangedPositionRisk {
+  adjacentEnemyCount: number;
+  meleeContactCount: number;
+  meleeExpectedDamage: number;
 }
 
 const linePathKey = (path: readonly Position[]): string =>
@@ -1427,7 +1435,7 @@ export class Stage0Battle {
     }
 
     const targetFilter = this.forces.targetFilterFor(id, this.units);
-    return this.planExpertCombatAction(unit, behavior !== 1, {
+    return this.planExpertCombatAction(unit, behavior === 1 ? "sentry" : "pursuit", {
       targetFilter,
       behavior,
     });
@@ -1517,7 +1525,7 @@ export class Stage0Battle {
       return action;
     }
     const targetFilter = this.forces.targetFilterFor(id, this.units);
-    return this.planExpertCombatAction(unit, behavior !== 1, {
+    return this.planExpertCombatAction(unit, behavior === 1 ? "sentry" : "pursuit", {
       targetFilter,
       behavior,
     });
@@ -1562,7 +1570,7 @@ export class Stage0Battle {
       return this.planConfusedAiAction(unit);
     }
     if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
-    return this.planExpertCombatAction(unit, intent === "pursuit", {
+    return this.planExpertCombatAction(unit, intent, {
       behavior: intent === "sentry" ? 1 : 2,
     });
   }
@@ -1631,13 +1639,13 @@ export class Stage0Battle {
 
   protected planExpertCombatAction(
     unit: BattleUnit,
-    allowMove: boolean,
+    intent: Extract<EnemyAiIntent, "sentry" | "pursuit">,
     options: {
       behavior: number;
       targetFilter?: (target: BattleUnit) => boolean;
     },
   ): AlliedAiAction {
-    const positionFilter = allowMove
+    const positionFilter = intent === "pursuit"
       ? undefined
       : (position: Position) => positionKey(position) === positionKey(unit);
     const iceIsForbidden = this.onlyIceCapableSideRemains(unit.side);
@@ -1649,11 +1657,28 @@ export class Stage0Battle {
         || (options.targetFilter?.(target) ?? true),
     });
     const opponentSide: BattleUnit["side"] = unit.side === 1 ? 2 : 1;
-    const ordinary = this.planOrdinaryAiAction(unit, opponentSide, options.behavior, {
-      expertRanking: true,
-      targetFilter: options.targetFilter,
-    });
-    const candidates = [classAction, ordinary]
+    let fallbackAction: AlliedAiAction | undefined;
+    if (classCombatRole(unit.classId) === "ranged") {
+      if (!classAction) {
+        fallbackAction = intent === "pursuit"
+          ? (usesTechniqueAi(unit.classId, unit.side)
+              ? this.planExpertTechniquePositioningAction(unit, {
+                  iceIsForbidden,
+                  targetFilter: options.targetFilter,
+                })
+              : undefined)
+            ?? this.planExpertRangedApproachAction(unit, {
+              targetFilter: options.targetFilter,
+            })
+          : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      }
+    } else {
+      fallbackAction = this.planOrdinaryAiAction(unit, opponentSide, options.behavior, {
+        expertRanking: true,
+        targetFilter: options.targetFilter,
+      });
+    }
+    const candidates = [classAction, fallbackAction]
       .filter((action): action is AlliedAiAction => action !== undefined)
       .filter((action, index, actions) => actions.findIndex((candidate) =>
         candidate.kind === action.kind
@@ -1695,6 +1720,265 @@ export class Stage0Battle {
     }
     this.recordExpertDecision(unit, candidates, selected);
     return selected;
+  }
+
+  /**
+   * REMAKE-065/066 read-only forecast for non-guard caster movement. A move
+   * never commits the forecasted action: after every intervening action the
+   * next AI turn still replans from current state. The intent keeps one fixed
+   * action/target pair while safety, terrain and target distance rank cells.
+   */
+  private planExpertTechniquePositioningAction(
+    unit: BattleUnit,
+    options: {
+      iceIsForbidden: boolean;
+      targetFilter?: (target: BattleUnit) => boolean;
+    },
+  ): AlliedAiAction | undefined {
+    const candidates: Array<{
+      position: Position;
+      path: Position[];
+      actionId: BattleActionId;
+      actionOrder: number;
+      target: BattleUnit;
+      tacticalScore: number;
+      terrainDefense: number;
+      targetDistance: number;
+      exposure: number;
+      risk: RangedPositionRisk;
+    }> = [];
+    const riskAt = this.rangedRiskEvaluator(unit);
+    const actionIds = techniqueActionIdsFor(unit);
+    for (const position of this.reachableCells(unit.id)) {
+      if (positionKey(position) === positionKey(unit)) continue;
+      for (const [actionOrder, actionId] of actionIds.entries()) {
+        const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+        const preparesAttack = definition.target === "enemy" || isIceActionId(actionId);
+        const preparesHealing = definition.target === "ally" && "healing" in definition;
+        if ((options.iceIsForbidden && isIceActionId(actionId))
+          || (!preparesAttack && !preparesHealing)) continue;
+        for (const target of this.units) {
+          const correctSide = definition.target === "ally"
+            ? target.side === unit.side
+            : target.side !== unit.side;
+          if (!correctSide
+            || (target.side !== unit.side && !(options.targetFilter?.(target) ?? true))) continue;
+          const forecast = this.planClassAction(unit, [actionId], {
+            expertRanking: true,
+            casterPosition: position,
+            targetFilter: (candidate) => candidate.id === target.id,
+          });
+          if (forecast?.actionId !== actionId
+            || forecast.targetId !== target.id
+            || forecast.path.length <= 1) continue;
+          const utility = this.expertSpecialUtility(
+            unit,
+            actionId,
+            target,
+            forecast.path,
+            forecast.linePath,
+          );
+          candidates.push({
+            position,
+            path: forecast.path,
+            actionId,
+            actionOrder,
+            target,
+            tacticalScore: expertTacticalScore(utility),
+            terrainDefense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
+            targetDistance: manhattan(position, target),
+            exposure: this.exposureAt(unit, position),
+            risk: riskAt(position),
+          });
+        }
+      }
+    }
+    if (candidates.length === 0) return undefined;
+
+    const minimumContacts = Math.min(...candidates.map(({ risk }) => risk.meleeContactCount));
+    let eligible = candidates.filter(({ risk }) => risk.meleeContactCount === minimumContacts);
+    if (minimumContacts > 0) {
+      const minimumDamage = Math.min(...eligible.map(({ risk }) => risk.meleeExpectedDamage));
+      eligible = eligible.filter(({ risk }) => risk.meleeExpectedDamage === minimumDamage);
+    }
+    eligible.sort((left, right) => right.tacticalScore - left.tacticalScore
+      || left.actionOrder - right.actionOrder
+      || left.target.y * this.stage.width + left.target.x
+        - (right.target.y * this.stage.width + right.target.x));
+    const selectedIntent = eligible[0];
+    const selected = eligible
+      .filter((candidate) => candidate.actionId === selectedIntent.actionId
+        && candidate.target.id === selectedIntent.target.id)
+      .sort((left, right) => right.terrainDefense - left.terrainDefense
+        || right.targetDistance - left.targetDistance
+        || left.exposure - right.exposure
+        || left.path.length - right.path.length
+        || left.position.y * this.stage.width + left.position.x
+          - (right.position.y * this.stage.width + right.position.x))[0];
+    return selected
+      ? {
+          unitId: unit.id,
+          kind: "move",
+          path: selected.path,
+          setupActionId: selected.actionId,
+          setupTargetId: selected.target.id,
+        }
+      : undefined;
+  }
+
+  /**
+   * REMAKE-066: ranged units without a current or forecasted action approach
+   * an outer firing/support ring instead of borrowing melee frontage.
+   */
+  private planExpertRangedApproachAction(
+    unit: BattleUnit,
+    options: {
+      targetFilter?: (target: BattleUnit) => boolean;
+    },
+  ): AlliedAiAction {
+    const actionIds = unit.classId === "archer"
+      ? ["archer-shot"] as const
+      : unit.classId === "crossbow"
+        ? ["crossbow-shot"] as const
+        : unit.classId === "magic-archer"
+          ? ["magic-archer-shot"] as const
+          : techniqueActionIdsFor(unit);
+    const hostileActionIds = actionIds.filter((actionId) =>
+      BATTLE_ACTION_DEFINITIONS[actionId].target === "enemy" || isIceActionId(actionId));
+    const pureSupport = hostileActionIds.length === 0;
+    const opponents = this.units.filter((candidate) => candidate.side !== unit.side
+      && !candidate.actionDisabled
+      && (options.targetFilter?.(candidate) ?? true));
+    let strategicTargets: BattleUnit[];
+    if (pureSupport) {
+      const allies = this.units.filter((candidate) => candidate.side === unit.side
+        && candidate.id !== unit.id
+        && !candidate.actionDisabled);
+      if (allies.length === 0 || opponents.length === 0) {
+        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      }
+      const frontDistance = Math.min(...allies.map((ally) =>
+        Math.min(...opponents.map((opponent) => manhattan(ally, opponent)))));
+      strategicTargets = allies.filter((ally) =>
+        Math.min(...opponents.map((opponent) => manhattan(ally, opponent))) === frontDistance);
+    } else {
+      strategicTargets = opponents;
+    }
+    if (strategicTargets.length === 0) {
+      return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    }
+
+    const relevantActionIds = pureSupport ? actionIds : hostileActionIds;
+    const preferredRange = Math.max(1, ...relevantActionIds.map((actionId) => {
+      const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+      if ("maximumDistance" in definition.range) return definition.range.maximumDistance;
+      if (definition.target === "self-area" && "effectRadius" in definition.range) {
+        return Math.max(1, definition.range.effectRadius - 1);
+      }
+      const selectionRadius = "aiCandidateSelectionRadius" in definition.range
+        ? definition.range.aiCandidateSelectionRadius
+        : "selectionRadius" in definition.range
+          ? definition.range.selectionRadius
+          : 1;
+      return Math.max(1, selectionRadius - 1);
+    }));
+    const occupied = new Set(this.units
+      .filter((candidate) => candidate.id !== unit.id)
+      .map(positionKey));
+    const ringCells: Position[] = [];
+    for (let y = 0; y < this.stage.height; y += 1) {
+      for (let x = 0; x < this.stage.width; x += 1) {
+        const position = { x, y };
+        if (occupied.has(positionKey(position))
+          || movementCost(unit.classId, position, this.dynamicBattlefield) >= 98
+          || !strategicTargets.some((target) => manhattan(position, target) === preferredRange)) continue;
+        ringCells.push(position);
+      }
+    }
+    const reachable = this.reachableCells(unit.id);
+    const riskAt = this.rangedRiskEvaluator(unit);
+    const candidateDetails = (position: Position) => {
+      const key = positionKey(position);
+      const path = key === positionKey(unit)
+        ? [{ x: unit.x, y: unit.y }]
+        : this.movementPath(unit.id, position);
+      return {
+        position,
+        path,
+        risk: riskAt(position),
+        terrainDefense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
+        targetDistance: Math.min(...strategicTargets.map((target) => manhattan(position, target))),
+        exposure: this.exposureAt(unit, position),
+      };
+    };
+    const magicArcherSafe = (risk: RangedPositionRisk): boolean =>
+      unit.classId !== "magic-archer" || risk.adjacentEnemyCount === 0;
+    const costs = movementCostsToNearestTarget(
+      unit,
+      ringCells,
+      this.units,
+      this.dynamicBattlefield,
+    );
+    const originCost = costs.get(positionKey(unit));
+    if (originCost !== undefined) {
+      const candidates = reachable
+        .map((position) => ({
+          ...candidateDetails(position),
+          remainingCost: costs.get(positionKey(position)),
+        }))
+        .filter(({ path, remainingCost, risk }) => path.length > 1
+          && remainingCost !== undefined
+          && remainingCost < originCost
+          && magicArcherSafe(risk))
+        .sort((left, right) => left.risk.meleeContactCount - right.risk.meleeContactCount
+          || left.risk.meleeExpectedDamage - right.risk.meleeExpectedDamage
+          || left.remainingCost! - right.remainingCost!
+          || right.terrainDefense - left.terrainDefense
+          || right.targetDistance - left.targetDistance
+          || left.exposure - right.exposure
+          || left.path.length - right.path.length
+          || left.position.y * this.stage.width + left.position.x
+            - (right.position.y * this.stage.width + right.position.x));
+      const selected = candidates[0];
+      if (selected) {
+        return {
+          unitId: unit.id,
+          kind: "move",
+          path: selected.path,
+          pursuitProgress: originCost - selected.remainingCost!,
+        };
+      }
+    }
+
+    const distanceToRing = (position: Position): number => Math.min(...strategicTargets.map((target) =>
+      Math.abs(manhattan(position, target) - preferredRange)));
+    const originDistance = distanceToRing(unit);
+    const candidates = reachable
+      .map((position) => ({
+        ...candidateDetails(position),
+        ringDistance: distanceToRing(position),
+      }))
+      .filter(({ path, ringDistance, risk }) => path.length > 1
+        && ringDistance < originDistance
+        && magicArcherSafe(risk))
+      .sort((left, right) => left.risk.meleeContactCount - right.risk.meleeContactCount
+        || left.risk.meleeExpectedDamage - right.risk.meleeExpectedDamage
+        || left.ringDistance - right.ringDistance
+        || right.terrainDefense - left.terrainDefense
+        || right.targetDistance - left.targetDistance
+        || left.exposure - right.exposure
+        || left.path.length - right.path.length
+        || left.position.y * this.stage.width + left.position.x
+          - (right.position.y * this.stage.width + right.position.x));
+    const selected = candidates[0];
+    return selected
+      ? {
+          unitId: unit.id,
+          kind: "move",
+          path: selected.path,
+          pursuitProgress: originDistance - selected.ringDistance,
+        }
+      : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
   }
 
   /**
@@ -1836,6 +2120,73 @@ export class Stage0Battle {
       position,
       ignoredTargetId,
     );
+  }
+
+  /**
+   * Exact one-enemy-phase melee reach for ranged positioning. Unlike the
+   * broad exposure estimate, this projects the candidate occupant, honors
+   * terrain entry costs, blockers and ZOC, and only counts front-line roles.
+   */
+  private rangedRiskEvaluator(actor: BattleUnit): (position: Position) => RangedPositionRisk {
+    const opponents = this.units.filter((opponent) => opponent.side !== actor.side);
+    const meleeOpponents = opponents.filter((opponent) =>
+      !opponent.actionDisabled && classCombatRole(opponent.classId) === "melee");
+    const unitsWithoutActor = this.units.filter((candidate) => candidate.id !== actor.id);
+    const broadReachByOpponent = new Map(meleeOpponents.map((opponent) => [
+      opponent.id,
+      new Set(reachableCells(
+        opponent,
+        unitsWithoutActor,
+        this.statsFor(opponent).movement,
+        this.dynamicBattlefield,
+      ).map(positionKey)),
+    ]));
+    const actorStats = this.effectiveStatsFor(actor);
+    const cache = new Map<string, RangedPositionRisk>();
+    return (position: Position): RangedPositionRisk => {
+      const key = positionKey(position);
+      const cached = cache.get(key);
+      if (cached) return cached;
+      const projectedUnits = this.units.map((candidate) => candidate.id === actor.id
+        ? { ...candidate, x: position.x, y: position.y }
+        : candidate);
+      const actorTerrainDefense = Math.floor(
+        actorStats.defense
+        * terrainDefensePercentFor(actor.classId, this.terrainSlotAt(position))
+        / 100,
+      );
+      let meleeContactCount = 0;
+      let meleeExpectedDamage = 0;
+      for (const opponent of meleeOpponents) {
+        const broadReach = broadReachByOpponent.get(opponent.id);
+        if (!neighbors(position, this.dynamicBattlefield).some((cell) =>
+          broadReach?.has(positionKey(cell)))) continue;
+        // The broad map removes the prospective actor and cheaply rejects
+        // distant cells. This exact second pass restores its blocking and ZOC
+        // only for cells the opponent might actually contact.
+        const canContact = reachableCells(
+          opponent,
+          projectedUnits,
+          this.statsFor(opponent).movement,
+          this.dynamicBattlefield,
+        ).some((attackPosition) => manhattan(attackPosition, position) === 1);
+        if (!canContact) continue;
+        meleeContactCount += 1;
+        const opponentStats = this.effectiveStatsFor(opponent);
+        meleeExpectedDamage += Math.max(
+          0,
+          opponentStats.attack - actorStats.defense - actorTerrainDefense,
+        ) + 11;
+      }
+      const risk = {
+        adjacentEnemyCount: opponents.filter((opponent) =>
+          manhattan(position, opponent) === 1).length,
+        meleeContactCount,
+        meleeExpectedDamage,
+      };
+      cache.set(key, risk);
+      return risk;
+    };
   }
 
   private expertOrdinaryUtility(
@@ -2121,7 +2472,32 @@ export class Stage0Battle {
         queueAdvance = originCost !== undefined;
       }
       if (originCost === undefined) {
-        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+        const originDistance = enemies.length > 0
+          ? Math.min(...enemies.map((enemy) => manhattan(unit, enemy)))
+          : Number.POSITIVE_INFINITY;
+        const geometricCandidates = reachable
+          .filter((position) => positionKey(position) !== positionKey(unit))
+          .map((position) => ({
+            position,
+            path: this.movementPath(unit.id, position),
+            distance: Math.min(...enemies.map((enemy) => manhattan(position, enemy))),
+            exposure: this.exposureAt(unit, position),
+            defense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
+          }))
+          .filter(({ path, distance }) => enemies.length > 0
+            && path.length > 1
+            && distance < originDistance
+            && (options.pathFilter?.(path) ?? true))
+          .sort((left, right) => left.distance - right.distance
+            || left.exposure - right.exposure
+            || right.defense - left.defense
+            || left.path.length - right.path.length
+            || left.position.y * this.stage.width + left.position.x
+              - (right.position.y * this.stage.width + right.position.x));
+        const geometric = geometricCandidates[0];
+        return geometric
+          ? { unitId: unit.id, kind: "move", path: geometric.path }
+          : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
       }
       const movementCandidates = reachable
         .filter((position) => positionKey(position) !== positionKey(unit))
@@ -2298,11 +2674,18 @@ export class Stage0Battle {
       targetOrder: number;
       positionOrder: number;
     }> = [];
+    let evaluateRangedRisk: ((position: Position) => RangedPositionRisk) | undefined;
+    const rangedRiskAt = (position: Position): RangedPositionRisk => {
+      evaluateRangedRisk ??= this.rangedRiskEvaluator(unit);
+      return evaluateRangedRisk(position);
+    };
 
     for (const [actionOrder, actionId] of actionIds.entries()) {
       if (!(options.actionFilter?.(actionId) ?? true)) continue;
       if (!this.canUseSpecialAction(unit, actionId)) continue;
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+      const shootingAction = actionId === "archer-shot" || actionId === "crossbow-shot"
+        || actionId === "magic-archer-shot";
       const positions = (actionId === "archer-shot" || actionId === "crossbow-shot"
         || actionId === "magic-archer-shot"
         ? reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
@@ -2320,9 +2703,16 @@ export class Stage0Battle {
         lethal: boolean;
         critical: boolean;
         utility: ExpertAiUtility;
+        rangedRisk: RangedPositionRisk;
       }> = [];
 
       for (const position of positions) {
+        const rangedRisk = shootingAction
+          ? rangedRiskAt(position)
+          : { adjacentEnemyCount: 0, meleeContactCount: 0, meleeExpectedDamage: 0 };
+        if ((options.expertRanking || options.modernRanking)
+          && actionId === "magic-archer-shot"
+          && rangedRisk.adjacentEnemyCount > 0) continue;
         const rangeActor = { ...unit, x: position.x, y: position.y };
         const shootingActionId = actionId === "archer-shot" || actionId === "crossbow-shot"
           || actionId === "magic-archer-shot" ? actionId : undefined;
@@ -2405,19 +2795,23 @@ export class Stage0Battle {
                 && actionId !== "magic-guard"
                 && target.life * 100 < targetStats.maxLife * 40,
               utility,
+              rangedRisk,
             });
           }
         }
       }
 
       if (options.expertRanking) {
-        const shootingAction = actionId === "archer-shot" || actionId === "crossbow-shot"
-          || actionId === "magic-archer-shot";
         candidates.sort((left, right) => (shootingAction
-          ? expertTacticalScore(right.utility) - expertTacticalScore(left.utility)
+          ? (actionId === "magic-archer-shot"
+              ? right.utility.effectiveDamage - left.utility.effectiveDamage
+              : 0)
+            || expertTacticalScore(right.utility) - expertTacticalScore(left.utility)
+            || left.rangedRisk.meleeContactCount - right.rangedRisk.meleeContactCount
+            || left.rangedRisk.meleeExpectedDamage - right.rangedRisk.meleeExpectedDamage
             || left.utility.exposure - right.utility.exposure
-            || right.utility.firingDistance - left.utility.firingDistance
             || right.utility.terrainDefense - left.utility.terrainDefense
+            || right.utility.firingDistance - left.utility.firingDistance
             || left.utility.pathLength - right.utility.pathLength
           : compareExpertAiUtility(left.utility, right.utility))
           || left.target.y * this.stage.width + left.target.x

@@ -219,8 +219,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 51;
-  contentVersion: "stage-27-valkyrie-return-1";
+  version: 53;
+  contentVersion: "class-role-ranged-tactics-ai-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

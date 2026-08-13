@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import mapRules from "../../reverse/parsed/native/map-rules.json";
 import unitCatalog from "../../reverse/parsed/native/unit-catalog.json";
 import {
+  CLASS_IDS,
+  classCombatRole,
   classDefinition,
   classIdFromNativeRecord,
   classStatsFor,
@@ -56,6 +58,58 @@ function expectGeneratedClassToMatchEvidence(classId: ClassId, record: number): 
     terrainDefensePercents: mapEvidence.terrainDefensePercents,
   });
 }
+
+describe("stable-remake combat roles", () => {
+  it("classifies every published profession as melee or ranged", () => {
+    const melee = CLASS_IDS.filter((classId) => classCombatRole(classId) === "melee");
+    const ranged = CLASS_IDS.filter((classId) => classCombatRole(classId) === "ranged");
+
+    expect(melee).toEqual([
+      "soldier",
+      "magic-sword-warrior",
+      "jungle-warrior",
+      "great-axe-warrior",
+      "half-dragon-warrior",
+      "magic-armor-warrior",
+      "land-knight",
+      "demon-dragon-knight",
+      "flying-dragon-knight",
+      "beast-knight",
+      "bone-knight",
+      "swift-dragon-knight",
+      "great-dragon-knight",
+      "cavalry",
+      "pegasus-warrior",
+      "water-warrior",
+      "divine-sword-warrior",
+      "warrior",
+      "steel-armor-warrior",
+      "evil-sword-warrior",
+      "engineer",
+      "empress",
+      "dragon",
+      "head",
+      "hand",
+    ]);
+    expect(ranged).toEqual([
+      "magic-priest",
+      "prayer-guide",
+      "curse-master",
+      "magician",
+      "magic-guide",
+      "evil-mage",
+      "magic-archer",
+      "archer",
+      "crossbow",
+      "sister",
+      "monk",
+      "priest",
+      "wizard",
+      "magic-master",
+    ]);
+    expect([...melee, ...ranged]).toHaveLength(CLASS_IDS.length);
+  });
+});
 
 function createWaterSplitBattle(options: {
   attackerClassId?: ClassId;

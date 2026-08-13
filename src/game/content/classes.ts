@@ -15,6 +15,7 @@ export {
 };
 
 export type ClassActionCategory = "ordinary" | "shooting" | "technique" | "special_runtime";
+export type ClassCombatRole = "melee" | "ranged";
 export type OrdinaryHitStatusKey = "confusion" | "attackDown" | "defenseDown" | "poison";
 
 export interface OrdinaryHitStatus {
@@ -65,12 +66,79 @@ export function className(classId: ClassId): string {
 }
 
 /**
+ * REMAKE-066 tactical responsibility, separate from the native action menu
+ * and dispatcher. In particular, technique-menu melee careers and runtime
+ * bosses keep a front-line role, while bows and the full sister progression
+ * share the ranged positioning policy.
+ */
+const CLASS_COMBAT_ROLE = {
+  soldier: "melee",
+  "magic-sword-warrior": "melee",
+  "jungle-warrior": "melee",
+  "magic-priest": "ranged",
+  "prayer-guide": "ranged",
+  "curse-master": "ranged",
+  magician: "ranged",
+  "great-axe-warrior": "melee",
+  "half-dragon-warrior": "melee",
+  "magic-armor-warrior": "melee",
+  "magic-guide": "ranged",
+  "evil-mage": "ranged",
+  "magic-archer": "ranged",
+  "land-knight": "melee",
+  "demon-dragon-knight": "melee",
+  "flying-dragon-knight": "melee",
+  "beast-knight": "melee",
+  "bone-knight": "melee",
+  "swift-dragon-knight": "melee",
+  "great-dragon-knight": "melee",
+  archer: "ranged",
+  crossbow: "ranged",
+  cavalry: "melee",
+  "pegasus-warrior": "melee",
+  sister: "ranged",
+  monk: "ranged",
+  "water-warrior": "melee",
+  "divine-sword-warrior": "melee",
+  warrior: "melee",
+  "steel-armor-warrior": "melee",
+  priest: "ranged",
+  wizard: "ranged",
+  "magic-master": "ranged",
+  "evil-sword-warrior": "melee",
+  engineer: "melee",
+  empress: "melee",
+  dragon: "melee",
+  head: "melee",
+  hand: "melee",
+} as const satisfies Readonly<Record<ClassId, ClassCombatRole>>;
+
+export function classCombatRole(classId: ClassId): ClassCombatRole {
+  return CLASS_COMBAT_ROLE[classId];
+}
+
+/**
  * `0P/1P` are the only classes the native dispatcher sends to `1000:1A68`.
  * That routine owns a WD-only skill pool and its own life bands, including
  * the one native case where a class both retreats and still casts.
  */
 export function usesEmpressOrDragonAi(classId: ClassId): boolean {
   return classDefinition(classId).aiClassDispatch.side2 === "empressOrDragonTechnique";
+}
+
+/**
+ * The native dispatcher, rather than the presence of a 技術 menu, identifies
+ * the caster careers. Half-dragon warriors and engineers already dispatch as
+ * ordinary AI; great dragon knights are the one technique-dispatch melee
+ * career and retain their adjacent attack comparison alongside 龍踏.
+ */
+export function usesTechniqueAi(
+  classId: ClassId,
+  side: BattleUnit["side"],
+): boolean {
+  const dispatch = classDefinition(classId).aiClassDispatch;
+  return classId !== "great-dragon-knight"
+    && (side === 1 ? dispatch.side1 : dispatch.side2) === "technique";
 }
 
 /**

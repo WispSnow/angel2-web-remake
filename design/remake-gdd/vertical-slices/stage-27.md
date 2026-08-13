@@ -155,6 +155,10 @@
 - [OF] 999/1000 路由模块 25／stage 28，1000 不重播；下一标题为“保衛瓦爾克麗城”；
 - [SR] 保存身份升级为 v51／`stage-27-valkyrie-return-1`，v50 原样迁移；战中档严格保存
   部署、三军团成员、五名静态敌军、事件边界、回合、行动、状态与完整 PRNG；
+- [SR] 后续 `REMAKE-065` 将当前保存身份升级为 v52／
+  `expert-approach-caster-positioning-ai-1`，v51 原样迁移；本关内容身份和 stage 28 路由不变；
+- [SR] 后续 `REMAKE-066` 将当前保存身份升级为 v53／
+  `class-role-ranged-tactics-ai-1`，v52／v51 原样迁移；本关内容身份和 stage 28 路由不变；
 - [SR] 失败直接回 stage 27 部署，本次尝试取得的成长依 `REMAKE-016` 保留；
 - [SR] stage 28 仅作为完成档和不可玩下一关边界，未获授权前不得载入战斗运行时。
 

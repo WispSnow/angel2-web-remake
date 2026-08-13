@@ -6,6 +6,7 @@ import type {
 } from "./ai-contracts";
 import type { TerrainHoldForceAiDoctrine } from "./forces";
 import type { ForceRegistry } from "./forces";
+import { classCombatRole } from "../content/classes";
 import {
   manhattan,
   positionKey,
@@ -140,6 +141,13 @@ export function planTerrainHoldForceAiAction(
       ? forceMemberIds.has(target.id)
       : (targetFilter?.(target) ?? true),
   });
+
+  // REMAKE-066: ranged careers keep the defensive doctrine and never turn a
+  // failed shot/technique into an ordinary melee hit.
+  if (classCombatRole(unit.classId) === "ranged") {
+    return classAction
+      ?? { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+  }
 
   const opponentSide: BattleUnit["side"] = unit.side === 1 ? 2 : 1;
   const ordinaryAction = context.planOrdinaryAction(unit, opponentSide, behavior, {

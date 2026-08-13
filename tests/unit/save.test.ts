@@ -2391,7 +2391,37 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("migrates v50 saves to the stage 27 content identity", () => {
+  it("migrates v52 saves to the class-role ranged-tactics identity", () => {
+    const current = stage27BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 52,
+      contentVersion: "expert-approach-caster-positioning-ai-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-27",
+    });
+  });
+
+  it("migrates v51 saves through the expert caster-positioning identity", () => {
+    const current = stage27BattleSave();
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 51,
+      contentVersion: "stage-27-valkyrie-return-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-27",
+    });
+  });
+
+  it("migrates v50 saves through the stage 27 content identity", () => {
     const current = stage26BattleSave();
     const migrated = parseSaveData(JSON.stringify({
       ...current,

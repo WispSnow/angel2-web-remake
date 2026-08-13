@@ -159,12 +159,29 @@ describe("stage 3 battle construction and stable-remake automation", () => {
       expect(battle.isPlayerControllableAlly(action!.targetId!)).toBe(!expectsAutomatic);
     };
 
-    for (const id of ["2:42", "2:41", "2:40", "2:43", "2:17"]) {
+    for (const id of ["2:42", "2:41", "2:40", "2:43"]) {
       assertAssignedTarget(id, true);
     }
     for (const id of ["2:44", "2:45", "2:47", "2:46", "2:50", "2:48", "2:49"]) {
       assertAssignedTarget(id, false);
     }
+
+  });
+
+  it("keeps a terrain-hold caster in its doctrine instead of forcing pursuit", () => {
+    const battle = new Stage3Battle({ ...campaign, difficulty: 3 });
+    battle.units = battle.units.filter((unit) => unit.side === 1 || unit.id === "2:17");
+    const monk = battle.unit("2:17")!;
+    const automatic = battle.unit("1:46")!;
+    monk.x = 24;
+    monk.y = 13;
+    automatic.x = 24;
+    automatic.y = 14;
+
+    expect(battle.planEnemyAiAction(monk.id)).toMatchObject({
+      kind: "wait",
+      path: [{ x: 24, y: 13 }],
+    });
   });
 
   it("falls back to any surviving opponent after an enemy corps loses its preferred force", () => {

@@ -15,6 +15,10 @@ export interface AlliedAiAction {
   trafficProgress?: number;
   targetId?: string;
   actionId?: BattleActionId;
+  /** Informational next-turn technique forecast for a positioning-only move. */
+  setupActionId?: BattleActionId;
+  /** Target paired with `setupActionId`; neither field commits a future action. */
+  setupTargetId?: string;
   /** Rules-significant magic-archer effect path, separate from movement path. */
   linePath?: Position[];
 }
@@ -33,9 +37,11 @@ export interface ClassActionPlanningOptions {
   /** Compares every legal action/target pair with the shared expert utility. */
   expertRanking?: boolean;
   /**
-   * Plans a non-shooting action as if the actor already stood here. Only the
-   * native `0P/1P` retreat-then-cast branch needs it; every other technique
-   * entry keeps casting from the actor's current cell.
+   * Plans a non-shooting action as if the actor already stood here. The
+   * native `0P/1P` branch uses it for a same-turn retreat-then-cast; expert
+   * caster positioning also uses it read-only to forecast a next-turn action.
+   * Every committed ordinary technique still casts from the actor's current
+   * cell.
    */
   casterPosition?: Position;
   actionFilter?: (actionId: BattleActionId) => boolean;

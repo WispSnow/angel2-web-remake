@@ -199,6 +199,28 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restoredKins) ? restoredKins : undefined;
 }
 
+function migrateVersion52Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 52
+    || value.contentVersion !== "expert-approach-caster-positioning-ai-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
+function migrateVersion51Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 51
+    || value.contentVersion !== "stage-27-valkyrie-return-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion50Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 50
@@ -1726,6 +1748,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion52 = migrateVersion52Save(value);
+    if (migratedVersion52) return migratedVersion52;
+    const migratedVersion51 = migrateVersion51Save(value);
+    if (migratedVersion51) return migratedVersion51;
     const migratedVersion50 = migrateVersion50Save(value);
     if (migratedVersion50) return migratedVersion50;
     const migratedVersion49 = migrateVersion49Save(value);

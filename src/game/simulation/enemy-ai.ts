@@ -1,4 +1,4 @@
-import { terrainDefensePercentFor } from "../content/classes";
+import { classCombatRole, terrainDefensePercentFor } from "../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../types";
 import type { AlliedAiAction } from "./ai-contracts";
 import { effectiveAttack, effectiveDefense } from "./status";
@@ -128,5 +128,6 @@ export function hasEnemyDamageActionThisTurn(
     && unit.statuses.techniqueSeal === 0
     && context.planSisterAction(unit, "fire-1")
   ) return true;
+  if (classCombatRole(unit.classId) === "ranged") return false;
   return planOrdinaryAttack(context, unit, true) !== undefined;
 }
