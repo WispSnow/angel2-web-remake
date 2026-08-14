@@ -3491,6 +3491,40 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
+  it("migrates legal v65 battle and completed saves without changing simulation state", () => {
+    const battle = stage36BattleSave();
+    const migratedBattle = parseSaveData(JSON.stringify({
+      ...battle,
+      version: 65,
+      contentVersion: "stage-36-bina-vige-otherworld-1",
+    }));
+    expect(migratedBattle).toEqual(battle);
+
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-37",
+      stageLabel: "究極女神",
+      roster: battle.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...battle.consumedEventIds,
+        "stage-36-objective-reached",
+        "stage-36-completed-route",
+      ],
+    };
+    const migratedCompleted = parseSaveData(JSON.stringify({
+      ...completed,
+      version: 65,
+      contentVersion: "stage-36-bina-vige-otherworld-1",
+    }));
+    expect(migratedCompleted).toEqual(completed);
+    expect(parseSaveData(JSON.stringify({
+      ...battle,
+      version: 65,
+      contentVersion: "wrong-v65-identity",
+    }))).toBeUndefined();
+  });
+
   it("migrates v64 stage 36 boundaries but rejects forged stage 36 battles and stage 37", () => {
     const currentStage36 = stage36BattleSave();
     const boundary: CompletedSaveData = {

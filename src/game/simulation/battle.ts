@@ -179,6 +179,14 @@ interface RangedPositionRisk {
 const linePathKey = (path: readonly Position[]): string =>
   path.map(positionKey).join(";");
 
+const compareFocusFireLife = (
+  left: number | undefined,
+  right: number | undefined,
+): number => left !== undefined && right !== undefined ? left - right : 0;
+
+const isDamagingActionId = (actionId: BattleActionId): boolean =>
+  "damage" in BATTLE_ACTION_DEFINITIONS[actionId];
+
 const cloneAiAction = (action: AlliedAiAction): AlliedAiAction => ({
   ...action,
   path: action.path.map((position) => ({ ...position })),
@@ -2048,6 +2056,9 @@ export class Stage0Battle {
       .sort((left, right) => compareExpertAiUtility(
         this.expertUtilityForAction(unit, left),
         this.expertUtilityForAction(unit, right),
+      ) || compareFocusFireLife(
+        this.focusFireLifeForAction(unit, left),
+        this.focusFireLifeForAction(unit, right),
       ));
     const selected = candidates[0]
       ?? { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
@@ -2161,6 +2172,14 @@ export class Stage0Battle {
       eligible = eligible.filter(({ risk }) => risk.meleeExpectedDamage === minimumDamage);
     }
     eligible.sort((left, right) => right.tacticalScore - left.tacticalScore
+      || compareFocusFireLife(
+        isDamagingActionId(left.actionId) && left.target.side !== unit.side
+          ? left.target.life
+          : undefined,
+        isDamagingActionId(right.actionId) && right.target.side !== unit.side
+          ? right.target.life
+          : undefined,
+      )
       || left.actionOrder - right.actionOrder
       || left.target.y * this.stage.width + left.target.x
         - (right.target.y * this.stage.width + right.target.x));
@@ -2623,6 +2642,21 @@ export class Stage0Battle {
     );
   }
 
+  /** REMAKE-079 only breaks exact expert-score ties between hostile damage actions. */
+  private focusFireLifeForAction(
+    unit: BattleUnit,
+    action: AlliedAiAction,
+  ): number | undefined {
+    const target = action.targetId ? this.unit(action.targetId) : undefined;
+    if (!target || target.side === unit.side) return undefined;
+    if (action.kind === "attack") return target.life;
+    return action.kind === "special"
+      && action.actionId !== undefined
+      && isDamagingActionId(action.actionId)
+      ? target.life
+      : undefined;
+  }
+
   private vacantEngagementRouteCost(
     unit: BattleUnit,
     units: readonly BattleUnit[],
@@ -2786,6 +2820,7 @@ export class Stage0Battle {
     if (options.expertRanking && expertAttackCandidates.length > 0) {
       expertAttackCandidates.sort((left, right) =>
         compareExpertAiUtility(left.utility, right.utility)
+        || left.target.life - right.target.life
         || left.target.y * this.stage.width + left.target.x
           - (right.target.y * this.stage.width + right.target.x)
         || left.position.y * this.stage.width + left.position.x
@@ -3068,6 +3103,7 @@ export class Stage0Battle {
       action: AlliedAiAction;
       utility: ExpertAiUtility;
       actionOrder: number;
+      focusFireLife?: number;
       targetOrder: number;
       positionOrder: number;
     }> = [];
@@ -3206,6 +3242,7 @@ export class Stage0Battle {
             || right.utility.firingDistance - left.utility.firingDistance
             || left.utility.pathLength - right.utility.pathLength
           : compareExpertAiUtility(left.utility, right.utility))
+          || (isDamagingActionId(actionId) ? left.target.life - right.target.life : 0)
           || left.target.y * this.stage.width + left.target.x
             - (right.target.y * this.stage.width + right.target.x)
           || left.position.y * this.stage.width + left.position.x
@@ -3224,6 +3261,7 @@ export class Stage0Battle {
             },
             utility: selected.utility,
             actionOrder,
+            ...(isDamagingActionId(actionId) ? { focusFireLife: selected.target.life } : {}),
             targetOrder: selected.target.y * this.stage.width + selected.target.x,
             positionOrder: selected.position.y * this.stage.width + selected.position.x,
           });
@@ -3278,6 +3316,7 @@ export class Stage0Battle {
     }
     if (options.expertRanking) {
       expertCandidates.sort((left, right) => compareExpertAiUtility(left.utility, right.utility)
+        || compareFocusFireLife(left.focusFireLife, right.focusFireLife)
         || left.actionOrder - right.actionOrder
         || left.targetOrder - right.targetOrder
         || left.positionOrder - right.positionOrder);
@@ -3363,11 +3402,16 @@ export class Stage0Battle {
         const score = unit && action
           ? expertAiScore(this.expertUtilityForAction(unit, action))
           : Number.MIN_SAFE_INTEGER;
-        return { id, score, order, action };
+        const focusFireLife = unit && action
+          ? this.focusFireLifeForAction(unit, action)
+          : undefined;
+        return { id, score, order, action, focusFireLife };
       });
       const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
       const selected = (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
-        .sort((left, right) => right.score - left.score || left.order - right.order)[0];
+        .sort((left, right) => right.score - left.score
+          || compareFocusFireLife(left.focusFireLife, right.focusFireLife)
+          || left.order - right.order)[0];
       return selected ? {
         unitId: selected.id,
         ...(selected.action ? { action: selected.action } : {}),
@@ -3412,11 +3456,15 @@ export class Stage0Battle {
           const score = unit && action
             ? expertAiScore(this.expertUtilityForAction(unit, action))
             : Number.MIN_SAFE_INTEGER;
-          return { id, score, stableOrder, action };
+          const focusFireLife = unit && action
+            ? this.focusFireLifeForAction(unit, action)
+            : undefined;
+          return { id, score, stableOrder, action, focusFireLife };
         });
       const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
       const selected = (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
         .sort((left, right) => right.score - left.score
+          || compareFocusFireLife(left.focusFireLife, right.focusFireLife)
           || left.stableOrder - right.stableOrder)[0];
       return selected ? {
         unitId: selected.id,

@@ -296,6 +296,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restoredEliola) ? restoredEliola : undefined;
 }
 
+function migrateVersion65Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 65
+    || value.contentVersion !== "stage-36-bina-vige-otherworld-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion64Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 64
@@ -2030,6 +2041,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion65 = migrateVersion65Save(value);
+    if (migratedVersion65) return migratedVersion65;
     const migratedVersion64 = migrateVersion64Save(value);
     if (migratedVersion64) return migratedVersion64;
     const migratedVersion63 = migrateVersion63Save(value);

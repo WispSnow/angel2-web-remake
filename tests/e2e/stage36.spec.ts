@@ -258,7 +258,7 @@ test("S36-G: Nia defeat retries directly from deployment", async ({ page }) => {
   });
 });
 
-test("S36-H/I: ordinary victory saves v65 and reaches the frozen stage-37 boundary", async ({ page }) => {
+test("S36-H/I: ordinary victory saves v66 and reaches the frozen stage-37 boundary", async ({ page }) => {
   await page.goto("/?debugScenario=stage-36-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();

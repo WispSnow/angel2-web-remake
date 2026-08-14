@@ -103,6 +103,100 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     }
   });
 
+  it("focuses the lowest-life hostile target when ordinary attack scores tie for either side", () => {
+    const alliedBattle = new ArenaBattle([
+      { id: "ally-soldier", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-earlier", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-wounded", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 25, y: 31 },
+    ], 0, new DeterministicRng(0x3370));
+    alliedBattle.unit("enemy-earlier")!.life = 109;
+    alliedBattle.unit("enemy-wounded")!.life = 100;
+
+    expect(alliedBattle.planAlliedAiAction("ally-soldier")).toMatchObject({
+      kind: "attack",
+      targetId: "enemy-wounded",
+    });
+
+    const enemyBattle = new ArenaBattle([
+      { id: "ally-earlier", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "ally-wounded", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 25, y: 31 },
+      { id: "enemy-soldier", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3371));
+    enemyBattle.unit("ally-earlier")!.life = 109;
+    enemyBattle.unit("ally-wounded")!.life = 100;
+
+    expect(enemyBattle.planEnemyAiAction("enemy-soldier", 1)).toMatchObject({
+      kind: "attack",
+      targetId: "ally-wounded",
+    });
+  });
+
+  it("focuses the lowest-life hostile target when shooting or technique scores tie", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-earlier", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 29 },
+      { id: "ally-wounded", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "enemy-archer", side: 2 as const, slot: 0, classId: "archer" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3372));
+    battle.unit("ally-earlier")!.life = 109;
+    battle.unit("ally-wounded")!.life = 100;
+
+    expect(battle.planEnemyAiAction("enemy-archer", 1)).toMatchObject({
+      kind: "special",
+      actionId: "archer-shot",
+      targetId: "ally-wounded",
+    });
+
+    const techniqueBattle = new ArenaBattle([
+      { id: "ally-earlier", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 29 },
+      { id: "ally-wounded", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "enemy-sister", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3375));
+    techniqueBattle.unit("ally-earlier")!.life = 109;
+    techniqueBattle.unit("ally-wounded")!.life = 100;
+
+    expect(techniqueBattle.planEnemyAiAction("enemy-sister", 1)).toMatchObject({
+      kind: "special",
+      actionId: "fire-1",
+      targetId: "ally-wounded",
+    });
+  });
+
+  it("focuses the lowest-life target when automatic squad action scores tie", () => {
+    const uniformTerrain = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    } satisfies ArenaBattleEnvironment;
+    const alliedBattle = new ArenaBattle([
+      { id: "ally-earlier", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 10 },
+      { id: "ally-focus", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-high", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 21, y: 10 },
+      { id: "enemy-low", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 21, y: 30 },
+    ], 0, new DeterministicRng(0x3373), uniformTerrain);
+    alliedBattle.unit("enemy-high")!.life = 109;
+    alliedBattle.unit("enemy-low")!.life = 100;
+
+    expect(alliedBattle.selectNextAlliedAiAction(["ally-earlier", "ally-focus"]))
+      .toMatchObject({
+        unitId: "ally-focus",
+        action: { kind: "attack", targetId: "enemy-low" },
+      });
+
+    const enemyBattle = new ArenaBattle([
+      { id: "ally-high", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 21, y: 10 },
+      { id: "ally-low", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 21, y: 30 },
+      { id: "enemy-earlier", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 10 },
+      { id: "enemy-focus", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3374), uniformTerrain);
+    enemyBattle.unit("ally-high")!.life = 109;
+    enemyBattle.unit("ally-low")!.life = 100;
+
+    expect(enemyBattle.selectNextEnemyAiAction(["enemy-earlier", "enemy-focus"]))
+      .toMatchObject({
+        unitId: "enemy-focus",
+        action: { kind: "attack", targetId: "ally-low" },
+      });
+  });
+
   it("takes a guaranteed kill before emergency healing", () => {
     const battle = new ArenaBattle(placements(), 0, new DeterministicRng(0x3301));
     battle.unit("ally-a")!.life = 1;
