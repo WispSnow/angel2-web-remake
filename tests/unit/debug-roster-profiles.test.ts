@@ -356,7 +356,7 @@ describe("debug roster profiles", () => {
     }
   });
 
-  it("carries Vesta's mandatory stage 30 recruitment into every stage 31 and 32 profile", () => {
+  it("carries Vesta's mandatory stage 30 recruitment into every stage 31–33 profile", () => {
     const profiles = [
       ["template-baseline", undefined],
       ["representative-growth", undefined],
@@ -365,7 +365,7 @@ describe("debug roster profiles", () => {
       ["promotion-coverage", DEFAULT_DEBUG_PER_STAGE_GROWTH],
     ] as const;
 
-    for (const stageId of ["stage-31", "stage-32"] as const) {
+    for (const stageId of ["stage-31", "stage-32", "stage-33"] as const) {
       for (const [profileId, perStageGrowth] of profiles) {
         const roster = debugRosterForProfile(profileId, stageId, perStageGrowth);
         expect(

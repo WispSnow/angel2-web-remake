@@ -67,6 +67,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 28 關 · 騎士城堡前",
     "第 29 關 · 治癒維斯塔女帝",
     "第 30 關 · 前往斯德林海峽",
+    "第 31 關 · 斯德林海峽",
+    "第 32 關 · 拉那洛城外",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -231,6 +233,18 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-31-near-defeat",
     "stage-31-victory-ready",
     "stage-31-cleared",
+    "stage-32-deployment",
+    "stage-32-player",
+    "stage-32-near-victory",
+    "stage-32-near-defeat",
+    "stage-32-victory-ready",
+    "stage-32-cleared",
+    "stage-33-deployment",
+    "stage-33-player",
+    "stage-33-near-victory",
+    "stage-33-near-defeat",
+    "stage-33-victory-ready",
+    "stage-33-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -242,6 +256,10 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     .toHaveCount(6);
   await expect(page.locator('[data-debug-stage-id="stage-31"] [data-debug-scenario-id]'))
     .toHaveCount(7);
+  await expect(page.locator('[data-debug-stage-id="stage-32"] [data-debug-scenario-id]'))
+    .toHaveCount(6);
+  await expect(page.locator('[data-debug-stage-id="stage-33"] [data-debug-scenario-id]'))
+    .toHaveCount(6);
   await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
   await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");
   await captureVisualAudit(page.locator('[data-debug-stage-id="stage-03"]'), {

@@ -39,7 +39,8 @@ export type StageId =
   | "stage-29"
   | "stage-30"
   | "stage-31"
-  | "stage-32";
+  | "stage-32"
+  | "stage-33";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -73,7 +74,8 @@ export type CampaignRouteId =
   | "stage-30"
   | "stage-31"
   | "stage-32"
-  | "stage-33";
+  | "stage-33"
+  | "stage-34";
 
 export interface Position {
   x: number;
@@ -231,8 +233,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 61;
-  contentVersion: "stage-32-sterling-strait-alliance-1";
+  version: 62;
+  contentVersion: "stage-33-lannal-castle-outskirts-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
