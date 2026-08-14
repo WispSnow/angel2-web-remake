@@ -42,7 +42,8 @@ export type StageId =
   | "stage-32"
   | "stage-33"
   | "stage-34"
-  | "stage-35";
+  | "stage-35"
+  | "stage-36";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -79,7 +80,8 @@ export type CampaignRouteId =
   | "stage-33"
   | "stage-34"
   | "stage-35"
-  | "stage-36";
+  | "stage-36"
+  | "stage-37";
 
 export interface Position {
   x: number;
@@ -237,8 +239,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 64;
-  contentVersion: "stage-35-time-space-anomaly-1";
+  version: 65;
+  contentVersion: "stage-36-bina-vige-otherworld-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

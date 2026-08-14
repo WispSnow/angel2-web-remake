@@ -151,7 +151,7 @@ test("S35-G/H: final elimination plays SAY/0068 and Nia defeat retries the openi
   });
 });
 
-test("S35-I: victory saves v64 and reaches the frozen stage-36 boundary", async ({ page }) => {
+test("S35-I: victory saves v65 and enters the playable stage-36 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-35-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "68");
@@ -163,7 +163,7 @@ test("S35-I: victory saves v64 and reaches the frozen stage-36 boundary", async 
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -190,13 +190,14 @@ test("S35-I: victory saves v64 and reaches the frozen stage-36 boundary", async 
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-35",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-36",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-36",
   });
-  await expect(page.getByText(/stage-36/u)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "異世界的碧娜維姬 · 出擊準備" })).toBeVisible();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／28");
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage35-stage36-boundary.png`,
+    path: `${ARTIFACT_DIR}/stage35-stage36-deployment-route.png`,
   });
 });

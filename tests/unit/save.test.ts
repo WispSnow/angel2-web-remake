@@ -57,6 +57,7 @@ import { STAGE31_DEFINITION } from "../../src/game/content/stage31";
 import { STAGE32_DEFINITION } from "../../src/game/content/stage32";
 import { STAGE33_DEFINITION } from "../../src/game/content/stage33";
 import { STAGE34_DEFINITION } from "../../src/game/content/stage34";
+import { STAGE36_DEFINITION } from "../../src/game/content/stage36";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
@@ -75,6 +76,7 @@ import { Stage32Battle } from "../../src/game/simulation/stage32-battle";
 import { Stage33Battle } from "../../src/game/simulation/stage33-battle";
 import { Stage34Battle } from "../../src/game/simulation/stage34-battle";
 import { Stage35Battle } from "../../src/game/simulation/stage35-battle";
+import { Stage36Battle } from "../../src/game/simulation/stage36-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
 import type { BattleSaveData, CompletedSaveData, Difficulty } from "../../src/game/types";
 
@@ -1812,6 +1814,63 @@ const stage35BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage36BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-36" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x36a0_b0c0,
+    rngCalls: 114,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 1_120, life: 330 },
+      { slot: 7, classId: "magic-priest", experience: 0, life: 190 },
+      { slot: 22, classId: "great-axe-warrior", experience: 0, life: 220 },
+      { slot: 23, classId: "empress", experience: 0, life: 380 },
+      { slot: 40, classId: "magic-sword-warrior", experience: 0, life: 150 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE36_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE36_DEFINITION.deployment.optionalSlots.slice(0, 27).map((slot, index) => ({
+        slot, position: { ...STAGE36_DEFINITION.deployment.openCells[index]! }, fixed: false,
+      })),
+    ],
+  };
+  const battle = new Stage36Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-14T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-36",
+    stageLabel: "異世界的碧娜維姬",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-36-enter-deployment",
+      "stage-36-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -3374,6 +3433,113 @@ describe("Web save validation", () => {
         (id) => id !== "stage-35-victory-story",
       ),
     })).toBe(false);
+  });
+
+  it("validates stage 36's deployment, 30 static enemies, and resume identity", () => {
+    const save = stage36BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1)).toHaveLength(28);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(30);
+    expect(save.battle.units.find(({ id }) => id === "2:1")).toMatchObject({
+      classId: "wizard", name: "碧娜維姬", portrait: 8,
+    });
+    expect(save.battle.units.filter(
+      ({ side, classId }) => side === 2 && classId === "wizard",
+    )).toHaveLength(6);
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: save.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.filter(({ id }) => id !== "1:0"),
+      },
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:1"
+          ? { ...unit, classId: "magic-master" as const, className: "魔法大師" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("accepts the stage-37 boundary only with stage 36's complete event identity", () => {
+    const current = stage36BattleSave();
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-37",
+      stageLabel: "究極女神",
+      roster: current.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...current.consumedEventIds,
+        "stage-36-objective-reached",
+        "stage-36-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.filter(
+        (id) => id !== "stage-36-objective-reached",
+      ),
+    })).toBe(false);
+  });
+
+  it("migrates v64 stage 36 boundaries but rejects forged stage 36 battles and stage 37", () => {
+    const currentStage36 = stage36BattleSave();
+    const boundary: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-36",
+      stageLabel: "異世界的碧娜維姬",
+      roster: currentStage36.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage35BattleSave().consumedEventIds,
+        "stage-35-objective-reached",
+        "stage-35-victory-story",
+        "stage-35-completed-route",
+      ],
+    };
+    const migrated = parseSaveData(JSON.stringify({
+      ...boundary,
+      version: 64,
+      contentVersion: "stage-35-time-space-anomaly-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "completed",
+      stageId: "stage-36",
+    });
+    expect(parseSaveData(JSON.stringify({
+      ...currentStage36,
+      version: 64,
+      contentVersion: "stage-35-time-space-anomaly-1",
+    }))).toBeUndefined();
+
+    const forgedStage37: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-37",
+      stageLabel: "究極女神",
+      roster: currentStage36.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...currentStage36.consumedEventIds,
+        "stage-36-objective-reached",
+        "stage-36-completed-route",
+      ],
+    };
+    expect(parseSaveData(JSON.stringify({
+      ...forgedStage37,
+      version: 64,
+      contentVersion: "stage-35-time-space-anomaly-1",
+    }))).toBeUndefined();
   });
 
   it("migrates v63 stage 35 boundaries but rejects forged stage 35 battles and stage 36", () => {

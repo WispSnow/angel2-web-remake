@@ -57,7 +57,7 @@ describe("stage 35 generated content", () => {
     expect(STAGE35_SEMANTIC_ENEMY_UNITS.every(({ aiBehavior }) => aiBehavior === 12)).toBe(true);
   });
 
-  it("registers SAY/0067, SAY/0068, and the frozen stage 36 route", () => {
+  it("registers SAY/0067, SAY/0068, and the stage 36 route", () => {
     activateStage35Content();
     expect(Object.fromEntries(Object.entries(STAGE35_STORY_PAGES)
       .map(([id, pages]) => [id, pages.length]))).toEqual({

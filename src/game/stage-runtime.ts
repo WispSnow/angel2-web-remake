@@ -1710,6 +1710,54 @@ async function loadStage35Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage36Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage36"),
+    import("./simulation/stage36-battle"),
+  ]);
+  content.activateStage36Content();
+  const definition = content.STAGE36_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 35",
+      title: content.STAGE36.name,
+      objective: content.STAGE36_DEFINITION.objective.victoryText,
+      minimap: content.STAGE36_ASSETS.minimap,
+      terrain: content.STAGE36_TERRAIN_TOKENS,
+      gridWidth: content.STAGE36.width,
+      gridHeight: content.STAGE36.height,
+      enemies: content.STAGE36_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十八名候選最多再選二十七人。擊敗碧娜維姬即可獲勝，不必全滅異世界軍。",
+    },
+    ["stage-36-enter-deployment"],
+    (campaign) => battleModule.createStage36DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 36 requires a deployment result");
+    return new battleModule.Stage36Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE36_DEFINITION,
+    assets: {
+      map: content.STAGE36_ASSETS.map,
+      minimap: content.STAGE36_ASSETS.minimap,
+      unitSprites: content.STAGE36_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -4005,6 +4053,85 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage35Module,
+  },
+  "stage-36": {
+    id: "stage-36",
+    ordinal: 35,
+    label: "異世界的碧娜維姬",
+    nextStageId: "stage-37",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅一行穿過異世界之門，追上吸收黑魔石力量的碧娜維姬。",
+      campaignRoute: "stage-36",
+    },
+    enemyPhaseStatusText: "敵方階段：碧娜維姬的異世界軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始異世界追擊戰部署。",
+      retreatStatusText: "全面撤退：返回異世界追擊戰部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "究極女神",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-36-enter-deployment",
+        "stage-36-opening-story",
+        "stage-36-objective-reached",
+        "stage-36-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-36-enter-deployment",
+        "stage-36-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 28,
+        openCellCount: 27,
+      },
+      enemyClassById: [
+        ["2:53", "demon-dragon-knight"],
+        ["2:42", "wizard"],
+        ["2:36", "magic-master"],
+        ["2:35", "magic-master"],
+        ["2:40", "wizard"],
+        ["2:55", "demon-dragon-knight"],
+        ["2:54", "flying-dragon-knight"],
+        ["2:43", "wizard"],
+        ["2:38", "evil-mage"],
+        ["2:1", "wizard"],
+        ["2:37", "evil-mage"],
+        ["2:41", "wizard"],
+        ["2:56", "flying-dragon-knight"],
+        ["2:47", "magic-sword-warrior"],
+        ["2:32", "prayer-guide"],
+        ["2:39", "curse-master"],
+        ["2:45", "great-axe-warrior"],
+        ["2:48", "magic-sword-warrior"],
+        ["2:33", "magician"],
+        ["2:44", "wizard"],
+        ["2:31", "magic-guide"],
+        ["2:30", "magic-priest"],
+        ["2:34", "magician"],
+        ["2:46", "great-axe-warrior"],
+        ["2:49", "evil-sword-warrior"],
+        ["2:51", "magic-armor-warrior"],
+        ["2:52", "magic-armor-warrior"],
+        ["2:50", "evil-sword-warrior"],
+        ["2:57", "bone-knight"],
+        ["2:58", "bone-knight"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage36Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 
