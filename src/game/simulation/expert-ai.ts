@@ -629,19 +629,21 @@ export function expertSpecialUtility(
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     const immune = "immuneClasses" in definition.status
       && definition.status.immuneClasses.some((classId) => classId === target.classId);
-    if (immune || target.statuses[statusKey] > 0) {
+    // REMAKE-083 treats confusion as the broader disable. Spell seal only
+    // matters when the target's primary action menu is actually sealable.
+    const spellSealHasEffect = actionId !== "spell-seal"
+      || classDefinition(target.classId).actionCategory === "technique";
+    if (immune || target.statuses[statusKey] > 0 || !spellSealHasEffect) {
       utility.waste = 1;
       return utility;
     }
     const threat = targetThreat(context, target);
     utility.control = actionId === "confusion"
-      ? 100 + Math.floor(threat / 2)
+      ? 140 + Math.floor(threat / 2)
       : actionId === "poison"
         ? 80 + Math.floor(target.life / 4)
         : actionId === "spell-seal"
-          ? classDefinition(target.classId).actionCategory === "technique"
-            ? 120 + Math.floor(threat / 2)
-            : 20
+          ? 120 + Math.floor(threat / 2)
           : 40 + Math.floor(threat / 4);
     utility.targetThreat = threat;
     countEffectiveWizardHit(utility, target, true);

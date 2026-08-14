@@ -3491,7 +3491,7 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("migrates legal v68 through v65 saves without changing simulation state", () => {
+  it("migrates legal v69 through v65 saves without changing simulation state", () => {
     const battle = stage36BattleSave();
     const completed: CompletedSaveData = {
       ...completedSave(),
@@ -3506,6 +3506,7 @@ describe("Web save validation", () => {
       ],
     };
     const legacyIdentities = [
+      { version: 69, contentVersion: "expert-target-priority-ai-1" },
       { version: 68, contentVersion: "expert-focus-fire-ai-3" },
       { version: 67, contentVersion: "expert-focus-fire-ai-2" },
       { version: 66, contentVersion: "expert-focus-fire-ai-1" },
@@ -3517,8 +3518,8 @@ describe("Web save validation", () => {
     }
     expect(parseSaveData(JSON.stringify({
       ...battle,
-      version: 68,
-      contentVersion: "wrong-v68-identity",
+      version: 69,
+      contentVersion: "wrong-v69-identity",
     }))).toBeUndefined();
   });
 

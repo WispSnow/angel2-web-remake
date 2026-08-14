@@ -521,6 +521,82 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     });
   });
 
+  it("ranks confusion above spell seal and rejects seal targets without a technique menu", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-technique", side: 1 as const, slot: 0, classId: "magician" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "ally-ordinary", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "enemy-curse", side: 2 as const, slot: 0, classId: "curse-master" as const, level: 3 as const, x: 26, y: 30 },
+    ], 0, new DeterministicRng(0x3380));
+    const actor = battle.unit("enemy-curse")!;
+    const techniqueTarget = battle.unit("ally-technique")!;
+    const ordinaryTarget = battle.unit("ally-ordinary")!;
+    const context = {
+      width: 50,
+      height: 60,
+      units: battle.units,
+      terrainSlotAt: () => 2,
+      statsFor: () => ({ attack: 100, defense: 80, maxLife: 200, movement: 4, level: 1 }),
+      effectiveStatsFor: () => ({ attack: 100, defense: 80, maxLife: 200, movement: 4, level: 1 }),
+    };
+
+    const confusion = expertSpecialUtility(
+      context,
+      actor,
+      "confusion",
+      techniqueTarget,
+      [actor],
+    );
+    const spellSeal = expertSpecialUtility(
+      context,
+      actor,
+      "spell-seal",
+      techniqueTarget,
+      [actor],
+    );
+    const invalidSpellSeal = expertSpecialUtility(
+      context,
+      actor,
+      "spell-seal",
+      ordinaryTarget,
+      [actor],
+    );
+
+    expect(confusion.control).toBe(spellSeal.control + 20);
+    expect(invalidSpellSeal).toMatchObject({ control: 0, targetThreat: 0, waste: 1 });
+    expect(battle.planEnemyAiAction("enemy-curse")).toMatchObject({
+      kind: "special",
+      actionId: "confusion",
+      targetId: "ally-technique",
+    });
+  });
+
+  it("completely rejects reapplying the same control status", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-confused", side: 1 as const, slot: 0, classId: "magician" as const, level: 1 as const, x: 22, y: 30 },
+      { id: "enemy-curse", side: 2 as const, slot: 0, classId: "curse-master" as const, level: 3 as const, x: 27, y: 30 },
+    ], 0, new DeterministicRng(0x3381));
+    const actor = battle.unit("enemy-curse")!;
+    const target = battle.unit("ally-confused")!;
+    target.statuses.confusion = 3;
+
+    const utility = expertSpecialUtility(
+      {
+        width: 50,
+        height: 60,
+        units: battle.units,
+        terrainSlotAt: () => 2,
+        statsFor: () => ({ attack: 100, defense: 80, maxLife: 200, movement: 4, level: 1 }),
+        effectiveStatsFor: () => ({ attack: 100, defense: 80, maxLife: 200, movement: 4, level: 1 }),
+      },
+      actor,
+      "confusion",
+      target,
+      [actor],
+    );
+
+    expect(utility).toMatchObject({ control: 0, targetThreat: 0, waste: 1 });
+  });
+
   it("re-evaluates squad actor priority from the current state", () => {
     const battle = new ArenaBattle(placements(), 0, new DeterministicRng(0x3305));
     battle.unit("enemy-front")!.life = 1;
