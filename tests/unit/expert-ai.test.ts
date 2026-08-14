@@ -8,6 +8,7 @@ import { shootingLineVisitProbabilities } from "../../src/game/simulation/action
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
 import { manhattan } from "../../src/game/simulation/grid";
+import { expertSpecialUtility } from "../../src/game/simulation/expert-ai";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
@@ -181,6 +182,72 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       targetId: "enemy-wizard-wounded",
     });
     expect({ state: rng.state, calls: rng.calls }).toEqual(before);
+  });
+
+  it("focuses the wizard with the lowest expected life after a crossbow shot", () => {
+    const rng = new DeterministicRng(0x3377);
+    const battle = new ArenaBattle([
+      { id: "ally-crossbow", side: 1 as const, slot: 0, classId: "crossbow" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-wizard-healthy", side: 2 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 22, y: 29 },
+      { id: "enemy-wizard-focus", side: 2 as const, slot: 1, classId: "wizard" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, rng, {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    });
+    battle.unit("enemy-wizard-healthy")!.life = 200;
+    // Crossbow minimum/expected damage is 70/79: this is not a guaranteed
+    // kill, but it is still the target the shot is most likely to finish.
+    battle.unit("enemy-wizard-focus")!.life = 75;
+    const before = { state: rng.state, calls: rng.calls };
+
+    expect(battle.planAlliedAiAction("ally-crossbow")).toMatchObject({
+      kind: "special",
+      actionId: "crossbow-shot",
+      targetId: "enemy-wizard-focus",
+    });
+    expect({ state: rng.state, calls: rng.calls }).toEqual(before);
+  });
+
+  it("does not treat a larger maximum-life pool as extra target threat", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-crossbow", side: 1 as const, slot: 0, classId: "crossbow" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-wizard-light", side: 2 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 22, y: 29 },
+      { id: "enemy-wizard-thick", side: 2 as const, slot: 1, classId: "wizard" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, new DeterministicRng(0x3378));
+    const actor = battle.unit("ally-crossbow")!;
+    const light = battle.unit("enemy-wizard-light")!;
+    const thick = battle.unit("enemy-wizard-thick")!;
+    const context = {
+      width: 50,
+      height: 60,
+      units: [actor, light, thick],
+      terrainSlotAt: () => 2,
+      statsFor: () => ({ attack: 120, defense: 80, maxLife: 200, movement: 4, level: 2 }),
+      effectiveStatsFor: (unit: typeof actor) => ({
+        attack: 120,
+        defense: 80,
+        maxLife: unit.id === thick.id ? 2_000 : 200,
+        movement: 4,
+        level: 2,
+      }),
+    };
+
+    const lightUtility = expertSpecialUtility(
+      context,
+      actor,
+      "crossbow-shot",
+      light,
+      [actor],
+    );
+    const thickUtility = expertSpecialUtility(
+      context,
+      actor,
+      "crossbow-shot",
+      thick,
+      [actor],
+    );
+
+    expect(thickUtility.targetThreat).toBe(lightUtility.targetThreat);
   });
 
   it("focuses the lowest-life target when automatic squad action scores tie", () => {

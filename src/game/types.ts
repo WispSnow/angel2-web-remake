@@ -239,8 +239,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 67;
-  contentVersion: "expert-focus-fire-ai-2";
+  version: 68;
+  contentVersion: "expert-focus-fire-ai-3";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

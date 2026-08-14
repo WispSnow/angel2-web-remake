@@ -36,7 +36,11 @@ export interface ForceAiPlanningContext {
     behavior: number,
     options?: OrdinaryAiPlanningOptions,
   ) => AlliedAiAction;
-  expertScore?: (unit: BattleUnit, action: AlliedAiAction) => number;
+  compareExpertActions?: (
+    unit: BattleUnit,
+    left: AlliedAiAction,
+    right: AlliedAiAction,
+  ) => number;
 }
 
 export function planTerrainHoldForceAiAction(
@@ -157,8 +161,8 @@ export function planTerrainHoldForceAiAction(
     targetFilter,
   });
   if (!classAction) return ordinaryAction;
-  if (unit.side === 2 && context.expertScore) {
-    return context.expertScore(unit, classAction) >= context.expertScore(unit, ordinaryAction)
+  if (unit.side === 2 && context.compareExpertActions) {
+    return context.compareExpertActions(unit, classAction, ordinaryAction) <= 0
       ? classAction
       : ordinaryAction;
   }

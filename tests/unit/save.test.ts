@@ -3491,7 +3491,7 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("migrates legal v66 and v65 saves without changing simulation state", () => {
+  it("migrates legal v67, v66 and v65 saves without changing simulation state", () => {
     const battle = stage36BattleSave();
     const completed: CompletedSaveData = {
       ...completedSave(),
@@ -3506,6 +3506,7 @@ describe("Web save validation", () => {
       ],
     };
     const legacyIdentities = [
+      { version: 67, contentVersion: "expert-focus-fire-ai-2" },
       { version: 66, contentVersion: "expert-focus-fire-ai-1" },
       { version: 65, contentVersion: "stage-36-bina-vige-otherworld-1" },
     ] as const;
@@ -3515,8 +3516,8 @@ describe("Web save validation", () => {
     }
     expect(parseSaveData(JSON.stringify({
       ...battle,
-      version: 66,
-      contentVersion: "wrong-v66-identity",
+      version: 67,
+      contentVersion: "wrong-v67-identity",
     }))).toBeUndefined();
   });
 

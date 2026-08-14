@@ -93,11 +93,11 @@ import {
   type PreparedEnemyPhaseTail,
 } from "./enemy-phase-tail";
 import {
+  compareExpertAiPriorityBand,
   compareExpertAiUtility,
   expertAiCandidateTrace,
   expertExposureAt,
   expertOrdinaryUtility,
-  expertAiScore,
   expertSpecialUtility,
   expertTacticalScore,
   expertUtilityForAction,
@@ -186,6 +186,23 @@ const compareFocusFireLife = (
 
 const isDamagingActionId = (actionId: BattleActionId): boolean =>
   "damage" in BATTLE_ACTION_DEFINITIONS[actionId];
+
+const isDirectFocusDamageActionId = (actionId: BattleActionId): boolean =>
+  actionId === "archer-shot"
+  || actionId === "crossbow-shot"
+  || actionId === "fire-1"
+  || actionId === "fire-2"
+  || actionId === "fire-3"
+  || actionId === "fire-4";
+
+const compareExpertFocusRanking = (
+  leftUtility: ExpertAiUtility,
+  leftExpectedRemainingLife: number | undefined,
+  rightUtility: ExpertAiUtility,
+  rightExpectedRemainingLife: number | undefined,
+): number => compareExpertAiPriorityBand(leftUtility, rightUtility)
+  || compareFocusFireLife(leftExpectedRemainingLife, rightExpectedRemainingLife)
+  || compareExpertAiUtility(leftUtility, rightUtility);
 
 const cloneAiAction = (action: AlliedAiAction): AlliedAiAction => ({
   ...action,
@@ -1922,9 +1939,19 @@ export class Stage0Battle {
           ...options,
           expertRanking: true,
         }),
-      expertScore: (candidate, action) => expertAiScore(
-        this.expertUtilityForAction(candidate, action),
-      ),
+      compareExpertActions: (candidate, left, right) => {
+        const leftUtility = this.expertUtilityForAction(candidate, left);
+        const rightUtility = this.expertUtilityForAction(candidate, right);
+        return compareExpertFocusRanking(
+          leftUtility,
+          this.expectedRemainingLifeForDirectFocusAction(candidate, left, leftUtility),
+          rightUtility,
+          this.expectedRemainingLifeForDirectFocusAction(candidate, right, rightUtility),
+        ) || compareFocusFireLife(
+          this.focusFireLifeForAction(candidate, left),
+          this.focusFireLifeForAction(candidate, right),
+        );
+      },
     }, unit, doctrine);
   }
 
@@ -2053,13 +2080,19 @@ export class Stage0Battle {
         && candidate.targetId === action.targetId
         && positionKey(candidate.path.at(-1) ?? unit)
           === positionKey(action.path.at(-1) ?? unit)) === index)
-      .sort((left, right) => compareExpertAiUtility(
-        this.expertUtilityForAction(unit, left),
-        this.expertUtilityForAction(unit, right),
-      ) || compareFocusFireLife(
-        this.focusFireLifeForAction(unit, left),
-        this.focusFireLifeForAction(unit, right),
-      ));
+      .sort((left, right) => {
+        const leftUtility = this.expertUtilityForAction(unit, left);
+        const rightUtility = this.expertUtilityForAction(unit, right);
+        return compareExpertFocusRanking(
+          leftUtility,
+          this.expectedRemainingLifeForDirectFocusAction(unit, left, leftUtility),
+          rightUtility,
+          this.expectedRemainingLifeForDirectFocusAction(unit, right, rightUtility),
+        ) || compareFocusFireLife(
+          this.focusFireLifeForAction(unit, left),
+          this.focusFireLifeForAction(unit, right),
+        );
+      });
     const selected = candidates[0]
       ?? { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
     const selectedUtility = this.expertUtilityForAction(unit, selected);
@@ -2111,6 +2144,7 @@ export class Stage0Battle {
       actionId: BattleActionId;
       actionOrder: number;
       target: BattleUnit;
+      utility: ExpertAiUtility;
       tacticalScore: number;
       terrainDefense: number;
       targetDistance: number;
@@ -2154,6 +2188,7 @@ export class Stage0Battle {
             actionId,
             actionOrder,
             target,
+            utility,
             tacticalScore: expertTacticalScore(utility),
             terrainDefense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
             targetDistance: manhattan(position, target),
@@ -2171,7 +2206,16 @@ export class Stage0Battle {
       const minimumDamage = Math.min(...eligible.map(({ risk }) => risk.meleeExpectedDamage));
       eligible = eligible.filter(({ risk }) => risk.meleeExpectedDamage === minimumDamage);
     }
-    eligible.sort((left, right) => right.tacticalScore - left.tacticalScore
+    eligible.sort((left, right) => compareExpertAiPriorityBand(left.utility, right.utility)
+      || compareFocusFireLife(
+        isDirectFocusDamageActionId(left.actionId) && left.target.side !== unit.side
+          ? Math.max(0, left.target.life - left.utility.effectiveDamage)
+          : undefined,
+        isDirectFocusDamageActionId(right.actionId) && right.target.side !== unit.side
+          ? Math.max(0, right.target.life - right.utility.effectiveDamage)
+          : undefined,
+      )
+      || right.tacticalScore - left.tacticalScore
       || compareFocusFireLife(
         isDamagingActionId(left.actionId) && left.target.side !== unit.side
           ? left.target.life
@@ -2642,7 +2686,22 @@ export class Stage0Battle {
     );
   }
 
-  /** REMAKE-079 only breaks exact expert-score ties between hostile damage actions. */
+  /** REMAKE-081 focuses direct damage without changing range/line total-value ranking. */
+  private expectedRemainingLifeForDirectFocusAction(
+    unit: BattleUnit,
+    action: AlliedAiAction,
+    utility: ExpertAiUtility = this.expertUtilityForAction(unit, action),
+  ): number | undefined {
+    const target = action.targetId ? this.unit(action.targetId) : undefined;
+    if (!target || target.side === unit.side) return undefined;
+    const directDamage = action.kind === "attack"
+      || (action.kind === "special"
+        && action.actionId !== undefined
+        && isDirectFocusDamageActionId(action.actionId));
+    return directDamage ? Math.max(0, target.life - utility.effectiveDamage) : undefined;
+  }
+
+  /** REMAKE-079 still breaks exact full-score ties between hostile damage actions. */
   private focusFireLifeForAction(
     unit: BattleUnit,
     action: AlliedAiAction,
@@ -2819,7 +2878,12 @@ export class Stage0Battle {
 
     if (options.expertRanking && expertAttackCandidates.length > 0) {
       expertAttackCandidates.sort((left, right) =>
-        compareExpertAiUtility(left.utility, right.utility)
+        compareExpertFocusRanking(
+          left.utility,
+          Math.max(0, left.target.life - left.utility.effectiveDamage),
+          right.utility,
+          Math.max(0, right.target.life - right.utility.effectiveDamage),
+        )
         || left.target.life - right.target.life
         || left.target.y * this.stage.width + left.target.x
           - (right.target.y * this.stage.width + right.target.x)
@@ -3103,6 +3167,7 @@ export class Stage0Battle {
       action: AlliedAiAction;
       utility: ExpertAiUtility;
       actionOrder: number;
+      expectedRemainingLife?: number;
       focusFireLife?: number;
       targetOrder: number;
       positionOrder: number;
@@ -3233,7 +3298,11 @@ export class Stage0Battle {
         candidates.sort((left, right) => (shootingAction
           ? (actionId === "magic-archer-shot"
               ? right.utility.effectiveDamage - left.utility.effectiveDamage
-              : 0)
+              : compareExpertAiPriorityBand(left.utility, right.utility)
+                || compareFocusFireLife(
+                  Math.max(0, left.target.life - left.utility.effectiveDamage),
+                  Math.max(0, right.target.life - right.utility.effectiveDamage),
+                ))
             || expertTacticalScore(right.utility) - expertTacticalScore(left.utility)
             || left.rangedRisk.meleeContactCount - right.rangedRisk.meleeContactCount
             || left.rangedRisk.meleeExpectedDamage - right.rangedRisk.meleeExpectedDamage
@@ -3241,7 +3310,14 @@ export class Stage0Battle {
             || right.utility.terrainDefense - left.utility.terrainDefense
             || right.utility.firingDistance - left.utility.firingDistance
             || left.utility.pathLength - right.utility.pathLength
-          : compareExpertAiUtility(left.utility, right.utility))
+          : isDirectFocusDamageActionId(actionId)
+            ? compareExpertFocusRanking(
+                left.utility,
+                Math.max(0, left.target.life - left.utility.effectiveDamage),
+                right.utility,
+                Math.max(0, right.target.life - right.utility.effectiveDamage),
+              )
+            : compareExpertAiUtility(left.utility, right.utility))
           || (isDamagingActionId(actionId) ? left.target.life - right.target.life : 0)
           || left.target.y * this.stage.width + left.target.x
             - (right.target.y * this.stage.width + right.target.x)
@@ -3261,6 +3337,12 @@ export class Stage0Battle {
             },
             utility: selected.utility,
             actionOrder,
+            ...(isDirectFocusDamageActionId(actionId) ? {
+              expectedRemainingLife: Math.max(
+                0,
+                selected.target.life - selected.utility.effectiveDamage,
+              ),
+            } : {}),
             ...(isDamagingActionId(actionId) ? { focusFireLife: selected.target.life } : {}),
             targetOrder: selected.target.y * this.stage.width + selected.target.x,
             positionOrder: selected.position.y * this.stage.width + selected.position.x,
@@ -3315,7 +3397,12 @@ export class Stage0Battle {
       }
     }
     if (options.expertRanking) {
-      expertCandidates.sort((left, right) => compareExpertAiUtility(left.utility, right.utility)
+      expertCandidates.sort((left, right) => compareExpertFocusRanking(
+        left.utility,
+        left.expectedRemainingLife,
+        right.utility,
+        right.expectedRemainingLife,
+      )
         || compareFocusFireLife(left.focusFireLife, right.focusFireLife)
         || left.actionOrder - right.actionOrder
         || left.targetOrder - right.targetOrder
@@ -3399,19 +3486,33 @@ export class Stage0Battle {
         const action = unit?.statuses.confusion
           ? undefined
           : this.planAlliedAiAction(id);
-        const score = unit && action
-          ? expertAiScore(this.expertUtilityForAction(unit, action))
-          : Number.MIN_SAFE_INTEGER;
+        const utility = unit && action
+          ? this.expertUtilityForAction(unit, action)
+          : undefined;
+        const expectedRemainingLife = unit && action && utility
+          ? this.expectedRemainingLifeForDirectFocusAction(unit, action, utility)
+          : undefined;
         const focusFireLife = unit && action
           ? this.focusFireLifeForAction(unit, action)
           : undefined;
-        return { id, score, order, action, focusFireLife };
+        return { id, utility, expectedRemainingLife, order, action, focusFireLife };
       });
       const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
       const selected = (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
-        .sort((left, right) => right.score - left.score
-          || compareFocusFireLife(left.focusFireLife, right.focusFireLife)
-          || left.order - right.order)[0];
+        .sort((left, right) => {
+          if (!left.utility || !right.utility) {
+            if (left.utility) return -1;
+            if (right.utility) return 1;
+            return left.order - right.order;
+          }
+          return compareExpertFocusRanking(
+            left.utility,
+            left.expectedRemainingLife,
+            right.utility,
+            right.expectedRemainingLife,
+          ) || compareFocusFireLife(left.focusFireLife, right.focusFireLife)
+            || left.order - right.order;
+        })[0];
       return selected ? {
         unitId: selected.id,
         ...(selected.action ? { action: selected.action } : {}),
@@ -3453,19 +3554,40 @@ export class Stage0Battle {
           const action = unit?.statuses.confusion
             ? undefined
             : this.planEnemyAiAction(id);
-          const score = unit && action
-            ? expertAiScore(this.expertUtilityForAction(unit, action))
-            : Number.MIN_SAFE_INTEGER;
+          const utility = unit && action
+            ? this.expertUtilityForAction(unit, action)
+            : undefined;
+          const expectedRemainingLife = unit && action && utility
+            ? this.expectedRemainingLifeForDirectFocusAction(unit, action, utility)
+            : undefined;
           const focusFireLife = unit && action
             ? this.focusFireLifeForAction(unit, action)
             : undefined;
-          return { id, score, stableOrder, action, focusFireLife };
+          return {
+            id,
+            utility,
+            expectedRemainingLife,
+            stableOrder,
+            action,
+            focusFireLife,
+          };
         });
       const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
       const selected = (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
-        .sort((left, right) => right.score - left.score
-          || compareFocusFireLife(left.focusFireLife, right.focusFireLife)
-          || left.stableOrder - right.stableOrder)[0];
+        .sort((left, right) => {
+          if (!left.utility || !right.utility) {
+            if (left.utility) return -1;
+            if (right.utility) return 1;
+            return left.stableOrder - right.stableOrder;
+          }
+          return compareExpertFocusRanking(
+            left.utility,
+            left.expectedRemainingLife,
+            right.utility,
+            right.expectedRemainingLife,
+          ) || compareFocusFireLife(left.focusFireLife, right.focusFireLife)
+            || left.stableOrder - right.stableOrder;
+        })[0];
       return selected ? {
         unitId: selected.id,
         ...(selected.action ? { action: selected.action } : {}),

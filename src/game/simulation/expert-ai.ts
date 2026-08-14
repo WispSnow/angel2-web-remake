@@ -97,10 +97,17 @@ export function emptyExpertAiUtility(): ExpertAiUtility {
   };
 }
 
-function expertPriorityBand(utility: ExpertAiUtility): number {
+export function expertAiPriorityBand(utility: ExpertAiUtility): number {
   if (utility.guaranteedKills > 0) return 2_000_000_000;
   if (utility.wizardHits > 0) return 1_000_000_000;
   return 0;
+}
+
+export function compareExpertAiPriorityBand(
+  left: ExpertAiUtility,
+  right: ExpertAiUtility,
+): number {
+  return expertAiPriorityBand(right) - expertAiPriorityBand(left);
 }
 
 function countEffectiveWizardHit(
@@ -117,7 +124,7 @@ function countEffectiveWizardHit(
  * without allowing additive tie-break value to cross either tactical band.
  */
 export function expertAiScore(utility: ExpertAiUtility): number {
-  return expertPriorityBand(utility)
+  return expertAiPriorityBand(utility)
     + utility.guaranteedKills * 1_000_000
     + utility.criticalSaves * 600_000
     + utility.effectiveDamage * 100
@@ -185,8 +192,11 @@ function targetThreat(context: ExpertAiEvaluationContext, unit: BattleUnit): num
   const cached = context.cache?.targetThreatByUnitId.get(unit.id);
   if (cached !== undefined) return cached;
   const stats = context.effectiveStatsFor(unit);
+  // `level` is the current-profession HUD level (promotion resets experience),
+  // while this bonus follows the generated action-menu category. Shooting is
+  // a separate catalog category and therefore receives no bonus here.
   const actionBonus = classDefinition(unit.classId).actionCategory === "technique" ? 30 : 0;
-  const threat = stats.attack + stats.level * 8 + Math.floor(stats.maxLife / 10) + actionBonus;
+  const threat = stats.attack + stats.level * 8 + actionBonus;
   context.cache?.targetThreatByUnitId.set(unit.id, threat);
   return threat;
 }
@@ -292,7 +302,7 @@ export function expertExposureAt(
 }
 
 export function expertTacticalScore(utility: ExpertAiUtility): number {
-  return expertPriorityBand(utility)
+  return expertAiPriorityBand(utility)
     + utility.guaranteedKills * 1_000_000
     + utility.criticalSaves * 600_000
     + utility.effectiveDamage * 100
