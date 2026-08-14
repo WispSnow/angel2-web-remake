@@ -7,6 +7,7 @@ import {
   classDefinition,
   classIdFromNativeRecord,
   classStatsFor,
+  classTargetPriorityProfile,
   classTierFor,
   isClassImmuneToOrdinaryHitStatus,
   ordinaryHitStatusFor,
@@ -108,6 +109,39 @@ describe("stable-remake combat roles", () => {
       "magic-master",
     ]);
     expect([...melee, ...ranged]).toHaveLength(CLASS_IDS.length);
+  });
+});
+
+describe("stable-remake target-priority profiles", () => {
+  it("separates casters and shooters from action menus and combat roles", () => {
+    const casters = CLASS_IDS.filter((classId) =>
+      classTargetPriorityProfile(classId) === "caster");
+    const shooters = CLASS_IDS.filter((classId) =>
+      classTargetPriorityProfile(classId) === "shooter");
+
+    expect(casters).toEqual([
+      "magic-priest",
+      "prayer-guide",
+      "curse-master",
+      "magician",
+      "magic-guide",
+      "evil-mage",
+      "sister",
+      "monk",
+      "priest",
+      "wizard",
+      "magic-master",
+    ]);
+    expect(shooters).toEqual(["magic-archer", "archer", "crossbow"]);
+    const excludedTechniqueMelee = [
+      "half-dragon-warrior",
+      "great-dragon-knight",
+      "engineer",
+    ] as const satisfies readonly ClassId[];
+    expect(excludedTechniqueMelee.map(classTargetPriorityProfile))
+      .toEqual(["none", "none", "none"]);
+    expect(casters.length + shooters.length + CLASS_IDS.filter((classId) =>
+      classTargetPriorityProfile(classId) === "none").length).toBe(CLASS_IDS.length);
   });
 });
 

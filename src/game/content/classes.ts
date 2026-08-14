@@ -16,6 +16,7 @@ export {
 
 export type ClassActionCategory = "ordinary" | "shooting" | "technique" | "special_runtime";
 export type ClassCombatRole = "melee" | "ranged";
+export type ClassTargetPriorityProfile = "none" | "caster" | "shooter";
 export type OrdinaryHitStatusKey = "confusion" | "attackDown" | "defenseDown" | "poison";
 
 export interface OrdinaryHitStatus {
@@ -115,6 +116,57 @@ const CLASS_COMBAT_ROLE = {
 
 export function classCombatRole(classId: ClassId): ClassCombatRole {
   return CLASS_COMBAT_ROLE[classId];
+}
+
+/**
+ * REMAKE-082 target value is independent from action menus, AI dispatch and
+ * melee/ranged positioning. This prevents technique-menu melee careers from
+ * inheriting caster priority while still recognizing the shooting line.
+ */
+const CLASS_TARGET_PRIORITY_PROFILE = {
+  soldier: "none",
+  "magic-sword-warrior": "none",
+  "jungle-warrior": "none",
+  "magic-priest": "caster",
+  "prayer-guide": "caster",
+  "curse-master": "caster",
+  magician: "caster",
+  "great-axe-warrior": "none",
+  "half-dragon-warrior": "none",
+  "magic-armor-warrior": "none",
+  "magic-guide": "caster",
+  "evil-mage": "caster",
+  "magic-archer": "shooter",
+  "land-knight": "none",
+  "demon-dragon-knight": "none",
+  "flying-dragon-knight": "none",
+  "beast-knight": "none",
+  "bone-knight": "none",
+  "swift-dragon-knight": "none",
+  "great-dragon-knight": "none",
+  archer: "shooter",
+  crossbow: "shooter",
+  cavalry: "none",
+  "pegasus-warrior": "none",
+  sister: "caster",
+  monk: "caster",
+  "water-warrior": "none",
+  "divine-sword-warrior": "none",
+  warrior: "none",
+  "steel-armor-warrior": "none",
+  priest: "caster",
+  wizard: "caster",
+  "magic-master": "caster",
+  "evil-sword-warrior": "none",
+  engineer: "none",
+  empress: "none",
+  dragon: "none",
+  head: "none",
+  hand: "none",
+} as const satisfies Readonly<Record<ClassId, ClassTargetPriorityProfile>>;
+
+export function classTargetPriorityProfile(classId: ClassId): ClassTargetPriorityProfile {
+  return CLASS_TARGET_PRIORITY_PROFILE[classId];
 }
 
 /**

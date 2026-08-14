@@ -4,6 +4,7 @@ import {
 } from "../content/actions";
 import {
   classDefinition,
+  classTargetPriorityProfile,
   suppressesOrdinaryCounterFor,
   terrainDefensePercentFor,
 } from "../content/classes";
@@ -193,10 +194,11 @@ function targetThreat(context: ExpertAiEvaluationContext, unit: BattleUnit): num
   if (cached !== undefined) return cached;
   const stats = context.effectiveStatsFor(unit);
   // `level` is the current-profession HUD level (promotion resets experience),
-  // while this bonus follows the generated action-menu category. Shooting is
-  // a separate catalog category and therefore receives no bonus here.
-  const actionBonus = classDefinition(unit.classId).actionCategory === "technique" ? 30 : 0;
-  const threat = stats.attack + stats.level * 8 + actionBonus;
+  // while REMAKE-082 keeps target priority independent from menus and combat
+  // roles.
+  const profile = classTargetPriorityProfile(unit.classId);
+  const priorityBonus = profile === "caster" ? 50 : profile === "shooter" ? 30 : 0;
+  const threat = stats.attack + stats.level * 8 + priorityBonus;
   context.cache?.targetThreatByUnitId.set(unit.id, threat);
   return threat;
 }

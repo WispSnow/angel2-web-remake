@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 68 as const;
-export const SAVE_CONTENT_VERSION = "expert-focus-fire-ai-3" as const;
+export const SAVE_VERSION = 69 as const;
+export const SAVE_CONTENT_VERSION = "expert-target-priority-ai-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

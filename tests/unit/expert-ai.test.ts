@@ -250,6 +250,44 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     expect(thickUtility.targetThreat).toBe(lightUtility.targetThreat);
   });
 
+  it("uses explicit caster and shooter target-priority bonuses", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-crossbow", side: 1 as const, slot: 0, classId: "crossbow" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-caster", side: 2 as const, slot: 0, classId: "magic-priest" as const, level: 1 as const, x: 22, y: 28 },
+      { id: "enemy-shooter", side: 2 as const, slot: 1, classId: "archer" as const, level: 1 as const, x: 22, y: 29 },
+      { id: "enemy-half-dragon", side: 2 as const, slot: 2, classId: "half-dragon-warrior" as const, level: 1 as const, x: 23, y: 28 },
+      { id: "enemy-great-dragon", side: 2 as const, slot: 3, classId: "great-dragon-knight" as const, level: 1 as const, x: 23, y: 29 },
+      { id: "enemy-engineer", side: 2 as const, slot: 4, classId: "engineer" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, new DeterministicRng(0x3379));
+    const actor = battle.unit("ally-crossbow")!;
+    const targets = [
+      battle.unit("enemy-caster")!,
+      battle.unit("enemy-shooter")!,
+      battle.unit("enemy-half-dragon")!,
+      battle.unit("enemy-great-dragon")!,
+      battle.unit("enemy-engineer")!,
+    ];
+    const context = {
+      width: 50,
+      height: 60,
+      units: [actor, ...targets],
+      terrainSlotAt: () => 2,
+      statsFor: () => ({ attack: 120, defense: 80, maxLife: 200, movement: 4, level: 2 }),
+      effectiveStatsFor: () => ({ attack: 120, defense: 80, maxLife: 200, movement: 4, level: 2 }),
+    };
+    const threatFor = (target: typeof actor): number => expertSpecialUtility(
+      context,
+      actor,
+      "crossbow-shot",
+      target,
+      [actor],
+    ).targetThreat;
+
+    expect(threatFor(targets[0])).toBe(186);
+    expect(threatFor(targets[1])).toBe(166);
+    expect(targets.slice(2).map(threatFor)).toEqual([136, 136, 136]);
+  });
+
   it("focuses the lowest-life target when automatic squad action scores tie", () => {
     const uniformTerrain = {
       ...ALL_TERRAIN_ARENA_ENVIRONMENT,
