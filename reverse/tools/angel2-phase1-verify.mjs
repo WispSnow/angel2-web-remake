@@ -174,8 +174,8 @@ async function verifyPhase1Artifacts(root) {
   "Niya portrait render changed");
 
   const evidence = audit.evidenceRegister;
-  assert(evidence.rows === 168 && evidence.confirmedRows === 147 && evidence.mixedRows === 21,
-    "phase-1 evidence counts must remain 168/147/21");
+  assert(evidence.rows === 169 && evidence.confirmedRows === 148 && evidence.mixedRows === 21,
+    "phase-1 evidence counts must remain 169/148/21");
   assert(audit.implementationRequiredUnknowns.length === 0,
     "phase-1 audit contains implementation-required unknowns");
   assert(evidence.residuals.every((entry) => entry.blocksDeterministicWebRules === false),
@@ -185,8 +185,8 @@ async function verifyPhase1Artifacts(root) {
     summary.phase1MixedRows === evidence.mixedRows &&
     summary.phase1ImplementationRequiredUnknowns === 0,
   "inventory and phase-1 audit counts disagree");
-  assert(gdd.includes("版本：Draft 0.74"), "GDD is not Draft 0.74");
-  assert(gdd.includes("168 项：147 项纯 C、21 项混合边界、实现必需未知 0"),
+  assert(gdd.includes("版本：Draft 0.75"), "GDD is not Draft 0.75");
+  assert(gdd.includes("169 项：148 项纯 C、21 项混合边界、实现必需未知 0"),
     "GDD evidence summary is stale");
 
   return {

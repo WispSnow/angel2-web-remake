@@ -453,6 +453,17 @@ const STAGE34_COMPLETED_EVENT_IDS = [
   "stage-34-completed-route",
 ] as const;
 
+const STAGE35_BATTLE_EVENT_IDS = [
+  "stage-35-opening-story",
+] as const;
+
+const STAGE35_COMPLETED_EVENT_IDS = [
+  ...STAGE35_BATTLE_EVENT_IDS,
+  "stage-35-objective-reached",
+  "stage-35-victory-story",
+  "stage-35-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -3145,6 +3156,47 @@ async function createStage34Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage35Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-35",
+    debugCampaign(context, "stage-35"),
+    { statusMessage: "調試場景：時空異變固定編隊。" },
+  );
+  return controller;
+}
+
+async function createStage35Player(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage35Opening(context);
+  controller.skipDialogue();
+  controller.statusMessage = "調試場景：九人調查隊迎戰十名原地待命的死亡之谷部隊。";
+  return controller;
+}
+
+async function createStage35Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-35");
+  const { Stage35Battle } = await import("./simulation/stage35-battle");
+  const completedCampaign = new Stage35Battle(campaign).campaignSnapshot();
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-36",
+    stageLabel: "異世界的碧娜維姬",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: completedCampaign.rngState,
+    rngCalls: completedCampaign.rngCalls,
+    roster: completedCampaign.roster,
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE35_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -4189,6 +4241,49 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-34-cleared": createStage34Completed,
+  "stage-35-opening": createStage35Opening,
+  "stage-35-player": createStage35Player,
+  "stage-35-near-victory": withSetup(createStage35Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const lastEnemy = controller.battle.unit("2:42");
+    if (!nia || !lastEnemy) return;
+    nia.x = 22;
+    nia.y = 11;
+    nia.life = controller.battle.statsFor(nia).maxLife;
+    nia.experience = 0;
+    nia.acted = false;
+    lastEnemy.x = 22;
+    lastEnemy.y = 10;
+    lastEnemy.life = 1;
+    controller.battle.units = controller.battle.units.filter(
+      ({ side, id }) => side === 1 || id === lastEnemy.id,
+    );
+    for (const ally of controller.battle.units.filter(({ side, id }) => side === 1 && id !== nia.id)) {
+      ally.acted = true;
+    }
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 18, y: 7 };
+    controller.statusMessage = "調試場景：最後一名死亡之谷士兵只剩 1 點生命。";
+  }),
+  "stage-35-near-defeat": withSetup(createStage35Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const lastEnemy = controller.battle.unit("2:42");
+    if (!nia || !lastEnemy) return;
+    nia.x = 22;
+    nia.y = 11;
+    nia.life = 1;
+    lastEnemy.x = 22;
+    lastEnemy.y = 10;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 18, y: 7 };
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，死亡之谷士兵位於相鄰格。";
+  }),
+  "stage-35-victory-ready": withSetup(createStage35Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-35-cleared": createStage35Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {

@@ -70,6 +70,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 31 關 · 斯德林海峽",
     "第 32 關 · 拉那洛城外",
     "第 33 關 · 拉那洛城內",
+    "第 34 關 · 時空異變",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -252,6 +253,12 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-34-near-defeat",
     "stage-34-victory-ready",
     "stage-34-cleared",
+    "stage-35-opening",
+    "stage-35-player",
+    "stage-35-near-victory",
+    "stage-35-near-defeat",
+    "stage-35-victory-ready",
+    "stage-35-cleared",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -268,6 +275,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.locator('[data-debug-stage-id="stage-33"] [data-debug-scenario-id]'))
     .toHaveCount(6);
   await expect(page.locator('[data-debug-stage-id="stage-34"] [data-debug-scenario-id]'))
+    .toHaveCount(6);
+  await expect(page.locator('[data-debug-stage-id="stage-35"] [data-debug-scenario-id]'))
     .toHaveCount(6);
   await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
   await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");

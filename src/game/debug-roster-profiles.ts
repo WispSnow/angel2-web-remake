@@ -249,6 +249,7 @@ const REPRESENTATIVE_PROFILE_STAGES = {
   "stage-32": REPRESENTATIVE_STAGE8,
   "stage-33": REPRESENTATIVE_STAGE8,
   "stage-34": REPRESENTATIVE_STAGE8,
+  "stage-35": REPRESENTATIVE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
 const PROMOTION_COVERAGE_PROFILE_STAGES = {
@@ -286,6 +287,7 @@ const PROMOTION_COVERAGE_PROFILE_STAGES = {
   "stage-32": PROMOTION_COVERAGE_STAGE8,
   "stage-33": PROMOTION_COVERAGE_STAGE8,
   "stage-34": PROMOTION_COVERAGE_STAGE8,
+  "stage-35": PROMOTION_COVERAGE_STAGE8,
 } as const satisfies Record<DebugGrowthStageId, readonly DebugRosterEntrySpec[]>;
 
 const DEBUG_ROSTER_PROFILE_SPECS = [

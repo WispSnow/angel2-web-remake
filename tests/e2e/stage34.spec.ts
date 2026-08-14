@@ -181,7 +181,7 @@ test("S34-G: Nia defeat retries directly from deployment", async ({ page }) => {
   });
 });
 
-test("S34-H/I: ordinary victory saves v63 and reaches the frozen stage-35 boundary", async ({ page }) => {
+test("S34-H/I: ordinary victory saves v64 and enters the playable stage-35 opening", async ({ page }) => {
   await page.goto("/?debugScenario=stage-34-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
@@ -191,7 +191,7 @@ test("S34-H/I: ordinary victory saves v63 and reaches the frozen stage-35 bounda
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "openingStory");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -218,13 +218,14 @@ test("S34-H/I: ordinary victory saves v63 and reaches the frozen stage-35 bounda
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-34",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-35",
+    stageProgress: 0,
+    phase: "openingStory",
     campaignRoute: "stage-35",
   });
-  await expect(page.getByText(/stage-35/u)).toBeVisible();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "67");
+  await expect(page.getByTestId("dialogue-layer")).toContainText("異世界之門");
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage34-stage35-boundary.png`,
+    path: `${ARTIFACT_DIR}/stage34-stage35-opening-route.png`,
   });
 });

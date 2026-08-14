@@ -1690,6 +1690,26 @@ async function loadStage34Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage35Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage35"),
+    import("./simulation/stage35-battle"),
+  ]);
+  content.activateStage35Content();
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, _deployment, rng) =>
+    new battleModule.Stage35Battle(campaign, rng);
+  return {
+    definition: content.STAGE35_DEFINITION,
+    assets: {
+      map: content.STAGE35_ASSETS.map,
+      minimap: content.STAGE35_ASSETS.minimap,
+      unitSprites: content.STAGE35_ASSETS.unitSprites,
+    },
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(createBattle, campaign, snapshot),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -3933,6 +3953,58 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage34Module,
+  },
+  "stage-35": {
+    id: "stage-35",
+    ordinal: 34,
+    label: "時空異變",
+    nextStageId: "stage-36",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "battle-started",
+      phase: "player",
+      statusText: "異世界之門發生異變，死亡之谷的部隊從門內湧出。",
+      campaignRoute: "stage-35",
+    },
+    enemyPhaseStatusText: "敵方階段：死亡之谷部隊原地消耗行動。",
+    retry: {
+      mode: "entry",
+      statusText: "重新建立時空異變固定編隊。",
+      retreatStatusText: "全面撤退：重新建立時空異變固定編隊。",
+    },
+    completion: {
+      destinationLabel: "異世界的碧娜維姬",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-35-opening-story",
+        "stage-35-objective-reached",
+        "stage-35-victory-story",
+        "stage-35-completed-route",
+      ],
+      requiredResumeEventIds: ["stage-35-opening-story"],
+      alliedUnits: {
+        kind: "exact-slots",
+        slots: [0, 1, 2, 3, 4, 5, 7, 8, 18],
+      },
+      enemyClassById: [
+        ["2:39", "land-knight"],
+        ["2:35", "magic-armor-warrior"],
+        ["2:36", "half-dragon-warrior"],
+        ["2:40", "magic-sword-warrior"],
+        ["2:44", "evil-mage"],
+        ["2:38", "demon-dragon-knight"],
+        ["2:41", "magic-priest"],
+        ["2:43", "great-axe-warrior"],
+        ["2:37", "land-knight"],
+        ["2:42", "magician"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage35Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

@@ -90,4 +90,11 @@ describe("original engineer construction tiles", () => {
     );
     expect(ironPlate.equals(obstacle)).toBe(true);
   });
+
+  it("keeps the stage 35 pair byte-identical when both construction tokens are absent", async () => {
+    const [ironPlate, obstacle] = await Promise.all(
+      kinds.map((kind) => readFile(tileFile(kind, "stage-35"))),
+    );
+    expect(ironPlate.equals(obstacle)).toBe(true);
+  });
 });

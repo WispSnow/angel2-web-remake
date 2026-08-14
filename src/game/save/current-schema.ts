@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 63 as const;
-export const SAVE_CONTENT_VERSION = "stage-34-lannal-castle-interior-1" as const;
+export const SAVE_VERSION = 64 as const;
+export const SAVE_CONTENT_VERSION = "stage-35-time-space-anomaly-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

@@ -296,6 +296,21 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restoredEliola) ? restoredEliola : undefined;
 }
 
+function migrateVersion63Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 63
+    || value.contentVersion !== "stage-34-lannal-castle-interior-1"
+    // v63 could route a completed stage-34 save to stage 35, but never shipped
+    // a stage-35 battle runtime, a stage-36 boundary, or their save contracts.
+    || value.stageId === "stage-36"
+    || (value.kind === "battle" && value.stageId === "stage-35")) return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion62Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 62
@@ -2000,6 +2015,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion63 = migrateVersion63Save(value);
+    if (migratedVersion63) return migratedVersion63;
     const migratedVersion62 = migrateVersion62Save(value);
     if (migratedVersion62) return migratedVersion62;
     const migratedVersion61 = migrateVersion61Save(value);

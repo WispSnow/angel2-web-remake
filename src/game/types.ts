@@ -41,7 +41,8 @@ export type StageId =
   | "stage-31"
   | "stage-32"
   | "stage-33"
-  | "stage-34";
+  | "stage-34"
+  | "stage-35";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -77,7 +78,8 @@ export type CampaignRouteId =
   | "stage-32"
   | "stage-33"
   | "stage-34"
-  | "stage-35";
+  | "stage-35"
+  | "stage-36";
 
 export interface Position {
   x: number;
@@ -235,8 +237,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 63;
-  contentVersion: "stage-34-lannal-castle-interior-1";
+  version: 64;
+  contentVersion: "stage-35-time-space-anomaly-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

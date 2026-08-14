@@ -106,6 +106,8 @@
 - [`milestones/M63-stage-33-implementation.md`](milestones/M63-stage-33-implementation.md)：内部第 33 关有界实现；
 - [`milestones/M64-stage-34-specification.md`](milestones/M64-stage-34-specification.md)：内部第 34 关纸面合同；
 - [`milestones/M65-stage-34-implementation.md`](milestones/M65-stage-34-implementation.md)：内部第 34 关有界实现；
+- [`milestones/M66-stage-35-specification.md`](milestones/M66-stage-35-specification.md)：内部第 35 关纸面合同；
+- [`milestones/M67-stage-35-implementation.md`](milestones/M67-stage-35-implementation.md)：内部第 35 关有界实现；
 - [`work-items/M00-native-side-panel-hotspots.md`](work-items/M00-native-side-panel-hotspots.md)：原版右栏战术桌 12 个鼠标热点的实现顺序与验收边界。
 
 ## 维护规则

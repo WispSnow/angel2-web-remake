@@ -74,6 +74,7 @@ import { Stage31Battle } from "../../src/game/simulation/stage31-battle";
 import { Stage32Battle } from "../../src/game/simulation/stage32-battle";
 import { Stage33Battle } from "../../src/game/simulation/stage33-battle";
 import { Stage34Battle } from "../../src/game/simulation/stage34-battle";
+import { Stage35Battle } from "../../src/game/simulation/stage35-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
 import type { BattleSaveData, CompletedSaveData, Difficulty } from "../../src/game/types";
 
@@ -1766,6 +1767,51 @@ const stage34BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage35BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-35" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x35a0_b0c0,
+    rngCalls: 113,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 1_080, life: 320 },
+      { slot: 7, classId: "magic-priest", experience: 0, life: 190 },
+      { slot: 18, classId: "archer", experience: 720, life: 145 },
+      { slot: 22, classId: "great-axe-warrior", experience: 0, life: 220 },
+      { slot: 23, classId: "empress", experience: 0, life: 380 },
+      { slot: 40, classId: "magic-sword-warrior", experience: 0, life: 150 },
+    ]),
+  };
+  const battle = new Stage35Battle(source);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-13T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-35",
+    stageLabel: "時空異變",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: ["stage-35-opening-story"],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -3273,6 +3319,112 @@ describe("Web save validation", () => {
         (id) => id !== "stage-34-objective-reached",
       ),
     })).toBe(false);
+  });
+
+  it("validates stage 35's fixed nine allies, ten behavior-12 enemies, and resume identity", () => {
+    const save = stage35BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1).map(({ slot }) => slot).sort((a, b) => a - b))
+      .toEqual([0, 1, 2, 3, 4, 5, 7, 8, 18]);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(10);
+    expect(save.battle.units.find(({ id }) => id === "2:39")).toMatchObject({
+      classId: "land-knight",
+    });
+    expect(save.battle.units.find(({ id }) => id === "2:38")).toMatchObject({
+      classId: "demon-dragon-knight",
+    });
+    expect(isSaveData({ ...save, consumedEventIds: [] })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.filter(({ id }) => id !== "1:18"),
+      },
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:38"
+          ? { ...unit, classId: "flying-dragon-knight" as const, className: "飛龍騎士" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("accepts the stage-36 boundary only with stage 35's complete event identity", () => {
+    const current = stage35BattleSave();
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-36",
+      stageLabel: "異世界的碧娜維姬",
+      roster: current.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...current.consumedEventIds,
+        "stage-35-objective-reached",
+        "stage-35-victory-story",
+        "stage-35-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.filter(
+        (id) => id !== "stage-35-victory-story",
+      ),
+    })).toBe(false);
+  });
+
+  it("migrates v63 stage 35 boundaries but rejects forged stage 35 battles and stage 36", () => {
+    const currentStage35 = stage35BattleSave();
+    const boundary: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-35",
+      stageLabel: "時空異變",
+      roster: currentStage35.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage34BattleSave().consumedEventIds,
+        "stage-34-objective-reached",
+        "stage-34-completed-route",
+      ],
+    };
+    const migrated = parseSaveData(JSON.stringify({
+      ...boundary,
+      version: 63,
+      contentVersion: "stage-34-lannal-castle-interior-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "completed",
+      stageId: "stage-35",
+    });
+    expect(parseSaveData(JSON.stringify({
+      ...currentStage35,
+      version: 63,
+      contentVersion: "stage-34-lannal-castle-interior-1",
+    }))).toBeUndefined();
+
+    const forgedStage36: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-36",
+      stageLabel: "異世界的碧娜維姬",
+      roster: currentStage35.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...currentStage35.consumedEventIds,
+        "stage-35-objective-reached",
+        "stage-35-victory-story",
+        "stage-35-completed-route",
+      ],
+    };
+    expect(parseSaveData(JSON.stringify({
+      ...forgedStage36,
+      version: 63,
+      contentVersion: "stage-34-lannal-castle-interior-1",
+    }))).toBeUndefined();
   });
 
   it("migrates v62 stage 34 boundaries but rejects forged stage 34 battles and stage 35", () => {
