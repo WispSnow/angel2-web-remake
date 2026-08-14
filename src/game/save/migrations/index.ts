@@ -296,6 +296,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restoredEliola) ? restoredEliola : undefined;
 }
 
+function migrateVersion66Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 66
+    || value.contentVersion !== "expert-focus-fire-ai-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+}
+
 function migrateVersion65Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 65
@@ -2041,6 +2052,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion66 = migrateVersion66Save(value);
+    if (migratedVersion66) return migratedVersion66;
     const migratedVersion65 = migrateVersion65Save(value);
     if (migratedVersion65) return migratedVersion65;
     const migratedVersion64 = migrateVersion64Save(value);

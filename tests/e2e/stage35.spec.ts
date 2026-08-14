@@ -151,7 +151,7 @@ test("S35-G/H: final elimination plays SAY/0068 and Nia defeat retries the openi
   });
 });
 
-test("S35-I: victory saves v66 and enters the playable stage-36 deployment", async ({ page }) => {
+test("S35-I: victory saves v67 and enters the playable stage-36 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-35-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "68");

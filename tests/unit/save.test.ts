@@ -3491,15 +3491,8 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("migrates legal v65 battle and completed saves without changing simulation state", () => {
+  it("migrates legal v66 and v65 saves without changing simulation state", () => {
     const battle = stage36BattleSave();
-    const migratedBattle = parseSaveData(JSON.stringify({
-      ...battle,
-      version: 65,
-      contentVersion: "stage-36-bina-vige-otherworld-1",
-    }));
-    expect(migratedBattle).toEqual(battle);
-
     const completed: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-37",
@@ -3512,16 +3505,18 @@ describe("Web save validation", () => {
         "stage-36-completed-route",
       ],
     };
-    const migratedCompleted = parseSaveData(JSON.stringify({
-      ...completed,
-      version: 65,
-      contentVersion: "stage-36-bina-vige-otherworld-1",
-    }));
-    expect(migratedCompleted).toEqual(completed);
+    const legacyIdentities = [
+      { version: 66, contentVersion: "expert-focus-fire-ai-1" },
+      { version: 65, contentVersion: "stage-36-bina-vige-otherworld-1" },
+    ] as const;
+    for (const identity of legacyIdentities) {
+      expect(parseSaveData(JSON.stringify({ ...battle, ...identity }))).toEqual(battle);
+      expect(parseSaveData(JSON.stringify({ ...completed, ...identity }))).toEqual(completed);
+    }
     expect(parseSaveData(JSON.stringify({
       ...battle,
-      version: 65,
-      contentVersion: "wrong-v65-identity",
+      version: 66,
+      contentVersion: "wrong-v66-identity",
     }))).toBeUndefined();
   });
 

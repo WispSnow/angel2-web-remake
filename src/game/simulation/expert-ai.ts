@@ -186,7 +186,7 @@ function targetThreat(context: ExpertAiEvaluationContext, unit: BattleUnit): num
   if (cached !== undefined) return cached;
   const stats = context.effectiveStatsFor(unit);
   const actionBonus = classDefinition(unit.classId).actionCategory === "technique" ? 30 : 0;
-  const threat = stats.attack + stats.level * 8 + Math.floor(unit.life / 10) + actionBonus;
+  const threat = stats.attack + stats.level * 8 + Math.floor(stats.maxLife / 10) + actionBonus;
   context.cache?.targetThreatByUnitId.set(unit.id, threat);
   return threat;
 }

@@ -161,6 +161,28 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     });
   });
 
+  it("does not let current-life threat scoring pull a free-action crossbow away from the weakest wizard", () => {
+    const rng = new DeterministicRng(0x3376);
+    const battle = new ArenaBattle([
+      { id: "ally-crossbow", side: 1 as const, slot: 0, classId: "crossbow" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-wizard-earlier", side: 2 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 22, y: 29 },
+      { id: "enemy-wizard-wounded", side: 2 as const, slot: 1, classId: "wizard" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, rng, {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: () => 2,
+    });
+    battle.unit("enemy-wizard-earlier")!.life = 200;
+    battle.unit("enemy-wizard-wounded")!.life = 100;
+    const before = { state: rng.state, calls: rng.calls };
+
+    expect(battle.planAlliedAiAction("ally-crossbow")).toMatchObject({
+      kind: "special",
+      actionId: "crossbow-shot",
+      targetId: "enemy-wizard-wounded",
+    });
+    expect({ state: rng.state, calls: rng.calls }).toEqual(before);
+  });
+
   it("focuses the lowest-life target when automatic squad action scores tie", () => {
     const uniformTerrain = {
       ...ALL_TERRAIN_ARENA_ENVIRONMENT,
