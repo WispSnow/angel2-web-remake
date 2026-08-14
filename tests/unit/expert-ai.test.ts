@@ -311,6 +311,37 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     expect(battle.nextEnemyActionId(pending)).toBe("enemy-front");
   });
 
+  it("returns the winning plan with its actor and invalidates that cache after state changes", () => {
+    const rng = new DeterministicRng(0x3305);
+    const battle = new ArenaBattle(placements(), 0, rng);
+    battle.unit("enemy-front")!.life = 1;
+    const pending = ["enemy-caster", "enemy-front"];
+    const rngBefore = { state: rng.state, calls: rng.calls };
+
+    const selection = battle.selectNextEnemyAiAction(pending);
+    expect(selection).toMatchObject({
+      unitId: "enemy-caster",
+      action: {
+        unitId: "enemy-caster",
+        kind: "special",
+        actionId: "heal-1",
+        targetId: "enemy-front",
+      },
+    });
+    if (!selection?.action) throw new Error("enemy selection is missing its planned action");
+    const diagnosticsAfterSelection = battle.aiPlanningDiagnostics();
+    expect(battle.planEnemyAiAction(selection.unitId)).toEqual(selection.action);
+    expect(battle.aiPlanningDiagnostics()).toEqual(diagnosticsAfterSelection);
+    expect({ state: rng.state, calls: rng.calls }).toEqual(rngBefore);
+
+    battle.unit("ally-b")!.life = 1;
+    expect(battle.selectNextEnemyAiAction(pending)).toMatchObject({
+      unitId: "enemy-front",
+      action: { kind: "attack", targetId: "ally-b" },
+    });
+    expect(battle.aiPlanningDiagnostics().movementMapBuilds).toBeGreaterThan(0);
+  });
+
   it("moves a shooter toward the safest effective range edge instead of closing for no reason", () => {
     const battle = new ArenaBattle([
       { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },

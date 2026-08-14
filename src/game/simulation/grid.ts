@@ -52,6 +52,16 @@ interface SearchResult {
   previous: Map<string, string>;
 }
 
+/**
+ * One native movement propagation shared by range display and every path
+ * reconstruction for the same actor/state. Reconstructing another destination
+ * is read-only and does not repeat the grid search.
+ */
+export interface MovementMap {
+  readonly cells: readonly Position[];
+  pathTo: (destination: Position) => Position[];
+}
+
 type Direction = Readonly<Position>;
 
 // Behavior 12's native path builder rotates between three PIT-selected
@@ -130,6 +140,17 @@ export function reachableCells(
   movementBudget = unitStatsMovement(unit),
   battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): Position[] {
+  return movementMap(unit, units, battlefield, movementBudget).cells.map((position) => ({
+    ...position,
+  }));
+}
+
+export function movementMap(
+  unit: BattleUnit,
+  units: readonly BattleUnit[],
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+  movementBudget = unitStatsMovement(unit),
+): MovementMap {
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
   const blocked = new Set(
     units
@@ -146,9 +167,15 @@ export function reachableCells(
     battlefield,
   );
   const originKey = positionKey(unit);
-  return [...result.costs.keys()]
+  const cells = [...result.costs.keys()]
     .filter((key) => key === originKey || !occupied.has(key))
     .map(parsePositionKey);
+  return {
+    cells,
+    pathTo: (destination) => occupied.has(positionKey(destination))
+      ? []
+      : reconstructPath(unit, destination, result),
+  };
 }
 
 export function zoneOfControl(
@@ -189,23 +216,7 @@ export function movementPath(
   battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
   movementBudget = unitStatsMovement(unit),
 ): Position[] {
-  const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
-  if (occupied.has(positionKey(destination))) return [];
-  const blocked = new Set(
-    units
-      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
-      .map(positionKey),
-  );
-  const result = search(
-    unit,
-    unit.classId,
-    movementBudget,
-    blocked,
-    zoneOfControl(unit, units, battlefield),
-    undefined,
-    battlefield,
-  );
-  return reconstructPath(unit, destination, result);
+  return movementMap(unit, units, battlefield, movementBudget).pathTo(destination);
 }
 
 /** Module 29 mode M: friendly cells are transit-only, enemies block, and no ZOC is applied. */

@@ -13,6 +13,7 @@ import type { BattleActionId } from "./actions/types";
 import {
   techniqueEffectRange,
   techniqueSelectionPath,
+  type NumericRangeMap,
 } from "./actions/range-map";
 import { manhattan } from "./grid";
 
@@ -23,6 +24,15 @@ export interface ExpertAiEvaluationContext {
   terrainSlotAt: (position: Position) => number;
   statsFor: (unit: Pick<BattleUnit, "classId" | "experience" | "side">) => UnitStats;
   effectiveStatsFor: (unit: BattleUnit) => UnitStats;
+  cache?: ExpertAiEvaluationCache;
+}
+
+/** All entries belong to one immutable battle-state signature. */
+export interface ExpertAiEvaluationCache {
+  readonly exposureByKey: Map<string, number>;
+  readonly effectRangeByKey: Map<string, NumericRangeMap>;
+  readonly selectionPathByKey: Map<string, readonly Position[]>;
+  readonly targetThreatByUnitId: Map<string, number>;
 }
 
 /**
@@ -172,9 +182,50 @@ export function expertAiCandidateTrace(
 }
 
 function targetThreat(context: ExpertAiEvaluationContext, unit: BattleUnit): number {
+  const cached = context.cache?.targetThreatByUnitId.get(unit.id);
+  if (cached !== undefined) return cached;
   const stats = context.effectiveStatsFor(unit);
   const actionBonus = classDefinition(unit.classId).actionCategory === "technique" ? 30 : 0;
-  return stats.attack + stats.level * 8 + Math.floor(unit.life / 10) + actionBonus;
+  const threat = stats.attack + stats.level * 8 + Math.floor(unit.life / 10) + actionBonus;
+  context.cache?.targetThreatByUnitId.set(unit.id, threat);
+  return threat;
+}
+
+function cachedTechniqueEffectRange(
+  context: ExpertAiEvaluationContext,
+  center: Position,
+  effectRadius: number,
+): NumericRangeMap {
+  const key = `${center.x},${center.y}:${effectRadius}`;
+  const cached = context.cache?.effectRangeByKey.get(key);
+  if (cached) return cached;
+  const range = techniqueEffectRange(center, context.width, context.height, effectRadius);
+  context.cache?.effectRangeByKey.set(key, range);
+  return range;
+}
+
+function cachedTechniqueSelectionPath(
+  context: ExpertAiEvaluationContext,
+  actor: BattleUnit,
+  position: Position,
+  target: BattleUnit,
+  selectionSeed: number,
+): readonly Position[] {
+  const key = `${actor.classId}:${position.x},${position.y}:${target.x},${target.y}:${selectionSeed}`;
+  const cached = context.cache?.selectionPathByKey.get(key);
+  if (cached) return cached;
+  const path = techniqueSelectionPath(
+    { ...actor, x: position.x, y: position.y },
+    target,
+    {
+      width: context.width,
+      height: context.height,
+      terrainSlotAt: context.terrainSlotAt,
+    },
+    selectionSeed,
+  );
+  context.cache?.selectionPathByKey.set(key, path);
+  return path;
 }
 
 export function expertExposureAt(
@@ -183,7 +234,10 @@ export function expertExposureAt(
   position: Position,
   ignoredTargetId?: string,
 ): number {
-  return context.units.filter((candidate) => {
+  const key = `${actor.id}:${position.x},${position.y}:${ignoredTargetId ?? ""}`;
+  const cached = context.cache?.exposureByKey.get(key);
+  if (cached !== undefined) return cached;
+  const exposure = context.units.filter((candidate) => {
     if (candidate.side === actor.side
       || candidate.id === ignoredTargetId
       || candidate.actionDisabled) return false;
@@ -233,6 +287,8 @@ export function expertExposureAt(
     }
     return manhattan(position, candidate) <= maximumReach;
   }).length;
+  context.cache?.exposureByKey.set(key, exposure);
+  return exposure;
 }
 
 export function expertTacticalScore(utility: ExpertAiUtility): number {
@@ -331,14 +387,11 @@ export function expertSpecialUtility(
     // REMAKE-052: expert ranking uses the stable first predecessor at every
     // tie. Only the committed action consumes gameplay PRNG for the native
     // PIT-influenced walk, so planning cannot peek at or advance randomness.
-    const line = techniqueSelectionPath(
-      { ...actor, x: position.x, y: position.y },
+    const line = cachedTechniqueSelectionPath(
+      context,
+      actor,
+      position,
       target,
-      {
-        width: context.width,
-        height: context.height,
-        terrainSlotAt: context.terrainSlotAt,
-      },
       BATTLE_ACTION_DEFINITIONS.wd.range.selectionRadius,
     );
     const lineCells = new Set(line.map((cell) => `${cell.x},${cell.y}`));
@@ -418,12 +471,7 @@ export function expertSpecialUtility(
   if (actionId === "lightning-1" || actionId === "lightning-2"
     || actionId === "lightning-3" || actionId === "lightning-4") {
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-    const effect = techniqueEffectRange(
-      target,
-      context.width,
-      context.height,
-      definition.range.effectRadius,
-    );
+    const effect = cachedTechniqueEffectRange(context, target, definition.range.effectRadius);
     const damageByRangeValue: Readonly<Record<number, number>> = definition.damage.byRangeValue;
     for (const affected of context.units.filter((candidate) =>
       candidate.side !== actor.side && effect.valueAt(candidate) > 0)) {
@@ -448,12 +496,7 @@ export function expertSpecialUtility(
   if (actionId === "ice-1" || actionId === "ice-2"
     || actionId === "ice-3" || actionId === "ice-4") {
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-    const effect = techniqueEffectRange(
-      actor,
-      context.width,
-      context.height,
-      definition.range.effectRadius,
-    );
+    const effect = cachedTechniqueEffectRange(context, actor, definition.range.effectRadius);
     for (const affected of context.units.filter((candidate) =>
       candidate.side !== actor.side && effect.valueAt(candidate) > 0)) {
       const immune = affected.classId === "dragon"
@@ -493,12 +536,7 @@ export function expertSpecialUtility(
 
   if (actionId === "recovery-1" || actionId === "recovery-2" || actionId === "recovery-3") {
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-    const effect = techniqueEffectRange(
-      target,
-      context.width,
-      context.height,
-      definition.range.effectRadius,
-    );
+    const effect = cachedTechniqueEffectRange(context, target, definition.range.effectRadius);
     const healingByRangeValue: Readonly<Record<number, number>> = definition.healing.byRangeValue;
     for (const affected of context.units.filter((candidate) =>
       candidate.side === actor.side && effect.valueAt(candidate) > 0 && !candidate.actionDisabled)) {
@@ -517,7 +555,7 @@ export function expertSpecialUtility(
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
     const expectedDamage = definition.damage.base
       + Math.floor((definition.damage.randomBelow - 1) / 2);
-    const conservativeEffect = techniqueEffectRange(target, context.width, context.height, 4);
+    const conservativeEffect = cachedTechniqueEffectRange(context, target, 4);
     for (const affected of context.units.filter((candidate) =>
       candidate.side !== actor.side
       && !candidate.actionDisabled

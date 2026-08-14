@@ -23,6 +23,16 @@ export interface AlliedAiAction {
   linePath?: Position[];
 }
 
+/**
+ * The phase scheduler ranks complete plans, not just actor ids. Returning the
+ * winning plan lets the controller commit that exact deterministic result
+ * without immediately running the same planner a second time.
+ */
+export interface AiActionSelection {
+  unitId: string;
+  action?: AlliedAiAction;
+}
+
 export interface OrdinaryAiPlanningOptions {
   /** Uses REMAKE-033 utility ranking and its 40% rest boundary. */
   expertRanking?: boolean;

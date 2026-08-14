@@ -28,6 +28,21 @@ interface Stage36State {
   }>;
 }
 
+interface Stage36AiPerfProbe {
+  startedAt: number;
+  lastTickAt: number;
+  gaps: number[];
+  longTasks: number[];
+  timer: number;
+  observer: PerformanceObserver;
+}
+
+declare global {
+  interface Window {
+    __STAGE36_AI_PERF__?: Stage36AiPerfProbe;
+  }
+}
+
 const state = (page: Page) => page.evaluate(
   () => window.__ANGEL2__?.getState() as Stage36State,
 );
@@ -143,6 +158,79 @@ test("S36-F: defeating Bina Vige wins while the other 29 enemies remain", async 
   await expect(page.getByTestId("status-strip")).toContainText("碧娜維姬已被擊敗");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage36-boss-victory.png`,
+  });
+});
+
+test("S36-J: full-force automatic actions stay within the shared expert-AI responsiveness budget", async ({ page }) => {
+  test.setTimeout(45_000);
+  const startPerformanceProbe = () => page.evaluate(() => {
+    const startedAt = performance.now();
+    const probe: Stage36AiPerfProbe = {
+      startedAt,
+      lastTickAt: startedAt,
+      gaps: [],
+      longTasks: [],
+      timer: 0,
+      observer: new PerformanceObserver((entries) => {
+        for (const entry of entries.getEntries()) probe.longTasks.push(entry.duration);
+      }),
+    };
+    probe.timer = window.setInterval(() => {
+      const now = performance.now();
+      probe.gaps.push(Math.max(0, now - probe.lastTickAt - 20));
+      probe.lastTickAt = now;
+    }, 20);
+    probe.observer.observe({ type: "longtask", buffered: true });
+    window.__STAGE36_AI_PERF__ = probe;
+  });
+  const finishPerformanceProbe = () => page.evaluate(() => {
+    const probe = window.__STAGE36_AI_PERF__;
+    if (!probe) throw new Error("stage 36 AI performance probe is missing");
+    window.clearInterval(probe.timer);
+    probe.observer.disconnect();
+    return {
+      firstActionMs: performance.now() - probe.startedAt,
+      maximumEventLoopGapMs: Math.max(0, ...probe.gaps),
+      maximumLongTaskMs: Math.max(0, ...probe.longTasks),
+    };
+  });
+  const expectWithinBudget = (result: Awaited<ReturnType<typeof finishPerformanceProbe>>) => {
+    expect(result.firstActionMs).toBeLessThan(15_000);
+    expect(result.maximumEventLoopGapMs).toBeLessThan(1_500);
+    expect(result.maximumLongTaskMs).toBeLessThan(1_500);
+  };
+
+  await page.goto(
+    "/?debugScenario=stage-36-player&difficulty=0&roster=representative-growth&test=1",
+  );
+  await waitForPhase(page, "player");
+  await startPerformanceProbe();
+
+  await page.keyboard.press("F3");
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage36State | undefined;
+    return current?.phase === "allyAuto"
+      && current.units.some(({ side, acted }) => side === 1 && acted);
+  }, undefined, { timeout: 20_000 });
+  expectWithinBudget(await finishPerformanceProbe());
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage36-free-action-performance.png`,
+  });
+
+  await page.goto(
+    "/?debugScenario=stage-36-player&difficulty=0&roster=template-baseline&test=1",
+  );
+  await waitForPhase(page, "player");
+  await startPerformanceProbe();
+  await page.keyboard.press("F1");
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage36State | undefined;
+    return current?.phase === "enemy"
+      && current.units.some(({ side, acted }) => side === 2 && acted);
+  }, undefined, { timeout: 20_000 });
+  expectWithinBudget(await finishPerformanceProbe());
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage36-enemy-action-performance.png`,
   });
 });
 

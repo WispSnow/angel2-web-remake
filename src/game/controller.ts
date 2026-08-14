@@ -3023,10 +3023,14 @@ export class GameController {
     const runQueue = async (ids: readonly string[], followId?: string): Promise<boolean> => {
       const pendingIds = new Set(ids);
       while (pendingIds.size > 0) {
-        const id = this.battle.nextAlliedActionId([...pendingIds], followId);
-        if (!id) break;
+        const selection = this.battle.selectNextAlliedAiAction([...pendingIds], followId);
+        if (!selection) break;
+        const { unitId: id } = selection;
         pendingIds.delete(id);
-        const action = this.battle.planAlliedAiAction(id, followId);
+        const action = selection.action
+          ?? (this.battle.unit(id)?.statuses.confusion
+            ? this.battle.planAlliedAiAction(id, followId)
+            : undefined);
         if (!action) continue;
         if (await this.runAlliedAiAction(action)) return true;
       }
@@ -3066,12 +3070,13 @@ export class GameController {
     const pendingEnemyIds = new Set(this.battle.enemyActionOrder());
     const deferEnemyOutcome = this.battle.enemyPhaseTailExecutionCount() > 0;
     while (pendingEnemyIds.size > 0) {
-      const id = this.battle.nextEnemyActionId([...pendingEnemyIds]);
-      if (!id) break;
+      const selection = this.battle.selectNextEnemyAiAction([...pendingEnemyIds]);
+      if (!selection) break;
+      const { unitId: id } = selection;
       pendingEnemyIds.delete(id);
       if (!this.battle.unit(id)) continue;
       if (!this.battle.hasRouteEnemy() || this.battle.unit(id)?.statuses.confusion) {
-        const action = this.battle.planEnemyAiAction(id);
+        const action = selection.action ?? this.battle.planEnemyAiAction(id);
         if (action && await this.runAlliedAiAction(action, "enemy", deferEnemyOutcome)) {
           this.busy = false;
           this.emit();

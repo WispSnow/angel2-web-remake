@@ -23,7 +23,7 @@ import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, PortraitRecord, Position, SaveRosterEntry, SavedBattleState, Side, UnitClassId, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
-import { constructionPath, constructionReachableCells, manhattan, movementCost, movementCostsToNearestTarget, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield } from "./grid";
+import { constructionPath, constructionReachableCells, manhattan, movementCost, movementCostsToNearestTarget, movementMap, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield, type MovementMap } from "./grid";
 import {
   promoteUnit,
   promotionQueue,
@@ -67,6 +67,7 @@ import {
 } from "./forces";
 import { planTerrainHoldForceAiAction } from "./force-ai";
 import type {
+  AiActionSelection,
   AlliedAiAction,
   ClassActionPlanningOptions,
   EnemyAiIntent,
@@ -101,11 +102,13 @@ import {
   expertTacticalScore,
   expertUtilityForAction,
   type ExpertAiDecisionTrace,
+  type ExpertAiEvaluationCache,
   type ExpertAiEvaluationContext,
   type ExpertAiUtility,
 } from "./expert-ai";
 
 export type {
+  AiActionSelection,
   AlliedAiAction,
   ClassActionPlanningOptions,
   EnemyAiIntent,
@@ -119,6 +122,12 @@ export interface MagicArcherLineOption {
   guaranteedKills: number;
   expectedDamage: number;
   targetThreat: number;
+}
+
+export interface AiPlanningDiagnostics extends AiPlanningMetrics {
+  movementMapEntries: number;
+  actionRangeEntries: number;
+  utilityEntries: number;
 }
 
 export interface UnitTransformationContext {
@@ -169,6 +178,36 @@ interface RangedPositionRisk {
 
 const linePathKey = (path: readonly Position[]): string =>
   path.map(positionKey).join(";");
+
+const cloneAiAction = (action: AlliedAiAction): AlliedAiAction => ({
+  ...action,
+  path: action.path.map((position) => ({ ...position })),
+  ...(action.linePath ? {
+    linePath: action.linePath.map((position) => ({ ...position })),
+  } : {}),
+});
+
+const cloneExpertUtility = (utility: ExpertAiUtility): ExpertAiUtility => ({ ...utility });
+
+export interface AiPlanningMetrics {
+  movementMapBuilds: number;
+  movementMapHits: number;
+  actionRangeBuilds: number;
+  actionRangeHits: number;
+  utilityBuilds: number;
+  utilityHits: number;
+}
+
+interface AiPlanningCache {
+  signature: string;
+  movementMaps: Map<string, MovementMap>;
+  actionRanges: Map<string, NumericRangeMap>;
+  shootingLinePaths: Map<string, readonly Position[][]>;
+  utilities: Map<string, ExpertAiUtility>;
+  plannedActions: Map<string, AlliedAiAction | undefined>;
+  expert: ExpertAiEvaluationCache;
+  metrics: AiPlanningMetrics;
+}
 
 const sameLinePath = (left: readonly Position[], right: readonly Position[]): boolean =>
   left.length === right.length
@@ -372,6 +411,8 @@ export class Stage0Battle {
   private readonly terrainOverrideByPosition = new Map<string, DynamicTerrainKind>();
   private readonly expertAiTraceByUnitId = new Map<string, ExpertAiDecisionTrace>();
   private readonly pendingTransformations: PendingUnitTransformation[] = [];
+  private aiPlanningCache?: AiPlanningCache;
+  private activeAiPlanningCache?: AiPlanningCache;
 
   constructor(
     public readonly difficulty: Difficulty = 0,
@@ -412,6 +453,143 @@ export class Stage0Battle {
       scenario.campaignUnitSlots
         ?? this.units.filter(({ side }) => side === 1).map(({ slot }) => slot),
     );
+  }
+
+  /**
+   * Cache identity deliberately derives from the public mutable simulation
+   * state instead of relying on callers to announce mutations. Tests, stage
+   * scripts and save restoration may replace or edit units directly; any
+   * rules-significant change therefore invalidates the cache automatically.
+   */
+  private aiPlanningStateSignature(): string {
+    const terrain = [...this.terrainOverrideByPosition]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, kind]) => `${key}:${kind}`)
+      .join(";");
+    const units = this.units.map((unit) => [
+      unit.id,
+      unit.side,
+      unit.slot,
+      unit.classId,
+      unit.experience,
+      unit.x,
+      unit.y,
+      unit.life,
+      Number(unit.acted),
+      Number(unit.actionDisabled),
+      this.alliedBehaviorFor(unit.id),
+      this.enemyBehaviorFor(unit.id),
+      ...UNIT_STATUS_KEYS.map((key) => unit.statuses[key]),
+    ].join(",")).join("|");
+    return `${this.round}/${this.rng.state}/${this.rng.calls}/${terrain}/${units}`;
+  }
+
+  private createAiPlanningCache(signature: string): AiPlanningCache {
+    return {
+      signature,
+      movementMaps: new Map(),
+      actionRanges: new Map(),
+      shootingLinePaths: new Map(),
+      utilities: new Map(),
+      plannedActions: new Map(),
+      expert: {
+        exposureByKey: new Map(),
+        effectRangeByKey: new Map(),
+        selectionPathByKey: new Map(),
+        targetThreatByUnitId: new Map(),
+      },
+      metrics: {
+        movementMapBuilds: 0,
+        movementMapHits: 0,
+        actionRangeBuilds: 0,
+        actionRangeHits: 0,
+        utilityBuilds: 0,
+        utilityHits: 0,
+      },
+    };
+  }
+
+  private withAiPlanningCache<T>(operation: () => T): T {
+    if (this.activeAiPlanningCache) return operation();
+    const signature = this.aiPlanningStateSignature();
+    const cache = this.aiPlanningCache?.signature === signature
+      ? this.aiPlanningCache
+      : this.createAiPlanningCache(signature);
+    this.aiPlanningCache = cache;
+    this.activeAiPlanningCache = cache;
+    try {
+      return operation();
+    } finally {
+      this.activeAiPlanningCache = undefined;
+    }
+  }
+
+  aiPlanningDiagnostics(): AiPlanningDiagnostics {
+    const cache = this.aiPlanningCache;
+    return {
+      movementMapBuilds: cache?.metrics.movementMapBuilds ?? 0,
+      movementMapHits: cache?.metrics.movementMapHits ?? 0,
+      actionRangeBuilds: cache?.metrics.actionRangeBuilds ?? 0,
+      actionRangeHits: cache?.metrics.actionRangeHits ?? 0,
+      utilityBuilds: cache?.metrics.utilityBuilds ?? 0,
+      utilityHits: cache?.metrics.utilityHits ?? 0,
+      movementMapEntries: cache?.movementMaps.size ?? 0,
+      actionRangeEntries: cache?.actionRanges.size ?? 0,
+      utilityEntries: cache?.utilities.size ?? 0,
+    };
+  }
+
+  private movementMapFor(unit: BattleUnit, movementBudget: number): MovementMap {
+    const cache = this.activeAiPlanningCache;
+    if (!cache) return movementMap(unit, this.units, this.dynamicBattlefield, movementBudget);
+    const key = `${unit.id}:${movementBudget}`;
+    const cached = cache.movementMaps.get(key);
+    if (cached) {
+      cache.metrics.movementMapHits += 1;
+      return cached;
+    }
+    const result = movementMap(unit, this.units, this.dynamicBattlefield, movementBudget);
+    cache.movementMaps.set(key, result);
+    cache.metrics.movementMapBuilds += 1;
+    return result;
+  }
+
+  private planningActionRange(
+    actor: Pick<BattleUnit, "x" | "y" | "classId">,
+    seed: number,
+    shooting: boolean,
+  ): NumericRangeMap {
+    const cache = this.activeAiPlanningCache;
+    const key = `${shooting ? "shoot" : "technique"}:${actor.classId}:${actor.x},${actor.y}:${seed}`;
+    const cached = cache?.actionRanges.get(key);
+    if (cached && cache) {
+      cache.metrics.actionRangeHits += 1;
+      return cached;
+    }
+    const battlefield = this.dynamicBattlefield;
+    const range = shooting
+      ? shootingRange(actor, battlefield, seed)
+      : techniqueSelectionRange(actor, battlefield, seed);
+    if (cache) {
+      cache.actionRanges.set(key, range);
+      cache.metrics.actionRangeBuilds += 1;
+    }
+    return range;
+  }
+
+  private planningShootingLinePaths(
+    actor: Pick<BattleUnit, "x" | "y" | "classId">,
+    target: Position,
+    actionId: Extract<BattleActionId, "magic-archer-shot">,
+  ): readonly Position[][] {
+    const seed = BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed;
+    const cache = this.activeAiPlanningCache;
+    const key = `${actionId}:${actor.classId}:${actor.x},${actor.y}:${target.x},${target.y}:${seed}`;
+    const cached = cache?.shootingLinePaths.get(key);
+    if (cached) return cached;
+    const paths = shootingLinePaths(actor, target, this.dynamicBattlefield, seed);
+    cache?.shootingLinePaths.set(key, paths);
+    return paths;
   }
 
   private canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
@@ -796,7 +974,7 @@ export class Stage0Battle {
     const unit = this.unit(id);
     const occupant = this.unitAt(destination);
     if (!unit || unit.acted || unit.actionDisabled || (occupant && occupant.id !== unit.id)) return [];
-    return findMovementPath(unit, destination, this.units, this.dynamicBattlefield);
+    return this.movementMapFor(unit, this.statsFor(unit).movement).pathTo(destination);
   }
 
   canUseFlyingDragonExtraMove(result: AttackResult): boolean {
@@ -861,9 +1039,8 @@ export class Stage0Battle {
   reachableCells(id: string, movementBudget?: number): Position[] {
     const unit = this.unit(id);
     if (!unit) return [];
-    return movementBudget === undefined
-      ? reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
-      : reachableCells(unit, this.units, movementBudget, this.dynamicBattlefield);
+    const budget = movementBudget ?? this.statsFor(unit).movement;
+    return this.movementMapFor(unit, budget).cells.map((position) => ({ ...position }));
   }
 
   scriptedPath(id: string, destination: Position, movementBudget: number): Position[] {
@@ -1530,8 +1707,27 @@ export class Stage0Battle {
   planAlliedAiAction(id: string, leaderId?: string): AlliedAiAction | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 1 || unit.acted || unit.actionDisabled) return undefined;
-    if (unit.statuses.confusion > 0) return this.planConfusedAiAction(unit);
+    if (unit.statuses.confusion > 0) {
+      return this.withAiPlanningCache(() => this.planConfusedAiAction(unit));
+    }
+    return this.withAiPlanningCache(() => {
+      const cache = this.activeAiPlanningCache;
+      const key = `ally:${id}:${leaderId ?? ""}`;
+      if (cache?.plannedActions.has(key)) {
+        const cached = cache.plannedActions.get(key);
+        return cached ? cloneAiAction(cached) : undefined;
+      }
+      const action = this.planAlliedAiActionUncached(unit, leaderId);
+      cache?.plannedActions.set(key, action ? cloneAiAction(action) : undefined);
+      return action;
+    });
+  }
 
+  private planAlliedAiActionUncached(
+    unit: BattleUnit,
+    leaderId?: string,
+  ): AlliedAiAction | undefined {
+    const id = unit.id;
     const routePulse = this.routePulseByActorId.get(id);
     if (routePulse) {
       return {
@@ -1663,7 +1859,24 @@ export class Stage0Battle {
   planEnemyAiAction(id: string, behavior = this.enemyBehaviorFor(id)): AlliedAiAction | undefined {
     const unit = this.unit(id);
     if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
-    if (unit.statuses.confusion > 0) return this.planConfusedAiAction(unit);
+    if (unit.statuses.confusion > 0) {
+      return this.withAiPlanningCache(() => this.planConfusedAiAction(unit));
+    }
+    return this.withAiPlanningCache(() => {
+      const cache = this.activeAiPlanningCache;
+      const key = `enemy:${id}:${behavior}`;
+      if (cache?.plannedActions.has(key)) {
+        const cached = cache.plannedActions.get(key);
+        return cached ? cloneAiAction(cached) : undefined;
+      }
+      const action = this.planEnemyAiActionUncached(unit, behavior);
+      cache?.plannedActions.set(key, action ? cloneAiAction(action) : undefined);
+      return action;
+    });
+  }
+
+  private planEnemyAiActionUncached(unit: BattleUnit, behavior: number): AlliedAiAction {
+    const id = unit.id;
     const doctrine = this.forces.definitionForUnit(id)?.doctrine;
     if (doctrine?.strategy === "terrain-hold") {
       const action = this.planTerrainHoldAiAction(unit, doctrine);
@@ -1722,7 +1935,7 @@ export class Stage0Battle {
   }
 
   protected planConfusedAiAction(unit: BattleUnit): AlliedAiAction {
-    const reachable = reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
+    const reachable = this.reachableCells(unit.id)
       .sort((left, right) => left.y * this.stage.width + left.x
         - (right.y * this.stage.width + right.x));
     if (classDefinition(unit.classId).actionCategory === "ordinary") {
@@ -2219,7 +2432,7 @@ export class Stage0Battle {
     const occupied = new Set(this.units.filter(({ id }) => id !== unit.id).map(positionKey));
     let destination: Position | undefined;
     let bestDefense = -1;
-    const candidates = reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
+    const candidates = this.reachableCells(unit.id)
       .filter((position) => positionKey(position) !== positionKey(unit)
         && !occupied.has(positionKey(position)))
       .sort((left, right) => left.y * this.stage.width + left.x
@@ -2252,7 +2465,28 @@ export class Stage0Battle {
       terrainSlotAt: (position) => this.terrainSlotAt(position),
       statsFor: (unit) => this.statsFor(unit),
       effectiveStatsFor: (unit) => this.effectiveStatsFor(unit),
+      ...(this.activeAiPlanningCache ? {
+        cache: this.activeAiPlanningCache.expert,
+      } : {}),
     };
+  }
+
+  private cachedExpertUtility(
+    key: string,
+    build: () => ExpertAiUtility,
+  ): ExpertAiUtility {
+    const cache = this.activeAiPlanningCache;
+    const cached = cache?.utilities.get(key);
+    if (cached && cache) {
+      cache.metrics.utilityHits += 1;
+      return cloneExpertUtility(cached);
+    }
+    const utility = build();
+    if (cache) {
+      cache.utilities.set(key, cloneExpertUtility(utility));
+      cache.metrics.utilityBuilds += 1;
+    }
+    return utility;
   }
 
   private exposureAt(
@@ -2340,7 +2574,10 @@ export class Stage0Battle {
     target: BattleUnit,
     path: readonly Position[],
   ): ExpertAiUtility {
-    return expertOrdinaryUtility(this.expertAiEvaluationContext(), actor, target, path);
+    return this.cachedExpertUtility(
+      `ordinary:${actor.id}:${target.id}:${linePathKey(path)}`,
+      () => expertOrdinaryUtility(this.expertAiEvaluationContext(), actor, target, path),
+    );
   }
 
   private expertSpecialUtility(
@@ -2350,13 +2587,16 @@ export class Stage0Battle {
     path: readonly Position[],
     linePath?: readonly Position[],
   ): ExpertAiUtility {
-    return expertSpecialUtility(
-      this.expertAiEvaluationContext(),
-      actor,
-      actionId,
-      target,
-      path,
-      linePath,
+    return this.cachedExpertUtility(
+      `special:${actor.id}:${actionId}:${target.id}:${linePathKey(path)}:${linePathKey(linePath ?? [])}`,
+      () => expertSpecialUtility(
+        this.expertAiEvaluationContext(),
+        actor,
+        actionId,
+        target,
+        path,
+        linePath,
+      ),
     );
   }
 
@@ -2364,7 +2604,23 @@ export class Stage0Battle {
     unit: BattleUnit,
     action: AlliedAiAction,
   ): ExpertAiUtility {
-    return expertUtilityForAction(this.expertAiEvaluationContext(), unit, action);
+    const key = [
+      "action",
+      unit.id,
+      action.kind,
+      action.actionId ?? "",
+      action.targetId ?? "",
+      linePathKey(action.path),
+      linePathKey(action.linePath ?? []),
+      action.pursuitProgress ?? "",
+      action.queueAdvance ? 1 : 0,
+      action.trafficRelease ?? "",
+      action.trafficProgress ?? "",
+    ].join(":");
+    return this.cachedExpertUtility(
+      key,
+      () => expertUtilityForAction(this.expertAiEvaluationContext(), unit, action),
+    );
   }
 
   private vacantEngagementRouteCost(
@@ -2468,7 +2724,7 @@ export class Stage0Battle {
       return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
     }
 
-    const reachable = reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
+    const reachable = this.reachableCells(unit.id)
       .filter((position) => options.destinationFilter?.(position) ?? true);
     const reachableKeys = new Set(reachable.map(positionKey));
     const occupied = new Set(this.units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
@@ -2726,7 +2982,7 @@ export class Stage0Battle {
   planSpecialAiAction(id: string, actionId: BattleActionId): AlliedAiAction | undefined {
     const unit = this.unit(id);
     if (!unit || unit.acted || unit.actionDisabled) return undefined;
-    return this.planClassAction(unit, [actionId]);
+    return this.withAiPlanningCache(() => this.planClassAction(unit, [actionId]));
   }
 
   protected planClassAction(
@@ -2808,11 +3064,6 @@ export class Stage0Battle {
     const occupied = new Set(
       this.units.filter(({ id }) => id !== unit.id).map(positionKey),
     );
-    const battlefield: GridBattlefield = {
-      width: this.stage.width,
-      height: this.stage.height,
-      terrainSlotAt: (position) => this.terrainSlotAt(position),
-    };
     const expertCandidates: Array<{
       action: AlliedAiAction;
       utility: ExpertAiUtility;
@@ -2834,7 +3085,7 @@ export class Stage0Battle {
         || actionId === "magic-archer-shot";
       const positions = (actionId === "archer-shot" || actionId === "crossbow-shot"
         || actionId === "magic-archer-shot"
-        ? reachableCells(unit, this.units, undefined, this.dynamicBattlefield)
+        ? this.reachableCells(unit.id)
         : [options.casterPosition ?? { x: unit.x, y: unit.y }])
         .filter((position) => !occupied.has(positionKey(position))
           && (options.positionFilter?.(position) ?? true));
@@ -2842,7 +3093,7 @@ export class Stage0Battle {
         position: Position;
         target: BattleUnit;
         path: Position[];
-        linePath?: Position[];
+        linePath?: readonly Position[];
         missingLife: number;
         effectiveDefense: number;
         positionDefense: number;
@@ -2862,18 +3113,18 @@ export class Stage0Battle {
         const rangeActor = { ...unit, x: position.x, y: position.y };
         const shootingActionId = actionId === "archer-shot" || actionId === "crossbow-shot"
           || actionId === "magic-archer-shot" ? actionId : undefined;
-        const range = shootingActionId
-          ? shootingRange(
-            rangeActor,
-            battlefield,
-            BATTLE_ACTION_DEFINITIONS[shootingActionId].range.nativeSeed,
-          )
-          : techniqueSelectionRange(rangeActor, battlefield,
-            "aiCandidateSelectionRadius" in definition.range
-              ? definition.range.aiCandidateSelectionRadius
-              : "selectionRadius" in definition.range
-                ? definition.range.selectionRadius
-                : 0);
+        const rangeSeed = shootingActionId
+          ? BATTLE_ACTION_DEFINITIONS[shootingActionId].range.nativeSeed
+          : "aiCandidateSelectionRadius" in definition.range
+            ? definition.range.aiCandidateSelectionRadius
+            : "selectionRadius" in definition.range
+              ? definition.range.selectionRadius
+              : 0;
+        const range = this.planningActionRange(
+          rangeActor,
+          rangeSeed,
+          shootingActionId !== undefined,
+        );
         const path = positionKey(position) === positionKey(unit)
           ? [{ x: unit.x, y: unit.y }]
           : this.movementPath(unit.id, position);
@@ -2905,13 +3156,8 @@ export class Stage0Battle {
             * terrainDefensePercentFor(target.classId, this.terrainSlotAt(target))
             / 100,
           );
-          const linePaths: Array<Position[] | undefined> = actionId === "magic-archer-shot"
-            ? shootingLinePaths(
-              rangeActor,
-              target,
-              battlefield,
-              BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed,
-            )
+          const linePaths: readonly (readonly Position[] | undefined)[] = actionId === "magic-archer-shot"
+            ? this.planningShootingLinePaths(rangeActor, target, actionId)
             : [undefined];
           for (const linePath of linePaths) {
             const utility = this.expertSpecialUtility(unit, actionId, target, path, linePath);
@@ -3085,29 +3331,52 @@ export class Stage0Battle {
    * reservation boundary as side 2. Explicit route, terrain-hold and follow
    * strategies keep their authored row-major order.
    */
-  nextAlliedActionId(candidateIds: readonly string[], leaderId?: string): string | undefined {
-    const candidates = new Set(candidateIds);
-    const stableOrder = this.alliedActionOrder(true).filter((id) => candidates.has(id));
-    if (stableOrder.length === 0) return undefined;
-    const hasExplicitStrategy = leaderId !== undefined || stableOrder.some((id) =>
-      this.routePulseByActorId.has(id)
-      || this.escortRouteByActorId.has(id)
-      || this.forces.definitionForUnit(id)?.doctrine.strategy === "terrain-hold");
-    if (hasExplicitStrategy) return stableOrder[0];
+  selectNextAlliedAiAction(
+    candidateIds: readonly string[],
+    leaderId?: string,
+  ): AiActionSelection | undefined {
+    return this.withAiPlanningCache(() => {
+      const candidates = new Set(candidateIds);
+      const stableOrder = this.alliedActionOrder(true).filter((id) => candidates.has(id));
+      if (stableOrder.length === 0) return undefined;
+      const hasExplicitStrategy = leaderId !== undefined || stableOrder.some((id) =>
+        this.routePulseByActorId.has(id)
+        || this.escortRouteByActorId.has(id)
+        || this.forces.definitionForUnit(id)?.doctrine.strategy === "terrain-hold");
+      if (hasExplicitStrategy) {
+        const unitId = stableOrder[0];
+        const unit = this.unit(unitId);
+        const action = !unit?.statuses.confusion
+          ? this.planAlliedAiAction(unitId, leaderId)
+          : undefined;
+        return {
+          unitId,
+          ...(action ? { action } : {}),
+        };
+      }
 
-    const planned = stableOrder.map((id, order) => {
-      const unit = this.unit(id);
-      const action = unit?.statuses.confusion
-        ? undefined
-        : this.planAlliedAiAction(id);
-      const score = unit && action
-        ? expertAiScore(this.expertUtilityForAction(unit, action))
-        : Number.MIN_SAFE_INTEGER;
-      return { id, score, order, action };
+      const planned = stableOrder.map((id, order) => {
+        const unit = this.unit(id);
+        const action = unit?.statuses.confusion
+          ? undefined
+          : this.planAlliedAiAction(id);
+        const score = unit && action
+          ? expertAiScore(this.expertUtilityForAction(unit, action))
+          : Number.MIN_SAFE_INTEGER;
+        return { id, score, order, action };
+      });
+      const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
+      const selected = (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
+        .sort((left, right) => right.score - left.score || left.order - right.order)[0];
+      return selected ? {
+        unitId: selected.id,
+        ...(selected.action ? { action: selected.action } : {}),
+      } : undefined;
     });
-    const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
-    return (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
-      .sort((left, right) => right.score - left.score || left.order - right.order)[0]?.id;
+  }
+
+  nextAlliedActionId(candidateIds: readonly string[], leaderId?: string): string | undefined {
+    return this.selectNextAlliedAiAction(candidateIds, leaderId)?.unitId;
   }
 
   enemyActionOrder(): string[] {
@@ -3128,25 +3397,36 @@ export class Stage0Battle {
    * reservation boundary: later units see deaths, healing, statuses and newly
    * occupied cells instead of following a stale phase-start script.
    */
+  selectNextEnemyAiAction(candidateIds: readonly string[]): AiActionSelection | undefined {
+    return this.withAiPlanningCache(() => {
+      const candidates = new Set(candidateIds);
+      const nativeOrder = this.enemyActionOrder().filter((id) => candidates.has(id));
+      if (nativeOrder.length === 0) return undefined;
+      if (this.hasRouteEnemy()) return { unitId: nativeOrder[0] };
+      const planned = nativeOrder
+        .map((id, stableOrder) => {
+          const unit = this.unit(id);
+          const action = unit?.statuses.confusion
+            ? undefined
+            : this.planEnemyAiAction(id);
+          const score = unit && action
+            ? expertAiScore(this.expertUtilityForAction(unit, action))
+            : Number.MIN_SAFE_INTEGER;
+          return { id, score, stableOrder, action };
+        });
+      const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
+      const selected = (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
+        .sort((left, right) => right.score - left.score
+          || left.stableOrder - right.stableOrder)[0];
+      return selected ? {
+        unitId: selected.id,
+        ...(selected.action ? { action: selected.action } : {}),
+      } : undefined;
+    });
+  }
+
   nextEnemyActionId(candidateIds: readonly string[]): string | undefined {
-    const candidates = new Set(candidateIds);
-    const nativeOrder = this.enemyActionOrder().filter((id) => candidates.has(id));
-    if (nativeOrder.length === 0 || this.hasRouteEnemy()) return nativeOrder[0];
-    const planned = nativeOrder
-      .map((id, stableOrder) => {
-        const unit = this.unit(id);
-        const action = unit?.statuses.confusion
-          ? undefined
-          : this.planEnemyAiAction(id);
-        const score = unit && action
-          ? expertAiScore(this.expertUtilityForAction(unit, action))
-          : Number.MIN_SAFE_INTEGER;
-        return { id, score, stableOrder, action };
-      });
-    const nonIceCandidates = planned.filter(({ action }) => !isIceActionId(action?.actionId));
-    return (nonIceCandidates.length > 0 ? nonIceCandidates : planned)
-      .sort((left, right) => right.score - left.score
-        || left.stableOrder - right.stableOrder)[0]?.id;
+    return this.selectNextEnemyAiAction(candidateIds)?.unitId;
   }
 
   planRouteEnemy(id: string): RouteMoveResult | undefined {
