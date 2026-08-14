@@ -258,7 +258,7 @@ test("S36-G: Nia defeat retries directly from deployment", async ({ page }) => {
   });
 });
 
-test("S36-H/I: ordinary victory saves v70 and reaches the frozen stage-37 boundary", async ({ page }) => {
+test("S36-H/I: ordinary victory saves v71 and enters the playable stage-37 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-36-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();
@@ -268,7 +268,7 @@ test("S36-H/I: ordinary victory saves v70 and reaches the frozen stage-37 bounda
   await waitForPhase(page, "savePrompt");
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
-  await waitForPhase(page, "nextStage");
+  await waitForPhase(page, "deployment");
 
   const completedSave = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
@@ -295,13 +295,14 @@ test("S36-H/I: ordinary victory saves v70 and reaches the frozen stage-37 bounda
     ],
   });
   expect(await state(page)).toMatchObject({
-    stageId: "stage-36",
-    stageProgress: 1000,
-    phase: "nextStage",
+    stageId: "stage-37",
+    stageProgress: 0,
+    phase: "deployment",
     campaignRoute: "stage-37",
   });
-  await expect(page.getByText(/stage-37/u)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "究極女神 · 出擊準備" })).toBeVisible();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／27");
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage36-stage37-boundary.png`,
+    path: `${ARTIFACT_DIR}/stage36-stage37-deployment-route.png`,
   });
 });

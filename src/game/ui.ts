@@ -1625,6 +1625,7 @@ function renderHud(
   stats: UnitStats,
 ): string {
   const baseStats = controller.battle.statsFor(unit);
+  const concealedBossStats = controller.battle.stage.id === "stage-37" && unit.side === 2;
   const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
   const nextExperience = nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
@@ -1651,7 +1652,7 @@ function renderHud(
         </li>`).join("")}
     </ul>`;
   return `
-    <div class="unit-detail" data-testid="unit-detail" aria-label="${context.controlSummary}，${unit.className}${displayName}${context.tacticLabel ? `，戰術${context.tacticLabel}` : ""}${context.traitDescription ? `，職業特性${context.traitDescription}` : ""}${context.routePulseSafetyLabel ? `，力場${context.routePulseSafetyLabel}` : ""}">
+    <div class="unit-detail" data-testid="unit-detail" data-concealed-stats="${concealedBossStats}" aria-label="${context.controlSummary}，${unit.className}${displayName}${context.tacticLabel ? `，戰術${context.tacticLabel}` : ""}${context.traitDescription ? `，職業特性${context.traitDescription}` : ""}${context.routePulseSafetyLabel ? `，力場${context.routePulseSafetyLabel}` : ""}${concealedBossStats ? "，數值隱藏" : ""}">
       <div class="unit-detail-shade" aria-hidden="true"></div>
       ${animatedPortraitMarkup(unit.portrait, {
         alt: `${displayName}肖像`,
@@ -1667,14 +1668,14 @@ function renderHud(
       <div class="hud-identity" data-testid="hud-identity">
         <b class="${identityClass}" title="${identity}">${identity}</b>
       </div>
-      <div class="meter-bar hp-bar" data-testid="hp-bar" aria-label="生命 ${unit.life}／${stats.maxLife}"><i style="height:${hpPercent}%"></i></div>
-      <div class="meter-bar exp-bar" data-testid="exp-bar" aria-label="經驗 ${unit.experience}／${nextExperience}"><i style="height:${expPercent}%"></i></div>
+      <div class="meter-bar hp-bar" data-testid="hp-bar" aria-label="${concealedBossStats ? "生命數值隱藏" : `生命 ${unit.life}／${stats.maxLife}`}"><i style="height:${hpPercent}%"></i></div>
+      <div class="meter-bar exp-bar" data-testid="exp-bar" aria-label="${concealedBossStats ? "經驗數值隱藏" : `經驗 ${unit.experience}／${nextExperience}`}"><i style="height:${expPercent}%"></i></div>
       <dl class="stat-list">
-        <div class="unit-core-stat"><dt>生命</dt><dd>${unit.life}／${stats.maxLife}</dd></div>
-        <div class="unit-core-stat" data-testid="unit-attack-stat"><dt>攻擊</dt><dd>${stats.attack}／${baseStats.attack}</dd></div>
-        <div class="unit-core-stat" data-testid="unit-defense-stat"><dt>防禦</dt><dd>${stats.defense}／${baseStats.defense}</dd></div>
-        <div class="unit-core-stat" data-testid="unit-level-stat"><dt>等級</dt><dd>${stats.level}</dd></div>
-        <div class="unit-core-stat"><dt>經驗</dt><dd>${unit.experience}／${nextExperience}</dd></div>
+        <div class="unit-core-stat"><dt>生命</dt><dd>${concealedBossStats ? "?????／?????" : `${unit.life}／${stats.maxLife}`}</dd></div>
+        <div class="unit-core-stat" data-testid="unit-attack-stat"><dt>攻擊</dt><dd>${concealedBossStats ? "?????／?????" : `${stats.attack}／${baseStats.attack}`}</dd></div>
+        <div class="unit-core-stat" data-testid="unit-defense-stat"><dt>防禦</dt><dd>${concealedBossStats ? "?????／?????" : `${stats.defense}／${baseStats.defense}`}</dd></div>
+        <div class="unit-core-stat" data-testid="unit-level-stat"><dt>等級</dt><dd>${concealedBossStats ? "?????" : stats.level}</dd></div>
+        <div class="unit-core-stat"><dt>經驗</dt><dd>${concealedBossStats ? "?????／?????" : `${unit.experience}／${nextExperience}`}</dd></div>
       </dl>
       ${statusMarkup}
     </div>`;

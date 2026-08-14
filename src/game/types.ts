@@ -43,7 +43,8 @@ export type StageId =
   | "stage-33"
   | "stage-34"
   | "stage-35"
-  | "stage-36";
+  | "stage-36"
+  | "stage-37";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -81,7 +82,8 @@ export type CampaignRouteId =
   | "stage-34"
   | "stage-35"
   | "stage-36"
-  | "stage-37";
+  | "stage-37"
+  | "stage-49";
 
 export interface Position {
   x: number;
@@ -232,6 +234,10 @@ export interface SavedBattleState {
   focusId: string;
   units: BattleUnit[];
   enemyAi?: SavedEnemyAiState;
+  stage37Boss?: {
+    headActionToggle: 0 | 1;
+    handActionToggle: 0 | 1;
+  };
   terrainOverrides: DynamicTerrainOverride[];
   cursor: Position;
   cameraOrigin: Position;
@@ -239,8 +245,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 70;
-  contentVersion: "expert-control-targeting-ai-1";
+  version: 71;
+  contentVersion: "stage-37-ultimate-goddess-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

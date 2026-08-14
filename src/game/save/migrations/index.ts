@@ -154,7 +154,7 @@ function normalizeStage22PostbattleTransition(value: unknown): unknown {
 
 const KINS_SLOT = 7;
 const KINS_CAMPAIGN_STAGES = new Set([
-  "stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29", "stage-30", "stage-31", "stage-32", "stage-33", "stage-34", "stage-35", "stage-36",
+  "stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29", "stage-30", "stage-31", "stage-32", "stage-33", "stage-34", "stage-35", "stage-36", "stage-37", "stage-49",
 ]);
 
 function restoreKinsCampaignClass(save: SaveData): SaveData {
@@ -196,7 +196,7 @@ function restoreKinsCampaignClass(save: SaveData): SaveData {
 
 const STAGE27_DEFENDER_SLOT = 22;
 const STAGE27_DEFENDER_CLASS = "great-axe-warrior" as const;
-const POST_STAGE27_CAMPAIGN_STAGES = new Set(["stage-28", "stage-29", "stage-30", "stage-31", "stage-32", "stage-33", "stage-34", "stage-35", "stage-36"]);
+const POST_STAGE27_CAMPAIGN_STAGES = new Set(["stage-28", "stage-29", "stage-30", "stage-31", "stage-32", "stage-33", "stage-34", "stage-35", "stage-36", "stage-37", "stage-49"]);
 
 /** Stage 27 necessarily commits its fixed slot-22 class before any later-stage entry. */
 function restoreStage27DefenderClass(save: SaveData): SaveData {
@@ -287,6 +287,9 @@ function addStage29EliolaDisplayIdentity(value: unknown): unknown {
 }
 
 function finalizeDirectMigration(value: unknown): SaveData | undefined {
+  if (isRecord(value)
+    && (value.stageId === "stage-49"
+      || (value.kind === "battle" && value.stageId === "stage-37"))) return undefined;
   const normalized = normalizeStage22PostbattleTransition(addEmptyTerrainOverrides(value));
   if (!isSaveData(normalized)) return undefined;
   const restored = restoreGadirathClassFromEntrySnapshot(normalized);
@@ -294,6 +297,17 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   const restoredStage27Defender = restoreStage27DefenderClass(restoredKins);
   const restoredEliola = restoreStage29EliolaDisplayIdentity(restoredStage27Defender);
   return isSaveData(restoredEliola) ? restoredEliola : undefined;
+}
+
+function migrateVersion70Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 70
+    || value.contentVersion !== "expert-control-targeting-ai-1") return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
 }
 
 function migrateVersion69Save(value: unknown): SaveData | undefined {
@@ -2085,6 +2099,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion70 = migrateVersion70Save(value);
+    if (migratedVersion70) return migratedVersion70;
     const migratedVersion69 = migrateVersion69Save(value);
     if (migratedVersion69) return migratedVersion69;
     const migratedVersion68 = migrateVersion68Save(value);

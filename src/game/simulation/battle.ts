@@ -617,8 +617,24 @@ export class Stage0Battle {
     return paths;
   }
 
-  private canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
+  protected canUseSpecialAction(actor: BattleUnit, actionId: BattleActionId): boolean {
     return canUseSpecialAction(actor, actionId);
+  }
+
+  protected allowsUnboundedSpecialTarget(
+    _actor: BattleUnit,
+    _target: BattleUnit | undefined,
+    _actionId: BattleActionId,
+  ): boolean {
+    return false;
+  }
+
+  protected specialActionResolutionRng(
+    _actor: BattleUnit,
+    _target: BattleUnit | undefined,
+    _intent: BattleActionIntent,
+  ): DeterministicRng {
+    return this.rng;
   }
 
   static fromCampaignEntry(campaign: CampaignState): Stage0Battle {
@@ -1333,8 +1349,9 @@ export class Stage0Battle {
       ? Boolean(actor
         && !intent.targetId
         && (!intent.target || (intent.target.x === actor.x && intent.target.y === actor.y)))
-      : Boolean(center && this.actionTargetCells(intent.actorId, intent.actionId)
-        .some(({ x, y }) => x === center.x && y === center.y));
+      : Boolean(center && actor && (this.allowsUnboundedSpecialTarget(actor, target, intent.actionId)
+        || this.actionTargetCells(intent.actorId, intent.actionId)
+          .some(({ x, y }) => x === center.x && y === center.y)));
     if (
       !actor
       || !center
@@ -1367,11 +1384,12 @@ export class Stage0Battle {
         linePath: selected.path.map((position) => ({ ...position })),
       };
     }
-    return resolveSpecialAction(
+    const resolutionRng = this.specialActionResolutionRng(actor, target, resolvedIntent);
+    const prepared = resolveSpecialAction(
       resolvedIntent,
       actor,
       target,
-      this.rng,
+      resolutionRng,
       {
         units: this.units,
         battlefield: {
@@ -1388,6 +1406,11 @@ export class Stage0Battle {
       },
       center,
     );
+    return resolutionRng === this.rng ? prepared : {
+      ...prepared,
+      rngBefore: this.rng.state,
+      rngCallsBefore: this.rng.calls,
+    };
   }
 
   commitPreparedAction(prepared: PreparedBattleAction): SpecialActionResult {

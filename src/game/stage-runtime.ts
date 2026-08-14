@@ -1758,6 +1758,54 @@ async function loadStage36Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage37Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage37"),
+    import("./simulation/stage37-battle"),
+  ]);
+  content.activateStage37Content();
+  const definition = content.STAGE37_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 36",
+      title: content.STAGE37.name,
+      objective: content.STAGE37_DEFINITION.objective.victoryText,
+      minimap: content.STAGE37_ASSETS.minimap,
+      terrain: content.STAGE37_TERRAIN_TOKENS,
+      gridWidth: content.STAGE37.width,
+      gridHeight: content.STAGE37.height,
+      enemies: content.STAGE37_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十八名候選最多再選二十六人。頭與兩隻手各有獨立生命，必須全部擊破；敵方九項數值保持隱藏。",
+    },
+    ["stage-37-enter-deployment"],
+    (campaign) => battleModule.createStage37DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 37 requires a deployment result");
+    return new battleModule.Stage37Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE37_DEFINITION,
+    assets: {
+      map: content.STAGE37_ASSETS.map,
+      minimap: content.STAGE37_ASSETS.minimap,
+      unitSprites: content.STAGE37_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -4132,6 +4180,58 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage36Module,
+  },
+  "stage-37": {
+    id: "stage-37",
+    ordinal: 36,
+    label: "究極女神",
+    nextStageId: "stage-49",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "碧娜維姬吸收部下的力量，化為由頭與兩隻手構成的究極女神。",
+      campaignRoute: "stage-37",
+    },
+    enemyPhaseStatusText: "敵方階段：究極女神的三個部位依序行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始究極女神決戰部署。",
+      retreatStatusText: "全面撤退：返回究極女神決戰部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "主線結局",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-37-enter-deployment",
+        "stage-37-opening-story",
+        "stage-37-objective-reached",
+        "stage-37-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-37-enter-deployment",
+        "stage-37-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 27,
+        openCellCount: 26,
+      },
+      enemyClassById: [
+        ["2:56", "head"],
+        ["2:54", "hand"],
+        ["2:55", "hand"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage37Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

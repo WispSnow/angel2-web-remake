@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 70 as const;
-export const SAVE_CONTENT_VERSION = "expert-control-targeting-ai-1" as const;
+export const SAVE_VERSION = 71 as const;
+export const SAVE_CONTENT_VERSION = "stage-37-ultimate-goddess-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -289,6 +289,14 @@ export function isSavedBattleState(
     } else if (value.enemyAi !== undefined) return false;
   } else if (value.enemyAi !== undefined) return false;
 
+  if (stageId === "stage-37") {
+    if (!isRecord(value.stage37Boss)
+      || (value.stage37Boss.headActionToggle !== 0 && value.stage37Boss.headActionToggle !== 1)
+      || (value.stage37Boss.handActionToggle !== 0 && value.stage37Boss.handActionToggle !== 1)) {
+      return false;
+    }
+  } else if (value.stage37Boss !== undefined) return false;
+
   const units = value.units;
   const terrainOverrides = (value.terrainOverrides ?? []) as Array<{
     x: number;
@@ -310,7 +318,12 @@ export function isSavedBattleState(
       const formSequence = saveSchema.enemyFormSequences?.find(
         ({ unitId }) => unitId === waterWarriorRootId(unit),
       );
-      return unit.life > statsFor(unit, difficulty).maxLife
+      const maximumLife = stageId === "stage-37"
+        && unit.side === 2
+        && (unit.classId === "head" || unit.classId === "hand")
+        ? difficulty === 3 ? 15_000 : 10_000
+        : statsFor(unit, difficulty).maxLife;
+      return unit.life > maximumLife
         || (formSequence
           ? unit.experience !== formSequence.experience
             || !formSequence.classIdsByDifficulty[difficulty]?.includes(unit.classId)
