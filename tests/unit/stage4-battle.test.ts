@@ -47,10 +47,11 @@ describe("stage 4 deployment, forces, and route pulse", () => {
   it("inherits selected campaign units and applies Gadirath's untouched magician baseline", () => {
     const roster = createStage4DeploymentRoster(campaign);
     expect(roster).toHaveLength(8);
+    // 部署名单也走新战重建：职业与经验继承战役状态，当前生命回满。
     expect(roster.find(({ slot }) => slot === 0)).toMatchObject({
       classId: "cavalry",
       experience: 520,
-      life: 120,
+      life: 270,
     });
     expect(roster.find(({ slot }) => slot === 24)).toMatchObject({
       classId: "magician",
@@ -84,9 +85,9 @@ describe("stage 4 deployment, forces, and route pulse", () => {
         : entry),
     };
     expect(createStage4DeploymentRoster(promotedCampaign).find(({ slot }) => slot === 24))
-      .toMatchObject({ classId: "evil-mage", experience: 1_050, life: 300 });
+      .toMatchObject({ classId: "evil-mage", experience: 1_050, life: 310 });
     expect(new Stage4Battle(promotedCampaign, fullDeployment()).unit("1:24"))
-      .toMatchObject({ classId: "evil-mage", experience: 1_050, life: 300 });
+      .toMatchObject({ classId: "evil-mage", experience: 1_050, life: 310 });
   });
 
   it("plans behavior 12 before ordinary AI and pulses after moving toward the lower cell", () => {

@@ -436,7 +436,8 @@ export class Stage0Battle {
         unit.portrait = classFallbackPortraitFor(entry.classId, unit.side) ?? unit.portrait;
       }
       unit.experience = entry.experience;
-      unit.life = entry.life;
+      // 与 `createInheritedAlly` 同一条原版规则：新战入场重建属性后当前生命回满。
+      unit.life = statsFor(unit, campaign.difficulty).maxLife;
     }
     battle.campaignRoster.splice(
       0,

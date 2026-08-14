@@ -43,17 +43,6 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   await expect(dialogue).toHaveAttribute("data-source-record", "1");
   await skipStoryDialogue(page);
 
-  // Use the shipping settings surface to speed up presentation. This changes
-  // only timing; the simulation and enemy route are the normal production path.
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("system-menu")).toBeVisible();
-  await page.getByTestId("system-command-settings").click();
-  await page.getByTestId("speed-button").click();
-  await expect(page.getByTestId("speed-button")).toHaveText("動畫 ×4");
-  await page.locator("[data-action=close-settings]").click();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("system-menu")).toBeHidden();
-
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage0-real-player-start.png`,
   });

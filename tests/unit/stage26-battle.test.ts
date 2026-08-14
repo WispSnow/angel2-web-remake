@@ -42,7 +42,7 @@ describe("stage 26 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(22);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(8);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 22, y: 31, life: 240,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 22, y: 31, life: 380,
     });
     expect(battle.unit("2:1")).toMatchObject({
       classId: "magic-master", name: "碧娜維姬", portrait: 8, x: 22, y: 15,

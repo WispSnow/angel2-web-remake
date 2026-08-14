@@ -356,13 +356,11 @@ test("S05-K/L: completed and reduced-motion portal paths preserve deterministic 
 
 test("S05-L: fast presentation and disabled combat sound preserve the portal result", async ({ page }) => {
   await page.goto("/?debugScenario=stage-05-player&difficulty=0&test=1");
-  await page.keyboard.press("Escape");
-  await page.getByTestId("system-command-settings").click();
-  await page.getByTestId("speed-button").click();
-  await page.getByTestId("sound-button").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await page.evaluate(() => window.__ANGEL2__?.setPresentationFast(true));
+  await page.keyboard.press("e");
   await page.getByTestId("sound-combat-button").click();
   await page.getByTestId("close-sound-settings").click();
-  await page.locator("[data-action=close-settings]").click();
   expect(await state(page)).toMatchObject({
     presentationFast: true,
     combatSoundEnabled: false,

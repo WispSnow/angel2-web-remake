@@ -1002,7 +1002,6 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await skipStoryDialogue(page);
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await setBattlePresentation(page, "full");
-  await expect(page.getByTestId("presentation-button")).toHaveText("戰鬥 全景");
   await clickCanvas(page, 220, 177);
   await clickCanvas(page, 220, 177);
   await page.locator("[data-action=attack]").click();
@@ -1916,16 +1915,16 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
 
   await page.getByTestId("system-menu-button").click();
   await page.getByTestId("system-command-settings").click();
-  await expect(page.getByTestId("presentation-button")).toHaveText("戰鬥 地圖");
-  await expect(page.getByTestId("grid-button")).toHaveText("方格 開");
-  await expect(page.getByTestId("edge-scroll-button")).toHaveText("捲動 關");
-  await expect(page.getByTestId("portraits-button")).toHaveText("圖像 關");
-  await expect(page.getByTestId("ai-dialogue-button")).toHaveText("ＡＩ對話 開");
+  await expect(page.getByTestId("presentation-button").locator(".native-settings-state")).toHaveText("OFF");
+  await expect(page.getByTestId("grid-button").locator(".native-settings-state")).toHaveText("ON");
+  await expect(page.getByTestId("edge-scroll-button").locator(".native-settings-state")).toHaveText("OFF");
+  await expect(page.getByTestId("portraits-button").locator(".native-settings-state")).toHaveText("OFF");
+  await expect(page.getByTestId("ai-dialogue-button").locator(".native-settings-state")).toHaveText("ON");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-settings-ai-dialogue.png",
   });
   await page.getByTestId("ai-dialogue-button").click();
-  await expect(page.getByTestId("ai-dialogue-button")).toHaveText("ＡＩ對話 關");
+  await expect(page.getByTestId("ai-dialogue-button").locator(".native-settings-state")).toHaveText("OFF");
   expect((await debugState(page)).aiDialogueEnabled).toBe(false);
 
   await page.reload();
@@ -2011,13 +2010,6 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   await page.getByTestId("close-sound-settings").click();
   await expect(page.getByTestId("sound-settings-menu")).toBeHidden();
   await expect(page.getByTestId("system-menu")).toBeHidden();
-  await page.getByTestId("system-menu-button").click();
-  await page.getByTestId("system-command-settings").click();
-  await page.getByTestId("sound-button").click();
-  expect((await debugState(page)).soundSettingsReturn).toBe("settings");
-  await page.getByTestId("close-sound-settings").click();
-  await expect(page.getByTestId("settings-menu")).toBeVisible();
-  await closeSettingsMenu(page);
 
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.sound.v1") ?? "null"))).toEqual({
     speechEnabled: false,
@@ -2121,15 +2113,6 @@ test("RHP-06: music desk object selects five persistent levels without restartin
   expect(afterLevels.cameraOrigin).toEqual(baseline.cameraOrigin);
   await page.getByTestId("close-music-settings").click();
   await expect(page.getByTestId("music-settings-menu")).toBeHidden();
-
-  await page.getByTestId("system-menu-button").click();
-  await page.getByTestId("system-command-settings").click();
-  await expect(page.getByTestId("music-button")).toHaveText("音樂 3");
-  await page.getByTestId("music-button").click();
-  expect((await debugState(page)).musicSettingsReturn).toBe("settings");
-  await page.getByTestId("close-music-settings").click();
-  await expect(page.getByTestId("settings-menu")).toBeVisible();
-  await closeSettingsMenu(page);
 
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.music.v1") ?? "null"))).toEqual({
     musicVolume: 3,
@@ -2947,7 +2930,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   await page.keyboard.press("Escape");
   await page.getByTestId("system-command-settings").click();
   await page.getByTestId("presentation-button").click();
-  await page.locator("[data-action=close-settings]").click();
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("system-menu")).toBeHidden();
 

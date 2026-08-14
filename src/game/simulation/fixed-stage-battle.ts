@@ -87,8 +87,6 @@ function createInheritedAlly(
     ? definition.untouchedExperience ?? inheritance.untouchedNamedExperience
     : inherited?.experience ?? 0;
   const maximumLife = classStatsFor({ classId, experience }).maxLife;
-  const templateLifeBaseline = definition.forcedClassId !== undefined
-    || (untouchedCampaignSlot && definition.initialClassId !== undefined);
   return {
     id: `1:${definition.slot}`,
     side: 1,
@@ -100,9 +98,10 @@ function createInheritedAlly(
     ...(definition.displayIdentity ? { displayIdentity: definition.displayIdentity } : {}),
     x: definition.position.x,
     y: definition.position.y,
-    life: namedBaseline || templateLifeBaseline
-      ? maximumLife
-      : Math.min(inherited?.life ?? maximumLife, maximumLife),
+    // 新战入场按原版模块 29 的 `0000:536B`：先由职业和累计经验重建属性，再把当前
+    // 生命写为重建后的最大生命。战役状态只携带职业与经验，不携带上一关的残血。
+    // 编号存档恢复走 `Stage0Battle.restore`，那里直接覆盖单位，不重复本次回满。
+    life: maximumLife,
     experience,
     acted: false,
     actionDisabled: false,

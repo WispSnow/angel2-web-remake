@@ -447,7 +447,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .minimap-unit.side-2 { background: #ef2024; }
 .minimap-preview { position: absolute; z-index: 3; width: 30px; height: 21px; border: 1px solid #fff; box-shadow: 0 0 0 1px #222, inset 0 0 0 1px #cfcfcf; pointer-events: none; }
 
-.system-menu button, .settings-menu button, .sound-settings-menu button, .music-settings-menu button, .action-menu button, .modal-panel button {
+.system-menu button, .sound-settings-menu button, .music-settings-menu button, .action-menu button, .modal-panel button {
   border: 1px solid #d4a62d;
   border-radius: 2px;
   color: #fff8d3;
@@ -491,11 +491,95 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 .action-menu.system-menu { left: 304px; top: 47px; width: 147px; height: 139px; }
 .action-menu.system-menu > button { display: block; width: 136px; height: 24px; padding: 1px 8px; border: 0; color: #eee3d5; background: transparent; text-align: center; text-indent: 0; letter-spacing: .18em; font-size: 14px; }
-.settings-menu { position: absolute; z-index: 14; left: 304px; top: 47px; width: 166px; padding: 12px 14px 14px; }
-.settings-menu h2 { margin: 3px 0 8px; color: #f3d466; font-size: 17px; }
-.system-menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.settings-menu .system-menu-grid > button { width: 100%; min-width: 0; padding: 5px 2px; font-size: 10px; }
-.system-menu-grid button:last-child { grid-column: 1 / -1; }
+.native-settings-menu {
+  position: absolute;
+  z-index: 14;
+  left: 280px;
+  top: 40px;
+  width: 128px;
+  height: 175px;
+  padding: 38px 8px 13px;
+  border: 0;
+  color: #fff;
+  background: #5d4131;
+  box-shadow: 16px 16px 0 #000;
+  image-rendering: pixelated;
+}
+.native-settings-menu::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 1px solid #000;
+  box-shadow:
+    inset 1px 1px 0 #fff,
+    inset -1px -1px 0 #000,
+    inset 2px 2px 0 #ffdf10,
+    inset -2px -2px 0 #ef2024;
+  pointer-events: none;
+}
+.native-settings-menu::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: 4px;
+  right: 4px;
+  top: 31px;
+  height: 4px;
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #fff;
+  background: #ef2024;
+  box-shadow: inset 0 1px 0 #ffdf10;
+  pointer-events: none;
+}
+.native-settings-menu h2 {
+  position: absolute;
+  left: 16px;
+  top: 8px;
+  width: 96px;
+  height: 24px;
+  margin: 0;
+  color: #fff;
+  font: 16px/20px "PMingLiU", "MingLiU", serif;
+  letter-spacing: .16em;
+  text-align: center;
+  text-shadow: 1px 1px 0 #000;
+}
+.native-settings-list {
+  display: grid;
+  grid-template-rows: repeat(5, 24px);
+  row-gap: 1px;
+}
+.native-settings-list > button {
+  position: relative;
+  display: grid;
+  grid-template-columns: 76px 28px;
+  align-items: center;
+  width: 112px;
+  height: 24px;
+  padding: 0 4px 0 8px;
+  border: 0;
+  border-radius: 0;
+  color: #fff;
+  background: transparent;
+  cursor: var(--native-cursor-hand, pointer);
+  font: 16px/24px "PMingLiU", "MingLiU", serif;
+  text-align: left;
+  text-shadow: 1px 1px 0 #000;
+}
+.native-settings-list > button:hover,
+.native-settings-list > button:focus-visible {
+  color: #fff;
+  background: transparent;
+  outline: 1px dotted #ffdf10;
+  outline-offset: -1px;
+}
+.native-settings-label { white-space: nowrap; }
+.native-settings-state {
+  font: 12px/24px "Courier New", monospace;
+  letter-spacing: 0;
+  text-align: left;
+}
 .sound-settings-menu { position: absolute; z-index: 15; left: 304px; top: 70px; width: 176px; padding: 14px 16px 16px; }
 .sound-settings-menu h2 { margin: 3px 0 10px; color: #f3d466; font-size: 18px; }
 .sound-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }

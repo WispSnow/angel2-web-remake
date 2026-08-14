@@ -88,7 +88,7 @@ describe("stage 1 battle construction", () => {
     expect(battle.unit("1:24")).toMatchObject({
       classId: "wizard",
       experience: 1_050,
-      life: 300,
+      life: 310,
     });
   });
 

@@ -26,10 +26,10 @@ describe("stage 8 battle simulation", () => {
       classId: "cavalry", name: "蘇蘭達", portrait: 10, x: 23, y: 30,
     });
     expect(battle.unit("1:17")).toMatchObject({
-      classId: "land-knight", name: "阿曼妮", life: 220,
+      classId: "land-knight", name: "阿曼妮", life: 340,
     });
     expect(battle.unit("1:18")).toMatchObject({
-      classId: "priest", name: "雷伊拉", life: 180,
+      classId: "priest", name: "雷伊拉", life: 265,
     });
     for (const id of ["1:8", "1:40", "1:41", "1:42", "1:43", "1:44"]) {
       const unit = battle.unit(id)!;

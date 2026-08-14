@@ -43,7 +43,7 @@ describe("stage 24 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(15);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(22);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 27, y: 39, life: 240,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 27, y: 39, life: 380,
     });
     expect(battle.outcome()).toBe("ongoing");
   });

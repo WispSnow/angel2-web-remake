@@ -46,7 +46,7 @@ describe("stage 34 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(11);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(19);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 30, y: 21, life: 270,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 30, y: 21, life: 390,
     });
     expect(battle.forceForUnit("1:0")).toMatchObject({
       id: "nia-lannal-interior-assault-force", control: "player", commanderId: "1:0",
@@ -59,6 +59,23 @@ describe("stage 34 battle simulation", () => {
     expect(battle.campaignSnapshot().roster[22]).toMatchObject({ classId: "great-axe-warrior" });
     expect(battle.campaignSnapshot().roster[23]).toMatchObject({ classId: "empress" });
     expect(battle.outcome()).toBe("ongoing");
+  });
+
+  it("refills the deployment roster and deployed units to maximum life on entry", () => {
+    // 与 stage 35 同一条原版规则：模块 29 新战 `0000:536B` 重建后当前生命回满，
+    // 部署名单和提交后的战场单位都不带入上一关的残血。
+    const damaged: CampaignState = {
+      ...campaign,
+      roster: campaign.roster.map((entry) => ({ ...entry, life: 9 })),
+    };
+    for (const entry of createStage34DeploymentRoster(damaged)) {
+      expect(entry.life, `roster ${entry.slot}`).toBeGreaterThan(9);
+    }
+    const battle = new Stage34Battle(damaged, fullDeployment);
+    for (const unit of battle.units.filter(({ side }) => side === 1)) {
+      expect(unit.life, unit.id).toBe(battle.statsFor(unit).maxLife);
+    }
+    expect(battle.unit("1:0")?.life).toBe(390);
   });
 
   it("accepts the native Nia-only minimum deployment", () => {

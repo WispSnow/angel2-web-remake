@@ -28,16 +28,20 @@ describe("stage 0 battle simulation", () => {
 
     expect(restored).toMatchObject({ difficulty: 2, round: 1, focusId: "1:0" });
     expect(restored.rng).toMatchObject({ state: 0x1357_2468, calls: 11 });
+    // 新战入场按原版 `0000:536B` 重建属性并回满生命，不沿用快照里的残血 123。
     expect(restored.unit("1:0")).toMatchObject({
       classId: "cavalry",
       className: "騎兵",
       experience: 0,
-      life: 123,
+      life: 200,
       acted: false,
       actionDisabled: false,
     });
     expect(restored.units.filter(({ side }) => side === 2)).toHaveLength(10);
-    expect(restored.campaignSnapshot()).toEqual(entry);
+    expect(restored.campaignSnapshot()).toEqual({
+      ...entry,
+      roster: entry.roster.map((slot) => (slot.slot === 0 ? { ...slot, life: 200 } : slot)),
+    });
   });
 
   it("uses difficulty-derived enemies in deterministic combat", () => {

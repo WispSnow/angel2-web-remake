@@ -62,7 +62,7 @@ describe("stage 22 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(19);
     expect(battle.units.filter(({ side }) => side === 2)).toEqual([]);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 23, y: 34, life: 240,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 23, y: 34, life: 340,
     });
     expect(battle.isPlayerControllableAlly("1:0")).toBe(true);
     expect(battle.outcome()).toBe("victory");

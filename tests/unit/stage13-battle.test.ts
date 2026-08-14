@@ -46,7 +46,7 @@ describe("stage 13 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(12);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(9);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 36, y: 37, life: 240,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 36, y: 37, life: 340,
     });
     expect(battle.unit("1:10")).toMatchObject({ classId: "water-warrior", name: "瑪琳", portrait: 26 });
     expect(battle.unit("1:11")).toMatchObject({ classId: "water-warrior", name: "摩莉娜", portrait: 27 });
@@ -100,7 +100,7 @@ describe("stage 13 battle simulation", () => {
       ]),
     };
     expect(createStage13DeploymentRoster(inheritedCampaign).find(({ slot }) => slot === 10))
-      .toMatchObject({ classId: "land-knight", experience: 640, life: 210 });
+      .toMatchObject({ classId: "land-knight", experience: 640, life: 340 });
     expect(createStage13DeploymentRoster(inheritedCampaign).find(({ slot }) => slot === 11))
       .toMatchObject({ classId: "water-warrior", experience: 299 });
     const deployment = {
@@ -110,7 +110,7 @@ describe("stage 13 battle simulation", () => {
     };
     const inheritedBattle = new Stage13Battle(inheritedCampaign, deployment);
     expect(inheritedBattle.campaignSnapshot().roster[10])
-      .toMatchObject({ classId: "land-knight", experience: 640, life: 210 });
+      .toMatchObject({ classId: "land-knight", experience: 640, life: 340 });
     expect(inheritedBattle.campaignSnapshot().roster[11])
       .toMatchObject({ classId: "water-warrior", experience: 299 });
   });

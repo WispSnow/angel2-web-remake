@@ -295,6 +295,8 @@ const MEMORY_ONLY_SYSTEM_COMMANDS: ReadonlyArray<{ id: SystemCommandId; label: s
   { id: "objectives", label: "勝利條件" },
 ];
 
+const GAME_FUNCTION_COUNT = 5;
+
 export interface MovementPresentation {
   unitId: string;
   kind: MovementKind;
@@ -339,6 +341,7 @@ export class GameController {
   systemMenuOpen = false;
   systemMenuIndex = 0;
   settingsOpen = false;
+  settingsMenuIndex = 0;
   soundSettingsOpen = false;
   soundSettingsReturn?: "battle" | "settings";
   musicSettingsOpen = false;
@@ -2818,12 +2821,11 @@ export class GameController {
   }
 
   openGroupCommands(): void {
-    const fromSettings = this.settingsOpen;
     const fromBattle = this.phase === "player"
       && !this.busy
       && !this.hasBlockingOverlay
       && this.actionMode === "idle";
-    if (!fromSettings && !fromBattle) return;
+    if (!fromBattle) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
     this.soundSettingsOpen = false;
@@ -3766,6 +3768,7 @@ export class GameController {
     if (!this.systemMenuOpen) return;
     this.systemMenuOpen = false;
     this.settingsOpen = true;
+    this.settingsMenuIndex = 0;
     this.emit();
   }
 
@@ -3776,17 +3779,44 @@ export class GameController {
     this.emit();
   }
 
+  moveSettingsMenuSelection(delta: number): void {
+    if (!this.settingsOpen || delta === 0) return;
+    this.settingsMenuIndex = (
+      this.settingsMenuIndex + delta + GAME_FUNCTION_COUNT
+    ) % GAME_FUNCTION_COUNT;
+    this.emit();
+  }
+
+  selectSettingsMenuItem(index: number): void {
+    if (
+      !this.settingsOpen
+      || index < 0
+      || index >= GAME_FUNCTION_COUNT
+      || index === this.settingsMenuIndex
+    ) return;
+    this.settingsMenuIndex = index;
+    this.emit();
+  }
+
+  activateSettingsMenuSelection(): void {
+    if (!this.settingsOpen) return;
+    if (this.settingsMenuIndex === 0) this.togglePortraits();
+    else if (this.settingsMenuIndex === 1) this.toggleBattlePresentation();
+    else if (this.settingsMenuIndex === 2) this.toggleGrid();
+    else if (this.settingsMenuIndex === 3) this.toggleEdgeScroll();
+    else this.toggleAiDialogue();
+  }
+
   openSoundSettings(): void {
-    const fromSettings = this.settingsOpen;
     const fromBattle = this.phase === "player"
       && !this.busy
       && !this.hasBlockingOverlay
       && this.actionMode === "idle";
-    if (!fromSettings && !fromBattle) return;
+    if (!fromBattle) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
     this.soundSettingsOpen = true;
-    this.soundSettingsReturn = fromSettings ? "settings" : "battle";
+    this.soundSettingsReturn = "battle";
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
     this.emit();
@@ -3794,24 +3824,21 @@ export class GameController {
 
   closeSoundSettings(): void {
     if (!this.soundSettingsOpen) return;
-    const returnToSettings = this.soundSettingsReturn === "settings";
     this.soundSettingsOpen = false;
     this.soundSettingsReturn = undefined;
-    this.settingsOpen = returnToSettings;
     this.emit();
   }
 
   openMusicSettings(): void {
-    const fromSettings = this.settingsOpen;
     const fromBattle = this.phase === "player"
       && !this.busy
       && !this.hasBlockingOverlay
       && this.actionMode === "idle";
-    if (!fromSettings && !fromBattle) return;
+    if (!fromBattle) return;
     this.systemMenuOpen = false;
     this.settingsOpen = false;
     this.musicSettingsOpen = true;
-    this.musicSettingsReturn = fromSettings ? "settings" : "battle";
+    this.musicSettingsReturn = "battle";
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
     this.emit();
@@ -3819,10 +3846,8 @@ export class GameController {
 
   closeMusicSettings(): void {
     if (!this.musicSettingsOpen) return;
-    const returnToSettings = this.musicSettingsReturn === "settings";
     this.musicSettingsOpen = false;
     this.musicSettingsReturn = undefined;
-    this.settingsOpen = returnToSettings;
     this.emit();
   }
 
@@ -3918,11 +3943,6 @@ export class GameController {
   markHintSeen(): void {
     this.hintVisible = false;
     localStorage.setItem("angel2.stage0.hintSeen", "yes");
-  }
-
-  toggleSpeed(): void {
-    this.presentationFast = !this.presentationFast;
-    this.emit();
   }
 
   toggleBattlePresentation(): void {
@@ -4480,7 +4500,10 @@ export class GameController {
       if (delta.x !== 0 || delta.y !== 0) this.moveQuitSelection(delta.x || delta.y);
       return;
     }
-    if (this.settingsOpen) return;
+    if (this.settingsOpen) {
+      if (delta.y !== 0) this.moveSettingsMenuSelection(delta.y);
+      return;
+    }
     if (this.systemMenuOpen) {
       if (delta.y !== 0) this.moveSystemMenuSelection(delta.y);
       return;
@@ -4574,7 +4597,7 @@ export class GameController {
     else if (this.phase === "saveSlots") this.selectSaveSlot(this.postSaveSlotIndex + 1);
     else if (this.recordMenuMode) this.activateRecordMenuSelection();
     else if (this.quitConfirmOpen) this.activateQuitSelection();
-    else if (this.settingsOpen) return;
+    else if (this.settingsOpen) this.activateSettingsMenuSelection();
     else if (this.retreatConfirmOpen) this.activateRetreatSelection();
     else if (this.groupCommandOpen) this.activateGroupCommandSelection();
     else if (this.systemMenuOpen) this.activateSystemMenuSelection();
@@ -5188,6 +5211,7 @@ export class GameController {
       systemCommands: this.systemCommands.map((command) => ({ ...command })),
       campaignPersistenceEnabled: this.campaignPersistenceEnabled,
       settingsOpen: this.settingsOpen,
+      settingsMenuIndex: this.settingsMenuIndex,
       soundSettingsOpen: this.soundSettingsOpen,
       soundSettingsReturn: this.soundSettingsReturn,
       musicSettingsOpen: this.musicSettingsOpen,
@@ -5645,6 +5669,7 @@ export class GameController {
 
 export interface Angel2DebugApi {
   getState: () => object;
+  setPresentationFast: (enabled: boolean) => void;
   advanceDialogue: () => void;
   skipDialogue: () => void;
   forceDefeat: () => void;
@@ -5673,6 +5698,10 @@ export function exposeDebugApi(controller: GameController): void {
   if (!controller.isTestMode) return;
   window.__ANGEL2__ = {
     getState: () => controller.debugState(),
+    setPresentationFast: (enabled) => {
+      controller.presentationFast = enabled;
+      controller.emit();
+    },
     advanceDialogue: () => controller.advanceDialogue(),
     skipDialogue: () => controller.skipDialogue(),
     forceDefeat: () => controller.forceDefeatForTest(),

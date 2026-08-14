@@ -107,21 +107,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               role="tooltip" aria-live="polite" hidden></div>
             <section class="system-menu action-menu native-command-menu" id="system-menu" data-testid="system-menu"
               data-kind="system" role="menu" aria-label="戰鬥系統選單" hidden></section>
-            <section class="settings-menu modal-panel" id="settings-menu" data-testid="settings-menu" role="dialog" aria-label="遊戲功能" hidden>
-              <span class="panel-kicker">SYSTEM</span><h2>遊戲功能</h2>
-              <div class="system-menu-grid">
-                <button data-action="open-group-commands" data-testid="group-commands-button">集體命令</button>
-                <button data-action="speed" data-testid="speed-button">動畫 ×1</button>
-                <button data-action="battle-presentation" data-testid="presentation-button">戰鬥 全景</button>
-                <button data-action="toggle-grid" data-testid="grid-button">方格 關</button>
-                <button data-action="toggle-edge-scroll" data-testid="edge-scroll-button">捲動 開</button>
-                <button data-action="toggle-portraits" data-testid="portraits-button">圖像 開</button>
-                <button data-action="toggle-ai-dialogue" data-testid="ai-dialogue-button">ＡＩ對話 開</button>
-                <button data-action="open-music-settings" data-testid="music-button">音樂 最大</button>
-                <button data-action="open-sound-settings" data-testid="sound-button">音效設定</button>
-                <button data-action="close-settings">返回</button>
-              </div>
-            </section>
+            <section class="settings-menu native-settings-menu" id="settings-menu" data-testid="settings-menu"
+              role="menu" aria-label="子 選 單" hidden></section>
             <section class="sound-settings-menu modal-panel" id="sound-settings-menu"
               data-testid="sound-settings-menu" role="dialog" aria-label="音效開關" hidden>
               <span class="panel-kicker">SOUND</span><h2>音效開關</h2>
@@ -492,6 +479,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       return;
     }
     if (button.matches("[data-side-panel-hotspot]")) hideSidePanelHint();
+    if (button.dataset.settingsIndex !== undefined) {
+      controller.selectSettingsMenuItem(Number(button.dataset.settingsIndex));
+    }
     const action = button.dataset.action;
     if (action === "dialogue-skip-confirm") controller.confirmDialogueSkip();
     else if (action === "dialogue-skip-cancel") controller.cancelDialogueSkip();
@@ -501,7 +491,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "system-load") controller.openRecordMenu("load");
     else if (action === "system-save") controller.openRecordMenu("save");
     else if (action === "system-quit") controller.requestQuit();
-    else if (action === "close-settings") controller.closeSettings();
     else if (action === "open-sound-settings") controller.openSoundSettings();
     else if (action === "close-sound-settings") controller.closeSoundSettings();
     else if (action === "toggle-sound-speech") controller.toggleSpeechSound();
@@ -536,7 +525,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "retreat-cancel") controller.cancelRetreat();
     else if (action === "objectives") controller.openObjectives();
     else if (action === "close-objectives") controller.closeObjectives();
-    else if (action === "speed") controller.toggleSpeed();
     else if (action === "battle-presentation") controller.toggleBattlePresentation();
     else if (action === "toggle-grid") controller.toggleGrid();
     else if (action === "toggle-edge-scroll") controller.toggleEdgeScroll();
@@ -593,6 +581,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (retreatChoice) controller.selectRetreatChoice(Number(retreatChoice.dataset.retreatIndex));
     const systemCommand = (event.target as Element).closest<HTMLElement>("[data-system-index]");
     if (systemCommand) controller.selectSystemMenuCommand(Number(systemCommand.dataset.systemIndex));
+    const settingsCommand = (event.target as Element).closest<HTMLElement>("[data-settings-index]");
+    if (settingsCommand) controller.selectSettingsMenuItem(Number(settingsCommand.dataset.settingsIndex));
     const recordSlot = (event.target as Element).closest<HTMLElement>("[data-record-index]");
     if (recordSlot) controller.selectRecordMenuSlot(Number(recordSlot.dataset.recordIndex));
     const quitChoice = (event.target as Element).closest<HTMLElement>("[data-quit-index]");
@@ -851,6 +841,52 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }).join("");
     }
     settingsMenu.hidden = !controller.settingsOpen;
+    if (!settingsMenu.hidden) {
+      const settings = [
+        {
+          label: "人物圖像",
+          enabled: controller.portraitsEnabled,
+          action: "toggle-portraits",
+          testId: "portraits-button",
+        },
+        {
+          label: "戰鬥動畫",
+          enabled: controller.battlePresentation === "full",
+          action: "battle-presentation",
+          testId: "presentation-button",
+        },
+        {
+          label: "地圖方格",
+          enabled: controller.gridEnabled,
+          action: "toggle-grid",
+          testId: "grid-button",
+        },
+        {
+          label: "地圖捲動",
+          enabled: controller.edgeScrollEnabled,
+          action: "toggle-edge-scroll",
+          testId: "edge-scroll-button",
+        },
+        {
+          label: "ＡＩ對話",
+          enabled: controller.aiDialogueEnabled,
+          action: "toggle-ai-dialogue",
+          testId: "ai-dialogue-button",
+        },
+      ] as const;
+      settingsMenu.innerHTML = `
+        <h2>子 選 單</h2>
+        <div class="native-settings-list">
+          ${settings.map((setting, index) => {
+            const selected = index === controller.settingsMenuIndex;
+            return `<button type="button" role="menuitemcheckbox" data-action="${setting.action}"
+              data-settings-index="${index}" data-testid="${setting.testId}"
+              class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"
+              aria-checked="${setting.enabled}"><span class="native-settings-label">${setting.label}</span><span
+                class="native-settings-state">${setting.enabled ? "ON" : "OFF"}</span></button>`;
+          }).join("")}
+        </div>`;
+    }
     soundSettingsMenu.hidden = !controller.soundSettingsOpen;
     musicSettingsMenu.hidden = !controller.musicSettingsOpen;
     recordMenu.hidden = controller.recordMenuMode === undefined;
@@ -920,24 +956,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         button.setAttribute("aria-current", String(selected));
       }
     }
-    const speed = root.querySelector<HTMLElement>("[data-testid=speed-button]");
-    if (speed) speed.textContent = controller.presentationFast ? "動畫 ×4" : "動畫 ×1";
-    const presentation = root.querySelector<HTMLElement>("[data-testid=presentation-button]");
-    if (presentation) presentation.textContent = controller.battlePresentation === "full" ? "戰鬥 全景" : "戰鬥 地圖";
-    const grid = root.querySelector<HTMLElement>("[data-testid=grid-button]");
-    if (grid) grid.textContent = controller.gridEnabled ? "方格 開" : "方格 關";
-    const edgeScroll = root.querySelector<HTMLElement>("[data-testid=edge-scroll-button]");
-    if (edgeScroll) edgeScroll.textContent = controller.edgeScrollEnabled ? "捲動 開" : "捲動 關";
-    const portraits = root.querySelector<HTMLElement>("[data-testid=portraits-button]");
-    if (portraits) portraits.textContent = controller.portraitsEnabled ? "圖像 開" : "圖像 關";
-    const aiDialogue = root.querySelector<HTMLElement>("[data-testid=ai-dialogue-button]");
-    if (aiDialogue) {
-      aiDialogue.textContent = controller.aiDialogueEnabled ? "ＡＩ對話 開" : "ＡＩ對話 關";
-      aiDialogue.setAttribute("aria-pressed", String(controller.aiDialogueEnabled));
-    }
-    const music = root.querySelector<HTMLElement>("[data-testid=music-button]");
-    const musicVolumeLabels = ["無聲", "1", "2", "3", "最大"] as const;
-    if (music) music.textContent = `音樂 ${musicVolumeLabels[controller.musicVolume]}`;
     for (const button of root.querySelectorAll<HTMLButtonElement>("[data-music-level]")) {
       const selected = Number(button.dataset.musicLevel) === controller.musicVolume;
       button.classList.toggle("is-selected", selected);

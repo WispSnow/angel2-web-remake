@@ -46,7 +46,7 @@ describe("stage 33 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(10);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(29);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 27, y: 44, life: 270,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 27, y: 44, life: 390,
     });
     expect(battle.forceForUnit("1:0")).toMatchObject({
       id: "nia-lannal-outskirts-assault-force", control: "player", commanderId: "1:0",

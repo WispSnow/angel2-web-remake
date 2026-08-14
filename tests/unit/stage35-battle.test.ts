@@ -28,7 +28,7 @@ describe("stage 35 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(9);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(10);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 32, y: 10, life: 270,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 32, y: 10, life: 390,
     });
     expect(battle.unit("1:18")).toMatchObject({
       classId: "archer", name: "雷伊拉", portrait: 21, x: 19, y: 12,
@@ -81,6 +81,26 @@ describe("stage 35 battle simulation", () => {
       battle.startNextRound();
       expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(9);
     }
+  });
+
+  it("refills every fixed ally to maximum life on entry but keeps a restored save damaged", () => {
+    // 原版模块 29 新战初始化 `0000:536B` 按职业和累计经验重建 side 1 后把当前生命
+    // 写为最大生命，所以上一关的残血不会跨关带入；编号存档恢复不重复这一步。
+    const damaged: CampaignState = {
+      ...campaign,
+      roster: campaign.roster.map((entry) => ({ ...entry, life: 7 })),
+    };
+    const battle = new Stage35Battle(damaged);
+    for (const unit of battle.units.filter(({ side }) => side === 1)) {
+      expect(unit.life, unit.id).toBe(battle.statsFor(unit).maxLife);
+    }
+    expect(battle.unit("1:0")?.life).toBe(390);
+
+    const wounded = new Stage35Battle(damaged);
+    wounded.unit("1:0")!.life = 42;
+    const restored = new Stage35Battle(damaged);
+    restored.restore(wounded.serializableSnapshot(), wounded.campaignSnapshot().roster);
+    expect(restored.unit("1:0")?.life).toBe(42);
   });
 
   it("uses the shared native construction terrain slot", () => {

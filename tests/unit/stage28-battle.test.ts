@@ -51,7 +51,7 @@ describe("stage 28 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(29);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(17);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 28, y: 24, life: 250,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 28, y: 24, life: 390,
     });
     expect(battle.forceForUnit("1:0")).toMatchObject({
       id: "nia-valkyrie-defense-team", control: "player", commanderId: "1:0",

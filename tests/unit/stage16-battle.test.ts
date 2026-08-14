@@ -45,7 +45,7 @@ describe("stage 16 battle simulation", () => {
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(10);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(13);
     expect(battle.unit("1:0")).toMatchObject({
-      classId: "land-knight", name: "妮雅", portrait: 46, x: 25, y: 31, life: 240,
+      classId: "land-knight", name: "妮雅", portrait: 46, x: 25, y: 31, life: 340,
     });
     expect(battle.unit("2:10")).toMatchObject({
       classId: "half-dragon-warrior", name: "莎", portrait: 36, x: 25, y: 12,

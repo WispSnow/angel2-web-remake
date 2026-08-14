@@ -91,7 +91,7 @@ describe("stage 2 battle construction and allied automation", () => {
     expect(battle.unit("1:24")).toMatchObject({
       classId: "magic-master",
       experience: 1_050,
-      life: 300,
+      life: 310,
     });
   });
 

@@ -261,16 +261,15 @@ test("S07-I: fast and reduced presentation with combat sound off preserves the r
   const resolveLaili = async (configured: boolean) => {
     if (configured) await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/?debugScenario=stage-07-near-laili&difficulty=0&test=1");
+    await page.waitForFunction(() => String(
+      (window.__ANGEL2__?.getState() as Stage7State | undefined)?.statusMessage,
+    ).startsWith("自動驗收："));
     if (configured) {
-      await page.getByTestId("battle-canvas").focus();
-      await page.keyboard.press("Escape");
-      await page.getByTestId("system-command-settings").click();
-      await page.getByTestId("speed-button").click();
-      await page.getByTestId("sound-button").click();
+      await expect(page.getByTestId("battle-canvas")).toBeVisible();
+      await page.evaluate(() => window.__ANGEL2__?.setPresentationFast(true));
+      await page.keyboard.press("e");
       await page.getByTestId("sound-combat-button").click();
       await page.getByTestId("close-sound-settings").click();
-      await page.locator("[data-action=close-settings]").click();
-      await page.keyboard.press("Escape");
       await expect(page.getByTestId("system-menu")).toBeHidden();
     }
     await page.getByTestId("battle-canvas").focus();
