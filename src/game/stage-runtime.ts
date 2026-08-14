@@ -1642,6 +1642,54 @@ async function loadStage33Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage34Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage34"),
+    import("./simulation/stage34-battle"),
+  ]);
+  content.activateStage34Content();
+  const definition = content.STAGE34_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 33",
+      title: content.STAGE34.name,
+      objective: content.STAGE34_DEFINITION.objective.victoryText,
+      minimap: content.STAGE34_ASSETS.minimap,
+      terrain: content.STAGE34_TERRAIN_TOKENS,
+      gridWidth: content.STAGE34.width,
+      gridHeight: content.STAGE34.height,
+      enemies: content.STAGE34_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅固定出場；二十八名候選最多再選十人。擊敗蕾娜吉芙及拉那洛城內全部敵軍並保護妮雅。",
+    },
+    ["stage-34-enter-deployment"],
+    (campaign) => battleModule.createStage34DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 34 requires a deployment result");
+    return new battleModule.Stage34Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE34_DEFINITION,
+    assets: {
+      map: content.STAGE34_ASSETS.map,
+      minimap: content.STAGE34_ASSETS.minimap,
+      unitSprites: content.STAGE34_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -3817,6 +3865,74 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage33Module,
+  },
+  "stage-34": {
+    id: "stage-34",
+    ordinal: 33,
+    label: "拉那洛城內",
+    nextStageId: "stage-35",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "妮雅進入拉那洛城內，準備迎戰蕾娜吉芙與城內守軍。",
+      campaignRoute: "stage-34",
+    },
+    enemyPhaseStatusText: "敵方階段：蕾娜吉芙與拉那洛城內守軍開始行動。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始拉那洛城內部署。",
+      retreatStatusText: "全面撤退：返回拉那洛城內部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "時空異變",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-34-enter-deployment",
+        "stage-34-opening-story",
+        "stage-34-objective-reached",
+        "stage-34-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-34-enter-deployment",
+        "stage-34-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0],
+        optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 11,
+        openCellCount: 10,
+      },
+      enemyClassById: [
+        ["2:6", "great-dragon-knight"],
+        ["2:39", "prayer-guide"],
+        ["2:7", "evil-sword-warrior"],
+        ["2:40", "prayer-guide"],
+        ["2:48", "magic-armor-warrior"],
+        ["2:49", "evil-sword-warrior"],
+        ["2:55", "evil-mage"],
+        ["2:54", "evil-mage"],
+        ["2:47", "evil-sword-warrior"],
+        ["2:56", "evil-mage"],
+        ["2:50", "magic-sword-warrior"],
+        ["2:46", "divine-sword-warrior"],
+        ["2:41", "prayer-guide"],
+        ["2:51", "evil-sword-warrior"],
+        ["2:53", "evil-sword-warrior"],
+        ["2:52", "divine-sword-warrior"],
+        ["2:43", "magic-master"],
+        ["2:42", "magic-master"],
+        ["2:44", "magic-master"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage34Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

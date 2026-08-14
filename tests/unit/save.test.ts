@@ -56,6 +56,7 @@ import {
 import { STAGE31_DEFINITION } from "../../src/game/content/stage31";
 import { STAGE32_DEFINITION } from "../../src/game/content/stage32";
 import { STAGE33_DEFINITION } from "../../src/game/content/stage33";
+import { STAGE34_DEFINITION } from "../../src/game/content/stage34";
 import { Stage15Battle } from "../../src/game/simulation/stage15-battle";
 import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
@@ -72,6 +73,7 @@ import { Stage30Battle } from "../../src/game/simulation/stage30-battle";
 import { Stage31Battle } from "../../src/game/simulation/stage31-battle";
 import { Stage32Battle } from "../../src/game/simulation/stage32-battle";
 import { Stage33Battle } from "../../src/game/simulation/stage33-battle";
+import { Stage34Battle } from "../../src/game/simulation/stage34-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
 import type { BattleSaveData, CompletedSaveData, Difficulty } from "../../src/game/types";
 
@@ -1707,6 +1709,63 @@ const stage33BattleSave = (): BattleSaveData => {
   };
 };
 
+const stage34BattleSave = (): BattleSaveData => {
+  const source = {
+    stageId: "stage-34" as const,
+    ruleset: "stableRemake" as const,
+    difficulty: 0 as const,
+    rngState: 0x34a0_b0c0,
+    rngCalls: 112,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 1_040, life: 310 },
+      { slot: 7, classId: "magic-priest", experience: 0, life: 190 },
+      { slot: 22, classId: "great-axe-warrior", experience: 0, life: 220 },
+      { slot: 23, classId: "empress", experience: 0, life: 380 },
+      { slot: 40, classId: "magic-sword-warrior", experience: 0, life: 150 },
+    ]),
+  };
+  const deployment = {
+    placements: [
+      ...STAGE34_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE34_DEFINITION.deployment.optionalSlots.slice(0, 10).map((slot, index) => ({
+        slot, position: { ...STAGE34_DEFINITION.deployment.openCells[index]! }, fixed: false,
+      })),
+    ],
+  };
+  const battle = new Stage34Battle(source, deployment);
+  const campaign = battle.campaignSnapshot();
+  const nia = battle.unit("1:0")!;
+  return {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "battle",
+    savedAt: "2026-08-13T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-34",
+    stageLabel: "拉那洛城內",
+    ruleset: "stableRemake",
+    difficulty: 0,
+    rngState: campaign.rngState,
+    rngCalls: campaign.rngCalls,
+    roster: campaign.roster,
+    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    stageProgress: 0,
+    consumedEventIds: [
+      "stage-34-enter-deployment",
+      "stage-34-opening-story",
+    ],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+};
+
 function legacyCompletedSave(
   save: CompletedSaveData,
   version: 2 | 3 | 4,
@@ -3158,6 +3217,112 @@ describe("Web save validation", () => {
         (id) => id !== "stage-33-objective-reached",
       ),
     })).toBe(false);
+  });
+
+  it("validates stage 34's eleven-unit deployment, 19 static enemies, and resume identity", () => {
+    const save = stage34BattleSave();
+    expect(isSaveData(save)).toBe(true);
+    expect(save.battle.units.filter(({ side }) => side === 1)).toHaveLength(11);
+    expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(19);
+    expect(save.battle.units.find(({ id }) => id === "2:6")).toMatchObject({
+      classId: "great-dragon-knight", name: "芙瑪羅妮", portrait: 11,
+    });
+    expect(save.battle.units.find(({ id }) => id === "2:7")).toMatchObject({
+      classId: "evil-sword-warrior", name: "蕾娜吉芙", portrait: 24,
+    });
+    expect(isSaveData({
+      ...save,
+      consumedEventIds: save.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.filter(({ id }) => id !== "1:0"),
+      },
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:7"
+          ? { ...unit, classId: "flying-dragon-knight" as const, className: "飛龍騎士" }
+          : unit),
+      },
+    })).toBe(false);
+  });
+
+  it("accepts the stage-35 boundary only with stage 34's complete event identity", () => {
+    const current = stage34BattleSave();
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-35",
+      stageLabel: "時空異變",
+      roster: current.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...current.consumedEventIds,
+        "stage-34-objective-reached",
+        "stage-34-completed-route",
+      ],
+    };
+    expect(isSaveData(completed)).toBe(true);
+    expect(isSaveData({
+      ...completed,
+      consumedEventIds: completed.consumedEventIds.filter(
+        (id) => id !== "stage-34-objective-reached",
+      ),
+    })).toBe(false);
+  });
+
+  it("migrates v62 stage 34 boundaries but rejects forged stage 34 battles and stage 35", () => {
+    const currentStage34 = stage34BattleSave();
+    const boundary: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-34",
+      stageLabel: "拉那洛城內",
+      roster: currentStage34.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...stage33BattleSave().consumedEventIds,
+        "stage-33-objective-reached",
+        "stage-33-completed-route",
+      ],
+    };
+    const migrated = parseSaveData(JSON.stringify({
+      ...boundary,
+      version: 62,
+      contentVersion: "stage-33-lannal-castle-outskirts-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "completed",
+      stageId: "stage-34",
+    });
+    expect(parseSaveData(JSON.stringify({
+      ...currentStage34,
+      version: 62,
+      contentVersion: "stage-33-lannal-castle-outskirts-1",
+    }))).toBeUndefined();
+
+    const forgedStage35: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-35",
+      stageLabel: "時空異變",
+      roster: currentStage34.roster,
+      stageProgress: 1000,
+      consumedEventIds: [
+        ...currentStage34.consumedEventIds,
+        "stage-34-objective-reached",
+        "stage-34-completed-route",
+      ],
+    };
+    expect(parseSaveData(JSON.stringify({
+      ...forgedStage35,
+      version: 62,
+      contentVersion: "stage-33-lannal-castle-outskirts-1",
+    }))).toBeUndefined();
   });
 
   it("migrates v61 stage 33 boundaries but rejects forged stage 33 battles and stage 34", () => {

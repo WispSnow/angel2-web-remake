@@ -154,7 +154,7 @@ function normalizeStage22PostbattleTransition(value: unknown): unknown {
 
 const KINS_SLOT = 7;
 const KINS_CAMPAIGN_STAGES = new Set([
-  "stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29", "stage-30", "stage-31", "stage-32", "stage-33", "stage-34",
+  "stage-23", "stage-24", "stage-26", "stage-27", "stage-28", "stage-29", "stage-30", "stage-31", "stage-32", "stage-33", "stage-34", "stage-35",
 ]);
 
 function restoreKinsCampaignClass(save: SaveData): SaveData {
@@ -196,7 +196,7 @@ function restoreKinsCampaignClass(save: SaveData): SaveData {
 
 const STAGE27_DEFENDER_SLOT = 22;
 const STAGE27_DEFENDER_CLASS = "great-axe-warrior" as const;
-const POST_STAGE27_CAMPAIGN_STAGES = new Set(["stage-28", "stage-29", "stage-30", "stage-31", "stage-32", "stage-33", "stage-34"]);
+const POST_STAGE27_CAMPAIGN_STAGES = new Set(["stage-28", "stage-29", "stage-30", "stage-31", "stage-32", "stage-33", "stage-34", "stage-35"]);
 
 /** Stage 27 necessarily commits its fixed slot-22 class before any later-stage entry. */
 function restoreStage27DefenderClass(save: SaveData): SaveData {
@@ -294,6 +294,21 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   const restoredStage27Defender = restoreStage27DefenderClass(restoredKins);
   const restoredEliola = restoreStage29EliolaDisplayIdentity(restoredStage27Defender);
   return isSaveData(restoredEliola) ? restoredEliola : undefined;
+}
+
+function migrateVersion62Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 62
+    || value.contentVersion !== "stage-33-lannal-castle-outskirts-1"
+    // v62 could route a completed stage-33 save to stage 34, but never shipped
+    // a stage-34 battle runtime, a stage-35 boundary, or their save contracts.
+    || value.stageId === "stage-35"
+    || (value.kind === "battle" && value.stageId === "stage-34")) return undefined;
+  return finalizeDirectMigration({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
 }
 
 function migrateVersion61Save(value: unknown): SaveData | undefined {
@@ -1985,6 +2000,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion62 = migrateVersion62Save(value);
+    if (migratedVersion62) return migratedVersion62;
     const migratedVersion61 = migrateVersion61Save(value);
     if (migratedVersion61) return migratedVersion61;
     const migratedVersion60 = migrateVersion60Save(value);

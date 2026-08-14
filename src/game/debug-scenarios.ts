@@ -442,6 +442,17 @@ const STAGE33_COMPLETED_EVENT_IDS = [
   "stage-33-completed-route",
 ] as const;
 
+const STAGE34_BATTLE_EVENT_IDS = [
+  "stage-34-enter-deployment",
+  "stage-34-opening-story",
+] as const;
+
+const STAGE34_COMPLETED_EVENT_IDS = [
+  ...STAGE34_BATTLE_EVENT_IDS,
+  "stage-34-objective-reached",
+  "stage-34-completed-route",
+] as const;
+
 export interface DebugScenarioContext {
   difficulty: Difficulty;
   rosterSource: DebugRosterSource;
@@ -3060,6 +3071,80 @@ async function createStage33Completed(context: DebugScenarioContext): Promise<Ga
   return GameController.fromSave(save, 1);
 }
 
+async function createStage34Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-34",
+    debugCampaign(context, "stage-34"),
+    { preparation: true, statusMessage: "調試場景：拉那洛城內部署。" },
+  );
+  return controller;
+}
+
+async function stage34FullDeployment() {
+  const { STAGE34_DEFINITION } = await import("./content/stage34");
+  return {
+    placements: [
+      ...STAGE34_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE34_DEFINITION.deployment.optionalSlots.slice(0, 10).map((slot, index) => ({
+        slot, position: { ...STAGE34_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage34Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-34");
+  const { Stage34Battle } = await import("./simulation/stage34-battle");
+  const battle = new Stage34Battle(campaign, await stage34FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 34 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-34"),
+    stageLabel: "拉那洛城內",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE34_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：十一人攻堅隊迎戰蕾娜吉芙與十八名城內敵軍。";
+  return controller;
+}
+
+async function createStage34Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-34");
+  const { Stage34Battle } = await import("./simulation/stage34-battle");
+  const completedCampaign = new Stage34Battle(campaign, await stage34FullDeployment())
+    .campaignSnapshot();
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-35",
+    stageLabel: "時空異變",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: completedCampaign.rngState,
+    rngCalls: completedCampaign.rngCalls,
+    roster: completedCampaign.roster,
+    stageProgress: 1000,
+    consumedEventIds: [...STAGE34_COMPLETED_EVENT_IDS],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 export async function createDebugScenarioController(
   id: DebugScenarioId,
   context: DebugScenarioContext,
@@ -4061,6 +4146,49 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-33-cleared": createStage33Completed,
+  "stage-34-deployment": createStage34Deployment,
+  "stage-34-player": createStage34Player,
+  "stage-34-near-victory": withSetup(createStage34Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const lastEnemy = controller.battle.unit("2:7");
+    if (!nia || !lastEnemy) return;
+    nia.x = 30;
+    nia.y = 17;
+    nia.life = controller.battle.statsFor(nia).maxLife;
+    nia.experience = 0;
+    nia.acted = false;
+    lastEnemy.x = 31;
+    lastEnemy.y = 17;
+    lastEnemy.life = 1;
+    controller.battle.units = controller.battle.units.filter(
+      ({ side, id }) => side === 1 || id === lastEnemy.id,
+    );
+    for (const ally of controller.battle.units.filter(({ side, id }) => side === 1 && id !== nia.id)) {
+      ally.acted = true;
+    }
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 26, y: 14 };
+    controller.statusMessage = "調試場景：最後的蕾娜吉芙只剩 1 點生命。";
+  }),
+  "stage-34-near-defeat": withSetup(createStage34Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const lastEnemy = controller.battle.unit("2:7");
+    if (!nia || !lastEnemy) return;
+    nia.x = 30;
+    nia.y = 17;
+    nia.life = 1;
+    lastEnemy.x = 31;
+    lastEnemy.y = 17;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 26, y: 14 };
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命，蕾娜吉芙位於相鄰格。";
+  }),
+  "stage-34-victory-ready": withSetup(createStage34Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-34-cleared": createStage34Completed,
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {
