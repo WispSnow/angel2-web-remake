@@ -120,8 +120,9 @@ function boundaryMarkup(): string {
   return `<div class="stage49-boundary" data-testid="stage38-boundary">
     <span>MAIN ENDING COMPLETE</span>
     <h2>主線結局完成</h2>
-    <p>原版接下來進入隱藏第 38 關；該關與其後製作人員表仍在設計凍結範圍內。</p>
-    <strong>隱藏關邊界 · STAGE 38</strong>
+    <p>墓碑上的異世界之門再次開啟。妮雅與夥伴即將迎戰最後的敵人。</p>
+    <strong>隱藏關 · STAGE 38</strong>
+    <span class="stage49-boundary-action" data-testid="start-stage38">進入異世界</span>
   </div>`;
 }
 
@@ -226,7 +227,7 @@ export function mountStage49EndingUi(
     storyRevealedCharacters = 0;
     const session = controller.stage49Ending;
     if (!session) return;
-    screen.disabled = session.section === "stage38-boundary";
+    screen.disabled = false;
     screen.innerHTML = session.section === "story"
       ? storyMarkup(controller)
       : session.section === "roster"

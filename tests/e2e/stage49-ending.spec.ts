@@ -74,7 +74,7 @@ async function storyTextMetrics(page: Page, slot: "upper" | "lower") {
   });
 }
 
-test("S49-A–D: main ending plays story, roster, conditional epilogue, then stops before hidden stage 38", async ({ page }) => {
+test("S49-A–D: main ending plays story, roster, conditional epilogue, then enters hidden stage 38", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-cleared&difficulty=0&test=1");
   await expect(page.getByTestId("start-stage49-ending")).toBeVisible();
   await page.getByTestId("start-stage49-ending").click();
@@ -292,19 +292,18 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then sto
     campaignRoute: "stage-38",
     stage49Ending: { section: "stage38-boundary" },
   });
-  await expect(page.getByTestId("stage38-boundary")).toContainText("製作人員表仍在設計凍結範圍內");
+  await expect(page.getByTestId("stage38-boundary")).toContainText("墓碑上的異世界之門再次開啟");
+  await expect(page.getByTestId("start-stage38")).toHaveText("進入異世界");
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", "none");
   await captureVisualAudit(page.getByTestId("ending-advance"), {
     path: `${ARTIFACT_DIR}/stage49-stage38-boundary.png`,
   });
 
-  // The boundary is terminal while stage 38 stays frozen: further input must
-  // not advance past it or re-emit the same state.
-  await page.keyboard.press("Enter");
-  await page.keyboard.press("Space");
+  await page.getByTestId("start-stage38").click();
+  await expect(page.getByTestId("deployment-screen")).toBeVisible();
   expect(await state(page)).toMatchObject({
+    phase: "deployment",
     campaignRoute: "stage-38",
-    stage49Ending: { section: "stage38-boundary", index: 0 },
   });
 });
 

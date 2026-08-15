@@ -60,6 +60,7 @@ import {
 } from "./simulation/battle";
 import type { AlliedAiAction } from "./simulation/ai-contracts";
 import { Stage49EndingSession } from "./simulation/stage49-ending";
+import { CreditsSession } from "./content/credits";
 import type { PreparedRoutePulse } from "./simulation/route-pulse";
 import type { PreparedEnemyPhaseTail } from "./simulation/enemy-phase-tail";
 import type {
@@ -327,6 +328,7 @@ export class GameController {
   phase: GamePhase = "prebattleStory";
   campaignRoute?: CampaignRouteId;
   stage49Ending?: Stage49EndingSession;
+  credits?: CreditsSession;
   actionMode: ActionMode = "idle";
   dialogueIndex = 0;
   selectedId?: string;
@@ -613,6 +615,7 @@ export class GameController {
     this.stageRuntime = runtime;
     this.completedProgressMetadata = undefined;
     this.stage49Ending = undefined;
+    this.credits = undefined;
     this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId });
     this.preparationCampaign = runtime.preparation
       ? cloneCampaignState(this.stageEntrySnapshot)
@@ -1187,6 +1190,13 @@ export class GameController {
       return;
     }
     this.campaignRoute = definition.destination;
+    if (definition.destination === "stage-39") {
+      this.stageProgress = 1000;
+      this.phase = "credits";
+      this.credits = new CreditsSession();
+      this.statusMessage = "製作人員表：模組 46。";
+      return;
+    }
     if (isPlayableStageId(definition.destination)) {
       await this.enterStage(definition.destination, {
         ...this.battle.campaignSnapshot(),
@@ -4313,6 +4323,7 @@ export class GameController {
   private async restoreSave(save: SaveData, message: string): Promise<void> {
     this.campaignSaveCount = save.saveCount;
     this.stage49Ending = undefined;
+    this.credits = undefined;
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
       this.recordMenuReturn = undefined;
@@ -4356,7 +4367,12 @@ export class GameController {
         this.dialogueSkipConfirmIndex = 1;
         this.campaignRoute = save.stageId;
         this.stageProgress = 1000;
-        this.phase = "nextStage";
+        if (save.stageId === "stage-39") {
+          this.phase = "credits";
+          this.credits = new CreditsSession();
+        } else {
+          this.phase = "nextStage";
+        }
       } else {
         await this.enterStage(save.stageId, {
           stageId: save.stageId,
@@ -4449,16 +4465,37 @@ export class GameController {
     this.emit();
   }
 
+  advanceCredits(): void {
+    if (this.phase !== "credits" || !this.credits) return;
+    this.credits.advance();
+    this.statusMessage = this.credits.section === "the-end"
+      ? "The End"
+      : `製作人員表：第 ${this.credits.pageIndex + 1}／7 頁。`;
+    this.emit();
+  }
+
   advanceStage49Ending(): void {
     const ending = this.stage49Ending;
-    // The hidden-stage boundary is terminal while stage 38 stays frozen, so
-    // input there must not keep re-emitting the same state.
-    if (this.phase !== "ending" || !ending || ending.section === "stage38-boundary") return;
+    if (this.phase !== "ending" || !ending) return;
+    if (ending.section === "stage38-boundary") {
+      void this.enterHiddenStage38();
+      return;
+    }
     if (ending.advance() === "stage38-boundary") {
       this.campaignRoute = "stage-38";
-      this.statusMessage = "主線結局完成；隱藏關仍在設計凍結範圍內。";
+      this.statusMessage = "主線結局完成；可進入隱藏關異世界。";
     }
     this.emit();
+  }
+
+  async enterHiddenStage38(): Promise<void> {
+    if (this.phase !== "ending"
+      || this.campaignRoute !== "stage-38"
+      || this.stage49Ending?.section !== "stage38-boundary") return;
+    await this.enterStage("stage-38", {
+      ...this.battle.campaignSnapshot(),
+      stageId: "stage-38",
+    });
   }
 
   requestQuit(): void {
@@ -4677,8 +4714,14 @@ export class GameController {
     }
     this.campaignRoute = destination;
     this.stageProgress = 1000;
-    this.phase = "nextStage";
-    this.statusMessage = `調試：第 ${completedOrdinal} 關已直接完成，進入 ${destination} 邊界。`;
+    if (destination === "stage-39") {
+      this.phase = "credits";
+      this.credits = new CreditsSession();
+      this.statusMessage = "調試：異世界已完成，進入模組 46 製作人員表。";
+    } else {
+      this.phase = "nextStage";
+      this.statusMessage = `調試：第 ${completedOrdinal} 關已直接完成，進入 ${destination} 邊界。`;
+    }
     this.emit();
   }
 
@@ -5229,6 +5272,11 @@ export class GameController {
         saveCount: this.stage49Ending.saveCount,
         recordTotal: this.stage49Ending.recordTotal,
         dominantClassFamily: this.stage49Ending.dominantClassFamily,
+      } : undefined,
+      credits: this.credits ? {
+        section: this.credits.section,
+        pageIndex: this.credits.pageIndex,
+        transitionIndex: this.credits.transitionIndex,
       } : undefined,
       difficulty: this.difficulty,
       dialogueIndex: this.dialogueIndex,

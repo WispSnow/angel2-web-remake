@@ -985,6 +985,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
       const active = new Set<string>();
       const renderedLifeByUnitId: Record<string, number> = {};
+      const renderedTextureByUnitId: Record<string, string> = {};
       let visibleCount = 0;
       for (const unit of displayedUnits.values()) {
         active.add(unit.id);
@@ -1017,6 +1018,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           displayPosition.y * TILE_HEIGHT + TILE_HEIGHT / 2,
         );
         view.sprite.setTexture(this.textureFor(unit));
+        renderedTextureByUnitId[unit.id] = view.sprite.texture.key;
         view.sprite.setX(this.unitVisualOffset(unit));
         view.sprite.setAlpha(1);
         view.sprite.clearTint();
@@ -1064,6 +1066,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (controller.isTestMode) {
         this.game.canvas.dataset.unitLifeLabelCount = String(visibleCount);
         this.game.canvas.dataset.unitDisplayedLifeById = JSON.stringify(renderedLifeByUnitId);
+        this.game.canvas.dataset.unitTextureById = JSON.stringify(renderedTextureByUnitId);
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);
         this.game.canvas.dataset.iceDisabledCount = String(
           controller.battle.units.filter((unit) => unit.actionDisabled).length,

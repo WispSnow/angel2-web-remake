@@ -1,0 +1,38 @@
+.credits-page-shell {
+  min-height: 100vh;
+  padding: 24px;
+  background: #02030a;
+}
+
+.credits-page-shell > .game-stage { justify-content: center; }
+.credits-viewport { max-width: 960px; }
+.credits-screen {
+  position: relative;
+  display: block;
+  width: 640px;
+  height: 350px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  color: #fff4c4;
+  background: #000;
+  box-shadow: 0 0 0 3px #e5ba62, 0 18px 52px #000b;
+  image-rendering: pixelated;
+  transform: scale(var(--game-scale, 1));
+  transform-origin: top left;
+}
+
+.credits-screen img { image-rendering: pixelated; }
+.credits-roll {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 640px;
+  height: 800px;
+}
+.credits-final { position: absolute; inset: 0; overflow: hidden; }
+.credits-page { position: absolute; inset: 0; }
+.credits-frame { position: absolute; max-width: none; filter: invert(1); }
+.credits-final-base { position: absolute; left: 160px; top: 27px; width: 408px; height: 301px; }
+.credits-final-overlay { position: absolute; left: 352px; top: 161px; width: 48px; height: 56px; }
+.credits-final-overlay img { position: absolute; inset: 0; }

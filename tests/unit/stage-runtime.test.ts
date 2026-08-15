@@ -59,9 +59,10 @@ describe("stage runtime manifest", () => {
       "stage-35",
       "stage-36",
       "stage-37",
+      "stage-38",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ ordinal }) => ordinal))
-      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]);
+      .toEqual([0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ nextStageId }) => nextStageId)).toEqual([
       "stage-01",
       "stage-02",
@@ -101,6 +102,7 @@ describe("stage runtime manifest", () => {
       "stage-36",
       "stage-37",
       "stage-49",
+      "stage-39",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ label }) => label)).toEqual([
       "瓦爾克麗宮",
@@ -141,6 +143,7 @@ describe("stage runtime manifest", () => {
       "時空異變",
       "異世界的碧娜維姬",
       "究極女神",
+      "異世界",
     ]);
     expect(Object.values(STAGE_RUNTIME_MANIFEST).map(({ completion }) => completion.destinationLabel))
       .toEqual([
@@ -176,6 +179,7 @@ describe("stage runtime manifest", () => {
         "異世界的碧娜維姬",
         "究極女神",
         "主線結局",
+        "製作人員表",
       ]);
     expect(isPlayableStageId("stage-03")).toBe(true);
     expect(isPlayableStageId("stage-04")).toBe(true);
@@ -212,6 +216,7 @@ describe("stage runtime manifest", () => {
     expect(isPlayableStageId("stage-35")).toBe(true);
     expect(isPlayableStageId("stage-36")).toBe(true);
     expect(isPlayableStageId("stage-37")).toBe(true);
+    expect(isPlayableStageId("stage-38")).toBe(true);
     expect(stageRuntimeSourceForDestination("stage-04")?.id).toBe("stage-03");
     expect(stageRuntimeSourceForDestination("stage-05")?.id).toBe("stage-04");
     expect(stageRuntimeSourceForDestination("stage-42-portal")?.id).toBe("stage-05");
@@ -246,6 +251,7 @@ describe("stage runtime manifest", () => {
     expect(stageRuntimeSourceForDestination("stage-36")?.id).toBe("stage-35");
     expect(stageRuntimeSourceForDestination("stage-37")?.id).toBe("stage-36");
     expect(stageRuntimeSourceForDestination("stage-49")?.id).toBe("stage-37");
+    expect(stageRuntimeSourceForDestination("stage-39")?.id).toBe("stage-38");
     expect(stageRuntimeSourceForDestination("stage-11")?.id).toBe("stage-09");
     expect(stageRuntimeSourceForDestination("stage-10")?.id).toBe("stage-11");
     expect(STAGE_RUNTIME_MANIFEST["stage-03"].mapPresentationActionIds).toContain("recovery-1");
@@ -665,6 +671,19 @@ describe("stage runtime manifest", () => {
     ]);
     expect(stage37.assets?.map).toBe("/assets/original/stage37-map.png");
     expect(stage37.nextStageId).toBe("stage-49");
+    const stage38 = await loadStageRuntime("stage-38");
+    expect(stage38.preparation?.definition).toMatchObject({
+      fixedPlacements: [
+        { slot: 0, position: { x: 29, y: 21 } },
+        { slot: 1, position: { x: 30, y: 21 } },
+      ],
+      maximumUnits: 20,
+    });
+    expect(stage38.preparation?.definition.openCells).toHaveLength(18);
+    expect(stage38.preparation?.presentation.enemies).toHaveLength(44);
+    expect(stage38.save.enemyClassById).toHaveLength(44);
+    expect(stage38.assets?.map).toBe("/assets/original/stage38-map.png");
+    expect(stage38.nextStageId).toBe("stage-39");
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
   });

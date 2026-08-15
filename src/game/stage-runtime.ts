@@ -1835,6 +1835,54 @@ async function loadStage37Module(): Promise<StageRuntimeModule> {
   };
 }
 
+async function loadStage38Module(): Promise<StageRuntimeModule> {
+  const [content, battleModule] = await Promise.all([
+    import("./content/stage38"),
+    import("./simulation/stage38-battle"),
+  ]);
+  content.activateStage38Content();
+  const definition = content.STAGE38_DEFINITION.deployment;
+  const preparation = createDeploymentPreparation(
+    definition,
+    {
+      kicker: "STAGE 38",
+      title: content.STAGE38.name,
+      objective: content.STAGE38_DEFINITION.objective.victoryText,
+      minimap: content.STAGE38_ASSETS.minimap,
+      terrain: content.STAGE38_TERRAIN_TOKENS,
+      gridWidth: content.STAGE38.width,
+      gridHeight: content.STAGE38.height,
+      enemies: content.STAGE38_SEMANTIC_ENEMY_UNITS.map(({ position }) => position),
+      pageLabels: ["Ⅰ", "Ⅱ", "Ⅲ"],
+      finishLabel: "結束",
+      minimumUnits: definition.fixedPlacements.length,
+      guidanceText: "妮雅與希蜜固定出場；二十九名候選最多再選十八人。擊敗所有回到異世界的敵人即可獲勝。",
+    },
+    ["stage-38-enter-deployment"],
+    (campaign) => battleModule.createStage38DeploymentRoster(campaign),
+  );
+  const createBattle: StageRuntimeModule["createBattle"] = (campaign, deployment, rng) => {
+    if (!deployment) throw new Error("stage 38 requires a deployment result");
+    return new battleModule.Stage38Battle(campaign, deployment, rng);
+  };
+  return {
+    definition: content.STAGE38_DEFINITION,
+    assets: {
+      map: content.STAGE38_ASSETS.map,
+      minimap: content.STAGE38_ASSETS.minimap,
+      unitSprites: content.STAGE38_ASSETS.unitSprites,
+    },
+    preparation,
+    createBattle,
+    restoreBattle: (campaign, snapshot) => restoreBattle(
+      createBattle,
+      campaign,
+      snapshot,
+      preparation.createResultFromSavedUnits(snapshot.units),
+    ),
+  };
+}
+
 const RELEASED_MAP_ACTION_IDS = [
   "archer-shot",
   "fire-1", "fire-2", "fire-3", "fire-4",
@@ -4282,6 +4330,62 @@ export const STAGE_RUNTIME_MANIFEST = {
       enemyAi: "none",
     },
     load: loadStage37Module,
+  },
+  "stage-38": {
+    id: "stage-38",
+    ordinal: 37,
+    label: "異世界",
+    nextStageId: "stage-39",
+    focusUnitId: "1:0",
+    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    entry: {
+      trigger: "campaign-entered",
+      phase: "player",
+      statusText: "異世界之墓的敵人自異世界之門現身，妮雅率隊迎戰。",
+      campaignRoute: "stage-38",
+    },
+    enemyPhaseStatusText: "敵方階段：異世界殘軍依序追擊。",
+    retry: {
+      mode: "preparation",
+      statusText: "重新開始異世界決戰部署。",
+      retreatStatusText: "全面撤退：返回異世界決戰部署並重新編隊。",
+    },
+    completion: {
+      destinationLabel: "製作人員表",
+      destinationProgress: 1000,
+      consumedEvents: "all",
+    },
+    save: {
+      validEventIds: [
+        "stage-38-enter-deployment",
+        "stage-38-opening-story",
+        "stage-38-objective-reached",
+        "stage-38-victory-story",
+        "stage-38-completed-route",
+      ],
+      requiredResumeEventIds: [
+        "stage-38-enter-deployment",
+        "stage-38-opening-story",
+      ],
+      alliedUnits: {
+        kind: "deployment",
+        eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        fixedSlots: [0, 1],
+        optionalSlots: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
+        maximumUnits: 20,
+        openCellCount: 18,
+      },
+      enemyClassById: [
+        ["2:52", "beast-knight"], ["2:53", "beast-knight"], ["2:51", "beast-knight"], ["2:50", "beast-knight"],
+        ["2:34", "great-axe-warrior"], ["2:30", "great-axe-warrior"], ["2:31", "great-axe-warrior"], ["2:32", "great-axe-warrior"], ["2:33", "great-axe-warrior"], ["2:35", "great-axe-warrior"],
+        ["2:45", "magic-armor-warrior"], ["2:24", "magic-master"], ["2:47", "magic-archer"], ["2:48", "magic-archer"], ["2:49", "magic-archer"], ["2:46", "magic-archer"], ["2:23", "wizard"], ["2:44", "magic-armor-warrior"],
+        ["2:22", "steel-armor-warrior"], ["2:15", "demon-dragon-knight"], ["2:20", "divine-sword-warrior"], ["2:19", "pegasus-warrior"], ["2:16", "swift-dragon-knight"], ["2:21", "warrior"],
+        ["2:42", "divine-sword-warrior"], ["2:56", "magic-master"], ["2:17", "great-dragon-knight"], ["2:37", "crossbow"], ["2:39", "crossbow"], ["2:38", "crossbow"], ["2:36", "crossbow"], ["2:18", "crossbow"], ["2:54", "magic-master"], ["2:40", "divine-sword-warrior"],
+        ["2:43", "divine-sword-warrior"], ["2:57", "magic-master"], ["2:6", "prayer-guide"], ["2:4", "great-axe-warrior"], ["2:2", "evil-mage"], ["2:3", "beast-knight"], ["2:7", "curse-master"], ["2:5", "magic-armor-warrior"], ["2:55", "magic-master"], ["2:41", "divine-sword-warrior"],
+      ],
+      enemyAi: "none",
+    },
+    load: loadStage38Module,
   },
 } as const satisfies Record<StageId, StageRuntimeManifestEntry>;
 

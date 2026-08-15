@@ -16,6 +16,8 @@ const generators = [
   "generate-ai-technique-dialogue.mjs",
   "generate-technique-lab.mjs",
   "generate-stage0-music.mjs",
+  "generate-stage38-runtime.mjs",
+  "generate-credits-runtime.mjs",
 ];
 
 const scriptsDirectory = fileURLToPath(new URL(".", import.meta.url));

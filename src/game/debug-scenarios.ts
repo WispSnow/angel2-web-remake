@@ -1,6 +1,7 @@
 import "../debug.css";
 import { classDefinition, classStatsFor } from "./content/classes";
 import { STAGE0, completeCampaignRoster } from "./content/stage0";
+import { cameraOriginForFocus } from "./camera";
 import { GameController } from "./controller";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "./save";
 import {
@@ -63,6 +64,10 @@ const STAGE3_COMPLETED_EVENT_IDS = [
   "stage-03-boss-defeated",
   "stage-03-victory-story",
   "stage-03-completed-route",
+] as const;
+const STAGE38_BATTLE_EVENT_IDS = [
+  "stage-38-enter-deployment",
+  "stage-38-opening-story",
 ] as const;
 
 const STAGE4_BATTLE_EVENT_IDS = [
@@ -3384,6 +3389,94 @@ async function createStage37Player(context: DebugScenarioContext): Promise<GameC
   return controller;
 }
 
+async function createStage38Deployment(context: DebugScenarioContext): Promise<GameController> {
+  const controller = new GameController(context.difficulty);
+  await controller.enterStage(
+    "stage-38",
+    debugCampaign(context, "stage-38"),
+    { preparation: true, statusMessage: "調試場景：異世界決戰部署。" },
+  );
+  return controller;
+}
+
+async function stage38FullDeployment() {
+  const { STAGE38_DEFINITION } = await import("./content/stage38");
+  return {
+    placements: [
+      ...STAGE38_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE38_DEFINITION.deployment.optionalSlots.slice(0, 18).map((slot, index) => ({
+        slot, position: { ...STAGE38_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+}
+
+async function createStage38Opening(context: DebugScenarioContext): Promise<GameController> {
+  const controller = await createStage38Deployment(context);
+  controller.completeDeployment(await stage38FullDeployment());
+  controller.statusMessage = "調試場景：墓園悼詞開始前，四十四名異世界敵軍已在棋盤上。";
+  return controller;
+}
+
+async function createStage38Player(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-38");
+  const { Stage38Battle } = await import("./simulation/stage38-battle");
+  const battle = new Stage38Battle(campaign, await stage38FullDeployment());
+  const nia = battle.unit("1:0");
+  if (!nia) throw new Error("stage 38 debug scenario is missing Nia");
+  battle.focusId = nia.id;
+  const battleCampaign = battle.campaignSnapshot();
+  const save: BattleSaveData = {
+    ...battleSaveBase(battleCampaign, "stage-38"),
+    stageLabel: "異世界",
+    roster: battleCampaign.roster,
+    consumedEventIds: [...STAGE38_BATTLE_EVENT_IDS],
+    battle: {
+      phase: "player",
+      ...battle.serializableSnapshot(),
+      cursor: { x: nia.x, y: nia.y },
+      cameraOrigin: cameraOriginForFocus(battle.stage, nia),
+    },
+  };
+  const controller = await GameController.fromSave(save, 1);
+  controller.statusMessage = "調試場景：二十人決戰隊迎戰四十四名異世界敵軍。";
+  return controller;
+}
+
+async function createStage38Completed(context: DebugScenarioContext): Promise<GameController> {
+  const campaign = debugCampaign(context, "stage-38");
+  const { Stage38Battle } = await import("./simulation/stage38-battle");
+  const completedCampaign = new Stage38Battle(campaign, await stage38FullDeployment())
+    .campaignSnapshot();
+  const save: CompletedSaveData = {
+    format: "ANGEL2-web-save",
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    kind: "completed",
+    savedAt: "2000-01-01T00:00:00.000Z",
+    saveCount: 1,
+    stageId: "stage-39",
+    stageLabel: "製作人員表",
+    ruleset: campaign.ruleset,
+    difficulty: campaign.difficulty,
+    rngState: completedCampaign.rngState,
+    rngCalls: completedCampaign.rngCalls,
+    roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
+    stageProgress: 1000,
+    consumedEventIds: [
+      "stage-38-enter-deployment",
+      "stage-38-opening-story",
+      "stage-38-objective-reached",
+      "stage-38-victory-story",
+      "stage-38-completed-route",
+    ],
+  };
+  return GameController.fromSave(save, 1);
+}
+
 interface Stage49CompletedOptions {
   familyClassId?: UnitClassId;
   recordTotal?: number;
@@ -4624,6 +4717,44 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-37-cleared": createStage37Completed,
+  "stage-38-deployment": createStage38Deployment,
+  "stage-38-opening": createStage38Opening,
+  "stage-38-player": createStage38Player,
+  "stage-38-near-victory": withSetup(createStage38Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    const finalEnemy = controller.battle.unit("2:52");
+    if (!nia || !finalEnemy) return;
+    nia.x = 29;
+    nia.y = 28;
+    nia.experience = 0;
+    nia.life = controller.battle.statsFor(nia).maxLife;
+    nia.acted = false;
+    finalEnemy.x = 30;
+    finalEnemy.y = 28;
+    finalEnemy.life = 1;
+    controller.battle.units = controller.battle.units.filter(
+      ({ side, id }) => side === 1 || id === finalEnemy.id,
+    );
+    for (const ally of controller.battle.units.filter(({ side, id }) => side === 1 && id !== nia.id)) {
+      ally.acted = true;
+    }
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.cameraOrigin = { x: 25, y: 25 };
+    controller.statusMessage = "調試場景：最後一名異世界敵軍只剩 1 點生命，妮雅位於相鄰格。";
+  }),
+  "stage-38-near-defeat": withSetup(createStage38Player, (controller) => {
+    const nia = controller.battle.unit("1:0");
+    if (!nia) return;
+    nia.life = 1;
+    controller.battle.focusId = nia.id;
+    controller.cursor = { x: nia.x, y: nia.y };
+    controller.statusMessage = "調試場景：妮雅只剩 1 點生命。";
+  }),
+  "stage-38-victory-ready": withSetup(createStage38Player, (controller) => {
+    controller.forceVictoryForTest();
+  }),
+  "stage-38-cleared": createStage38Completed,
   "stage-49-family-cavalry": (context) => createStage49Epilogue(context, {
     epilogueIndex: 0,
     familyClassId: "cavalry",

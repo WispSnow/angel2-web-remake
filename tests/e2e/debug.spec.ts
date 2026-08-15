@@ -73,6 +73,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 34 關 · 時空異變",
     "第 35 關 · 異世界的碧娜維姬",
     "第 36 關 · 究極女神",
+    "第 37 關 · 異世界",
     "主線結局 · 四段尾聲",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
@@ -275,6 +276,13 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-37-near-defeat",
     "stage-37-victory-ready",
     "stage-37-cleared",
+    "stage-38-deployment",
+    "stage-38-opening",
+    "stage-38-player",
+    "stage-38-near-victory",
+    "stage-38-near-defeat",
+    "stage-38-victory-ready",
+    "stage-38-cleared",
     "stage-49-family-cavalry",
     "stage-49-family-fighter",
     "stage-49-family-mage",
@@ -286,6 +294,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
+  await expect(page.getByTestId("debug-scenario-stage-38-near-victory"))
+    .toContainText("只保留 1 點生命的異世界敵軍");
   await expect(page.locator('[data-debug-stage-id="stage-28"] [data-debug-scenario-id]'))
     .toHaveCount(8);
   await expect(page.locator('[data-debug-stage-id="stage-29"] [data-debug-scenario-id]'))
@@ -305,6 +315,8 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.locator('[data-debug-stage-id="stage-36"] [data-debug-scenario-id]'))
     .toHaveCount(6);
   await expect(page.locator('[data-debug-stage-id="stage-37"] [data-debug-scenario-id]'))
+    .toHaveCount(7);
+  await expect(page.locator('[data-debug-stage-id="stage-38"] [data-debug-scenario-id]'))
     .toHaveCount(7);
   await expect(page.locator('[data-debug-stage-id="stage-49"] [data-debug-scenario-id]'))
     .toHaveCount(8);

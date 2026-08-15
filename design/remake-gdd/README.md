@@ -4,7 +4,7 @@
 
 日期：2026-08-14
 
-阶段：第 36 个可玩关卡（内部第 37 关）“究極女神”已获用户接受；stage 49 主线结局已实现并通过自动／视觉门禁；隐藏 stage 38 及后续内容冻结
+阶段：第 36 个可玩关卡（内部第 37 关）“究極女神”与 stage 49 主线结局已获用户确认；隐藏 stage 38“異世界”及模块 46 终端已实现并通过自动／视觉门禁，等待用户普通入口试玩
 
 开发状态：全战役设计仍为 `implementationFrozen=true`；第 0–9 关与内部第 11 关已获用户
 接受；内部第 10 关已获用户试玩接受，`M20-BAL-01` 留待未来平衡调整；内部第 12–24、26、
@@ -19,8 +19,9 @@
 stage 37 的 1–27 人部署、究極女神三部位、专属交替术法、九字段隐藏、SAY/0081、
 v72/v71/v70 与 stage 49 主线结局入口；冰雪轮頭最后与碧娜維姬 `D/8` 部位肖像已按
 试玩反馈修正并获用户接受。M72/M73 现按 `REMAKE-086` 接入 SAY/0070、二十二张战绩卡、
-四段尾声（三段条件分支、一段固定）、v73/v72 与隐藏 stage 38 可见边界，等待用户观看
-结局复验。
+四段尾声（三段条件分支、一段固定）、v73/v72 与隐藏 stage 38 可见边界；用户确认
+`STAGE-49 主線結局` 测试通过。M74/M75 按 `REMAKE-087` 接入隐藏 stage 38、模块 46
+七页制作人员表、八次不可跳过转场、`UN/55` 音乐与 `UN/54` 永久 `The End`，等待普通入口试玩。
 
 ## 文档目的
 
@@ -93,7 +94,8 @@ v72/v71/v70 与 stage 49 主线结局入口；冰雪轮頭最后与碧娜維姬 
 | [`vertical-slices/stage-35.md`](vertical-slices/stage-35.md) | 固定九对十、SAY 67/68、全员行为 12 无路线待命、全灭、无动态增援及 stage 36 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-36.md`](vertical-slices/stage-36.md) | 1–28 人部署、SAY 80、碧娜維姬与二十九名静态敌军、单首领目标、无动态增援及 stage 37 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-37.md`](vertical-slices/stage-37.md) | 1–27 人部署、SAY 81、究極女神三部位、冰雪轮頭最后、`D/8` 身份肖像、专属交替术法、九字段隐藏及 stage 49 主线结局入口 | Draft 0.2 / 已接受 |
-| [`vertical-slices/stage-49.md`](vertical-slices/stage-49.md) | SAY 70、二十二张战绩卡、四段尾声（三段条件分支、一段固定）、v73 战绩计数及隐藏 stage 38 边界 | Draft 0.1 / 已验证，等待用户复验 |
+| [`vertical-slices/stage-49.md`](vertical-slices/stage-49.md) | SAY 70、二十二张战绩卡、四段尾声（三段条件分支、一段固定）、v73 战绩计数及隐藏 stage 38 边界 | Draft 0.1 / 已接受 |
+| [`vertical-slices/stage-38.md`](vertical-slices/stage-38.md) | B/0077、18 格部署、44 名静态敌军、SAY 164/165、stage-39 终端、模块 46 自动片尾与 The End | Draft 0.1 / 已验证，等待用户试玩 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |

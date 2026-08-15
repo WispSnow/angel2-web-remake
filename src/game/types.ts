@@ -44,7 +44,8 @@ export type StageId =
   | "stage-34"
   | "stage-35"
   | "stage-36"
-  | "stage-37";
+  | "stage-37"
+  | "stage-38";
 export type CampaignRouteId =
   | "stage-01"
   | "stage-02"
@@ -84,7 +85,8 @@ export type CampaignRouteId =
   | "stage-36"
   | "stage-37"
   | "stage-49"
-  | "stage-38";
+  | "stage-38"
+  | "stage-39";
 
 export interface Position {
   x: number;
@@ -147,6 +149,7 @@ export type GamePhase =
   | "saveSlots"
   | "quit"
   | "ending"
+  | "credits"
   | "nextStage";
 
 export type ActionMode =

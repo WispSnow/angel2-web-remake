@@ -21,6 +21,7 @@ import {
   STAGE49_ENDING_MUSIC,
   STAGE49_EPILOGUE_MUSIC_BY_SELECTOR,
 } from "./content/stage49-ending";
+import { CREDITS_MUSIC_PROGRAM } from "./content/credits";
 
 type BattleMusicSide = "player" | "enemy";
 
@@ -159,7 +160,12 @@ export class AudioManager {
       );
       restart = desired?.id === this.selectedMusic?.id;
     }
-    else if (this.controller.phase === "quit" || this.controller.phase === "nextStage") {
+    else if (this.controller.phase === "credits") {
+      desired = CREDITS_MUSIC_PROGRAM;
+    }
+    else if (this.controller.phase === "quit"
+      || this.controller.phase === "nextStage"
+    ) {
       desired = undefined;
     }
 

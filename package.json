@@ -67,6 +67,8 @@
     "content:stage35": "node scripts/generate-stage35-runtime.mjs",
     "content:stage36": "node scripts/generate-stage36-runtime.mjs",
     "content:stage37": "node scripts/generate-stage37-runtime.mjs",
+    "content:stage38": "node scripts/generate-stage38-runtime.mjs",
+    "content:credits": "node scripts/generate-credits-runtime.mjs",
     "content:stage49": "node scripts/generate-stage49-ending.mjs",
     "content:actions": "node scripts/generate-stage0-actions.mjs && node scripts/generate-stage1-actions.mjs",
     "content:terrain-actions": "node scripts/generate-dynamic-terrain-assets.mjs",
