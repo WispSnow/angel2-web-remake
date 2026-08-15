@@ -1048,6 +1048,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     stageId: "stage-01",
     stageLabel: "騎士城堡前",
     ruleset: "stableRemake",
+    // First record written in this campaign; the post-victory writer advances
+    // the same cumulative count the stage-49 epilogue reads.
+    saveCount: 1,
     rngCalls: expect.any(Number),
     stageProgress: 0,
     consumedEventIds: [],

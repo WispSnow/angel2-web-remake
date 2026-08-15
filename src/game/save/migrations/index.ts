@@ -128,9 +128,11 @@ function addEmptyTerrainOverrides(value: unknown): unknown {
 }
 
 /**
- * Saves before v73 did not preserve the native KILL_ALL presentation counters.
- * Their historic values cannot be reconstructed, so migration adopts a zeroed
- * baseline while all future ordinary attacks are tracked deterministically.
+ * Saves before v73 did not preserve the native KILL_ALL presentation counters,
+ * and v73 itself counted every ordinary attack instead of only the ones that
+ * killed. Neither history can be reconstructed into the v74 kill semantics, so
+ * both migrations adopt a zeroed baseline while all future kills are tracked
+ * deterministically.
  */
 function addEmptyRecordCounters(value: unknown): unknown {
   if (!isRecord(value)) return value;
@@ -345,6 +347,18 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
   };
   const withRecordCounters = addEmptyRecordCounters(migrated);
   return isSaveData(withRecordCounters) ? withRecordCounters : undefined;
+}
+
+function migrateVersion73Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 73
+    || value.contentVersion !== "stage-49-ending-records-1") return undefined;
+  const migrated = addEmptyRecordCounters({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
+  return isSaveData(migrated) ? migrated : undefined;
 }
 
 function migrateVersion72Save(value: unknown): SaveData | undefined {
@@ -2163,6 +2177,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion73 = migrateVersion73Save(value);
+    if (migratedVersion73) return migratedVersion73;
     const migratedVersion72 = migrateVersion72Save(value);
     if (migratedVersion72) return migratedVersion72;
     const migratedVersion71 = migrateVersion71Save(value);

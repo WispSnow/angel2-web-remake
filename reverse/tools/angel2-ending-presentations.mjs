@@ -9,7 +9,9 @@ const MODULE_DATA_BASE = { 33: 0x86e0, 35: 0x8550, 46: 0x84f0 };
 const BIG5 = new TextDecoder("big5", { fatal: true });
 
 const VERIFIED_RANGES = [
-  { module: 29, address: "0000:91F1", start: 0x91f1, end: 0x9262, role: "player primary experience award and per-slot record counter increment", sha256: "14947957f904d55bdef5ea07d6af50bde1c81e5e83488e2834644ef46d158bc5" },
+  { module: 29, address: "0000:91F1", start: 0x91f1, end: 0x9262, role: "primary experience award: 0000:91FE branches on whether the defender cell is still occupied, and only the killed-defender branch 0000:921C reaches the record-counter increment at 0000:9252", sha256: "14947957f904d55bdef5ea07d6af50bde1c81e5e83488e2834644ef46d158bc5" },
+  { module: 29, address: "0000:9161", start: 0x9161, end: 0x91c5, role: "counterattack experience award: same kill split as 0000:91F1 and no record-counter write on either branch", sha256: "9f4ea8320b68df1d3bf7441b3fdcf26f3a50ba9a953bb7ccb796e481c1855777" },
+  { module: 29, address: "0000:926B", start: 0x926b, end: 0x92b3, role: "ordinary-hit dispatch: both presentation variants call the primary award once and the counter award once", sha256: "7c2db1329b581e2a1d1787a0ad0018ac4802b39edf6ef80a472b432620820d3e" },
   { module: 29, address: "1000:8882", start: 0x18882, end: 0x188cb, role: "save-slot metadata writer increments SAVE_NUM", sha256: "e334609e98cb68f8cc29a8fa8d809b13eb033711198d2a6424f29b8ce788498a" },
   { module: 33, address: "0000:004E", start: 0x4e, end: 0xd5, role: "load UN7/8/6 and A9 then run postgame roster", sha256: "281b98117b24737da754920160eae8c5fdbb689b7badaff0b9c146ae88d0a6c8" },
   { module: 33, address: "0000:02FA", start: 0x2fa, end: 0x3c8, role: "import class, experience, options, and record counters from parent", sha256: "c4c8ca5ba60a3b20bb33423ef02550a9d9fc86376edabd9f4e1ee6d078382e74" },
@@ -310,7 +312,8 @@ function parseEpilogue(module35, descriptors) {
         parentPointerOffset: "+0x1A",
         goSymbol: "KILL_ALL",
         entriesImported: 75,
-        producer: "module 29 0000:9252-925D increments the initiating side-1 slot once on the ordinary primary-experience path",
+        producer: "module 29 0000:9252-9260 increments the initiating slot once per ordinary attack that kills its defender; it is the module's only KILL_ALL write, it is reachable only through the killed-defender branch 0000:921C, and the mirrored counterattack award at 0000:9161 has no equivalent",
+        nonProducers: "surviving-defender hits return at 0000:921B, counterattack kills return at 0000:91C4, and shot/technique actions never reach the ordinary-attack resolution 0000:90D8",
         module33VisibleLabel: "戰績",
       },
       saveCount: {

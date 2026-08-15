@@ -675,11 +675,16 @@ export class Stage0Battle {
     );
   }
 
+  /**
+   * Native 0000:9252 indexes KILL_ALL with `DS:31CB`, the acting unit's own
+   * slot, and applies no campaign-membership test, so a side-1 unit that only
+   * exists for one stage — stage 20's 守護者 in slot 32 is the campaign's one
+   * controllable case — still records its kills.
+   */
   private isCampaignRecordSlot(unit: BattleUnit): boolean {
     return unit.side === 1
       && unit.slot >= 0
-      && unit.slot < this.campaignRecordCounters.length
-      && this.campaignUnitSlots.has(unit.slot);
+      && unit.slot < this.campaignRecordCounters.length;
   }
 
   restore(
@@ -1172,12 +1177,18 @@ export class Stage0Battle {
       : defenderStats.level + this.rng.between(4, 7);
     const experienceGained = baseExperience * (defenderDied ? defenderGroup.length : 1);
     attacker.experience += experienceGained;
-    // Native KILL_ALL increments once for the initiating side-1 slot on the
-    // ordinary primary-experience path; counters and kills do not increment it.
-    // Gate on the same membership the roster write-back uses, so a projected
-    // side-1 unit that never reaches the campaign cannot bump another
-    // character's 戰績 through a shared slot number.
-    if (this.isCampaignRecordSlot(attacker)) this.campaignRecordCounters[attacker.slot] += 1;
+    // Native module 29 applies the primary damage at 0000:91DE and then splits
+    // the experience path at 0000:91FE on whether the defender's board cell is
+    // still occupied: a surviving defender takes 0000:9200 and returns at
+    // 0000:921B, while a killed one takes 0000:921C, which pays the kill reward
+    // and ends with the only KILL_ALL write in the module
+    // (0000:9252-9260, `KILL_ALL[DS:31CB] += 1`). So this is a kill count for
+    // the initiating slot, not an attack count. The mirrored counter-attack
+    // routine at 0000:9161 has the same kill split and no such tail, and shots
+    // and techniques never reach this resolution at all.
+    if (defenderDied && this.isCampaignRecordSlot(attacker)) {
+      this.campaignRecordCounters[attacker.slot] += 1;
+    }
     this.synchronizeWaterWarriorState(attacker);
     const counterExperienceBase = counterOccurred
       ? attackerDied

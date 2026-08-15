@@ -1970,6 +1970,23 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v73 attack-counted records to a zeroed kill-count baseline", () => {
+    // v73 advanced 戰績 on every ordinary attack; v74 only counts kills, and a
+    // v73 total cannot be split back into kills, so the counters restart at 0.
+    const current = completedSave();
+    const legacyCounters = Array<number>(75).fill(0);
+    legacyCounters[0] = 37;
+    legacyCounters[7] = 12;
+    const migrated = parseSaveData(JSON.stringify({
+      ...current,
+      version: 73,
+      contentVersion: "stage-49-ending-records-1",
+      recordCounters: legacyCounters,
+    }));
+    expect(migrated).toEqual(current);
+    expect((migrated as CompletedSaveData).recordCounters).toEqual(Array<number>(75).fill(0));
+  });
+
   it("migrates v72 saves to a zeroed native record-counter baseline", () => {
     const current = completedSave();
     const { recordCounters: _currentCounters, ...legacy } = current;

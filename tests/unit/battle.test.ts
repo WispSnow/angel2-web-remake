@@ -64,12 +64,40 @@ describe("stage 0 battle simulation", () => {
     });
   });
 
-  it("increments the native record counter once for an allied ordinary attack", () => {
+  it("increments the native record counter only when an allied ordinary attack kills", () => {
+    // Native module 29 runs the KILL_ALL tail (0000:9252-9260) exclusively on
+    // the killed-defender branch 0000:921C; a defender that survives returns at
+    // 0000:921B first. 戰績 is therefore a kill count for the initiating slot.
+    const survived = battleAtPlayableOpening(42);
+    survived.setCampaignRecordCounters([7]);
+    expect(survived.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    expect(survived.attack("1:0", "2:45").defenderDied).toBe(false);
+    expect(survived.campaignSnapshot().recordCounters?.[0]).toBe(7);
+
+    const killed = battleAtPlayableOpening(42);
+    killed.setCampaignRecordCounters([7]);
+    expect(killed.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    const target = killed.unit("2:45");
+    if (!target) throw new Error("missing stage 0 target");
+    target.life = 1;
+    expect(killed.attack("1:0", "2:45").defenderDied).toBe(true);
+    expect(killed.campaignSnapshot().recordCounters?.[0]).toBe(8);
+  });
+
+  it("leaves the native record counter alone when an allied counterattack kills", () => {
+    // The mirrored counter routine 0000:9161 splits on the same kill test and
+    // ends at 0000:91C4 without a KILL_ALL write, so only the unit that
+    // initiated the attack can record a kill.
     const battle = battleAtPlayableOpening(42);
     battle.setCampaignRecordCounters([7]);
     expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
-    battle.attack("1:0", "2:45");
-    expect(battle.campaignSnapshot().recordCounters?.[0]).toBe(8);
+    const enemy = battle.unit("2:45");
+    if (!enemy) throw new Error("missing stage 0 enemy");
+    enemy.life = 1;
+    const result = battle.attack("2:45", "1:0");
+    expect(result.counterOccurred).toBe(true);
+    expect(result.attackerDied).toBe(true);
+    expect(battle.campaignSnapshot().recordCounters?.[0]).toBe(7);
   });
 
   it("keeps simulation deterministic for equal seed and commands", () => {

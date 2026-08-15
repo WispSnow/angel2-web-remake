@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -29,6 +30,35 @@ const waitForEnding = (page: Page, section: string, index?: number) => page.wait
       && (expectedIndex === undefined || ending.index === expectedIndex);
   },
   { expectedSection: section, expectedIndex: index },
+);
+
+const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
+  (expected) => (window.__ANGEL2__?.getState() as EndingState | undefined)?.phase === expected,
+  phase,
+);
+
+const openRecordMenu = async (page: Page, command: "save" | "load") => {
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeVisible();
+  await page.getByTestId(`system-command-${command}`).click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+};
+
+const writeRecord = async (page: Page, slot: number) => {
+  await openRecordMenu(page, "save");
+  await page.getByTestId(`record-slot-${slot}`).click();
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+};
+
+const loadRecord = async (page: Page, slot: number) => {
+  await openRecordMenu(page, "load");
+  await page.getByTestId(`record-slot-${slot}`).click();
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+};
+
+const savedRecord = (page: Page, slot: number) => page.evaluate(
+  (key) => JSON.parse(localStorage.getItem(key) ?? "null") as { kind: string; saveCount: number },
+  `angel2.save.${slot}`,
 );
 
 async function advance(page: Page, count: number): Promise<void> {
@@ -371,4 +401,32 @@ test("S49-E: a loaded stage-49 completed save reaches the same main-ending entry
   await captureVisualAudit(page.getByTestId("ending-advance"), {
     path: `${ARTIFACT_DIR}/stage49-epilogue-decline.png`,
   });
+});
+
+test("S49-F: the save-count selector accumulates across record slots and resumes from a loaded record", async ({ page }) => {
+  // REMAKE-086 defines the third epilogue segment's selector as the campaign's
+  // cumulative record-write count: writing any slot advances it once, and
+  // loading a record resumes from the count that record was written with.
+  // S49-E injects a finished count and asserts the branch; this asserts the
+  // producer, so it runs from a real battle where records can be written.
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+
+  await writeRecord(page, 1);
+  expect(await savedRecord(page, 1)).toMatchObject({ kind: "battle", saveCount: 1 });
+
+  // A different slot keeps counting the campaign's writes, not that slot's.
+  await writeRecord(page, 2);
+  expect(await savedRecord(page, 2)).toMatchObject({ saveCount: 2 });
+  expect(await savedRecord(page, 1)).toMatchObject({ saveCount: 1 });
+
+  // Loading record 1 resumes from its own count, so the next write is 2 again.
+  await loadRecord(page, 1);
+  await writeRecord(page, 3);
+  expect(await savedRecord(page, 3)).toMatchObject({ saveCount: 2 });
+  expect(await savedRecord(page, 2)).toMatchObject({ saveCount: 2 });
 });
