@@ -4,9 +4,12 @@
   background: radial-gradient(circle at 50% 10%, #1d2448 0, #090b19 62%, #03040a 100%);
 }
 
+.stage49-page > .game-stage {
+  justify-content: center;
+}
+
 .stage49-viewport {
   max-width: 960px;
-  margin: 0 auto;
 }
 
 .stage49-screen {
@@ -61,7 +64,8 @@
 .stage49-dialogue-window.is-upper { top: 20px; }
 .stage49-dialogue-window.is-lower { bottom: 20px; }
 .stage49-dialogue-window.is-active::after { content: "▼"; position: absolute; right: 12px; bottom: 5px; color: #ffe684; }
-.stage49-dialogue-window img { position: absolute; left: 14px; bottom: 8px; width: 104px; max-height: 94px; object-fit: contain; object-position: bottom; }
+.stage49-dialogue-portrait { position: absolute; left: 19px; bottom: 8px; width: 94px; height: 94px; }
+.stage49-dialogue-portrait .portrait-base { object-fit: contain; object-position: bottom; }
 .stage49-dialogue-window strong { display: block; color: #ffe284; font-size: 15px; letter-spacing: 4px; }
 .stage49-dialogue-window p { margin: 4px 0 0; white-space: pre-line; font-size: 15px; line-height: 1.45; text-shadow: 1px 1px #000; }
 
@@ -80,16 +84,22 @@
 /* A/9 is an 8x349 stripe and the postgame screen is 350 tall, so tile on both
    axes: repeat-x alone leaves an unpainted row, and scaling to fit would smooth
    the original pixels. */
-.stage49-roster-stripe { position: absolute; inset: 0; background: url("/assets/original/ending/roster-background.png") repeat; opacity: .9; }
-.stage49-decoration { position: absolute; left: 0; bottom: 0; width: 448px; height: 148px; object-fit: contain; object-position: left bottom; }
-.stage49-roster-portrait { position: absolute; left: 54px; bottom: 58px; width: 172px; max-height: 230px; object-fit: contain; object-position: bottom; filter: drop-shadow(5px 7px 0 #0008); }
-.stage49-roster-copy { position: absolute; top: 28px; right: 34px; width: 300px; min-height: 284px; padding: 18px 22px; border: 3px double #f1cf7b; background: #080d2ce8; box-shadow: 8px 8px 0 #0007; }
-.stage49-roster-copy > span { color: #aebcf1; font-size: 11px; letter-spacing: 2px; }
-.stage49-roster-copy h2 { margin: 8px 0 16px; color: #ffe28e; font-size: 27px; letter-spacing: 7px; }
-.stage49-roster-copy dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin: 0; }
-.stage49-roster-copy dl div { display: flex; justify-content: space-between; border-bottom: 1px solid #8c79a5; padding: 5px 2px; }
-.stage49-roster-copy dt { color: #bbc9ec; }
-.stage49-roster-copy dd { margin: 0; color: #fff4bd; font-variant-numeric: tabular-nums; }
+.stage49-roster-stripe { position: absolute; z-index: 0; inset: 0; background: url("/assets/original/ending/roster-background.png") repeat; }
+.stage49-decoration { position: absolute; z-index: 1; left: 148px; top: 50px; width: 448px; height: 148px; }
+.stage49-roster-portrait { position: absolute; z-index: 2; left: 16px; top: 50px; width: 112px; height: 112px; }
+.stage49-roster-class-illustration { position: absolute; z-index: 3; left: 200px; top: 186px; max-width: none; transform: translate(-50%, -100%); }
+.stage49-roster-fields { position: absolute; z-index: 4; inset: 0; margin: 0; color: #fff8dd; font: 15px/20px "PMingLiU", "MingLiU", "Noto Serif TC", serif; text-shadow: 1px 1px #000; }
+.stage49-roster-fields > div { position: absolute; display: flex; white-space: nowrap; }
+.stage49-roster-fields dt,
+.stage49-roster-fields dd { margin: 0; }
+.stage49-roster-fields dd { font-variant-numeric: tabular-nums; }
+.stage49-roster-fields .is-name { left: 32px; top: 220px; }
+.stage49-roster-fields .is-class { left: 176px; top: 220px; }
+.stage49-roster-fields .is-level { left: 176px; top: 240px; }
+.stage49-roster-fields .is-life { left: 296px; top: 220px; }
+.stage49-roster-fields .is-attack { left: 296px; top: 240px; }
+.stage49-roster-fields .is-defense { left: 296px; top: 260px; }
+.stage49-roster-fields .is-record { left: 476px; top: 220px; }
 
 .stage49-epilogue { background: #000; }
 .stage49-epilogue-left,

@@ -32,8 +32,18 @@ const waitForEnding = (page: Page, section: string, index?: number) => page.wait
 );
 
 async function advance(page: Page, count: number): Promise<void> {
+  const button = page.getByTestId("ending-advance");
   for (let index = 0; index < count; index += 1) {
-    await page.getByTestId("ending-advance").click();
+    const before = await state(page);
+    await button.click();
+    const after = await state(page);
+    // A click during native-style typing only completes the line. Compare
+    // semantic state instead of racing a transient DOM attribute: if the
+    // checkpoint did not move, the next click is the actual KY advance.
+    if (before.stage49Ending?.section === after.stage49Ending?.section
+      && before.stage49Ending?.index === after.stage49Ending?.index) {
+      await button.click();
+    }
   }
 }
 
@@ -50,6 +60,21 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then sto
   });
   await expect(page.getByTestId("stage49-story")).toContainText("恭禧妳！妮雅");
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MAGIC/77");
+  const storyPortrait = page.getByTestId("stage49-story-portrait-lower");
+  await expect(storyPortrait.locator(".portrait-eye")).toHaveCount(3);
+  await expect(storyPortrait.locator(".portrait-mouth")).toHaveCount(3);
+  await expect.poll(async () => Number(await storyPortrait.getAttribute("data-talk-count")))
+    .toBeGreaterThan(0);
+  await expect(storyPortrait).toHaveAttribute("data-speaking", "false");
+  await expect(storyPortrait).toHaveAttribute("data-mouth-frame", "1");
+  await expect.poll(async () => Number(await storyPortrait.getAttribute("data-blink-count")), {
+    timeout: 2_000,
+  }).toBeGreaterThan(0);
+  const centerDelta = await page.getByTestId("ending-advance").evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return bounds.left + bounds.width / 2 - window.innerWidth / 2;
+  });
+  expect(Math.abs(centerDelta)).toBeLessThanOrEqual(1);
   await captureVisualAudit(page.getByTestId("ending-advance"), {
     path: `${ARTIFACT_DIR}/stage49-story.png`,
   });
@@ -60,6 +85,36 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then sto
   // Native card field is 兵種 with 戰績：00000 人.
   await expect(page.getByTestId("stage49-roster")).toContainText("兵種");
   await expect(page.getByTestId("stage49-record")).toHaveText("00000 人");
+  await expect(page.getByTestId("stage49-roster-class-illustration"))
+    .toHaveAttribute("src", "/assets/original/ending/class-illustrations/00.png");
+  await expect.poll(() => page.getByTestId("stage49-roster-class-illustration")
+    .evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  const rosterGeometry = await page.getByTestId("ending-advance").evaluate((screen) => {
+    const nativeBounds = (selector: string) => {
+      const element = screen.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`missing roster element ${selector}`);
+      const screenBounds = screen.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      const scale = screenBounds.width / 640;
+      return {
+        x: (bounds.left - screenBounds.left) / scale,
+        y: (bounds.top - screenBounds.top) / scale,
+        width: bounds.width / scale,
+        height: bounds.height / scale,
+        centerX: (bounds.left + bounds.width / 2 - screenBounds.left) / scale,
+        bottom: (bounds.bottom - screenBounds.top) / scale,
+      };
+    };
+    return {
+      portrait: nativeBounds(".stage49-roster-portrait"),
+      decoration: nativeBounds(".stage49-decoration"),
+      classIllustration: nativeBounds(".stage49-roster-class-illustration"),
+    };
+  });
+  expect(rosterGeometry.portrait).toMatchObject({ x: 16, y: 50, width: 112, height: 112 });
+  expect(rosterGeometry.decoration).toMatchObject({ x: 148, y: 50, width: 448, height: 148 });
+  expect(rosterGeometry.classIllustration.centerX).toBeCloseTo(200, 1);
+  expect(rosterGeometry.classIllustration.bottom).toBeCloseTo(186, 1);
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", "UN/6");
   await captureVisualAudit(page.getByTestId("ending-advance"), {
     path: `${ARTIFACT_DIR}/stage49-roster.png`,

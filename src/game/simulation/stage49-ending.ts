@@ -15,6 +15,7 @@ export interface Stage49RosterCard {
   actor: (typeof STAGE49_ROSTER_ACTORS)[number];
   roster: SaveRosterEntry;
   className: string;
+  nativeClassRecord: number;
   level: number;
   maxLife: number;
   attack: number;
@@ -81,6 +82,7 @@ export class Stage49EndingSession {
       actor,
       roster,
       className: className(roster.classId),
+      nativeClassRecord: classDefinition(roster.classId).nativeRecord,
       level: stats.level,
       maxLife: stats.maxLife,
       attack: stats.attack,

@@ -19,6 +19,8 @@ export const STAGE49_ENDING_ASSETS = {
   rosterBackground: "/assets/original/ending/roster-background.png",
   decoration: (record: number) =>
     `/assets/original/ending/decorations/${String(record).padStart(2, "0")}.png`,
+  classIllustration: (nativeClassRecord: number) =>
+    `/assets/original/ending/class-illustrations/${String(nativeClassRecord).padStart(2, "0")}.png`,
   epilogue: (record: number) =>
     `/assets/original/ending/epilogue/${String(record).padStart(2, "0")}.png`,
   audio: {

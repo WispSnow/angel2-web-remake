@@ -43,6 +43,7 @@ describe("stage 49 main ending", () => {
     expect(session.rosterCard).toMatchObject({
       actor: { slot: 0, portraitRecord: 46, name: "妮雅" },
       className: "士兵",
+      nativeClassRecord: 0,
       record: 0,
     });
     for (let index = 1; index < 22; index += 1) session.advance();

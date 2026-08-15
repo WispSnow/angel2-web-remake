@@ -1,6 +1,12 @@
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import { STAGE49_ENDING_ASSETS } from "./content/stage49-ending";
 import type { GameController } from "./controller";
+import {
+  animatedPortraitMarkup,
+  nativeMouthFrameAfterGlyph,
+  nativeStoryGlyphMovesMouth,
+  startPortraitAnimations,
+} from "./portrait";
 import { configureGameScaling } from "./scaling";
 import type { DialoguePage } from "./types";
 
@@ -19,8 +25,14 @@ function dialogueWindow(
     || line.portrait === undefined
     || line.speaker === undefined
     || line.text === undefined) return "";
-  return `<section class="stage49-dialogue-window is-${slot} ${active ? "is-active" : ""}">
-    <img src="${portraitSourceFor(line.portrait)}" alt="${escapeHtml(line.speaker)}肖像">
+  return `<section class="stage49-dialogue-window is-${slot} ${active ? "is-active" : ""}"
+      data-stage49-dialogue-slot="${slot}">
+    ${animatedPortraitMarkup(line.portrait, {
+      alt: `${escapeHtml(line.speaker)}肖像`,
+      channel: `stage49-story-${slot}`,
+      className: "stage49-dialogue-portrait",
+      wrapperTestId: `stage49-story-portrait-${slot}`,
+    })}
     <strong>${escapeHtml(line.speaker)}</strong>
     <p>${escapeHtml(line.text)}</p>
   </section>`;
@@ -42,25 +54,28 @@ function rosterMarkup(controller: GameController): string {
   const session = controller.stage49Ending;
   const card = session?.rosterCard;
   if (!card || !session) return "";
-  return `<div class="stage49-roster" data-testid="stage49-roster">
+  return `<div class="stage49-roster" data-testid="stage49-roster"
+      aria-label="戰後記錄 ${session.index + 1}／22">
     <div class="stage49-roster-stripe" aria-hidden="true"></div>
-    <img class="stage49-decoration" src="${STAGE49_ENDING_ASSETS.decoration(card.actor.decorationRecord)}" alt="">
-    <img class="stage49-roster-portrait" src="${portraitSourceFor(card.actor.portraitRecord)}" alt="${escapeHtml(card.actor.name)}肖像">
-    <section class="stage49-roster-copy">
-      <span>戰後記錄 ${session.index + 1}／22</span>
-      <h2>${escapeHtml(card.actor.name)}</h2>
-      <dl>
-        <div><dt>兵種</dt><dd>${escapeHtml(card.className)}</dd></div>
-        <div><dt>等級</dt><dd>${card.level}</dd></div>
-        <div><dt>生命</dt><dd>${card.maxLife}</dd></div>
-        <div><dt>攻擊</dt><dd>${card.attack}</dd></div>
-        <div><dt>防禦</dt><dd>${card.defense}</dd></div>
+    <img class="stage49-decoration" data-testid="stage49-roster-decoration"
+      src="${STAGE49_ENDING_ASSETS.decoration(card.actor.decorationRecord)}" alt="">
+    <img class="stage49-roster-portrait" data-testid="stage49-roster-portrait"
+      src="${portraitSourceFor(card.actor.portraitRecord)}" alt="${escapeHtml(card.actor.name)}肖像">
+    <img class="stage49-roster-class-illustration" data-testid="stage49-roster-class-illustration"
+      src="${STAGE49_ENDING_ASSETS.classIllustration(card.nativeClassRecord)}"
+      alt="${escapeHtml(card.className)}全景戰鬥圖形">
+    <dl class="stage49-roster-fields">
+      <div class="is-name"><dt>姓名：</dt><dd>${escapeHtml(card.actor.name)}</dd></div>
+      <div class="is-class"><dt>兵種：</dt><dd>${escapeHtml(card.className)}</dd></div>
+      <div class="is-level"><dt>等級：</dt><dd>${card.level}</dd></div>
+      <div class="is-life"><dt>生命：</dt><dd>${card.maxLife}</dd></div>
+      <div class="is-attack"><dt>攻擊：</dt><dd>${card.attack}</dd></div>
+      <div class="is-defense"><dt>防禦：</dt><dd>${card.defense}</dd></div>
         <!-- Native label is 戰績：00000 人; keep the five-digit pad and unit. -->
-        <div class="is-record"><dt>戰績</dt><dd data-testid="stage49-record">${
+      <div class="is-record"><dt>戰績：</dt><dd data-testid="stage49-record">${
           String(Math.min(card.record, 99_999)).padStart(5, "0")
         } 人</dd></div>
-      </dl>
-    </section>
+    </dl>
   </div>`;
 }
 
@@ -104,9 +119,87 @@ export function mountStage49EndingUi(
   const screen = root.querySelector<HTMLButtonElement>("#stage49-screen");
   if (!viewport || !screen) throw new Error("stage 49 ending surface not found");
   const destroyScaling = configureGameScaling(viewport, screen);
+  const destroyPortraitAnimations = startPortraitAnimations(root, controller.isTestMode);
   let timer: number | undefined;
+  let storyTimer: number | undefined;
+  let storyText: HTMLElement | undefined;
+  let storyPortrait: HTMLElement | undefined;
+  let storyFullText = "";
+  let storyRevealedCharacters = 0;
+
+  const stopSpeaking = (portrait: HTMLElement | undefined) => {
+    if (!portrait) return;
+    portrait.dataset.speaking = "false";
+    portrait.dataset.mouthFrame = "1";
+  };
+  const stopStoryTimer = () => {
+    if (storyTimer !== undefined) window.clearTimeout(storyTimer);
+    storyTimer = undefined;
+  };
+  const finishStoryTyping = (): boolean => {
+    if (!storyText || storyRevealedCharacters >= storyFullText.length) return false;
+    stopStoryTimer();
+    storyRevealedCharacters = storyFullText.length;
+    storyText.textContent = storyFullText;
+    stopSpeaking(storyPortrait);
+    screen.dataset.storyTyping = "false";
+    return true;
+  };
+  const startStoryTyping = () => {
+    const session = controller.stage49Ending;
+    const page: DialoguePage | undefined = session?.storyPage;
+    if (!session || session.section !== "story" || !page) return;
+    const slot = page.activeSlot;
+    if (!slot) {
+      screen.dataset.storyTyping = "false";
+      return;
+    }
+    const line = page[slot];
+    if (!line?.text) {
+      screen.dataset.storyTyping = "false";
+      return;
+    }
+    storyText = screen.querySelector<HTMLElement>(`[data-stage49-dialogue-slot="${slot}"] p`) ?? undefined;
+    storyPortrait = screen.querySelector<HTMLElement>(`[data-testid="stage49-story-portrait-${slot}"]`) ?? undefined;
+    if (!storyText) return;
+    storyFullText = line.text;
+    storyRevealedCharacters = Math.max(0, Math.min(storyFullText.length, page.revealStart ?? 0));
+    storyText.textContent = storyFullText.slice(0, storyRevealedCharacters);
+    const speaking = storyRevealedCharacters < storyFullText.length;
+    if (storyPortrait) storyPortrait.dataset.speaking = String(speaking);
+    screen.dataset.storyTyping = String(speaking);
+    const tick = () => {
+      if (!storyText || storyRevealedCharacters >= storyFullText.length) {
+        stopSpeaking(storyPortrait);
+        screen.dataset.storyTyping = "false";
+        storyTimer = undefined;
+        return;
+      }
+      const character = storyFullText[storyRevealedCharacters];
+      storyRevealedCharacters += 1;
+      storyText.textContent = storyFullText.slice(0, storyRevealedCharacters);
+      if (storyPortrait && nativeStoryGlyphMovesMouth(character)) {
+        storyPortrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(
+          storyPortrait.dataset.mouthFrame,
+          character,
+        );
+        storyPortrait.dataset.talkCount = String(Number(storyPortrait.dataset.talkCount ?? "0") + 1);
+      }
+      storyTimer = window.setTimeout(
+        tick,
+        controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80,
+      );
+    };
+    tick();
+  };
   const render = () => {
     if (timer !== undefined) window.clearTimeout(timer);
+    stopStoryTimer();
+    stopSpeaking(storyPortrait);
+    storyText = undefined;
+    storyPortrait = undefined;
+    storyFullText = "";
+    storyRevealedCharacters = 0;
     const session = controller.stage49Ending;
     if (!session) return;
     screen.disabled = session.section === "stage38-boundary";
@@ -117,6 +210,8 @@ export function mountStage49EndingUi(
         : session.section === "epilogue"
           ? epilogueMarkup(controller)
           : boundaryMarkup();
+    screen.dataset.storyTyping = "false";
+    if (session.section === "story") startStoryTyping();
     const delay = session.autoAdvanceMilliseconds;
     if (delay !== undefined && session.section !== "stage38-boundary") {
       timer = window.setTimeout(
@@ -125,7 +220,10 @@ export function mountStage49EndingUi(
       );
     }
   };
-  const advance = () => controller.advanceStage49Ending();
+  const advance = () => {
+    if (finishStoryTyping()) return;
+    controller.advanceStage49Ending();
+  };
   const keydown = (event: KeyboardEvent) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -138,7 +236,10 @@ export function mountStage49EndingUi(
   screen.focus({ preventScroll: true });
   return () => {
     if (timer !== undefined) window.clearTimeout(timer);
+    stopStoryTimer();
+    stopSpeaking(storyPortrait);
     unsubscribe();
+    destroyPortraitAnimations();
     destroyScaling();
     window.removeEventListener("keydown", keydown);
   };

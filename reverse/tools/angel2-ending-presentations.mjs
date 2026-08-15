@@ -15,6 +15,7 @@ const VERIFIED_RANGES = [
   { module: 33, address: "0000:02FA", start: 0x2fa, end: 0x3c8, role: "import class, experience, options, and record counters from parent", sha256: "c4c8ca5ba60a3b20bb33423ef02550a9d9fc86376edabd9f4e1ee6d078382e74" },
   { module: 33, address: "0000:042C", start: 0x42c, end: 0x50a, role: "load 35 DATA rows and run roster cards with advance/wait loop", sha256: "07a4c34f4481e64d68a759d43712b336a4301fb2cad16693106672c5f6e92c79" },
   { module: 33, address: "0000:0526", start: 0x526, end: 0x6c2, role: "draw one roster status card or terminate on portrait FF", sha256: "a43a2b3d864c156c288fee79c84a6b229b74290feb7201de8f39e1da9f48fa5c" },
+  { module: 33, address: "0000:06C2", start: 0x6c2, end: 0x84a, role: "scroll the composed card into view, draw M_00 current-class frame 0, and render status labels", sha256: "72fa3c61bb2f6f76632d2d5f67c56222931391c2ef8655321be783462d1535b1" },
   { module: 33, address: "0000:084A", start: 0x84a, end: 0x8d6, role: "select roster unit, state, name/portrait, and record counter", sha256: "a7e32b9baef53102c4bd3be253ec14a8872c7a151c1b70d36ec0cba9d1e193a7" },
   { module: 33, address: "0000:09A7", start: 0x9a7, end: 0xa13, role: "derive class row, level, and displayed stats", sha256: "78cc492b973331f8ef16353b938f29b16287de3a9f97fc19b0c02ebfc2396df5" },
   { module: 33, address: "0000:0F34", start: 0xf34, end: 0xf4f, role: "native tick wait", sha256: "9a16e79e1c60c7edefaaf3b8fd03159ce88a534a5afc04c1e413852b6bf6f9a3" },
@@ -434,7 +435,7 @@ async function extract(module29Path, module33Path, module35Path, module46Path, d
 
   const output = {
     format: "ANGEL2 native postgame roster, conditional epilogue, credits, and terminal presentation",
-    semanticVersion: 1,
+    semanticVersion: 2,
     sources: [
       { module: 29, path: module29Path, bytes: module29.length, sha256: sha256(module29) },
       { module: 33, path: module33Path, bytes: module33.length, sha256: sha256(module33) },
@@ -466,9 +467,40 @@ async function extract(module29Path, module33Path, module35Path, module46Path, d
         { label: "戰績", source: "KILL_ALL[presentation index]" },
       ],
       visuals: {
-        background: { resource: "A.SWF", record: 9 },
-        portrait: { resource: "D.SWF", record: "actor portrait byte" },
-        decorativeClassGraphic: { resource: "C.SWF", record: "PIT random below 31, with result 28 remapped to 29" },
+        background: {
+          resource: "A.SWF",
+          record: 9,
+          nativeSize: { width: 8, height: 349 },
+          composition: "repeat the 8-pixel stripe across the full 640-pixel card",
+        },
+        portrait: {
+          resource: "D.SWF",
+          record: "actor portrait byte",
+          frame: 0,
+          visiblePositionAfterScroll: { x: 16, y: 50 },
+        },
+        decorativeGraphic: {
+          resource: "C.SWF",
+          record: "PIT random below 31, with result 28 remapped to 29",
+          frame: 0,
+          visiblePositionAfterScroll: { x: 148, y: 50 },
+        },
+        classFullScreenGraphic: {
+          resource: "M_00.SWF",
+          record: "current ME_DATA class record",
+          frame: 0,
+          visiblePlacementAfterScroll: { horizontalCenter: 200, bottom: 186 },
+          note: "module 33 loads startup resource index 5 directly; this is the current class's left-side direct full-combat frame, not a decorative C record",
+        },
+        statusLabelPositions: {
+          name: { x: 32, y: 220 },
+          class: { x: 176, y: 220 },
+          level: { x: 176, y: 240 },
+          maximumLife: { x: 296, y: 220 },
+          attack: { x: 296, y: 240 },
+          defense: { x: 296, y: 260 },
+          record: { x: 476, y: 220 },
+        },
         font: { codeRecord: "UN.SWF/7", bitmapRecord: "UN.SWF/8" },
         music: { resource: "UN.SWF", record: 6 },
       },
