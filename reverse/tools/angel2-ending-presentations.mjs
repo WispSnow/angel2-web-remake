@@ -190,6 +190,57 @@ function illustrationPair(resourceIndexByVariant, variant) {
   return { resource: "UN.SWF", variantTableIndex: variant, records: [first, first + 1] };
 }
 
+/**
+ * The closing track is chosen by the record-total selector but is loaded and
+ * played at module entry, before the first of the four segments. Reading the
+ * per-variant music as "segment 4 changes the music" is wrong: all four
+ * segments already play over it. Byte evidence inside 0000:0454..0529:
+ *
+ *   0454: e8 d8 02              call 072F   ; count families, apply thresholds
+ *   0457: e8 16 00              call 0470   ; pick MUSIC/40 or UN/49
+ *   045A: ff 36 ab 00           push [00AB] ; the buffer 0470 just filled
+ *   045E: 6a 00 6a 02 6a 01     push 0, 2, 1
+ *   0464: 9a 3c 06 88 06        call far ...:063C  ; module 33 plays UN/6 with
+ *                                                  ; the same 063C entry point
+ *   046C: e8 2c 00              call 049B   ; only now run the four segments
+ *   0470: 83 3e d2 04 01        cmp word [04D2], 1 ; record-total selector
+ *   0475: 74 12                 je 0489
+ *   0477: ...  b9 28 00 bb 08 00 ; cx=40 bx=MUSIC.SWF
+ *   0489: ...  b9 31 00 bb 0d 00 ; cx=49 bx=UN.SWF
+ */
+function parseEntryMusic(module35) {
+  const dispatch = module35.subarray(0x454, 0x470).toString("hex");
+  assert(
+    dispatch.startsWith("e8d802e81600ff36ab006a006a026a019a3c068806" + "83c408" + "e82c00"),
+    "module 35 no longer selects and starts the closing music before the four segments",
+  );
+  const selectorProbe = module35.subarray(0x470, 0x477).toString("hex");
+  assert(
+    selectorProbe === "833ed2040174" + "12",
+    "module 35 entry music is no longer branched on the record-total selector",
+  );
+  // a1 ab 00 | 8e c0 | bf 00 00 | b9 <record> | bb <resourceIndex> | e8 .. .. | c3
+  const readSelection = (start) => ({
+    record: module35.readUInt16LE(start + 9),
+    resourceIndex: module35.readUInt16LE(start + 12),
+  });
+  const low = readSelection(0x477);
+  const high = readSelection(0x489);
+  assert(
+    low.record === 40 && low.resourceIndex === 0x08 && high.record === 49 && high.resourceIndex === 0x0d,
+    "module 35 entry music records changed",
+  );
+  return {
+    startedAt: "0000:0457 selects the record, 0000:045A plays it, 0000:046C then runs the four segments",
+    selector: "record-total selector at DS:04D2, the same value segment 4 uses for its text",
+    playsOverSegments: "all four",
+    variants: [
+      { selector: 0, condition: "sum(KILL_ALL[0..74]) <= 100", resource: "MUSIC.SWF", record: low.record },
+      { selector: 1, condition: "sum(KILL_ALL[0..74]) > 100", resource: "UN.SWF", record: high.record },
+    ],
+  };
+}
+
 function parseEpilogue(module35, descriptors) {
   const resourceIndexByVariant = Array.from({ length: 8 }, (_, index) => readWord(module35, 35, 0x032e + index * 2));
   assert(resourceIndexByVariant.join(",") === "4,13,0,17,19,11,2,15", "module 35 illustration variant table changed");
@@ -268,11 +319,12 @@ function parseEpilogue(module35, descriptors) {
       },
     },
     classFamilyDecision: familyDecision,
+    entryMusic: parseEntryMusic(module35),
     orderedSegments: [
       { order: 1, id: "dominantClassFamily", waitLimitNativeTicks: 0x0946, skippableByEitherAction: true, variants: primary },
       { order: 2, id: "warriorStatue", waitLimitNativeTicks: 0, skippableByEitherAction: true, variants: [fixed] },
       { order: 3, id: "saveCountOutcome", waitLimitNativeTicks: 0x08c3, skippableByEitherAction: true, variants: saveCount },
-      { order: 4, id: "recordTotalOutcome", waitLimitNativeTicks: 0x09ec, skippableByEitherAction: true, variants: recordTotal },
+      { order: 4, id: "recordTotalOutcome", waitLimitNativeTicks: 0x09ec, skippableByEitherAction: true, musicNote: "the paired music is selected by this segment's condition but started at module entry; see entryMusic, and do not implement it as a segment-4 music change", variants: recordTotal },
     ],
     illustrationVariantTable: resourceIndexByVariant.map((record, variantTableIndex) => ({ variantTableIndex, records: [record, record + 1] })),
     exit: { nextModule: 27, nextStage: 38, purpose: "deploy the postgame otherworld rematch" },

@@ -82,6 +82,10 @@ const expectedDeployment = {
 };
 assertEqual(template.deployment.eligibleUnitSlots, expectedDeployment.eligibleSlots, "stage 9 eligible slots");
 assertEqual(template.deployment.fixedPlayerUnitSlots, expectedDeployment.fixedSlots, "stage 9 fixed slots");
+// Both side-1 board occupants carry a nonzero scenarioUnitFlag, so stage 9 has no
+// board-only unit and every fixed slot is also a locked roster entry.
+assertEqual(template.deployment.fixedRosterUnitSlots, expectedDeployment.fixedSlots, "stage 9 fixed roster slots");
+assertEqual(template.deployment.fixedBoardOnlyUnitSlots, [], "stage 9 fixed board-only slots");
 assertEqual(template.deployment.optionalUnitSlots, expectedDeployment.optionalSlots, "stage 9 optional slots");
 assertEqual(template.deployment.cells.map(({ x, y }) => ({ x, y })), expectedDeployment.openCells, "stage 9 cells");
 assertEqual(stageLifecycle, {
@@ -91,11 +95,15 @@ assertEqual(stageLifecycle, {
   openCells: 7,
   eligibleUnits: 14,
   fixedUnits: 2,
+  fixedRosterUnits: 2,
+  fixedBoardOnlyUnits: 0,
   optionalUnits: 12,
   maximumPlayerUnits: 9,
   cells: template.deployment.cells,
   eligibleUnitSlots: expectedDeployment.eligibleSlots,
   fixedPlayerUnitSlots: expectedDeployment.fixedSlots,
+  fixedRosterUnitSlots: expectedDeployment.fixedSlots,
+  fixedBoardOnlyUnitSlots: [],
   optionalUnitSlots: expectedDeployment.optionalSlots,
 }, "stage 9 lifecycle");
 

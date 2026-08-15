@@ -247,9 +247,14 @@ describe("stage 37 battle simulation", () => {
       rngState: battleCampaign.rngState,
       rngCalls: battleCampaign.rngCalls,
       roster: battleCampaign.roster,
+      recordCounters: [...(battleCampaign.recordCounters ?? Array<number>(75).fill(0))],
       stageProgress: 0,
       consumedEventIds: ["stage-37-enter-deployment", "stage-37-opening-story"],
-      stageEntrySnapshot: { ...campaign, roster: battleCampaign.roster },
+      stageEntrySnapshot: {
+        ...campaign,
+        roster: battleCampaign.roster,
+        recordCounters: [...(battleCampaign.recordCounters ?? Array<number>(75).fill(0))],
+      },
       battle: {
         phase: "player",
         ...battle.serializableSnapshot(),
@@ -304,6 +309,42 @@ describe("stage 37 battle simulation", () => {
     expect(migrated?.kind === "battle"
       ? migrated.battle.units.filter(({ side }) => side === 2).map(({ portrait }) => portrait)
       : []).toEqual([8, 8, 8]);
+
+    // The boss life ceiling comes from the save manifest's per-difficulty table, so
+    // the highest difficulty must accept 15000 and still reject one point above it.
+    const hardBattle = new Stage37Battle({ ...campaign, difficulty: 3 }, fullDeployment);
+    const hardCampaign = hardBattle.campaignSnapshot();
+    const hardSave = {
+      ...save,
+      difficulty: 3,
+      rngState: hardCampaign.rngState,
+      rngCalls: hardCampaign.rngCalls,
+      roster: hardCampaign.roster,
+      recordCounters: [...(hardCampaign.recordCounters ?? Array<number>(75).fill(0))],
+      stageEntrySnapshot: {
+        ...save.stageEntrySnapshot,
+        difficulty: 3,
+        roster: hardCampaign.roster,
+        recordCounters: [...(hardCampaign.recordCounters ?? Array<number>(75).fill(0))],
+      },
+      battle: {
+        phase: "player",
+        ...hardBattle.serializableSnapshot(),
+        cursor: { x: 23, y: 17 },
+        cameraOrigin: { x: 19, y: 11 },
+      },
+    } as const;
+    expect(hardSave.battle.units.find(({ id }) => id === "2:56")?.life).toBe(15_000);
+    expect(isSaveData(hardSave)).toBe(true);
+    expect(isSaveData({
+      ...hardSave,
+      battle: {
+        ...hardSave.battle,
+        units: hardSave.battle.units.map((unit) => unit.id === "2:56"
+          ? { ...unit, life: 15_001 }
+          : unit),
+      },
+    })).toBe(false);
   });
 
   it("migrates the legal v70 stage-37 boundary but rejects unshipped battles and stage-49 saves", () => {

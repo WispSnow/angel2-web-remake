@@ -11,8 +11,10 @@ import type {
   BattleUnit,
   CampaignState,
   GamePhase,
+  PortraitRecord,
   Position,
   SavedBattleState,
+  Side,
   StageId,
   UnitClassId,
 } from "./types";
@@ -74,6 +76,27 @@ export type StageSaveAlliedUnitRule =
   }
   | { kind: "exact-slots"; slots: readonly number[] };
 
+export type StageSaveNamedUnitMatch =
+  | { kind: "unit"; unitId: string; side: Side; slot: number }
+  /** Matches a water-warrior root and every split copy sharing that root identity. */
+  | { kind: "unit-group"; rootUnitId: string }
+  | { kind: "enemy-classes"; classIds: readonly UnitClassId[] };
+
+/**
+ * Units whose saved display identity or life ceiling departs from the shared class
+ * defaults — story-named allies, named enemies keeping a class portrait, and boss
+ * parts with a scripted life pool. The current save validator reads these rules
+ * instead of branching on stage ids, so adding such a unit stays a manifest edit.
+ */
+export interface StageSaveNamedUnitRule {
+  match: StageSaveNamedUnitMatch;
+  displayIdentity?: "named-class-portrait";
+  name?: string;
+  /** "class-fallback" resolves to the unit's own class portrait for its side. */
+  portrait?: PortraitRecord | "class-fallback";
+  maximumLifeByDifficulty?: readonly number[];
+}
+
 export interface StageSaveSchema {
   validEventIds: readonly string[];
   requiredResumeEventIds?: readonly string[];
@@ -84,6 +107,12 @@ export interface StageSaveSchema {
     classIdsByDifficulty: readonly (readonly UnitClassId[])[];
     experience: number;
   }[];
+  namedUnits?: readonly StageSaveNamedUnitRule[];
+  /**
+   * Extra saved battle state a boss stage persists. The payload key itself stays
+   * `stage37Boss` because renaming it would invalidate every existing save.
+   */
+  bossActionState?: "head-hand-toggles";
   enemyAi: "none" | "stage-01-castle-guard";
 }
 
@@ -3712,6 +3741,13 @@ export const STAGE_RUNTIME_MANIFEST = {
         ["2:45", "magic-archer"],
         ["2:49", "magic-archer"],
       ],
+      namedUnits: [{
+        // 愛莉歐拉 joins as a named ally who keeps her class portrait.
+        match: { kind: "unit", unitId: "1:22", side: 1, slot: 22 },
+        displayIdentity: "named-class-portrait",
+        name: "愛莉歐拉",
+        portrait: "class-fallback",
+      }],
       enemyAi: "none",
     },
     load: loadStage29Module,
@@ -3764,6 +3800,12 @@ export const STAGE_RUNTIME_MANIFEST = {
           ["soldier", "magic-sword-warrior", "jungle-warrior", "magic-priest", "prayer-guide", "curse-master", "magician", "great-axe-warrior", "half-dragon-warrior", "magic-armor-warrior", "magic-guide", "evil-mage", "magic-archer", "land-knight", "demon-dragon-knight", "flying-dragon-knight", "beast-knight", "bone-knight", "swift-dragon-knight", "great-dragon-knight", "archer", "crossbow", "cavalry", "pegasus-warrior", "sister", "monk", "water-warrior", "divine-sword-warrior", "warrior", "steel-armor-warrior", "priest", "wizard"],
         ],
         experience: 0,
+      }],
+      namedUnits: [{
+        // The possessed 維絲塔 keeps her own name and portrait through every form.
+        match: { kind: "unit-group", rootUnitId: "2:27" },
+        name: "維絲塔",
+        portrait: 41,
       }],
       enemyAi: "none",
     },
@@ -4229,6 +4271,14 @@ export const STAGE_RUNTIME_MANIFEST = {
         ["2:54", "hand"],
         ["2:55", "hand"],
       ],
+      namedUnits: [{
+        // The goddess parts share one boss portrait and a scripted life pool that
+        // ignores the class stat table.
+        match: { kind: "enemy-classes", classIds: ["head", "hand"] },
+        portrait: 8,
+        maximumLifeByDifficulty: [10_000, 10_000, 10_000, 15_000],
+      }],
+      bossActionState: "head-hand-toggles",
       enemyAi: "none",
     },
     load: loadStage37Module,
@@ -4238,6 +4288,30 @@ export const STAGE_RUNTIME_MANIFEST = {
 const loadedRuntimes = new Map<StageId, LoadedStageRuntime>();
 const runtimePromises = new Map<StageId, Promise<LoadedStageRuntime>>();
 
+/**
+ * Per-stage battle constructors only accept difficulty, roster, and RNG, so a
+ * freshly built battle always starts from zeroed native record counters. Every
+ * caller that rebuilds a battle mid-campaign — stage entry, deployment confirm,
+ * retreat, and save restore — must therefore reapply the campaign's counters,
+ * and doing it here keeps that invariant at one choke point instead of leaving
+ * each call site to remember it.
+ */
+function withCampaignRecordCounters(runtime: StageRuntimeModule): StageRuntimeModule {
+  return {
+    ...runtime,
+    createBattle: (campaign, preparation, rng) => {
+      const battle = runtime.createBattle(campaign, preparation, rng);
+      battle.setCampaignRecordCounters(campaign.recordCounters);
+      return battle;
+    },
+    restoreBattle: (campaign, snapshot) => {
+      const battle = runtime.restoreBattle(campaign, snapshot);
+      battle.setCampaignRecordCounters(campaign.recordCounters);
+      return battle;
+    },
+  };
+}
+
 function combineRuntime(
   entry: StageRuntimeManifestEntry,
   runtime: StageRuntimeModule,
@@ -4246,7 +4320,7 @@ function combineRuntime(
     throw new Error(`stage runtime ${entry.id} loaded definition ${runtime.definition.id}`);
   }
   const { load: _load, ...metadata } = entry;
-  return { ...metadata, ...runtime };
+  return { ...metadata, ...withCampaignRecordCounters(runtime) };
 }
 
 export async function loadStageRuntime(stageId: StageId): Promise<LoadedStageRuntime> {

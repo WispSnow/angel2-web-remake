@@ -562,6 +562,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     else if (action === "overwrite-confirm") controller.confirmOverwrite();
     else if (action === "overwrite-cancel") controller.cancelOverwrite();
+    else if (action === "start-stage49-ending") controller.beginStage49Ending();
   }, { signal: eventController.signal });
 
   root.addEventListener("wheel", (event) => {
@@ -1810,6 +1811,10 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
     const progress = controller.currentStageProgressMetadata;
     const destinationOrdinal = progress.completedOrdinal + 1;
     const stageCode = String(destinationOrdinal).padStart(2, "0");
+    if (progress.destinationId === "stage-49") {
+      layer.innerHTML = `<div class="modal-panel result-card next-card" data-testid="stage49-ending-ready"><span class="panel-kicker">MAIN ENDING</span><h2>第 ${progress.completedOrdinal} 關已完成</h2><p>主線結局已接入：戰後道別、戰績回顧與條件尾聲將依序播放。</p><button type="button" class="primary-cta" data-action="start-stage49-ending" data-testid="start-stage49-ending">觀看主線結局</button><div class="completion-seal">究極女神 完成</div></div>`;
+      return;
+    }
     layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE ${stageCode}</span><h2>第 ${progress.completedOrdinal} 關已完成</h2><p>戰役進度已寫入「${progress.destinationLabel}」（${progress.destinationId}）入口；該關仍在設計凍結範圍內，尚未接入可玩流程。</p><div class="completion-seal">第 ${progress.completedOrdinal} 關完成</div></div>`;
   }
 }

@@ -83,7 +83,8 @@ export type CampaignRouteId =
   | "stage-35"
   | "stage-36"
   | "stage-37"
-  | "stage-49";
+  | "stage-49"
+  | "stage-38";
 
 export interface Position {
   x: number;
@@ -145,6 +146,7 @@ export type GamePhase =
   | "savePrompt"
   | "saveSlots"
   | "quit"
+  | "ending"
   | "nextStage";
 
 export type ActionMode =
@@ -245,8 +247,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 72;
-  contentVersion: "stage-37-ice-last-portrait-1";
+  version: 73;
+  contentVersion: "stage-49-ending-records-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
@@ -254,6 +256,8 @@ interface SaveDataBase {
   rngState: number;
   rngCalls: number;
   roster: SaveRosterEntry[];
+  /** Native KILL_ALL presentation counters, indexed by campaign slot. */
+  recordCounters: number[];
   stageProgress: 0 | 999 | 1000;
   consumedEventIds: string[];
 }
@@ -279,6 +283,8 @@ export interface CampaignState {
   ruleset: "stableRemake";
   difficulty: Difficulty;
   roster: SaveRosterEntry[];
+  /** Optional only for internal fixtures created before the stage-49 contract. */
+  recordCounters?: number[];
   rngState: number;
   rngCalls: number;
 }

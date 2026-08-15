@@ -44,6 +44,7 @@ const completedStage3Save = (): CompletedSaveData => ({
   roster: completeCampaignRoster([
     { slot: 0, classId: "swift-dragon-knight", experience: 321, life: 287 },
   ]),
+  recordCounters: Array<number>(75).fill(0),
   stageProgress: 1000,
   consumedEventIds: [
     "stage-03-opening-story",

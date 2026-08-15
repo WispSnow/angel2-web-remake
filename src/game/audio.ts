@@ -17,6 +17,10 @@ import {
   type SoundEffectChannel,
 } from "./audio-settings";
 import type { GamePhase } from "./types";
+import {
+  STAGE49_ENDING_MUSIC,
+  STAGE49_EPILOGUE_MUSIC_BY_SELECTOR,
+} from "./content/stage49-ending";
 
 type BattleMusicSide = "player" | "enemy";
 
@@ -132,7 +136,19 @@ export class AudioManager {
     const previousSide = this.previousBattleMusicSide;
     let desired = this.selectedMusic;
     let restart = false;
-    if (this.controller.phase === "prebattleStory") {
+    if (this.controller.phase === "ending") {
+      const ending = this.controller.stage49Ending;
+      if (ending?.section === "story") desired = STAGE49_ENDING_MUSIC.story;
+      else if (ending?.section === "roster") desired = STAGE49_ENDING_MUSIC.roster;
+      // Native module 35 selects and starts the record-total branch track at
+      // entry (0000:0457/045A) before running the four segments, so it plays
+      // over the whole epilogue instead of arriving with segment 4.
+      else if (ending?.section === "epilogue") {
+        desired = STAGE49_EPILOGUE_MUSIC_BY_SELECTOR[ending.epilogueMusicSelector];
+      }
+      else if (ending?.section === "stage38-boundary") desired = undefined;
+    }
+    else if (this.controller.phase === "prebattleStory") {
       desired = musicProgramFor(this.controller.battle.stage.music.story);
     }
     else if (side && (side !== previousSide || !desired)) {

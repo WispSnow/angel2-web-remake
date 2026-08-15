@@ -77,11 +77,17 @@ assertEqual(stageLifecycle, {
   openCells: 0,
   eligibleUnits: 0,
   fixedUnits: 9,
+  // No scenarioUnitFlag is nonzero, so every side-1 board occupant stays board-only
+  // and stage 11 publishes no roster entry at all.
+  fixedRosterUnits: 0,
+  fixedBoardOnlyUnits: 9,
   optionalUnits: 0,
   maximumPlayerUnits: 9,
   cells: [],
   eligibleUnitSlots: [],
   fixedPlayerUnitSlots: [9, 18, 17, 19, 16, 42, 8, 41, 40],
+  fixedRosterUnitSlots: [],
+  fixedBoardOnlyUnitSlots: [9, 18, 17, 19, 16, 42, 8, 41, 40],
   optionalUnitSlots: [],
 }, "stage 11 lifecycle");
 

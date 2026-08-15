@@ -1935,7 +1935,7 @@ export const DEBUG_SCENARIOS = [
     stageId: "stage-37",
     title: "三部位已敗",
     phase: "Victory",
-    description: "究極女神三部位已全部離場，驗證普通回饋、保存與內部 stage 49 結局邊界。",
+    description: "究極女神三部位已全部離場，驗證普通回饋、v73 保存與內部 stage 49 主線結局入口。",
     fixture: true,
   },
   {
@@ -1943,7 +1943,7 @@ export const DEBUG_SCENARIOS = [
     stageId: "stage-37",
     title: "完成路由",
     phase: "Route to stage 49",
-    description: "視為究極女神決戰已完成，顯示主線結局鏈凍結邊界。",
+    description: "視為究極女神決戰已完成，可直接播放主線結局至隱藏第 38 關邊界。",
     fixture: true,
   },
 ] as const satisfies readonly DebugScenarioDefinition[];

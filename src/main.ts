@@ -1,9 +1,11 @@
 import "./styles.css";
+import "./stage49-ending.css";
 import { GameController, exposeDebugApi } from "./game/controller";
 import { startPhaser } from "./game/phaser/BattleScene";
 import { mountUi } from "./game/ui";
 import { AudioManager } from "./game/audio";
 import { mountStartup, type StartupSelection } from "./game/startup";
+import { mountStage49EndingUi } from "./game/stage49-ending-ui";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
@@ -77,13 +79,19 @@ const mountController = (controller: GameController, userActivated: boolean) => 
   };
 
   const syncSurface = () => {
-    const nextKey = controller.phase === "deployment"
+    const nextKey = controller.phase === "ending"
+      ? "ending:stage49"
+      : controller.phase === "deployment"
       ? `deployment:${controller.battle.stage.id}`
       : `battle:${controller.battle.stage.id}`;
     if (nextKey === surfaceKey) return;
     destroySurface();
     const generation = ++surfaceGeneration;
     surfaceKey = nextKey;
+    if (controller.phase === "ending") {
+      destroySurface = mountStage49EndingUi(root, controller);
+      return;
+    }
     if (controller.phase === "deployment") {
       destroySurface = () => undefined;
       void mountDeploymentSurface().then((destroy) => {

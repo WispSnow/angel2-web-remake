@@ -96,6 +96,7 @@ const completedSave = (): CompletedSaveData => ({
   roster: completeCampaignRoster([
     { slot: 0, classId: "soldier", experience: 319, life: 170 },
   ]),
+  recordCounters: Array<number>(75).fill(0),
   stageProgress: 0,
   consumedEventIds: [],
 });
@@ -118,7 +119,9 @@ const battleSave = (): BattleSaveData => {
     rngState: 0x1020_3040,
     rngCalls: 0,
     roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       stageId: "stage-00",
       ruleset: "stableRemake",
       difficulty: 2,
@@ -211,7 +214,9 @@ const stage1BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       stageId: "stage-01",
       ruleset: "stableRemake",
       difficulty: campaign.difficulty,
@@ -262,7 +267,9 @@ const stage2BattleSave = (): BattleSaveData => {
     rngState: snapshot.rngState,
     rngCalls: snapshot.rngCalls,
     roster: snapshot.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       ...campaign,
       roster: campaign.roster.map((entry) => ({ ...entry })),
     },
@@ -307,7 +314,9 @@ const stage3BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       ...campaign,
       stageId: "stage-03",
       roster: campaign.roster.map((entry) => ({ ...entry })),
@@ -366,7 +375,9 @@ const stage4BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       ...source,
       roster: source.roster.map((entry) => ({ ...entry })),
     },
@@ -424,7 +435,9 @@ const stage6BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       ...source,
       roster: source.roster.map((entry) => ({ ...entry })),
     },
@@ -482,7 +495,9 @@ const stage7BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       ...source,
       roster: source.roster.map((entry) => ({ ...entry })),
     },
@@ -529,7 +544,9 @@ const stage8BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       ...source,
       roster: source.roster.map((entry) => ({ ...entry })),
     },
@@ -580,7 +597,9 @@ const stage9BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       ...source,
       roster: source.roster.map((entry) => ({ ...entry })),
     },
@@ -629,7 +648,9 @@ const stage11BattleSave = (reinforcementCount = 1): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
+    recordCounters: Array<number>(75).fill(0),
     stageEntrySnapshot: {
+      recordCounters: Array<number>(75).fill(0),
       ...source,
       roster: source.roster.map((entry) => ({ ...entry })),
     },
@@ -685,7 +706,8 @@ const stage10BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-10-prebattle-story", "stage-10-enter-deployment"],
     battle: {
@@ -745,7 +767,8 @@ const stage12BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-12-prebattle-story",
@@ -804,7 +827,8 @@ const stage14BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-14-enter-deployment", "stage-14-opening-story"],
     battle: {
@@ -859,7 +883,8 @@ const stage15BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-15-enter-deployment", "stage-15-opening-story"],
     battle: {
@@ -914,7 +939,8 @@ const stage16BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-16-enter-deployment", "stage-16-opening-story"],
     battle: {
@@ -969,7 +995,8 @@ const stage17BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-17-enter-deployment", "stage-17-opening-story"],
     battle: {
@@ -1024,7 +1051,8 @@ const stage18BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-18-enter-deployment", "stage-18-opening-story"],
     battle: {
@@ -1079,7 +1107,8 @@ const stage19BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-19-enter-deployment", "stage-19-opening-story"],
     battle: {
@@ -1138,7 +1167,8 @@ const stage22BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-22-enter-deployment",
@@ -1207,7 +1237,8 @@ const stage23BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-23-enter-deployment",
@@ -1263,7 +1294,8 @@ const stage24BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-24-enter-deployment",
@@ -1313,7 +1345,8 @@ const stage26BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-26-enter-deployment",
@@ -1362,7 +1395,8 @@ const stage27BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-27-enter-deployment",
@@ -1418,7 +1452,8 @@ const stage28BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-28-prebattle-story",
@@ -1475,7 +1510,8 @@ const stage29BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-29-prebattle-story",
@@ -1527,7 +1563,8 @@ const stage30BattleSave = (difficulty: Difficulty = 0): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-30-prebattle-story",
@@ -1584,7 +1621,8 @@ const stage31BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-31-prebattle-story",
@@ -1641,7 +1679,8 @@ const stage32BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-32-enter-deployment",
@@ -1697,7 +1736,8 @@ const stage33BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-33-enter-deployment",
@@ -1754,7 +1794,8 @@ const stage34BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-34-enter-deployment",
@@ -1802,7 +1843,8 @@ const stage35BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: ["stage-35-opening-story"],
     battle: {
@@ -1856,7 +1898,8 @@ const stage36BattleSave = (): BattleSaveData => {
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: campaign.roster,
-    stageEntrySnapshot: { ...source, roster: source.roster.map((entry) => ({ ...entry })) },
+    recordCounters: Array<number>(75).fill(0),
+    stageEntrySnapshot: { ...source, recordCounters: Array<number>(75).fill(0), roster: source.roster.map((entry) => ({ ...entry })) },
     stageProgress: 0,
     consumedEventIds: [
       "stage-36-enter-deployment",
@@ -1927,6 +1970,17 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v72 saves to a zeroed native record-counter baseline", () => {
+    const current = completedSave();
+    const { recordCounters: _currentCounters, ...legacy } = current;
+    const migrated = parseSaveData(JSON.stringify({
+      ...legacy,
+      version: 72,
+      contentVersion: "stage-37-ice-last-portrait-1",
+    }));
+    expect(migrated).toEqual(current);
+  });
+
   it("migrates v46 saves through the traversable-path expert AI identity", () => {
     for (const current of [battleSave(), completedSave()]) {
       const legacy = {
@@ -4653,6 +4707,7 @@ describe("Web save validation", () => {
       rngState: completedStage1.rngState,
       rngCalls: completedStage1.rngCalls,
       roster: completedStage1.roster,
+      recordCounters: [...completedStage1.recordCounters],
       stageProgress: 1000,
       consumedEventIds: STAGE1_DEFINITION.events.map(({ id }) => id),
     };

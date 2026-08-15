@@ -258,7 +258,7 @@ test("S36-G: Nia defeat retries directly from deployment", async ({ page }) => {
   });
 });
 
-test("S36-H/I: ordinary victory saves v72 and enters the playable stage-37 deployment", async ({ page }) => {
+test("S36-H/I: ordinary victory saves v73 and enters the playable stage-37 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-36-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();

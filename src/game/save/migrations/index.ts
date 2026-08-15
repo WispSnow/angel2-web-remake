@@ -127,6 +127,24 @@ function addEmptyTerrainOverrides(value: unknown): unknown {
   };
 }
 
+/**
+ * Saves before v73 did not preserve the native KILL_ALL presentation counters.
+ * Their historic values cannot be reconstructed, so migration adopts a zeroed
+ * baseline while all future ordinary attacks are tracked deterministically.
+ */
+function addEmptyRecordCounters(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  const recordCounters = Array<number>(MAX_UNIT_SLOT + 1).fill(0);
+  const stageEntrySnapshot = isRecord(value.stageEntrySnapshot)
+    ? { ...value.stageEntrySnapshot, recordCounters: [...recordCounters] }
+    : value.stageEntrySnapshot;
+  return {
+    ...value,
+    recordCounters,
+    ...(stageEntrySnapshot === undefined ? {} : { stageEntrySnapshot }),
+  };
+}
+
 function normalizeStage22PostbattleTransition(value: unknown): unknown {
   if (!isRecord(value)
     || !Array.isArray(value.consumedEventIds)
@@ -290,7 +308,9 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   if (isRecord(value)
     && (value.stageId === "stage-49"
       || (value.kind === "battle" && value.stageId === "stage-37"))) return undefined;
-  const normalized = normalizeStage22PostbattleTransition(addEmptyTerrainOverrides(value));
+  const normalized = normalizeStage22PostbattleTransition(
+    addEmptyRecordCounters(addEmptyTerrainOverrides(value)),
+  );
   if (!isSaveData(normalized)) return undefined;
   const restored = restoreGadirathClassFromEntrySnapshot(normalized);
   const restoredKins = restoreKinsCampaignClass(restored);
@@ -323,6 +343,19 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
         }
       : {}),
   };
+  const withRecordCounters = addEmptyRecordCounters(migrated);
+  return isSaveData(withRecordCounters) ? withRecordCounters : undefined;
+}
+
+function migrateVersion72Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 72
+    || value.contentVersion !== "stage-37-ice-last-portrait-1") return undefined;
+  const migrated = addEmptyRecordCounters({
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  });
   return isSaveData(migrated) ? migrated : undefined;
 }
 
@@ -1100,6 +1133,7 @@ function isVersion12SaveData(value: unknown): value is Version12SaveData {
       ...value,
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
+      recordCounters: Array<number>(MAX_UNIT_SLOT + 1).fill(0),
     })
   ) return false;
   const normalized = {
@@ -1120,6 +1154,7 @@ function migrateVersion12Save(save: Version12SaveData): SaveData {
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
       stageLabel,
+      recordCounters: Array<number>(MAX_UNIT_SLOT + 1).fill(0),
     };
   }
   return {
@@ -1127,6 +1162,7 @@ function migrateVersion12Save(save: Version12SaveData): SaveData {
     version: SAVE_VERSION,
     contentVersion: SAVE_CONTENT_VERSION,
     stageLabel,
+    recordCounters: Array<number>(MAX_UNIT_SLOT + 1).fill(0),
     // v12 did not retain an earlier immutable baseline. Adopt its current
     // campaign state once; gains made after migration will then roll back.
     stageEntrySnapshot: {
@@ -1136,6 +1172,7 @@ function migrateVersion12Save(save: Version12SaveData): SaveData {
       roster: save.roster.map((entry) => ({ ...entry })),
       rngState: save.rngState,
       rngCalls: save.rngCalls,
+      recordCounters: Array<number>(MAX_UNIT_SLOT + 1).fill(0),
     },
   };
 }
@@ -2126,6 +2163,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion72 = migrateVersion72Save(value);
+    if (migratedVersion72) return migratedVersion72;
     const migratedVersion71 = migrateVersion71Save(value);
     if (migratedVersion71) return migratedVersion71;
     const migratedVersion70 = migrateVersion70Save(value);

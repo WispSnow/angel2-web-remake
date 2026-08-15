@@ -64,6 +64,14 @@ describe("stage 0 battle simulation", () => {
     });
   });
 
+  it("increments the native record counter once for an allied ordinary attack", () => {
+    const battle = battleAtPlayableOpening(42);
+    battle.setCampaignRecordCounters([7]);
+    expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    battle.attack("1:0", "2:45");
+    expect(battle.campaignSnapshot().recordCounters?.[0]).toBe(8);
+  });
+
   it("keeps simulation deterministic for equal seed and commands", () => {
     const left = battleAtPlayableOpening(42);
     const right = battleAtPlayableOpening(42);

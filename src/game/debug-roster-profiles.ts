@@ -562,6 +562,7 @@ export function campaignFromDebugSave(
     ruleset: source.ruleset,
     difficulty,
     roster: source.roster.map((entry) => ({ ...entry })),
+    recordCounters: [...(source.recordCounters ?? Array<number>(75).fill(0))],
     rngState: source.rngState,
     rngCalls: source.rngCalls,
   };
@@ -580,6 +581,7 @@ export function createDebugCampaignState(
       ruleset: "stableRemake",
       difficulty,
       roster: debugRosterForProfile(source.id, stageId, perStageGrowth),
+      recordCounters: Array<number>(75).fill(0),
       rngState: DEFAULT_DEBUG_RNG_STATE,
       rngCalls: 0,
     };

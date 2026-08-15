@@ -523,6 +523,7 @@ function battleSaveBase(
   | "difficulty"
   | "rngState"
   | "rngCalls"
+  | "recordCounters"
   | "stageEntrySnapshot"
   | "stageProgress"
 > {
@@ -538,10 +539,12 @@ function battleSaveBase(
     difficulty: campaign.difficulty,
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageEntrySnapshot: {
       ...campaign,
       stageId,
       roster: campaign.roster.map((entry) => ({ ...entry })),
+      recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     },
     stageProgress: 0,
   };
@@ -646,6 +649,7 @@ async function createStage1Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE1_COMPLETED_EVENT_IDS],
   };
@@ -684,6 +688,7 @@ async function createStage2Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE2_COMPLETED_EVENT_IDS],
   };
@@ -722,6 +727,7 @@ async function createStage3Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE3_COMPLETED_EVENT_IDS],
   };
@@ -802,6 +808,7 @@ async function createStage4Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE4_COMPLETED_EVENT_IDS],
   };
@@ -872,6 +879,7 @@ async function createStage5Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE5_COMPLETED_EVENT_IDS],
   };
@@ -894,6 +902,7 @@ async function createStage42Completed(context: DebugScenarioContext): Promise<Ga
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE42_COMPLETED_EVENT_IDS],
   };
@@ -971,6 +980,7 @@ async function createStage6Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE6_COMPLETED_EVENT_IDS],
   };
@@ -1048,6 +1058,7 @@ async function createStage7Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE7_COMPLETED_EVENT_IDS],
   };
@@ -1115,6 +1126,7 @@ async function createStage8Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE8_COMPLETED_EVENT_IDS],
   };
@@ -1192,6 +1204,7 @@ async function createStage9Completed(context: DebugScenarioContext): Promise<Gam
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE9_COMPLETED_EVENT_IDS],
   };
@@ -1246,6 +1259,7 @@ async function createStage11Completed(context: DebugScenarioContext): Promise<Ga
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE11_COMPLETED_EVENT_IDS],
   };
@@ -1323,6 +1337,7 @@ async function createStage10Completed(context: DebugScenarioContext): Promise<Ga
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE10_COMPLETED_EVENT_IDS],
   };
@@ -1440,6 +1455,7 @@ async function createStage12Completed(context: DebugScenarioContext): Promise<Ga
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE12_COMPLETED_EVENT_IDS],
   };
@@ -1523,6 +1539,7 @@ async function createStage13Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE13_COMPLETED_EVENT_IDS],
   };
@@ -1606,6 +1623,7 @@ async function createStage14Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE14_COMPLETED_EVENT_IDS],
   };
@@ -1689,6 +1707,7 @@ async function createStage15Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE15_COMPLETED_EVENT_IDS],
   };
@@ -1772,6 +1791,7 @@ async function createStage16Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE16_COMPLETED_EVENT_IDS],
   };
@@ -1855,6 +1875,7 @@ async function createStage17Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE17_COMPLETED_EVENT_IDS],
   };
@@ -1938,6 +1959,7 @@ async function createStage18Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE18_COMPLETED_EVENT_IDS],
   };
@@ -2021,6 +2043,7 @@ async function createStage19Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE19_COMPLETED_EVENT_IDS],
   };
@@ -2131,6 +2154,7 @@ async function createStage20Completed(context: DebugScenarioContext): Promise<Ga
         experience: unit.experience,
         life: unit.life,
       }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE20_COMPLETED_EVENT_IDS],
   };
@@ -2159,6 +2183,7 @@ async function createStage21Completed(context: DebugScenarioContext): Promise<Ga
     rngState: campaign.rngState,
     rngCalls: campaign.rngCalls,
     roster: completeCampaignRoster(campaign.roster),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE21_COMPLETED_EVENT_IDS],
   };
@@ -2252,6 +2277,7 @@ async function createStage22Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE22_COMPLETED_EVENT_IDS],
   };
@@ -2335,6 +2361,7 @@ async function createStage23Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE23_COMPLETED_EVENT_IDS],
   };
@@ -2418,6 +2445,7 @@ async function createStage24Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE24_COMPLETED_EVENT_IDS],
   };
@@ -2501,6 +2529,7 @@ async function createStage26Completed(context: DebugScenarioContext): Promise<Ga
       experience: unit.experience,
       life: unit.life,
     }))),
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE26_COMPLETED_EVENT_IDS],
   };
@@ -2581,6 +2610,7 @@ async function createStage27Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE27_COMPLETED_EVENT_IDS],
   };
@@ -2667,6 +2697,7 @@ async function createStage28Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE28_COMPLETED_EVENT_IDS],
   };
@@ -2751,6 +2782,7 @@ async function createStage29Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE29_COMPLETED_EVENT_IDS],
   };
@@ -2871,6 +2903,7 @@ async function createStage30Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE30_COMPLETED_EVENT_IDS],
   };
@@ -2951,6 +2984,7 @@ async function createStage31Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE31_COMPLETED_EVENT_IDS],
   };
@@ -3025,6 +3059,7 @@ async function createStage32Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE32_COMPLETED_EVENT_IDS],
   };
@@ -3099,6 +3134,7 @@ async function createStage33Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE33_COMPLETED_EVENT_IDS],
   };
@@ -3173,6 +3209,7 @@ async function createStage34Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE34_COMPLETED_EVENT_IDS],
   };
@@ -3214,6 +3251,7 @@ async function createStage35Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE35_COMPLETED_EVENT_IDS],
   };
@@ -3288,6 +3326,7 @@ async function createStage36Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE36_COMPLETED_EVENT_IDS],
   };
@@ -3362,6 +3401,7 @@ async function createStage37Completed(context: DebugScenarioContext): Promise<Ga
     rngState: completedCampaign.rngState,
     rngCalls: completedCampaign.rngCalls,
     roster: completedCampaign.roster,
+    recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
     stageProgress: 1000,
     consumedEventIds: [...STAGE37_COMPLETED_EVENT_IDS],
   };

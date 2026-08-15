@@ -10,6 +10,7 @@ import {
   isPlayableStageId,
   stageRuntimeSourceForDestination,
   STAGE_RUNTIME_MANIFEST,
+  type StageSaveNamedUnitRule,
   type StageSaveSchema,
 } from "../stage-runtime";
 import type {
@@ -28,14 +29,15 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 72 as const;
-export const SAVE_CONTENT_VERSION = "stage-37-ice-last-portrait-1" as const;
+export const SAVE_VERSION = 73 as const;
+export const SAVE_CONTENT_VERSION = "stage-49-ending-records-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
 export const MAX_ROUND = 9_999;
 export const MAX_EXPERIENCE = 0x7fff_ffff;
 export const MAX_LIFE = 0x7fff_ffff;
+export const MAX_RECORD_COUNTER = 0x7fff_ffff;
 const MAX_STATUS = 0x7fff;
 const STAGE_WIDTH = 50;
 const STAGE_HEIGHT = 50;
@@ -103,6 +105,10 @@ function isStageEntrySnapshot(
     || !Array.isArray(value.roster)
     || value.roster.length !== MAX_UNIT_SLOT + 1
     || !value.roster.every(isRosterEntry)
+    || !Array.isArray(value.recordCounters)
+    || value.recordCounters.length !== MAX_UNIT_SLOT + 1
+    || !value.recordCounters.every((counter) =>
+      isIntegerBetween(counter, 0, MAX_RECORD_COUNTER))
   ) return false;
   return hasUniqueValues(value.roster.map((entry) => entry.slot))
     && value.roster.every(hasNamedAllyExperienceFloor);
@@ -207,34 +213,35 @@ function hasValidWaterWarriorGroups(units: readonly BattleUnit[]): boolean {
   return true;
 }
 
+function namedUnitRuleFor(
+  unit: BattleUnit,
+  schema: StageSaveSchema,
+): StageSaveNamedUnitRule | undefined {
+  return schema.namedUnits?.find(({ match }) => {
+    switch (match.kind) {
+      case "unit":
+        return unit.id === match.unitId && unit.side === match.side && unit.slot === match.slot;
+      case "unit-group":
+        return waterWarriorRootId(unit) === match.rootUnitId;
+      case "enemy-classes":
+        return unit.side === 2 && match.classIds.includes(unit.classId);
+    }
+  });
+}
+
 function hasValidNamedClassPortraits(
   units: readonly BattleUnit[],
-  stageId: StageId,
+  schema: StageSaveSchema,
 ): boolean {
   return units.every((unit) => {
-    const isStage37BossPart = stageId === "stage-37"
-      && unit.side === 2
-      && (unit.classId === "head" || unit.classId === "hand");
-    if (isStage37BossPart) {
-      return unit.displayIdentity === undefined && unit.portrait === 8;
-    }
-    const isStage29Eliola = stageId === "stage-29"
-      && unit.id === "1:22"
-      && unit.side === 1
-      && unit.slot === 22;
-    if (isStage29Eliola) {
-      return unit.displayIdentity === "named-class-portrait"
-        && unit.name === "愛莉歐拉"
-        && unit.portrait === classFallbackPortraitFor(unit.classId, 1);
-    }
-    const isStage30Vesta = stageId === "stage-30"
-      && waterWarriorRootId(unit) === "2:27";
-    if (isStage30Vesta) {
-      return unit.displayIdentity === undefined
-        && unit.name === "維絲塔"
-        && unit.portrait === 41;
-    }
-    return unit.displayIdentity === undefined;
+    const rule = namedUnitRuleFor(unit, schema);
+    if (unit.displayIdentity !== rule?.displayIdentity) return false;
+    if (!rule) return true;
+    if (rule.name !== undefined && unit.name !== rule.name) return false;
+    if (rule.portrait === undefined) return true;
+    return unit.portrait === (rule.portrait === "class-fallback"
+      ? classFallbackPortraitFor(unit.classId, unit.side)
+      : rule.portrait);
   });
 }
 
@@ -295,7 +302,7 @@ export function isSavedBattleState(
     } else if (value.enemyAi !== undefined) return false;
   } else if (value.enemyAi !== undefined) return false;
 
-  if (stageId === "stage-37") {
+  if (saveSchema.bossActionState === "head-hand-toggles") {
     if (!isRecord(value.stage37Boss)
       || (value.stage37Boss.headActionToggle !== 0 && value.stage37Boss.headActionToggle !== 1)
       || (value.stage37Boss.handActionToggle !== 0 && value.stage37Boss.handActionToggle !== 1)) {
@@ -313,7 +320,7 @@ export function isSavedBattleState(
     !hasUniqueValues(units.map((unit) => unit.id))
     || !hasUniqueValues(units.map((unit) => `${unit.x},${unit.y}`))
     || !hasValidWaterWarriorGroups(units)
-    || !hasValidNamedClassPortraits(units, stageId)
+    || !hasValidNamedClassPortraits(units, saveSchema)
     || !hasUniqueValues(terrainOverrides.map(({ x, y }) => `${x},${y}`))
     || terrainOverrides.some((override, index) => index > 0
       && terrainOverrides[index - 1].y * STAGE_WIDTH + terrainOverrides[index - 1].x
@@ -324,11 +331,8 @@ export function isSavedBattleState(
       const formSequence = saveSchema.enemyFormSequences?.find(
         ({ unitId }) => unitId === waterWarriorRootId(unit),
       );
-      const maximumLife = stageId === "stage-37"
-        && unit.side === 2
-        && (unit.classId === "head" || unit.classId === "hand")
-        ? difficulty === 3 ? 15_000 : 10_000
-        : statsFor(unit, difficulty).maxLife;
+      const maximumLife = namedUnitRuleFor(unit, saveSchema)?.maximumLifeByDifficulty?.[difficulty]
+        ?? statsFor(unit, difficulty).maxLife;
       return unit.life > maximumLife
         || (formSequence
           ? unit.experience !== formSequence.experience
@@ -416,6 +420,10 @@ export function hasValidBase(value: Record<string, unknown>): boolean {
     || !Array.isArray(value.roster)
     || value.roster.length !== MAX_UNIT_SLOT + 1
     || !value.roster.every(isRosterEntry)
+    || !Array.isArray(value.recordCounters)
+    || value.recordCounters.length !== MAX_UNIT_SLOT + 1
+    || !value.recordCounters.every((counter) =>
+      isIntegerBetween(counter, 0, MAX_RECORD_COUNTER))
     || !Array.isArray(value.consumedEventIds)
     || !value.consumedEventIds.every((id) => typeof id === "string")
     || !hasUniqueValues(value.consumedEventIds)

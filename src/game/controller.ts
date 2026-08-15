@@ -59,6 +59,7 @@ import {
   type MagicArcherLineOption,
 } from "./simulation/battle";
 import type { AlliedAiAction } from "./simulation/ai-contracts";
+import { Stage49EndingSession } from "./simulation/stage49-ending";
 import type { PreparedRoutePulse } from "./simulation/route-pulse";
 import type { PreparedEnemyPhaseTail } from "./simulation/enemy-phase-tail";
 import type {
@@ -128,6 +129,7 @@ function cloneCampaignState(campaign: CampaignState): CampaignState {
   return {
     ...campaign,
     roster: campaign.roster.map((entry) => ({ ...entry })),
+    ...(campaign.recordCounters ? { recordCounters: [...campaign.recordCounters] } : {}),
   };
 }
 
@@ -324,6 +326,7 @@ export class GameController {
   difficulty: Difficulty;
   phase: GamePhase = "prebattleStory";
   campaignRoute?: CampaignRouteId;
+  stage49Ending?: Stage49EndingSession;
   actionMode: ActionMode = "idle";
   dialogueIndex = 0;
   selectedId?: string;
@@ -431,6 +434,7 @@ export class GameController {
   };
   private listeners = new Set<Listener>();
   private campaignPersistenceEnabled = true;
+  private campaignSaveCount = 0;
   private readonly testMode = new URLSearchParams(location.search).has("test");
   private readonly debugMode = this.testMode
     || new URLSearchParams(location.search).has("debugScenario");
@@ -608,6 +612,7 @@ export class GameController {
     const runtime = await loadStageRuntime(stageId);
     this.stageRuntime = runtime;
     this.completedProgressMetadata = undefined;
+    this.stage49Ending = undefined;
     this.stageEntrySnapshot = cloneCampaignState({ ...campaign, stageId });
     this.preparationCampaign = runtime.preparation
       ? cloneCampaignState(this.stageEntrySnapshot)
@@ -4166,16 +4171,16 @@ export class GameController {
   }
 
   private writeCompletedSave(slot: number): void {
-    const prior = this.readSave(slot);
     const campaign = this.battle.campaignSnapshot();
     const runtime = this.stageRuntime;
+    this.campaignSaveCount += 1;
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
       kind: "completed",
       savedAt: new Date().toISOString(),
-      saveCount: (prior?.saveCount ?? 0) + 1,
+      saveCount: this.campaignSaveCount,
       stageId: runtime.nextStageId,
       stageLabel: runtime.completion.destinationLabel,
       ruleset: campaign.ruleset,
@@ -4183,6 +4188,7 @@ export class GameController {
       rngState: campaign.rngState,
       rngCalls: campaign.rngCalls,
       roster: campaign.roster,
+      recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
       stageProgress: runtime.completion.destinationProgress,
       consumedEventIds: runtime.completion.consumedEvents === "all"
         ? this.battle.stage.events.map(({ id }) => id)
@@ -4257,16 +4263,16 @@ export class GameController {
   }
 
   private writeBattleSave(slot: number): void {
-    const prior = this.readSave(slot);
     const campaign = this.battle.campaignSnapshot();
     const snapshot = this.battle.serializableSnapshot();
+    this.campaignSaveCount += 1;
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
       kind: "battle",
       savedAt: new Date().toISOString(),
-      saveCount: (prior?.saveCount ?? 0) + 1,
+      saveCount: this.campaignSaveCount,
       stageId: this.battle.stage.id,
       stageLabel: this.stageRuntime.label,
       ruleset: campaign.ruleset,
@@ -4274,6 +4280,7 @@ export class GameController {
       rngState: campaign.rngState,
       rngCalls: campaign.rngCalls,
       roster: campaign.roster,
+      recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
       stageProgress: 0,
       consumedEventIds: [...this.stageEventState.consumedEventIds],
       stageEntrySnapshot: cloneCampaignState(this.stageEntrySnapshot),
@@ -4304,6 +4311,8 @@ export class GameController {
   }
 
   private async restoreSave(save: SaveData, message: string): Promise<void> {
+    this.campaignSaveCount = save.saveCount;
+    this.stage49Ending = undefined;
     if (save.kind === "completed") {
       this.recordMenuMode = undefined;
       this.recordMenuReturn = undefined;
@@ -4316,6 +4325,7 @@ export class GameController {
             ruleset: save.ruleset,
             difficulty: save.difficulty,
             roster: save.roster,
+            recordCounters: save.recordCounters,
             rngState: save.rngState,
             rngCalls: save.rngCalls,
           } as const;
@@ -4353,6 +4363,7 @@ export class GameController {
           ruleset: save.ruleset,
           difficulty: save.difficulty,
           roster: save.roster,
+          recordCounters: save.recordCounters,
           rngState: save.rngState,
           rngCalls: save.rngCalls,
         });
@@ -4365,6 +4376,7 @@ export class GameController {
       ruleset: save.ruleset,
       difficulty: save.difficulty,
       roster: save.roster,
+      recordCounters: save.recordCounters,
       rngState: save.rngState,
       rngCalls: save.rngCalls,
     };
@@ -4424,6 +4436,29 @@ export class GameController {
     this.resetAction();
     this.statusMessage = message;
     this.scheduleFrozenPlayerPhaseSkip();
+  }
+
+  beginStage49Ending(): void {
+    if (this.phase !== "nextStage" || this.campaignRoute !== "stage-49") return;
+    this.stage49Ending = new Stage49EndingSession(
+      this.battle.campaignSnapshot(),
+      this.campaignSaveCount,
+    );
+    this.phase = "ending";
+    this.statusMessage = "主線結局：戰後道別。";
+    this.emit();
+  }
+
+  advanceStage49Ending(): void {
+    const ending = this.stage49Ending;
+    // The hidden-stage boundary is terminal while stage 38 stays frozen, so
+    // input there must not keep re-emitting the same state.
+    if (this.phase !== "ending" || !ending || ending.section === "stage38-boundary") return;
+    if (ending.advance() === "stage38-boundary") {
+      this.campaignRoute = "stage-38";
+      this.statusMessage = "主線結局完成；隱藏關仍在設計凍結範圍內。";
+    }
+    this.emit();
   }
 
   requestQuit(): void {
@@ -5188,6 +5223,13 @@ export class GameController {
       phase: this.phase,
       statusMessage: this.statusMessage,
       campaignRoute: this.campaignRoute,
+      stage49Ending: this.stage49Ending ? {
+        section: this.stage49Ending.section,
+        index: this.stage49Ending.index,
+        saveCount: this.stage49Ending.saveCount,
+        recordTotal: this.stage49Ending.recordTotal,
+        dominantClassFamily: this.stage49Ending.dominantClassFamily,
+      } : undefined,
       difficulty: this.difficulty,
       dialogueIndex: this.dialogueIndex,
       activeStoryId: this.activeStoryId,

@@ -162,7 +162,7 @@ test("S37-H: Nia defeat retries deployment", async ({ page }) => {
   });
 });
 
-test("S37-I: victory saves v72 and stops at the native stage-49 ending boundary", async ({ page }) => {
+test("S37-I: victory saves v73 and exposes the native stage-49 main ending", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("status-strip")).toContainText("頭與兩隻手已全部被擊破");
@@ -203,7 +203,7 @@ test("S37-I: victory saves v72 and stops at the native stage-49 ending boundary"
     phase: "nextStage",
     campaignRoute: "stage-49",
   });
-  await expect(page.getByText(/stage-49/u)).toBeVisible();
+  await expect(page.getByTestId("start-stage49-ending")).toBeVisible();
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage37-stage49-ending-boundary.png`,
   });

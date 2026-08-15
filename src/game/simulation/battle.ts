@@ -429,6 +429,7 @@ export class Stage0Battle {
   round = 1;
   focusId = "1:0";
   private readonly campaignRoster: SaveRosterEntry[];
+  private campaignRecordCounters = Array<number>(75).fill(0);
   private readonly campaignUnitSlots: ReadonlySet<number>;
   protected readonly forces: ForceRegistry;
   private readonly routePulseByActorId: ReadonlyMap<string, RoutePulseDefinition>;
@@ -663,7 +664,22 @@ export class Stage0Battle {
       battle.campaignRoster.length,
       ...completeCampaignRoster(campaign.roster),
     );
+    battle.setCampaignRecordCounters(campaign.recordCounters);
     return battle;
+  }
+
+  setCampaignRecordCounters(counters: readonly number[] | undefined): void {
+    this.campaignRecordCounters = Array.from(
+      { length: 75 },
+      (_, slot) => Math.max(0, Math.trunc(counters?.[slot] ?? 0)),
+    );
+  }
+
+  private isCampaignRecordSlot(unit: BattleUnit): boolean {
+    return unit.side === 1
+      && unit.slot >= 0
+      && unit.slot < this.campaignRecordCounters.length
+      && this.campaignUnitSlots.has(unit.slot);
   }
 
   restore(
@@ -1156,6 +1172,12 @@ export class Stage0Battle {
       : defenderStats.level + this.rng.between(4, 7);
     const experienceGained = baseExperience * (defenderDied ? defenderGroup.length : 1);
     attacker.experience += experienceGained;
+    // Native KILL_ALL increments once for the initiating side-1 slot on the
+    // ordinary primary-experience path; counters and kills do not increment it.
+    // Gate on the same membership the roster write-back uses, so a projected
+    // side-1 unit that never reaches the campaign cannot bump another
+    // character's 戰績 through a shared slot number.
+    if (this.isCampaignRecordSlot(attacker)) this.campaignRecordCounters[attacker.slot] += 1;
     this.synchronizeWaterWarriorState(attacker);
     const counterExperienceBase = counterOccurred
       ? attackerDied
@@ -3757,6 +3779,7 @@ export class Stage0Battle {
       ruleset: "stableRemake",
       difficulty: this.difficulty,
       roster: [...rosterBySlot.values()].sort((left, right) => left.slot - right.slot),
+      recordCounters: [...this.campaignRecordCounters],
       rngState: this.rng.state,
       rngCalls: this.rng.calls,
     };

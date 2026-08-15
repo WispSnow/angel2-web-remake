@@ -711,6 +711,7 @@ test("debug hub imports a formal save roster read-only", async ({ page }) => {
       experience,
       life: classStatsFor({ classId, experience }).maxLife,
     }]),
+    recordCounters: Array<number>(75).fill(0),
     stageProgress: 1000,
     consumedEventIds: [
       "stage-03-opening-story",

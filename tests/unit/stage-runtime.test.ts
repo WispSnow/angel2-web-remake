@@ -6,7 +6,8 @@ import {
   stageRuntimeSourceForDestination,
   STAGE_RUNTIME_MANIFEST,
 } from "../../src/game/stage-runtime";
-import type { CampaignState } from "../../src/game/types";
+import { completeCampaignRoster } from "../../src/game/content/stage0";
+import type { CampaignState, StageId } from "../../src/game/types";
 
 const campaign: CampaignState = {
   stageId: "stage-02",
@@ -666,5 +667,32 @@ describe("stage runtime manifest", () => {
     expect(stage37.nextStageId).toBe("stage-49");
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
+  });
+
+  it("carries the campaign record counters into every rebuilt battle", async () => {
+    // Regression: the per-stage constructors only receive difficulty, roster,
+    // and RNG, so a battle rebuilt at deployment confirm or retreat used to
+    // restart from zeroed counters and silently discarded every earlier stage's
+    // 戰績 before the stage-49 ending read them.
+    const counters = Array<number>(75).fill(0);
+    counters[0] = 41;
+    counters[7] = 13;
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const runtime = await loadStageRuntime(stageId);
+      const entry = {
+        ...campaign,
+        stageId,
+        difficulty: 0 as const,
+        roster: completeCampaignRoster([]),
+        recordCounters: [...counters],
+      };
+      const battle = runtime.createBattle(entry, runtime.preparation?.createInitialResult());
+      expect(battle.campaignSnapshot().recordCounters?.slice(0, 8))
+        .toEqual([41, 0, 0, 0, 0, 0, 0, 13]);
+      if (!runtime.preparation) continue;
+      // The deployment-confirm rebuild takes the same path with a real result.
+      const deployed = runtime.createBattle(entry, runtime.preparation.createInitialResult());
+      expect(deployed.campaignSnapshot().recordCounters?.[0]).toBe(41);
+    }
   });
 });
