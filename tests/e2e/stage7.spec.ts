@@ -145,7 +145,7 @@ test("S07-D/E: the objective names Laili and removing slot 18 ends the battle", 
   await page.goto("/?debugScenario=stage-07-near-laili&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("擊敗萊莉");
+  await expect(page.getByTestId("objective-panel")).toContainText("打敗入侵的敵首領「萊莉」");
   await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
   await expect(page.getByTestId("objective-panel")).not.toContainText("妖龍");
   await page.locator("[data-action=close-objectives]").click();

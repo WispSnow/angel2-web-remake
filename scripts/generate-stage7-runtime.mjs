@@ -137,21 +137,27 @@ assertEqual(
   "stage 7 side-1 class overrides",
 );
 
+const bossActor = enemyActorFor(18);
 const nativeObjective = requireEntry(objectives.normalStageObjectives, ({ stage }) => stage === 7, "stage 7 objective");
+// REMAKE-030 (rev. 2026-08-15): the objective panel quotes SAY/0109 verbatim.
+// The earlier remake-authored "擊敗萊莉" existed only because REMAKE-030 believed
+// the original text said 妖龍 and had to be corrected; REMAKE-051 disproved that.
 const generatedObjective = {
   victory: { type: "unit-removed", side: nativeObjective.victory.side, slot: nativeObjective.victory.unitSlot },
   defeat: { type: "unit-removed", side: nativeObjective.defeat.side, slot: nativeObjective.defeat.unitSlot },
-  victoryText: "擊敗萊莉",
+  victoryText: `打敗入侵的敵首領「${bossActor.normalizedName}」`,
   defeatText: "「妮雅」戰敗",
-  victoryStatusText: "萊莉已停止戰鬥。",
+  victoryStatusText: `${bossActor.normalizedName}已停止戰鬥。`,
 };
 assertEqual(generatedObjective.victory, { type: "unit-removed", side: 2, slot: 18 }, "stage 7 victory");
 assertEqual(generatedObjective.defeat, { type: "unit-removed", side: 1, slot: 0 }, "stage 7 defeat");
 const originalObjectiveText = parseInput("objectiveText").actions
   .filter(({ op }) => op === "text").map(({ text }) => text).join("");
-if (!originalObjectiveText.includes("打敗入侵的敵首領「萊莉」")
-  || !originalObjectiveText.includes("「妮雅」戰敗")) {
-  throw new Error("SAY/0109 objective wording changed");
+// Both panel lines must appear verbatim in SAY/0109; the generator may only drop
+// the record's trailing "．" separators, never reword the sentence.
+if (!originalObjectiveText.includes(generatedObjective.victoryText)
+  || !originalObjectiveText.includes(generatedObjective.defeatText)) {
+  throw new Error(`stage 7 objective text is not verbatim SAY/0109: ${JSON.stringify(generatedObjective)}`);
 }
 // REMAKE-051: the victory-condition record comes from the module-29 `DS:1273`
 // stage table, not from a stage-number formula. Lock the lookup so this stage

@@ -32,7 +32,7 @@ describe("stage 7 generated content", () => {
       objective: {
         victory: { type: "unit-removed", side: 2, slot: 18 },
         defeat: { type: "unit-removed", side: 1, slot: 0 },
-        victoryText: "擊敗萊莉",
+        victoryText: "打敗入侵的敵首領「萊莉」",
       },
       deployment: {
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
