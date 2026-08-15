@@ -1,6 +1,15 @@
-import { portraitSourceFor } from "./content/portrait-catalog.generated";
-import { STAGE49_ENDING_ASSETS } from "./content/stage49-ending";
+import {
+  DIALOGUE_PORTRAIT_FRAME_ASSETS,
+  DIALOGUE_TEXT_WINDOW_ASSET,
+  PORTRAIT_CATALOG,
+  portraitSourceFor,
+} from "./content/portrait-catalog.generated";
+import {
+  STAGE49_ENDING_ASSETS,
+  STAGE49_STORY_PAGES,
+} from "./content/stage49-ending";
 import type { GameController } from "./controller";
+import { renderNativeDialogueText } from "./dialogue-text";
 import {
   animatedPortraitMarkup,
   nativeMouthFrameAfterGlyph,
@@ -16,25 +25,38 @@ const escapeHtml = (value: string): string => value
   .replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;");
 
+const dialoguePortraitFrameStyle = [
+  `--dialogue-portrait-frame-top:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.top}')`,
+  `--dialogue-portrait-frame-nameplate:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate}')`,
+  `--dialogue-portrait-frame-side:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.side}')`,
+  `--dialogue-text-window:url('${DIALOGUE_TEXT_WINDOW_ASSET}')`,
+].join(";");
+
 function dialogueWindow(
   slot: "upper" | "lower",
   line: DialoguePage["upper"] | DialoguePage["lower"],
   active: boolean,
+  opening: boolean,
 ): string {
   if (!line
     || line.portrait === undefined
     || line.speaker === undefined
     || line.text === undefined) return "";
-  return `<section class="stage49-dialogue-window is-${slot} ${active ? "is-active" : ""}"
+  const displayName = (PORTRAIT_CATALOG[line.portrait].displayName ?? line.speaker).trim();
+  return `<section class="stage49-dialogue-window dialogue-box ${slot} ${active ? "is-active" : ""} ${opening ? "is-opening" : ""}"
       data-stage49-dialogue-slot="${slot}">
     ${animatedPortraitMarkup(line.portrait, {
       alt: `${escapeHtml(line.speaker)}肖像`,
       channel: `stage49-story-${slot}`,
-      className: "stage49-dialogue-portrait",
+      className: "stage49-dialogue-portrait dialogue-portrait",
       wrapperTestId: `stage49-story-portrait-${slot}`,
     })}
-    <strong>${escapeHtml(line.speaker)}</strong>
-    <p>${escapeHtml(line.text)}</p>
+    <b class="stage49-dialogue-portrait-name dialogue-portrait-name"
+      aria-hidden="true">${escapeHtml(displayName)}</b>
+    <div class="stage49-dialogue-copy dialogue-copy">
+      <b class="dialogue-speaker">${escapeHtml(line.speaker)}</b>
+      <p>${escapeHtml(line.text)}</p><span class="continue-mark">▼</span>
+    </div>
   </section>`;
 }
 
@@ -42,11 +64,12 @@ function storyMarkup(controller: GameController): string {
   const session = controller.stage49Ending;
   const page: DialoguePage | undefined = session?.storyPage;
   if (!page || !session) return "";
-  return `<div class="stage49-story" data-testid="stage49-story">
+  const previousPage: DialoguePage | undefined = STAGE49_STORY_PAGES[session.index - 1];
+  return `<div class="stage49-story dialogue-layer prebattle" data-testid="stage49-story"
+      aria-label="戰後道別 ${session.index + 1}／17">
     <img class="stage49-story-background" src="${STAGE49_ENDING_ASSETS.storyBackground}" alt="">
-    ${dialogueWindow("upper", page.upper, page.activeSlot === "upper")}
-    ${dialogueWindow("lower", page.lower, page.activeSlot === "lower")}
-    <span class="stage49-progress">戰後道別 ${session.index + 1}／17</span>
+    ${dialogueWindow("upper", page.upper, page.activeSlot === "upper", Boolean(page.upper && !previousPage?.upper))}
+    ${dialogueWindow("lower", page.lower, page.activeSlot === "lower", Boolean(page.lower && !previousPage?.lower))}
   </div>`;
 }
 
@@ -110,7 +133,8 @@ export function mountStage49EndingUi(
     <div class="game-stage">
       <div class="game-viewport stage49-viewport" id="stage49-viewport">
         <button type="button" class="logical-screen stage49-screen" id="stage49-screen"
-          data-testid="ending-advance" aria-label="推進主線結局"></button>
+          data-testid="ending-advance" style="${dialoguePortraitFrameStyle}"
+          aria-label="推進主線結局"></button>
       </div>
     </div>
     <p class="stage49-help">點擊畫面或按 Enter／Space 推進；戰績卡與尾聲亦會依原版上限自動推進。</p>
@@ -140,7 +164,7 @@ export function mountStage49EndingUi(
     if (!storyText || storyRevealedCharacters >= storyFullText.length) return false;
     stopStoryTimer();
     storyRevealedCharacters = storyFullText.length;
-    storyText.textContent = storyFullText;
+    renderNativeDialogueText(storyText, storyFullText);
     stopSpeaking(storyPortrait);
     screen.dataset.storyTyping = "false";
     return true;
@@ -164,7 +188,7 @@ export function mountStage49EndingUi(
     if (!storyText) return;
     storyFullText = line.text;
     storyRevealedCharacters = Math.max(0, Math.min(storyFullText.length, page.revealStart ?? 0));
-    storyText.textContent = storyFullText.slice(0, storyRevealedCharacters);
+    renderNativeDialogueText(storyText, storyFullText.slice(0, storyRevealedCharacters));
     const speaking = storyRevealedCharacters < storyFullText.length;
     if (storyPortrait) storyPortrait.dataset.speaking = String(speaking);
     screen.dataset.storyTyping = String(speaking);
@@ -177,7 +201,7 @@ export function mountStage49EndingUi(
       }
       const character = storyFullText[storyRevealedCharacters];
       storyRevealedCharacters += 1;
-      storyText.textContent = storyFullText.slice(0, storyRevealedCharacters);
+      renderNativeDialogueText(storyText, storyFullText.slice(0, storyRevealedCharacters));
       if (storyPortrait && nativeStoryGlyphMovesMouth(character)) {
         storyPortrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(
           storyPortrait.dataset.mouthFrame,
@@ -211,7 +235,12 @@ export function mountStage49EndingUi(
           ? epilogueMarkup(controller)
           : boundaryMarkup();
     screen.dataset.storyTyping = "false";
-    if (session.section === "story") startStoryTyping();
+    if (session.section === "story") {
+      for (const text of screen.querySelectorAll<HTMLElement>(".stage49-dialogue-copy p")) {
+        renderNativeDialogueText(text, text.textContent ?? "");
+      }
+      startStoryTyping();
+    }
     const delay = session.autoAdvanceMilliseconds;
     if (delay !== undefined && session.section !== "stage38-boundary") {
       timer = window.setTimeout(

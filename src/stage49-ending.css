@@ -43,31 +43,25 @@
 }
 
 .stage49-story-background {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: brightness(.72) saturate(.82);
 }
 
 .stage49-dialogue-window {
-  position: absolute;
-  left: 42px;
-  width: 556px;
-  min-height: 104px;
-  padding: 14px 22px 12px 132px;
-  border: 3px solid #e8ca74;
-  background: linear-gradient(180deg, #202b68ee, #090d2aee);
-  box-shadow: inset 0 0 0 2px #6e4a99, 0 4px 16px #000a;
-  text-align: left;
+  animation: none;
 }
 
-.stage49-dialogue-window.is-upper { top: 20px; }
-.stage49-dialogue-window.is-lower { bottom: 20px; }
-.stage49-dialogue-window.is-active::after { content: "▼"; position: absolute; right: 12px; bottom: 5px; color: #ffe684; }
-.stage49-dialogue-portrait { position: absolute; left: 19px; bottom: 8px; width: 94px; height: 94px; }
-.stage49-dialogue-portrait .portrait-base { object-fit: contain; object-position: bottom; }
-.stage49-dialogue-window strong { display: block; color: #ffe284; font-size: 15px; letter-spacing: 4px; }
-.stage49-dialogue-window p { margin: 4px 0 0; white-space: pre-line; font-size: 15px; line-height: 1.45; text-shadow: 1px 1px #000; }
+.stage49-dialogue-window.is-opening {
+  animation: dialogue-window-open 110ms steps(11);
+}
+
+.stage49-dialogue-copy {
+  overflow: hidden;
+  text-align: left;
+}
 
 .stage49-progress {
   position: absolute;

@@ -29,6 +29,7 @@ import {
 import type { BattleUnit, Position, UnitClassId, UnitStats } from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
+import { renderNativeDialogueText } from "./dialogue-text";
 import {
   animatedPortraitMarkup,
   configureAnimatedPortrait,
@@ -292,22 +293,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     portrait.dataset.speaking = String(speaking);
     portrait.dataset.mouthFrame = "1";
   };
-  const renderDialogueText = (target: HTMLElement, text: string) => {
-    const fragment = document.createDocumentFragment();
-    for (const character of text) {
-      if (character === "\n") {
-        fragment.append(document.createTextNode(character));
-        continue;
-      }
-      const glyph = document.createElement("span");
-      glyph.className = /[^\x00-\x7f]/u.test(character)
-        ? "dialogue-glyph big5"
-        : "dialogue-glyph ascii";
-      glyph.textContent = character;
-      fragment.append(glyph);
-    }
-    target.replaceChildren(fragment);
-  };
   const drawSpeechGlyph = (portrait: HTMLElement | undefined, character: string) => {
     if (!portrait || !nativeStoryGlyphMovesMouth(character)) return;
     portrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(portrait.dataset.mouthFrame, character);
@@ -352,7 +337,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     activeDialogueText = target;
     activeDialoguePortrait = portrait;
     revealedCharacters = Math.max(0, Math.min(fullText.length, revealStart));
-    renderDialogueText(target, fullText.slice(0, revealedCharacters));
+    renderNativeDialogueText(target, fullText.slice(0, revealedCharacters));
     startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length);
     const tick = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
@@ -363,7 +348,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }
       const character = dialogueFullText[revealedCharacters];
       revealedCharacters += 1;
-      renderDialogueText(target, dialogueFullText.slice(0, revealedCharacters));
+      renderNativeDialogueText(target, dialogueFullText.slice(0, revealedCharacters));
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
       drawSpeechGlyph(activeDialoguePortrait, character);
       const delay = controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80;
@@ -375,7 +360,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (!dialogueFullText || !activeDialogueText || revealedCharacters >= dialogueFullText.length) return false;
     stopDialogueTimer();
     revealedCharacters = dialogueFullText.length;
-    renderDialogueText(activeDialogueText, dialogueFullText);
+    renderNativeDialogueText(activeDialogueText, dialogueFullText);
     stopSpeaking(activeDialoguePortrait);
     if (controller.groupCommandDialogueActive) scheduleAutomaticDialogueAdvance(activeDialogueKey);
     return true;
@@ -392,7 +377,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     feedbackRevealedCharacters = 0;
     activeFeedbackText = target;
     activeFeedbackPortrait = portrait;
-    renderDialogueText(target, "");
+    renderNativeDialogueText(target, "");
     startSpeaking(activeFeedbackPortrait, fullText.length > 0);
     const tick = () => {
       if (activeFeedbackKey !== key || activeFeedbackText !== target || feedbackRevealedCharacters >= fullText.length) {
@@ -402,7 +387,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }
       const character = fullText[feedbackRevealedCharacters];
       feedbackRevealedCharacters += 1;
-      renderDialogueText(target, fullText.slice(0, feedbackRevealedCharacters));
+      renderNativeDialogueText(target, fullText.slice(0, feedbackRevealedCharacters));
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
       drawSpeechGlyph(activeFeedbackPortrait, character);
       feedbackTimer = globalThis.setTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
@@ -413,7 +398,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (!feedbackFullText || !activeFeedbackText || feedbackRevealedCharacters >= feedbackFullText.length) return false;
     stopFeedbackTimer();
     feedbackRevealedCharacters = feedbackFullText.length;
-    renderDialogueText(activeFeedbackText, feedbackFullText);
+    renderNativeDialogueText(activeFeedbackText, feedbackFullText);
     stopSpeaking(activeFeedbackPortrait);
     return true;
   };
@@ -1084,7 +1069,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             : state.speaker ? `${state.speaker}對話` : "旁白",
         );
         if (state.text !== undefined && (!active || pageChanged)) {
-          renderDialogueText(elements.text, state.text);
+          renderNativeDialogueText(elements.text, state.text);
         }
         if (state.textInset) {
           elements.copy.style.setProperty("--dialogue-text-inset-x", `${state.textInset.x}px`);
@@ -1184,7 +1169,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         feedbackRevealedCharacters = fullText.length;
         activeFeedbackText = feedbackText;
         activeFeedbackPortrait = feedbackPortrait;
-        renderDialogueText(feedbackText, fullText);
+        renderNativeDialogueText(feedbackText, fullText);
       } else if (activeFeedbackKey !== feedbackKey || activeFeedbackText !== feedbackText) {
         revealFeedback(fullText, feedbackKey, feedbackText, feedbackPortrait);
       }

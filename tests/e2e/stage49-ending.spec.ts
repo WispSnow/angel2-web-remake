@@ -47,6 +47,33 @@ async function advance(page: Page, count: number): Promise<void> {
   }
 }
 
+async function storyTextMetrics(page: Page, slot: "upper" | "lower") {
+  return page.locator(`.stage49-dialogue-window.${slot} .stage49-dialogue-copy`).evaluate((copy) => {
+    const screen = copy.closest<HTMLElement>("#stage49-screen");
+    const text = copy.querySelector<HTMLElement>("p");
+    const firstGlyph = text?.querySelector<HTMLElement>(".dialogue-glyph");
+    if (!screen || !text || !firstGlyph) throw new Error("missing native story text");
+    const screenBounds = screen.getBoundingClientRect();
+    const copyBounds = copy.getBoundingClientRect();
+    const scale = screenBounds.width / 640;
+    const glyphs = [...text.querySelectorAll<HTMLElement>(".dialogue-glyph")];
+    const big5Widths = [...new Set(
+      glyphs
+        .filter((glyph) => glyph.classList.contains("big5"))
+        .map((glyph) => glyph.getBoundingClientRect().width / scale),
+    )];
+    return {
+      textAlign: getComputedStyle(copy).textAlign,
+      overflow: getComputedStyle(copy).overflow,
+      firstGlyphX: (firstGlyph.getBoundingClientRect().left - copyBounds.left) / scale,
+      maxGlyphOverflow: Math.max(
+        ...glyphs.map((glyph) => (glyph.getBoundingClientRect().right - copyBounds.right) / scale),
+      ),
+      big5Widths,
+    };
+  });
+}
+
 test("S49-A–D: main ending plays story, roster, conditional epilogue, then stops before hidden stage 38", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-cleared&difficulty=0&test=1");
   await expect(page.getByTestId("start-stage49-ending")).toBeVisible();
@@ -70,6 +97,48 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then sto
   await expect.poll(async () => Number(await storyPortrait.getAttribute("data-blink-count")), {
     timeout: 2_000,
   }).toBeGreaterThan(0);
+  const originalDialoguePresentation = await page.getByTestId("ending-advance").evaluate((screen) => {
+    const nativeBounds = (selector: string) => {
+      const element = screen.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`missing story element ${selector}`);
+      const screenBounds = screen.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      const scale = screenBounds.width / 640;
+      return {
+        x: (bounds.left - screenBounds.left) / scale,
+        y: (bounds.top - screenBounds.top) / scale,
+        width: bounds.width / scale,
+        height: bounds.height / scale,
+      };
+    };
+    const portrait = screen.querySelector<HTMLElement>(".stage49-dialogue-portrait");
+    const copy = screen.querySelector<HTMLElement>(".stage49-dialogue-copy");
+    if (!portrait || !copy) throw new Error("missing original story window composition");
+    return {
+      portrait: nativeBounds(".stage49-dialogue-portrait"),
+      copy: nativeBounds(".stage49-dialogue-copy"),
+      portraitTopAndNameplate: getComputedStyle(portrait, "::before").backgroundImage,
+      portraitSides: getComputedStyle(portrait, "::after").backgroundImage,
+      textWindow: getComputedStyle(copy).backgroundImage,
+    };
+  });
+  expect(originalDialoguePresentation.portrait).toMatchObject({
+    x: 512,
+    y: 210,
+    width: 112,
+    height: 112,
+  });
+  expect(originalDialoguePresentation.copy).toMatchObject({
+    x: 97,
+    y: 260,
+    width: 400,
+    height: 86,
+  });
+  expect(originalDialoguePresentation.portraitTopAndNameplate).toContain("portrait-top.png");
+  expect(originalDialoguePresentation.portraitTopAndNameplate).toContain("portrait-nameplate.png");
+  expect(originalDialoguePresentation.portraitSides).toContain("portrait-side.png");
+  expect(originalDialoguePresentation.textWindow).toContain("text-window.png");
+  await expect(page.getByText(/戰後道別 \d+／17/)).toHaveCount(0);
   const centerDelta = await page.getByTestId("ending-advance").evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     return bounds.left + bounds.width / 2 - window.innerWidth / 2;
@@ -79,7 +148,64 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then sto
     path: `${ARTIFACT_DIR}/stage49-story.png`,
   });
 
-  await advance(page, 17);
+  await advance(page, 2);
+  await waitForEnding(page, "story", 2);
+  const upperText = page.locator(".stage49-dialogue-window.upper .stage49-dialogue-copy p");
+  await expect.poll(() => upperText.locator(".dialogue-glyph").count()).toBeGreaterThan(0);
+  const upperTypingStart = await storyTextMetrics(page, "upper");
+  expect(upperTypingStart.firstGlyphX).toBeCloseTo(12, 1);
+  await expect(page.getByTestId("ending-advance")).toHaveAttribute("data-story-typing", "false");
+  const upperTextComplete = await storyTextMetrics(page, "upper");
+  expect(upperTextComplete).toMatchObject({ textAlign: "left", overflow: "hidden" });
+  expect(upperTextComplete.firstGlyphX).toBeCloseTo(12, 1);
+  expect(upperTextComplete.maxGlyphOverflow).toBeLessThanOrEqual(0);
+  expect(upperTextComplete.big5Widths).toEqual([16]);
+  await captureVisualAudit(page.getByTestId("ending-advance"), {
+    path: `${ARTIFACT_DIR}/stage49-story-long-upper.png`,
+  });
+
+  await advance(page, 1);
+  await waitForEnding(page, "story", 3);
+  await expect(page.getByTestId("ending-advance")).toHaveAttribute("data-story-typing", "false");
+  const lowerTextComplete = await storyTextMetrics(page, "lower");
+  expect(lowerTextComplete).toMatchObject({ textAlign: "left", overflow: "hidden" });
+  expect(lowerTextComplete.firstGlyphX).toBeCloseTo(12, 1);
+  expect(lowerTextComplete.maxGlyphOverflow).toBeLessThanOrEqual(0);
+  expect(lowerTextComplete.big5Widths).toEqual([16]);
+  await captureVisualAudit(page.getByTestId("ending-advance"), {
+    path: `${ARTIFACT_DIR}/stage49-story-long-lower.png`,
+  });
+
+  await advance(page, 11);
+  await waitForEnding(page, "story", 14);
+  await expect(page.getByTestId("ending-advance")).toHaveAttribute("data-story-typing", "false");
+  await expect(page.locator(".stage49-dialogue-window")).toHaveCount(2);
+  const upperWindowGeometry = await page.getByTestId("ending-advance").evaluate((screen) => {
+    const nativeBounds = (selector: string) => {
+      const element = screen.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`missing story element ${selector}`);
+      const screenBounds = screen.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      const scale = screenBounds.width / 640;
+      return {
+        x: (bounds.left - screenBounds.left) / scale,
+        y: (bounds.top - screenBounds.top) / scale,
+        width: bounds.width / scale,
+        height: bounds.height / scale,
+      };
+    };
+    return {
+      portrait: nativeBounds(".stage49-dialogue-window.upper .stage49-dialogue-portrait"),
+      copy: nativeBounds(".stage49-dialogue-window.upper .stage49-dialogue-copy"),
+    };
+  });
+  expect(upperWindowGeometry.portrait).toMatchObject({ x: 8, y: 18, width: 112, height: 112 });
+  expect(upperWindowGeometry.copy).toMatchObject({ x: 153, y: 2, width: 400, height: 86 });
+  await captureVisualAudit(page.getByTestId("ending-advance"), {
+    path: `${ARTIFACT_DIR}/stage49-story-two-windows.png`,
+  });
+
+  await advance(page, 3);
   await waitForEnding(page, "roster", 0);
   await expect(page.getByTestId("stage49-roster")).toContainText("妮雅");
   // Native card field is 兵種 with 戰績：00000 人.
