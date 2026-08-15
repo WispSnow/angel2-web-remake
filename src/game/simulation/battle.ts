@@ -680,6 +680,12 @@ export class Stage0Battle {
    * slot, and applies no campaign-membership test, so a side-1 unit that only
    * exists for one stage — stage 20's 守護者 in slot 32 is the campaign's one
    * controllable case — still records its kills.
+   *
+   * The same instruction has no side test either, so in DOS an enemy kill wrote
+   * to the one shared 75-entry array under the enemy's own slot and inflated the
+   * same-numbered ally's 戰績 card and the epilogue total. REMAKE-088 treats that
+   * as an original bug and keeps the counters to side 1; `legacyStrict` is where
+   * the native write belongs.
    */
   private isCampaignRecordSlot(unit: BattleUnit): boolean {
     return unit.side === 1

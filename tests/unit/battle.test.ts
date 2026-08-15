@@ -84,6 +84,22 @@ describe("stage 0 battle simulation", () => {
     expect(killed.campaignSnapshot().recordCounters?.[0]).toBe(8);
   });
 
+  it("keeps an enemy kill out of the record counters", () => {
+    // REMAKE-088: native 0000:9252 has no side test, so a side-2 kill wrote to
+    // the one shared array under the enemy's own slot and inflated the
+    // same-numbered ally's card and the epilogue total. stableRemake fixes that.
+    const battle = battleAtPlayableOpening(42);
+    const counters = Array<number>(75).fill(0);
+    battle.setCampaignRecordCounters(counters);
+    expect(battle.moveUnit("1:0", { x: 28, y: 26 })).toBe(true);
+    const nia = battle.unit("1:0");
+    if (!nia) throw new Error("missing 妮雅");
+    nia.life = 1;
+    const result = battle.attack("2:45", "1:0");
+    expect(result.defenderDied).toBe(true);
+    expect(battle.campaignSnapshot().recordCounters).toEqual(counters);
+  });
+
   it("leaves the native record counter alone when an allied counterattack kills", () => {
     // The mirrored counter routine 0000:9161 splits on the same kill test and
     // ends at 0000:91C4 without a KILL_ALL write, so only the unit that
