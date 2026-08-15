@@ -36,6 +36,7 @@ import {
   STAGE0_FULL_COMBAT_FRAME_META,
   STAGE0_FULL_COMBAT_PROFILES,
 } from "./content/stage0-actions.generated";
+import { FULL_COMBAT_BACKGROUND_FALLBACK_RECORD } from "./content/full-combat-backgrounds.generated";
 import { classDefinition } from "./content/classes";
 import type { AttackResult, BattleUnit, UnitClassId } from "./types";
 
@@ -72,6 +73,12 @@ export interface FullCombatSpriteState {
 export interface FullCombatSceneState {
   /** Increments once per presented battle so the renderer can rebuild. */
   battleKey: number;
+  /**
+   * `C.SWF` battlefield record scrolling behind the fighters. Module 29 picks
+   * it once per attack from the stage and the defender's terrain, so it stays
+   * constant across the counter-attack.
+   */
+  backgroundRecord: number;
   t: number;
   showRightPanel: boolean;
   showLeftPanel: boolean;
@@ -1594,6 +1601,7 @@ export function buildFullCombatScript(
   attacker: BattleUnit,
   defender: BattleUnit,
   result: AttackResult,
+  backgroundRecord: number = FULL_COMBAT_BACKGROUND_FALLBACK_RECORD,
 ): FullCombatScript {
   const battleKey = ++battleKeyCounter;
   const attackerLeft = attacker.side === 1;
@@ -1704,6 +1712,7 @@ export function buildFullCombatScript(
     if (!stage.showScene) {
       return {
         battleKey,
+        backgroundRecord,
         t,
         ...stage,
         camera: 0,
@@ -1719,6 +1728,7 @@ export function buildFullCombatScript(
     const clamped = Math.min(t, times.end);
     return {
       battleKey,
+      backgroundRecord,
       t,
       ...stage,
       lifeGauges: lifeGaugesAt(t),

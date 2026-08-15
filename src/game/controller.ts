@@ -14,6 +14,7 @@ import {
   techniqueActionIdsFor,
 } from "./content/actions";
 import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
+import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
 import {
   classDefinition,
   className,
@@ -3564,7 +3565,12 @@ export class GameController {
     // whole presentation is a single measured timeline sampled against a clock.
     // Camera and panel timing remain wall-clock driven, while profession poses
     // and projectile positions preserve the original discrete renderer steps.
-    const script = buildFullCombatScript(attacker, defender, result);
+    // 0000:90D8 resolves the backdrop from the defender's cell before the
+    // presentation is dispatched, so the counter-attack keeps the same one.
+    const script = buildFullCombatScript(attacker, defender, result, fullCombatBackgroundRecord(
+      this.battle.stage.nativeStage,
+      this.battle.terrainSlotAt(defender),
+    ));
     const fastTest = this.testMode && !this.fullCombatRealTime;
     const timeScale = fastTest ? 24 : this.presentationFast ? 3.2 : 1;
     const frameInterval = fastTest ? 2 : 15;

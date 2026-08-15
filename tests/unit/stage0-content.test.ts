@@ -55,8 +55,7 @@ describe("stage 0 evidence-backed content", () => {
     ]);
   });
 
-  it("binds the native full-combat background and complete cavalry attack records", () => {
-    expect(ASSETS.fullBattle.stageBackground).toContain("stage0-background.png");
+  it("binds the complete cavalry attack records", () => {
     expect(ASSETS.fullBattle.left.cavalryPlus50).toHaveLength(9);
     expect(ASSETS.fullBattle.right.cavalryPlus50).toHaveLength(9);
     expect(ASSETS.allyPromotionTargets).toEqual({

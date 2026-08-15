@@ -2470,7 +2470,11 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
     window.__ANGEL2__?.getState().combatPresentation?.fullScene?.showScene === true);
   await expect(fullLayer).toHaveAttribute("data-full-left-record", "M_00/50");
   await expect(fullLayer).toHaveAttribute("data-full-right-record", "Y_00/0");
-  await expect(page.getByTestId("full-combat-background")).toHaveAttribute("src", /stage0-background/);
+  // Stage 0's DS:78DC entry is C/5 and its indoor terrain slots never reach
+  // the 964E override chain, so the palace backdrop stands for every battle.
+  await expect(page.getByTestId("full-combat-background")).toHaveAttribute("data-record", "5");
+  await expect(page.getByTestId("full-combat-background"))
+    .toHaveAttribute("src", "/assets/original/full-combat/backgrounds/05.png");
   await expect(page.getByTestId("full-left-status")).toBeVisible();
   await expect(page.getByTestId("full-right-status")).toBeVisible();
   await expect(page.getByTestId("full-combat-window")).toBeVisible();

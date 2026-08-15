@@ -72,6 +72,7 @@
     "content:stage49": "node scripts/generate-stage49-ending.mjs",
     "content:actions": "node scripts/generate-stage0-actions.mjs && node scripts/generate-stage1-actions.mjs",
     "content:terrain-actions": "node scripts/generate-dynamic-terrain-assets.mjs",
+    "content:backgrounds": "node scripts/generate-full-combat-backgrounds.mjs",
     "content:ai-dialogue": "node scripts/generate-ai-technique-dialogue.mjs",
     "content:technique-lab": "node scripts/generate-technique-lab.mjs",
     "content:music": "node scripts/generate-stage0-music.mjs"

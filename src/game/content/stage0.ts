@@ -214,7 +214,9 @@ export const ASSETS = {
     death: Array.from({ length: 38 }, (_, frame) => `/assets/original/map-combat/death/${String(frame).padStart(2, "0")}.png`),
   },
   fullBattle: {
-    stageBackground: "/assets/original/full-combat/stage0-background.png",
+    // The battlefield backdrop is not a stage asset: module 29 re-selects a
+    // `C.SWF` record per attack from the stage table and the defender's
+    // terrain. See content/full-combat-backgrounds.ts.
     left: {
       soldierDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/left-soldier-direct/${String(frame).padStart(2, "0")}.png`),
       soldierPlus50: [0, 1, 2, 3, 4, 5].map((frame) => `/assets/original/full-combat/left-soldier-plus50/${String(frame).padStart(2, "0")}.png`),

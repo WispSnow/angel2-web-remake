@@ -20,6 +20,7 @@ import {
 import { allyMapUnitAsset } from "./content/map-unit-assets";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "./content/technique-lab.generated";
 import { classTraitsFor } from "./content/class-traits";
+import { fullCombatBackgroundAsset } from "./content/full-combat-backgrounds";
 import { activeUnitStatusPresentations } from "./content/status-presentations";
 import type { CombatPresentation, GameController } from "./controller";
 import {
@@ -1239,8 +1240,10 @@ function buildFullCombatSkeleton(
   layer: HTMLElement,
   presentation: CombatPresentation,
   source: CombatPresentationRenderSource,
+  backgroundRecord: number,
 ): void {
   const { attacker, defender } = presentation;
+  const background = fullCombatBackgroundAsset(backgroundRecord);
   const leftUnit = attacker.side === 1 ? attacker : defender;
   const rightUnit = attacker.side === 2 ? attacker : defender;
   const statusPanel = (side: "left" | "right", unit: typeof attacker) => {
@@ -1265,10 +1268,10 @@ function buildFullCombatSkeleton(
       <div class="full-combat-viewport-content" data-testid="full-combat-viewport-content">
         <div class="full-combat-scene" data-testid="full-combat-scene" hidden>
           <div class="full-combat-backdrop">
-            <img class="far" src="${ASSETS.fullBattle.stageBackground}" alt="" data-testid="full-combat-background" />
-            <img class="far copy" src="${ASSETS.fullBattle.stageBackground}" alt="" />
-            <img class="near" src="${ASSETS.fullBattle.stageBackground}" alt="" />
-            <img class="near copy" src="${ASSETS.fullBattle.stageBackground}" alt="" />
+            <img class="far" src="${background}" alt="" data-testid="full-combat-background" data-record="${backgroundRecord}" />
+            <img class="far copy" src="${background}" alt="" />
+            <img class="near" src="${background}" alt="" />
+            <img class="near copy" src="${background}" alt="" />
           </div>
           <div class="full-combat-particles" aria-hidden="true"></div>
           <img class="full-combat-lance" alt="" hidden />
@@ -1331,7 +1334,7 @@ export function renderCombat(
   if (layer.dataset.fullBattleKey !== battleKey) {
     layer.className = "combat-presentation full-combat";
     layer.removeAttribute("style");
-    buildFullCombatSkeleton(layer, presentation, source);
+    buildFullCombatSkeleton(layer, presentation, source, scene.backgroundRecord);
     layer.dataset.fullBattleKey = battleKey;
   }
   layer.dataset.fullCombatPhase = presentation.phase;
