@@ -90,8 +90,8 @@
 | M69 | 内部第 36 关有界实现 | `accepted` | 证据生成、直接部署、SAY 80、三十敌首领战、v65/v64、六类调试场景、两套成长档及 stage 37 路由通过；用户确认测试通过 |
 | M70 | 内部第 37 关纸面合同 | `specified` | B/0075、SAY 81、1–27 人部署、究極女神三部位、交替术法、九字段隐藏、全灭目标、五通道无增援、`REMAKE-084/085` 与 stage 49 结局边界闭合 |
 | M71 | 内部第 37 关有界实现 | `accepted` | 证据生成、直接部署、SAY 81、三部位专属行动、v72/v71/v70、七类调试场景与 stage 49 入口通过；用户确认测试通过 |
-| M72 | stage 49 主线结局纸面合同 | `specified` | SAY 70、二十二张战绩卡、四段条件尾声、`SAVE_NUM`／`KILL_ALL`、v73/v72、REMAKE-086 与隐藏 stage 38 边界闭合 |
-| M73 | stage 49 主线结局有界实现 | `verified` | 故事、战绩、条件尾声、原版音画、75 槽战绩、累计存档次数、v73/v72 与 stage 38 可见边界通过，等待用户复验 |
+| M72 | stage 49 主线结局纸面合同 | `specified` | SAY 70、二十二张战绩卡、四段尾声（三段条件分支、一段固定）、`SAVE_NUM`／`KILL_ALL`、v73/v72、REMAKE-086 与隐藏 stage 38 边界闭合 |
+| M73 | stage 49 主线结局有界实现 | `verified` | 故事、战绩、条件尾声、原版音画、75 槽战绩、累计存档次数、八个尾声直达调试夹具、v73/v72 与 stage 38 可见边界通过，等待用户复验 |
 | M04+ | 职业与技术能力切片 | `verified` | 33 项分层玩家技术、`1N` 直连技術「傳送」（`BAT-068`／`REMAKE-062`）、常规职业、终阶特性、水戰士分裂与三类组合实验表面完成自动门禁 |
 | Campaign | 全战役扩展 | `frozen` | 在通用边界稳定后逐关固化内容与验收 |
 
@@ -449,7 +449,8 @@ M70/M71 记录见 [`milestones/M70-stage-37-specification.md`](milestones/M70-st
 M72/M73 记录见 [`milestones/M72-stage-49-ending-specification.md`](milestones/M72-stage-49-ending-specification.md)
 与 [`milestones/M73-stage-49-ending-implementation.md`](milestones/M73-stage-49-ending-implementation.md)。
 内部 stage 49 按 SAY/0070、模块 33/35、`REMAKE-086` 与 v73/v72 闭合并实现 17 个剧情检查点、
-二十二张战绩卡、四段条件尾声、原版音画、75 槽普通攻击战绩与跨槽累计存档次数，完整播放
+二十二张战绩卡、四段尾声（三段条件分支、一段固定）、原版音画、75 槽普通攻击战绩与
+跨槽累计存档次数，完整播放
 后停在隐藏 stage 38 可见边界。M73 为 `verified`，等待用户普通入口观看结局。
 
 用户于 2026-08-04 将顺序调整为“先逐个实现职业，再继续推进关卡”。原版玩家目录 33 项

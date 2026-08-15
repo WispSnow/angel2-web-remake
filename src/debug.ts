@@ -1,9 +1,11 @@
 import "./debug.css";
 import {
   DEBUG_SCENARIOS,
+  debugRosterStageId,
   debugStageLabel,
   debugScenarioUrl,
   type DebugScenarioId,
+  type DebugStageId,
 } from "./game/debug-scenario-catalog";
 import type { Difficulty } from "./game/types";
 import { STAGE_RUNTIME_MANIFEST } from "./game/stage-runtime";
@@ -22,7 +24,10 @@ import {
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
 
-const stageOrder = Object.keys(STAGE_RUNTIME_MANIFEST) as Array<keyof typeof STAGE_RUNTIME_MANIFEST>;
+const stageOrder: DebugStageId[] = [
+  ...(Object.keys(STAGE_RUNTIME_MANIFEST) as Array<keyof typeof STAGE_RUNTIME_MANIFEST>),
+  "stage-49",
+];
 const stageGroups = stageOrder.map((stageId) => ({
   stageId,
   scenarios: DEBUG_SCENARIOS.filter((scenario) => scenario.stageId === stageId),
@@ -137,7 +142,7 @@ const updateLinks = () => {
   const rosterSource = parseDebugRosterSourceId(rosterSourceId);
   const supportsAnyStage = rosterSource?.kind === "profile"
     && stageGroups.some(({ stageId }) =>
-      debugRosterProfileSupportsGrowthOverride(rosterSource.id, stageId));
+      debugRosterProfileSupportsGrowthOverride(rosterSource.id, debugRosterStageId(stageId)));
   rosterDescription.textContent = rosterOption?.description ?? "未知成長檔案";
   growthInput.disabled = !supportsAnyStage;
   growthApply.disabled = !supportsAnyStage;
@@ -156,7 +161,10 @@ const updateLinks = () => {
     const scenarioGrowth = perStageGrowth !== undefined
       && rosterSource?.kind === "profile"
       && scenario
-      && debugRosterProfileSupportsGrowthOverride(rosterSource.id, scenario.stageId)
+      && debugRosterProfileSupportsGrowthOverride(
+        rosterSource.id,
+        debugRosterStageId(scenario.stageId),
+      )
       ? perStageGrowth
       : undefined;
     link.href = debugScenarioUrl(id, difficulty, rosterSourceId, scenarioGrowth);

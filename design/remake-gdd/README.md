@@ -19,7 +19,8 @@
 stage 37 的 1–27 人部署、究極女神三部位、专属交替术法、九字段隐藏、SAY/0081、
 v72/v71/v70 与 stage 49 主线结局入口；冰雪轮頭最后与碧娜維姬 `D/8` 部位肖像已按
 试玩反馈修正并获用户接受。M72/M73 现按 `REMAKE-086` 接入 SAY/0070、二十二张战绩卡、
-四段条件尾声、v73/v72 与隐藏 stage 38 可见边界，等待用户观看结局复验。
+四段尾声（三段条件分支、一段固定）、v73/v72 与隐藏 stage 38 可见边界，等待用户观看
+结局复验。
 
 ## 文档目的
 
@@ -92,7 +93,7 @@ v72/v71/v70 与 stage 49 主线结局入口；冰雪轮頭最后与碧娜維姬 
 | [`vertical-slices/stage-35.md`](vertical-slices/stage-35.md) | 固定九对十、SAY 67/68、全员行为 12 无路线待命、全灭、无动态增援及 stage 36 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-36.md`](vertical-slices/stage-36.md) | 1–28 人部署、SAY 80、碧娜維姬与二十九名静态敌军、单首领目标、无动态增援及 stage 37 路由 | Draft 0.1 / 已接受 |
 | [`vertical-slices/stage-37.md`](vertical-slices/stage-37.md) | 1–27 人部署、SAY 81、究極女神三部位、冰雪轮頭最后、`D/8` 身份肖像、专属交替术法、九字段隐藏及 stage 49 主线结局入口 | Draft 0.2 / 已接受 |
-| [`vertical-slices/stage-49.md`](vertical-slices/stage-49.md) | SAY 70、二十二张战绩卡、四段条件尾声、v73 战绩计数及隐藏 stage 38 边界 | Draft 0.1 / 已验证，等待用户复验 |
+| [`vertical-slices/stage-49.md`](vertical-slices/stage-49.md) | SAY 70、二十二张战绩卡、四段尾声（三段条件分支、一段固定）、v73 战绩计数及隐藏 stage 38 边界 | Draft 0.1 / 已验证，等待用户复验 |
 | [`ui/stage-00-ui-flow.md`](ui/stage-00-ui-flow.md) | 第 0 关 UI 状态、输入语义与低保真构图 | Draft 0.7 / 已接受 |
 | [`ui/stage-01-ui-flow.md`](ui/stage-01-ui-flow.md) | 第 1 关部署状态、输入焦点与低保真构图 | Draft 0.1 / 正式接入与自动验收完成 |
 | [`systems/promotion.md`](systems/promotion.md) | 动作后转职扫描、强制选择与原子提交 | M00.5 / 已接受 |

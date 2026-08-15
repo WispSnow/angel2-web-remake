@@ -2,18 +2,27 @@ import type { Difficulty, StageId } from "./types";
 import { STAGE_RUNTIME_MANIFEST } from "./stage-runtime";
 import type { DebugRosterSourceId } from "./debug-roster-profiles";
 
+export type DebugStageId = StageId | "stage-49";
+
 export interface DebugScenarioDefinition {
   id: string;
-  stageId: StageId;
+  stageId: DebugStageId;
   title: string;
   phase: string;
   description: string;
   fixture?: boolean;
 }
 
-export function debugStageLabel(stageId: StageId): string {
+export function debugStageLabel(stageId: DebugStageId): string {
+  if (stageId === "stage-49") return "主線結局 · 四段尾聲";
   const stage = STAGE_RUNTIME_MANIFEST[stageId];
   return `第 ${stage.ordinal} 關 · ${stage.label}`;
+}
+
+/** Non-battle ending fixtures reuse the final implemented stage's roster and
+ * growth profile without pretending stage 49 is a playable stage runtime. */
+export function debugRosterStageId(stageId: DebugStageId): StageId {
+  return stageId === "stage-49" ? "stage-37" : stageId;
 }
 
 export const DEBUG_SCENARIOS = [
@@ -1944,6 +1953,70 @@ export const DEBUG_SCENARIOS = [
     title: "完成路由",
     phase: "Route to stage 49",
     description: "視為究極女神決戰已完成，可直接播放主線結局至隱藏第 38 關邊界。",
+    fixture: true,
+  },
+  {
+    id: "stage-49-family-cavalry",
+    stageId: "stage-49",
+    title: "職業尾聲 · 騎兵",
+    phase: "Epilogue 1/4 · selector 0",
+    description: "直接顯示槽 0–22 全為騎兵時的職業族群尾聲。",
+    fixture: true,
+  },
+  {
+    id: "stage-49-family-fighter",
+    stageId: "stage-49",
+    title: "職業尾聲 · 戰士",
+    phase: "Epilogue 1/4 · selector 1",
+    description: "直接顯示槽 0–22 全為戰士時的職業族群尾聲。",
+    fixture: true,
+  },
+  {
+    id: "stage-49-family-mage",
+    stageId: "stage-49",
+    title: "職業尾聲 · 法師",
+    phase: "Epilogue 1/4 · selector 2",
+    description: "直接顯示槽 0–22 全為法師時的職業族群尾聲。",
+    fixture: true,
+  },
+  {
+    id: "stage-49-warrior-statue",
+    stageId: "stage-49",
+    title: "戰士雕像",
+    phase: "Epilogue 2/4 · fixed",
+    description: "直接顯示原版等待上限為 0、Web 採用可見下限的固定雕像段。",
+    fixture: true,
+  },
+  {
+    id: "stage-49-save-count-100",
+    stageId: "stage-49",
+    title: "存檔 100 · 神將官",
+    phase: "Epilogue 3/4 · selector 1",
+    description: "以 SAVE_NUM = 100 直達妮雅成為神將官的臨界分支。",
+    fixture: true,
+  },
+  {
+    id: "stage-49-save-count-101",
+    stageId: "stage-49",
+    title: "存檔 101 · 女帝登基",
+    phase: "Epilogue 3/4 · selector 0",
+    description: "以 SAVE_NUM = 101 直達女帝重新登基的臨界分支。",
+    fixture: true,
+  },
+  {
+    id: "stage-49-record-total-100",
+    stageId: "stage-49",
+    title: "戰績 100 · 王朝繁盛",
+    phase: "Epilogue 4/4 · selector 0",
+    description: "以全 75 槽戰績總和 100 直達王朝歷久不衰與 MUSIC/40。",
+    fixture: true,
+  },
+  {
+    id: "stage-49-record-total-101",
+    stageId: "stage-49",
+    title: "戰績 101 · 王朝衰亡",
+    phase: "Epilogue 4/4 · selector 1",
+    description: "以全 75 槽戰績總和 101 直達王朝衰亡與 UN/49。",
     fixture: true,
   },
 ] as const satisfies readonly DebugScenarioDefinition[];

@@ -20,7 +20,11 @@ import {
   parseDebugPerStageGrowth,
   parseDebugRosterSourceId,
 } from "../../src/game/debug-roster-profiles";
-import { debugScenarioUrl } from "../../src/game/debug-scenario-catalog";
+import {
+  debugRosterStageId,
+  debugScenarioUrl,
+  debugStageLabel,
+} from "../../src/game/debug-scenario-catalog";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION, saveSlotKey } from "../../src/game/save";
 import { STAGE_RUNTIME_MANIFEST } from "../../src/game/stage-runtime";
 import type { BattleSaveData, CompletedSaveData, StageId } from "../../src/game/types";
@@ -478,6 +482,12 @@ describe("debug roster profiles", () => {
       .toBe(
         "/?debugScenario=stage-04-player&difficulty=2&roster=promotion-coverage&growth=120",
       );
+    expect(debugScenarioUrl("stage-49-record-total-101", 0, "representative-growth", 100))
+      .toBe(
+        "/?debugScenario=stage-49-record-total-101&difficulty=0&roster=representative-growth&growth=100",
+      );
+    expect(debugRosterStageId("stage-49")).toBe("stage-37");
+    expect(debugStageLabel("stage-49")).toBe("主線結局 · 四段尾聲");
     expect(parseDebugPerStageGrowth("0")).toBe(0);
     expect(parseDebugPerStageGrowth("9999")).toBe(9999);
     expect(parseDebugPerStageGrowth(undefined)).toBeUndefined();

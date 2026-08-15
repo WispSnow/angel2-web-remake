@@ -1,5 +1,5 @@
 import "../debug.css";
-import { classDefinition } from "./content/classes";
+import { classDefinition, classStatsFor } from "./content/classes";
 import { STAGE0, completeCampaignRoster } from "./content/stage0";
 import { GameController } from "./controller";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "./save";
@@ -15,9 +15,11 @@ import type {
   CampaignState,
   CompletedSaveData,
   Difficulty,
+  UnitClassId,
 } from "./types";
 import {
   DEBUG_SCENARIOS,
+  debugRosterStageId,
   debugScenarioUrl,
   debugStageLabel,
   isDebugScenarioId,
@@ -3382,8 +3384,35 @@ async function createStage37Player(context: DebugScenarioContext): Promise<GameC
   return controller;
 }
 
-async function createStage37Completed(context: DebugScenarioContext): Promise<GameController> {
-  const campaign = debugCampaign(context, "stage-37");
+interface Stage49CompletedOptions {
+  familyClassId?: UnitClassId;
+  recordTotal?: number;
+  saveCount?: number;
+}
+
+async function createStage49CompletedController(
+  context: DebugScenarioContext,
+  options: Stage49CompletedOptions = {},
+): Promise<GameController> {
+  const source = debugCampaign(context, "stage-37");
+  const familyClassId = options.familyClassId;
+  const roster = familyClassId === undefined
+    ? source.roster.map((entry) => ({ ...entry }))
+    : source.roster.map((entry) => {
+      if (entry.slot > 22) return { ...entry };
+      const experience = 0;
+      return {
+        slot: entry.slot,
+        classId: familyClassId,
+        experience,
+        life: classStatsFor({ classId: familyClassId, experience }).maxLife,
+      };
+    });
+  const recordCounters = options.recordTotal === undefined
+    ? [...(source.recordCounters ?? Array<number>(75).fill(0))]
+    : Array<number>(75).fill(0);
+  if (options.recordTotal !== undefined) recordCounters[0] = options.recordTotal;
+  const campaign: CampaignState = { ...source, roster, recordCounters };
   const { Stage37Battle } = await import("./simulation/stage37-battle");
   const completedCampaign = new Stage37Battle(campaign, await stage37FullDeployment())
     .campaignSnapshot();
@@ -3393,7 +3422,7 @@ async function createStage37Completed(context: DebugScenarioContext): Promise<Ga
     contentVersion: SAVE_CONTENT_VERSION,
     kind: "completed",
     savedAt: "2000-01-01T00:00:00.000Z",
-    saveCount: 1,
+    saveCount: options.saveCount ?? 1,
     stageId: "stage-49",
     stageLabel: "主線結局",
     ruleset: campaign.ruleset,
@@ -3406,6 +3435,38 @@ async function createStage37Completed(context: DebugScenarioContext): Promise<Ga
     consumedEventIds: [...STAGE37_COMPLETED_EVENT_IDS],
   };
   return GameController.fromSave(save, 1);
+}
+
+async function createStage37Completed(context: DebugScenarioContext): Promise<GameController> {
+  return createStage49CompletedController(context);
+}
+
+interface Stage49EpilogueFixture extends Stage49CompletedOptions {
+  epilogueIndex: 0 | 1 | 2 | 3;
+  statusMessage: string;
+}
+
+async function createStage49Epilogue(
+  context: DebugScenarioContext,
+  fixture: Stage49EpilogueFixture,
+): Promise<GameController> {
+  const controller = await createStage49CompletedController(context, fixture);
+  controller.beginStage49Ending();
+  for (let guard = 0; controller.stage49Ending?.section !== "epilogue"; guard += 1) {
+    if (guard >= 100 || !controller.stage49Ending) {
+      throw new Error("stage 49 debug fixture could not reach the epilogue");
+    }
+    controller.advanceStage49Ending();
+  }
+  while (controller.stage49Ending.index < fixture.epilogueIndex) {
+    controller.advanceStage49Ending();
+  }
+  if (controller.stage49Ending.section !== "epilogue"
+    || controller.stage49Ending.index !== fixture.epilogueIndex) {
+    throw new Error(`stage 49 debug fixture missed epilogue ${fixture.epilogueIndex + 1}`);
+  }
+  controller.statusMessage = fixture.statusMessage;
+  return controller;
 }
 
 export async function createDebugScenarioController(
@@ -4563,6 +4624,51 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.forceVictoryForTest();
   }),
   "stage-37-cleared": createStage37Completed,
+  "stage-49-family-cavalry": (context) => createStage49Epilogue(context, {
+    epilogueIndex: 0,
+    familyClassId: "cavalry",
+    recordTotal: 0,
+    statusMessage: "調試場景：職業族群尾聲的騎兵分支。",
+  }),
+  "stage-49-family-fighter": (context) => createStage49Epilogue(context, {
+    epilogueIndex: 0,
+    familyClassId: "warrior",
+    recordTotal: 0,
+    statusMessage: "調試場景：職業族群尾聲的戰士分支。",
+  }),
+  "stage-49-family-mage": (context) => createStage49Epilogue(context, {
+    epilogueIndex: 0,
+    familyClassId: "magician",
+    recordTotal: 0,
+    statusMessage: "調試場景：職業族群尾聲的法師分支。",
+  }),
+  "stage-49-warrior-statue": (context) => createStage49Epilogue(context, {
+    epilogueIndex: 1,
+    recordTotal: 0,
+    statusMessage: "調試場景：固定戰士雕像尾聲。",
+  }),
+  "stage-49-save-count-100": (context) => createStage49Epilogue(context, {
+    epilogueIndex: 2,
+    saveCount: 100,
+    recordTotal: 0,
+    statusMessage: "調試場景：SAVE_NUM = 100 的神將官分支。",
+  }),
+  "stage-49-save-count-101": (context) => createStage49Epilogue(context, {
+    epilogueIndex: 2,
+    saveCount: 101,
+    recordTotal: 0,
+    statusMessage: "調試場景：SAVE_NUM = 101 的女帝登基分支。",
+  }),
+  "stage-49-record-total-100": (context) => createStage49Epilogue(context, {
+    epilogueIndex: 3,
+    recordTotal: 100,
+    statusMessage: "調試場景：全員戰績總和 100 的王朝繁盛分支。",
+  }),
+  "stage-49-record-total-101": (context) => createStage49Epilogue(context, {
+    epilogueIndex: 3,
+    recordTotal: 101,
+    statusMessage: "調試場景：全員戰績總和 101 的王朝衰亡分支。",
+  }),
 } as const satisfies Record<DebugScenarioId, DebugScenarioFactory>;
 
 export interface Angel2DeveloperApi {
@@ -4630,20 +4736,22 @@ export function mountDebugToolbar(
   const scenario = DEBUG_SCENARIOS.find(({ id }) => id === scenarioId);
   const rosterOption = debugRosterSourceOption(rosterSource, storage);
   const growthBudget = scenario && perStageGrowth !== undefined
-    ? debugGrowthBudgetForStage(scenario.stageId, perStageGrowth)
+    ? debugGrowthBudgetForStage(debugRosterStageId(scenario.stageId), perStageGrowth)
     : undefined;
 
   const render = () => {
-    scenarioLabel.textContent = `${debugStageLabel(controller.battle.stage.id)} · ${scenario?.title ?? scenarioId}`;
+    scenarioLabel.textContent = `${
+      debugStageLabel(scenario?.stageId ?? controller.battle.stage.id)
+    } · ${scenario?.title ?? scenarioId}`;
     rosterLabel.textContent = `成長：${rosterOption.label}`;
     experienceLabel.textContent = perStageGrowth === undefined || growthBudget === undefined
       ? "每關成長：沿用成長檔案"
       : `每關成長：${perStageGrowth} · 本關成長預算：${growthBudget}`;
-    stateLabel.textContent = `${controller.battle.stage.id} · ${controller.phase}`;
+    stateLabel.textContent = `${scenario?.stageId ?? controller.battle.stage.id} · ${controller.phase}`;
     const battleActive = controller.phase === "player";
     victory.disabled = !battleActive;
     defeat.disabled = !battleActive;
-    complete.disabled = controller.phase === "nextStage";
+    complete.disabled = controller.phase === "nextStage" || controller.phase === "ending";
   };
   const unsubscribe = controller.onChange(render);
   render();

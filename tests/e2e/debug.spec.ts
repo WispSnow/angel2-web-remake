@@ -73,6 +73,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "第 34 關 · 時空異變",
     "第 35 關 · 異世界的碧娜維姬",
     "第 36 關 · 究極女神",
+    "主線結局 · 四段尾聲",
   ]);
   const titleOffsets = await page.locator(".debug-stage-heading h2").evaluateAll((headings) =>
     headings.map((heading) => Math.round(heading.getBoundingClientRect().left)));
@@ -274,6 +275,14 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-37-near-defeat",
     "stage-37-victory-ready",
     "stage-37-cleared",
+    "stage-49-family-cavalry",
+    "stage-49-family-fighter",
+    "stage-49-family-mage",
+    "stage-49-warrior-statue",
+    "stage-49-save-count-100",
+    "stage-49-save-count-101",
+    "stage-49-record-total-100",
+    "stage-49-record-total-101",
   ]) {
     await expect(page.getByTestId(`debug-scenario-${scenarioId}`)).toBeVisible();
   }
@@ -297,10 +306,15 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     .toHaveCount(6);
   await expect(page.locator('[data-debug-stage-id="stage-37"] [data-debug-scenario-id]'))
     .toHaveCount(7);
+  await expect(page.locator('[data-debug-stage-id="stage-49"] [data-debug-scenario-id]'))
+    .toHaveCount(8);
   await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
   await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");
   await captureVisualAudit(page.locator('[data-debug-stage-id="stage-03"]'), {
     path: `${ARTIFACT_DIR}/debug-stage3-dual-defeat-fixtures.png`,
+  });
+  await captureVisualAudit(page.locator('[data-debug-stage-id="stage-49"]'), {
+    path: `${ARTIFACT_DIR}/debug-stage49-epilogue-fixtures.png`,
   });
   const prebattleCard = page.getByTestId("debug-scenario-stage-00-prebattle");
   await expect(prebattleCard.locator(".debug-scenario-title")).toHaveText("關前劇情");
@@ -433,6 +447,101 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     experience: 100,
   }));
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/debug-stage1-deployment.png` });
+});
+
+test("debug hub stage-49 fixtures directly expose every epilogue result", async ({ page }) => {
+  const cases = [
+    {
+      id: "stage-49-family-cavalry",
+      index: 0,
+      segment: "dominantClassFamily",
+      selector: "0",
+      text: "只有騎兵一職",
+      family: "cavalry",
+      music: "MUSIC/40",
+    },
+    {
+      id: "stage-49-family-fighter",
+      index: 0,
+      segment: "dominantClassFamily",
+      selector: "1",
+      text: "愛斯嘉的英雄",
+      family: "fighter",
+      music: "MUSIC/40",
+    },
+    {
+      id: "stage-49-family-mage",
+      index: 0,
+      segment: "dominantClassFamily",
+      selector: "2",
+      text: "近半數的兵力投入法術",
+      family: "mage",
+      music: "MUSIC/40",
+    },
+    {
+      id: "stage-49-warrior-statue",
+      index: 1,
+      segment: "warriorStatue",
+      selector: "0",
+      text: "興建了一座戰士雕像",
+      music: "MUSIC/40",
+    },
+    {
+      id: "stage-49-save-count-100",
+      index: 2,
+      segment: "saveCountOutcome",
+      selector: "1",
+      text: "神將官",
+      music: "MUSIC/40",
+    },
+    {
+      id: "stage-49-save-count-101",
+      index: 2,
+      segment: "saveCountOutcome",
+      selector: "0",
+      text: "重新舉行登基大典",
+      music: "MUSIC/40",
+    },
+    {
+      id: "stage-49-record-total-100",
+      index: 3,
+      segment: "recordTotalOutcome",
+      selector: "0",
+      text: "歷久不衰",
+      music: "MUSIC/40",
+    },
+    {
+      id: "stage-49-record-total-101",
+      index: 3,
+      segment: "recordTotalOutcome",
+      selector: "1",
+      text: "結束了輝煌的傳奇霸業",
+      music: "UN/49",
+    },
+  ] as const;
+
+  for (const fixture of cases) {
+    await page.goto(`/?debugScenario=${fixture.id}&difficulty=0&test=1`);
+    const epilogue = page.getByTestId("stage49-epilogue");
+    await expect(epilogue).toBeVisible();
+    await expect(epilogue).toHaveAttribute("data-segment", fixture.segment);
+    await expect(epilogue).toHaveAttribute("data-selector", fixture.selector);
+    await expect(epilogue).toContainText(fixture.text);
+    await expect(page.locator("#app")).toHaveAttribute("data-music-track", fixture.music);
+    await expect(page.getByTestId("debug-toolbar")).toContainText("主線結局 · 四段尾聲");
+    const ending = await page.evaluate(() => {
+      const state = window.__ANGEL2_DEBUG__?.getState() as {
+        stage49Ending?: { index: number; dominantClassFamily: string };
+      } | undefined;
+      return state?.stage49Ending;
+    });
+    expect(ending?.index).toBe(fixture.index);
+    if ("family" in fixture) expect(ending?.dominantClassFamily).toBe(fixture.family);
+  }
+
+  await captureVisualAudit(page, {
+    path: `${ARTIFACT_DIR}/debug-stage49-record-decline.png`,
+  });
 });
 
 test("one per-stage growth budget advances the stage-five profession", async ({ page }) => {
