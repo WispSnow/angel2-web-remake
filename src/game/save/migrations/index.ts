@@ -299,6 +299,33 @@ function finalizeDirectMigration(value: unknown): SaveData | undefined {
   return isSaveData(restoredEliola) ? restoredEliola : undefined;
 }
 
+function migrateVersion71Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 71
+    || value.contentVersion !== "stage-37-ultimate-goddess-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+    ...(value.kind === "battle"
+      && value.stageId === "stage-37"
+      && isRecord(value.battle)
+      && Array.isArray(value.battle.units)
+      ? {
+          battle: {
+            ...value.battle,
+            units: value.battle.units.map((unit) => isRecord(unit)
+              && unit.side === 2
+              && (unit.classId === "head" || unit.classId === "hand")
+              ? { ...unit, portrait: 8 }
+              : unit),
+          },
+        }
+      : {}),
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
 function migrateVersion70Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 70
@@ -2099,6 +2126,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion71 = migrateVersion71Save(value);
+    if (migratedVersion71) return migratedVersion71;
     const migratedVersion70 = migrateVersion70Save(value);
     if (migratedVersion70) return migratedVersion70;
     const migratedVersion69 = migrateVersion69Save(value);

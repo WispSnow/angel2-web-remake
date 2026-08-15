@@ -627,6 +627,22 @@ test("all four ice tiers expand one complete six-frame ring at a time", async ({
     await expect(canvas).toHaveAttribute("data-effect-tile-count", "0");
     expect(Number(await canvas.getAttribute("data-frozen-unit-count"))).toBeGreaterThan(0);
   }
+
+  await page.getByTestId("technique-lab-side").selectOption("2");
+  await page.getByTestId("technique-lab-class").selectOption("head");
+  await page.getByRole("button", { name: "放置／替換" }).click();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("technique laboratory canvas has no bounds");
+  await canvas.click({
+    position: {
+      x: (23 - 15 + .5) * box.width / 16,
+      y: (18 - 13 + .5) * box.height / 11,
+    },
+  });
+  await action.selectOption("1C");
+  await seek(page, 1200);
+  await expect(canvas).toHaveAttribute("data-frozen-unit-count", "0");
+  await expect(page.locator('[data-readout="result"]')).toContainText("冰封 0 名");
   expect(pageErrors).toEqual([]);
 });
 
@@ -1135,6 +1151,13 @@ test("IP plays both poison phases, preserves boss immunity, and stays below a pe
     .toContainText("龍／頭／手免疫寫入");
   await seek(page, 2900);
   await expect(page.locator('[data-readout="result"]')).toContainText("免疫中毒寫入");
+  await page.getByTestId("technique-lab-class").selectOption("head");
+  await page.getByRole("button", { name: "放置／替換" }).click();
+  await clickCell(23, 18);
+  await expect(page.locator('[data-readout="affected"]'))
+    .toContainText("龍／頭／手免疫寫入");
+  await seek(page, 2900);
+  await expect(page.locator('[data-readout="result"]')).toContainText("免疫中毒寫入");
   expect(pageErrors).toEqual([]);
 });
 
@@ -1201,6 +1224,13 @@ test("LA plays eleven silent 3x2 descriptors, preserves boss immunity, and stays
 
   await page.getByTestId("technique-lab-side").selectOption("2");
   await page.getByTestId("technique-lab-class").selectOption("dragon");
+  await page.getByRole("button", { name: "放置／替換" }).click();
+  await clickCell(23, 18);
+  await expect(page.locator('[data-readout="affected"]'))
+    .toContainText("龍／頭／手免疫寫入");
+  await seek(page, 1650);
+  await expect(page.locator('[data-readout="result"]')).toContainText("免疫混亂寫入");
+  await page.getByTestId("technique-lab-class").selectOption("hand");
   await page.getByRole("button", { name: "放置／替換" }).click();
   await clickCell(23, 18);
   await expect(page.locator('[data-readout="affected"]'))
@@ -1430,6 +1460,19 @@ test("SN plays nine silent 3x2 descriptors, preserves dragon immunity, and stays
   await expect(page.locator('[data-readout="affected"]')).toContainText("龍免疫寫入");
   await seek(page, 2250);
   await expect(page.locator('[data-readout="result"]')).toContainText("龍免疫禁咒寫入");
+
+  await page.getByTestId("technique-lab-class").selectOption("head");
+  await page.getByRole("button", { name: "放置／替換" }).click();
+  await clickCell(23, 18);
+  await expect(page.locator('[data-readout="affected"]'))
+    .toContainText("禁咒狀態 3 · 頭／手專屬行動不受影響");
+  await seek(page, 2250);
+  await expect(page.locator('[data-readout="result"]'))
+    .toContainText("頭／手專屬行動不讀取此狀態");
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/technique-lab-spell-seal-head.png",
+    fullPage: true,
+  });
   expect(pageErrors).toEqual([]);
 });
 

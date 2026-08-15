@@ -1907,6 +1907,14 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-37-status-audit",
+    stageId: "stage-37",
+    title: "負面狀態／控制查驗",
+    phase: "Round 1",
+    description: "多莉可施放禁咒，驗證頭／手寫入狀態但專屬行動不受封鎖。",
+    fixture: true,
+  },
+  {
     id: "stage-37-near-victory",
     stageId: "stage-37",
     title: "三部位近乎擊破",

@@ -131,8 +131,7 @@ export class Stage37Battle extends Stage0Battle {
       : actionId === "lightning-4" || actionId === "fire-4";
     return classAction
       && !actor.acted
-      && !actor.actionDisabled
-      && actor.statuses.techniqueSeal === 0;
+      && !actor.actionDisabled;
   }
 
   protected override allowsUnboundedSpecialTarget(
@@ -202,6 +201,17 @@ export class Stage37Battle extends Stage0Battle {
       };
     }
     return super.planEnemyAiAction(id);
+  }
+
+  override enemyActionOrder(): string[] {
+    const nativeOrder = super.enemyActionOrder();
+    if (this.headActionToggle === 0) return nativeOrder;
+    // REMAKE-085: frozen units cannot be damaged in stableRemake, so the
+    // head's ice turn resolves after both hands have spent their actions.
+    return [
+      ...nativeOrder.filter((id) => this.unit(id)?.classId !== "head"),
+      ...nativeOrder.filter((id) => this.unit(id)?.classId === "head"),
+    ];
   }
 
   override selectNextEnemyAiAction(candidateIds: readonly string[]): AiActionSelection | undefined {

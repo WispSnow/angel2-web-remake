@@ -269,6 +269,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-36-cleared",
     "stage-37-deployment",
     "stage-37-player",
+    "stage-37-status-audit",
     "stage-37-near-victory",
     "stage-37-near-defeat",
     "stage-37-victory-ready",
@@ -295,7 +296,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.locator('[data-debug-stage-id="stage-36"] [data-debug-scenario-id]'))
     .toHaveCount(6);
   await expect(page.locator('[data-debug-stage-id="stage-37"] [data-debug-scenario-id]'))
-    .toHaveCount(6);
+    .toHaveCount(7);
   await expect(page.getByTestId("debug-scenario-stage-03-himi-defeat")).toContainText("希蜜戰敗");
   await expect(page.getByTestId("debug-scenario-stage-03-daisy-defeat")).toContainText("黛西戰敗");
   await captureVisualAudit(page.locator('[data-debug-stage-id="stage-03"]'), {

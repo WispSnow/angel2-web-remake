@@ -44,9 +44,9 @@ describe("stage 37 generated content", () => {
     expect(STAGE37_DEFINITION.deployment.openCells).toHaveLength(26);
     expect(STAGE37_SEMANTIC_ALLIED_UNITS).toHaveLength(29);
     expect(STAGE37_SEMANTIC_ENEMY_UNITS).toEqual([
-      expect.objectContaining({ slot: 56, classId: "head", position: { x: 23, y: 11 } }),
-      expect.objectContaining({ slot: 54, classId: "hand", position: { x: 22, y: 12 } }),
-      expect.objectContaining({ slot: 55, classId: "hand", position: { x: 24, y: 12 } }),
+      expect.objectContaining({ slot: 56, classId: "head", portrait: 8, position: { x: 23, y: 11 } }),
+      expect.objectContaining({ slot: 54, classId: "hand", portrait: 8, position: { x: 22, y: 12 } }),
+      expect.objectContaining({ slot: 55, classId: "hand", portrait: 8, position: { x: 24, y: 12 } }),
     ]);
     expect(STAGE37_TERRAIN_TOKENS).toHaveLength(2500);
   });
@@ -60,13 +60,38 @@ describe("stage 37 generated content", () => {
       visibleObjectiveRecord: { record: 105 },
       enemyReinforcements: { kind: "none", initialSide2: 3 },
       completedRoute: { module: 25, stage: 49, replayPresentation: false },
-      stableRemakeDecisions: ["REMAKE-005", "REMAKE-013", "REMAKE-084"],
+      stableRemakeDecisions: ["REMAKE-005", "REMAKE-013", "REMAKE-084", "REMAKE-085"],
     });
     expect(STAGE37_EVENT_PROGRAM.visibleObjectiveRecord.conflict).toContain("all side-2 parts");
     expect(STAGE37_EVENT_PROGRAM.enemyReinforcements.auditedSources).toEqual([
       "initial-template", "round-event-handler", "dynamic-board-catalog",
       "full-round-special-chain", "defeat-replacement-and-form-chain",
     ]);
+    expect(STAGE37_EVENT_PROGRAM.boss.statusAndControl).toEqual({
+      ice: {
+        immuneClasses: ["head", "hand"],
+        effect: "no displacement or action disable",
+      },
+      confusion: { immuneClasses: ["head", "hand"], stateWrite: false },
+      poison: { immuneClasses: ["head", "hand"], stateWrite: false },
+      attackDown: { immuneClasses: [], stateWrite: true, fixedDelta: -20 },
+      defenseDown: { immuneClasses: [], stateWrite: true, fixedDelta: -20 },
+      spellSeal: {
+        immuneClasses: [],
+        stateWrite: true,
+        blocksDedicatedBossActions: false,
+      },
+    });
+    expect(STAGE37_EVENT_PROGRAM.boss.actionOrder).toEqual({
+      recoveryRound: ["head", "left-hand", "right-hand"],
+      iceRound: ["left-hand", "right-hand", "head"],
+    });
+    expect(STAGE37_EVENT_PROGRAM.boss.portraitIdentity).toEqual({
+      name: "碧娜維姬",
+      portraitRecord: 8,
+      nativePartPortraitSentinel: 255,
+      nativeClassFallbackPortraitRecord: 51,
+    });
   });
 
   it("registers SAY/0081, native music, and the stage-49 ending boundary", () => {

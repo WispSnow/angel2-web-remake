@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { classDefinition, className, type ClassId } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE37_DEFINITION } from "../../src/game/content/stage37";
 import {
@@ -36,6 +37,22 @@ const fullDeployment = {
   ],
 };
 
+function configureCaster(
+  battle: Stage37Battle,
+  classId: ClassId,
+  tier: 1 | 2 | 3,
+) {
+  const actor = battle.unit("1:0")!;
+  actor.classId = classId;
+  actor.className = className(classId);
+  actor.experience = classDefinition(classId).dataRows[tier - 1].experienceThreshold;
+  actor.x = 23;
+  actor.y = 13;
+  actor.acted = false;
+  actor.actionDisabled = false;
+  return actor;
+}
+
 describe("stage 37 battle simulation", () => {
   it("builds the 27-person decision force and three independent boss parts", () => {
     expect(createStage37DeploymentRoster(campaign)).toHaveLength(29);
@@ -69,7 +86,7 @@ describe("stage 37 battle simulation", () => {
     expect(battle.outcome()).toBe("defeat");
   });
 
-  it("keeps every boss part immobile and follows native head/hand action order", () => {
+  it("keeps every boss part immobile and moves only the ice-casting head behind both hands", () => {
     const battle = new Stage37Battle(campaign, fullDeployment);
     expect(battle.movementPath("2:56", { x: 23, y: 12 })).toEqual([]);
     expect(battle.enemyActionOrder()).toEqual(["2:56", "2:54", "2:55"]);
@@ -81,7 +98,27 @@ describe("stage 37 battle simulation", () => {
       actionId: head.actionId!,
       targetId: head.targetId,
     }));
+    for (const id of ["2:54", "2:55"]) {
+      const hand = battle.planEnemyAiAction(id)!;
+      battle.commitPreparedAction(battle.prepareSpecialAction({
+        actorId: hand.unitId,
+        actionId: hand.actionId!,
+        targetId: hand.targetId,
+      }));
+    }
     battle.startNextRound();
+    expect(battle.enemyActionOrder()).toEqual(["2:54", "2:55", "2:56"]);
+    expect(battle.selectNextEnemyAiAction(["2:56", "2:54", "2:55"]))
+      .toMatchObject({ unitId: "2:54", action: { actionId: "lightning-4" } });
+    for (const id of ["2:54", "2:55"]) {
+      const hand = battle.planEnemyAiAction(id)!;
+      battle.commitPreparedAction(battle.prepareSpecialAction({
+        actorId: hand.unitId,
+        actionId: hand.actionId!,
+        targetId: hand.targetId,
+      }));
+    }
+    expect(battle.enemyActionOrder()).toEqual(["2:56"]);
     expect(battle.planEnemyAiAction("2:56")).toMatchObject({ actionId: "ice-3" });
   });
 
@@ -105,6 +142,79 @@ describe("stage 37 battle simulation", () => {
     const restored = new Stage37Battle(campaign, fullDeployment);
     restored.restore(snapshot, campaign.roster);
     expect(restored.planEnemyAiAction("2:55")).toMatchObject({ actionId: "fire-4" });
+  });
+
+  it("reproduces the native head/hand status matrix and keeps seal outside their dedicated dispatcher", () => {
+    const battle = new Stage37Battle(campaign, fullDeployment);
+    const head = battle.unit("2:56")!;
+    const leftHand = battle.unit("2:54")!;
+    const rightHand = battle.unit("2:55")!;
+
+    const iceCaster = configureCaster(battle, "magician", 1);
+    const ice = battle.prepareSpecialAction({ actionId: "ice-1", actorId: iceCaster.id });
+    expect(ice.result.affectedUnits).toEqual(expect.arrayContaining([
+      expect.objectContaining({ unitId: head.id, blocked: true, blockReason: "classImmune", moved: false, actionDisabledAfter: false }),
+      expect.objectContaining({ unitId: leftHand.id, blocked: true, blockReason: "classImmune", moved: false, actionDisabledAfter: false }),
+      expect.objectContaining({ unitId: rightHand.id, blocked: true, blockReason: "classImmune", moved: false, actionDisabledAfter: false }),
+    ]));
+
+    const curseCaster = configureCaster(battle, "curse-master", 3);
+    for (const [actionId, target] of [
+      ["confusion", head],
+      ["poison", leftHand],
+    ] as const) {
+      const prepared = battle.prepareSpecialAction({
+        actionId,
+        actorId: curseCaster.id,
+        targetId: target.id,
+      });
+      expect(prepared.result).toMatchObject({ blocked: true, blockReason: "classImmune" });
+      battle.commitPreparedAction(prepared);
+      expect(target.statuses[actionId]).toBe(0);
+      curseCaster.acted = false;
+    }
+
+    const attackDown = battle.prepareSpecialAction({
+      actionId: "attack-down",
+      actorId: curseCaster.id,
+      targetId: head.id,
+    });
+    expect(attackDown.result.blocked).toBe(false);
+    battle.commitPreparedAction(attackDown);
+    curseCaster.acted = false;
+
+    const priest = configureCaster(battle, "magic-priest", 1);
+    const defenseDown = battle.prepareSpecialAction({
+      actionId: "defense-down",
+      actorId: priest.id,
+      targetId: head.id,
+    });
+    expect(defenseDown.result.blocked).toBe(false);
+    battle.commitPreparedAction(defenseDown);
+    expect(head.statuses).toMatchObject({ attackDown: 3, defenseDown: 3 });
+    expect(battle.effectiveStatsFor(head)).toMatchObject({ attack: 80, defense: 0 });
+
+    configureCaster(battle, "curse-master", 3);
+    for (const target of [head, leftHand, rightHand]) {
+      const sealed = battle.prepareSpecialAction({
+        actionId: "spell-seal",
+        actorId: curseCaster.id,
+        targetId: target.id,
+      });
+      expect(sealed.result.blocked).toBe(false);
+      battle.commitPreparedAction(sealed);
+      expect(target.statuses.techniqueSeal).toBe(3);
+      curseCaster.acted = false;
+    }
+
+    expect(battle.planEnemyAiAction(head.id)).toMatchObject({ actionId: "recovery-3" });
+    expect(battle.planEnemyAiAction(leftHand.id)).toMatchObject({ actionId: "lightning-4" });
+    const sealedHeadAction = battle.prepareSpecialAction({
+      actorId: head.id,
+      actionId: "recovery-3",
+      targetId: head.id,
+    });
+    expect(() => battle.commitPreparedAction(sealedHeadAction)).not.toThrow();
   });
 
   it("never creates reinforcements or replacement forms", () => {
@@ -165,6 +275,35 @@ describe("stage 37 battle simulation", () => {
           : unit),
       },
     })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:56"
+          ? { ...unit, portrait: 51 as const }
+          : unit),
+      },
+    })).toBe(false);
+
+    const migrated = parseSaveData(JSON.stringify({
+      ...save,
+      version: 71,
+      contentVersion: "stage-37-ultimate-goddess-1",
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.side === 2
+          ? { ...unit, portrait: 51 }
+          : unit),
+      },
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      stageId: "stage-37",
+    });
+    expect(migrated?.kind === "battle"
+      ? migrated.battle.units.filter(({ side }) => side === 2).map(({ portrait }) => portrait)
+      : []).toEqual([8, 8, 8]);
   });
 
   it("migrates the legal v70 stage-37 boundary but rejects unshipped battles and stage-49 saves", () => {

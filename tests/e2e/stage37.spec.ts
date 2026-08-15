@@ -21,7 +21,9 @@ interface Stage37State {
     x: number;
     y: number;
     life: number;
+    statuses: { techniqueSeal: number };
   }>;
+  lastSpecialAction?: { actionId: string; actorId: string };
 }
 
 const state = (page: Page) => page.evaluate(
@@ -95,15 +97,24 @@ test("S37-F: boss HUD conceals all numeric fields while preserving the gauges", 
   const detail = page.getByTestId("unit-detail");
   await expect(detail).toHaveAttribute("data-concealed-stats", "true");
   await expect(detail).toContainText("?????／?????");
+  await expect(page.getByTestId("unit-portrait"))
+    .toHaveAttribute("src", "/assets/original/portraits/0008/base.png");
   await expect(page.getByTestId("hp-bar")).toHaveAttribute("aria-label", "生命數值隱藏");
   await expect(page.getByTestId("exp-bar")).toHaveAttribute("aria-label", "經驗數值隱藏");
   await expect(page.getByTestId("hp-bar").locator("i")).toHaveAttribute("style", /height:100%/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage37-concealed-boss-hud.png`,
   });
+
+  await clickCell(page, 22, 12);
+  await expect(page.getByTestId("unit-portrait"))
+    .toHaveAttribute("src", "/assets/original/portraits/0008/base.png");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage37-hand-bina-portrait.png`,
+  });
 });
 
-test("S37-G: a complete enemy phase executes all three immobile boss parts", async ({ page }) => {
+test("S37-G: the ice round lets both immobile hands act before the head", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-player&difficulty=0&test=1");
   await waitForPhase(page, "player");
   const bossPositions = (await state(page)).units.filter(({ side }) => side === 2)
@@ -119,7 +130,20 @@ test("S37-G: a complete enemy phase executes all three immobile boss parts", asy
   });
   expect((await state(page)).units.filter(({ side }) => side === 2)
     .map(({ id, x, y }) => ({ id, x, y }))).toEqual(bossPositions);
+  expect((await state(page)).lastSpecialAction)
+    .toMatchObject({ actionId: "fire-4", actorId: "2:55" });
   await expect(page.getByTestId("status-strip")).toContainText("第 2 回合");
+
+  await page.keyboard.press("F1");
+  if (await confirmation.isVisible()) await confirmation.click();
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage37State | undefined;
+    return current?.phase === "player" && current.round === 3;
+  });
+  expect((await state(page)).lastSpecialAction)
+    .toMatchObject({ actionId: "ice-3", actorId: "2:56" });
+  expect((await state(page)).units.filter(({ side }) => side === 2)
+    .map(({ id, x, y }) => ({ id, x, y }))).toEqual(bossPositions);
 });
 
 test("S37-H: Nia defeat retries deployment", async ({ page }) => {
@@ -138,7 +162,7 @@ test("S37-H: Nia defeat retries deployment", async ({ page }) => {
   });
 });
 
-test("S37-I: victory saves v71 and stops at the native stage-49 ending boundary", async ({ page }) => {
+test("S37-I: victory saves v72 and stops at the native stage-49 ending boundary", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("status-strip")).toContainText("頭與兩隻手已全部被擊破");
@@ -183,4 +207,45 @@ test("S37-I: victory saves v71 and stops at the native stage-49 ending boundary"
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage37-stage49-ending-boundary.png`,
   });
+});
+
+test("S37-J: spell seal is visible on a hand but does not block its dedicated action", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-37-status-audit&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  const hint = page.locator("#hint-toast");
+  if (await hint.isVisible()) {
+    await hint.click();
+    await page.getByRole("button", { name: "返回戰場" }).click();
+  }
+  await page.evaluate(() => window.__ANGEL2__?.setPresentationFast(true));
+
+  await clickCell(page, 27, 15);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-spell-seal").click();
+  await clickCell(page, 24, 12);
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage37State | undefined;
+    return current?.lastSpecialAction?.actionId === "spell-seal";
+  });
+  expect((await state(page)).units.find(({ id }) => id === "2:55")?.statuses.techniqueSeal)
+    .toBe(3);
+  await expect(page.getByTestId("status-strip")).toContainText("專屬行動不受影響");
+
+  await clickCell(page, 24, 12);
+  await expect(page.getByTestId("status-icon-techniqueSeal"))
+    .toHaveAttribute("data-remaining-rounds", "3");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage37-spell-sealed-hand.png`,
+  });
+
+  await page.keyboard.press("F1");
+  const confirmation = page.getByTestId("dialogue-layer");
+  if (await confirmation.isVisible()) await confirmation.click();
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage37State | undefined;
+    return current?.phase === "player" && current.round === 2;
+  });
+  const after = await state(page);
+  expect(after.lastSpecialAction).toMatchObject({ actionId: "fire-4", actorId: "2:55" });
+  expect(after.units.find(({ id }) => id === "2:55")?.statuses.techniqueSeal).toBe(2);
 });

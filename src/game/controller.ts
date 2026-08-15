@@ -2091,7 +2091,9 @@ export class GameController {
         : actionId === "spell-seal" && targetPresentation
           ? result.blockReason === "classImmune"
             ? `${targetPresentation.name}完整承受禁咒演出，但龍職業免疫狀態寫入。`
-            : `${targetPresentation.name}遭到禁咒，狀態重置為 3。`
+            : targetPresentation.classId === "head" || targetPresentation.classId === "hand"
+              ? `${targetPresentation.name}遭到禁咒，狀態重置為 3；專屬行動不受影響。`
+              : `${targetPresentation.name}遭到禁咒，狀態重置為 3。`
         : actionId === HALF_DRAGON_TELEPORT_ACTION_ID
           ? `${actorPresentation.name}已傳送至（${result.target.x}, ${result.target.y}）。`
         : actionId === "lightning-1" || actionId === "lightning-2" || actionId === "lightning-3"
@@ -3267,7 +3269,9 @@ export class GameController {
             : action.actionId === "spell-seal"
               ? result.blockReason === "classImmune"
                 ? `${target.name}免疫禁咒。`
-                : `${unit.name}使${target.name}遭到禁咒，狀態重置為 3。`
+                : target.classId === "head" || target.classId === "hand"
+                  ? `${unit.name}使${target.name}遭到禁咒，狀態重置為 3；專屬行動不受影響。`
+                  : `${unit.name}使${target.name}遭到禁咒，狀態重置為 3。`
             : result.blocked
             ? `${target.name}的魔法防禦抵消了攻擊。`
             : result.healing > 0

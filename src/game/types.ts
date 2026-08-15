@@ -245,8 +245,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 71;
-  contentVersion: "stage-37-ultimate-goddess-1";
+  version: 72;
+  contentVersion: "stage-37-ice-last-portrait-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

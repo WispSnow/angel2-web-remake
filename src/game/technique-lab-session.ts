@@ -394,7 +394,9 @@ export class TechniqueLabSession {
       && this.affectedUnits().some(({ id }) => id === unit.id)) {
       return TECHNIQUE_LAB_SPELL_SEAL.immuneClassIds.some((classId) => classId === unit.classId)
         ? "完整演出 · 龍免疫寫入"
-        : `禁咒狀態 ${TECHNIQUE_LAB_SPELL_SEAL.statusCounter} · 技術不可用`;
+        : unit.classId === "head" || unit.classId === "hand"
+          ? `禁咒狀態 ${TECHNIQUE_LAB_SPELL_SEAL.statusCounter} · 頭／手專屬行動不受影響`
+          : `禁咒狀態 ${TECHNIQUE_LAB_SPELL_SEAL.statusCounter} · 技術不可用`;
     }
     if (this.current.actionCode === "OJ") {
       const preview = this.prayerPreview().find((candidate) => candidate.unit.id === unit.id);

@@ -2,7 +2,7 @@ import type { MusicProgram } from "../music-transport";
 import type { PortraitRecord, Position, UnitClassId } from "../types";
 import * as actionContent from "./stage1-actions.generated";
 import { registerActionContent } from "./actions";
-import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./classes";
+import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
 import { registerStageMusicPrograms } from "./music";
@@ -125,7 +125,7 @@ export const STAGE37_SEMANTIC_ENEMY_UNITS = STAGE37_ENEMY_UNITS.map((unit) => {
     position: unit.position,
     classId,
     name: className(classId),
-    portrait: classFallbackPortraitFor(classId, 2) as PortraitRecord,
+    portrait: unit.portraitRecord as PortraitRecord,
     aiBehavior: unit.aiBehavior,
   };
 });

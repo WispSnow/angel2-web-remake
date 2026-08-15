@@ -768,7 +768,9 @@ function render(): void {
         ? session.affectedUnits().some(({ classId }) =>
           TECHNIQUE_LAB_SPELL_SEAL.immuneClassIds.some((immune) => immune === classId))
           ? "225 tick 完整演出完成 · 龍免疫禁咒寫入 · 仍取得 14..17 經驗"
-          : "禁咒狀態重置為 3 · 技術菜單與技術 AI 暫停 · 冰封目標仍保持冰封"
+          : session.affectedUnits().some(({ classId }) => classId === "head" || classId === "hand")
+            ? "禁咒狀態重置為 3 · 頭／手專屬行動不讀取此狀態 · 冰封目標仍保持冰封"
+            : "禁咒狀態重置為 3 · 技術菜單與技術 AI 暫停 · 冰封目標仍保持冰封"
         : "MAGIC/36 九組 3×2 描述符；原版無音效，225 tick 後才提交 14..17 經驗"
     : session.state.actionCode === "OJ"
       ? completed

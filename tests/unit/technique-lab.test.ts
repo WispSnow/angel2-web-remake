@@ -935,6 +935,13 @@ describe("map technique laboratory session", () => {
     expect(session.affectedUnits().map(({ classId }) => classId)).toEqual(["soldier"]);
     expect(session.damagePreviewFor(session.affectedUnits()[0]!))
       .toBe("禁咒狀態 3 · 技術不可用");
+    session.setPlacementSide(2);
+    expect(session.setPlacementClass("head")).toBe(true);
+    session.setTool("place");
+    expect(session.interact(23, 18)).toBe(true);
+    expect(session.affectedUnits().map(({ classId }) => classId)).toEqual(["head"]);
+    expect(session.damagePreviewFor(session.affectedUnits()[0]!))
+      .toBe("禁咒狀態 3 · 頭／手專屬行動不受影響");
     session.setPlacementSide(1);
     expect(session.setPlacementClass("dragon")).toBe(false);
     expect(session.state.placementClass).toBe("soldier");

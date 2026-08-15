@@ -1,4 +1,5 @@
 import "../debug.css";
+import { classDefinition } from "./content/classes";
 import { STAGE0, completeCampaignRoster } from "./content/stage0";
 import { GameController } from "./controller";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "./save";
@@ -4496,6 +4497,16 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-36-cleared": createStage36Completed,
   "stage-37-deployment": createStage37Deployment,
   "stage-37-player": createStage37Player,
+  "stage-37-status-audit": withSetup(createStage37Player, (controller) => {
+    const dori = controller.battle.unit("1:9");
+    if (!dori) return;
+    dori.experience = classDefinition("curse-master").dataRows[2].experienceThreshold;
+    dori.life = controller.battle.statsFor(dori).maxLife;
+    dori.acted = false;
+    controller.battle.focusId = dori.id;
+    controller.cursor = { x: dori.x, y: dori.y };
+    controller.statusMessage = "調試場景：多莉已達咒術師第三層，可查驗究極女神的禁咒邊界。";
+  }),
   "stage-37-near-victory": withSetup(createStage37Player, (controller) => {
     for (const part of controller.battle.units.filter(({ side }) => side === 2)) part.life = 1;
     controller.statusMessage = "調試場景：究極女神三個部位均只剩 1 點生命。";

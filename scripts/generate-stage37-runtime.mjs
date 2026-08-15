@@ -162,19 +162,55 @@ if (eventsDocument.module29BattleRuntime.stage30MultiClassSequence.stage !== 30)
   throw new Error("defeat replacement is no longer stage-30 only");
 }
 
+const binaVigeIdentity = requireEntry(
+  campaignRoster.displayResolution.enemyActors,
+  ({ slot }) => slot === 1,
+  "Bina Vige enemy identity",
+);
+assertEqual(
+  { name: binaVigeIdentity.normalizedName, portraitRecord: binaVigeIdentity.portraitRecord },
+  { name: "碧娜維姬", portraitRecord: 8 },
+  "Bina Vige enemy identity",
+);
 const enemyUnits = template.activeUnitInstances
   .filter(({ side }) => side === 2)
   .map((unit) => ({
     slot: unit.unitSlot,
     nativeClassRecord: unit.descriptorClass,
     position: { x: unit.x, y: unit.y },
+    portraitRecord: binaVigeIdentity.portraitRecord,
     aiBehavior: unit.perSlotBehavior,
   }));
 assertEqual(enemyUnits, [
-  { slot: 56, nativeClassRecord: 37, position: { x: 23, y: 11 }, aiBehavior: 0 },
-  { slot: 54, nativeClassRecord: 38, position: { x: 22, y: 12 }, aiBehavior: 0 },
-  { slot: 55, nativeClassRecord: 38, position: { x: 24, y: 12 }, aiBehavior: 0 },
+  { slot: 56, nativeClassRecord: 37, position: { x: 23, y: 11 }, portraitRecord: 8, aiBehavior: 0 },
+  { slot: 54, nativeClassRecord: 38, position: { x: 22, y: 12 }, portraitRecord: 8, aiBehavior: 0 },
+  { slot: 55, nativeClassRecord: 38, position: { x: 24, y: 12 }, portraitRecord: 8, aiBehavior: 0 },
 ], "stage 37 boss parts");
+assertEqual(
+  campaignRoster.displayResolution.enemyActors
+    .filter(({ slot }) => slot === 54 || slot === 55 || slot === 56)
+    .map(({ slot, portraitRecord }) => ({ slot, portraitRecord })),
+  [
+    { slot: 54, portraitRecord: 255 },
+    { slot: 55, portraitRecord: 255 },
+    { slot: 56, portraitRecord: 255 },
+  ],
+  "stage 37 native portrait sentinels",
+);
+assertEqual(
+  campaignRoster.displayResolution.classFallbacks
+    .filter(({ classCode }) => classCode === "2P" || classCode === "3P")
+    .map(({ classCode, portraitRecord, normalizedName }) => ({
+      classCode,
+      portraitRecord,
+      normalizedName,
+    })),
+  [
+    { classCode: "2P", portraitRecord: 51, normalizedName: "水戰士" },
+    { classCode: "3P", portraitRecord: 51, normalizedName: "水戰士" },
+  ],
+  "stage 37 native class portrait fallback",
+);
 const enemyReinforcements = {
   kind: "none",
   initialSide2: 3,
@@ -220,6 +256,35 @@ assertEqual({
   obstacle: constructionTokens.obstacleSourceToken,
 }, { ironPlate: 78, obstacle: 23 }, "stage 37 construction tokens");
 
+const nativeStatus = (code) => requireEntry(
+  techniqueRules.rules.families.statuses.entries,
+  (entry) => entry.code === code,
+  `${code} status rule`,
+);
+assertEqual(nativeStatus("LA").immunity, ["1P", "2P", "3P"], "confusion immunity");
+assertEqual(nativeStatus("IP").immunity, ["1P", "2P", "3P"], "poison immunity");
+assertEqual(nativeStatus("SN").immunity, ["1P"], "spell-seal immunity");
+assertEqual(
+  techniqueRules.rules.families.C.immunity,
+  "defense-magic high bit blocks the effect; 1P/2P/3P boss parts are immune",
+  "ice immunity",
+);
+const bossStatusAndControl = {
+  ice: {
+    immuneClasses: ["head", "hand"],
+    effect: "no displacement or action disable",
+  },
+  confusion: { immuneClasses: ["head", "hand"], stateWrite: false },
+  poison: { immuneClasses: ["head", "hand"], stateWrite: false },
+  attackDown: { immuneClasses: [], stateWrite: true, fixedDelta: -20 },
+  defenseDown: { immuneClasses: [], stateWrite: true, fixedDelta: -20 },
+  spellSeal: {
+    immuneClasses: [],
+    stateWrite: true,
+    blocksDedicatedBossActions: false,
+  },
+};
+
 const terrain = templateBytes.subarray(256, 2756);
 const tokenToSlot = new Uint8Array(128).fill(0);
 for (const mapping of stageTerrain.configuredMappings) tokenToSlot[mapping.token] = mapping.logicalSlot;
@@ -230,7 +295,7 @@ const sources = Object.entries(inputPaths).map(([id, file]) => ({
   bytes: inputBuffers[id].length,
 }));
 const identityHash = createHash("sha256");
-identityHash.update("stableRemake\0REMAKE-084\0");
+identityHash.update("stableRemake\0REMAKE-084\0REMAKE-085\0");
 for (const source of sources) identityHash.update(`${source.path}\0${source.sha256}\n`);
 const contentIdentity = `stage-37/evidence-${identityHash.digest("hex")}`;
 const eventProgram = {
@@ -253,10 +318,21 @@ const eventProgram = {
     concealedNumericFields: 9,
     headActions: ["recovery-3", "ice-3"],
     sharedHandActions: ["lightning-4", "fire-4"],
+    actionOrder: {
+      recoveryRound: ["head", "left-hand", "right-hand"],
+      iceRound: ["left-hand", "right-hand", "head"],
+    },
+    portraitIdentity: {
+      name: binaVigeIdentity.normalizedName,
+      portraitRecord: binaVigeIdentity.portraitRecord,
+      nativePartPortraitSentinel: 255,
+      nativeClassFallbackPortraitRecord: 51,
+    },
     handTargetGate: { randomBelow: 5, acceptedValue: 0, scan: "ascending-board-cells" },
+    statusAndControl: bossStatusAndControl,
   },
   completedRoute: { module: 25, stage: 49, replayPresentation: false },
-  stableRemakeDecisions: ["REMAKE-005", "REMAKE-013", "REMAKE-084"],
+  stableRemakeDecisions: ["REMAKE-005", "REMAKE-013", "REMAKE-084", "REMAKE-085"],
 };
 const deployment = {
   kind: "interactive",

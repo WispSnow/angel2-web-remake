@@ -28,8 +28,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 71 as const;
-export const SAVE_CONTENT_VERSION = "stage-37-ultimate-goddess-1" as const;
+export const SAVE_VERSION = 72 as const;
+export const SAVE_CONTENT_VERSION = "stage-37-ice-last-portrait-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -212,6 +212,12 @@ function hasValidNamedClassPortraits(
   stageId: StageId,
 ): boolean {
   return units.every((unit) => {
+    const isStage37BossPart = stageId === "stage-37"
+      && unit.side === 2
+      && (unit.classId === "head" || unit.classId === "hand");
+    if (isStage37BossPart) {
+      return unit.displayIdentity === undefined && unit.portrait === 8;
+    }
     const isStage29Eliola = stageId === "stage-29"
       && unit.id === "1:22"
       && unit.side === 1
