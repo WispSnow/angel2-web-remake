@@ -7,6 +7,7 @@ import {
 import {
   classDefinition,
   classTargetPriorityProfile,
+  mitigateOrdinaryDamage,
   suppressesOrdinaryCounterFor,
   terrainDefensePercentFor,
 } from "../content/classes";
@@ -328,8 +329,10 @@ export function expertOrdinaryUtility(
     / 100,
   );
   const baseDamage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense);
-  const minimumDamage = baseDamage + 8;
-  const expectedDamage = baseDamage + 11;
+  // REMAKE-100: model the magic armor warrior's missing-life mitigation, or the
+  // AI over-values hitting a wounded one and mis-reads guaranteed kills.
+  const minimumDamage = mitigateOrdinaryDamage(target, defenderStats.maxLife, baseDamage + 8);
+  const expectedDamage = mitigateOrdinaryDamage(target, defenderStats.maxLife, baseDamage + 11);
   const guaranteedKill = minimumDamage >= target.life;
   utility.guaranteedKills = guaranteedKill ? 1 : 0;
   utility.effectiveDamage = Math.min(target.life, expectedDamage);
@@ -351,9 +354,13 @@ export function expertOrdinaryUtility(
       0,
       defenderStats.attack - attackerStats.defense - attackerTerrainDefense,
     ) / 2);
-    utility.counterRisk = target.classId === "bone-knight"
+    // REMAKE-098 made this exact rather than a worst-case guess: the bone
+    // knight now always counters for max(reflected, normal).
+    const rawCounter = target.classId === "bone-knight"
       ? Math.max(expectedDamage, normalCounter)
       : normalCounter;
+    // REMAKE-100: a wounded magic armor warrior also soaks the counter it eats.
+    utility.counterRisk = mitigateOrdinaryDamage(actor, attackerStats.maxLife, rawCounter);
   }
   return utility;
 }
@@ -427,7 +434,12 @@ export function expertSpecialUtility(
       return utility;
     }
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-    const swiftEvasion = target.classId === "swift-dragon-knight";
+    // REMAKE-099: physical shots cannot touch a swift dragon knight at all, so
+    // the shot is pure waste; the magic archer is unaffected by the trait.
+    if (target.classId === "swift-dragon-knight" && actionId !== "magic-archer-shot") {
+      utility.waste = 1;
+      return utility;
+    }
     const expectedRoll = Math.floor((definition.damage.minimum + definition.damage.maximum) / 2);
     const guardedMagicShot = actionId === "magic-archer-shot" && target.statuses.magicGuard > 0;
     const selectedDamage = actionId === "magic-archer-shot"
@@ -440,12 +452,9 @@ export function expertSpecialUtility(
         ? Math.floor(definition.damage.minimum / 2)
         : definition.damage.minimum
       : definition.damage.minimum;
-    utility.effectiveDamage = Math.min(
-      target.life,
-      swiftEvasion ? Math.floor(selectedDamage / 2) : selectedDamage,
-    );
+    utility.effectiveDamage = Math.min(target.life, selectedDamage);
     countEffectiveWizardHit(utility, target, utility.effectiveDamage > 0);
-    utility.guaranteedKills = !swiftEvasion && minimumDamage >= target.life ? 1 : 0;
+    utility.guaranteedKills = minimumDamage >= target.life ? 1 : 0;
     if (utility.guaranteedKills > 0) {
       utility.exposure = expertExposureAt(context, actor, position, target.id);
     }

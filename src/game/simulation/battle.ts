@@ -4,9 +4,13 @@ import {
   classDefinition,
   classFallbackPortraitFor,
   className,
+  immuneToPhysicalShootingFor,
   isClassImmuneToOrdinaryHitStatus,
   killRewardFor,
+  mitigateOrdinaryDamage,
   ordinaryHitStatusFor,
+  STRIPPABLE_BUFF_KEYS,
+  stripsTargetBuffsOnActiveHit,
   suppressesOrdinaryCounterFor,
   terrainDefensePercentFor,
   usesClassIdentity,
@@ -315,6 +319,15 @@ function applyActiveOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit
   if (status && !isClassImmuneToOrdinaryHitStatus(defender.classId, status.key)) {
     defender.statuses[status.key] = status.counter;
   }
+}
+
+/**
+ * `REMAKE-097`. Runs on the same active-attack-only boundary as the native
+ * status hook above, so a counter-attacking demon dragon knight strips nothing.
+ */
+function stripTargetBuffsOnActiveHit(attacker: BattleUnit, defender: BattleUnit): void {
+  if (!stripsTargetBuffsOnActiveHit(attacker.classId)) return;
+  for (const key of STRIPPABLE_BUFF_KEYS) defender.statuses[key] = 0;
 }
 
 function canUseSpecialAction(
@@ -1159,9 +1172,14 @@ export class Stage0Battle {
       * terrainDefensePercentFor(defender.classId, this.terrainSlotAt(defender))
       / 100,
     );
-    const damage = Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense)
-      + this.rng.between(4, 7)
-      + this.rng.between(4, 7);
+    // REMAKE-100 mitigates against the defender's life *before* this hit lands.
+    const damage = mitigateOrdinaryDamage(
+      defender,
+      defenderStats.maxLife,
+      Math.max(0, attackerStats.attack - defenderStats.defense - terrainDefense)
+        + this.rng.between(4, 7)
+        + this.rng.between(4, 7),
+    );
     this.setSharedLife(defender, defender.life - damage);
 
     const counterOccurred = defender.life > 0
@@ -1174,16 +1192,23 @@ export class Stage0Battle {
         * terrainDefensePercentFor(attacker.classId, this.terrainSlotAt(attacker))
         / 100,
       );
-      const primaryCounterCandidate = defender.classId === "bone-knight"
-        && (this.rng.nextUint() & 1) === 1;
-      counterDamage = primaryCounterCandidate
-        ? damage
-        : Math.floor(Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2);
+      const normalCounter = Math.floor(
+        Math.max(0, defenderStats.attack - attackerStats.defense - attackerTerrainDefense) / 2,
+      );
+      // REMAKE-098: the bone knight's native reflect was a ~50% PIT coin flip
+      // that *overwrote* the normal counter, so it could roll in below it. It is
+      // now deterministic and takes the better of the two, which is also what
+      // the expert AI has always assumed as worst case.
+      const rawCounter = defender.classId === "bone-knight"
+        ? Math.max(damage, normalCounter)
+        : normalCounter;
+      counterDamage = mitigateOrdinaryDamage(attacker, attackerStats.maxLife, rawCounter);
       this.setSharedLife(attacker, attacker.life - counterDamage);
     }
     // Native 0000:92DC applies the class status once from the original
     // attacker/defender pair; the counter branch only resolves damage.
     applyActiveOrdinaryHitStatus(attacker, defender);
+    stripTargetBuffsOnActiveHit(attacker, defender);
     this.synchronizeWaterWarriorState(defender);
 
     const defenderDied = defender.life === 0;
@@ -3338,6 +3363,13 @@ export class Stage0Battle {
             || range.valueAt(target) === 0
             || (!canTargetFrozenUnit(actionId) && target.actionDisabled)
             || !(options.targetFilter?.(target) ?? true)) continue;
+          // REMAKE-099: a physical shot at a swift dragon knight is a
+          // guaranteed zero, so no ranking mode may spend a turn on it. The
+          // expert path also drops it via `waste`, but the native-style
+          // ranking below has no such gate.
+          if (shootingAction
+            && actionId !== "magic-archer-shot"
+            && immuneToPhysicalShootingFor(target.classId)) continue;
           const targetStats = this.statsFor(target);
           const missingLife = targetStats.maxLife - target.life;
           if (definition.target === "ally"

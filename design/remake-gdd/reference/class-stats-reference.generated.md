@@ -209,6 +209,12 @@
 
 只列出有非普通行动、普通命中附加状态或职业特例的记录；其余记录只有普通攻击且无特例。
 
+> `[DD]` 「职业特例」列是**复刻版特性层**，不全是 `[OF]`。行动、AI 分派、射擊射程与
+> 普通命中附加四列仍是原版事实；特例列另含 `REMAKE-097`（妖龍騎士命中驅散增益）、
+> `REMAKE-098`（獸骨騎士以牙還牙）、`REMAKE-099`（迅龍騎士免疫物理射擊）与
+> `REMAKE-100`（魔鎧戰士殘血減傷）。其中妖龍與魔鎧在原版没有任何职业分支（见 `BAT-053`），
+> 獸骨與迅龍的原版特性是约 50% 的 PIT 掷骰，已被确定化。
+
 | 记录 | 职业 | 行动 | AI 分派 side 1／2 | 射擊 射程 | 普通命中附加 | 职业特例 |
 | ---: | --- | --- | --- | --- | --- | --- |
 | 1 | 魔劍戰士 | 普通 | ordinary／ordinary | — | 防禦下降 | 命中降防 |
@@ -219,13 +225,15 @@
 | 6 | 魔術士 | 技術 | technique／technique | — | — | — |
 | 7 | 巨斧戰士 | 普通 | ordinary／ordinary | — | — | 攻擊無反擊 |
 | 8 | 半龍戰士 | 技術 | ordinary／ordinary | — | — | — |
+| 9 | 魔鎧戰士 | 普通 | ordinary／ordinary | — | — | 殘血減傷 |
 | 10 | 魔導師 | 技術 | technique／technique | — | — | — |
 | 11 | 邪法師 | 技術 | technique／technique | — | — | — |
 | 12 | 魔弓兵 | 射擊 | shooting／shooting | 2–6 | — | — |
+| 14 | 妖龍騎士 | 普通 | ordinary／ordinary | — | — | 命中驅散增益 |
 | 15 | 飛龍騎士 | 普通 | ordinary／ordinary | — | — | 攻後再移動 |
 | 16 | 獸騎士 | 普通 | ordinary／ordinary | — | 攻擊下降 | 命中降攻 |
-| 17 | 獸骨騎士 | 普通 | ordinary／ordinary | — | — | 約50%強力反擊 |
-| 18 | 迅龍騎士 | 普通 | ordinary／ordinary | — | — | 約50%閃避弓箭 |
+| 17 | 獸骨騎士 | 普通 | ordinary／ordinary | — | — | 以牙還牙 |
+| 18 | 迅龍騎士 | 普通 | ordinary／ordinary | — | — | 免疫物理射擊 |
 | 19 | 巨龍騎士 | 技術 | technique／technique | — | — | 龍踏技術 |
 | 20 | 弓兵 | 射擊 | shooting／shooting | 2–5 | — | — |
 | 21 | 弩兵 | 射擊 | shooting／shooting | 2–8 | — | — |

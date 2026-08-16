@@ -215,7 +215,9 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   expect(pageErrors).toEqual([]);
 });
 
-test("probability traits show approximate rates in the selected-unit strip", async ({ page }) => {
+// REMAKE-098/099 removed the last two probabilistic class traits, so this strip
+// must no longer advertise a rate for either one.
+test("determinized traits show exact wording in the selected-unit strip", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/class-showdown.html?test=1");
@@ -227,13 +229,13 @@ test("probability traits show approximate rates in the selected-unit strip", asy
     .toEqual({ x: 17, y: 32 });
   await page.keyboard.press("Space");
   await expect(page.locator(".hud-identity-name")).toHaveText("獸骨騎士／獸骨騎士");
-  await expect(page.getByTestId("unit-traits")).toHaveText("特性約50%強力反擊");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性以牙還牙");
   await expect(page.getByTestId("unit-traits")).toHaveAttribute(
     "aria-label",
-    /約 50% 機率.*完整傷害/u,
+    /必定.*完整傷害.*較高者/u,
   );
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/class-showdown-probability-traits.png`,
+    path: `${ARTIFACT_DIR}/class-showdown-determinized-traits.png`,
   });
 
   await page.keyboard.press("Enter");
@@ -244,10 +246,10 @@ test("probability traits show approximate rates in the selected-unit strip", asy
     .toEqual({ x: 29, y: 15 });
   await page.keyboard.press("Space");
   await expect(page.locator(".hud-identity-name")).toHaveText("迅龍騎士／迅龍騎士");
-  await expect(page.getByTestId("unit-traits")).toHaveText("特性約50%閃避弓箭");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性免疫物理射擊");
   await expect(page.getByTestId("unit-traits")).toHaveAttribute(
     "aria-label",
-    /約 50% 機率.*完全閃避傷害/u,
+    /完全免疫.*魔弓兵/u,
   );
   expect(pageErrors).toEqual([]);
 });

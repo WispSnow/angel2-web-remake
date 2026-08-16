@@ -3,7 +3,7 @@ import {
   HALF_DRAGON_TELEPORT_ACTION_ID,
   WATER_WARRIOR_SHOT_ACTION_ID,
 } from "../../content/actions";
-import { killRewardFor } from "../../content/classes";
+import { immuneToPhysicalShootingFor, killRewardFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
 import type { DeterministicRng } from "../rng";
 import { cloneUnitStatuses } from "../status";
@@ -49,8 +49,16 @@ const isSingleTargetShootingAction = (
   || actionId === "crossbow-shot"
   || actionId === WATER_WARRIOR_SHOT_ACTION_ID;
 
-function shootingEvaded(target: BattleUnit, trial: DeterministicRng): boolean {
-  return target.classId === "swift-dragon-knight" && (trial.nextUint() & 1) === 1;
+/**
+ * `REMAKE-099`: the swift dragon knight's native ~50% PIT coin flip against
+ * shots becomes a deterministic immunity, but only to *physical* projectiles —
+ * the three single-target shots above. The magic archer is explicitly excluded:
+ * its damage is magical, so it is answered by `magicGuard`, not by this trait.
+ * That also keeps the magic archer's line splash coherent, since splash never
+ * consulted this check for non-selected targets in the first place.
+ */
+function shootingEvaded(target: BattleUnit): boolean {
+  return immuneToPhysicalShootingFor(target.classId);
 }
 
 function affectedUnit(
@@ -176,7 +184,7 @@ function prepareSingleTarget(
     if (target.actionDisabled) {
       blocked = true;
       blockReason = "frozen";
-    } else if (shootingEvaded(target, trial)) {
+    } else if (shootingEvaded(target)) {
       damage = 0;
     } else {
       // REMAKE-009 uses the player-visible action definition for both sides;
@@ -407,13 +415,12 @@ function prepareMagicArcher(
   const affectedUnits = lineUnits.map((unit) => {
     const statusesAfter = cloneUnitStatuses(unit.statuses);
     const guarded = unit.statuses.magicGuard > 0;
-    const evaded = unit.id === target.id && shootingEvaded(unit, trial);
-    if (!evaded) statusesAfter.magicGuard = 0;
-    const damage = evaded
-      ? 0
-      : unit.id === target.id
-        ? (guarded ? halfDamage : halfDamage * 2)
-        : (guarded ? 0 : halfDamage);
+    // REMAKE-099 removes the swift dragon knight's evasion from this path: the
+    // magic archer deals magic damage, so `magicGuard` is its only counter.
+    statusesAfter.magicGuard = 0;
+    const damage = unit.id === target.id
+      ? (guarded ? halfDamage : halfDamage * 2)
+      : (guarded ? 0 : halfDamage);
     const lifeAfter = Math.max(0, unit.life - damage);
     return affectedUnit(unit, {
       lifeAfter,

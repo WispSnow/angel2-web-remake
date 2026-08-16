@@ -29,8 +29,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 80 as const;
-export const SAVE_CONTENT_VERSION = "ice-cardinal-radial-1" as const;
+export const SAVE_VERSION = 81 as const;
+export const SAVE_CONTENT_VERSION = "tier4-melee-traits-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

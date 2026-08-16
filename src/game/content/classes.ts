@@ -432,6 +432,68 @@ export function suppressesOrdinaryCounterFor(classId: ClassId): boolean {
   return classDefinition(classId).codes.variants.some((code) => code === "0G");
 }
 
+/**
+ * `REMAKE-097`: the demon dragon knight strips every positive status from the
+ * unit it actively attacks. BAT-053 confirmed `1F` has no native branch at all,
+ * so this is a remake-only balance trait, not a recovered original rule. It
+ * mirrors the native attacker-keyed hook at `0000:92DC`: one application per
+ * attack chain, active attacks only, and it resolves after damage so the
+ * stripped buffs still apply to the hit that removes them.
+ */
+export function stripsTargetBuffsOnActiveHit(classId: ClassId): boolean {
+  return classDefinition(classId).codes.variants.some((code) => code === "1F");
+}
+
+/** Positive statuses cleared by {@link stripsTargetBuffsOnActiveHit}. */
+export const STRIPPABLE_BUFF_KEYS = ["attackUp", "defenseUp", "magicGuard"] as const;
+
+/**
+ * `REMAKE-099`: the swift dragon knight's native ~50% PIT evasion against shots
+ * becomes a deterministic immunity to *physical* projectiles only — the archer,
+ * crossbow and water warrior shots. The magic archer is deliberately excluded
+ * because its damage is magical and is already answered by `magicGuard`.
+ *
+ * Because the immunity is now total, every AI ranking must skip such a shot
+ * instead of spending a turn on a guaranteed zero.
+ */
+export function immuneToPhysicalShootingFor(classId: ClassId): boolean {
+  return classDefinition(classId).codes.variants.some((code) => code === "0E");
+}
+
+/**
+ * `REMAKE-100`: the magic armor warrior mitigates ordinary physical damage in
+ * proportion to missing life, up to 50% at the brink of death. BAT-053 confirmed
+ * `1H` has no native branch; this replaces the flat `+20` defense-up proposal
+ * because the native `+8..14` random floor makes flat defense saturate — once
+ * `defense + terrainDefense` covers the attacker's attack, more defense buys
+ * literally nothing, so a flat bonus swung between 0% and 65% depending only on
+ * the tile. A proportional cut cannot be swallowed by that floor.
+ *
+ * Scope matches what the discarded `+20` defense bonus would have covered: the
+ * ordinary attack chain only. Shooting and techniques bypass defense natively
+ * and keep bypassing this, which preserves shooting as the original's answer to
+ * high-defense units.
+ */
+export function mitigatesOrdinaryDamageFor(classId: ClassId): boolean {
+  return classDefinition(classId).codes.variants.some((code) => code === "1H");
+}
+
+/**
+ * Integer-exact mitigation so the result never depends on float rounding:
+ * `damage - floor(damage * missingLife / (maxLife * 2))`, i.e. a reduction of
+ * `(1 - life/maxLife) * 50%`. `life` is the value before this damage lands.
+ */
+export function mitigateOrdinaryDamage(
+  unit: Pick<BattleUnit, "classId" | "life">,
+  maxLife: number,
+  damage: number,
+): number {
+  if (damage <= 0 || maxLife <= 0) return damage;
+  if (!mitigatesOrdinaryDamageFor(unit.classId)) return damage;
+  const missingLife = Math.max(0, Math.min(maxLife, maxLife - unit.life));
+  return damage - Math.floor(damage * missingLife / (maxLife * 2));
+}
+
 export function promotionTargetsFor(classId: ClassId): readonly PromotionTarget[] {
   return classDefinition(classId).promotion.targets;
 }

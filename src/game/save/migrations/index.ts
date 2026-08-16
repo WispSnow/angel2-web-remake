@@ -355,6 +355,30 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-097/098/099/100 add no saved fields — a unit still stores only class,
+ * experience, life and the eight status counters. What changes is how those are
+ * consumed: the demon dragon knight clears buff counters on an active hit, the
+ * bone knight's counter and the swift dragon knight's shot immunity stop drawing
+ * from the PRNG, and the magic armor warrior mitigates by missing life.
+ *
+ * Dropping those two draws is why this needs a version at all: a v80 battle
+ * saved mid-fight would resume against a different PRNG call sequence. The
+ * stored fields carry over untouched and no stored value changes meaning, so the
+ * migration is lossless; only unresolved future rolls differ.
+ */
+function migrateVersion80Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 80
+    || value.contentVersion !== "ice-cardinal-radial-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-096 narrows the radial push back to the native four directions. Like
  * REMAKE-095 it only changes which cell a target lands on, so a v79 save carries
  * over untouched.
@@ -2336,6 +2360,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion80 = migrateVersion80Save(value);
+  if (migratedVersion80) return migratedVersion80;
   const migratedVersion79 = migrateVersion79Save(value);
   if (migratedVersion79) return migratedVersion79;
   const migratedVersion78 = migrateVersion78Save(value);

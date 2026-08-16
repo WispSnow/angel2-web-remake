@@ -268,10 +268,12 @@ describe("native class implementation sequence", () => {
       "bone-knight",
       "great-dragon-knight",
       "flying-dragon-knight",
+      "demon-dragon-knight",
       "great-axe-warrior",
       "magic-sword-warrior",
       "evil-sword-warrior",
       "jungle-warrior",
+      "magic-armor-warrior",
     ] satisfies readonly ClassId[];
     expect(Object.fromEntries(traitClasses.map(
       (classId) => [classId, classTraitsFor(classId).map(({ id }) => id)],
@@ -282,28 +284,30 @@ describe("native class implementation sequence", () => {
         "bone-knight": ["bone-knight-full-counter"],
         "great-dragon-knight": ["great-dragon-stomp"],
         "flying-dragon-knight": ["flying-dragon-extra-move"],
+        "demon-dragon-knight": ["demon-dragon-buff-strip"],
         "great-axe-warrior": ["great-axe-no-counter"],
         "magic-sword-warrior": ["magic-sword-defense-down"],
         "evil-sword-warrior": ["evil-sword-confusion"],
         "jungle-warrior": ["jungle-poison"],
+        "magic-armor-warrior": ["magic-armor-mitigation"],
       });
     expect(Object.fromEntries(traitClasses.map(
       (classId) => [classId, classTraitsFor(classId).map(({ shortDescription }) => shortDescription)],
     ))).toEqual({
-      "swift-dragon-knight": ["約50%閃避弓箭"],
+      "swift-dragon-knight": ["免疫物理射擊"],
       "beast-knight": ["命中降攻"],
-      "bone-knight": ["約50%強力反擊"],
+      "bone-knight": ["以牙還牙"],
       "great-dragon-knight": ["龍踏技術"],
       "flying-dragon-knight": ["攻後再移動"],
+      "demon-dragon-knight": ["命中驅散增益"],
       "great-axe-warrior": ["攻擊無反擊"],
       "magic-sword-warrior": ["命中降防"],
       "evil-sword-warrior": ["命中混亂"],
       "jungle-warrior": ["命中施毒"],
+      "magic-armor-warrior": ["殘血減傷"],
     });
     expect(traitClasses.flatMap((classId) => classTraitsFor(classId))
       .every(({ description }) => description.length > 0)).toBe(true);
-    expect(classTraitsFor("demon-dragon-knight")).toEqual([]);
-    expect(classTraitsFor("magic-armor-warrior")).toEqual([]);
     expect(classTraitsFor("water-warrior")).toEqual([{
       id: "water-warrior-split",
       shortDescription: "近戰受擊分裂",
@@ -846,8 +850,9 @@ describe("native class implementation sequence", () => {
       .toMatchObject({ attack: 87, defense: 45 });
     expect(classStatsFor({ classId: "magic-armor-warrior", experience: 0 }))
       .toMatchObject({ attack: 76, defense: 60 });
-    expect(classTraitsFor("demon-dragon-knight")).toEqual([]);
-    expect(classTraitsFor("magic-armor-warrior")).toEqual([]);
+    // BAT-053: neither record has a native branch. The generated catalog is the
+    // evidence surface and must stay empty; REMAKE-097/100 add their traits in
+    // the remake-only `class-traits` layer, asserted separately below.
     expect(demonDragon.ordinaryHitStatuses).toEqual([]);
     expect(magicArmor.ordinaryHitStatuses).toEqual([]);
     expect(demonDragon.shooting).toBeNull();
@@ -1071,20 +1076,102 @@ describe("native class implementation sequence", () => {
     expect(activeAttacker.statuses[statusKey]).toBe(0);
   });
 
-  it("record 17 bone knight uses the native full-damage counter candidate", () => {
+  it("record 17 bone knight always counters for at least the damage it took", () => {
+    // REMAKE-098: the native reflect was a ~50% PIT flip that also *overwrote*
+    // the normal counter, so it could land below it. Before this rule the seed
+    // sweep below produced counters under `damage` roughly half the time.
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const battle = new Stage0Battle(0, new DeterministicRng(seed));
+      const attacker = battle.unit("1:0")!;
+      const defender = battle.units.find(({ side }) => side === 2)!;
+      battle.units = [attacker, defender];
+      // A high-attack, high-defense attacker is what separates the two counter
+      // formulas: it takes ~53 reflected but only ~19 from the normal counter,
+      // so a missed coin flip used to be plainly visible.
+      attacker.classId = "magic-sword-warrior";
+      attacker.className = classDefinition("magic-sword-warrior").nativeName;
+      attacker.life = 380;
+      attacker.x = 20;
+      attacker.y = 20;
+      defender.classId = "bone-knight";
+      defender.life = 400;
+      defender.x = 21;
+      defender.y = 20;
+      const result = battle.attack(attacker.id, defender.id);
+      expect(result.counterOccurred, `seed ${seed}`).toBe(true);
+      expect(result.damage, `seed ${seed}`).toBeGreaterThan(20);
+      expect(result.counterDamage, `seed ${seed}`).toBe(result.damage);
+    }
+  });
+
+  it("record 14 demon dragon knight strips buffs only on its own active hit", () => {
     const battle = new Stage0Battle(0);
     const attacker = battle.unit("1:0")!;
     const defender = battle.units.find(({ side }) => side === 2)!;
     battle.units = [attacker, defender];
+    attacker.classId = "demon-dragon-knight";
     attacker.x = 20;
     attacker.y = 20;
-    defender.classId = "bone-knight";
+    defender.life = 400;
+    defender.x = 21;
+    defender.y = 20;
+    defender.statuses.attackUp = 3;
+    defender.statuses.defenseUp = 3;
+    defender.statuses.magicGuard = 3;
+    defender.statuses.poison = 2;
+    battle.attack(attacker.id, defender.id);
+    expect(defender.statuses.attackUp).toBe(0);
+    expect(defender.statuses.defenseUp).toBe(0);
+    expect(defender.statuses.magicGuard).toBe(0);
+    // REMAKE-097 clears buffs only; an existing debuff must survive untouched.
+    expect(defender.statuses.poison).toBe(2);
+  });
+
+  it("record 14 demon dragon knight strips nothing while counter-attacking", () => {
+    const battle = new Stage0Battle(0);
+    const attacker = battle.unit("1:0")!;
+    const defender = battle.units.find(({ side }) => side === 2)!;
+    battle.units = [attacker, defender];
+    attacker.life = 400;
+    attacker.statuses.attackUp = 3;
+    attacker.statuses.magicGuard = 3;
+    attacker.x = 20;
+    attacker.y = 20;
+    defender.classId = "demon-dragon-knight";
+    defender.life = 400;
     defender.x = 21;
     defender.y = 20;
     const result = battle.attack(attacker.id, defender.id);
     expect(result.counterOccurred).toBe(true);
-    expect(result.counterDamage).toBeGreaterThanOrEqual(0);
-    expect(Number.isInteger(result.counterDamage)).toBe(true);
+    expect(attacker.statuses.attackUp).toBe(3);
+    expect(attacker.statuses.magicGuard).toBe(3);
+  });
+
+  it("record 9 magic armor warrior mitigates ordinary damage by missing life", () => {
+    const attackAt = (life: number): number => {
+      const battle = new Stage0Battle(0, new DeterministicRng(7));
+      const attacker = battle.unit("1:0")!;
+      const defender = battle.units.find(({ side }) => side === 2)!;
+      battle.units = [attacker, defender];
+      attacker.x = 20;
+      attacker.y = 20;
+      defender.classId = "magic-armor-warrior";
+      defender.x = 21;
+      defender.y = 20;
+      defender.life = life;
+      return battle.attack(attacker.id, defender.id).damage;
+    };
+    const maxLife = 450;
+    const full = attackAt(maxLife);
+    // Same seed, so the underlying roll is identical and only mitigation moves.
+    expect(attackAt(maxLife)).toBe(full);
+    const brink = attackAt(1);
+    expect(brink).toBe(full - Math.floor(full * (maxLife - 1) / (maxLife * 2)));
+    expect(brink).toBeLessThan(full);
+    // Never more than half, and never below half.
+    expect(brink).toBeGreaterThanOrEqual(Math.ceil(full / 2));
+    expect(attackAt(Math.floor(maxLife / 2)))
+      .toBe(full - Math.floor(full * Math.ceil(maxLife / 2) / (maxLife * 2)));
   });
 
   it("all native technique careers expose each recorded tier through the shared action map", () => {
@@ -1131,25 +1218,59 @@ describe("native class implementation sequence", () => {
     expect(prepared.result.damage).toBeLessThanOrEqual(89);
   });
 
-  it("record 18 swift dragon knight can evade shooting on the native bit candidate", () => {
-    const battle = new Stage0Battle(0, new DeterministicRng(1));
-    const attacker = battle.unit("1:0")!;
-    const target = battle.units.find(({ side }) => side === 2)!;
-    battle.units = [attacker, target];
-    attacker.classId = "archer";
-    attacker.x = 20;
-    attacker.y = 20;
-    target.classId = "swift-dragon-knight";
-    target.x = 22;
-    target.y = 20;
-    const prepared = battle.prepareSpecialAction({
-      actionId: "archer-shot",
-      actorId: attacker.id,
-      targetId: target.id,
-      target: { x: target.x, y: target.y },
-    });
-    expect(prepared.result.damage).toBe(0);
-    expect(prepared.result.targetDied).toBe(false);
+  it("record 18 swift dragon knight is immune to every physical shot", () => {
+    // REMAKE-099: this used to be a ~50% flip, so a seed sweep landed real
+    // damage about half the time.
+    for (const shot of ["archer-shot", "crossbow-shot"] as const) {
+      for (let seed = 1; seed <= 12; seed += 1) {
+        const battle = new Stage0Battle(0, new DeterministicRng(seed));
+        const attacker = battle.unit("1:0")!;
+        const target = battle.units.find(({ side }) => side === 2)!;
+        battle.units = [attacker, target];
+        attacker.classId = shot === "archer-shot" ? "archer" : "crossbow";
+        attacker.x = 20;
+        attacker.y = 20;
+        target.classId = "swift-dragon-knight";
+        target.life = 400;
+        target.x = 22;
+        target.y = 20;
+        const prepared = battle.prepareSpecialAction({
+          actionId: shot,
+          actorId: attacker.id,
+          targetId: target.id,
+          target: { x: target.x, y: target.y },
+        });
+        expect(prepared.result.damage, `${shot} seed ${seed}`).toBe(0);
+        expect(prepared.result.targetDied, `${shot} seed ${seed}`).toBe(false);
+      }
+    }
+  });
+
+  it("record 18 swift dragon knight still takes magic archer damage", () => {
+    // REMAKE-099 scopes the immunity to physical projectiles; the magic archer
+    // is magic damage and is answered by 防魔 instead.
+    let hits = 0;
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const battle = new Stage0Battle(0, new DeterministicRng(seed));
+      const attacker = battle.unit("1:0")!;
+      const target = battle.units.find(({ side }) => side === 2)!;
+      battle.units = [attacker, target];
+      attacker.classId = "magic-archer";
+      attacker.x = 20;
+      attacker.y = 20;
+      target.classId = "swift-dragon-knight";
+      target.life = 400;
+      target.x = 22;
+      target.y = 20;
+      const prepared = battle.prepareSpecialAction({
+        actionId: "magic-archer-shot",
+        actorId: attacker.id,
+        targetId: target.id,
+        target: { x: target.x, y: target.y },
+      });
+      if (prepared.result.damage > 0) hits += 1;
+    }
+    expect(hits).toBe(12);
   });
 });
 

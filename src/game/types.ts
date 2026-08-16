@@ -250,8 +250,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 80;
-  contentVersion: "ice-cardinal-radial-1";
+  version: 81;
+  contentVersion: "tier4-melee-traits-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -1970,6 +1970,20 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v80 saves losslessly", () => {
+    // REMAKE-097/098/099/100 add no stored fields and change no stored meaning.
+    // The version moves because REMAKE-098/099 stop drawing from the PRNG, so a
+    // mid-battle v80 save would otherwise resume on a shifted call sequence.
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 80,
+        contentVersion: "ice-cardinal-radial-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v79 saves losslessly", () => {
     // REMAKE-096 narrows the radial push back to four directions; no stored field
     // changes meaning, so both save kinds carry over untouched.
