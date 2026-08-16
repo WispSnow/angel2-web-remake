@@ -3,6 +3,7 @@ import type { PortraitRecord, Position, UnitClassId } from "../types";
 import * as actionContent from "./stage1-actions.generated";
 import { registerActionContent } from "./actions";
 import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./classes";
+import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
 import { registerStageMusicPrograms } from "./music";
@@ -209,7 +210,7 @@ export const STAGE22_SEMANTIC_ALLIED_UNITS = STAGE22_DEPLOYMENT_ACTORS.map((acto
   name: actor.normalizedName,
   portrait: actor.portraitRecord as PortraitRecord,
   aiBehavior: 0,
-  untouchedExperience: 299,
+  untouchedExperience: untouchedEntryExperience(actor.slot, 299),
 }));
 
 export const STAGE22_SEMANTIC_ENEMIES = STAGE22_ENEMIES.map((enemy) => {

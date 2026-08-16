@@ -11,6 +11,11 @@ import {
   initialEnemyExperience,
   statsFor,
 } from "../../content/stage0";
+import {
+  HALF_DRAGON_SISTER_CLASS_ID,
+  HALF_DRAGON_SISTER_ENTRY_EXPERIENCE,
+  HALF_DRAGON_SISTER_SLOTS,
+} from "../../content/campaign-entry-experience";
 import { STAGE0_DEFINITION } from "../../content/stages";
 import { consumedEventIdsForBattleResume } from "../../simulation/stage-events";
 import type {
@@ -347,6 +352,25 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
   };
   const withRecordCounters = addEmptyRecordCounters(migrated);
   return isSaveData(withRecordCounters) ? withRecordCounters : undefined;
+}
+
+/**
+ * REMAKE-092/093 add no saved fields: a unit still stores only its class and
+ * experience. What changes is what those two derive — the half-dragon curve now
+ * continues past the third row, and side-1 water warriors gain a shot. The
+ * version moves so a v76 save is re-validated against the new ceilings rather
+ * than silently reinterpreted, and so the sister entry baseline gets applied.
+ */
+function migrateVersion76Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 76
+    || value.contentVersion !== "force-follower-engage-first-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
 }
 
 /**
@@ -2206,172 +2230,222 @@ function migrateLegacySave(save: LegacySaveData): SaveData {
   });
 }
 
+/**
+ * REMAKE-092 replaces the sisters' entry baseline, so a save written before it
+ * can still hold a sister parked on the old class-0 soldier number. Raising her
+ * to the entry threshold on migration keeps an in-flight campaign consistent
+ * with a fresh one; a sister who already earned more than the threshold keeps
+ * every point of it, and the pass never lowers anyone.
+ */
+function raiseHalfDragonSisterEntryExperience(save: SaveData): SaveData {
+  const belowEntry = (entry: Pick<SaveRosterEntry, "slot" | "classId" | "experience">): boolean =>
+    HALF_DRAGON_SISTER_SLOTS.includes(entry.slot)
+    && entry.classId === HALF_DRAGON_SISTER_CLASS_ID
+    && entry.experience < HALF_DRAGON_SISTER_ENTRY_EXPERIENCE;
+  const raiseEntry = (entry: SaveRosterEntry): SaveRosterEntry => {
+    if (!belowEntry(entry)) return entry;
+    // Carry the accumulated damage across rather than the raw life value, so a
+    // wounded sister stays wounded by the same amount at her new ceiling.
+    const damage = Math.max(0, classStatsFor(entry).maxLife - Math.min(entry.life, classStatsFor(entry).maxLife));
+    const experience = HALF_DRAGON_SISTER_ENTRY_EXPERIENCE;
+    const maximumLife = classStatsFor({ classId: entry.classId, experience }).maxLife;
+    return { ...entry, experience, life: Math.max(1, maximumLife - damage) };
+  };
+  const roster = save.roster.map(raiseEntry);
+  if (save.kind !== "battle") return { ...save, roster };
+  return {
+    ...save,
+    roster,
+    stageEntrySnapshot: {
+      ...save.stageEntrySnapshot,
+      roster: save.stageEntrySnapshot.roster.map(raiseEntry),
+    },
+    battle: {
+      ...save.battle,
+      units: save.battle.units.map((unit) => {
+        if (unit.side !== 1 || !belowEntry(unit)) return unit;
+        const raised = raiseEntry(unit);
+        return { ...unit, experience: raised.experience, life: raised.life };
+      }),
+    },
+  };
+}
+
 export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
+    // A save already at the current version is returned untouched: its sisters
+    // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
-    const migratedVersion75 = migrateVersion75Save(value);
-    if (migratedVersion75) return migratedVersion75;
-    const migratedVersion74 = migrateVersion74Save(value);
-    if (migratedVersion74) return migratedVersion74;
-    const migratedVersion73 = migrateVersion73Save(value);
-    if (migratedVersion73) return migratedVersion73;
-    const migratedVersion72 = migrateVersion72Save(value);
-    if (migratedVersion72) return migratedVersion72;
-    const migratedVersion71 = migrateVersion71Save(value);
-    if (migratedVersion71) return migratedVersion71;
-    const migratedVersion70 = migrateVersion70Save(value);
-    if (migratedVersion70) return migratedVersion70;
-    const migratedVersion69 = migrateVersion69Save(value);
-    if (migratedVersion69) return migratedVersion69;
-    const migratedVersion68 = migrateVersion68Save(value);
-    if (migratedVersion68) return migratedVersion68;
-    const migratedVersion67 = migrateVersion67Save(value);
-    if (migratedVersion67) return migratedVersion67;
-    const migratedVersion66 = migrateVersion66Save(value);
-    if (migratedVersion66) return migratedVersion66;
-    const migratedVersion65 = migrateVersion65Save(value);
-    if (migratedVersion65) return migratedVersion65;
-    const migratedVersion64 = migrateVersion64Save(value);
-    if (migratedVersion64) return migratedVersion64;
-    const migratedVersion63 = migrateVersion63Save(value);
-    if (migratedVersion63) return migratedVersion63;
-    const migratedVersion62 = migrateVersion62Save(value);
-    if (migratedVersion62) return migratedVersion62;
-    const migratedVersion61 = migrateVersion61Save(value);
-    if (migratedVersion61) return migratedVersion61;
-    const migratedVersion60 = migrateVersion60Save(value);
-    if (migratedVersion60) return migratedVersion60;
-    const migratedVersion59 = migrateVersion59Save(value);
-    if (migratedVersion59) return migratedVersion59;
-    const migratedVersion58 = migrateVersion58Save(value);
-    if (migratedVersion58) return migratedVersion58;
-    const migratedVersion57 = migrateVersion57Save(value);
-    if (migratedVersion57) return migratedVersion57;
-    const migratedVersion56 = migrateVersion56Save(value);
-    if (migratedVersion56) return migratedVersion56;
-    const migratedVersion55 = migrateVersion55Save(value);
-    if (migratedVersion55) return migratedVersion55;
-    const migratedVersion54 = migrateVersion54Save(value);
-    if (migratedVersion54) return migratedVersion54;
-    const migratedVersion53 = migrateVersion53Save(value);
-    if (migratedVersion53) return migratedVersion53;
-    const migratedVersion52 = migrateVersion52Save(value);
-    if (migratedVersion52) return migratedVersion52;
-    const migratedVersion51 = migrateVersion51Save(value);
-    if (migratedVersion51) return migratedVersion51;
-    const migratedVersion50 = migrateVersion50Save(value);
-    if (migratedVersion50) return migratedVersion50;
-    const migratedVersion49 = migrateVersion49Save(value);
-    if (migratedVersion49) return migratedVersion49;
-    const migratedVersion48 = migrateVersion48Save(value);
-    if (migratedVersion48) return migratedVersion48;
-    const migratedVersion47 = migrateVersion47Save(value);
-    if (migratedVersion47) return migratedVersion47;
-    const migratedVersion46 = migrateVersion46Save(value);
-    if (migratedVersion46) return migratedVersion46;
-    const migratedVersion45 = migrateVersion45Save(value);
-    if (migratedVersion45) return migratedVersion45;
-    const migratedVersion44 = migrateVersion44Save(value);
-    if (migratedVersion44) return migratedVersion44;
-    const migratedVersion43 = migrateVersion43Save(value);
-    if (migratedVersion43) return migratedVersion43;
-    const migratedVersion42 = migrateVersion42Save(value);
-    if (migratedVersion42) return migratedVersion42;
-    const migratedVersion41 = migrateVersion41Save(value);
-    if (migratedVersion41) return migratedVersion41;
-    const migratedVersion40 = migrateVersion40Save(value);
-    if (migratedVersion40) return migratedVersion40;
-    const migratedVersion39 = migrateVersion39Save(value);
-    if (migratedVersion39) return migratedVersion39;
-    const migratedVersion38 = migrateVersion38Save(value);
-    if (migratedVersion38) return migratedVersion38;
-    const migratedVersion37 = migrateVersion37Save(value);
-    if (migratedVersion37) return migratedVersion37;
-    const migratedVersion36 = migrateVersion36Save(value);
-    if (migratedVersion36) return migratedVersion36;
-    const migratedVersion35 = migrateVersion35Save(value);
-    if (migratedVersion35) return migratedVersion35;
-    const migratedVersion34 = migrateVersion34Save(value);
-    if (migratedVersion34) return migratedVersion34;
-    const migratedVersion33 = migrateVersion33Save(value);
-    if (migratedVersion33) return migratedVersion33;
-    const migratedVersion32 = migrateVersion32Save(value);
-    if (migratedVersion32) return migratedVersion32;
-    const migratedVersion31 = migrateVersion31Save(value);
-    if (migratedVersion31) return migratedVersion31;
-    const migratedVersion30 = migrateVersion30Save(value);
-    if (migratedVersion30) return migratedVersion30;
-    const migratedVersion29 = migrateVersion29Save(value);
-    if (migratedVersion29) return migratedVersion29;
-    const migratedVersion28 = migrateVersion28Save(value);
-    if (migratedVersion28) return migratedVersion28;
-    const migratedVersion27 = migrateVersion27Save(value);
-    if (migratedVersion27) return migratedVersion27;
-    const migratedVersion26 = migrateVersion26Save(value);
-    if (migratedVersion26) return migratedVersion26;
-    const migratedVersion25 = migrateVersion25Save(value);
-    if (migratedVersion25) return migratedVersion25;
-    const migratedVersion24 = migrateVersion24Save(value);
-    if (migratedVersion24) return migratedVersion24;
-    const migratedVersion23 = migrateVersion23Save(value);
-    if (migratedVersion23) return migratedVersion23;
-    const migratedVersion22 = migrateVersion22Save(value);
-    if (migratedVersion22) return migratedVersion22;
-    const migratedVersion21 = migrateVersion21Save(value);
-    if (migratedVersion21) return migratedVersion21;
-    const migratedVersion20 = migrateVersion20Save(value);
-    if (migratedVersion20) return migratedVersion20;
-    const migratedVersion19 = migrateVersion19Save(value);
-    if (migratedVersion19) return migratedVersion19;
-    const migratedVersion18 = migrateVersion18Save(value);
-    if (migratedVersion18) return migratedVersion18;
-    const migratedVersion17 = migrateVersion17Save(value);
-    if (migratedVersion17) return migratedVersion17;
-    const migratedVersion16 = migrateVersion16Save(value);
-    if (migratedVersion16) return migratedVersion16;
-    const migratedVersion15 = migrateVersion15Save(value);
-    if (migratedVersion15) return migratedVersion15;
-    const migratedVersion14 = migrateVersion14Save(value);
-    if (migratedVersion14) return migratedVersion14;
-    const migratedVersion13 = migrateVersion13Save(value);
-    if (migratedVersion13) return migratedVersion13;
-    if (isVersion12SaveData(value)) {
-      const migrated = migrateVersion12Save(value);
-      return finalizeDirectMigration(migrated);
-    }
-    if (isVersion11SaveData(value)) {
-      const migrated = migrateVersion11Save(value);
-      return finalizeDirectMigration(migrated);
-    }
-    if (isVersion10SaveData(value)) {
-      const migrated = migrateVersion10Save(value);
-      return finalizeDirectMigration(migrated);
-    }
-    if (isVersion9SaveData(value)) {
-      const migrated = migrateVersion9Save(value);
-      return finalizeDirectMigration(migrated);
-    }
-    if (isVersion8SaveData(value)) {
-      const migrated = migrateVersion8Save(value);
-      return finalizeDirectMigration(migrated);
-    }
-    if (isVersion7SaveData(value)) {
-      const migrated = migrateVersion7Save(value);
-      return finalizeDirectMigration(migrated);
-    }
-    if (isVersion6SaveData(value)) {
-      const migrated = migrateVersion6Save(value);
-      return finalizeDirectMigration(migrated);
-    }
-    if (isVersion5SaveData(value)) {
-      const migrated = migrateVersion5Save(value);
-      return finalizeDirectMigration(migrated);
-    }
-    if (!isLegacySaveData(value)) return undefined;
-    const migrated = migrateLegacySave(value);
-    return finalizeDirectMigration(migrated);
+    const migrated = migrateLegacySaveData(value);
+    return migrated ? raiseHalfDragonSisterEntryExperience(migrated) : undefined;
   } catch {
     return undefined;
   }
+}
+
+function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion76 = migrateVersion76Save(value);
+  if (migratedVersion76) return migratedVersion76;
+  const migratedVersion75 = migrateVersion75Save(value);
+  if (migratedVersion75) return migratedVersion75;
+  const migratedVersion74 = migrateVersion74Save(value);
+  if (migratedVersion74) return migratedVersion74;
+  const migratedVersion73 = migrateVersion73Save(value);
+  if (migratedVersion73) return migratedVersion73;
+  const migratedVersion72 = migrateVersion72Save(value);
+  if (migratedVersion72) return migratedVersion72;
+  const migratedVersion71 = migrateVersion71Save(value);
+  if (migratedVersion71) return migratedVersion71;
+  const migratedVersion70 = migrateVersion70Save(value);
+  if (migratedVersion70) return migratedVersion70;
+  const migratedVersion69 = migrateVersion69Save(value);
+  if (migratedVersion69) return migratedVersion69;
+  const migratedVersion68 = migrateVersion68Save(value);
+  if (migratedVersion68) return migratedVersion68;
+  const migratedVersion67 = migrateVersion67Save(value);
+  if (migratedVersion67) return migratedVersion67;
+  const migratedVersion66 = migrateVersion66Save(value);
+  if (migratedVersion66) return migratedVersion66;
+  const migratedVersion65 = migrateVersion65Save(value);
+  if (migratedVersion65) return migratedVersion65;
+  const migratedVersion64 = migrateVersion64Save(value);
+  if (migratedVersion64) return migratedVersion64;
+  const migratedVersion63 = migrateVersion63Save(value);
+  if (migratedVersion63) return migratedVersion63;
+  const migratedVersion62 = migrateVersion62Save(value);
+  if (migratedVersion62) return migratedVersion62;
+  const migratedVersion61 = migrateVersion61Save(value);
+  if (migratedVersion61) return migratedVersion61;
+  const migratedVersion60 = migrateVersion60Save(value);
+  if (migratedVersion60) return migratedVersion60;
+  const migratedVersion59 = migrateVersion59Save(value);
+  if (migratedVersion59) return migratedVersion59;
+  const migratedVersion58 = migrateVersion58Save(value);
+  if (migratedVersion58) return migratedVersion58;
+  const migratedVersion57 = migrateVersion57Save(value);
+  if (migratedVersion57) return migratedVersion57;
+  const migratedVersion56 = migrateVersion56Save(value);
+  if (migratedVersion56) return migratedVersion56;
+  const migratedVersion55 = migrateVersion55Save(value);
+  if (migratedVersion55) return migratedVersion55;
+  const migratedVersion54 = migrateVersion54Save(value);
+  if (migratedVersion54) return migratedVersion54;
+  const migratedVersion53 = migrateVersion53Save(value);
+  if (migratedVersion53) return migratedVersion53;
+  const migratedVersion52 = migrateVersion52Save(value);
+  if (migratedVersion52) return migratedVersion52;
+  const migratedVersion51 = migrateVersion51Save(value);
+  if (migratedVersion51) return migratedVersion51;
+  const migratedVersion50 = migrateVersion50Save(value);
+  if (migratedVersion50) return migratedVersion50;
+  const migratedVersion49 = migrateVersion49Save(value);
+  if (migratedVersion49) return migratedVersion49;
+  const migratedVersion48 = migrateVersion48Save(value);
+  if (migratedVersion48) return migratedVersion48;
+  const migratedVersion47 = migrateVersion47Save(value);
+  if (migratedVersion47) return migratedVersion47;
+  const migratedVersion46 = migrateVersion46Save(value);
+  if (migratedVersion46) return migratedVersion46;
+  const migratedVersion45 = migrateVersion45Save(value);
+  if (migratedVersion45) return migratedVersion45;
+  const migratedVersion44 = migrateVersion44Save(value);
+  if (migratedVersion44) return migratedVersion44;
+  const migratedVersion43 = migrateVersion43Save(value);
+  if (migratedVersion43) return migratedVersion43;
+  const migratedVersion42 = migrateVersion42Save(value);
+  if (migratedVersion42) return migratedVersion42;
+  const migratedVersion41 = migrateVersion41Save(value);
+  if (migratedVersion41) return migratedVersion41;
+  const migratedVersion40 = migrateVersion40Save(value);
+  if (migratedVersion40) return migratedVersion40;
+  const migratedVersion39 = migrateVersion39Save(value);
+  if (migratedVersion39) return migratedVersion39;
+  const migratedVersion38 = migrateVersion38Save(value);
+  if (migratedVersion38) return migratedVersion38;
+  const migratedVersion37 = migrateVersion37Save(value);
+  if (migratedVersion37) return migratedVersion37;
+  const migratedVersion36 = migrateVersion36Save(value);
+  if (migratedVersion36) return migratedVersion36;
+  const migratedVersion35 = migrateVersion35Save(value);
+  if (migratedVersion35) return migratedVersion35;
+  const migratedVersion34 = migrateVersion34Save(value);
+  if (migratedVersion34) return migratedVersion34;
+  const migratedVersion33 = migrateVersion33Save(value);
+  if (migratedVersion33) return migratedVersion33;
+  const migratedVersion32 = migrateVersion32Save(value);
+  if (migratedVersion32) return migratedVersion32;
+  const migratedVersion31 = migrateVersion31Save(value);
+  if (migratedVersion31) return migratedVersion31;
+  const migratedVersion30 = migrateVersion30Save(value);
+  if (migratedVersion30) return migratedVersion30;
+  const migratedVersion29 = migrateVersion29Save(value);
+  if (migratedVersion29) return migratedVersion29;
+  const migratedVersion28 = migrateVersion28Save(value);
+  if (migratedVersion28) return migratedVersion28;
+  const migratedVersion27 = migrateVersion27Save(value);
+  if (migratedVersion27) return migratedVersion27;
+  const migratedVersion26 = migrateVersion26Save(value);
+  if (migratedVersion26) return migratedVersion26;
+  const migratedVersion25 = migrateVersion25Save(value);
+  if (migratedVersion25) return migratedVersion25;
+  const migratedVersion24 = migrateVersion24Save(value);
+  if (migratedVersion24) return migratedVersion24;
+  const migratedVersion23 = migrateVersion23Save(value);
+  if (migratedVersion23) return migratedVersion23;
+  const migratedVersion22 = migrateVersion22Save(value);
+  if (migratedVersion22) return migratedVersion22;
+  const migratedVersion21 = migrateVersion21Save(value);
+  if (migratedVersion21) return migratedVersion21;
+  const migratedVersion20 = migrateVersion20Save(value);
+  if (migratedVersion20) return migratedVersion20;
+  const migratedVersion19 = migrateVersion19Save(value);
+  if (migratedVersion19) return migratedVersion19;
+  const migratedVersion18 = migrateVersion18Save(value);
+  if (migratedVersion18) return migratedVersion18;
+  const migratedVersion17 = migrateVersion17Save(value);
+  if (migratedVersion17) return migratedVersion17;
+  const migratedVersion16 = migrateVersion16Save(value);
+  if (migratedVersion16) return migratedVersion16;
+  const migratedVersion15 = migrateVersion15Save(value);
+  if (migratedVersion15) return migratedVersion15;
+  const migratedVersion14 = migrateVersion14Save(value);
+  if (migratedVersion14) return migratedVersion14;
+  const migratedVersion13 = migrateVersion13Save(value);
+  if (migratedVersion13) return migratedVersion13;
+  if (isVersion12SaveData(value)) {
+    const migrated = migrateVersion12Save(value);
+    return finalizeDirectMigration(migrated);
+  }
+  if (isVersion11SaveData(value)) {
+    const migrated = migrateVersion11Save(value);
+    return finalizeDirectMigration(migrated);
+  }
+  if (isVersion10SaveData(value)) {
+    const migrated = migrateVersion10Save(value);
+    return finalizeDirectMigration(migrated);
+  }
+  if (isVersion9SaveData(value)) {
+    const migrated = migrateVersion9Save(value);
+    return finalizeDirectMigration(migrated);
+  }
+  if (isVersion8SaveData(value)) {
+    const migrated = migrateVersion8Save(value);
+    return finalizeDirectMigration(migrated);
+  }
+  if (isVersion7SaveData(value)) {
+    const migrated = migrateVersion7Save(value);
+    return finalizeDirectMigration(migrated);
+  }
+  if (isVersion6SaveData(value)) {
+    const migrated = migrateVersion6Save(value);
+    return finalizeDirectMigration(migrated);
+  }
+  if (isVersion5SaveData(value)) {
+    const migrated = migrateVersion5Save(value);
+    return finalizeDirectMigration(migrated);
+  }
+  if (!isLegacySaveData(value)) return undefined;
+  const migrated = migrateLegacySave(value);
+  return finalizeDirectMigration(migrated);
 }

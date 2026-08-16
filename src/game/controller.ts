@@ -10,7 +10,10 @@ import {
   BATTLE_ACTION_DEFINITIONS,
   HALF_DRAGON_TELEPORT_ACTION_ID,
   STAGE0_REST_PRESENTATION,
+  WATER_WARRIOR_SHOT_ACTION_ID,
   actionPresentationCatalog,
+  isShootingActionId,
+  shootingActionIdFor,
   techniqueActionIdsFor,
 } from "./content/actions";
 import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
@@ -269,10 +272,18 @@ const POST_MOVE_COMMANDS: readonly UnitCommand[] = [
  * The native action-menu chains at `0000:6770/67D2/67EF` decide which extra
  * command a class gets; the generated catalog already carries that split as
  * `actionCategory`, so this reads it instead of restating the 21 classes.
+ *
+ * A granted shot is checked first and by side, because REMAKE-093 adds one to a
+ * class whose native `actionCategory` stays `ordinary` — the catalog keeps the
+ * native value so the AI dispatch and formation rules that also read it are
+ * untouched.
  */
-function classCommandFor(classId: BattleUnit["classId"]): UnitCommand | undefined {
+function classCommandFor(
+  classId: BattleUnit["classId"],
+  side: BattleUnit["side"],
+): UnitCommand | undefined {
+  if (shootingActionIdFor(classId, side)) return { id: "shoot", label: "射擊" };
   const category = classDefinition(classId).actionCategory;
-  if (category === "shooting") return { id: "shoot", label: "射擊" };
   if (category === "technique") return { id: "technique", label: "技術" };
   return undefined;
 }
@@ -871,7 +882,7 @@ export class GameController {
       return [BASIC_COMMANDS[0], { id: "end", label: "放棄" }];
     }
     const selectedClassCommand = this.selectedUnit
-      ? classCommandFor(this.selectedUnit.classId)
+      ? classCommandFor(this.selectedUnit.classId, this.selectedUnit.side)
       : undefined;
     const classCommand = selectedClassCommand?.id === "technique"
       && this.selectedUnit?.statuses.techniqueSeal
@@ -1684,13 +1695,8 @@ export class GameController {
 
   chooseShoot(): void {
     if (this.commandMenuKind === "extraMove") return;
-    const actionId = this.selectedUnit?.classId === "archer"
-      ? "archer-shot"
-      : this.selectedUnit?.classId === "crossbow"
-        ? "crossbow-shot"
-        : this.selectedUnit?.classId === "magic-archer"
-          ? "magic-archer-shot"
-          : undefined;
+    const unit = this.selectedUnit;
+    const actionId = unit && shootingActionIdFor(unit.classId, unit.side);
     if (actionId) this.chooseSpecialAction(actionId);
   }
 
@@ -1970,9 +1976,7 @@ export class GameController {
       this.emit();
       return;
     } else if (this.actionMode === "specialTarget") {
-      const returnToTechnique = this.selectedActionId !== "archer-shot"
-        && this.selectedActionId !== "crossbow-shot"
-        && this.selectedActionId !== "magic-archer-shot";
+      const returnToTechnique = !isShootingActionId(this.selectedActionId);
       this.actionRange = [];
       this.targets = [];
       this.selectedActionId = undefined;
@@ -2213,7 +2217,8 @@ export class GameController {
       );
     };
 
-    if (result.actionId === "archer-shot" || result.actionId === "crossbow-shot") {
+    if (result.actionId === "archer-shot" || result.actionId === "crossbow-shot"
+      || result.actionId === WATER_WARRIOR_SHOT_ACTION_ID) {
       await present("shootBlank", -1, 6);
       for (let frame = 0; frame < 8; frame += 1) {
         await present("shootHit", frame, 6);

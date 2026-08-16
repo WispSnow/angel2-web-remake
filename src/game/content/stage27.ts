@@ -3,6 +3,7 @@ import type { PortraitRecord, Position, UnitClassId } from "../types";
 import * as actionContent from "./stage1-actions.generated";
 import { registerActionContent } from "./actions";
 import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./classes";
+import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
 import { registerStageMusicPrograms } from "./music";
@@ -123,7 +124,7 @@ const campaignActors = STAGE27_DEPLOYMENT_ACTORS.map((actor) => ({
   name: actor.normalizedName,
   portrait: actor.portraitRecord as PortraitRecord,
   aiBehavior: 0,
-  untouchedExperience: actor.slot === 7 ? 0 : 299,
+  untouchedExperience: untouchedEntryExperience(actor.slot, actor.slot === 7 ? 0 : 299),
 }));
 
 export const STAGE27_SEMANTIC_DEPLOYMENT_ROSTER_UNITS = campaignActors;

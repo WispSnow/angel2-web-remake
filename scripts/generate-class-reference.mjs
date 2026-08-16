@@ -21,6 +21,10 @@ import path from "node:path";
 
 import { CLASS_CATALOG, CLASS_ID_BY_NATIVE_RECORD } from "../src/game/content/class-catalog.generated.ts";
 import { classTraitsFor } from "../src/game/content/class-traits.ts";
+import {
+  CLASS_GROWTH_OVERRIDES,
+  SIDE1_ONLY_SHOOTING_CLASSES,
+} from "../src/game/content/class-balance-overrides.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const SOURCES = {
@@ -282,9 +286,17 @@ export async function buildClassReference() {
     record,
   );
 
+  const overrideOf = (record) => {
+    const classId = CLASS_ID_BY_NATIVE_RECORD[String(record.record)];
+    return classId ? CLASS_GROWTH_OVERRIDES[classId] : undefined;
+  };
+
   const growthCellOf = (record) => {
     const growth = growthOf(record);
-    return `+${growth.threshold}${EM}+${growth.attack}${EM}+0${EM}+${growth.life}`;
+    const native = `+${growth.threshold}${EM}+${growth.attack}${EM}+0${EM}+${growth.life}`;
+    // The native rule stays printed as-is; the marker points at the override
+    // section so nobody reads this column as what the game actually derives.
+    return overrideOf(record) ? `${native} ※` : native;
   };
 
   const killRewardOf = (record) => uniqueValueOf(
@@ -364,6 +376,7 @@ export async function buildClassReference() {
     "   不能用来外推成长曲线。",
     "2. `[OF]` 达到职业内 3 级后，只有**攻击与最大生命**继续增长；**防御与移动永久固定**。",
     "   这是原版最重要的结构性特征：后期是攻击膨胀、防御停滞。",
+    "   标 ※ 的记录带 `[SR]` 成长覆写，实际派生曲线见本节后的覆写表，本表列的仍是原版规则。",
     "3. `[OF]` 法系与弓系职业 3 级后攻击步长为 `+0`；对它们而言面板攻击是死数字。",
     "4. `[OF]` **面板攻击不参与射击与技术伤害**。射击读固定动作表，与射手攻击、目标防御、",
     "   地形防御都无关，也不触发反击。弩兵与魔弓兵职业内 1 级面板攻击同为 `52`，实战差距极大。",
@@ -458,6 +471,82 @@ export async function buildClassReference() {
       }),
     ),
   );
+
+  const overriddenRecords = ordinaryRecords.filter(overrideOf);
+  if (overriddenRecords.length > 0) {
+    push(
+      "### `[SR]` 复刻成长覆写",
+      "",
+      "上表标 ※ 的记录在 `stableRemake` 下不按原版规则派生。原版数值仍逐字保留在",
+      "`class-catalog.generated.ts` 里，本节列出运行时实际使用的分段曲线；关闭覆写即回到上表。",
+      "每段为「每档累计经验`／`攻击`／`防御`／`最大生命`」，「覆盖行数」为该段重复的成长行数。",
+      "",
+      table(
+        ["职业", "段", "覆盖行数", "每档", "职业内等级", "该段终点属性"],
+        ["---", "---:", "---", "---", "---", "---"],
+        overriddenRecords.flatMap((record) => {
+          const third = record.dataRows[2];
+          let level = 3;
+          let attack = third.attack;
+          let defense = third.defense;
+          let life = third.maxLife;
+          return overrideOf(record).map((segment, index) => {
+            const rows = segment.rows;
+            const span = rows === undefined ? "无限" : String(rows);
+            const from = level + 1;
+            if (rows === undefined) {
+              return [
+                index === 0 ? record.name : "",
+                String(index + 1),
+                span,
+                `+${segment.thresholdIncrement}${EM}+${segment.attackIncrement}`
+                  + `${EM}+${segment.defenseIncrement}${EM}+${segment.maxLifeIncrement}`,
+                `${from} 级起`,
+                "每档继续累加",
+              ];
+            }
+            level += rows;
+            attack += rows * segment.attackIncrement;
+            defense += rows * segment.defenseIncrement;
+            life += rows * segment.maxLifeIncrement;
+            return [
+              index === 0 ? record.name : "",
+              String(index + 1),
+              span,
+              `+${segment.thresholdIncrement}${EM}+${segment.attackIncrement}`
+                + `${EM}+${segment.defenseIncrement}${EM}+${segment.maxLifeIncrement}`,
+              `${from}–${level} 级`,
+              `${attack}${EM}${defense}${EM}${life}`,
+            ];
+          });
+        }),
+      ),
+      "",
+      "`[OF]` 敌方出场经验按「推进 `难度+1` 个整行」取值，落在哪一行与阈值数值无关：",
+      "难度 0／1 停在原版固定第 2／3 行，完全不受覆写影响；难度 2／3 位于 3 级之后的成长行，",
+      "会随覆写变化（难度 3 另有原版 side 2 的 `+50%` 修正）。",
+    );
+  }
+
+  if (SIDE1_ONLY_SHOOTING_CLASSES.length > 0) {
+    push(
+      "### `[SR]` 仅 side 1 的射击授予",
+      "",
+      "下列职业在原版没有射击记录，`stableRemake` 只给我方授予一个复刻版射击动作；",
+      "敌方维持原版纯近战行为，因此这些职业当敌人出场的关卡不受影响。",
+      "面板攻击、防御、生命与地形 profile 全部保持原版。",
+      "",
+      table(
+        ["职业", "side 1", "side 2"],
+        ["---", "---", "---"],
+        SIDE1_ONLY_SHOOTING_CLASSES.map((classId) => [
+          CLASS_CATALOG[classId].nativeName,
+          "普通攻擊 ＋ 射擊",
+          "普通攻擊",
+        ]),
+      ),
+    );
+  }
 
   push(
     "## 三、转职关系",

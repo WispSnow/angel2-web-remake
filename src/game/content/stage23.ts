@@ -3,6 +3,7 @@ import type { PortraitRecord, Position, UnitClassId } from "../types";
 import * as actionContent from "./stage1-actions.generated";
 import { registerActionContent } from "./actions";
 import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./classes";
+import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
 import { registerStageMusicPrograms } from "./music";
@@ -120,7 +121,7 @@ export const STAGE23_SEMANTIC_ALLIED_UNITS = STAGE23_DEPLOYMENT_ACTORS.map((acto
   aiBehavior: 0,
   // Kins enters the deployable roster as the stage-22 record-3 magic priest;
   // unlike native class-0 named baselines, that override does not grant 299 experience.
-  untouchedExperience: actor.slot === 7 ? 0 : 299,
+  untouchedExperience: untouchedEntryExperience(actor.slot, actor.slot === 7 ? 0 : 299),
 }));
 
 export const STAGE23_SEMANTIC_ENEMY_UNITS = STAGE23_ENEMY_UNITS.map((unit) => {

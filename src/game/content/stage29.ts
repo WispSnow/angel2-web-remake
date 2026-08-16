@@ -3,6 +3,7 @@ import type { PortraitRecord, Position, UnitClassId } from "../types";
 import * as actionContent from "./stage1-actions.generated";
 import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
+import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
 import { registerStageMusicPrograms } from "./music";
@@ -120,7 +121,10 @@ export const STAGE29_SEMANTIC_ALLIED_UNITS = STAGE29_DEPLOYMENT_ACTORS.map((acto
       ? actor.normalizedName
       : usesClassFallback ? "士兵" : actor.normalizedName,
     aiBehavior: 0,
-    untouchedExperience: usesClassFallback || actor.slot === 7 ? 0 : 299,
+    untouchedExperience: untouchedEntryExperience(
+      actor.slot,
+      usesClassFallback || actor.slot === 7 ? 0 : 299,
+    ),
     // REMAKE-070 keeps Eliola's reachable deployment name on the battlefield,
     // while the missing native portrait still follows her inherited profession.
     ...(keepsNamedClassPortrait

@@ -15,6 +15,7 @@ import {
   type ClassId,
 } from "../../src/game/content/classes";
 import { Stage0Battle } from "../../src/game/simulation/battle";
+import { CLASS_GROWTH_OVERRIDES } from "../../src/game/content/class-balance-overrides";
 import { techniqueActionIdsFor } from "../../src/game/content/actions";
 import { classTraitsFor } from "../../src/game/content/class-traits";
 import { DeterministicRng } from "../../src/game/simulation/rng";
@@ -217,6 +218,10 @@ describe("native class implementation sequence", () => {
       ) ?? evidence.postThirdRowGrowth[0];
       expect(growth, `${evidence.record} ${evidence.name} growth entry`).toBeDefined();
       if (!growth) continue;
+      // The fixed rows above stay native for every class. Only the derived
+      // curve past the third row may be replaced by a balance override, and
+      // `class-balance-overrides.test.ts` pins what each override derives.
+      if (CLASS_GROWTH_OVERRIDES[classId]) continue;
 
       const third = fixedRows[2];
       expect(
@@ -775,13 +780,17 @@ describe("native class implementation sequence", () => {
       expect.objectContaining({ experienceThreshold: 380, attack: 72, defense: 39, maxLife: 320, movement: 7, level: 9 }),
       expect.objectContaining({ experienceThreshold: 760, attack: 78, defense: 42, maxLife: 340, movement: 7, level: 10 }),
     ]);
-    expect(classStatsFor({ classId: "half-dragon-warrior", experience: 1140 })).toEqual({
-      attack: 80,
-      defense: 42,
-      maxLife: 352,
-      movement: 7,
-      level: 4,
-    });
+    // The generated catalog still carries the untouched native growth rule;
+    // REMAKE-092 replaces only what `classStatsFor` derives from it, so a
+    // disabled override returns the class to this baseline with no residue.
+    expect(definition.postThirdRowGrowth).toEqual([
+      expect.objectContaining({
+        code: "1N",
+        thresholdIncrement: 380,
+        attackIncrement: 2,
+        maxLifeIncrement: 12,
+      }),
+    ]);
     expect(definition.promotion.targets).toEqual([]);
     expect(definition.ordinaryHitStatuses).toEqual([]);
     expect(definition.shooting).toBeNull();

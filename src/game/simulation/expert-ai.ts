@@ -1,5 +1,7 @@
 import {
   BATTLE_ACTION_DEFINITIONS,
+  isShootingActionId,
+  shootingActionIdFor,
   techniqueActionIdsFor,
 } from "../content/actions";
 import {
@@ -255,13 +257,7 @@ export function expertExposureAt(
       || candidate.actionDisabled) return false;
     const stats = context.statsFor(candidate);
     let maximumReach = stats.movement + 1;
-    const shootingActionId = candidate.classId === "archer"
-      ? "archer-shot"
-      : candidate.classId === "crossbow"
-        ? "crossbow-shot"
-        : candidate.classId === "magic-archer"
-          ? "magic-archer-shot"
-          : undefined;
+    const shootingActionId = shootingActionIdFor(candidate.classId, candidate.side);
     if (shootingActionId) {
       maximumReach = Math.max(
         maximumReach,
@@ -279,8 +275,7 @@ export function expertExposureAt(
       for (const actionId of techniqueActionIdsFor(candidate)) {
         const definition = BATTLE_ACTION_DEFINITIONS[actionId];
         if (definition.target !== "enemy" && definition.target !== "self-area") continue;
-        if (actionId === "archer-shot" || actionId === "crossbow-shot"
-          || actionId === "magic-archer-shot") continue;
+        if (isShootingActionId(actionId)) continue;
         const selectionRadius = "aiCandidateSelectionRadius" in definition.range
           ? definition.range.aiCandidateSelectionRadius
           : "selectionRadius" in definition.range
@@ -425,8 +420,7 @@ export function expertSpecialUtility(
     return utility;
   }
 
-  if (actionId === "archer-shot" || actionId === "crossbow-shot"
-    || actionId === "magic-archer-shot") {
+  if (isShootingActionId(actionId)) {
     if (actionId === "magic-archer-shot" && !linePath) {
       utility.waste = 1;
       return utility;

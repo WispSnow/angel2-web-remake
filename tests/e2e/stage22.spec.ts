@@ -330,7 +330,9 @@ test("S22-J: a deployed half-dragon warrior flies the native teleport across the
 
   const actor = (await state(page)).units.find(({ classId }) =>
     classId === "half-dragon-warrior");
-  expect(actor).toMatchObject({ id: "1:25", acted: false });
+  // REMAKE-092: the sisters join on the third fixed row rather than the retired
+  // class-0 soldier baseline, so a freshly recruited one opens at 78/42/340.
+  expect(actor).toMatchObject({ id: "1:25", acted: false, experience: 760, life: 340 });
 
   const cursor = await page.evaluate(() =>
     (window.__ANGEL2__?.getState() as { cursor: { x: number; y: number } }).cursor);

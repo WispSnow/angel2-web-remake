@@ -4,6 +4,7 @@ import {
   CLASS_IDS,
   type ClassId,
 } from "./class-catalog.generated";
+import { CLASS_GROWTH_OVERRIDES, type ClassGrowthSegment } from "./class-balance-overrides";
 import type { BattleUnit, UnitStats } from "../types";
 import type { PortraitRecord } from "./portrait-catalog.generated";
 
@@ -250,6 +251,74 @@ function growthFor(classId: ClassId, side: BattleUnit["side"] = 1) {
     ?? definition.postThirdRowGrowth[0];
 }
 
+/**
+ * Native classes have exactly one post-third-row rule that repeats forever and
+ * never touches defense. A balance override may replace it with several
+ * segments, so every reader goes through this shape instead of branching on
+ * whether an override exists.
+ */
+function growthSegmentsFor(
+  classId: ClassId,
+  side: BattleUnit["side"] = 1,
+): readonly ClassGrowthSegment[] {
+  const override = CLASS_GROWTH_OVERRIDES[classId];
+  if (override) return override;
+  const growth = growthFor(classId, side);
+  return growth
+    ? [{
+      thresholdIncrement: growth.thresholdIncrement,
+      attackIncrement: growth.attackIncrement,
+      defenseIncrement: 0,
+      maxLifeIncrement: growth.maxLifeIncrement,
+    }]
+    : [];
+}
+
+interface PostThirdRowProgress {
+  rows: number;
+  attack: number;
+  defense: number;
+  maxLife: number;
+}
+
+/** Walks the segments an accumulated experience surplus has actually paid for. */
+function postThirdRowProgress(
+  segments: readonly ClassGrowthSegment[],
+  experienceAboveThird: number,
+): PostThirdRowProgress {
+  const progress: PostThirdRowProgress = { rows: 0, attack: 0, defense: 0, maxLife: 0 };
+  let remaining = Math.max(0, experienceAboveThird);
+  for (const segment of segments) {
+    const affordable = Math.floor(remaining / segment.thresholdIncrement);
+    const taken = segment.rows === undefined ? affordable : Math.min(affordable, segment.rows);
+    progress.rows += taken;
+    progress.attack += taken * segment.attackIncrement;
+    progress.defense += taken * segment.defenseIncrement;
+    progress.maxLife += taken * segment.maxLifeIncrement;
+    remaining -= taken * segment.thresholdIncrement;
+    // A segment that still has rows left is where the unit currently sits, so
+    // later segments cannot have been reached no matter how much is left over.
+    if (segment.rows === undefined || taken < segment.rows) break;
+  }
+  return progress;
+}
+
+/** Total experience above the third row needed to complete `rows` growth rows. */
+function experienceForPostThirdRows(
+  segments: readonly ClassGrowthSegment[],
+  rows: number,
+): number | undefined {
+  let remaining = rows;
+  let experience = 0;
+  for (const segment of segments) {
+    const taken = segment.rows === undefined ? remaining : Math.min(remaining, segment.rows);
+    experience += taken * segment.thresholdIncrement;
+    remaining -= taken;
+    if (remaining === 0) return experience;
+  }
+  return undefined;
+}
+
 export function classStatsFor(
   unit: ClassProgressionState,
 ): UnitStats {
@@ -273,26 +342,16 @@ export function classStatsFor(
     };
   }
 
-  const growth = growthFor(unit.classId, unit.side);
-  if (!growth) {
-    return {
-      attack: selected.attack,
-      defense: selected.defense,
-      maxLife: selected.maxLife,
-      movement: selected.movement,
-      level: selectedIndex + 1,
-    };
-  }
-  const thirdThreshold = fixedRows[2].experienceThreshold;
-  const postThirdRows = Math.floor(
-    Math.max(0, unit.experience - thirdThreshold) / growth.thresholdIncrement,
+  const progress = postThirdRowProgress(
+    growthSegmentsFor(unit.classId, unit.side),
+    unit.experience - fixedRows[2].experienceThreshold,
   );
   return {
-    attack: selected.attack + postThirdRows * growth.attackIncrement,
-    defense: selected.defense,
-    maxLife: selected.maxLife + postThirdRows * growth.maxLifeIncrement,
+    attack: selected.attack + progress.attack,
+    defense: selected.defense + progress.defense,
+    maxLife: selected.maxLife + progress.maxLife,
     movement: selected.movement,
-    level: selectedIndex + 1 + postThirdRows,
+    level: selectedIndex + 1 + progress.rows,
   };
 }
 
@@ -317,12 +376,11 @@ export function nextExperienceThresholdFor(
     .find((threshold) => threshold > unit.experience);
   if (fixedThreshold !== undefined) return fixedThreshold;
 
-  const growth = growthFor(unit.classId, unit.side);
-  if (!growth) return Number.MAX_SAFE_INTEGER;
+  const segments = growthSegmentsFor(unit.classId, unit.side);
   const thirdThreshold = definition.dataRows[2].experienceThreshold;
-  return thirdThreshold
-    + (Math.floor((unit.experience - thirdThreshold) / growth.thresholdIncrement) + 1)
-      * growth.thresholdIncrement;
+  const reached = postThirdRowProgress(segments, unit.experience - thirdThreshold).rows;
+  const next = experienceForPostThirdRows(segments, reached + 1);
+  return next === undefined ? Number.MAX_SAFE_INTEGER : thirdThreshold + next;
 }
 
 /**

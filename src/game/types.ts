@@ -250,8 +250,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 76;
-  contentVersion: "force-follower-engage-first-1";
+  version: 77;
+  contentVersion: "half-dragon-curve-water-warrior-shot-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

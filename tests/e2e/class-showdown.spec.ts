@@ -305,6 +305,47 @@ test("water warrior splits after defensive melee and all copies show shared life
   expect(pageErrors).toEqual([]);
 });
 
+test("REMAKE-093 adds 射擊 to the water warrior's own command menu", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  // Only the side-1 half is observable here: an enemy never opens a player
+  // command menu, so the side-2 withholding is pinned in
+  // `class-balance-overrides.test.ts` against the simulation instead.
+  const selectWaterWarrior = async (unitId: string): Promise<void> => {
+    const placed = await classShowdownBattleState(page);
+    const unit = placed?.units.find(({ id }) => id === unitId);
+    expect(unit?.classId, unitId).toBe("water-warrior");
+    const from = placed!.cursor;
+    for (let step = 0; step < Math.abs(unit!.y - from.y); step += 1) {
+      await page.keyboard.press(unit!.y > from.y ? "ArrowDown" : "ArrowUp");
+    }
+    for (let step = 0; step < Math.abs(unit!.x - from.x); step += 1) {
+      await page.keyboard.press(unit!.x > from.x ? "ArrowRight" : "ArrowLeft");
+    }
+    await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+      .toEqual({ x: unit!.x, y: unit!.y });
+    await page.keyboard.press("Space");
+    await expect(page.locator(".hud-identity-name")).toHaveText("水戰士／水戰士");
+  };
+
+  // The side-1 water warrior keeps its melee command and gains 射擊 beside it.
+  await selectWaterWarrior("arena-1-26");
+  await expect(page.getByTestId("unit-command-attack")).toBeVisible();
+  await expect(page.getByTestId("unit-command-shoot")).toBeVisible();
+  // The melee identity is untouched: the split trait and 攻擊 both survive.
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性近戰受擊分裂");
+  await expect(page.getByTestId("unit-command-move")).toBeVisible();
+  await expect(page.getByTestId("unit-command-rest")).toBeVisible();
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-water-warrior-shoot-command.png`,
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test("water warrior copies die in sequence and multiply the killer's experience", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

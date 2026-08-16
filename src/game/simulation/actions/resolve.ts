@@ -1,6 +1,7 @@
 import {
   BATTLE_ACTION_DEFINITIONS,
   HALF_DRAGON_TELEPORT_ACTION_ID,
+  WATER_WARRIOR_SHOT_ACTION_ID,
 } from "../../content/actions";
 import { killRewardFor, movementRulesFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
@@ -35,8 +36,17 @@ const isFireAction = (actionId: BattleActionId): actionId is "fire-1" | "fire-2"
   actionId === "fire-1" || actionId === "fire-2" || actionId === "fire-3" || actionId === "fire-4";
 const isHealAction = (actionId: BattleActionId): actionId is "heal-1" | "heal-2" | "heal-3" =>
   actionId === "heal-1" || actionId === "heal-2" || actionId === "heal-3";
-const isShootingAction = (actionId: BattleActionId): actionId is "archer-shot" | "crossbow-shot" =>
-  actionId === "archer-shot" || actionId === "crossbow-shot";
+/**
+ * Single-target shots resolved by the shared roll below. The magic archer is
+ * deliberately absent: its line splash and doubled selected-target damage are
+ * resolved on their own path.
+ */
+const isSingleTargetShootingAction = (
+  actionId: BattleActionId,
+): actionId is "archer-shot" | "crossbow-shot" | typeof WATER_WARRIOR_SHOT_ACTION_ID =>
+  actionId === "archer-shot"
+  || actionId === "crossbow-shot"
+  || actionId === WATER_WARRIOR_SHOT_ACTION_ID;
 
 function shootingEvaded(target: BattleUnit, trial: DeterministicRng): boolean {
   return target.classId === "swift-dragon-knight" && (trial.nextUint() & 1) === 1;
@@ -160,7 +170,7 @@ function prepareSingleTarget(
   let blockReason: ActionBlockReason | undefined;
   const targetStatusesAfter = cloneUnitStatuses(target.statuses);
 
-  if (isShootingAction(intent.actionId)) {
+  if (isSingleTargetShootingAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     if (target.actionDisabled) {
       blocked = true;
@@ -336,7 +346,7 @@ function prepareSingleTarget(
   const lifeAfter = Math.max(0, Math.min(targetMaximumLife, target.life - damage + healing));
   const targetDied = lifeAfter === 0;
   let experienceGained = 0;
-  if (isShootingAction(intent.actionId)) {
+  if (isSingleTargetShootingAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     experienceGained = trial.between(
       definition.experience.minimum,

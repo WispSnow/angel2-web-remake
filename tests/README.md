@@ -27,6 +27,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `src/game/simulation/forces.ts`、`force-ai.ts` 的军团归属、目标策略、`terrain-hold` 防区教义、优先治疗与成对领队／跟随（近端判据用普通移动图、跟随只在无合法动作时接管） | `forces.test.ts`，防区与编队实例见 `stage3-battle.test.ts` | `stage3.spec.ts` |
 | `src/game/content/technique-*`、地图技术时间轴 | `technique-lab.test.ts` | `technique-lab.spec.ts`；只在正式接入变化时追加对应竞技场文件 |
 | `src/game/content/classes.ts`、职业固定行／第三行后成长、近战／远程职责、39 职业目标优先级档案、`class-traits.ts`、终阶职业特性、飛龍攻后移动与水戰士受击分裂／共享状态 | `classes.test.ts` | `class-showdown.spec.ts` 的职业说明、飛龍流程和水戰士分裂用例 |
+| `src/game/content/class-balance-overrides.ts`、`campaign-entry-experience.ts`：`REMAKE-092` 半龍戰士分段成长与 3 级后防御成长、七姊妹入队经验、`REMAKE-093` 水戰士仅 side 1 射击授予与敌方零影响 | `class-balance-overrides.test.ts`，入队实例见 `stage22-battle.test.ts`，迁移见 `save.test.ts` | `class-showdown.spec.ts` 的职业说明与射击用例 |
 | `src/game/arena-*`、`src/arena.ts` | `arena.test.ts` | `arena.spec.ts`，再按动作族选择 `arena-*.spec.ts` |
 | `class-showdown-session.ts` 的对阵场编成与镜像 | `class-showdown.test.ts` | `class-showdown.spec.ts` |
 | 半龍戰士 `1N` 直连技術「傳送」：seed 200／模式 `0` 传播、空格落点、行动消耗与移動路径表现 | `half-dragon-teleport.test.ts`，职业菜单口径另见 `classes.test.ts` | `stage22.spec.ts` 的 `S22-J`、`class-showdown.spec.ts` 的傳送用例 |

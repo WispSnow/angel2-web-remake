@@ -46,18 +46,25 @@ describe("stage 22 battle simulation", () => {
   it("builds the nineteen-unit deployment before any enemy is visible", () => {
     const roster = createStage22DeploymentRoster(campaign);
     expect(roster).toHaveLength(28);
+    // REMAKE-092: the sisters join at the just-reached-level-3 threshold rather
+    // than the class-0 soldier baseline, which only means anything on a curve
+    // that is about to promote at 300.
     for (const slot of [25, 26, 27, 28, 29, 30, 31]) {
       expect(roster.find((unit) => unit.slot === slot)).toMatchObject({
         classId: "half-dragon-warrior",
-        experience: 299,
+        experience: 760,
       });
     }
     const battle = new Stage22Battle(campaign, fullDeployment);
     for (const slot of [25, 26, 27, 28, 29, 30, 31]) {
       expect(battle.campaignSnapshot().roster[slot]).toMatchObject({
         classId: "half-dragon-warrior",
-        experience: 299,
+        experience: 760,
       });
+      // Entering on the third fixed row means a deployed sister opens at the
+      // native 340 life, not the level-1 300 the old baseline produced.
+      const deployed = battle.unit(`1:${slot}`);
+      if (deployed) expect(deployed).toMatchObject({ life: 340 });
     }
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(19);
     expect(battle.units.filter(({ side }) => side === 2)).toEqual([]);

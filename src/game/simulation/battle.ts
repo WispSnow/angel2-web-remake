@@ -16,8 +16,11 @@ import {
 import {
   BATTLE_ACTION_DEFINITIONS,
   HALF_DRAGON_TELEPORT_ACTION_ID,
+  WATER_WARRIOR_SHOT_ACTION_ID,
   hasIceTechnique,
   isIceActionId,
+  isShootingActionId,
+  shootingActionIdFor,
   techniqueActionIdsFor,
 } from "../content/actions";
 import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
@@ -191,6 +194,7 @@ const isDamagingActionId = (actionId: BattleActionId): boolean =>
 const isDirectFocusDamageActionId = (actionId: BattleActionId): boolean =>
   actionId === "archer-shot"
   || actionId === "crossbow-shot"
+  || actionId === WATER_WARRIOR_SHOT_ACTION_ID
   || actionId === "fire-1"
   || actionId === "fire-2"
   || actionId === "fire-3"
@@ -246,6 +250,7 @@ const ACTION_CLASSES: Readonly<Record<BattleActionId, readonly ClassId[]>> = {
   "archer-shot": ["archer"],
   "crossbow-shot": ["crossbow"],
   "magic-archer-shot": ["magic-archer"],
+  [WATER_WARRIOR_SHOT_ACTION_ID]: ["water-warrior"],
   "fire-1": ["sister", "magician", "magic-priest", "priest"],
   "fire-2": ["magic-priest", "evil-mage"],
   "fire-3": ["evil-mage"],
@@ -359,11 +364,16 @@ function canUseSpecialAction(
   if (actionId === "ice-4" && tier !== 3) return false;
   if (actionId === "stomp-2" && tier !== 2) return false;
   if (actionId === "stomp-3" && tier !== 3) return false;
+  // A shooting action additionally has to be the one this actor's class grants
+  // on this side, so a side-2 water warrior cannot reach the side-1-only shot
+  // that ACTION_CLASSES lists for its class.
+  const classGrantsAction = isShootingActionId(actionId)
+    ? shootingActionIdFor(actor.classId, actor.side) === actionId
+    : ACTION_CLASSES[actionId].includes(actor.classId);
   return !actor.acted
     && !actor.actionDisabled
-    && (nativeTechniqueAction || ACTION_CLASSES[actionId].includes(actor.classId))
-    && (actionId === "archer-shot" || actionId === "crossbow-shot"
-      || actionId === "magic-archer-shot" || actor.statuses.techniqueSeal === 0);
+    && (nativeTechniqueAction || classGrantsAction)
+    && (isShootingActionId(actionId) || actor.statuses.techniqueSeal === 0);
 }
 
 export interface RouteMoveResult {
@@ -1251,7 +1261,7 @@ export class Stage0Battle {
       }
       return result;
     }
-    if (actionId === "archer-shot" || actionId === "crossbow-shot" || actionId === "magic-archer-shot") {
+    if (isShootingActionId(actionId)) {
       return shootingRange(actor, battlefield, BATTLE_ACTION_DEFINITIONS[actionId].range.nativeSeed);
     }
     // The native `1N` handler writes seed 200 into the same mode-`0` builder
@@ -2323,13 +2333,10 @@ export class Stage0Battle {
       targetFilter?: (target: BattleUnit) => boolean;
     },
   ): AlliedAiAction {
-    const actionIds = unit.classId === "archer"
-      ? ["archer-shot"] as const
-      : unit.classId === "crossbow"
-        ? ["crossbow-shot"] as const
-        : unit.classId === "magic-archer"
-          ? ["magic-archer-shot"] as const
-          : techniqueActionIdsFor(unit);
+    const shootingActionId = shootingActionIdFor(unit.classId, unit.side);
+    const actionIds: readonly BattleActionId[] = shootingActionId
+      ? [shootingActionId]
+      : techniqueActionIdsFor(unit);
     const hostileActionIds = actionIds.filter((actionId) =>
       BATTLE_ACTION_DEFINITIONS[actionId].target === "enemy" || isIceActionId(actionId));
     const pureSupport = hostileActionIds.length === 0;
@@ -3188,16 +3195,12 @@ export class Stage0Battle {
     requestedActionIds?: readonly BattleActionId[],
     options: ClassActionPlanningOptions = {},
   ): AlliedAiAction | undefined {
-    if (unit.classId !== "archer" && unit.classId !== "crossbow"
-      && unit.classId !== "magic-archer" && unit.statuses.techniqueSeal > 0) return undefined;
+    const shootingActionId = shootingActionIdFor(unit.classId, unit.side);
+    if (!shootingActionId && unit.statuses.techniqueSeal > 0) return undefined;
     const tier = classTierFor(unit);
     const actionIds: readonly BattleActionId[] = requestedActionIds
-      ?? (unit.classId === "archer"
-        ? ["archer-shot"]
-        : unit.classId === "crossbow"
-          ? ["crossbow-shot"]
-          : unit.classId === "magic-archer"
-            ? ["magic-archer-shot"]
+      ?? (shootingActionId
+        ? [shootingActionId]
           : unit.classId === "sister"
           ? ["heal-1", "fire-1"]
           : unit.classId === "priest"
@@ -3281,10 +3284,8 @@ export class Stage0Battle {
       if (!(options.actionFilter?.(actionId) ?? true)) continue;
       if (!this.canUseSpecialAction(unit, actionId)) continue;
       const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-      const shootingAction = actionId === "archer-shot" || actionId === "crossbow-shot"
-        || actionId === "magic-archer-shot";
-      const positions = (actionId === "archer-shot" || actionId === "crossbow-shot"
-        || actionId === "magic-archer-shot"
+      const shootingAction = isShootingActionId(actionId);
+      const positions = (shootingAction
         ? this.reachableCells(unit.id)
         : [options.casterPosition ?? { x: unit.x, y: unit.y }])
         .filter((position) => !occupied.has(positionKey(position))
@@ -3311,8 +3312,7 @@ export class Stage0Battle {
           && actionId === "magic-archer-shot"
           && rangedRisk.adjacentEnemyCount > 0) continue;
         const rangeActor = { ...unit, x: position.x, y: position.y };
-        const shootingActionId = actionId === "archer-shot" || actionId === "crossbow-shot"
-          || actionId === "magic-archer-shot" ? actionId : undefined;
+        const shootingActionId = isShootingActionId(actionId) ? actionId : undefined;
         const rangeSeed = shootingActionId
           ? BATTLE_ACTION_DEFINITIONS[shootingActionId].range.nativeSeed
           : "aiCandidateSelectionRadius" in definition.range

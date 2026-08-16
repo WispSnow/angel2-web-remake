@@ -1970,6 +1970,73 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v76 saves losslessly when no sister sits below the entry baseline", () => {
+    // REMAKE-092/093 add no stored fields: a unit still carries only its class
+    // and experience, so a save without an under-baseline sister is unchanged.
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 76,
+        contentVersion: "force-follower-engage-first-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
+  it("raises a v76 sister parked on the retired class-0 entry baseline", () => {
+    const current = completedSave();
+    const legacy = {
+      ...current,
+      version: 76,
+      contentVersion: "force-follower-engage-first-1",
+      roster: current.roster.map((entry) => entry.slot === 25
+        ? { ...entry, classId: "half-dragon-warrior", experience: 299, life: 300 }
+        : entry),
+    };
+    const migrated = parseSaveData(JSON.stringify(legacy));
+    expect(migrated?.roster.find(({ slot }) => slot === 25)).toMatchObject({
+      classId: "half-dragon-warrior",
+      experience: 760,
+      // Undamaged at the old level-1 ceiling of 300, so she arrives full at 340.
+      life: 340,
+    });
+  });
+
+  it("carries a wounded v76 sister's damage across to the raised ceiling", () => {
+    const current = completedSave();
+    const legacy = {
+      ...current,
+      version: 76,
+      contentVersion: "force-follower-engage-first-1",
+      roster: current.roster.map((entry) => entry.slot === 26
+        ? { ...entry, classId: "half-dragon-warrior", experience: 299, life: 260 }
+        : entry),
+    };
+    const migrated = parseSaveData(JSON.stringify(legacy));
+    // 40 points down from the old 300 ceiling stays 40 points down from 340.
+    expect(migrated?.roster.find(({ slot }) => slot === 26)).toMatchObject({
+      experience: 760,
+      life: 300,
+    });
+  });
+
+  it("never lowers a v76 sister who already earned past the entry baseline", () => {
+    const current = completedSave();
+    const legacy = {
+      ...current,
+      version: 76,
+      contentVersion: "force-follower-engage-first-1",
+      roster: current.roster.map((entry) => entry.slot === 27
+        ? { ...entry, classId: "half-dragon-warrior", experience: 1900, life: 400 }
+        : entry),
+    };
+    const migrated = parseSaveData(JSON.stringify(legacy));
+    expect(migrated?.roster.find(({ slot }) => slot === 27)).toMatchObject({
+      experience: 1900,
+      life: 400,
+    });
+  });
+
   it("migrates v75 saves losslessly through the formation-follower AI identity", () => {
     // REMAKE-091 only changes how a paired follower plans, so nothing in the
     // stored battle, roster or PRNG is reinterpreted.

@@ -5,6 +5,11 @@ import {
   promotionTargetsFor,
   type ClassId,
 } from "./content/classes";
+import {
+  HALF_DRAGON_SISTER_CLASS_ID,
+  HALF_DRAGON_SISTER_ENTRY_EXPERIENCE,
+  HALF_DRAGON_SISTER_SLOTS,
+} from "./content/campaign-entry-experience";
 import { completeCampaignRoster } from "./content/stage0";
 import { readSaveSlot, SAVE_SLOT_COUNT } from "./save";
 import { DeterministicRng } from "./simulation/rng";
@@ -55,10 +60,12 @@ const STAGE30_VESTA_EMPRESS_BASELINE = {
   classId: "empress",
   experience: 0,
 } as const;
-const HALF_DRAGON_SISTER_BASELINES = [25, 26, 27, 28, 29, 30, 31].map((slot) => ({
+// REMAKE-092 gives the sisters a just-reached-level-3 entry baseline instead of
+// the class-0 soldier number, so the fixture reads the same constant the stages do.
+const HALF_DRAGON_SISTER_BASELINES = HALF_DRAGON_SISTER_SLOTS.map((slot) => ({
   slot,
-  classId: "half-dragon-warrior" as const,
-  experience: 299,
+  classId: HALF_DRAGON_SISTER_CLASS_ID,
+  experience: HALF_DRAGON_SISTER_ENTRY_EXPERIENCE,
 }));
 
 /**
