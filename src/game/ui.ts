@@ -132,7 +132,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="close-music-settings" data-testid="close-music-settings">返回</button>
               </div>
             </section>
-            <section class="record-menu action-menu" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
+            <section class="record-menu action-menu native-command-menu" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
             <section class="quit-confirm native-feedback-confirm" id="quit-confirm" data-testid="quit-confirm" role="dialog" aria-label="離開遊戲確認" hidden>
               ${animatedPortraitMarkup(46, {
                 alt: "妮雅肖像",
@@ -886,20 +886,22 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const slot = index + 1;
         const save = controller.readSave(slot);
         const selected = index === controller.recordMenuIndex;
-        const label = save
-          ? `${save.stageLabel}　第 ${save.kind === "battle" ? save.battle?.round ?? 1 : "完"} 回合`
-          : "此處沒有記錄";
-        return `<button type="button" role="menuitem" data-action="record-slot" data-record-index="${index}" data-testid="record-slot-${slot}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}" ${mode === "load" && !save ? "disabled" : ""}><b>${slot}</b><span>${label}</span></button>`;
+        // 144 px 原生外框只留 116 px 給槽位文字。關卡名放進可省略的彈性欄，回合
+        // 數固定在右欄，長關卡名截斷後仍能區分同一關的多個記錄。
+        const round = save
+          ? `第 ${save.kind === "battle" ? save.battle?.round ?? 1 : "完"} 回合`
+          : "";
+        return `<button type="button" role="menuitem" class="native-slot-row ${selected ? "is-selected" : ""}" data-action="record-slot" data-record-index="${index}" data-testid="record-slot-${slot}" aria-current="${selected ? "true" : "false"}" ${mode === "load" && !save ? "disabled" : ""}><b>${slot}</b><span class="native-slot-name">${save ? save.stageLabel : "此處沒有記錄"}</span><span class="native-slot-note">${round}</span></button>`;
       }).join("");
-      recordMenu.innerHTML = `<strong>${mode === "save" ? "儲存遊戲進度" : "讀取遊戲進度"}</strong>${slots}
-        <div class="record-menu-pagination">
+      recordMenu.innerHTML = `<strong class="native-menu-title">${mode === "save" ? "儲存遊戲進度" : "讀取遊戲進度"}</strong>${slots}
+        <div class="native-slot-pagination record-menu-pagination">
           <button type="button" data-action="record-page" data-record-page-delta="-1"
             data-testid="record-previous-page" aria-label="上一頁">◀</button>
           <span data-testid="record-page">第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁</span>
           <button type="button" data-action="record-page" data-record-page-delta="1"
             data-testid="record-next-page" aria-label="下一頁">▶</button>
         </div>
-        <button type="button" data-action="close-record-menu">取 消</button>`;
+        <button type="button" data-action="close-record-menu"><span class="native-command-label">取 消</span></button>`;
     }
     quitConfirm.hidden = !controller.quitConfirmOpen;
     if (!quitConfirm.hidden) {
@@ -1778,10 +1780,10 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
       const slot = index + 1;
       const save = controller.readSave(slot);
       const selected = index === controller.postSaveSlotIndex;
-      return `<button class="save-slot ${selected ? "is-selected" : ""}" data-action="save-slot" data-slot="${slot}" data-post-save-index="${index}" data-testid="save-slot-${slot}" aria-current="${selected ? "true" : "false"}"><b>${slot}</b><span>${save ? save.stageLabel : "此處沒有記錄"}</span></button>`;
+      return `<button type="button" class="save-slot native-slot-row ${selected ? "is-selected" : ""}" data-action="save-slot" data-slot="${slot}" data-post-save-index="${index}" data-testid="save-slot-${slot}" aria-current="${selected ? "true" : "false"}"><b>${slot}</b><span class="native-slot-name">${save ? save.stageLabel : "此處沒有記錄"}</span></button>`;
     }).join("");
-    layer.innerHTML = `<div class="native-save-selector"><strong>儲存遊戲進度</strong>${slots}
-      <div class="native-save-pagination">
+    layer.innerHTML = `<div class="native-save-selector action-menu native-command-menu"><strong class="native-menu-title">儲存遊戲進度</strong>${slots}
+      <div class="native-slot-pagination native-save-pagination">
         <button type="button" data-action="post-save-page" data-post-save-page-delta="-1"
           data-testid="post-save-previous-page" aria-label="上一頁">◀</button>
         <span data-testid="post-save-page">第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁</span>

@@ -595,45 +595,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   background: #8d342f;
   box-shadow: inset 0 0 0 1px #f4d34b;
 }
-.action-menu.record-menu { z-index: 15; left: 384px; top: 88px; width: 146px; height: 205px; padding-top: 27px; }
-.record-menu > strong { position: absolute; left: 0; top: 4px; width: 100%; color: #f5d86c; text-align: center; font-size: 13px; }
-.action-menu.record-menu > button { display: grid; grid-template-columns: 20px 1fr; align-items: center; width: 136px; height: 24px; padding: 0 4px; border: 0; color: #eee3d5; background: transparent; text-align: left; text-indent: 0; letter-spacing: 0; font-size: 11px; }
-.record-menu > button b { color: #f4c43d; }
-.record-menu > button span { overflow: hidden; white-space: nowrap; text-align: left; }
-.action-menu.record-menu > button:last-child { display: block; margin-top: 2px; text-align: center; }
-.record-menu-pagination,
-.native-save-pagination {
-  display: grid;
-  grid-template-columns: 24px 1fr 24px;
-  align-items: center;
-  width: 136px;
-  height: 22px;
-  color: #d8c8a6;
-  font: 9px/20px system-ui, sans-serif;
-  text-align: center;
-}
-.record-menu-pagination button,
-.native-save-pagination button {
-  width: 22px;
-  height: 18px;
-  min-width: 0;
-  padding: 0 !important;
-  border: 0;
-  color: #f4d34b;
-  background: transparent;
-  font-size: 10px;
-  cursor: var(--native-cursor-hand, pointer);
-}
-.record-menu-pagination button:hover,
-.record-menu-pagination button:focus-visible,
-.native-save-pagination button:hover,
-.native-save-pagination button:focus-visible {
-  color: #fff;
-  background: #8d342f;
-  outline: 1px solid #f4d34b;
-}
-.system-menu > button.is-selected,
-.record-menu > button.is-selected { color: #fff; background: #8d342f; box-shadow: inset 0 0 0 1px #f4d34b; }
+.system-menu > button.is-selected { color: #fff; background: #8d342f; box-shadow: inset 0 0 0 1px #f4d34b; }
 .action-menu {
   position: absolute;
   z-index: 9;
@@ -777,6 +739,104 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .group-command-menu button:disabled {
   color: #81766d;
   background: transparent;
+}
+/* 戰鬥中「儲存記錄／讀取記錄」與戰後「儲存遊戲進度」沿用同一個 `A/0001` 外框：
+   144 px 寬、24 px 行距、素材選中橫飾，外高仍是 `24N + 28`。記錄選單的 N 是
+   標題列 + 五個槽位列 + 分頁列 + 取消列 = 8；戰後存檔沒有取消列，N = 7。
+   分頁是 Web 側新增的二十槽需求，這裡按同一行距做成一列，不改外框幾何。 */
+.action-menu.native-command-menu.record-menu {
+  z-index: 15;
+  left: 304px;
+  top: 47px;
+  width: 144px;
+  height: 220px;
+}
+/* 原版通用選單「會移動位置以避開當前指針／右側資訊欄矩形」，資訊欄佔 x=480..639
+   （`reverse/notes/input-and-battle-ui.md` 通用行動菜單一節、
+   `reverse/parsed/native/input-ui.json` 的 `unitHud.positioning`）。通用外框的紅橙
+   棋盤紋理又只有 50% 不透明度，壓在戰術欄上會透出欄內文字。因此所有沿用 `A/0001`
+   外框的表面一律靠右對齊到戰場邊界 480 px 之內。 */
+.action-menu.native-command-menu.native-save-selector {
+  z-index: 2;
+  left: 336px;
+  top: 100px;
+  width: 144px;
+  height: 196px;
+}
+.action-menu.native-command-menu > .native-menu-title {
+  display: block;
+  width: 136px;
+  height: 24px;
+  color: #ffd75f;
+  font: 15px/24px "PMingLiU", "Noto Serif TC", serif;
+  letter-spacing: 1px;
+  text-align: center;
+  text-indent: 1px;
+  text-shadow: 2px 2px #000;
+}
+.action-menu.native-command-menu > button.native-slot-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 3px;
+  width: 136px;
+  height: 24px;
+  padding: 0 2px;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-align: left;
+  text-indent: 0;
+  text-shadow: 1px 1px #000;
+}
+.native-slot-row > b { position: relative; color: #ffd75f; font-weight: 400; text-align: center; }
+.native-slot-name { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.native-slot-note { position: relative; color: #e4d3ac; white-space: nowrap; }
+/* 全域 `button:disabled` 的灰階與半透明會讓槽位在 50% 透明棋盤紋理上糊掉；
+   讀取模式的空槽改用純色壓暗，保持「不可選但可讀」。 */
+.native-slot-row:disabled {
+  color: #a3937f;
+  background: transparent;
+  filter: none;
+  opacity: 1;
+}
+.native-slot-row:disabled > b { color: #a3937f; }
+.action-menu.native-command-menu > .native-slot-pagination {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
+  width: 136px;
+  height: 24px;
+  color: #efdcb0;
+  font: 12px/24px "PMingLiU", "Noto Serif TC", serif;
+  text-align: center;
+  text-shadow: 1px 1px #000;
+}
+.action-menu.native-command-menu .native-slot-pagination > button {
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  padding: 0;
+  color: #ffd75f;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-align: center;
+  text-indent: 0;
+  text-shadow: 1px 1px #000;
+}
+.action-menu.native-command-menu .native-slot-pagination > button::before { content: none; }
+.action-menu.native-command-menu .native-slot-pagination > button:hover,
+.action-menu.native-command-menu .native-slot-pagination > button:focus-visible {
+  color: #fff;
+  background: #9c581e99;
+  outline: none;
+}
+.action-menu.native-command-menu.record-menu > button[data-action="close-record-menu"] {
+  width: 136px;
+  height: 24px;
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-align: center;
+  text-indent: 1px;
 }
 .status-strip { position: absolute; z-index: 7; left: 45px; top: 306px; width: 386px; min-height: 20px; padding: 3px 8px; overflow: hidden; color: #fff6c8; background: #120b0bcc; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
 .status-strip.is-shot-route-picker {
@@ -1306,8 +1366,6 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .button-row { display: flex; justify-content: center; gap: 10px; }
 .save-card { width: 490px; padding: 18px 24px; }
 .save-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
-.save-slot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px !important; text-align: left; }
-.save-slot span { color: #d8c8a6; font: 9px system-ui, sans-serif; }
 .overwrite { margin-top: 10px; padding: 8px; border: 1px solid #cda42b; background: #17090b; }
 .overwrite p { margin: 0 0 8px; }
 .completion-seal { display: inline-block; padding: 8px 18px; border: 2px solid #d6af34; color: #f8dd78; letter-spacing: .16em; transform: rotate(-2deg); }
@@ -1332,30 +1390,17 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 .native-feedback-copy > .continue-mark { right: 5px; }
 .feedback-primary { position: absolute; inset: 0; width: 640px; height: 350px; padding: 0; border: 0; opacity: 0; pointer-events: auto; }
+/* 勝利存檔、全面撤退與離開遊戲的兩項確認選單沒有已取證的原版座標：證據只記下
+   `DS:3F2C` 的兩項表、逐行 `136×24` 熱區與接受 x/y 參數的通用選單繪製例程，沒有
+   呼叫端座標；`(384,110)` 是五槽編號存檔選擇器的 `pointerTarget`，不屬於本選單。
+   故按上述通用選單避讓資訊欄的原版規則靠右對齊到 480 px，不再壓住戰術欄文字。 */
 .action-menu.native-command-menu.native-confirm-menu {
   z-index: 2;
-  left: 384px;
+  left: 336px;
   top: 110px;
   width: 144px;
   height: 76px;
 }
-.native-save-selector {
-  position: absolute;
-  left: 384px;
-  top: 110px;
-  width: 146px;
-  min-height: 173px;
-  padding: 27px 5px 4px;
-  border: 2px solid #f3c323;
-  color: #eee3d5;
-  background: #24100ef2;
-  box-shadow: inset 0 0 0 3px #a96c05, 3px 4px #0009;
-}
-.native-save-selector > strong { position: absolute; left: 0; top: 5px; width: 100%; color: #f5d86c; text-align: center; font-size: 13px; }
-.native-save-selector .save-slot { display: grid; grid-template-columns: 20px 1fr; width: 136px; height: 24px; min-width: 0; padding: 0 4px !important; border: 0; border-radius: 0; color: #eee3d5; background: transparent; font-size: 11px; }
-.native-save-selector .save-slot:hover,
-.native-save-selector .save-slot:focus-visible,
-.native-save-selector .save-slot.is-selected { background: #8d342f; box-shadow: inset 0 0 0 1px #f4d34b; }
 .quit-confirm,
 .retreat-confirm {
   position: absolute;
