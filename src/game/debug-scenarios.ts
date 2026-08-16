@@ -4870,15 +4870,26 @@ export function mountDebugToolbar(
     ? debugGrowthBudgetForStage(debugRosterStageId(scenario.stageId), perStageGrowth)
     : undefined;
 
+  /**
+   * The toolbar tracks the *live* stage so it stays correct after 直接通關
+   * routes the session into the next stage. `stage-49` is the one debug stage
+   * id with no playable stage runtime — its ending fixtures reuse an earlier
+   * stage's battle — so it is the only case that must keep reporting the
+   * scenario's own id instead of whatever battle happens to be loaded.
+   */
+  const currentStageId = () => (scenario?.stageId === "stage-49"
+    ? scenario.stageId
+    : controller.battle.stage.id);
+
   const render = () => {
     scenarioLabel.textContent = `${
-      debugStageLabel(scenario?.stageId ?? controller.battle.stage.id)
+      debugStageLabel(currentStageId())
     } · ${scenario?.title ?? scenarioId}`;
     rosterLabel.textContent = `成長：${rosterOption.label}`;
     experienceLabel.textContent = perStageGrowth === undefined || growthBudget === undefined
       ? "每關成長：沿用成長檔案"
       : `每關成長：${perStageGrowth} · 本關最高成長預算：${growthBudget}（自入隊關起算）`;
-    stateLabel.textContent = `${scenario?.stageId ?? controller.battle.stage.id} · ${controller.phase}`;
+    stateLabel.textContent = `${currentStageId()} · ${controller.phase}`;
     const battleActive = controller.phase === "player";
     victory.disabled = !battleActive;
     defeat.disabled = !battleActive;
