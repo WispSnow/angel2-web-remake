@@ -251,8 +251,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 81;
-  contentVersion: "tier4-melee-traits-1";
+  version: 82;
+  contentVersion: "expert-attack-up-melee-targeting-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

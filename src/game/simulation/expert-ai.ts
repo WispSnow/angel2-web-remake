@@ -5,6 +5,7 @@ import {
   techniqueActionIdsFor,
 } from "../content/actions";
 import {
+  classCombatRole,
   classDefinition,
   classTargetPriorityProfile,
   mitigateOrdinaryDamage,
@@ -611,7 +612,13 @@ export function expertSpecialUtility(
       : actionId === "defense-up"
         ? target.statuses.defenseUp
         : target.statuses.magicGuard;
-    if (statusValue > 0) {
+    // REMAKE-102: the `+20` only reaches a damage table through the ordinary
+    // attack chain, and REMAKE-066 never lets a planned caster or shooter open
+    // one — the 魔導師 itself included. Their attack value cashes out solely on
+    // counters they are meant to avoid, yet a tier-one 巫師 and 魔導師 both show
+    // 53 attack against the 戰士's 50, so `攻擊 + 40` used to outbid the escort.
+    if (statusValue > 0
+      || (actionId === "attack-up" && classCombatRole(target.classId) !== "melee")) {
       utility.waste = 1;
     } else {
       const stats = context.effectiveStatsFor(target);

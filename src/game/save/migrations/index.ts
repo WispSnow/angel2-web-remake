@@ -355,6 +355,24 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-102 only narrows which ally the shared expert planner may pick for AA.
+ * No stored field is added or changes meaning and the cast still draws once, so
+ * the migration is lossless; a mid-battle v81 save resumes with the same units,
+ * statuses and PRNG cursor, and only its unsubmitted AI plans differ.
+ */
+function migrateVersion81Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 81
+    || value.contentVersion !== "tier4-melee-traits-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-097/098/099/100 add no saved fields — a unit still stores only class,
  * experience, life and the eight status counters. What changes is how those are
  * consumed: the demon dragon knight clears buff counters on an active hit, the
@@ -2360,6 +2378,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion81 = migrateVersion81Save(value);
+  if (migratedVersion81) return migratedVersion81;
   const migratedVersion80 = migrateVersion80Save(value);
   if (migratedVersion80) return migratedVersion80;
   const migratedVersion79 = migrateVersion79Save(value);

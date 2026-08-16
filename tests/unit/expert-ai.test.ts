@@ -681,6 +681,56 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     expect(utility).toMatchObject({ control: 0, targetThreat: 0, waste: 1 });
   });
 
+  it("spends AA on the melee front instead of a higher-attack caster or the 魔導師 itself", () => {
+    // REMAKE-102. At tier one the 魔導師 and the 巫師 both show 53 attack against
+    // the 戰士's 50, so the plain `攻擊 + 40` support estimate used to hand AA to
+    // a caster that never converts it into ordinary-attack damage.
+    const battle = new ArenaBattle([
+      { id: "ally-bait", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 18, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "warrior" as const, level: 1 as const, x: 26, y: 30 },
+      { id: "enemy-guide", side: 2 as const, slot: 1, classId: "magic-guide" as const, level: 1 as const, x: 27, y: 30 },
+      { id: "enemy-wizard", side: 2 as const, slot: 2, classId: "wizard" as const, level: 1 as const, x: 28, y: 30 },
+    ], 0, new DeterministicRng(0x3392));
+
+    expect(battle.planEnemyAiAction("enemy-guide")).toMatchObject({
+      kind: "special",
+      actionId: "attack-up",
+      targetId: "enemy-front",
+    });
+    expect(battle.expertAiDecisionTrace("enemy-guide")?.candidates
+      .filter(({ action }) => action.actionId === "attack-up")
+      .map(({ action }) => action.targetId))
+      .toEqual(["enemy-front"]);
+  });
+
+  it("rejects every non-melee AA target while defense up and magic guard keep theirs", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-bait", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 18, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "warrior" as const, level: 1 as const, x: 26, y: 30 },
+      { id: "enemy-guide", side: 2 as const, slot: 1, classId: "magic-guide" as const, level: 3 as const, x: 27, y: 30 },
+      { id: "enemy-archer", side: 2 as const, slot: 2, classId: "archer" as const, level: 1 as const, x: 28, y: 30 },
+    ], 0, new DeterministicRng(0x3393));
+    const actor = battle.unit("enemy-guide")!;
+    const context = {
+      width: 50,
+      height: 60,
+      units: battle.units,
+      terrainSlotAt: () => 2,
+      statsFor: () => ({ attack: 100, defense: 80, maxLife: 200, movement: 4, level: 1 }),
+      effectiveStatsFor: () => ({ attack: 100, defense: 80, maxLife: 200, movement: 4, level: 1 }),
+    };
+    const utilityFor = (actionId: "attack-up" | "magic-guard", targetId: string) =>
+      expertSpecialUtility(context, actor, actionId, battle.unit(targetId)!, [actor]);
+
+    expect(utilityFor("attack-up", "enemy-front")).toMatchObject({ support: 140, waste: 0 });
+    for (const targetId of ["enemy-guide", "enemy-archer"]) {
+      expect(utilityFor("attack-up", targetId))
+        .toMatchObject({ support: 0, targetThreat: 0, waste: 1 });
+      // FM keeps the full ally set: it answers magic damage, not the attack chain.
+      expect(utilityFor("magic-guard", targetId)).toMatchObject({ support: 120, waste: 0 });
+    }
+  });
+
   it("re-evaluates squad actor priority from the current state", () => {
     const battle = new ArenaBattle(placements(), 0, new DeterministicRng(0x3305));
     battle.unit("enemy-front")!.life = 1;

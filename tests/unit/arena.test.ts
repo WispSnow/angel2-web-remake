@@ -499,7 +499,7 @@ describe("all-terrain arena", () => {
     }
   });
 
-  it("offers AA at every magic-guide tier and lets AI prefer the later full-life frozen ally", () => {
+  it("offers AA at every magic-guide tier and lets AI prefer the later frozen melee ally", () => {
     const placements = [
       { id: "arena-1-0", side: 1 as const, slot: 0, classId: "magic-guide" as const, level: 1 as const, x: 21, y: 30 },
       { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
@@ -507,6 +507,9 @@ describe("all-terrain arena", () => {
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "magic-guide" as const, level: 1 as const, x: 30, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 28, y: 30 },
       { id: "arena-2-2", side: 2 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 29, y: 31 },
+      // REMAKE-102 keeps this later-scanned 弓兵 out of the AI candidate set even
+      // in the native-style ranking, where the later cell would otherwise win.
+      { id: "arena-2-3", side: 2 as const, slot: 3, classId: "archer" as const, level: 1 as const, x: 30, y: 31 },
     ];
 
     for (const level of [1, 2, 3] as const) {

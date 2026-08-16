@@ -88,9 +88,9 @@ test("magic guide commits AA through the formal technique flow", async ({ page }
 });
 
 // `REMAKE-037` replaced the native AA pool roll with the shared expert planner,
-// so AA now goes to whichever reachable ally gains the most attack. The
-// 巨斧戰士 escort outranks the caster itself, which is what makes AA — rather
-// than a self-buff — the enemy's best action here.
+// so AA now goes to whichever reachable ally gains the most attack. Under
+// `REMAKE-102` only melee allies are candidates at all, so the 巨斧戰士 escort
+// is the enemy's single legal AA target: the 魔導師 can no longer buff itself.
 test("enemy magic guide uses AA with the original group-17 typo", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

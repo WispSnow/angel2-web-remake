@@ -1970,6 +1970,20 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v81 saves losslessly", () => {
+    // REMAKE-102 only narrows which ally the AI may pick for AA. No stored field
+    // is added or changes meaning and the cast still draws once, so a mid-battle
+    // save resumes on the same PRNG cursor with only its AI plans recomputed.
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 81,
+        contentVersion: "tier4-melee-traits-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v80 saves losslessly", () => {
     // REMAKE-097/098/099/100 add no stored fields and change no stored meaning.
     // The version moves because REMAKE-098/099 stop drawing from the PRNG, so a

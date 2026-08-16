@@ -3370,6 +3370,10 @@ export class Stage0Battle {
           if (shootingAction
             && actionId !== "magic-archer-shot"
             && immuneToPhysicalShootingFor(target.classId)) continue;
+          // REMAKE-102: AA is a front-line buff, so a caster or shooter — the
+          // 魔導師 itself included — is never a candidate. The expert path also
+          // drops it via `waste`; this guard covers the native-style ranking.
+          if (actionId === "attack-up" && classCombatRole(target.classId) !== "melee") continue;
           const targetStats = this.statsFor(target);
           const missingLife = targetStats.maxLife - target.life;
           if (definition.target === "ally"
