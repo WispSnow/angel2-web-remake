@@ -4877,7 +4877,7 @@ export function mountDebugToolbar(
     rosterLabel.textContent = `成長：${rosterOption.label}`;
     experienceLabel.textContent = perStageGrowth === undefined || growthBudget === undefined
       ? "每關成長：沿用成長檔案"
-      : `每關成長：${perStageGrowth} · 本關成長預算：${growthBudget}`;
+      : `每關成長：${perStageGrowth} · 本關最高成長預算：${growthBudget}（自入隊關起算）`;
     stateLabel.textContent = `${scenario?.stageId ?? controller.battle.stage.id} · ${controller.phase}`;
     const battleActive = controller.phase === "player";
     victory.disabled = !battleActive;

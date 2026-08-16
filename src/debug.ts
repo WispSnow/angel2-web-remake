@@ -151,9 +151,9 @@ const updateLinks = () => {
     ? "此來源保留原有經驗"
     : `${perStageGrowth === DEFAULT_DEBUG_PER_STAGE_GROWTH ? "目前使用預設" : "已套用"}：每關 +${
       perStageGrowth
-    }（第 1 關預算 ${
+    }，自各角色入隊關起算（第 1 關最高預算 ${
         debugGrowthBudgetForStage("stage-01", perStageGrowth)
-      }／下一場「龍塔外」預算 ${debugGrowthBudgetForStage("stage-13", perStageGrowth)}）`;
+      }／下一場「龍塔外」最高預算 ${debugGrowthBudgetForStage("stage-13", perStageGrowth)}）`;
   root.querySelectorAll<HTMLAnchorElement>("[data-debug-scenario-id]").forEach((link) => {
     const id = link.dataset.debugScenarioId as DebugScenarioId | undefined;
     if (!id) return;

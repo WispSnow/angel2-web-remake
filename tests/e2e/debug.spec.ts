@@ -359,7 +359,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.getByTestId("debug-growth-reset")).toHaveText("恢復預設（每關 100）");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／下一場「龍塔外」預算 1300）",
+    "目前使用預設：每關 +100，自各角色入隊關起算（第 1 關最高預算 100／下一場「龍塔外」最高預算 1300）",
   );
 
   await page.getByTestId("debug-difficulty").selectOption("3");
@@ -371,7 +371,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-per-stage-growth").fill("120");
   await page.getByTestId("debug-growth-apply").click();
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "已套用：每關 +120（第 1 關預算 120／下一場「龍塔外」預算 1560）",
+    "已套用：每關 +120，自各角色入隊關起算（第 1 關最高預算 120／下一場「龍塔外」最高預算 1560）",
   );
   await expect(deployment).toHaveAttribute(
     "href",
@@ -420,7 +420,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await page.getByTestId("debug-growth-reset").click();
   await expect(page.getByTestId("debug-per-stage-growth")).toHaveValue("100");
   await expect(page.locator("[data-debug-growth-status]")).toHaveText(
-    "目前使用預設：每關 +100（第 1 關預算 100／下一場「龍塔外」預算 1300）",
+    "目前使用預設：每關 +100，自各角色入隊關起算（第 1 關最高預算 100／下一場「龍塔外」最高預算 1300）",
   );
   await expect(deployment).toHaveAttribute(
     "href",
@@ -440,7 +440,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-toolbar")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
-    "每關成長：100 · 本關成長預算：100",
+    "每關成長：100 · 本關最高成長預算：100",
   );
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     stageId: string;
@@ -562,7 +562,7 @@ test("one per-stage growth budget advances the stage-five profession", async ({ 
   );
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText(
-    "每關成長：120 · 本關成長預算：600",
+    "每關成長：120 · 本關最高成長預算：600",
   );
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
     units: Array<{ id: string; classId: string; experience: number }>;
@@ -574,13 +574,20 @@ test("one per-stage growth budget advances the stage-five profession", async ({ 
   }));
 });
 
-test("stage-eleven debug profiles preserve Sulanda's stage-eight cavalry baseline", async ({ page }) => {
-  for (const query of [
-    "roster=template-baseline",
-    "roster=representative-growth",
-    "roster=representative-growth&growth=120",
-    "roster=promotion-coverage&growth=120",
-  ]) {
+test("stage-eleven debug profiles start Sulanda from her stage-eight cavalry baseline", async ({ page }) => {
+  // 未套用每關成長時保留固定基線；套用時從騎兵入隊職業起算兩關預算，尚未到 460 的轉職門檻。
+  for (const { query, expected } of [
+    { query: "roster=template-baseline", expected: { classId: "cavalry", experience: 299 } },
+    { query: "roster=representative-growth", expected: { classId: "cavalry", experience: 299 } },
+    {
+      query: "roster=representative-growth&growth=120",
+      expected: debugRosterForProfile("representative-growth", "stage-11", 120)[8]!,
+    },
+    {
+      query: "roster=promotion-coverage&growth=120",
+      expected: debugRosterForProfile("promotion-coverage", "stage-11", 120)[8]!,
+    },
+  ] as const) {
     await page.goto(`/?debugScenario=stage-11-player&difficulty=2&${query}`);
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
     const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
@@ -588,10 +595,11 @@ test("stage-eleven debug profiles preserve Sulanda's stage-eight cavalry baselin
     });
     expect(state.units, query).toContainEqual(expect.objectContaining({
       id: "1:8",
-      classId: "cavalry",
-      experience: 299,
-      life: classStatsFor({ classId: "cavalry", experience: 299 }).maxLife,
+      classId: expected.classId,
+      experience: expected.experience,
+      life: classStatsFor(expected).maxLife,
     }));
+    expect(expected.experience, query).toBe(query.includes("growth=120") ? 240 : 299);
   }
 });
 
@@ -607,7 +615,7 @@ test("stage-twenty-seven debug entry uses the configured campaign professions", 
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
-    "每關成長：100 · 本關成長預算：2600",
+    "每關成長：100 · 本關最高成長預算：2600",
   );
   await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", /巨龍騎士妮雅/u);
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
@@ -618,7 +626,9 @@ test("stage-twenty-seven debug entry uses the configured campaign professions", 
     expect(classes.get(id), id).not.toBe("soldier");
   }
   expect(classes.get("1:7")).toBe("magic-priest");
-  expect(classes.get("1:8")).toBe("cavalry");
+  // 蘇蘭達第 8 關以騎兵入隊，每關成長讓她走完騎兵→陸戰騎士→龍騎士的合法轉職鏈。
+  expect(classes.get("1:8")).toBe(debugRosterForProfile("representative-growth", "stage-27", 100)[8]?.classId);
+  expect(classes.get("1:8")).not.toBe("soldier");
   expect(classes.get("1:10")).toBe("water-warrior");
   expect(classes.get("1:11")).toBe("water-warrior");
   expect(classes.get("1:57")).toBe("engineer");
@@ -639,7 +649,7 @@ test("stage-twenty-eight debug entry uses the configured campaign professions", 
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
-    "每關成長：100 · 本關成長預算：2700",
+    "每關成長：100 · 本關最高成長預算：2700",
   );
   await expect(page.getByTestId("unit-detail")).toHaveAttribute("aria-label", /巨龍騎士妮雅/u);
   const state = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
@@ -651,7 +661,8 @@ test("stage-twenty-eight debug entry uses the configured campaign professions", 
     expect(classes.get(id), id).not.toBe("soldier");
   }
   expect(classes.get("1:7")).toBe("magic-priest");
-  expect(classes.get("1:8")).toBe("cavalry");
+  expect(classes.get("1:8")).toBe(debugRosterForProfile("representative-growth", "stage-28", 100)[8]?.classId);
+  expect(classes.get("1:8")).not.toBe("soldier");
   expect(classes.get("1:10")).toBe("water-warrior");
   expect(classes.get("1:11")).toBe("water-warrior");
   await captureVisualAudit(page.getByTestId("game-screen"), {
@@ -671,7 +682,7 @@ test("stage-twenty-nine debug deployment preserves the inherited great-axe defen
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
   await expect(page.getByTestId("debug-toolbar")).toContainText("成長：逐關代表性成長");
   await expect(page.getByTestId("debug-toolbar")).toContainText(
-    "每關成長：100 · 本關成長預算：2800",
+    "每關成長：100 · 本關最高成長預算：2800",
   );
   await page.getByTestId("deployment-page-1").click();
   await expect(page.getByTestId("deployment-roster-7")).toContainText("愛莉歐拉");
@@ -725,7 +736,7 @@ test("stage-thirty debug entry preserves both growth profiles and the magic-swor
       profile === "representative-growth" ? "成長：逐關代表性成長" : "成長：深層轉職分支覆蓋",
     );
     await expect(page.getByTestId("debug-toolbar")).toContainText(
-      "每關成長：100 · 本關成長預算：2900",
+      "每關成長：100 · 本關最高成長預算：2900",
     );
     await expect(page.locator(".hud-identity-name")).toHaveText(`${className(nia.classId)}／妮雅`);
     const battle = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
@@ -760,7 +771,7 @@ test("stage-thirty-one debug entry preserves both growth profiles in the full cr
       profile === "representative-growth" ? "成長：逐關代表性成長" : "成長：深層轉職分支覆蓋",
     );
     await expect(page.getByTestId("debug-toolbar")).toContainText(
-      "每關成長：100 · 本關成長預算：3000",
+      "每關成長：100 · 本關最高成長預算：3000",
     );
     await expect(page.locator(".hud-identity-name")).toHaveText(`${className(nia.classId)}／妮雅`);
     const battle = await page.evaluate(() => window.__ANGEL2_DEBUG__?.getState() as {
