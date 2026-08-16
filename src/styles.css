@@ -595,7 +595,6 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   background: #8d342f;
   box-shadow: inset 0 0 0 1px #f4d34b;
 }
-.system-menu > button.is-selected { color: #fff; background: #8d342f; box-shadow: inset 0 0 0 1px #f4d34b; }
 .action-menu {
   position: absolute;
   z-index: 9;
@@ -740,104 +739,158 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   color: #81766d;
   background: transparent;
 }
-/* 戰鬥中「儲存記錄／讀取記錄」與戰後「儲存遊戲進度」沿用同一個 `A/0001` 外框：
-   144 px 寬、24 px 行距、素材選中橫飾，外高仍是 `24N + 28`。記錄選單的 N 是
-   標題列 + 五個槽位列 + 分頁列 + 取消列 = 8；戰後存檔沒有取消列，N = 7。
-   分頁是 Web 側新增的二十槽需求，這裡按同一行距做成一列，不改外框幾何。 */
-.action-menu.native-command-menu.record-menu {
+/* 戰鬥中「儲存記錄／讀取記錄」與戰後「儲存遊戲進度」是原版的彈出式資料面板，不套用
+   `A/0001` 通用選單外框：奶白外框、深棕面板底、逐槽凸起橫條、當前槽綠色高亮，並列出
+   逐槽元數據。原版通用選單會避開 x=480..639 的右側資訊欄
+   （`reverse/notes/input-and-battle-ui.md` 通用行動菜單一節），本面板同樣整體落在
+   戰場 40..480 之內。 */
+.record-panel {
+  position: absolute;
   z-index: 15;
-  left: 304px;
-  top: 47px;
-  width: 144px;
-  height: 220px;
-}
-/* 原版通用選單「會移動位置以避開當前指針／右側資訊欄矩形」，資訊欄佔 x=480..639
-   （`reverse/notes/input-and-battle-ui.md` 通用行動菜單一節、
-   `reverse/parsed/native/input-ui.json` 的 `unitHud.positioning`）。通用外框的紅橙
-   棋盤紋理又只有 50% 不透明度，壓在戰術欄上會透出欄內文字。因此所有沿用 `A/0001`
-   外框的表面一律靠右對齊到戰場邊界 480 px 之內。 */
-.action-menu.native-command-menu.native-save-selector {
-  z-index: 2;
-  left: 336px;
-  top: 100px;
-  width: 144px;
-  height: 196px;
-}
-.action-menu.native-command-menu > .native-menu-title {
-  display: block;
-  width: 136px;
-  height: 24px;
-  color: #ffd75f;
-  font: 15px/24px "PMingLiU", "Noto Serif TC", serif;
-  letter-spacing: 1px;
-  text-align: center;
-  text-indent: 1px;
-  text-shadow: 2px 2px #000;
-}
-.action-menu.native-command-menu > button.native-slot-row {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 3px;
-  width: 136px;
-  height: 24px;
-  padding: 0 2px;
-  font-size: 11px;
-  letter-spacing: 0;
-  text-align: left;
-  text-indent: 0;
-  text-shadow: 1px 1px #000;
-}
-.native-slot-row > b { position: relative; color: #ffd75f; font-weight: 400; text-align: center; }
-.native-slot-name { position: relative; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.native-slot-note { position: relative; color: #e4d3ac; white-space: nowrap; }
-/* 全域 `button:disabled` 的灰階與半透明會讓槽位在 50% 透明棋盤紋理上糊掉；
-   讀取模式的空槽改用純色壓暗，保持「不可選但可讀」。 */
-.native-slot-row:disabled {
-  color: #a3937f;
-  background: transparent;
-  filter: none;
-  opacity: 1;
-}
-.native-slot-row:disabled > b { color: #a3937f; }
-.action-menu.native-command-menu > .native-slot-pagination {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 22px;
-  align-items: center;
-  width: 136px;
-  height: 24px;
-  color: #efdcb0;
-  font: 12px/24px "PMingLiU", "Noto Serif TC", serif;
-  text-align: center;
-  text-shadow: 1px 1px #000;
-}
-.action-menu.native-command-menu .native-slot-pagination > button {
-  width: 22px;
-  height: 22px;
-  min-width: 0;
-  padding: 0;
-  color: #ffd75f;
-  font-size: 11px;
-  letter-spacing: 0;
-  text-align: center;
-  text-indent: 0;
-  text-shadow: 1px 1px #000;
-}
-.action-menu.native-command-menu .native-slot-pagination > button::before { content: none; }
-.action-menu.native-command-menu .native-slot-pagination > button:hover,
-.action-menu.native-command-menu .native-slot-pagination > button:focus-visible {
+  left: 44px;
+  top: 32px;
+  width: 432px;
+  height: 252px;
+  padding: 10px 11px 11px;
+  border: 2px solid #d5c096;
   color: #fff;
-  background: #9c581e99;
-  outline: none;
+  background: #6d5238;
+  box-shadow:
+    0 0 0 1px #150c06,
+    inset 0 0 0 1px #46331f,
+    6px 7px 0 #0009;
+  font-family: "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+  text-shadow: 1px 1px #000;
 }
-.action-menu.native-command-menu.record-menu > button[data-action="close-record-menu"] {
-  width: 136px;
-  height: 24px;
+.post-save-panel { z-index: 2; }
+.record-panel-title {
+  display: block;
+  height: 22px;
+  color: #ffeab4;
   font-size: 16px;
-  letter-spacing: 1px;
-  text-align: center;
-  text-indent: 1px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: .1em;
 }
+/* 標題列與槽位列共用同一套欄寬，表頭才能對齊凸起橫條裡的資料欄。 */
+.record-panel-header,
+.record-panel-slots > .record-slot {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 6px;
+  width: 100%;
+}
+.record-panel-header {
+  height: 20px;
+  color: #e3d2ad;
+  font-size: 12px;
+}
+/* 透明邊框而不是 `border: 0`，表頭欄位才會和凸起橫條裡的資料欄逐像素對齊。 */
+.record-panel-header > .record-slot-bar {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.record-panel-slots {
+  display: grid;
+  row-gap: 3px;
+  margin-top: 3px;
+}
+.record-panel-slots > .record-slot {
+  height: 27px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #fff;
+  background: transparent;
+  font: 14px/27px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+  text-align: left;
+  text-shadow: 1px 1px #000;
+  cursor: var(--native-cursor-hand, pointer);
+}
+.record-cell-index { text-align: center; }
+.record-slot-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px 74px 88px;
+  align-items: center;
+  height: 100%;
+  padding: 0 10px;
+  border: 1px solid #33240f;
+  background: #8a6c48;
+  box-shadow: inset 1px 1px 0 #b8996f, inset -1px -1px 0 #543c22;
+}
+.record-slot-bar > .record-cell-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.record-cell-round,
+.record-cell-count,
+.record-cell-difficulty { text-align: center; }
+.record-cell-empty { grid-column: 1 / -1; color: #ddd0b6; text-align: center; }
+.record-slot:hover > .record-slot-bar,
+.record-slot:focus-visible > .record-slot-bar { background: #9c7c55; outline: none; }
+/* 全域 `button:disabled` 的灰階與半透明會讓空槽在棕色面板上糊掉；讀取模式的空槽
+   改用純色壓暗，保持「不可確認但可讀」。 */
+.record-slot:disabled { filter: none; opacity: 1; }
+.record-slot:disabled > .record-cell-index { color: #c3b498; }
+.record-slot:disabled > .record-slot-bar {
+  background: #6a5238;
+  box-shadow: inset 1px 1px 0 #8b7150, inset -1px -1px 0 #46331f;
+}
+.record-slot:disabled > .record-slot-bar > .record-cell-empty { color: #bdae94; }
+/* `[OF]` 空槽可高亮但確認後留在本狀態（`reverse/notes/title-presentations.md`），
+   所以綠色當前列必須壓過上面的空槽壓暗。 */
+.record-slot.is-selected > .record-slot-bar,
+.record-slot.is-selected:disabled > .record-slot-bar {
+  background: #2c9535;
+  box-shadow: inset 1px 1px 0 #74d67c, inset -1px -1px 0 #17561d;
+}
+.record-slot.is-selected:disabled > .record-slot-bar > .record-cell-empty { color: #eafbe6; }
+.record-panel-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  height: 24px;
+  margin-top: 6px;
+}
+.record-panel-pagination {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: 24px 96px 24px;
+  align-items: center;
+  height: 22px;
+  color: #f0e2c1;
+  font-size: 12px;
+  text-align: center;
+}
+.record-panel-pagination > button {
+  height: 20px;
+  padding: 0;
+  border: 1px solid #46331f;
+  border-radius: 0;
+  color: #ffeab4;
+  background: #8a6c48;
+  box-shadow: inset 1px 1px 0 #b8996f, inset -1px -1px 0 #543c22;
+  font: 11px/18px "PMingLiU", "MingLiU", serif;
+  cursor: var(--native-cursor-hand, pointer);
+}
+.record-panel-pagination > button:hover,
+.record-panel-pagination > button:focus-visible { color: #fff; background: #a8865c; outline: none; }
+.record-panel-cancel {
+  grid-column: 3;
+  justify-self: end;
+  height: 22px;
+  padding: 0 12px;
+  border: 1px solid #46331f;
+  border-radius: 0;
+  color: #ffeab4;
+  background: #8a6c48;
+  box-shadow: inset 1px 1px 0 #b8996f, inset -1px -1px 0 #543c22;
+  font: 13px/20px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+  letter-spacing: .1em;
+  text-shadow: 1px 1px #000;
+  cursor: var(--native-cursor-hand, pointer);
+}
+.record-panel-cancel:hover,
+.record-panel-cancel:focus-visible { color: #fff; background: #a8865c; outline: none; }
 .status-strip { position: absolute; z-index: 7; left: 45px; top: 306px; width: 386px; min-height: 20px; padding: 3px 8px; overflow: hidden; color: #fff6c8; background: #120b0bcc; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
 .status-strip.is-shot-route-picker {
   display: grid;

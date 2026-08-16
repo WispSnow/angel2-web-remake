@@ -50,6 +50,7 @@ import {
   saveSlotPageIndex,
   saveSlotPageStart,
 } from "./save";
+import { DIFFICULTY_OPTIONS } from "./content/startup";
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
   ASSETS.allyPromotionTargets;
@@ -132,7 +133,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 <button data-action="close-music-settings" data-testid="close-music-settings">返回</button>
               </div>
             </section>
-            <section class="record-menu action-menu native-command-menu" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
+            <section class="record-menu record-panel" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
             <section class="quit-confirm native-feedback-confirm" id="quit-confirm" data-testid="quit-confirm" role="dialog" aria-label="離開遊戲確認" hidden>
               ${animatedPortraitMarkup(46, {
                 alt: "妮雅肖像",
@@ -879,29 +880,18 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     recordMenu.hidden = controller.recordMenuMode === undefined;
     if (!recordMenu.hidden) {
       const mode = controller.recordMenuMode;
-      const page = saveSlotPageIndex(controller.recordMenuIndex);
-      const start = saveSlotPageStart(controller.recordMenuIndex);
-      const slots = Array.from({ length: SAVE_SLOTS_PER_PAGE }, (_, localIndex) => {
-        const index = start + localIndex;
-        const slot = index + 1;
-        const save = controller.readSave(slot);
-        const selected = index === controller.recordMenuIndex;
-        // 144 px 原生外框只留 116 px 給槽位文字。關卡名放進可省略的彈性欄，回合
-        // 數固定在右欄，長關卡名截斷後仍能區分同一關的多個記錄。
-        const round = save
-          ? `第 ${save.kind === "battle" ? save.battle?.round ?? 1 : "完"} 回合`
-          : "";
-        return `<button type="button" role="menuitem" class="native-slot-row ${selected ? "is-selected" : ""}" data-action="record-slot" data-record-index="${index}" data-testid="record-slot-${slot}" aria-current="${selected ? "true" : "false"}" ${mode === "load" && !save ? "disabled" : ""}><b>${slot}</b><span class="native-slot-name">${save ? save.stageLabel : "此處沒有記錄"}</span><span class="native-slot-note">${round}</span></button>`;
-      }).join("");
-      recordMenu.innerHTML = `<strong class="native-menu-title">${mode === "save" ? "儲存遊戲進度" : "讀取遊戲進度"}</strong>${slots}
-        <div class="native-slot-pagination record-menu-pagination">
-          <button type="button" data-action="record-page" data-record-page-delta="-1"
-            data-testid="record-previous-page" aria-label="上一頁">◀</button>
-          <span data-testid="record-page">第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁</span>
-          <button type="button" data-action="record-page" data-record-page-delta="1"
-            data-testid="record-next-page" aria-label="下一頁">▶</button>
-        </div>
-        <button type="button" data-action="close-record-menu"><span class="native-command-label">取 消</span></button>`;
+      recordMenu.innerHTML = renderRecordPanel(controller, {
+        title: mode === "save" ? "儲存遊戲進度" : "讀取遊戲進度",
+        selectedIndex: controller.recordMenuIndex,
+        slotAction: "record-slot",
+        pageAction: "record-page",
+        pageDeltaAttribute: "data-record-page-delta",
+        slotTestIdPrefix: "record-slot",
+        pageTestIdPrefix: "record",
+        slotAttributes: (index) => `data-record-index="${index}"`,
+        disableEmptySlots: mode === "load",
+        cancelAction: "close-record-menu",
+      });
     }
     quitConfirm.hidden = !controller.quitConfirmOpen;
     if (!quitConfirm.hidden) {
@@ -1709,6 +1699,69 @@ function renderTerrainInspection(inspection: TerrainInspection): string {
     </section>`;
 }
 
+interface RecordPanelConfig {
+  /** 面板标题原文，例如「讀取遊戲進度」。 */
+  readonly title: string;
+  readonly selectedIndex: number;
+  /** 槽位与翻页按钮的 `data-action`；两个表面各自路由到不同的控制器方法。 */
+  readonly slotAction: string;
+  readonly pageAction: string;
+  readonly pageDeltaAttribute: string;
+  readonly slotTestIdPrefix: string;
+  readonly pageTestIdPrefix: string;
+  /** 每个槽位按钮的附加属性，承载各自的索引契约。 */
+  readonly slotAttributes: (index: number, slot: number) => string;
+  /** 读取模式下空槽不可确认；储存模式允许覆盖。 */
+  readonly disableEmptySlots: boolean;
+  readonly cancelAction?: string;
+}
+
+// 战中「儲存記錄／讀取記錄」与战后「儲存遊戲進度」共用同一张面板：原版这两处是
+// 弹出式资料面板而不是通用选单外框，列出逐槽元数据而不是单行摘要。原版五列
+// 「職業/等級/經驗值/儲存次數/難度」的前三列取自保存器的工作单位快照，对复刻版
+// 玩家没有辨识价值，因此按产品决定换成「關卡名／回合數」，保留后两列。
+function renderRecordPanel(controller: GameController, config: RecordPanelConfig): string {
+  const page = saveSlotPageIndex(config.selectedIndex);
+  const start = saveSlotPageStart(config.selectedIndex);
+  const rows = Array.from({ length: SAVE_SLOTS_PER_PAGE }, (_, localIndex) => {
+    const index = start + localIndex;
+    const slot = index + 1;
+    const save = controller.readSave(slot);
+    const selected = index === config.selectedIndex;
+    const disabled = config.disableEmptySlots && !save;
+    const cells = save
+      ? `<span class="record-cell-name">${save.stageLabel}</span><span
+          class="record-cell-round">${save.kind === "battle" ? save.battle?.round ?? 1 : "完"}</span><span
+          class="record-cell-count">${save.saveCount}</span><span
+          class="record-cell-difficulty">${DIFFICULTY_OPTIONS[save.difficulty].label}</span>`
+      : `<span class="record-cell-empty">此處沒有記錄</span>`;
+    return `<button type="button" role="menuitem" class="record-slot ${selected ? "is-selected" : ""}"
+      data-action="${config.slotAction}" ${config.slotAttributes(index, slot)}
+      data-testid="${config.slotTestIdPrefix}-${slot}" aria-current="${selected ? "true" : "false"}"
+      ${disabled ? "disabled" : ""}><span class="record-cell-index">${slot}</span><span
+        class="record-slot-bar">${cells}</span></button>`;
+  }).join("");
+  const cancel = config.cancelAction
+    ? `<button type="button" class="record-panel-cancel" data-action="${config.cancelAction}">取 消</button>`
+    : "";
+  return `<strong class="record-panel-title">${config.title}</strong>
+    <div class="record-panel-header" aria-hidden="true"><span class="record-cell-index">槽</span><span
+      class="record-slot-bar"><span class="record-cell-name">關卡名</span><span
+        class="record-cell-round">回合數</span><span class="record-cell-count">儲存次數</span><span
+        class="record-cell-difficulty">難度</span></span></div>
+    <div class="record-panel-slots">${rows}</div>
+    <div class="record-panel-foot">
+      <div class="record-panel-pagination">
+        <button type="button" data-action="${config.pageAction}" ${config.pageDeltaAttribute}="-1"
+          data-testid="${config.pageTestIdPrefix}-previous-page" aria-label="上一頁">◀</button>
+        <span data-testid="${config.pageTestIdPrefix}-page">第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁</span>
+        <button type="button" data-action="${config.pageAction}" ${config.pageDeltaAttribute}="1"
+          data-testid="${config.pageTestIdPrefix}-next-page" aria-label="下一頁">▶</button>
+      </div>
+      ${cancel}
+    </div>`;
+}
+
 function renderTactical(controller: GameController, underUnit = false): string {
   const markers = underUnit ? "" : controller.battle.units.map((unit) =>
     `<i class="minimap-unit side-${unit.side}" style="left:${unit.x * 3}px;top:${unit.y * 3}px" aria-hidden="true"></i>`,
@@ -1773,24 +1826,19 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
           class="${controller.savePromptIndex === 1 ? "is-selected" : ""}" aria-current="${controller.savePromptIndex === 1}"><span class="native-command-label">取 消</span></button>
       </div>`;
   } else if (phase === "saveSlots") {
-    const page = saveSlotPageIndex(controller.postSaveSlotIndex);
-    const start = saveSlotPageStart(controller.postSaveSlotIndex);
-    const slots = Array.from({ length: SAVE_SLOTS_PER_PAGE }, (_, localIndex) => {
-      const index = start + localIndex;
-      const slot = index + 1;
-      const save = controller.readSave(slot);
-      const selected = index === controller.postSaveSlotIndex;
-      return `<button type="button" class="save-slot native-slot-row ${selected ? "is-selected" : ""}" data-action="save-slot" data-slot="${slot}" data-post-save-index="${index}" data-testid="save-slot-${slot}" aria-current="${selected ? "true" : "false"}"><b>${slot}</b><span class="native-slot-name">${save ? save.stageLabel : "此處沒有記錄"}</span></button>`;
-    }).join("");
-    layer.innerHTML = `<div class="native-save-selector action-menu native-command-menu"><strong class="native-menu-title">儲存遊戲進度</strong>${slots}
-      <div class="native-slot-pagination native-save-pagination">
-        <button type="button" data-action="post-save-page" data-post-save-page-delta="-1"
-          data-testid="post-save-previous-page" aria-label="上一頁">◀</button>
-        <span data-testid="post-save-page">第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁</span>
-        <button type="button" data-action="post-save-page" data-post-save-page-delta="1"
-          data-testid="post-save-next-page" aria-label="下一頁">▶</button>
-      </div>
-    </div>`;
+    layer.innerHTML = `<div class="record-panel post-save-panel" role="menu" aria-label="儲存遊戲進度">${
+      renderRecordPanel(controller, {
+        title: "儲存遊戲進度",
+        selectedIndex: controller.postSaveSlotIndex,
+        slotAction: "save-slot",
+        pageAction: "post-save-page",
+        pageDeltaAttribute: "data-post-save-page-delta",
+        slotTestIdPrefix: "save-slot",
+        pageTestIdPrefix: "post-save",
+        slotAttributes: (index, slot) => `data-slot="${slot}" data-post-save-index="${index}"`,
+        disableEmptySlots: false,
+      })
+    }</div>`;
   } else if (phase === "quit") {
     layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2>天使帝國 II</h2><p>已離開遊戲</p></div>`;
   } else if (phase === "nextStage") {
