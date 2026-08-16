@@ -7,6 +7,11 @@
   --gold-dark: #8b5712;
   --wine: #661722;
   --ink: #130d0e;
+  /* Eight-way 1px halo: keeps plate-less overlay text readable over any map
+     tile without thinning glyphs the way `-webkit-text-stroke` would. */
+  --text-outline:
+    1px 1px 0 #000, 0 1px 0 #000, -1px 1px 0 #000, -1px 0 0 #000,
+    -1px -1px 0 #000, 0 -1px 0 #000, 1px -1px 0 #000, 1px 0 0 #000;
 }
 
 * { box-sizing: border-box; }
@@ -891,10 +896,18 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 .record-panel-cancel:hover,
 .record-panel-cancel:focus-visible { color: #fff; background: #a8865c; outline: none; }
-.status-strip { position: absolute; z-index: 7; left: 45px; top: 306px; width: 386px; min-height: 20px; padding: 3px 8px; overflow: hidden; color: #fff6c8; background: #120b0bcc; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
+/* Anchored inside the map viewport's top-right corner (right edge 440px, top
+   edge 23px) instead of across its floor, where the strip used to sit on top of
+   the pieces the player is about to command. The box shrinks to its text and
+   carries no plate, so an outline does the legibility work the old background
+   bar did. */
+.status-strip { position: absolute; z-index: 7; right: 205px; top: 28px; max-width: 390px; overflow: hidden; color: #fff6c8; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-align: right; text-shadow: var(--text-outline); text-overflow: ellipsis; pointer-events: none; }
+/* The route picker is a real control, so it keeps its plate and a fixed width
+   the grid can divide. */
 .status-strip.is-shot-route-picker {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) 24px 48px;
+  width: 240px;
   min-height: 20px;
   padding: 1px 3px;
   border: 1px solid #d7aa2d;
@@ -927,7 +940,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   background: #684017;
   outline: none;
 }
-.selected-unit-context { display: flex; width: 100%; align-items: center; justify-content: center; overflow: hidden; color: #fff1b0; font-weight: 700; text-shadow: 1px 1px #000; }
+.selected-unit-context { display: flex; max-width: 100%; align-items: center; justify-content: flex-end; overflow: hidden; color: #fff1b0; font-weight: 700; text-shadow: var(--text-outline); }
 .selected-unit-context > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .selected-unit-separator { flex: none; color: #d7aa2d; font-style: normal; }
 .selected-unit-tactic { display: inline-flex; align-items: center; }
@@ -938,7 +951,9 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .selected-unit-traits { display: inline-flex; min-width: 0; align-items: center; gap: 4px; color: #dff4c0; }
 .selected-unit-traits b { flex: none; color: #9ee276; }
 .selected-unit-traits > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.hint-toast { position: absolute; z-index: 9; left: 58px; top: 36px; max-width: 360px; padding: 7px 10px; border: 1px solid #f5d665; border-radius: 3px; color: #fff6c8; background: #351b1dea; font: 11px/1.3 system-ui, sans-serif; cursor: var(--native-cursor-hand, pointer); }
+/* Clears the status strip, which now owns the viewport's first row — including
+   the taller plate the strip grows when it hosts the shot-route picker. */
+.hint-toast { position: absolute; z-index: 9; left: 58px; top: 56px; max-width: 360px; padding: 7px 10px; border: 1px solid #f5d665; border-radius: 3px; color: #fff6c8; background: #351b1dea; font: 11px/1.3 system-ui, sans-serif; cursor: var(--native-cursor-hand, pointer); }
 
 .combat-presentation { position: absolute; z-index: 11; pointer-events: none; }
 .map-combat { width: 40px; height: 44px; color: #fff; text-align: center; text-shadow: 2px 2px #000; }
