@@ -1970,6 +1970,19 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v75 saves losslessly through the formation-follower AI identity", () => {
+    // REMAKE-091 only changes how a paired follower plans, so nothing in the
+    // stored battle, roster or PRNG is reinterpreted.
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 75,
+        contentVersion: "expert-named-leader-caution-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v74 saves losslessly through the named-leader AI identity", () => {
     // REMAKE-090 only changes how side-2 named leaders plan, so every unit,
     // round, roster and PRNG field carries over untouched.

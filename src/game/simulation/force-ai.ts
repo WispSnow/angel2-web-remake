@@ -9,8 +9,8 @@ import type { ForceRegistry } from "./forces";
 import { classCombatRole } from "../content/classes";
 import {
   manhattan,
+  movementMap,
   positionKey,
-  shortestPath,
   type GridBattlefield,
 } from "./grid";
 import type { BattleUnit, Position, UnitStats } from "../types";
@@ -94,7 +94,34 @@ export function planTerrainHoldForceAiAction(
   const behavior = unit.side === 1
     ? context.alliedBehaviorFor(unit.id)
     : context.enemyBehaviorFor(unit.id);
-  if (doctrine.preserveNativeFormation && behavior >= 4 && behavior % 2 === 0) {
+  const targetFilter = context.forces.targetFilterFor(unit.id, context.units);
+  const positionAndPathOptions = {
+    positionFilter: isAllowedPosition,
+    pathFilter: (path: readonly Position[]) => path.every(isAllowedPosition),
+  };
+  const classAction = context.planClassAction(unit, undefined, {
+    ...positionAndPathOptions,
+    targetFilter: (target) => target.side === unit.side
+      ? forceMemberIds.has(target.id)
+      : (targetFilter?.(target) ?? true),
+  });
+  /**
+   * REMAKE-091. The native follower branch exists to bring a straggler back to
+   * its leader — `nearLeader` is phrased as "do not spend the action here".
+   * Spending it while the follower already has a shot, technique or adjacent
+   * target inverts that intent: on stage 3 the fourth corps stands on forest,
+   * where a movement-6 archer reaches exactly one cell, so its leader read as
+   * far almost every round and it shuffled instead of ever firing.
+   */
+  const hasImmediateAction = classAction !== undefined
+    || context.units.some((candidate) => candidate.side !== unit.side
+      && !candidate.actionDisabled
+      && (targetFilter?.(candidate) ?? true)
+      && manhattan(unit, candidate) === 1);
+  if (!hasImmediateAction
+    && doctrine.preserveNativeFormation
+    && behavior >= 4
+    && behavior % 2 === 0) {
     const automaticLeader = forceMembers.find((candidate) => {
       const candidateBehavior = candidate.side === 1
         ? context.alliedBehaviorFor(candidate.id)
@@ -102,15 +129,19 @@ export function planTerrainHoldForceAiAction(
       return candidateBehavior === behavior - 1;
     });
     if (automaticLeader && automaticLeader.id !== unit.id) {
-      const directPath = shortestPath(
+      // The native test is whether the leader is "already present in the
+      // follower's normal movement map" — mode `A`, where same-side units are
+      // transit, not walls. `shortestPath` blocks every ally instead, so in a
+      // packed formation one squadmate standing between the pair made a leader
+      // two cells away read as unreachable and the follower shuffled forward
+      // with a legal shot in hand.
+      const normalMovementMap = movementMap(
         unit,
-        automaticLeader,
-        unit.classId,
-        context.statsFor(unit).movement,
-        context.units.filter((candidate) => candidate.id !== unit.id),
+        context.units,
         context.battlefield,
+        context.statsFor(unit).movement,
       );
-      if (directPath.length === 0) {
+      if (!normalMovementMap.reaches(automaticLeader)) {
         const distanceBefore = manhattan(unit, automaticLeader);
         const candidates = context.reachableCells(unit.id)
           .filter(isAllowedPosition)
@@ -133,18 +164,6 @@ export function planTerrainHoldForceAiAction(
       }
     }
   }
-
-  const targetFilter = context.forces.targetFilterFor(unit.id, context.units);
-  const positionAndPathOptions = {
-    positionFilter: isAllowedPosition,
-    pathFilter: (path: readonly Position[]) => path.every(isAllowedPosition),
-  };
-  const classAction = context.planClassAction(unit, undefined, {
-    ...positionAndPathOptions,
-    targetFilter: (target) => target.side === unit.side
-      ? forceMemberIds.has(target.id)
-      : (targetFilter?.(target) ?? true),
-  });
 
   // REMAKE-066: ranged careers keep the defensive doctrine and never turn a
   // failed shot/technique into an ordinary melee hit.

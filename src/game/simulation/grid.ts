@@ -60,6 +60,13 @@ interface SearchResult {
 export interface MovementMap {
   readonly cells: readonly Position[];
   pathTo: (destination: Position) => Position[];
+  /**
+   * Whether the propagation reached this cell at all, including cells only a
+   * same-side unit stands on. `cells` lists legal landings; the native range
+   * map also assigns a value to friendly transit cells, and the paired
+   * leader/follower test asks exactly that question.
+   */
+  reaches: (position: Position) => boolean;
 }
 
 type Direction = Readonly<Position>;
@@ -175,6 +182,7 @@ export function movementMap(
     pathTo: (destination) => occupied.has(positionKey(destination))
       ? []
       : reconstructPath(unit, destination, result),
+    reaches: (position) => result.costs.has(positionKey(position)),
   };
 }
 

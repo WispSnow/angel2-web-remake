@@ -18,6 +18,17 @@ const campaign: CampaignState = {
   rngCalls: 7,
 };
 
+/** Slot 21 is 愛歐里雅, the behavior-4 follower the player may promote to 弓兵. */
+const archerFollowerCampaign: CampaignState = {
+  ...campaign,
+  roster: completeCampaignRoster([
+    { slot: 1, classId: "monk", experience: 520, life: 120 },
+    { slot: 3, classId: "warrior", experience: 480, life: 140 },
+    { slot: 4, classId: "archer", experience: 360, life: 90 },
+    { slot: 21, classId: "archer", experience: 480, life: 200 },
+  ]),
+};
+
 describe("stage 3 battle construction and stable-remake automation", () => {
   it("builds the fixed 13-vs-12 roster with inherited classes and named leaders", () => {
     const battle = new Stage3Battle(campaign);
@@ -85,6 +96,43 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     const distanceBefore = Math.abs(follower.x - leader.x) + Math.abs(follower.y - leader.y);
     const action = battle.planAlliedAiAction(follower.id);
     expect(action).toMatchObject({ unitId: follower.id, kind: "move" });
+    const destination = action!.path.at(-1)!;
+    expect(Math.abs(destination.x - leader.x) + Math.abs(destination.y - leader.y))
+      .toBeLessThan(distanceBefore);
+  });
+
+  /**
+   * REMAKE-091. The fourth corps stands on forest, where a movement-6 archer
+   * reaches exactly one cell, so its leader read as "far" nearly every round
+   * and the follow move ate the turn while a legal shot was on the board.
+   */
+  it("shoots with a behavior-4 follower that already has a target instead of following", () => {
+    const battle = new Stage3Battle(archerFollowerCampaign);
+    const follower = battle.unit("1:21")!;
+    const leader = battle.unit("1:3")!;
+    expect(follower.classId).toBe("archer");
+    expect(battle.alliedBehaviorFor("1:21")).toBe(4);
+    // The leader stays out of the follower's one-cell forest movement map.
+    expect(Math.abs(follower.x - leader.x) + Math.abs(follower.y - leader.y))
+      .toBeGreaterThan(1);
+    expect(battle.actionTargets("1:21", "archer-shot").length).toBeGreaterThan(0);
+
+    expect(battle.planAlliedAiAction("1:21")).toMatchObject({
+      unitId: "1:21",
+      kind: "special",
+      actionId: "archer-shot",
+    });
+  });
+
+  it("still follows its leader once no shot is left on the board", () => {
+    const battle = new Stage3Battle(archerFollowerCampaign);
+    const leader = battle.unit("1:3")!;
+    battle.units = battle.units.filter((unit) => unit.side === 1);
+    const follower = battle.unit("1:21")!;
+    const distanceBefore = Math.abs(follower.x - leader.x) + Math.abs(follower.y - leader.y);
+
+    const action = battle.planAlliedAiAction("1:21");
+    expect(action).toMatchObject({ unitId: "1:21", kind: "move" });
     const destination = action!.path.at(-1)!;
     expect(Math.abs(destination.x - leader.x) + Math.abs(destination.y - leader.y))
       .toBeLessThan(distanceBefore);

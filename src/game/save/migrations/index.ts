@@ -350,6 +350,22 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-091 only changes how a paired formation follower plans; like v74 it
+ * adds no simulation state, so a v75 save carries over untouched.
+ */
+function migrateVersion75Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 75
+    || value.contentVersion !== "expert-named-leader-caution-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-090 only changes how side-2 named leaders plan; no simulation state
  * is added, removed or reinterpreted, so a v74 save carries over untouched and
  * the next automatic plan simply uses the new pursuit boundary.
@@ -2194,6 +2210,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion75 = migrateVersion75Save(value);
+    if (migratedVersion75) return migratedVersion75;
     const migratedVersion74 = migrateVersion74Save(value);
     if (migratedVersion74) return migratedVersion74;
     const migratedVersion73 = migrateVersion73Save(value);
