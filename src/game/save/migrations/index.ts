@@ -355,6 +355,40 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-095 only changes which cell an ice target is pushed to; nothing about a
+ * stored unit changes meaning, so a v78 save carries over untouched and the next
+ * cast simply uses the radial direction.
+ */
+function migrateVersion78Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 78
+    || value.contentVersion !== "ice-freeze-on-landing-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * REMAKE-094 only narrows which ice targets receive the freeze bit. The bit
+ * itself is an existing saved field and no in-flight state changes meaning, so a
+ * v77 save carries over untouched; the next cast simply uses the landing gate.
+ */
+function migrateVersion77Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 77
+    || value.contentVersion !== "half-dragon-curve-water-warrior-shot-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-092/093 add no saved fields: a unit still stores only its class and
  * experience. What changes is what those two derive — the half-dragon curve now
  * continues past the third row, and side-1 water warriors gain a shot. The
@@ -2285,6 +2319,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion78 = migrateVersion78Save(value);
+  if (migratedVersion78) return migratedVersion78;
+  const migratedVersion77 = migrateVersion77Save(value);
+  if (migratedVersion77) return migratedVersion77;
   const migratedVersion76 = migrateVersion76Save(value);
   if (migratedVersion76) return migratedVersion76;
   const migratedVersion75 = migrateVersion75Save(value);

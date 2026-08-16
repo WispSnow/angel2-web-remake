@@ -13,6 +13,7 @@ import {
 import type { BattleUnit, Position, UnitStats } from "../types";
 import type { AlliedAiAction } from "./ai-contracts";
 import type { BattleActionId } from "./actions/types";
+import { planIceDisplacement } from "./actions/ice-displacement";
 import {
   techniqueEffectRange,
   techniqueSelectionPath,
@@ -501,21 +502,28 @@ export function expertSpecialUtility(
 
   if (actionId === "ice-1" || actionId === "ice-2"
     || actionId === "ice-3" || actionId === "ice-4") {
+    // REMAKE-094: score the same plan the resolver will commit, so a cast that
+    // only shoves its targets out of the effect never reads as control — nor as
+    // an effective wizard hit for the REMAKE-036 priority band.
     const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-    const effect = cachedTechniqueEffectRange(context, actor, definition.range.effectRadius);
-    for (const affected of context.units.filter((candidate) =>
-      candidate.side !== actor.side && effect.valueAt(candidate) > 0)) {
-      const immune = affected.classId === "dragon"
-        || affected.classId === "head"
-        || affected.classId === "hand";
-      if (affected.actionDisabled || immune) continue;
+    const { targets } = planIceDisplacement(
+      actionId,
+      actor,
+      actor,
+      context.units,
+      { width: context.width, height: context.height, terrainSlotAt: context.terrainSlotAt },
+      cachedTechniqueEffectRange(context, actor, definition.range.effectRadius),
+    );
+    for (const { unit: affected, blockReason, freezes } of targets) {
+      if (blockReason === "frozen" || blockReason === "classImmune") continue;
       const threat = targetThreat(context, affected);
-      if (affected.statuses.magicGuard > 0) {
+      if (blockReason === "magicGuard") {
         utility.support += 20;
         utility.targetThreat += threat;
         countEffectiveWizardHit(utility, affected, true);
         continue;
       }
+      if (!freezes) continue;
       utility.control += 120 + threat;
       countEffectiveWizardHit(utility, affected, true);
       utility.targetThreat += threat;

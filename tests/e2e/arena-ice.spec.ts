@@ -82,7 +82,8 @@ test("tier-one wizard pushes the outer ring beyond 2C through the formal techniq
         unitId: "arena-2-1",
         positionAfter: { x: 23, y: 31 },
         lifeAfter: outerBefore?.life,
-        actionDisabledAfter: true,
+        // REMAKE-094: it lands on a value-0 cell, so it leaves without freezing.
+        actionDisabledAfter: false,
         moved: true,
       }),
     ],
@@ -263,7 +264,8 @@ test("tier-two wizard pushes the fourth ring beyond 3C", async ({ page }) => {
         unitId: "arena-2-1",
         positionAfter: { x: 24, y: 31 },
         lifeAfter: outerBefore?.life,
-        actionDisabledAfter: true,
+        // REMAKE-094: it lands on a value-0 cell, so it leaves without freezing.
+        actionDisabledAfter: false,
         moved: true,
       }),
     ],
@@ -350,7 +352,8 @@ test("tier-three wizard pushes the fifth ring beyond 4C", async ({ page }) => {
         unitId: "arena-2-1",
         positionAfter: { x: 25, y: 31 },
         lifeAfter: outerBefore?.life,
-        actionDisabledAfter: true,
+        // REMAKE-094: it lands on a value-0 cell, so it leaves without freezing.
+        actionDisabledAfter: false,
         moved: true,
       }),
     ],

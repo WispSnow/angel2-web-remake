@@ -3,10 +3,11 @@ import {
   HALF_DRAGON_TELEPORT_ACTION_ID,
   WATER_WARRIOR_SHOT_ACTION_ID,
 } from "../../content/actions";
-import { killRewardFor, movementRulesFor } from "../../content/classes";
+import { killRewardFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
 import type { DeterministicRng } from "../rng";
 import { cloneUnitStatuses } from "../status";
+import { planIceDisplacement } from "./ice-displacement";
 import {
   stompEffectRange,
   techniqueEffectRange,
@@ -540,66 +541,30 @@ function prepareIce(
   trial: DeterministicRng,
 ): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
   const definition = BATTLE_ACTION_DEFINITIONS[actionId];
-  const effect = techniqueEffectRange(
+  const { effect, targets, movedCount } = planIceDisplacement(
+    actionId,
+    actor,
     center,
-    context.battlefield.width,
-    context.battlefield.height,
-    definition.range.effectRadius,
+    context.units,
+    context.battlefield,
   );
-  const occupied = new Set(context.units.map(positionKey));
-  const offsets = [
-    { x: 0, y: 1 },
-    { x: 0, y: -1 },
-    { x: -1, y: 0 },
-    { x: 1, y: 0 },
-  ] as const;
-  let moved = 0;
-  const affectedUnits = context.units
-    .filter((unit) => unit.side !== actor.side && effect.valueAt(unit) > 0)
-    .sort((left, right) => left.y * context.battlefield.width + left.x
-      - (right.y * context.battlefield.width + right.x))
-    .map((unit) => {
-      const statusesAfter = cloneUnitStatuses(unit.statuses);
-      const alreadyFrozen = unit.actionDisabled;
-      const guarded = unit.statuses.magicGuard > 0;
-      const classImmune = unit.classId === "dragon"
-        || unit.classId === "head"
-        || unit.classId === "hand";
-      const blocked = alreadyFrozen || guarded || classImmune;
-      const blockReason: ActionBlockReason | undefined = alreadyFrozen
-        ? "frozen"
-        : guarded
-          ? "magicGuard"
-          : classImmune
-            ? "classImmune"
-            : undefined;
-      if (!alreadyFrozen && guarded) statusesAfter.magicGuard = 0;
-      let positionAfter = copyPosition(unit);
-      if (!blocked) {
-        const currentValue = effect.valueAt(unit);
-        const movementRules = movementRulesFor(unit.classId);
-        const destination = offsets
-          .map((offset) => ({ x: unit.x + offset.x, y: unit.y + offset.y }))
-          .find((position) => effect.contains(position)
-            && effect.valueAt(position) < currentValue
-            && !occupied.has(positionKey(position))
-            && (movementRules[context.battlefield.terrainSlotAt(position)] ?? 99) < 99);
-        if (destination) {
-          occupied.delete(positionKey(unit));
-          occupied.add(positionKey(destination));
-          positionAfter = destination;
-          moved += 1;
-        }
-      }
-      return affectedUnit(unit, {
-        positionAfter,
-        actionDisabledAfter: blocked ? unit.actionDisabled : true,
-        statusesAfter,
-        blocked,
-        blockReason,
-      });
+  const affectedUnits = targets.map(({ unit, positionAfter, freezes, blocked, blockReason }) => {
+    const statusesAfter = cloneUnitStatuses(unit.statuses);
+    if (blockReason === "magicGuard") statusesAfter.magicGuard = 0;
+    return affectedUnit(unit, {
+      positionAfter,
+      // REMAKE-094: the ice bit follows the settled landing cell. Targets shoved
+      // onto a value-0 cell leave the effect and keep their action; blocked and
+      // stationary targets stay inside and freeze exactly as before.
+      actionDisabledAfter: freezes ? true : unit.actionDisabled,
+      statusesAfter,
+      blocked,
+      blockReason,
     });
-  const experienceGained = moved > 0
+  });
+  // Native experience still keys off displacement, not off how many targets the
+  // narrowed gate actually froze.
+  const experienceGained = movedCount > 0
     ? trial.between(definition.experience.base + definition.experience.randomMinimum,
       definition.experience.base + definition.experience.randomMaximum)
     : 0;

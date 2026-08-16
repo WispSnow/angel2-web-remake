@@ -2573,13 +2573,15 @@ describe("Stage-0 class actions", () => {
       },
       actor,
     );
+    // REMAKE-094: the outer ring still leaves the effect, but a target that lands
+    // outside it keeps its action instead of freezing off-range.
     expect(outer.result.affectedUnits).toEqual([
       expect.objectContaining({
         unitId: outerTarget.id,
         positionAfter: { x: 5, y: 7 },
         moved: true,
         blocked: false,
-        actionDisabledAfter: true,
+        actionDisabledAfter: false,
       }),
     ]);
     expect(outer.result.experienceGained).toBeGreaterThanOrEqual(8);
@@ -2688,6 +2690,100 @@ describe("Stage-0 class actions", () => {
     expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore);
   });
 
+  it("freezes ice targets by their landing cell, so a blocked outer ring freezes but a shoved one does not", () => {
+    const battle = new Stage0Battle(0);
+    const actor = {
+      ...battle.unit("1:0")!,
+      id: "ice-094-actor",
+      x: 5,
+      y: 5,
+      classId: "wizard" as const,
+      experience: 0,
+    };
+    const enemyTemplate = battle.units.find((unit) => unit.side === 2)!;
+    // `ice-2` has radius 4, so (5, 8) sits on the value-1 outer ring.
+    const outer = { ...enemyTemplate, id: "ice-094-outer", x: 5, y: 8 };
+
+    const shoved = prepareSpecialAction(
+      { actionId: "ice-2", actorId: actor.id },
+      actor,
+      undefined,
+      new DeterministicRng(0x9494, 3),
+      {
+        units: [actor, outer],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      actor,
+    );
+    const shovedOuter = shoved.result.affectedUnits[0];
+    expect(shovedOuter).toMatchObject({
+      unitId: outer.id,
+      positionAfter: { x: 5, y: 9 },
+      moved: true,
+      blocked: false,
+      actionDisabledAfter: false,
+    });
+    // Landing outside the effect is what removes the freeze, not the push itself:
+    // displacement experience still rolls exactly once.
+    expect(shoved.result.experienceGained).toBeGreaterThanOrEqual(10);
+    expect(shoved.rngCallsAfter).toBe(shoved.rngCallsBefore + 1);
+
+    // Same outer-ring cell, but every lower-value retreat is taken, so the target
+    // stays on a positive-value cell and REMAKE-094 keeps it frozen.
+    const walls = [
+      { ...actor, id: "ice-094-wall-down", x: 5, y: 9 },
+      { ...actor, id: "ice-094-wall-left", x: 4, y: 8 },
+      { ...actor, id: "ice-094-wall-right", x: 6, y: 8 },
+    ];
+    const pinned = prepareSpecialAction(
+      { actionId: "ice-2", actorId: actor.id },
+      actor,
+      undefined,
+      new DeterministicRng(0x9494, 3),
+      {
+        units: [actor, outer, ...walls],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      actor,
+    );
+    expect(pinned.result.affectedUnits).toEqual([
+      expect.objectContaining({
+        unitId: outer.id,
+        positionAfter: { x: 5, y: 8 },
+        moved: false,
+        blocked: false,
+        actionDisabledAfter: true,
+      }),
+    ]);
+    expect(pinned.result.experienceGained).toBe(0);
+    expect(pinned.rngCallsAfter).toBe(pinned.rngCallsBefore);
+
+    // An inner-ring target still lands inside the effect, so it freezes as before.
+    const inner = { ...enemyTemplate, id: "ice-094-inner", x: 5, y: 7 };
+    const kept = prepareSpecialAction(
+      { actionId: "ice-2", actorId: actor.id },
+      actor,
+      undefined,
+      new DeterministicRng(0x9494, 3),
+      {
+        units: [actor, inner],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      actor,
+    );
+    expect(kept.result.affectedUnits).toEqual([
+      expect.objectContaining({
+        unitId: inner.id,
+        positionAfter: { x: 5, y: 8 },
+        moved: true,
+        actionDisabledAfter: true,
+      }),
+    ]);
+  });
+
   it("uses the native radius-four, three-ring, and 10..11 experience contract for intermediate ice", () => {
     const battle = new Stage0Battle(0);
     const actor = {
@@ -2734,7 +2830,8 @@ describe("Stage-0 class actions", () => {
         positionAfter: { x: 5, y: 9 },
         moved: true,
         lifeAfter: outer.life,
-        actionDisabledAfter: true,
+        // REMAKE-094: pushed onto the value-0 cell, so it leaves without freezing.
+        actionDisabledAfter: false,
       }),
     ]);
     expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(10);
@@ -2859,7 +2956,8 @@ describe("Stage-0 class actions", () => {
         positionAfter: { x: 5, y: 10 },
         moved: true,
         lifeAfter: outer.life,
-        actionDisabledAfter: true,
+        // REMAKE-094: pushed onto the value-0 cell, so it leaves without freezing.
+        actionDisabledAfter: false,
       }),
     ]);
     expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(12);
@@ -2939,7 +3037,9 @@ describe("Stage-0 class actions", () => {
         positionAfter: { x: 4, y: 0 },
         moved: true,
         lifeAfter: outer.life,
-        actionDisabledAfter: true,
+        // REMAKE-094: sideways onto a value-0 cell still counts as leaving the
+        // effect, so the outer ring is shoved without freezing.
+        actionDisabledAfter: false,
       }),
       expect.objectContaining({
         unitId: inner.id,

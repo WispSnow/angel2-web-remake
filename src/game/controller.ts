@@ -5142,13 +5142,16 @@ export class GameController {
     ally.acted = false;
     ally.actionDisabled = false;
 
+    // REMAKE-094 freezes only targets that land back inside the effect, and 1C's
+    // radius leaves just the four orthogonal neighbours. The pursuing ice fixture
+    // therefore starts adjacent: it is pushed to the value-1 ring, freezes there,
+    // and is two cells out once it thaws, so it resumes by moving rather than
+    // attacking from where it stood.
     enemy.x = ordinaryCombat
       ? 30
       : classId === "archer"
         ? 33
-        : pursuingStage1Target
-          ? 31
-          : 30;
+        : 30;
     enemy.y = 26;
     enemy.life = ordinaryCombat ? 1 : this.battle.statsFor(enemy).maxLife;
     enemy.acted = false;

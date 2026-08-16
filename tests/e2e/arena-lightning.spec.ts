@@ -410,7 +410,10 @@ test("formal 4L skips an ice-frozen covered enemy and keeps its shell above the 
     arena.setSide(2);
     arena.setClass("soldier");
     arena.setLevel(1);
-    const frozen = arena.interact(23, 30);
+    // REMAKE-094 only freezes targets that land back inside the ice effect, so
+    // this one starts on 2C's value-2 ring and is pushed to the value-1 cell
+    // (22,31) — still inside the 4L column the 魔導師 is about to drop.
+    const frozen = arena.interact(22, 30);
     const center = arena.interact(23, 32);
     return [wizard, caster, frozen, center];
   });

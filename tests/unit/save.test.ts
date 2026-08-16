@@ -1970,6 +1970,29 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v77 saves losslessly", () => {
+    // REMAKE-094 only narrows which ice targets receive the freeze bit. That bit
+    // is an existing stored field and no in-flight state changes meaning, so both
+    // a mid-battle and a completed v77 save carry over untouched.
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 77,
+        contentVersion: "half-dragon-curve-water-warrior-shot-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
+  it("rejects a v77 save whose content identity does not match that version", () => {
+    const legacy = {
+      ...battleSave(),
+      version: 77,
+      contentVersion: "ice-freeze-on-landing-1",
+    };
+    expect(parseSaveData(JSON.stringify(legacy))).toBeUndefined();
+  });
+
   it("migrates v76 saves losslessly when no sister sits below the entry baseline", () => {
     // REMAKE-092/093 add no stored fields: a unit still carries only its class
     // and experience, so a save without an under-baseline sister is unchanged.

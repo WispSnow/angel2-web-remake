@@ -1261,6 +1261,39 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       .toBe("enemy-warrior");
   });
 
+  it("scores ice from the landing cells the resolver will commit", () => {
+    // REMAKE-094: a target on the value-1 outer ring is shoved clear of the
+    // effect and never freezes, so the scorer must not book it as control — nor
+    // as an effective wizard hit for the REMAKE-036 priority band.
+    const battle = new ArenaBattle([
+      { id: "ally-outer", side: 1 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "ally-inner", side: 1 as const, slot: 1, classId: "wizard" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-wizard", side: 2 as const, slot: 0, classId: "wizard" as const, level: 1 as const, x: 26, y: 30 },
+    ], 0, new DeterministicRng(0x3311));
+    const actor = battle.unit("enemy-wizard")!;
+    const outer = battle.unit("ally-outer")!;
+    const inner = battle.unit("ally-inner")!;
+    const stats = { attack: 60, defense: 40, maxLife: 200, movement: 4, level: 2 };
+    const contextFor = (units: readonly (typeof actor)[]) => ({
+      width: 50,
+      height: 60,
+      units,
+      terrainSlotAt: () => 2,
+      statsFor: () => stats,
+      effectiveStatsFor: () => stats,
+    });
+
+    const shovedOut = expertSpecialUtility(contextFor([actor, outer]), actor, "ice-2", actor, [actor]);
+    expect(shovedOut.control).toBe(0);
+    expect(shovedOut.wizardHits).toBe(0);
+    expect(shovedOut.waste).toBe(1);
+
+    const held = expertSpecialUtility(contextFor([actor, inner]), actor, "ice-2", actor, [actor]);
+    expect(held.control).toBeGreaterThan(0);
+    expect(held.wizardHits).toBe(1);
+    expect(held.waste).toBe(0);
+  });
+
   it("keeps a wizard out of melee and defers its ice action behind ordinary attackers", () => {
     const battle = new ArenaBattle([
       { id: "ally", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
