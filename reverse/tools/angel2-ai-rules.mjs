@@ -58,6 +58,15 @@ const CODE_SIGNATURES = [
   { address: "1000:1AF8", offset: 0x11af8, hex: "8b36161f8936bf77b83000a30f1fb83200a3181f9a04009d138b36161fe83e0083ff0074359a2900de172ea17f01a30f" },
   { address: "1000:1B56", offset: 0x11b56, hex: "a122008ec0268a04a8807401c3a1470da3181fa1772e3d0400740e3d000074133d09007418bf0000c3bf7d00c706181f" },
   { address: "1000:1BD9", offset: 0x11bd9, hex: "e8810983fa597503e9bf00a13f0d3d040074223d0600741d3d080074183d0a0074133d0000750a833e340d597503e99900ba4e00c32ea17f" },
+  // Paired follower near test: base mode from [cs:017F], seed straight from
+  // DS:0D47 with no floor, then the same-side behavior lookup at 1000:0D83.
+  { address: "1000:1C0E", offset: 0x11c0e, hex: "2ea17f01a30f1fa1470da3181f9a04009d1333c02ea083018b1ef63b4b9a83067010893e7a0483ff" },
+  // The only DS:0D47 writer: the AI input loader gated on base mode 'Y'/'A'.
+  { address: "1000:2300", offset: 0x12300, hex: "2e833e7f015974092e833e7f01417401c38b1e161f9a58500000a1f63ba33f0da1c531a3470da1bd31a3" },
+  // DS:0D45 is the DATA row: decremented and clamped to 0..2 for the skill pool.
+  { address: "1000:1DC8", offset: 0x11dc8, hex: "8b1e450d4b83fb037203bb020003db8b" },
+  // The one site that floors the same movement seed to 8 (behavior 2's gate).
+  { address: "1000:21A0", offset: 0x121a0, hex: "a1470d3d08007703b80800a3181f" },
   { address: "1000:1D0B", offset: 0x11d0b, hex: "2ea17f01a30f1fa1470da3181f9a04009d1333c02ea083018b1ef63b4b9a930270108b36161f8b3e7a043bfe742a83ff" },
   { address: "1000:2044", offset: 0x12044, hex: "2ea17f01a30f1fa1470da3181f9a04009d1333c02ea083018b1ef63b4b9a0a0070108b36161f8b3e7a0483ff00740a3b" },
   { address: "1000:2081", offset: 0x12081, hex: "a13f0d3d01007504e8b8ffc32ea17f01a30f1fa1470da3181f9a04009d1333c02ea083018b1ef63b4b9a0a0070108b36" },
@@ -524,7 +533,7 @@ function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue) 
         nativeQuirk: "side-2 behavior 2 therefore probes with side-1 occupancy semantics because mode A is written literally",
       },
       pairedLeaderFollowerBehaviors: {
-        dispatcher: "1000:1BD9; exact same-side behavior lookup 1000:0D83/0D9C",
+        dispatcher: "1000:1BD9; follower branch 1000:1C0E; exact same-side behavior lookup 1000:0D83/0D9C",
         pairs: [
           { leader: 3, follower: 4 },
           { leader: 5, follower: 6 },
@@ -532,7 +541,19 @@ function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue) 
           { leader: 9, follower: 10, staticTemplatePresence: "absent" },
         ],
         nearLeader: "if a same-side leader with behavior follower-1 is already present in the follower's normal movement map, do not spend the action here; continue to the class attack/shot/technique flow",
+        nearLeaderMap: {
+          entry: "1000:1C0E",
+          mode: "DS:1F0F receives [cs:017F], the phase base movement mode the 1000:2300 loader gates on ('Y' for the side-2 phase, 'A' for the side-1 automatic phase)",
+          seed: "DS:1F18 receives DS:0D47 verbatim at 1000:1C15, with no floor applied",
+          seedMeaning: "DS:0D47 is the acting unit's movement value: 1000:2323 is its only writer and copies the unit record word at DS:31C5, and every reader forwards it straight into the DS:1F18 range seed",
+          contrast: "1000:21A0 is the only site that clamps the same value, raising it to 8 for the behavior-2 gate map; the follower near test has no such floor, so on expensive terrain a follower reaches only the cells its raw movement value pays for",
+        },
         farLeader: "otherwise build the phase FY/FA pursuit map with seed 55, locate the same-side leader, move toward it using the actual movement map, and consume the action",
+        farLeaderMap: {
+          entry: "1000:1C3D",
+          probe: "DS:1F0F receives [cs:0181] (the phase FY/FA pursuit mode) and DS:1F18 the literal 0x37 = 55 at 1000:1C48",
+          execution: "1000:1C6C rebuilds the base mode with the raw DS:0D47 movement seed again, moves, and returns 'Y' so the action is consumed",
+        },
         noLeader: "if the extended map finds no paired leader, continue to the class action flow",
       },
       stageRouteBehavior12: {
