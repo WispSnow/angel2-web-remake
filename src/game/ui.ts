@@ -520,9 +520,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "move") controller.chooseMove();
     else if (action === "attack") controller.chooseAttack();
     else if (action === "shoot") controller.chooseShoot();
-    else if (action === "shot-route-previous") controller.cycleMagicArcherRoute(-1);
-    else if (action === "shot-route-next") controller.cycleMagicArcherRoute(1);
-    else if (action === "shot-route-confirm") controller.confirmMagicArcherRoute();
     else if (action === "technique") controller.chooseTechnique();
     else if (action === "technique-action") {
       controller.selectTechnique(Number(button.dataset.techniqueIndex));
@@ -613,10 +610,26 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (preview) preview.hidden = true;
   }, { signal: eventController.signal });
 
+  /**
+   * The battlefield canvas answers its own right press through Phaser's
+   * `pointerdown`, so the document-level fallback below must skip it. Testing the
+   * canvas against `contextmenu`'s own target is not enough: the press has
+   * already run one cancel by then, and if that cancel rendered a menu under the
+   * cursor, `contextmenu` reports the fresh button instead of the canvas and the
+   * fallback cancels a second level. Latching the target at press time keeps one
+   * physical right-click worth exactly one cancel wherever the menu lands.
+   */
+  let rightPressStartedOnCanvas = false;
+  root.addEventListener("pointerdown", (event) => {
+    if (event.button === 2) rightPressStartedOnCanvas = event.target instanceof HTMLCanvasElement;
+  }, { capture: true, signal: eventController.signal });
+
   root.addEventListener("contextmenu", (event) => {
     if (!(event.target as Element).closest("#logical-screen")) return;
     event.preventDefault();
-    if (!(event.target instanceof HTMLCanvasElement)) void controller.rightClickAction();
+    const handledByCanvas = rightPressStartedOnCanvas;
+    rightPressStartedOnCanvas = false;
+    if (!handledByCanvas) void controller.rightClickAction();
   }, { signal: eventController.signal });
 
   window.addEventListener("keydown", (event) => {
@@ -685,19 +698,28 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const routePickerVisible = controller.actionMode === "shotRoute"
       && selectedRoute !== undefined
       && routeTarget !== undefined;
-    status.classList.toggle("is-shot-route-picker", routePickerVisible);
+    const iceCastPreview = controller.iceCastPreview;
     if (routePickerVisible) {
       const collateralCount = selectedRoute.affectedUnitIds
         .filter((id) => id !== routeTarget.id).length;
       status.dataset.routeIndex = String(controller.magicArcherRouteIndex);
       status.dataset.routeCount = String(controller.magicArcherRouteOptions.length);
-      status.innerHTML = `<button type="button" data-action="shot-route-previous"
-          data-testid="shot-route-previous" aria-label="上一條箭道">◀</button>
-        <span data-testid="shot-route-summary">箭道 ${controller.magicArcherRouteIndex + 1}/${controller.magicArcherRouteOptions.length} · 副目標 ${collateralCount}</span>
-        <button type="button" data-action="shot-route-next"
-          data-testid="shot-route-next" aria-label="下一條箭道">▶</button>
-        <button type="button" data-action="shot-route-confirm"
-          data-testid="shot-route-confirm">發射</button>`;
+      status.innerHTML = skillCastHint("shot-route-summary", [
+        `箭道 ${controller.magicArcherRouteIndex + 1}/${controller.magicArcherRouteOptions.length}`,
+        `副目標 ${collateralCount}`,
+        "滾輪切換",
+        "點目標發射",
+      ]);
+    } else if (iceCastPreview) {
+      delete status.dataset.routeIndex;
+      delete status.dataset.routeCount;
+      status.innerHTML = skillCastHint("ice-cast-summary", [
+        BATTLE_ACTION_DEFINITIONS[iceCastPreview.actionId].label,
+        `<b class="ice-cast-freeze">藍格冰封</b>`,
+        `<b class="ice-cast-displace">黃圈只推開</b>`,
+        "點範圍內施展",
+        "右鍵取消",
+      ], controller.statusMessage);
     } else {
       delete status.dataset.routeIndex;
       delete status.dataset.routeCount;
@@ -1598,6 +1620,26 @@ function renderSelectedUnitContext(controller: GameController): string | undefin
   return `<span class="selected-unit-context" data-testid="selected-unit-context">${items.join(
     '<i class="selected-unit-separator" aria-hidden="true">・</i>',
   )}</span>`;
+}
+
+/**
+ * Skill overlays that need the player to read something before they commit —
+ * the ice footprint, the magic-arrow line — write into the same status strip as
+ * every other readout, so they render as plain outlined text rather than a
+ * plated widget with its own buttons. Each input they mention is reachable from
+ * the map or the keyboard, so naming them here costs no on-screen control.
+ */
+function skillCastHint(
+  testId: string,
+  items: readonly string[],
+  fullText?: string,
+): string {
+  const describedBy = fullText
+    ? ` title="${fullText}" aria-label="${fullText}"`
+    : "";
+  return `<span class="skill-cast-hint" data-testid="${testId}"${describedBy}>${items
+    .map((item) => `<span>${item}</span>`)
+    .join('<i class="selected-unit-separator" aria-hidden="true">・</i>')}</span>`;
 }
 
 function renderHud(

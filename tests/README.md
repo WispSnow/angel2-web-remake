@@ -29,6 +29,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `src/game/content/classes.ts`、职业固定行／第三行后成长、近战／远程职责、39 职业目标优先级档案、`class-traits.ts`、终阶职业特性、飛龍攻后移动与水戰士受击分裂／共享状态 | `classes.test.ts` | `class-showdown.spec.ts` 的职业说明、飛龍流程和水戰士分裂用例 |
 | `src/game/content/class-balance-overrides.ts`、`campaign-entry-experience.ts`：`REMAKE-092` 半龍戰士分段成长与 3 级后防御成长、七姊妹入队经验、`REMAKE-093` 水戰士仅 side 1 射击授予与敌方零影响 | `class-balance-overrides.test.ts`，入队实例见 `stage22-battle.test.ts`，迁移见 `save.test.ts` | `class-showdown.spec.ts` 的职业说明与射击用例 |
 | `src/game/arena-*`、`src/arena.ts` | `arena.test.ts` | `arena.spec.ts`，再按动作族选择 `arena-*.spec.ts` |
+| `REMAKE-101` 冰雪施法前的 `selfAreaConfirm` 双色范围预览、纯文字信息栏（任何技能候选态都不放按钮或底板）、确认／取消入口，以及一次物理右键只退一层的画布取消判据 | 无独立模拟数值测试（预览是纯派生表现，不写模拟状态） | `arena-ice.spec.ts` 的预览与取消用例；魔弓箭道的纯文字信息栏与滚轮／点目标输入见 `arena-magic-archer-route.spec.ts`；其他冰雪施放路径见 `stage1.spec.ts`、`debug.spec.ts`、`arena-healing.spec.ts`、`arena-lightning.spec.ts` |
 | `class-showdown-session.ts` 的对阵场编成与镜像 | `class-showdown.test.ts` | `class-showdown.spec.ts` |
 | 半龍戰士 `1N` 直连技術「傳送」：seed 200／模式 `0` 传播、空格落点、行动消耗与移動路径表现 | `half-dragon-teleport.test.ts`，职业菜单口径另见 `classes.test.ts` | `stage22.spec.ts` 的 `S22-J`、`class-showdown.spec.ts` 的傳送用例 |
 | `promotion-lab-session.ts`、转职触发阈值与全候选 UI | `promotion-lab.test.ts`、`promotion.test.ts` | `promotion-lab.spec.ts`，入口另见 `debug.spec.ts` |

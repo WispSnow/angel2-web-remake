@@ -93,7 +93,12 @@ export const arenaBattleState = (page: Page) => page.evaluate(() =>
     battle?: ArenaBattleDebugState;
   }).battle);
 
-export async function clickArenaWorldCell(page: Page, x: number, y: number): Promise<void> {
+export async function clickArenaWorldCell(
+  page: Page,
+  x: number,
+  y: number,
+  options: { button?: "left" | "right" } = {},
+): Promise<void> {
   const canvas = page.getByTestId("battle-canvas");
   const [battle, box, dimensions] = await Promise.all([
     arenaBattleState(page),
@@ -107,6 +112,7 @@ export async function clickArenaWorldCell(page: Page, x: number, y: number): Pro
   const logicalX = 40 + (x - battle.cameraOrigin.x + .5) * 40;
   const logicalY = 23 + (y - battle.cameraOrigin.y + .5) * 44;
   await canvas.click({
+    ...options,
     position: {
       x: logicalX * box.width / dimensions.width,
       y: logicalY * box.height / dimensions.height,

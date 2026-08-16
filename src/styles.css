@@ -902,46 +902,16 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
    carries no plate, so an outline does the legibility work the old background
    bar did. */
 .status-strip { position: absolute; z-index: 7; right: 205px; top: 28px; max-width: 390px; overflow: hidden; color: #fff6c8; font: 11px/14px system-ui, sans-serif; white-space: nowrap; text-align: right; text-shadow: var(--text-outline); text-overflow: ellipsis; pointer-events: none; }
-/* The route picker is a real control, so it keeps its plate and a fixed width
-   the grid can divide. */
-.status-strip.is-shot-route-picker {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 24px 48px;
-  width: 240px;
-  min-height: 20px;
-  padding: 1px 3px;
-  border: 1px solid #d7aa2d;
-  align-items: center;
-  gap: 2px;
-  color: #fff8cf;
-  background: #1d0d08e8;
-  pointer-events: auto;
-  text-shadow: 1px 1px #000;
-}
-.status-strip.is-shot-route-picker span {
-  min-width: 0;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-}
-.status-strip.is-shot-route-picker button {
-  height: 16px;
-  padding: 0 3px;
-  border: 1px solid #8e6620;
-  color: #fff3ad;
-  background: #3b2112;
-  font: 700 10px/14px system-ui, sans-serif;
-  cursor: var(--native-cursor-hand);
-}
-.status-strip.is-shot-route-picker button:hover,
-.status-strip.is-shot-route-picker button:focus-visible {
-  border-color: #ffe27d;
-  color: #fff;
-  background: #684017;
-  outline: none;
-}
-.selected-unit-context { display: flex; max-width: 100%; align-items: center; justify-content: flex-end; overflow: hidden; color: #fff1b0; font-weight: 700; text-shadow: var(--text-outline); }
-.selected-unit-context > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Unit readouts and skill-cast hints are the same kind of overlay text, so they
+   share one layout: no plate, no controls, right-anchored and outlined. */
+.selected-unit-context,
+.skill-cast-hint { display: flex; max-width: 100%; align-items: center; justify-content: flex-end; overflow: hidden; color: #fff1b0; font-weight: 700; text-shadow: var(--text-outline); }
+.selected-unit-context > span,
+.skill-cast-hint > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The two swatch words carry the map colours the preview bands are drawn in, so
+   the legend cannot drift away from `BattleScene`'s fills. */
+.skill-cast-hint .ice-cast-freeze { color: #9df0ff; }
+.skill-cast-hint .ice-cast-displace { color: #ffdf85; }
 .selected-unit-separator { flex: none; color: #d7aa2d; font-style: normal; }
 .selected-unit-tactic { display: inline-flex; align-items: center; }
 .selected-unit-affiliation { flex: none; color: #e9dca9; }

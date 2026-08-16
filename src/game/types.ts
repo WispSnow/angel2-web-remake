@@ -160,6 +160,7 @@ export type ActionMode =
   | "techniqueMenu"
   | "target"
   | "specialTarget"
+  | "selfAreaConfirm"
   | "shotRoute"
   | "allyPreview"
   | "enemyPreview";

@@ -12,9 +12,11 @@ import {
   STAGE0_REST_PRESENTATION,
   WATER_WARRIOR_SHOT_ACTION_ID,
   actionPresentationCatalog,
+  isIceActionId,
   isShootingActionId,
   shootingActionIdFor,
   techniqueActionIdsFor,
+  type IceActionId,
 } from "./content/actions";
 import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
 import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
@@ -254,6 +256,27 @@ export interface UnitCommand {
 export interface GroupCommand {
   id: GroupCommandId;
   label: string;
+}
+
+/**
+ * Derived presentation state for the ice cast the player is about to confirm.
+ * The two bands are read straight off the effect range map, so they cost the
+ * simulation nothing and can never disagree with the resolver's own footprint.
+ *
+ * The split is geometric, not a per-unit forecast: every target is shoved one
+ * orthogonal step outward, so a value-1 target lands on value 0 and leaves the
+ * effect unfrozen (`REMAKE-094`), while a value>=2 target lands on value>=1 and
+ * still freezes. The one case the colour cannot express is a value-1 target with
+ * no legal push cell — it stays put and freezes after all. Naming the bands for
+ * geometry rather than for a guaranteed outcome keeps that honest.
+ */
+export interface IceCastPreview {
+  readonly actionId: IceActionId;
+  readonly center: Position;
+  /** Effect value >= 2: a target here still ends inside the effect and freezes. */
+  readonly freezeCells: readonly Position[];
+  /** Effect value 1: the shove normally carries a target clear of the effect. */
+  readonly displacementRingCells: readonly Position[];
 }
 
 const BASIC_COMMANDS: readonly UnitCommand[] = [
@@ -590,6 +613,36 @@ export class GameController {
       this.battle.stage.height,
       definition.range.effectRadius,
     ).cells();
+  }
+
+  /**
+   * Ice is self-centred, so the native flow fires it the moment the technique
+   * menu is confirmed and the player never sees what it is about to cover. The
+   * remake inserts a confirmation step that draws the footprint first; this
+   * getter is the only source the renderer and the HUD read, so both always
+   * describe the same two bands.
+   */
+  get iceCastPreview(): IceCastPreview | undefined {
+    if (this.actionMode !== "selfAreaConfirm") return undefined;
+    const actionId = this.selectedActionId;
+    const unit = this.selectedUnit;
+    if (!unit || !isIceActionId(actionId)) return undefined;
+    const definition = BATTLE_ACTION_DEFINITIONS[actionId];
+    if (!("effectRadius" in definition.range)) return undefined;
+    const center = { x: unit.x, y: unit.y };
+    const effect = techniqueEffectRange(
+      center,
+      this.battle.stage.width,
+      this.battle.stage.height,
+      definition.range.effectRadius,
+    );
+    const freezeCells: Position[] = [];
+    const displacementRingCells: Position[] = [];
+    for (const cell of effect.cells()) {
+      if (effect.valueAt(cell) > 1) freezeCells.push(cell);
+      else displacementRingCells.push(cell);
+    }
+    return { actionId, center, freezeCells, displacementRingCells };
   }
 
   get magicArcherRouteOptions(): readonly MagicArcherLineOption[] {
@@ -1556,6 +1609,16 @@ export class GameController {
       }
       return;
     }
+    if (this.actionMode === "selfAreaConfirm") {
+      // Clicking the drawn footprint casts; anything outside it is treated as a
+      // miss rather than a cast, so an off-target click cannot fire the spell.
+      const preview = this.iceCastPreview;
+      const inside = preview !== undefined
+        && [...preview.freezeCells, ...preview.displacementRingCells]
+          .some((cell) => positionKey(cell) === positionKey(position));
+      if (inside) this.confirmSelfAreaAction();
+      return;
+    }
     this.cursor = { ...position };
     const unit = this.battle.unitAt(position);
 
@@ -1754,7 +1817,18 @@ export class GameController {
       this.actionRange = [];
       this.targets = [];
       this.cursor = { x: unit.x, y: unit.y };
-      void this.commitSpecialAction(this.cursor);
+      // Ice is the only self-centred technique with a footprint worth showing —
+      // prayer scans allies without an effect radius — so only ice pauses for a
+      // look. Everything else keeps the native "confirm the menu, it fires" flow.
+      if (!isIceActionId(actionId)) {
+        void this.commitSpecialAction(this.cursor);
+        return;
+      }
+      this.actionMode = "selfAreaConfirm";
+      this.statusMessage
+        = `「${definition.label}」以${unit.className}為中心：藍格內的敵軍會被冰封，`
+        + "黃色外圈只會被推出範圍。確定施展或按右鍵取消。";
+      this.emit();
       return;
     }
     this.actionRange = this.battle.actionRange(unit.id, actionId).cells();
@@ -1773,6 +1847,23 @@ export class GameController {
         : `選擇工兵移動並${actionId === "obstacle" ? "設置障礙" : "鋪設鐵板"}的空格。`
       : `選擇「${definition.label}」的${definition.target === "ally" ? "我方" : "敵方"}目標。`;
     this.emit();
+  }
+
+  /**
+   * Commits the previewed ice cast. The centre is re-read from the actor rather
+   * than from the cursor so a stray cursor can never relocate a self-centred
+   * technique, whichever control the player used to confirm.
+   */
+  confirmSelfAreaAction(): void {
+    if (
+      this.phase !== "player"
+      || this.actionMode !== "selfAreaConfirm"
+      || this.busy
+      || this.hasBlockingOverlay
+    ) return;
+    const unit = this.selectedUnit;
+    if (!unit) return;
+    void this.commitSpecialAction({ x: unit.x, y: unit.y });
   }
 
   chooseRest(): void {
@@ -1981,6 +2072,9 @@ export class GameController {
       this.targets = [];
       this.selectedActionId = undefined;
       this.actionMode = returnToTechnique ? "techniqueMenu" : "actionMenu";
+    } else if (this.actionMode === "selfAreaConfirm") {
+      this.selectedActionId = undefined;
+      this.actionMode = "techniqueMenu";
     } else if (this.actionMode === "techniqueMenu") {
       this.techniqueIndex = 0;
       this.actionMode = "actionMenu";
@@ -4697,6 +4791,7 @@ export class GameController {
     else if (this.actionMode === "actionMenu") this.activateCommandSelection();
     else if (this.actionMode === "techniqueMenu") this.activateTechniqueSelection();
     else if (this.actionMode === "shotRoute") this.confirmMagicArcherRoute();
+    else if (this.actionMode === "selfAreaConfirm") this.confirmSelfAreaAction();
     else this.selectCell(this.cursor);
   }
 

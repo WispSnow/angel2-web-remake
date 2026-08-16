@@ -989,6 +989,10 @@ test("the magician outer-ring fixture pushes once and releases after one enemy p
   await expect(page.getByTestId("unit-command-technique")).toBeVisible();
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-ice-1").click();
+  // Self-centred ice previews its footprint first; the cast needs a confirmation.
+  await expect(page.getByTestId("game-screen"))
+    .toHaveAttribute("data-action-mode", "selfAreaConfirm");
+  await page.keyboard.press(" ");
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as {
       lastSpecialAction?: { actionId?: string };

@@ -534,6 +534,8 @@ test("formal 3I keeps an ice-frozen ally blocked and leaves its shell above the 
   await clickArenaWorldCell(page, 21, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-ice-1").click();
+  // Self-centred ice previews its footprint first; the cast needs a confirmation.
+  await page.keyboard.press(" ");
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
       battle?: ArenaBattleDebugState;

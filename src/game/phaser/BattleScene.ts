@@ -751,6 +751,55 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           );
         }
       }
+      // Ice confirmation: the freeze band and the outer ring must never read as
+      // one area, because only the freeze band actually ends the turn of what
+      // stands in it. Ice cyan for "frozen", the established effect amber for
+      // "shoved clear" (`REMAKE-094`).
+      const iceCastPreview = controller.iceCastPreview;
+      const iceCastBands = iceCastPreview
+        ? [
+          {
+            cells: iceCastPreview.freezeCells,
+            fill: 0x35c8f0,
+            stroke: 0x9df0ff,
+            alpha: 0.32,
+            width: 1,
+          },
+          // The ring is one cell thick, so a heavier outline is what makes it
+          // read as its own band rather than a slightly different shade.
+          {
+            cells: iceCastPreview.displacementRingCells,
+            fill: 0xf1b94a,
+            stroke: 0xffd34f,
+            alpha: 0.26,
+            width: 2,
+          },
+        ]
+        : [];
+      for (const band of iceCastBands) {
+        this.effectPreviewGraphics.fillStyle(band.fill, band.alpha);
+        this.effectPreviewGraphics.lineStyle(band.width, band.stroke, 0.95);
+        for (const cell of band.cells) {
+          if (
+            cell.x < controller.cameraOrigin.x
+            || cell.x >= controller.cameraOrigin.x + 10
+            || cell.y < controller.cameraOrigin.y
+            || cell.y >= controller.cameraOrigin.y + 7
+          ) continue;
+          this.effectPreviewGraphics.fillRect(
+            cell.x * TILE_WIDTH + 2,
+            cell.y * TILE_HEIGHT + 2,
+            TILE_WIDTH - 4,
+            TILE_HEIGHT - 4,
+          );
+          this.effectPreviewGraphics.strokeRect(
+            cell.x * TILE_WIDTH + 2,
+            cell.y * TILE_HEIGHT + 2,
+            TILE_WIDTH - 4,
+            TILE_HEIGHT - 4,
+          );
+        }
+      }
       const magicArcherRoutes = controller.magicArcherRouteOptions;
       const selectedMagicArcherRoute = controller.selectedMagicArcherRoute;
       if (controller.actionMode === "shotRoute" && selectedMagicArcherRoute) {
@@ -843,6 +892,16 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           : "";
         this.game.canvas.dataset.effectPreviewCellCount = String(controller.effectPreviewCells.length);
         this.game.canvas.dataset.effectPreviewVisibleCellCount = String(visibleEffectPreviewCells.length);
+        this.game.canvas.dataset.iceCastPreviewActionId = iceCastPreview?.actionId ?? "";
+        this.game.canvas.dataset.iceCastPreviewCenter = iceCastPreview
+          ? `${iceCastPreview.center.x},${iceCastPreview.center.y}`
+          : "";
+        this.game.canvas.dataset.iceCastPreviewFreezeCellCount = String(
+          iceCastPreview?.freezeCells.length ?? 0,
+        );
+        this.game.canvas.dataset.iceCastPreviewDisplacementCellCount = String(
+          iceCastPreview?.displacementRingCells.length ?? 0,
+        );
         this.game.canvas.dataset.routePulseSafeCellCount = String(routePulseSafeArea.length);
         this.game.canvas.dataset.routePulseDangerUnitIds = routePulseSafeArea.length > 0
           ? controller.battle.units

@@ -44,7 +44,9 @@ test("player chooses an exact magic-arrow line before firing", async ({ page }) 
   await expect(page.getByTestId("status-strip")).toHaveAttribute("data-route-index", "1");
   await page.keyboard.press("Q");
   await expect(page.getByTestId("status-strip")).toHaveAttribute("data-route-index", "0");
-  await page.getByTestId("status-strip").hover();
+  // The strip is a plain readout now, so the wheel is taken anywhere over the
+  // game surface rather than only while hovering the picker.
+  await page.getByTestId("battle-canvas").hover();
   await page.mouse.wheel(0, 100);
   await expect(page.getByTestId("status-strip")).toHaveAttribute("data-route-index", "1");
   await page.mouse.wheel(0, -100);
@@ -60,7 +62,7 @@ test("player chooses an exact magic-arrow line before firing", async ({ page }) 
     && !route.affectedUnitIds.includes("arena-2-1"));
   expect(selectedIndex).toBeGreaterThanOrEqual(0);
   for (let index = 0; index < selectedIndex; index += 1) {
-    await page.getByTestId("shot-route-next").click();
+    await page.mouse.wheel(0, 100);
   }
 
   await expect(page.getByTestId("status-strip"))
@@ -73,7 +75,9 @@ test("player chooses an exact magic-arrow line before firing", async ({ page }) 
     path: `${ARTIFACT_DIR}/arena-magic-archer-route-picker.png`,
   });
 
-  await page.getByTestId("shot-route-confirm").click();
+  // Clicking the chosen target fires the selected line; the picker no longer
+  // carries its own button.
+  await clickArenaWorldCell(page, 23, 31);
   await page.waitForFunction(() => {
     const battle = window.__ANGEL2_ARENA__?.getState().battle;
     return battle?.lastSpecialAction?.actionId === "magic-archer-shot"

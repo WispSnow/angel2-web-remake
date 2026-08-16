@@ -513,6 +513,12 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await clickMapCell(page, 220, 177);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-ice-1").click();
+  // Self-centred ice now shows its footprint and waits for a confirmation before
+  // it fires, so the cast starts one click later than the other techniques.
+  await expect(page.getByTestId("game-screen"))
+    .toHaveAttribute("data-action-mode", "selfAreaConfirm");
+  await expect(battleCanvas).toHaveAttribute("data-ice-cast-preview-action-id", "ice-1");
+  await page.keyboard.press(" ");
   await page.waitForFunction(() => {
     const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
     return canvas?.dataset.mapCombatIceRangeValue === "2";
