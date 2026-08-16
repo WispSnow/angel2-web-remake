@@ -29,8 +29,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 74 as const;
-export const SAVE_CONTENT_VERSION = "stage-49-ending-kill-records-1" as const;
+export const SAVE_VERSION = 75 as const;
+export const SAVE_CONTENT_VERSION = "expert-named-leader-caution-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

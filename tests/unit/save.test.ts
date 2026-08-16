@@ -1970,6 +1970,19 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v74 saves losslessly through the named-leader AI identity", () => {
+    // REMAKE-090 only changes how side-2 named leaders plan, so every unit,
+    // round, roster and PRNG field carries over untouched.
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 74,
+        contentVersion: "stage-49-ending-kill-records-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v73 attack-counted records to a zeroed kill-count baseline", () => {
     // v73 advanced 戰績 on every ordinary attack; v74 only counts kills, and a
     // v73 total cannot be split back into kills, so the counters restart at 0.

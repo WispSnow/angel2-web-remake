@@ -349,6 +349,23 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
   return isSaveData(withRecordCounters) ? withRecordCounters : undefined;
 }
 
+/**
+ * REMAKE-090 only changes how side-2 named leaders plan; no simulation state
+ * is added, removed or reinterpreted, so a v74 save carries over untouched and
+ * the next automatic plan simply uses the new pursuit boundary.
+ */
+function migrateVersion74Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 74
+    || value.contentVersion !== "stage-49-ending-kill-records-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
 function migrateVersion73Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 73
@@ -2177,6 +2194,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     if (isSaveData(value)) return value;
+    const migratedVersion74 = migrateVersion74Save(value);
+    if (migratedVersion74) return migratedVersion74;
     const migratedVersion73 = migrateVersion73Save(value);
     if (migratedVersion73) return migratedVersion73;
     const migratedVersion72 = migrateVersion72Save(value);

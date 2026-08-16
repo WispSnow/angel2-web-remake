@@ -9,6 +9,7 @@ import {
   ordinaryHitStatusFor,
   suppressesOrdinaryCounterFor,
   terrainDefensePercentFor,
+  usesClassIdentity,
   usesEmpressOrDragonAi,
   usesTechniqueAi,
 } from "../content/classes";
@@ -2000,6 +2001,7 @@ export class Stage0Battle {
         this.planOrdinaryAiAction(candidate, opponentSide, behavior, {
           ...options,
           expertRanking: true,
+          namedLeaderCaution: this.isEnemyNamedLeader(candidate),
         }),
       compareExpertActions: (candidate, left, right) => {
         const leftUtility = this.expertUtilityForAction(candidate, left);
@@ -2131,6 +2133,7 @@ export class Stage0Battle {
     } else {
       fallbackAction = this.planOrdinaryAiAction(unit, opponentSide, options.behavior, {
         expertRanking: true,
+        namedLeaderCaution: this.isEnemyNamedLeader(unit),
         targetFilter: options.targetFilter,
       });
     }
@@ -2505,6 +2508,17 @@ export class Stage0Battle {
   }
 
   /**
+   * REMAKE-090's named side-2 leader. The content identity boundary already
+   * separates them from rank and file: a generic unit carries its profession's
+   * fallback portrait, a named general keeps a character portrait. Victory
+   * slots are not a sufficient test on their own — the wipe-out stages name
+   * nobody, yet that is exactly where a named general used to charge alone.
+   */
+  private isEnemyNamedLeader(unit: BattleUnit): boolean {
+    return unit.side === 2 && !usesClassIdentity(unit);
+  }
+
+  /**
    * The 20..39% band of native `1000:2233` as reached from the `0P/1P`
    * dispatcher. It is the one native case where a class both moves and acts:
    * `1000:2233` answers a successful `1000:1D67` retreat with `M`, and
@@ -2628,9 +2642,10 @@ export class Stage0Battle {
   }
 
   /**
-   * Exact one-enemy-phase melee reach for ranged positioning. Unlike the
-   * broad exposure estimate, this projects the candidate occupant, honors
-   * terrain entry costs, blockers and ZOC, and only counts front-line roles.
+   * Exact one-enemy-phase melee reach, used by ranged positioning and by the
+   * REMAKE-090 named-leader landing. Unlike the broad exposure estimate, this
+   * projects the candidate occupant, honors terrain entry costs, blockers and
+   * ZOC, and only counts front-line roles.
    */
   private rangedRiskEvaluator(actor: BattleUnit): (position: Position) => RangedPositionRisk {
     const opponents = this.units.filter((opponent) => opponent.side !== actor.side);
@@ -2912,7 +2927,11 @@ export class Stage0Battle {
         const candidate = { x: enemy.x + offset.x, y: enemy.y + offset.y };
         const candidateKey = positionKey(candidate);
         if (!reachableKeys.has(candidateKey) || occupied.has(candidateKey)) continue;
-        if (options.expertRanking && behavior === 1 && candidateKey !== positionKey(unit)) continue;
+        // REMAKE-090: a named leader keeps the native pursuit boundary and
+        // strikes only from the cell it already holds, exactly like a guard.
+        if (options.expertRanking
+          && (behavior === 1 || options.namedLeaderCaution)
+          && candidateKey !== positionKey(unit)) continue;
         const path = candidateKey === positionKey(unit)
           ? [{ x: unit.x, y: unit.y }]
           : this.movementPath(unit.id, candidate);
@@ -3008,6 +3027,20 @@ export class Stage0Battle {
         return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
       }
       const targets = enemies.flatMap((enemy) => neighbors(enemy, this.dynamicBattlefield));
+      // REMAKE-090: a named leader ranks its pursuit landing by the exact
+      // next-phase melee threat first, so it advances behind its escort
+      // instead of spending the whole movement budget on the deepest cell.
+      // Progress still gates every candidate, so the advance never stalls.
+      const cautiousRiskAt = options.namedLeaderCaution
+        ? this.rangedRiskEvaluator(unit)
+        : undefined;
+      const compareCautiousLanding = (
+        left: RangedPositionRisk | undefined,
+        right: RangedPositionRisk | undefined,
+      ): number => left && right
+        ? left.meleeContactCount - right.meleeContactCount
+          || left.meleeExpectedDamage - right.meleeExpectedDamage
+        : 0;
       const pursuitPositionFilter = options.destinationFilter && options.pathFilter
         ? options.destinationFilter
         : undefined;
@@ -3046,12 +3079,14 @@ export class Stage0Battle {
             distance: Math.min(...enemies.map((enemy) => manhattan(position, enemy))),
             exposure: this.exposureAt(unit, position),
             defense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
+            cautiousRisk: cautiousRiskAt?.(position),
           }))
           .filter(({ path, distance }) => enemies.length > 0
             && path.length > 1
             && distance < originDistance
             && (options.pathFilter?.(path) ?? true))
-          .sort((left, right) => left.distance - right.distance
+          .sort((left, right) => compareCautiousLanding(left.cautiousRisk, right.cautiousRisk)
+            || left.distance - right.distance
             || left.exposure - right.exposure
             || right.defense - left.defense
             || left.path.length - right.path.length
@@ -3077,6 +3112,7 @@ export class Stage0Battle {
             remainingCost: pursuitCosts.get(positionKey(position)),
             defense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
             exposure: this.exposureAt(unit, position),
+            cautiousRisk: cautiousRiskAt?.(position),
           };
         })
         .filter((candidate): candidate is typeof candidate & { remainingCost: number } =>
@@ -3084,7 +3120,8 @@ export class Stage0Battle {
           && candidate.path.length > 1
           && candidate.traveledCost + candidate.remainingCost === originCost
           && (options.pathFilter?.(candidate.path) ?? true))
-        .sort((left, right) => left.remainingCost - right.remainingCost
+        .sort((left, right) => compareCautiousLanding(left.cautiousRisk, right.cautiousRisk)
+          || left.remainingCost - right.remainingCost
           || left.exposure - right.exposure
           || right.defense - left.defense
           || left.path.length - right.path.length

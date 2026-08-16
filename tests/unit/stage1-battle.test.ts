@@ -236,10 +236,13 @@ describe("stage 1 battle construction", () => {
     expect(sisterAction?.path.length).toBeGreaterThan(1);
     expect(sisterAction).not.toHaveProperty("actionId");
     pursuing.startNextRound();
-    expect(pursuing.planEnemyAiAction("2:16")).toMatchObject({
-      kind: "attack",
-      targetId: pursuitTarget.id,
-    });
+    // REMAKE-090: the delay still turns the named boss into a pursuer, but a
+    // named leader keeps the native pursuit boundary and never attacks in the
+    // action that moves.
+    const fangAction = pursuing.planEnemyAiAction("2:16");
+    expect(fangAction).toMatchObject({ kind: "move" });
+    expect(fangAction?.path.length).toBeGreaterThan(1);
+    expect(fangAction).not.toHaveProperty("targetId");
   });
 
   it("activates the second group when a member can move and ordinary-attack this turn", () => {

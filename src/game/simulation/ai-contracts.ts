@@ -36,6 +36,14 @@ export interface AiActionSelection {
 export interface OrdinaryAiPlanningOptions {
   /** Uses REMAKE-033 utility ranking and its 40% rest boundary. */
   expertRanking?: boolean;
+  /**
+   * REMAKE-090 restores the native pursuit boundary for named side-2 leaders:
+   * `longPursuit`/`behaviorTwoPursuit` never attack in the action that moves,
+   * so the actor only strikes from the cell it already holds, and a pursuit
+   * action ranks landings by exact next-phase melee contact before progress.
+   * Rank and file keep the REMAKE-012 move-then-attack pursuit.
+   */
+  namedLeaderCaution?: boolean;
   targetFilter?: (target: BattleUnit) => boolean;
   destinationFilter?: (position: Position) => boolean;
   pathFilter?: (path: readonly Position[]) => boolean;

@@ -5,12 +5,15 @@ import {
   type ArenaBattleEnvironment,
 } from "../../src/game/simulation/arena-battle";
 import { shootingLineVisitProbabilities } from "../../src/game/simulation/actions/range-map";
+import { classCombatRole, classDefinition } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
+import { STAGE34_DEFINITION } from "../../src/game/content/stage34";
 import { manhattan } from "../../src/game/simulation/grid";
 import { expertSpecialUtility } from "../../src/game/simulation/expert-ai";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
+import { Stage34Battle } from "../../src/game/simulation/stage34-battle";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
 import type { CampaignState } from "../../src/game/types";
 
@@ -43,6 +46,31 @@ const stage3Campaign: CampaignState = {
   roster: completeCampaignRoster([]),
   rngState: 0x1234_5678,
   rngCalls: 0,
+};
+
+/**
+ * Stage 34 wins by wiping side 2 out, so its victory condition names nobody.
+ * Its two named generals — 芙瑪羅妮 `2:6` and 蕾娜吉芙 `2:7` — are therefore the
+ * REMAKE-090 case that the victory-slot commander test never covered.
+ */
+const stage34Campaign: CampaignState = {
+  stageId: "stage-34",
+  ruleset: "stableRemake",
+  difficulty: 0,
+  roster: completeCampaignRoster([]),
+  rngState: 0x3434_3434,
+  rngCalls: 0,
+};
+
+const stage34Deployment = {
+  placements: [
+    ...STAGE34_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+      slot, position: { ...position }, fixed: true,
+    })),
+    ...STAGE34_DEFINITION.deployment.optionalSlots.slice(0, 10).map((slot, index) => ({
+      slot, position: { ...STAGE34_DEFINITION.deployment.openCells[index] }, fixed: false,
+    })),
+  ],
 };
 
 const placements = () => [
@@ -414,6 +442,62 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     }
 
     expect(battle.planEnemyAiAction(trooper.id)).toMatchObject({ kind: "rest" });
+  });
+
+  /**
+   * REMAKE-090. Before this rule the leader spent its whole movement budget on
+   * the deepest engagement cell and attacked from it, landing alone inside the
+   * player formation with its escort left several cells behind.
+   */
+  it("advances a named leader without attacking and keeps it out of the deepest cell", () => {
+    const battle = new Stage34Battle(stage34Campaign, stage34Deployment);
+    const leader = battle.unit("2:6");
+    if (!leader) throw new Error("leader missing");
+    expect(leader.name).toBe("芙瑪羅妮");
+    // The stage wipes side 2 out, so no victory slot marks her as a commander.
+    const action = battle.planEnemyAiAction("2:6");
+    expect(action).toMatchObject({ kind: "move" });
+    expect(action).not.toHaveProperty("targetId");
+
+    const destination = action!.path.at(-1)!;
+    const players = battle.units.filter(({ side }) => side === 1);
+    const nearestPlayerAfter = Math.min(...players.map((player) => manhattan(destination, player)));
+    const squad = battle.units.filter((unit) => unit.side === 2 && unit.id !== leader.id);
+    const nearestSquadmateAfter = Math.min(...squad.map((mate) => manhattan(destination, mate)));
+    // She stops behind her own escort instead of outrunning it into contact.
+    expect(nearestPlayerAfter).toBeGreaterThan(nearestSquadmateAfter);
+    expect(battle.expertAiDecisionTrace("2:6")?.chosen?.reasons).toContain("暴露 1");
+  });
+
+  it("still lets a named leader strike from the cell it already holds", () => {
+    const battle = new Stage34Battle(stage34Campaign, stage34Deployment);
+    const leader = battle.unit("2:6");
+    const bait = battle.unit("1:0");
+    if (!leader || !bait) throw new Error("units missing");
+    bait.x = leader.x;
+    bait.y = leader.y + 1;
+
+    expect(battle.planEnemyAiAction("2:6")).toMatchObject({
+      kind: "attack",
+      targetId: "1:0",
+      path: [{ x: leader.x, y: leader.y }],
+    });
+  });
+
+  it("keeps the rank and file of the same force on move-then-attack pursuit", () => {
+    const battle = new Stage34Battle(stage34Campaign, stage34Deployment);
+    const trooper = battle.units.find((unit) => unit.side === 2
+      && unit.name === unit.className
+      && classCombatRole(unit.classId) === "melee"
+      && classDefinition(unit.classId).actionCategory === "ordinary");
+    const bait = battle.unit("1:0");
+    if (!trooper || !bait) throw new Error("units missing");
+    bait.x = trooper.x;
+    bait.y = trooper.y + 2;
+
+    const action = battle.planEnemyAiAction(trooper.id);
+    expect(action).toMatchObject({ kind: "attack", targetId: "1:0" });
+    expect(action?.path.length).toBeGreaterThan(1);
   });
 
   it("keeps the named victory target fighting at or above 20% life", () => {
