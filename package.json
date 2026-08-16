@@ -26,6 +26,7 @@
     "test:e2e": "playwright test",
     "test:e2e:visual": "VISUAL_AUDIT=1 playwright test",
     "docs:check": "node scripts/check-project-contracts.mjs",
+    "docs:classes": "node scripts/generate-class-reference.mjs",
     "check": "pnpm run docs:check && pnpm run test:coverage && pnpm run build && pnpm run test:e2e",
     "content": "node scripts/generate-content.mjs",
     "content:classes": "node scripts/generate-class-catalog.mjs",

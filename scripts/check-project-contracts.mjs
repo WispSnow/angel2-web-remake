@@ -2,6 +2,12 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  buildClassReference,
+  csvPath as classReferenceCsvPath,
+  markdownPath as classReferenceMarkdownPath,
+} from "./generate-class-reference.mjs";
+
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "..");
 const allowedStates = new Set([
@@ -217,8 +223,40 @@ async function checkMilestoneStates() {
   return { milestones: milestones.size, active: active.map(([id]) => id) };
 }
 
+/**
+ * The class stats reference is a generated `[OF]` baseline. Rebuilding it here
+ * keeps a stale committed copy from silently outliving a change to the native
+ * catalog, the map profiles or the runtime class catalog.
+ */
+async function checkClassReference() {
+  let built;
+  try {
+    built = await buildClassReference();
+  } catch (error) {
+    report(`class stats reference cannot be rebuilt: ${error.message}`);
+    return { rebuilt: false };
+  }
+
+  for (const [target, expected] of [
+    [classReferenceMarkdownPath, built.markdown],
+    [classReferenceCsvPath, built.csv],
+  ]) {
+    const relative = path.relative(repositoryRoot, target);
+    if (!(await pathExists(target))) {
+      report(`${relative} is missing; run pnpm docs:classes`);
+      continue;
+    }
+    if ((await readFile(target, "utf8")) !== expected) {
+      report(`${relative} is stale; run pnpm docs:classes`);
+    }
+  }
+
+  return { rebuilt: true, summary: built.summary };
+}
+
 const milestoneResult = await checkMilestoneStates();
 const markdownResult = await checkMarkdownLinks();
+const classReferenceResult = await checkClassReference();
 
 if (errors.length > 0) {
   console.error(`Project contract check failed with ${errors.length} error(s):`);
@@ -230,7 +268,8 @@ if (errors.length > 0) {
   const active = milestoneResult.active.length > 0 ? milestoneResult.active.join(", ") : "none";
   console.log(
     `Project contracts verified: ${milestoneResult.milestones} milestones, ` +
-      `${markdownResult.files} Markdown files, ${markdownResult.links} document links; ` +
+      `${markdownResult.files} Markdown files, ${markdownResult.links} document links, ` +
+      `class stats reference up to date (${classReferenceResult.summary}); ` +
       `active implementation milestone: ${active}.`,
   );
 }

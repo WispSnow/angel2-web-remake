@@ -51,12 +51,13 @@ v72/v71/v70 与 stage 49 主线结局入口；冰雪轮頭最后与碧娜維姬 
 | [`01-ruleset-policy.md`](01-ruleset-policy.md) | 忠实、修复与 Mod 如何分层 | Draft 0.1 |
 | [`02-game-flow.md`](02-game-flow.md) | 从标题到战后、从回合到行动的完整循环 | Draft 0.1 |
 | [`03-battle-rules.md`](03-battle-rules.md) | 战斗规则的产品级合同；含普通攻击公式、射击固定伤害与职业特例 | Draft 0.2 |
-| [`04-units-progression-balance.md`](04-units-progression-balance.md) | 兵种、成长、转职与平衡边界；含 39 职业固定三行与第三行后成长真值表 | Draft 0.2 |
+| [`04-units-progression-balance.md`](04-units-progression-balance.md) | 兵种、成长、转职与平衡边界；数值基线已移出到生成的职业参考表 | Draft 0.3 |
 | [`05-ai-and-difficulty.md`](05-ai-and-difficulty.md) | 敌方意图、AI 修复与难度 | Draft 0.1 |
 | [`06-campaign-and-narrative.md`](06-campaign-and-narrative.md) | 关卡与剧情如何编排 | Draft 0.1 |
 | [`07-ui-ux-and-presentation.md`](07-ui-ux-and-presentation.md) | 原版 UI 如何复现并适配浏览器 | Draft 0.2 |
 | [`08-mod-policy.md`](08-mod-policy.md) | 哪些内容可改、如何保持可追溯 | Draft 0.1 |
 | [`09-design-acceptance.md`](09-design-acceptance.md) | 何时可以结束设计冻结 | Draft 0.3 |
+| [`reference/class-stats-reference.generated.md`](reference/class-stats-reference.generated.md) | 全 39 职业的 `[OF]` 属性、成长、转职、行动与地形 profile 基线表，供未来平衡工作对照 | 生成（`pnpm docs:classes`） |
 | [`vertical-slices/stage-00.md`](vertical-slices/stage-00.md) | 第 0 关的玩法合同与实现验收 | Draft 0.6 / 自动验收通过 |
 | [`vertical-slices/stage-01.md`](vertical-slices/stage-01.md) | 首个交互部署、技术扩展与首领目标关 | Draft 0.3 / 已接受 |
 | [`vertical-slices/stage-02.md`](vertical-slices/stage-02.md) | 固定续关、友军自动阶段与首领目标关 | Draft 0.1 / 已接受 |
