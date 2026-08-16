@@ -1000,9 +1000,11 @@ test("the magician outer-ring fixture pushes once and releases after one enemy p
 
   const frozen = await debugState();
   const frozenTarget = frozen.units.find(({ id }) => id === "2:45");
+  // REMAKE-095: the fixture puts it due east of the 魔術士, so it is pushed east
+  // and lands on the value-1 ring, where REMAKE-094 still freezes it.
   expect(frozenTarget).toMatchObject({
-    x: initialTarget?.x,
-    y: (initialTarget?.y ?? 0) + 1,
+    x: (initialTarget?.x ?? 0) + 1,
+    y: initialTarget?.y,
     actionDisabled: true,
   });
   expect(frozen.lastSpecialAction).toMatchObject({

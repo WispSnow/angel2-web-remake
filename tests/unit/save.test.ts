@@ -1970,6 +1970,32 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v79 saves losslessly", () => {
+    // REMAKE-096 narrows the radial push back to four directions; no stored field
+    // changes meaning, so both save kinds carry over untouched.
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 79,
+        contentVersion: "ice-radial-displacement-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
+  it("migrates v78 saves losslessly", () => {
+    // REMAKE-095 only changes which cell an ice push lands on; no stored field
+    // changes meaning, so both save kinds carry over untouched.
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 78,
+        contentVersion: "ice-freeze-on-landing-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v77 saves losslessly", () => {
     // REMAKE-094 only narrows which ice targets receive the freeze bit. That bit
     // is an existing stored field and no in-flight state changes meaning, so both
@@ -1984,11 +2010,11 @@ describe("Web save validation", () => {
     }
   });
 
-  it("rejects a v77 save whose content identity does not match that version", () => {
+  it("rejects a legacy save whose content identity does not match its version", () => {
     const legacy = {
       ...battleSave(),
-      version: 77,
-      contentVersion: "ice-freeze-on-landing-1",
+      version: 79,
+      contentVersion: "ice-cardinal-radial-1",
     };
     expect(parseSaveData(JSON.stringify(legacy))).toBeUndefined();
   });

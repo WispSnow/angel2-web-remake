@@ -1022,7 +1022,10 @@ describe("all-terrain arena", () => {
       { id: "arena-1-0", side: 1 as const, slot: 0, classId: "wizard" as const, level: 3 as const, x: 20, y: 30 },
       { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
       { id: "arena-2-1", side: 2 as const, slot: 1, classId: "wizard" as const, level: 3 as const, x: 29, y: 30 },
-      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      // REMAKE-095 pushes this soldier straight back along the caster's line, so
+      // it has to start where that landing cell is free and still inside the
+      // effect — otherwise the cast only shoves it clear and scores nothing.
+      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
     ];
     const battle = new ArenaBattle(placements, 0);
     expect(battle.actionTargetCells("arena-1-0", "ice-4")).toEqual([{ x: 20, y: 30 }]);

@@ -250,8 +250,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 79;
-  contentVersion: "ice-radial-displacement-1";
+  version: 80;
+  contentVersion: "ice-cardinal-radial-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

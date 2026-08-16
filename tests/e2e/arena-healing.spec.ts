@@ -497,8 +497,8 @@ test("formal 3I keeps an ice-frozen ally blocked and leaves its shell above the 
     arena.setLevel(1);
     // 1C's effect value is `effectRadius - distance`, so its outermost ring is
     // two cells out. REMAKE-094 only freezes targets whose landing cell is still
-    // inside the effect, so the 士兵 starts on the inner ring at (22,30) and is
-    // pushed to the value-1 cell (22,31).
+    // inside the effect, so the 士兵 starts on the inner ring at (22,30); REMAKE-095
+    // then pushes it due east to the value-1 cell (23,30).
     const magician = arena.interact(21, 30);
     arena.setClass("great-axe-warrior");
     const attacker = arena.interact(24, 31);
@@ -547,8 +547,8 @@ test("formal 3I keeps an ice-frozen ally blocked and leaves its shell above the 
   // is about to centre on its wounded escort.
   const frozen = (await arenaBattleState(page))?.units.find(({ id }) => id === "arena-2-0");
   expect({ x: frozen?.x, y: frozen?.y, life: frozen?.life }).toEqual({
-    x: 22,
-    y: 31,
+    x: 23,
+    y: 30,
     life: frozenLife,
   });
 

@@ -204,15 +204,15 @@ test("AA buffs an ice-frozen ally while the persistent shell stays above the eff
       && current.lastSpecialAction?.actionId === "ice-2"
       && current.units.find(({ id }) => id === "arena-1-1")?.actionDisabled === true;
   });
-  // `REMAKE-036` pushes every unblocked receiver one cell outward, trying
-  // down/up/left/right in that order, so the ally is buffed on (20,31).
+  // `REMAKE-095` pushes every unblocked receiver one cell outward along the
+  // caster's line; the 巫師 is due east, so the ally is buffed on (19,30).
   const frozen = (await arenaBattleState(page))?.units.find(({ id }) => id === "arena-1-1");
-  expect({ x: frozen?.x, y: frozen?.y }).toEqual({ x: 20, y: 31 });
+  expect({ x: frozen?.x, y: frozen?.y }).toEqual({ x: 19, y: 30 });
 
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-attack-up").click();
-  await clickArenaWorldCell(page, 20, 31);
+  await clickArenaWorldCell(page, 19, 30);
   const canvas = page.getByTestId("battle-canvas");
   await page.waitForFunction(() => {
     const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
@@ -441,14 +441,14 @@ test("AD buffs an ice-frozen ally while the persistent shell stays above the shi
       && current.lastSpecialAction?.actionId === "ice-2"
       && current.units.find(({ id }) => id === "arena-1-1")?.actionDisabled === true;
   });
-  // Same `REMAKE-036` pushback as the AA case above.
+  // Same `REMAKE-095` pushback as the AA case above.
   const frozen = (await arenaBattleState(page))?.units.find(({ id }) => id === "arena-1-1");
-  expect({ x: frozen?.x, y: frozen?.y }).toEqual({ x: 20, y: 31 });
+  expect({ x: frozen?.x, y: frozen?.y }).toEqual({ x: 19, y: 30 });
 
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-defense-up").click();
-  await clickArenaWorldCell(page, 20, 31);
+  await clickArenaWorldCell(page, 19, 30);
   const canvas = page.getByTestId("battle-canvas");
   await page.waitForFunction(() => {
     const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");

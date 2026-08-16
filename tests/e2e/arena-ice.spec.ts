@@ -73,14 +73,15 @@ test("tier-one wizard pushes the outer ring beyond 2C through the formal techniq
     affectedUnits: [
       expect.objectContaining({
         unitId: "arena-2-0",
-        positionAfter: { x: 21, y: 31 },
+        // REMAKE-095: due east of the caster, so it is pushed east.
+        positionAfter: { x: 22, y: 30 },
         lifeAfter: innerBefore?.life,
         actionDisabledAfter: true,
         moved: true,
       }),
       expect.objectContaining({
         unitId: "arena-2-1",
-        positionAfter: { x: 23, y: 31 },
+        positionAfter: { x: 24, y: 30 },
         lifeAfter: outerBefore?.life,
         // REMAKE-094: it lands on a value-0 cell, so it leaves without freezing.
         actionDisabledAfter: false,
@@ -255,14 +256,15 @@ test("tier-two wizard pushes the fourth ring beyond 3C", async ({ page }) => {
     affectedUnits: [
       expect.objectContaining({
         unitId: "arena-2-0",
-        positionAfter: { x: 21, y: 31 },
+        // REMAKE-095: due east of the caster, so it is pushed east.
+        positionAfter: { x: 22, y: 30 },
         lifeAfter: innerBefore?.life,
         actionDisabledAfter: true,
         moved: true,
       }),
       expect.objectContaining({
         unitId: "arena-2-1",
-        positionAfter: { x: 24, y: 31 },
+        positionAfter: { x: 25, y: 30 },
         lifeAfter: outerBefore?.life,
         // REMAKE-094: it lands on a value-0 cell, so it leaves without freezing.
         actionDisabledAfter: false,
@@ -343,14 +345,15 @@ test("tier-three wizard pushes the fifth ring beyond 4C", async ({ page }) => {
     affectedUnits: [
       expect.objectContaining({
         unitId: "arena-2-0",
-        positionAfter: { x: 21, y: 31 },
+        // REMAKE-095: due east of the caster, so it is pushed east.
+        positionAfter: { x: 22, y: 30 },
         lifeAfter: innerBefore?.life,
         actionDisabledAfter: true,
         moved: true,
       }),
       expect.objectContaining({
         unitId: "arena-2-1",
-        positionAfter: { x: 25, y: 31 },
+        positionAfter: { x: 26, y: 30 },
         lifeAfter: outerBefore?.life,
         // REMAKE-094: it lands on a value-0 cell, so it leaves without freezing.
         actionDisabledAfter: false,

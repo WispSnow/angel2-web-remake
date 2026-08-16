@@ -2510,7 +2510,7 @@ describe("Stage-0 class actions", () => {
     expect(battle.actionTargetCells(actor.id, "recovery-2")).toEqual([]);
   });
 
-  it("pushes ice targets down first, resolves occupancy in row-major order, and rolls experience only when something moved", () => {
+  it("pushes ice targets along the caster's line, resolves occupancy in row-major order, and rolls experience only when something moved", () => {
     const battle = new Stage0Battle(0);
     const actor = { ...battle.unit("1:0")!, id: "ice-actor", x: 5, y: 4, classId: "magician" as const };
     const first = {
@@ -2542,7 +2542,9 @@ describe("Stage-0 class actions", () => {
     expect(prepared.result.affectedUnits).toEqual([
       expect.objectContaining({
         unitId: first.id,
-        positionAfter: { x: 4, y: 5 },
+        // REMAKE-095: due west of the caster, so it is pushed west rather than
+        // down, and its landing cell is still inside the effect.
+        positionAfter: { x: 3, y: 4 },
         moved: true,
         actionDisabledBefore: false,
         actionDisabledAfter: true,
@@ -2615,10 +2617,14 @@ describe("Stage-0 class actions", () => {
     expect(blocked.rngAfter).toBe(blocked.rngBefore);
 
     const pinned = { ...first, id: "ice-pinned", x: 5, y: 5 };
+    // REMAKE-095 added the diagonals, so a target only runs out of retreats when
+    // every outward neighbour is taken.
     const occupiedRetreats = [
       { ...actor, id: "ice-ally-blocker-down", x: 5, y: 6 },
       { ...actor, id: "ice-ally-blocker-left", x: 4, y: 5 },
       { ...actor, id: "ice-ally-blocker-right", x: 6, y: 5 },
+      { ...actor, id: "ice-ally-blocker-down-left", x: 4, y: 6 },
+      { ...actor, id: "ice-ally-blocker-down-right", x: 6, y: 6 },
     ];
     const noMove = prepareSpecialAction(
       { actionId: "ice-1", actorId: actor.id },
@@ -2690,6 +2696,98 @@ describe("Stage-0 class actions", () => {
     expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore);
   });
 
+  it("pushes ice targets along the caster-to-target line, including due west and east", () => {
+    const battle = new Stage0Battle(0);
+    const actor = {
+      ...battle.unit("1:0")!,
+      id: "ice-095-actor",
+      x: 5,
+      y: 5,
+      classId: "wizard" as const,
+      experience: 0,
+    };
+    const enemyTemplate = battle.units.find((unit) => unit.side === 2)!;
+    // The native "down, up, left, right" scan pushed a due-west target south,
+    // because the first candidate it tried already had a lower range value.
+    const pushFrom = (
+      actionId: "ice-2" | "ice-4",
+      dx: number,
+      dy: number,
+    ) => {
+      const caster = actionId === "ice-2"
+        ? actor
+        : { ...actor, experience: classDefinition("wizard").dataRows[2].experienceThreshold };
+      const target = { ...enemyTemplate, id: `ice-095-${dx}-${dy}`, x: caster.x + dx, y: caster.y + dy };
+      const prepared = prepareSpecialAction(
+        { actionId, actorId: caster.id },
+        caster,
+        undefined,
+        new DeterministicRng(0x9595, 5),
+        {
+          units: [caster, target],
+          battlefield: openBattlefield,
+          statsFor: (unit) => battle.statsFor(unit),
+        },
+        caster,
+      );
+      const affected = prepared.result.affectedUnits[0]!;
+      return {
+        dx: affected.positionAfter.x - caster.x,
+        dy: affected.positionAfter.y - caster.y,
+        frozen: affected.actionDisabledAfter,
+      };
+    };
+
+    expect(pushFrom("ice-2", -2, 0)).toEqual({ dx: -3, dy: 0, frozen: true });
+    expect(pushFrom("ice-2", 2, 0)).toEqual({ dx: 3, dy: 0, frozen: true });
+    expect(pushFrom("ice-2", 0, -2)).toEqual({ dx: 0, dy: -3, frozen: true });
+    expect(pushFrom("ice-2", 0, 2)).toEqual({ dx: 0, dy: 3, frozen: true });
+
+    // REMAKE-096 keeps the four native directions, so an off-axis target takes
+    // the one its line is closest to and still moves a single orthogonal step.
+    expect(pushFrom("ice-2", -2, -1)).toEqual({ dx: -3, dy: -1, frozen: false });
+    expect(pushFrom("ice-4", -2, -1)).toEqual({ dx: -3, dy: -1, frozen: true });
+    expect(pushFrom("ice-4", -3, -1)).toEqual({ dx: -4, dy: -1, frozen: true });
+    // An exact 45° target ties two directions; the native down/up/left/right
+    // order breaks it, which lands the push vertically.
+    expect(pushFrom("ice-2", -1, -1)).toEqual({ dx: -1, dy: -2, frozen: true });
+    expect(pushFrom("ice-2", 1, 1)).toEqual({ dx: 1, dy: 2, frozen: true });
+  });
+
+  it("falls back to the next direction in the angle order when the radial ice push is blocked", () => {
+    const battle = new Stage0Battle(0);
+    const actor = {
+      ...battle.unit("1:0")!,
+      id: "ice-095-fallback-actor",
+      x: 5,
+      y: 5,
+      classId: "wizard" as const,
+      experience: 0,
+    };
+    const enemyTemplate = battle.units.find((unit) => unit.side === 2)!;
+    const target = { ...enemyTemplate, id: "ice-095-fallback", x: 3, y: 5 };
+    const prepared = prepareSpecialAction(
+      { actionId: "ice-2", actorId: actor.id },
+      actor,
+      undefined,
+      new DeterministicRng(0x9595, 5),
+      {
+        // (2,5) is the radial landing cell; with it taken the fallback takes the
+        // next direction in the same angle order, which is the native "down".
+        units: [actor, target, { ...actor, id: "ice-095-fallback-wall", x: 2, y: 5 }],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      actor,
+    );
+    expect(prepared.result.affectedUnits[0]).toMatchObject({
+      unitId: target.id,
+      positionAfter: { x: 3, y: 6 },
+      moved: true,
+      actionDisabledAfter: true,
+    });
+  });
+
   it("freezes ice targets by their landing cell, so a blocked outer ring freezes but a shoved one does not", () => {
     const battle = new Stage0Battle(0);
     const actor = {
@@ -2735,6 +2833,8 @@ describe("Stage-0 class actions", () => {
       { ...actor, id: "ice-094-wall-down", x: 5, y: 9 },
       { ...actor, id: "ice-094-wall-left", x: 4, y: 8 },
       { ...actor, id: "ice-094-wall-right", x: 6, y: 8 },
+      { ...actor, id: "ice-094-wall-down-left", x: 4, y: 9 },
+      { ...actor, id: "ice-094-wall-down-right", x: 6, y: 9 },
     ];
     const pinned = prepareSpecialAction(
       { actionId: "ice-2", actorId: actor.id },
@@ -2936,7 +3036,8 @@ describe("Stage-0 class actions", () => {
     expect(prepared.result.affectedUnits).toEqual([
       expect.objectContaining({
         unitId: inner.id,
-        positionAfter: { x: 4, y: 6 },
+        // REMAKE-095: due west of the caster, so it is pushed west.
+        positionAfter: { x: 3, y: 5 },
         moved: true,
         lifeAfter: inner.life,
         actionDisabledAfter: true,
@@ -3043,7 +3144,8 @@ describe("Stage-0 class actions", () => {
       }),
       expect.objectContaining({
         unitId: inner.id,
-        positionAfter: { x: 4, y: 6 },
+        // REMAKE-095: due west of the caster, so it is pushed west.
+        positionAfter: { x: 3, y: 5 },
         moved: true,
         lifeAfter: inner.life,
         actionDisabledAfter: true,

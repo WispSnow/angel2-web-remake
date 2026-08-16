@@ -355,6 +355,23 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-096 narrows the radial push back to the native four directions. Like
+ * REMAKE-095 it only changes which cell a target lands on, so a v79 save carries
+ * over untouched.
+ */
+function migrateVersion79Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 79
+    || value.contentVersion !== "ice-radial-displacement-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-095 only changes which cell an ice target is pushed to; nothing about a
  * stored unit changes meaning, so a v78 save carries over untouched and the next
  * cast simply uses the radial direction.
@@ -2319,6 +2336,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion79 = migrateVersion79Save(value);
+  if (migratedVersion79) return migratedVersion79;
   const migratedVersion78 = migrateVersion78Save(value);
   if (migratedVersion78) return migratedVersion78;
   const migratedVersion77 = migrateVersion77Save(value);

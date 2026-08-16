@@ -1,7 +1,6 @@
 import { BATTLE_ACTION_DEFINITIONS, type IceActionId } from "../../content/actions";
 import { movementRulesFor } from "../../content/classes";
 import type { BattleUnit, Position } from "../../types";
-import { manhattan } from "../grid";
 import {
   techniqueEffectRange,
   type ActionBattlefield,
@@ -10,48 +9,31 @@ import {
 import type { ActionBlockReason } from "./types";
 
 /**
- * `REMAKE-095` replaces the native "down, up, left, right" scan with a radial
- * one. The list order is only the last tie-break, so it keeps the native four
- * first and appends the diagonals.
+ * `REMAKE-095` replaced the native "down, up, left, right" scan with a radial
+ * one; `REMAKE-096` then took the direction set back to these four. The list
+ * order survives as the tie-break below, so it stays in native order.
  */
 const DISPLACEMENT_OFFSETS = [
   { x: 0, y: 1 },
   { x: 0, y: -1 },
   { x: -1, y: 0 },
   { x: 1, y: 0 },
-  { x: 1, y: 1 },
-  { x: 1, y: -1 },
-  { x: -1, y: 1 },
-  { x: -1, y: -1 },
 ] as const;
 
 type DisplacementOffset = (typeof DISPLACEMENT_OFFSETS)[number];
 
-const isDiagonal = ({ x, y }: DisplacementOffset): boolean => x !== 0 && y !== 0;
-
 /**
- * `REMAKE-095`: the offset whose direction is closest to the caster→target line,
- * decided by exact integers rather than `atan2` so the result cannot drift with
- * a platform's floating point. Maximising `dot(v, d) / |d|` is the same as
- * minimising the angle; comparing `dot² / |d|²` by cross-multiplication keeps it
- * in integers. The 22.5° boundary this produces is never hit exactly, because a
- * tie would need `(ax + ay) / max(ax, ay)` to equal √2.
+ * `REMAKE-095`/`REMAKE-096`: the four directions ordered by how closely each
+ * matches the caster→target line. They share a length, so the plain integer dot
+ * product already is the angle order — no `atan2`, no floating point that could
+ * drift between platforms. A target on an exact 45° diagonal ties two
+ * directions; `REMAKE-096` breaks that with the native order, which lands it
+ * vertically.
  */
 function radialOffsetOrder(dx: number, dy: number): readonly DisplacementOffset[] {
   return DISPLACEMENT_OFFSETS
-    .map((offset, index) => {
-      const dot = dx * offset.x + dy * offset.y;
-      return {
-        offset,
-        index,
-        // A direction pointing away from the target never wins on angle.
-        numerator: dot > 0 ? dot * dot : -1,
-        denominator: offset.x * offset.x + offset.y * offset.y,
-      };
-    })
-    .sort((left, right) =>
-      (right.numerator * left.denominator - left.numerator * right.denominator)
-      || (left.index - right.index))
+    .map((offset, index) => ({ offset, index, dot: dx * offset.x + dy * offset.y }))
+    .sort((left, right) => (right.dot - left.dot) || (left.index - right.index))
     .map(({ offset }) => offset);
 }
 
@@ -135,29 +117,15 @@ export function planIceDisplacement(
 
       const currentValue = effect.valueAt(unit);
       const movementRules = movementRulesFor(unit.classId);
-      const passable = (position: Position): boolean => effect.contains(position)
-        && (movementRules[battlefield.terrainSlotAt(position)] ?? 99) < 99;
+      // REMAKE-096: every orthogonal push gains exactly one range value, so the
+      // candidates are all equidistant and the angle order is the whole ordering
+      // — the closest direction first, then the rest as its fallback.
       const destination = radialOffsetOrder(unit.x - center.x, unit.y - center.y)
-        .map((offset, rank) => ({
-          offset,
-          rank,
-          position: { x: unit.x + offset.x, y: unit.y + offset.y },
-        }))
-        .filter(({ position }) => effect.valueAt(position) < currentValue)
-        // REMAKE-095: the radial direction is the choice; everything else is the
-        // fallback for a blocked one, ordered farthest-from-the-caster first and
-        // then by the angular rank the map above already carries.
-        .sort((left, right) => (left.rank === 0 || right.rank === 0
-          ? left.rank - right.rank
-          : manhattan(right.position, center) - manhattan(left.position, center)))
-        .find(({ offset, position }) => passable(position)
+        .map((offset) => ({ x: unit.x + offset.x, y: unit.y + offset.y }))
+        .find((position) => effect.contains(position)
+          && effect.valueAt(position) < currentValue
           && !occupied.has(positionKey(position))
-          // A diagonal may not squeeze through a corner sealed by terrain on both
-          // sides. Occupancy does not block it: ice blows units past each other.
-          && (!isDiagonal(offset)
-            || passable({ x: unit.x + offset.x, y: unit.y })
-            || passable({ x: unit.x, y: unit.y + offset.y })))
-        ?.position;
+          && (movementRules[battlefield.terrainSlotAt(position)] ?? 99) < 99);
 
       let positionAfter: Position = { x: unit.x, y: unit.y };
       if (destination) {
