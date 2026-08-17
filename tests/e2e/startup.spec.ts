@@ -143,11 +143,14 @@ test("title artwork dissolves in over its background before the menu appears", a
 
   await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "title-assemble");
   await expect(page.getByTestId("title-menu")).toBeHidden();
+  // The BK/40 surround belongs to the menu draw, so it must not lead the art in.
+  await expect(page.getByTestId("startup-title-menu-frame")).toBeHidden();
   const upperEarly = await luminance(32, 0, 472, 200);
   const logoEarly = await luminance(0, 216, 640, 123);
 
   await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "title");
   await expect(page.getByTestId("title-menu")).toBeVisible();
+  await expect(page.getByTestId("startup-title-menu-frame")).toBeVisible();
   expect(await luminance(32, 0, 472, 200)).toBeGreaterThan(upperEarly);
   expect(await luminance(0, 216, 640, 123)).toBeGreaterThan(logoEarly);
 
@@ -221,7 +224,8 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await expect(page.getByTestId("new-game")).toHaveAttribute("aria-current", "true");
   await expect(page.getByTestId("startup-title-menu-frame")).toBeVisible();
   await expect(page.getByTestId("startup-difficulty-menu-frame")).toBeHidden();
-  await expect(page.getByTestId("startup-title-menu-frame")).toHaveCSS("top", "50px");
+  // 0000:19F2 draws BK/40 image 0 at (480,45), in the same call as the labels.
+  await expect(page.getByTestId("startup-title-menu-frame")).toHaveCSS("top", "45px");
   await expect.poll(() => page.getByTestId("title-screen").locator("img:not([hidden])").evaluateAll((images) =>
     images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
   )).toBe(true);

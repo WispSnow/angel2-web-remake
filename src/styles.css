@@ -83,9 +83,9 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   image-rendering: pixelated;
   pointer-events: none;
 }
-.startup-menu-frame { z-index: 3; left: 480px; width: 144px; height: auto; }
-.startup-title-menu-frame { top: 50px; }
-.startup-difficulty-menu-frame { top: 21px; }
+/* 0000:19F2 draws BK/40 image 0 at (480,45) and 0000:1B7E image 1 at (480,21);
+ * both positions come from the generated evidence as inline styles. */
+.startup-menu-frame { z-index: 3; width: 144px; height: auto; }
 .startup-menu {
   position: absolute;
   z-index: 4;

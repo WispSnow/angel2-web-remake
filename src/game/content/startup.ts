@@ -1,15 +1,11 @@
 import type { Difficulty } from "../types";
 
 /**
- * The pretitle logo, intro plates, title art, glyph font and dissolve patterns
- * are generated into `startup.generated.ts` from module-23 evidence. Only the
- * two BK/40 menu frames and the two RIX tracks are still referenced by path.
+ * The pretitle logo, intro plates, title art, BK/40 menu frames, glyph font and
+ * dissolve patterns are generated into `startup.generated.ts` from module-23
+ * evidence. Only the two RIX tracks are still referenced by path.
  */
 export const STARTUP_ASSETS = {
-  title: {
-    titleMenuFrame: "/assets/original/startup/title/menu-frame.png",
-    difficultyMenuFrame: "/assets/original/startup/title/menu-frame-difficulty.png",
-  },
   audio: {
     intro: "/assets/original/startup/audio/intro.wav",
     title: "/assets/original/startup/audio/title.wav",

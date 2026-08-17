@@ -473,8 +473,22 @@ async function extract(module23Path, audioManifestPath, decodedRoot, renderRoot,
         colorIndex: 7,
         pattern: "50% checkerboard; set where (x + y) is even",
       },
-      title: { entry: "0000:1A91", firstTextY: 75, highlightDescriptor: "DS:0BDE" },
-      difficulty: { entry: "0000:1C23", firstTextY: 51, highlightDescriptor: "DS:0D5E" },
+      /* 0000:19F2 and 0000:1B7E draw the BK/40 surround and then the labels in
+       * the same call, so the box is part of the menu and appears only after the
+       * title art has finished dissolving in. */
+      title: {
+        entry: "0000:19F2",
+        firstTextY: 75,
+        highlightDescriptor: "DS:0BDE",
+        frame: { resource: "BK/40", imageIndex: 0, x: 480, y: 45 },
+      },
+      difficulty: {
+        entry: "0000:1C23",
+        initEntry: "0000:1B7E",
+        firstTextY: 51,
+        highlightDescriptor: "DS:0D5E",
+        frame: { resource: "BK/40", imageIndex: 1, x: 480, y: 21 },
+      },
       note: "the two title options and the four difficulty labels are drawn from the A/23+A/24 glyph pair, not from a system font",
     },
     resourceCatalog: {

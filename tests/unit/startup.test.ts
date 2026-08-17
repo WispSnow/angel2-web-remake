@@ -92,6 +92,9 @@ describe("module 23 startup presentation", () => {
     expect(STARTUP_MENU_LABELS.title.firstTextY).toBe(75);
     expect(STARTUP_MENU_LABELS.difficulty.firstTextY).toBe(51);
     expect(STARTUP_MENU_LABELS.highlight).toMatchObject({ x: 504, yOffset: -2, width: 96, height: 20 });
+    // 0000:19F2/0000:1B7E draw the BK/40 surround in the same call as the labels.
+    expect(STARTUP_MENU_LABELS.title.frame).toMatchObject({ x: 480, y: 45 });
+    expect(STARTUP_MENU_LABELS.difficulty.frame).toMatchObject({ x: 480, y: 21 });
   });
 
   it("ships the A/24 glyph atlas bit for bit", async () => {

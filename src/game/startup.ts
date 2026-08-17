@@ -120,10 +120,12 @@ export function mountStartup(
             </section>
             <section class="startup-title" data-testid="title-screen" aria-label="標題畫面" hidden>
               <img class="startup-menu-frame startup-title-menu-frame" data-testid="startup-title-menu-frame"
-                src="${STARTUP_ASSETS.title.titleMenuFrame}" alt="" />
+                style="left:${STARTUP_MENU_LABELS.title.frame.x}px;top:${STARTUP_MENU_LABELS.title.frame.y}px"
+                src="${STARTUP_MENU_LABELS.title.frame.src}" alt="" hidden />
               <img class="startup-menu-frame startup-difficulty-menu-frame"
                 data-testid="startup-difficulty-menu-frame"
-                src="${STARTUP_ASSETS.title.difficultyMenuFrame}" alt="" hidden />
+                style="left:${STARTUP_MENU_LABELS.difficulty.frame.x}px;top:${STARTUP_MENU_LABELS.difficulty.frame.y}px"
+                src="${STARTUP_MENU_LABELS.difficulty.frame.src}" alt="" hidden />
               <div class="startup-menu title-menu" data-testid="title-menu" role="menu" aria-label="標題選單" hidden>
                 ${TITLE_OPTIONS.map((label, index) => `
                   <button type="button" role="menuitem" data-startup-action="title" data-menu-index="${index}"
@@ -308,6 +310,11 @@ export function mountStartup(
     screen.dataset.startupPhase = "title-assemble";
     intro.hidden = true;
     title.hidden = false;
+    // 0000:19F2 draws the BK/40 surround together with the labels, so nothing of
+    // the menu may show while the art is still dissolving in.
+    titleMenuFrame.hidden = true;
+    difficultyMenuFrame.hidden = true;
+    titleMenu.hidden = true;
   };
 
   /**

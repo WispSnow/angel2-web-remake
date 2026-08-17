@@ -173,8 +173,11 @@ assert.deepEqual(titleVariants.map(({ upperRecord, lowerRecord }) => [upperRecor
   [[52, 53], [54, 55]]);
 
 const labels = presentations.titleMenuLabels;
-const menuGroup = (texts, group) => ({
+const menuGroup = (texts, group, src) => ({
   firstTextY: group.firstTextY,
+  // 0000:19F2/0000:1B7E draw the BK/40 surround in the same call as the labels,
+  // so the box must not appear before the title art has finished dissolving.
+  frame: { src, x: group.frame.x, y: group.frame.y },
   labels: texts.map((text) => ({ text, glyphs: layout(text, labels.textX).glyphs })),
 });
 const titlePalette = presentations.resourceCatalog.graphics
@@ -189,14 +192,29 @@ const menuLabels = {
     height: labels.highlightBar.height,
     color: cssColor(TITLE_PALETTE[labels.highlightBar.colorIndex]),
   },
-  title: menuGroup(["遊戲開始", "繼續遊戲"], labels.title),
+  title: menuGroup(
+    ["遊戲開始", "繼續遊戲"],
+    labels.title,
+    "/assets/original/startup/title/menu-frame.png",
+  ),
   difficulty: menuGroup(
     DIFFICULTY_LABELS,
     labels.difficulty,
+    "/assets/original/startup/title/menu-frame-difficulty.png",
   ),
 };
 assert.equal(menuLabels.title.firstTextY, 75);
 assert.equal(menuLabels.difficulty.firstTextY, 51);
+assert.deepEqual(menuLabels.title.frame, {
+  src: "/assets/original/startup/title/menu-frame.png",
+  x: 480,
+  y: 45,
+});
+assert.deepEqual(menuLabels.difficulty.frame, {
+  src: "/assets/original/startup/title/menu-frame-difficulty.png",
+  x: 480,
+  y: 21,
+});
 
 const generatedSources = Object.entries(inputPaths).map(([id, file]) => ({
   id,
@@ -269,6 +287,11 @@ await Promise.all([
     path.join(publicRoot, "pretitle.png"),
   ),
   copyFile(titleFrame(51), path.join(publicRoot, "title/background.png")),
+  copyFile(titleFrame(40), path.join(publicRoot, "title/menu-frame.png")),
+  copyFile(
+    reversePath("renders/title-presentations/frames/BK/0040/01.png"),
+    path.join(publicRoot, "title/menu-frame-difficulty.png"),
+  ),
   ...titleVariants.flatMap(({ upperRecord, lowerRecord }, index) => [
     copyFile(titleFrame(upperRecord), path.join(publicRoot, "title", `upper-${index}.png`)),
     copyFile(titleFrame(lowerRecord), path.join(publicRoot, "title", `lower-${index}.png`)),
