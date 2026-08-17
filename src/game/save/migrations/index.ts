@@ -355,6 +355,26 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-105 restores the native `FFh` reservation: an occupied neighbour of an
+ * opposing unit is no longer a terminal cell, so both sides may again propagate
+ * through a unit standing beside its opponent. No field is added and none
+ * changes meaning — a v83 save resumes with the same units, statuses and PRNG
+ * cursor. Only the movement range offered from the current board differs, and
+ * that range is recomputed on load rather than stored.
+ */
+function migrateVersion83Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 83
+    || value.contentVersion !== "enemy-difficulty-scaling-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-103 changes what a stored enemy experience value means: difficulties 1
  * and 2 now seed side-2 units on growth rows 4 and 6 under the linear curve
  * instead of rows 3 and 4 under the native one. No field is added and no ally
@@ -2403,6 +2423,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion83 = migrateVersion83Save(value);
+  if (migratedVersion83) return migratedVersion83;
   const migratedVersion82 = migrateVersion82Save(value);
   if (migratedVersion82) return migratedVersion82;
   const migratedVersion81 = migrateVersion81Save(value);

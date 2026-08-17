@@ -251,8 +251,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 83;
-  contentVersion: "enemy-difficulty-scaling-1";
+  version: 84;
+  contentVersion: "control-zone-occupied-gap-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

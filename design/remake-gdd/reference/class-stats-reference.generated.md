@@ -378,7 +378,7 @@
 | 文件 | 字节 | SHA-256 |
 | --- | ---: | --- |
 | `reverse/parsed/native/unit-catalog.json` | 196879 | `a6fd8249bbc3e23eff88b6d33aa45c93bf8a00834ad78a210c19d6d938e22f95` |
-| `reverse/parsed/native/map-rules.json` | 108260 | `d651abcdfd41d3c54b3abea27947380af94d6cb724c6528a3cf0c6482530b171` |
+| `reverse/parsed/native/map-rules.json` | 110857 | `4602deafbc3cb0d3974c079973c92cd5721e2afcdeb2821090f5f8b00945e9a4` |
 | `reverse/parsed/native/promotion-table.json` | 41063 | `aac4c49b0d31ce829e8a42feda58b9a3996bc511c7d6bfb22dcd6ee4af9944e8` |
 | `reverse/parsed/native/terrain-token-map.json` | 3757676 | `bdebd087d056ce2ebfccb9bacbe5d17210b2bc2256e143f15d86e5eb7f6f1f64` |
 | `reverse/parsed/native/technique-rules.json` | 91919 | `ffa9229f65e8b8b92f6cac3f9855c0ba0d11672ca5b791ae87d4d02a691f4f02` |

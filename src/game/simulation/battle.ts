@@ -74,6 +74,7 @@ import {
   type ForceDefinition,
 } from "./forces";
 import { planTerrainHoldForceAiAction } from "./force-ai";
+import { planNativeStageRoute } from "./stage-route";
 import type {
   AiActionSelection,
   AlliedAiAction,
@@ -3738,14 +3739,18 @@ export class Stage0Battle {
     const unit = this.unit(id);
     const definition = this.scenario.routeEnemy;
     if (!unit || unit.side !== 2 || unit.actionDisabled || !definition) return undefined;
-    const route = routePath(unit, [definition.target], this.units, definition.movement, this.dynamicBattlefield);
-    const exitIndex = route.findIndex((position, index) => index > 0 && definition.isExit(position));
-    const path = exitIndex >= 0 ? route.slice(0, exitIndex + 1) : route;
-    const destination = path.at(-1) ?? { x: unit.x, y: unit.y };
+    const plan = planNativeStageRoute(
+      unit,
+      this.units,
+      definition.target,
+      definition.movement,
+      this.dynamicBattlefield,
+    );
+    // 1000:1876 只读行动结束后的格号，所以途经撤离区但停在区外的单位不会离场。
     return {
-      path,
-      destination,
-      reachedExit: definition.isExit(destination),
+      path: plan.path.map((position) => ({ ...position })),
+      destination: { ...plan.destination },
+      reachedExit: definition.isExit(plan.destination),
     };
   }
 

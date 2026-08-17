@@ -1121,12 +1121,14 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       terrainSlotAt: (position) => bypassCells.has(`${position.x},${position.y}`) ? 2 : 0,
     });
 
+    // 真实空闲通路优先于排队；`(24,30)` 站着自己人，原版保留规则不把它记为终止格，
+    // 所以等代价的两条通路里先扫描到的 `+x` 方向直接穿过队友，落点仍是 `(25,29)`。
     expect(bypassBattle.planEnemyAiAction("enemy-rear")).toMatchObject({
       kind: "attack",
       targetId: "ally-target",
       path: [
         { x: 23, y: 30 },
-        { x: 23, y: 29 },
+        { x: 24, y: 30 },
         { x: 24, y: 29 },
         { x: 25, y: 29 },
       ],
@@ -1134,6 +1136,9 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
   });
 
   it("vacates an equivalent melee choke attack position for an unacted squadmate", () => {
+    // 同职业时队友总能穿过挡路者跟上，所以这块棋盘不再是「无通路→有通路」，
+    // 而是「通路从 3 缩短到 1」；让路本身仍然发生，计入 `trafficProgress`。
+    // `trafficRelease` 的新增通路分支改由下一条混合职业用例覆盖。
     const openCells = new Set(["23,30", "24,30", "24,29", "25,29", "25,30"]);
     const chokeEnvironment: ArenaBattleEnvironment = {
       ...ALL_TERRAIN_ARENA_ENVIRONMENT,
@@ -1151,7 +1156,7 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     expect(frontAction).toMatchObject({
       kind: "attack",
       targetId: "ally-target",
-      trafficRelease: 1,
+      trafficProgress: 2,
       path: [
         { x: 24, y: 30 },
         { x: 24, y: 29 },
@@ -1159,7 +1164,7 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       ],
     });
     expect(battle.expertAiDecisionTrace("enemy-front")?.chosen?.reasons)
-      .toContain("讓路×1");
+      .toContain("通路縮短 2");
     expect(battle.nextEnemyActionId(["enemy-front", "enemy-rear"]))
       .toBe("enemy-front");
     expect({ state: reliefRng.state, calls: reliefRng.calls }).toEqual(reliefRngBefore);
@@ -1195,6 +1200,55 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     expect(unsafeSideStep.planEnemyAiAction("enemy-front")).toMatchObject({
       kind: "attack",
       path: [{ x: 24, y: 30 }],
+    });
+  });
+
+  it("counts a released engagement route when the squadmate cannot use the actor's detour", () => {
+    // `trafficRelease` 计的是「原本没有通路，让出后才有」。同职业时队友总能跟着穿过
+    // 挡路者，所以真正的新增通路要靠职业地形差：槽 7 对天馬戰士代价 1、对士兵是 99。
+    const slotByCell = new Map<string, number>([
+      ["23,30", 2],
+      ["24,30", 2],
+      ["24,29", 7],
+      ["25,29", 2],
+      ["25,30", 2],
+    ]);
+    const flyerChokeEnvironment: ArenaBattleEnvironment = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: (position) => slotByCell.get(`${position.x},${position.y}`) ?? 0,
+    };
+    const releaseRng = new DeterministicRng(0x3316);
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "pegasus-warrior" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-rear", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+    ], 0, releaseRng, flyerChokeEnvironment);
+    const releaseRngBefore = { state: releaseRng.state, calls: releaseRng.calls };
+
+    const frontAction = battle.planEnemyAiAction("enemy-front");
+    expect(frontAction).toMatchObject({
+      kind: "attack",
+      targetId: "ally-target",
+      trafficRelease: 1,
+      path: [
+        { x: 24, y: 30 },
+        { x: 24, y: 29 },
+        { x: 25, y: 29 },
+      ],
+    });
+    expect(battle.expertAiDecisionTrace("enemy-front")?.chosen?.reasons)
+      .toContain("讓路×1");
+    expect({ state: releaseRng.state, calls: releaseRng.calls }).toEqual(releaseRngBefore);
+
+    expect(battle.moveUnit("enemy-front", frontAction!.path.at(-1)!)).toBe(true);
+    battle.attack("enemy-front", "ally-target");
+    expect(battle.planEnemyAiAction("enemy-rear")).toMatchObject({
+      kind: "attack",
+      targetId: "ally-target",
+      path: [
+        { x: 23, y: 30 },
+        { x: 24, y: 30 },
+      ],
     });
   });
 

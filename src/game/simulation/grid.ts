@@ -119,9 +119,11 @@ function search(
     if (!current) continue;
     const currentKey = positionKey(current.position);
     if (current.cost !== costs.get(currentKey)) continue;
-    // A unit that begins its move inside an opposing control zone may leave
-    // that origin. Any controlled cell entered during this move is still a
-    // terminal cell and cannot be used to reach cells beyond it.
+    // Any controlled cell entered during this move is terminal and cannot be
+    // used to reach cells beyond it. The origin never terminates the search: a
+    // unit that begins its move inside an opposing control zone may still leave
+    // it. `zoneOfControl` already excludes every occupied cell, so this only
+    // guards callers that build `stopAfterEntering` some other way.
     if (currentKey !== startKey && stopAfterEntering.has(currentKey)) continue;
 
     for (const next of directedNeighbors(current.position, battlefield, directions)) {
@@ -186,15 +188,37 @@ export function movementMap(
   };
 }
 
+/**
+ * The `FFh` reservation of `1000:3E3B`, shared by every propagation mode that
+ * reads the side map (`M/A/Y/FM/FA/FY/CM/CY`).
+ *
+ * The reservation loop reads the side-map byte first and only reserves a
+ * neighbour whose byte is 0. An occupied neighbour therefore stays an ordinary
+ * cell, and because `M/A/Y` propagate through own-side cells, a unit standing
+ * beside its opponent opens a traversable gap in the control zone: the original
+ * walks straight through the ally, charges that cell's terrain cost and keeps
+ * going. The gap is transit only — the cell is still an illegal landing, kept so
+ * by `blocked` for opposing occupants and by the `occupied` filter for own-side
+ * ones.
+ *
+ * The native loop also skips neighbours whose movement rule is 98/99. That half
+ * needs no filter here: propagation already refuses to enter those cells, so
+ * reserving them would be unobservable.
+ */
 export function zoneOfControl(
   unit: BattleUnit,
   units: readonly BattleUnit[],
   battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
 ): ReadonlySet<string> {
+  const occupied = new Set(units.map(positionKey));
   const controlled = new Set<string>();
   for (const opponent of units) {
     if (opponent.side === unit.side) continue;
-    for (const position of neighbors(opponent, battlefield)) controlled.add(positionKey(position));
+    for (const position of neighbors(opponent, battlefield)) {
+      const key = positionKey(position);
+      if (occupied.has(key)) continue;
+      controlled.add(key);
+    }
   }
   return controlled;
 }

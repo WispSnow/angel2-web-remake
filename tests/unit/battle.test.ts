@@ -4,6 +4,7 @@ import { STAGE0 } from "../../src/game/content/stage0";
 import { Stage0Battle } from "../../src/game/simulation/battle";
 import { manhattan, movementCost, positionKey, reachableCells, zoneOfControl } from "../../src/game/simulation/grid";
 import { DeterministicRng } from "../../src/game/simulation/rng";
+import type { Position } from "../../src/game/types";
 
 function battleAtPlayableOpening(seed = 0x1234, difficulty: 0 | 1 | 2 | 3 = 0): Stage0Battle {
   const battle = new Stage0Battle(difficulty, new DeterministicRng(seed));
@@ -164,6 +165,27 @@ describe("stage 0 battle simulation", () => {
     expect(cells).not.toContainEqual({ x: 26, y: 19 });
   });
 
+  it("charges terrain cost for the last step into contact as well", () => {
+    // REMAKE-104: 原版 1000:3E81 只要求「敌方邻格的某个邻格剩余 >= 2」，从不减去该格自己的
+    // 地形代价，等于按代价 1 写死最后一步；复刻按地形代价照常结算。宫殿第 36 行代价为 2，
+    // 妮雅（移动 4）从 (25,33) 出发累计到 (25,36) 是 4，超出预算，因此本回合打不到 (25,37)。
+    expect(movementCost("soldier", { x: 25, y: 35 })).toBe(1);
+    expect(movementCost("soldier", { x: 25, y: 36 })).toBe(2);
+
+    const battle = battleAtPlayableOpening();
+    const nia = battle.unit("1:0")!;
+    const enemy = battle.unit("2:47")!;
+    nia.x = 25;
+    nia.y = 33;
+    enemy.x = 25;
+    enemy.y = 37;
+    battle.units = [nia, enemy];
+    const cells = reachableCells(nia, battle.units);
+
+    expect(cells).toContainEqual({ x: 25, y: 35 });
+    expect(cells).not.toContainEqual({ x: 25, y: 36 });
+  });
+
   it("can path through a friendly unit but cannot stop on its occupied cell", () => {
     const battle = battleAtPlayableOpening();
     const nia = battle.unit("1:0")!;
@@ -207,6 +229,74 @@ describe("stage 0 battle simulation", () => {
     expect(withEnemy).toContainEqual({ x: 21, y: 20 });
     expect(withEnemy).not.toContainEqual({ x: 21, y: 21 });
     expect(battle.moveUnit(nia.id, { x: 21, y: 21 })).toBe(false);
+  });
+
+  it("keeps an occupied cell out of the control zone and propagates through it", () => {
+    // `1000:3E3B` 先读阵营图，只把**空的**敌方邻格保留为 `FFh`。妮雅旁边的 (25,27) 由
+    // side 2 自己占着，所以它不进保留集合：模式 `Y` 照常扣 1 穿过去继续向下，只是不能
+    // 停在上面。复刻此前把全部四邻记为终止格，才让 2:47 绕道 (26,26..28)。
+    const battle = battleAtPlayableOpening();
+    const nia = battle.unit("1:0")!;
+    const actor = battle.unit("2:47")!;
+    const ally = battle.unit("2:48")!;
+    nia.x = 24;
+    nia.y = 27;
+    actor.x = 25;
+    actor.y = 26;
+    ally.x = 25;
+    ally.y = 27;
+    battle.units = [nia, actor, ally];
+
+    const controlled = zoneOfControl(actor, battle.units);
+    expect(controlled.has(positionKey(ally))).toBe(false);
+    expect(controlled.has(positionKey({ x: 24, y: 26 }))).toBe(true);
+
+    const range = battle.enemyMovementRange(actor.id);
+    expect(range).not.toContainEqual({ x: 25, y: 27 });
+    expect(range).toContainEqual({ x: 25, y: 28 });
+    expect(range).toContainEqual({ x: 25, y: 29 });
+    // (25,30) 属代价 2 的槽 14，累计 5 不小于路线移动力 5，所以本回合仍到不了；
+    // 这条边界由地形代价决定，与控制区无关。
+    expect(range).not.toContainEqual({ x: 25, y: 30 });
+
+    const movement = battle.planRouteEnemy(actor.id);
+    expect(movement?.path).toEqual([
+      { x: 25, y: 26 },
+      { x: 25, y: 27 },
+      { x: 25, y: 28 },
+      { x: 25, y: 29 },
+    ]);
+  });
+
+  it("does not let an ally beside an enemy truncate another ally's range", () => {
+    // 保留规则不分阵营，模式 `M` 同样执行，所以我方棋子也会在控制区上开出可通行缺口。
+    const battle = battleAtPlayableOpening();
+    const nia = battle.unit("1:0")!;
+    const ally = battle.unit("1:43")!;
+    const enemy = battle.unit("2:45")!;
+    nia.x = 25;
+    nia.y = 26;
+    ally.x = 25;
+    ally.y = 27;
+    enemy.x = 24;
+    enemy.y = 27;
+    battle.units = [nia, ally, enemy];
+
+    const cells = reachableCells(nia, battle.units);
+
+    expect(zoneOfControl(nia, battle.units).has(positionKey(ally))).toBe(false);
+    expect(cells).not.toContainEqual({ x: 25, y: 27 });
+    expect(cells).toContainEqual({ x: 25, y: 28 });
+    expect(cells).toContainEqual({ x: 25, y: 29 });
+    expect(battle.movementPath(nia.id, { x: 25, y: 29 })).toEqual([
+      { x: 25, y: 26 },
+      { x: 25, y: 27 },
+      { x: 25, y: 28 },
+      { x: 25, y: 29 },
+    ]);
+    // 空的控制区格照旧终止传播：可以停在 (24,26)，但不能借它走到 (23,26)。
+    expect(cells).toContainEqual({ x: 24, y: 26 });
+    expect(cells).not.toContainEqual({ x: 23, y: 26 });
   });
 
   it("lets an enemy leave a control zone it starts in", () => {
@@ -437,45 +527,108 @@ describe("stage 0 battle simulation", () => {
     }
   });
 
-  it("accepts all three staircase cells and evacuates during the route action", () => {
-    for (const exit of STAGE0.enemyExitCells) {
+  it("evacuates every cell above native index 2271, not only the staircase", () => {
+    // 1000:1876 只比较行动结束后的格号，所以第 45 行 x>=22、第 46 行全部与三格楼梯
+    // 同属撤离区，而 (21,45) 恰好等于 2271 不触发。
+    const evacuating: Position[] = [
+      ...STAGE0.enemyStaircaseCells,
+      { x: 22, y: 45 },
+      { x: 29, y: 45 },
+      { x: 21, y: 46 },
+      { x: 29, y: 46 },
+    ];
+    for (const cell of evacuating) {
       const battle = battleAtPlayableOpening();
       const nia = battle.unit("1:0")!;
       const hading = battle.unit("2:15")!;
       battle.units = [nia, hading];
-      hading.x = exit.x;
-      hading.y = exit.y;
+      hading.x = cell.x;
+      hading.y = cell.y;
       expect(battle.evacuateEnemy(hading.id)).toBe(true);
       expect(battle.unit(hading.id)).toBeUndefined();
       expect(battle.outcome()).toBe("victory");
     }
 
+    for (const cell of [{ x: 21, y: 45 }, { x: 29, y: 44 }] satisfies Position[]) {
+      const battle = battleAtPlayableOpening();
+      const hading = battle.unit("2:15")!;
+      hading.x = cell.x;
+      hading.y = cell.y;
+      expect(battle.evacuateEnemy(hading.id)).toBe(false);
+      expect(battle.unit(hading.id)).toBeDefined();
+    }
+  });
+
+  it("evacuates a route enemy as soon as its action ends inside the region", () => {
     const battle = battleAtPlayableOpening();
     const nia = battle.unit("1:0")!;
     const hading = battle.unit("2:15")!;
-    const leftExit = STAGE0.enemyExitCells[0];
     battle.units = [nia, hading];
-    hading.x = leftExit.x;
-    hading.y = leftExit.y - 1;
+    hading.x = 25;
+    hading.y = 43;
     const movement = battle.moveRouteEnemy(hading.id)!;
     expect(movement.reachedExit).toBe(true);
-    expect(movement.destination).toEqual(STAGE0.enemyRouteTarget);
+    // 撤离区从第 45 行开始，所以本次行动不必走到楼梯锚点。
+    expect(movement.destination).toEqual({ x: 25, y: 46 });
     expect(movement.path.at(-1)).toEqual(movement.destination);
-    expect(movement.path.filter((step) => STAGE0.enemyExitCells.some((exit) => positionKey(exit) === positionKey(step)))).toHaveLength(1);
     expect(battle.unit(hading.id)).toBeUndefined();
     expect(battle.outcome()).toBe("victory");
+  });
 
-    const crossingBattle = battleAtPlayableOpening();
-    const crossingNia = crossingBattle.unit("1:0")!;
-    const crossingHading = crossingBattle.unit("2:15")!;
-    crossingBattle.units = [crossingNia, crossingHading];
-    crossingHading.x = leftExit.x - 1;
-    crossingHading.y = leftExit.y;
-    const crossingMovement = crossingBattle.moveRouteEnemy(crossingHading.id)!;
-    expect(crossingMovement.destination).toEqual(leftExit);
-    expect(crossingMovement.path.at(-1)).toEqual(leftExit);
-    expect(crossingMovement.path).not.toContainEqual(STAGE0.enemyRouteTarget);
-    expect(crossingBattle.unit(crossingHading.id)).toBeUndefined();
+  it("keeps a blocked route enemy one row down, beside the unit in its way", () => {
+    // 原版行为 12 先用忽略占格的模式 0 探路图定出理想路线，再取该路线上第一个落在
+    // 移动图内的格，因此挡路的我方棋子不会被绕开：它只会停到挡路者旁边。
+    const beside = battleAtPlayableOpening();
+    const enemy = beside.unit("2:47")!;
+    const blocker = beside.unit("1:43")!;
+    enemy.x = 25;
+    enemy.y = 26;
+    blocker.x = 25;
+    blocker.y = 27;
+    beside.units = [beside.unit("1:0")!, blocker, enemy];
+    const sidestep = beside.planRouteEnemy(enemy.id)!;
+    expect(sidestep.destination).toEqual({ x: 26, y: 27 });
+    expect(sidestep.path).toHaveLength(3);
+
+    const above = battleAtPlayableOpening();
+    const distantEnemy = above.unit("2:47")!;
+    const distantBlocker = above.unit("1:43")!;
+    distantEnemy.x = 25;
+    distantEnemy.y = 25;
+    distantBlocker.x = 25;
+    distantBlocker.y = 27;
+    above.units = [above.unit("1:0")!, distantBlocker, distantEnemy];
+    const singleStep = above.planRouteEnemy(distantEnemy.id)!;
+    expect(singleStep.destination).toEqual({ x: 25, y: 26 });
+    expect(singleStep.path).toHaveLength(2);
+
+    const mounted = battleAtPlayableOpening();
+    const cavalry = mounted.unit("2:15")!;
+    const mountedBlocker = mounted.unit("1:43")!;
+    cavalry.x = 25;
+    cavalry.y = 30;
+    mountedBlocker.x = 25;
+    mountedBlocker.y = 31;
+    mounted.units = [mounted.unit("1:0")!, mountedBlocker, cavalry];
+    const mountedStep = mounted.planRouteEnemy(cavalry.id)!;
+    expect(mountedStep.destination).toEqual({ x: 26, y: 31 });
+    expect(mountedStep.path).toHaveLength(3);
+  });
+
+  it("advances a free route enemy straight down its own column", () => {
+    // 探路图的同值由后扫描方向覆盖（右 → 下 → 左 → 上），所以横向修正发生在锚点附近，
+    // 而不是一开始就并入中央纵列。
+    const battle = battleAtPlayableOpening();
+    const enemy = battle.unit("2:45")!;
+    battle.units = [battle.unit("1:0")!, enemy];
+    const movement = battle.planRouteEnemy(enemy.id)!;
+    expect(movement.destination).toEqual({ x: enemy.x, y: enemy.y + 3 });
+    expect(movement.path.map(positionKey)).toEqual([
+      { x: 27, y: 26 },
+      { x: 27, y: 27 },
+      { x: 27, y: 28 },
+      { x: 27, y: 29 },
+    ].map(positionKey));
   });
 
   it("advances rounds and refreshes action state", () => {

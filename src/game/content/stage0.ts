@@ -31,7 +31,16 @@ export const STAGE0 = {
   opening: { from: { x: 10, y: 23 }, to: { x: 29, y: 26 }, budget: 50 },
   enemyRouteTarget: { x: 25, y: 47 },
   enemyRouteMovement: 5,
-  enemyExitCells: [{ x: 24, y: 47 }, { x: 25, y: 47 }, { x: 26, y: 47 }],
+  /**
+   * `1000:1876` 是 AI 单位行动流程 `1000:1681` 的收尾调用，只在场景 0 生效：行动结束后
+   * 若行动者格号「大于」2271 `(21,45)`，立即清空槽位图与阵营图，单位当场离场。
+   * 因此撤离区不是三格楼梯，而是第 45 行 `x>=22`、第 46 行全部与三格楼梯组成的整片
+   * 区域（可通行的共 20 格）；`(21,45)` 恰好等于 2271，不触发。玩家「移動」走
+   * `0000:7310`，不经过这条收尾，所以我方棋子永远不会被撤离。
+   */
+  enemyEvacuationCellAbove: 2271,
+  /** 楼梯只是撤离区最深处；调试夹具与文案仍需要这三格的坐标。 */
+  enemyStaircaseCells: [{ x: 24, y: 47 }, { x: 25, y: 47 }, { x: 26, y: 47 }],
   objective: "清除瓦爾克麗宮內的敵人；擊倒或撤離均計入。",
   defeat: "妮雅戰敗。",
 } as const;
@@ -45,7 +54,7 @@ export const STAGE0_AI_CLASS_PRIORITY: Readonly<Partial<Record<UnitClassId, numb
 };
 
 export function isStage0Exit(position: Position): boolean {
-  return STAGE0.enemyExitCells.some(({ x, y }) => position.x === x && position.y === y);
+  return position.y * STAGE0.width + position.x > STAGE0.enemyEvacuationCellAbove;
 }
 
 export const TERRAIN_TOKENS = decode(STAGE0_TERRAIN_TOKENS_BASE64);

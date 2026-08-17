@@ -1975,6 +1975,19 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v83 saves losslessly", () => {
+    // REMAKE-105 只把「被占据的敌方邻格不再是终止格」这条原版行为补回传播器。
+    // 没有字段新增或改义，可达范围本来就在读档后重算，所以 v83 存档无损迁移。
+    for (const current of [battleSave(), completedSave()]) {
+      const legacy = {
+        ...current,
+        version: 83,
+        contentVersion: "enemy-difficulty-scaling-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy))).toEqual(current);
+    }
+  });
+
   it("migrates v82 saves whose enemy baseline did not move", () => {
     // REMAKE-103 只改难度 1／2 的敌方出场行，难度 0／3 的基线逐字保持原版，
     // 因此这两档的 v82 存档无损迁移。

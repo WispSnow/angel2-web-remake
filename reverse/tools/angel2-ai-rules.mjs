@@ -57,6 +57,23 @@ const CODE_SIGNATURES = [
   { address: "1000:1A68", offset: 0x11a68, hex: "e8c807a13f0d3d0c0074773dff00747983fa59740983fa4d745ae8ad05c3a13f0d3d010074169a8305701083f900740c" },
   { address: "1000:1AF8", offset: 0x11af8, hex: "8b36161f8936bf77b83000a30f1fb83200a3181f9a04009d138b36161fe83e0083ff0074359a2900de172ea17f01a30f" },
   { address: "1000:1B56", offset: 0x11b56, hex: "a122008ec0268a04a8807401c3a1470da3181fa1772e3d0400740e3d000074133d09007418bf0000c3bf7d00c706181f" },
+  // Behavior 12 route path builder: clear the 100-word list at CS:028B, then
+  // hill-climb the probe map from the goal with `neighbour >= best`.
+  { address: "1000:7E09", offset: 0x17e09, hex: "893eb077a1a9018ec0893ea5773bf77417e8f5008e06a901be8b02e81400c606af77598b3eb077cbc606af774e893eb077cb" },
+  { address: "1000:7E3B", offset: 0x17e3b, hex: "8b3ea5772e893c83c602268a0db630b230e80d0080fa3075e78b1ea577268a2fc3" },
+  // PIT channel 0 accumulates into CS:00E9 and selects one of three tables.
+  { address: "1000:7E5C", offset: 0x17e5c, hex: "33c0e4402e0106e900525333d2bb0300f7f32e8916e9005b5a2e833ee900" },
+  { address: "1000:7ECB", offset: 0x17ecb, hex: "b638c706a777ceffe82500c3b632c706a7773200e81900c3b634c706a777ffffe80d00c3b636c706a7770100e80100c3" },
+  { address: "1000:7EFB", offset: 0x17efb, hex: "8bdf031ea777268a2f3ae97301c38acd8ad6891ea577c3" },
+  // Route endpoint selection: first route cell inside the real movement map,
+  // then the five-offset landing test, then a fresh path on that same map.
+  { address: "1000:828F", offset: 0x1828f, hex: "803eaf774e7479b8ba1e8ed8be00002e8bbc8b02a1a9018ec0268a053c00750b81fec800775a83c602ebe42e8b" },
+  { address: "1000:82BA", offset: 0x182ba, hex: "2e8bbc8b0283ff00744b8bdfe8600083fa59743a8bdf83c332e8530083fa59742d8bdf83c3cee8460083fa5974208bdf83c301e8390083fa5974138bdf83c3ffe82c0083fa59740683c602ebb3cb" },
+  { address: "1000:8329", offset: 0x18329, hex: "a1a9018ec0268a073c007410a124008ec0268a073c007504ba5900c3ba4e00c3" },
+  // Scenario-0 evacuation: the AI action epilogue clears the slot and side maps
+  // whenever the actor's post-action cell index is above 2271.
+  { address: "1000:16AD", offset: 0x116ad, hex: "e8c601c706161f0000582ea3" },
+  { address: "1000:1876", offset: 0x11876, hex: "a1772e3d00007401c38b1e161f81fbdf087701c3a122008ec0b80000268807a124008ec0b80000268807c3" },
   { address: "1000:1BD9", offset: 0x11bd9, hex: "e8810983fa597503e9bf00a13f0d3d040074223d0600741d3d080074183d0a0074133d0000750a833e340d597503e99900ba4e00c32ea17f" },
   // Paired follower near test: base mode from [cs:017F], seed straight from
   // DS:0D47 with no floor, then the same-side behavior lookup at 1000:0D83.
@@ -560,8 +577,29 @@ function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue) 
         entry: "1000:1AF8/1B56/1BBE",
         machineEvidence: "reverse/parsed/native/behavior12-effects.json",
         rule: "bypasses the ordinary attack/shot/technique decision and follows fixed stage-dependent goals using a mode-0 seed-50 probe, then the normal movement mode",
+        routeSelection: {
+          probeMap: "1000:1B00..1B0C writes mode '0' and seed 0x32 = 50, so the probe charges 1 per cell, rejects only movement rule 99, and ignores every occupied cell",
+          probePath: "1000:1B1D calls the path builder 1000:7E09/7E3B at the goal cell and hill-climbs the probe map back to the actor; 1000:7EFB accepts `neighbour >= best`, so ties go to the later direction of the PIT-rotated table and the list at CS:028B holds at most 100 cells",
+          directionTables: "1000:7E5C adds PIT channel 0 into CS:00E9 and takes it mod 3; residue 0 scans -50,-1,+50,+1, residue 1 scans +1,+50,-1,-50 and residue 2 scans -1,+50,+1,-50",
+          movementMap: "1000:1B29..1B2C re-runs the goal selector (which rewrites the seed with the stage movement override) and rebuilds the range with the phase base mode, so occupancy, terrain cost and the Y/A attack markers all apply",
+          endpoint: "1000:828F scans the stored route from the goal end for the first cell whose finalized range byte is nonzero, then 1000:82C4..82F5 tests that cell and its +50, -50, +1, -1 neighbours with 1000:8329 (nonzero range and empty side map) and takes the first hit; failures advance one route cell toward the actor",
+          walk: "1000:8308 re-enters 1000:7E09 on the movement map to build the real step list, so the actor advances along the occupancy-blind ideal route and stops beside whatever blocks it instead of pathing around",
+          consequence: "a unit whose route cell is occupied never detours: the scan stops at the blocking unit's own cell, which the Y/A finalizer marks as 1, and the +50/-50/+1/-1 test then places the actor next to it",
+        },
         stages: [
-          { stage: 0, goalCell: 2375, movementOverride: 5 },
+          {
+            stage: 0,
+            goalCell: 2375,
+            movementOverride: 5,
+            evacuation: {
+              entry: "1000:1876, called unconditionally from the AI action epilogue 1000:16AD",
+              condition: "current stage is 0 and the actor's post-action cell index is above 2271 = (21,45)",
+              effect: "write zero into both the unit-slot map DS:[0022] and the side map DS:[0024] at that cell, so the unit leaves the board and the shared victory predicate sees one fewer side-2 unit",
+              region: "cell 2272..2499: row 45 from x=22, all of rows 46..49 and therefore the three staircase cells; (21,45) is exactly 2271 and does not trigger",
+              walkableRegionCells: 20,
+              scope: "only units routed through the AI action wrapper reach this call, so the player's own 0000:7310 movement never evacuates",
+            },
+          },
           {
             stage: 4,
             goalCell: 125,

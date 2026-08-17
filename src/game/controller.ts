@@ -5070,9 +5070,9 @@ export class GameController {
     if (!this.debugMode) return;
     const finalEnemy = this.battle.unit("2:15");
     if (!finalEnemy) return;
-    const leftExit = STAGE0.enemyExitCells[0];
-    finalEnemy.x = leftExit.x;
-    finalEnemy.y = leftExit.y - 3;
+    const leftStaircase = STAGE0.enemyStaircaseCells[0];
+    finalEnemy.x = leftStaircase.x;
+    finalEnemy.y = leftStaircase.y - 3;
     finalEnemy.acted = false;
     this.battle.units = this.battle.units.filter((unit) => unit.side === 1 || unit.id === finalEnemy.id);
     this.battle.focusId = finalEnemy.id;

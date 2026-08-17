@@ -304,13 +304,13 @@ const CODE_SIGNATURES = [
     address: "1000:3D6D",
     offset: 0x13d6d,
     hex: "813e0f1f46597436813e0f1f464d742e813e0f1f43597426813e0f1f434d741e813e0f1f46417416833e0f1f59740f83",
-    meaning: "AI side-aware modes reserve valid empty cells adjacent to opposing units before propagation",
+    meaning: "M/A/Y/FM/FA/FY/CM/CY reserve valid empty cells adjacent to opposing units before propagation; occupied cells are skipped",
   },
   {
     address: "1000:3DC5",
     offset: 0x13dc5,
     hex: "833e0f1f4d7437833e0f1f597430813e0f1f46597428813e0f1f464d7420813e0f1f43597418813e0f1f434d7410833e",
-    meaning: "AI modes convert reserved enemy-adjacent cells into attack-reachability markers after propagation",
+    meaning: "the same eight modes convert reserved enemy-adjacent cells into landing markers after propagation",
   },
   {
     address: "1000:3E23",
@@ -328,7 +328,7 @@ const CODE_SIGNATURES = [
     address: "1000:3E81",
     offset: 0x13e81,
     hex: "3cff7401c3268a44ce3cff74043c01772a268a44323cff74043c01771e268a44",
-    meaning: "a reserved cell becomes reachable when a neighboring propagated cell can connect to it",
+    meaning: "a reserved cell becomes reachable when an orthogonal neighbor holds remaining > 1; the reserved cell's own entry cost is never subtracted",
   },
   {
     address: "1000:40EE",
@@ -485,6 +485,102 @@ function auditRangeModeProducers(moduleBuffer) {
       producers: SCRIPTED_FM_WRITERS.map(([address, offset, stage]) => ({ address, offset, stage })),
       stages: uniqueSorted(SCRIPTED_FM_WRITERS.map((writer) => writer[2])),
       businessUse: "scripted story-unit movement with uniform cost 1, terrain rule 99 blocked, and propagation through empty or side-1 occupied cells",
+    },
+  };
+}
+
+/**
+ * The enemy-adjacent FFh layer is often mistaken for an AI-only marking. Decode the mode
+ * words each of its three passes compares, and check the two rules that decide how faithful
+ * a remake's control zone has to be: an occupied cell is never reserved, and the conversion
+ * test never subtracts the reserved cell's own terrain cost.
+ */
+function auditEnemyAdjacentReservation(moduleBuffer) {
+  const decodeModeGate = (start, end, label) => {
+    const codes = [];
+    for (let offset = start; offset < end;) {
+      // cmp word [1f0f], imm16 -> 81 3E 0F 1F lo hi ; cmp word [1f0f], imm8 -> 83 3E 0F 1F imm8
+      if (moduleBuffer[offset] === 0x81 && moduleBuffer[offset + 1] === 0x3e
+        && moduleBuffer.readUInt16LE(offset + 2) === 0x1f0f) {
+        codes.push(moduleBuffer.subarray(offset + 4, offset + 6).toString("ascii"));
+        offset += 8;
+        continue;
+      }
+      if (moduleBuffer[offset] === 0x83 && moduleBuffer[offset + 1] === 0x3e
+        && moduleBuffer.readUInt16LE(offset + 2) === 0x1f0f) {
+        codes.push(String.fromCharCode(moduleBuffer[offset + 4]));
+        offset += 7;
+        continue;
+      }
+      break;
+    }
+    if (codes.length === 0) throw new Error(`${label}: no mode comparison decoded`);
+    return codes;
+  };
+  const reservationModes = decodeModeGate(0x13d6d, 0x13dab, "1000:3D6D reservation gate");
+  const conversionModes = decodeModeGate(0x13dc5, 0x13e03, "1000:3DC5 conversion gate");
+  const finalPassModes = decodeModeGate(0x140ee, 0x1410d, "1000:40EE final-pass gate");
+  for (const [label, modes] of [
+    ["reservation", reservationModes],
+    ["conversion", conversionModes],
+  ]) {
+    if (!modes.includes("M")) {
+      throw new Error(`${label} gate no longer admits player mode M`);
+    }
+  }
+  if (finalPassModes.includes("M")) {
+    throw new Error("the final increment/opposing-cell pass unexpectedly admits mode M");
+  }
+  // 1000:3E3B: mov di,si / add di,[1f11] / mov ah,[es:di] / cmp ah,0 / jnz -> skip.
+  // ES is the side map DS:[0024] at this point, so only empty cells continue to the
+  // terrain-rule test and the FFh store.
+  const emptyCellTest = moduleBuffer.subarray(0x13e41, 0x13e49);
+  if (!emptyCellTest.equals(Buffer.from([0x26, 0x8a, 0x25, 0x80, 0xfc, 0x00, 0x75, 0x37]))) {
+    throw new Error("1000:3E41 no longer gates the FFh reservation on an empty side-map byte");
+  }
+  // 1000:3E81 is 65 bytes long and contains nothing but the FFh test, four
+  // `mov al,[es:si±(1|50)] / cmp al,0xff / jz next / cmp al,1 / ja convert` neighbor tests and
+  // the two stores 0 / 1. Locking the whole body is what makes "the reserved cell's own entry
+  // cost is never subtracted" a byte-checked fact instead of a transcription.
+  const conversion = moduleBuffer.subarray(0x13e81, 0x13ec2);
+  const expectedConversion = Buffer.from(
+    "3cff7401c3268a44ce3cff74043c01772a268a44323cff74043c01771e268a44ff3cff"
+    + "74043c017712268a44013cff74043c017706b000268804c3b001268804c3",
+    "hex",
+  );
+  if (!conversion.equals(expectedConversion)) {
+    throw new Error("1000:3E81 conversion body changed; re-verify whether it now charges an entry cost");
+  }
+  let neighborThresholdTests = 0;
+  for (let index = 0; index + 2 < conversion.length; index += 1) {
+    if (conversion[index] === 0x3c && conversion[index + 1] === 0x01
+      && conversion[index + 2] === 0x77) neighborThresholdTests += 1;
+  }
+  if (neighborThresholdTests !== 4) {
+    throw new Error(`1000:3E81 has ${neighborThresholdTests} \`cmp al,1 / ja\` neighbor tests, expected 4`);
+  }
+  return {
+    evidenceLevel: "C",
+    reservation: {
+      entry: "1000:3D6D -> 1000:3E12 -> 1000:3E23 -> 1000:3B71 -> 1000:3E3B",
+      appliesTo: reservationModes,
+      rule: "for every opposing occupied cell, each orthogonal neighbor whose side-map byte is 0 and whose movement rule is neither 98 nor 99 is stored as FFh, which normal propagation can never overwrite",
+      occupiedCellsAreNeverReserved: true,
+      consequence: "a same-side unit standing next to an opposing unit leaves a traversable gap in the control zone, because modes M/A/Y propagate through own-side cells; it still cannot be used as a landing cell",
+    },
+    conversion: {
+      entry: "1000:3DC5 -> 1000:3E12 -> 1000:3E81",
+      appliesTo: conversionModes,
+      rule: "a reserved cell becomes 1 when any orthogonal neighbor holds a raw remaining value above 1 and is not itself FFh; every other reserved cell is cleared to 0",
+      neighborThresholdTests,
+      chargesReservedCellEntryCost: false,
+      nativeDefect: "the propagator subtracts each cell's terrain rule everywhere else, and `remaining > 1` is exactly the `cost == 1` condition for affording one more step; on cost 2..5 terrain the original therefore grants up to 4 extra movement points for the final step into contact",
+      remakeDecision: "REMAKE-104 charges that step normally; see ../gdd/web-remake-rule-decisions.md",
+    },
+    finalPass: {
+      entry: "1000:40EE -> 1000:412F / 1000:413D",
+      appliesTo: finalPassModes,
+      rule: "increment every nonzero cell, then write 1 into each opposing occupied cell that has an orthogonal neighbor above 1",
     },
   };
 }
@@ -706,6 +802,7 @@ async function extract(mapPath, modulePath, descriptorsPath, outputPath) {
   }
   const unitDescriptors = JSON.parse(descriptorsText);
   const verifiedCodeSignatures = verifySignatures(moduleBuffer);
+  const enemyAdjacentReservation = auditEnemyAdjacentReservation(moduleBuffer);
   const rangeModeProducerAudit = auditRangeModeProducers(moduleBuffer);
   const movementProfileTable = readProfileTable(
     moduleBuffer,
@@ -849,10 +946,12 @@ async function extract(mapPath, modulePath, descriptorsPath, outputPath) {
             selectedSide: "CM -> side 1; CY -> side 2",
           },
         ],
+        enemyAdjacentReservation,
         aiTargetMarkers: {
-          appliesTo: ["Y", "A", "FY", "FA"],
-          beforePropagation: "valid empty cells orthogonally adjacent to opposing units are reserved as FFh so normal propagation does not overwrite them",
-          adjacencyFinalization: "a reserved cell connected to the propagated range is converted to value 1 before the final pass",
+          appliesTo: enemyAdjacentReservation.finalPass.appliesTo,
+          scopeCorrection: "only the increment/opposing-cell pass is AI-only; the FFh reservation and its conversion also run for player mode M, so this layer is the shared control zone rather than an AI marking (see enemyAdjacentReservation)",
+          beforePropagation: "valid empty cells orthogonally adjacent to opposing units are reserved as FFh so normal propagation does not overwrite them; occupied cells are never reserved",
+          adjacencyFinalization: "a reserved cell connected to the propagated range is converted to value 1 before the final pass, using an orthogonal-neighbor `remaining > 1` test that never subtracts the reserved cell's own terrain cost",
           finalPass: "all nonzero cells are incremented; an opposing occupied cell with any orthogonal neighbor above 1 is then written as value 1",
           resultingValues: {
             attackAdjacentPosition: 2,

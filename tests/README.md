@@ -23,7 +23,9 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `src/game/simulation/actions/`、动作数值与 PRNG | `actions.test.ts` | 对应 `arena-*.spec.ts` 技能族文件；魔弓线路见 `arena-magic-archer-route.spec.ts` |
 | `src/game/simulation/battle.ts` 的普通伤害、地形防御、反击与经验 | `battle.test.ts`，职业特例另见 `classes.test.ts` | 对应关卡或 `class-showdown.spec.ts` |
 | `src/game/simulation/objectives.ts` 的胜负条件、到达区展开与 Phaser 目的地标记 | `objectives.test.ts` | 到达型关卡 `stage4.spec.ts`、`stage9.spec.ts`、`stage11.spec.ts`、`stage23.spec.ts`、`stage24.spec.ts` |
-| `src/game/simulation/expert-ai.ts`、共享统一效用评分、无耐久威胁、单体预计残血集火、法系／射手独立目标优先级、混乱／禁咒顺序与重复状态剔除、`REMAKE-102` 的 `AA` 近战候选边界、完整通路／断路追击、虚拟前线排队、近身让路、近战威胁投影、法系固定目标施法落点、魔弓禁贴身／总伤害优先、具名主将原版远追边界与安全落点、行动者重规划、棋盘版本缓存与决策追踪 | `expert-ai.test.ts`，最大规模预算见 `stage36-ai-performance.test.ts`，职业动作覆盖另见 `arena.test.ts` | `arena.spec.ts`、`arena-magic-archer-route.spec.ts` 或当前开放关卡的自动阶段用例 |
+| `src/game/simulation/stage-route.ts` 的行为 12 两阶段路线落点（忽略占格的探路图、锚点爬坡路线表、真实移动图上的五偏移落点）与 `stage0.ts` 的撤离区判据 | `battle.test.ts` 的路线／撤离用例 | `stage0.spec.ts` 的 `S00-F`，无夹具通关见 `stage0-real-clear.spec.ts` |
+| `src/game/simulation/grid.ts` 的范围传播、地形代价、友军中转、敌方控制区（`REMAKE-105`：被占据的敌方邻格不进保留集合，可穿过但不可停留）与 `REMAKE-104`「贴身最后一步照常计价」 | `battle.test.ts` 的移动范围与地形代价用例 | 关卡移动流程见 `stage0.spec.ts`，跨职业地形见 `arena.spec.ts` |
+| `src/game/simulation/expert-ai.ts`、共享统一效用评分、无耐久威胁、单体预计残血集火、法系／射手独立目标优先级、混乱／禁咒顺序与重复状态剔除、`REMAKE-102` 的 `AA` 近战候选边界、完整通路／断路追击、虚拟前线排队、近身让路（同职业记「通路缩短」，职业地形差造成断路时记「新增通路」）、近战威胁投影、法系固定目标施法落点、魔弓禁贴身／总伤害优先、具名主将原版远追边界与安全落点、行动者重规划、棋盘版本缓存与决策追踪 | `expert-ai.test.ts`，最大规模预算见 `stage36-ai-performance.test.ts`，职业动作覆盖另见 `arena.test.ts` | `arena.spec.ts`、`arena-magic-archer-route.spec.ts` 或当前开放关卡的自动阶段用例 |
 | `src/game/simulation/forces.ts`、`force-ai.ts` 的军团归属、目标策略、`terrain-hold` 防区教义、优先治疗与成对领队／跟随（近端判据用普通移动图、跟随只在无合法动作时接管） | `forces.test.ts`，防区与编队实例见 `stage3-battle.test.ts` | `stage3.spec.ts` |
 | `src/game/content/technique-*`、地图技术时间轴 | `technique-lab.test.ts` | `technique-lab.spec.ts`；只在正式接入变化时追加对应竞技场文件 |
 | `src/game/content/classes.ts`、职业固定行／第三行后成长、近战／远程职责、39 职业目标优先级档案、`class-traits.ts`、终阶职业特性、飛龍攻后移动与水戰士受击分裂／共享状态 | `classes.test.ts` | `class-showdown.spec.ts` 的职业说明、飛龍流程和水戰士分裂用例 |

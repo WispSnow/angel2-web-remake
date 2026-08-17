@@ -39,6 +39,9 @@ const CODE_SIGNATURES = [
   ["1000:7F4A", 0x17f4a, 0x17f72, "scripted movement wrapper", "bc9b09dae18a56aaeb6f1fd4f8e8e90056f7a6acf1a5edc5434731b3a5b1fe22"],
   ["1000:7F72", 0x17f72, 0x18069, "path animation with E/14", "0d09bc21c82ec87ac63296b0456c392ec623f5cd01d0b1aae888e169b6131880"],
   ["1000:828F", 0x1828f, 0x18329, "fallback to reachable empty path cell", "2640d5fd7fde8f1b53dcd067ceff92c61c4b9a438696492bf389818dcc89d03e"],
+  ["1000:8329", 0x18329, 0x18349, "landing test: nonzero range byte and empty side map", "8136d672e8c01d83e194734f31c9f175d4894c02bc34838117ff6d9bf8998c5a"],
+  ["1000:16AD", 0x116ad, 0x116b9, "AI action epilogue call into the scenario-0 evacuation", "3221f776bc2533a67255e65f0d3d4d0c6f823cf2e9c7c08ea0e79fb293d76f63"],
+  ["1000:1876", 0x11876, 0x118a1, "scenario-0 evacuation above cell 2271", "de6e98c46f2db7111cf3531099681cf9cf33df56b410086c10afe632931e8009"],
   ["0000:D4EE", 0x0d4ee, 0x0d597, "VGA rectangle copy that leaves DI advanced", "e1084ba2522b87160a597b6bf72fa7c6501f9e6a76508d9497268d7b88cb22b0"],
   ["0000:FFF0", 0x0fff0, 0x1001a, "three adjacent 2500-byte grid segment pointers", "bb4ad7d9730dc3a6c71415d4b46e2e041e3a3f080522ee4c27f6413b79802bfd"],
 ];
@@ -190,20 +193,27 @@ async function extract(modulePath, decodedRoot, battleTemplatesPath, terrainMapP
     readFile(mapRulesPath, "utf8").then(JSON.parse),
     readFile(techniquePresentationsPath, "utf8").then(JSON.parse),
   ]);
+  const stage0 = templates.stages.find((entry) => entry.stage === 0);
   const stage4 = templates.stages.find((entry) => entry.stage === 4);
   const stage9 = templates.stages.find((entry) => entry.stage === 9);
+  const stage0TerrainMap = terrainMap.stages.find((entry) => entry.stage === 0);
   const stage4TerrainMap = terrainMap.stages.find((entry) => entry.stage === 4);
   const stage9TerrainMap = terrainMap.stages.find((entry) => entry.stage === 9);
+  assert(stage0?.bRecord === 1, "stage 0 battle template mapping changed");
   assert(stage4?.bRecord === 9 && stage9?.bRecord === 19, "stage 4/9 battle template mapping changed");
+  assert(stage0TerrainMap?.bRecord === 1, "stage 0 terrain mapping changed");
   assert(stage4TerrainMap?.bRecord === 9 && stage9TerrainMap?.bRecord === 19,
     "stage 4/9 terrain mapping changed");
 
-  const [stage4Raw, stage9Raw] = await Promise.all([
+  const [stage0Raw, stage4Raw, stage9Raw] = await Promise.all([
+    stageTerrain(stage0, decodedRoot),
     stageTerrain(stage4, decodedRoot),
     stageTerrain(stage9, decodedRoot),
   ]);
+  const stage0Terrain = stage0Raw.subarray(256, 2756);
   const stage4Terrain = stage4Raw.subarray(256, 2756);
   const stage9Terrain = stage9Raw.subarray(256, 2756);
+  const stage0Slots = tokenSlotMap(stage0Terrain, stage0TerrainMap);
   const stage4Slots = tokenSlotMap(stage4Terrain, stage4TerrainMap);
   const stage9Slots = tokenSlotMap(stage9Terrain, stage9TerrainMap);
   const stage4Rules = mapRules.records[6].movementRules;
@@ -211,6 +221,42 @@ async function extract(modulePath, decodedRoot, battleTemplatesPath, terrainMapP
   assert(mapRules.records[6].name === "魔術士" && mapRules.records[5].name === "咒術師",
     "behavior-12 class/profile binding changed");
 
+  // Scenario 0's evacuation threshold is an immediate inside 1000:1876, which the AI
+  // action epilogue 1000:16AD calls after every AI unit action. Reading it back from the
+  // image keeps the region derived rather than transcribed.
+  assert(checkedSlice(buffer, 0x11876, 0x1187c, "scenario-0 stage gate")
+    .equals(Buffer.from([0xa1, 0x77, 0x2e, 0x3d, 0x00, 0x00])),
+  "1000:1876 no longer gates on stage 0");
+  assert(checkedSlice(buffer, 0x11883, 0x11885, "evacuation compare opcode")
+    .equals(Buffer.from([0x81, 0xfb])) && buffer[0x11887] === 0x77,
+  "1000:1883 no longer compares the actor cell with a `ja` branch");
+  const evacuationCellAbove = buffer.readUInt16LE(0x11885);
+  assert(evacuationCellAbove === 2271, `unexpected evacuation threshold ${evacuationCellAbove}`);
+  const stage0Rules = mapRules.records[0].movementRules;
+  const stage0CavalryRules = mapRules.records[22].movementRules;
+  assert(mapRules.records[0].name === "士兵" && mapRules.records[22].name === "騎兵",
+    "stage-0 class/profile binding changed");
+  const stage0EvacuationCells = Array.from({ length: BOARD_CELLS }, (_, cell) => cell)
+    .filter((cell) => cell > evacuationCellAbove)
+    .filter((cell) => stage0Rules[stage0Slots[cell]] < 98)
+    .map((cell) => ({
+      cell,
+      x: cell % BOARD_WIDTH,
+      y: Math.floor(cell / BOARD_WIDTH),
+      soldierMovementRule: stage0Rules[stage0Slots[cell]],
+      cavalryMovementRule: stage0CavalryRules[stage0Slots[cell]],
+    }));
+  const stage0Staircase = stage0EvacuationCells.filter((entry) => entry.y === 47).map((entry) => entry.cell);
+  assert(stage0EvacuationCells.length === 20,
+    `expected 20 walkable stage-0 evacuation cells, got ${stage0EvacuationCells.length}`);
+  assert(stage0Staircase.join(",") === "2374,2375,2376", "stage-0 staircase cells changed");
+  assert(stage0Rules[stage0Slots[2271]] < 98,
+    "(21,45) is no longer walkable, so the exclusive threshold is untestable");
+
+  const stage0Actor = stage0.activeUnitInstances.find((unit) => unit.side === 2 && unit.perSlotBehavior === 12);
+  assert(stage0.activeUnitInstances.filter((unit) => unit.perSlotBehavior === 12).length === 10
+    && stage0.activeUnitInstances.every((unit) => unit.side !== 2 || unit.perSlotBehavior === 12),
+  "stage-0 no longer routes every side-2 unit through behavior 12");
   const stage4Actor = stage4.activeUnitInstances.find((unit) => unit.side === 1 && unit.perSlotBehavior === 12);
   const stage9Actor = stage9.activeUnitInstances.find((unit) => unit.side === 1 && unit.perSlotBehavior === 12);
   assert(stage4Actor?.cell === 2075 && stage4Actor.unitSlot === 24,
@@ -377,6 +423,39 @@ async function extract(modulePath, decodedRoot, battleTemplatesPath, terrainMapP
     },
     verifiedCodeSignatures: verifySignatures(buffer, CODE_SIGNATURES),
     verifiedDataSignatures: verifySignatures(buffer, DATA_SIGNATURES),
+    stage0: {
+      stage: 0,
+      routeGoalCell: 2375,
+      movementOverride: 5,
+      behavior12Actors: stage0.activeUnitInstances
+        .filter((unit) => unit.perSlotBehavior === 12)
+        .map(({ cell, x, y, side, unitSlot, className }) => ({ cell, x, y, side, unitSlot, className })),
+      firstScheduledActor: stage0Actor === undefined ? null : {
+        cell: stage0Actor.cell,
+        unitSlot: stage0Actor.unitSlot,
+        className: stage0Actor.className,
+      },
+      evacuation: {
+        entry: "1000:1876",
+        caller: "1000:16AD, the unconditional tail of the AI unit-action wrapper 1000:1681",
+        stageGate: "the routine returns immediately unless DS:2E77 (current stage) is 0",
+        condition: `actor cell index > ${evacuationCellAbove}`,
+        comparedRegister: "BX = DS:1F16, the actor cell the route handler wrote back after the walk",
+        effect: "write 0 into the unit-slot map DS:[0022] and the side map DS:[0024] at that cell",
+        scope: "only AI-driven actions reach this tail; the player's own 0000:7310 movement never evacuates",
+        exclusiveThresholdCell: {
+          cell: evacuationCellAbove,
+          x: evacuationCellAbove % BOARD_WIDTH,
+          y: Math.floor(evacuationCellAbove / BOARD_WIDTH),
+          walkable: true,
+          evacuates: false,
+        },
+        walkableCellCount: stage0EvacuationCells.length,
+        walkableCells: stage0EvacuationCells,
+        staircaseCells: stage0Staircase,
+        note: "the three staircase cells are only the deepest part of the region; row 45 from x=22 and the whole of row 46 evacuate as well",
+      },
+    },
     stage4: {
       stage: 4,
       actor: stage4Actor,
