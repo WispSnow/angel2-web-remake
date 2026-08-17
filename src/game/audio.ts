@@ -40,6 +40,12 @@ const battleMusicSide = (phase: GamePhase): BattleMusicSide | undefined => {
   return undefined;
 };
 
+// Total release is 4 × 15 ms, short enough to stay inside one walk step.
+const WALK_FADE_STEP_MS = 15;
+
+const isWalkCue = (cue: { group: string; record: number; reason: string }): boolean =>
+  cue.group === "e" && cue.record === 14 && soundEffectChannelForCue(cue.reason) === "movement";
+
 export class AudioManager {
   private readonly events = new AbortController();
   private readonly unsubscribe: () => void;
@@ -60,6 +66,8 @@ export class AudioManager {
     combat: 0,
     key: 0,
   };
+  private walkEffect?: HTMLAudioElement;
+  private readonly releasingWalkEffects = new Set<HTMLAudioElement>();
   constructor(
     private readonly controller: GameController,
     private readonly root: HTMLElement,
@@ -90,6 +98,11 @@ export class AudioManager {
   destroy(): void {
     this.events.abort();
     this.unsubscribe();
+    // Teardown cuts immediately: a release fade would keep its timer running
+    // against an element nothing owns any more.
+    for (const effect of [this.walkEffect, ...this.releasingWalkEffects]) effect?.pause();
+    this.walkEffect = undefined;
+    this.releasingWalkEffects.clear();
     this.music.select(undefined);
   }
 
@@ -116,13 +129,64 @@ export class AudioManager {
           ? ASSETS.audio.effects[cue.record as keyof typeof ASSETS.audio.effects]
           : undefined);
       if (source) {
-        this.playEffect(
+        const walk = isWalkCue(cue);
+        // A second walk must never stack on the first: cut the previous clip
+        // before the new one starts.
+        if (walk) this.stopWalkEffect();
+        const effect = this.playEffect(
           source,
           cue.record === 11 ? 0.5 : 0.55,
           soundEffectChannelForCue(cue.reason),
         );
+        if (walk) {
+          this.walkEffect = effect;
+          this.updateWalkDebugState();
+        }
       }
     }
+    // The native request is fire-and-forget, but E/14 runs 1.261 s while an
+    // ordinary remake step takes 80 ms, so a short walk would keep sounding
+    // well after the unit has arrived. Bound the clip by the walk presentation
+    // instead. This only shortens playback — it never delays or advances the
+    // simulation, which has already committed every step by this point.
+    if (!this.controller.movementPresentation) this.stopWalkEffect();
+  }
+
+  private stopWalkEffect(): void {
+    const effect = this.walkEffect;
+    this.walkEffect = undefined;
+    if (effect) this.releaseWalkEffect(effect);
+    this.updateWalkDebugState();
+  }
+
+  // Cutting a footstep clip mid-waveform clicks, so let it down over a few
+  // frames. Each clip owns its own timer: a walk that starts while an earlier
+  // one is still releasing must not cancel that release and strand it playing.
+  private releaseWalkEffect(effect: HTMLAudioElement): void {
+    if (effect.paused) return;
+    this.releasingWalkEffects.add(effect);
+    let remaining = 4;
+    const timer = setInterval(() => {
+      remaining -= 1;
+      if (remaining > 0) {
+        effect.volume = Math.max(0, effect.volume * (remaining / (remaining + 1)));
+        return;
+      }
+      clearInterval(timer);
+      effect.pause();
+      effect.currentTime = 0;
+      this.releasingWalkEffects.delete(effect);
+      this.updateWalkDebugState();
+    }, WALK_FADE_STEP_MS);
+  }
+
+  // Derived rather than pushed, so a late release callback cannot report on a
+  // walk that has already been replaced.
+  private updateWalkDebugState(): void {
+    if (!this.controller.isTestMode) return;
+    this.root.dataset.walkEffectActive = String(
+      this.walkEffect !== undefined || this.releasingWalkEffects.size > 0,
+    );
   }
 
   private syncMusic(): void {
@@ -207,15 +271,20 @@ export class AudioManager {
     if (channel) this.root.dataset.lastEffectChannel = channel;
   }
 
-  private playEffect(source: string, volume: number, channel: SoundEffectChannel): void {
+  private playEffect(
+    source: string,
+    volume: number,
+    channel: SoundEffectChannel,
+  ): HTMLAudioElement | undefined {
     this.effectRequestCounts[channel] += 1;
     if (this.controller.isTestMode) this.root.dataset.lastEffectRequestChannel = channel;
     this.updateEffectDebugState();
-    if (!this.unlocked || !isSoundEffectChannelEnabled(this.controller, channel)) return;
+    if (!this.unlocked || !isSoundEffectChannelEnabled(this.controller, channel)) return undefined;
     this.effectPlaybackCounts[channel] += 1;
     this.updateEffectDebugState(channel);
     const effect = new Audio(source);
     effect.volume = volume;
     void effect.play().catch(() => undefined);
+    return effect;
   }
 }

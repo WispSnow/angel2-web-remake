@@ -129,13 +129,16 @@ type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
 
 // The native walk sound is per movement, not per step, and every reason has to
 // keep the "movement" substring so it routes to the 移動 category switch.
-// Taking a move back has no native walk at all — the cancel paths restore the
-// previous cell directly — so the remake's rollback replay stays silent [DD].
+// Two kinds stay silent by decision, not by omission:
+//   rollback — the native cancel paths restore the previous cell directly, so
+//              there is no original walk to reproduce for the replay [DD];
+//   enemy    — the original does play E/14 for side 2, but a full enemy phase
+//              chains many walks back to back; see REMAKE-106 [DD].
 const MOVEMENT_AUDIO_REASON: Readonly<Record<MovementKind, string | undefined>> = {
   scripted: "stage-event-scripted-movement",
   player: "player-movement",
   allyAuto: "ally-auto-movement",
-  enemy: "enemy-movement",
+  enemy: undefined,
   rollback: undefined,
 };
 
@@ -3808,6 +3811,14 @@ export class GameController {
     this.queueAudioCue(14, reason);
   }
 
+  // Publish the end of a walk so the audio layer can bound E/14 by the actual
+  // presentation instead of letting the 1.261 s clip run past the arrival.
+  // Every step is already committed here, so this only notifies observers.
+  private endMovementPresentation(): void {
+    this.movementPresentation = undefined;
+    this.emit();
+  }
+
   private mapCombatDelay(nativeTicks: number): number {
     if (this.testMode && !this.mapCombatRealTime) return Math.max(4, nativeTicks * 4);
     if (this.presentationFast) return Math.max(3, Math.round(nativeTicks * 2.5));
@@ -5783,7 +5794,7 @@ export class GameController {
       if (!this.battle.moveUnitStep(unitId, step, index < path.length - 1)) {
         const unit = this.battle.unit(unitId);
         if (unit) this.cursor = { x: unit.x, y: unit.y };
-        this.movementPresentation = undefined;
+        this.endMovementPresentation();
         return false;
       }
       this.movementPresentation.stepIndex = index;
@@ -5791,7 +5802,7 @@ export class GameController {
       this.emit();
       await pause(this.movementStepDuration);
     }
-    this.movementPresentation = undefined;
+    this.endMovementPresentation();
     return true;
   }
 
@@ -5812,14 +5823,14 @@ export class GameController {
     this.emit();
     for (let index = 1; index < path.length; index += 1) {
       if (!this.battle.unit(unitId)) {
-        this.movementPresentation = undefined;
+        this.endMovementPresentation();
         return false;
       }
       this.movementPresentation.stepIndex = index;
       this.emit();
       await pause(this.movementStepDuration);
     }
-    this.movementPresentation = undefined;
+    this.endMovementPresentation();
     return true;
   }
 

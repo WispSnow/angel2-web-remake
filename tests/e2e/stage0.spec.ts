@@ -803,9 +803,12 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   // 返悔 replays the route in reverse as a remake-only presentation; the native
   // cancel paths restore the previous cell directly, so it must not request a
-  // walk sound of its own [DD].
-  expect((await debugState(page)).audioCueLog.filter(({ record }) => record === 14))
-    .toHaveLength(afterFirstMove.audioCueLog.filter(({ record }) => record === 14).length);
+  // walk sound of its own [DD]. E/14 doubles as the full-combat charge cue, so
+  // match the 移動-category reason rather than the record alone.
+  const walkCues = (log: Array<{ record: number; reason: string }>) =>
+    log.filter(({ record, reason }) => record === 14 && reason.includes("movement"));
+  expect(walkCues((await debugState(page)).audioCueLog))
+    .toHaveLength(walkCues(afterFirstMove.audioCueLog).length);
   await page.getByTestId("unit-command-move").click();
   await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
   await clickCanvas(page, 180, 177);
@@ -2116,6 +2119,12 @@ test("RHP-05b: the 移動 switch gates the ordinary player walk, not only script
   await walkUnitOneCell();
   expect(await movementRequests()).toBeGreaterThan(enabledRequests);
   expect(await movementPlaybacks()).toBeGreaterThan(enabledPlaybacks);
+  // E/14 runs 1.261 s but this walk is one step, so the clip must already be
+  // released once the unit has arrived rather than sounding over the next
+  // action. The short release fade is why this polls instead of reading once.
+  await expect.poll(async () => await app.getAttribute("data-walk-effect-active"))
+    .toBe("false");
+  expect((await debugState(page)).movementPresentation).toBeUndefined();
 
   await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 220, y: 177 } });
   await expect(page.getByTestId("action-menu")).toBeHidden();

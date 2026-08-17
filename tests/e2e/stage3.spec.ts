@@ -276,6 +276,10 @@ test("S03-N/O: free action hands off player units first and round two still foll
   });
 
   await waitForPhase(page, "enemy");
+  // E/14 is also the full-combat charge cue, so walk cues are identified by the
+  // "movement" reason that routes them to the 移動 category, not by record alone.
+  const walkCuesBeforeEnemyPhase = (await state(page)).audioCueLog
+    .filter(({ record, reason }) => record === 14 && reason.includes("movement"));
   const handoffTrace = await page.evaluate(() => {
     const traceHost = window as typeof window & {
       __stage3HandoffTimer?: number;
@@ -295,11 +299,16 @@ test("S03-N/O: free action hands off player units first and round two still foll
   await waitForPhase(page, "player");
   const afterEnemyPhase = await state(page);
   expect(afterEnemyPhase.round).toBe(2);
-  // side 2 AI walks share the playback function 1000:7F72 with the player
-  // command, so a completed enemy phase requests E/14 through the 移動 gate.
+  // The allied automatic phase that just ran proves walk cues are reachable
+  // here, so the enemy-phase assertion below cannot pass vacuously.
+  expect(walkCuesBeforeEnemyPhase.filter(({ reason }) => reason === "ally-auto-movement").length)
+    .toBeGreaterThan(0);
+  // REMAKE-106: side 2 walks share the native playback function with the player
+  // command and do request E/14 in the original, but the remake keeps the enemy
+  // phase silent so the walk sound only marks the player's own side.
   expect(afterEnemyPhase.audioCueLog.filter(
-    ({ record, reason }) => record === 14 && reason === "enemy-movement",
-  ).length).toBeGreaterThan(0);
+    ({ record, reason }) => record === 14 && reason.includes("movement"),
+  )).toEqual(walkCuesBeforeEnemyPhase);
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
   expect((await state(page)).groupLeaderId).toBe("1:1");

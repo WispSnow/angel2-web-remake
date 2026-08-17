@@ -82,6 +82,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 原生“肖像不随文字窗关闭而消失”的检查点（SAY/0043 点名段、SAY/0074 龍王石像） | `stage21-content.test.ts`、`stage20-content.test.ts` | `stage21.spec.ts` |
 | 第 0–6 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
 | `dialogue-text.ts`、剧情对话 DOM、原生 Big5／ASCII 固定字宽、逐字推进、右键跳过确认与输入阻断 | 无独立模拟数值测试 | `stage0.spec.ts` 的剧情对话用例、`stage49-ending.spec.ts` 的上下窗长行排版；各关卡通过 `dialogue-controls.ts` 复用真实跳过路径 |
+| `audio.ts`、`audio-settings.ts` 的四类音效请求门与走路声 `E/14`：玩家／我方自动／工兵構築／半龍戰士傳送／逐关脚本移动各请求一次，返悔与 `REMAKE-106` 的敌方阶段静音，走路声随移动演出结束淡出收尾（`data-walk-effect-active`） | `audio.test.ts` 的通道路由 | `stage0.spec.ts` 的 `RHP-05`／`RHP-05b` 与 `S00-A` 移动段、我方自动见 `stage2.spec.ts`、敌方静音见 `stage3.spec.ts` 的 `S03-N/O` |
 | 部署 | `deployment*.test.ts` | `deployment-lab.spec.ts` 或对应关卡部署用例 |
 | 肖像目录与职业通用头像回退 | `portrait.test.ts`、`arena.test.ts`、对应 `stageN-battle.test.ts`、`promotion.test.ts` | `portrait-lab.spec.ts`、`arena.spec.ts` 或具体关卡肖像用例 |
 
