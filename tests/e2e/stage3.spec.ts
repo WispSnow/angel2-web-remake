@@ -293,7 +293,13 @@ test("S03-N/O: free action hands off player units first and round two still foll
   expect(playerHandoffIndex).toBeGreaterThanOrEqual(0);
   expect(independentNpcIndex).toBeGreaterThan(playerHandoffIndex);
   await waitForPhase(page, "player");
-  expect((await state(page)).round).toBe(2);
+  const afterEnemyPhase = await state(page);
+  expect(afterEnemyPhase.round).toBe(2);
+  // side 2 AI walks share the playback function 1000:7F72 with the player
+  // command, so a completed enemy phase requests E/14 through the 移動 gate.
+  expect(afterEnemyPhase.audioCueLog.filter(
+    ({ record, reason }) => record === 14 && reason === "enemy-movement",
+  ).length).toBeGreaterThan(0);
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
   expect((await state(page)).groupLeaderId).toBe("1:1");

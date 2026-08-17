@@ -770,6 +770,13 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
   await clickCanvas(page, 180, 177);
   await expect(page.getByTestId("action-menu")).toBeVisible();
+  // Native player 移動 reaches the shared walk playback 1000:7F72, which loads
+  // E/14 and submits it once per movement — not once per step — through the
+  // 移動 category gate 0000:0249.
+  const afterFirstMove = await debugState(page);
+  expect(afterFirstMove.audioCueLog.filter(
+    ({ record, reason }) => record === 14 && reason === "player-movement",
+  )).toHaveLength(1);
   expect((await debugState(page))).toMatchObject({
     actionMode: "actionMenu",
     commandMenuKind: "postMove",
@@ -793,6 +800,11 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     selectedId: movedBeforeRollback.selectedId,
     cursor: { x: 29, y: 26 },
   });
+  // 返悔 replays the route in reverse as a remake-only presentation; the native
+  // cancel paths restore the previous cell directly, so it must not request a
+  // walk sound of its own [DD].
+  expect((await debugState(page)).audioCueLog.filter(({ record }) => record === 14))
+    .toHaveLength(afterFirstMove.audioCueLog.filter(({ record }) => record === 14).length);
   await page.getByTestId("unit-command-move").click();
   await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
   await clickCanvas(page, 180, 177);
@@ -801,6 +813,11 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     actionMode: "actionMenu",
     commandMenuKind: "postMove",
   });
+  // Re-walking the same route requests the walk sound again, so the gate is per
+  // movement rather than a once-per-unit or once-per-turn latch.
+  expect((await debugState(page)).audioCueLog.filter(
+    ({ record, reason }) => record === 14 && reason === "player-movement",
+  )).toHaveLength(2);
   await page.locator("[data-action=attack]").click();
   await expect.poll(async () => (await debugState(page)).units.find((unit) => unit.id === "1:0")?.acted).toBe(true);
   await expect(page.getByTestId("combat-presentation")).toBeHidden();
@@ -2058,6 +2075,71 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   expect((await debugState(page)).audioCueLog.some(({ reason }) => reason.startsWith("full-"))).toBe(true);
   expect(Number(await app.getAttribute("data-combat-effect-request-count"))).toBeGreaterThan(0);
   await expect(app).toHaveAttribute("data-combat-effect-count", "0");
+});
+
+test("RHP-05b: the 移動 switch gates the ordinary player walk, not only scripted movement", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => localStorage.removeItem("angel2.preferences.sound.v1"));
+  await page.reload();
+  const app = page.locator("#app");
+
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+
+  const movementRequests = async () => Number(await app.getAttribute("data-movement-effect-request-count"));
+  const movementPlaybacks = async () => Number(await app.getAttribute("data-movement-effect-count"));
+
+  // Walk (29,26) → (28,26) and take it back, so every call leaves the board in
+  // its starting arrangement and contributes exactly one ordinary player walk.
+  const walkUnitOneCell = async () => {
+    await clickCanvas(page, 220, 177);
+    await expect(page.getByTestId("action-menu")).toBeVisible();
+    await page.getByTestId("unit-command-move").click();
+    await expect.poll(async () => (await debugState(page)).actionMode).toBe("move");
+    await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
+    await clickCanvas(page, 180, 177);
+    await expect.poll(async () => (await debugState(page)).commandMenuKind).toBe("postMove");
+    await page.getByTestId("unit-command-undo").click();
+    await expect.poll(async () => (await debugState(page)).commandMenuKind).toBe("initial");
+    await expect.poll(async () => {
+      const unit = (await debugState(page)).units.find(({ id }) => id === "1:0");
+      return unit ? { x: unit.x, y: unit.y } : undefined;
+    }).toEqual({ x: 29, y: 26 });
+  };
+
+  // With the switch on, an ordinary player 移動 both requests and plays E/14.
+  const enabledRequests = await movementRequests();
+  const enabledPlaybacks = await movementPlaybacks();
+  await walkUnitOneCell();
+  expect(await movementRequests()).toBeGreaterThan(enabledRequests);
+  expect(await movementPlaybacks()).toBeGreaterThan(enabledPlaybacks);
+
+  await page.getByTestId("battle-canvas").click({ button: "right", position: { x: 220, y: 177 } });
+  await expect(page.getByTestId("action-menu")).toBeHidden();
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  const soundHotspot = page.getByTestId("sound-hotspot");
+  await expect(soundHotspot).toBeVisible();
+  await soundHotspot.click();
+  await expect(page.getByTestId("sound-settings-menu")).toBeVisible();
+  await page.getByTestId("sound-movement-button").click();
+  await expect(page.getByTestId("sound-movement-button")).toHaveText("移動 關");
+  await page.getByTestId("close-sound-settings").click();
+  await expect(page.getByTestId("sound-settings-menu")).toBeHidden();
+
+  // With it off the request still reaches the gate — matching the native
+  // wrapper 0000:0249, which tests DS:10EC bit 0 before submitting — but no
+  // sound is played, and the deterministic state is untouched.
+  const gatedBaseline = await debugState(page);
+  const disabledRequests = await movementRequests();
+  const disabledPlaybacks = await movementPlaybacks();
+  await walkUnitOneCell();
+  expect(await movementRequests()).toBeGreaterThan(disabledRequests);
+  expect(await movementPlaybacks()).toBe(disabledPlaybacks);
+  const gatedAfter = await debugState(page);
+  expect(gatedAfter.rngState).toBe(gatedBaseline.rngState);
+  expect(gatedAfter.units).toEqual(gatedBaseline.units);
 });
 
 test("RHP-06: music desk object selects five persistent levels without restarting transport", async ({ page }) => {

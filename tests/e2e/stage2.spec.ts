@@ -28,6 +28,7 @@ interface Stage2State {
     experience: number;
     acted: boolean;
   }>;
+  audioCueLog: Array<{ group: string; record: number; reason: string }>;
 }
 
 const state = (page: Page) => page.evaluate(
@@ -126,7 +127,13 @@ test("S02-C/D: all-rest spends only manual units, then every automatic ally acts
     expect(alliedFocusIds.has(id), `${id} should receive its automatic action`).toBe(true);
   }
   expect(trace.some(({ phase }) => phase === "allyAuto")).toBe(true);
-  expect((await state(page)).phase).toBe("enemy");
+  const afterAllyAuto = await state(page);
+  expect(afterAllyAuto.phase).toBe("enemy");
+  // AI walks reach the same shared playback 1000:7F72 as the player command
+  // (1000:1B1D..2202 → 7F4A), so automatic allies request E/14 too.
+  expect(afterAllyAuto.audioCueLog.filter(
+    ({ record, reason }) => record === 14 && reason === "ally-auto-movement",
+  ).length).toBeGreaterThan(0);
 });
 
 test("S02-E/H: defeating Lan plays SAY/175 once and enters stage 3", async ({ page }) => {

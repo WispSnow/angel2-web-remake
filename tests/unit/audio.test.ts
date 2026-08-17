@@ -12,8 +12,20 @@ import {
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
 
 describe("native sound-effect request gates", () => {
-  test("routes scripted movement separately from map and full combat cues", () => {
-    expect(soundEffectChannelForCue("stage-event-scripted-movement")).toBe("movement");
+  test("routes every board walk to the 移動 category, separately from map and full combat cues", () => {
+    // Player 移動, the 半龍戰士 direct technique, 工兵 construction, both AI
+    // sides and scripted stage events all reach the shared walk playback
+    // 1000:7F72, whose single E/14 request passes the 移動 gate 0000:0249.
+    for (const reason of [
+      "stage-event-scripted-movement",
+      "player-movement",
+      "ally-auto-movement",
+      "enemy-movement",
+      "construction-movement",
+      "half-dragon-technique-movement",
+    ]) {
+      expect(soundEffectChannelForCue(reason)).toBe("movement");
+    }
     expect(soundEffectChannelForCue("map-primary-hit-first")).toBe("combat");
     expect(soundEffectChannelForCue("full-primary-hurt")).toBe("combat");
     expect(soundEffectChannelForCue("full-primary-death")).toBe("combat");

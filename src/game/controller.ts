@@ -127,6 +127,18 @@ import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage,
 type Listener = () => void;
 type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
 
+// The native walk sound is per movement, not per step, and every reason has to
+// keep the "movement" substring so it routes to the 移動 category switch.
+// Taking a move back has no native walk at all — the cancel paths restore the
+// previous cell directly — so the remake's rollback replay stays silent [DD].
+const MOVEMENT_AUDIO_REASON: Readonly<Record<MovementKind, string | undefined>> = {
+  scripted: "stage-event-scripted-movement",
+  player: "player-movement",
+  allyAuto: "ally-auto-movement",
+  enemy: "enemy-movement",
+  rollback: undefined,
+};
+
 interface StageEntryOptions {
   preparation?: boolean;
   statusMessage?: string;
@@ -2254,7 +2266,11 @@ export class GameController {
       this.resetAction();
       this.markHintSeen();
       this.emit();
-      const completed = await this.presentPreparedUnitPath(actor.id, prepared.path);
+      const completed = await this.presentPreparedUnitPath(
+        actor.id,
+        prepared.path,
+        "construction-movement",
+      );
       if (!completed) throw new Error(`${label}移動路徑已失效`);
       this.lastConstruction = this.battle.commitConstruction(prepared);
       const changed = this.lastConstruction.terrainMutations.filter(({ changed }) => changed).length;
@@ -2607,6 +2623,7 @@ export class GameController {
       await this.presentPreparedUnitPath(
         result.actorId,
         this.battle.directTechniquePath(result.actorId, result.target),
+        "half-dragon-technique-movement",
       );
     } else {
       const dispel = actionPresentationCatalog().dispel;
@@ -3778,6 +3795,17 @@ export class GameController {
     const cue = { sequence: ++this.audioCueSequence, group, record, reason };
     this.audioCue = cue;
     this.audioCueLog.push(cue);
+  }
+
+  // Every native board walk — player 移動, the 半龍戰士 direct technique, 工兵
+  // construction, both AI sides and scripted stage events — reaches the shared
+  // playback function 1000:7F72, which loads E/14 and submits it once through
+  // the 移動 gate 0000:0249 before the first step. Path building at 1000:7E09
+  // marks start==destination with DS:77AF='N', and 7F72 then skips to 805B
+  // without requesting audio, so a path with no step stays silent.
+  private queueWalkAudioCue(reason: string | undefined, path: readonly Position[]): void {
+    if (reason === undefined || path.length < 2) return;
+    this.queueAudioCue(14, reason);
   }
 
   private mapCombatDelay(nativeTicks: number): number {
@@ -5747,7 +5775,7 @@ export class GameController {
       path: path.map((step) => ({ ...step })),
       stepIndex: 0,
     };
-    if (kind === "scripted") this.queueAudioCue(14, "stage-event-scripted-movement");
+    this.queueWalkAudioCue(MOVEMENT_AUDIO_REASON[kind], path);
     this.cursor = { ...path[path.length - 1] };
     this.emit();
     for (let index = 1; index < path.length; index += 1) {
@@ -5767,7 +5795,11 @@ export class GameController {
     return true;
   }
 
-  private async presentPreparedUnitPath(unitId: string, path: readonly Position[]): Promise<boolean> {
+  private async presentPreparedUnitPath(
+    unitId: string,
+    path: readonly Position[],
+    walkReason: string,
+  ): Promise<boolean> {
     if (path.length === 0 || !this.battle.unit(unitId)) return false;
     this.movementPresentation = {
       unitId,
@@ -5775,6 +5807,7 @@ export class GameController {
       path: path.map((step) => ({ ...step })),
       stepIndex: 0,
     };
+    this.queueWalkAudioCue(walkReason, path);
     this.cursor = { ...path[path.length - 1] };
     this.emit();
     for (let index = 1; index < path.length; index += 1) {
