@@ -31,24 +31,6 @@ export interface Stage49EpiloguePresentation {
 const nativeRecordSet = (family: Stage49ClassFamily): ReadonlySet<number> =>
   new Set<number>(STAGE49_CLASS_FAMILIES[family]);
 
-/**
- * [DD] Native module 35 leaves the warrior-statue segment's wait limit at 0
- * (`mov word [0DED],0000` at 0000:04C4), and its wait loop is an unsigned
- * `counter < limit` test, so DOS drew the two plates and the text and then
- * advanced on the very next iteration. Players only ever caught it flashing
- * while the next segment loaded from disk — the segment has full text and its
- * own illustration pair, so the missing limit is an original oversight rather
- * than a designed cut.
- *
- * A browser cannot reproduce even that flash: the plates are `<img>` elements
- * that load asynchronously, so a 0 ms limit means the segment never paints at
- * all, which is strictly less than the original showed. The floor adopts the
- * shortest limit the three sibling segments actually use (0x08C3) instead of an
- * invented number, and the segment stays skippable by any semantic action. This
- * is presentation only: it consumes no simulation PRNG and changes no branch,
- * roster, or save state.
- */
-const STAGE49_MINIMUM_EPILOGUE_NATIVE_TICKS = 0x08c3;
 
 export class Stage49EndingSession {
   section: Stage49EndingSection = "story";
@@ -101,12 +83,24 @@ export class Stage49EndingSession {
     return { segment, variant };
   }
 
+  /**
+   * Native module 35 zeroes the segment's tick counter at 0000:0529, before the
+   * plates load and before 0000:069E types the text out one glyph at a time, so
+   * the per-glyph waits are spent inside the segment's own limit rather than
+   * before it. A segment therefore lasts for whichever is longer: typing the
+   * text, or the limit at 0000:04AE/04C3/04E0/04FD. That is also why the
+   * warrior-statue segment is not the flash its zero limit suggests — its 46
+   * glyphs alone hold the screen for 1104 ticks.
+   */
   get autoAdvanceMilliseconds(): number | undefined {
     if (this.section === "roster") return STAGE49_ROSTER_WAIT_NATIVE_TICKS * 10;
     if (this.section === "epilogue") {
-      const ticks = this.epiloguePresentation?.segment.waitNativeTicks;
-      if (ticks === undefined) return undefined;
-      return Math.max(ticks, STAGE49_MINIMUM_EPILOGUE_NATIVE_TICKS) * 10;
+      const presentation = this.epiloguePresentation;
+      if (!presentation) return undefined;
+      return Math.max(
+        presentation.segment.waitNativeTicks,
+        presentation.variant.typingNativeTicks,
+      ) * 10;
     }
     return undefined;
   }

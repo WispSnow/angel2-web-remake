@@ -430,3 +430,45 @@ test("S49-F: the save-count selector accumulates across record slots and resumes
   expect(await savedRecord(page, 3)).toMatchObject({ saveCount: 2 });
   expect(await savedRecord(page, 2)).toMatchObject({ saveCount: 2 });
 });
+
+test("S49-G: the epilogue types its native bitmap text and the first press only finishes it", async ({ page }) => {
+  // Runs from the debug entry rather than ?test=1 so the native cadence is
+  // live: module 35 draws no text window and types one full-width glyph every
+  // 24 native ticks (0000:069E-0725), and the warrior-statue segment alone
+  // holds the screen for 46 of them.
+  await page.goto(
+    "/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=representative-growth&growth=100",
+  );
+  const screen = page.locator("#stage49-screen");
+  const epilogue = page.getByTestId("stage49-epilogue");
+  await expect(epilogue).toHaveAttribute("data-segment", "warriorStatue");
+  await expect(screen).toHaveAttribute("data-epilogue-typing", "true");
+
+  const inkPixels = () => page.getByTestId("stage49-epilogue-text")
+    .evaluate((canvas) => {
+      const context = (canvas as HTMLCanvasElement).getContext("2d");
+      if (!context) return 0;
+      const { data } = context.getImageData(
+        0,
+        0,
+        (canvas as HTMLCanvasElement).width,
+        (canvas as HTMLCanvasElement).height,
+      );
+      let opaque = 0;
+      for (let index = 3; index < data.length; index += 4) if (data[index] !== 0) opaque += 1;
+      return opaque;
+    });
+  const partial = await inkPixels();
+  expect(partial).toBeGreaterThan(0);
+
+  // [SR] 0000:0717/071E mean to skip a glyph's wait while an action flag is set
+  // but both branches land on the wait itself. Restoring the intent makes the
+  // first press finish the remaining text without advancing the segment.
+  await screen.click();
+  await expect(screen).toHaveAttribute("data-epilogue-typing", "false");
+  expect(await inkPixels()).toBeGreaterThan(partial);
+  await expect(epilogue).toHaveAttribute("data-segment", "warriorStatue");
+
+  await screen.click();
+  await expect(epilogue).toHaveAttribute("data-segment", "saveCountOutcome");
+});

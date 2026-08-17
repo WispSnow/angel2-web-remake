@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { encodeRgbaPng } from "../reverse/tools/angel2-planar.mjs";
 import { compileNativeStory } from "./lib/compile-native-story.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,6 +21,10 @@ const inputPaths = {
   // the epilogue plates come from the palette-correct postgame renders rather
   // than the gameplay-palette planar masters under renders/planar/UN.
   endingRenders: reversePath("renders/ending-presentations/manifest.json"),
+  // 258 headerless 16x15 glyphs; UN/9 in the evidence JSON supplies their Big5
+  // codes in the same order. Module 35 draws the epilogue with these, not with
+  // any system font, so the remake ships them as a bitmap atlas.
+  endingGlyphs: reversePath("extracted/UN/0010.bin"),
   storyMusic: reversePath("converted/audio/rix-wav/MAGIC/0077.wav"),
   rosterMusic: reversePath("converted/audio/rix-wav/UN/0006.wav"),
   prosperousMusic: reversePath("converted/audio/rix-wav/MUSIC/0040.wav"),
@@ -137,19 +142,124 @@ assert.deepEqual(families, {
   fighter: [1, 2, 7, 9, 27, 28, 29, 33],
   mage: [3, 4, 5, 6, 10, 11, 24, 25, 30, 31, 32],
 });
+/* Native epilogue typesetting, from module 35 0000:069E-072E. The cursor starts
+ * at (112,170); `|` returns X to 112 and adds 20 to Y; a half-width byte only
+ * advances 8 pixels; a Big5 pair draws and advances 16. Every full-width glyph
+ * is followed by an unconditional 24-native-tick wait at 0000:0725, which is why
+ * the text types out instead of appearing at once. Centering is authored as
+ * literal half-width spaces, so the raw bytes must survive into the runtime. */
+const EPILOGUE_LAYOUT = {
+  screenWidth: 640,
+  screenHeight: 350,
+  originX: 112,
+  originY: 170,
+  fullWidthAdvance: 16,
+  halfWidthAdvance: 8,
+  lineAdvance: 20,
+  glyphNativeTicks: 24,
+  /* 0000:1AD2-1B18 draws the row-smeared glyph at (X,Y) and (X+2,Y) in palette
+   * index 0, then the crisp glyph at (X+1,Y+1) in index 15. The smear ORs the
+   * glyph with itself one and two rows down, so relative to the ink the shadow
+   * is the same glyph repeated at exactly these six offsets. */
+  inkOffset: [1, 1],
+  shadowOffsets: [[-1, -1], [-1, 0], [-1, 1], [1, -1], [1, 0], [1, 1]],
+};
+
+const GLYPH_WIDTH = 16;
+const GLYPH_HEIGHT = 15;
+const GLYPH_BYTES = 30;
+const ATLAS_COLUMNS = 16;
+
+const endingGlyphs = ending.glyphSets.epilogueAndCredits;
+assert.equal(endingGlyphs.glyphCount, 258);
+assert.equal(endingGlyphs.glyphWidth, GLYPH_WIDTH);
+assert.equal(endingGlyphs.glyphHeight, GLYPH_HEIGHT);
+assert.equal(buffers.endingGlyphs.length, endingGlyphs.glyphCount * GLYPH_BYTES);
+const glyphIndexByCharacter = Object.fromEntries(
+  endingGlyphs.glyphs.map(({ index, char }) => [char, index]),
+);
+assert.equal(
+  Object.keys(glyphIndexByCharacter).length,
+  endingGlyphs.glyphCount,
+  "UN/9 repeats a character, so a character-keyed atlas index would be ambiguous",
+);
+
+const atlasRows = Math.ceil(endingGlyphs.glyphCount / ATLAS_COLUMNS);
+const atlasWidth = ATLAS_COLUMNS * GLYPH_WIDTH;
+const atlasHeight = atlasRows * GLYPH_HEIGHT;
+const atlasPixels = Buffer.alloc(atlasWidth * atlasHeight * 4);
+for (let glyph = 0; glyph < endingGlyphs.glyphCount; glyph += 1) {
+  const cellX = (glyph % ATLAS_COLUMNS) * GLYPH_WIDTH;
+  const cellY = Math.floor(glyph / ATLAS_COLUMNS) * GLYPH_HEIGHT;
+  for (let row = 0; row < GLYPH_HEIGHT; row += 1) {
+    const bits = buffers.endingGlyphs.readUInt16BE(glyph * GLYPH_BYTES + row * 2);
+    for (let column = 0; column < GLYPH_WIDTH; column += 1) {
+      if ((bits & (0x8000 >>> column)) === 0) continue;
+      const target = ((cellY + row) * atlasWidth + cellX + column) * 4;
+      atlasPixels.fill(0xff, target, target + 4);
+    }
+  }
+}
+
+const cssColor = (rgb) => `#${rgb.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+
+/** Walks the native cursor so the runtime can reuse one pre-resolved layout
+ * instead of re-deriving Big5 widths in the browser. */
+function layoutNativeText(big5Hex) {
+  const bytes = Buffer.from(big5Hex, "hex");
+  const decoder = new TextDecoder("big5", { fatal: true });
+  const glyphs = [];
+  let x = EPILOGUE_LAYOUT.originX;
+  let y = EPILOGUE_LAYOUT.originY;
+  for (let index = 0; index < bytes.length;) {
+    const byte = bytes[index];
+    if (byte === 0x24) break;
+    if (byte === 0x7c) {
+      x = EPILOGUE_LAYOUT.originX;
+      y += EPILOGUE_LAYOUT.lineAdvance;
+      index += 1;
+      continue;
+    }
+    if (byte <= 0x7f) {
+      assert.equal(byte, 0x20, `epilogue text uses unexpected half-width byte ${byte}`);
+      x += EPILOGUE_LAYOUT.halfWidthAdvance;
+      index += 1;
+      continue;
+    }
+    const character = decoder.decode(bytes.subarray(index, index + 2));
+    const glyph = glyphIndexByCharacter[character];
+    assert.notEqual(glyph, undefined, `epilogue character ${character} is missing from UN/9`);
+    glyphs.push({ glyph, x, y });
+    x += EPILOGUE_LAYOUT.fullWidthAdvance;
+    index += 2;
+  }
+  return glyphs;
+}
+
 const epilogueSegments = epilogue.orderedSegments.map((segment) => ({
   id: segment.id,
   waitNativeTicks: segment.waitLimitNativeTicks,
-  variants: segment.variants.map((variant) => ({
-    selector: variant.selector ?? 0,
-    ...(variant.family ? { family: variant.family } : {}),
-    ...(variant.condition ? { condition: variant.condition } : {}),
-    text: variant.text.text,
-    illustrationRecords: variant.illustration.records,
-    ...(variant.music ? {
-      music: `${variant.music.resource.replace(".SWF", "")}/${variant.music.record}`,
-    } : {}),
-  })),
+  variants: segment.variants.map((variant) => {
+    const glyphs = layoutNativeText(variant.text.big5Hex);
+    const palette = variant.illustration.palette.colors;
+    const ink = cssColor(palette[15]);
+    assert.equal(ink, "#ffffff", "epilogue ink index 15 is no longer white in every palette");
+    return {
+      selector: variant.selector ?? 0,
+      ...(variant.family ? { family: variant.family } : {}),
+      ...(variant.condition ? { condition: variant.condition } : {}),
+      text: variant.text.text,
+      // Flat triples keep the generated table small: glyph index, x, y.
+      glyphs: glyphs.flatMap(({ glyph, x, y }) => [glyph, x, y]),
+      typingNativeTicks: glyphs.length * EPILOGUE_LAYOUT.glyphNativeTicks,
+      inkColor: ink,
+      shadowColor: cssColor(palette[0]),
+      illustrationRecords: variant.illustration.records,
+      ...(variant.music ? {
+        music: `${variant.music.resource.replace(".SWF", "")}/${variant.music.record}`,
+      } : {}),
+    };
+  }),
 }));
 
 const generatedSources = Object.entries(inputPaths).map(([id, file]) => ({
@@ -172,6 +282,15 @@ const generated = `// Generated by scripts/generate-stage49-ending.mjs from nati
   + `export const STAGE49_ROSTER_WAIT_NATIVE_TICKS = 400 as const;\n`
   + `export const STAGE49_CLASS_FAMILIES = ${json(families)} as const;\n`
   + `export const STAGE49_EPILOGUE_SEGMENTS = ${json(epilogueSegments)} as const;\n`
+  + `/** Native module-35 typesetting; see scripts/generate-stage49-ending.mjs. */\n`
+  + `export const STAGE49_EPILOGUE_LAYOUT = ${json(EPILOGUE_LAYOUT)} as const;\n`
+  + `export const STAGE49_EPILOGUE_FONT = ${json({
+    src: "/assets/original/ending/epilogue-font.png",
+    glyphWidth: GLYPH_WIDTH,
+    glyphHeight: GLYPH_HEIGHT,
+    columns: ATLAS_COLUMNS,
+    glyphCount: endingGlyphs.glyphCount,
+  })} as const;\n`
   + `/** Started at module-35 entry, so it plays over all four segments. */\n`
   + `export const STAGE49_EPILOGUE_ENTRY_MUSIC = ${json(entryMusic)} as const;\n`
   + `export const STAGE49_ENDING_ROUTE = ${json({ nextModule: 27, nextStage: 38 })} as const;\n`;
@@ -182,6 +301,10 @@ await mkdir(path.join(publicRoot, "class-illustrations"), { recursive: true });
 await mkdir(path.join(publicRoot, "epilogue"), { recursive: true });
 await mkdir(path.join(publicRoot, "audio"), { recursive: true });
 const copies = [
+  writeFile(
+    path.join(publicRoot, "epilogue-font.png"),
+    encodeRgbaPng(atlasWidth, atlasHeight, atlasPixels),
+  ),
   copyFile(reversePath("renders/planar/A/0009/00.png"), path.join(publicRoot, "roster-background.png")),
   copyFile(inputPaths.storyMusic, path.join(publicRoot, "audio/story.wav")),
   copyFile(inputPaths.rosterMusic, path.join(publicRoot, "audio/roster.wav")),

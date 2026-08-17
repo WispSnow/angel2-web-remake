@@ -100,7 +100,10 @@
 .stage49-epilogue-right { position: absolute; top: 0; width: 320px; height: 350px; object-fit: cover; }
 .stage49-epilogue-left { left: 0; }
 .stage49-epilogue-right { right: 0; }
-.stage49-epilogue p { position: absolute; left: 112px; right: 112px; bottom: 20px; margin: 0; padding: 14px 20px; white-space: pre-line; color: #fff6cf; background: #03030bcf; border: 1px solid #e8c772; font-size: 13px; line-height: 1.48; text-align: center; text-shadow: 1px 1px 2px #000; }
+/* Native module 35 has no text window: 0000:069E types the UN/9+UN/10 bitmap
+ * font straight onto the illustration, so the canvas covers the whole screen
+ * and the paragraph exists only for assistive technology. */
+.stage49-epilogue-text { position: absolute; inset: 0; width: 640px; height: 350px; image-rendering: pixelated; pointer-events: none; }
 
 .stage49-boundary { display: grid; place-content: center; gap: 13px; padding: 70px; background: radial-gradient(circle, #26336a, #060817 70%); text-align: center; }
 .stage49-boundary span { color: #a6b6ea; letter-spacing: 4px; }

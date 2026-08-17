@@ -6,9 +6,11 @@ import {
 } from "./content/portrait-catalog.generated";
 import {
   STAGE49_ENDING_ASSETS,
+  STAGE49_EPILOGUE_LAYOUT,
   STAGE49_STORY_PAGES,
 } from "./content/stage49-ending";
 import type { GameController } from "./controller";
+import { drawEpilogueGlyphs, loadEpilogueFont } from "./epilogue-text";
 import { renderNativeDialogueText } from "./dialogue-text";
 import {
   animatedPortraitMarkup,
@@ -102,16 +104,25 @@ function rosterMarkup(controller: GameController): string {
   </div>`;
 }
 
+/**
+ * Native module 35 draws no text window at all: 0000:0529-05FC only blits the
+ * two illustration halves, and 0000:069E then types the Big5 text straight onto
+ * them with the UN/9+UN/10 bitmap font. The canvas reproduces that; the
+ * paragraph stays for assistive technology and carries no visible style.
+ */
 function epilogueMarkup(controller: GameController): string {
   const session = controller.stage49Ending;
   const presentation = session?.epiloguePresentation;
   if (!presentation || !session) return "";
   const [left, right] = presentation.variant.illustrationRecords;
+  const { screenWidth, screenHeight } = STAGE49_EPILOGUE_LAYOUT;
   return `<div class="stage49-epilogue" data-testid="stage49-epilogue"
       data-segment="${presentation.segment.id}" data-selector="${presentation.variant.selector}">
     <img class="stage49-epilogue-left" src="${STAGE49_ENDING_ASSETS.epilogue(left)}" alt="">
     <img class="stage49-epilogue-right" src="${STAGE49_ENDING_ASSETS.epilogue(right)}" alt="">
-    <p>${escapeHtml(presentation.variant.text)}</p>
+    <canvas class="stage49-epilogue-text" data-testid="stage49-epilogue-text"
+      width="${screenWidth}" height="${screenHeight}" aria-hidden="true"></canvas>
+    <p class="visually-hidden">${escapeHtml(presentation.variant.text)}</p>
     <span class="stage49-progress">尾聲 ${session.index + 1}／4</span>
   </div>`;
 }
@@ -151,6 +162,16 @@ export function mountStage49EndingUi(
   let storyPortrait: HTMLElement | undefined;
   let storyFullText = "";
   let storyRevealedCharacters = 0;
+  let epilogueTimer: number | undefined;
+  let epilogueGeneration = 0;
+  let finishEpilogueTyping: (() => boolean) | undefined;
+
+  const stopEpilogueTyping = () => {
+    if (epilogueTimer !== undefined) window.clearTimeout(epilogueTimer);
+    epilogueTimer = undefined;
+    finishEpilogueTyping = undefined;
+    epilogueGeneration += 1;
+  };
 
   const stopSpeaking = (portrait: HTMLElement | undefined) => {
     if (!portrait) return;
@@ -217,9 +238,79 @@ export function mountStage49EndingUi(
     };
     tick();
   };
+  /**
+   * Reproduces module 35 0000:069E: the plates are already on screen and the
+   * text types itself on, one full-width glyph every 24 native ticks, before the
+   * segment's own hold begins. The hold counter at DS:0310 is zeroed back at
+   * 0000:0529, so the typing time is spent inside the limit — the segment ends
+   * at whichever of the two is longer, which the session already reports.
+   *
+   * [SR] 0000:0717/071E test the two action flags to decide whether to skip a
+   * glyph's wait, but both `je` targets are the wait itself, so the shipped
+   * build never skips. Nothing else clears the flags until typing returns, so
+   * the author's intent is unambiguous: the first press finishes the remaining
+   * text at once, and only a second press advances the segment.
+   */
+  const startEpilogueTyping = (startedAt: number) => {
+    const session = controller.stage49Ending;
+    const presentation = session?.epiloguePresentation;
+    const canvas = screen.querySelector<HTMLCanvasElement>(".stage49-epilogue-text");
+    if (!presentation || !canvas) return;
+    const { variant, segment } = presentation;
+    const glyphs = variant.glyphs;
+    const total = glyphs.length / 3;
+    const colors = { ink: variant.inkColor, shadow: variant.shadowColor };
+    const generation = epilogueGeneration;
+    const glyphDelay = controller.presentationFast
+      ? 20
+      : STAGE49_EPILOGUE_LAYOUT.glyphNativeTicks * 10;
+    const scheduleHold = () => {
+      screen.dataset.epilogueTyping = "false";
+      const limit = Math.max(segment.waitNativeTicks, variant.typingNativeTicks) * 10;
+      const remaining = Math.max(0, limit - (performance.now() - startedAt));
+      timer = window.setTimeout(
+        () => controller.advanceStage49Ending(),
+        controller.presentationFast ? Math.min(30, remaining) : remaining,
+      );
+    };
+    void loadEpilogueFont().then((font) => {
+      if (generation !== epilogueGeneration) return;
+      let revealed = controller.isTestMode ? total : 0;
+      drawEpilogueGlyphs(canvas, font, glyphs, revealed, colors);
+      if (revealed >= total) {
+        scheduleHold();
+        return;
+      }
+      screen.dataset.epilogueTyping = "true";
+      finishEpilogueTyping = () => {
+        if (revealed >= total) return false;
+        if (epilogueTimer !== undefined) window.clearTimeout(epilogueTimer);
+        epilogueTimer = undefined;
+        revealed = total;
+        drawEpilogueGlyphs(canvas, font, glyphs, revealed, colors);
+        finishEpilogueTyping = undefined;
+        scheduleHold();
+        return true;
+      };
+      const tick = () => {
+        if (generation !== epilogueGeneration) return;
+        revealed += 1;
+        drawEpilogueGlyphs(canvas, font, glyphs, revealed, colors);
+        if (revealed >= total) {
+          epilogueTimer = undefined;
+          finishEpilogueTyping = undefined;
+          scheduleHold();
+          return;
+        }
+        epilogueTimer = window.setTimeout(tick, glyphDelay);
+      };
+      epilogueTimer = window.setTimeout(tick, glyphDelay);
+    });
+  };
   const render = () => {
     if (timer !== undefined) window.clearTimeout(timer);
     stopStoryTimer();
+    stopEpilogueTyping();
     stopSpeaking(storyPortrait);
     storyText = undefined;
     storyPortrait = undefined;
@@ -236,11 +327,18 @@ export function mountStage49EndingUi(
           ? epilogueMarkup(controller)
           : boundaryMarkup();
     screen.dataset.storyTyping = "false";
+    screen.dataset.epilogueTyping = "false";
     if (session.section === "story") {
       for (const text of screen.querySelectorAll<HTMLElement>(".stage49-dialogue-copy p")) {
         renderNativeDialogueText(text, text.textContent ?? "");
       }
       startStoryTyping();
+    }
+    // The epilogue owns its own advance timer: the hold only starts once the
+    // text has finished typing, and typing may be cut short by a key press.
+    if (session.section === "epilogue") {
+      startEpilogueTyping(performance.now());
+      return;
     }
     const delay = session.autoAdvanceMilliseconds;
     if (delay !== undefined && session.section !== "stage38-boundary") {
@@ -252,6 +350,7 @@ export function mountStage49EndingUi(
   };
   const advance = () => {
     if (finishStoryTyping()) return;
+    if (finishEpilogueTyping?.()) return;
     controller.advanceStage49Ending();
   };
   const keydown = (event: KeyboardEvent) => {
@@ -267,6 +366,7 @@ export function mountStage49EndingUi(
   return () => {
     if (timer !== undefined) window.clearTimeout(timer);
     stopStoryTimer();
+    stopEpilogueTyping();
     stopSpeaking(storyPortrait);
     unsubscribe();
     destroyPortraitAnimations();
