@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const EDGE_PAN_SETTLE_MS = 180;
@@ -3005,7 +3006,7 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   await page.goto("/");
   expect(new URL(page.url()).search).toBe("");
   expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
-  await page.keyboard.press("x");
+  await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("difficulty-menu")).toBeVisible();

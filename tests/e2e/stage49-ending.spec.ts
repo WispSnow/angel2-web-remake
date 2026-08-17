@@ -3,6 +3,7 @@ import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -369,7 +370,7 @@ test("S49-E: a loaded stage-49 completed save reaches the same main-ending entry
   await page.evaluate((value) => localStorage.setItem("angel2.save.1", value), JSON.stringify(save));
   await page.reload();
   // Load it the way a player does: skip the opening, 繼續遊戲, pick record 1.
-  await page.keyboard.press("x");
+  await skipOpeningToTitle(page);
   await page.getByTestId("continue-game").click();
   await page.getByTestId("title-record-slot-1").click();
   await expect(page.getByTestId("start-stage49-ending")).toBeVisible();

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -256,7 +257,7 @@ test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves 
   });
 
   await page.goto("/?test=1");
-  await page.keyboard.press("x");
+  await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("continue-game").click();
   await expect(page.getByTestId("title-record-slot-1"))

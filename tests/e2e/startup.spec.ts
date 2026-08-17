@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createStage0Units } from "../../src/game/content/stage0";
+import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const battleSave = () => {
@@ -114,20 +115,9 @@ const writeLocalSave = (
  * background that was itself brought up by 64 additive DAC writes. Assert the
  * three stages land in that order and that the menu only appears afterwards.
  */
-/**
- * The Softstar logo now runs before the scroll, so "skip the opening" means
- * waiting for the intro to own the screen and then sending one action. A press
- * during the logo only shortens its hold, which is what 0000:0D2F does.
- */
-const skipToTitle = async (page: Page, via: "key" | "pointer" = "key") => {
-  await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "intro");
-  if (via === "pointer") await page.getByTestId("opening-intro").click();
-  else await page.keyboard.press("x");
-};
-
 test("title artwork dissolves in over its background before the menu appears", async ({ page }) => {
   await page.goto("/?test=1");
-  await skipToTitle(page);
+  await skipOpeningToTitle(page);
 
   // The art is bright against a dark blue plate, so the mean luminance of a band
   // rises as more of the dither pattern fills in.
@@ -162,7 +152,7 @@ test("title artwork dissolves in over its background before the menu appears", a
 
 test("pointer difficulty confirmation carries audio activation into stage zero", async ({ page }) => {
   await page.goto("/?test=1");
-  await skipToTitle(page, "pointer");
+  await skipOpeningToTitle(page, "pointer");
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("new-game").click();
   await page.getByTestId("difficulty-0").click();
@@ -218,7 +208,7 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   })).toBeGreaterThan(0);
   await captureVisualAudit(startup, { path: "artifacts/playwright/startup-opening-intro.png" });
 
-  await skipToTitle(page);
+  await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-screen")).toBeVisible();
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await expect(page.getByTestId("new-game")).toHaveAttribute("aria-current", "true");
@@ -269,7 +259,7 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
   await writeLocalSave(page, 20, save);
   await page.reload();
 
-  await skipToTitle(page);
+  await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("continue-game").click();
 
@@ -352,7 +342,7 @@ test("BOOT-C: a normal reconnect migrates a stage-0 clear into stage-1 prebattle
   await page.reload();
   expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
 
-  await skipToTitle(page);
+  await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("continue-game").click();
   await expect(page.getByTestId("title-record-detail")).toContainText("騎士城堡前");

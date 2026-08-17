@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 async function enterStage0FromOrdinaryStartup(page: Page, difficulty: 0 | 3): Promise<void> {
   await page.goto("/");
-  await page.keyboard.press("x");
+  await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("new-game").click();
   await expect(page.getByTestId("difficulty-menu")).toBeVisible();

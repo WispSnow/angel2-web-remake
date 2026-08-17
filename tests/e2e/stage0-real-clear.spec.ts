@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -28,7 +29,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
 
   await expect(page.getByTestId("opening-intro")).toBeVisible();
-  await page.keyboard.press("x");
+  await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("difficulty-menu")).toBeVisible();

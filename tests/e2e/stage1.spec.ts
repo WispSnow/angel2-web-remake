@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -114,7 +115,7 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
   await page.goto("/?test=1");
   await page.evaluate((value) => localStorage.setItem("angel2.save.1", JSON.stringify(value)), save);
   await page.reload();
-  await page.keyboard.press("x");
+  await skipOpeningToTitle(page);
   await page.getByTestId("continue-game").click();
   await page.getByTestId("title-record-slot-1").click();
 
