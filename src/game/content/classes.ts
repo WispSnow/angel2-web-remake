@@ -5,6 +5,7 @@ import {
   type ClassId,
 } from "./class-catalog.generated";
 import { CLASS_GROWTH_OVERRIDES, type ClassGrowthSegment } from "./class-balance-overrides";
+import type { EnemyGrowthMode } from "./enemy-scaling";
 import type { BattleUnit, UnitStats } from "../types";
 import type { PortraitRecord } from "./portrait-catalog.generated";
 
@@ -252,6 +253,35 @@ function growthFor(classId: ClassId, side: BattleUnit["side"] = 1) {
 }
 
 /**
+ * REMAKE-103 `linear` 模式：把职业前 3 级的每行增量一直延续下去。
+ *
+ * 除女帝外，全部职业第 1→2 行与第 2→3 行的属性增量和经验门槛增量逐值相同，所以
+ * 「前 3 级的成长数值」就是 `dataRows[1] − dataRows[0]`，无须在两段之间取舍。女帝
+ * 是唯一例外（两段门槛 1200／100 不同），但她只以 side 1 出场，够不到本模式。
+ *
+ * 门槛沿用原版 3 级后的增量而不是前 3 级的增量：本模式只改「每行给多少属性」，
+ * 经验↔等级的阶梯保持原版，敌方战中升级节奏因而完全不变。
+ *
+ * 本模式绕开 `CLASS_GROWTH_OVERRIDES`。那些覆写是为 `legacy` 曲线打的补丁，其中
+ * `REMAKE-092` 半龍戰士本身就是「把前 3 级曲线续到 6 级」——在 `linear` 下由通用
+ * 规则接管即可，前 3 段结果一致，第 7 行起继续保持前 3 级速率。
+ */
+function linearGrowthSegmentsFor(
+  classId: ClassId,
+  side: BattleUnit["side"],
+): readonly ClassGrowthSegment[] {
+  const rows = classDefinition(classId).dataRows;
+  const growth = growthFor(classId, side);
+  if (!growth) return [];
+  return [{
+    thresholdIncrement: growth.thresholdIncrement,
+    attackIncrement: rows[1].attack - rows[0].attack,
+    defenseIncrement: rows[1].defense - rows[0].defense,
+    maxLifeIncrement: rows[1].maxLife - rows[0].maxLife,
+  }];
+}
+
+/**
  * Native classes have exactly one post-third-row rule that repeats forever and
  * never touches defense. A balance override may replace it with several
  * segments, so every reader goes through this shape instead of branching on
@@ -260,7 +290,9 @@ function growthFor(classId: ClassId, side: BattleUnit["side"] = 1) {
 function growthSegmentsFor(
   classId: ClassId,
   side: BattleUnit["side"] = 1,
+  mode: EnemyGrowthMode = "legacy",
 ): readonly ClassGrowthSegment[] {
+  if (mode === "linear") return linearGrowthSegmentsFor(classId, side);
   const override = CLASS_GROWTH_OVERRIDES[classId];
   if (override) return override;
   const growth = growthFor(classId, side);
@@ -319,8 +351,14 @@ function experienceForPostThirdRows(
   return undefined;
 }
 
+/**
+ * `mode` 只影响职业内 3 级之后的成长行，固定三行永远是原版数据。默认 `legacy`，
+ * 所有我方、名册、UI 参考与存档路径因此保持原版语义；只有 side 2 的难度缩放
+ * （`stage0.ts` 的 `statsFor`）会显式传入 `linear`。
+ */
 export function classStatsFor(
   unit: ClassProgressionState,
+  mode: EnemyGrowthMode = "legacy",
 ): UnitStats {
   const definition = classDefinition(unit.classId);
   const fixedRows = definition.dataRows.slice(0, 3);
@@ -343,7 +381,7 @@ export function classStatsFor(
   }
 
   const progress = postThirdRowProgress(
-    growthSegmentsFor(unit.classId, unit.side),
+    growthSegmentsFor(unit.classId, unit.side, mode),
     unit.experience - fixedRows[2].experienceThreshold,
   );
   return {
@@ -368,6 +406,7 @@ export function classTierFor(
 
 export function nextExperienceThresholdFor(
   unit: ClassProgressionState,
+  mode: EnemyGrowthMode = "legacy",
 ): number {
   const definition = classDefinition(unit.classId);
   const fixedThreshold = definition.dataRows
@@ -376,7 +415,7 @@ export function nextExperienceThresholdFor(
     .find((threshold) => threshold > unit.experience);
   if (fixedThreshold !== undefined) return fixedThreshold;
 
-  const segments = growthSegmentsFor(unit.classId, unit.side);
+  const segments = growthSegmentsFor(unit.classId, unit.side, mode);
   const thirdThreshold = definition.dataRows[2].experienceThreshold;
   const reached = postThirdRowProgress(segments, unit.experience - thirdThreshold).rows;
   const next = experienceForPostThirdRows(segments, reached + 1);

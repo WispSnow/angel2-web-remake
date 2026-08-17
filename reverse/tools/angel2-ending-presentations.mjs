@@ -4,9 +4,30 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
+import { composePlanarImage, encodeRgbaPng, parseBitmapBundle } from "./angel2-planar.mjs";
 
 const MODULE_DATA_BASE = { 33: 0x86e0, 35: 0x8550, 46: 0x84f0 };
 const BIG5 = new TextDecoder("big5", { fatal: true });
+
+/** Module 35 keeps one 16-color VGA DAC table per epilogue illustration pair and
+ * selects it with the same variant index that picks the UN records, so the
+ * gameplay palette is wrong for every one of the eight screens:
+ *
+ *   053E: 8b 1e 2c 03           mov bx,[032C]      ; variant index
+ *   0544: 8b b7 2e 03           mov si,[bx+032E]   ; first UN record of the pair
+ *   ...                                            ; draw left half, then SI+1
+ *   05A4: 8b 1e 2c 03           mov bx,[032C]
+ *   05AA: 8b b7 3e 03           mov si,[bx+033E]   ; palette pointer for the pair
+ *   05B0: e8 87 19              call 1F3A          ; 64-step fade-in to it
+ *
+ * Module 46 is the same story: its credit pages run under DS:00AF and the
+ * permanent UN/54 finale under DS:01F6, neither of which is the gameplay table.
+ */
+const MODULE35_VARIANT_RECORD_TABLE = 0x032e;
+const MODULE35_VARIANT_PALETTE_TABLE = 0x033e;
+const MODULE46_CREDIT_PAGE_PALETTE = 0x00af;
+const MODULE46_FINAL_SCREEN_PALETTE = 0x01f6;
 
 const VERIFIED_RANGES = [
   { module: 29, address: "0000:91F1", start: 0x91f1, end: 0x9262, role: "primary experience award: 0000:91FE branches on whether the defender cell is still occupied, and only the killed-defender branch 0000:921C reaches the record-counter increment at 0000:9252", sha256: "14947957f904d55bdef5ea07d6af50bde1c81e5e83488e2834644ef46d158bc5" },
@@ -31,9 +52,33 @@ const VERIFIED_RANGES = [
   { module: 35, address: "DS:032E", start: 0x887e, end: 0x8a42, role: "epilogue resource, buffer, selector, and pointer tables", sha256: "c0750b539184fc35a900f73a7e67d99b09ac8b4b9e10b9e8707a76a613cebd4d" },
   { module: 35, address: "DS:04F5", start: 0x8a45, end: 0x92f6, role: "eight Big5 epilogue text blocks", sha256: "4becff5d69960fbc52c2ab829733b202c97cb72cb6e3e980199ab0e3f8ffca65" },
   { module: 46, address: "0000:0054", start: 0x54, end: 0xbf, role: "load UN9/10/55, C33, and B88", sha256: "2eb3176490c3f245d1ba5dc8043c51dcd667def4676d094236bdda493753a6fa" },
+  { module: 46, address: "0000:00BF", start: 0xbf, end: 0xfe, role: "program the credit-page palette DS:00AF and start UN/55 before entering the credits", sha256: "903d04134b9b98af57926af1786d8b94f081c0ac2579fc7bceaf852b89bddbae" },
   { module: 46, address: "0000:00FE", start: 0xfe, end: 0x129, role: "call nonreturning credits before unreachable route writes", sha256: "96c3bb4188dc2aeea6aab2caac707031cbefde32d4cb7f35cf7a5f62ff277312" },
   { module: 46, address: "0000:03CE", start: 0x3ce, end: 0x44d, role: "credits sequence, fades, final screen, and terminal call", sha256: "17824db017e3cdcba392e5383d459ae28b5a63390d4f5b7bd190eec09f46b561" },
   { module: 46, address: "0000:0467", start: 0x467, end: 0x801, role: "credit frame composition, scrolling, and final animation loop", sha256: "6c39eeedac6f747d5c79cc08972304b492e81a900315ed8eaa0b7814c99c3062" },
+  { module: 46, address: "DS:00AF", start: 0x859f, end: 0x8716, role: "credit-page palette DS:00AF and final-screen palette DS:01F6", sha256: "960ed2d6bf9caaa9a9c6fbaf41ee5a6297adc45870278df3f024a8a173786fdc" },
+];
+
+/** The eight epilogue pairs and the UN/54 finale, each with the native DAC table
+ * that module 35 or module 46 fades in before the graphic becomes visible. */
+const RENDER_SPECS = [
+  { module: 35, variantTableIndex: 2, group: "UN", records: [0, 1], role: "epilogue: mage class family" },
+  { module: 35, variantTableIndex: 6, group: "UN", records: [2, 3], role: "epilogue: dynasty declines" },
+  { module: 35, variantTableIndex: 0, group: "UN", records: [4, 5], role: "epilogue: cavalry class family" },
+  { module: 35, variantTableIndex: 5, group: "UN", records: [11, 12], role: "epilogue: warrior statue" },
+  { module: 35, variantTableIndex: 1, group: "UN", records: [13, 14], role: "epilogue: fighter class family" },
+  { module: 35, variantTableIndex: 7, group: "UN", records: [15, 16], role: "epilogue: dynasty prospers" },
+  { module: 35, variantTableIndex: 3, group: "UN", records: [17, 18], role: "epilogue: empress is crowned again" },
+  { module: 35, variantTableIndex: 4, group: "UN", records: [19, 20], role: "epilogue: Nia becomes 神將官" },
+  {
+    module: 46,
+    paletteOffset: MODULE46_FINAL_SCREEN_PALETTE,
+    group: "UN",
+    records: [54],
+    frames: [0, 1, 2, 3, 4],
+    masked: true,
+    role: "permanent The end scene and its four overlay frames",
+  },
 ];
 
 const RESOURCE_EXPECTATIONS = [
@@ -71,6 +116,22 @@ function readWord(moduleBuffer, module, dataOffset) {
   return moduleBuffer.readUInt16LE(linear(module, dataOffset));
 }
 
+/** The native routine streams these 48 bytes straight to DAC ports 3C8h/3C9h,
+ * so they are 6-bit channels and must be scaled, not shifted. */
+function readPalette(moduleBuffer, module, dataOffset) {
+  const start = linear(module, dataOffset);
+  assert(start + 48 <= moduleBuffer.length, `module ${module} palette DS:${hex(dataOffset).slice(2)} is out of range`);
+  const bytes = moduleBuffer.subarray(start, start + 48);
+  assert(bytes.every((value) => value <= 0x3f), `module ${module} DS:${hex(dataOffset).slice(2)} is not a 6-bit DAC table`);
+  return {
+    address: `DS:${hex(dataOffset).slice(2)}`,
+    dataOffset,
+    colors: Array.from({ length: 16 }, (_, index) =>
+      Array.from(bytes.subarray(index * 3, index * 3 + 3), (value) => Math.round(value * 255 / 63))),
+    dacHex: bytes.toString("hex").toUpperCase(),
+  };
+}
+
 function decodeDollarString(moduleBuffer, module, dataOffset) {
   const start = linear(module, dataOffset);
   let end = start;
@@ -85,8 +146,11 @@ function decodeDollarString(moduleBuffer, module, dataOffset) {
   };
 }
 
-function verifyRanges(modules) {
-  return VERIFIED_RANGES.map((range) => {
+function verifyRanges(modules, onlyModules = null) {
+  const selected = onlyModules === null
+    ? VERIFIED_RANGES
+    : VERIFIED_RANGES.filter((range) => onlyModules.includes(range.module));
+  return selected.map((range) => {
     const bytes = modules[range.module].subarray(range.start, range.end);
     const actual = sha256(bytes);
     assert(actual === range.sha256, `module ${range.module} ${range.address}: ending-presentation signature mismatch`);
@@ -188,9 +252,14 @@ function parseClassFamilyDecision(descriptors) {
   };
 }
 
-function illustrationPair(resourceIndexByVariant, variant) {
+function illustrationPair(resourceIndexByVariant, palettesByVariant, variant) {
   const first = resourceIndexByVariant[variant];
-  return { resource: "UN.SWF", variantTableIndex: variant, records: [first, first + 1] };
+  return {
+    resource: "UN.SWF",
+    variantTableIndex: variant,
+    records: [first, first + 1],
+    palette: palettesByVariant[variant],
+  };
 }
 
 /**
@@ -244,9 +313,22 @@ function parseEntryMusic(module35) {
   };
 }
 
+function parseEpiloguePalettes(module35) {
+  const pointers = Array.from({ length: 8 }, (_, index) =>
+    readWord(module35, 35, MODULE35_VARIANT_PALETTE_TABLE + index * 2));
+  assert(
+    pointers.join(",") === "942,1038,846,1134,1182,990,894,1086",
+    "module 35 epilogue palette pointer table changed",
+  );
+  return pointers.map((pointer) => readPalette(module35, 35, pointer));
+}
+
 function parseEpilogue(module35, descriptors) {
-  const resourceIndexByVariant = Array.from({ length: 8 }, (_, index) => readWord(module35, 35, 0x032e + index * 2));
+  const resourceIndexByVariant = Array.from({ length: 8 }, (_, index) =>
+    readWord(module35, 35, MODULE35_VARIANT_RECORD_TABLE + index * 2));
   assert(resourceIndexByVariant.join(",") === "4,13,0,17,19,11,2,15", "module 35 illustration variant table changed");
+  const palettesByVariant = parseEpiloguePalettes(module35);
+  const pair = (variant) => illustrationPair(resourceIndexByVariant, palettesByVariant, variant);
   const primaryPointers = Array.from({ length: 3 }, (_, index) => readWord(module35, 35, 0x04d4 + index * 2));
   const savePointers = Array.from({ length: 2 }, (_, index) => readWord(module35, 35, 0x04da + index * 2));
   const recordPointers = Array.from({ length: 2 }, (_, index) => readWord(module35, 35, 0x04de + index * 2));
@@ -264,11 +346,11 @@ function parseEpilogue(module35, descriptors) {
     selector,
     family: family.id,
     text: decodeDollarString(module35, 35, primaryPointers[selector]),
-    illustration: illustrationPair(resourceIndexByVariant, variantTables.primary[selector]),
+    illustration: pair(variantTables.primary[selector]),
   }));
   const fixed = {
     text: decodeDollarString(module35, 35, 0x083f),
-    illustration: illustrationPair(resourceIndexByVariant, 5),
+    illustration: pair(5),
   };
   const saveCount = [
     {
@@ -276,14 +358,14 @@ function parseEpilogue(module35, descriptors) {
       condition: "SAVE_NUM > 100",
       result: "the empress holds a new coronation and Nia follows her",
       text: decodeDollarString(module35, 35, savePointers[0]),
-      illustration: illustrationPair(resourceIndexByVariant, variantTables.save[0]),
+      illustration: pair(variantTables.save[0]),
     },
     {
       selector: 1,
       condition: "SAVE_NUM <= 100",
       result: "Nia becomes the 神將官",
       text: decodeDollarString(module35, 35, savePointers[1]),
-      illustration: illustrationPair(resourceIndexByVariant, variantTables.save[1]),
+      illustration: pair(variantTables.save[1]),
     },
   ];
   const recordTotal = [
@@ -292,7 +374,7 @@ function parseEpilogue(module35, descriptors) {
       condition: "sum(KILL_ALL[0..74]) <= 100",
       result: "the dynasty remains prosperous for later empresses",
       text: decodeDollarString(module35, 35, recordPointers[0]),
-      illustration: illustrationPair(resourceIndexByVariant, variantTables.record[0]),
+      illustration: pair(variantTables.record[0]),
       music: { resource: "MUSIC.SWF", record: 40 },
     },
     {
@@ -300,7 +382,7 @@ function parseEpilogue(module35, descriptors) {
       condition: "sum(KILL_ALL[0..74]) > 100",
       result: "the dynasty declines after the empress and Nia die",
       text: decodeDollarString(module35, 35, recordPointers[1]),
-      illustration: illustrationPair(resourceIndexByVariant, variantTables.record[1]),
+      illustration: pair(variantTables.record[1]),
       music: { resource: "UN.SWF", record: 49 },
     },
   ];
@@ -330,7 +412,19 @@ function parseEpilogue(module35, descriptors) {
       { order: 3, id: "saveCountOutcome", waitLimitNativeTicks: 0x08c3, skippableByEitherAction: true, variants: saveCount },
       { order: 4, id: "recordTotalOutcome", waitLimitNativeTicks: 0x09ec, skippableByEitherAction: true, musicNote: "the paired music is selected by this segment's condition but started at module entry; see entryMusic, and do not implement it as a segment-4 music change", variants: recordTotal },
     ],
-    illustrationVariantTable: resourceIndexByVariant.map((record, variantTableIndex) => ({ variantTableIndex, records: [record, record + 1] })),
+    illustrationVariantTable: resourceIndexByVariant.map((record, variantTableIndex) => ({
+      variantTableIndex,
+      records: [record, record + 1],
+      palette: palettesByVariant[variantTableIndex],
+    })),
+    illustrationPaletteRule: {
+      recordTable: `DS:${hex(MODULE35_VARIANT_RECORD_TABLE).slice(2)}`,
+      paletteTable: `DS:${hex(MODULE35_VARIANT_PALETTE_TABLE).slice(2)}`,
+      selection: "0000:05A4 reloads the same DS:032C variant index used for the records and fades in DS:033E[index]",
+      consequence: "each pair is authored against its own 16-color DAC table; rendering any of them with the gameplay palette is wrong",
+      compositionRule: "the first record fills the left half of the 640x350 screen and the second the right half; both halves share one DAC table",
+      maskRule: "every epilogue record ships the same filler stream 4, and the native draw is a full-screen copy, so the plates are opaque",
+    },
     exit: { nextModule: 27, nextStage: 38, purpose: "deploy the postgame otherworld rematch" },
   };
 }
@@ -349,7 +443,7 @@ function creditFrame(resource, frame, x, y) {
   return { resource, frame, x, y };
 }
 
-function parseCredits() {
+function parseCredits(module46) {
   const B = (frame, x, y) => creditFrame("B.SWF/88", frame, x, y);
   const C = (frame, x, y) => creditFrame("C.SWF/33", frame, x, y);
   const pages = [
@@ -362,6 +456,11 @@ function parseCredits() {
     [C(21, 400, 400)],
   ].map((frames, index) => ({ page: index + 1, frames }));
   return {
+    pagePalette: {
+      ...readPalette(module46, 46, MODULE46_CREDIT_PAGE_PALETTE),
+      programmedAt: "0000:00E9, before the credits are entered at 0000:00FE",
+      renderImpact: "none: every B/88 and C/33 frame draws only palette index 0, which is black in every ANGEL2 table",
+    },
     roleFrames: CREDIT_ROLES.map((text, frame) => ({ frame, text, render: `reverse/renders/planar/B/0088/${frame.toString().padStart(2, "0")}.png` })),
     nameFrames: CREDIT_NAMES.map((text, frame) => ({
       frame,
@@ -380,7 +479,12 @@ function parseCredits() {
     },
     finalScreen: {
       resource: "UN.SWF/54",
-      baseFrame: { frame: 0, x: 160, y: 27, render: "reverse/renders/planar/UN/0054/00.png" },
+      palette: {
+        ...readPalette(module46, 46, MODULE46_FINAL_SCREEN_PALETTE),
+        programmedAt: "0000:041B fades the credits out through it and 0000:042A fades the finale in with it",
+        renderImpact: "UN/54 uses all sixteen indices, so the gameplay table recolors the sun, mountains and heart",
+      },
+      baseFrame: { frame: 0, x: 160, y: 27, render: "reverse/renders/ending-presentations/frames/UN/0054/00.png" },
       overlayPosition: { x: 352, y: 161 },
       outerLoop: [
         { op: "wait", nativeTicks: 1 },
@@ -405,6 +509,92 @@ function parseCredits() {
       unreachableCode: { address: "0000:0101-0128", writes: { nextModule: 27, nextStage: 38 }, consequence: "the previously inferred replay seed cannot execute in shipped normal control flow" },
     },
   };
+}
+
+function paletteForSpec(modules, spec) {
+  if (spec.module === 35) {
+    return parseEpiloguePalettes(modules[35])[spec.variantTableIndex];
+  }
+  return readPalette(modules[spec.module], spec.module, spec.paletteOffset);
+}
+
+async function renderRecord(decodedRoot, renderRoot, spec, record, palette) {
+  const recordDirectory = path.join(decodedRoot, spec.group, String(record).padStart(4, "0"));
+  const streams = await Promise.all(Array.from({ length: 5 }, (_, index) =>
+    readFile(path.join(recordDirectory, `${String(index).padStart(2, "0")}.raw`))));
+  const bundles = streams.map((buffer, index) =>
+    parseBitmapBundle(buffer, `${spec.group}/${record} stream ${index}`));
+  const colorPlanes = bundles.slice(0, 4);
+  const mask = spec.masked === true ? bundles[4] : null;
+  const images = [];
+  for (const frame of spec.frames ?? [0]) {
+    const composed = composePlanarImage(colorPlanes, frame, mask, palette.colors);
+    const relative = path.join(
+      "frames",
+      spec.group,
+      String(record).padStart(4, "0"),
+      `${String(frame).padStart(2, "0")}.png`,
+    );
+    const output = path.join(renderRoot, relative);
+    await mkdir(path.dirname(output), { recursive: true });
+    const png = encodeRgbaPng(composed.width, composed.height, composed.pixels);
+    await writeFile(output, png);
+    images.push({
+      frame,
+      width: composed.width,
+      height: composed.height,
+      maskUsed: mask !== null,
+      output: relative,
+      sha256: sha256(png),
+    });
+  }
+  return { record, images };
+}
+
+/**
+ * Renders every postgame graphic whose native DAC table is not the gameplay
+ * palette. `reverse/renders/planar/UN` stays as the palette-neutral master; the
+ * runtime asset generators must read the palette-correct copies from here.
+ */
+async function render(module35Path, module46Path, decodedRoot, renderRoot) {
+  const [module35, module46] = await Promise.all([readFile(module35Path), readFile(module46Path)]);
+  const modules = { 35: module35, 46: module46 };
+  verifyRanges(modules, [35, 46]);
+  const records = [];
+  for (const spec of RENDER_SPECS) {
+    const palette = paletteForSpec(modules, spec);
+    const rendered = [];
+    for (const record of spec.records) {
+      rendered.push(await renderRecord(decodedRoot, renderRoot, spec, record, palette));
+    }
+    records.push({
+      key: `${spec.group}/${spec.records.join("-")}`,
+      module: spec.module,
+      role: spec.role,
+      variantTableIndex: spec.variantTableIndex,
+      palette,
+      halves: spec.module === 35 ? ["left", "right"] : undefined,
+      rendered,
+    });
+  }
+  const manifest = {
+    format: "ANGEL2 module-35 and module-46 postgame palette-correct renders",
+    paletteRule: "each record uses the exact 16-color VGA DAC table the owning module fades in before the graphic is visible",
+    epilogueCompositionRule: "module 35 draws the first record of each pair into the left half of a 640x350 screen and the second into the right half",
+    sources: [
+      { module: 35, path: module35Path, bytes: module35.length, sha256: sha256(module35) },
+      { module: 46, path: module46Path, bytes: module46.length, sha256: sha256(module46) },
+    ],
+    decodedRoot,
+    renderedRecords: records.reduce((total, entry) => total + entry.rendered.length, 0),
+    renderedImages: records.reduce((total, entry) =>
+      total + entry.rendered.reduce((count, item) => count + item.images.length, 0), 0),
+    records,
+  };
+  await mkdir(renderRoot, { recursive: true });
+  await writeFile(path.join(renderRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  console.log(`rendered ${manifest.renderedImages} palette-correct postgame images from ${manifest.renderedRecords} records`);
+  return manifest;
 }
 
 async function readResources(root) {
@@ -434,7 +624,7 @@ async function extract(module29Path, module33Path, module35Path, module46Path, d
   const rosterActors = parseRosterActors(module33);
   const statusLabels = parseStatusLabels(module33);
   const epilogue = parseEpilogue(module35, descriptors);
-  const credits = parseCredits();
+  const credits = parseCredits(module46);
 
   const output = {
     format: "ANGEL2 native postgame roster, conditional epilogue, credits, and terminal presentation",
@@ -532,19 +722,29 @@ async function extract(module29Path, module33Path, module35Path, module46Path, d
 }
 
 function usage() {
-  return "usage: angel2-ending-presentations.mjs --extract MODULE29.bin MODULE33.bin MODULE35.bin MODULE46.bin UNIT_DESCRIPTORS.json EXTRACTED_ROOT OUTPUT.json";
+  return "usage:\n" +
+    "  angel2-ending-presentations.mjs --render MODULE35.bin MODULE46.bin DECODED_ROOT RENDER_ROOT\n" +
+    "  angel2-ending-presentations.mjs --extract MODULE29.bin MODULE33.bin MODULE35.bin MODULE46.bin UNIT_DESCRIPTORS.json EXTRACTED_ROOT OUTPUT.json";
 }
 
-const [command, module29Path, module33Path, module35Path, module46Path, descriptorsPath, extractedRoot, outputPath] = process.argv.slice(2);
-if (command !== "--extract" || [module29Path, module33Path, module35Path, module46Path, descriptorsPath, extractedRoot, outputPath].some((value) => value === undefined)) {
-  console.error(usage());
-  process.exitCode = 1;
+async function main() {
+  const [command, ...args] = process.argv.slice(2);
+  if (command === "--render" && args.length === 4) {
+    await render(...args);
+    return;
+  }
+  if (command === "--extract" && args.length === 7) {
+    await extract(...args);
+    return;
+  }
+  throw new Error(usage());
 }
-else {
-  extract(module29Path, module33Path, module35Path, module46Path, descriptorsPath, extractedRoot, outputPath).catch((error) => {
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
     console.error(error.stack ?? error.message);
     process.exitCode = 1;
   });
 }
 
-export { RESOURCE_EXPECTATIONS, VERIFIED_RANGES, extract };
+export { RENDER_SPECS, RESOURCE_EXPECTATIONS, VERIFIED_RANGES, extract, render };

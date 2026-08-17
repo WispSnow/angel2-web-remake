@@ -101,17 +101,11 @@ export class Stage37Battle extends Stage0Battle {
     }
   }
 
+  // 属性由 `SCRIPTED_BOSS_STATS` 逐难度给出，`super.statsFor` 已经套用；这里只保留
+  // 移动力 1 这条与职业表无关的脚本约束。
   override statsFor(unit: Pick<BattleUnit, "classId" | "experience" | "side">): UnitStats {
     const base = super.statsFor(unit);
-    if (!isBossPart(unit)) return base;
-    const highestDifficulty = this.difficulty === 3;
-    return {
-      ...base,
-      attack: highestDifficulty ? 150 : 100,
-      defense: highestDifficulty ? 15 : 10,
-      maxLife: highestDifficulty ? 15_000 : 10_000,
-      movement: 1,
-    };
+    return isBossPart(unit) ? { ...base, movement: 1 } : base;
   }
 
   override movementPath(id: string, destination: { x: number; y: number }): { x: number; y: number }[] {

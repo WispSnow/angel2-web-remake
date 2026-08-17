@@ -59,12 +59,24 @@ describe("stage 37 battle simulation", () => {
     const battle = new Stage37Battle(campaign, fullDeployment);
     expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(27);
     expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(3);
-    expect(battle.unit("2:56")).toMatchObject({ classId: "head", life: 10_000, x: 23, y: 11 });
-    expect(battle.unit("2:54")).toMatchObject({ classId: "hand", life: 10_000, x: 22, y: 12 });
-    expect(battle.unit("2:55")).toMatchObject({ classId: "hand", life: 10_000, x: 24, y: 12 });
+    // 难度 2 的 boss 值来自 `REMAKE-103` 的 `SCRIPTED_BOSS_STATS`：原本只有
+    // 「难度 3 / 其余」两档，现在四个难度各有一档。
+    expect(battle.unit("2:56")).toMatchObject({ classId: "head", life: 13_000, x: 23, y: 11 });
+    expect(battle.unit("2:54")).toMatchObject({ classId: "hand", life: 13_000, x: 22, y: 12 });
+    expect(battle.unit("2:55")).toMatchObject({ classId: "hand", life: 13_000, x: 24, y: 12 });
     expect(battle.statsFor(battle.unit("2:56")!)).toMatchObject({
-      attack: 100, defense: 10, maxLife: 10_000, movement: 1,
+      attack: 132, defense: 13, maxLife: 13_000, movement: 1,
     });
+  });
+
+  it("keeps the lowest difficulty on the original boss values", () => {
+    const battle = new Stage37Battle({ ...campaign, difficulty: 0 }, fullDeployment);
+    for (const unit of battle.units.filter(({ side }) => side === 2)) {
+      expect(unit.life).toBe(10_000);
+      expect(battle.statsFor(unit)).toMatchObject({
+        attack: 100, defense: 10, maxLife: 10_000, movement: 1,
+      });
+    }
   });
 
   it("applies the highest-difficulty 50% boss override without adding units", () => {
@@ -192,7 +204,7 @@ describe("stage 37 battle simulation", () => {
     expect(defenseDown.result.blocked).toBe(false);
     battle.commitPreparedAction(defenseDown);
     expect(head.statuses).toMatchObject({ attackDown: 3, defenseDown: 3 });
-    expect(battle.effectiveStatsFor(head)).toMatchObject({ attack: 80, defense: 0 });
+    expect(battle.effectiveStatsFor(head)).toMatchObject({ attack: 112, defense: 0 });
 
     configureCaster(battle, "curse-master", 3);
     for (const target of [head, leftHand, rightHand]) {
@@ -276,7 +288,7 @@ describe("stage 37 battle simulation", () => {
       battle: {
         ...save.battle,
         units: save.battle.units.map((unit) => unit.id === "2:56"
-          ? { ...unit, life: 10_001 }
+          ? { ...unit, life: 13_001 }
           : unit),
       },
     })).toBe(false);

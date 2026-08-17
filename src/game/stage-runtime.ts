@@ -2,6 +2,7 @@ import { STAGE0_DEFINITION, type InteractiveDeploymentDefinition, type StageDefi
 import type { CampaignRouteId } from "./content/stage-effects";
 import type { EnemyPhaseTailPresentationDefinition } from "./enemy-phase-tail-presentation";
 import { createStage0Units } from "./content/stage0";
+import { stage37BossMaximumLifeByDifficulty } from "./content/enemy-scaling";
 import type { BattleActionId } from "./content/actions";
 import type { DeploymentRosterUnit } from "./deployment-session";
 import { Stage0Battle } from "./simulation/battle";
@@ -4324,7 +4325,7 @@ export const STAGE_RUNTIME_MANIFEST = {
         // ignores the class stat table.
         match: { kind: "enemy-classes", classIds: ["head", "hand"] },
         portrait: 8,
-        maximumLifeByDifficulty: [10_000, 10_000, 10_000, 15_000],
+        maximumLifeByDifficulty: stage37BossMaximumLifeByDifficulty,
       }],
       bossActionState: "head-hand-toggles",
       enemyAi: "none",

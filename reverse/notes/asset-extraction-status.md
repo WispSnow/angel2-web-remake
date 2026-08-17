@@ -69,7 +69,7 @@
 | `M_00.SWF` | 90 | 85 | 350 | 0 | 369 | 0 | 0 | 全屏左侧角色帧；普通职业 direct/+50 完整，魔劍记录 1/51 由原生代码改读 Y，特殊记录占位/缺项原样保留 |
 | `NUM.SWF` | 200 | 176 | 0 | 0 | 0 | 0 | 0 | 与 `CHA` 配套的 Big5 编码表 |
 | `SAY.SWF` | 200 | 176 | 0 | 0 | 0 | 0 | 0 | 176 记录已全部解析：93 条命令脚本、83 条文本/标签；两套解释器和 semanticVersion 2 动作流已闭合，69/116/117/118 确认为无发布版生产者的归档脚本 |
-| `UN.SWF` | 80 | 63 | 128 | 930 | 151 | 3 | 4 | 图像、字形、音频和运行模块混合容器；`UN/39+40` 是部署错误的 95 项 Big5 码表/字模，`UN/53` 绑定标题前 Logo，`UN/60` 绑定射击，`UN/62` 绑定普通地图受击及 AI 迅龍闪避，`UN/61` 的 39 帧绑定初级治疗，`UN/50` VOC 绑定冰雪循环；`UN/51,52` VOC 绑定正面状态，`UN/57` 绑定破邪；`UN/0..20` 为结局插画，`UN/54` 为终幕动画 |
+| `UN.SWF` | 80 | 63 | 128 | 930 | 151 | 3 | 4 | 图像、字形、音频和运行模块混合容器；`UN/39+40` 是部署错误的 95 项 Big5 码表/字模，`UN/53` 绑定标题前 Logo，`UN/60` 绑定射击，`UN/62` 绑定普通地图受击及 AI 迅龍闪避，`UN/61` 的 39 帧绑定初级治疗，`UN/50` VOC 绑定冰雪循环；`UN/51,52` VOC 绑定正面状态，`UN/57` 绑定破邪；`UN/0..20` 为结局插画（模块 35 逐对专属调色板），`UN/54` 为终幕动画（模块 46 `DS:01F6`）|
 | `Y_00.SWF` | 100 | 90 | 410 | 0 | 426 | 0 | 0 | 全屏右侧角色帧及左侧魔劍重映射；普通职业 direct/+50 和 `Y/41、42` 均已渲染。特殊记录 36–38「龍／頭／手」的右侧 `Y/36..38`（各 4 帧）与 `Y/86..88`（2/7/2 帧）同样存在并已渲染——它们只在 side 2 出战，左侧 `M_00` 缺项属于不可达组合，不是缺素材 |
 
 ## 已解码但仍有业务字段待命名的文件
@@ -80,7 +80,7 @@
 | `JUST.TST` | 模块 27 按关卡重新生成、由 `N` 分支载入的下一场战斗状态；同算法解为 8,358 字节，偏移 7,952 为地形描述偏移表，双方 75-word 数组为逐槽 AI 行为；残余 `FFh` 是未填部署格并在正式开战前清零 | 无格式级未知；特殊关动态覆写归场景逻辑 |
 | `AG2.JS3` | Joymouse Setup 3.00 输入配置；78 字节全布局、六模式、128 项 Set-1 键表、逐动作重复位、速度、标志及长度哨兵均已解析；当前 Keyboard 4 Way 的 12/12 项已对齐游戏语义 | 未选用的遗留硬件轮询只作 DOS 兼容取证；不阻塞 Web 规则 |
 | `B.SWF` 奇数记录 | 场景 0–38 使用记录 1–77，39–43 使用 1/49/65/85/87；每条为 128 项地形描述偏移、原始地形 token/单位槽/阵营三张 `50×50` 图和五组 75-word 数组；双方逐槽数组是 AI 行为，末数组是出场名单标志，`FFh` 是部署格；小地图地形/占用表现已重构；38/38 个现存逐关处理器及九个特殊表现时间轴已与模板叠加 | 三个未选奇数模板 79/81/83 已分别证明与 21/49/65 逐字节相同且无运行时读取路径；无待提取独有内容 |
-| 调色板映射 | gameplay、intro、password 与标题逐场景表均有原生 DAC 绑定；通用流顺序也已由模块 21/25/29 三份例程闭合 | 未发现运行时调色板绑定的归档资源仍保留位平面母版，不臆测唯一预览色表 |
+| 调色板映射 | gameplay、intro、password、标题逐场景表与战后模块 35／46 逐画面表均有原生 DAC 绑定；通用流顺序也已由模块 21/25/29 三份例程闭合 | 未发现运行时调色板绑定的归档资源仍保留位平面母版，不臆测唯一预览色表 |
 
 ## 可复现命令
 
@@ -89,6 +89,7 @@ reverse/tools/swf-index.mjs --extract ref/ANGEL2/A.SWF reverse/extracted/A
 reverse/tools/angel2-lha-frame.mjs --extract-resource reverse/extracted/A reverse/decoded/A
 reverse/tools/angel2-planar.mjs --render-resource reverse/decoded/A reverse/renders/planar/A gameplay
 reverse/tools/angel2-planar.mjs --render-resource reverse/decoded/C reverse/renders/planar/C_password password
+node reverse/tools/angel2-ending-presentations.mjs --render reverse/unpacked/lzexe-modules/raw/0035-unpacked.bin reverse/unpacked/lzexe-modules/raw/0046-unpacked.bin reverse/decoded reverse/renders/ending-presentations
 node reverse/tools/angel2-plane-order.mjs --extract reverse/unpacked/lzexe-modules/raw/0021-unpacked.bin reverse/unpacked/lzexe-modules/raw/0025-unpacked.bin reverse/unpacked/lzexe-modules/raw/0029-unpacked.bin reverse/parsed/native/plane-order.json
 reverse/tools/angel2-audio.mjs --convert-root reverse/extracted reverse/converted/audio
 reverse/tools/angel2-tables.mjs --export ref/ANGEL2 reverse/parsed/tables

@@ -10,10 +10,33 @@ const reverseRoot = (...parts) => path.join(root, "reverse", ...parts);
 const outputPath = path.join(root, "src/game/content/credits-runtime.generated.ts");
 const assetRoot = path.join(root, "public/assets/original/credits");
 const sourcePath = reverseRoot("parsed/native/ending-presentations.json");
-const sourceBytes = await readFile(sourcePath);
+const renderManifestPath = reverseRoot("renders/ending-presentations/manifest.json");
+const [sourceBytes, renderManifestBytes] = await Promise.all([
+  readFile(sourcePath),
+  readFile(renderManifestPath),
+]);
 const source = JSON.parse(sourceBytes.toString("utf8"));
+const renderManifest = JSON.parse(renderManifestBytes.toString("utf8"));
 const presentation = source.module46CreditsAndTerminalScreen;
 const sourceHash = createHash("sha256").update(sourceBytes).digest("hex");
+
+// UN/54 uses all sixteen palette indices under module 46's DS:01F6 table, so it
+// must come from the palette-correct render rather than the gameplay-palette
+// planar master. The B/88 and C/33 credit frames draw only index 0 and stay on
+// the shared planar renders.
+const finalScreenRender = renderManifest.records.find(({ module, rendered }) =>
+  module === 46 && rendered.some(({ record }) => record === 54));
+if (!finalScreenRender) {
+  throw new Error("postgame render manifest is missing the palette-correct UN/54 finale");
+}
+const finalScreenPalette = presentation.finalScreen.palette;
+if (JSON.stringify(finalScreenRender.palette.colors) !== JSON.stringify(finalScreenPalette.colors)
+  || finalScreenPalette.address !== "DS:01F6") {
+  throw new Error("UN/54 was rendered with a palette other than module 46 DS:01F6");
+}
+const finalScreenFrames = new Map(finalScreenRender.rendered
+  .find(({ record }) => record === 54).images
+  .map(({ frame, output }) => [frame, output]));
 const musicResource = source.resources.find(({ container, record }) =>
   container === "UN" && record === 55);
 if (!musicResource || musicResource.role !== "module-46 credits music data") {
@@ -93,7 +116,11 @@ await writeFile(outputPath, generated, "utf8");
 const copySet = [];
 for (const frame of roleFrames) copySet.push([reverseRoot("renders/planar/B/0088", `${String(frame.frame).padStart(2, "0")}.png`), path.join(assetRoot, "roles", `${String(frame.frame).padStart(2, "0")}.png`)]);
 for (const frame of nameFrames) copySet.push([reverseRoot("renders/planar/C/0033", `${String(frame.frame).padStart(2, "0")}.png`), path.join(assetRoot, "names", `${String(frame.frame).padStart(2, "0")}.png`)]);
-for (let frame = 0; frame < 5; frame += 1) copySet.push([reverseRoot("renders/planar/UN/0054", `${String(frame).padStart(2, "0")}.png`), path.join(assetRoot, "end", `${String(frame).padStart(2, "0")}.png`)]);
+for (let frame = 0; frame < 5; frame += 1) {
+  const rendered = finalScreenFrames.get(frame);
+  if (!rendered) throw new Error(`postgame render manifest is missing UN/54 frame ${frame}`);
+  copySet.push([reverseRoot("renders/ending-presentations", rendered), path.join(assetRoot, "end", `${String(frame).padStart(2, "0")}.png`)]);
+}
 copySet.push([
   reverseRoot("converted/audio/rix-wav/UN/0055.wav"),
   path.join(assetRoot, "music.wav"),

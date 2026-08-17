@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import endingPresentations from "../../reverse/parsed/native/ending-presentations.json";
 import {
   CREDITS_FINAL_SCREEN,
   CREDITS_FINAL_TIMELINE,
@@ -15,6 +16,7 @@ import {
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { isSaveData, SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
+import { opaquePlateColors, paletteKeys } from "./postgame-plate-support";
 
 const workspace = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -54,6 +56,20 @@ describe("module 46 credits", () => {
     }
     expect(CREDITS_FINAL_TIMELINE[0]).toEqual({ frame: null, waitNativeTicks: 402 });
     expect(CREDITS_FINAL_TIMELINE.at(-1)).toEqual({ frame: 1, waitNativeTicks: 10 });
+  });
+
+  /** UN/54 uses all sixteen indices, and module 46 fades it in with DS:01F6
+   * rather than the gameplay table, which is what recolors the sun, mountains
+   * and heart when the planar master is shipped instead. */
+  it("ships the final screen under module 46's DS:01F6 palette", async () => {
+    const palette = endingPresentations.module46CreditsAndTerminalScreen.finalScreen.palette;
+    expect(palette.address).toBe("DS:01F6");
+    const allowed = paletteKeys(palette.colors);
+    for (const source of [CREDITS_FINAL_SCREEN.base, ...CREDITS_FINAL_SCREEN.overlays]) {
+      const colors = await opaquePlateColors(source);
+      expect(colors.size).toBeGreaterThan(1);
+      expect([...colors].filter((color) => !allowed.has(color))).toEqual([]);
+    }
   });
 
   it("accepts stage-39 only as stage 38's completed credits route", () => {

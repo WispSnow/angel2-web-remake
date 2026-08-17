@@ -5,7 +5,6 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { deflateSync, inflateSync } from "node:zlib";
 import { compileNativeStory } from "./lib/compile-native-story.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,6 +16,10 @@ const inputPaths = {
   events: reversePath("parsed/native/stage-events.json"),
   story: reversePath("parsed/dialogue/0070.json"),
   storyPresentations: reversePath("parsed/native/story-presentations.json"),
+  // Module 35 fades in a dedicated 16-color DAC table per illustration pair, so
+  // the epilogue plates come from the palette-correct postgame renders rather
+  // than the gameplay-palette planar masters under renders/planar/UN.
+  endingRenders: reversePath("renders/ending-presentations/manifest.json"),
   storyMusic: reversePath("converted/audio/rix-wav/MAGIC/0077.wav"),
   rosterMusic: reversePath("converted/audio/rix-wav/UN/0006.wav"),
   prosperousMusic: reversePath("converted/audio/rix-wav/MUSIC/0040.wav"),
@@ -25,106 +28,7 @@ const inputPaths = {
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const json = (value) => JSON.stringify(value);
-const PNG_SIGNATURE_BYTES = 8;
 
-const crcTable = Array.from({ length: 256 }, (_, index) => {
-  let value = index;
-  for (let bit = 0; bit < 8; bit += 1) {
-    value = (value & 1) !== 0 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-  }
-  return value >>> 0;
-});
-
-function pngChunk(type, data) {
-  const typeBuffer = Buffer.from(type, "ascii");
-  const body = Buffer.concat([typeBuffer, data]);
-  let crc = 0xffff_ffff;
-  for (const byte of body) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-  const chunk = Buffer.alloc(12 + data.length);
-  chunk.writeUInt32BE(data.length, 0);
-  typeBuffer.copy(chunk, 4);
-  data.copy(chunk, 8);
-  chunk.writeUInt32BE((crc ^ 0xffff_ffff) >>> 0, 8 + data.length);
-  return chunk;
-}
-
-const paeth = (left, up, upperLeft) => {
-  const prediction = left + up - upperLeft;
-  const leftDistance = Math.abs(prediction - left);
-  const upDistance = Math.abs(prediction - up);
-  const upperLeftDistance = Math.abs(prediction - upperLeft);
-  return leftDistance <= upDistance && leftDistance <= upperLeftDistance
-    ? left
-    : upDistance <= upperLeftDistance ? up : upperLeft;
-};
-
-/** UN ending plates are full-screen opaque pictures; the shared planar renderer
- * marks palette index 0 transparent for sprite consumers. Decode its RGBA PNG,
- * restore an opaque alpha channel, then emit deterministic filter-0 scanlines. */
-async function writeOpaqueRgbaPng(source, target) {
-  const png = await readFile(source);
-  assert.ok(
-    png.subarray(0, PNG_SIGNATURE_BYTES).equals(
-      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    ),
-    `${source} is not a PNG`,
-  );
-  const width = png.readUInt32BE(16);
-  const height = png.readUInt32BE(20);
-  assert.equal(png[24], 8, `${source} must use 8-bit channels`);
-  assert.equal(png[25], 6, `${source} must be an RGBA PNG`);
-  assert.equal(png[28], 0, `${source} must be non-interlaced`);
-  const sourceChunks = [];
-  const idatParts = [];
-  let offset = PNG_SIGNATURE_BYTES;
-  while (offset < png.length) {
-    const length = png.readUInt32BE(offset);
-    const end = offset + 12 + length;
-    assert.ok(end <= png.length, `${source} contains a truncated PNG chunk`);
-    const type = png.subarray(offset + 4, offset + 8).toString("ascii");
-    if (type === "IDAT") idatParts.push(png.subarray(offset + 8, offset + 8 + length));
-    else sourceChunks.push({ type, bytes: png.subarray(offset, end) });
-    offset = end;
-  }
-  const bytesPerPixel = 4;
-  const rowBytes = width * bytesPerPixel;
-  const filtered = inflateSync(Buffer.concat(idatParts));
-  assert.equal(filtered.length, (rowBytes + 1) * height);
-  const pixels = Buffer.alloc(rowBytes * height);
-  for (let y = 0; y < height; y += 1) {
-    const filter = filtered[y * (rowBytes + 1)];
-    const sourceRow = y * (rowBytes + 1) + 1;
-    const targetRow = y * rowBytes;
-    for (let x = 0; x < rowBytes; x += 1) {
-      const encoded = filtered[sourceRow + x];
-      const left = x >= bytesPerPixel ? pixels[targetRow + x - bytesPerPixel] : 0;
-      const up = y > 0 ? pixels[targetRow + x - rowBytes] : 0;
-      const upperLeft = y > 0 && x >= bytesPerPixel
-        ? pixels[targetRow + x - rowBytes - bytesPerPixel]
-        : 0;
-      const predictor = filter === 0 ? 0
-        : filter === 1 ? left
-          : filter === 2 ? up
-            : filter === 3 ? Math.floor((left + up) / 2)
-              : filter === 4 ? paeth(left, up, upperLeft) : undefined;
-      assert.notEqual(predictor, undefined, `${source} contains unknown PNG filter ${filter}`);
-      pixels[targetRow + x] = (encoded + predictor) & 0xff;
-    }
-    for (let x = 3; x < rowBytes; x += bytesPerPixel) pixels[targetRow + x] = 0xff;
-  }
-  const opaqueScanlines = Buffer.alloc((rowBytes + 1) * height);
-  for (let y = 0; y < height; y += 1) {
-    const targetRow = y * (rowBytes + 1);
-    opaqueScanlines[targetRow] = 0;
-    pixels.copy(opaqueScanlines, targetRow + 1, y * rowBytes, (y + 1) * rowBytes);
-  }
-  const chunks = [png.subarray(0, PNG_SIGNATURE_BYTES)];
-  for (const chunk of sourceChunks) {
-    if (chunk.type === "IEND") chunks.push(pngChunk("IDAT", deflateSync(opaqueScanlines)));
-    chunks.push(chunk.bytes);
-  }
-  await writeFile(target, Buffer.concat(chunks));
-}
 const buffers = Object.fromEntries(await Promise.all(
   Object.entries(inputPaths).map(async ([id, file]) => [id, await readFile(file)]),
 ));
@@ -187,6 +91,27 @@ const rosterActors = roster.rosterActors.reachableActors.map(({ index, portraitR
 
 const epilogue = ending.module35ConditionalEpilogue;
 assert.equal(epilogue.orderedSegments.length, 4);
+
+// Bind every epilogue record to the module-35 render that used its own DAC
+// table. Falling back to a gameplay-palette master would silently restore the
+// miscolored plates, so a missing or mismatched entry must fail the build.
+const endingRenders = parse("endingRenders");
+const epiloguePlateByRecord = new Map();
+for (const entry of endingRenders.records) {
+  if (entry.module !== 35) continue;
+  const variant = epilogue.illustrationVariantTable[entry.variantTableIndex];
+  assert.ok(variant, `render manifest references unknown epilogue variant ${entry.variantTableIndex}`);
+  assert.deepEqual(entry.palette.colors, variant.palette.colors,
+    `epilogue variant ${entry.variantTableIndex} was rendered with the wrong palette`);
+  for (const rendered of entry.rendered) {
+    assert.equal(rendered.images.length, 1);
+    assert.equal(rendered.images[0].maskUsed, false);
+    epiloguePlateByRecord.set(rendered.record, rendered.images[0].output);
+  }
+}
+const EPILOGUE_RECORDS = [0, 1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+assert.deepEqual([...epiloguePlateByRecord.keys()].sort((a, b) => a - b), EPILOGUE_RECORDS);
+
 assert.deepEqual(epilogue.exit, {
   nextModule: 27,
   nextStage: 38,
@@ -275,9 +200,9 @@ for (let record = 0; record <= 34; record += 1) {
     path.join(publicRoot, "class-illustrations", `${String(record).padStart(2, "0")}.png`),
   ));
 }
-for (const record of [0, 1, 2, 3, 4, 5, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) {
-  copies.push(writeOpaqueRgbaPng(
-    reversePath("renders/planar/UN", String(record).padStart(4, "0"), "00.png"),
+for (const record of EPILOGUE_RECORDS) {
+  copies.push(copyFile(
+    reversePath("renders/ending-presentations", epiloguePlateByRecord.get(record)),
     path.join(publicRoot, "epilogue", `${String(record).padStart(2, "0")}.png`),
   ));
 }

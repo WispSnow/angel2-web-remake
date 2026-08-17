@@ -16,7 +16,11 @@ import {
 } from "../../src/game/save";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
 import { classFallbackPortraitFor, className, classStatsFor } from "../../src/game/content/classes";
-import { completeCampaignRoster } from "../../src/game/content/stage0";
+import {
+  completeCampaignRoster,
+  initialEnemyExperience,
+  statsFor,
+} from "../../src/game/content/stage0";
 import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
 import { Stage1Battle } from "../../src/game/simulation/stage1-battle";
 import { Stage2Battle } from "../../src/game/simulation/stage2-battle";
@@ -169,7 +173,8 @@ const battleSave = (): BattleSaveData => {
           x: 23,
           y: 32,
           life: 250,
-          experience: 461,
+          // 敌方出场经验由难度表决定（`REMAKE-103`），夹具跟着难度 2 走而不抄死数字。
+          experience: initialEnemyExperience("cavalry", 2),
           acted: true,
           actionDisabled: false,
           statuses: emptyUnitStatuses(),
@@ -1970,6 +1975,42 @@ function legacyBattleSave(
 }
 
 describe("Web save validation", () => {
+  it("migrates v82 saves whose enemy baseline did not move", () => {
+    // REMAKE-103 只改难度 1／2 的敌方出场行，难度 0／3 的基线逐字保持原版，
+    // 因此这两档的 v82 存档无损迁移。
+    for (const difficulty of [0, 3] as const) {
+      const current = { ...battleSave(), difficulty };
+      current.stageEntrySnapshot = { ...current.stageEntrySnapshot, difficulty };
+      const enemy = {
+        ...current.battle.units[1],
+        experience: initialEnemyExperience("cavalry", difficulty),
+      };
+      // 难度 0 的騎兵上限低于夹具默认残血值，按该难度重新落在上限内。
+      current.battle.units[1] = {
+        ...enemy,
+        life: Math.min(enemy.life, statsFor(enemy, difficulty).maxLife),
+      };
+      const legacy = {
+        ...current,
+        version: 82,
+        contentVersion: "expert-attack-up-melee-targeting-1",
+      };
+      expect(parseSaveData(JSON.stringify(legacy)), `d${difficulty}`).toEqual(current);
+    }
+  });
+
+  it("safely rejects v82 saves still on the pre-REMAKE-103 enemy baseline", () => {
+    // 难度 2 的敌方出场行从 4 抬到 6，旧存档里的经验因此低于新基线。迁移不会就地
+    // 重播——那会在玩家眼皮底下改变一场进行中的战斗——而是整体拒绝。
+    const stale = {
+      ...battleSave(),
+      version: 82,
+      contentVersion: "expert-attack-up-melee-targeting-1",
+    };
+    stale.battle.units[1] = { ...stale.battle.units[1], experience: 461 };
+    expect(parseSaveData(JSON.stringify(stale))).toBeUndefined();
+  });
+
   it("migrates v81 saves losslessly", () => {
     // REMAKE-102 only narrows which ally the AI may pick for AA. No stored field
     // is added or changes meaning and the cast still draws once, so a mid-battle
@@ -4972,6 +5013,15 @@ describe("Web save validation", () => {
 
   it("migrates version-2 stage-0 ally and enemy stats while preserving missing life", () => {
     const current = battleSave();
+    // v2 敌方迁移按「保留已损失生命」重算：新上限 − 旧缺口。旧生命由当前难度反推，
+    // 这样难度表调整后本用例仍在验证迁移语义，而不是某个具体数字。
+    const currentEnemy = current.battle.units[1];
+    const legacyEnemyMaximumLife = classStatsFor({
+      classId: currentEnemy.classId,
+      experience: 0,
+    }).maxLife;
+    const legacyEnemyLife = legacyEnemyMaximumLife
+      - (statsFor(currentEnemy, current.difficulty).maxLife - currentEnemy.life);
     const legacy = {
       ...legacyBattleSave(current, 2),
       roster: legacyBattleSave(current, 2).roster.map((entry) => entry.slot === 0
@@ -4980,7 +5030,7 @@ describe("Web save validation", () => {
       battle: {
         ...legacyBattleSave(current, 2).battle,
         units: legacyBattleSave(current, 2).battle.units.map((unit) => {
-          if (unit.side === 2) return { ...unit, experience: 0, life: 180 };
+          if (unit.side === 2) return { ...unit, experience: 0, life: legacyEnemyLife };
           if (unit.slot === 0) return { ...unit, experience: 100, life: 140 };
           return { ...unit };
         }),
@@ -5060,7 +5110,8 @@ describe("Web save validation", () => {
     expect(isSaveData(underseededNia)).toBe(false);
 
     const overfullEnemy = battleSave();
-    overfullEnemy.battle.units[1].life = 271;
+    const enemy = overfullEnemy.battle.units[1];
+    overfullEnemy.battle.units[1].life = statsFor(enemy, overfullEnemy.difficulty).maxLife + 1;
     expect(isSaveData(overfullEnemy)).toBe(false);
 
     const invalidStatus = battleSave();

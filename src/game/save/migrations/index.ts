@@ -355,6 +355,31 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-103 changes what a stored enemy experience value means: difficulties 1
+ * and 2 now seed side-2 units on growth rows 4 and 6 under the linear curve
+ * instead of rows 3 and 4 under the native one. No field is added and no ally
+ * value changes, so difficulty 0 and 3 saves — whose enemy baselines are byte
+ * identical to the native ones — carry over untouched.
+ *
+ * A difficulty 1 or 2 v82 save still holds the old, now sub-baseline enemy
+ * experience, so `isSaveData` refuses it and the whole migration returns
+ * undefined. That is the intended outcome rather than a silent re-seed: the
+ * project is pre-release, and rewriting a mid-battle enemy's level would change
+ * a live fight underneath the player.
+ */
+function migrateVersion82Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 82
+    || value.contentVersion !== "expert-attack-up-melee-targeting-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-102 only narrows which ally the shared expert planner may pick for AA.
  * No stored field is added or changes meaning and the cast still draws once, so
  * the migration is lossless; a mid-battle v81 save resumes with the same units,
@@ -2378,6 +2403,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion82 = migrateVersion82Save(value);
+  if (migratedVersion82) return migratedVersion82;
   const migratedVersion81 = migrateVersion81Save(value);
   if (migratedVersion81) return migratedVersion81;
   const migratedVersion80 = migrateVersion80Save(value);

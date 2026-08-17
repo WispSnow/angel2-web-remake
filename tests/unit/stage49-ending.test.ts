@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
+import endingPresentations from "../../reverse/parsed/native/ending-presentations.json";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import {
+  STAGE49_ENDING_ASSETS,
   STAGE49_EPILOGUE_MUSIC_BY_SELECTOR,
   STAGE49_EPILOGUE_SEGMENTS,
 } from "../../src/game/content/stage49-ending";
 import { Stage49EndingSession } from "../../src/game/simulation/stage49-ending";
 import type { CampaignState, UnitClassId } from "../../src/game/types";
+import { opaquePlateColors, paletteKeys } from "./postgame-plate-support";
 
 function campaignWith(
   classes: readonly UnitClassId[] = [],
@@ -129,6 +132,26 @@ describe("stage 49 main ending", () => {
       id: "warriorStatue",
       waitNativeTicks: 0,
     });
+  });
+
+  /**
+   * Module 35 fades in a dedicated 16-color DAC table per illustration pair, so
+   * shipping the gameplay-palette planar masters recolored every epilogue plate
+   * into saturated dithering. Each shipped half must therefore stay inside its
+   * own pair's palette.
+   */
+  it("ships every epilogue plate under its own native module-35 palette", async () => {
+    const variants = endingPresentations.module35ConditionalEpilogue.illustrationVariantTable;
+    expect(variants).toHaveLength(8);
+    for (const variant of variants) {
+      const allowed = paletteKeys(variant.palette.colors);
+      expect(allowed.size).toBeGreaterThan(1);
+      for (const record of variant.records) {
+        const colors = await opaquePlateColors(STAGE49_ENDING_ASSETS.epilogue(record));
+        expect(colors.size).toBeGreaterThan(1);
+        expect([...colors].filter((color) => !allowed.has(color))).toEqual([]);
+      }
+    }
   });
 
   it("ends at the hidden-stage boundary without entering stage 38 or credits", () => {

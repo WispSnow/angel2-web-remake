@@ -139,31 +139,40 @@ describe("REMAKE-092 half-dragon warrior extended curve", () => {
     expect(next(2400)).toBe(2900);
   });
 
-  it("keeps difficulty 0 and 1 enemy half-dragons on their native rows", () => {
-    // initialEnemyExperience advances whole growth rows, so difficulties 0 and 1
-    // land on native fixed rows 2 and 3 and cannot see the override at all.
-    // The six sister boss stages run at these bands by default.
+  it("keeps difficulty 0 enemy half-dragons on their native fixed row", () => {
+    // 难度 0 坐在原版固定行 2，任何 3 级后的成长规则都够不到它。
+    // 六姊妹关卡默认就跑在这一档。
     expect(statsFor(
       { classId: "half-dragon-warrior", experience: initialEnemyExperience("half-dragon-warrior", 0), side: 2 },
       0,
     )).toMatchObject({ attack: 72, defense: 39, maxLife: 320 });
+  });
+
+  it("accepts the difficulty 1 to 3 enemy increase the extended curve implies", () => {
+    // 三档都落在第 3 行之后。难度 1／2 走 `REMAKE-103` 的 linear 曲线（等级 4／6），
+    // 难度 3 走本覆写的 legacy 曲线（等级 5）并叠加原版 side-2 +50%。
     expect(statsFor(
       { classId: "half-dragon-warrior", experience: initialEnemyExperience("half-dragon-warrior", 1), side: 2 },
       1,
-    )).toMatchObject({ attack: 78, defense: 42, maxLife: 340 });
-  });
-
-  it("accepts the difficulty 2 and 3 enemy increase the override implies", () => {
-    // These two bands sit past the third row, so they move with the override.
-    // Difficulty 3 additionally applies the native +50% side-2 modifier.
+    )).toMatchObject({ attack: 84, defense: 45, maxLife: 360 });
     expect(statsFor(
       { classId: "half-dragon-warrior", experience: initialEnemyExperience("half-dragon-warrior", 2), side: 2 },
       2,
-    )).toMatchObject({ attack: 84, defense: 45, maxLife: 360 });
+    )).toMatchObject({ attack: 96, defense: 51, maxLife: 400 });
     expect(statsFor(
       { classId: "half-dragon-warrior", experience: initialEnemyExperience("half-dragon-warrior", 3), side: 2 },
       3,
     )).toMatchObject({ attack: 135, defense: 72, maxLife: 570 });
+  });
+
+  it("agrees with REMAKE-103 linear growth across the override's first segment", () => {
+    // 本覆写第 1 段就是「把前 3 级曲线续下去」，与 linear 的通用规则同值，所以敌方
+    // 难度 1／2 无论读哪一边都得到同一组数值——难度 2 正好落在覆写描述的 96/51/400。
+    for (const difficulty of [1, 2] as const) {
+      const experience = initialEnemyExperience("half-dragon-warrior", difficulty);
+      const unit = { classId: "half-dragon-warrior" as const, experience, side: 2 as const };
+      expect(classStatsFor(unit, "linear"), `d${difficulty}`).toEqual(classStatsFor(unit, "legacy"));
+    }
   });
 });
 

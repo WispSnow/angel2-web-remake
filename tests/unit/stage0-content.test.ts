@@ -121,19 +121,22 @@ describe("stage 0 evidence-backed content", () => {
     expect(nextExperienceThresholdFor({ classId: "cavalry", experience: 461 })).toBe(560);
   });
 
-  it("reproduces the native stage-0 enemy stats for all four difficulties", () => {
+  it("reproduces the stage-0 enemy stats for all four difficulties", () => {
+    // 难度 0（等级 2）与难度 3（等级 5 + ×1.5）逐字保持原版。难度 1／2 走
+    // `REMAKE-103` 的 linear 曲线并分别坐在等级 4／6：士兵每行 +3/+3/+10，
+    // 騎兵每行 +5/+3/+30，经验阶梯仍是原版的每行 +100。
     const expected = [
       {
         soldier: { experience: 101, attack: 42, defense: 24, maxLife: 170, level: 2 },
         hading: { experience: 181, attack: 60, defense: 33, maxLife: 230, level: 2 },
       },
       {
-        soldier: { experience: 201, attack: 45, defense: 27, maxLife: 180, level: 3 },
-        hading: { experience: 361, attack: 65, defense: 36, maxLife: 260, level: 3 },
+        soldier: { experience: 301, attack: 48, defense: 30, maxLife: 190, level: 4 },
+        hading: { experience: 461, attack: 70, defense: 39, maxLife: 290, level: 4 },
       },
       {
-        soldier: { experience: 301, attack: 46, defense: 27, maxLife: 190, level: 4 },
-        hading: { experience: 461, attack: 66, defense: 36, maxLife: 270, level: 4 },
+        soldier: { experience: 501, attack: 54, defense: 36, maxLife: 210, level: 6 },
+        hading: { experience: 661, attack: 80, defense: 45, maxLife: 350, level: 6 },
       },
       {
         soldier: { experience: 401, attack: 70, defense: 40, maxLife: 300, level: 5 },

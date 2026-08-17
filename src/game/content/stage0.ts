@@ -5,6 +5,7 @@ import {
   classStatsFor,
   nextExperienceThresholdFor,
 } from "./classes";
+import { enemyScalingFor, scriptedBossStatsFor } from "./enemy-scaling";
 import { emptyUnitStatuses } from "../simulation/status";
 
 export { classStatsFor, nextExperienceThresholdFor };
@@ -84,24 +85,43 @@ const UNIT_DEFINITIONS: Array<Pick<BattleUnit, "side" | "slot" | "classId" | "cl
   { side: 2, slot: 42, classId: "soldier", className: "士兵", name: "騎士團士兵", portrait: 48, x: 27, y: 39 },
 ];
 
+/**
+ * 唯一的难度感知属性口。`Battle.statsFor` 把模拟、AI、HUD 与存档校验全部路由到这里，
+ * 所以 `REMAKE-103` 的成长模式、剧情 boss 数值和原版难度 3 倍率都只需在此收口。
+ */
 export function statsFor(
   unit: Pick<BattleUnit, "classId" | "experience" | "side">,
   difficulty: Difficulty,
 ): UnitStats {
-  const base = classStatsFor(unit);
-  if (unit.side !== 2 || difficulty !== 3) return base;
+  if (unit.side !== 2) return classStatsFor(unit);
+
+  const rule = enemyScalingFor(difficulty);
+  const base = classStatsFor(unit, rule.growth);
+
+  // 剧情 boss 逐难度直接给值，不参与成长曲线，也不再叠加难度 3 倍率。
+  const scripted = scriptedBossStatsFor(unit.classId, difficulty);
+  if (scripted) return { ...base, ...scripted };
+
+  const percent = rule.statMultiplierPercent;
+  if (percent === undefined) return base;
+  const scale = (value: number): number => Math.floor(value * percent / 100);
   return {
     ...base,
-    attack: base.attack + Math.floor(base.attack / 2),
-    defense: base.defense + Math.floor(base.defense / 2),
-    maxLife: base.maxLife + Math.floor(base.maxLife / 2),
+    attack: scale(base.attack),
+    defense: scale(base.defense),
+    maxLife: scale(base.maxLife),
   };
 }
 
+/**
+ * 敌方出场经验 = 走到 `ENEMY_SCALING[difficulty].level` 这一成长行所需的经验再 +1。
+ * 门槛阶梯由成长模式决定，所以这里与 `statsFor` 必须读同一条规则。
+ */
 export function initialEnemyExperience(classId: UnitClassId, difficulty: Difficulty): number {
+  const rule = enemyScalingFor(difficulty);
   let experience = 0;
-  for (let step = 0; step <= difficulty; step += 1) {
-    experience = nextExperienceThresholdFor({ classId, experience, side: 2 }) + 1;
+  for (let level = 1; level < rule.level; level += 1) {
+    experience = nextExperienceThresholdFor({ classId, experience, side: 2 }, rule.growth) + 1;
   }
   return experience;
 }

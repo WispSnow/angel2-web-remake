@@ -79,6 +79,35 @@
 
 模块 35 使用 `UN/9` + `UN/10` 的 258 项结局字形。每张结局画面使用 `UN` 中相邻的两个 `320×350` 记录，分别绘制在 640 像素宽画面的左右半边。
 
+### 每对插画各自带一份调色板
+
+**八张结局画面不共用 gameplay 调色板**：模块 35 在 `DS:033E` 保存八个 16 色 VGA DAC 表指针（`DS:034E..04CD`），并用挑选 `UN` 记录的同一个变体索引 `DS:032C` 取表，画完左右半边后才淡入：
+
+```text
+053E: 8b 1e 2c 03           mov bx,[032C]      ; 变体索引
+0544: 8b b7 2e 03           mov si,[bx+032E]   ; 该对的首个 UN 记录
+0569: ba 00 00 bb 00 00     ; 左半边 x=0，随后 057F 的 inc si 画右半边
+05A4: 8b 1e 2c 03           mov bx,[032C]
+05AA: 8b b7 3e 03           mov si,[bx+033E]   ; 该对专属调色板
+05B0: e8 87 19              call 1F3A          ; 64 步淡入
+```
+
+| 变体 | 插画 | 调色板 | 段落 |
+| ---: | --- | --- | --- |
+| 0 | `UN/4–5` | `DS:03AE` | 骑兵 |
+| 1 | `UN/13–14` | `DS:040E` | 战士 |
+| 2 | `UN/0–1` | `DS:034E` | 法师 |
+| 3 | `UN/17–18` | `DS:046E` | 存档次数 > 100 |
+| 4 | `UN/19–20` | `DS:049E` | 存档次数 ≤ 100 |
+| 5 | `UN/11–12` | `DS:03DE` | 战士雕像 |
+| 6 | `UN/2–3` | `DS:037E` | 战绩总和 > 100 |
+| 7 | `UN/15–16` | `DS:043E` | 战绩总和 ≤ 100 |
+
+gameplay 调色板的索引 7、8、9、10、12、13（`186,170,154`／`0,0,26`h 系蓝紫绿）在这八张表里一个都不存在，所以用 gameplay 渲染会把整幅画变成高饱和噪点。这八张画面必须来自
+`reverse/renders/ending-presentations/`，不能直接用 `reverse/renders/planar/UN/` 的位平面母版。
+
+十六个结局记录的第 5 条流逐字节相同（sha256 `0ca096b9…`），且原生是整屏拷贝而非精灵掩码绘制，因此这些画面按不透明处理。
+
 ### 结局音乐在入口就已切换
 
 分支音乐由战绩总和选择子决定，但**在四段之前就已加载并播放**，因此四段全程都在同一首曲子上；不能实现成“第四段才换曲”。`0000:0454` 的派发顺序为：
@@ -202,6 +231,13 @@
 
 原生代码组成七个虚拟字幕页。每次翻页固定进行 400 次 CRTC 起始地址移动，每步加 `0x50` 并等待 2 tick；没有输入跳过检查。七页之后还会额外翻动一次，再进入最终画面，因此共有八次转场。部分姓名帧会跨页复用；职务帧 16“美编”没有被七个页面组合函数引用，而职务帧 17“文案”有引用，这是原版页面编排，不应自动修正。
 
+### 字幕与终幕的调色板
+
+模块 46 也不用 gameplay 调色板：`0000:00E9` 在进入字幕前把 `DS:00AF` 写进 DAC，`0000:041B`／`0000:042A` 再用 `DS:01F6` 淡出字幕、淡入终幕。
+
+- `B/88`、`C/33` 的 42 个字幕帧只画调色板索引 0（各表均为纯黑），因此渲染结果与调色板无关，仍可沿用 `reverse/renders/planar/`；
+- `UN/54` 用满 16 个索引，必须按 `DS:01F6` 渲染。用 gameplay 表会把太阳画成黄色、山画成红色、爱心画成绿色。
+
 ### `UN/54` 终幕循环
 
 字幕结束后，模块 46 把 `UN/54` 帧 0 绘制在 `(160,27)`，再把帧 1–4 作为 `(352,161)` 的小角色叠加动画。每个外循环的确定顺序为：
@@ -217,6 +253,11 @@
 ## 可重复验证
 
 ```sh
+node reverse/tools/angel2-ending-presentations.mjs --render \
+  reverse/unpacked/lzexe-modules/raw/0035-unpacked.bin \
+  reverse/unpacked/lzexe-modules/raw/0046-unpacked.bin \
+  reverse/decoded \
+  reverse/renders/ending-presentations
 node reverse/tools/angel2-ending-presentations.mjs --extract \
   reverse/unpacked/lzexe-modules/raw/0029-unpacked.bin \
   reverse/unpacked/lzexe-modules/raw/0033-unpacked.bin \
@@ -227,4 +268,7 @@ node reverse/tools/angel2-ending-presentations.mjs --extract \
   reverse/parsed/native/ending-presentations.json
 ```
 
-提取器断言 22 张可达角色卡、8 段结局文字、20 个职务帧、22 个姓名帧、全部等待/跳过规则和模块 46 的不可返回控制流。当前尚未开始任何 Web/Phaser 实现。
+`--render` 输出 16 张结局插画和 5 帧 `UN/54`，每张都按其所属模块淡入的原生 DAC 表着色；
+`pnpm content:stage49` 与 `pnpm content:credits` 只从这里取图，并在调色板不匹配时报错。
+
+提取器断言 22 张可达角色卡、8 段结局文字、8 张结局调色板、20 个职务帧、22 个姓名帧、全部等待/跳过规则和模块 46 的不可返回控制流。
