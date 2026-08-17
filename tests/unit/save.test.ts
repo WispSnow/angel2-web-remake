@@ -4974,6 +4974,37 @@ describe("Web save validation", () => {
     expect(isSaveData(wrongOpening)).toBe(false);
   });
 
+  it("carries version-84 saves forward but refuses stage-2/3 battles whose slots moved", () => {
+    // REMAKE-108 changed which campaign slots garrison stages 2 and 3, so a v84
+    // board inside either stage no longer matches its schema. Everything else —
+    // completed saves and battles in other stages — migrates untouched.
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 84,
+      contentVersion: "control-zone-occupied-gap-1",
+    }))).toEqual(completed);
+
+    const stage0 = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...stage0,
+      version: 84,
+      contentVersion: "control-zone-occupied-gap-1",
+    }))).toEqual(stage0);
+
+    // 旧的第 2 关棋盘还带着 1:40..1:43，新的 schema 只接受 1:51..1:54。
+    const legacyStage2 = stage2BattleSave();
+    legacyStage2.battle.units = legacyStage2.battle.units.map((unit) => {
+      const moved = new Map([[51, 43], [52, 41], [53, 40], [54, 42]]).get(unit.slot);
+      return moved === undefined ? unit : { ...unit, id: `1:${moved}`, slot: moved };
+    });
+    expect(parseSaveData(JSON.stringify({
+      ...legacyStage2,
+      version: 84,
+      contentVersion: "control-zone-occupied-gap-1",
+    }))).toBeUndefined();
+  });
+
   it("migrates version-11 stage-1 completion into the playable stage-2 label", () => {
     const current: CompletedSaveData = {
       ...completedSave(),

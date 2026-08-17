@@ -2122,8 +2122,9 @@ export const STAGE_RUNTIME_MANIFEST = {
       ],
       requiredResumeEventIds: ["stage-02-opening-story"],
       alliedUnits: {
+        // REMAKE-108 swaps the four grown campaign slots out to stage 3.
         kind: "exact-slots",
-        slots: [0, 2, 24, 40, 41, 42, 43, 44, 45],
+        slots: [0, 2, 24, 44, 45, 51, 52, 53, 54],
       },
       enemyClassById: [
         ["2:47", "cavalry"],
@@ -2204,8 +2205,9 @@ export const STAGE_RUNTIME_MANIFEST = {
       ],
       requiredResumeEventIds: ["stage-03-opening-story"],
       alliedUnits: {
+        // REMAKE-108 hands Himi the four campaign slots the player grew in stages 0–1.
         kind: "exact-slots",
-        slots: [1, 3, 4, 20, 21, 45, 46, 47, 50, 51, 52, 53, 54],
+        slots: [1, 3, 4, 20, 21, 40, 41, 42, 43, 45, 46, 47, 50],
       },
       enemyClassById: [
         ["2:42", "soldier"],

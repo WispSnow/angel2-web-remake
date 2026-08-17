@@ -123,7 +123,8 @@ test("S02-C/D: all-rest spends only manual units, then every automatic ally acts
   const alliedFocusIds = new Set(
     trace.filter(({ phase }) => phase === "allyAuto").map(({ focusId }) => focusId),
   );
-  for (const id of ["1:40", "1:41", "1:42", "1:43", "1:44", "1:45"]) {
+  // REMAKE-108: stage 2 now garrisons campaign slots 44/45 and 51..54.
+  for (const id of ["1:44", "1:45", "1:51", "1:52", "1:53", "1:54"]) {
     expect(alliedFocusIds.has(id), `${id} should receive its automatic action`).toBe(true);
   }
   expect(trace.some(({ phase }) => phase === "allyAuto")).toBe(true);

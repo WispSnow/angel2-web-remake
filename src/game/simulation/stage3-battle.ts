@@ -33,13 +33,22 @@ const STAGE3_AI_CLASS_PRIORITY = {
 const sideUnitIds = (side: BattleUnit["side"], slots: readonly number[]): string[] =>
   slots.map((slot) => `${side}:${slot}`);
 
+/**
+ * 两支我方军团按原版逐槽行为划分：行为 0 归希蜜救援队，行为 2/3/4 归第四军团。
+ * `REMAKE-108` 换掉四个玩家槽后不需要在这里再抄一遍槽号。
+ */
+const alliedUnitIdsByBehavior = (playerControlled: boolean): string[] =>
+  sideUnitIds(1, STAGE3_SEMANTIC_ALLIED_UNITS
+    .filter(({ aiBehavior }) => (aiBehavior === 0) === playerControlled)
+    .map(({ slot }) => slot));
+
 const STAGE3_FORCE_DEFINITIONS = [
   {
     id: "himi-rescue-force",
     label: "希蜜救援隊",
     side: 1,
     control: "player",
-    unitIds: sideUnitIds(1, [54, 53, 52, 51, 1, 4]),
+    unitIds: alliedUnitIdsByBehavior(true),
     commanderId: "1:1",
     doctrine: { strategy: "expert" },
   },
@@ -49,7 +58,7 @@ const STAGE3_FORCE_DEFINITIONS = [
     tacticLabel: "固守防區",
     side: 1,
     control: "independent-ai",
-    unitIds: sideUnitIds(1, [21, 46, 45, 47, 3, 20, 50]),
+    unitIds: alliedUnitIdsByBehavior(false),
     doctrine: {
       strategy: "terrain-hold",
       allowedTerrainSlots: [3, 5],

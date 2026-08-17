@@ -43,7 +43,12 @@ const STAGE2_FORCE_DEFINITIONS = [
     tacticLabel: "自主作戰",
     side: 1,
     control: "independent-ai",
-    unitIds: ["1:40", "1:41", "1:42", "1:43", "1:44", "1:45"],
+    // 从语义单位按原版行为 11 派生，`REMAKE-108` 换掉四个槽后不需要在这里再抄一遍。
+    unitIds: STAGE2_SEMANTIC_ALLIED_UNITS
+      .filter(({ aiBehavior }) => aiBehavior === 11)
+      .map(({ slot }) => slot)
+      .sort((left, right) => left - right)
+      .map((slot) => `1:${slot}`),
     doctrine: { strategy: "expert" },
   },
   {

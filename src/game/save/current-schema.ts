@@ -29,8 +29,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 84 as const;
-export const SAVE_CONTENT_VERSION = "control-zone-occupied-gap-1" as const;
+export const SAVE_VERSION = 85 as const;
+export const SAVE_CONTENT_VERSION = "stage-2-3-generic-ally-swap-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

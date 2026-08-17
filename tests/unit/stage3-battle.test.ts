@@ -43,7 +43,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
 
   it("exposes behavior-zero allies to the player and schedules automatic allies in map order", () => {
     const battle = new Stage3Battle(campaign);
-    expect(["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"]
+    expect(["1:40", "1:41", "1:42", "1:43", "1:1", "1:4"]
       .every((id) => battle.isPlayerControllableAlly(id))).toBe(true);
     expect(["1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50"]
       .some((id) => battle.isPlayerControllableAlly(id))).toBe(false);
@@ -68,12 +68,12 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     expect(battle.forceForUnit("2:44")).toMatchObject({
       tacticLabel: "阻擊救援隊",
     });
-    expect(battle.planAlliedAiAction("1:54")).toBeDefined();
+    expect(battle.planAlliedAiAction("1:40")).toBeDefined();
   });
 
   it("applies all-rest only to manual rescue units and leaves automatic allies for their phase", () => {
     const battle = new Stage3Battle(campaign);
-    const manualIds = ["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"];
+    const manualIds = ["1:40", "1:41", "1:42", "1:43", "1:1", "1:4"];
     const automaticIds = ["1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50"];
     for (const id of [...manualIds, ...automaticIds]) battle.unit(id)!.life -= 10;
 
@@ -194,7 +194,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
       battle.units = battle.units.filter((unit) => unit.side === 1 || unit.id === enemyId);
       const enemy = battle.unit(enemyId)!;
       const automatic = battle.unit("1:46")!;
-      const rescue = battle.unit("1:54")!;
+      const rescue = battle.unit("1:40")!;
       enemy.x = 24;
       enemy.y = 13;
       automatic.x = 24;
@@ -237,7 +237,7 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     battle.units = battle.units.filter((unit) =>
       unit.id === "2:42" || battle.forceForUnit(unit.id)?.id === "himi-rescue-force");
     const enemy = battle.unit("2:42")!;
-    const rescue = battle.unit("1:54")!;
+    const rescue = battle.unit("1:40")!;
     enemy.x = 24;
     enemy.y = 13;
     rescue.x = 24;

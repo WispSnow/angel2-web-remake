@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createStage0Units } from "../../src/game/content/stage0";
+import { createStage0Units, initialEnemyExperience, statsFor } from "../../src/game/content/stage0";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -325,9 +325,16 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
     life: 160,
     experience: 399,
   });
+  // 本用例证的是「v2 存档迁移后敌方按当前难度基线重建」，不是基线数值本身——后者归
+  // `enemy-scaling.test.ts` 与 `stage0-difficulty.spec.ts`。所以这里从内容层派生，
+  // `REMAKE-103` 那样的成长档调整不会再把它留成过期期望。
+  const hadingExperience = initialEnemyExperience("cavalry", save.difficulty);
   expect(state.units.find((unit) => unit.id === "2:15")).toMatchObject({
-    life: 270,
-    experience: 461,
+    life: statsFor(
+      { classId: "cavalry", experience: hadingExperience, side: 2 },
+      save.difficulty,
+    ).maxLife,
+    experience: hadingExperience,
   });
   await expect(page.locator("#status-strip")).toHaveText("已讀取記錄 1。");
   await captureVisualAudit(page.getByTestId("game-screen"), {

@@ -4,6 +4,10 @@ import * as actionContent from "./stage1-actions.generated";
 import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
+import {
+  STAGE2_GENERIC_ALLY_SLOT_SWAP,
+  withSwappedGenericAllySlots,
+} from "./generic-ally-stage-swap";
 import { registerStageSimulationEffects } from "./stage-effects";
 import { registerStageMusicPrograms } from "./music";
 import {
@@ -126,16 +130,21 @@ export function stage2TerrainSlotAt(position: Position): number {
   return STAGE2_TOKEN_TO_TERRAIN_SLOT[token] ?? 0;
 }
 
-export const STAGE2_SEMANTIC_ALLIED_UNITS = STAGE2_ALLIED_UNITS.map((unit) => {
-  const actor = STAGE2_ALLIED_ACTORS.find(({ slot }) => slot === unit.slot);
-  if (!actor) throw new Error(`Missing stage 2 allied actor ${unit.slot}`);
-  return {
-    ...unit,
-    initialClassId: unit.nativeClassRecord === null ? undefined : semanticClassId(unit.nativeClassRecord),
-    name: actor.portraitRecord === 255 ? "士兵" : actor.normalizedName,
-    portrait: (actor.portraitRecord === 255 ? 47 : actor.portraitRecord) as PortraitRecord,
-  };
-});
+// 角色描述符按原版槽查表，槽号随后由 `REMAKE-108` 改写；四个被换走的槽都是 `FFh`
+// 通用条目，与换进来的 51–54 同为通用身份，所以查表顺序不影响姓名与肖像。
+export const STAGE2_SEMANTIC_ALLIED_UNITS = withSwappedGenericAllySlots(
+  STAGE2_ALLIED_UNITS.map((unit) => {
+    const actor = STAGE2_ALLIED_ACTORS.find(({ slot }) => slot === unit.slot);
+    if (!actor) throw new Error(`Missing stage 2 allied actor ${unit.slot}`);
+    return {
+      ...unit,
+      initialClassId: unit.nativeClassRecord === null ? undefined : semanticClassId(unit.nativeClassRecord),
+      name: actor.portraitRecord === 255 ? "士兵" : actor.normalizedName,
+      portrait: (actor.portraitRecord === 255 ? 47 : actor.portraitRecord) as PortraitRecord,
+    };
+  }),
+  STAGE2_GENERIC_ALLY_SLOT_SWAP,
+);
 
 export const STAGE2_SEMANTIC_ENEMY_UNITS = STAGE2_ENEMY_UNITS.map((unit) => {
   const classId = semanticClassId(unit.nativeClassRecord);

@@ -265,7 +265,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("希蜜");
   await page.getByTestId("dialogue-layer").click();
   await page.waitForFunction(() => {
-    const playerUnitIds = new Set(["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"]);
+    const playerUnitIds = new Set(["1:40", "1:41", "1:42", "1:43", "1:1", "1:4"]);
     const traceHost = window as typeof window & {
       __stage3HandoffTrace?: Array<{ unitId?: string; statusMessage: string }>;
     };
@@ -291,7 +291,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
     return traceHost.__stage3HandoffTrace ?? [];
   });
   const playerHandoffIndex = handoffTrace.findIndex(({ unitId }) =>
-    ["1:54", "1:53", "1:52", "1:51", "1:1", "1:4"].includes(unitId ?? ""));
+    ["1:40", "1:41", "1:42", "1:43", "1:1", "1:4"].includes(unitId ?? ""));
   const independentNpcIndex = handoffTrace.findIndex(({ statusMessage }) =>
     statusMessage.includes("友軍 NPC 軍團") && statusMessage.includes("獨立行動"));
   expect(playerHandoffIndex).toBeGreaterThanOrEqual(0);

@@ -80,19 +80,22 @@ describe("REMAKE-107 generic ally slot letters", () => {
     const stage3 = labelBySlot(new Stage3Battle(campaignAt("stage-03")).units);
     const stage8 = labelBySlot(new Stage8Battle(campaignAt("stage-08")).units);
 
-    // B/0001、B/0003、B/0005 复用同一批战役槽，B/0017 在职业覆写后仍是这批槽。
+    // B/0001、B/0003 复用同一批战役槽；`REMAKE-108` 让它们跳过第 2 关直接进第 3 关，
+    // B/0017 在职业覆写后仍是这批槽。
     for (const slot of [40, 41, 42, 43]) {
       const letter = stage0.get(slot);
       expect(letter, `slot ${slot} has no stage-0 letter`).toBeTruthy();
       expect(stage1.get(slot), `stage 1 slot ${slot}`).toBe(letter);
-      expect(stage2.get(slot), `stage 2 slot ${slot}`).toBe(letter);
+      expect(stage3.get(slot), `stage 3 slot ${slot}`).toBe(letter);
       expect(stage8.get(slot), `stage 8 slot ${slot}`).toBe(letter);
+      expect(stage2.has(slot), `stage 2 must not host slot ${slot}`).toBe(false);
     }
-    // 第 2 关新增槽 44/45；第 3 关换成另一批，只有槽 45 与第 2 关重叠。
-    expect([...stage2.keys()].sort((a, b) => a - b)).toEqual([40, 41, 42, 43, 44, 45]);
-    expect([...stage3.keys()].sort((a, b) => a - b)).toEqual([45, 46, 47, 50, 51, 52, 53, 54]);
+    // 第 2 关保留原有的 44/45，另外四个位置换成 51–54；第 3 关的自动友军 45–47、50 不变。
+    expect([...stage2.keys()].sort((a, b) => a - b)).toEqual([44, 45, 51, 52, 53, 54]);
+    expect([...stage3.keys()].sort((a, b) => a - b)).toEqual([40, 41, 42, 43, 45, 46, 47, 50]);
     expect(stage3.get(45)).toBe(stage2.get(45));
-    expect([...stage3.values()].sort()).toEqual(["F", "G", "H", "K", "L", "M", "N", "O"]);
+    expect([...stage2.values()].sort()).toEqual(["E", "F", "L", "M", "N", "O"]);
+    expect([...stage3.values()].sort()).toEqual(["A", "B", "C", "D", "F", "G", "H", "K"]);
 
     for (const [stageId, labels] of [
       ["stage-00", stage0],
@@ -126,12 +129,12 @@ describe("REMAKE-107 generic ally slot letters", () => {
     const snapshot = battle.serializableSnapshot();
     battle.restore({
       ...snapshot,
-      units: snapshot.units.map((unit) => unit.id === "1:41"
+      units: snapshot.units.map((unit) => unit.id === "1:52"
         // 旧存档：还没有槽字母，而且职业已经变了但 name 停在上一个职业。
         ? { ...unit, classId: "warrior", className: "戰士", name: "士兵", portrait: 57 }
         : unit),
     });
-    expect(battle.unit("1:41")).toMatchObject({ classId: "warrior", name: "戰士B" });
+    expect(battle.unit("1:52")).toMatchObject({ classId: "warrior", name: "戰士M" });
     expect(classFallbackPortraitFor("warrior", 1)).toBe(57);
   });
 });

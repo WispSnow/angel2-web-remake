@@ -355,6 +355,32 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-108 swaps which campaign slots garrison stages 2 and 3: the grown
+ * slots 40–43 move to Himi's stage-3 rescue party and the fresh slots 51–54
+ * take their stage-2 places. Every other stage, the campaign roster and the
+ * completed-save shape are untouched, so those carry over unchanged.
+ *
+ * A v84 battle save sitting inside stage 2 or stage 3 still holds the old slot
+ * set on its board. There is no honest remap: rewriting `1:40` to `1:54`
+ * mid-battle would silently move the player's accumulated growth into a slot
+ * that never appears again, and the reverse would invent growth that was never
+ * earned. `isSaveData` therefore refuses those two, and the whole migration
+ * returns undefined — the same deliberate rejection `migrateVersion82Save`
+ * uses. Re-entering the stage from its prebattle route rebuilds it correctly.
+ */
+function migrateVersion84Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 84
+    || value.contentVersion !== "control-zone-occupied-gap-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-105 restores the native `FFh` reservation: an occupied neighbour of an
  * opposing unit is no longer a terminal cell, so both sides may again propagate
  * through a unit standing beside its opponent. No field is added and none
@@ -2423,6 +2449,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion84 = migrateVersion84Save(value);
+  if (migratedVersion84) return migratedVersion84;
   const migratedVersion83 = migrateVersion83Save(value);
   if (migratedVersion83) return migratedVersion83;
   const migratedVersion82 = migrateVersion82Save(value);

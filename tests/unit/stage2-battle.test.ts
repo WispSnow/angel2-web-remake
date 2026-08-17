@@ -11,7 +11,7 @@ const campaign: CampaignState = {
   roster: completeCampaignRoster([
     { slot: 0, classId: "cavalry", experience: 450, life: 100 },
     { slot: 2, classId: "archer", experience: 360, life: 90 },
-    { slot: 40, classId: "warrior", experience: 100, life: 110 },
+    { slot: 53, classId: "warrior", experience: 100, life: 110 },
     { slot: 24, classId: "soldier", experience: 0, life: 160 },
   ]),
   rngState: 0x12345678,
@@ -59,12 +59,14 @@ describe("stage 2 battle construction and allied automation", () => {
       y: 35,
     });
     expect(battle.unit("1:2")).toMatchObject({ classId: "archer", x: 28, y: 35 });
-    expect(battle.unit("1:40")).toMatchObject({
+    // REMAKE-108: the (27,33) post now belongs to campaign slot 53, not 40.
+    expect(battle.unit("1:53")).toMatchObject({
       classId: "warrior",
       portrait: 57,
       x: 27,
       y: 33,
     });
+    expect(battle.unit("1:40")).toBeUndefined();
     expect(battle.unit("1:24")).toMatchObject({
       classId: "magician",
       name: "葛蒂拉斯",
@@ -99,11 +101,11 @@ describe("stage 2 battle construction and allied automation", () => {
     const battle = new Stage2Battle(campaign);
     expect(["1:0", "1:2", "1:24"].map((id) => battle.isPlayerControllableAlly(id)))
       .toEqual([true, true, true]);
-    expect(["1:40", "1:41", "1:42", "1:43", "1:44", "1:45"]
+    expect(["1:44", "1:45", "1:51", "1:52", "1:53", "1:54"]
       .map((id) => battle.isPlayerControllableAlly(id)))
       .toEqual([false, false, false, false, false, false]);
     expect(battle.alliedActionOrder(false)).toEqual([
-      "1:44", "1:45", "1:43", "1:41", "1:40", "1:42",
+      "1:44", "1:45", "1:51", "1:52", "1:53", "1:54",
     ]);
   });
 
