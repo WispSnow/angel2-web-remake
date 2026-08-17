@@ -62,32 +62,20 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 
 .startup-screen { color: #fff; background: #000; }
+/* Both layers now only carry hidden narration, the menu frames and the menus;
+ * the canvas underneath paints every startup pixel. */
 .startup-intro,
-.startup-title { position: absolute; inset: 0; overflow: hidden; background: #000; }
-.startup-intro {
-  box-shadow: inset 0 0 0 1px #4b4b4b;
-  border-radius: 0 0 10px 10px;
-}
-.startup-intro-background {
+.startup-title { position: absolute; inset: 0; overflow: hidden; background: transparent; }
+/* Module 23 draws the pretitle logo, the scrolling intro and the title art with
+ * additive DAC fades, an 8x8 ordered-dither dissolve and its own bitmap font, so
+ * the startup visuals live on one canvas. The paragraphs keep the narration for
+ * assistive technology. */
+.startup-canvas {
   position: absolute;
-  left: 24px;
-  top: 0;
-  width: 608px;
-  height: 257px;
-  image-rendering: pixelated;
-}
-.startup-intro-lines { position: absolute; inset: 0; pointer-events: none; }
-.startup-intro-lines p {
-  position: absolute;
-  left: 0;
+  inset: 0;
   width: 640px;
-  height: 18px;
-  margin: 0;
-  color: #f7f7f7;
-  font: 15px/18px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
-  text-align: center;
-  white-space: pre;
-  text-shadow: 1px 1px #000;
+  height: 350px;
+  image-rendering: pixelated;
 }
 .startup-title > img {
   position: absolute;
@@ -95,31 +83,9 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   image-rendering: pixelated;
   pointer-events: none;
 }
-.startup-title-background { z-index: 0; left: 0; top: 0; width: 640px; height: 349px; }
-.startup-title-upper { z-index: 1; left: 32px; top: 0; width: 472px; height: 349px; }
-.startup-title-lower { z-index: 2; left: 0; top: 216px; width: 640px; height: 123px; }
 .startup-menu-frame { z-index: 3; left: 480px; width: 144px; height: auto; }
 .startup-title-menu-frame { top: 50px; }
 .startup-difficulty-menu-frame { top: 21px; }
-.startup-title.is-assembling .startup-title-background {
-  opacity: 0;
-  animation: startup-palette-fade var(--title-background-duration) steps(16, end) forwards;
-}
-.startup-title.is-assembling .startup-title-upper {
-  opacity: 0;
-  animation: startup-palette-fade var(--title-upper-duration) steps(8, end)
-    var(--title-background-duration) forwards;
-}
-.startup-title.is-assembling .startup-title-lower {
-  opacity: 0;
-  animation: startup-palette-fade var(--title-lower-duration) steps(16, end)
-    calc(var(--title-background-duration) + var(--title-upper-duration) + var(--title-hold-duration)) forwards;
-}
-.startup-title.is-assembling .startup-title-menu-frame {
-  opacity: 0;
-  animation: startup-menu-appear 1ms linear
-    calc(var(--title-background-duration) + var(--title-upper-duration) + var(--title-hold-duration) + var(--title-lower-duration)) forwards;
-}
 .startup-menu {
   position: absolute;
   z-index: 4;
@@ -131,24 +97,18 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 .startup-menu.title-menu { top: 75px; }
 .startup-menu.difficulty-menu { top: 51px; }
+/* The canvas draws the real labels and their highlight bar with the native
+ * bitmap font, so the buttons stay as transparent hit targets that keep the
+ * accessible name and the keyboard focus ring. */
 .startup-menu button {
   width: 96px;
   height: 20px;
   padding: 0;
   border: 0;
-  color: #eee;
+  color: transparent;
   background: transparent;
   font: 16px/20px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
-  letter-spacing: .04em;
-  text-align: center;
-  text-shadow: 1px 1px #000;
   cursor: var(--native-cursor-hand, pointer);
-}
-.startup-menu button:hover,
-.startup-menu button.is-selected {
-  color: #fff;
-  background:
-    linear-gradient(90deg, transparent, rgba(73, 70, 103, .9) 12% 88%, transparent);
 }
 .startup-menu button:focus-visible { outline: 1px solid #fff; outline-offset: -2px; }
 .startup-menu-status {
@@ -292,8 +252,6 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   font-size: 11px;
   text-align: center;
 }
-@keyframes startup-palette-fade { to { opacity: 1; } }
-@keyframes startup-menu-appear { to { opacity: 1; } }
 
 .battle-chrome { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #0a0708; }
 .battle-chrome > img { position: absolute; display: block; image-rendering: pixelated; }

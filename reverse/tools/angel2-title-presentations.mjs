@@ -23,6 +23,9 @@ const CODE_SIGNATURES = [
   ["0000:0BC7", 0x0bc7, 0x0c1f, "title-variant-static-layers", "db2f03c50ee0c6f2124017c0ed497f99838161d5e17defeabb91e5e050031ef8"],
   ["0000:0CE2", 0x0ce2, 0x0d2f, "pretitle-load-fade-and-hold", "fb0a4009150444a36ade0ba8ae2c7cb2d1c42b87f988236e2aa8b36845f916db"],
   ["0000:0D2F", 0x0d2f, 0x0d55, "pretitle-skippable-300-tick-hold", "4d18aa50e8221f4d2b357b079f1dd8ee44297bd5600dd16da7076758f698e98e"],
+  ["0000:0DC3", 0x0dc3, 0x0e86, "dissolve-blit-per-plane-setup", "e50ebad7ef34217e09a74d8d443f58115efba8a63a4b9fe9b9263d6cc788e854"],
+  ["0000:0E86", 0x0e86, 0x0f06, "dissolve-pattern-row-dispatch", "811ab2dd734caa6457355ab65cf6e0082af5be2abd67d83b42f1ba5bb28d606e"],
+  ["0000:0F0A", 0x0f0a, 0x0fac, "sixteen-8x8-dissolve-patterns", "36f0b823e1cc1763719aa6ac2983933bb42ddd86b568fa530a788fd439a5dee2"],
   ["0000:1034", 0x1034, 0x117d, "intro-loader-main-loop-and-music", "59bf7da6e376c6d9274261675e440eeb5dd18c2ad5950ad886b08988522ad889"],
   ["0000:117D", 0x117d, 0x11da, "intro-background-reload", "671487d6981c9f6e98c0c3ae444fe5ef8cd22f194e18724ffc98973d7a6f531e"],
   ["0000:11DA", 0x11da, 0x123c, "intro-three-row-scroll-update", "e6184292ee9a170090c8037b551effc0050832579dcd776a150f974b17e6b029"],
@@ -99,6 +102,56 @@ function dacPalette(values) {
   assert(values.length === 48, "title palette must have 16 RGB triples");
   return Array.from({ length: 16 }, (_, index) =>
     Array.from(values.subarray(index * 3, index * 3 + 3), (value) => Math.round(value * 255 / 63)));
+}
+
+/**
+ * The title art is not faded in: `0000:0766`/`0000:07FB` call the planar blit at
+ * `0000:0DC3` with a step number, and `0000:0EB0` uses it to index the pointer
+ * table at `0000:0F0A`. Each entry is an eight-byte 8x8 dither pattern consumed
+ * one row per scanline (`0000:0ED5` wraps the row counter at 8); `0000:0EF4`
+ * keeps the source pixel where the bit is set and the destination pixel where it
+ * is clear. Steps 0-7 and 8-15 are two nested, complementary phases, so the
+ * upper art's 1,3,5,...,15 and the lower art's 0..15 both end fully covered.
+ */
+function parseDissolvePatterns(module23) {
+  const patterns = Array.from({ length: 16 }, (_, step) => {
+    const offset = module23.readUInt16LE(0x0f0a + step * 2);
+    assert(offset >= 0x0f2c && offset + 8 <= 0x0fac, `dissolve pattern ${step} points outside its table`);
+    const rows = Array.from(module23.subarray(offset, offset + 8));
+    return {
+      step,
+      address: `0000:${offset.toString(16).toUpperCase().padStart(4, "0")}`,
+      rows,
+      setPixelsPerCell: rows.reduce((total, row) => total + row.toString(2).replaceAll("0", "").length, 0),
+    };
+  });
+  const density = patterns.map((pattern) => pattern.setPixelsPerCell);
+  assert(
+    density.join(",") === "4,8,12,16,20,24,28,32,4,8,12,16,20,24,28,32",
+    "dissolve pattern densities changed",
+  );
+  for (const phase of [0, 8]) {
+    for (let step = phase; step < phase + 7; step += 1) {
+      const inner = patterns[step].rows;
+      const outer = patterns[step + 1].rows;
+      assert(
+        inner.every((row, index) => (row & outer[index]) === row),
+        `dissolve step ${step} is not nested inside step ${step + 1}`,
+      );
+    }
+  }
+  assert(
+    patterns[7].rows.every((row, index) => (row & patterns[15].rows[index]) === 0
+      && (row | patterns[15].rows[index]) === 0xff),
+    "the two dissolve phases no longer tile the full 8x8 cell",
+  );
+  return {
+    table: "0000:0F0A",
+    cellWidth: 8,
+    cellHeight: 8,
+    rowRule: "one byte per scanline, wrapping every 8 rows; a set bit takes the source pixel",
+    patterns,
+  };
 }
 
 function verifySignatures(module23) {
@@ -375,10 +428,10 @@ async function extract(module23Path, audioManifestPath, decodedRoot, renderRoot,
       background: { graphic: "BK/51", x: 0, y: 0 },
       variant0: { condition: "idle-rebuild flag bit 0 is clear", upper: "BK/52", lower: "BK/53" },
       variant1: { condition: "idle-rebuild flag bit 0 is set", upper: "BK/54", lower: "BK/55" },
-      upperReveal: { x: 32, y: 0, masks: [1, 3, 5, 7, 9, 11, 13, 15], ticksPerStep: 5, fixedNativeTicks: 40 },
+      upperReveal: { x: 32, y: 0, dissolveSteps: [1, 3, 5, 7, 9, 11, 13, 15], ticksPerStep: 5, fixedNativeTicks: 40 },
       preMusicHold: { iterations: 20, ticksPerIteration: 2, maximumFixedNativeTicks: 40, skippableByEitherActionFlag: true },
       audio: { ...audioEntry(audioManifest, 1), start: "after upper reveal and pre-music hold, before lower reveal" },
-      lowerReveal: { x: 0, y: 216, masks: Array.from({ length: 16 }, (_, index) => index), ticksPerStep: 5, fixedNativeTicks: 80 },
+      lowerReveal: { x: 0, y: 216, dissolveSteps: Array.from({ length: 16 }, (_, index) => index), ticksPerStep: 5, fixedNativeTicks: 80 },
       palette: { table: "DS:02C2", fadeInDacWrites: 64, fadeOutDacWrites: 63 },
       menuIdle: {
         waitNativeTicksPerCycle: 8,
@@ -404,6 +457,25 @@ async function extract(module23Path, audioManifestPath, decodedRoot, renderRoot,
         explicitNativeWaitCalls: 0,
         emptySlotRule: "highlight is allowed but confirmation loops until a populated slot or cancel",
       },
+    },
+    dissolve: parseDissolvePatterns(module23),
+    titleMenuLabels: {
+      textX: 520,
+      rowPitch: 24,
+      /* DS:0BDE and DS:0D5E are both a 96x20 bitmap whose rows alternate AAh and
+       * 55h, drawn in colour 7, so the selected row is a 50% checkerboard
+       * stipple rather than a solid bar. */
+      highlightBar: {
+        x: 504,
+        yOffset: -2,
+        width: 96,
+        height: 20,
+        colorIndex: 7,
+        pattern: "50% checkerboard; set where (x + y) is even",
+      },
+      title: { entry: "0000:1A91", firstTextY: 75, highlightDescriptor: "DS:0BDE" },
+      difficulty: { entry: "0000:1C23", firstTextY: 51, highlightDescriptor: "DS:0D5E" },
+      note: "the two title options and the four difficulty labels are drawn from the A/23+A/24 glyph pair, not from a system font",
     },
     resourceCatalog: {
       graphicRecordCount: RENDER_SPECS.length,

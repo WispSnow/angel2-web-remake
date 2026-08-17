@@ -1,11 +1,21 @@
 import {
   DIFFICULTY_OPTIONS,
-  INTRO_BACKGROUND_CHANGES,
-  INTRO_LINE_ASSIGNMENTS,
-  NATIVE_INTRO_DURATION_MS,
-  NATIVE_INTRO_SCROLL_UPDATES,
   STARTUP_ASSETS,
 } from "./content/startup";
+import {
+  STARTUP_INTRO,
+  STARTUP_MENU_LABELS,
+  STARTUP_PRETITLE,
+  STARTUP_SCREEN,
+  STARTUP_TITLE,
+} from "./content/startup.generated";
+import {
+  drawDissolvedImage,
+  drawFadedImage,
+  drawStartupGlyphs,
+  loadStartupFont,
+  loadStartupImage,
+} from "./startup-screen";
 import { classStatsFor } from "./content/stage0";
 import { className } from "./content/classes";
 import { configureGameScaling } from "./scaling";
@@ -22,7 +32,7 @@ import {
 } from "./save";
 import type { Difficulty, SaveData } from "./types";
 
-type StartupPhase = "intro" | "title" | "difficulty" | "records";
+type StartupPhase = "pretitle" | "intro" | "title" | "difficulty" | "records";
 
 export interface NewGameSelection {
   kind: "new";
@@ -40,21 +50,17 @@ export interface ContinueGameSelection {
 export type StartupSelection = NewGameSelection | ContinueGameSelection;
 
 const TITLE_OPTIONS = ["遊戲開始", "繼續遊戲"] as const;
-const INTRO_TRANSITION_HALF_UPDATES = 21;
-const TITLE_ASSEMBLY_DURATION_MS = {
-  native: {
-    background: 640,
-    upper: 400,
-    hold: 400,
-    lower: 800,
-  },
-  test: {
-    background: 8,
-    upper: 8,
-    hold: 8,
-    lower: 16,
-  },
-} as const;
+const NATIVE_TICK_MS = 10;
+/** The DAC writes at 0000:31E0 are paced by vertical retrace, not the timer. */
+const DAC_STEP_MS = 1000 / 70;
+/**
+ * A background swap spends 128 main loops fading the old plate down, loading the
+ * next one and fading it back up, and the rows keep scrolling throughout. Three
+ * loops make one scroll update, so the swap straddles the update that read the
+ * control entry by half of 128/3 updates on each side.
+ */
+const INTRO_TRANSITION_HALF_UPDATES = Math.round(STARTUP_INTRO.transitionLoops / 3 / 2);
+const INTRO_UPDATE_MS = STARTUP_INTRO.ticksPerScrollUpdate * NATIVE_TICK_MS;
 
 const required = <T extends HTMLElement>(root: ParentNode, selector: string): T => {
   const element = root.querySelector<T>(selector);
@@ -67,20 +73,31 @@ export function mountStartup(
   startGame: (selection: StartupSelection) => void,
 ): () => void {
   const testMode = new URLSearchParams(location.search).has("test");
-  const introDuration = testMode ? 8_000 : NATIVE_INTRO_DURATION_MS;
-  let phase: StartupPhase = "intro";
+  const introDuration = testMode
+    ? 8_000
+    : STARTUP_INTRO.scrollUpdates * INTRO_UPDATE_MS;
+  const dacStepMs = testMode ? 1 : DAC_STEP_MS;
+  const pretitleHoldMs = testMode ? 120 : STARTUP_PRETITLE.holdNativeTicks * NATIVE_TICK_MS;
+  const dissolveStepMs = testMode ? 4 : STARTUP_TITLE.upperReveal.ticksPerStep * NATIVE_TICK_MS;
+  const backgroundFadeMs = STARTUP_TITLE.backgroundFadeSteps * dacStepMs;
+  const preMusicHoldMs = testMode
+    ? 20
+    : STARTUP_TITLE.preMusicHoldNativeTicks * NATIVE_TICK_MS;
+  let phase: StartupPhase = "pretitle";
   let titleIndex = 0;
   let difficultyIndex = 0;
   let recordIndex = 0;
   let recordSlots: SaveSlotReadResult[] = [];
-  let introFrame = 0;
-  let titleReadyTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  let animationFrame = 0;
+  let phaseStartedAt = performance.now();
+  let titleAssembled = false;
+  /** 0000:0480 flips this on every idle replay, alternating BK/52+53 and 54+55. */
+  let titleVariant = 0;
+  let idleSince = 0;
+  let font: HTMLImageElement | undefined;
+  let musicStarted = false;
   let disposed = false;
-  const titleTiming = testMode
-    ? TITLE_ASSEMBLY_DURATION_MS.test
-    : TITLE_ASSEMBLY_DURATION_MS.native;
-  const titleAssemblyDuration = Object.values(titleTiming)
-    .reduce((total, duration) => total + duration, 0);
+  const loadedImages = new Map<string, HTMLImageElement>();
 
   root.innerHTML = `
     <div class="page-shell startup-shell">
@@ -90,11 +107,11 @@ export function mountStartup(
       <div class="game-stage">
         <div class="game-viewport" id="startup-viewport">
           <section class="logical-screen startup-screen" id="startup-screen" data-testid="startup-screen"
-            style="--title-background-duration:${titleTiming.background}ms;--title-upper-duration:${titleTiming.upper}ms;--title-hold-duration:${titleTiming.hold}ms;--title-lower-duration:${titleTiming.lower}ms"
-            data-startup-phase="intro" aria-label="天使帝國 II 啟動畫面">
+            data-startup-phase="pretitle" aria-label="天使帝國 II 啟動畫面">
+            <canvas class="startup-canvas" id="startup-canvas" data-testid="startup-canvas"
+              width="${STARTUP_SCREEN.width}" height="${STARTUP_SCREEN.height}" aria-hidden="true"></canvas>
             <section class="startup-intro" data-testid="opening-intro" aria-label="開場劇情動畫">
-              <img class="startup-intro-background" alt="" />
-              <div class="startup-intro-lines" aria-live="off">
+              <div class="startup-intro-lines visually-hidden" aria-live="off">
                 <p data-intro-slot="0"></p>
                 <p data-intro-slot="1"></p>
                 <p data-intro-slot="2"></p>
@@ -102,9 +119,6 @@ export function mountStartup(
               <span class="visually-hidden">按任意鍵跳過開場動畫</span>
             </section>
             <section class="startup-title" data-testid="title-screen" aria-label="標題畫面" hidden>
-              <img class="startup-title-background" src="${STARTUP_ASSETS.title.background}" alt="" />
-              <img class="startup-title-upper" src="${STARTUP_ASSETS.title.upper}" alt="" />
-              <img class="startup-title-lower" src="${STARTUP_ASSETS.title.lower}" alt="天使帝國 II" />
               <img class="startup-menu-frame startup-title-menu-frame" data-testid="startup-title-menu-frame"
                 src="${STARTUP_ASSETS.title.titleMenuFrame}" alt="" />
               <img class="startup-menu-frame startup-difficulty-menu-frame"
@@ -150,8 +164,11 @@ export function mountStartup(
 
   const screen = required(root, "#startup-screen");
   const viewport = required(root, "#startup-viewport");
+  const canvas = required<HTMLCanvasElement>(root, "#startup-canvas");
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("startup screen needs a 2D context");
+  context.imageSmoothingEnabled = false;
   const intro = required(root, ".startup-intro");
-  const introBackground = required<HTMLImageElement>(root, ".startup-intro-background");
   const introLines = [0, 1, 2].map((slot) =>
     required<HTMLParagraphElement>(root, `[data-intro-slot="${slot}"]`));
   const title = required(root, ".startup-title");
@@ -256,10 +273,13 @@ export function mountStartup(
     if (phase === "records" && recordSlots[recordIndex]) {
       recordDetail.textContent = recordDescription(recordSlots[recordIndex], recordIndex + 1);
     }
+    if (titleAssembled) paintTitleStatic();
   };
 
   const showTitleMenu = () => {
     phase = "title";
+    titleAssembled = true;
+    idleSince = performance.now();
     screen.dataset.startupPhase = phase;
     titleMenuFrame.hidden = false;
     difficultyMenuFrame.hidden = true;
@@ -270,23 +290,140 @@ export function mountStartup(
     updateMenuSelection();
   };
 
+  const enterIntro = () => {
+    if (phase !== "pretitle") return;
+    phase = "intro";
+    phaseStartedAt = performance.now();
+    screen.dataset.startupPhase = "intro";
+    play(introAudio);
+  };
+
   const enterTitle = () => {
-    if (phase !== "intro") return;
+    if (phase !== "intro" && phase !== "pretitle") return;
     stopAudio(introAudio);
     phase = "title";
+    titleAssembled = false;
+    musicStarted = false;
+    phaseStartedAt = performance.now();
     screen.dataset.startupPhase = "title-assemble";
     intro.hidden = true;
     title.hidden = false;
-    title.classList.add("is-assembling");
-    play(titleAudio);
-    titleReadyTimer = globalThis.setTimeout(
-      showTitleMenu,
-      titleAssemblyDuration,
+  };
+
+  /**
+   * 0000:0480 replays the whole scrolling intro after 201 unchanged menu cycles:
+   * the art variant flips, MUSIC/1 stops, the palette fades out and the pretitle
+   * logo is skipped. Pointer movement resets the counter.
+   */
+  const replayIntro = () => {
+    if (phase !== "title" || !titleAssembled) return;
+    stopAudio(titleAudio);
+    titleVariant = titleVariant === 0 ? 1 : 0;
+    phase = "intro";
+    titleAssembled = false;
+    phaseStartedAt = performance.now();
+    screen.dataset.startupPhase = "intro";
+    screen.dataset.titleVariant = String(titleVariant);
+    title.hidden = true;
+    titleMenuFrame.hidden = true;
+    titleMenu.hidden = true;
+    intro.hidden = false;
+    play(introAudio);
+  };
+
+  /**
+   * 0000:0611: fade BK/51 up, dissolve the upper art in over eight nested
+   * patterns, hold, start MUSIC/1, then dissolve the lower logo in over sixteen.
+   * The dissolve accumulates, so each step is drawn once and left in place.
+   */
+  const paintTitleAssembly = (elapsed: number) => {
+    const variant = STARTUP_TITLE.variants[titleVariant];
+    const background = loadedImages.get(STARTUP_TITLE.background);
+    const upper = loadedImages.get(variant.upper);
+    const lower = loadedImages.get(variant.lower);
+    if (!background || !upper || !lower) return;
+    const upperMs = STARTUP_TITLE.upperReveal.dissolveSteps.length * dissolveStepMs;
+    const lowerStart = backgroundFadeMs + upperMs + preMusicHoldMs;
+    clearScreen();
+    drawFadedImage(
+      context,
+      background,
+      0,
+      0,
+      Math.min(
+        STARTUP_TITLE.backgroundFadeSteps - 1,
+        Math.floor(elapsed / backgroundFadeMs * STARTUP_TITLE.backgroundFadeSteps),
+      ),
+      STARTUP_TITLE.backgroundFadeSteps,
     );
+    const upperSteps = Math.floor((elapsed - backgroundFadeMs) / dissolveStepMs);
+    for (const [index, step] of STARTUP_TITLE.upperReveal.dissolveSteps.entries()) {
+      if (index > upperSteps) break;
+      drawDissolvedImage(context, upper, STARTUP_TITLE.upperReveal.x, STARTUP_TITLE.upperReveal.y, step);
+    }
+    if (elapsed >= lowerStart && !musicStarted) {
+      musicStarted = true;
+      play(titleAudio);
+    }
+    const lowerSteps = Math.floor((elapsed - lowerStart) / dissolveStepMs);
+    for (const [index, step] of STARTUP_TITLE.lowerReveal.dissolveSteps.entries()) {
+      if (index > lowerSteps) break;
+      drawDissolvedImage(context, lower, STARTUP_TITLE.lowerReveal.x, STARTUP_TITLE.lowerReveal.y, step);
+    }
+    if (lowerSteps >= STARTUP_TITLE.lowerReveal.dissolveSteps.length && !titleAssembled) {
+      showTitleMenu();
+    }
+  };
+
+  /**
+   * DS:0BDE is a 96x20 bitmap whose rows alternate AAh and 55h drawn in colour
+   * 7, so the selected row is a 50% stipple rather than a solid bar.
+   */
+  const drawMenuHighlight = (labelY: number) => {
+    const { x, yOffset, width, height, color } = STARTUP_MENU_LABELS.highlight;
+    context.fillStyle = color;
+    const top = labelY + yOffset;
+    for (let row = 0; row < height; row += 1) {
+      for (let column = (row & 1); column < width; column += 2) {
+        context.fillRect(x + column, top + row, 1, 1);
+      }
+    }
+  };
+
+  /** The menu labels are glyph strings too, so they live on the canvas. */
+  const paintMenuLabels = () => {
+    if (!font) return;
+    if (phase !== "title" && phase !== "difficulty") return;
+    const group = phase === "difficulty" ? STARTUP_MENU_LABELS.difficulty : STARTUP_MENU_LABELS.title;
+    const selected = phase === "difficulty" ? difficultyIndex : titleIndex;
+    for (const [index, label] of group.labels.entries()) {
+      const y = group.firstTextY + index * STARTUP_MENU_LABELS.rowPitch;
+      if (index === selected) drawMenuHighlight(y);
+      drawStartupGlyphs(context, font, label.glyphs, y);
+    }
+  };
+
+  /**
+   * Repaints the finished title plus its menu labels. The labels are glyph
+   * strings drawn from the same A/23+A/24 font, so they belong on the canvas
+   * next to the art rather than in a host font over it.
+   */
+  const paintTitleStatic = () => {
+    const variant = STARTUP_TITLE.variants[titleVariant];
+    const background = loadedImages.get(STARTUP_TITLE.background);
+    const upper = loadedImages.get(variant.upper);
+    const lower = loadedImages.get(variant.lower);
+    if (!background || !upper || !lower) return;
+    clearScreen();
+    context.drawImage(background, 0, 0);
+    context.drawImage(upper, STARTUP_TITLE.upperReveal.x, STARTUP_TITLE.upperReveal.y);
+    context.drawImage(lower, STARTUP_TITLE.lowerReveal.x, STARTUP_TITLE.lowerReveal.y);
+    paintMenuLabels();
   };
 
   const showDifficultyMenu = () => {
     phase = "difficulty";
+    idleSince = performance.now();
     difficultyIndex = 0;
     screen.dataset.startupPhase = phase;
     titleMenuFrame.hidden = true;
@@ -341,6 +478,13 @@ export function mountStartup(
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (disposed || event.repeat) return;
+    idleSince = performance.now();
+    if (phase === "pretitle") {
+      // 0000:0D2F ends the hold early, but 0000:0D1C still runs the fade-out.
+      event.preventDefault();
+      skipPretitleHold();
+      return;
+    }
     if (phase === "intro") {
       event.preventDefault();
       enterTitle();
@@ -394,6 +538,8 @@ export function mountStartup(
   };
 
   const onPointerOver = (event: PointerEvent) => {
+    // 0000:0480 resets the 201-cycle idle counter whenever the pointer moves.
+    idleSince = performance.now();
     const button = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action]");
     if (!button) return;
     if (button.dataset.startupAction === "record-page") return;
@@ -432,76 +578,138 @@ export function mountStartup(
   };
 
   const onPointerDown = (event: PointerEvent) => {
+    idleSince = performance.now();
+    if (phase === "pretitle") {
+      event.preventDefault();
+      skipPretitleHold();
+      return;
+    }
     if (phase !== "intro") return;
     event.preventDefault();
     enterTitle();
   };
 
-  const updateIntroBackground = (scrollUpdate: number) => {
-    let backgroundIndex = 0;
-    for (let index = 1; index < INTRO_BACKGROUND_CHANGES.length; index += 1) {
-      if (scrollUpdate >= INTRO_BACKGROUND_CHANGES[index].update) backgroundIndex = index;
+  /**
+   * Native intro backgrounds never overlap: 0000:1382 fades the live plate down
+   * to black, loads the next record, then fades it back up, all inside one
+   * 128-loop window. Returns the plate to paint and how far its own fade has
+   * progressed, so the screen is black at the midpoint instead of showing two
+   * pictures at once.
+   */
+  const introBackgroundAt = (scrollUpdate: number) => {
+    let index = 0;
+    for (const change of STARTUP_INTRO.backgroundChanges) {
+      if (scrollUpdate >= change.update) index = change.index;
     }
-    const background = INTRO_BACKGROUND_CHANGES[backgroundIndex];
-    if (introBackground.dataset.source !== background.source) {
-      introBackground.src = background.source;
-      introBackground.dataset.source = background.source;
-    }
-
-    let opacity = 1;
-    const next = INTRO_BACKGROUND_CHANGES[backgroundIndex + 1];
+    const change = STARTUP_INTRO.backgroundChanges.find((entry) => entry.index === index);
+    const next = STARTUP_INTRO.backgroundChanges.find((entry) => entry.index === index + 1);
+    let level = 1;
     if (next && scrollUpdate >= next.update - INTRO_TRANSITION_HALF_UPDATES) {
-      opacity = Math.max(0, (next.update - scrollUpdate) / INTRO_TRANSITION_HALF_UPDATES);
-    } else if (
-      backgroundIndex > 0
-      && scrollUpdate < background.update + INTRO_TRANSITION_HALF_UPDATES
-    ) {
-      opacity = Math.max(0, (scrollUpdate - background.update) / INTRO_TRANSITION_HALF_UPDATES);
+      level = Math.max(0, (next.update - scrollUpdate) / INTRO_TRANSITION_HALF_UPDATES);
+    } else if (change && scrollUpdate < change.update + INTRO_TRANSITION_HALF_UPDATES) {
+      level = Math.max(0, (scrollUpdate - change.update) / INTRO_TRANSITION_HALF_UPDATES);
     }
-    introBackground.style.opacity = String(opacity);
+    return { plate: STARTUP_INTRO.backgrounds[index], level };
   };
 
-  const updateIntroLines = (scrollUpdate: number) => {
+  const introRowAt = (slot: number, scrollUpdate: number) => {
+    let assignment: (typeof STARTUP_INTRO.lines)[number] | undefined;
+    for (const candidate of STARTUP_INTRO.lines) {
+      if (candidate.slot === slot && candidate.update <= scrollUpdate) assignment = candidate;
+    }
+    if (!assignment) return undefined;
+    const y = STARTUP_INTRO.resetY - (scrollUpdate - assignment.update);
+    if (y < STARTUP_INTRO.visibleTopY || y > STARTUP_INTRO.visibleBottomY) return undefined;
+    return { assignment, y };
+  };
+
+  const clearScreen = () => {
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  };
+
+  /** The native hold may end early; the fade-out that follows never does. */
+  const skipPretitleHold = () => {
+    const fadeIn = STARTUP_PRETITLE.fadeInSteps * dacStepMs;
+    const elapsed = performance.now() - phaseStartedAt;
+    if (elapsed >= fadeIn + pretitleHoldMs) return;
+    phaseStartedAt = performance.now() - Math.max(fadeIn, elapsed) - pretitleHoldMs;
+  };
+
+  const paintIntro = (scrollUpdate: number) => {
+    clearScreen();
+    const { plate, level } = introBackgroundAt(scrollUpdate);
+    const background = loadedImages.get(plate.src);
+    if (background) {
+      drawFadedImage(
+        context,
+        background,
+        plate.x,
+        plate.y,
+        Math.round(level * (STARTUP_TITLE.backgroundFadeSteps - 1)),
+        STARTUP_TITLE.backgroundFadeSteps,
+      );
+    }
     for (let slot = 0; slot < introLines.length; slot += 1) {
-      let assignment: (typeof INTRO_LINE_ASSIGNMENTS)[number] | undefined;
-      for (const candidate of INTRO_LINE_ASSIGNMENTS) {
-        if (candidate.slot === slot && candidate.update <= scrollUpdate) assignment = candidate;
-      }
+      const row = introRowAt(slot, scrollUpdate);
       const line = introLines[slot];
-      if (!assignment) {
-        line.hidden = true;
-        continue;
-      }
-      const y = 317 - (scrollUpdate - assignment.update);
-      line.hidden = assignment.text.length === 0 || y < 258 || y > 316;
-      line.textContent = assignment.text;
-      line.style.top = `${y}px`;
+      line.hidden = !row || row.assignment.text.length === 0;
+      line.textContent = row?.assignment.text ?? "";
+      if (row && font) drawStartupGlyphs(context, font, row.assignment.glyphs, row.y);
     }
   };
 
-  const introStartedAt = performance.now();
-  const animateIntro = (now: number) => {
-    if (disposed || phase !== "intro") return;
-    const progress = Math.min(1, Math.max(0, (now - introStartedAt) / introDuration));
-    const scrollUpdate = Math.min(
-      NATIVE_INTRO_SCROLL_UPDATES,
-      Math.floor(progress * NATIVE_INTRO_SCROLL_UPDATES),
-    );
-    screen.dataset.introUpdate = String(scrollUpdate);
-    updateIntroBackground(scrollUpdate);
-    updateIntroLines(scrollUpdate);
-    if (progress >= 1) {
-      enterTitle();
-      return;
+  /** 0000:0CE2: draw the logo, fade it up, hold, then always fade it out. */
+  const paintPretitle = (elapsed: number) => {
+    clearScreen();
+    const logo = loadedImages.get(STARTUP_PRETITLE.src);
+    if (!logo) return;
+    const fadeIn = STARTUP_PRETITLE.fadeInSteps * dacStepMs;
+    const hold = pretitleHoldMs;
+    const fadeOut = STARTUP_PRETITLE.fadeOutSteps * dacStepMs;
+    let step = STARTUP_PRETITLE.fadeInSteps - 1;
+    if (elapsed < fadeIn) step = Math.floor(elapsed / dacStepMs);
+    else if (elapsed >= fadeIn + hold) {
+      const out = Math.floor((elapsed - fadeIn - hold) / dacStepMs);
+      step = STARTUP_PRETITLE.fadeOutSteps - 1 - out;
     }
-    introFrame = requestAnimationFrame(animateIntro);
+    drawFadedImage(
+      context,
+      logo,
+      STARTUP_PRETITLE.x,
+      STARTUP_PRETITLE.y,
+      step,
+      STARTUP_PRETITLE.fadeInSteps,
+    );
+    // A durable marker: the logo is far too brief to observe by phase alone.
+    screen.dataset.pretitleShown = "true";
+    if (elapsed >= fadeIn + hold + fadeOut) enterIntro();
+  };
+
+  const animate = (now: number) => {
+    if (disposed) return;
+    const elapsed = now - phaseStartedAt;
+    if (phase === "pretitle") paintPretitle(elapsed);
+    else if (phase === "intro") {
+      const progress = Math.min(1, Math.max(0, elapsed / introDuration));
+      const scrollUpdate = Math.min(
+        STARTUP_INTRO.scrollUpdates,
+        Math.floor(progress * STARTUP_INTRO.scrollUpdates),
+      );
+      screen.dataset.introUpdate = String(scrollUpdate);
+      paintIntro(scrollUpdate);
+      if (progress >= 1) enterTitle();
+    } else if (!titleAssembled) paintTitleAssembly(elapsed);
+    else if (phase === "title" && now - idleSince >= STARTUP_TITLE.idleReplayNativeTicks * NATIVE_TICK_MS) {
+      replayIntro();
+    }
+    animationFrame = requestAnimationFrame(animate);
   };
 
   const cleanup = () => {
     if (disposed) return;
     disposed = true;
-    cancelAnimationFrame(introFrame);
-    if (titleReadyTimer !== undefined) globalThis.clearTimeout(titleReadyTimer);
+    cancelAnimationFrame(animationFrame);
     stopAudio(introAudio);
     stopAudio(titleAudio);
     stopScaling();
@@ -516,8 +724,18 @@ export function mountStartup(
   root.addEventListener("click", onClick);
   root.addEventListener("pointerdown", onPointerDown);
   updateMenuSelection();
-  play(introAudio);
-  introFrame = requestAnimationFrame(animateIntro);
+  void Promise.all([
+    loadStartupFont().then((image) => { font = image; }),
+    ...[
+      STARTUP_PRETITLE.src,
+      STARTUP_TITLE.background,
+      ...STARTUP_TITLE.variants.flatMap(({ upper, lower }) => [upper, lower]),
+      ...STARTUP_INTRO.backgrounds.map(({ src }) => src),
+    ].map(async (src) => {
+      loadedImages.set(src, await loadStartupImage(src));
+    }),
+  ]).catch(() => undefined);
+  animationFrame = requestAnimationFrame(animate);
 
   return cleanup;
 }

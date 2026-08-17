@@ -108,37 +108,58 @@ const writeLocalSave = (
   serialized: typeof value === "string" ? value : JSON.stringify(value),
 });
 
-test("title artwork uses staged palette fades before the menu appears", async ({ page }) => {
-  await page.goto("/");
-  await page.keyboard.press("x");
+/**
+ * Module 23 never fades the title art in: 0000:0766/0000:07FB blit it through
+ * eight and sixteen nested 8x8 dither patterns, five native ticks apart, over a
+ * background that was itself brought up by 64 additive DAC writes. Assert the
+ * three stages land in that order and that the menu only appears afterwards.
+ */
+/**
+ * The Softstar logo now runs before the scroll, so "skip the opening" means
+ * waiting for the intro to own the screen and then sending one action. A press
+ * during the logo only shortens its hold, which is what 0000:0D2F does.
+ */
+const skipToTitle = async (page: Page, via: "key" | "pointer" = "key") => {
+  await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "intro");
+  if (via === "pointer") await page.getByTestId("opening-intro").click();
+  else await page.keyboard.press("x");
+};
 
-  const title = page.getByTestId("title-screen");
-  const opacityOf = (selector: string) => title.locator(selector).evaluate((element) =>
-    Number(getComputedStyle(element).opacity));
+test("title artwork dissolves in over its background before the menu appears", async ({ page }) => {
+  await page.goto("/?test=1");
+  await skipToTitle(page);
 
+  // The art is bright against a dark blue plate, so the mean luminance of a band
+  // rises as more of the dither pattern fills in.
+  const luminance = (x: number, y: number, width: number, height: number) =>
+    page.getByTestId("startup-canvas").evaluate((canvas, [left, top, w, h]) => {
+      const { data } = (canvas as HTMLCanvasElement).getContext("2d")!.getImageData(left, top, w, h);
+      let total = 0;
+      for (let index = 0; index < data.length; index += 4) {
+        total += data[index] + data[index + 1] + data[index + 2];
+      }
+      return total / (w * h);
+    }, [x, y, width, height]);
+
+  await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "title-assemble");
   await expect(page.getByTestId("title-menu")).toBeHidden();
-  await expect.poll(() => opacityOf(".startup-title-background")).toBeGreaterThan(0);
-  expect(await opacityOf(".startup-title-upper")).toBe(0);
-  expect(await opacityOf(".startup-title-lower")).toBe(0);
+  const upperEarly = await luminance(32, 0, 472, 200);
+  const logoEarly = await luminance(0, 216, 640, 123);
 
-  await expect.poll(() => opacityOf(".startup-title-upper")).toBeGreaterThan(0);
-  expect(await opacityOf(".startup-title-lower")).toBe(0);
-  await expect(page.getByTestId("title-menu")).toBeHidden();
-
-  await expect.poll(() => opacityOf(".startup-title-lower")).toBeGreaterThan(0);
-  await expect(page.getByTestId("title-menu")).toBeHidden();
+  await expect(page.getByTestId("startup-screen")).toHaveAttribute("data-startup-phase", "title");
   await expect(page.getByTestId("title-menu")).toBeVisible();
-  expect(await title.evaluate((element) => getComputedStyle(element).cursor)).toContain(
-    "command-menu-pointer.png",
-  );
-  expect(await page.getByTestId("new-game").evaluate((element) => getComputedStyle(element).cursor)).toContain(
-    "command-menu-pointer.png",
-  );
+  expect(await luminance(32, 0, 472, 200)).toBeGreaterThan(upperEarly);
+  expect(await luminance(0, 216, 640, 123)).toBeGreaterThan(logoEarly);
+
+  expect(await page.getByTestId("title-screen").evaluate((element) => getComputedStyle(element).cursor))
+    .toContain("command-menu-pointer.png");
+  expect(await page.getByTestId("new-game").evaluate((element) => getComputedStyle(element).cursor))
+    .toContain("command-menu-pointer.png");
 });
 
 test("pointer difficulty confirmation carries audio activation into stage zero", async ({ page }) => {
   await page.goto("/?test=1");
-  await page.getByTestId("opening-intro").click();
+  await skipToTitle(page, "pointer");
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("new-game").click();
   await page.getByTestId("difficulty-0").click();
@@ -173,28 +194,35 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await page.goto("/?test=1");
   const startup = page.getByTestId("startup-screen");
   const intro = page.getByTestId("opening-intro");
+  // The Softstar logo runs first now, exactly as 0000:0CE2 does. It is too brief
+  // under ?test=1 to catch by phase, so it leaves a marker behind.
   await expect(startup).toHaveAttribute("data-startup-phase", "intro");
+  await expect(startup).toHaveAttribute("data-pretitle-shown", "true");
   await expect(intro).toBeVisible();
-  await expect.poll(() => intro.locator(".startup-intro-background").evaluate((image) => {
-    const element = image as HTMLImageElement;
-    return element.complete && element.naturalWidth === 608 && element.naturalHeight === 257;
-  })).toBe(true);
+  // The scrolling rows are drawn with the A/23+A/24 bitmap font on the canvas;
+  // the paragraphs keep the same text for assistive technology.
   await expect.poll(() => intro.locator("[data-intro-slot]").evaluateAll((lines) =>
     lines.some((line) => !line.hasAttribute("hidden") && (line.textContent?.trim().length ?? 0) > 0),
   )).toBe(true);
+  await expect.poll(() => page.getByTestId("startup-canvas").evaluate(() => {
+    const canvas = document.querySelector("#startup-canvas") as HTMLCanvasElement;
+    const { data } = canvas.getContext("2d")!.getImageData(0, 258, 640, 59);
+    let white = 0;
+    for (let index = 0; index < data.length; index += 4) {
+      if (data[index] > 200 && data[index + 1] > 200 && data[index + 2] > 200) white += 1;
+    }
+    return white;
+  })).toBeGreaterThan(0);
   await captureVisualAudit(startup, { path: "artifacts/playwright/startup-opening-intro.png" });
 
-  await page.keyboard.press("x");
+  await skipToTitle(page);
   await expect(page.getByTestId("title-screen")).toBeVisible();
-  await expect.poll(() => page.getByTestId("title-screen").locator(".startup-title-upper").evaluate((image) =>
-    getComputedStyle(image).animationName,
-  )).toContain("startup-palette-fade");
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await expect(page.getByTestId("new-game")).toHaveAttribute("aria-current", "true");
   await expect(page.getByTestId("startup-title-menu-frame")).toBeVisible();
   await expect(page.getByTestId("startup-difficulty-menu-frame")).toBeHidden();
   await expect(page.getByTestId("startup-title-menu-frame")).toHaveCSS("top", "50px");
-  await expect.poll(() => page.getByTestId("title-screen").locator("img").evaluateAll((images) =>
+  await expect.poll(() => page.getByTestId("title-screen").locator("img:not([hidden])").evaluateAll((images) =>
     images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
   )).toBe(true);
   await captureVisualAudit(startup, { path: "artifacts/playwright/startup-title-menu.png" });
@@ -237,7 +265,7 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
   await writeLocalSave(page, 20, save);
   await page.reload();
 
-  await page.keyboard.press("x");
+  await skipToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("continue-game").click();
 
@@ -320,7 +348,7 @@ test("BOOT-C: a normal reconnect migrates a stage-0 clear into stage-1 prebattle
   await page.reload();
   expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
 
-  await page.keyboard.press("x");
+  await skipToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("continue-game").click();
   await expect(page.getByTestId("title-record-detail")).toContainText("騎士城堡前");
