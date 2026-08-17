@@ -52,6 +52,26 @@ describe("stage 8 battle simulation", () => {
     });
   });
 
+  it("keeps campaign experience when the template overrides the class", () => {
+    // 原版模块 27 只写非零 side-1 职业覆写，不碰 `ME_EXP`；模块 29 `0000:536B` 随后用
+    // 同一份累计经验重走新职业的成长行。所以覆写是等价经验换算，不是重置——与转职
+    // （`PROMO-006` 提交时经验清零）是两套语义。
+    const promoted: CampaignState = {
+      ...campaign,
+      roster: completeCampaignRoster([
+        { slot: 40, classId: "warrior", experience: 400, life: 260 },
+      ]),
+    };
+    const battle = new Stage8Battle(promoted);
+    const overridden = battle.unit("1:40")!;
+    expect(overridden).toMatchObject({ classId: "cavalry", experience: 400 });
+    expect(battle.statsFor(overridden))
+      .toMatchObject({ attack: 65, defense: 36, maxLife: 260, movement: 8, level: 3 });
+    // 覆写后的职业与保留的经验一起写回战役档，玩家在第 2 关选的戰士不会回来。
+    expect(battle.campaignSnapshot().roster.find(({ slot }) => slot === 40))
+      .toMatchObject({ classId: "cavalry", experience: 400 });
+  });
+
   it("wins only after all enemies leave and loses when Sulanda leaves", () => {
     const ongoing = new Stage8Battle(campaign);
     ongoing.units = ongoing.units.filter(({ side, id }) => side === 1 || id === "2:39");
