@@ -12,6 +12,7 @@ interface DebugState {
   activeStoryId?: string;
   consumedEventIds: string[];
   dialogueIndex: number;
+  statusMessage: string;
   actionMode: string;
   selectedId?: string;
   commandMenuKind: "initial" | "postMove";
@@ -2509,6 +2510,80 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
     Array.from({ length: 15 }, (_, frame) => frame),
   );
   expect(resolved.combatPresentationTrace.some(({ phase }) => phase.startsWith("counter"))).toBe(false);
+});
+
+test("the status strip reports ordinary-combat damage only after the presentation", async ({ page }) => {
+  // Both presentations count the life bars down themselves, so the strip must
+  // narrate the swing while it plays and report the exchange only once it is
+  // over. Writing the damage line before the await spoiled the result under
+  // either battle-animation setting.
+  const attackWithStatusTrace = async (presentation: "map" | "full") => {
+    await page.evaluate(() => {
+      const samples: Array<{ presenting: boolean; statusMessage: string }> = [];
+      const interval = window.setInterval(() => {
+        const current = window.__ANGEL2__?.getState() as DebugState | undefined;
+        if (current) samples.push({
+          presenting: Boolean(current.combatPresentation),
+          statusMessage: current.statusMessage,
+        });
+      }, 4);
+      Object.assign(window, { __statusTrace: samples, __statusTraceInterval: interval });
+    });
+
+    await page.keyboard.press(" ");
+    // The fixture leaves exactly one adjacent enemy, so 攻擊 auto-locks it and
+    // commits without a target click.
+    await page.getByTestId("unit-command-attack").click();
+    await page.waitForFunction(() => window.__ANGEL2__?.getState().combatPresentation !== undefined);
+    await captureVisualAudit(page.getByTestId("game-screen"), {
+      path: `artifacts/playwright/stage0-${presentation}-combat-strip-narration.png`,
+      animations: "allow",
+    });
+    await page.waitForFunction(() => window.__ANGEL2__?.getState().combatPresentation === undefined);
+    const reported = await debugState(page);
+    await captureVisualAudit(page.getByTestId("game-screen"), {
+      path: `artifacts/playwright/stage0-${presentation}-combat-strip-report.png`,
+      animations: "allow",
+    });
+
+    return {
+      reported,
+      samples: await page.evaluate(() => {
+        const holder = window as typeof window & {
+          __statusTrace?: Array<{ presenting: boolean; statusMessage: string }>;
+          __statusTraceInterval?: number;
+        };
+        if (holder.__statusTraceInterval !== undefined) window.clearInterval(holder.__statusTraceInterval);
+        return holder.__statusTrace ?? [];
+      }),
+    };
+  };
+
+  for (const presentation of ["map", "full"] as const) {
+    await page.goto("/?test=1&skipStartup=1");
+    await skipStoryDialogue(page);
+    await waitForPhase(page, "openingStory");
+    await skipStoryDialogue(page);
+    await waitForPhase(page, "player");
+    await setBattlePresentation(page, presentation);
+    // The class-action fixture restarts Nia at zero experience and leaves a
+    // second ally unspent, so this swing neither queues a promotion prompt nor
+    // hands the phase over — the report it writes is the one that stays up.
+    await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("cavalry"));
+
+    const { reported, samples } = await attackWithStatusTrace(presentation);
+    const presenting = samples.filter(({ presenting: active }) => active);
+    expect(presenting.length).toBeGreaterThan(0);
+    expect(presenting.every(({ statusMessage }) => !statusMessage.includes("點傷害"))).toBe(true);
+    expect(presenting.every(({ statusMessage }) => statusMessage === "妮雅攻擊士兵……")).toBe(true);
+    expect(reported.promotionUnitIds).toEqual([]);
+    expect(reported.lastCombat!.damage).toBeGreaterThan(0);
+    expect(reported.statusMessage).toBe(
+      `造成 ${reported.lastCombat!.damage} 點傷害${reported.lastCombat!.counterDamage
+        ? `，受到 ${reported.lastCombat!.counterDamage} 點反擊`
+        : ""}。`,
+    );
+  }
 });
 
 test("S00-K: native full-screen records, step tables and death sequence preserve map-mode results", async ({ page }) => {

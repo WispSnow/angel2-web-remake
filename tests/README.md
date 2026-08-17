@@ -30,6 +30,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `src/game/content/technique-*`、地图技术时间轴 | `technique-lab.test.ts` | `technique-lab.spec.ts`；只在正式接入变化时追加对应竞技场文件 |
 | `src/game/content/classes.ts`、职业固定行／第三行后成长、近战／远程职责、39 职业目标优先级档案、`class-traits.ts`、终阶职业特性、飛龍攻后移动与水戰士受击分裂／共享状态 | `classes.test.ts` | `class-showdown.spec.ts` 的职业说明、飛龍流程和水戰士分裂用例 |
 | `src/game/content/class-balance-overrides.ts`、`campaign-entry-experience.ts`：`REMAKE-092` 半龍戰士分段成长与 3 级后防御成长、七姊妹入队经验、`REMAKE-093` 水戰士仅 side 1 射击授予与敌方零影响 | `class-balance-overrides.test.ts`，入队实例见 `stage22-battle.test.ts`，迁移见 `save.test.ts` | `class-showdown.spec.ts` 的职业说明与射击用例 |
+| `src/game/content/generic-ally-labels.ts`、`classes.ts` 的 `genericUnitName`／`unitDisplayName`：`REMAKE-107` 通用友军槽 40–59 的字母编号、只对 side 1 生效、跨关与转职稳定、读档重派生 | `generic-ally-labels.test.ts`，转职边界见 `promotion.test.ts`，继承实例见 `stage1-battle.test.ts` | `stage0-difficulty.spec.ts` 的单位循环身份行 |
 | `src/game/content/enemy-scaling.ts`、`stage0.ts` 的 `statsFor`／`initialEnemyExperience`：`REMAKE-103` 的 `legacy`／`linear` 敌方成长模式、逐难度出场等级、难度间单调性、剧情 boss 逐难度脚本值与我方零影响 | `enemy-scaling.test.ts`，逐难度实例见 `stage0-content.test.ts`，boss 实例见 `stage37-battle.test.ts`，覆写交界见 `class-balance-overrides.test.ts`，存档身份见 `save.test.ts` | 逐难度玩家可见口径见 `debug.spec.ts` 与当前开放关卡用例 |
 | `src/game/arena-*`、`src/arena.ts` | `arena.test.ts` | `arena.spec.ts`，再按动作族选择 `arena-*.spec.ts` |
 | `REMAKE-101` 冰雪施法前的 `selfAreaConfirm` 双色范围预览、纯文字信息栏（任何技能候选态都不放按钮或底板）、确认／取消入口，以及一次物理右键只退一层的画布取消判据 | 无独立模拟数值测试（预览是纯派生表现，不写模拟状态） | `arena-ice.spec.ts` 的预览与取消用例；魔弓箭道的纯文字信息栏与滚轮／点目标输入见 `arena-magic-archer-route.spec.ts`；其他冰雪施放路径见 `stage1.spec.ts`、`debug.spec.ts`、`arena-healing.spec.ts`、`arena-lightning.spec.ts` |
@@ -38,6 +39,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `promotion-lab-session.ts`、转职触发阈值与全候选 UI | `promotion-lab.test.ts`、`promotion.test.ts` | `promotion-lab.spec.ts`，入口另见 `debug.spec.ts` |
 | 踩踏与目标落点 | `technique-lab.test.ts` 的 stomp 用例 | `technique-lab.spec.ts`、`arena-stomp.spec.ts`、`class-showdown.spec.ts` 的 stomp 用例 |
 | 全景普通战斗 | `full-combat.test.ts` | `combat-lab.spec.ts` 或相关关卡用例 |
+| 普通战斗信息栏时序：地图与全景表现期间只显示叙述行，战果在演出结束后才写入（玩家攻击与敌我 AI 攻击共用） | 无独立模拟数值测试（信息栏是派生表现） | `stage0.spec.ts` 的「the status strip reports ordinary-combat damage only after the presentation」 |
 | `content/full-combat-backgrounds*` 的关卡表、受击方地形改写与 `C.SWF` 背景素材 | `full-combat-backgrounds.test.ts` | `full-combat-background.spec.ts`，第 0 关表值路径另见 `stage0.spec.ts` |
 | 调试中心与场景目录 | `debug-roster-profiles.test.ts` | `debug.spec.ts` |
 | `src/styles.css` 的胜负条件／出击提示面板安全区、长文排版与滚动兜底 | 无独立模拟数值测试 | `objective-panel-layout.spec.ts` |

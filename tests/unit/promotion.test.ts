@@ -195,10 +195,11 @@ describe("evidence-backed class catalog and promotion", () => {
     if (landKnightPortrait === undefined) throw new Error("land knight portrait is missing");
     generic.portrait = landKnightPortrait;
 
-    expect(unitDisplayName(generic)).toBe("陸戰騎士");
+    // REMAKE-107: the slot letter rides on the current profession, so slot 40 stays "A".
+    expect(unitDisplayName(generic)).toBe("陸戰騎士A");
     expect(promotionDialogueFor(generic)[0]?.lower).toMatchObject({
       portrait: generic.portrait,
-      speaker: "陸戰騎士",
+      speaker: "陸戰騎士A",
     });
 
     generic.classId = "steel-armor-warrior";
@@ -207,7 +208,7 @@ describe("evidence-backed class catalog and promotion", () => {
     const steelArmorPortrait = classFallbackPortraitFor(generic.classId, 1);
     if (steelArmorPortrait === undefined) throw new Error("steel armor portrait is missing");
     generic.portrait = steelArmorPortrait;
-    expect(promotionDialogueFor(generic)[0]?.lower?.speaker).toBe("鋼甲戰士");
+    expect(promotionDialogueFor(generic)[0]?.lower?.speaker).toBe("鋼甲戰士A");
   });
 
   it("keeps a named actor visible while her portrait follows the current profession", () => {
@@ -301,7 +302,7 @@ describe("evidence-backed class catalog and promotion", () => {
     expect(generic).toMatchObject({
       classId: "warrior",
       className: "戰士",
-      name: "戰士",
+      name: "戰士A",
       portrait: 57,
     });
     expect(nia).toMatchObject({
@@ -334,7 +335,8 @@ describe("evidence-backed class catalog and promotion", () => {
         expect(unit, `${sourceClassId} -> ${target.id}`).toMatchObject({
           classId: target.id,
           className: className(target.id),
-          name: className(target.id),
+          // REMAKE-107: the campaign-slot letter survives every promotion edge.
+          name: `${className(target.id)}A`,
           portrait: classFallbackPortraitFor(target.id, 1),
         });
       }

@@ -104,7 +104,8 @@ describe("stage 1 battle construction", () => {
     expect(battle.unit("1:40")).toMatchObject({
       classId: "warrior",
       className: "戰士",
-      name: "戰士",
+      // REMAKE-107: campaign slot 40 keeps letter A across stages and promotions.
+      name: "戰士A",
       portrait: 57,
     });
     expect(battle.unit("1:0")).toMatchObject({ classId: "cavalry", portrait: 46 });

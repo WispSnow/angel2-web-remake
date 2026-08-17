@@ -2841,7 +2841,12 @@ export class GameController {
       const displayedLifeByUnitId = this.combatEntryLifeByUnitId();
       this.lastCombat = this.battle.attack(attacker.id, defenderId);
       const result = this.lastCombat;
-      this.statusMessage = `造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}${result.splitCount ? `，水戰士分裂為 ${result.splitCount} 個並共享生命` : ""}。`;
+      // The strip narrates first and reports the exchange only after the
+      // presentation returns, like every other presented action. Both the map
+      // and full-screen timelines count the life bars down themselves, so
+      // writing the damage line before the await spoiled the swing under either
+      // battle-animation setting.
+      this.statusMessage = `${unitDisplayName(attackerPresentation)}攻擊${unitDisplayName(defenderPresentation)}……`;
       this.resetAction();
       this.markHintSeen();
       await this.presentOrdinaryCombat(
@@ -2850,6 +2855,7 @@ export class GameController {
         result,
         displayedLifeByUnitId,
       );
+      this.statusMessage = `造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}${result.splitCount ? `，水戰士分裂為 ${result.splitCount} 個並共享生命` : ""}。`;
       const transformations = await this.presentPendingUnitTransformations();
       if (transformations > 0 && this.resolveOutcome()) {
         this.busy = false;
@@ -3432,13 +3438,15 @@ export class GameController {
         const displayedLifeByUnitId = this.combatEntryLifeByUnitId();
         this.lastCombat = this.battle.attack(unit.id, defender.id);
         const result = this.lastCombat;
-        this.statusMessage = `${unit.name}造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}${result.splitCount ? `，水戰士分裂為 ${result.splitCount} 個並共享生命` : ""}。`;
+        // The acting line set above stays up for the whole presentation; the
+        // damage readout lands only once the exchange has played out.
         await this.presentOrdinaryCombat(
           attackerPresentation,
           defenderPresentation,
           result,
           displayedLifeByUnitId,
         );
+        this.statusMessage = `${unit.name}造成 ${result.damage} 點傷害${result.counterDamage ? `，受到 ${result.counterDamage} 點反擊` : ""}${result.splitCount ? `，水戰士分裂為 ${result.splitCount} 個並共享生命` : ""}。`;
         await this.presentPendingUnitTransformations();
       } else {
         this.battle.spendAction(unit.id);

@@ -5,6 +5,7 @@ import {
   type ClassId,
 } from "./class-catalog.generated";
 import { CLASS_GROWTH_OVERRIDES, type ClassGrowthSegment } from "./class-balance-overrides";
+import { genericAllyLabelFor } from "./generic-ally-labels";
 import type { EnemyGrowthMode } from "./enemy-scaling";
 import type { BattleUnit, UnitStats } from "../types";
 import type { PortraitRecord } from "./portrait-catalog.generated";
@@ -236,10 +237,20 @@ export function usesClassIdentity(
   return unit.portrait === classFallbackPortraitFor(unit.classId, unit.side);
 }
 
-export function unitDisplayName(
-  unit: Pick<BattleUnit, "classId" | "side" | "portrait" | "name" | "displayIdentity">,
+/**
+ * 通用单位的玩家向名称。`REMAKE-107` 在职业名后追加通用友军槽的稳定字母编号，
+ * 让同关多名通用友军可以区分，也让玩家看得出跨关继承的是哪一个槽。
+ */
+export function genericUnitName(
+  unit: Pick<BattleUnit, "classId" | "side" | "slot">,
 ): string {
-  return usesClassIdentity(unit) ? className(unit.classId) : unit.name;
+  return `${className(unit.classId)}${genericAllyLabelFor(unit)}`;
+}
+
+export function unitDisplayName(
+  unit: Pick<BattleUnit, "classId" | "side" | "slot" | "portrait" | "name" | "displayIdentity">,
+): string {
+  return usesClassIdentity(unit) ? genericUnitName(unit) : unit.name;
 }
 
 type ClassProgressionState = Pick<BattleUnit, "classId" | "experience">

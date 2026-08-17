@@ -4,6 +4,7 @@ import {
   classDefinition,
   classFallbackPortraitFor,
   className,
+  genericUnitName,
   immuneToPhysicalShootingFor,
   isClassImmuneToOrdinaryHitStatus,
   killRewardFor,
@@ -727,6 +728,9 @@ export class Stage0Battle {
     this.focusId = snapshot.focusId;
     this.units = snapshot.units.map((unit) => ({
       ...unit,
+      // 通用单位的显示名由职业与槽位派生（`REMAKE-107`），所以旧存档里停在上一个
+      // 职业、或还没有槽字母的 `name` 在这里重新写正，而不是当作真值恢复。
+      ...(unit.side === 1 && usesClassIdentity(unit) ? { name: genericUnitName(unit) } : {}),
       statuses: { ...unit.statuses },
     }));
     this.restoreWaterWarriorGroups();

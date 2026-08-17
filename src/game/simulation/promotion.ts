@@ -2,6 +2,7 @@ import {
   classFallbackPortraitFor,
   className,
   classStatsFor,
+  genericUnitName,
   isPromotionEligible,
   promotionTargetsFor,
   usesClassIdentity,
@@ -51,7 +52,8 @@ export function promoteUnit(
   unit.classId = targetClassId;
   unit.className = className(targetClassId);
   if (followsClassIdentity) {
-    unit.name = unit.className;
+    // 通用槽转职后名字跟着新职业走，`REMAKE-107` 的槽字母保持不变。
+    unit.name = genericUnitName(unit);
   }
   if (followsClassPortrait) {
     unit.portrait = classFallbackPortraitFor(targetClassId, unit.side) ?? unit.portrait;

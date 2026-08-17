@@ -3,6 +3,7 @@ import {
   classFallbackPortraitFor,
   className,
   classStatsFor,
+  genericUnitName,
 } from "../content/classes";
 import { completeCampaignRoster, initialEnemyExperience, statsFor } from "../content/stage0";
 import type { StageDefinition } from "../content/stages";
@@ -93,7 +94,9 @@ function createInheritedAlly(
     slot: definition.slot,
     classId,
     className: className(classId),
-    name: genericIdentity ? className(classId) : definition.name,
+    name: genericIdentity
+      ? genericUnitName({ classId, side: 1, slot: definition.slot })
+      : definition.name,
     portrait,
     ...(definition.displayIdentity ? { displayIdentity: definition.displayIdentity } : {}),
     x: definition.position.x,

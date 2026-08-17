@@ -3,7 +3,9 @@ import type { BattleUnit, Difficulty, Position, SaveRosterEntry, UnitClassId, Un
 import {
   className,
   classStatsFor,
+  genericUnitName,
   nextExperienceThresholdFor,
+  usesClassIdentity,
 } from "./classes";
 import { enemyScalingFor, scriptedBossStatsFor } from "./enemy-scaling";
 import { emptyUnitStatuses } from "../simulation/status";
@@ -150,6 +152,9 @@ export function createStage0Units(difficulty: Difficulty = 0): BattleUnit[] {
       statuses: emptyUnitStatuses(),
     };
     unit.className = className(unit.classId);
+    // 四名通用友军的显示名由 `REMAKE-107` 的槽字母派生，模板里的「士兵」只是原版
+    // 职业回退的证据。敌方通用槽不参与编号，名称保持模板值。
+    if (unit.side === 1 && usesClassIdentity(unit)) unit.name = genericUnitName(unit);
     unit.life = statsFor(unit, difficulty).maxLife;
     return unit;
   });
