@@ -368,6 +368,64 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
  * prebattle route rebuilds it at round 1. Reaching round 100 at all took
  * deliberate stalling, so this rejects nothing a normal run can produce.
  */
+/**
+ * REMAKE-109 moved stage 3's "the rescued fourth corps can promote" moment out
+ * of the entry baseline and into two opening events: `stage-03-player-ready`
+ * hands the board to the player, and `stage-03-fourth-corps-joined` awards the
+ * trio the single experience point that puts them on the soldier threshold.
+ * Both run before the player may act, so every stage-3 battle save and every
+ * stage-4 completion now carries their ids.
+ *
+ * Legacy saves predate the ids, so they are backfilled rather than replayed.
+ * Marking them consumed is the honest reading of an older run: its board was
+ * built before the rule existed, so its trio never received the point, while
+ * firing the grant on load would hand out a promotion that run never reached.
+ * Re-entering stage 3 from its prebattle route replays both events normally.
+ *
+ * This runs on the raw legacy value ahead of the version chain, so the direct
+ * migrations and the per-version ones pick it up alike. Nothing else changes:
+ * the trio still enters on the native 299 named-actor floor.
+ */
+function normalizeStage3OpeningEvents(value: unknown): unknown {
+  if (!isRecord(value)
+    || !Array.isArray(value.consumedEventIds)
+    || !value.consumedEventIds.every((id) => typeof id === "string")) return value;
+  const carriesStage3Opening = (value.kind === "battle" && value.stageId === "stage-03")
+    || (value.kind === "completed" && value.stageId === "stage-04");
+  if (!carriesStage3Opening) return value;
+  const consumedEventIds = value.consumedEventIds as string[];
+  const storyIndex = consumedEventIds.indexOf("stage-03-opening-story");
+  if (storyIndex < 0) return value;
+  const missing = ["stage-03-player-ready", "stage-03-fourth-corps-joined"]
+    .filter((id) => !consumedEventIds.includes(id));
+  if (missing.length === 0) return value;
+  return {
+    ...value,
+    consumedEventIds: [
+      ...consumedEventIds.slice(0, storyIndex + 1),
+      ...missing,
+      ...consumedEventIds.slice(storyIndex + 1),
+    ],
+  };
+}
+
+/**
+ * The two stage-3 opening events are the only difference, and
+ * `normalizeStage3OpeningEvents` has already backfilled them, so a v87 save
+ * carries over as it stands. No field is added and none changes meaning.
+ */
+function migrateVersion87Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 87
+    || value.contentVersion !== "stage-round-limit-99-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
 function migrateVersion86Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 86
@@ -2499,7 +2557,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
   }
 }
 
-function migrateLegacySaveData(value: unknown): SaveData | undefined {
+function migrateLegacySaveData(raw: unknown): SaveData | undefined {
+  const value = normalizeStage3OpeningEvents(raw);
+  const migratedVersion87 = migrateVersion87Save(value);
+  if (migratedVersion87) return migratedVersion87;
   const migratedVersion86 = migrateVersion86Save(value);
   if (migratedVersion86) return migratedVersion86;
   const migratedVersion85 = migrateVersion85Save(value);

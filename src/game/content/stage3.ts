@@ -101,6 +101,20 @@ export const STAGE3_DEFINITION = {
       simulationEffect: "none",
       presentation: "stage-03-opening-story",
     },
+    // REMAKE-109：开场剧情结束后先正式进入玩家回合，再把第四军团三名具名成员推过
+    // 转职阈值。顺序不能反——授职提示必须落在玩家阶段里，而不是还在剧情阶段。
+    {
+      id: "stage-03-player-ready",
+      trigger: { type: "story-completed", storyId: "stage-03-opening-story" },
+      simulationEffect: "stage-03-player-ready",
+      presentation: "none",
+    },
+    {
+      id: "stage-03-fourth-corps-joined",
+      trigger: { type: "effect-completed", effectId: "stage-03-player-ready" },
+      simulationEffect: "stage-03-fourth-corps-joined",
+      presentation: "none",
+    },
     {
       id: "stage-03-boss-defeated",
       trigger: { type: "objective-satisfied" },
@@ -130,13 +144,6 @@ export function stage3TerrainSlotAt(position: Position): number {
   return STAGE3_TOKEN_TO_TERRAIN_SLOT[token] ?? 0;
 }
 
-/**
- * `REMAKE-109`：被救援的第四军团三名具名 NPC 以士兵 300 转职阈值入队，而不是
- * `untouchedNamedExperience` 的 299。判据与军团归属同源——非零逐槽行为属于第四军团，
- * 真实肖像记录说明这是具名角色——所以不在这里手抄槽 3／20／21。
- */
-const STAGE3_FOURTH_CORPS_ENTRY_EXPERIENCE = 300;
-
 // 角色描述符按原版槽查表，槽号随后由 `REMAKE-108` 改写；换进来的 40–43 与被换走的
 // 51–54 同为 `FFh` 通用条目，所以查表顺序不影响姓名与肖像。
 export const STAGE3_SEMANTIC_ALLIED_UNITS = withSwappedGenericAllySlots(
@@ -149,13 +156,25 @@ export const STAGE3_SEMANTIC_ALLIED_UNITS = withSwappedGenericAllySlots(
       initialClassId: unit.nativeClassRecord === null ? undefined : semanticClassId(unit.nativeClassRecord),
       name: named ? actor.normalizedName : "士兵",
       portrait: (named ? actor.portraitRecord : 47) as PortraitRecord,
-      ...(named && unit.aiBehavior !== 0
-        ? { untouchedExperience: STAGE3_FOURTH_CORPS_ENTRY_EXPERIENCE }
-        : {}),
     };
   }),
   STAGE3_GENERIC_ALLY_SLOT_SWAP,
 );
+
+/**
+ * `REMAKE-109`：被救援的第四军团具名成员，按棋盘顺序排列。
+ *
+ * 判据与军团归属同源，所以这里不手抄槽 3／20／21：逐槽行为非 `0` 的属于第四军团，
+ * 描述符肖像不是 `FFh` 的才是具名角色。三人的入队经验保持原版 299 名单基线，开场
+ * 加的那 1 点经验由 `stage-03-fourth-corps-joined` 事件发放。
+ */
+export const STAGE3_FOURTH_CORPS_NAMED_ACTORS = STAGE3_SEMANTIC_ALLIED_UNITS
+  .filter(({ slot, aiBehavior }) => aiBehavior !== 0
+    && STAGE3_ALLIED_ACTORS.find((actor) => actor.slot === slot)?.portraitRecord !== 255)
+  .sort((left, right) =>
+    (left.position.y * STAGE3.width + left.position.x)
+    - (right.position.y * STAGE3.width + right.position.x))
+  .map(({ slot }) => ({ side: 1 as const, slot }));
 
 function enemyIdentity(
   slot: number,
@@ -219,6 +238,16 @@ export const STAGE3_MUSIC_PROGRAMS = {
 export function activateStage3Content(): void {
   registerActionContent(actionContent);
   registerStageSimulationEffects({
+    "stage-03-player-ready": {
+      type: "enter-player-phase",
+      statusText: "我方回合：選擇一名尚未行動的單位。",
+    },
+    "stage-03-fourth-corps-joined": {
+      type: "grant-experience",
+      actors: STAGE3_FOURTH_CORPS_NAMED_ACTORS,
+      amount: 1,
+      statusText: "獲救的第四軍團夥伴加入希蜜的隊伍，達到轉職條件。",
+    },
     "stage-03-set-victory-999": { type: "victory-state", value: 999 },
     "stage-03-route-to-stage-04": { type: "campaign-route", destination: "stage-04" },
   });

@@ -52,6 +52,8 @@ describe("stage 3 generated content", () => {
     });
     expect(STAGE3_DEFINITION.events.map(({ id }) => id)).toEqual([
       "stage-03-opening-story",
+      "stage-03-player-ready",
+      "stage-03-fourth-corps-joined",
       "stage-03-boss-defeated",
       "stage-03-victory-story",
       "stage-03-completed-route",

@@ -1604,6 +1604,36 @@ export class Stage0Battle {
     return result;
   }
 
+  /**
+   * REMAKE-109: a scripted experience award. Growth, thresholds and the promotion
+   * queue stay on the ordinary rules — this only writes the experience a stage
+   * event hands out.
+   *
+   * Ordinary combat experience never heals, but this fires while the board is
+   * still being set up and no one has acted, so a unit that is at full life must
+   * stay at full life: carrying the accumulated damage across a raised ceiling
+   * keeps a wounded unit wounded by the same amount without inventing a wound on
+   * a unit that never took one.
+   */
+  grantScriptedExperience(
+    actors: readonly { side: Side; slot: number }[],
+    amount: number,
+  ): readonly string[] {
+    const granted: string[] = [];
+    for (const { side, slot } of actors) {
+      const unit = this.units.find(
+        (candidate) => candidate.side === side && candidate.slot === slot,
+      );
+      if (!unit || amount === 0) continue;
+      const damage = Math.max(0, this.statsFor(unit).maxLife - unit.life);
+      unit.experience = Math.max(0, unit.experience + amount);
+      unit.life = Math.max(1, this.statsFor(unit).maxLife - damage);
+      this.recordCampaignUnit(unit);
+      granted.push(unit.id);
+    }
+    return granted;
+  }
+
   removeStoryUnits(actors: readonly { side: Side; slot: number }[]): readonly string[] {
     const ids = new Set(actors.map(({ side, slot }) => `${side}:${slot}`));
     const removed = this.units.filter(({ id }) => ids.has(id)).map(({ id }) => id);

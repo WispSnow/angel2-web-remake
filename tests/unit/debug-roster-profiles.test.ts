@@ -82,6 +82,8 @@ const completedStage3Save = (): CompletedSaveData => ({
   stageProgress: 1000,
   consumedEventIds: [
     "stage-03-opening-story",
+    "stage-03-player-ready",
+    "stage-03-fourth-corps-joined",
     "stage-03-boss-defeated",
     "stage-03-victory-story",
     "stage-03-completed-route",
@@ -180,8 +182,11 @@ describe("debug roster profiles", () => {
     expect(new Set(stage1Progressions.map(({ classId }) => classId)).size).toBeGreaterThan(1);
     for (const [index, progression] of stage1Progressions.entries()) {
       const slot = [0, 1, 2, 4][index] as number;
-      expect(soldierTargets).toContain(progression.classId);
-      // 妮雅與希蜜第 0 關就在隊，蒙欣曼與拉朵那第 1 關才入隊，入隊當關預算為 0。
+      // 妮雅與希蜜第 0 關就在隊，蒙欣曼與拉朵那第 1 關才入隊，入隊當關預算為 0——
+      // 角色第一次出場時還沒打出任何成長，所以停在戰役入隊職業，不預先轉職。
+      const joinedHere = slot === 2 || slot === 4;
+      expect(progression.classId, `slot ${slot}`).toBe(joinedHere ? "soldier" : progression.classId);
+      if (!joinedHere) expect(soldierTargets).toContain(progression.classId);
       expect(progression.experience).toBe(expectedBudget(slot, "stage-01", perStageGrowth));
       expect(progression.promotions).toEqual([progression.classId]);
     }
@@ -198,11 +203,22 @@ describe("debug roster profiles", () => {
         slot,
         perStageGrowth,
       );
-      const joinStageId = memberFor(slot).joinStageId;
+      const member = memberFor(slot);
+      // 入隊當關預算為 0：角色第一次出場時停在戰役入隊職業，不預先轉職。
+      expect(
+        debugGrowthProgressionForSlot(
+          "representative-growth",
+          member.joinStageId,
+          slot,
+          perStageGrowth,
+        ).promotions,
+        `slot ${slot} at its join stage`,
+      ).toEqual([member.campaignEntryClassId]);
+      // 入隊之後，首次轉職在每一關都是同一個確定結果。
       expect(progression.promotions[0]).toBe(
         debugGrowthProgressionForSlot(
           "representative-growth",
-          joinStageId,
+          "stage-38",
           slot,
           perStageGrowth,
         ).promotions[0],
@@ -232,7 +248,10 @@ describe("debug roster profiles", () => {
       DEFAULT_DEBUG_PER_STAGE_GROWTH,
     );
     for (const slot of [0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24]) {
-      expect(stage6Roster[slot]?.classId).not.toBe("soldier");
+      // 槽 5／6／12／13／14 第 6 關才入隊，當關預算為 0，所以還是未轉職士兵。
+      const joinsHere = memberFor(slot).joinStageId === "stage-06";
+      if (joinsHere) expect(stage6Roster[slot]).toMatchObject({ classId: "soldier", experience: 0 });
+      else expect(stage6Roster[slot]?.classId, `slot ${slot}`).not.toBe("soldier");
     }
     const stage7Roster = debugRosterForProfile(
       "representative-growth",
@@ -247,7 +266,10 @@ describe("debug roster profiles", () => {
       "stage-08",
       DEFAULT_DEBUG_PER_STAGE_GROWTH,
     );
-    for (const slot of [17, 18]) expect(stage8Roster[slot]?.classId).not.toBe("soldier");
+    // 阿曼妮與雷伊拉第 8 關入隊，當關預算為 0，所以停在未轉職士兵。
+    for (const slot of [17, 18]) {
+      expect(stage8Roster[slot]).toMatchObject({ classId: "soldier", experience: 0 });
+    }
     const stage9Roster = debugRosterForProfile(
       "representative-growth",
       "stage-09",

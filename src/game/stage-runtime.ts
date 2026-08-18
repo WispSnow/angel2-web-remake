@@ -2199,11 +2199,19 @@ export const STAGE_RUNTIME_MANIFEST = {
     save: {
       validEventIds: [
         "stage-03-opening-story",
+        "stage-03-player-ready",
+        "stage-03-fourth-corps-joined",
         "stage-03-boss-defeated",
         "stage-03-victory-story",
         "stage-03-completed-route",
       ],
-      requiredResumeEventIds: ["stage-03-opening-story"],
+      // REMAKE-109 runs both opening events before the player may act, so any
+      // in-battle save necessarily carries all three.
+      requiredResumeEventIds: [
+        "stage-03-opening-story",
+        "stage-03-player-ready",
+        "stage-03-fourth-corps-joined",
+      ],
       alliedUnits: {
         // REMAKE-108 hands Himi the four campaign slots the player grew in stages 0–1.
         kind: "exact-slots",

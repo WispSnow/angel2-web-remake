@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { isPromotionEligible } from "../../src/game/content/classes";
-import { stage3TerrainSlotAt } from "../../src/game/content/stage3";
+import {
+  STAGE3_FOURTH_CORPS_NAMED_ACTORS,
+  stage3TerrainSlotAt,
+} from "../../src/game/content/stage3";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
 import type { CampaignState } from "../../src/game/types";
@@ -49,16 +52,27 @@ describe("stage 3 battle construction and stable-remake automation", () => {
   });
 
   /**
-   * REMAKE-109. The three rescued fourth-corps characters join here, so an
-   * untouched campaign gives them the stage's entry baseline — 300 instead of
-   * the 299 every other named class-0 actor keeps.
+   * REMAKE-109. The three rescued fourth-corps characters join here, so they
+   * enter on the native 299 named-actor floor — un-promoted, exactly one point
+   * short — and the stage's opening event hands them that point.
    */
-  it("enters the three named fourth-corps NPCs on the soldier promotion threshold", () => {
+  it("puts the three named fourth-corps NPCs on the threshold from the opening event", () => {
     const battle = new Stage3Battle(untouchedCampaign);
+    expect(STAGE3_FOURTH_CORPS_NAMED_ACTORS.map(({ slot }) => slot)).toEqual([21, 3, 20]);
     for (const id of ["1:3", "1:20", "1:21"]) {
       const unit = battle.unit(id)!;
-      // 300 是士兵第 4 成长行，属性因此比 299 高一行，入场生命按新上限补满。
-      expect(unit, `${id} enters ready to promote`)
+      expect(unit, `${id} enters on the native named floor`)
+        .toMatchObject({ classId: "soldier", experience: 299, life: 180 });
+      expect(isPromotionEligible(unit)).toBe(false);
+    }
+    expect(battle.promotionQueue()).toEqual([]);
+
+    expect(battle.grantScriptedExperience(STAGE3_FOURTH_CORPS_NAMED_ACTORS, 1))
+      .toEqual(["1:21", "1:3", "1:20"]);
+    for (const id of ["1:3", "1:20", "1:21"]) {
+      const unit = battle.unit(id)!;
+      // 300 是士兵第 4 成长行，属性随之高一行；开场没人受过伤，所以生命仍是满值。
+      expect(unit, `${id} is ready to promote`)
         .toMatchObject({ classId: "soldier", experience: 300, life: 190 });
       expect(isPromotionEligible(unit)).toBe(true);
     }
@@ -76,13 +90,28 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     }
   });
 
-  it("keeps a campaign-written fourth-corps slot on its inherited growth", () => {
-    // 入队基线只对未被战役写过的槽成立：槽 21 名冊里是士兵 330，必须原样继承，
-    // 不得被改写成 300；同关未写过的槽 20 仍取新基线。
+  it("carries a wounded unit's damage across the scripted experience award", () => {
+    // 发放本身不治疗：满血单位保持满血，受伤单位在新上限下伤势不变。
+    const battle = new Stage3Battle(untouchedCampaign);
+    const wounded = battle.unit("1:3")!;
+    wounded.life = 100;
+    battle.grantScriptedExperience(STAGE3_FOURTH_CORPS_NAMED_ACTORS, 1);
+    expect(wounded).toMatchObject({ experience: 300, life: 110 });
+    expect(battle.statsFor(wounded).maxLife).toBe(190);
+  });
+
+  it("keeps campaign-written fourth-corps slots on their inherited growth", () => {
+    // 入队基线只对未被战役写过的槽成立：槽 21 名冊里是士兵 330，槽 3 已是戰士 480，
+    // 两者都原样继承；开场那 1 点经验照发，但对已成长的槽不构成转职特例。
     const battle = new Stage3Battle(campaign);
     expect(battle.unit("1:21")).toMatchObject({ classId: "soldier", experience: 330 });
     expect(battle.unit("1:3")).toMatchObject({ classId: "warrior", experience: 480 });
-    expect(battle.unit("1:20")).toMatchObject({ classId: "soldier", experience: 300 });
+    expect(battle.unit("1:20")).toMatchObject({ classId: "soldier", experience: 299 });
+
+    battle.grantScriptedExperience(STAGE3_FOURTH_CORPS_NAMED_ACTORS, 1);
+    expect(battle.unit("1:21")).toMatchObject({ experience: 331 });
+    expect(battle.unit("1:3")).toMatchObject({ experience: 481 });
+    expect(battle.promotionQueue()).toEqual(["1:21", "1:20"]);
   });
 
   it("exposes behavior-zero allies to the player and schedules automatic allies in map order", () => {

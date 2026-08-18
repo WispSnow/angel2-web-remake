@@ -38,6 +38,16 @@ export type StageSimulationEffectDefinition =
     value: 999;
   }
   | {
+    /**
+     * `REMAKE-109`：按剧情给指定槽发放经验。经验、成长与转职判定都走常规规则，
+     * 发放完成后交给与动作后扫描同一条转职队列。
+     */
+    type: "grant-experience";
+    actors: readonly { side: Side; slot: number }[];
+    amount: number;
+    statusText: string;
+  }
+  | {
     type: "messenger-arrival";
     actor: { side: 1; slot: 48 };
     from: Position;

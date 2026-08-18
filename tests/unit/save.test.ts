@@ -328,7 +328,11 @@ const stage3BattleSave = (): BattleSaveData => {
       roster: campaign.roster.map((entry) => ({ ...entry })),
     },
     stageProgress: 0,
-    consumedEventIds: ["stage-03-opening-story"],
+    consumedEventIds: [
+      "stage-03-opening-story",
+      "stage-03-player-ready",
+      "stage-03-fourth-corps-joined",
+    ],
     battle: {
       phase: "player",
       ...battle.serializableSnapshot(),
@@ -4685,6 +4689,8 @@ describe("Web save validation", () => {
       stageProgress: 1000,
       consumedEventIds: [
         "stage-03-opening-story",
+        "stage-03-player-ready",
+        "stage-03-fourth-corps-joined",
         "stage-03-boss-defeated",
         "stage-03-victory-story",
         "stage-03-completed-route",
@@ -5010,31 +5016,58 @@ describe("Web save validation", () => {
     }))).toBeUndefined();
   });
 
-  it("carries version-85 saves forward and leaves a stage-3 board on the experience it holds", () => {
-    // REMAKE-109 raises an *entry* baseline, read while the stage builds its board.
-    // A v85 stage-3 battle was built at 299, so it resumes at 299 instead of being
-    // handed a promotion that run never earned; fresh entries pick 300 up on their own.
-    const completed: CompletedSaveData = { ...completedSave() };
+  it("backfills the stage-3 opening events a legacy save predates", () => {
+    // REMAKE-109 turned the fourth corps' promotion moment into two opening
+    // events. Older saves predate the ids, so they are marked consumed rather
+    // than replayed: that run built its board before the rule existed and its
+    // trio never received the point, and firing the grant on load would hand out
+    // a promotion the run never reached.
+    const battle = stage3BattleSave();
+    const legacyBattle = {
+      ...battle,
+      version: 87,
+      contentVersion: "stage-round-limit-99-1",
+      consumedEventIds: ["stage-03-opening-story"],
+    };
+    expect(parseSaveData(JSON.stringify(legacyBattle))).toEqual(battle);
+
+    const completed: CompletedSaveData = {
+      ...completedSave(),
+      stageId: "stage-04",
+      stageLabel: "通過力場",
+      stageProgress: 1000,
+      consumedEventIds: [
+        "stage-03-opening-story",
+        "stage-03-player-ready",
+        "stage-03-fourth-corps-joined",
+        "stage-03-boss-defeated",
+        "stage-03-victory-story",
+        "stage-03-completed-route",
+      ],
+    };
     expect(parseSaveData(JSON.stringify({
       ...completed,
-      version: 85,
-      contentVersion: "stage-2-3-generic-ally-swap-1",
+      version: 87,
+      contentVersion: "stage-round-limit-99-1",
+      consumedEventIds: [
+        "stage-03-opening-story",
+        "stage-03-boss-defeated",
+        "stage-03-victory-story",
+        "stage-03-completed-route",
+      ],
     }))).toEqual(completed);
 
-    const legacyStage3 = stage3BattleSave();
-    // 蕾奇蒂特与愛歐里雅在 v85 是士兵 299，也就是第 3 成长行的 180 生命上限。
-    const rollBack = <T extends { slot: number; experience: number; life: number }>(entry: T): T =>
-      entry.slot === 20 || entry.slot === 21 ? { ...entry, experience: 299, life: 180 } : entry;
-    legacyStage3.roster = legacyStage3.roster.map(rollBack);
-    legacyStage3.stageEntrySnapshot.roster = legacyStage3.stageEntrySnapshot.roster.map(rollBack);
-    legacyStage3.battle.units = legacyStage3.battle.units
-      .map((unit) => unit.side === 1 ? rollBack(unit) : unit);
+    // 名冊、單位與 PRNG 一個位元都不動：只补事件 id。
+    const legacyRoster = stage3BattleSave().roster;
+    expect(parseSaveData(JSON.stringify(legacyBattle))?.roster).toEqual(legacyRoster);
 
+    // 其他关卡的存档不受影响。
+    const stage0 = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...legacyStage3,
-      version: 85,
-      contentVersion: "stage-2-3-generic-ally-swap-1",
-    }))).toEqual(legacyStage3);
+      ...stage0,
+      version: 87,
+      contentVersion: "stage-round-limit-99-1",
+    }))).toEqual(stage0);
   });
 
   it("carries version-84 saves forward but refuses stage-2/3 battles whose slots moved", () => {

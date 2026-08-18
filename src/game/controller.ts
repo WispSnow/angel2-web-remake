@@ -23,8 +23,6 @@ import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
 import {
   classDefinition,
   className,
-  isPromotionEligible,
-  promotionExperienceThresholdFor,
   promotionTargetsFor,
   unitDisplayName,
   type PromotionTarget,
@@ -1237,6 +1235,18 @@ export class GameController {
     }
     if (definition.type === "victory-state") {
       this.stageProgress = definition.value;
+      return;
+    }
+    if (definition.type === "grant-experience") {
+      const granted = this.battle.grantScriptedExperience(definition.actors, definition.amount);
+      if (granted.length === 0) return;
+      this.statusMessage = definition.statusText;
+      this.emit();
+      // 已经分出胜负的棋盘由胜负流程接管，剧情发放不再抢一个授职窗口出来。
+      if (this.battle.outcome() !== "ongoing") return;
+      // 发放本身不是转职：由与动作后扫描同一条队列决定谁必须选择新职业。
+      const promotionPause = this.pauseForPromotions();
+      if (promotionPause) await promotionPause;
       return;
     }
     if (definition.type === "messenger-arrival") {
@@ -5093,15 +5103,7 @@ export class GameController {
     );
     for (const unit of this.battle.units.filter(
       ({ side, id }) => side === 1 && id !== candidate.id,
-    )) {
-      unit.acted = true;
-      // 夹具只演示一名候选。`REMAKE-109` 让第四军团的三名具名 NPC 一开场就够转职，
-      // 而转职队列按棋盘顺序排，所以先把其余候选压回阈值下一点，否则先弹的是她们。
-      if (isPromotionEligible(unit)) {
-        unit.experience = promotionExperienceThresholdFor(unit.classId) - 1;
-        unit.life = Math.min(unit.life, this.battle.statsFor(unit).maxLife);
-      }
-    }
+    )) unit.acted = true;
     this.battle.focusId = candidate.id;
     this.phase = "player";
     this.centerCamera(candidate);
@@ -5689,8 +5691,25 @@ export class GameController {
     };
   }
 
+  /**
+   * A decided battle hands the screen to the victory/defeat flow, so a promotion
+   * queue that is still open has nothing left to decide. Every ordinary action
+   * path drains the queue before it resolves an outcome, so this only releases a
+   * queue a scripted effect opened on a board that was decided out from under it.
+   */
+  private cancelPendingPromotions(): void {
+    if (this.promotionUnitIds.length === 0 && this.promotionResume === undefined) return;
+    this.promotionUnitIds = [];
+    this.promotionDialogueIndex = undefined;
+    this.promotionSelectionIndex = 0;
+    const resume = this.promotionResume;
+    this.promotionResume = undefined;
+    resume?.();
+  }
+
   private resolveOutcome(): boolean {
     const outcome = this.battle.outcome();
+    if (outcome !== "ongoing") this.cancelPendingPromotions();
     if (outcome === "defeat") {
       this.systemMenuOpen = false;
       this.settingsOpen = false;

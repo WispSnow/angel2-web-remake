@@ -251,8 +251,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 87;
-  contentVersion: "stage-round-limit-99-1";
+  version: 88;
+  contentVersion: "stage-3-fourth-corps-joined-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

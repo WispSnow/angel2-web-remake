@@ -16,6 +16,7 @@ interface Stage3State {
   groupLeaderId?: string;
   groupCommandDialogueId?: string;
   statusMessage: string;
+  cursor: { x: number; y: number };
   cameraOrigin: { x: number; y: number };
   rngCalls: number;
   movementPresentation?: {
@@ -40,6 +41,7 @@ interface Stage3State {
     x: number;
     y: number;
     life: number;
+    experience: number;
     acted: boolean;
   }>;
 }
@@ -64,10 +66,13 @@ const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
 );
 
 /**
- * REMAKE-109 starts 黛西／蕾奇蒂特／愛歐里雅 on the soldier promotion threshold, so
- * the very first action of the stage stops to grant their next professions. Grants
- * the queued choices in board order and reports whom it promoted.
+ * REMAKE-109 hands 愛歐里雅／黛西／蕾奇蒂特 their last experience point in a
+ * stage-opening event, so stage 3 stops for three grants before the player may act.
+ * Board order, and the order every stage-3 flow below has to clear.
  */
+const JOINING_PROMOTION_IDS = ["1:21", "1:3", "1:20"];
+
+/** Grants every queued promotion in board order and reports whom it promoted. */
 async function grantPendingPromotions(page: Page): Promise<string[]> {
   const promoted: string[] = [];
   for (;;) {
@@ -75,8 +80,10 @@ async function grantPendingPromotions(page: Page): Promise<string[]> {
     const unitId = current.promotionUnitIds[0];
     if (unitId === undefined) return promoted;
     if (current.promotionDialogueIndex !== undefined) {
-      // The first click finishes the typing reveal, the next turns the page.
-      await page.getByTestId("dialogue-layer").click();
+      // Page through the 授职 lines by state rather than by clicking the layer:
+      // the layer hides the moment the last page turns, so a click can race it.
+      // The player-visible path is covered by S03-P and the grantor case below.
+      await page.evaluate(() => window.__ANGEL2__?.advanceDialogue());
       continue;
     }
     const target = current.promotionTargets[0];
@@ -104,10 +111,49 @@ async function waitForPhaseThroughPromotions(page: Page, phase: string): Promise
   }
 }
 
+/**
+ * Opens a stage-3 debug scenario and clears the opening grants, leaving the board
+ * exactly where a player reaches it: player phase, three professions chosen.
+ */
+async function openStage3(page: Page, query: string): Promise<string[]> {
+  await page.goto(`/?debugScenario=${query}`);
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  // 只等阶段会和 `enter-player-phase` 抢跑——那一步先于发放。等经验真的发下去，
+  // 授职队列才一定已经排好。
+  await page.waitForFunction((ids) => {
+    const current = window.__ANGEL2__?.getState() as
+      { units: Array<{ id: string; classId: string; experience: number }> } | undefined;
+    if (!current) return false;
+    const present = current.units.filter(({ id }) => ids.includes(id));
+    return present.length > 0
+      && present.every(({ classId, experience }) => !(classId === "soldier" && experience === 299));
+  }, JOINING_PROMOTION_IDS);
+  return grantPendingPromotions(page);
+}
+
+/** Walks the cursor with the arrow keys, which is what the HUD checks exercise. */
+async function moveCursorTo(page: Page, x: number, y: number): Promise<void> {
+  const { cursor } = await state(page);
+  for (let step = 0; step < Math.abs(y - cursor.y); step += 1) {
+    await page.keyboard.press(y < cursor.y ? "ArrowUp" : "ArrowDown");
+  }
+  for (let step = 0; step < Math.abs(x - cursor.x); step += 1) {
+    await page.keyboard.press(x < cursor.x ? "ArrowLeft" : "ArrowRight");
+  }
+}
+
 async function clickUnit(page: Page, id: string): Promise<void> {
-  const current = await state(page);
+  let current = await state(page);
   const unit = current.units.find((candidate) => candidate.id === id);
   if (!unit) throw new Error(`missing unit ${id}`);
+  // 授职会把镜头带到别处，目标可能已经在 10×7 视口之外——先用方向键把它带回来，
+  // 否则按镜头换算出的点击点会落在画布外面。
+  const visible = unit.x >= current.cameraOrigin.x && unit.x <= current.cameraOrigin.x + 9
+    && unit.y >= current.cameraOrigin.y && unit.y <= current.cameraOrigin.y + 6;
+  if (!visible) {
+    await moveCursorTo(page, unit.x, unit.y);
+    current = await state(page);
+  }
   await page.getByTestId("battle-canvas").click({
     position: {
       x: 40 + (unit.x - current.cameraOrigin.x) * 40 + 20,
@@ -132,7 +178,8 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   });
 
   await skipStoryDialogue(page);
-  await waitForPhase(page, "player");
+  // REMAKE-109: 开场剧情结束后先授职，三名第四军团成员选完才交还战场。
+  expect(await waitForPhaseThroughPromotions(page, "player")).toEqual(JOINING_PROMOTION_IDS);
   await page.keyboard.press("o");
   // REMAKE-051: the machine victory slot is side-2 slot 17, whose enemy actor is
   // 梅蒂. The earlier 莎 came from quoting the wrong SAY record.
@@ -144,8 +191,8 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   });
   await page.locator("[data-action=close-objectives]").click();
 
-  for (let step = 0; step < 21; step += 1) await page.keyboard.press("ArrowUp");
-  for (let step = 0; step < 14; step += 1) await page.keyboard.press("ArrowRight");
+  // 愛歐里雅 `(30,15)`：授职把焦点移动过，所以按绝对坐标走，不按固定步数。
+  await moveCursorTo(page, 30, 15);
   await page.keyboard.press("Space");
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveText("友軍・戰術固守防區");
@@ -155,8 +202,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   });
 
   await page.keyboard.press("Enter");
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("ArrowUp");
+  await moveCursorTo(page, 30, 13);
   await page.keyboard.press("Space");
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveText("戰術壓制第四軍團");
@@ -165,8 +211,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   });
 
   await page.keyboard.press("Enter");
-  for (let step = 0; step < 7; step += 1) await page.keyboard.press("ArrowDown");
-  for (let step = 0; step < 3; step += 1) await page.keyboard.press("ArrowRight");
+  await moveCursorTo(page, 33, 20);
   await page.keyboard.press("Space");
   await expect(page.getByTestId("unit-tactic")).toHaveText("戰術阻擊救援隊");
   const [tacticLabelColor, tacticValueColor, tacticGap] = await Promise.all([
@@ -182,8 +227,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
 });
 
 test("S03-F/G: monk recovery exposes the native menu and marks only allies inside its effect diamond", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await openStage3(page, "stage-03-player&difficulty=0&test=1");
   await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("monk"));
   const setup = await state(page);
   const actor = setup.units.find(({ side, classId, x, y }) =>
@@ -224,8 +268,7 @@ test("S03-F/G: monk recovery exposes the native menu and marks only allies insid
 });
 
 test("S03-D/E/H/I: Meidi's defeat plays SAY/13 once and enters stage 4", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-03-near-victory&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await openStage3(page, "stage-03-near-victory&difficulty=0&test=1");
   const commander = (await state(page)).units.find(({ side, acted }) => side === 1 && !acted);
   if (!commander) throw new Error("missing stage-3 victory commander");
   await clickUnit(page, commander.id);
@@ -274,8 +317,7 @@ test("S03-F: debug fixtures prove that either protected commander triggers defea
 });
 
 test("stage 3 group commands use Himi as the fixed commander while Nia is absent", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await openStage3(page, "stage-03-player&difficulty=0&test=1");
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
   expect((await state(page)).groupLeaderId).toBe("1:1");
@@ -288,8 +330,7 @@ test("stage 3 group commands use Himi as the fixed commander while Nia is absent
 });
 
 test("S03-N/O: free action hands off player units first and round two still follows Himi", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await openStage3(page, "stage-03-player&difficulty=0&test=1");
   await page.evaluate(() => {
     const traceHost = window as typeof window & {
       __stage3HandoffTimer?: number;
@@ -369,14 +410,11 @@ test("S03-N/O: free action hands off player units first and round two still foll
 });
 
 test("S03-C/L: hard-mode automatic allies finish their first phase inside the defense area", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-03-player&difficulty=3&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await openStage3(page, "stage-03-player&difficulty=3&test=1");
   await page.keyboard.press("Tab");
   await page.getByTestId("group-command-allRest").click();
   await page.getByTestId("dialogue-layer").click();
-  // 全部休息先结算六名玩家角色，随后就停在第四军团的三次转职上。
-  expect(await waitForPhaseThroughPromotions(page, "enemy"))
-    .toEqual(["1:21", "1:3", "1:20"]);
+  await waitForPhaseThroughPromotions(page, "enemy");
 
   const current = await state(page);
   const automaticIds = new Set(["1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50"]);
@@ -391,23 +429,22 @@ test("S03-C/L: hard-mode automatic allies finish their first phase inside the de
   });
 });
 
-test("S03-P: the three rescued fourth-corps NPCs are promotable from the opening action", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
+test("S03-P: the rescued fourth corps promotes before round one opens", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-03-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   const opening = await state(page);
-  const npcIds = ["1:21", "1:3", "1:20"];
-  for (const id of npcIds) {
+  // 三人以未转职士兵登场，只差 1 点经验，跟原版名单基线一致。
+  for (const id of JOINING_PROMOTION_IDS) {
     expect(opening.units.find((unit) => unit.id === id)?.classId, `${id} enters as a soldier`)
       .toBe("soldier");
   }
 
-  // REMAKE-109: 一开场就够转职。玩家的第一个动作（这里是希蜜休息）立刻停在授职流程上，
-  // 不需要先给这三名 NPC 打满最后 1 点经验。
-  await clickUnit(page, "1:1");
-  await page.getByTestId("unit-command-rest").click();
+  await skipStoryDialogue(page);
+  // REMAKE-109：开场剧情之后、玩家第一次行动之前就发放那 1 点经验并弹出授职。
   await expect(page.getByTestId("dialogue-layer"))
     .toHaveAttribute("data-source-record", "promotion");
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("愛歐里雅");
+  expect((await state(page)).round).toBe(1);
   // 自动友军同样走「队友请求 → 主将授职」分支，妮雅缺席时由希蜜授职。
   await page.evaluate(() => window.__ANGEL2__?.advanceDialogue());
   await expect(page.locator("#dialogue-speaker-upper")).toHaveText("希蜜");
@@ -415,20 +452,22 @@ test("S03-P: the three rescued fourth-corps NPCs are promotable from the opening
     path: `${ARTIFACT_DIR}/stage3-fourth-corps-opening-promotion.png`,
   });
 
-  // 转职队列按棋盘顺序排，三名 NPC 全部授职后战场才恢复。
-  expect(await waitForPhaseThroughPromotions(page, "player")).toEqual(npcIds);
+  // 队列按棋盘顺序排，三人全部授职后战场才交还玩家。
+  expect(await waitForPhaseThroughPromotions(page, "player")).toEqual(JOINING_PROMOTION_IDS);
   const promoted = await state(page);
-  for (const id of npcIds) {
+  for (const id of JOINING_PROMOTION_IDS) {
     expect(promoted.units.find((unit) => unit.id === id)?.classId, `${id} took its new profession`)
       .toBe("cavalry");
   }
-  // 希蜜与拉朵那仍停在原版 299 基线，本特例只针对被救援的第四军团。
-  expect(promoted.units.find((unit) => unit.id === "1:4")?.classId).toBe("soldier");
+  // 希蜜与拉朵那属于救援队，不在特例内。
+  for (const id of ["1:1", "1:4"]) {
+    expect(promoted.units.find((unit) => unit.id === id)?.classId).toBe("soldier");
+  }
+  expect(promoted.units.filter(({ side }) => side === 1)).toHaveLength(13);
 });
 
 test("stage 3 promotions use Himi as the on-field grantor while Nia is absent", async ({ page }) => {
-  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
-  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await openStage3(page, "stage-03-player&difficulty=0&test=1");
   await page.evaluate(() => window.__ANGEL2__?.forcePromotionSetup());
   await clickUnit(page, "1:4");
   await page.getByTestId("unit-command-attack").click();

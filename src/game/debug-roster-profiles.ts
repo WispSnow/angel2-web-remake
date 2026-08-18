@@ -258,14 +258,14 @@ const REPRESENTATIVE_STAGE2 = [
   { slot: 24, classPath: ["magician"], experience: 700 },
 ] as const satisfies readonly DebugRosterEntrySpec[];
 
+// 槽 3／20／21（黛西、蕾奇蒂特、愛歐里雅）第 3 关才入队，本关不能已经有职业，
+// 所以不在这里登记：名冊留在未成长士兵，由关卡自己的具名士兵经验下限接手，
+// `REMAKE-109` 的开场事件再把她们推过转职阈值。
 const REPRESENTATIVE_STAGE3 = [
   { slot: 0, classPath: ["soldier", "cavalry", "land-knight"], experience: 300 },
   { slot: 1, classPath: ["soldier", "sister", "priest"], experience: 520 },
   { slot: 2, classPath: ["soldier", "archer"], experience: 520 },
-  { slot: 3, classPath: ["soldier", "warrior"], experience: 420 },
   { slot: 4, classPath: ["soldier", "archer"], experience: 440 },
-  { slot: 20, classPath: ["soldier", "cavalry"], experience: 400 },
-  { slot: 21, classPath: ["soldier", "sister"], experience: 480 },
   { slot: 24, classPath: ["magician"], experience: 920 },
 ] as const satisfies readonly DebugRosterEntrySpec[];
 
@@ -589,7 +589,9 @@ function debugGrowthProgression(
   growthBudget: number,
 ): DebugGrowthProgression {
   const rng = debugGrowthRng(profileId, slot);
-  let classId = campaignEntryClassId === "soldier"
+  // 入队当关预算为 0：角色刚登场，还没打出任何成长，因此保持战役入队职业。士兵在
+  // 之后的关卡照旧立刻转职一次，让档案覆盖到已转职的常见形态。
+  let classId = campaignEntryClassId === "soldier" && growthBudget > 0
     ? randomPromotionTarget(campaignEntryClassId, rng)
     : campaignEntryClassId;
   let experience = growthBudget;
