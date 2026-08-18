@@ -298,18 +298,66 @@ describe("stage 3 battle construction and stable-remake automation", () => {
   it("rallies a leaderless ranged automatic ally on Daisy once no shot is left", () => {
     const battle = new Stage3Battle(campaign);
     battle.units = battle.units.filter((unit) => unit.side === 1);
-    const archer = battle.unit("1:50")!;
+    const archer = battle.unit("1:45")!;
     archer.classId = "archer";
     archer.className = "弓兵";
     const daisy = battle.unit("1:3")!;
     // 行为 2 没有成对领队，所以这一步只可能来自集结规则本身。
-    expect(battle.alliedBehaviorFor("1:50")).toBe(2);
+    expect(battle.alliedBehaviorFor("1:45")).toBe(2);
 
-    const action = battle.planAlliedAiAction("1:50");
-    expect(action).toMatchObject({ unitId: "1:50", kind: "move" });
+    const action = battle.planAlliedAiAction("1:45");
+    expect(action).toMatchObject({ unitId: "1:45", kind: "move" });
     const destination = action!.path.at(-1)!;
     expect(Math.abs(destination.x - daisy.x) + Math.abs(destination.y - daisy.y))
       .toBeLessThan(Math.abs(archer.x - daisy.x) + Math.abs(archer.y - daisy.y));
+  });
+
+  /**
+   * REMAKE-111. 黛西与右翼之间的森林正好缺一格（31,18 是防区外地形），所以按直线
+   * 距离判断会把每一条合法绕行都读成「更远」，右翼从此原地不动。集结改用防区内的
+   * 真实路径代价，士兵 K 因此沿 `y = 17` 的森林走廊绕过缺口。
+   */
+  it("walks the right flank around the hole in the forest instead of stalling", () => {
+    const battle = new Stage3Battle(campaign);
+    battle.units = battle.units.filter((unit) => unit.side === 1);
+    const daisy = battle.unit("1:3")!;
+    const flank = battle.unit("1:50")!;
+    expect(stage3TerrainSlotAt({ x: 31, y: 18 })).toBe(2);
+    const distanceToDaisy = (position: { x: number; y: number }): number =>
+      Math.abs(position.x - daisy.x) + Math.abs(position.y - daisy.y);
+
+    const first = battle.planAlliedAiAction("1:50");
+    expect(first).toMatchObject({ unitId: "1:50", kind: "move" });
+    // 绕行的第一步在直线上反而更远，只有路径代价看得出它是进展。
+    expect(distanceToDaisy(first!.path.at(-1)!)).toBeGreaterThan(distanceToDaisy(flank));
+
+    for (let phase = 0; phase < 8; phase += 1) {
+      const action = battle.planAlliedAiAction("1:50")!;
+      expect(action.path.every((position) => [3, 5].includes(stage3TerrainSlotAt(position))))
+        .toBe(true);
+      if (action.kind !== "move") break;
+      battle.moveUnit("1:50", action.path.at(-1)!);
+      battle.unit("1:50")!.acted = false;
+    }
+    expect(distanceToDaisy(battle.unit("1:50")!)).toBe(1);
+  });
+
+  /**
+   * REMAKE-111. 撤回防区和向集结点靠拢是同一步：蕾奇蒂特开局站在森林缺口上，
+   * 左边和上边都是可进入的森林，按落点离黛西的剩余路程排序才会选左边那格。
+   */
+  it("enters the defense area on the side that also closes on Daisy", () => {
+    const battle = new Stage3Battle(campaign);
+    const daisy = battle.unit("1:3")!;
+    const outside = battle.unit("1:20")!;
+    expect(stage3TerrainSlotAt(outside)).toBe(2);
+
+    const action = battle.planAlliedAiAction("1:20");
+    expect(action).toMatchObject({ unitId: "1:20", kind: "move" });
+    const destination = action!.path.at(-1)!;
+    expect(stage3TerrainSlotAt(destination)).toBe(3);
+    expect(Math.abs(destination.x - daisy.x) + Math.abs(destination.y - daisy.y))
+      .toBeLessThan(Math.abs(outside.x - daisy.x) + Math.abs(outside.y - daisy.y));
   });
 
   it("has an automatic sister heal a sub-half-life automatic ally before other actions", () => {

@@ -9,6 +9,7 @@ import type { ForceRegistry } from "./forces";
 import { classCombatRole } from "../content/classes";
 import {
   manhattan,
+  movementCostsToNearestTarget,
   movementMap,
   positionKey,
   type GridBattlefield,
@@ -44,9 +45,36 @@ export interface ForceAiPlanningContext {
 }
 
 /**
+ * Cheapest route cost from every in-doctrine cell to a squadmate, measured with
+ * the mover's own terrain costs. The squadmate's occupied cell seeds the field,
+ * and same-side units stay transit rather than walls, so a packed formation
+ * still reports the corridor it is standing in.
+ */
+function allowedRouteCostsToAlly(
+  context: ForceAiPlanningContext,
+  unit: BattleUnit,
+  destinationAlly: BattleUnit,
+  isAllowedPosition: (position: Position) => boolean,
+): ReadonlyMap<string, number> {
+  return movementCostsToNearestTarget(
+    unit,
+    [{ x: destinationAlly.x, y: destinationAlly.y }],
+    context.units,
+    context.battlefield,
+    { positionFilter: isAllowedPosition, allowFriendlyOccupiedTargets: true },
+  );
+}
+
+/**
  * One step closer to a squadmate without leaving the doctrine: the same ranking
  * serves the native leader/follower branch and the `REMAKE-111` rally, so the
  * two rules can never pull the same unit in opposite directions.
+ *
+ * Progress is the real in-doctrine route cost, not the straight line. Stage 3's
+ * forest breaks at a single cell between the fourth corps' right flank and
+ * Daisy, and a straight-line test rejects every legal way around it — the
+ * squadmate behind that hole reads every detour as "farther" and never moves
+ * again. The straight line only stands in when the pair has no route at all.
  */
 function planCloseOnAlly(
   context: ForceAiPlanningContext,
@@ -55,7 +83,12 @@ function planCloseOnAlly(
   isAllowedPosition: (position: Position) => boolean,
 ): AlliedAiAction | undefined {
   if (destinationAlly.id === unit.id) return undefined;
-  const distanceBefore = manhattan(unit, destinationAlly);
+  const routeCosts = allowedRouteCostsToAlly(context, unit, destinationAlly, isAllowedPosition);
+  const routeCostBefore = routeCosts.get(positionKey(unit));
+  const distanceAt = (position: Position): number => routeCostBefore === undefined
+    ? manhattan(position, destinationAlly)
+    : routeCosts.get(positionKey(position)) ?? Number.POSITIVE_INFINITY;
+  const distanceBefore = routeCostBefore ?? manhattan(unit, destinationAlly);
   const candidates = context.reachableCells(unit.id)
     .filter(isAllowedPosition)
     .map((position) => ({
@@ -63,7 +96,7 @@ function planCloseOnAlly(
       path: positionKey(position) === positionKey(unit)
         ? [{ x: unit.x, y: unit.y }]
         : context.movementPath(unit.id, position),
-      distance: manhattan(position, destinationAlly),
+      distance: distanceAt(position),
     }))
     .filter(({ path, distance }) => path.length > 1
       && distance < distanceBefore
@@ -86,14 +119,33 @@ export function planTerrainHoldForceAiAction(
     allowedTerrainSlots.has(context.battlefield.terrainSlotAt(position));
   const holdPosition = (): AlliedAiAction =>
     ({ unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] });
+  // A fallen rally unit is already a lost stage, but the planner still has to
+  // answer for the units that outlive it, so the rally simply drops out.
+  const rally = doctrine.rally;
+  const rallyUnit = rally
+    ? context.units.find(({ id }) => id === rally.unitId)
+    : undefined;
 
   if (!isAllowedPosition(unit)) {
     const entryTerrainSlots = new Set(doctrine.entryTerrainSlots);
+    /**
+     * REMAKE-111. Falling back into the defense area and closing on the rally
+     * unit are one move, not two: rank the entry cells by what is still left
+     * to walk once inside. Without a rally every cell scores the same and the
+     * original cheapest-entry order stands.
+     */
+    const entryRallyCosts = rallyUnit
+      ? allowedRouteCostsToAlly(context, unit, rallyUnit, isAllowedPosition)
+      : undefined;
+    const entryRallyCostAt = (position: Position): number => entryRallyCosts
+      ? entryRallyCosts.get(positionKey(position)) ?? Number.POSITIVE_INFINITY
+      : 0;
     const candidates = context.reachableCells(unit.id)
       .filter((position) => entryTerrainSlots.has(context.battlefield.terrainSlotAt(position)))
       .map((position) => ({ position, path: context.movementPath(unit.id, position) }))
       .filter(({ path }) => path.length > 1)
-      .sort((left, right) => left.path.length - right.path.length
+      .sort((left, right) => entryRallyCostAt(left.position) - entryRallyCostAt(right.position)
+        || left.path.length - right.path.length
         || left.position.y * context.width + left.position.x
           - (right.position.y * context.width + right.position.x));
     const selected = candidates[0];
@@ -122,12 +174,6 @@ export function planTerrainHoldForceAiAction(
     if (recoveryHeal) return recoveryHeal;
   }
 
-  // A fallen rally unit is already a lost stage, but the planner still has to
-  // answer for the units that outlive it, so the rally simply drops out.
-  const rally = doctrine.rally;
-  const rallyUnit = rally
-    ? context.units.find(({ id }) => id === rally.unitId)
-    : undefined;
   const rallyMove = (): AlliedAiAction | undefined => rallyUnit
     && planCloseOnAlly(context, unit, rallyUnit, isAllowedPosition);
   /**
