@@ -218,7 +218,7 @@ export const STAGE1_SEMANTIC_ENEMY_UNITS = STAGE1_ENEMY_UNITS.map((unit) => {
 export const STAGE1_ASSETS = {
   map: "/assets/original/stage1-map.png",
   minimap: "/assets/original/stage1-minimap.png",
-  storyBackground: "/assets/original/story-stage1-background.png",
+  storyBackground: "/assets/original/story-palace.png",
   allyMagician: "/assets/original/unit-ally-magician.png",
   allyMagicPriest: "/assets/original/unit-ally-magic-priest.png",
   enemySister: "/assets/original/unit-enemy-sister.png",

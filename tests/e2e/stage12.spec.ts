@@ -100,7 +100,7 @@ test("S12-A/B/C: stage 10 completion plays the crash story, deploys 1–9, then 
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "10");
   await expect(page.locator("#story-background")).toHaveCSS(
     "background-image",
-    /story-stage12-background-10\.png/u,
+    /story-stage10-background-10\.png/u,
   );
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("女帝現在的狀況");
   await waitForBackgroundImage(page);

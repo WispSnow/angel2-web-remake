@@ -6,6 +6,7 @@ import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileNativeStory } from "./lib/compile-native-story.mjs";
+import { assertIdenticalImage, removeDuplicateImage } from "./lib/shared-image-assets.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reversePath = (...parts) => path.join(root, "reverse", ...parts);
@@ -380,7 +381,8 @@ await mkdir(publicAssetPath, { recursive: true });
 await Promise.all([
   copyFile(inputPaths.map, path.join(publicAssetPath, "stage1-map.png")),
   copyFile(inputPaths.minimap, path.join(publicAssetPath, "stage1-minimap.png")),
-  copyFile(inputPaths.storyBackground, path.join(publicAssetPath, "story-stage1-background.png")),
+  assertIdenticalImage(inputPaths.storyBackground, reversePath("renders/planar/BK/0001/00.png"), "stage 1 story background"),
+  removeDuplicateImage(path.join(publicAssetPath, "story-stage1-background.png")),
   copyFile(inputPaths.allyMagician, path.join(publicAssetPath, "unit-ally-magician.png")),
   copyFile(inputPaths.portraitGetilas, path.join(publicAssetPath, "portrait-0.png")),
   copyFile(inputPaths.portraitMengxinman, path.join(publicAssetPath, "portrait-42.png")),

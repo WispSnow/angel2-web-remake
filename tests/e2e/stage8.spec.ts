@@ -65,7 +65,7 @@ test("S08-A/B/C/D/F: stage 7 completion plays three SAY/21 backgrounds and enter
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "7");
   await expect(page.locator("#story-background")).toHaveCSS(
     "background-image",
-    /story-stage8-background-7\.png/u,
+    /story-stage7-background-7\.png/u,
   );
   expect(await state(page)).toMatchObject({
     stageId: "stage-08",
@@ -86,7 +86,7 @@ test("S08-A/B/C/D/F: stage 7 completion plays three SAY/21 backgrounds and enter
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "6");
   await expect(page.locator("#story-background")).toHaveCSS(
     "background-image",
-    /story-stage8-background-6\.png/u,
+    /story-stage7-background-6\.png/u,
   );
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage8-prebattle-background-6.png`,

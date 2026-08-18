@@ -133,8 +133,8 @@ export const STAGE18_SEMANTIC_ENEMY_UNITS = STAGE18_ENEMY_UNITS.map((unit) => {
 });
 
 export const STAGE18_ASSETS = {
-  map: "/assets/original/stage18-map.png",
-  minimap: "/assets/original/stage18-minimap.png",
+  map: "/assets/original/stage14-map.png",
+  minimap: "/assets/original/stage14-minimap.png",
   unitSprites: {
     "enemy-half-dragon-warrior": "/assets/original/technique-lab/units/enemy-half-dragon-warrior.png",
     "enemy-monk": "/assets/original/technique-lab/units/enemy-monk.png",

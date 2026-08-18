@@ -55,7 +55,7 @@ test("S31-A–E: SAY/0060 leads through five fixed allies into the SAY/0061 ambu
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "23");
   await expect(page.locator("#story-background")).toHaveCSS(
     "background-image",
-    /story-stage31-background-23\.png/u,
+    /story-stage29-background-23\.png/u,
   );
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("外面的吵雜聲");
   expect(await state(page)).toMatchObject({

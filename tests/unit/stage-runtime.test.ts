@@ -330,8 +330,8 @@ describe("stage runtime manifest", () => {
     });
     expect(stage8.createBattle({ ...campaign, stageId: "stage-08" }).stage.id).toBe("stage-08");
     expect(stage8.assets?.storyBackgrounds).toEqual({
-      6: "/assets/original/story-stage8-background-6.png",
-      7: "/assets/original/story-stage8-background-7.png",
+      6: "/assets/original/story-stage7-background-6.png",
+      7: "/assets/original/story-stage7-background-7.png",
       8: "/assets/original/story-stage8-background-8.png",
     });
     expect(stage8.save.alliedUnits).toEqual({
@@ -364,7 +364,7 @@ describe("stage runtime manifest", () => {
       maximumUnits: 9,
     });
     expect(stage12.assets?.storyBackgrounds).toEqual({
-      10: "/assets/original/story-stage12-background-10.png",
+      10: "/assets/original/story-stage10-background-10.png",
       11: "/assets/original/story-stage12-background-11.png",
       12: "/assets/original/story-stage12-background-12.png",
       13: "/assets/original/story-stage12-background-13.png",
@@ -576,7 +576,7 @@ describe("stage runtime manifest", () => {
     expect(stage30.save.enemyFormSequences?.[0]?.classIdsByDifficulty.map(({ length }) => length))
       .toEqual([8, 16, 24, 32]);
     expect(stage30.assets?.storyBackground)
-      .toBe("/assets/original/story-stage30-background-23.png");
+      .toBe("/assets/original/story-stage29-background-23.png");
     expect(stage30.assets?.unitSprites["enemy-empress"]).toContain("enemy-empress.png");
     expect(stage30.retry.mode).toBe("entry");
     expect(stage30.nextStageId).toBe("stage-31");
@@ -594,7 +594,7 @@ describe("stage runtime manifest", () => {
     expect(stage31.preparation?.presentation.enemies).toHaveLength(15);
     expect(stage31.save.enemyClassById).toHaveLength(15);
     expect(stage31.assets?.storyBackground)
-      .toBe("/assets/original/story-stage31-background-23.png");
+      .toBe("/assets/original/story-stage29-background-23.png");
     expect(stage31.nextStageId).toBe("stage-32");
     expect(stage32.preparation?.definition).toMatchObject({
       fixedPlacements: [{ slot: 0, position: { x: 26, y: 28 } }],

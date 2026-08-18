@@ -157,7 +157,7 @@ const enemyUnitSprites = Object.fromEntries([
 export const STAGE30_ASSETS = {
   map: "/assets/original/stage30-map.png",
   minimap: "/assets/original/stage30-minimap.png",
-  storyBackground: "/assets/original/story-stage30-background-23.png",
+  storyBackground: "/assets/original/story-stage29-background-23.png",
   unitSprites: enemyUnitSprites,
   audio: {
     story: musicAsset("MAGIC", 78),

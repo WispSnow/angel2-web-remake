@@ -145,7 +145,7 @@ export const STAGE12_ASSETS = {
   map: "/assets/original/stage12-map.png",
   minimap: "/assets/original/stage12-minimap.png",
   storyBackgrounds: {
-    10: "/assets/original/story-stage12-background-10.png",
+    10: "/assets/original/story-stage10-background-10.png",
     11: "/assets/original/story-stage12-background-11.png",
     12: "/assets/original/story-stage12-background-12.png",
     13: "/assets/original/story-stage12-background-13.png",

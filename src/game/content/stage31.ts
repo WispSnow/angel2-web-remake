@@ -151,7 +151,7 @@ export const STAGE31_SEMANTIC_ENEMY_UNITS = STAGE31_ENEMY_UNITS.map((unit) => {
 export const STAGE31_ASSETS = {
   map: "/assets/original/stage31-map.png",
   minimap: "/assets/original/stage31-minimap.png",
-  storyBackground: "/assets/original/story-stage31-background-23.png",
+  storyBackground: "/assets/original/story-stage29-background-23.png",
   unitSprites: {
     "enemy-demon-dragon-knight": "/assets/original/technique-lab/units/enemy-demon-dragon-knight.png",
     "enemy-half-dragon-warrior": "/assets/original/technique-lab/units/enemy-half-dragon-warrior.png",

@@ -149,8 +149,8 @@ export const STAGE8_ASSETS = {
   map: "/assets/original/stage8-map.png",
   minimap: "/assets/original/stage8-minimap.png",
   storyBackgrounds: {
-    6: "/assets/original/story-stage8-background-6.png",
-    7: "/assets/original/story-stage8-background-7.png",
+    6: "/assets/original/story-stage7-background-6.png",
+    7: "/assets/original/story-stage7-background-7.png",
     8: "/assets/original/story-stage8-background-8.png",
   },
   unitSprites: {

@@ -77,7 +77,7 @@ test("S30-A–E: SAY/0057 and SAY/0058 lead through the Empress mutation into th
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "23");
   await expect(page.locator("#story-background")).toHaveCSS(
     "background-image",
-    /story-stage30-background-23\.png/u,
+    /story-stage29-background-23\.png/u,
   );
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("收復騎士團堡");
   expect(await state(page)).toMatchObject({

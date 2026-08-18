@@ -1,6 +1,10 @@
 import type { LoopMusicProgram, MusicProgram } from "../music-transport";
 
-import { STAGE49_EPILOGUE_ENTRY_MUSIC } from "./stage49-ending.generated";
+import { fullCombatBackgroundAsset } from "./full-combat-backgrounds";
+import {
+  STAGE49_EPILOGUE_ENTRY_MUSIC,
+  STAGE49_SHARED_DECORATION_RECORDS,
+} from "./stage49-ending.generated";
 import { musicAsset } from "./music-assets";
 
 export {
@@ -14,14 +18,16 @@ export {
   STAGE49_EPILOGUE_SEGMENTS,
   STAGE49_ROSTER_ACTORS,
   STAGE49_ROSTER_WAIT_NATIVE_TICKS,
+  STAGE49_SHARED_DECORATION_RECORDS,
   STAGE49_STORY_PAGES,
 } from "./stage49-ending.generated";
 
 export const STAGE49_ENDING_ASSETS = {
   storyBackground: "/assets/original/stage37-map.png",
   rosterBackground: "/assets/original/ending/roster-background.png",
-  decoration: (record: number) =>
-    `/assets/original/ending/decorations/${String(record).padStart(2, "0")}.png`,
+  decoration: (record: number) => STAGE49_SHARED_DECORATION_RECORDS.some((sharedRecord) => sharedRecord === record)
+    ? fullCombatBackgroundAsset(record)
+    : `/assets/original/ending/decorations/${String(record).padStart(2, "0")}.png`,
   classIllustration: (nativeClassRecord: number) =>
     `/assets/original/ending/class-illustrations/${String(nativeClassRecord).padStart(2, "0")}.png`,
   epilogue: (record: number) =>

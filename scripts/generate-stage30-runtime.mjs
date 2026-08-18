@@ -5,6 +5,7 @@ import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileNativeStory } from "./lib/compile-native-story.mjs";
+import { assertIdenticalImage, removeDuplicateImage } from "./lib/shared-image-assets.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reversePath = (...parts) => path.join(root, "reverse", ...parts);
@@ -322,7 +323,8 @@ await mkdir(publicAssetPath, { recursive: true });
 await Promise.all([
   copyFile(inputPaths.map, path.join(publicAssetPath, "stage30-map.png")),
   copyFile(inputPaths.minimap, path.join(publicAssetPath, "stage30-minimap.png")),
-  copyFile(inputPaths.storyBackground23, path.join(publicAssetPath, "story-stage30-background-23.png")),
+  assertIdenticalImage(inputPaths.storyBackground23, reversePath("renders/planar/BK/0023/00.png"), "stage 30 story background 23"),
+  removeDuplicateImage(path.join(publicAssetPath, "story-stage30-background-23.png")),
 ]);
 
 console.log(`wrote ${path.relative(root, outputPath)} (17/18/6 dialogue checkpoints)`);
