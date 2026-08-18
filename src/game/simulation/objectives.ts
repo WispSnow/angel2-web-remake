@@ -100,6 +100,25 @@ export function slotsNamedByCondition(
   return [];
 }
 
+/**
+ * `REMAKE-110`：`stableRemake` 给每关一个 99 个完整回合的上限，超时判负。
+ *
+ * 原版没有这条规则。原版的 `DS:2F83` 同时是完整回合号和终局哨兵（`999` = 本次运行中的
+ * 胜利，`1000` = 已完成胜利），HUD 又只画五字符缓冲的后三位，所以回合号涨到 999 会被
+ * 误读成胜利——那是一个潜在冲突，不是设计出来的限时规则。本上限是明确的复刻产品决定。
+ *
+ * 语义是「没有第 100 回合」：回合号在回合边界推进到 `STAGE_ROUND_LIMIT + 1` 的那一刻
+ * 判负，所以玩家实际打满 99 个完整回合。第 99 回合内达成的胜利照常成立。判据只读回合
+ * 号，因此不需要新的存档字段，读档后也能原样重算。
+ */
+export const STAGE_ROUND_LIMIT = 99;
+
+/**
+ * 上限本身是个安全阀，触发时必须已经预告过——突然判负等于没收玩家的一局。最后这些
+ * 回合里，回合框进入警告态，回合开始信息栏也逐条报剩余回合数。
+ */
+export const STAGE_ROUND_LIMIT_WARNING_ROUNDS = 10;
+
 export function battleOutcomeForObjective(
   units: readonly ObjectiveUnitIdentity[],
   objective: StageObjectiveDefinition,

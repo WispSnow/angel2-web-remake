@@ -3086,6 +3086,38 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-save-confirm.png" });
 });
 
+test("S00-S: the 99-round cap warns on the final rounds and loses the stage at the boundary", async ({ page }) => {
+  // REMAKE-110. 夹具停在第 99 回合，场上只剩一名够不到妮雅的敌人，所以结束本回合
+  // 一定由逾时判负接管，而不是关卡目标先分出胜负。
+  await page.goto("/?debugScenario=stage-00-round-limit&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await expect(page.locator("#bottom-round-text")).toHaveText("第 99 回合");
+  await expect(page.locator("#bottom-round"))
+    .toHaveAttribute("data-round-limit-warning", "true");
+
+  await page.keyboard.press("o");
+  await expect(page.getByTestId("objective-round-limit"))
+    .toHaveText("或 99 回合內未達成勝利條件（剩餘 1 回合）");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-round-limit-final-round.png",
+  });
+  await page.locator("[data-action=close-objectives]").click();
+
+  // 妮雅休息即交出本回合；敌方阶段结束后的回合边界就是上限。
+  await page.keyboard.press("Space");
+  await page.getByTestId("unit-command-rest").click();
+  await waitForPhase(page, "defeat");
+  await expect(page.locator("#status-strip")).toHaveText("未能在 99 回合內達成目標");
+  // 玩家没有打第 100 个回合，回合框必须停在最后一个真的打过的回合。
+  await expect(page.locator("#bottom-round-text")).toHaveText("第 99 回合");
+  // 逾时走的是普通失败流程，反馈文字与肖像仍是原版那一套。
+  await expect(page.getByTestId("feedback-text"))
+    .toHaveText("啊！．．．竟然失敗了？\n我太低辜敵人的實力，再給我一次機會吧！");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-round-limit-defeat.png",
+  });
+});
+
 test("S00-R: Ximi independently enters the shared promotion tree and commits a semantic class", async ({ page }) => {
   await page.goto("/");
   expect(new URL(page.url()).search).toBe("");

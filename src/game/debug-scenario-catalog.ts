@@ -49,6 +49,14 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-00-round-limit",
+    stageId: "stage-00",
+    title: "回合上限逾時",
+    phase: "Round 99",
+    description: "停在最後一個合法回合，敵人在攻擊範圍外；結束本回合即驗證逾時判負。",
+    fixture: true,
+  },
+  {
     id: "stage-00-cleared",
     stageId: "stage-00",
     title: "直接通關",

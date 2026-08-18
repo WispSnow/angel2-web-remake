@@ -65,7 +65,12 @@ import type {
   SpecialActionResult,
 } from "./actions/types";
 import { effectiveAttack, effectiveDefense, emptyUnitStatuses, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
-import { battleOutcomeForObjective, slotsNamedByCondition } from "./objectives";
+import {
+  battleOutcomeForObjective,
+  slotsNamedByCondition,
+  STAGE_ROUND_LIMIT,
+  STAGE_ROUND_LIMIT_WARNING_ROUNDS,
+} from "./objectives";
 import {
   hasEnemyDamageActionThisTurn,
   type EnemyThreatContext,
@@ -3833,9 +3838,42 @@ export class Stage0Battle {
     if (this.unit("1:0")) this.focusId = "1:0";
   }
 
+  /** `REMAKE-110` 的每关回合上限。目前是全局常量，逐关差异化需要新的规则身份。 */
+  get roundLimit(): number {
+    return STAGE_ROUND_LIMIT;
+  }
+
+  /** 含本回合在内还能打几个完整回合；越过上限后为 0。 */
+  get roundsRemaining(): number {
+    return Math.max(0, STAGE_ROUND_LIMIT - this.round + 1);
+  }
+
+  /**
+   * 给玩家看的回合号。越过上限的那一档只是回合边界上的判负标记，玩家并没有打第
+   * 100 个回合，所以回合框停在最后一个真的打过的回合。
+   */
+  get displayRound(): number {
+    return Math.min(this.round, STAGE_ROUND_LIMIT);
+  }
+
+  get roundLimitExceeded(): boolean {
+    return this.round > STAGE_ROUND_LIMIT;
+  }
+
+  /** 进入倒数警告区间；越过上限后战斗已结束，不再报警告。 */
+  get roundLimitWarningActive(): boolean {
+    return !this.roundLimitExceeded
+      && this.roundsRemaining <= STAGE_ROUND_LIMIT_WARNING_ROUNDS;
+  }
+
   outcome(): BattleOutcome {
     if (this.pendingTransformations.length > 0) return "ongoing";
-    return battleOutcomeForObjective(this.units, this.stage.objective);
+    const objectiveOutcome = battleOutcomeForObjective(this.units, this.stage.objective);
+    // REMAKE-110 的逾时判负只接管「目标还没分出结果」的局面：第 99 回合内打出的胜利
+    // 照常成立。回合号越过上限时目标必定仍未达成——每次行动和敌方阶段结束都会结算一次
+    // 胜负，真打赢了根本走不到这个回合边界——所以这里不需要再定义两者的优先级。
+    if (objectiveOutcome !== "ongoing") return objectiveOutcome;
+    return this.roundLimitExceeded ? "defeat" : "ongoing";
   }
 
   snapshot(): object {

@@ -494,7 +494,15 @@ test("tier-three curse-master commits SN after its formal presentation", async (
   expect(pageErrors).toEqual([]);
 });
 
-test("enemy tier-three curse-master selects native SN after two deterministic rolls and announces 禁咒.", async ({ page }) => {
+// REMAKE-083 raised 混亂 to `140 + threat/2` while 有效禁咒 stayed at `120 + threat/2`,
+// so a tier-three curse-master facing clean technique-menu targets now announces LA, not
+// SN. This case therefore pins the AI announcement path on the action the planner really
+// picks. SN itself stays covered twice over: the player-cast presentation is the preceding
+// case in this file, and `expert-ai.test.ts` asserts the exact `confusion = spellSeal + 20`
+// ordering that makes the AI branch unreachable here. Driving the AI to SN would need both
+// targets already confused (verified against `planEnemyAiAction`), which costs three enemy
+// rounds during which the confused player units act erratically.
+test("enemy tier-three curse-master announces the native LA notice its pool now ranks first.", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -532,31 +540,31 @@ test("enemy tier-three curse-master selects native SN after two deterministic ro
 
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
-  await expect(dialogue).toHaveAttribute("data-source-wait", "21");
-  await expect(dialogue).toHaveAttribute("data-source-address", "DS:8642");
-  await expect(dialogue).toHaveAttribute("data-action-id", "spell-seal");
+  await expect(dialogue).toHaveAttribute("data-source-wait", "22");
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:8648");
+  await expect(dialogue).toHaveAttribute("data-action-id", "confusion");
   await expect(dialogue).toHaveAttribute("data-effect-center", "20,30");
-  await expect(page.getByText("禁咒.", { exact: true })).toBeVisible();
+  await expect(page.getByText("混亂.", { exact: true })).toBeVisible();
   await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-spell-seal-ai-notice.png`,
+    path: `${ARTIFACT_DIR}/arena-confusion-ai-notice.png`,
   });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
-    return current?.lastSpecialAction?.actionId === "spell-seal"
+    return current?.lastSpecialAction?.actionId === "confusion"
       && current.lastSpecialAction.actorId === "arena-2-0"
       && current.specialActionPresentation === undefined;
   });
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
-    actionId: "spell-seal",
+    actionId: "confusion",
     actorId: "arena-2-0",
     affectedUnits: [expect.objectContaining({
       unitId: "arena-1-0",
-      statusesAfter: expect.objectContaining({ techniqueSeal: 3 }),
+      statusesAfter: expect.objectContaining({ confusion: 3 }),
     })],
   });
-  expect(after?.units.find(({ id }) => id === "arena-1-0")?.statuses.techniqueSeal).toBe(3);
+  expect(after?.units.find(({ id }) => id === "arena-1-0")?.statuses.confusion).toBe(3);
   expect(pageErrors).toEqual([]);
 });
 

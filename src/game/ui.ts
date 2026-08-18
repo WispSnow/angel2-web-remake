@@ -211,6 +211,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               <span class="panel-kicker">${stage.name}</span>
               <h2>勝利條件</h2><p>${stage.objective.victoryText}</p>
               <h2>失敗條件</h2><p>${stage.objective.defeatText}</p>
+              <p data-testid="objective-round-limit"></p>
               ${controller.deploymentGuidance
                 ? `<h2>出擊提示</h2><p data-testid="objective-guidance">${controller.deploymentGuidance}</p>`
                 : ""}
@@ -254,6 +255,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const defaultStoryBackgroundSource = stageAssets?.storyBackground ?? ASSETS.storyBackground;
   storyBackground.style.backgroundImage = `url("${defaultStoryBackgroundSource}")`;
   const objectivePanel = required(root, "#objective-panel");
+  const objectiveRoundLimit = required(root, "[data-testid=objective-round-limit]");
+  const roundBox = required(root, "#bottom-round");
   const systemMenu = required(root, "#system-menu");
   const settingsMenu = required(root, "#settings-menu");
   const soundSettingsMenu = required(root, "#sound-settings-menu");
@@ -691,7 +694,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const render = () => {
     screen.dataset.phase = controller.phase;
     screen.dataset.actionMode = controller.actionMode;
-    round.textContent = `第 ${controller.battle.round} 回合`;
+    round.textContent = `第 ${controller.battle.displayRound} 回合`;
+    // REMAKE-110: 原版回合框只有三个字符的位置，所以倒数不写进框里，改为整框进入
+    // 警告态；具体剩余回合数由信息栏和胜负条件面板承担。
+    roundBox.dataset.roundLimitWarning = String(controller.battle.roundLimitWarningActive);
+    objectiveRoundLimit.textContent =
+      `或 ${controller.battle.roundLimit} 回合內未達成勝利條件（剩餘 ${controller.battle.roundsRemaining} 回合）`;
     const selectedUnitContext = renderSelectedUnitContext(controller);
     const selectedRoute = controller.selectedMagicArcherRoute;
     const routeTarget = controller.magicArcherRouteTarget;

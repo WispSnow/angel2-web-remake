@@ -130,17 +130,28 @@ export function stage3TerrainSlotAt(position: Position): number {
   return STAGE3_TOKEN_TO_TERRAIN_SLOT[token] ?? 0;
 }
 
+/**
+ * `REMAKE-109`：被救援的第四军团三名具名 NPC 以士兵 300 转职阈值入队，而不是
+ * `untouchedNamedExperience` 的 299。判据与军团归属同源——非零逐槽行为属于第四军团，
+ * 真实肖像记录说明这是具名角色——所以不在这里手抄槽 3／20／21。
+ */
+const STAGE3_FOURTH_CORPS_ENTRY_EXPERIENCE = 300;
+
 // 角色描述符按原版槽查表，槽号随后由 `REMAKE-108` 改写；换进来的 40–43 与被换走的
 // 51–54 同为 `FFh` 通用条目，所以查表顺序不影响姓名与肖像。
 export const STAGE3_SEMANTIC_ALLIED_UNITS = withSwappedGenericAllySlots(
   STAGE3_ALLIED_UNITS.map((unit) => {
     const actor = STAGE3_ALLIED_ACTORS.find(({ slot }) => slot === unit.slot);
     if (!actor) throw new Error(`Missing stage 3 allied actor ${unit.slot}`);
+    const named = actor.portraitRecord !== 255;
     return {
       ...unit,
       initialClassId: unit.nativeClassRecord === null ? undefined : semanticClassId(unit.nativeClassRecord),
-      name: actor.portraitRecord === 255 ? "士兵" : actor.normalizedName,
-      portrait: (actor.portraitRecord === 255 ? 47 : actor.portraitRecord) as PortraitRecord,
+      name: named ? actor.normalizedName : "士兵",
+      portrait: (named ? actor.portraitRecord : 47) as PortraitRecord,
+      ...(named && unit.aiBehavior !== 0
+        ? { untouchedExperience: STAGE3_FOURTH_CORPS_ENTRY_EXPERIENCE }
+        : {}),
     };
   }),
   STAGE3_GENERIC_ALLY_SLOT_SWAP,

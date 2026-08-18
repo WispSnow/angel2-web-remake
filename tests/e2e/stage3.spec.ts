@@ -44,14 +44,65 @@ interface Stage3State {
   }>;
 }
 
+interface Stage3PromotionState {
+  promotionUnitIds: string[];
+  promotionDialogueIndex?: number;
+  promotionTargets: Array<{ id: string }>;
+}
+
 const state = (page: Page) => page.evaluate(
   () => window.__ANGEL2__?.getState() as Stage3State,
+);
+
+const promotionState = (page: Page) => page.evaluate(
+  () => window.__ANGEL2__?.getState() as Stage3PromotionState,
 );
 
 const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
   (expected) => (window.__ANGEL2__?.getState() as Stage3State | undefined)?.phase === expected,
   phase,
 );
+
+/**
+ * REMAKE-109 starts 黛西／蕾奇蒂特／愛歐里雅 on the soldier promotion threshold, so
+ * the very first action of the stage stops to grant their next professions. Grants
+ * the queued choices in board order and reports whom it promoted.
+ */
+async function grantPendingPromotions(page: Page): Promise<string[]> {
+  const promoted: string[] = [];
+  for (;;) {
+    const current = await promotionState(page);
+    const unitId = current.promotionUnitIds[0];
+    if (unitId === undefined) return promoted;
+    if (current.promotionDialogueIndex !== undefined) {
+      // The first click finishes the typing reveal, the next turns the page.
+      await page.getByTestId("dialogue-layer").click();
+      continue;
+    }
+    const target = current.promotionTargets[0];
+    if (!target) throw new Error(`${unitId} reached the promotion prompt without candidates`);
+    await page.getByTestId(`promotion-target-${target.id}`).click();
+    promoted.push(unitId);
+  }
+}
+
+/** Waits for `phase`, granting every promotion the flow stops for on the way there. */
+async function waitForPhaseThroughPromotions(page: Page, phase: string): Promise<string[]> {
+  const promoted: string[] = [];
+  for (;;) {
+    const stop = await page.waitForFunction((expected) => {
+      const current = window.__ANGEL2__?.getState() as
+        (Stage3State & Stage3PromotionState) | undefined;
+      if (!current) return undefined;
+      // A pending grant always wins: the pause leaves `phase` untouched, so
+      // checking the phase first would walk past an open promotion modal.
+      if (current.promotionUnitIds.length > 0) return "promotion";
+      return current.phase === expected ? "phase" : undefined;
+    }, phase).then((handle) => handle.jsonValue());
+    if (stop === "phase") return promoted;
+    promoted.push(...await grantPendingPromotions(page));
+  }
+}
 
 async function clickUnit(page: Page, id: string): Promise<void> {
   const current = await state(page);
@@ -179,15 +230,11 @@ test("S03-D/E/H/I: Meidi's defeat plays SAY/13 once and enters stage 4", async (
   if (!commander) throw new Error("missing stage-3 victory commander");
   await clickUnit(page, commander.id);
   await page.getByTestId("unit-command-attack").click();
-  // The finishing blow can push Himi over a promotion threshold, and the modal
-  // only appears after the battle presentation finishes. Polling isVisible()
-  // right after the click raced the animation and left the modal waiting.
-  const promotion = page.getByTestId("promotion-layer");
-  await expect(async () => {
-    expect(await promotion.isVisible() || (await state(page)).phase === "victoryStory").toBe(true);
-  }).toPass();
-  if (await promotion.isVisible()) await page.getByTestId("promotion-target-cavalry").click();
-  await waitForPhase(page, "victoryStory");
+  // The finishing blow can push Himi over a promotion threshold, and REMAKE-109
+  // parks the fourth corps on one from the start. Both modals only appear after
+  // the battle presentation finishes, so wait on state rather than visibility —
+  // polling isVisible() right after the click raced the animation.
+  await waitForPhaseThroughPromotions(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "13");
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("由於希蜜等人的幫助");
   await captureVisualAudit(page.getByTestId("game-screen"), {
@@ -275,7 +322,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
     path: `${ARTIFACT_DIR}/stage3-player-group-handoff.png`,
   });
 
-  await waitForPhase(page, "enemy");
+  await waitForPhaseThroughPromotions(page, "enemy");
   // E/14 is also the full-combat charge cue, so walk cues are identified by the
   // "movement" reason that routes them to the 移動 category, not by record alone.
   const walkCuesBeforeEnemyPhase = (await state(page)).audioCueLog
@@ -296,7 +343,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
     statusMessage.includes("友軍 NPC 軍團") && statusMessage.includes("獨立行動"));
   expect(playerHandoffIndex).toBeGreaterThanOrEqual(0);
   expect(independentNpcIndex).toBeGreaterThan(playerHandoffIndex);
-  await waitForPhase(page, "player");
+  await waitForPhaseThroughPromotions(page, "player");
   const afterEnemyPhase = await state(page);
   expect(afterEnemyPhase.round).toBe(2);
   // The allied automatic phase that just ran proves walk cues are reachable
@@ -327,7 +374,9 @@ test("S03-C/L: hard-mode automatic allies finish their first phase inside the de
   await page.keyboard.press("Tab");
   await page.getByTestId("group-command-allRest").click();
   await page.getByTestId("dialogue-layer").click();
-  await waitForPhase(page, "enemy");
+  // 全部休息先结算六名玩家角色，随后就停在第四军团的三次转职上。
+  expect(await waitForPhaseThroughPromotions(page, "enemy"))
+    .toEqual(["1:21", "1:3", "1:20"]);
 
   const current = await state(page);
   const automaticIds = new Set(["1:21", "1:46", "1:45", "1:47", "1:3", "1:20", "1:50"]);
@@ -340,6 +389,41 @@ test("S03-C/L: hard-mode automatic allies finish their first phase inside the de
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage3-defensive-allies-hard.png`,
   });
+});
+
+test("S03-P: the three rescued fourth-corps NPCs are promotable from the opening action", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const opening = await state(page);
+  const npcIds = ["1:21", "1:3", "1:20"];
+  for (const id of npcIds) {
+    expect(opening.units.find((unit) => unit.id === id)?.classId, `${id} enters as a soldier`)
+      .toBe("soldier");
+  }
+
+  // REMAKE-109: 一开场就够转职。玩家的第一个动作（这里是希蜜休息）立刻停在授职流程上，
+  // 不需要先给这三名 NPC 打满最后 1 点经验。
+  await clickUnit(page, "1:1");
+  await page.getByTestId("unit-command-rest").click();
+  await expect(page.getByTestId("dialogue-layer"))
+    .toHaveAttribute("data-source-record", "promotion");
+  await expect(page.getByTestId("dialogue-window-lower")).toContainText("愛歐里雅");
+  // 自动友军同样走「队友请求 → 主将授职」分支，妮雅缺席时由希蜜授职。
+  await page.evaluate(() => window.__ANGEL2__?.advanceDialogue());
+  await expect(page.locator("#dialogue-speaker-upper")).toHaveText("希蜜");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage3-fourth-corps-opening-promotion.png`,
+  });
+
+  // 转职队列按棋盘顺序排，三名 NPC 全部授职后战场才恢复。
+  expect(await waitForPhaseThroughPromotions(page, "player")).toEqual(npcIds);
+  const promoted = await state(page);
+  for (const id of npcIds) {
+    expect(promoted.units.find((unit) => unit.id === id)?.classId, `${id} took its new profession`)
+      .toBe("cavalry");
+  }
+  // 希蜜与拉朵那仍停在原版 299 基线，本特例只针对被救援的第四军团。
+  expect(promoted.units.find((unit) => unit.id === "1:4")?.classId).toBe("soldier");
 });
 
 test("stage 3 promotions use Himi as the on-field grantor while Nia is absent", async ({ page }) => {

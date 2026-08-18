@@ -23,6 +23,8 @@ import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
 import {
   classDefinition,
   className,
+  isPromotionEligible,
+  promotionExperienceThresholdFor,
   promotionTargetsFor,
   unitDisplayName,
   type PromotionTarget,
@@ -884,6 +886,16 @@ export class GameController {
 
   get isCampaignPersistenceEnabled(): boolean {
     return this.campaignPersistenceEnabled;
+  }
+
+  /**
+   * `REMAKE-110` 的倒数提示，接在回合开始信息之后。不在警告区间时是空串，因此普通
+   * 回合的信息栏与原来逐字一致。
+   */
+  get roundLimitNotice(): string {
+    return this.battle.roundLimitWarningActive
+      ? `剩餘 ${this.battle.roundsRemaining} 回合，逾時判負。`
+      : "";
   }
 
   get hasBlockingOverlay(): boolean {
@@ -3268,6 +3280,13 @@ export class GameController {
     }
     await this.presentTurnTransition("player");
     this.battle.startNextRound();
+    // REMAKE-110: 越过回合上限就没有下一个玩家阶段。判负必须发生在逐关回合事件和
+    // 焦点重置之前，否则会先跑一遍第 100 回合的事件、并让 HUD 画出一个不存在的回合。
+    if (this.resolveOutcome()) {
+      this.busy = false;
+      this.emit();
+      return;
+    }
     const commander = this.battle.groupCommander ?? this.battle.unit("1:0");
     if (commander) {
       this.battle.focusId = commander.id;
@@ -3283,7 +3302,7 @@ export class GameController {
       this.statusMessage = `第 ${this.battle.round} 回合事件`;
     } else {
       this.phase = "player";
-      this.statusMessage = `第 ${this.battle.round} 回合開始。`;
+      this.statusMessage = `第 ${this.battle.round} 回合開始。${this.roundLimitNotice}`;
     }
     this.busy = false;
     this.emit();
@@ -5074,7 +5093,15 @@ export class GameController {
     );
     for (const unit of this.battle.units.filter(
       ({ side, id }) => side === 1 && id !== candidate.id,
-    )) unit.acted = true;
+    )) {
+      unit.acted = true;
+      // 夹具只演示一名候选。`REMAKE-109` 让第四军团的三名具名 NPC 一开场就够转职，
+      // 而转职队列按棋盘顺序排，所以先把其余候选压回阈值下一点，否则先弹的是她们。
+      if (isPromotionEligible(unit)) {
+        unit.experience = promotionExperienceThresholdFor(unit.classId) - 1;
+        unit.life = Math.min(unit.life, this.battle.statsFor(unit).maxLife);
+      }
+    }
     this.battle.focusId = candidate.id;
     this.phase = "player";
     this.centerCamera(candidate);
@@ -5329,6 +5356,36 @@ export class GameController {
       ? `調試場景：${actor.className}可對追擊型敵兵驗證一次敵方階段冰封。`
       : `自動驗收：${actor.className}職業行動場景。`;
     this.busy = false;
+    this.emit();
+  }
+
+  /**
+   * `REMAKE-110` 的回合上限夹具。把战斗放到最后一个合法回合，棋盘上只留一名够不到
+   * 主将的敌人：结束本回合必定走到回合边界的逾时判负，而不会被目标胜负抢先。
+   * 落点沿用 `forceRestSetupForTest` 已验证的第 0 关可通行格。
+   */
+  forceRoundLimitSetupForTest(): void {
+    if (!this.debugMode || this.battle.stage.id !== "stage-00") return;
+    const ally = this.battle.unit("1:0");
+    const enemy = this.battle.units.find((unit) => unit.side === 2);
+    if (!ally || !enemy) return;
+    ally.x = 29;
+    ally.y = 26;
+    ally.life = this.battle.statsFor(ally).maxLife;
+    ally.acted = false;
+    ally.actionDisabled = false;
+    enemy.x = 34;
+    enemy.y = 26;
+    enemy.acted = false;
+    enemy.actionDisabled = false;
+    this.battle.units = [ally, enemy];
+    this.battle.round = this.battle.roundLimit;
+    this.battle.focusId = ally.id;
+    this.phase = "player";
+    this.centerCamera(ally);
+    this.cursor = { x: ally.x, y: ally.y };
+    this.resetAction();
+    this.statusMessage = `自動驗收：第 ${this.battle.round} 回合，結束本回合即逾時判負。`;
     this.emit();
   }
 
@@ -5652,7 +5709,11 @@ export class GameController {
       this.objectiveOpen = false;
       this.movementPresentation = undefined;
       this.phase = "defeat";
-      this.statusMessage = this.battle.stage.objective.defeatText;
+      // REMAKE-110: 逾时是一条与关卡目标无关的失败原因，信息栏必须说清楚，
+      // 否则玩家只会看到一条与棋盘对不上的关卡失败条件。
+      this.statusMessage = this.battle.roundLimitExceeded
+        ? `未能在 ${this.battle.roundLimit} 回合內達成目標`
+        : this.battle.stage.objective.defeatText;
       this.resetAction();
       return true;
     }
@@ -5941,6 +6002,7 @@ export interface Angel2DebugApi {
   forceEnemySisterSetup: () => void;
   forceEnemyAlertBoundarySetup: () => void;
   forceRestSetup: () => void;
+  forceRoundLimitSetup: () => void;
   forceClassActionSetup: (
     classId: "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
     ordinaryCombat?: boolean,
@@ -5973,6 +6035,7 @@ export function exposeDebugApi(controller: GameController): void {
     forceEnemySisterSetup: () => controller.forceEnemySisterSetupForTest(),
     forceEnemyAlertBoundarySetup: () => controller.forceEnemyAlertBoundarySetupForTest(),
     forceRestSetup: () => controller.forceRestSetupForTest(),
+    forceRoundLimitSetup: () => controller.forceRoundLimitSetupForTest(),
     forceClassActionSetup: (classId, ordinaryCombat) =>
       controller.forceClassActionSetupForTest(classId, ordinaryCombat),
     clearSaves: () => {

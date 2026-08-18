@@ -355,6 +355,57 @@ function migrateVersion71Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-110 caps every stage at 99 full rounds. The cap is derived from the
+ * round counter alone, so no field is added and none changes meaning — a v86
+ * save resumes with the same units, statuses and PRNG cursor, and simply has a
+ * finite number of rounds left.
+ *
+ * The one case that cannot carry over is a v86 battle saved past round 99.
+ * `isSaveData` now bounds the round to the cap, so those return `undefined`
+ * rather than being rewritten: clamping the counter to 99 would drop the player
+ * one round short of a defeat their run never actually earned, and there is no
+ * honest smaller number to pick either. Re-entering the stage from its
+ * prebattle route rebuilds it at round 1. Reaching round 100 at all took
+ * deliberate stalling, so this rejects nothing a normal run can produce.
+ */
+function migrateVersion86Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 86
+    || value.contentVersion !== "stage-3-fourth-corps-promotion-ready-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * REMAKE-109 raises the untouched entry experience of stage 3's three named
+ * fourth-corps NPCs from 299 to the soldier promotion threshold of 300. That is
+ * an *entry* baseline: it is read while the stage builds its board, so a v85
+ * save already holding a stage-3 battle keeps the 299 it was created with.
+ *
+ * Nothing is rewritten here on purpose. Bumping those three mid-battle would
+ * hand the player a promotion they never earned in that run, and every other
+ * path — a completed stage-2 save routing into stage 3, or a failed retry
+ * rebuilding from the entry snapshot — constructs the board fresh and picks up
+ * 300 on its own. No field is added and none changes meaning, so completed
+ * saves and battles in every stage carry over unchanged.
+ */
+function migrateVersion85Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 85
+    || value.contentVersion !== "stage-2-3-generic-ally-swap-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-108 swaps which campaign slots garrison stages 2 and 3: the grown
  * slots 40–43 move to Himi's stage-3 rescue party and the fresh slots 51–54
  * take their stage-2 places. Every other stage, the campaign roster and the
@@ -2449,6 +2500,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(value: unknown): SaveData | undefined {
+  const migratedVersion86 = migrateVersion86Save(value);
+  if (migratedVersion86) return migratedVersion86;
+  const migratedVersion85 = migrateVersion85Save(value);
+  if (migratedVersion85) return migratedVersion85;
   const migratedVersion84 = migrateVersion84Save(value);
   if (migratedVersion84) return migratedVersion84;
   const migratedVersion83 = migrateVersion83Save(value);

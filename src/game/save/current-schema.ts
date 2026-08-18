@@ -5,6 +5,7 @@ import {
   statsFor,
 } from "../content/stage0";
 import { isPortraitRecord } from "../content/portrait-catalog.generated";
+import { STAGE_ROUND_LIMIT } from "../simulation/objectives";
 import { UNIT_STATUS_KEYS } from "../simulation/status";
 import {
   isPlayableStageId,
@@ -29,12 +30,14 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 85 as const;
-export const SAVE_CONTENT_VERSION = "stage-2-3-generic-ally-swap-1" as const;
+export const SAVE_VERSION = 87 as const;
+export const SAVE_CONTENT_VERSION = "stage-round-limit-99-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
-export const MAX_ROUND = 9_999;
+// REMAKE-110: 战中档只能在玩家阶段写出，而越过上限就没有下一个玩家阶段，所以
+// 合法的存档回合号正好是 1..99。这里直接引用规则常量，避免 schema 与规则各说各话。
+export const MAX_ROUND = STAGE_ROUND_LIMIT;
 export const MAX_EXPERIENCE = 0x7fff_ffff;
 export const MAX_LIFE = 0x7fff_ffff;
 export const MAX_RECORD_COUNTER = 0x7fff_ffff;

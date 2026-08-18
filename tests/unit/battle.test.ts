@@ -3,6 +3,10 @@ import { killRewardFor, terrainDefensePercentFor } from "../../src/game/content/
 import { STAGE0 } from "../../src/game/content/stage0";
 import { Stage0Battle } from "../../src/game/simulation/battle";
 import { manhattan, movementCost, positionKey, reachableCells, zoneOfControl } from "../../src/game/simulation/grid";
+import {
+  STAGE_ROUND_LIMIT,
+  STAGE_ROUND_LIMIT_WARNING_ROUNDS,
+} from "../../src/game/simulation/objectives";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import type { Position } from "../../src/game/types";
 
@@ -691,6 +695,52 @@ describe("stage 0 battle simulation", () => {
     const victory = battleAtPlayableOpening();
     victory.units = victory.units.filter((unit) => unit.side === 1);
     expect(victory.outcome()).toBe("victory");
+  });
+
+  /**
+   * REMAKE-110. The stage runs for at most `STAGE_ROUND_LIMIT` full rounds; the
+   * counter only crosses the cap at a round boundary, so nothing is stored.
+   */
+  it("loses the stage once the round counter passes the cap", () => {
+    const battle = battleAtPlayableOpening();
+    expect(battle.roundLimit).toBe(STAGE_ROUND_LIMIT);
+
+    battle.round = STAGE_ROUND_LIMIT;
+    expect(battle.roundsRemaining).toBe(1);
+    expect(battle.roundLimitExceeded).toBe(false);
+    expect(battle.outcome()).toBe("ongoing");
+
+    battle.startNextRound();
+    expect(battle.round).toBe(STAGE_ROUND_LIMIT + 1);
+    expect(battle.roundsRemaining).toBe(0);
+    expect(battle.roundLimitExceeded).toBe(true);
+    expect(battle.outcome()).toBe("defeat");
+    // 越过上限的那一档只是判负标记；玩家看到的回合号停在最后一个真的打过的回合。
+    expect(battle.displayRound).toBe(STAGE_ROUND_LIMIT);
+  });
+
+  it("keeps a victory won on the final round", () => {
+    // 上限只在越过回合边界时判负，所以第 99 回合内打完敌人照常胜利。
+    const battle = battleAtPlayableOpening();
+    battle.round = STAGE_ROUND_LIMIT;
+    battle.units = battle.units.filter((unit) => unit.side === 1);
+    expect(battle.outcome()).toBe("victory");
+  });
+
+  it("marks the warning window only inside the final rounds of the cap", () => {
+    const battle = battleAtPlayableOpening();
+    expect(battle.roundLimitWarningActive).toBe(false);
+
+    battle.round = STAGE_ROUND_LIMIT - STAGE_ROUND_LIMIT_WARNING_ROUNDS;
+    expect(battle.roundLimitWarningActive).toBe(false);
+
+    battle.round = STAGE_ROUND_LIMIT - STAGE_ROUND_LIMIT_WARNING_ROUNDS + 1;
+    expect(battle.roundsRemaining).toBe(STAGE_ROUND_LIMIT_WARNING_ROUNDS);
+    expect(battle.roundLimitWarningActive).toBe(true);
+
+    // 越过上限后战斗已经结束，不再报「还剩几回合」。
+    battle.round = STAGE_ROUND_LIMIT + 1;
+    expect(battle.roundLimitWarningActive).toBe(false);
   });
 
   it("saturates life at zero and removes a killed unit before counterattack", () => {

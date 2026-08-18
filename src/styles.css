@@ -302,6 +302,9 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .bottom-round { position: absolute; z-index: 7; left: 480px; top: 322px; width: 160px; height: 28px; color: #fff; text-align: center; font-size: 16px; pointer-events: none; }
 .bottom-round img { position: absolute; inset: 0; display: block; width: 160px; height: 28px; image-rendering: pixelated; }
 .bottom-round span { position: absolute; left: 16px; top: 5px; width: 128px; height: 20px; line-height: 20px; text-shadow: 1px 1px #000; }
+/* REMAKE-110: 回合框只有三个字符的原版位置，倒数放不进去，所以警告只改字色。
+   不做闪烁——那需要额外的减少动态分支，而且这里要的是持续可读，不是吸引注意。 */
+.bottom-round[data-round-limit-warning="true"] span { color: #ffb7a8; }
 
 .animated-portrait { position: relative; display: block; overflow: hidden; image-rendering: pixelated; }
 .animated-portrait > img { position: absolute; display: block; image-rendering: pixelated; pointer-events: none; }

@@ -3590,6 +3590,9 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-00-near-victory": withSetup(createStage0Player, (controller) => {
     controller.forceVictorySetupForTest();
   }),
+  "stage-00-round-limit": withSetup(createStage0Player, (controller) => {
+    controller.forceRoundLimitSetupForTest();
+  }),
   "stage-00-cleared": createStage1Prebattle,
   "stage-01-prebattle": createStage1Prebattle,
   "stage-01-deployment": createStage1Deployment,

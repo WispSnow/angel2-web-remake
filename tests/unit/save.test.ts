@@ -14,6 +14,7 @@ import {
   saveSlotPageStart,
   saveSlotKey,
 } from "../../src/game/save";
+import { STAGE_ROUND_LIMIT } from "../../src/game/simulation/objectives";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
 import { classFallbackPortraitFor, className, classStatsFor } from "../../src/game/content/classes";
 import {
@@ -4972,6 +4973,68 @@ describe("Web save validation", () => {
     const wrongOpening = stage2BattleSave();
     wrongOpening.consumedEventIds = [];
     expect(isSaveData(wrongOpening)).toBe(false);
+  });
+
+  it("bounds a saved round by the stage cap and refuses version-86 battles past it", () => {
+    // REMAKE-110: 战中档只能在玩家阶段写出，越过上限就没有下一个玩家阶段，
+    // 所以合法回合号正好是 1..99。
+    const atCap = battleSave();
+    atCap.battle.round = STAGE_ROUND_LIMIT;
+    expect(isSaveData(atCap)).toBe(true);
+
+    const pastCap = battleSave();
+    pastCap.battle.round = STAGE_ROUND_LIMIT + 1;
+    expect(isSaveData(pastCap)).toBe(false);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 86,
+      contentVersion: "stage-3-fourth-corps-promotion-ready-1",
+    }))).toEqual(completed);
+
+    const legacyAtCap = { ...battleSave(), battle: { ...battleSave().battle, round: STAGE_ROUND_LIMIT } };
+    expect(parseSaveData(JSON.stringify({
+      ...legacyAtCap,
+      version: 86,
+      contentVersion: "stage-3-fourth-corps-promotion-ready-1",
+    }))).toEqual(legacyAtCap);
+
+    // 停在上限之后的 v86 战中档明确拒绝：把回合号钳回 99 会让玩家在一个它从未打出的
+    // 判负前一回合复活，没有诚实的改写方式。
+    const legacyPastCap = { ...battleSave(), battle: { ...battleSave().battle, round: STAGE_ROUND_LIMIT + 5 } };
+    expect(parseSaveData(JSON.stringify({
+      ...legacyPastCap,
+      version: 86,
+      contentVersion: "stage-3-fourth-corps-promotion-ready-1",
+    }))).toBeUndefined();
+  });
+
+  it("carries version-85 saves forward and leaves a stage-3 board on the experience it holds", () => {
+    // REMAKE-109 raises an *entry* baseline, read while the stage builds its board.
+    // A v85 stage-3 battle was built at 299, so it resumes at 299 instead of being
+    // handed a promotion that run never earned; fresh entries pick 300 up on their own.
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 85,
+      contentVersion: "stage-2-3-generic-ally-swap-1",
+    }))).toEqual(completed);
+
+    const legacyStage3 = stage3BattleSave();
+    // 蕾奇蒂特与愛歐里雅在 v85 是士兵 299，也就是第 3 成长行的 180 生命上限。
+    const rollBack = <T extends { slot: number; experience: number; life: number }>(entry: T): T =>
+      entry.slot === 20 || entry.slot === 21 ? { ...entry, experience: 299, life: 180 } : entry;
+    legacyStage3.roster = legacyStage3.roster.map(rollBack);
+    legacyStage3.stageEntrySnapshot.roster = legacyStage3.stageEntrySnapshot.roster.map(rollBack);
+    legacyStage3.battle.units = legacyStage3.battle.units
+      .map((unit) => unit.side === 1 ? rollBack(unit) : unit);
+
+    expect(parseSaveData(JSON.stringify({
+      ...legacyStage3,
+      version: 85,
+      contentVersion: "stage-2-3-generic-ally-swap-1",
+    }))).toEqual(legacyStage3);
   });
 
   it("carries version-84 saves forward but refuses stage-2/3 battles whose slots moved", () => {

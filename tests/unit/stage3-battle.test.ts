@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isPromotionEligible } from "../../src/game/content/classes";
 import { stage3TerrainSlotAt } from "../../src/game/content/stage3";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
@@ -16,6 +17,12 @@ const campaign: CampaignState = {
   ]),
   rngState: 0x12345678,
   rngCalls: 7,
+};
+
+/** Nobody has been written by an earlier stage, so every slot falls back to its entry baseline. */
+const untouchedCampaign: CampaignState = {
+  ...campaign,
+  roster: completeCampaignRoster([]),
 };
 
 /** Slot 21 is 愛歐里雅, the behavior-4 follower the player may promote to 弓兵. */
@@ -39,6 +46,43 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     expect(battle.unit("1:4")).toMatchObject({ classId: "archer", name: "拉朵那", x: 18, y: 36 });
     expect(battle.unit("2:17")).toMatchObject({ classId: "monk", name: "梅蒂", x: 18, y: 15 });
     expect(battle.focusId).toBe("1:1");
+  });
+
+  /**
+   * REMAKE-109. The three rescued fourth-corps characters join here, so an
+   * untouched campaign gives them the stage's entry baseline — 300 instead of
+   * the 299 every other named class-0 actor keeps.
+   */
+  it("enters the three named fourth-corps NPCs on the soldier promotion threshold", () => {
+    const battle = new Stage3Battle(untouchedCampaign);
+    for (const id of ["1:3", "1:20", "1:21"]) {
+      const unit = battle.unit(id)!;
+      // 300 是士兵第 4 成长行，属性因此比 299 高一行，入场生命按新上限补满。
+      expect(unit, `${id} enters ready to promote`)
+        .toMatchObject({ classId: "soldier", experience: 300, life: 190 });
+      expect(isPromotionEligible(unit)).toBe(true);
+    }
+    // 转职队列按棋盘顺序排：愛歐里雅 (30,15)、黛西 (28,18)、蕾奇蒂特 (31,18)。
+    expect(battle.promotionQueue()).toEqual(["1:21", "1:3", "1:20"]);
+
+    // 希蜜救援队的具名角色与无肖像通用友军都不在特例内。
+    for (const id of ["1:1", "1:4"]) {
+      expect(battle.unit(id), `${id} keeps the native named baseline`)
+        .toMatchObject({ classId: "soldier", experience: 299 });
+    }
+    for (const id of ["1:40", "1:45"]) {
+      expect(battle.unit(id), `${id} keeps the generic baseline`)
+        .toMatchObject({ classId: "soldier", experience: 0 });
+    }
+  });
+
+  it("keeps a campaign-written fourth-corps slot on its inherited growth", () => {
+    // 入队基线只对未被战役写过的槽成立：槽 21 名冊里是士兵 330，必须原样继承，
+    // 不得被改写成 300；同关未写过的槽 20 仍取新基线。
+    const battle = new Stage3Battle(campaign);
+    expect(battle.unit("1:21")).toMatchObject({ classId: "soldier", experience: 330 });
+    expect(battle.unit("1:3")).toMatchObject({ classId: "warrior", experience: 480 });
+    expect(battle.unit("1:20")).toMatchObject({ classId: "soldier", experience: 300 });
   });
 
   it("exposes behavior-zero allies to the player and schedules automatic allies in map order", () => {
