@@ -31,6 +31,8 @@ ref/*
 !public/assets/original/full-combat/**/*.png
 !public/assets/original/map-actions/
 !public/assets/original/map-actions/**/*.png
+!public/assets/original/map-action-atlases/
+!public/assets/original/map-action-atlases/*.png
 !public/assets/original/status-icons/
 !public/assets/original/status-icons/*.png
 !public/assets/original/stage4-force-field-pulse/

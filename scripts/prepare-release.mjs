@@ -15,6 +15,15 @@ const developmentOnlyFiles = new Set([
   "deployment-lab.html",
   "technique-lab.html",
 ]);
+const mapActionAtlasIds = [
+  "shoot",
+  "fire-1", "fire-2", "fire-3", "fire-4",
+  "heal-1", "heal-2", "heal-3",
+  "lightning-1", "lightning-2", "lightning-3", "lightning-4",
+  "ice-1", "recovery-1", "attack-up", "defense-up",
+  "poison", "confusion", "attack-down", "defense-down", "spell-seal", "dispel",
+  "stomp-1", "stomp-2", "stomp-3", "wd",
+];
 
 async function pathExists(target) {
   try {
@@ -60,6 +69,21 @@ await rm(path.join(releaseDirectory, "assets", "original", "technique-lab", "aud
   recursive: true,
   force: true,
 });
+for (const actionId of mapActionAtlasIds) {
+  await rm(path.join(releaseDirectory, "assets", "original", "map-actions", actionId), {
+    recursive: true,
+    force: true,
+  });
+}
+
+const atlasDirectory = path.join(releaseDirectory, "assets", "original", "map-action-atlases");
+for (const actionId of mapActionAtlasIds) {
+  for (const extension of ["png", "json"]) {
+    if (!(await pathExists(path.join(atlasDirectory, `${actionId}.${extension}`)))) {
+      throw new Error(`release build is missing map action atlas ${actionId}.${extension}`);
+    }
+  }
+}
 
 const files = await collectFiles(releaseDirectory);
 const musicManifestPath = path.join(releaseDirectory, "assets/original/music/music-manifest.json");

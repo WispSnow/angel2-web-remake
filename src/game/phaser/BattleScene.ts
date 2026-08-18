@@ -12,11 +12,16 @@ import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-techniq
 import { TURN_TRANSITION_DUST } from "../turn-transition-presentation";
 import { buildStompPresentationSteps } from "../stomp-presentation";
 import {
-  preloadMapTechniqueAssets,
   renderLightningFrame,
   type MapTechniqueGraphicAssets,
 } from "./MapTechniqueRenderer";
 import { renderPrayerPresentation } from "./PrayerRenderer";
+import {
+  addMapActionImage,
+  mapActionAtlasIdForAction,
+  mapActionDebugTextureKey,
+  preloadMapActionAtlases,
+} from "./map-action-atlas";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
@@ -53,6 +58,22 @@ const NATIVE_POINTER_FRAME: Readonly<Record<NativePointerCursor, number>> = {
   left: 3,
   right: 4,
 };
+
+const MAP_ACTION_SOURCE_PREFIX = "/assets/original/map-actions/";
+
+function collectMapActionSources(value: unknown, output: string[]): void {
+  if (typeof value === "string") {
+    if (value.startsWith(MAP_ACTION_SOURCE_PREFIX)) output.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectMapActionSources(entry, output));
+    return;
+  }
+  if (value && typeof value === "object") {
+    Object.values(value).forEach((entry) => collectMapActionSources(entry, output));
+  }
+}
 
 interface DeathDescriptor {
   xOffset: number;
@@ -240,85 +261,20 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.load.image("turn-transition-shadow", ASSETS.turnTransition.shadow);
       ASSETS.turnTransition.dust.forEach((source, frame) =>
         this.load.image(`turn-transition-dust-${frame}`, source));
-      STAGE0_ACTION_PRESENTATION_ASSETS.shoot.hit.forEach((source, frame) =>
-        this.load.image(`map-shoot-${frame}`, source));
-      STAGE0_ACTION_PRESENTATION_ASSETS.fire1.effect.forEach((source, frame) =>
-        this.load.image(`map-fire-1-${frame}`, source));
-      STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary.forEach((source, frame) =>
-        this.load.image(`map-heal-1-primary-${frame}`, source));
-      STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.forEach((source, frame) =>
-        this.load.image(`map-heal-1-tail-${frame}`, source));
+      const mapActionSources: string[] = [];
+      collectMapActionSources(STAGE0_ACTION_PRESENTATION_ASSETS, mapActionSources);
       if (presentationAssets) {
-        if (presentationActionIds.has("fire-2")) presentationAssets.fire2.effect.forEach((source, frame) =>
-          this.load.image(`map-fire-2-${frame}`, source));
-        if (presentationActionIds.has("fire-3")) presentationAssets.fire3.effect.forEach((source, frame) =>
-          this.load.image(`map-fire-3-${frame}`, source));
-        if (presentationActionIds.has("fire-4")) {
-          presentationAssets.fire4.ground.forEach((source, frame) =>
-            this.load.image(`map-fire-4-ground-${frame}`, source));
-          presentationAssets.fire4.column.forEach((source, frame) =>
-            this.load.image(`map-fire-4-column-${frame}`, source));
-          presentationAssets.fire4.finish.forEach((source, frame) =>
-            this.load.image(`map-fire-4-finish-${frame}`, source));
-        }
-        if (presentationActionIds.has("heal-2")) presentationAssets.heal2.primary.forEach((source, frame) =>
-          this.load.image(`map-heal-2-primary-${frame}`, source));
-        if (presentationActionIds.has("heal-3")) {
-          presentationAssets.heal3.outer.forEach((source, frame) =>
-            this.load.image(`map-heal-3-outer-${frame}`, source));
-          presentationAssets.heal3.loop.forEach((source, frame) =>
-            this.load.image(`map-heal-3-loop-${frame}`, source));
-        }
-        if (lightningAssets) preloadMapTechniqueAssets(this, lightningAssets);
-        if (hasIcePresentation) presentationAssets.ice1.expansion.forEach((source, frame) =>
-          this.load.image(`map-ice-1-expansion-${frame}`, source));
-        if (presentationActionIds.has("recovery-1")
-          || presentationActionIds.has("recovery-2")
-          || presentationActionIds.has("recovery-3")) presentationAssets.recovery1.effect.forEach((source, frame) =>
-          this.load.image(`map-recovery-1-${frame}`, source));
-        if (presentationActionIds.has("attack-up")) presentationAssets.attackUp.effect.forEach((source, frame) =>
-          this.load.image(`map-attack-up-${frame}`, source));
-        if (presentationActionIds.has("defense-up")) presentationAssets.defenseUp.effect.forEach((source, frame) =>
-          this.load.image(`map-defense-up-${frame}`, source));
-        if (presentationActionIds.has("magic-guard")) presentationAssets.magicGuard.effect.forEach((source, frame) =>
-          this.load.image(`map-magic-guard-${frame}`, source));
-        if (presentationActionIds.has("poison")) {
-          presentationAssets.poison.rise.forEach((source, frame) =>
-            this.load.image(`map-poison-rise-${frame}`, source));
-          presentationAssets.poison.cloud.forEach((source, frame) =>
-            this.load.image(`map-poison-cloud-${frame}`, source));
-        }
-        if (presentationActionIds.has("confusion")) presentationAssets.confusion.effect
-          .forEach((source, frame) => this.load.image(`map-confusion-${frame}`, source));
-        if (presentationActionIds.has("attack-down")) presentationAssets.attackDown.effect
-          .forEach((source, frame) => this.load.image(`map-attack-down-${frame}`, source));
-        if (presentationActionIds.has("defense-down")) presentationAssets.defenseDown.effect
-          .forEach((source, frame) => this.load.image(`map-defense-down-${frame}`, source));
-        if (presentationActionIds.has("spell-seal")) presentationAssets.spellSeal.effect
-          .forEach((source, frame) => this.load.image(`map-spell-seal-${frame}`, source));
-        if (presentationActionIds.has("dispel")) presentationAssets.dispel.effect.forEach((source, frame) =>
-          this.load.image(`map-dispel-${frame}`, source));
-        if (presentationActionIds.has("stomp-1")) {
-          presentationAssets.stomp1.side1.forEach((source, frame) =>
-            this.load.image(`map-stomp-1-side1-${frame}`, source));
-          presentationAssets.stomp1.side2.forEach((source, frame) =>
-            this.load.image(`map-stomp-1-side2-${frame}`, source));
-        }
-        if (presentationActionIds.has("stomp-2")) {
-          presentationAssets.stomp2.side1.forEach((source, frame) =>
-            this.load.image(`map-stomp-2-side1-${frame}`, source));
-          presentationAssets.stomp2.side2.forEach((source, frame) =>
-            this.load.image(`map-stomp-2-side2-${frame}`, source));
-        }
-        if (presentationActionIds.has("stomp-3")) {
-          presentationAssets.stomp3.side1.forEach((source, frame) =>
-            this.load.image(`map-stomp-3-side1-${frame}`, source));
-          presentationAssets.stomp3.side2.forEach((source, frame) =>
-            this.load.image(`map-stomp-3-side2-${frame}`, source));
-        }
-        if (presentationActionIds.has("wd")) presentationAssets.wd.effect.forEach((source, frame) =>
-          this.load.image(`map-wd-${frame}`, source));
+        const selectedDirectories = new Set(
+          [...presentationActionIds].map(mapActionAtlasIdForAction),
+        );
+        const extendedSources: string[] = [];
+        collectMapActionSources(presentationAssets, extendedSources);
+        mapActionSources.push(...extendedSources.filter((source) => {
+          const relative = source.slice(MAP_ACTION_SOURCE_PREFIX.length);
+          return selectedDirectories.has(relative.slice(0, relative.indexOf("/")));
+        }));
       }
+      preloadMapActionAtlases(this, mapActionSources);
       for (const presentation of stageAssets?.routePulsePresentations ?? []) {
         presentation.frames.forEach((source, frame) =>
           this.load.image(routePulseTextureKey(presentation.id, frame), source));
@@ -950,7 +906,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const container = this.add.container(this.unitWorldX(unit), unit.y * TILE_HEIGHT + 43).setDepth(5);
       const sprite = this.add.image(this.unitVisualOffset(unit), 0, this.textureFor(unit)).setOrigin(0.5, 1);
       const iceDisabledOverlay = hasIcePresentation
-        ? this.add.image(
+        ? addMapActionImage(this,
           this.unitWorldX(unit),
           unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
           "map-ice-1-expansion-5",
@@ -1192,7 +1148,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatTarget = prepared.selectedUnitId;
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
           canvas.dataset.mapCombatEffectTextureKeys = this.combatEffects.flatMap((effect) =>
-            effect instanceof Phaser.GameObjects.Image ? [effect.texture.key] : []).join(",");
+            effect instanceof Phaser.GameObjects.Image ? [mapActionDebugTextureKey(effect)] : []).join(",");
           canvas.dataset.enemyPhaseTailExecution = String(enemyPhaseTail.execution);
           canvas.dataset.enemyPhaseTailNativeTicks = String(enemyPhaseTail.nativeTicks);
           canvas.dataset.enemyPhaseTailOrigin = `${origin.x},${origin.y}`;
@@ -1276,7 +1232,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (rest) {
         if (rest.phase === "restEffect") {
           this.combatEffects.push(
-            this.add.image(
+            addMapActionImage(this,
               rest.unit.x * TILE_WIDTH + TILE_WIDTH / 2,
               rest.unit.y * TILE_HEIGHT + TILE_HEIGHT,
               `map-heal-1-tail-${rest.frame}`,
@@ -1332,7 +1288,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ? Math.min(7, Math.max(0, cells.length - index - 1))
               : special.frame;
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 cell.position.x * TILE_WIDTH + TILE_WIDTH / 2,
                 cell.position.y * TILE_HEIGHT + TILE_HEIGHT,
                 `map-shoot-${frame}`,
@@ -1350,7 +1306,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               ? Math.min(9, visible.length - visibleIndex - 1)
               : Math.min(9, special.frame);
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 cell.position.x * TILE_WIDTH + TILE_WIDTH / 2,
                 cell.position.y * TILE_HEIGHT + TILE_HEIGHT,
                 `map-wd-${frame}`,
@@ -1368,7 +1324,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
         if (texture) {
           this.combatEffects.push(
-            this.add.image(
+            addMapActionImage(this,
               center.x * TILE_WIDTH + TILE_WIDTH / 2,
               center.y * TILE_HEIGHT + TILE_HEIGHT,
               texture,
@@ -1403,7 +1359,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
                 : phase.resource === "MAGIC/28" ? "column" : "finish"}-${sourceFrame}`
               : `map-${fireId}-${sourceFrame}`;
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 (center.x + mapAnchorOffset.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (center.y + mapAnchorOffset.y + descriptor.yOffset + row) * TILE_HEIGHT,
                 texture,
@@ -1418,7 +1374,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 (center.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-heal-2-primary-${sourceFrame}`,
@@ -1439,7 +1395,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const row = Math.floor(index / descriptor.width);
             const assetPhase = phase.resource === "MAGIC/42" ? "outer" : "loop";
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 (center.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-heal-3-${assetPhase}-${sourceFrame}`,
@@ -1473,6 +1429,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               effectCells: special.result.effectCells,
               wavePositions: hitPositions,
               cleanupPositions: hitPositions,
+              assets: lightningAssets,
             });
             this.combatEffects.push(...rendered.images);
             mapAnchorOffset = rendered.anchorOffset;
@@ -1492,7 +1449,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           for (const { position, value } of special.result.effectCells) {
             if (sourceFrame === undefined || value !== iceRangeValue) continue;
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 position.x * TILE_WIDTH + TILE_WIDTH / 2,
                 position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
                 `map-ice-1-expansion-${sourceFrame}`,
@@ -1506,7 +1463,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           if (sourceFrame !== null && sourceFrame !== undefined) {
             for (const affected of special.result.affectedUnits.filter(({ blocked }) => !blocked)) {
               this.combatEffects.push(
-                this.add.image(
+                addMapActionImage(this,
                   affected.positionBefore.x * TILE_WIDTH + TILE_WIDTH / 2,
                   affected.positionBefore.y * TILE_HEIGHT + TILE_HEIGHT / 2,
                   `map-recovery-1-${sourceFrame}`,
@@ -1520,7 +1477,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           const runtimeTileCodes = phase.runtimeTileCodePairs[special.frame] ?? [];
           runtimeTileCodes.forEach((runtimeTileCode, row) => {
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 center.x * TILE_WIDTH,
                 (center.y + phase.descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-attack-up-${runtimeTileCode - 1}`,
@@ -1534,7 +1491,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 (center.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-defense-up-${sourceFrame}`,
@@ -1546,7 +1503,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           const runtimeTileCodes = phase.runtimeTileCodePairs[special.frame] ?? [];
           runtimeTileCodes.forEach((runtimeTileCode, row) => {
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 center.x * TILE_WIDTH,
                 (center.y + phase.descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-magic-guard-${runtimeTileCode - 1}`,
@@ -1560,7 +1517,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 (center.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-confusion-${sourceFrame}`,
@@ -1574,7 +1531,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 (center.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-attack-down-${sourceFrame}`,
@@ -1588,7 +1545,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 (center.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-defense-down-${sourceFrame}`,
@@ -1603,7 +1560,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 (center.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-spell-seal-${sourceFrame}`,
@@ -1619,7 +1576,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               const column = index % rise.descriptor.width;
               const row = Math.floor(index / rise.descriptor.width);
               this.combatEffects.push(
-                this.add.image(
+                addMapActionImage(this,
                   (center.x + rise.descriptor.xOffset + column) * TILE_WIDTH,
                   (center.y + rise.descriptor.yOffset + row) * TILE_HEIGHT,
                   `map-poison-rise-${runtimeTileCode - 1}`,
@@ -1635,7 +1592,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               const column = index % descriptor.width;
               const row = Math.floor(index / descriptor.width);
               this.combatEffects.push(
-                this.add.image(
+                addMapActionImage(this,
                   (center.x + descriptor.xOffset + column) * TILE_WIDTH,
                   (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
                   `map-poison-cloud-${sourceFrame}`,
@@ -1653,7 +1610,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           runtimeTileCodes.forEach((runtimeTileCode, row) => {
             if (runtimeTileCode === 0) return;
             this.combatEffects.push(
-              this.add.image(
+              addMapActionImage(this,
                 center.x * TILE_WIDTH,
                 (center.y + dispel.dynamicPresentation.descriptor.yOffset + row) * TILE_HEIGHT,
                 `map-dispel-${runtimeTileCode - 1}`,
@@ -1692,7 +1649,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
               sourceFrame: number,
             ): void => {
               this.combatEffects.push(
-                this.add.image(
+                addMapActionImage(this,
                   drawX,
                   targetGroundY + drawYCoordinate - targetImpactAnchor.y,
                   `map-${special.result.actionId}-${resourceSide}-${sourceFrame}`,
@@ -1724,7 +1681,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatTarget = target?.id ?? `${center.x},${center.y}`;
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
           canvas.dataset.mapCombatEffectTextureKeys = this.combatEffects.flatMap((effect) =>
-            effect instanceof Phaser.GameObjects.Image ? [effect.texture.key] : []).join(",");
+            effect instanceof Phaser.GameObjects.Image ? [mapActionDebugTextureKey(effect)] : []).join(",");
           if (special.phase === "prayerEffect") {
             const prayer = special.result.affectedUnits.find(
               ({ unitId }) => unitId === special.lifeChangeUnitId,

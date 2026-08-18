@@ -4,6 +4,7 @@ import type {
   LightningPresentationFrame,
 } from "../map-technique-presentation";
 import { lightningWaveDistance } from "../map-technique-presentation";
+import { addMapActionImageFromSource } from "./map-action-atlas";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
@@ -18,6 +19,8 @@ export interface LightningRenderContext {
   }[];
   readonly wavePositions: readonly { readonly x: number; readonly y: number }[];
   readonly cleanupPositions: readonly { readonly x: number; readonly y: number }[];
+  /** BattleScene supplies map-action source paths so release builds can use atlases. */
+  readonly assets?: MapTechniqueGraphicAssets;
 }
 
 export interface LightningRenderResult {
@@ -49,6 +52,17 @@ export function renderLightningFrame(
   context: LightningRenderContext,
 ): LightningRenderResult {
   const images: Phaser.GameObjects.Image[] = [];
+  const addFrame = (
+    x: number,
+    y: number,
+    resource: string,
+    sourceFrame: number,
+  ): Phaser.GameObjects.Image => {
+    const source = context.assets?.[resource]?.[sourceFrame];
+    const textureKey = mapTechniqueTextureKey(resource, sourceFrame);
+    if (source) return addMapActionImageFromSource(scene, x, y, source, textureKey);
+    return scene.add.image(x, y, textureKey);
+  };
   if (frame.kind === "main") {
     const phase = definition.phases[frame.phaseIndex];
     const descriptor = phase?.descriptorSequence[frame.drawIndex];
@@ -58,10 +72,11 @@ export function renderLightningFrame(
       const column = index % descriptor.width;
       const row = Math.floor(index / descriptor.width);
       images.push(
-        scene.add.image(
+        addFrame(
           (context.center.x + anchorOffset.x + descriptor.xOffset + column) * TILE_WIDTH,
           (context.center.y + anchorOffset.y + descriptor.yOffset + row) * TILE_HEIGHT,
-          mapTechniqueTextureKey(phase.resource, sourceFrame),
+          phase.resource,
+          sourceFrame,
         ).setOrigin(0).setDepth(8),
       );
     });
@@ -75,10 +90,11 @@ export function renderLightningFrame(
       sourceFrame: number,
     ): void => {
       images.push(
-        scene.add.image(
+        addFrame(
           position.x * TILE_WIDTH + TILE_WIDTH / 2,
           position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-          mapTechniqueTextureKey(hit.resource, sourceFrame),
+          hit.resource,
+          sourceFrame,
         ).setOrigin(.5).setDepth(8),
       );
     };
@@ -118,10 +134,11 @@ export function renderLightningFrame(
   if (sourceFrame === null || sourceFrame === undefined) return { images };
   for (const position of context.cleanupPositions) {
     images.push(
-      scene.add.image(
+      addFrame(
         position.x * TILE_WIDTH + TILE_WIDTH / 2,
         position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-        mapTechniqueTextureKey(definition.commonHit.cleanup.resource, sourceFrame),
+        definition.commonHit.cleanup.resource,
+        sourceFrame,
       ).setOrigin(.5).setDepth(8),
     );
   }

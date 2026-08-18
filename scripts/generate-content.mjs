@@ -12,6 +12,7 @@ const generators = [
   "generate-stage5-runtime.mjs",
   "generate-stage0-actions.mjs",
   "generate-stage1-actions.mjs",
+  "generate-map-action-atlases.mjs",
   "generate-dynamic-terrain-assets.mjs",
   "generate-ai-technique-dialogue.mjs",
   "generate-technique-lab.mjs",

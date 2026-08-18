@@ -133,15 +133,20 @@
 - `pnpm build` 保留开发构建并包含调试中心、竞技场和各实验室；`pnpm build:release` 使用
   `release` 模式，仅输出主游戏入口到 `release/`，并在构建期禁用 `debugScenario`、`?test`、
   `?skipStartup` 和开发专用动态模块。
-- `release/` 是可重复生成的发布产物，当前为 3,082 个文件、58.5 MiB；音乐运行时统一使用
+- `release/` 是可重复生成的发布产物，当前为 2,105 个文件、58.6 MiB；音乐运行时统一使用
   `public/assets/original/music/` 下的 54 个去重 OGG 母版和 3 个 Stage 0 无缝 OGG 派生文件。
+  地图技能的 1,029 个原始动作帧在开发版继续保留，供逆向证据与技术实验室逐帧验收；正式
+  战斗按技能族生成 26 组 Phaser JSON Hash 图集（52 个 PNG/JSON 文件，约 461 KiB），发布
+  清理掉这些技能的逐帧目录，只保留 78 个 `iron-plate`／`obstacle` 地形素材。这样把发布版
+  地图技能帧从 1,029 个文件降到 52 个，每个实际使用的技能族只请求一张 PNG 与一份 JSON；
+  帧尺寸、透明边界、顺序和像素值均不变。主要收益是请求数和目录复杂度，体积则由约 365 KiB
+  原始 PNG 变为约 461 KiB（PNG 加 JSON）。
   图片运行时对第 14–19 关地图、重复剧情背景、结局装饰和肖像母版复用单一路径；技能实验室
   的落雷帧与实验音频不进入玩家包，但战役地图使用的职业棋子仍保留。`pnpm assets:audit`
-  会按 SHA-256 输出图片重复组与可回收体积；当前开发图片剩余重复主要是逐帧技能素材中的
-  空白／透明帧，发布目录精确去重后的剩余可回收量约 0.22 MiB，不再为此改变帧路径语义。
-  `reverse/converted/audio/rix-wav/` 中的 WAV 只作逆向母版；发布构建直接复制开发资源，并由
-  `scripts/prepare-release.mjs` 校验 OGG 清单哈希且拒绝遗留音乐 WAV。`release/` 被 `.gitignore`
-  忽略，不应手工编辑或作为源码真值。
+  会按 SHA-256 输出图片重复组与可回收体积；当前发布目录精确去重后的剩余可回收量约 0.19 MiB，
+  不再为此改变帧路径语义。`reverse/converted/audio/rix-wav/` 中的 WAV 只作逆向母版；发布构建
+  直接复制开发资源，并由 `scripts/prepare-release.mjs` 校验 OGG 清单哈希且拒绝遗留音乐 WAV。
+  `release/` 被 `.gitignore` 忽略，不应手工编辑或作为源码真值。
 - 隐藏 stage 38、`REMAKE-096` 冰雪外推、第 2／3 关友军槽与开场转职、99 回合上限和第四军团
   集结等项目仍按上方状态表等待用户普通入口试玩或复验；发布版不得把 `verified` 误写成用户
   已接受。
