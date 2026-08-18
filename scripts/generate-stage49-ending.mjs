@@ -320,7 +320,7 @@ for (let record = 0; record <= 30; record += 1) {
   if (SHARED_DECORATION_RECORDS.includes(record)) {
     copies.push(assertIdenticalImage(
       source,
-      path.join(root, "public/assets/original/full-combat/backgrounds", `${name}.png`),
+      path.join(root, "public/assets/original/full-combat/backgrounds", `${String(record === 29 ? 19 : record).padStart(2, "0")}.png`),
       `stage 49 decoration ${record}`,
     ));
     copies.push(removeDuplicateImage(target));

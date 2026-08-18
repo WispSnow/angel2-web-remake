@@ -384,10 +384,19 @@ await Promise.all([
   assertIdenticalImage(inputPaths.storyBackground, reversePath("renders/planar/BK/0001/00.png"), "stage 1 story background"),
   removeDuplicateImage(path.join(publicAssetPath, "story-stage1-background.png")),
   copyFile(inputPaths.allyMagician, path.join(publicAssetPath, "unit-ally-magician.png")),
-  copyFile(inputPaths.portraitGetilas, path.join(publicAssetPath, "portrait-0.png")),
-  copyFile(inputPaths.portraitMengxinman, path.join(publicAssetPath, "portrait-42.png")),
-  copyFile(inputPaths.portraitDaisy, path.join(publicAssetPath, "portrait-43.png")),
-  copyFile(inputPaths.portraitLadonna, path.join(publicAssetPath, "portrait-44.png")),
+  assertIdenticalImage(inputPaths.portraitGetilas, path.join(publicAssetPath, "portraits/0000/base.png"), "stage 1 portrait 0"),
+  assertIdenticalImage(inputPaths.portraitMengxinman, path.join(publicAssetPath, "portraits/0042/base.png"), "stage 1 portrait 42"),
+  assertIdenticalImage(inputPaths.portraitDaisy, path.join(publicAssetPath, "portraits/0043/base.png"), "stage 1 portrait 43"),
+  assertIdenticalImage(inputPaths.portraitLadonna, path.join(publicAssetPath, "portraits/0044/base.png"), "stage 1 portrait 44"),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-0.png")),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-42.png")),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-43.png")),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-44.png")),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-ally-soldier.png")),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-enemy-soldier.png")),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-hading.png")),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-nia.png")),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-ximi.png")),
 ]);
 
 execFileSync("magick", [

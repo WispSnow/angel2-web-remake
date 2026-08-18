@@ -14,7 +14,7 @@
 
 ## 运行
 
-环境要求：Node.js、pnpm 和 `oggenc`（vorbis-tools）。`.node-version` 记录主版本 `26`，CI 按它安装最新 26.x；本地直接使用 Homebrew 的 `node`，不引入版本管理器，`package.json#engines` 只声明下限 `>=24.18.0`。重新生成第 0 关原版图像或地圖技能实验室职业棋子时需要 ImageMagick 的 `magick` 命令；生成器已用 `png:exclude-chunk=date,time` 去掉 PNG 的时间戳块，所以重跑 `pnpm content` 只在像素真的改变时才产生 diff。音乐子生成器会从逆向目录的 RIX WAV 确定性生成 54 个去重 OGG 母版、3 个 Stage 0 无缝 OGG 派生文件及哈希清单；逆向 WAV 保留为母版，不复制到运行时。
+环境要求：Node.js、pnpm 和 `oggenc`（vorbis-tools）。`.node-version` 记录主版本 `26`，CI 按它安装最新 26.x；本地直接使用 Homebrew 的 `node`，不引入版本管理器，`package.json#engines` 只声明下限 `>=24.18.0`。重新生成第 0 关原版图像或地圖技能实验室职业棋子时需要 ImageMagick 的 `magick` 命令；生成器已用 `png:exclude-chunk=date,time` 去掉 PNG 的时间戳块，所以重跑 `pnpm content` 只在像素真的改变时才产生 diff。音乐子生成器会从逆向目录的 RIX WAV 确定性生成 54 个去重 OGG 母版、3 个 Stage 0 无缝 OGG 派生文件及哈希清单；逆向 WAV 保留为母版，不复制到运行时。运行时图片也会复用字节完全相同的地图、剧情背景和结局装饰母版；`pnpm assets:audit` 可检查当前图片目录的重复内容，审计只按 SHA-256 判断，不会把近似但有语义差异的帧合并。
 
 ```bash
 pnpm install
@@ -33,7 +33,8 @@ pnpm preview:release
 ```
 
 发布构建输出到 `release/`，只包含主游戏入口和其运行时资源，不生成 `debug.html`、实验室页面或
-调试场景动态模块。`release/` 是可重复生成的编译产物，不应手工编辑；正式部署时上传该目录的内容。
+调试场景动态模块；技能实验室的落雷帧与实验音频也不会进入发布目录，但战役地图实际使用的职业棋子会保留。
+`release/` 是可重复生成的编译产物，不应手工编辑；正式部署时上传该目录的内容。
 
 ## 战役调试中心
 
@@ -208,6 +209,7 @@ pnpm test:e2e      # 固定版本 Chromium 端到端验收
 pnpm check         # 顺序执行以上全部检查
 pnpm content:portraits # 从 D.SWF、原版元数据与 A/18 纹理重建肖像、头像框和文字窗
 pnpm content:music # 从逆向 RIX WAV 生成去重 OGG、Stage 0 无缝循环与哈希清单
+pnpm assets:audit # 按字节哈希审计图片重复内容与可回收体积
 pnpm content:stage2 # 从第 2 关机器证据重建地图、固定阵容、剧情与音乐内容
 pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧情与音乐内容
 pnpm content:stage4 # 从第 4 关机器证据重建地图、部署、剧情、音乐与力场内容

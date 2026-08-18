@@ -38,5 +38,8 @@ export function fullCombatBackgroundAsset(record: number): string {
   if (!FULL_COMBAT_BACKGROUND_RECORDS.includes(record)) {
     throw new Error(`no full-screen battle backdrop for C/${record}`);
   }
-  return `/assets/original/full-combat/backgrounds/${String(record).padStart(2, "0")}.png`;
+  // C/0029 is byte-identical to C/0019; preserve the native record identity
+  // while serving the single published image file.
+  const assetRecord = record === 29 ? 19 : record;
+  return `/assets/original/full-combat/backgrounds/${String(assetRecord).padStart(2, "0")}.png`;
 }

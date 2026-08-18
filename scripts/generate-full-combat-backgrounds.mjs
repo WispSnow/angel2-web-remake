@@ -20,6 +20,7 @@ import {
   encodeRgbaPng,
   parseBitmapBundle,
 } from "../reverse/tools/angel2-planar.mjs";
+import { assertIdenticalImage, removeDuplicateImage } from "./lib/shared-image-assets.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const modulePath = path.join(root, "reverse/unpacked/lzexe-modules/raw/0029-unpacked.bin");
@@ -196,6 +197,16 @@ for (const record of referencedRecords) {
     clampedRows: BACKDROP_HEIGHT,
     sha256: sha256(png),
   });
+}
+
+// C/0019 and C/0029 are the same rendered backdrop. Keep both native record
+// numbers in the evidence table, but publish one URL and resolve the alias in
+// the runtime asset function.
+if (referencedRecords.includes(19) && referencedRecords.includes(29)) {
+  const record19 = path.join(publicRoot, "19.png");
+  const record29 = path.join(publicRoot, "29.png");
+  await assertIdenticalImage(record19, record29, "full-combat background C/0019-C/0029");
+  await removeDuplicateImage(record29);
 }
 
 const literal = (values) => `[${values.join(", ")}]`;
