@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE8_ALLIED_ACTORS,
   STAGE8_ALLIED_UNITS,
@@ -161,11 +161,11 @@ export const STAGE8_ASSETS = {
     "enemy-soldier": "/assets/original/technique-lab/units/enemy-soldier.png",
   },
   audio: {
-    story: "/assets/original/story-stage8.wav",
-    playerEntry: "/assets/original/battle-stage8-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage8-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage8-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage8-enemy-loop.wav",
+    story: musicAsset("MAGIC", 72),
+    playerEntry: musicAsset("MUSIC", 29),
+    playerLoop: musicAsset("MUSIC", 28),
+    enemyEntry: musicAsset("MUSIC", 13),
+    enemyLoop: musicAsset("MUSIC", 12),
   },
 } as const;
 

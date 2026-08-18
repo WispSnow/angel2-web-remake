@@ -79,7 +79,7 @@
     "content:backgrounds": "node scripts/generate-full-combat-backgrounds.mjs",
     "content:ai-dialogue": "node scripts/generate-ai-technique-dialogue.mjs",
     "content:technique-lab": "node scripts/generate-technique-lab.mjs",
-    "content:music": "node scripts/generate-stage0-music.mjs"
+    "content:music": "node scripts/generate-music-assets.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

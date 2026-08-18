@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE32_CONSTRUCTION_TOKENS,
   STAGE32_CONTENT_IDENTITY,
@@ -162,10 +162,10 @@ export const STAGE32_ASSETS = {
     "enemy-magic-guide": "/assets/original/technique-lab/units/enemy-magic-guide.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage32-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage32-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage32-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage32-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 39),
+    playerLoop: musicAsset("MUSIC", 38),
+    enemyEntry: musicAsset("MUSIC", 13),
+    enemyLoop: musicAsset("MUSIC", 12),
   },
 } as const;
 

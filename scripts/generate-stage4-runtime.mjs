@@ -303,11 +303,6 @@ await Promise.all([
   copyFile(inputPaths.minimap, path.join(publicAssetPath, "stage4-minimap.png")),
   copyFile(inputPaths.allyMagician, path.join(publicAssetPath, "unit-ally-magician.png")),
   copyFile(inputPaths.storyBackground, path.join(publicAssetPath, "story-stage4-background.png")),
-  copyFile(inputPaths.storyMusic, path.join(publicAssetPath, "story-stage4.wav")),
-  copyFile(inputPaths.playerEntryMusic, path.join(publicAssetPath, "battle-stage4-player-entry.wav")),
-  copyFile(inputPaths.playerLoopMusic, path.join(publicAssetPath, "battle-stage4-player-loop.wav")),
-  copyFile(inputPaths.enemyEntryMusic, path.join(publicAssetPath, "battle-stage4-enemy-entry.wav")),
-  copyFile(inputPaths.enemyLoopMusic, path.join(publicAssetPath, "battle-stage4-enemy-loop.wav")),
   ...pulseFramePaths.map((source, frame) => copyFile(source, path.join(pulseAssetPath, `${String(frame).padStart(2, "0")}.png`))),
 ]);
 

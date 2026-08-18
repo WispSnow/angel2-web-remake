@@ -349,11 +349,6 @@ await Promise.all([
   copyFile(inputPaths.map, path.join(publicAssetPath, "stage29-map.png")),
   copyFile(inputPaths.minimap, path.join(publicAssetPath, "stage29-minimap.png")),
   copyFile(inputPaths.storyBackground23, path.join(publicAssetPath, "story-stage29-background-23.png")),
-  copyFile(inputPaths.storyMusic, path.join(publicAssetPath, "story-stage29.wav")),
-  copyFile(inputPaths.playerEntryMusic, path.join(publicAssetPath, "battle-stage29-player-entry.wav")),
-  copyFile(inputPaths.playerLoopMusic, path.join(publicAssetPath, "battle-stage29-player-loop.wav")),
-  copyFile(inputPaths.enemyEntryMusic, path.join(publicAssetPath, "battle-stage29-enemy-entry.wav")),
-  copyFile(inputPaths.enemyLoopMusic, path.join(publicAssetPath, "battle-stage29-enemy-loop.wav")),
 ]);
 
 console.log(`wrote ${path.relative(root, outputPath)} (${storyPages["stage-29-prebattle-story"].length} dialogue checkpoints)`);

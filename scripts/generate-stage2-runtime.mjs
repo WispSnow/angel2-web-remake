@@ -236,8 +236,4 @@ await mkdir(publicAssetPath, { recursive: true });
 await Promise.all([
   copyFile(inputPaths.map, path.join(publicAssetPath, "stage2-map.png")),
   copyFile(inputPaths.minimap, path.join(publicAssetPath, "stage2-minimap.png")),
-  copyFile(inputPaths.playerEntryMusic, path.join(publicAssetPath, "battle-stage2-player-entry.wav")),
-  copyFile(inputPaths.playerLoopMusic, path.join(publicAssetPath, "battle-stage2-player-loop.wav")),
-  copyFile(inputPaths.enemyEntryMusic, path.join(publicAssetPath, "battle-stage2-enemy-entry.wav")),
-  copyFile(inputPaths.enemyLoopMusic, path.join(publicAssetPath, "battle-stage2-enemy-loop.wav")),
 ]);

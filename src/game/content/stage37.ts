@@ -6,7 +6,7 @@ import { classIdFromNativeRecord, className } from "./classes";
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE37_CONSTRUCTION_TOKENS,
   STAGE37_CONTENT_IDENTITY,
@@ -139,10 +139,10 @@ export const STAGE37_ASSETS = {
     "enemy-hand": "/assets/original/technique-lab/units/enemy-hand.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage37-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage37-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage37-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage37-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 33),
+    playerLoop: musicAsset("MUSIC", 32),
+    enemyEntry: musicAsset("MUSIC", 5),
+    enemyLoop: musicAsset("MUSIC", 4),
   },
 } as const;
 

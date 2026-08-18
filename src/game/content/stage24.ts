@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE24_CONSTRUCTION_TOKENS,
   STAGE24_CONTENT_IDENTITY,
@@ -154,10 +154,10 @@ export const STAGE24_ASSETS = {
     "enemy-jungle-warrior": "/assets/original/technique-lab/units/enemy-jungle-warrior.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage24-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage24-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage24-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage24-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 11),
+    playerLoop: musicAsset("MUSIC", 10),
+    enemyEntry: musicAsset("MUSIC", 5),
+    enemyLoop: musicAsset("MUSIC", 4),
   },
 } as const;
 

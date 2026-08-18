@@ -14,7 +14,7 @@
 
 ## 运行
 
-环境要求：Node.js 与 pnpm。`.node-version` 记录主版本 `26`，CI 按它安装最新 26.x；本地直接使用 Homebrew 的 `node`，不引入版本管理器，`package.json#engines` 只声明下限 `>=24.18.0`。重新生成第 0 关原版图像或地圖技能实验室职业棋子时需要 ImageMagick 的 `magick` 命令；生成器已用 `png:exclude-chunk=date,time` 去掉 PNG 的时间戳块，所以重跑 `pnpm content` 只在像素真的改变时才产生 diff。音乐子生成器会从已转换的 RIX WAV 确定性重建无缝循环派生文件及哈希清单，不覆盖证据母版。
+环境要求：Node.js、pnpm 和 `oggenc`（vorbis-tools）。`.node-version` 记录主版本 `26`，CI 按它安装最新 26.x；本地直接使用 Homebrew 的 `node`，不引入版本管理器，`package.json#engines` 只声明下限 `>=24.18.0`。重新生成第 0 关原版图像或地圖技能实验室职业棋子时需要 ImageMagick 的 `magick` 命令；生成器已用 `png:exclude-chunk=date,time` 去掉 PNG 的时间戳块，所以重跑 `pnpm content` 只在像素真的改变时才产生 diff。音乐子生成器会从逆向目录的 RIX WAV 确定性生成 54 个去重 OGG 母版、3 个 Stage 0 无缝 OGG 派生文件及哈希清单；逆向 WAV 保留为母版，不复制到运行时。
 
 ```bash
 pnpm install
@@ -207,7 +207,7 @@ pnpm preview:release # 预览 release/ 中的玩家版构建
 pnpm test:e2e      # 固定版本 Chromium 端到端验收
 pnpm check         # 顺序执行以上全部检查
 pnpm content:portraits # 从 D.SWF、原版元数据与 A/18 纹理重建肖像、头像框和文字窗
-pnpm content:music # 重建第 0 关无缝循环 WAV、清单与运行时交叉淡化参数
+pnpm content:music # 从逆向 RIX WAV 生成去重 OGG、Stage 0 无缝循环与哈希清单
 pnpm content:stage2 # 从第 2 关机器证据重建地图、固定阵容、剧情与音乐内容
 pnpm content:stage3 # 从第 3 关机器证据重建地图、固定阵容、剧情与音乐内容
 pnpm content:stage4 # 从第 4 关机器证据重建地图、部署、剧情、音乐与力场内容

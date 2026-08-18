@@ -322,10 +322,6 @@ await mkdir(publicAssetPath, { recursive: true });
 await Promise.all([
   copyFile(inputPaths.map, path.join(publicAssetPath, "stage11-map.png")),
   copyFile(inputPaths.minimap, path.join(publicAssetPath, "stage11-minimap.png")),
-  copyFile(inputPaths.playerEntryMusic, path.join(publicAssetPath, "battle-stage11-player-entry.wav")),
-  copyFile(inputPaths.playerLoopMusic, path.join(publicAssetPath, "battle-stage11-player-loop.wav")),
-  copyFile(inputPaths.enemyEntryMusic, path.join(publicAssetPath, "battle-stage11-enemy-entry.wav")),
-  copyFile(inputPaths.enemyLoopMusic, path.join(publicAssetPath, "battle-stage11-enemy-loop.wav")),
 ]);
 
 console.log(`wrote ${path.relative(root, outputPath)} (${Object.values(storyPages).flat().length} dialogue checkpoints)`);

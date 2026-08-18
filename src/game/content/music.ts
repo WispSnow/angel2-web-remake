@@ -31,6 +31,8 @@ export const STAGE_MUSIC_PROGRAMS = {
   },
 } as const satisfies Partial<Record<StageMusicId, MusicProgram>>;
 
+export { musicAsset } from "./music-assets";
+
 const STAGE_MUSIC_REGISTRY: Partial<Record<StageMusicId, MusicProgram>> =
   { ...STAGE_MUSIC_PROGRAMS };
 

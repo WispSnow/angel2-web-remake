@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE28_CONSTRUCTION_TOKENS,
   STAGE28_CONTENT_IDENTITY,
@@ -163,11 +163,11 @@ export const STAGE28_ASSETS = {
     "enemy-pegasus-warrior": "/assets/original/technique-lab/units/enemy-pegasus-warrior.png",
   },
   audio: {
-    story: "/assets/original/story-stage28.wav",
-    playerEntry: "/assets/original/battle-stage28-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage28-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage28-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage28-enemy-loop.wav",
+    story: musicAsset("MAGIC", 76),
+    playerEntry: musicAsset("MUSIC", 11),
+    playerLoop: musicAsset("MUSIC", 10),
+    enemyEntry: musicAsset("MUSIC", 27),
+    enemyLoop: musicAsset("MUSIC", 26),
   },
 } as const;
 

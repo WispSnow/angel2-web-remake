@@ -328,11 +328,6 @@ await Promise.all([
   copyFile(inputPaths.map, path.join(publicAssetPath, "stage21-map.png")),
   copyFile(inputPaths.minimap, path.join(publicAssetPath, "stage21-minimap.png")),
   copyFile(inputPaths.storyBackground, path.join(publicAssetPath, "story-stage21-background-16.png")),
-  copyFile(inputPaths.storyMusic, path.join(publicAssetPath, "story-stage21.wav")),
-  copyFile(inputPaths.playerEntryMusic, path.join(publicAssetPath, "battle-stage21-player-entry.wav")),
-  copyFile(inputPaths.playerLoopMusic, path.join(publicAssetPath, "battle-stage21-player-loop.wav")),
-  copyFile(inputPaths.enemyEntryMusic, path.join(publicAssetPath, "battle-stage21-enemy-entry.wav")),
-  copyFile(inputPaths.enemyLoopMusic, path.join(publicAssetPath, "battle-stage21-enemy-loop.wav")),
 ]);
 
 console.log(`wrote ${path.relative(root, outputPath)} (${Object.values(storyPages).reduce((sum, pages) => sum + pages.length, 0)} dialogue checkpoints)`);

@@ -6,7 +6,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className, classStatsFor } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE1_BOSS,
   STAGE1_CONTENT_IDENTITY,
@@ -232,11 +232,11 @@ export const STAGE1_ASSETS = {
     47: "/assets/original/portrait-ally-soldier.png",
   },
   audio: {
-    story: "/assets/original/story-stage1.wav",
-    playerEntry: "/assets/original/battle-stage1-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage1-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage1-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage1-enemy-loop.wav",
+    story: musicAsset("MAGIC", 72),
+    playerEntry: musicAsset("MUSIC", 11),
+    playerLoop: musicAsset("MUSIC", 10),
+    enemyEntry: musicAsset("MUSIC", 27),
+    enemyLoop: musicAsset("MUSIC", 26),
   },
 } as const;
 

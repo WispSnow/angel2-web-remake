@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE23_CONSTRUCTION_TOKENS,
   STAGE23_CONTENT_IDENTITY,
@@ -153,10 +153,10 @@ export const STAGE23_ASSETS = {
     "enemy-steel-armor-warrior": "/assets/original/technique-lab/units/enemy-steel-armor-warrior.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage23-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage23-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage23-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage23-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 19),
+    playerLoop: musicAsset("MUSIC", 18),
+    enemyEntry: musicAsset("MUSIC", 27),
+    enemyLoop: musicAsset("MUSIC", 26),
   },
 } as const;
 

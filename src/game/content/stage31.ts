@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE31_CONSTRUCTION_TOKENS,
   STAGE31_CONTENT_IDENTITY,
@@ -160,11 +160,11 @@ export const STAGE31_ASSETS = {
     "enemy-swift-dragon-knight": "/assets/original/technique-lab/units/enemy-swift-dragon-knight.png",
   },
   audio: {
-    story: "/assets/original/story-stage31.wav",
-    playerEntry: "/assets/original/battle-stage31-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage31-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage31-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage31-enemy-loop.wav",
+    story: musicAsset("MAGIC", 79),
+    playerEntry: musicAsset("MUSIC", 11),
+    playerLoop: musicAsset("MUSIC", 10),
+    enemyEntry: musicAsset("MUSIC", 37),
+    enemyLoop: musicAsset("MUSIC", 36),
   },
 } as const;
 

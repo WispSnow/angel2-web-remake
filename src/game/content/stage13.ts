@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE13_CONSTRUCTION_TOKENS,
   STAGE13_CONTENT_IDENTITY,
@@ -161,11 +161,11 @@ export const STAGE13_ASSETS = {
     "enemy-monk": "/assets/original/technique-lab/units/enemy-monk.png",
   },
   audio: {
-    story: "/assets/original/story-stage13.wav",
-    playerEntry: "/assets/original/battle-stage13-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage13-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage13-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage13-enemy-loop.wav",
+    story: musicAsset("MAGIC", 77),
+    playerEntry: musicAsset("MUSIC", 29),
+    playerLoop: musicAsset("MUSIC", 28),
+    enemyEntry: musicAsset("MUSIC", 27),
+    enemyLoop: musicAsset("MUSIC", 26),
   },
 } as const;
 

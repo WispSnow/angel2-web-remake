@@ -6,7 +6,7 @@ import { classIdFromNativeRecord, className } from "./classes";
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE29_CONSTRUCTION_TOKENS,
   STAGE29_CONTENT_IDENTITY,
@@ -161,11 +161,11 @@ export const STAGE29_ASSETS = {
     "enemy-swift-dragon-knight": "/assets/original/technique-lab/units/enemy-swift-dragon-knight.png",
   },
   audio: {
-    story: "/assets/original/story-stage29.wav",
-    playerEntry: "/assets/original/battle-stage29-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage29-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage29-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage29-enemy-loop.wav",
+    story: musicAsset("MAGIC", 77),
+    playerEntry: musicAsset("MUSIC", 35),
+    playerLoop: musicAsset("MUSIC", 34),
+    enemyEntry: musicAsset("MUSIC", 13),
+    enemyLoop: musicAsset("MUSIC", 12),
   },
 } as const;
 

@@ -165,7 +165,8 @@ async function clickUnit(page: Page, id: string): Promise<void> {
 test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected objective", async ({ page }) => {
   await page.goto("/?debugScenario=stage-03-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /救援友軍/u })).toBeVisible();
+  await expect(page.getByTestId("game-screen"))
+    .toHaveAttribute("aria-label", "天使帝國 II 救援友軍遊戲畫面");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "12");
   expect(await state(page)).toMatchObject({
     stageId: "stage-03",

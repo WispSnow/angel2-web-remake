@@ -9,7 +9,7 @@ import {
   withSwappedGenericAllySlots,
 } from "./generic-ally-stage-swap";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE2_ALLIED_ACTORS,
   STAGE2_ALLIED_UNITS,
@@ -168,10 +168,10 @@ export const STAGE2_ASSETS = {
   allyMagicPriest: "/assets/original/unit-ally-magic-priest.png",
   enemySister: "/assets/original/unit-enemy-sister.png",
   audio: {
-    playerEntry: "/assets/original/battle-stage2-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage2-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage2-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage2-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 29),
+    playerLoop: musicAsset("MUSIC", 28),
+    enemyEntry: musicAsset("MUSIC", 37),
+    enemyLoop: musicAsset("MUSIC", 36),
   },
 } as const;
 

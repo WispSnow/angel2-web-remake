@@ -306,10 +306,6 @@ const copies = [
     encodeRgbaPng(atlasWidth, atlasHeight, atlasPixels),
   ),
   copyFile(reversePath("renders/planar/A/0009/00.png"), path.join(publicRoot, "roster-background.png")),
-  copyFile(inputPaths.storyMusic, path.join(publicRoot, "audio/story.wav")),
-  copyFile(inputPaths.rosterMusic, path.join(publicRoot, "audio/roster.wav")),
-  copyFile(inputPaths.prosperousMusic, path.join(publicRoot, "audio/prosperous.wav")),
-  copyFile(inputPaths.declineMusic, path.join(publicRoot, "audio/decline.wav")),
 ];
 for (let record = 0; record <= 30; record += 1) {
   copies.push(copyFile(

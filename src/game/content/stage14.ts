@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE14_CONSTRUCTION_TOKENS,
   STAGE14_CONTENT_IDENTITY,
@@ -143,10 +143,10 @@ export const STAGE14_ASSETS = {
     "enemy-pegasus-warrior": "/assets/original/technique-lab/units/enemy-pegasus-warrior.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage14-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage14-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage14-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage14-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 11),
+    playerLoop: musicAsset("MUSIC", 10),
+    enemyEntry: musicAsset("MUSIC", 23),
+    enemyLoop: musicAsset("MUSIC", 22),
   },
 } as const;
 

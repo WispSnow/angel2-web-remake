@@ -74,9 +74,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const eventController = new AbortController();
   root.innerHTML = `
     <div class="page-shell">
-      <header class="project-header">
-        <div><span class="eyebrow">${controller.isCampaignPersistenceEnabled ? "WEB REMAKE · CAMPAIGN" : "DEVELOPER LAB · MEMORY ONLY"}</span><h1>天使帝國 II · ${stage.name}</h1></div>
-      </header>
       <div class="game-stage">
         <div class="game-viewport" id="game-viewport">
           <section class="logical-screen" id="logical-screen" data-testid="game-screen"

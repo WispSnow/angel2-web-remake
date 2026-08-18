@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
@@ -35,7 +35,7 @@ describe("generated seamless stage-zero music", () => {
       await readFile(path.join(root, "public/assets/original/stage0-music-seams.json"), "utf8"),
     ) as SeamManifest;
     expect(manifest).toMatchObject({
-      version: 1,
+      version: 2,
       algorithm: "periodic-linear-overlap-add",
     });
     expect(manifest.tracks.map(({ id }) => id)).toEqual([
@@ -51,13 +51,33 @@ describe("generated seamless stage-zero music", () => {
       expect(track.outputBoundary.rmsDbfs).toBeLessThan(-30);
       const output = await readFile(path.join(root, track.output));
       expect(sha256(output)).toBe(track.outputSha256);
-      expect(output.toString("ascii", 0, 4)).toBe("RIFF");
-      expect(output.toString("ascii", 8, 12)).toBe("WAVE");
-      expect(output.readUInt32LE(40) / output.readUInt16LE(32)).toBe(track.outputFrames);
+      expect(output.toString("ascii", 0, 4)).toBe("OggS");
     }
 
     const player = manifest.tracks.find(({ id }) => id === "battle-stage0-player-loop");
     if (!player) throw new Error("player loop seam manifest is missing");
     expect(player.outputBoundary.rmsDbfs - player.sourceBoundary.rmsDbfs).toBeLessThan(-15);
+  });
+
+  test("publishes one OGG per reverse music master and no legacy music copies", async () => {
+    const manifest = JSON.parse(
+      await readFile(path.join(root, "public/assets/original/music/music-manifest.json"), "utf8"),
+    ) as { version: number; quality: number; tracks: Array<{ output: string; outputSha256: string }> };
+    expect(manifest).toMatchObject({ version: 1, quality: 5 });
+    expect(manifest.tracks).toHaveLength(54);
+    const outputPaths = new Set(manifest.tracks.map(({ output }) => output));
+    expect(outputPaths.size).toBe(manifest.tracks.length);
+    for (const track of manifest.tracks) {
+      const output = await readFile(path.join(root, track.output));
+      expect(output.toString("ascii", 0, 4)).toBe("OggS");
+      expect(sha256(output)).toBe(track.outputSha256);
+    }
+    const runtimeFiles = await readdir(path.join(root, "public/assets/original"), {
+      recursive: true,
+    });
+    expect(runtimeFiles.filter((file) =>
+      /(?:^|\/)(?:story-stage\d+(?:-loop-seamless)?|battle-stage\d+-(?:player|enemy)-(?:entry|loop)(?:-seamless)?)\.wav$/u.test(file)
+      || /(?:^|\/)(?:startup\/audio\/(?:intro|title)|credits\/music|ending\/audio\/(?:story|roster|prosperous|decline))\.wav$/u.test(file),
+    )).toEqual([]);
   });
 });

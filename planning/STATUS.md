@@ -133,7 +133,10 @@
 - `pnpm build` 保留开发构建并包含调试中心、竞技场和各实验室；`pnpm build:release` 使用
   `release` 模式，仅输出主游戏入口到 `release/`，并在构建期禁用 `debugScenario`、`?test`、
   `?skipStartup` 和开发专用动态模块。
-- `release/` 是可重复生成的发布产物，当前约 4,190 个文件、1,031.2 MiB；它被 `.gitignore`
+- `release/` 是可重复生成的发布产物，当前约 4,067 个文件、59.7 MiB；音乐运行时统一使用
+  `public/assets/original/music/` 下的 54 个去重 OGG 母版和 3 个 Stage 0 无缝 OGG 派生文件。
+  `reverse/converted/audio/rix-wav/` 中的 WAV 只作逆向母版；发布构建直接复制开发资源，并由
+  `scripts/prepare-release.mjs` 校验 OGG 清单哈希且拒绝遗留音乐 WAV。`release/` 被 `.gitignore`
   忽略，不应手工编辑或作为源码真值。
 - 隐藏 stage 38、`REMAKE-096` 冰雪外推、第 2／3 关友军槽与开场转职、99 回合上限和第四军团
   集结等项目仍按上方状态表等待用户普通入口试玩或复验；发布版不得把 `verified` 误写成用户

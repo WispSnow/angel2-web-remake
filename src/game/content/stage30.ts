@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE30_CONSTRUCTION_TOKENS,
   STAGE30_CONTENT_IDENTITY,
@@ -160,11 +160,11 @@ export const STAGE30_ASSETS = {
   storyBackground: "/assets/original/story-stage30-background-23.png",
   unitSprites: enemyUnitSprites,
   audio: {
-    story: "/assets/original/story-stage30.wav",
-    playerEntry: "/assets/original/battle-stage30-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage30-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage30-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage30-enemy-loop.wav",
+    story: musicAsset("MAGIC", 78),
+    playerEntry: musicAsset("MUSIC", 29),
+    playerLoop: musicAsset("MUSIC", 28),
+    enemyEntry: musicAsset("MUSIC", 5),
+    enemyLoop: musicAsset("MUSIC", 4),
   },
 } as const;
 

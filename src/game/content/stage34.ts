@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE34_CONSTRUCTION_TOKENS,
   STAGE34_CONTENT_IDENTITY,
@@ -147,10 +147,10 @@ export const STAGE34_ASSETS = {
     "enemy-magic-sword-warrior": "/assets/original/technique-lab/units/enemy-magic-sword-warrior.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage34-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage34-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage34-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage34-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 3),
+    playerLoop: musicAsset("MUSIC", 2),
+    enemyEntry: musicAsset("MUSIC", 21),
+    enemyLoop: musicAsset("MUSIC", 20),
   },
 } as const;
 

@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE35_CONSTRUCTION_TOKENS,
   STAGE35_CONTENT_IDENTITY,
@@ -147,10 +147,10 @@ export const STAGE35_ASSETS = {
     "enemy-magician": "/assets/original/technique-lab/units/enemy-magician.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage35-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage35-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage35-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage35-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 35),
+    playerLoop: musicAsset("MUSIC", 34),
+    enemyEntry: musicAsset("MUSIC", 13),
+    enemyLoop: musicAsset("MUSIC", 12),
   },
 } as const;
 

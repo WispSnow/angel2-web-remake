@@ -386,11 +386,6 @@ await Promise.all([
   copyFile(inputPaths.portraitMengxinman, path.join(publicAssetPath, "portrait-42.png")),
   copyFile(inputPaths.portraitDaisy, path.join(publicAssetPath, "portrait-43.png")),
   copyFile(inputPaths.portraitLadonna, path.join(publicAssetPath, "portrait-44.png")),
-  copyFile(inputPaths.storyMusic, path.join(publicAssetPath, "story-stage1.wav")),
-  copyFile(inputPaths.playerEntryMusic, path.join(publicAssetPath, "battle-stage1-player-entry.wav")),
-  copyFile(inputPaths.playerLoopMusic, path.join(publicAssetPath, "battle-stage1-player-loop.wav")),
-  copyFile(inputPaths.enemyEntryMusic, path.join(publicAssetPath, "battle-stage1-enemy-entry.wav")),
-  copyFile(inputPaths.enemyLoopMusic, path.join(publicAssetPath, "battle-stage1-enemy-loop.wav")),
 ]);
 
 execFileSync("magick", [

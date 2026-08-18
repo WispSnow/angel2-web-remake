@@ -1,4 +1,5 @@
-import { access, readdir, rm, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, readdir, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -51,6 +52,30 @@ for (const file of developmentOnlyFiles) {
 await rm(path.join(releaseDirectory, "assets", "labs"), { recursive: true, force: true });
 
 const files = await collectFiles(releaseDirectory);
+const musicManifestPath = path.join(releaseDirectory, "assets/original/music/music-manifest.json");
+if (!(await pathExists(musicManifestPath))) {
+  throw new Error("release build is missing the deduplicated OGG music manifest");
+}
+const musicManifest = JSON.parse(await readFile(musicManifestPath, "utf8"));
+if (musicManifest.version !== 1 || musicManifest.tracks.length !== 54) {
+  throw new Error("release build has an unexpected music manifest");
+}
+for (const track of musicManifest.tracks) {
+  const relativeOutput = track.output.replace(/^public\//u, "");
+  const released = await readFile(path.join(releaseDirectory, relativeOutput));
+  const releasedHash = createHash("sha256").update(released).digest("hex");
+  if (releasedHash !== track.outputSha256) {
+    throw new Error(`release music differs from the development asset: ${relativeOutput}`);
+  }
+}
+const legacyMusic = files.filter((file) => {
+  const relative = path.relative(releaseDirectory, file);
+  return /(?:^|\/)(?:story-stage\d+(?:-loop-seamless)?|battle-stage\d+-(?:player|enemy)-(?:entry|loop)(?:-seamless)?)\.wav$/u.test(relative)
+    || /(?:^|\/)(?:startup\/audio\/(?:intro|title)|credits\/music|ending\/audio\/(?:story|roster|prosperous|decline))\.wav$/u.test(relative);
+});
+if (legacyMusic.length > 0) {
+  throw new Error(`release build contains legacy music WAVs: ${legacyMusic.map((file) => path.relative(releaseDirectory, file)).join(", ")}`);
+}
 const forbidden = files.filter((file) => {
   const name = path.basename(file);
   if (/^deployment-lab-.*\.css$/u.test(name)) return false;

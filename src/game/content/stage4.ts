@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE4_CONTENT_IDENTITY,
   STAGE4_DEPLOYMENT,
@@ -168,11 +168,11 @@ export const STAGE4_ASSETS = {
   },
   forceFieldPulse: STAGE4_FORCE_FIELD_PRESENTATION,
   audio: {
-    story: "/assets/original/story-stage4.wav",
-    playerEntry: "/assets/original/battle-stage4-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage4-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage4-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage4-enemy-loop.wav",
+    story: musicAsset("MAGIC", 76),
+    playerEntry: musicAsset("MUSIC", 39),
+    playerLoop: musicAsset("MUSIC", 38),
+    enemyEntry: musicAsset("MUSIC", 5),
+    enemyLoop: musicAsset("MUSIC", 4),
   },
 } as const;
 

@@ -361,10 +361,6 @@ await Promise.all([mkdir(phase1Destination, { recursive: true }), mkdir(phase2De
 await Promise.all([
   copyFile(inputPaths.map, path.join(publicAssetPath, "stage26-map.png")),
   copyFile(inputPaths.minimap, path.join(publicAssetPath, "stage26-minimap.png")),
-  copyFile(inputPaths.playerEntryMusic, path.join(publicAssetPath, "battle-stage26-player-entry.wav")),
-  copyFile(inputPaths.playerLoopMusic, path.join(publicAssetPath, "battle-stage26-player-loop.wav")),
-  copyFile(inputPaths.enemyEntryMusic, path.join(publicAssetPath, "battle-stage26-enemy-entry.wav")),
-  copyFile(inputPaths.enemyLoopMusic, path.join(publicAssetPath, "battle-stage26-enemy-loop.wav")),
   ...phase1Entry.renderedPaths.map((source, index) => copyFile(
     path.join(root, source),
     path.join(phase1Destination, `${String(index).padStart(2, "0")}.png`),

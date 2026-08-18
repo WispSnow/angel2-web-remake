@@ -150,6 +150,42 @@ test("title artwork dissolves in over its background before the menu appears", a
     .toContain("command-menu-pointer.png");
 });
 
+/**
+ * The host right button is the second mapping of the one native cancel flag, so
+ * it has to back out of both sub-menus and never raise the browser context menu.
+ * `REMAKE-112` then keeps MUSIC/1 running across that cancel instead of taking
+ * the native RIX stop, and the track loops for as long as the title is up.
+ */
+test("right click cancels the startup sub-menus without interrupting MUSIC/1", async ({ page }) => {
+  await page.goto("/?test=1");
+  await skipOpeningToTitle(page);
+  const startup = page.getByTestId("startup-screen");
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await expect(startup).toHaveAttribute("data-title-music-playing", "true");
+  await expect(startup).toHaveAttribute("data-title-music-loop", "true");
+  await expect(startup).toHaveAttribute("data-title-music-play-count", "1");
+
+  await page.getByTestId("new-game").click();
+  await expect(page.getByTestId("difficulty-menu")).toBeVisible();
+  await startup.click({ button: "right" });
+  await expect(startup).toHaveAttribute("data-startup-phase", "title");
+  await expect(page.getByTestId("difficulty-menu")).toBeHidden();
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  // The pre-REMAKE-112 cancel stopped MUSIC/1 here, and the next input restarted
+  // it from the top; both show up as a stopped transport or a second play.
+  await expect(startup).toHaveAttribute("data-title-music-playing", "true");
+  await expect(startup).toHaveAttribute("data-title-music-play-count", "1");
+
+  await page.getByTestId("continue-game").click();
+  await expect(page.getByTestId("title-record-menu")).toBeVisible();
+  await startup.click({ button: "right" });
+  await expect(startup).toHaveAttribute("data-startup-phase", "title");
+  await expect(page.getByTestId("title-record-menu")).toBeHidden();
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await expect(startup).toHaveAttribute("data-title-music-playing", "true");
+  await expect(startup).toHaveAttribute("data-title-music-play-count", "1");
+});
+
 test("pointer difficulty confirmation carries audio activation into stage zero", async ({ page }) => {
   await page.goto("/?test=1");
   await skipOpeningToTitle(page, "pointer");
@@ -173,7 +209,8 @@ test("later-stage and debug modules stay deferred during stage-zero startup", as
 
   await page.goto("/?test=1&skipStartup");
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "天使帝國 II · 瓦爾克麗宮" })).toBeVisible();
+  await expect(page.getByTestId("game-screen"))
+    .toHaveAttribute("aria-label", "天使帝國 II 瓦爾克麗宮遊戲畫面");
   expect(deferredRequests).toEqual([]);
   expect(await page.evaluate(() => window.__ANGEL2_DEBUG__)).toBeUndefined();
 });
@@ -357,7 +394,8 @@ test("BOOT-C: a normal reconnect migrates a stage-0 clear into stage-1 prebattle
 
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "4");
-  await expect(page.getByRole("heading", { name: "天使帝國 II · 騎士城堡前" })).toBeVisible();
+  await expect(page.getByTestId("game-screen"))
+    .toHaveAttribute("aria-label", "天使帝國 II 騎士城堡前遊戲畫面");
   expect(await page.evaluate(() => "__ANGEL2__" in window)).toBe(false);
   expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBe(JSON.stringify(save));
 });

@@ -312,14 +312,6 @@ await Promise.all([
   copyFile(inputPaths.stage5Minimap, path.join(publicAssetPath, "stage5-minimap.png")),
   copyFile(inputPaths.portalMap, path.join(publicAssetPath, "stage42-portal-map.png")),
   copyFile(inputPaths.portalMinimap, path.join(publicAssetPath, "stage42-portal-minimap.png")),
-  copyFile(inputPaths.stage5PlayerEntryMusic, path.join(publicAssetPath, "battle-stage5-player-entry.wav")),
-  copyFile(inputPaths.stage5PlayerLoopMusic, path.join(publicAssetPath, "battle-stage5-player-loop.wav")),
-  copyFile(inputPaths.stage5EnemyEntryMusic, path.join(publicAssetPath, "battle-stage5-enemy-entry.wav")),
-  copyFile(inputPaths.stage5EnemyLoopMusic, path.join(publicAssetPath, "battle-stage5-enemy-loop.wav")),
-  copyFile(inputPaths.portalPlayerEntryMusic, path.join(publicAssetPath, "battle-stage42-player-entry.wav")),
-  copyFile(inputPaths.portalPlayerLoopMusic, path.join(publicAssetPath, "battle-stage42-player-loop.wav")),
-  copyFile(inputPaths.portalEnemyEntryMusic, path.join(publicAssetPath, "battle-stage42-enemy-entry.wav")),
-  copyFile(inputPaths.portalEnemyLoopMusic, path.join(publicAssetPath, "battle-stage42-enemy-loop.wav")),
 ]);
 
 console.log(`wrote ${path.relative(root, outputPath)} (${Object.values(storyPages).flat().length} dialogue checkpoints)`);

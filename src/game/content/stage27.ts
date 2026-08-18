@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE27_CONSTRUCTION_TOKENS,
   STAGE27_CONTENT_IDENTITY,
@@ -181,10 +181,10 @@ export const STAGE27_ASSETS = {
     "enemy-curse-master": "/assets/original/technique-lab/units/enemy-curse-master.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage27-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage27-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage27-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage27-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 3),
+    playerLoop: musicAsset("MUSIC", 2),
+    enemyEntry: musicAsset("MUSIC", 5),
+    enemyLoop: musicAsset("MUSIC", 4),
   },
 } as const;
 

@@ -55,7 +55,8 @@ async function clickUnit(page: Page, id: string): Promise<void> {
 test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as automatic", async ({ page }) => {
   await page.goto("/?debugScenario=stage-02-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /攻打騎士堡/u })).toBeVisible();
+  await expect(page.getByTestId("game-screen"))
+    .toHaveAttribute("aria-label", "天使帝國 II 攻打騎士堡遊戲畫面");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "155");
   expect(await state(page)).toMatchObject({
     stageId: "stage-02",

@@ -9,6 +9,7 @@ import {
 } from "./classes";
 import { enemyScalingFor, scriptedBossStatsFor } from "./enemy-scaling";
 import { emptyUnitStatuses } from "../simulation/status";
+import { musicAsset, STAGE0_SEAMLESS_MUSIC_ASSETS } from "./music-assets";
 
 export { classStatsFor, nextExperienceThresholdFor };
 
@@ -265,12 +266,12 @@ export const ASSETS = {
     },
   },
   audio: {
-    story: "/assets/original/story-stage0.wav",
-    storySeamlessLoop: "/assets/original/story-stage0-loop-seamless.wav",
-    playerBattleEntry: "/assets/original/battle-stage0-player-entry.wav",
-    playerBattleSeamlessLoop: "/assets/original/battle-stage0-player-loop-seamless.wav",
-    enemyBattleEntry: "/assets/original/battle-stage0-enemy-entry.wav",
-    enemyBattleSeamlessLoop: "/assets/original/battle-stage0-enemy-loop-seamless.wav",
+    story: musicAsset("MAGIC", 73),
+    storySeamlessLoop: STAGE0_SEAMLESS_MUSIC_ASSETS.story,
+    playerBattleEntry: musicAsset("MUSIC", 7),
+    playerBattleSeamlessLoop: STAGE0_SEAMLESS_MUSIC_ASSETS.player,
+    enemyBattleEntry: musicAsset("MUSIC", 5),
+    enemyBattleSeamlessLoop: STAGE0_SEAMLESS_MUSIC_ASSETS.enemy,
     confirm: "/assets/original/ui-confirm.wav",
     effects: {
       0: "/assets/original/audio/e/00.wav",

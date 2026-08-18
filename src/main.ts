@@ -45,9 +45,6 @@ const mountController = (controller: GameController, userActivated: boolean) => 
     ]);
     root.innerHTML = `
       <div class="page-shell">
-        <header class="project-header">
-          <div><span class="eyebrow">${controller.deploymentPresentation.kicker} · DEPLOYMENT</span><h1>天使帝國 II · ${controller.deploymentPresentation.title}</h1></div>
-        </header>
         <div class="game-stage">
           <div class="game-viewport deployment-viewport" id="deployment-viewport">
             <section class="logical-screen deployment-screen" id="deployment-screen" data-testid="deployment-screen"

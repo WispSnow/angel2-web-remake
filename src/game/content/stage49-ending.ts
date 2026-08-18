@@ -1,6 +1,7 @@
 import type { LoopMusicProgram, MusicProgram } from "../music-transport";
 
 import { STAGE49_EPILOGUE_ENTRY_MUSIC } from "./stage49-ending.generated";
+import { musicAsset } from "./music-assets";
 
 export {
   STAGE49_CLASS_FAMILIES,
@@ -26,10 +27,10 @@ export const STAGE49_ENDING_ASSETS = {
   epilogue: (record: number) =>
     `/assets/original/ending/epilogue/${String(record).padStart(2, "0")}.png`,
   audio: {
-    story: "/assets/original/ending/audio/story.wav",
-    roster: "/assets/original/ending/audio/roster.wav",
-    prosperous: "/assets/original/ending/audio/prosperous.wav",
-    decline: "/assets/original/ending/audio/decline.wav",
+    story: musicAsset("MAGIC", 77),
+    roster: musicAsset("UN", 6),
+    prosperous: musicAsset("MUSIC", 40),
+    decline: musicAsset("UN", 49),
   },
 } as const;
 

@@ -122,7 +122,8 @@ async function endManualPhase(page: Page): Promise<void> {
 test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment hazard map", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /通過力場/u })).toBeVisible();
+  await expect(page.getByTestId("game-screen"))
+    .toHaveAttribute("aria-label", "天使帝國 II 通過力場遊戲畫面");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "7");
   expect(await state(page)).toMatchObject({
     stageId: "stage-04",

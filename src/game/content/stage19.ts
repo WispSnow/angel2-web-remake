@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE19_CONSTRUCTION_TOKENS,
   STAGE19_CONTENT_IDENTITY,
@@ -146,10 +146,10 @@ export const STAGE19_ASSETS = {
     "enemy-great-axe-warrior": "/assets/original/technique-lab/units/enemy-great-axe-warrior.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage19-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage19-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage19-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage19-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 11),
+    playerLoop: musicAsset("MUSIC", 10),
+    enemyEntry: musicAsset("MUSIC", 21),
+    enemyLoop: musicAsset("MUSIC", 20),
   },
 } as const;
 

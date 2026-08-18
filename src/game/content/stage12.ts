@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE12_CONTENT_IDENTITY,
   STAGE12_DEPLOYMENT,
@@ -155,11 +155,11 @@ export const STAGE12_ASSETS = {
     "enemy-water-warrior": "/assets/original/technique-lab/units/enemy-water-warrior.png",
   },
   audio: {
-    story: "/assets/original/story-stage12.wav",
-    playerEntry: "/assets/original/battle-stage12-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage12-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage12-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage12-enemy-loop.wav",
+    story: musicAsset("MAGIC", 76),
+    playerEntry: musicAsset("MUSIC", 9),
+    playerLoop: musicAsset("MUSIC", 8),
+    enemyEntry: musicAsset("MUSIC", 25),
+    enemyLoop: musicAsset("MUSIC", 24),
   },
 } as const;
 

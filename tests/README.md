@@ -47,7 +47,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 调试中心与场景目录 | `debug-roster-profiles.test.ts` | `debug.spec.ts` |
 | `src/styles.css` 的胜负条件／出击提示面板安全区、长文排版与滚动兜底 | 无独立模拟数值测试 | `objective-panel-layout.spec.ts` |
 | “遊戲功能”原版“子 選 單”的五项顺序、`ON/OFF`、面板／命中行几何、原版调色板与手形光标，以及键盘和鼠标切换 | 无独立模拟数值测试 | `game-functions-menu.spec.ts` |
-| 模块 23 啟動流程：Softstar Logo、加法式调色板淡入、開場背景淡出淡入与 `A/23`+`A/24` 点阵滚动文字、標題 8×8 抖动溶解、点阵菜单文字与 50% 棋盘高亮、两套素材与 1608 tick 空闲重播 | `startup.test.ts` | `startup.spec.ts`；各关卡通过 `startup-controls.ts` 复用真实跳過开场路径——Logo 期间的按键只缩短停留，必须等滚动開場接管后再送一次动作 |
+| 模块 23 啟動流程：Softstar Logo、加法式调色板淡入、開場背景淡出淡入与 `A/23`+`A/24` 点阵滚动文字、標題 8×8 抖动溶解、点阵菜单文字与 50% 棋盘高亮、两套素材与 1608 tick 空闲重播、`Esc`／鼠标右键共用的取消语义与 `REMAKE-112` 的 `MUSIC/1` 循环与取消续播 | `startup.test.ts` | `startup.spec.ts`；各关卡通过 `startup-controls.ts` 复用真实跳過开场路径——Logo 期间的按键只缩短停留，必须等滚动開場接管后再送一次动作 |
 | 存档 schema 与迁移 | `save.test.ts` | `startup.spec.ts` 或对应关卡的存读档用例 |
 | 第 4 关内容、行为 12 结界路线与 `route-pulse.ts`／`route-pulse-presentation.ts` 的两层力场电波 | `stage4-content.test.ts`、`stage4-battle.test.ts`、`route-pulse-presentation.test.ts`、`stage-runtime.test.ts` | `stage4.spec.ts` |
 | 第 7 关内容、部署与战斗合同 | `stage7-content.test.ts`、`stage7-battle.test.ts`、`stage-runtime.test.ts` | `stage7.spec.ts` |
@@ -88,6 +88,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 第 0–6 关内容或流程 | 对应 `stageN-*.test.ts` | 对应 `stageN.spec.ts`；真实通关只在入口合同受影响时运行 |
 | `dialogue-text.ts`、剧情对话 DOM、原生 Big5／ASCII 固定字宽、逐字推进、右键跳过确认与输入阻断 | 无独立模拟数值测试 | `stage0.spec.ts` 的剧情对话用例、`stage49-ending.spec.ts` 的上下窗长行排版；各关卡通过 `dialogue-controls.ts` 复用真实跳过路径 |
 | `audio.ts`、`audio-settings.ts` 的四类音效请求门与走路声 `E/14`：玩家／我方自动／工兵構築／半龍戰士傳送／逐关脚本移动各请求一次，返悔与 `REMAKE-106` 的敌方阶段静音，走路声随移动演出结束淡出收尾（`data-walk-effect-active`） | `audio.test.ts` 的通道路由 | `stage0.spec.ts` 的 `RHP-05`／`RHP-05b` 与 `S00-A` 移动段、我方自动见 `stage2.spec.ts`、敌方静音见 `stage3.spec.ts` 的 `S03-N/O` |
+| 逆向 RIX WAV 到运行时去重 OGG、Stage 0 无缝派生、源/输出哈希和发布目录禁用旧音乐 WAV | `music-assets.test.ts`、`credits.test.ts`、`stage49-ending.test.ts` | `stage0.spec.ts` 的 `S00-P`、`startup.spec.ts` 音频激活、`stage49-ending.spec.ts` 的音乐阶段 |
 | 部署 | `deployment*.test.ts` | `deployment-lab.spec.ts` 或对应关卡部署用例 |
 | 肖像目录与职业通用头像回退 | `portrait.test.ts`、`arena.test.ts`、对应 `stageN-battle.test.ts`、`promotion.test.ts` | `portrait-lab.spec.ts`、`arena.spec.ts` 或具体关卡肖像用例 |
 

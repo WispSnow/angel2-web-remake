@@ -7,7 +7,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE26_COLUMN_PUSH,
   STAGE26_CONSTRUCTION_TOKENS,
@@ -181,10 +181,10 @@ export const STAGE26_ASSETS = {
   },
   enemyPhaseTailPresentations: [STAGE26_COLUMN_PUSH_PRESENTATION],
   audio: {
-    playerEntry: "/assets/original/battle-stage26-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage26-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage26-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage26-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 29),
+    playerLoop: musicAsset("MUSIC", 28),
+    enemyEntry: musicAsset("MUSIC", 27),
+    enemyLoop: musicAsset("MUSIC", 26),
   },
 } as const;
 

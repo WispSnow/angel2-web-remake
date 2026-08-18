@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE38_CONSTRUCTION_TOKENS,
   STAGE38_CONTENT_IDENTITY,
@@ -168,10 +168,10 @@ export const STAGE38_ASSETS = {
     "enemy-engineer": "/assets/original/technique-lab/units/enemy-engineer.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage38-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage38-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage38-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage38-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 33),
+    playerLoop: musicAsset("MUSIC", 32),
+    enemyEntry: musicAsset("MUSIC", 5),
+    enemyLoop: musicAsset("MUSIC", 4),
   },
 } as const;
 

@@ -1,4 +1,5 @@
 import type { Difficulty } from "../types";
+import { musicAsset } from "./music-assets";
 
 /**
  * The pretitle logo, intro plates, title art, BK/40 menu frames, glyph font and
@@ -7,8 +8,8 @@ import type { Difficulty } from "../types";
  */
 export const STARTUP_ASSETS = {
   audio: {
-    intro: "/assets/original/startup/audio/intro.wav",
-    title: "/assets/original/startup/audio/title.wav",
+    intro: musicAsset("MUSIC", 14),
+    title: musicAsset("MUSIC", 1),
   },
 } as const;
 

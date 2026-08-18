@@ -4,7 +4,7 @@ import * as actionContent from "./stage1-actions.generated";
 import { registerActionContent } from "./actions";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE21_CONSTRUCTION_TOKENS,
   STAGE21_CONTENT_IDENTITY,
@@ -156,11 +156,11 @@ export const STAGE21_ASSETS = {
   },
   unitSprites: {},
   audio: {
-    story: "/assets/original/story-stage21.wav",
-    playerEntry: "/assets/original/battle-stage21-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage21-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage21-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage21-enemy-loop.wav",
+    story: musicAsset("MAGIC", 77),
+    playerEntry: musicAsset("MUSIC", 7),
+    playerLoop: musicAsset("MUSIC", 6),
+    enemyEntry: musicAsset("MUSIC", 31),
+    enemyLoop: musicAsset("MUSIC", 30),
   },
 } as const;
 

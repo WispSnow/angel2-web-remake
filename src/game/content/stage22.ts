@@ -6,7 +6,7 @@ import { classFallbackPortraitFor, classIdFromNativeRecord, className } from "./
 import { untouchedEntryExperience } from "./campaign-entry-experience";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE22_CONSTRUCTION_TOKENS,
   STAGE22_CONTENT_IDENTITY,
@@ -242,10 +242,10 @@ export const STAGE22_ASSETS = {
     "enemy-dragon": "/assets/original/technique-lab/units/enemy-dragon.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage22-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage22-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage22-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage22-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 35),
+    playerLoop: musicAsset("MUSIC", 34),
+    enemyEntry: musicAsset("MUSIC", 13),
+    enemyLoop: musicAsset("MUSIC", 12),
   },
 } as const;
 

@@ -96,14 +96,18 @@ export function mountStartup(
   let idleSince = 0;
   let font: HTMLImageElement | undefined;
   let musicStarted = false;
+  /**
+   * MUSIC/1 starts inside the title assembly, which can finish before the page
+   * has ever seen a gesture, so a blocked autoplay has to be retried on the next
+   * input. This flag keeps that retry from resurrecting a track the native flow
+   * deliberately stopped.
+   */
+  let titleMusicStopped = false;
   let disposed = false;
   const loadedImages = new Map<string, HTMLImageElement>();
 
   root.innerHTML = `
     <div class="page-shell startup-shell">
-      <header class="project-header">
-        <div><span class="eyebrow">原版啟動流程</span><h1>天使帝國 II</h1></div>
-      </header>
       <div class="game-stage">
         <div class="game-viewport" id="startup-viewport">
           <section class="logical-screen startup-screen" id="startup-screen" data-testid="startup-screen"
@@ -190,6 +194,14 @@ export function mountStartup(
   introAudio.preload = "auto";
   titleAudio.volume = 0.32;
   titleAudio.preload = "auto";
+  /**
+   * [H] The evidence records only explicit MUSIC/1 stops — the idle replay, the
+   * difficulty confirm and the difficulty cancel — while MUSIC/14 separately gets
+   * "stop on natural completion or any skip input". The native RIX driver is read
+   * as repeating MUSIC/1 until one of those stops, so the 13.37 s decode loops
+   * rather than leaving the title silent. Needs a playtest against the original.
+   */
+  titleAudio.loop = true;
 
   const play = (audio: HTMLAudioElement) => {
     void audio.play().catch(() => undefined);
@@ -197,6 +209,35 @@ export function mountStartup(
   const stopAudio = (audio: HTMLAudioElement) => {
     audio.pause();
     audio.currentTime = 0;
+  };
+  /**
+   * Mirrors `audio.ts#updateMusicDebugState`: MUSIC/1 lives in a detached `Audio`
+   * element, so its transport is otherwise unobservable from a test. The count
+   * separates "still the same playback" from "restarted from the top".
+   */
+  let titleMusicPlays = 0;
+  const updateTitleMusicDebugState = () => {
+    if (!testMode) return;
+    screen.dataset.titleMusicPlaying = String(!titleAudio.paused);
+    screen.dataset.titleMusicPlayCount = String(titleMusicPlays);
+    screen.dataset.titleMusicLoop = String(titleAudio.loop);
+  };
+  const startTitleMusic = () => {
+    titleMusicStopped = false;
+    titleMusicPlays += 1;
+    play(titleAudio);
+    updateTitleMusicDebugState();
+  };
+  const stopTitleMusic = () => {
+    titleMusicStopped = true;
+    stopAudio(titleAudio);
+    updateTitleMusicDebugState();
+  };
+  /** Only retries a MUSIC/1 start the browser refused, never a native stop. */
+  const resumeBlockedTitleMusic = () => {
+    if (!musicStarted || titleMusicStopped || !titleAudio.paused) return;
+    play(titleAudio);
+    updateTitleMusicDebugState();
   };
 
   const recordDescription = (result: SaveSlotReadResult, slot: number): string => {
@@ -324,7 +365,7 @@ export function mountStartup(
    */
   const replayIntro = () => {
     if (phase !== "title" || !titleAssembled) return;
-    stopAudio(titleAudio);
+    stopTitleMusic();
     titleVariant = titleVariant === 0 ? 1 : 0;
     phase = "intro";
     titleAssembled = false;
@@ -370,7 +411,7 @@ export function mountStartup(
     }
     if (elapsed >= lowerStart && !musicStarted) {
       musicStarted = true;
-      play(titleAudio);
+      startTitleMusic();
     }
     const lowerSteps = Math.floor((elapsed - lowerStart) / dissolveStepMs);
     for (const [index, step] of STARTUP_TITLE.lowerReveal.dissolveSteps.entries()) {
@@ -483,6 +524,34 @@ export function mountStartup(
     startGame({ kind: "continue", save: result.save, slot, userActivated: true });
   };
 
+  /**
+   * The native flow has one cancel flag, not one per surface: `0000:0D2F` and the
+   * scrolling intro both end on either the confirm or the cancel flag, `0000:059F`
+   * returns from the difficulty menu, and `0000:1455` returns ASCII `X` from the
+   * slot list. `Escape` and the host right button are two mappings of that flag,
+   * so both run this and nothing else.
+   */
+  const cancelInput = () => {
+    if (phase === "pretitle") {
+      skipPretitleHold();
+      return;
+    }
+    if (phase === "intro") {
+      enterTitle();
+      return;
+    }
+    if (screen.dataset.startupPhase === "title-assemble") return;
+    if (phase === "difficulty") {
+      // [DD] The native `menus/difficulty/audioRule` issues the RIX stop on cancel
+      // as well as on confirm, which leaves the title menu silent for the rest of
+      // the visit. The remake keeps MUSIC/1 running through a cancel; only the
+      // confirm that actually leaves the startup flow stops it.
+      showTitleMenu();
+      return;
+    }
+    if (phase === "records") showTitleMenu();
+  };
+
   const onKeyDown = (event: KeyboardEvent) => {
     if (disposed || event.repeat) return;
     idleSince = performance.now();
@@ -497,7 +566,7 @@ export function mountStartup(
       enterTitle();
       return;
     }
-    if (titleAudio.paused) play(titleAudio);
+    resumeBlockedTitleMusic();
     if (screen.dataset.startupPhase === "title-assemble") return;
     if (phase === "title") {
       if (event.key === "ArrowUp" || event.key === "ArrowDown") {
@@ -514,7 +583,7 @@ export function mountStartup(
     if (phase === "records") {
       if (event.key === "Escape") {
         event.preventDefault();
-        showTitleMenu();
+        cancelInput();
       } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
         event.preventDefault();
         const delta = event.key === "ArrowUp" ? -1 : 1;
@@ -531,8 +600,7 @@ export function mountStartup(
     }
     if (event.key === "Escape") {
       event.preventDefault();
-      stopAudio(titleAudio);
-      showTitleMenu();
+      cancelInput();
     } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
       const delta = event.key === "ArrowUp" ? -1 : 1;
@@ -564,7 +632,7 @@ export function mountStartup(
   const onClick = (event: MouseEvent) => {
     const button = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action]");
     if (!button) return;
-    if (titleAudio.paused) play(titleAudio);
+    resumeBlockedTitleMusic();
     if (button.dataset.startupAction === "record-page") {
       setRecordIndex(moveSaveSlotPage(recordIndex, Number(button.dataset.pageDelta)));
       return;
@@ -586,6 +654,10 @@ export function mountStartup(
 
   const onPointerDown = (event: PointerEvent) => {
     idleSince = performance.now();
+    // `contextmenu` is the single home for the right button, so the skip below
+    // stays a left/primary-press path and one physical right press keeps meaning
+    // exactly one cancel wherever the phase lands by the time it fires.
+    if (event.button === 2) return;
     if (phase === "pretitle") {
       event.preventDefault();
       skipPretitleHold();
@@ -594,6 +666,14 @@ export function mountStartup(
     if (phase !== "intro") return;
     event.preventDefault();
     enterTitle();
+  };
+
+  const onContextMenu = (event: MouseEvent) => {
+    if (disposed || !(event.target as Element).closest("#startup-screen")) return;
+    event.preventDefault();
+    idleSince = performance.now();
+    resumeBlockedTitleMusic();
+    cancelInput();
   };
 
   /**
@@ -724,12 +804,14 @@ export function mountStartup(
     root.removeEventListener("pointerover", onPointerOver);
     root.removeEventListener("click", onClick);
     root.removeEventListener("pointerdown", onPointerDown);
+    root.removeEventListener("contextmenu", onContextMenu);
   };
 
   window.addEventListener("keydown", onKeyDown);
   root.addEventListener("pointerover", onPointerOver);
   root.addEventListener("click", onClick);
   root.addEventListener("pointerdown", onPointerDown);
+  root.addEventListener("contextmenu", onContextMenu);
   updateMenuSelection();
   void Promise.all([
     loadStartupFont().then((image) => { font = image; }),

@@ -255,15 +255,28 @@ describe("stage 1 generated content", () => {
       [STAGE1_ASSETS.portraits[42], "portraitMengxinman"],
       [STAGE1_ASSETS.portraits[43], "portraitDaisy"],
       [STAGE1_ASSETS.portraits[44], "portraitLadonna"],
+    ] as const;
+    for (const [url, sourceId] of expectedAssets) {
+      const bytes = await readFile(path.join(workspace, "public", url));
+      expect(sha256(bytes), `${sourceId}: ${url}`).toBe(sourceById[sourceId]?.sha256);
+    }
+    const musicManifest = JSON.parse(
+      await readFile(path.join(workspace, "public/assets/original/music/music-manifest.json"), "utf8"),
+    ) as { tracks: Array<{ output: string; outputSha256: string; sourceSha256: string }> };
+    const musicByOutput = new Map(musicManifest.tracks.map((track) => [track.output, track]));
+    const musicAssets = [
       [STAGE1_ASSETS.audio.story, "storyMusic"],
       [STAGE1_ASSETS.audio.playerEntry, "playerEntryMusic"],
       [STAGE1_ASSETS.audio.playerLoop, "playerLoopMusic"],
       [STAGE1_ASSETS.audio.enemyEntry, "enemyEntryMusic"],
       [STAGE1_ASSETS.audio.enemyLoop, "enemyLoopMusic"],
     ] as const;
-    for (const [url, sourceId] of expectedAssets) {
+    for (const [url, sourceId] of musicAssets) {
+      const track = musicByOutput.get(`public${url}`);
+      expect(track, `${sourceId}: ${url}`).toBeDefined();
       const bytes = await readFile(path.join(workspace, "public", url));
-      expect(sha256(bytes), `${sourceId}: ${url}`).toBe(sourceById[sourceId]?.sha256);
+      expect(sha256(bytes), `${sourceId}: ${url}`).toBe(track?.outputSha256);
+      expect(track?.sourceSha256, `${sourceId}: source hash`).toBe(sourceById[sourceId]?.sha256);
     }
     expect(await readFile(path.join(workspace, "public", STAGE1_ASSETS.enemySister)))
       .not.toHaveLength(0);

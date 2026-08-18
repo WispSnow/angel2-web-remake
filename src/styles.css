@@ -29,8 +29,6 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 [hidden] { display: none !important; }
 
 .page-shell { width: min(640px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 40px; }
-.project-header { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
-.project-header h1 { margin: 3px 0 0; color: #fff6da; font-size: clamp(20px, 3vw, 30px); font-weight: 700; letter-spacing: .06em; }
 .eyebrow, .panel-kicker { color: #dba638; font: 700 11px/1.2 system-ui, sans-serif; letter-spacing: .18em; text-transform: uppercase; }
 .game-stage { display: grid; grid-template-columns: minmax(0, 640px); align-items: start; }
 .game-viewport { width: 100%; max-width: 640px; overflow: hidden; box-shadow: 0 22px 70px #000b, 0 0 0 1px #3e2921; }
@@ -1431,8 +1429,6 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 
 @media (max-width: 560px) {
   .page-shell { width: 100%; padding: 12px 0 28px; }
-  .project-header { padding: 0 12px; align-items: center; }
-  .project-header h1 { font-size: 17px; }
   .eyebrow { font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {

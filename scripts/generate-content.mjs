@@ -15,7 +15,7 @@ const generators = [
   "generate-dynamic-terrain-assets.mjs",
   "generate-ai-technique-dialogue.mjs",
   "generate-technique-lab.mjs",
-  "generate-stage0-music.mjs",
+  "generate-music-assets.mjs",
   "generate-stage38-runtime.mjs",
   "generate-credits-runtime.mjs",
 ];

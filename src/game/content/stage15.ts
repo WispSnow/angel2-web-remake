@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE15_CONSTRUCTION_TOKENS,
   STAGE15_CONTENT_IDENTITY,
@@ -144,10 +144,10 @@ export const STAGE15_ASSETS = {
     "enemy-steel-armor-warrior": "/assets/original/technique-lab/units/enemy-steel-armor-warrior.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage15-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage15-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage15-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage15-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 19),
+    playerLoop: musicAsset("MUSIC", 18),
+    enemyEntry: musicAsset("MUSIC", 21),
+    enemyLoop: musicAsset("MUSIC", 20),
   },
 } as const;
 

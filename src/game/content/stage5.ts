@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE5_CONTENT_IDENTITY,
   STAGE5_DEPLOYMENT,
@@ -264,10 +264,10 @@ export const STAGE5_ASSETS = {
     "enemy-warrior": "/assets/original/technique-lab/units/enemy-warrior.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage5-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage5-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage5-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage5-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 29),
+    playerLoop: musicAsset("MUSIC", 28),
+    enemyEntry: musicAsset("MUSIC", 27),
+    enemyLoop: musicAsset("MUSIC", 26),
   },
 } as const;
 export const STAGE42_ASSETS = {
@@ -275,10 +275,10 @@ export const STAGE42_ASSETS = {
   minimap: "/assets/original/stage42-portal-minimap.png",
   unitSprites: {},
   audio: {
-    playerEntry: "/assets/original/battle-stage42-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage42-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage42-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage42-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 35),
+    playerLoop: musicAsset("MUSIC", 34),
+    enemyEntry: musicAsset("MUSIC", 13),
+    enemyLoop: musicAsset("MUSIC", 12),
   },
 } as const;
 

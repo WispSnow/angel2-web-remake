@@ -5,7 +5,7 @@ import { registerActionContent } from "./actions";
 import { classIdFromNativeRecord, className } from "./classes";
 import { registerStageStoryPages } from "./dialogue";
 import { registerStageSimulationEffects } from "./stage-effects";
-import { registerStageMusicPrograms } from "./music";
+import { musicAsset, registerStageMusicPrograms } from "./music";
 import {
   STAGE17_CONSTRUCTION_TOKENS,
   STAGE17_CONTENT_IDENTITY,
@@ -145,10 +145,10 @@ export const STAGE17_ASSETS = {
     "enemy-divine-sword-warrior": "/assets/original/technique-lab/units/enemy-divine-sword-warrior.png",
   },
   audio: {
-    playerEntry: "/assets/original/battle-stage17-player-entry.wav",
-    playerLoop: "/assets/original/battle-stage17-player-loop.wav",
-    enemyEntry: "/assets/original/battle-stage17-enemy-entry.wav",
-    enemyLoop: "/assets/original/battle-stage17-enemy-loop.wav",
+    playerEntry: musicAsset("MUSIC", 7),
+    playerLoop: musicAsset("MUSIC", 6),
+    enemyEntry: musicAsset("MUSIC", 21),
+    enemyLoop: musicAsset("MUSIC", 20),
   },
 } as const;
 

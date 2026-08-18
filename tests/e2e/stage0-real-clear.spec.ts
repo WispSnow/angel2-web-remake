@@ -135,7 +135,8 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
   await expect(page.getByTestId("quit-screen")).toHaveCount(0);
   await expect(dialogue).toBeVisible();
   await expect(dialogue).toHaveAttribute("data-source-record", "4");
-  await expect(page.getByRole("heading", { name: "天使帝國 II · 騎士城堡前" })).toBeVisible();
+  await expect(page.getByTestId("game-screen"))
+    .toHaveAttribute("aria-label", "天使帝國 II 騎士城堡前遊戲畫面");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-real-prebattle-entry.png`,
     animations: "disabled",
