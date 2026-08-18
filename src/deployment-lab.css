@@ -68,7 +68,7 @@
 }
 
 #deployment-phaser-root { z-index: 0; }
-#deployment-phaser-root canvas { image-rendering: pixelated; }
+#deployment-phaser-root canvas { image-rendering: var(--image-rendering, pixelated); }
 
 /* ---------------------------------------------------------------------------
    Deployment screen (REMAKE-011)
@@ -285,7 +285,7 @@
   object-fit: contain;
   object-position: center bottom;
   filter: saturate(.5) brightness(.66);
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 
 .deployment-entry-body {
@@ -459,7 +459,7 @@
 .deployment-map {
   display: block;
   background: #0a0f08;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 
 /* Half-second hard toggle between ally blue and the white `FFh` open-cell
@@ -581,7 +581,7 @@
   object-fit: cover;
   object-position: center top;
   border: 1px solid var(--panel-edge-bright);
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 
 .deployment-detail-state {

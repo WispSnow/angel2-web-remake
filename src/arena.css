@@ -138,7 +138,7 @@ body.arena-page {
   display: block;
   width: 100% !important;
   height: auto !important;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 
 .arena-terrain-legend {

@@ -1,13 +1,17 @@
 import { describe, expect, test } from "vitest";
 import {
+  DEFAULT_DISPLAY_PREFERENCES,
   DEFAULT_MUSIC_PREFERENCES,
   DEFAULT_PRESENTATION_PREFERENCES,
   DEFAULT_SOUND_PREFERENCES,
+  DISPLAY_PREFERENCES_KEY,
+  loadDisplayPreferences,
   loadMusicPreferences,
   loadPresentationPreferences,
   loadSoundPreferences,
   MUSIC_PREFERENCES_KEY,
   PRESENTATION_PREFERENCES_KEY,
+  saveDisplayPreferences,
   saveMusicPreferences,
   savePresentationPreferences,
   saveSoundPreferences,
@@ -114,5 +118,27 @@ describe("music preferences", () => {
       saveMusicPreferences(storage, { musicVolume });
       expect(loadMusicPreferences(storage)).toEqual({ musicVolume });
     }
+  });
+});
+
+describe("display preferences", () => {
+  test("defaults to the original-faithful sharp filter and rejects unknown modes", () => {
+    const storage = new MemoryStorage();
+    expect(loadDisplayPreferences(storage)).toEqual(DEFAULT_DISPLAY_PREFERENCES);
+    expect(DEFAULT_DISPLAY_PREFERENCES.imageScaling).toBe("sharp");
+    storage.setItem(DISPLAY_PREFERENCES_KEY, JSON.stringify({ imageScaling: "bicubic" }));
+    expect(loadDisplayPreferences(storage)).toEqual(DEFAULT_DISPLAY_PREFERENCES);
+    storage.setItem(DISPLAY_PREFERENCES_KEY, "{");
+    expect(loadDisplayPreferences(storage)).toEqual(DEFAULT_DISPLAY_PREFERENCES);
+  });
+
+  test("round-trips every supported mode under its own key", () => {
+    const storage = new MemoryStorage();
+    for (const imageScaling of ["sharp", "smooth", "integer"] as const) {
+      saveDisplayPreferences(storage, { imageScaling });
+      expect(loadDisplayPreferences(storage)).toEqual({ imageScaling });
+    }
+    // A host-display choice must not disturb the in-game presentation switches.
+    expect(storage.getItem(PRESENTATION_PREFERENCES_KEY)).toBeNull();
   });
 });

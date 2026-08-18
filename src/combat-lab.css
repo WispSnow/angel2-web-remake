@@ -86,7 +86,7 @@
   width: 800px;
   max-width: none;
   opacity: .72;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 
 .combat-lab-transport {

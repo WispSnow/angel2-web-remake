@@ -17,12 +17,12 @@
   color: #fff4c4;
   background: #000;
   box-shadow: 0 0 0 3px #e5ba62, 0 18px 52px #000b;
-  image-rendering: pixelated;
-  transform: scale(var(--game-scale, 1));
+  image-rendering: var(--image-rendering, pixelated);
+  transform: translateX(var(--game-offset-x, 0px)) scale(var(--game-scale, 1));
   transform-origin: top left;
 }
 
-.credits-screen img { image-rendering: pixelated; }
+.credits-screen img { image-rendering: var(--image-rendering, pixelated); }
 .credits-roll {
   position: absolute;
   left: 0;

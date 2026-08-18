@@ -31,7 +31,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .page-shell { width: min(640px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 40px; }
 .eyebrow, .panel-kicker { color: #dba638; font: 700 11px/1.2 system-ui, sans-serif; letter-spacing: .18em; text-transform: uppercase; }
 .game-stage { display: grid; grid-template-columns: minmax(0, 640px); align-items: start; }
-.game-viewport { width: 100%; max-width: 640px; overflow: hidden; box-shadow: 0 22px 70px #000b, 0 0 0 1px #3e2921; }
+.game-viewport { width: 100%; max-width: 640px; overflow: hidden; background: #050405; box-shadow: 0 22px 70px #000b, 0 0 0 1px #3e2921; }
 .logical-screen {
   --game-scale: 1;
   --native-cursor-hand: url("/assets/original/command-menu-pointer.png") 3 2, pointer;
@@ -39,13 +39,20 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   width: 640px;
   height: 350px;
   overflow: hidden;
-  transform: scale(var(--game-scale));
+  transform: translateX(var(--game-offset-x, 0px)) scale(var(--game-scale, 1));
   transform-origin: left top;
   background: #050405;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
   user-select: none;
   cursor: var(--native-cursor-hand);
 }
+
+/* Phaser writes `image-rendering: pixelated` straight onto its canvas element
+ * whenever `pixelArt` is enabled, and an inline declaration outranks the
+ * inherited one. The host preference has to win over it, so this is the one
+ * place `!important` is warranted. Labs that never call `configureGameScaling`
+ * fall back to the pixelated default through the custom property. */
+canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 
 .visually-hidden {
   position: absolute;
@@ -73,12 +80,12 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   inset: 0;
   width: 640px;
   height: 350px;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .startup-title > img {
   position: absolute;
   display: block;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }
 /* 0000:19F2 draws BK/40 image 0 at (480,45) and 0000:1B7E image 1 at (480,21);
@@ -252,7 +259,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 }
 
 .battle-chrome { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #0a0708; }
-.battle-chrome > img { position: absolute; display: block; image-rendering: pixelated; }
+.battle-chrome > img { position: absolute; display: block; image-rendering: var(--image-rendering, pixelated); }
 .chrome-top { left: 0; top: 0; width: 480px; height: 23px; }
 .chrome-corner-left { left: 0; top: 23px; width: 40px; height: 34px; }
 .chrome-corner-right { left: 440px; top: 23px; width: 40px; height: 34px; }
@@ -269,7 +276,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   display: block;
   width: 640px !important;
   height: 350px !important;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
   cursor: var(--native-cursor-hand);
 }
 #phaser-root canvas[data-native-pointer-cursor="up"] {
@@ -285,7 +292,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   cursor: url("/assets/original/native-cursor-right.png") 23 9, e-resize;
 }
 .battle-foreground { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
-.battle-foreground > img { position: absolute; top: 140px; width: 32px; height: 191px; image-rendering: pixelated; }
+.battle-foreground > img { position: absolute; top: 140px; width: 32px; height: 191px; image-rendering: var(--image-rendering, pixelated); }
 .statue-foreground-left { left: 40px; }
 .statue-foreground-right { left: 408px; }
 .story-background { position: absolute; z-index: 8; inset: 0; background: #000 url("/assets/original/story-palace.png") center / 320px 200px no-repeat; }
@@ -298,14 +305,14 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 
 .bottom-location { position: absolute; z-index: 6; left: 80px; top: 331px; width: 320px; height: 19px; border-block: 1px solid #d8aa2c; color: #fff; background: #5d3b2b; text-align: center; font-size: 17px; line-height: 16px; text-shadow: 1px 1px #000; pointer-events: none; }
 .bottom-round { position: absolute; z-index: 7; left: 480px; top: 322px; width: 160px; height: 28px; color: #fff; text-align: center; font-size: 16px; pointer-events: none; }
-.bottom-round img { position: absolute; inset: 0; display: block; width: 160px; height: 28px; image-rendering: pixelated; }
+.bottom-round img { position: absolute; inset: 0; display: block; width: 160px; height: 28px; image-rendering: var(--image-rendering, pixelated); }
 .bottom-round span { position: absolute; left: 16px; top: 5px; width: 128px; height: 20px; line-height: 20px; text-shadow: 1px 1px #000; }
 /* REMAKE-110: 回合框只有三个字符的原版位置，倒数放不进去，所以警告只改字色。
    不做闪烁——那需要额外的减少动态分支，而且这里要的是持续可读，不是吸引注意。 */
 .bottom-round[data-round-limit-warning="true"] span { color: #ffb7a8; }
 
-.animated-portrait { position: relative; display: block; overflow: hidden; image-rendering: pixelated; }
-.animated-portrait > img { position: absolute; display: block; image-rendering: pixelated; pointer-events: none; }
+.animated-portrait { position: relative; display: block; overflow: hidden; image-rendering: var(--image-rendering, pixelated); }
+.animated-portrait > img { position: absolute; display: block; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
 .animated-portrait .portrait-base { z-index: 0; inset: 0; width: 100%; height: 100%; }
 .animated-portrait .portrait-eye,
 .animated-portrait .portrait-mouth { z-index: 1; opacity: 0; }
@@ -330,8 +337,8 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .unit-detail { position: absolute; z-index: 1; inset: 0; width: 152px; height: 317px; }
 .unit-detail-shade { position: absolute; z-index: 0; left: -4px; top: -4px; width: 160px; height: 321px; background: linear-gradient(#5d4131 0 146px, rgba(3, 2, 3, .72) 146px); }
 .hud-portrait { position: absolute; z-index: 1; left: 4px; top: 4px; width: 112px; height: 112px; }
-.hud-unit-top-chrome { position: absolute; z-index: 2; left: -4px; top: -4px; display: block; width: 160px; height: 149px; image-rendering: pixelated; }
-.hud-unit-body-frame { position: absolute; z-index: 2; left: -4px; top: 146px; display: block; width: 160px; height: 171px; image-rendering: pixelated; }
+.hud-unit-top-chrome { position: absolute; z-index: 2; left: -4px; top: -4px; display: block; width: 160px; height: 149px; image-rendering: var(--image-rendering, pixelated); }
+.hud-unit-body-frame { position: absolute; z-index: 2; left: -4px; top: 146px; display: block; width: 160px; height: 171px; image-rendering: var(--image-rendering, pixelated); }
 .hud-identity { position: absolute; z-index: 3; left: 0; top: 119px; display: flex; width: 152px; height: 22px; align-items: center; color: #fff; text-align: center; }
 .hud-identity b {
   display: block;
@@ -358,7 +365,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .stat-list dt { color: #f4efcf; } .stat-list dd { margin: 0; text-align: right; font-size: 15px; font-weight: 700; }
 .hud-status-list { position: absolute; z-index: 3; left: 0; top: 255px; display: grid; grid-template-columns: repeat(4, 38px); grid-auto-rows: 30px; width: 156px; height: 61px; margin: 0; padding: 0; overflow: visible; list-style: none; }
 .hud-status-item { position: relative; width: 38px; height: 30px; }
-.hud-status-item img { position: absolute; left: 0; top: 0; display: block; width: 40px; height: 31px; image-rendering: pixelated; }
+.hud-status-item img { position: absolute; left: 0; top: 0; display: block; width: 40px; height: 31px; image-rendering: var(--image-rendering, pixelated); }
 .hud-status-item > span { position: absolute; z-index: 1; left: -6px; top: 20px; min-width: 8px; color: #fff; font: 700 9px/10px "Arial Narrow", sans-serif; text-align: right; text-shadow: 1px 1px #000, -1px 0 #000; }
 .hud-tactical { position: absolute; left: -4px; top: -4px; width: 160px; height: 321px; overflow: hidden; }
 .terrain-detail {
@@ -399,10 +406,10 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   cursor: var(--native-cursor-hand, pointer);
   pointer-events: auto;
 }
-.tactical-panel-art { position: absolute; z-index: 0; left: 0; top: 0; width: 160px; height: 149px; image-rendering: pixelated; pointer-events: none; }
-.tactical-panel-state { position: absolute; z-index: 1; display: block; image-rendering: pixelated; pointer-events: none; }
-.tactical-minimap { position: absolute; z-index: 1; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: pixelated; }
-.tactical-minimap-frame { position: absolute; z-index: 2; left: 0; top: 150px; display: block; width: 160px; height: 171px; image-rendering: pixelated; pointer-events: none; }
+.tactical-panel-art { position: absolute; z-index: 0; left: 0; top: 0; width: 160px; height: 149px; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
+.tactical-panel-state { position: absolute; z-index: 1; display: block; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
+.tactical-minimap { position: absolute; z-index: 1; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: var(--image-rendering, pixelated); }
+.tactical-minimap-frame { position: absolute; z-index: 2; left: 0; top: 150px; display: block; width: 160px; height: 171px; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
 .hud-tactical:not(.under-unit) .tactical-minimap { pointer-events: auto; cursor: var(--native-cursor-hand); }
 .tactical-minimap > img { position: absolute; inset: 0; width: 150px; height: 150px; }
 .minimap-viewport { position: absolute; z-index: 1; width: 30px; height: 21px; border: 1px solid #000; box-shadow: 0 0 0 1px #b99b73; }
@@ -467,7 +474,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   color: #fff;
   background: #5d4131;
   box-shadow: 16px 16px 0 #000;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .native-settings-menu::before {
   content: "";
@@ -639,7 +646,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
     ) left top / 2px 2px repeat;
   background-color: transparent;
   box-shadow: 3px 4px 0 #0009;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .action-menu.native-command-menu::before,
 .action-menu.native-command-menu::after { content: none; }
@@ -679,7 +686,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   background: url("/assets/original/command-menu-selection.png") left top / 144px 37px no-repeat;
   opacity: 0;
   pointer-events: none;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .action-menu.native-command-menu button:hover,
 .action-menu.native-command-menu button.is-selected { color: #fff; background: transparent; }
@@ -897,7 +904,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   height: 350px;
   overflow: hidden;
   color: #fff;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .full-combat::before {
   position: absolute;
@@ -941,7 +948,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   width: 448px;
   height: 148px;
   max-width: none;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 /* Far layer (wall + walkway) pans at 1×, near floor rows at 2×; each is the
    same cyclic 448 px image shown twice for seamless wrap. */
@@ -963,10 +970,10 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   bottom: 0;
   display: block;
   max-width: none;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .full-combat-lance,
-.full-combat-projectile { position: absolute; z-index: 4; left: 0; top: 0; max-width: none; image-rendering: pixelated; }
+.full-combat-projectile { position: absolute; z-index: 4; left: 0; top: 0; max-width: none; image-rendering: var(--image-rendering, pixelated); }
 .full-combat-particles { position: absolute; z-index: 2; inset: 0; }
 .full-combat-particles img {
   position: absolute;
@@ -974,7 +981,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   top: 0;
   display: block;
   max-width: none;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .full-combat-strip {
   position: absolute;
@@ -1031,7 +1038,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   height: 104px;
   border: 2px ridge #e7b827;
   object-fit: cover;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .full-status.left > img { left: 6px; }
 .full-status.right > img { right: 6px; }
@@ -1122,7 +1129,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   background-position: 0 0, 0 123px;
   background-size: 112px 17px, 112px 23px;
   background-repeat: no-repeat;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }
 .dialogue-portrait::after,
@@ -1141,7 +1148,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   background-position: 0 0, 107px 0;
   background-size: 8px 8px;
   background-repeat: repeat-y;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }
 .dialogue-portrait-name,
@@ -1174,7 +1181,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   border: 0;
   background: transparent var(--dialogue-text-window) 0 0 / 400px 86px no-repeat;
   box-shadow: none;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .dialogue-speaker {
   position: absolute;
@@ -1237,7 +1244,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   font: 700 18px/24px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
   text-align: center;
   text-shadow: 1px 1px #000;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .action-menu.native-command-menu.dialogue-skip-menu {
   z-index: 7;
@@ -1309,7 +1316,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   width: 40px;
   height: 43px;
   object-fit: contain;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 .promotion-art-missing {
   color: #bda979;
@@ -1427,9 +1434,46 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .quit-screen h2 { margin: 0; font-size: 28px; letter-spacing: .12em; }
 .quit-screen p { margin: 12px 0 0; color: #ddd0b4; font-size: 15px; }
 
+/* Host-display controls. These sit outside the 640x350 logical screen because
+ * they choose how the browser resamples the finished frame - the same class of
+ * choice as browser zoom - and must not be mistaken for an original sub-menu
+ * entry. They never reach the simulation, the PRNG or the save payload. */
+.display-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: #c4ae86;
+  font: 12px/1.5 system-ui, sans-serif;
+}
+.display-settings-label {
+  color: #dba638;
+  font: 700 11px/1.2 system-ui, sans-serif;
+  letter-spacing: .18em;
+}
+.display-settings-options { display: flex; gap: 4px; }
+.display-settings-options > button {
+  padding: 3px 12px;
+  border: 1px solid #4b3527;
+  border-radius: 2px;
+  color: #c9b590;
+  background: #1a1214;
+  cursor: pointer;
+  font: 12px/1.5 system-ui, sans-serif;
+}
+.display-settings-options > button:hover { border-color: #7a5730; color: #f3dcae; }
+.display-settings-options > button.is-selected {
+  border-color: var(--gold);
+  color: var(--ink);
+  background: var(--gold);
+}
+.display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
+
 @media (max-width: 560px) {
   .page-shell { width: 100%; padding: 12px 0 28px; }
   .eyebrow { font-size: 9px; }
+  .display-settings { padding: 0 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; transition-duration: .001ms !important; }

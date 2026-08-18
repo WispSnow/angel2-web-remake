@@ -15,6 +15,23 @@ export interface SoundPreferences {
 
 export type MusicVolume = 0 | 1 | 2 | 3 | 4;
 
+/**
+ * How the 640x350 logical screen is resampled on its way to the host display.
+ * This is a host-display preference in the same family as browser zoom: it never
+ * reaches the simulation, the PRNG or the save payload, so it lives outside the
+ * original sub-menu instead of inside it.
+ *
+ * - `sharp`   nearest neighbour, the original-faithful default.
+ * - `smooth`  bilinear, even at fractional scales but soft.
+ * - `integer` nearest neighbour with the scale snapped to a whole number of
+ *             device pixels, so every source pixel keeps the same size.
+ */
+export type ImageScalingMode = "sharp" | "smooth" | "integer";
+
+export interface DisplayPreferences {
+  imageScaling: ImageScalingMode;
+}
+
 export interface MusicPreferences {
   musicVolume: MusicVolume;
 }
@@ -27,6 +44,7 @@ export interface PreferenceStorage {
 export const PRESENTATION_PREFERENCES_KEY = "angel2.preferences.presentation.v1";
 export const SOUND_PREFERENCES_KEY = "angel2.preferences.sound.v1";
 export const MUSIC_PREFERENCES_KEY = "angel2.preferences.music.v1";
+export const DISPLAY_PREFERENCES_KEY = "angel2.preferences.display.v1";
 
 export const DEFAULT_PRESENTATION_PREFERENCES: Readonly<PresentationPreferences> = {
   battlePresentation: "full",
@@ -46,6 +64,13 @@ export const DEFAULT_SOUND_PREFERENCES: Readonly<SoundPreferences> = {
 export const DEFAULT_MUSIC_PREFERENCES: Readonly<MusicPreferences> = {
   musicVolume: 4,
 };
+
+export const DEFAULT_DISPLAY_PREFERENCES: Readonly<DisplayPreferences> = {
+  imageScaling: "sharp",
+};
+
+export const isImageScalingMode = (value: unknown): value is ImageScalingMode =>
+  value === "sharp" || value === "smooth" || value === "integer";
 
 export const isMusicVolume = (value: unknown): value is MusicVolume =>
   Number.isInteger(value) && typeof value === "number" && value >= 0 && value <= 4;
@@ -135,4 +160,26 @@ export function saveMusicPreferences(
   preferences: MusicPreferences,
 ): void {
   storage.setItem(MUSIC_PREFERENCES_KEY, JSON.stringify(preferences));
+}
+
+export function loadDisplayPreferences(storage: PreferenceStorage): DisplayPreferences {
+  const raw = storage.getItem(DISPLAY_PREFERENCES_KEY);
+  if (!raw) return { ...DEFAULT_DISPLAY_PREFERENCES };
+  try {
+    const candidate = JSON.parse(raw) as Partial<DisplayPreferences>;
+    return {
+      imageScaling: isImageScalingMode(candidate.imageScaling)
+        ? candidate.imageScaling
+        : DEFAULT_DISPLAY_PREFERENCES.imageScaling,
+    };
+  } catch {
+    return { ...DEFAULT_DISPLAY_PREFERENCES };
+  }
+}
+
+export function saveDisplayPreferences(
+  storage: PreferenceStorage,
+  preferences: DisplayPreferences,
+): void {
+  storage.setItem(DISPLAY_PREFERENCES_KEY, JSON.stringify(preferences));
 }

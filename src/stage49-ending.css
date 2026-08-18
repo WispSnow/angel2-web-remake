@@ -24,14 +24,14 @@
   background: #02030a;
   box-shadow: 0 0 0 3px #e5ba62, 0 18px 52px #000b;
   cursor: pointer;
-  image-rendering: pixelated;
-  transform: scale(var(--game-scale, 1));
+  image-rendering: var(--image-rendering, pixelated);
+  transform: translateX(var(--game-offset-x, 0px)) scale(var(--game-scale, 1));
   transform-origin: top left;
 }
 
 .stage49-screen:focus-visible { outline: 3px solid #fff; outline-offset: 6px; }
 .stage49-screen:disabled { cursor: default; }
-.stage49-screen img { image-rendering: pixelated; }
+.stage49-screen img { image-rendering: var(--image-rendering, pixelated); }
 
 .stage49-story,
 .stage49-roster,
@@ -103,7 +103,7 @@
 /* Native module 35 has no text window: 0000:069E types the UN/9+UN/10 bitmap
  * font straight onto the illustration, so the canvas covers the whole screen
  * and the paragraph exists only for assistive technology. */
-.stage49-epilogue-text { position: absolute; inset: 0; width: 640px; height: 350px; image-rendering: pixelated; pointer-events: none; }
+.stage49-epilogue-text { position: absolute; inset: 0; width: 640px; height: 350px; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
 
 .stage49-boundary { display: grid; place-content: center; gap: 13px; padding: 70px; background: radial-gradient(circle, #26336a, #060817 70%); text-align: center; }
 .stage49-boundary span { color: #a6b6ea; letter-spacing: 4px; }

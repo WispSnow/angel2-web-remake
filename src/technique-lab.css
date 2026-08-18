@@ -76,7 +76,7 @@
   display: block;
   width: 100% !important;
   height: 100% !important;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 
 .technique-lab-transport {

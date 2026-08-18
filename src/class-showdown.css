@@ -185,7 +185,7 @@ body.class-showdown-page {
   width: 40px;
   height: 44px;
   object-fit: contain;
-  image-rendering: pixelated;
+  image-rendering: var(--image-rendering, pixelated);
 }
 
 .class-record { color: #c9a54b; font: 700 11px/1 ui-monospace, monospace; }
