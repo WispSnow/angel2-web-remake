@@ -10,12 +10,24 @@ const seek = async (page: Page, timeMs: number) => {
 
 test("all four native lightning scripts expose their main, wave and cleanup phases", async ({ page }) => {
   const pageErrors: string[] = [];
+  const resourceRequests: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("request", (request) => resourceRequests.push(new URL(request.url()).pathname));
   await page.goto("/technique-lab.html");
   await expect(page.getByRole("heading", { name: "地圖技能動畫實驗室" })).toBeVisible();
   const canvas = page.locator("#technique-lab-canvas canvas");
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute("data-target", "23,18");
+  for (const id of ["lightning-1", "lightning-2", "lightning-3", "lightning-4"]) {
+    expect(resourceRequests).toContain(`/assets/original/map-action-atlases/${id}.json`);
+    expect(resourceRequests).toContain(`/assets/original/map-action-atlases/${id}.png`);
+  }
+  expect(resourceRequests.filter((pathname) =>
+    pathname.startsWith("/assets/original/map-actions/")
+      && !pathname.includes("/iron-plate/")
+      && !pathname.includes("/obstacle/"))).toEqual([]);
+  expect(resourceRequests.some((pathname) =>
+    pathname.includes("/assets/original/technique-lab/lightning/"))).toBe(false);
 
   const contracts = [
     { code: "1L", duration: 4140, waveAt: 3200, cleanupAt: 3640, affected: 2 },

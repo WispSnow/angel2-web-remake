@@ -57,9 +57,10 @@ for (const file of developmentOnlyFiles) {
 }
 
 // The only public assets used by the player build are under original/.
-// Technique-lab unit sprites are shared by campaign map rendering, but its
-// lightning frames and audio are laboratory-only and would otherwise be
-// copied by Vite's public directory pass.
+// Technique-lab unit sprites are shared by campaign map rendering, while its
+// audio is laboratory-only and would otherwise be copied by Vite's public
+// directory pass. The obsolete lightning directory is removed defensively;
+// the laboratory now shares the campaign map-action atlases.
 await rm(path.join(releaseDirectory, "assets", "labs"), { recursive: true, force: true });
 await rm(path.join(releaseDirectory, "assets", "original", "technique-lab", "lightning"), {
   recursive: true,

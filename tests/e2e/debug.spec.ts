@@ -940,8 +940,16 @@ test("a completed stage-three save enters the playable stage-four prebattle", as
 });
 
 test("the magician outer-ring fixture pushes once and releases after one enemy phase", async ({ page }) => {
+  const resourceRequests: string[] = [];
+  page.on("request", (request) => resourceRequests.push(new URL(request.url()).pathname));
   await page.goto("/?debugScenario=stage-01-magician&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  expect(resourceRequests).toContain("/assets/original/map-action-atlases/ice-1.json");
+  expect(resourceRequests).toContain("/assets/original/map-action-atlases/ice-1.png");
+  expect(resourceRequests.filter((pathname) =>
+    pathname.startsWith("/assets/original/map-actions/")
+      && !pathname.includes("/iron-plate/")
+      && !pathname.includes("/obstacle/"))).toEqual([]);
 
   const debugState = () => page.evaluate(() => window.__ANGEL2__?.getState() as {
     phase: string;

@@ -6,6 +6,7 @@ import {
   MAP_ACTION_ATLAS_IDS,
   MAP_ACTION_ATLASES,
 } from "../../src/game/content/map-action-atlases.generated";
+import { TECHNIQUE_LAB_GRAPHIC_ASSETS } from "../../src/game/content/technique-lab.generated";
 import {
   mapActionAtlasIdForAction,
   mapActionTextureRefFromLegacyKey,
@@ -106,7 +107,7 @@ describe("generated map-action atlases", () => {
     });
     expect(mapActionTextureRefFromLegacyKey("map-stomp-3-side2-1")).toEqual({
       texture: "map-action-stomp-3",
-      frame: "stomp-3__side2__01",
+      frame: "stomp-3__side-2__01",
     });
     expect(mapActionTextureRefFromLegacyKey("map-wd-0")).toEqual({
       texture: "map-action-wd",
@@ -123,5 +124,13 @@ describe("generated map-action atlases", () => {
     expect(mapActionAtlasIdForAction("recovery-3")).toBe("recovery-1");
     expect(mapActionAtlasIdForAction("magic-guard")).toBe("attack-up");
     expect(mapActionAtlasIdForAction("fire-4")).toBe("fire-4");
+  });
+
+  test("keeps the technique laboratory on map-action source paths", () => {
+    const sources = Object.values(TECHNIQUE_LAB_GRAPHIC_ASSETS).flat();
+    expect(sources.length).toBeGreaterThan(900);
+    expect(sources.every((source) => source.startsWith("/assets/original/map-actions/"))).toBe(true);
+    expect(sources.some((source) => source.includes("/technique-lab/lightning/"))).toBe(false);
+    for (const source of sources) expect(mapActionTextureRefFromSource(source)).toBeDefined();
   });
 });

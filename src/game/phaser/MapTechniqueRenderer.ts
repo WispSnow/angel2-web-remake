@@ -19,8 +19,8 @@ export interface LightningRenderContext {
   }[];
   readonly wavePositions: readonly { readonly x: number; readonly y: number }[];
   readonly cleanupPositions: readonly { readonly x: number; readonly y: number }[];
-  /** BattleScene supplies map-action source paths so release builds can use atlases. */
-  readonly assets?: MapTechniqueGraphicAssets;
+  /** Source paths resolve to atlas frames; renderers must not fall back to raw textures. */
+  readonly assets: MapTechniqueGraphicAssets;
 }
 
 export interface LightningRenderResult {
@@ -32,18 +32,6 @@ const resourceSlug = (resource: string): string => resource.replace(/[^a-z0-9]+/
 
 export const mapTechniqueTextureKey = (resource: string, frame: number): string =>
   `map-technique-${resourceSlug(resource)}-${frame}`;
-
-export function preloadMapTechniqueAssets(
-  scene: Phaser.Scene,
-  assets: MapTechniqueGraphicAssets,
-): void {
-  for (const [resource, frames] of Object.entries(assets)) {
-    frames.forEach((source, frame) => {
-      const key = mapTechniqueTextureKey(resource, frame);
-      if (!scene.textures.exists(key)) scene.load.image(key, source);
-    });
-  }
-}
 
 export function renderLightningFrame(
   scene: Phaser.Scene,
@@ -58,10 +46,10 @@ export function renderLightningFrame(
     resource: string,
     sourceFrame: number,
   ): Phaser.GameObjects.Image => {
-    const source = context.assets?.[resource]?.[sourceFrame];
+    const source = context.assets[resource]?.[sourceFrame];
+    if (!source) throw new Error(`missing map-action atlas source ${resource}/${sourceFrame}`);
     const textureKey = mapTechniqueTextureKey(resource, sourceFrame);
-    if (source) return addMapActionImageFromSource(scene, x, y, source, textureKey);
-    return scene.add.image(x, y, textureKey);
+    return addMapActionImageFromSource(scene, x, y, source, textureKey);
   };
   if (frame.kind === "main") {
     const phase = definition.phases[frame.phaseIndex];

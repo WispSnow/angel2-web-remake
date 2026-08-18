@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -639,21 +639,59 @@ dispelPresentation.dynamicPresentation.resource,
   action.graphicByTargetSide.side1,
   action.graphicByTargetSide.side2,
 ])];
+const mapActionSourceByResource = {
+  "MAGIC/8": "lightning-1/main",
+  "MAGIC/31": "lightning-1/hit",
+  "MAGIC/6": "lightning-1/cleanup",
+  "MAGIC/47": "lightning-2/primary",
+  "MAGIC/48": "lightning-2/column",
+  "MAGIC/24": "lightning-2/hit",
+  "MAGIC/3": "lightning-3/cloud",
+  "MAGIC/4": "lightning-3/column",
+  "MAGIC/25": "lightning-3/hit",
+  "MAGIC/39": "lightning-4/primary",
+  "MAGIC/40": "lightning-4/column",
+  "MAGIC/26": "lightning-4/hit",
+  "MAGIC/10": "ice-1/expansion",
+  "MAGIC/22": "fire-1",
+  "MAGIC/23": "fire-2/effect",
+  "MAGIC/27": "fire-3/effect",
+  "MAGIC/30": "fire-4/ground",
+  "MAGIC/28": "fire-4/column",
+  "MAGIC/29": "fire-4/finish",
+  "UN/61": "heal-1/primary",
+  "MAGIC/0": "heal-1/tail",
+  "MAGIC/37": "heal-2/primary",
+  "MAGIC/42": "heal-3/outer",
+  "MAGIC/41": "heal-3/loop",
+  "MAGIC/20": "recovery-1/effect",
+  "MAGIC/16": "attack-up/effect",
+  "MAGIC/17": "poison/rise",
+  "MAGIC/18": "poison/cloud",
+  "MAGIC/44": "confusion/effect",
+  "MAGIC/46": "attack-down/effect",
+  "MAGIC/45": "defense-down/effect",
+  "MAGIC/36": "spell-seal/effect",
+  "MAGIC/33": "defense-up/effect",
+  "UN/57": "dispel/effect",
+  "MAGIC/50": "stomp-1/side-1",
+  "MAGIC/49": "stomp-1/side-2",
+  "MAGIC/52": "stomp-2/side-1",
+  "MAGIC/51": "stomp-2/side-2",
+  "MAGIC/54": "stomp-3/side-1",
+  "MAGIC/53": "stomp-3/side-2",
+  "MAGIC/19": "wd/effect",
+};
 const techniqueGraphicAssets = {};
+await rm(path.join(publicRoot, "lightning"), { recursive: true, force: true });
 for (const resource of requiredResources) {
   const entry = graphicEntries.find(({ key }) => key === resource);
   if (!entry) throw new Error(`missing ${resource} graphic entry`);
-  const directory = resource.replace("/", "-").toLowerCase();
-  const destination = path.join(publicRoot, "lightning", directory);
-  await mkdir(destination, { recursive: true });
-  techniqueGraphicAssets[resource] = [];
-  for (const [index, source] of entry.renderedPaths.entries()) {
-    const filename = `${String(index).padStart(2, "0")}.png`;
-    await copyFile(path.join(root, source), path.join(destination, filename));
-    techniqueGraphicAssets[resource].push(
-      `/assets/original/technique-lab/lightning/${directory}/${filename}`,
-    );
-  }
+  const directory = mapActionSourceByResource[resource];
+  if (!directory) throw new Error(`missing map-action source mapping for ${resource}`);
+  if (entry.renderedPaths.length === 0) throw new Error(`${resource} has no rendered frames`);
+  techniqueGraphicAssets[resource] = entry.renderedPaths.map((_, index) =>
+    `/assets/original/map-actions/${directory}/${String(index).padStart(2, "0")}.png`);
 }
 
 const audioResources = [...new Set([

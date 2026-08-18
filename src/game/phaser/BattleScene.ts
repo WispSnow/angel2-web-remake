@@ -20,6 +20,7 @@ import {
   addMapActionImage,
   mapActionAtlasIdForAction,
   mapActionDebugTextureKey,
+  collectMapActionSources,
   preloadMapActionAtlases,
 } from "./map-action-atlas";
 
@@ -58,22 +59,6 @@ const NATIVE_POINTER_FRAME: Readonly<Record<NativePointerCursor, number>> = {
   left: 3,
   right: 4,
 };
-
-const MAP_ACTION_SOURCE_PREFIX = "/assets/original/map-actions/";
-
-function collectMapActionSources(value: unknown, output: string[]): void {
-  if (typeof value === "string") {
-    if (value.startsWith(MAP_ACTION_SOURCE_PREFIX)) output.push(value);
-    return;
-  }
-  if (Array.isArray(value)) {
-    value.forEach((entry) => collectMapActionSources(entry, output));
-    return;
-  }
-  if (value && typeof value === "object") {
-    Object.values(value).forEach((entry) => collectMapActionSources(entry, output));
-  }
-}
 
 interface DeathDescriptor {
   xOffset: number;
@@ -169,7 +154,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
   const mapTextureKey = `${controller.battle.stage.id}-map`;
   const presentationCatalog = hasExtendedActions ? actionPresentationCatalog() : undefined;
   const presentationAssets = hasExtendedActions ? actionPresentationAssetCatalog() : undefined;
-  const lightningAssets: MapTechniqueGraphicAssets | undefined = presentationAssets
+  const lightningAssets: MapTechniqueGraphicAssets = presentationAssets
     && hasLightningPresentation
     ? {
       ...(presentationActionIds.has("lightning-1") ? {
@@ -199,7 +184,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           ? presentationAssets.lightning2.cleanup
           : presentationAssets.lightning1.cleanup,
     }
-    : undefined;
+    : {};
   return class BattleScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
     private rangeGraphics!: Phaser.GameObjects.Graphics;
@@ -261,16 +246,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.load.image("turn-transition-shadow", ASSETS.turnTransition.shadow);
       ASSETS.turnTransition.dust.forEach((source, frame) =>
         this.load.image(`turn-transition-dust-${frame}`, source));
-      const mapActionSources: string[] = [];
-      collectMapActionSources(STAGE0_ACTION_PRESENTATION_ASSETS, mapActionSources);
+      const mapActionSources = collectMapActionSources(STAGE0_ACTION_PRESENTATION_ASSETS);
       if (presentationAssets) {
         const selectedDirectories = new Set(
           [...presentationActionIds].map(mapActionAtlasIdForAction),
         );
-        const extendedSources: string[] = [];
-        collectMapActionSources(presentationAssets, extendedSources);
+        const extendedSources = collectMapActionSources(presentationAssets);
         mapActionSources.push(...extendedSources.filter((source) => {
-          const relative = source.slice(MAP_ACTION_SOURCE_PREFIX.length);
+          const relative = source.slice("/assets/original/map-actions/".length);
           return selectedDirectories.has(relative.slice(0, relative.indexOf("/")));
         }));
       }

@@ -31,9 +31,15 @@ import {
 } from "../technique-lab-session";
 import {
   mapTechniqueTextureKey,
-  preloadMapTechniqueAssets,
   renderLightningFrame,
+  type MapTechniqueGraphicAssets,
 } from "./MapTechniqueRenderer";
+import {
+  addMapActionImageFromSource,
+  collectMapActionSources,
+  mapActionDebugTextureKey,
+  preloadMapActionAtlases,
+} from "./map-action-atlas";
 import type { StompPresentationStep } from "../stomp-presentation";
 import { renderPrayerPresentation } from "./PrayerRenderer";
 import type { PrayerOutcomeKind } from "../simulation/actions/types";
@@ -42,6 +48,58 @@ const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
 const WIDTH = TECHNIQUE_LAB_MAP.width * TILE_WIDTH;
 const HEIGHT = TECHNIQUE_LAB_MAP.height * TILE_HEIGHT;
+
+const techniqueLabGraphicAssets: MapTechniqueGraphicAssets = TECHNIQUE_LAB_GRAPHIC_ASSETS;
+
+const techniqueLabLightningAssets: Readonly<
+  Record<keyof typeof TECHNIQUE_LAB_LIGHTNING, MapTechniqueGraphicAssets>
+> = {
+  "1L": {
+    "MAGIC/8": STAGE1_ACTION_PRESENTATION_ASSETS.lightning1.main,
+    "MAGIC/31": STAGE1_ACTION_PRESENTATION_ASSETS.lightning1.hit,
+    "MAGIC/6": STAGE1_ACTION_PRESENTATION_ASSETS.lightning1.cleanup,
+  },
+  "2L": {
+    "MAGIC/47": STAGE1_ACTION_PRESENTATION_ASSETS.lightning2.primary,
+    "MAGIC/48": STAGE1_ACTION_PRESENTATION_ASSETS.lightning2.column,
+    "MAGIC/24": STAGE1_ACTION_PRESENTATION_ASSETS.lightning2.hit,
+    "MAGIC/6": STAGE1_ACTION_PRESENTATION_ASSETS.lightning2.cleanup,
+  },
+  "3L": {
+    "MAGIC/3": STAGE1_ACTION_PRESENTATION_ASSETS.lightning3.cloud,
+    "MAGIC/4": STAGE1_ACTION_PRESENTATION_ASSETS.lightning3.column,
+    "MAGIC/25": STAGE1_ACTION_PRESENTATION_ASSETS.lightning3.hit,
+    "MAGIC/6": STAGE1_ACTION_PRESENTATION_ASSETS.lightning3.cleanup,
+  },
+  "4L": {
+    "MAGIC/39": STAGE1_ACTION_PRESENTATION_ASSETS.lightning4.primary,
+    "MAGIC/40": STAGE1_ACTION_PRESENTATION_ASSETS.lightning4.column,
+    "MAGIC/26": STAGE1_ACTION_PRESENTATION_ASSETS.lightning4.hit,
+    "MAGIC/6": STAGE1_ACTION_PRESENTATION_ASSETS.lightning4.cleanup,
+  },
+};
+
+function mapActionSource(resource: string, frame: number): string {
+  const source = techniqueLabGraphicAssets[resource]?.[frame];
+  if (!source) throw new Error(`missing map-action atlas source ${resource}/${frame}`);
+  return source;
+}
+
+function addMapTechniqueImage(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  resource: string,
+  frame: number,
+): Phaser.GameObjects.Image {
+  return addMapActionImageFromSource(
+    scene,
+    x,
+    y,
+    mapActionSource(resource, frame),
+    mapTechniqueTextureKey(resource, frame),
+  );
+}
 
 export type TechniqueLabVisualFrame =
   | { readonly kind: "none" }
@@ -106,15 +164,12 @@ export function startTechniqueLabPhaser(
         if (assets.ally) this.load.image(`technique-lab-ally-${classId}`, assets.ally);
         this.load.image(`technique-lab-enemy-${classId}`, assets.enemy);
       }
-      preloadMapTechniqueAssets(this, TECHNIQUE_LAB_GRAPHIC_ASSETS);
-      STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary.forEach((source, frame) =>
-        this.load.image(`technique-lab-heal-primary-${frame}`, source));
-      STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail.forEach((source, frame) =>
-        this.load.image(`technique-lab-heal-tail-${frame}`, source));
-      STAGE1_ACTION_PRESENTATION_ASSETS.recovery1.effect.forEach((source, frame) =>
-        this.load.image(`technique-lab-recovery-${frame}`, source));
-      STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion.forEach((source, frame) =>
-        this.load.image(`technique-lab-ice-${frame}`, source));
+      const mapActionSources = [
+        ...collectMapActionSources(techniqueLabGraphicAssets),
+        ...collectMapActionSources(STAGE0_ACTION_PRESENTATION_ASSETS),
+        ...collectMapActionSources(STAGE1_ACTION_PRESENTATION_ASSETS),
+      ];
+      preloadMapActionAtlases(this, mapActionSources);
     }
 
     create(): void {
@@ -170,6 +225,7 @@ export function startTechniqueLabPhaser(
             effectCells: session.effectCells(),
             wavePositions: hitPositions,
             cleanupPositions: hitPositions,
+            assets: techniqueLabLightningAssets[actionCode],
           });
           this.effectObjects.push(...rendered.images);
           mapAnchorOffset = rendered.anchorOffset;
@@ -194,10 +250,11 @@ export function startTechniqueLabPhaser(
           if (sourceFrame === null) return;
           const column = index % descriptor.width;
           const row = Math.floor(index / descriptor.width);
-          this.effectObjects.push(this.add.image(
+          this.effectObjects.push(addMapTechniqueImage(this,
             (center.x + anchorOffset.x + descriptor.xOffset + column) * TILE_WIDTH,
             (center.y + anchorOffset.y + descriptor.yOffset + row) * TILE_HEIGHT,
-            mapTechniqueTextureKey(phase.resource, sourceFrame),
+            phase.resource,
+            sourceFrame,
           ).setOrigin(0).setDepth(8));
         });
       } else if (frame.kind === "heal-primary"
@@ -214,19 +271,20 @@ export function startTechniqueLabPhaser(
           if (sourceFrame === null || !phase) return;
           const column = index % descriptor.width;
           const row = Math.floor(index / descriptor.width);
-          this.effectObjects.push(this.add.image(
+          this.effectObjects.push(addMapTechniqueImage(this,
             (center.x + descriptor.xOffset + column) * TILE_WIDTH,
             (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
-            mapTechniqueTextureKey(phase.resource, sourceFrame),
+            phase.resource,
+            sourceFrame,
           ).setOrigin(0).setDepth(8));
         });
       } else if (frame.kind === "heal-primary" || frame.kind === "heal-tail") {
-        this.effectObjects.push(this.add.image(
+        this.effectObjects.push(addMapActionImageFromSource(this,
           center.x * TILE_WIDTH + TILE_WIDTH / 2,
           center.y * TILE_HEIGHT + TILE_HEIGHT,
           frame.kind === "heal-primary"
-            ? `technique-lab-heal-primary-${frame.frame}`
-            : `technique-lab-heal-tail-${frame.frame}`,
+            ? STAGE0_ACTION_PRESENTATION_ASSETS.heal1.primary[frame.frame]
+            : STAGE0_ACTION_PRESENTATION_ASSETS.heal1.tail[frame.frame],
         ).setOrigin(.5, 1).setDepth(8));
       } else if (frame.kind === "recovery") {
         const recovery = this.state.actionCode === "3I"
@@ -240,10 +298,10 @@ export function startTechniqueLabPhaser(
         if (sourceFrame !== null && sourceFrame !== undefined) {
           const frozenIds = new Set(pendingFrozenUnitIds);
           for (const unit of session.affectedUnits().filter(({ id }) => !frozenIds.has(id))) {
-            this.effectObjects.push(this.add.image(
+            this.effectObjects.push(addMapActionImageFromSource(this,
               unit.x * TILE_WIDTH + TILE_WIDTH / 2,
               unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-              `technique-lab-recovery-${sourceFrame}`,
+              STAGE1_ACTION_PRESENTATION_ASSETS.recovery1.effect[sourceFrame],
             ).setOrigin(.5).setDepth(8));
           }
         }
@@ -262,10 +320,11 @@ export function startTechniqueLabPhaser(
             if (sourceFrame === null) return;
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
-            this.effectObjects.push(this.add.image(
+            this.effectObjects.push(addMapTechniqueImage(this,
               (center.x + descriptor.xOffset + column) * TILE_WIDTH,
               (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
-              mapTechniqueTextureKey(phase.resource, sourceFrame),
+              phase.resource,
+              sourceFrame,
             ).setOrigin(0).setDepth(8));
           });
         } else if (frame.action === "attack-up" || frame.action === "magic-guard") {
@@ -274,10 +333,11 @@ export function startTechniqueLabPhaser(
             : TECHNIQUE_LAB_ATTACK_UP.phases[0];
           const runtimeTileCodes = phase.runtimeTileCodePairs[frame.frame] ?? [];
           runtimeTileCodes.forEach((runtimeTileCode, row) => {
-            this.effectObjects.push(this.add.image(
+            this.effectObjects.push(addMapTechniqueImage(this,
               center.x * TILE_WIDTH,
               (center.y + phase.descriptor.yOffset + row) * TILE_HEIGHT,
-              mapTechniqueTextureKey(phase.resource, runtimeTileCode - 1),
+              phase.resource,
+              runtimeTileCode - 1,
             ).setOrigin(0).setDepth(8));
           });
         } else {
@@ -286,10 +346,11 @@ export function startTechniqueLabPhaser(
           descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
-            this.effectObjects.push(this.add.image(
+            this.effectObjects.push(addMapTechniqueImage(this,
               (center.x + descriptor.xOffset + column) * TILE_WIDTH,
               (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
-              mapTechniqueTextureKey(phase.resource, sourceFrame),
+              phase.resource,
+              sourceFrame,
             ).setOrigin(0).setDepth(8));
           });
         }
@@ -302,10 +363,11 @@ export function startTechniqueLabPhaser(
             const descriptor = TECHNIQUE_LAB_POISON.phases[0].descriptor;
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
-            this.effectObjects.push(this.add.image(
+            this.effectObjects.push(addMapTechniqueImage(this,
               (center.x + descriptor.xOffset + column) * TILE_WIDTH,
               (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
-              mapTechniqueTextureKey(poisonPhase.resource, runtimeTileCode - 1),
+              poisonPhase.resource,
+              runtimeTileCode - 1,
             ).setOrigin(0).setDepth(8));
           });
         } else {
@@ -314,10 +376,11 @@ export function startTechniqueLabPhaser(
           descriptor?.low7BitFrameIndices.forEach((sourceFrame, index) => {
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
-            this.effectObjects.push(this.add.image(
+            this.effectObjects.push(addMapTechniqueImage(this,
               (center.x + descriptor.xOffset + column) * TILE_WIDTH,
               (center.y + descriptor.yOffset + row) * TILE_HEIGHT,
-              mapTechniqueTextureKey(poisonPhase.resource, sourceFrame),
+              poisonPhase.resource,
+              sourceFrame,
             ).setOrigin(0).setDepth(8));
           });
         }
@@ -338,11 +401,12 @@ export function startTechniqueLabPhaser(
       } else if (frame.kind === "dispel") {
         frame.runtimeTileCodes.forEach((runtimeTileCode, row) => {
           if (runtimeTileCode === 0) return;
-          this.effectObjects.push(this.add.image(
+          this.effectObjects.push(addMapTechniqueImage(this,
             center.x * TILE_WIDTH,
             (center.y + TECHNIQUE_LAB_DISPEL.dynamicPresentation.descriptor.yOffset + row)
               * TILE_HEIGHT,
-            `map-technique-un-57-${runtimeTileCode - 1}`,
+            TECHNIQUE_LAB_DISPEL.dynamicPresentation.resource,
+            runtimeTileCode - 1,
           ).setOrigin(0).setDepth(8));
         });
       } else if (frame.kind === "stomp") {
@@ -361,15 +425,19 @@ export function startTechniqueLabPhaser(
           + stomp.action.drawXCoordinate
           - targetImpactAnchor.x;
         this.effectObjects.push(
-          this.add.image(
+          addMapTechniqueImage(
+            this,
             drawX,
             targetGroundY + frame.step.y - targetImpactAnchor.y,
-            mapTechniqueTextureKey(resource, 0),
+            resource,
+            0,
           ).setOrigin(0).setDepth(8),
-          this.add.image(
+          addMapTechniqueImage(
+            this,
             drawX,
             targetGroundY + stomp.action.shadowDrawYCoordinate - targetImpactAnchor.y,
-            mapTechniqueTextureKey(resource, 1),
+            resource,
+            1,
           ).setOrigin(0).setDepth(8),
         );
       } else if (frame.kind === "construction") {
@@ -410,10 +478,10 @@ export function startTechniqueLabPhaser(
         const sourceFrame = frame.frame % STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion.length;
         for (const { position, value } of session.effectCells()) {
           if (value !== frame.rangeValue) continue;
-          this.effectObjects.push(this.add.image(
+          this.effectObjects.push(addMapActionImageFromSource(this,
             position.x * TILE_WIDTH + TILE_WIDTH / 2,
             position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-            `technique-lab-ice-${sourceFrame}`,
+            STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion[sourceFrame],
           ).setOrigin(.5).setDepth(8));
         }
       }
@@ -493,10 +561,11 @@ export function startTechniqueLabPhaser(
       const frozenIds = new Set(pendingFrozenUnitIds);
       for (const unit of this.state.units) {
         if (!frozenIds.has(unit.id)) continue;
-        this.frozenObjects.push(this.add.image(
+        this.frozenObjects.push(addMapActionImageFromSource(this,
           unit.x * TILE_WIDTH + TILE_WIDTH / 2,
           unit.y * TILE_HEIGHT + TILE_HEIGHT / 2,
-          "technique-lab-ice-5",
+          STAGE1_ACTION_PRESENTATION_ASSETS.ice1.expansion[5],
+          mapTechniqueTextureKey("MAGIC/22", 5),
         ).setOrigin(.5).setDepth(9));
       }
       this.game.canvas.dataset.frozenUnitCount = String(this.frozenObjects.length);
@@ -522,7 +591,7 @@ export function startTechniqueLabPhaser(
         : "frame" in frame ? String(frame.frame) : "-1";
       canvas.dataset.effectTileCount = String(count);
       canvas.dataset.effectTextureKeys = this.effectObjects.flatMap((object) =>
-        object instanceof Phaser.GameObjects.Image ? [object.texture.key] : []).join(",");
+        object instanceof Phaser.GameObjects.Image ? [mapActionDebugTextureKey(object)] : []).join(",");
       canvas.dataset.constructionTerrainCount = frame.kind === "construction" && frame.completed
         ? String(session.effectCells().length)
         : "0";

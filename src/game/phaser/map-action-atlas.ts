@@ -51,7 +51,7 @@ function sourceForLegacyKey(key: string): string | undefined {
   if (match) return `${MAP_ACTION_PREFIX}poison/${match[1]}/${paddedFrame(match[2])}.png`;
 
   match = /^map-stomp-([1-3])-(side1|side2)-(\d+)$/u.exec(key);
-  if (match) return `${MAP_ACTION_PREFIX}stomp-${match[1]}/${match[2]}/${paddedFrame(match[3])}.png`;
+  if (match) return `${MAP_ACTION_PREFIX}stomp-${match[1]}/side-${match[2].slice(-1)}/${paddedFrame(match[3])}.png`;
   match = /^map-wd-(\d+)$/u.exec(key);
   if (match) return `${MAP_ACTION_PREFIX}wd/effect/${paddedFrame(match[1])}.png`;
   return undefined;
@@ -62,6 +62,23 @@ export function mapActionAtlasIdForAction(actionId: string): string {
   if (actionId.startsWith("recovery-")) return "recovery-1";
   if (actionId === "magic-guard") return "attack-up";
   return actionId;
+}
+
+export function collectMapActionSources(value: unknown): string[] {
+  const output: string[] = [];
+  const visit = (entry: unknown): void => {
+    if (typeof entry === "string") {
+      if (entry.startsWith(MAP_ACTION_PREFIX)) output.push(entry);
+      return;
+    }
+    if (Array.isArray(entry)) {
+      entry.forEach(visit);
+      return;
+    }
+    if (entry && typeof entry === "object") Object.values(entry).forEach(visit);
+  };
+  visit(value);
+  return output;
 }
 
 export function mapActionTextureRefFromSource(source: string): MapActionTextureRef | undefined {
