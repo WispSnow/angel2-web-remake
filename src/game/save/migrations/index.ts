@@ -410,6 +410,24 @@ function normalizeStage3OpeningEvents(value: unknown): unknown {
 }
 
 /**
+ * REMAKE-111 only changes how stage 3's fourth corps plans its own phase. That
+ * plan is recomputed from public battle state every round and never saved, so a
+ * v88 save carries over as it stands: the corps simply holds its ground from
+ * the next automatic phase on. No field is added and none changes meaning.
+ */
+function migrateVersion88Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 88
+    || value.contentVersion !== "stage-3-fourth-corps-joined-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * The two stage-3 opening events are the only difference, and
  * `normalizeStage3OpeningEvents` has already backfilled them, so a v87 save
  * carries over as it stands. No field is added and none changes meaning.
@@ -2559,6 +2577,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
   const value = normalizeStage3OpeningEvents(raw);
+  const migratedVersion88 = migrateVersion88Save(value);
+  if (migratedVersion88) return migratedVersion88;
   const migratedVersion87 = migrateVersion87Save(value);
   if (migratedVersion87) return migratedVersion87;
   const migratedVersion86 = migrateVersion86Save(value);

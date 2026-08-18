@@ -171,5 +171,20 @@ describe("force registry", () => {
         preserveNativeFormation: false,
       },
     }], [units[0]])).toThrow(/entry slot outside/);
+
+    // REMAKE-111: a rally point outside the force would send the squad to
+    // someone it is not protecting, so it is rejected like a foreign commander.
+    expect(() => new ForceRegistry([{
+      ...expertForce("one", 1, ["1:1"]),
+      doctrine: {
+        strategy: "terrain-hold",
+        allowedTerrainSlots: [3],
+        entryTerrainSlots: [3],
+        restThresholdPercent: 50,
+        criticalHealThresholdPercent: 50,
+        preserveNativeFormation: false,
+        rally: { unitId: "1:2", meleeHoldsFire: true },
+      },
+    }], [units[0]])).toThrow(/Rally unit 1:2 is not a member/);
   });
 });

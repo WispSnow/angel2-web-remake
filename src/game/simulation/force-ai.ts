@@ -43,6 +43,39 @@ export interface ForceAiPlanningContext {
   ) => number;
 }
 
+/**
+ * One step closer to a squadmate without leaving the doctrine: the same ranking
+ * serves the native leader/follower branch and the `REMAKE-111` rally, so the
+ * two rules can never pull the same unit in opposite directions.
+ */
+function planCloseOnAlly(
+  context: ForceAiPlanningContext,
+  unit: BattleUnit,
+  destinationAlly: BattleUnit,
+  isAllowedPosition: (position: Position) => boolean,
+): AlliedAiAction | undefined {
+  if (destinationAlly.id === unit.id) return undefined;
+  const distanceBefore = manhattan(unit, destinationAlly);
+  const candidates = context.reachableCells(unit.id)
+    .filter(isAllowedPosition)
+    .map((position) => ({
+      position,
+      path: positionKey(position) === positionKey(unit)
+        ? [{ x: unit.x, y: unit.y }]
+        : context.movementPath(unit.id, position),
+      distance: manhattan(position, destinationAlly),
+    }))
+    .filter(({ path, distance }) => path.length > 1
+      && distance < distanceBefore
+      && path.every(isAllowedPosition))
+    .sort((left, right) => left.distance - right.distance
+      || right.path.length - left.path.length
+      || left.position.y * context.width + left.position.x
+        - (right.position.y * context.width + right.position.x));
+  const selected = candidates[0];
+  return selected ? { unitId: unit.id, kind: "move", path: selected.path } : undefined;
+}
+
 export function planTerrainHoldForceAiAction(
   context: ForceAiPlanningContext,
   unit: BattleUnit,
@@ -51,6 +84,8 @@ export function planTerrainHoldForceAiAction(
   const allowedTerrainSlots = new Set(doctrine.allowedTerrainSlots);
   const isAllowedPosition = (position: Position): boolean =>
     allowedTerrainSlots.has(context.battlefield.terrainSlotAt(position));
+  const holdPosition = (): AlliedAiAction =>
+    ({ unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] });
 
   if (!isAllowedPosition(unit)) {
     const entryTerrainSlots = new Set(doctrine.entryTerrainSlots);
@@ -64,7 +99,7 @@ export function planTerrainHoldForceAiAction(
     const selected = candidates[0];
     return selected
       ? { unitId: unit.id, kind: "move", path: selected.path }
-      : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      : holdPosition();
   }
 
   const forceMembers = context.forces.membersForUnit(unit.id, context.units);
@@ -87,9 +122,30 @@ export function planTerrainHoldForceAiAction(
     if (recoveryHeal) return recoveryHeal;
   }
 
-  if (unit.life * 100 < context.statsFor(unit).maxLife * doctrine.restThresholdPercent) {
+  // A fallen rally unit is already a lost stage, but the planner still has to
+  // answer for the units that outlive it, so the rally simply drops out.
+  const rally = doctrine.rally;
+  const rallyUnit = rally
+    ? context.units.find(({ id }) => id === rally.unitId)
+    : undefined;
+  const rallyMove = (): AlliedAiAction | undefined => rallyUnit
+    && planCloseOnAlly(context, unit, rallyUnit, isAllowedPosition);
+  /**
+   * REMAKE-111. A melee member that never opens an attack has nothing else to
+   * spend the round on, so any wound is worth resting off — the doctrine's
+   * half-life boundary only still governs the careers that do act.
+   */
+  const holdsFire = rally?.meleeHoldsFire === true
+    && classCombatRole(unit.classId) === "melee";
+  const restThresholdPercent = holdsFire ? 100 : doctrine.restThresholdPercent;
+  if (unit.life * 100 < context.statsFor(unit).maxLife * restThresholdPercent) {
     return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
   }
+
+  // Whole again, and still not attacking: close on the member this force may
+  // not lose. Native formation order is a special case of the same intent, so
+  // holding fire skips it rather than ranking the two against each other.
+  if (holdsFire) return rallyMove() ?? holdPosition();
 
   const behavior = unit.side === 1
     ? context.alliedBehaviorFor(unit.id)
@@ -142,34 +198,18 @@ export function planTerrainHoldForceAiAction(
         context.statsFor(unit).movement,
       );
       if (!normalMovementMap.reaches(automaticLeader)) {
-        const distanceBefore = manhattan(unit, automaticLeader);
-        const candidates = context.reachableCells(unit.id)
-          .filter(isAllowedPosition)
-          .map((position) => ({
-            position,
-            path: positionKey(position) === positionKey(unit)
-              ? [{ x: unit.x, y: unit.y }]
-              : context.movementPath(unit.id, position),
-            distance: manhattan(position, automaticLeader),
-          }))
-          .filter(({ path, distance }) => path.length > 1
-            && distance < distanceBefore
-            && path.every(isAllowedPosition))
-          .sort((left, right) => left.distance - right.distance
-            || right.path.length - left.path.length
-            || left.position.y * context.width + left.position.x
-              - (right.position.y * context.width + right.position.x));
-        const selected = candidates[0];
-        if (selected) return { unitId: unit.id, kind: "move", path: selected.path };
+        const follow = planCloseOnAlly(context, unit, automaticLeader, isAllowedPosition);
+        if (follow) return follow;
       }
     }
   }
 
   // REMAKE-066: ranged careers keep the defensive doctrine and never turn a
-  // failed shot/technique into an ordinary melee hit.
+  // failed shot/technique into an ordinary melee hit. REMAKE-111 spends the
+  // round that leaves on the rally instead of standing still, but only after
+  // every action that actually pays off has been ruled out.
   if (classCombatRole(unit.classId) === "ranged") {
-    return classAction
-      ?? { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    return classAction ?? rallyMove() ?? holdPosition();
   }
 
   const opponentSide: BattleUnit["side"] = unit.side === 1 ? 2 : 1;

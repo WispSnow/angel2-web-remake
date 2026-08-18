@@ -5016,6 +5016,25 @@ describe("Web save validation", () => {
     }))).toBeUndefined();
   });
 
+  it("carries version-88 saves forward when the fourth corps changes its doctrine", () => {
+    // REMAKE-111 only changes how stage 3's automatic corps plans its phase.
+    // Nothing about that plan is saved, so every v88 save — the stage-3 battle
+    // the rule actually governs included — migrates untouched.
+    const stage3 = stage3BattleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...stage3,
+      version: 88,
+      contentVersion: "stage-3-fourth-corps-joined-1",
+    }))).toEqual(stage3);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 88,
+      contentVersion: "stage-3-fourth-corps-joined-1",
+    }))).toEqual(completed);
+  });
+
   it("backfills the stage-3 opening events a legacy save predates", () => {
     // REMAKE-109 turned the fourth corps' promotion moment into two opening
     // events. Older saves predate the ids, so they are marked consumed rather

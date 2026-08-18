@@ -235,15 +235,81 @@ describe("stage 3 battle construction and stable-remake automation", () => {
       .toBe(true);
   });
 
-  it("rests an automatic ally below half life before it can attack or pursue", () => {
-    const battle = new Stage3Battle(campaign);
-    const unit = battle.unit("1:46")!;
+  it("rests an acting automatic ally below half life before it can shoot", () => {
+    const battle = new Stage3Battle(archerFollowerCampaign);
+    const unit = battle.unit("1:21")!;
+    expect(unit.classId).toBe("archer");
+    expect(battle.actionTargets("1:21", "archer-shot").length).toBeGreaterThan(0);
     unit.life = Math.floor((battle.statsFor(unit).maxLife - 1) / 2);
     expect(battle.planAlliedAiAction(unit.id)).toEqual({
       unitId: unit.id,
       kind: "rest",
       path: [{ x: unit.x, y: unit.y }],
     });
+  });
+
+  /**
+   * REMAKE-111. The rescued corps is scored on staying alive, not on kills:
+   * its melee members stop opening attacks, rest off any wound at all — not
+   * just the doctrine's half-life boundary — and close on Daisy once whole.
+   */
+  it("rests a scratched melee automatic ally that the half-life boundary would have sent in", () => {
+    const battle = new Stage3Battle(campaign);
+    const unit = battle.unit("1:46")!;
+    unit.life = battle.statsFor(unit).maxLife - 1;
+    expect(battle.planAlliedAiAction(unit.id)).toEqual({
+      unitId: unit.id,
+      kind: "rest",
+      path: [{ x: unit.x, y: unit.y }],
+    });
+  });
+
+  it("closes a healthy melee automatic ally on Daisy instead of striking an adjacent enemy", () => {
+    const battle = new Stage3Battle(campaign);
+    const unit = battle.unit("1:45")!;
+    const daisy = battle.unit("1:3")!;
+    const enemy = battle.unit("2:42")!;
+    enemy.x = unit.x;
+    enemy.y = unit.y - 1;
+    expect(unit.life).toBe(battle.statsFor(unit).maxLife);
+    // 正交相邻、双方都能行动：换成原来的教义这一格就是普通攻击。
+    expect(Math.abs(enemy.x - unit.x) + Math.abs(enemy.y - unit.y)).toBe(1);
+    expect(stage3TerrainSlotAt(enemy)).toBe(3);
+
+    const action = battle.planAlliedAiAction(unit.id);
+    expect(action).toMatchObject({ unitId: unit.id, kind: "move" });
+    const destination = action!.path.at(-1)!;
+    expect(Math.abs(destination.x - daisy.x) + Math.abs(destination.y - daisy.y))
+      .toBeLessThan(Math.abs(unit.x - daisy.x) + Math.abs(unit.y - daisy.y));
+    expect(action!.path.every((position) => [3, 5].includes(stage3TerrainSlotAt(position))))
+      .toBe(true);
+  });
+
+  it("keeps Daisy herself in place rather than rallying on her own cell", () => {
+    const battle = new Stage3Battle(campaign);
+    const daisy = battle.unit("1:3")!;
+    expect(battle.planAlliedAiAction("1:3")).toEqual({
+      unitId: "1:3",
+      kind: "wait",
+      path: [{ x: daisy.x, y: daisy.y }],
+    });
+  });
+
+  it("rallies a leaderless ranged automatic ally on Daisy once no shot is left", () => {
+    const battle = new Stage3Battle(campaign);
+    battle.units = battle.units.filter((unit) => unit.side === 1);
+    const archer = battle.unit("1:50")!;
+    archer.classId = "archer";
+    archer.className = "弓兵";
+    const daisy = battle.unit("1:3")!;
+    // 行为 2 没有成对领队，所以这一步只可能来自集结规则本身。
+    expect(battle.alliedBehaviorFor("1:50")).toBe(2);
+
+    const action = battle.planAlliedAiAction("1:50");
+    expect(action).toMatchObject({ unitId: "1:50", kind: "move" });
+    const destination = action!.path.at(-1)!;
+    expect(Math.abs(destination.x - daisy.x) + Math.abs(destination.y - daisy.y))
+      .toBeLessThan(Math.abs(archer.x - daisy.x) + Math.abs(archer.y - daisy.y));
   });
 
   it("has an automatic sister heal a sub-half-life automatic ally before other actions", () => {

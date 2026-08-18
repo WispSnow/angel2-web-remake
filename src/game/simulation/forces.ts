@@ -8,6 +8,22 @@ export interface ExpertForceAiDoctrine {
   strategy: "expert";
 }
 
+/**
+ * REMAKE-111. A protected force does not trade its own survival for kills: the
+ * rally unit is the member it must not lose, so idle members close on it inside
+ * the defense area instead of drifting toward the enemy.
+ */
+export interface ForceRallyDoctrine {
+  /** Stable id of the member every idle squadmate closes on. */
+  unitId: string;
+  /**
+   * Melee careers stop opening attacks entirely: they rest off any damage and
+   * only close on the rally unit once whole. Ranged and healing careers keep
+   * their own actions and rally only when nothing else pays off.
+   */
+  meleeHoldsFire: boolean;
+}
+
 export interface TerrainHoldForceAiDoctrine {
   strategy: "terrain-hold";
   allowedTerrainSlots: readonly number[];
@@ -18,6 +34,7 @@ export interface TerrainHoldForceAiDoctrine {
     Partial<Record<ClassId, readonly BattleActionId[]>>
   >;
   preserveNativeFormation: boolean;
+  rally?: ForceRallyDoctrine;
 }
 
 export type ForceAiDoctrine = ExpertForceAiDoctrine | TerrainHoldForceAiDoctrine;
@@ -97,6 +114,9 @@ export class ForceRegistry {
           `${definition.id} critical-heal threshold`,
           doctrine.criticalHealThresholdPercent,
         );
+        if (doctrine.rally && !definition.unitIds.includes(doctrine.rally.unitId)) {
+          throw new Error(`Rally unit ${doctrine.rally.unitId} is not a member of ${definition.id}`);
+        }
       }
 
       this.definitionsById.set(definition.id, definition);

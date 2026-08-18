@@ -37,10 +37,27 @@ const sideUnitIds = (side: BattleUnit["side"], slots: readonly number[]): string
  * 两支我方军团按原版逐槽行为划分：行为 0 归希蜜救援队，行为 2/3/4 归第四军团。
  * `REMAKE-108` 换掉四个玩家槽后不需要在这里再抄一遍槽号。
  */
-const alliedUnitIdsByBehavior = (playerControlled: boolean): string[] =>
-  sideUnitIds(1, STAGE3_SEMANTIC_ALLIED_UNITS
+const alliedSlotsByBehavior = (playerControlled: boolean): number[] =>
+  STAGE3_SEMANTIC_ALLIED_UNITS
     .filter(({ aiBehavior }) => (aiBehavior === 0) === playerControlled)
-    .map(({ slot }) => slot));
+    .map(({ slot }) => slot);
+
+const alliedUnitIdsByBehavior = (playerControlled: boolean): string[] =>
+  sideUnitIds(1, alliedSlotsByBehavior(playerControlled));
+
+/**
+ * `REMAKE-111` 的集结点同样不手抄槽号：第四军团里唯一同时写进关卡失败条件的成员
+ * 就是被救援的黛西。她倒下直接判负，所以这一队休整时该围住的正是这个人。
+ */
+const STAGE3_RALLY_UNIT_ID = ((): string => {
+  const protectedSlots: readonly number[] = STAGE3_DEFINITION.objective.defeat.slots;
+  const rallySlots = alliedSlotsByBehavior(false)
+    .filter((slot) => protectedSlots.includes(slot));
+  if (rallySlots.length !== 1) {
+    throw new Error(`Stage 3 needs exactly one protected fourth-corps member, got ${rallySlots.length}`);
+  }
+  return `1:${rallySlots[0]}`;
+})();
 
 const STAGE3_FORCE_DEFINITIONS = [
   {
@@ -67,6 +84,8 @@ const STAGE3_FORCE_DEFINITIONS = [
       criticalHealThresholdPercent: 50,
       priorityHealingActionsByClass: { sister: ["heal-1"] },
       preserveNativeFormation: true,
+      // REMAKE-111：被救援的第四军团只求活下来，近战交出主动权，全队向黛西收拢。
+      rally: { unitId: STAGE3_RALLY_UNIT_ID, meleeHoldsFire: true },
     },
   },
   {
