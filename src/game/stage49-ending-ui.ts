@@ -275,7 +275,13 @@ export function mountStage49EndingUi(
     };
     void loadEpilogueFont().then((font) => {
       if (generation !== epilogueGeneration) return;
-      let revealed = controller.isTestMode ? total : 0;
+      // 0000:0725 waits 24 native ticks *after* each full-width glyph, so the
+      // first glyph is already on screen when the segment's counter starts.
+      // Waiting one interval first would blank the opening 240 ms and push the
+      // last glyph onto the hold limit itself, which costs `warriorStatue` -
+      // the one typing-bound segment, wait 0 against 46 glyphs - its whole
+      // trailing pause before the segment advances.
+      let revealed = controller.isTestMode ? total : Math.min(1, total);
       drawEpilogueGlyphs(canvas, font, glyphs, revealed, colors);
       if (revealed >= total) {
         scheduleHold();
@@ -292,6 +298,18 @@ export function mountStage49EndingUi(
         scheduleHold();
         return true;
       };
+      // 0000:0725 waits on the module's own native tick counter, so a segment
+      // costs exactly `glyphs x 24` ticks however long any single redraw takes.
+      // Chaining fixed `setTimeout` delays drifted ~250 ms over `warriorStatue`
+      // - each redraw repaints every revealed glyph seven times - which is more
+      // than its whole 240 ms trailing pause, so glyphs are scheduled against
+      // the segment's own start instead of against the previous glyph.
+      const scheduleGlyph = () => {
+        epilogueTimer = window.setTimeout(
+          tick,
+          Math.max(0, startedAt + revealed * glyphDelay - performance.now()),
+        );
+      };
       const tick = () => {
         if (generation !== epilogueGeneration) return;
         revealed += 1;
@@ -302,9 +320,9 @@ export function mountStage49EndingUi(
           scheduleHold();
           return;
         }
-        epilogueTimer = window.setTimeout(tick, glyphDelay);
+        scheduleGlyph();
       };
-      epilogueTimer = window.setTimeout(tick, glyphDelay);
+      scheduleGlyph();
     });
   };
   const render = () => {

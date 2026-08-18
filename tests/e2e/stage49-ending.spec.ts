@@ -459,6 +459,9 @@ test("S49-G: the epilogue types its native bitmap text and the first press only 
       for (let index = 3; index < data.length; index += 4) if (data[index] !== 0) opaque += 1;
       return opaque;
     });
+  // Not a race: 0000:0725 waits *after* each glyph, so the first one is drawn
+  // before `data-epilogue-typing` flips. A blank canvas here means the typer has
+  // gone back to waiting one interval before its first glyph.
   const partial = await inkPixels();
   expect(partial).toBeGreaterThan(0);
 
@@ -472,4 +475,67 @@ test("S49-G: the epilogue types its native bitmap text and the first press only 
 
   await screen.click();
   await expect(epilogue).toHaveAttribute("data-segment", "saveCountOutcome");
+});
+
+test("S49-H: the epilogue keeps its native trailing pause after the last glyph", async ({ page }) => {
+  test.setTimeout(90_000);
+  // `warriorStatue` is the one typing-bound segment: wait 0 against 46 glyphs, so
+  // the evidence table's 1104 ticks are entirely `0000:0725`'s per-glyph waits.
+  // Because that wait runs off the module's tick counter, the 46th glyph lands at
+  // tick 1080 and the segment still owes one 24-tick wait before it advances.
+  // Chained `setTimeout` delays drift far enough over 46 redraws to swallow that
+  // pause, so the schedule has to be anchored to the segment's own start.
+  await page.goto(
+    "/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=representative-growth&growth=100",
+  );
+  const timeline = await page.evaluate(() => new Promise<{
+    firstInkAt: number;
+    typingEndedAt: number;
+    advancedAt: number;
+    glyphSteps: number;
+  }>((resolve) => {
+    const screen = document.querySelector<HTMLElement>("#stage49-screen");
+    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=stage49-epilogue-text]");
+    const context = canvas?.getContext("2d");
+    if (!screen || !canvas || !context) throw new Error("epilogue surface not found");
+    const ink = () => {
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+      let opaque = 0;
+      for (let index = 3; index < data.length; index += 4) if (data[index] !== 0) opaque += 1;
+      return opaque;
+    };
+    const started = performance.now();
+    const marks = { firstInkAt: 0, typingEndedAt: 0, advancedAt: 0, glyphSteps: 0 };
+    let previous = -1;
+    const poll = window.setInterval(() => {
+      const current = ink();
+      if (current > 0 && !marks.firstInkAt) marks.firstInkAt = performance.now() - started;
+      if (current > previous) {
+        marks.glyphSteps += 1;
+        previous = current;
+      }
+      if (screen.dataset.epilogueTyping === "false" && !marks.typingEndedAt) {
+        marks.typingEndedAt = performance.now() - started;
+      }
+      const segment = document.querySelector<HTMLElement>("[data-testid=stage49-epilogue]")
+        ?.dataset.segment;
+      if (marks.typingEndedAt && segment && segment !== "warriorStatue") {
+        marks.advancedAt = performance.now() - started;
+        window.clearInterval(poll);
+        resolve(marks);
+      }
+    // 30 ms still resolves every 240 ms glyph while keeping this probe's own
+    // `getImageData` cost off the timer the segment is being measured against.
+    }, 30);
+  }));
+
+  // The first glyph is drawn before the typing flag flips, not one wait later.
+  expect(timeline.firstInkAt).toBeLessThan(200);
+  expect(timeline.glyphSteps).toBe(46);
+  // 46 glyphs x 24 ticks = 1104; the last glyph lands one wait before the end.
+  expect(timeline.typingEndedAt).toBeGreaterThan(9_000);
+  expect(timeline.typingEndedAt).toBeLessThan(11_040);
+  // The tolerance is wide on purpose: 240 ms is the target, drift regressions
+  // collapse this to single digits, and a slow host only stretches it.
+  expect(timeline.advancedAt - timeline.typingEndedAt).toBeGreaterThan(120);
 });
