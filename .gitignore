@@ -42,6 +42,7 @@ test-results/
 playwright-report/
 coverage/
 dist/
+release/
 node_modules/
 .playwright-mcp/
 *.tsbuildinfo

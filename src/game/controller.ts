@@ -487,12 +487,15 @@ export class GameController {
   private listeners = new Set<Listener>();
   private campaignPersistenceEnabled = true;
   private campaignSaveCount = 0;
-  private readonly testMode = new URLSearchParams(location.search).has("test");
-  private readonly debugMode = this.testMode
-    || new URLSearchParams(location.search).has("debugScenario");
+  private readonly testMode = import.meta.env.MODE !== "release"
+    && new URLSearchParams(location.search).has("test");
+  private readonly debugMode = import.meta.env.MODE !== "release"
+    && (this.testMode || new URLSearchParams(location.search).has("debugScenario"));
   // Keeps the measured full-screen timing under ?test=1 for visual review.
-  private readonly fullCombatRealTime = new URLSearchParams(location.search).has("slowFull");
-  private readonly mapCombatRealTime = new URLSearchParams(location.search).has("slowMap");
+  private readonly fullCombatRealTime = import.meta.env.MODE !== "release"
+    && new URLSearchParams(location.search).has("slowFull");
+  private readonly mapCombatRealTime = import.meta.env.MODE !== "release"
+    && new URLSearchParams(location.search).has("slowMap");
 
   constructor(difficulty: Difficulty = 0) {
     this.difficulty = difficulty;

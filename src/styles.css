@@ -1345,7 +1345,7 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   top: 50%;
   width: 388px;
   max-height: calc(100% - 16px);
-  padding: 14px 30px;
+  padding: 7px 30px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;

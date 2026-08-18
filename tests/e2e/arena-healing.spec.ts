@@ -210,13 +210,7 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
   const wounded = (await arenaBattleState(page))?.units.find(({ id }) => id === "arena-2-0");
   expect(wounded!.life).toBeLessThan(guideMaxLife! - 90);
 
-  const dialogue = page.getByTestId("dialogue-layer");
-  await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
-  await expect(dialogue).toHaveAttribute("data-action-id", "heal-3");
-  await expect(dialogue).toHaveAttribute("data-effect-center", "26,30");
-  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
-  await expect(page.getByText("生命單.", { exact: true })).toBeVisible();
-  await page.waitForFunction(() => {
+  const healHeartFrame = page.waitForFunction(() => {
     const dataset = document.querySelector<HTMLCanvasElement>(
       "[data-testid='battle-canvas']",
     )?.dataset;
@@ -224,6 +218,13 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
       && dataset.mapCombatFrame === "12"
       && dataset.mapCombatEffectTileCount === "6";
   }, undefined, { polling: "raf" });
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
+  await expect(dialogue).toHaveAttribute("data-action-id", "heal-3");
+  await expect(dialogue).toHaveAttribute("data-effect-center", "26,30");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
+  await expect(page.getByText("生命單.", { exact: true })).toBeVisible();
+  await healHeartFrame;
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-heal-3-ai-heart.png`,
   });

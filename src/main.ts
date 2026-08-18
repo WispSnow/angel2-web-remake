@@ -11,6 +11,7 @@ import "./credits.css";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
+const releaseBuild = import.meta.env.MODE === "release";
 
 const mountController = (controller: GameController, userActivated: boolean) => {
   const audio = new AudioManager(controller, root, userActivated);
@@ -116,7 +117,7 @@ const mountController = (controller: GameController, userActivated: boolean) => 
 
   controller.onChange(syncSurface);
   syncSurface();
-  exposeDebugApi(controller);
+  if (!releaseBuild) exposeDebugApi(controller);
 };
 
 const startGame = async (selection: StartupSelection) => {
@@ -141,8 +142,8 @@ const renderDebugLoadError = (title: string, message: string) => {
 };
 
 const parameters = new URLSearchParams(location.search);
-const debugScenario = parameters.get("debugScenario");
-if (debugScenario) {
+const debugScenario = releaseBuild ? null : parameters.get("debugScenario");
+if (!releaseBuild && debugScenario) {
   void import("./game/debug-scenarios").then(async (debug) => {
     if (!debug.isDebugScenarioId(debugScenario)) {
       renderDebugLoadError("未知調試場景", debugScenario);
@@ -183,7 +184,7 @@ if (debugScenario) {
     renderDebugLoadError("調試場景載入失敗", message);
   });
 }
-else if (parameters.has("skipStartup")) {
+else if (!releaseBuild && parameters.has("skipStartup")) {
   void startGame({ kind: "new", difficulty: 0, userActivated: false });
 }
 else mountStartup(root, startGame);
