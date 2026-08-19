@@ -1,9 +1,11 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import {
   aiTechniqueDialogueFor,
+  confusedActorDialogueFor,
   nativeAiTechniqueDialogueForCode,
   NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
+  NATIVE_CONFUSED_ACTOR_DIALOGUE,
 } from "../../src/game/content/ai-technique-dialogue";
 import { HALF_DRAGON_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
 import { activateStage1Content } from "../../src/game/content/stage1";
@@ -169,5 +171,34 @@ describe("native AI technique dialogue", () => {
       { name: "半龍戰士", portrait: 58, side: 2 },
       HALF_DRAGON_TELEPORT_ACTION_ID,
     )).toBeUndefined();
+  });
+});
+
+describe("native confused-actor dialogue", () => {
+  test("publishes contextual entry 1Ch outside the technique groups", () => {
+    expect(NATIVE_CONFUSED_ACTOR_DIALOGUE).toEqual({
+      selector: 0x1c,
+      pointerEntry: "DS:84F3",
+      address: "DS:86AB",
+      text: "我的頭好昏，無法思考．",
+    });
+    // 0Ah..17h belong to the 33 AI action rows; the confused-actor line is a
+    // player-side route and must not join them.
+    const techniqueSelectors: readonly number[] = NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS
+      .map(({ selector }) => selector);
+    expect(techniqueSelectors).not.toContain(NATIVE_CONFUSED_ACTOR_DIALOGUE.selector);
+  });
+
+  test("speaks in the acting unit's own window with its own portrait", () => {
+    expect(confusedActorDialogueFor({ name: "士兵", portrait: 60, side: 1 })).toEqual({
+      activeSlot: "upper",
+      upper: { portrait: 60, speaker: "士兵", text: "我的頭好昏，無法思考．" },
+      lower: undefined,
+      source: { record: "confused-actor", wait: 0x1c, address: "DS:86AB" },
+    });
+    expect(confusedActorDialogueFor({ name: "邪法師", portrait: 53, side: 2 })).toMatchObject({
+      activeSlot: "lower",
+      lower: { portrait: 53, speaker: "邪法師" },
+    });
   });
 });

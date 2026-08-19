@@ -46,7 +46,7 @@ export const UNIT_STATUS_PRESENTATIONS = [
   {
     key: "confusion",
     label: "混亂",
-    description: "自動行動時只會移動或停留，不攻擊、不射擊、不施術；玩家手動操作不受影響。",
+    description: "點選後只會自行移動或停留，不攻擊、不射擊、不施術，並直接耗盡本回合行動。",
     nativeFrame: 3,
     source: "/assets/original/status-icons/03.png",
   },

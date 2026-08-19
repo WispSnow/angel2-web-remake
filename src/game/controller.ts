@@ -18,7 +18,7 @@ import {
   techniqueActionIdsFor,
   type IceActionId,
 } from "./content/actions";
-import { aiTechniqueDialogueFor } from "./content/ai-technique-dialogue";
+import { aiTechniqueDialogueFor, confusedActorDialogueFor } from "./content/ai-technique-dialogue";
 import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
 import {
   classDefinition,
@@ -247,6 +247,12 @@ export interface AiTechniqueDialoguePresentation {
   page: DialoguePage;
 }
 
+/** `0000:66F4`'s contextual line for a clicked unit that is still confused. */
+export interface ConfusedActorDialoguePresentation {
+  actor: BattleUnit;
+  page: DialoguePage;
+}
+
 export type RestPresentationPhase = "restEffect" | "restBlank";
 
 export interface RestPresentation {
@@ -450,6 +456,7 @@ export class GameController {
   turnTransitionPresentation?: TurnTransitionPresentation;
   turnTransitionPresentationTrace: TurnTransitionPresentation[] = [];
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
+  confusedActorDialogue?: ConfusedActorDialoguePresentation;
   private battleContextDialogue?: { page: DialoguePage; resume: () => void };
   movementPresentation?: MovementPresentation;
   statusMessage = "";
@@ -786,6 +793,7 @@ export class GameController {
   get currentDialogue(): DialoguePage | undefined {
     if (this.battleContextDialogue) return this.battleContextDialogue.page;
     if (this.aiTechniqueDialogue) return this.aiTechniqueDialogue.page;
+    if (this.confusedActorDialogue) return this.confusedActorDialogue.page;
     if (this.groupCommandDialogueId) {
       return groupCommandDialogueFor(this.groupCommandDialogueId, this.groupCommandSpeaker);
     }
@@ -863,6 +871,10 @@ export class GameController {
     return this.aiTechniqueDialogue !== undefined;
   }
 
+  get confusedActorDialogueActive(): boolean {
+    return this.confusedActorDialogue !== undefined;
+  }
+
   get promotionChoiceVisible(): boolean {
     return this.promotionUnit !== undefined && !this.promotionDialogueActive;
   }
@@ -912,6 +924,7 @@ export class GameController {
       || this.retreatConfirmOpen
       || this.battleContextDialogue !== undefined
       || this.aiTechniqueDialogueActive
+      || this.confusedActorDialogueActive
       || this.groupCommandDialogueActive
       || this.promotionUnitIds.length > 0;
   }
@@ -1715,6 +1728,14 @@ export class GameController {
       this.reachable = this.battle.reachableCells(unit.id);
       this.actionMode = "allyPreview";
       this.statusMessage = "藍色格為友軍自動單位的目前移動範圍；它會在玩家手動階段結束後自行行動。";
+    } else if (!unit.acted && !unit.actionDisabled && unit.statuses.confusion > 0) {
+      // `0000:55D3` accepts the click on side, action bit, disable value and
+      // per-slot behavior alone, so a confused unit still passes the gate. The
+      // accepted cell then reaches `0000:66F4`, which re-reads the confusion
+      // word and diverts it to the contextual line plus the single-unit AI
+      // entry `1000:1506` instead of opening the command menu.
+      void this.runConfusedSelection(unit.id);
+      return;
     } else if (!unit.acted && !unit.actionDisabled) {
       this.selectedId = unit.id;
       this.pendingOrigin = { x: unit.x, y: unit.y };
@@ -3245,7 +3266,7 @@ export class GameController {
       if (!this.battle.unit(id)) continue;
       if (!this.battle.hasRouteEnemy() || this.battle.unit(id)?.statuses.confusion) {
         const action = selection.action ?? this.battle.planEnemyAiAction(id);
-        if (action && await this.runAlliedAiAction(action, "enemy", deferEnemyOutcome)) {
+        if (action && await this.runAlliedAiAction(action, "enemy", undefined, deferEnemyOutcome)) {
           this.busy = false;
           this.emit();
           return;
@@ -3334,9 +3355,57 @@ export class GameController {
     });
   }
 
+  /**
+   * Native `0000:66F4`: a clicked player unit whose confusion bit is set never
+   * reaches the command menu. It speaks contextual line `1Ch` with its own
+   * portrait — through `0000:C97E` directly, so the ＡＩ對話 switch does not
+   * gate it — and is then dispatched to the same single-unit AI entry the
+   * automatic phase uses, which spends its action.
+   */
+  private async runConfusedSelection(unitId: string): Promise<void> {
+    if (this.phase !== "player" || this.busy) return;
+    const unit = this.battle.unit(unitId);
+    if (!unit || unit.statuses.confusion <= 0) return;
+    this.busy = true;
+    this.resetAction();
+    this.terrainInspectionPosition = undefined;
+    this.battle.focusId = unit.id;
+    this.cursor = { x: unit.x, y: unit.y };
+    this.centerCamera(unit);
+    await this.presentConfusedActorDialogue(unit);
+    const action = this.battle.planAlliedAiAction(unit.id);
+    if (action) {
+      await this.runAlliedAiAction(action, "allyAuto", `${unit.name}混亂中，無法聽從指揮。`);
+    } else {
+      this.battle.spendAction(unit.id);
+      this.statusMessage = `${unit.name}混亂中，原地耗盡本回合行動。`;
+    }
+    this.busy = false;
+    this.emit();
+  }
+
+  private async presentConfusedActorDialogue(actor: BattleUnit): Promise<void> {
+    const page = confusedActorDialogueFor(actor);
+    this.confusedActorDialogue = { actor, page };
+    this.statusMessage = `${actor.name}混亂中，無法聽從指揮。`;
+    this.emit();
+    const text = page.activeSlot ? page[page.activeSlot]?.text ?? "" : "";
+    // The native window closes on its own after the per-character wait; there is
+    // no confirmation menu, so the remake only scales the wall clock.
+    await pause(this.testMode
+      ? 800
+      : this.presentationFast
+        ? Math.max(360, text.length * 20 + 120)
+        : Math.max(1_200, text.length * 80 + 220));
+    this.confusedActorDialogue = undefined;
+    this.emit();
+  }
+
   private async runAlliedAiAction(
     action: AlliedAiAction,
     movementKind: Extract<MovementKind, "allyAuto" | "enemy"> = "allyAuto",
+    /** Set when the actor was not scheduled by a phase queue, e.g. a confused click. */
+    actingStatusText?: string,
     deferOutcome = false,
   ): Promise<boolean> {
     let unit = this.battle.unit(action.unitId);
@@ -3344,11 +3413,12 @@ export class GameController {
     this.battle.focusId = unit.id;
     this.cursor = { x: unit.x, y: unit.y };
     this.centerCamera(unit);
-    this.statusMessage = movementKind === "enemy"
-      ? `${unit.name}正在自動行動。`
-      : this.battle.isPlayerControllableAlly(unit.id)
-        ? `玩家軍團：${unit.name}正在執行集團命令。`
-        : `友軍 NPC 軍團：${unit.name}正在獨立行動。`;
+    this.statusMessage = actingStatusText
+      ?? (movementKind === "enemy"
+        ? `${unit.name}正在自動行動。`
+        : this.battle.isPlayerControllableAlly(unit.id)
+          ? `玩家軍團：${unit.name}正在執行集團命令。`
+          : `友軍 NPC 軍團：${unit.name}正在獨立行動。`);
     this.emit();
 
     if (
@@ -4632,6 +4702,7 @@ export class GameController {
     this.restPresentation = undefined;
     this.restPresentationTrace = [];
     this.aiTechniqueDialogue = undefined;
+    this.confusedActorDialogue = undefined;
     this.busy = false;
     this.resetAction();
     this.statusMessage = message;
@@ -4886,6 +4957,7 @@ export class GameController {
     this.specialActionPresentation = undefined;
     this.restPresentation = undefined;
     this.aiTechniqueDialogue = undefined;
+    this.confusedActorDialogue = undefined;
     const completedOrdinal = this.stageRuntime.ordinal;
     const destination = this.stageRuntime.nextStageId;
     if (isPlayableStageId(destination)) {
@@ -5681,6 +5753,13 @@ export class GameController {
         },
         center: { ...this.aiTechniqueDialogue.center },
         page: { ...this.aiTechniqueDialogue.page },
+      } : undefined,
+      confusedActorDialogue: this.confusedActorDialogue ? {
+        actor: {
+          ...this.confusedActorDialogue.actor,
+          statuses: { ...this.confusedActorDialogue.actor.statuses },
+        },
+        page: { ...this.confusedActorDialogue.page },
       } : undefined,
       movementPresentation: this.movementPresentation ? {
         ...this.movementPresentation,

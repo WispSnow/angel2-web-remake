@@ -629,3 +629,71 @@ test("enemy tier-two curse-master keeps the native IP pool slot and announces �
   expect(after?.units.find(({ id }) => id === "arena-1-0")?.statuses.poison).toBe(3);
   expect(pageErrors).toEqual([]);
 });
+
+test("a confused player unit answers a click with the native line and its own move", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  // The evil-sword warrior writes the same 3-round confusion the LA technique
+  // does, so one enemy melee hit is enough to confuse a player unit.
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("soldier");
+    arena.setLevel(3);
+    const soldier = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("evil-sword-warrior");
+    arena.setLevel(1);
+    const attacker = arena.interact(21, 30);
+    return [soldier, attacker];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-rest").click();
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.phase === "player"
+      && (current.units.find(({ id }) => id === "arena-1-0")?.statuses.confusion ?? 0) > 0;
+  });
+  const confused = await arenaBattleState(page);
+  const soldierBefore = confused?.units.find(({ id }) => id === "arena-1-0");
+  // The hit wrote 3; the round boundary that hands the phase back has already
+  // consumed one count.
+  expect(soldierBefore?.statuses.confusion).toBe(2);
+  expect(soldierBefore?.acted).toBe(false);
+
+  // Native 0000:66F4: the click is accepted, but the unit speaks and is handed
+  // to the single-unit AI entry instead of opening the command menu.
+  await clickArenaWorldCell(page, soldierBefore!.x, soldierBefore!.y);
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "confused-actor");
+  await expect(dialogue).toHaveAttribute("data-source-wait", "28");
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:86AB");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "upper");
+  await expect(dialogue).toContainText("我的頭好昏，無法思考．");
+  await expect(page.getByTestId("command-menu")).toHaveCount(0);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-confused-player-line.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.units.find(({ id }) => id === "arena-1-0")?.acted === true;
+  });
+  const after = await arenaBattleState(page);
+  const soldierAfter = after?.units.find(({ id }) => id === "arena-1-0");
+  const attacker = after?.units.find(({ id }) => id === "arena-2-0");
+  // The confused ordinary class retreats out of contact and never attacks, so
+  // the last exchange on record is still the enemy hit that confused it.
+  expect(soldierAfter?.acted).toBe(true);
+  expect(after?.lastCombat).toEqual(confused?.lastCombat);
+  expect(Math.abs(soldierAfter!.x - attacker!.x) + Math.abs(soldierAfter!.y - attacker!.y))
+    .toBeGreaterThan(1);
+  expect(after?.actionMode).not.toBe("actionMenu");
+  expect(pageErrors).toEqual([]);
+});

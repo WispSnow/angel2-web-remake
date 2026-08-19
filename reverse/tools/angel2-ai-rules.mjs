@@ -38,6 +38,14 @@ const CODE_SIGNATURES = [
   { address: "1000:2016", offset: 0x12016, hex: "2e8a26c10be44002c4b4003bc272072e2816c10bebea" },
   { address: "1000:2233", offset: 0x12233, hex: "e832023d140072453d28007204ba5900c3a13f0d3d0100" },
   { address: "1000:2291", offset: 0x12291, hex: "e8d4013bd17204ba5900c38b36161f8936bf778936095a" },
+  // Player selection gate: side 1, action bit clear, per-unit disable clear and
+  // per-slot auto behavior zero, then the accepted cell falls into 0000:66F4.
+  { address: "0000:55D3", offset: 0x055d3, hex: "8b36095a833e9a45007542c60690f5008936161f8bdee83efa833ec931017522833eb73100751ba09c31a8807514833ef63b00750da19d31e8e610" },
+  // The accepted-selection routine reads the confusion word through the same
+  // SI=31A5h+8 address arithmetic the AI input loader uses, then branches to the
+  // contextual line and the single-unit AI dispatch instead of the command menu.
+  { address: "0000:66F4", offset: 0x066f4, hex: "c7063d0d4e00a3430da1bd31a34c52bea53183c6088b04a900807423a180f8e8e4908b1e161fb81c00e85e62e8a614c706ed5dffff8b36095a9a96004711c3" },
+  { address: "1000:1506", offset: 0x11506, hex: "8936161fc606d78059ff367afac7067afa4e002ec7067f0141002ec70681014641" },
   { address: "1000:2300", offset: 0x12300, hex: "2e833e7f015974092e833e7f01417401c38b1e161f9a58500000a1f63ba33f0da1c531a3470da1bd31a3450dbea53183c6088b04a900807406c7063f0dff00a19d31c3" },
   { address: "1000:2468", offset: 0x12468, hex: "8b1e161f9a5850000033d2a19f31bb6400f7e33d0000" },
   { address: "1000:3FE6", offset: 0x13fe6, hex: "e8d9ffc7064a3d3000c7060f1f30000ee8dbf9e83800" },
@@ -99,6 +107,9 @@ const CODE_SIGNATURES = [
   { address: "0000:7BFC", offset: 0x07bfc, hex: "e80100cb" },
 ];
 
+const PLAYER_CONFUSION_DIALOGUE_SELECTOR = 0x1c;
+const EXPECTED_PLAYER_CONFUSION_LINE = "我的頭好昏，無法思考．";
+
 const DATA_SIGNATURES = [
   { address: "DS:111C", offset: 0x1fcbc, hex: "01" },
   { address: "DS:84BB[0Ah]", offset: 0x2706f, hex: "ca85" },
@@ -106,6 +117,10 @@ const DATA_SIGNATURES = [
   { address: "DS:84BB[0Fh]", offset: 0x27079, hex: "0c86" },
   { address: "DS:860C", offset: 0x271ac, hex: "a5cda952b3e62e24" },
   { address: "DS:84BB[0Ah..17h]", offset: 0x2706f, hex: "ca85da85ea85f88504860c8614861e86288632863c86428648864e86" },
+  // Contextual line 1Ch is outside the technique groups: it belongs to the
+  // player-side confusion route, not to the 33 AI action rows.
+  { address: "DS:84BB[1Ch]", offset: 0x27093, hex: "ab86" },
+  { address: "DS:86AB", offset: 0x2724b, hex: "a7daaabac059a66ea9fca141b54caa6babe4a6d2a144" },
   { address: "DS:85CA..8653", offset: 0x2716a, hex: "acdda7daaabaa4f5b279c55daa6b2e24acdda7daaabab970b971c55daa6b2e24acdda7daaabaa642c55daa6b2e24acdda7daaabaa5a8c0732e24a5cda952a5fe2e24a5cda952b3e62e24a8bebf6db4a3aa402e24a55cc0bbb4a3aa402e24a8bebf6dadb0a7432e24a55cc0bbadb0a7432e24a4a4ac722e24b854a9472e24b256b6c32e24af7da8b82e24" },
 ];
 
@@ -323,6 +338,65 @@ function parseAiTechniqueDialogue(buffer, actionEntries) {
   };
 }
 
+/**
+ * The player-side confusion route. `0000:55D3` accepts the clicked cell on the
+ * usual four conditions and hands it to `0000:66F4`, which re-reads the
+ * confusion word through the same `SI=31A5h+8` arithmetic as the AI input
+ * loader. With bit 15 set the accepted unit never reaches the command menu: it
+ * speaks contextual line `1Ch` and is dispatched to the single-unit AI entry.
+ */
+function parsePlayerConfusionRoute(buffer) {
+  const decoder = new TextDecoder("big5", { fatal: true });
+  const pointerEntry = AI_CONTEXT_DIALOGUE_POINTER_TABLE
+    + PLAYER_CONFUSION_DIALOGUE_SELECTOR * 2;
+  const stringAddress = buffer.readUInt16LE(dataOffset(pointerEntry, 2, buffer));
+  const stringFileOffset = dataOffset(stringAddress, 1, buffer);
+  const terminator = buffer.indexOf(0x24, stringFileOffset);
+  if (terminator < stringFileOffset) {
+    throw new Error(`DS:${hex(stringAddress)}: confused-actor line has no dollar terminator`);
+  }
+  const text = decoder.decode(buffer.subarray(stringFileOffset, terminator));
+  if (text !== EXPECTED_PLAYER_CONFUSION_LINE) {
+    throw new Error(
+      `player confusion line: expected ${EXPECTED_PLAYER_CONFUSION_LINE}, got ${text}`,
+    );
+  }
+  return {
+    selectionGate: {
+      entry: "0000:55D3",
+      conditions: [
+        "the clicked cell belongs to side 1 (DS:31C9 == 1)",
+        "the per-unit action-disable value DS:31B7 is zero",
+        "the board action bit 80h is clear",
+        "the per-slot auto/AI behavior DS:3BF6 is zero",
+      ],
+      accepted: "0000:66F4",
+      note: "confusion is not part of this gate, so a confused unit is still accepted here",
+    },
+    confusionBranch: {
+      entry: "0000:66F4",
+      statusRead: "SI = 31A5h + 8 -> DS:31ADh, the same address arithmetic as the AI input loader 1000:2300",
+      test: "test ax,8000h; bit 15 clear falls through to the normal manual flow at 0000:6733",
+      dialogueSelector: `${hex(PLAYER_CONFUSION_DIALOGUE_SELECTOR, 2)}h`,
+      pointerEntry: `DS:${hex(pointerEntry)}`,
+      address: `DS:${hex(stringAddress)}`,
+      text,
+      dialogueGate: "0000:66F4 calls 0000:C97E directly, so the ＡＩ對話 switch DS:111C never gates this line",
+      dispatch: "far call 1147:0096 = 1000:1506, the single-unit AI entry that loads inputs through 1000:2300 and runs the class dispatcher 1000:1681",
+      selectionCleared: "0000:560E writes DS:1F16 = FFFFh, so the command menu never opens for the confused unit",
+    },
+    evidence: [
+      "0000:55D3",
+      "0000:66F4",
+      "0000:C97E",
+      "1000:1506",
+      "1000:2300",
+      `DS:84BB[${hex(PLAYER_CONFUSION_DIALOGUE_SELECTOR, 2)}h]`,
+      `DS:${hex(stringAddress)}`,
+    ],
+  };
+}
+
 function attachDescriptors(codes, descriptorsByCode) {
   return codes.map((classCode) => ({
     classCode,
@@ -410,7 +484,7 @@ function summarizeBehaviorTemplates(templates, templatePath) {
   };
 }
 
-function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue) {
+function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue, playerConfusionRoute) {
   return {
     phaseConfiguration: {
       side2: { side: 2, baseMovementMode: "Y", pursuitMode: "FY", entry: "1000:14D8" },
@@ -446,9 +520,9 @@ function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue) 
       override: "replace the loaded per-slot behavior with FFh",
       ordinaryClasses: "run defensive retreat (highest terrain-defense reachable empty cell with no orthogonally adjacent enemy), then spend the action without attacking",
       shootingTechniqueAndEmpressDragonClasses: "scan nonzero movement-range cells in ascending order and select the first whose PIT bit0 is zero; move if it differs from the origin, then spend the action without shooting/casting",
-      playerSelection: "0000:55D3 does not inspect +0E, so confusion does not directly block manual player selection",
-      correction: "a previous direct scalar-reference audit missed this consumer because 31ADh is formed by register arithmetic",
-      evidence: ["1000:2300", "1000:18A1", "1000:192C", "1000:19DD", "1000:1A68", "1000:1D67", "1000:212D"],
+      playerSelection: "0000:55D3 does not inspect +0E, but the accepted-selection routine 0000:66F4 re-reads DS:31AD through the same arithmetic and diverts the clicked unit into the contextual line plus the single-unit AI dispatch; see playerConfusionRoute",
+      correction: "a previous direct scalar-reference audit missed this consumer because 31ADh is formed by register arithmetic; the same miss also produced the withdrawn claim that a confused player unit stays manually controllable",
+      evidence: ["1000:2300", "0000:66F4", "1000:18A1", "1000:192C", "1000:19DD", "1000:1A68", "1000:1D67", "1000:212D"],
     },
     lowLifePolicy: {
       percentage: "floor(currentLife * 100 / maxLife)",
@@ -492,6 +566,7 @@ function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue) 
       },
       evidence: ["1000:1E51", "1000:1E6B", "1000:254F", "0000:7BFC", "DS:111C", "DS:84BB[0Ah]", "DS:85CA", "DS:84BB[0Fh]", "DS:860C"],
     },
+    playerConfusionRoute,
     shooting: {
       sharedRange: { mode: "2", minimumManhattanRange: 2 },
       targetRule: "minimum effective defense, then minimum current life",
@@ -662,6 +737,7 @@ async function extract(runtimePath, descriptorPath, guideComparisonPath, battleT
   const classPools = parseClassPools(buffer, descriptorsByCode);
   const actionEntries = parseActionTable(buffer);
   const aiTechniqueDialogue = parseAiTechniqueDialogue(buffer, actionEntries);
+  const playerConfusionRoute = parsePlayerConfusionRoute(buffer);
   const poolCodes = new Set(classPools.flatMap((entry) => entry.tiers.flatMap((tier) => tier.actions)));
   const dispatchCodes = new Set(actionEntries.map((entry) => entry.actionCode));
   const dormantVPoolCodes = ["1V", "2V", "3V"].filter((code) => poolCodes.has(code));
@@ -691,7 +767,7 @@ async function extract(runtimePath, descriptorPath, guideComparisonPath, battleT
     },
     addressModel: { dataSegment: hex(DATA_SEGMENT), dataLinearBase: DATA_LINEAR_BASE, code1000FileBase: 0x10000 },
     battleTemplates: battleTemplatePath,
-    rules: nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue),
+    rules: nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue, playerConfusionRoute),
     techniqueSelection: {
       classPoolTable: `${hex(DATA_SEGMENT)}:${hex(AI_CLASS_POOL_TABLE)}`,
       tierSelector: "current DATA row count at DS:0D45, minus one and clamped to tier index 0..2",

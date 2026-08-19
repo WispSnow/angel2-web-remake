@@ -342,3 +342,15 @@ export const NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE: Readonly<Record<string, Nativ
     "text": "看我的雷電魔法."
   }
 };
+
+/**
+ * Contextual line `DS:84BB[1Ch]`. `0000:66F4` plays it with the clicked unit's
+ * portrait before handing a confused player unit to the single-unit AI entry,
+ * and it calls `0000:C97E` directly, so the ＡＩ對話 switch never gates it.
+ */
+export const NATIVE_CONFUSED_ACTOR_DIALOGUE = {
+  "selector": 28,
+  "pointerEntry": "DS:84F3",
+  "address": "DS:86AB",
+  "text": "我的頭好昏，無法思考．"
+} as const;

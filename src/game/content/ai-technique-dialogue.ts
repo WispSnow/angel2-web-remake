@@ -3,6 +3,7 @@ import { BATTLE_ACTION_DEFINITIONS } from "./actions";
 import {
   NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
+  NATIVE_CONFUSED_ACTOR_DIALOGUE,
   type NativeAiTechniqueDialogueRecord,
 } from "./ai-technique-dialogue.generated";
 import type { BattleUnit, DialoguePage } from "../types";
@@ -12,6 +13,7 @@ import type { BattleUnit, DialoguePage } from "../types";
  * parameter rows. Both side-1 autonomous actors and side-2 enemies use them.
  */
 export { NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE, NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS };
+export { NATIVE_CONFUSED_ACTOR_DIALOGUE };
 
 export function nativeAiTechniqueDialogueForCode(
   nativeCode: string,
@@ -44,6 +46,32 @@ export function aiTechniqueDialogueFor(
       record: "ai-technique",
       wait: line.selector,
       address: line.address,
+    },
+  };
+}
+
+/**
+ * `0000:66F4` plays contextual line `1Ch` with the clicked unit's own portrait
+ * before the confused unit is handed to the single-unit AI entry. It reaches
+ * `0000:C97E` directly rather than through `1000:254F`, so unlike every AI
+ * technique line it is not gated by the ＡＩ對話 switch.
+ */
+export function confusedActorDialogueFor(
+  actor: Pick<BattleUnit, "name" | "portrait" | "side">,
+): DialoguePage {
+  const window = {
+    portrait: actor.portrait,
+    speaker: actor.name,
+    text: NATIVE_CONFUSED_ACTOR_DIALOGUE.text,
+  };
+  return {
+    activeSlot: actor.side === 1 ? "upper" : "lower",
+    upper: actor.side === 1 ? window : undefined,
+    lower: actor.side === 2 ? window : undefined,
+    source: {
+      record: "confused-actor",
+      wait: NATIVE_CONFUSED_ACTOR_DIALOGUE.selector,
+      address: NATIVE_CONFUSED_ACTOR_DIALOGUE.address,
     },
   };
 }

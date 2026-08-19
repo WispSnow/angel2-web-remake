@@ -207,7 +207,12 @@ export interface DialoguePage {
   /** Characters already present before an appended line starts typing. */
   revealStart?: number;
   source: {
-    record: number | "promotion" | "battle-command" | "ai-technique" | "battle-context";
+    record: number
+      | "promotion"
+      | "battle-command"
+      | "ai-technique"
+      | "battle-context"
+      | "confused-actor";
     wait: number;
     address?: string;
     /** Native PP background record active at this KY checkpoint. */
