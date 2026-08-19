@@ -30,8 +30,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 89 as const;
-export const SAVE_CONTENT_VERSION = "fourth-corps-rally-hold-1" as const;
+export const SAVE_VERSION = 90 as const;
+export const SAVE_CONTENT_VERSION = "expert-attack-down-melee-targeting-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

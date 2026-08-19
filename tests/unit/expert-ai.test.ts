@@ -731,6 +731,40 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     }
   });
 
+  it("rejects every non-melee SA target while the other debuffs keep theirs", () => {
+    // REMAKE-116. `SA` only moves the panel attack the ordinary-attack chain
+    // reads, and REMAKE-066 never lets a planned caster or shooter open one, so
+    // a `-20` on them is the mirror image of the AA waste REMAKE-102 removed.
+    const battle = new ArenaBattle([
+      { id: "enemy-curse", side: 2 as const, slot: 0, classId: "curse-master" as const, level: 3 as const, x: 27, y: 30 },
+      { id: "ally-front", side: 1 as const, slot: 0, classId: "warrior" as const, level: 1 as const, x: 26, y: 30 },
+      { id: "ally-wizard", side: 1 as const, slot: 1, classId: "wizard" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "ally-archer", side: 1 as const, slot: 2, classId: "archer" as const, level: 1 as const, x: 24, y: 30 },
+    ], 0, new DeterministicRng(0x33a1));
+    const actor = battle.unit("enemy-curse")!;
+    const context = {
+      width: 50,
+      height: 60,
+      units: battle.units,
+      terrainSlotAt: () => 2,
+      statsFor: () => ({ attack: 100, defense: 80, maxLife: 200, movement: 4, level: 1 }),
+      effectiveStatsFor: () => ({ attack: 100, defense: 80, maxLife: 200, movement: 4, level: 1 }),
+    };
+    const utilityFor = (actionId: "attack-down" | "defense-down" | "confusion", targetId: string) =>
+      expertSpecialUtility(context, actor, actionId, battle.unit(targetId)!, [actor]);
+
+    expect(utilityFor("attack-down", "ally-front")).toMatchObject({ waste: 0 });
+    expect(utilityFor("attack-down", "ally-front").control).toBeGreaterThan(0);
+    for (const targetId of ["ally-wizard", "ally-archer"]) {
+      expect(utilityFor("attack-down", targetId))
+        .toMatchObject({ control: 0, targetThreat: 0, waste: 1 });
+      // SD answers incoming damage and LA disables the actor outright, so both
+      // keep the full target set — casters and shooters are prime targets there.
+      expect(utilityFor("defense-down", targetId)).toMatchObject({ waste: 0 });
+      expect(utilityFor("confusion", targetId)).toMatchObject({ waste: 0 });
+    }
+  });
+
   it("re-evaluates squad actor priority from the current state", () => {
     const battle = new ArenaBattle(placements(), 0, new DeterministicRng(0x3305));
     battle.unit("enemy-front")!.life = 1;

@@ -5035,6 +5035,25 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("carries version-89 saves forward when SA narrows its target set", () => {
+    // REMAKE-116 only narrows which enemy the AI may pick for SA. Like
+    // REMAKE-102 on the buff side it stores nothing, so every v89 save —
+    // mid-battle and completed alike — migrates untouched.
+    const battle = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...battle,
+      version: 89,
+      contentVersion: "fourth-corps-rally-hold-1",
+    }))).toEqual(battle);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 89,
+      contentVersion: "fourth-corps-rally-hold-1",
+    }))).toEqual(completed);
+  });
+
   it("backfills the stage-3 opening events a legacy save predates", () => {
     // REMAKE-109 turned the fourth corps' promotion moment into two opening
     // events. Older saves predate the ids, so they are marked consumed rather

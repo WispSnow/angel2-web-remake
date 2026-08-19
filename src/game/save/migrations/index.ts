@@ -415,6 +415,23 @@ function normalizeStage3OpeningEvents(value: unknown): unknown {
  * v88 save carries over as it stands: the corps simply holds its ground from
  * the next automatic phase on. No field is added and none changes meaning.
  */
+/**
+ * REMAKE-116 only narrows which enemy the AI may pick for `SA`. Like
+ * REMAKE-102 on the buff side it adds no field and changes no stored meaning;
+ * an uncommitted automatic action is replanned from public state on load.
+ */
+function migrateVersion89Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 89
+    || value.contentVersion !== "fourth-corps-rally-hold-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
 function migrateVersion88Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 88
@@ -2577,6 +2594,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
   const value = normalizeStage3OpeningEvents(raw);
+  const migratedVersion89 = migrateVersion89Save(value);
+  if (migratedVersion89) return migratedVersion89;
   const migratedVersion88 = migrateVersion88Save(value);
   if (migratedVersion88) return migratedVersion88;
   const migratedVersion87 = migrateVersion87Save(value);

@@ -651,7 +651,14 @@ export function expertSpecialUtility(
     // matters when the target's primary action menu is actually sealable.
     const spellSealHasEffect = actionId !== "spell-seal"
       || classDefinition(target.classId).actionCategory === "technique";
-    if (immune || target.statuses[statusKey] > 0 || !spellSealHasEffect) {
+    // REMAKE-116 mirrors REMAKE-102 on the debuff side: `SA` only moves the
+    // panel attack the ordinary-attack chain reads, and REMAKE-066 never lets a
+    // planned caster or shooter open one. Shooting and techniques resolve off
+    // fixed action tables, so a `-20` on them buys nothing but the counter they
+    // are already positioned to avoid.
+    const attackDownHasEffect = actionId !== "attack-down"
+      || classCombatRole(target.classId) === "melee";
+    if (immune || target.statuses[statusKey] > 0 || !spellSealHasEffect || !attackDownHasEffect) {
       utility.waste = 1;
       return utility;
     }

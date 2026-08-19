@@ -265,8 +265,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 89;
-  contentVersion: "fourth-corps-rally-hold-1";
+  version: 90;
+  contentVersion: "expert-attack-down-melee-targeting-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
