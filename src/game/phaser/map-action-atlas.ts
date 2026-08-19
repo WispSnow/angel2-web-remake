@@ -23,7 +23,7 @@ function paddedFrame(value: string): string {
 
 function sourceForLegacyKey(key: string): string | undefined {
   let match = /^map-shoot-(\d+)$/u.exec(key);
-  if (match) return `${MAP_ACTION_PREFIX}shoot/hit/${paddedFrame(match[1])}.png`;
+  if (match) return `${MAP_ACTION_PREFIX}shoot/${paddedFrame(match[1])}.png`;
 
   match = /^map-fire-([1-3])-(\d+)$/u.exec(key);
   if (match) return `${MAP_ACTION_PREFIX}fire-${match[1]}/${paddedFrame(match[2])}.png`;

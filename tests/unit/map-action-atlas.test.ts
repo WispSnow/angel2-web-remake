@@ -97,6 +97,14 @@ describe("generated map-action atlases", () => {
   });
 
   test("maps legacy render keys and shared action families to their atlas frames", () => {
+    expect(mapActionTextureRefFromLegacyKey("map-shoot-0")).toEqual({
+      texture: "map-action-shoot",
+      frame: "shoot__00",
+    });
+    expect(mapActionTextureRefFromLegacyKey("map-shoot-7")).toEqual({
+      texture: "map-action-shoot",
+      frame: "shoot__07",
+    });
     expect(mapActionTextureRefFromLegacyKey("map-fire-4-ground-0")).toEqual({
       texture: "map-action-fire-4",
       frame: "fire-4__ground__00",
