@@ -1815,10 +1815,13 @@ function renderTerrainInspection(inspection: TerrainInspection): string {
   return `
     <section class="terrain-detail" data-testid="terrain-detail" data-terrain-slot="${inspection.terrainSlot}"
       role="status" aria-label="${aria}">
-      <header><span>地形特性</span><b data-testid="terrain-name">${inspection.terrainName}</b></header>
-      <p class="terrain-position" data-testid="terrain-position">格 ${inspection.position.x}，${inspection.position.y}</p>
+      <header><span>地形特性</span></header>
+      <p class="terrain-headline">
+        <b data-testid="terrain-name">${inspection.terrainName}</b><span
+          class="terrain-position" data-testid="terrain-position">格 ${inspection.position.x}，${inspection.position.y}</span>
+      </p>
       <dl>
-        <div><dt>參照</dt><dd data-testid="terrain-reference">${reference ? `${reference.name}・${reference.className}` : "未選擇單位"}</dd></div>
+        <div class="terrain-reference-row"><dt>參照</dt><dd data-testid="terrain-reference">${reference ? `${reference.name}・${reference.className}` : "未選擇單位"}</dd></div>
         <div><dt>移動損耗</dt><dd data-testid="terrain-movement-cost">${movement}</dd></div>
         <div><dt>攻擊加成</dt><dd data-testid="terrain-attack-bonus">無</dd></div>
         <div><dt>防禦加成</dt><dd data-testid="terrain-defense-bonus">${defense}</dd></div>

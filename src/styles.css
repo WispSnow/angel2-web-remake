@@ -456,11 +456,21 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
     #261516;
   text-shadow: 1px 1px #000;
 }
-.terrain-detail header { display: flex; gap: 6px; align-items: center; justify-content: space-between; padding-right: 16px; color: #f4d25c; font: 700 13px/16px "PMingLiU", serif; letter-spacing: .08em; }
-.terrain-detail header b { max-width: 72px; overflow: hidden; color: #fff1b0; font: 700 12px/16px "PMingLiU", serif; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
-.terrain-position { margin: 0 0 3px; color: #cbbf9f; font: 9px/11px ui-monospace, monospace; }
+.terrain-detail header { display: flex; align-items: center; padding-right: 20px; color: #f4d25c; font: 700 13px/16px "PMingLiU", serif; letter-spacing: .08em; white-space: nowrap; }
+/* The classification name is the card's subject, so it owns a headline row instead
+   of sharing the 136px header with the fixed title. Sharing left both sides too
+   little: five-character names such as「流沙與陷阱」pushed the title onto a second
+   line and were still clipped to an ellipsis. The coordinate rides along on the
+   right because it is short, fixed-width and secondary. */
+.terrain-headline { display: flex; gap: 6px; align-items: baseline; justify-content: space-between; margin: 1px 0 2px; }
+.terrain-headline b { min-width: 0; overflow: hidden; color: #fff1b0; font: 700 14px/18px "PMingLiU", serif; text-overflow: ellipsis; white-space: nowrap; }
+.terrain-position { flex: none; color: #cbbf9f; font: 9px/11px ui-monospace, monospace; }
 .terrain-detail dl { margin: 0; font: 10px/17px "PMingLiU", serif; }
 .terrain-detail dl div { display: grid; grid-template-columns: 50px minmax(0, 1fr); border-top: 1px dotted #84682e; }
+/* 參照 has the shortest label but the longest value (four-character name +「・」+
+   four-character class), so its value column starts earlier. Values stay
+   right-aligned, so the shared right edge is unchanged. */
+.terrain-detail dl div.terrain-reference-row { grid-template-columns: 30px minmax(0, 1fr); }
 .terrain-detail dt { color: #e7d7ac; }
 .terrain-detail dd { min-width: 0; margin: 0; overflow: hidden; color: #fff; font-weight: 700; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .terrain-note { margin: 3px 0 0; color: #bfae88; font: 8px/10px system-ui, sans-serif; text-align: center; }
