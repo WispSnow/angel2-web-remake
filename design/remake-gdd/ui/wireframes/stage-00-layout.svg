@@ -48,10 +48,6 @@
     <text x="38" y="190" class="body">• 规则集 / Mod 来源</text>
     <text x="38" y="220" class="body">• 地形与状态解释</text>
     <text x="38" y="250" class="body">• 可选公式详情</text>
-    <rect x="24" y="292" width="272" height="92" rx="6" fill="#193844" stroke="#72d7e9"/>
-    <text x="39" y="322" class="small">第 0 关一次性提示</text>
-    <text x="39" y="350" class="body">查看勝利條件：</text>
-    <text x="39" y="375" class="body">保護妮雅，清除宮內敵人。</text>
     <text x="24" y="430" class="body">显示策略：</text>
     <text x="38" y="462" class="body">只由玩家显式打开，</text>
     <text x="38" y="490" class="body">不压缩或重排原版 HUD。</text>

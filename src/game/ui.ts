@@ -183,7 +183,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <section class="combat-presentation" id="combat-presentation" data-testid="combat-presentation" hidden></section>
             <section class="promotion-layer" id="promotion-layer" data-testid="promotion-layer"
               role="dialog" aria-modal="true" aria-label="選擇轉職" hidden></section>
-            <button class="hint-toast" id="hint-toast" data-action="objectives" hidden></button>
             <section class="dialogue-layer" id="dialogue-layer" data-testid="dialogue-layer" hidden>
               <div class="dialogue-box upper" id="dialogue-box-upper" data-testid="dialogue-window-upper" hidden>
                 <span class="animated-portrait dialogue-portrait" id="dialogue-portrait-upper"
@@ -241,7 +240,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const status = required(root, "#status-strip");
   const combatPresentation = required(root, "#combat-presentation");
   const promotionLayer = required(root, "#promotion-layer");
-  const hint = required(root, "#hint-toast");
   const dialogueLayer = required(root, "#dialogue-layer");
   const dialogueWindows = {
     upper: {
@@ -914,17 +912,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     } else {
       promotionLayer.replaceChildren();
     }
-    hint.hidden = !controller.hintVisible
-      || controller.phase !== "player"
-      || controller.systemMenuOpen
-      || controller.settingsOpen
-      || controller.soundSettingsOpen
-      || controller.musicSettingsOpen
-      || controller.recordMenuMode !== undefined
-      || controller.objectiveOpen
-      || controller.groupCommandOpen
-      || controller.retreatConfirmOpen;
-    hint.textContent = `查看勝利條件：${controller.battle.stage.objective.victoryText}`;
     setMenuOpen(objectivePanel, controller.objectiveOpen);
     if (setMenuOpen(systemMenu, controller.systemMenuOpen)) {
       systemMenu.innerHTML = controller.systemCommands.map((command, index) => {

@@ -441,7 +441,6 @@ export class GameController {
   groupCommandDialogueId?: SpokenGroupCommandId;
   retreatConfirmOpen = false;
   retreatConfirmIndex = 1;
-  hintVisible = localStorage.getItem("angel2.stage0.hintSeen") !== "yes";
   presentationFast = false;
   battlePresentation: "map" | "full";
   gridEnabled: boolean;
@@ -569,7 +568,6 @@ export class GameController {
     controller.activeStoryId = undefined;
     controller.campaignRoute = undefined;
     controller.phase = "player";
-    controller.hintVisible = false;
     controller.resetAction();
     const focus = battle.focus ?? battle.units.find(({ side }) => side === 1);
     if (focus) {
@@ -2225,7 +2223,6 @@ export class GameController {
       this.busy = true;
       this.statusMessage = `${actor.name}施展${BATTLE_ACTION_DEFINITIONS[actionId].label}……`;
       this.resetAction();
-      this.markHintSeen();
       this.emit();
 
       if (actionId === "prayer") {
@@ -2341,7 +2338,6 @@ export class GameController {
       this.busy = true;
       this.statusMessage = `${actor.name}前往${actionId === "iron-plate" ? "鋪設" : "設置"}${label}……`;
       this.resetAction();
-      this.markHintSeen();
       this.emit();
       const completed = await this.presentPreparedUnitPath(
         actor.id,
@@ -2922,7 +2918,6 @@ export class GameController {
       // battle-animation setting.
       this.statusMessage = `${unitDisplayName(attackerPresentation)}攻擊${unitDisplayName(defenderPresentation)}……`;
       this.resetAction();
-      this.markHintSeen();
       await this.presentOrdinaryCombat(
         attackerPresentation,
         defenderPresentation,
@@ -4103,7 +4098,6 @@ export class GameController {
     this.minimapPreviewOrigin = undefined;
     this.terrainInspectionPosition = undefined;
     this.objectiveOpen = true;
-    this.markHintSeen();
     this.emit();
   }
 
@@ -4339,11 +4333,6 @@ export class GameController {
     this.centerCamera(next);
     this.statusMessage = `已對焦下一名可行動友軍：${next.name}。`;
     this.emit();
-  }
-
-  markHintSeen(): void {
-    this.hintVisible = false;
-    localStorage.setItem("angel2.stage0.hintSeen", "yes");
   }
 
   toggleBattlePresentation(): void {

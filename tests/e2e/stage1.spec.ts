@@ -617,12 +617,6 @@ test("S01-J: every stage-1 camera entry stays inside the drawn map", async ({ pa
   await expect(battleCanvas).toHaveAttribute("data-camera-origin-bounds", "14,13,26,31");
   expect((await state(page)).cameraOrigin).toEqual({ x: 18, y: 31 });
 
-  const hint = page.locator("#hint-toast");
-  if (await hint.isVisible()) {
-    await hint.click();
-    await page.getByTestId("objective-panel").click({ button: "right" });
-  }
-
   // Focus an empty visible cell so the live tactical minimap is available.
   await battleCanvas.click({ position: { x: 60, y: 45 } });
   const minimap = page.getByTestId("tactical-minimap");

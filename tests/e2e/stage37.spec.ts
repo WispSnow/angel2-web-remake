@@ -36,6 +36,14 @@ const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
 );
 
 async function clickCell(page: Page, x: number, y: number): Promise<void> {
+  // The offsets below assume the drawn camera already sits on the simulated
+  // origin, but `waitForPhase` only proves the controller reached that phase.
+  // A static debug fixture can still be on its first scene tick with the Phaser
+  // camera parked at world (0,0), which silently shifts every click by the
+  // whole camera offset. The grid flag is published by the same scene sync that
+  // scrolls the camera, so its presence means the two agree.
+  await expect(page.getByTestId("battle-canvas"))
+    .toHaveAttribute("data-grid-enabled", /^(?:true|false)$/u);
   const current = await state(page);
   await page.getByTestId("battle-canvas").click({
     force: true,
@@ -91,8 +99,6 @@ test("S37-A–E: the stage-36 route enters deployment, SAY/0081, and the three-p
 test("S37-F: boss HUD conceals all numeric fields while preserving the gauges", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-player&difficulty=0&test=1");
   await waitForPhase(page, "player");
-  await page.locator("#hint-toast").click();
-  await page.getByRole("button", { name: "返回戰場" }).click();
   await clickCell(page, 23, 11);
   const detail = page.getByTestId("unit-detail");
   await expect(detail).toHaveAttribute("data-concealed-stats", "true");
@@ -212,11 +218,6 @@ test("S37-I: victory saves v73 and exposes the native stage-49 main ending", asy
 test("S37-J: spell seal is visible on a hand but does not block its dedicated action", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-status-audit&difficulty=0&test=1");
   await waitForPhase(page, "player");
-  const hint = page.locator("#hint-toast");
-  if (await hint.isVisible()) {
-    await hint.click();
-    await page.getByRole("button", { name: "返回戰場" }).click();
-  }
   await page.evaluate(() => window.__ANGEL2__?.setPresentationFast(true));
 
   await clickCell(page, 27, 15);
