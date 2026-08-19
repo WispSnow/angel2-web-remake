@@ -54,7 +54,7 @@ function renderNote(note: RemakeNote): string {
     ? `<div><dt>${escapeHtml(term)}</dt><dd>${inlineMarkup(value)}</dd></div>`
     : "";
   return `
-    <article class="rn-note" data-testid="remake-note-${note.id}">
+    <article class="rn-note" data-testid="remake-note-${note.slug ?? note.id}">
       <header>
         <span class="rn-note-id">${escapeHtml(note.id)}</span>
         <h4>${escapeHtml(note.title)}</h4>
