@@ -52,6 +52,11 @@ async function clickUnit(page: Page, id: string): Promise<void> {
   });
 }
 
+const npcAllyBadgeIds = async (page: Page): Promise<string[]> => {
+  const raw = await page.getByTestId("battle-canvas").getAttribute("data-npc-ally-badge-unit-ids");
+  return (raw ?? "").split(",").filter((id) => id.length > 0).sort();
+};
+
 test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as automatic", async ({ page }) => {
   await page.goto("/?debugScenario=stage-02-prebattle&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
@@ -79,6 +84,8 @@ test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as aut
   await expect(page.getByTestId("status-strip")).not.toContainText("藍色格");
   await expect(page.getByTestId("unit-force")).toHaveCount(0);
   await expect(page.getByTestId("action-menu")).toBeHidden();
+  // 原版对自动友军画 `A/1` frame 13 的 `N`；棋子上没有任何敌我色环。
+  expect(await npcAllyBadgeIds(page)).toContain("1:44");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage2-auto-ally-hud.png`,
   });
@@ -136,6 +143,61 @@ test("S02-C/D: all-rest spends only manual units, then every automatic ally acts
   expect(afterAllyAuto.audioCueLog.filter(
     ({ record, reason }) => record === 14 && reason === "ally-auto-movement",
   ).length).toBeGreaterThan(0);
+});
+
+test("S02-K: the native `N` badge marks unspent automatic allies and yields to `E`", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+
+  // 模块 29 `0000:825B` 把 `A/1` frame 13 画在 `E` 的同一个 16×14 槽位。
+  await expect(canvas).toHaveAttribute("data-npc-ally-badge-geometry", "-22,-15,16,14");
+  await expect(canvas).toHaveAttribute("data-acted-badge-geometry", "-22,-15,16,14");
+  const badgedBefore = await npcAllyBadgeIds(page);
+  // REMAKE-108：第 2 关的自动友军是战役槽 44/45 与 51..54。
+  expect(badgedBefore).toEqual(["1:44", "1:45", "1:51", "1:52", "1:53", "1:54"]);
+  await expect(canvas).toHaveAttribute("data-acted-badge-count", "0");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage2-npc-ally-badges.png`,
+  });
+
+  // `0000:822B` 先测棋盘格的 `80h` 行动位再走到 `N` 分支，所以自动友军一旦
+  // 行动，同一个槽位就换成 `E`。录下整段我方阶段的标记轨迹来观察这次交接。
+  await page.evaluate(() => {
+    const trace: string[] = [];
+    const interval = window.setInterval(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
+      const ids = canvas?.dataset.npcAllyBadgeUnitIds;
+      if (ids !== undefined && trace.at(-1) !== ids) trace.push(ids);
+    }, 5);
+    Object.assign(window, { __stage2BadgeTrace: trace, __stage2BadgeInterval: interval });
+  });
+
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.getByTestId("group-command-allRest").click();
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await page.getByTestId("dialogue-layer").click();
+  await waitForPhase(page, "enemy");
+
+  const badgeTrace = await page.evaluate(() => {
+    const holder = window as typeof window & {
+      __stage2BadgeTrace?: string[];
+      __stage2BadgeInterval?: number;
+    };
+    if (holder.__stage2BadgeInterval !== undefined) window.clearInterval(holder.__stage2BadgeInterval);
+    return holder.__stage2BadgeTrace ?? [];
+  });
+  const badgedCounts = badgeTrace.map((entry) => entry.split(",").filter(Boolean).length);
+  // 全部休息只消耗手动单位，所以自动友军先全部带 `N`，再在自己的阶段里逐个换成 `E`。
+  expect(badgedCounts[0]).toBe(badgedBefore.length);
+  const allSpent = badgedCounts.indexOf(0);
+  expect(allSpent).toBeGreaterThan(0);
+  expect(badgedCounts.slice(0, allSpent + 1))
+    .toEqual([...badgedCounts.slice(0, allSpent + 1)].sort((left, right) => right - left));
+  // 玩家单位在整段轨迹里都没有出现在 `N` 名单上。
+  const everBadged = new Set(badgeTrace.flatMap((entry) => entry.split(",").filter(Boolean)));
+  expect([...everBadged].sort()).toEqual(badgedBefore);
 });
 
 test("S02-E/H: defeating Lan plays SAY/175 once and enters stage 3", async ({ page }) => {

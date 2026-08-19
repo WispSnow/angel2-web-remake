@@ -42,6 +42,66 @@ const NATIVE_CURSOR_HIGHLIGHT = 0xffffff;
 const OBJECTIVE_DESTINATION_FILL = 0xc08bc5;
 const OBJECTIVE_DESTINATION_STROKE = 0xf2c4ec;
 
+// 原版地图棋子标记共用 `A/1` 的 16×14 位图：frame 9 是「已行動」的 `E`，
+// frame 13 是自动友军的 `N`。两者在同一格槽位、同一四色调色板上绘制，
+// 因此像素表只在字形上不同。
+const MAP_BADGE_COLORS = {
+  W: 0xffffff,
+  G: 0xbaaa9a,
+  R: 0xef2024,
+  K: 0x000000,
+} as const;
+
+type MapBadgePixel = keyof typeof MAP_BADGE_COLORS;
+
+/** `A/1` frame 9：单位本阶段已行动。 */
+const ACTED_BADGE_PATTERN = [
+  "WWWWWWWWWWWWWWWK",
+  "WGGGGGGGGGGGGGGK",
+  "WGGRRRRRRRRRKGGK",
+  "WGGKRRKKKKKRKGGK",
+  "WGGGRRKGGGGKKGGK",
+  "WGGGRRKGGRKGGGGK",
+  "WGGGRRRRRRKGGGGK",
+  "WGGGRRKKKRKGGGGK",
+  "WGGGRRKGGKKGGGGK",
+  "WGGGRRKGGGGRKGGK",
+  "WGGRRRRRRRRRKGGK",
+  "WGGKKKKKKKKKKGGK",
+  "WGGGGGGGGGGGGGGK",
+  "KKKKKKKKKKKKKKKK",
+] as const;
+
+/** `A/1` frame 13：side 1 的自动友军（NPC）。 */
+const NPC_ALLY_BADGE_PATTERN = [
+  "WWWWWWWWWWWWWWWK",
+  "WGGGGGGGGGGGGGGK",
+  "WGRRRKGGGRRRRKGK",
+  "WGKRRRKGGKRRKKGK",
+  "WGGRRRRKGGRRKGGK",
+  "WGGRRKRRKGRRKGGK",
+  "WGGRRKKRRKRRKGGK",
+  "WGGRRKGKRRRRKGGK",
+  "WGGRRKGGKRRRKGGK",
+  "WGGRRKGGGKRRKGGK",
+  "WGRRRRKGGGRRKGGK",
+  "WGKKKKKGGGKKKGGK",
+  "WGGGGGGGGGGGGGGK",
+  "KKKKKKKKKKKKKKKK",
+] as const;
+
+const paintMapBadge = (
+  graphics: Phaser.GameObjects.Graphics,
+  pattern: readonly string[],
+): void => {
+  for (let row = 0; row < pattern.length; row += 1) {
+    for (let column = 0; column < pattern[row].length; column += 1) {
+      graphics.fillStyle(MAP_BADGE_COLORS[pattern[row][column] as MapBadgePixel], 1);
+      graphics.fillRect(column, row, 1, 1);
+    }
+  }
+};
+
 const routePulseTextureKey = (presentationId: string, frame: number): string =>
   `route-pulse-${presentationId}-${frame}`;
 const enemyPhaseTailTextureKey = (
@@ -104,6 +164,7 @@ interface UnitView {
   iceDisabledOverlay?: Phaser.GameObjects.Image;
   lifeDigits: Phaser.GameObjects.Graphics;
   actedBadge: Phaser.GameObjects.Graphics;
+  npcAllyBadge: Phaser.GameObjects.Graphics;
 }
 
 export function createBattleScene(controller: GameController): typeof Phaser.Scene {
@@ -900,43 +961,20 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       // has a fixed offset from the logical unit center, so three-digit life
       // labels naturally overlap its right edge slightly.
       const lifeDigits = this.add.graphics().setPosition(0, -9);
+      // 模块 29 `0000:8243` 与 `0000:825B` 把两个标记画在同一格坐标
+      // `(cellX, cellY + 1Ch)`，所以它们共用同一个槽位，永远只显示一个。
       const actedBadge = this.add.graphics().setPosition(-22, -15);
-      const actedBadgePattern = [
-        "WWWWWWWWWWWWWWWK",
-        "WGGGGGGGGGGGGGGK",
-        "WGGRRRRRRRRRKGGK",
-        "WGGKRRKKKKKRKGGK",
-        "WGGGRRKGGGGKKGGK",
-        "WGGGRRKGGRKGGGGK",
-        "WGGGRRRRRRKGGGGK",
-        "WGGGRRKKKRKGGGGK",
-        "WGGGRRKGGKKGGGGK",
-        "WGGGRRKGGGGRKGGK",
-        "WGGRRRRRRRRRKGGK",
-        "WGGKKKKKKKKKKGGK",
-        "WGGGGGGGGGGGGGGK",
-        "KKKKKKKKKKKKKKKK",
-      ] as const;
-      const actedBadgeColors = {
-        W: 0xffffff,
-        G: 0xb1a08f,
-        R: 0xec1d21,
-        K: 0x000000,
-      } as const;
-      for (let row = 0; row < actedBadgePattern.length; row += 1) {
-        for (let column = 0; column < actedBadgePattern[row].length; column += 1) {
-          const pixel = actedBadgePattern[row][column] as keyof typeof actedBadgeColors;
-          actedBadge.fillStyle(actedBadgeColors[pixel], 1);
-          actedBadge.fillRect(column, row, 1, 1);
-        }
-      }
+      paintMapBadge(actedBadge, ACTED_BADGE_PATTERN);
+      const npcAllyBadge = this.add.graphics().setPosition(-22, -15);
+      paintMapBadge(npcAllyBadge, NPC_ALLY_BADGE_PATTERN);
 
       container.add([
         sprite,
         lifeDigits,
         actedBadge,
+        npcAllyBadge,
       ]);
-      return { container, sprite, iceDisabledOverlay, lifeDigits, actedBadge };
+      return { container, sprite, iceDisabledOverlay, lifeDigits, actedBadge, npcAllyBadge };
     }
 
     private drawLifeDigits(view: UnitView, unit: BattleUnit): void {
@@ -1053,7 +1091,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         // Frozen units are state-driven and untargetable; keep the shell visible
         // while unrelated area techniques play until dispel or phase cleanup.
         view.iceDisabledOverlay?.setVisible(unit.actionDisabled);
-        view.actedBadge.setVisible(unit.acted && !mapPresentation);
+        // `0000:822B` 先测棋盘格的 `80h` 行动位，命中就画 `E` 并返回；
+        // 只有未行动的自动友军才继续走到 `825B` 的 `N` 分支。
+        const showActed = unit.acted && !mapPresentation;
+        view.actedBadge.setVisible(showActed);
+        view.npcAllyBadge.setVisible(
+          !showActed && !mapPresentation && controller.battle.isNpcAlly(unit.id),
+        );
       }
       for (const [id, view] of this.unitViews) {
         if (active.has(id)) continue;
@@ -1074,6 +1118,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           .map((unit) => unit.id)
           .join(",");
         this.game.canvas.dataset.actedBadgeGeometry = "-22,-15,16,14";
+        this.game.canvas.dataset.npcAllyBadgeGeometry = "-22,-15,16,14";
+        this.game.canvas.dataset.npcAllyBadgeUnitIds = controller.battle.units
+          .filter((unit) => !unit.acted && controller.battle.isNpcAlly(unit.id))
+          .map((unit) => unit.id)
+          .join(",");
         this.game.canvas.dataset.rangeMode = controller.actionMode;
         this.game.canvas.dataset.rangeCellCount = String(
           controller.actionMode === "specialTarget"
@@ -1956,14 +2005,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         || controller.restPresentation
         || controller.turnTransitionPresentation
       ) return;
+      // 原版只用这一层 40×44 斜面框标记当前格（INPUT-004），棋子本身没有
+      // 任何敌我色环，所以这里不再叠加额外的悬浮/选中圆圈。
       const focus = controller.cursor;
       this.drawNativeCursorFrame(focus.x * TILE_WIDTH, focus.y * TILE_HEIGHT);
-      const unit = controller.focusedUnit;
-      if (unit) {
-        const marker = controller.movementPresentation ? focus : unit;
-        this.cursorGraphics.lineStyle(2, unit.side === 1 ? 0x59b9ff : 0xff5252, 1);
-        this.cursorGraphics.strokeCircle(marker.x * TILE_WIDTH + 20, marker.y * TILE_HEIGHT + 23, 17);
-      }
     }
 
     private drawNativeCursorFrame(x: number, y: number): void {

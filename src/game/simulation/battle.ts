@@ -1013,6 +1013,19 @@ export class Stage0Battle {
     return !this.forces.hasExplicitDefinitions() && this.alliedBehaviorFor(id) === 0;
   }
 
+  /**
+   * 自动友军（NPC）身份。原版在棋子左下画 `A/1` frame 13 的 `N`，条件是
+   * side 1 且逐槽 AI 行为值非零（模块 29 `0000:8234..825B`）。复刻的 `[DD]`
+   * 决定会在两个方向上偏离这条数据：`REMAKE-038` 把第 8 关原版行为 `2` 的
+   * 五名游骑兵收归玩家指挥，第 42 关传送门则为纯剧情台阵取消玩家控制却没有
+   * 行为值。两者都不是自动友军，因此这里要求原版行为和复刻指挥权同时成立。
+   */
+  isNpcAlly(id: string): boolean {
+    return this.unit(id)?.side === 1
+      && this.alliedBehaviorFor(id) !== 0
+      && !this.isPlayerControllableAlly(id);
+  }
+
   forceForUnit(id: string): ForceDefinition | undefined {
     return this.forces.definitionForUnit(id);
   }

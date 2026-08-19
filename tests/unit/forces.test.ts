@@ -15,7 +15,21 @@ import {
 } from "../../src/game/simulation/forces";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
-import type { BattleUnit, Side } from "../../src/game/types";
+import { STAGE_RUNTIME_MANIFEST } from "../../src/game/stage-runtime";
+import type { BattleUnit, CampaignState, Side, StageId } from "../../src/game/types";
+
+const loadStageBattle = async (stageId: StageId): Promise<Stage0Battle> => {
+  const module = await STAGE_RUNTIME_MANIFEST[stageId].load();
+  const campaign: CampaignState = {
+    stageId,
+    ruleset: "stableRemake",
+    difficulty: 0,
+    roster: completeCampaignRoster([]),
+    rngState: 0x1234_5678,
+    rngCalls: 0,
+  };
+  return module.createBattle(campaign, module.preparation?.createInitialResult());
+};
 
 const unit = (id: string, side: Side): BattleUnit => ({
   id,
@@ -83,6 +97,8 @@ describe("force registry", () => {
 
     expect(battle.alliedBehaviorFor("1:43")).toBe(0);
     expect(battle.isPlayerControllableAlly("1:43")).toBe(false);
+    // 原版按逐槽 AI 行为值画 `N`；行为为 0 的纯过场编队没有这个标记。
+    expect(battle.isNpcAlly("1:43")).toBe(false);
     expect(battle.alliedActionOrder(false)).toContain("1:43");
     expect(battle.planAlliedAiAction("1:43", "1:0"))
       .toEqual(battle.planAlliedAiAction("1:43"));
@@ -186,5 +202,70 @@ describe("force registry", () => {
         rally: { unitId: "1:2", meleeHoldsFire: true },
       },
     }], [units[0]])).toThrow(/Rally unit 1:2 is not a member/);
+  });
+});
+
+describe("npc ally map badge identity", () => {
+  it("requires both the native behavior word and the remake command model", async () => {
+    // 原版模块 29 `0000:8234..825B`：side 1 且逐槽 AI 行为值非零才画 `A/1`
+    // frame 13 的 `N`。复刻的 `[DD]` 决定在两个方向上偏离这条数据，标记必须
+    // 同时满足原版行为与复刻指挥权。
+    const stage8 = await loadStageBattle("stage-08");
+    for (const slot of [40, 41, 42, 43, 44]) {
+      const id = `1:${slot}`;
+      expect(stage8.alliedBehaviorFor(id)).toBe(2);
+      // REMAKE-038 把这五名游骑兵收归玩家指挥，本关没有自动友军。
+      expect(stage8.isPlayerControllableAlly(id)).toBe(true);
+      expect(stage8.isNpcAlly(id)).toBe(false);
+    }
+
+    // 第 42 关是纯剧情台阵：没有玩家控制，但原版行为值也全是 0。
+    const portal = await loadStageBattle("stage-42-portal");
+    expect(portal.units.filter(({ side }) => side === 1).length).toBeGreaterThan(0);
+    for (const { id } of portal.units.filter(({ side }) => side === 1)) {
+      expect(portal.isPlayerControllableAlly(id)).toBe(false);
+      expect(portal.isNpcAlly(id)).toBe(false);
+    }
+
+    // 第 3 关「救援友軍」的自动友军两个条件都成立。
+    const stage3 = await loadStageBattle("stage-03");
+    const stage3Npc = stage3.units.filter(({ id }) => stage3.isNpcAlly(id)).map(({ id }) => id);
+    expect(stage3Npc.length).toBeGreaterThan(0);
+    for (const id of stage3Npc) {
+      expect(stage3.alliedBehaviorFor(id)).not.toBe(0);
+      expect(stage3.isPlayerControllableAlly(id)).toBe(false);
+    }
+  });
+
+  it("marks the same allies the unit HUD calls 自動 in every implemented stage", async () => {
+    const npcAlliesByStage: Record<string, string[]> = {};
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const battle = await loadStageBattle(stageId);
+      npcAlliesByStage[stageId] = battle.units
+        .filter(({ id }) => battle.isNpcAlly(id))
+        .map(({ id }) => id)
+        .sort();
+      for (const member of battle.units) {
+        // 标记只属于 side 1 的自动单位，并且与右栏「我方／友軍」判据一致。
+        if (member.side !== 1) {
+          expect(battle.isNpcAlly(member.id)).toBe(false);
+          continue;
+        }
+        if (battle.isNpcAlly(member.id)) {
+          expect(battle.isPlayerControllableAlly(member.id)).toBe(false);
+        }
+      }
+    }
+    expect(
+      Object.fromEntries(
+        Object.entries(npcAlliesByStage).filter(([, ids]) => ids.length > 0),
+      ),
+    ).toEqual({
+      "stage-02": ["1:44", "1:45", "1:51", "1:52", "1:53", "1:54"],
+      "stage-03": ["1:20", "1:21", "1:3", "1:45", "1:46", "1:47", "1:50"],
+      "stage-04": ["1:24"],
+      "stage-09": ["1:9"],
+      "stage-27": ["1:22", "1:40", "1:41", "1:42", "1:43", "1:44", "1:45"],
+    });
   });
 });
