@@ -12,6 +12,7 @@ import {
   STARTUP_PRETITLE,
   STARTUP_TITLE,
 } from "../../src/game/content/startup.generated";
+import { clipStartupGlyphRow } from "../../src/game/startup-screen";
 import { readPlatePixels } from "./postgame-plate-support";
 
 const workspace = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -65,20 +66,60 @@ describe("module 23 startup presentation", () => {
     expect(STARTUP_TITLE.variants).toHaveLength(2);
   });
 
+  /**
+   * The rows do not appear whole at a target row. 0000:11DA clears the band,
+   * draws the three rows and then fills DS:07C0 and DS:07CA with colour 0, so a
+   * row entering at Y=316 shows one scanline, gains one per scroll update until
+   * it clears the lower bar, and slides back under the upper bar the same way.
+   */
+  it("uncovers and covers each scrolling row one scanline per update", () => {
+    const draw = titlePresentations.intro.draw;
+    expect(STARTUP_INTRO.visibleWindow).toEqual(draw.visibleWindow);
+    expect(draw.upperMask).toMatchObject({ y: 257, height: 16, colorIndex: 0 });
+    expect(draw.lowerMask).toMatchObject({ y: 317, height: 16, colorIndex: 0 });
+    const band = {
+      top: STARTUP_INTRO.visibleWindow.y,
+      bottom: STARTUP_INTRO.visibleWindow.y + STARTUP_INTRO.visibleWindow.height,
+    };
+    // The reset row and the update after the last visible one stay fully masked.
+    expect(clipStartupGlyphRow(STARTUP_INTRO.resetY, band)).toBeUndefined();
+    expect(clipStartupGlyphRow(STARTUP_INTRO.visibleTopY - 1, band)).toBeUndefined();
+    expect(clipStartupGlyphRow(STARTUP_INTRO.visibleBottomY, band))
+      .toEqual({ sourceY: 0, y: 316, height: 1 });
+    expect(clipStartupGlyphRow(STARTUP_INTRO.visibleTopY + 1, band))
+      .toEqual({ sourceY: STARTUP_FONT.glyphHeight - 1, y: 273, height: 1 });
+    const run = STARTUP_INTRO.visibleBottomY - STARTUP_INTRO.visibleTopY + 1;
+    const heights = Array.from({ length: run }, (_, index) =>
+      clipStartupGlyphRow(STARTUP_INTRO.visibleBottomY - index, band)?.height ?? 0);
+    const ramp = STARTUP_FONT.glyphHeight;
+    expect(heights.slice(0, ramp)).toEqual(Array.from({ length: ramp }, (_, index) => index + 1));
+    expect(heights.slice(ramp - 1, run - ramp)).toEqual(new Array(run - 2 * ramp + 1).fill(ramp));
+    expect(heights.slice(run - ramp)).toEqual(Array.from({ length: ramp }, (_, index) => ramp - 1 - index));
+    // Every row still spends its whole 316..258 run inside the cleared band.
+    expect(heights.filter((height) => height > 0)).toHaveLength(run - 1);
+  });
+
   /** Every visible string is drawn with A/23+A/24, so the layouts must decode
    * back to the native text and sit on the 8-pixel cursor grid. */
   it("lays every intro row and menu label out with the native glyph font", () => {
     const rows = STARTUP_INTRO.lines.filter(({ text }) => text !== "");
     expect(rows).toHaveLength(17);
     expect(titlePresentations.intro.counts.narrativeLines).toBe(17);
+    // 0000:1242 writes 00A0h to DS:510E before every row draw, so all 17 share
+    // one left margin and their indents come from their own leading ideographic
+    // spaces. Centring the padded line instead would apply the indent twice.
+    const { textOriginX } = titlePresentations.intro.draw;
+    const { x: bandX, width: bandWidth } = titlePresentations.intro.draw.visibleWindow;
     for (const row of rows) {
       const decoded = Array.from({ length: row.glyphs.length / 2 }, (_, index) =>
         glyphCharacter(row.glyphs[index * 2])).join("");
       expect(decoded).toBe(row.text.replaceAll("　", "").replaceAll(" ", ""));
+      const indent = row.text.length - row.text.replace(/^　+/u, "").length;
+      expect(row.glyphs[1]).toBe(textOriginX + indent * STARTUP_FONT.glyphWidth);
       for (let index = 0; index < row.glyphs.length; index += 2) {
         expect(row.glyphs[index + 1] % 8).toBe(0);
-        expect(row.glyphs[index + 1]).toBeGreaterThanOrEqual(0);
-        expect(row.glyphs[index + 1] + STARTUP_FONT.glyphWidth).toBeLessThanOrEqual(640);
+        expect(row.glyphs[index + 1]).toBeGreaterThanOrEqual(bandX);
+        expect(row.glyphs[index + 1] + STARTUP_FONT.glyphWidth).toBeLessThanOrEqual(bandX + bandWidth);
       }
     }
     for (const group of [STARTUP_MENU_LABELS.title, STARTUP_MENU_LABELS.difficulty]) {

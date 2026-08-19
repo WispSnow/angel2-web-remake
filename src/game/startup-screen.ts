@@ -129,29 +129,57 @@ export function drawDissolvedImage(
   context.drawImage(source.canvas, x, y);
 }
 
+/** Scanlines `[top, bottom)` a row may occupy; anything else is masked away. */
+export interface StartupGlyphBand {
+  readonly top: number;
+  readonly bottom: number;
+}
+
 /**
- * Draws a generated `[glyphIndex, x, ...]` pair list at `y`. Module 23 uses
- * palette index 15, which is pure white in every startup palette.
+ * The slice of a glyph row at `y` that survives `band`, or `undefined` when the
+ * whole row is masked. The scrolling intro needs this because 0000:11DA paints
+ * two colour-0 bars over the ends of the text band after drawing the rows: a row
+ * entering at Y=316 shows only its top scanline, gains one more per scroll
+ * update until it clears the lower bar, and slides back under the upper bar the
+ * same way, so lines are uncovered and covered a scanline at a time.
+ */
+export function clipStartupGlyphRow(
+  y: number,
+  band: StartupGlyphBand,
+): { sourceY: number; y: number; height: number } | undefined {
+  const top = Math.max(y, band.top);
+  const bottom = Math.min(y + STARTUP_FONT.glyphHeight, band.bottom);
+  if (bottom <= top) return undefined;
+  return { sourceY: top - y, y: top, height: bottom - top };
+}
+
+/**
+ * Draws a generated `[glyphIndex, x, ...]` pair list at `y`, keeping only the
+ * scanlines inside `band` when one is given. Module 23 uses palette index 15,
+ * which is pure white in every startup palette.
  */
 export function drawStartupGlyphs(
   context: CanvasRenderingContext2D,
   font: HTMLImageElement,
   glyphs: readonly number[],
   y: number,
+  band?: StartupGlyphBand,
 ): void {
   const { glyphWidth, glyphHeight, columns } = STARTUP_FONT;
+  const slice = band ? clipStartupGlyphRow(y, band) : { sourceY: 0, y, height: glyphHeight };
+  if (!slice) return;
   for (let index = 0; index < glyphs.length; index += 2) {
     const glyph = glyphs[index];
     context.drawImage(
       font,
       (glyph % columns) * glyphWidth,
-      Math.floor(glyph / columns) * glyphHeight,
+      Math.floor(glyph / columns) * glyphHeight + slice.sourceY,
       glyphWidth,
-      glyphHeight,
+      slice.height,
       glyphs[index + 1],
-      y,
+      slice.y,
       glyphWidth,
-      glyphHeight,
+      slice.height,
     );
   }
 }

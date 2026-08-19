@@ -255,6 +255,62 @@ async function render(module23Path, decodedRoot, renderRoot) {
   return manifest;
 }
 
+/**
+ * `0000:11DA` frames every scroll update with four descriptors at DS:07B6. It
+ * clears the text band, draws the three rows, paints two colour-0 bars over the
+ * band's ends and copies what is left to the other VGA page. The bars are the
+ * whole reason the rows do not pop: a row first drawn at Y=316 is still under
+ * the lower bar except for its top scanline, and a row leaving at Y=258 has
+ * already slid completely under the upper one, so each line is uncovered and
+ * covered one scanline per update. `0000:1D3A` reads a fill as
+ * `{x, y, width, height, colour}` and `0000:21D8` reads the blit as
+ * `{x, y, width, height, sourceX, sourceY, destinationSegment, sourceSegment}`,
+ * with the two segments overwritten per update by DS:07E0/07E2.
+ */
+function parseIntroDrawDescriptors(module23) {
+  const address = (offset) => `DS:${offset.toString(16).toUpperCase().padStart(4, "0")}`;
+  const words = (offset, count) => Array.from({ length: count }, (_, index) =>
+    module23.readUInt16LE(MODULE23_DATA_BASE + offset + index * 2));
+  const fill = (offset, role) => {
+    const [x, y, width, height, colour] = words(offset, 5);
+    return { descriptor: address(offset), role, x, y, width, height, colorIndex: colour & 0xff };
+  };
+  const [x, y, width, height, sourceX, sourceY] = words(0x07d4, 6);
+  const pageCopy = { descriptor: address(0x07d4), role: "copy the band to the other page", x, y, width, height, sourceX, sourceY };
+  const clear = fill(0x07b6, "erase the whole text band before the rows are drawn");
+  const upperMask = fill(0x07c0, "cover the band above the visible window");
+  const lowerMask = fill(0x07ca, "cover the band below the visible window");
+  for (const rectangle of [clear, upperMask, lowerMask]) {
+    assert(rectangle.colorIndex === 0, `${rectangle.descriptor} must fill with colour 0`);
+    assert(rectangle.x === 160 && rectangle.width === 400, `${rectangle.descriptor} must span the 400-pixel text band`);
+  }
+  assert(clear.y === 257 && clear.height === 70, "intro band clear moved");
+  assert(upperMask.y === 257 && upperMask.height === 16, "intro upper mask moved");
+  assert(lowerMask.y === 317 && lowerMask.height === 16, "intro lower mask moved");
+  assert(pageCopy.x === 160 && pageCopy.width === 400, "intro page copy no longer matches the band");
+  const visibleWindow = {
+    x: upperMask.x,
+    y: upperMask.y + upperMask.height,
+    width: upperMask.width,
+    height: lowerMask.y - (upperMask.y + upperMask.height),
+  };
+  assert(visibleWindow.y === 273 && visibleWindow.height === 44, "intro visible window moved");
+  assert(pageCopy.y === visibleWindow.y && pageCopy.sourceY === visibleWindow.y,
+    "intro page copy no longer starts at the visible window");
+  return {
+    entry: "0000:11DA",
+    order: ["clear band", "draw three rows", "mask above window", "mask below window", "copy band to other page"],
+    textOriginX: 0x00a0,
+    textOriginEvidence: "0000:1242 writes 00A0h to DS:510E before every row draw, exactly as 0000:1AD1 writes 0208h for the menu labels; the rows are indented by their own leading ideographic spaces, not by centring",
+    clear,
+    upperMask,
+    lowerMask,
+    pageCopy,
+    visibleWindow,
+    revealScanlinesPerUpdate: 1,
+  };
+}
+
 function parseIntroEntries(module23) {
   const entries = [];
   for (let index = 0; ; index++) {
@@ -409,6 +465,7 @@ async function extract(module23Path, audioManifestPath, decodedRoot, renderRoot,
       controlAndTextEntries: introEntries,
       counts: { totalEntries: 35, narrativeLines: 17, blankRows: 12, backgroundControls: 6 },
       scroll: introSimulation,
+      draw: parseIntroDrawDescriptors(module23),
       loop: {
         waitNativeTicksPerIteration: 4,
         scrollUpdateEveryIterations: 3,

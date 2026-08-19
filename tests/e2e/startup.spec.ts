@@ -234,16 +234,38 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await expect.poll(() => intro.locator("[data-intro-slot]").evaluateAll((lines) =>
     lines.some((line) => !line.hasAttribute("hidden") && (line.textContent?.trim().length ?? 0) > 0),
   )).toBe(true);
-  await expect.poll(() => page.getByTestId("startup-canvas").evaluate(() => {
+  // Rows only ever show between the two colour-0 bars 0000:11DA paints at
+  // DS:07C0 and DS:07CA; the band above 273 and below 316 has to stay black
+  // while the rows ramp in and out of it, one scanline per scroll update.
+  const introWhite = (y: number, height: number) => page.evaluate(([top, rows]) => {
     const canvas = document.querySelector("#startup-canvas") as HTMLCanvasElement;
-    const { data } = canvas.getContext("2d")!.getImageData(0, 258, 640, 59);
+    const { data } = canvas.getContext("2d")!.getImageData(160, top, 400, rows);
     let white = 0;
     for (let index = 0; index < data.length; index += 4) {
       if (data[index] > 200 && data[index + 1] > 200 && data[index + 2] > 200) white += 1;
     }
     return white;
-  })).toBeGreaterThan(0);
+  }, [y, height]);
+  await expect.poll(() => introWhite(273, 44)).toBeGreaterThan(0);
   await captureVisualAudit(startup, { path: "artifacts/playwright/startup-opening-intro.png" });
+  const maskedWhite = await page.evaluate(async () => {
+    const canvas = document.querySelector("#startup-canvas") as HTMLCanvasElement;
+    const context = canvas.getContext("2d")!;
+    let worst = 0;
+    for (let frame = 0; frame < 120; frame += 1) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      for (const [top, rows] of [[257, 16], [317, 16]]) {
+        const { data } = context.getImageData(160, top, 400, rows);
+        let white = 0;
+        for (let index = 0; index < data.length; index += 4) {
+          if (data[index] > 200 && data[index + 1] > 200 && data[index + 2] > 200) white += 1;
+        }
+        worst = Math.max(worst, white);
+      }
+    }
+    return worst;
+  });
+  expect(maskedWhite).toBe(0);
 
   await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-screen")).toBeVisible();

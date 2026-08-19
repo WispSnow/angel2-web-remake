@@ -10,6 +10,7 @@ import {
   STARTUP_TITLE,
 } from "./content/startup.generated";
 import {
+  clipStartupGlyphRow,
   drawDissolvedImage,
   drawFadedImage,
   drawStartupGlyphs,
@@ -61,6 +62,18 @@ const DAC_STEP_MS = 1000 / 70;
  */
 const INTRO_TRANSITION_HALF_UPDATES = Math.round(STARTUP_INTRO.transitionLoops / 3 / 2);
 const INTRO_UPDATE_MS = STARTUP_INTRO.ticksPerScrollUpdate * NATIVE_TICK_MS;
+/**
+ * 0000:11DA clears the 400x70 text band, draws the three rows and then fills
+ * DS:07C0 and DS:07CA — two colour-0 bars — over everything above 273 and below
+ * 316. The bars are what reveals and hides a line one scanline per scroll
+ * update, so the rows are drawn clipped to what they leave open. Only the Y
+ * bounds are enforced here: every native row starts at x=160 and is at most 400
+ * pixels wide, so the bars never trim a row horizontally.
+ */
+const INTRO_BAND = {
+  top: STARTUP_INTRO.visibleWindow.y,
+  bottom: STARTUP_INTRO.visibleWindow.y + STARTUP_INTRO.visibleWindow.height,
+} as const;
 
 const required = <T extends HTMLElement>(root: ParentNode, selector: string): T => {
   const element = root.querySelector<T>(selector);
@@ -707,7 +720,9 @@ export function mountStartup(
     if (!assignment) return undefined;
     const y = STARTUP_INTRO.resetY - (scrollUpdate - assignment.update);
     if (y < STARTUP_INTRO.visibleTopY || y > STARTUP_INTRO.visibleBottomY) return undefined;
-    return { assignment, y };
+    // A row exists for its whole 316..258 run, but the masks decide how much of
+    // it is on screen, so the paragraph mirror follows the visible slice.
+    return { assignment, y, slice: clipStartupGlyphRow(y, INTRO_BAND) };
   };
 
   const clearScreen = () => {
@@ -740,9 +755,9 @@ export function mountStartup(
     for (let slot = 0; slot < introLines.length; slot += 1) {
       const row = introRowAt(slot, scrollUpdate);
       const line = introLines[slot];
-      line.hidden = !row || row.assignment.text.length === 0;
-      line.textContent = row?.assignment.text ?? "";
-      if (row && font) drawStartupGlyphs(context, font, row.assignment.glyphs, row.y);
+      line.hidden = !row?.slice || row.assignment.text.length === 0;
+      line.textContent = row?.slice ? row.assignment.text : "";
+      if (row && font) drawStartupGlyphs(context, font, row.assignment.glyphs, row.y, INTRO_BAND);
     }
   };
 
