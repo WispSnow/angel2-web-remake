@@ -811,11 +811,15 @@ test("attacking with an empty reach speaks the native line instead of a strip no
   expect(pageErrors).toEqual([]);
 });
 
-test("a counterattacking defender speaks between the hit and its counter", async ({ page }) => {
+test("only the bone knight's full reflect speaks between the hit and its counter", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
   await page.getByTestId("arena-clear").click();
+  // `0000:92B3`'s gate DS:77B4 is written 'Y' only at `0000:9557`, behind the PIT
+  // coin flip *and* class `2E`; that is the bone knight's full-damage reflect,
+  // which `REMAKE-098` made deterministic. An ordinary counter stays silent, so
+  // the board carries one of each defender.
   const placed = await page.evaluate(() => {
     const arena = window.__ANGEL2_ARENA__;
     if (!arena) return [];
@@ -823,13 +827,17 @@ test("a counterattacking defender speaks between the hit and its counter", async
     arena.setClass("soldier");
     arena.setLevel(1);
     const attacker = arena.interact(20, 30);
+    const secondAttacker = arena.interact(20, 32);
     arena.setSide(2);
+    arena.setClass("bone-knight");
+    arena.setLevel(3);
+    const reflector = arena.interact(21, 30);
     arena.setClass("soldier");
     arena.setLevel(3);
-    const defender = arena.interact(21, 30);
-    return [attacker, defender];
+    const ordinary = arena.interact(21, 32);
+    return [attacker, secondAttacker, reflector, ordinary];
   });
-  expect(placed).toEqual([true, true]);
+  expect(placed).toEqual([true, true, true, true]);
   await page.getByTestId("arena-start").click();
 
   // The native counter line lives on the map branch only: `0000:9296`, the
@@ -859,6 +867,20 @@ test("a counterattacking defender speaks between the hit and its counter", async
   const after = await arenaBattleState(page);
   expect(after?.lastCombat?.counterOccurred).toBe(true);
   expect(after?.lastCombat?.counterDamage).toBeGreaterThan(0);
+  await expect(dialogue).toBeHidden({ timeout: 15_000 });
+
+  // Same exchange against an ordinary defender: the counter still lands, and
+  // the native gate keeps it silent.
+  await clickArenaWorldCell(page, 20, 32);
+  await page.getByTestId("unit-command-attack").click();
+  await clickArenaWorldCell(page, 21, 32);
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.lastCombat?.attackerId === "arena-1-1" && current.combatPresentation === undefined;
+  }, undefined, { timeout: 30_000 });
+  const ordinaryExchange = await arenaBattleState(page);
+  expect(ordinaryExchange?.lastCombat?.counterOccurred).toBe(true);
+  await expect(dialogue).toBeHidden();
   expect(pageErrors).toEqual([]);
 });
 
@@ -905,5 +927,138 @@ test("a physical shot that cannot land makes the target say so", async ({ page }
   const dragonAfter = after?.units.find(({ id }) => id === "arena-2-0");
   expect(after?.lastSpecialAction?.damage).toBe(0);
   expect(dragonAfter?.life).toBe(dragonBefore?.life);
+  expect(pageErrors).toEqual([]);
+});
+
+test("an automatic archer announces its shot and the ＡＩ對話 switch silences it", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  // `1000:1F6D` is the shot's own contextual line, not an action-table notice,
+  // and it reaches the renderer through the gated `1000:254F`.
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const bait = arena.interact(24, 30);
+    arena.setSide(2);
+    arena.setClass("archer");
+    arena.setLevel(1);
+    const archer = arena.interact(28, 30);
+    return [bait, archer];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  await clickArenaWorldCell(page, 24, 30);
+  await page.getByTestId("unit-command-rest").click();
+  await expect(dialogue).toHaveAttribute("data-source-record", "shooting-announce", { timeout: 30_000 });
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:85A5");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
+  await expect(dialogue).toContainText("看我的飛箭.");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-ai-shot-announce-line.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.phase === "player";
+  }, undefined, { timeout: 30_000 });
+
+  // Unlike the five player-side responses, this one follows DS:111C. The side
+  // panel only answers the pointer while nothing is focused, so park the cursor
+  // on empty ground first.
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await page.getByTestId("system-menu-button").click();
+  await page.getByTestId("system-command-settings").click();
+  await page.getByTestId("ai-dialogue-button").click();
+  await expect(page.getByTestId("ai-dialogue-button").locator(".native-settings-state")).toHaveText("OFF");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("settings-menu")).toBeHidden();
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+
+  await clickArenaWorldCell(page, 24, 30);
+  await page.getByTestId("unit-command-rest").click();
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.phase === "player" && (current.round ?? 0) >= 3;
+  }, undefined, { timeout: 30_000 });
+  await expect(dialogue).toBeHidden();
+  expect(pageErrors).toEqual([]);
+});
+
+test("a poisoned enemy rests below 20% life and says the native planner line", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  // Poison halves current life at every round boundary and `REMAKE-004` keeps it
+  // from killing, so it is the deterministic way to walk an AI unit down into
+  // `1000:2233`'s first branch without touching the板面 any other way.
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("curse-master");
+    arena.setLevel(3);
+    const caster = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    arena.setLevel(3);
+    const victim = arena.interact(24, 30);
+    return [caster, victim];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+  const opening = await arenaBattleState(page);
+  const fullLife = opening!.units.find(({ id }) => id === "arena-2-0")!.life;
+
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-poison").click();
+  await clickArenaWorldCell(page, 24, 30);
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.phase === "player"
+      && (current.units.find(({ id }) => id === "arena-2-0")?.statuses.poison ?? 0) > 0;
+  }, undefined, { timeout: 30_000 });
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  // The only player unit's rest ends the phase, so wait for the round counter
+  // rather than for `phase === "player"`, which is still true at click time.
+  const restOnce = async () => {
+    const before = (await arenaBattleState(page))!.round;
+    await clickArenaWorldCell(page, 20, 30);
+    await page.getByTestId("unit-command-rest").click();
+    await page.waitForFunction((round) => {
+      const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+      return current?.phase === "player" && (current.round ?? 0) > round;
+    }, before, { timeout: 30_000 });
+    const state = await arenaBattleState(page);
+    return state!.units.find(({ id }) => id === "arena-2-0")!.life;
+  };
+
+  // Walk the boundaries until the victim is inside the native sub-20% branch.
+  let life = fullLife;
+  for (let round = 0; round < 5 && life * 100 >= fullLife * 20; round += 1) {
+    life = await restOnce();
+  }
+  expect(life * 100).toBeLessThan(fullLife * 20);
+
+  // The next automatic turn plans a rest, and `1000:2233` speaks before it runs.
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-rest").click();
+  await expect(dialogue).toHaveAttribute("data-source-record", "resting-low-life", { timeout: 30_000 });
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:8501");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
+  await expect(dialogue).toContainText("快不行了!...我必需休息一下.");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-ai-low-life-rest-line.png`,
+  });
   expect(pageErrors).toEqual([]);
 });

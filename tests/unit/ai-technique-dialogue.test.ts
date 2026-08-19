@@ -182,14 +182,23 @@ describe("native contextual battle lines", () => {
       key,
       line.selector,
       line.address,
+      line.gate,
       line.text,
       line.emitters,
     ])).toEqual([
-      ["spellSealed", 0x1a, "DS:8677", "我中了禁咒，無法使用法術．", ["0000:701F"]],
-      ["noTargetInRange", 0x1b, "DS:8692", "沒有人在我的攻擊範圍內．", ["0000:70ED"]],
-      ["confusedActor", 0x1c, "DS:86AB", "我的頭好昏，無法思考．", ["0000:671D"]],
-      ["dodgedShot", 0x1d, "DS:86C2", "要打中我沒那麼容易．", ["0000:7260", "1000:1FB2"]],
-      ["counterattack", 0x1e, "DS:86D7", "妳竟敢打我．", ["0000:92C1"]],
+      // Planner-emitted lines: they reach the renderer through the
+      // ＡＩ對話-gated `1000:254F`.
+      ["restingLowLife", 0x00, "DS:8501", "aiDialogue", "快不行了!...我必需休息一下.", ["1000:2287"]],
+      ["breakingContact", 0x01, "DS:851D", "aiDialogue", "我體力太低了!\n先閃一邊....", ["1000:2265"]],
+      ["surrounded", 0x02, "DS:8538", "aiDialogue", "這....被包圍了.", ["1000:227B"]],
+      ["shootingAnnounce", 0x08, "DS:85A5", "aiDialogue", "看我的飛箭.", ["1000:1F6D"]],
+      // Player responses: direct `0000:C97E` sites the switch never silences.
+      ["spellSealed", 0x1a, "DS:8677", "direct", "我中了禁咒，無法使用法術．", ["0000:701F"]],
+      ["noTargetInRange", 0x1b, "DS:8692", "direct", "沒有人在我的攻擊範圍內．", ["0000:70ED"]],
+      ["confusedActor", 0x1c, "DS:86AB", "direct", "我的頭好昏，無法思考．", ["0000:671D"]],
+      // The one line with both kinds of site, so the caller picks the gate.
+      ["dodgedShot", 0x1d, "DS:86C2", "mixed", "要打中我沒那麼容易．", ["0000:7260", "1000:1FB2"]],
+      ["counterattack", 0x1e, "DS:86D7", "direct", "妳竟敢打我．", ["0000:92C1"]],
     ]);
 
     // 0Ah..17h belong to the 33 AI action rows; these lines have their own
@@ -228,5 +237,20 @@ describe("native contextual battle lines", () => {
         upper: { speaker: "士兵", text: "妳竟敢打我．" },
         source: { record: "counterattack", wait: 0x1e },
       });
+  });
+});
+
+describe("native contextual battle-line gates", () => {
+  test("splits the table into planner lines, player responses and the mixed one", () => {
+    const byGate = (gate: string) => Object.entries(NATIVE_CONTEXTUAL_BATTLE_LINES)
+      .filter(([, line]) => line.gate === gate)
+      .map(([key]) => key);
+    // `1000:254F` carries the ＡＩ對話 switch, so everything behind it is
+    // silenceable and everything reaching `0000:C97E` directly is not.
+    expect(byGate("aiDialogue"))
+      .toEqual(["restingLowLife", "breakingContact", "surrounded", "shootingAnnounce"]);
+    expect(byGate("direct"))
+      .toEqual(["spellSealed", "noTargetInRange", "confusedActor", "counterattack"]);
+    expect(byGate("mixed")).toEqual(["dodgedShot"]);
   });
 });

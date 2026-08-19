@@ -213,6 +213,10 @@ export interface DialoguePage {
       | "ai-technique"
       | "battle-context"
       // DS:84BB contextual battle lines outside the AI technique groups.
+      | "resting-low-life"
+      | "breaking-contact"
+      | "surrounded"
+      | "shooting-announce"
       | "spell-sealed"
       | "no-target-in-range"
       | "confused-actor"

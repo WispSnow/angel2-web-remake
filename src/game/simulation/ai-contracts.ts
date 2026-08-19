@@ -21,7 +21,19 @@ export interface AlliedAiAction {
   setupTargetId?: string;
   /** Rules-significant magic-archer effect path, separate from movement path. */
   linePath?: Position[];
+  /**
+   * The DS:84BB contextual line the native planner speaks for this branch.
+   * Informational: the native code emits it from the planner itself, so the
+   * plan records which branch it took and the presentation layer reads it.
+   */
+  nativeLine?: AiPlannerLineKey;
 }
+
+/**
+ * The planner-emitted subset of the contextual battle lines. Each one is spoken
+ * from inside the native AI decision, before the chosen action runs.
+ */
+export type AiPlannerLineKey = "restingLowLife" | "breakingContact" | "surrounded";
 
 /**
  * The phase scheduler ranks complete plans, not just actor ids. Returning the

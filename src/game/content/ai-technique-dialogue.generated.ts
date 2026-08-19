@@ -348,22 +348,70 @@ export interface NativeContextualBattleLine {
   readonly selector: number;
   readonly pointerEntry: `DS:${string}`;
   readonly address: `DS:${string}`;
+  /** `aiDialogue` lines are silenced by the ＡＩ對話 switch; `direct` ones are not. */
+  readonly gate: "aiDialogue" | "direct" | "mixed";
   readonly text: string;
   /** Native call sites that play this line. */
   readonly emitters: readonly string[];
 }
 
 /**
- * DS:84BB entries outside the AI technique groups. Each reaches
- * `0000:C97E` directly rather than through the ＡＩ對話-gated `1000:254F`,
- * so none of them is silenced by that switch.
+ * DS:84BB entries outside the AI technique groups. Each carries the gate its
+ * own call sites use: the player responses reach `0000:C97E` directly and
+ * are never silenced, while the AI lines go through `1000:254F` and follow
+ * the ＡＩ對話 switch.
  */
 export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
+  "restingLowLife": {
+    "record": "resting-low-life",
+    "selector": 0,
+    "pointerEntry": "DS:84BB",
+    "address": "DS:8501",
+    "gate": "aiDialogue",
+    "text": "快不行了!...我必需休息一下.",
+    "emitters": [
+      "1000:2287"
+    ]
+  },
+  "breakingContact": {
+    "record": "breaking-contact",
+    "selector": 1,
+    "pointerEntry": "DS:84BD",
+    "address": "DS:851D",
+    "gate": "aiDialogue",
+    "text": "我體力太低了!\n先閃一邊....",
+    "emitters": [
+      "1000:2265"
+    ]
+  },
+  "surrounded": {
+    "record": "surrounded",
+    "selector": 2,
+    "pointerEntry": "DS:84BF",
+    "address": "DS:8538",
+    "gate": "aiDialogue",
+    "text": "這....被包圍了.",
+    "emitters": [
+      "1000:227B"
+    ]
+  },
+  "shootingAnnounce": {
+    "record": "shooting-announce",
+    "selector": 8,
+    "pointerEntry": "DS:84CB",
+    "address": "DS:85A5",
+    "gate": "aiDialogue",
+    "text": "看我的飛箭.",
+    "emitters": [
+      "1000:1F6D"
+    ]
+  },
   "spellSealed": {
     "record": "spell-sealed",
     "selector": 26,
     "pointerEntry": "DS:84EF",
     "address": "DS:8677",
+    "gate": "direct",
     "text": "我中了禁咒，無法使用法術．",
     "emitters": [
       "0000:701F"
@@ -374,6 +422,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "selector": 27,
     "pointerEntry": "DS:84F1",
     "address": "DS:8692",
+    "gate": "direct",
     "text": "沒有人在我的攻擊範圍內．",
     "emitters": [
       "0000:70ED"
@@ -384,6 +433,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "selector": 28,
     "pointerEntry": "DS:84F3",
     "address": "DS:86AB",
+    "gate": "direct",
     "text": "我的頭好昏，無法思考．",
     "emitters": [
       "0000:671D"
@@ -394,6 +444,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "selector": 29,
     "pointerEntry": "DS:84F5",
     "address": "DS:86C2",
+    "gate": "mixed",
     "text": "要打中我沒那麼容易．",
     "emitters": [
       "0000:7260",
@@ -405,6 +456,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "selector": 30,
     "pointerEntry": "DS:84F7",
     "address": "DS:86D7",
+    "gate": "direct",
     "text": "妳竟敢打我．",
     "emitters": [
       "0000:92C1"

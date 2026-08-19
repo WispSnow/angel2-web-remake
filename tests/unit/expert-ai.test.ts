@@ -1435,3 +1435,50 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     expect(battle.allPlayerControllableAlliesFrozen()).toBe(false);
   });
 });
+
+describe("native contextual lines emitted from the AI planner", () => {
+  /** `1000:2233`'s first branch: below 20% the plan is a rest that says so. */
+  it("tags the sub-20% rest with the native low-life line", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-hurt", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-far", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 40, y: 30 },
+    ], 0, new DeterministicRng(0x4401));
+    const unit = battle.unit("ally-hurt")!;
+    unit.life = Math.max(1, Math.floor(battle.statsFor(unit).maxLife * 19 / 100));
+
+    const action = battle.planAlliedAiAction("ally-hurt");
+    expect(action).toMatchObject({ kind: "rest", nativeLine: "restingLowLife" });
+  });
+
+  it("leaves a healthy plan untagged", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-fit", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-near", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 21, y: 30 },
+    ], 0, new DeterministicRng(0x4402));
+
+    expect(battle.planAlliedAiAction("ally-fit")?.nativeLine).toBeUndefined();
+  });
+
+  /**
+   * The 20..39% band is the only place the remake still performs the native
+   * break-contact retreat, so it is the only place `01h`/`02h` can be honest.
+   * `1000:2233` splits it by adjacency, and so does the tag.
+   */
+  it("separates break-contact from surrounded inside the 20..39% band", () => {
+    const cornered = new ArenaBattle([
+      { id: "empress", side: 1 as const, slot: 0, classId: "empress" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-a", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 21, y: 30 },
+    ], 0, new DeterministicRng(0x4403));
+    const banded = cornered.unit("empress")!;
+    banded.life = Math.floor(cornered.statsFor(banded).maxLife * 30 / 100);
+    expect(cornered.planAlliedAiAction("empress")?.nativeLine).toBe("breakingContact");
+
+    const clear = new ArenaBattle([
+      { id: "empress", side: 1 as const, slot: 0, classId: "empress" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-far", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 40, y: 30 },
+    ], 0, new DeterministicRng(0x4404));
+    const alone = clear.unit("empress")!;
+    alone.life = Math.floor(clear.statsFor(alone).maxLife * 30 / 100);
+    expect(clear.planAlliedAiAction("empress")?.nativeLine).toBe("restingLowLife");
+  });
+});

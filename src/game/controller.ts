@@ -3446,10 +3446,12 @@ export class GameController {
   }
 
   /**
-   * Native `0000:722B` / `1000:1FB2`: when a physical shot lands on a class that
-   * shrugs it off, the *target* speaks line `1Dh` after the shot presentation.
-   * `REMAKE-099` replaced the native PIT coin flip with a deterministic
-   * immunity, so the line now accompanies every such blocked shot.
+   * Native `0000:722B`: the *player's* physical shot on a class that shrugs it
+   * off makes the target speak line `1Dh` after the shot presentation. This half
+   * reaches `0000:C97E` directly, so the ＡＩ對話 switch does not silence it; the
+   * AI half at `1000:1FB2` does and is played separately. `REMAKE-099` replaced
+   * the native PIT coin flip with a deterministic immunity, so the line now
+   * accompanies every such blocked shot instead of about half of them.
    */
   private async presentShotDodgeLine(
     actionId: BattleActionId,
@@ -3457,6 +3459,20 @@ export class GameController {
   ): Promise<void> {
     if (!target || !isPhysicalShotDodgedBy(actionId, target)) return;
     await this.presentContextualLine(target, "dodgedShot");
+  }
+
+  /**
+   * The planner-emitted lines reach `0000:C97E` through `1000:254F`, so unlike
+   * the player responses they obey the ＡＩ對話 switch DS:111C exactly like the
+   * AI technique notices do.
+   */
+  private async presentAiContextualLine(
+    actor: BattleUnit,
+    line: ContextualBattleLineKey,
+    statusText?: string,
+  ): Promise<void> {
+    if (!this.aiDialogueEnabled) return;
+    await this.presentContextualLine(actor, line, statusText);
   }
 
   private async presentContextualLine(
@@ -3499,6 +3515,10 @@ export class GameController {
           ? `玩家軍團：${unit.name}正在執行集團命令。`
           : `友軍 NPC 軍團：${unit.name}正在獨立行動。`);
     this.emit();
+
+    // Native `1000:2233`/`2265`/`227B` speak from inside the planner, before the
+    // retreat or rest they chose actually runs.
+    if (action.nativeLine) await this.presentAiContextualLine(unit, action.nativeLine);
 
     if (
       (action.kind === "move" || action.kind === "attack" || action.kind === "special"
@@ -3554,8 +3574,21 @@ export class GameController {
             action.actionId,
             prepared.result.target,
           );
+          // `1000:1F6D`: the shot has its own contextual line rather than an
+          // action-table notice, because the native shooting codes collide with
+          // the technique codes in that table. Only the three native shooting
+          // careers `3A/0I/1I` reach that flow; the water warrior's shot is
+          // `REMAKE-093`'s side-1 grant and has no native line to borrow.
+          if (isShootingActionId(action.actionId)
+            && action.actionId !== WATER_WARRIOR_SHOT_ACTION_ID) {
+            await this.presentAiContextualLine(actorPresentation, "shootingAnnounce");
+          }
           await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
-          await this.presentShotDodgeLine(action.actionId, targetPresentation);
+          // `1000:1FB2` is the AI half of the dodge line, so this one follows the
+          // switch; the player's own shot answers through `0000:7260` and does not.
+          if (isPhysicalShotDodgedBy(action.actionId, targetPresentation)) {
+            await this.presentAiContextualLine(targetPresentation, "dodgedShot");
+          }
           const result = this.battle.commitPreparedAction(prepared);
           this.lastSpecialAction = result;
           for (const affected of result.affectedUnits.filter(({ died }) => died)) {
@@ -3787,8 +3820,14 @@ export class GameController {
     } else if (result.counterOccurred) {
       // `0000:9289` plays contextual line 1Eh from the defender between the
       // attack damage and the counter, and only on the map route: the
-      // full-screen branch at `0000:9296` never calls it.
-      await this.presentContextualLine(defender, "counterattack");
+      // full-screen branch at `0000:9296` never calls it. Its gate DS:77B4 is
+      // written 'Y' only at `0000:9557`, which needs both the PIT coin flip and
+      // class `2E`; that is the bone knight's full-damage reflect, not an
+      // ordinary counter. `REMAKE-098` made the same reflect deterministic, so
+      // the line now follows every bone-knight counter and no other.
+      if (defender.classId === "bone-knight") {
+        await this.presentContextualLine(defender, "counterattack");
+      }
       for (let frame = 0; frame < hitFrames.length; frame += 1) {
         if (frame === 0 || frame === 4) this.queueAudioCue(38, `map-counter-hit-${frame === 0 ? "first" : "second"}`);
         this.setCombatPresentation(

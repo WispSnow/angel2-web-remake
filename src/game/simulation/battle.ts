@@ -2242,7 +2242,7 @@ export class Stage0Battle {
     // stage over. Everyone else keeps taking a guaranteed kill at any life,
     // because for them an even trade costs the player more than the AI.
     if (unit.life * 100 < maximumLife * 20 && this.isEnemyCommander(unit)) {
-      const recovery = this.planSelfRecoveryAction(unit);
+      const recovery = this.tagLowLifeRest(unit, this.planSelfRecoveryAction(unit));
       this.recordExpertDecision(unit, [...candidates, recovery], recovery);
       return recovery;
     }
@@ -2257,7 +2257,7 @@ export class Stage0Battle {
       && selectedUtility.guaranteedKills === 0
       && selectedUtility.wizardHits === 0
       && selectedUtility.criticalSaves === 0) {
-      const recovery = this.planSelfRecoveryAction(unit);
+      const recovery = this.tagLowLifeRest(unit, this.planSelfRecoveryAction(unit));
       this.recordExpertDecision(unit, [...candidates, recovery], recovery);
       return recovery;
     }
@@ -2541,6 +2541,19 @@ export class Stage0Battle {
   }
 
   /**
+   * Native `1000:2233`'s first branch: below 20% life the unit rests and says
+   * so. The tag is attached where the plan is produced because the original
+   * speaks the line from inside the planner, not from the presentation. The
+   * same line also covers the 20..39% band's no-adjacent-enemy case, which
+   * `planEmpressOrDragonLifeBand` tags for itself.
+   */
+  private tagLowLifeRest(unit: BattleUnit, action: AlliedAiAction): AlliedAiAction {
+    if (action.kind !== "rest") return action;
+    const lifePercent = Math.floor(unit.life * 100 / this.statsFor(unit).maxLife);
+    return lifePercent < 20 ? { ...action, nativeLine: "restingLowLife" } : action;
+  }
+
+  /**
    * Rest restores `floor(maxLife * 15 / 100)`, which a healer's own pool often
    * beats — `1H` alone returns 24% of max life. Whenever the policy decides a
    * unit should spend its action recovering, it should therefore spend it on
@@ -2607,13 +2620,21 @@ export class Stage0Battle {
   ): AlliedAiAction | undefined {
     const lifePercent = Math.floor(unit.life * 100 / this.statsFor(unit).maxLife);
     if (lifePercent >= 40 || lifePercent < 20) return undefined;
-    const retreat = options.behavior !== 1 && this.hasAdjacentOpponent(unit)
-      ? this.defensiveRetreatPath(unit)
-      : undefined;
+    // Native `1000:2233` splits this band three ways and says something
+    // different in each: sentries rest silently, a unit with nobody adjacent
+    // rests with line 00h, and a unit that wants to break contact says 01h —
+    // then 02h if the retreat finds no cell. Splitting the predicate here only
+    // labels the branch; the chosen action is unchanged.
+    const sentry = options.behavior === 1;
+    const adjacent = this.hasAdjacentOpponent(unit);
+    const retreat = !sentry && adjacent ? this.defensiveRetreatPath(unit) : undefined;
     if (!retreat) {
       const recovery = this.planSelfRecoveryAction(unit);
-      this.recordExpertDecision(unit, [recovery], recovery);
-      return recovery;
+      const banded: AlliedAiAction = sentry
+        ? recovery
+        : { ...recovery, nativeLine: adjacent ? "surrounded" : "restingLowLife" };
+      this.recordExpertDecision(unit, [banded], banded);
+      return banded;
     }
     const selected = this.planClassAction(unit, undefined, {
       expertRanking: true,
@@ -2621,8 +2642,9 @@ export class Stage0Battle {
       targetFilter: (target) => target.side === unit.side
         || (options.targetFilter?.(target) ?? true),
     }) ?? { unitId: unit.id, kind: "move", path: retreat };
-    this.recordExpertDecision(unit, [selected], selected);
-    return selected;
+    const banded: AlliedAiAction = { ...selected, nativeLine: "breakingContact" };
+    this.recordExpertDecision(unit, [banded], banded);
+    return banded;
   }
 
   /** Native `1070:0583`: an orthogonal neighbour holding an opposing unit. */
@@ -2963,7 +2985,7 @@ export class Stage0Battle {
     const stats = this.statsFor(unit);
     const lifePercent = Math.floor(unit.life * 100 / stats.maxLife);
     if (!options.expertRanking && lifePercent < (options.restThresholdPercent ?? 20)) {
-      return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+      return this.tagLowLifeRest(unit, { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] });
     }
 
     const reachable = this.reachableCells(unit.id)
@@ -3093,7 +3115,7 @@ export class Stage0Battle {
 
     if (options.expertRanking) {
       if (lifePercent < (options.restThresholdPercent ?? 40)) {
-        return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
+        return this.tagLowLifeRest(unit, { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] });
       }
       if (behavior === 1) {
         return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };

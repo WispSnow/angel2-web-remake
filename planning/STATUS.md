@@ -6,6 +6,7 @@
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
+| AI 上下文台词分支映射 | `partially-implemented` | `DS:84BB[00h..09h]` 九条 AI 台词的原版工位已逐条定位；对照复刻共享专家效用后分四级，见 [`ai-contextual-lines-branch-mapping.md`](audits/ai-contextual-lines-branch-mapping.md)。第 1、2 级已实装（`00h/01h/02h/08h`），第 3 级待规则决定，第 4 级不做 |
 | 逆向第一阶段证据基线 | `verified` | 校验器通过，实施必需未知项为 0；正式阶段签署仍见设计验收清单 |
 | 第 0 关“瓦爾克麗宮” | `accepted` | 实现、自动验收与用户手动试玩均通过 |
 | M00 第 0 关人工接受 | `accepted` | 用户于 2026-07-27 确认试玩清单全部无误 |
