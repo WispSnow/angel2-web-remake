@@ -31,6 +31,7 @@ import type { BattleUnit, Position, UnitClassId, UnitStats } from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
+import { finishMenuClose, setMenuOpen } from "./menu-animation";
 import {
   animatedPortraitMarkup,
   configureAnimatedPortrait,
@@ -264,6 +265,21 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const groupCommandMenu = required(root, "#group-command-menu");
   const retreatConfirm = required(root, "#retreat-confirm");
   const resultLayer = required(root, "#result-layer");
+  // 收合動畫會讓選單比控制器狀態多留在 DOM 一小段時間；卸載時必須立刻結清，
+  // 否則等待中的收尾回呼會作用在已被替換的畫面上。
+  const animatedMenus = [
+    actionMenu,
+    objectivePanel,
+    systemMenu,
+    settingsMenu,
+    soundSettingsMenu,
+    musicSettingsMenu,
+    recordMenu,
+    quitConfirm,
+    groupCommandMenu,
+    retreatConfirm,
+    dialogueSkipConfirm,
+  ];
   let dialogueTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let dialogueAdvanceTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let activeDialogueKey = "";
@@ -733,8 +749,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     const actionMenuVisible = controller.phase === "player"
       && (controller.actionMode === "actionMenu" || controller.actionMode === "techniqueMenu");
-    actionMenu.hidden = !actionMenuVisible;
-    if (!actionMenu.hidden) {
+    if (setMenuOpen(actionMenu, actionMenuVisible)) {
       const position = controller.commandMenuPosition;
       actionMenu.style.left = `${position.x}px`;
       actionMenu.style.top = `${position.y}px`;
@@ -842,9 +857,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       || controller.groupCommandOpen
       || controller.retreatConfirmOpen;
     hint.textContent = `查看勝利條件：${controller.battle.stage.objective.victoryText}`;
-    objectivePanel.hidden = !controller.objectiveOpen;
-    systemMenu.hidden = !controller.systemMenuOpen;
-    if (!systemMenu.hidden) {
+    setMenuOpen(objectivePanel, controller.objectiveOpen);
+    if (setMenuOpen(systemMenu, controller.systemMenuOpen)) {
       systemMenu.innerHTML = controller.systemCommands.map((command, index) => {
         const action = command.id === "settings"
           ? "system-settings"
@@ -855,8 +869,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         return `<button type="button" role="menuitem" data-action="${action}" data-system-index="${index}" data-testid="system-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${command.label}</span></button>`;
       }).join("");
     }
-    settingsMenu.hidden = !controller.settingsOpen;
-    if (!settingsMenu.hidden) {
+    if (setMenuOpen(settingsMenu, controller.settingsOpen)) {
       const settings = [
         {
           label: "人物圖像",
@@ -902,10 +915,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           }).join("")}
         </div>`;
     }
-    soundSettingsMenu.hidden = !controller.soundSettingsOpen;
-    musicSettingsMenu.hidden = !controller.musicSettingsOpen;
-    recordMenu.hidden = controller.recordMenuMode === undefined;
-    if (!recordMenu.hidden) {
+    setMenuOpen(soundSettingsMenu, controller.soundSettingsOpen);
+    setMenuOpen(musicSettingsMenu, controller.musicSettingsOpen);
+    if (setMenuOpen(recordMenu, controller.recordMenuMode !== undefined)) {
       const mode = controller.recordMenuMode;
       recordMenu.innerHTML = renderRecordPanel(controller, {
         title: mode === "save" ? "儲存遊戲進度" : "讀取遊戲進度",
@@ -920,16 +932,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         cancelAction: "close-record-menu",
       });
     }
-    quitConfirm.hidden = !controller.quitConfirmOpen;
-    if (!quitConfirm.hidden) {
+    if (setMenuOpen(quitConfirm, controller.quitConfirmOpen)) {
       for (const button of quitConfirm.querySelectorAll<HTMLButtonElement>("[data-quit-index]")) {
         const selected = Number(button.dataset.quitIndex) === controller.quitConfirmIndex;
         button.classList.toggle("is-selected", selected);
         button.setAttribute("aria-current", String(selected));
       }
     }
-    groupCommandMenu.hidden = !controller.groupCommandOpen;
-    if (!groupCommandMenu.hidden) {
+    if (setMenuOpen(groupCommandMenu, controller.groupCommandOpen)) {
       groupCommandMenu.innerHTML = controller.groupCommands.map((command, index) => {
         const action = command.id === "allRest"
           ? "all-rest"
@@ -943,16 +953,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         return `<button type="button" role="menuitem" data-action="${action}" data-group-command-index="${index}" data-testid="group-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}" ${disabled ? "disabled" : ""}><span class="native-command-label">${command.label}</span></button>`;
       }).join("");
     }
-    retreatConfirm.hidden = !controller.retreatConfirmOpen;
-    if (!retreatConfirm.hidden) {
+    if (setMenuOpen(retreatConfirm, controller.retreatConfirmOpen)) {
       for (const button of retreatConfirm.querySelectorAll<HTMLButtonElement>("[data-retreat-index]")) {
         const selected = Number(button.dataset.retreatIndex) === controller.retreatConfirmIndex;
         button.classList.toggle("is-selected", selected);
         button.setAttribute("aria-current", String(selected));
       }
     }
-    dialogueSkipConfirm.hidden = !controller.dialogueSkipConfirmOpen;
-    if (!dialogueSkipConfirm.hidden) {
+    if (setMenuOpen(dialogueSkipConfirm, controller.dialogueSkipConfirmOpen)) {
       for (const button of dialogueSkipConfirm.querySelectorAll<HTMLButtonElement>(
         "[data-dialogue-skip-index]",
       )) {
@@ -1224,6 +1232,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     stopDialogueTimer();
     stopFeedbackTimer();
     hideSidePanelHint();
+    for (const menu of animatedMenus) finishMenuClose(menu);
   };
 }
 

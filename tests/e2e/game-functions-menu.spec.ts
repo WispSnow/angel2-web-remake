@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { settleMenuAnimation } from "./menu-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 test("game functions reproduces the native five-switch submenu", async ({ page }) => {
@@ -36,6 +37,7 @@ test("game functions reproduces the native five-switch submenu", async ({ page }
   await expect(page.getByTestId("music-settings-menu")).toBeHidden();
   await expect(page.getByTestId("group-command-menu")).toBeHidden();
 
+  await settleMenuAnimation(menu);
   const presentation = await menu.evaluate((element) => {
     const style = getComputedStyle(element);
     const menuBounds = element.getBoundingClientRect();

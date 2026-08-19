@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -254,6 +255,8 @@ const openSystemMenu = async (page: Page) => {
 };
 const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => {
   await expect(menu).toHaveClass(/native-command-menu/);
+  // 開闔縮放動畫期間量到的是中途尺寸；原生外框尺寸只在動畫落地後成立。
+  await settleMenuAnimation(menu);
   const presentation = await menu.evaluate((element) => {
     const selected = element.querySelector<HTMLElement>("button.is-selected");
     const label = selected?.querySelector<HTMLElement>(".native-command-label");
@@ -695,6 +698,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("action-menu")).toBeVisible();
   await expect(page.getByTestId("unit-command-move")).toHaveAttribute("aria-current", "true");
   await expect(page.getByTestId("action-menu")).toHaveClass(/native-command-menu/);
+  await settleMenuAnimation(page.getByTestId("action-menu"));
   const nativeMenuArt = await page.getByTestId("action-menu").evaluate((menu) => {
     const selected = menu.querySelector<HTMLElement>("button.is-selected");
     const label = selected?.querySelector<HTMLElement>(".native-command-label");
@@ -771,7 +775,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("unit-command-move").click();
   await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
   await clickCanvas(page, 180, 177);
-  await expect(page.getByTestId("action-menu")).toBeVisible();
+  await expectMenuOpen(page.getByTestId("action-menu"));
   // Native player 移動 reaches the shared walk playback 1000:7F72, which loads
   // E/14 and submits it once per movement — not once per step — through the
   // 移動 category gate 0000:0249.
@@ -813,7 +817,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("unit-command-move").click();
   await page.getByTestId("battle-canvas").hover({ position: { x: 180, y: 177 } });
   await clickCanvas(page, 180, 177);
-  await expect(page.getByTestId("action-menu")).toBeVisible();
+  await expectMenuOpen(page.getByTestId("action-menu"));
   expect((await debugState(page))).toMatchObject({
     actionMode: "actionMenu",
     commandMenuKind: "postMove",

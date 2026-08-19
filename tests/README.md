@@ -16,6 +16,10 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 普通 Playwright 运行由配置在失败时保存截图、录像和 trace。成功路径中的显式截图只在
 `VISUAL_AUDIT=1` 时生成，用于动画、Canvas、HUD 和响应式布局的人工视觉审计。
 
+选单以缩放动画开闔：Playwright 的可操作性检查会等方框稳定，所以「开选单 → 立刻点选项」
+的用例会自动等这段动画，不需要手动 sleep；但量测几何或「关掉再开同一个选单」的用例要用
+`menu-controls.ts` 的 `settleMenuAnimation` 与 `expectMenuOpen`，见责任映射对应行。
+
 ## 责任映射
 
 | 改动区域 | 首选单元测试 | 首选浏览器测试 |
@@ -49,6 +53,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `content/full-combat-backgrounds*` 的关卡表、受击方地形改写与 `C.SWF` 背景素材 | `full-combat-backgrounds.test.ts` | `full-combat-background.spec.ts`，第 0 关表值路径另见 `stage0.spec.ts` |
 | 调试中心与场景目录 | `debug-roster-profiles.test.ts` | `debug.spec.ts` |
 | `src/styles.css` 的胜负条件／出击提示面板安全区、长文排版与滚动兜底 | 无独立模拟数值测试 | `objective-panel-layout.spec.ts` |
+| `src/game/menu-animation.ts` 与 `src/styles.css` 的选单开闔动画：开启由 CSS 在 `hidden` 解除时重播，关闭先播收合动画再真正隐藏，收合期间标 `aria-hidden`、不接收指针、不重建内容 | 无独立单元测试（Vitest 运行在 node 环境，无 DOM） | `menu-animation.spec.ts`；量测选单几何的用例先调 `menu-controls.ts` 的 `settleMenuAnimation`，关掉再开同一个选单的流程改用同一文件的 `expectMenuOpen`（收合动画期间旧方框仍可见，`toBeVisible()` 会提前成立）；两者的现有调用点见 `game-functions-menu.spec.ts`、`objective-panel-layout.spec.ts`、`stage0.spec.ts` |
 | “遊戲功能”原版“子 選 單”的五项顺序、`ON/OFF`、面板／命中行几何、原版调色板与手形光标，以及键盘和鼠标切换 | 无独立模拟数值测试 | `game-functions-menu.spec.ts` |
 | `src/game/scaling.ts`、`display-settings.ts` 的宿主「畫面縮放」偏好：`sharp`／`smooth`／`integer` 的取值校验、整数倍按装置像素吸附与留边取整，以及逻辑屏外的选择器位置与持久化 | `scaling.test.ts`、`preferences.test.ts` 的「display preferences」 | `display-scaling.spec.ts` |
 | 模块 23 啟動流程：Softstar Logo、加法式调色板淡入、開場背景淡出淡入与 `A/23`+`A/24` 点阵滚动文字、標題 8×8 抖动溶解、点阵菜单文字与 50% 棋盘高亮、两套素材与 1608 tick 空闲重播、`Esc`／鼠标右键共用的取消语义与 `REMAKE-112` 的 `MUSIC/1` 循环与取消续播 | `startup.test.ts` | `startup.spec.ts`；各关卡通过 `startup-controls.ts` 复用真实跳過开场路径——Logo 期间的按键只缩短停留，必须等滚动開場接管后再送一次动作 |

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { settleMenuAnimation } from "./menu-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -59,6 +60,7 @@ for (const { scenario, artifact } of representativePanels) {
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
     await page.keyboard.press("o");
     await expect(page.getByTestId("objective-panel")).toBeVisible();
+    await settleMenuAnimation(page.getByTestId("objective-panel"));
 
     const layout = await objectivePanelLayout(page);
     expectInsideScreen(layout.panel, layout.screen);
@@ -78,6 +80,7 @@ test("extra-long future objective guidance stays contained and keeps its close b
   await page.keyboard.press("o");
   const panel = page.getByTestId("objective-panel");
   await expect(panel).toBeVisible();
+  await settleMenuAnimation(panel);
 
   await page.getByTestId("objective-guidance").evaluate((guidance) => {
     guidance.textContent = Array.from(

@@ -734,6 +734,51 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   color: #81766d;
   background: transparent;
 }
+
+/* 選單開闔動畫。原版通用命令選單是「存背景 → 一次貼上 `A/0001` 外框 → 關閉還原背景」
+   （模組 29 `0000:5651/566A/5779`），沒有逐步縮放；這段縮放開闔是複刻版的表現決定，
+   只改變方框自身的顯示時機，不接觸模擬、輸入語義或存檔。等比縮放而非分軸拉伸，是為了
+   讓 Big5 字形在動畫中只有整體縮放、不會被壓扁。
+
+   開啟不需要 JS：選單以 `hidden` 收起時是 `display: none`，重新顯示會自動重播動畫。
+   關閉由 `menu-animation.ts` 加上 `.is-menu-closing`，等動畫播完才真正 `hidden`。
+
+   `--menu-anchor` 讓本來就靠 transform 定位的面板（例如垂直置中的勝利條件面板）保住
+   它的定位量：關鍵幀寫死 `transform` 會整條覆蓋掉原本的 `translateY(-50%)`，面板就會
+   在動畫期間掉到畫面下半並被裁掉。 */
+@keyframes native-menu-zoom-in {
+  from { opacity: 0; transform: var(--menu-anchor, translate(0)) scale(.66); }
+  55% { opacity: 1; }
+  to { opacity: 1; transform: var(--menu-anchor, translate(0)) scale(1); }
+}
+@keyframes native-menu-zoom-out {
+  from { opacity: 1; transform: var(--menu-anchor, translate(0)) scale(1); }
+  to { opacity: 0; transform: var(--menu-anchor, translate(0)) scale(.72); }
+}
+.action-menu,
+.native-settings-menu,
+.sound-settings-menu,
+.music-settings-menu,
+.record-menu,
+.objective-panel {
+  /* 尾段過衝約 3.5%，方框是「彈」到定位而不是滑到定位。 */
+  animation: native-menu-zoom-in 160ms cubic-bezier(.34, 1.56, .64, 1);
+}
+/* 離開遊戲／全面撤退／跳過劇情的選擇框裝在整屏的肖像反饋容器裡：開啟時方框照樣縮放
+   彈出，收合則沿用原本的瞬間隱藏。只縮小方框、肖像與逐字文字卻原地不動會前後不一，
+   而整個反饋窗的關閉是 `A/18` 自己那套已取證的 12 步收窗，不屬於選單動畫的範圍。 */
+.is-menu-closing.action-menu,
+.is-menu-closing.native-settings-menu,
+.is-menu-closing.sound-settings-menu,
+.is-menu-closing.music-settings-menu,
+.is-menu-closing.record-menu,
+.is-menu-closing.objective-panel {
+  /* 收合純加速、不做開啟那樣的過衝：關閉多一段預備動作只會讓操作變鈍。 */
+  animation: native-menu-zoom-out 110ms cubic-bezier(.4, 0, .8, .35) both;
+}
+/* 收合中的選單已經不是可操作狀態：不能吃掉玩家投向戰場的下一次點擊。 */
+.is-menu-closing { pointer-events: none; }
+
 /* 戰鬥中「儲存記錄／讀取記錄」與戰後「儲存遊戲進度」是原版的彈出式資料面板，不套用
    `A/0001` 通用選單外框：奶白外框、深棕面板底、逐槽凸起橫條、當前槽綠色高亮，並列出
    逐槽元數據。原版通用選單會避開 x=480..639 的右側資訊欄
@@ -1381,6 +1426,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   scrollbar-color: #d4a62d #170d10;
   scrollbar-width: thin;
   transform: translateY(-50%);
+  /* 見 `native-menu-zoom-in`：開闔動畫要把這個置中位移接回去。 */
+  --menu-anchor: translateY(-50%);
 }
 .objective-panel h2 { margin: 6px 0 2px; color: #f3d466; font-size: 18px; line-height: 1.2; }
 .objective-panel p { margin: 0 0 7px; overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; }
