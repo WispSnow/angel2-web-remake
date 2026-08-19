@@ -6,7 +6,11 @@ import {
   activeUnitStatusPresentations,
   UNIT_STATUS_PRESENTATIONS,
 } from "../../src/game/content/status-presentations";
-import { emptyUnitStatuses } from "../../src/game/simulation/status";
+import {
+  effectiveAttack,
+  effectiveDefense,
+  emptyUnitStatuses,
+} from "../../src/game/simulation/status";
 
 const EXPECTED_PNG_HASHES = [
   "716a8d77e873b8f2045c5d74ea536a0d463ace1cc1cb07ebc2a13fe9ec7ad867",
@@ -44,6 +48,43 @@ describe("unit status presentations", () => {
       ["attackDown", 3],
       ["techniqueSeal", 2],
     ]);
+  });
+
+  it("gives every native slot a hover description of the rule it already applies", () => {
+    expect(UNIT_STATUS_PRESENTATIONS.map(({ key, description }) => [key, description])).toEqual([
+      ["attackUp", "攻擊力提高 20。"],
+      ["defenseUp", "防禦力提高 20。"],
+      ["magicGuard", "抵擋一次魔法效果，抵擋後即消失。"],
+      [
+        "confusion",
+        "自動行動時只會移動或停留，不攻擊、不射擊、不施術；玩家手動操作不受影響。",
+      ],
+      ["attackDown", "攻擊力降低 20。"],
+      ["defenseDown", "防禦力降低 20。"],
+      ["poison", "回合開始時生命減半，最低保留 1。"],
+      ["techniqueSeal", "無法使用技術，普通攻擊與射擊不受限。"],
+    ]);
+
+    // The tooltip is a reading aid, so the magnitudes it prints have to stay the
+    // ones the status maths actually applies.
+    const statuses = emptyUnitStatuses();
+    statuses.attackUp = 1;
+    statuses.defenseDown = 1;
+    expect(effectiveAttack(100, statuses)).toBe(120);
+    expect(effectiveDefense(100, statuses)).toBe(80);
+  });
+
+  it("carries the description onto every active entry", () => {
+    const statuses = emptyUnitStatuses();
+    statuses.poison = 2;
+    expect(activeUnitStatusPresentations(statuses)).toEqual([{
+      key: "poison",
+      label: "施毒",
+      description: "回合開始時生命減半，最低保留 1。",
+      nativeFrame: 6,
+      source: "/assets/original/status-icons/06.png",
+      remainingRounds: 2,
+    }]);
   });
 
   it("publishes the eight evidence-rendered icons byte for byte", async () => {

@@ -1669,14 +1669,25 @@ function renderHud(
       ? "hud-identity-name is-compact"
       : "hud-identity-name";
   const statusIcons = activeUnitStatusPresentations(unit.statuses);
+  // The native HUD only drew the icon and its low-order counter, so the hover
+  // plate is a browser reading aid. It lives inside its own `<li>` and opens on
+  // `:hover`, which keeps it correct across HUD re-renders without a second
+  // source of hint state; `--status-column` lets every column anchor its right
+  // edge to the panel's left edge instead of to its own icon.
   const statusMarkup = statusIcons.length === 0 ? "" : `
     <ul class="hud-status-list" data-testid="unit-status-list" aria-label="目前狀態">
-      ${statusIcons.map(({ key, label, source, remainingRounds }) => `
+      ${statusIcons.map(({ key, label, description, source, remainingRounds }, index) => `
         <li class="hud-status-item" data-testid="status-icon-${key}"
+          style="--status-column:${index % 4}"
           data-status-key="${key}" data-remaining-rounds="${remainingRounds}"
-          aria-label="${label}，剩餘 ${remainingRounds} 回合">
+          aria-label="${label}，剩餘 ${remainingRounds} 回合"
+          aria-describedby="status-tooltip-${key}">
           <img src="${source}" alt="" aria-hidden="true" />
           <span aria-hidden="true">${remainingRounds}</span>
+          <div class="hud-status-tooltip" id="status-tooltip-${key}" role="tooltip"
+            data-testid="status-tooltip-${key}">
+            <b>${label}</b><i>剩餘 ${remainingRounds} 回合</i><em>${description}</em>
+          </div>
         </li>`).join("")}
     </ul>`;
   return `

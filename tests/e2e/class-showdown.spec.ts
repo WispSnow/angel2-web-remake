@@ -212,6 +212,31 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-jungle-poison-status-icon.png`,
   });
+
+  const tooltip = page.getByTestId("status-tooltip-poison");
+  await expect(tooltip).toBeHidden();
+  await poisonIcon.hover();
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toHaveText("施毒剩餘 3 回合回合開始時生命減半，最低保留 1。");
+  // The panel is flush against the right edge, so the plate has to open inside
+  // the logical screen instead of spilling off it.
+  const [screenBox, tooltipBox] = await Promise.all([
+    page.getByTestId("game-screen").boundingBox(),
+    tooltip.boundingBox(),
+  ]);
+  if (!screenBox || !tooltipBox) throw new Error("status tooltip geometry is not measurable");
+  expect(tooltipBox.x).toBeGreaterThanOrEqual(screenBox.x);
+  expect(tooltipBox.y).toBeGreaterThanOrEqual(screenBox.y);
+  expect(tooltipBox.x + tooltipBox.width).toBeLessThanOrEqual(screenBox.x + screenBox.width);
+  expect(tooltipBox.y + tooltipBox.height).toBeLessThanOrEqual(screenBox.y + screenBox.height);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-status-icon-tooltip.png`,
+  });
+
+  // Only the icon row opts back into hit testing, so leaving it is enough to
+  // close the plate again.
+  await page.mouse.move(screenBox.x + 8, screenBox.y + 8);
+  await expect(tooltip).toBeHidden();
   expect(pageErrors).toEqual([]);
 });
 

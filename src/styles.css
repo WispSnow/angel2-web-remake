@@ -364,9 +364,33 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .stat-list div { display: grid; grid-template-columns: 47px 1fr; height: 21px; align-items: center; }
 .stat-list dt { color: #f4efcf; } .stat-list dd { margin: 0; text-align: right; font-size: 15px; font-weight: 700; }
 .hud-status-list { position: absolute; z-index: 3; left: 0; top: 255px; display: grid; grid-template-columns: repeat(4, 38px); grid-auto-rows: 30px; width: 156px; height: 61px; margin: 0; padding: 0; overflow: visible; list-style: none; }
-.hud-status-item { position: relative; width: 38px; height: 30px; }
+/* The icon row is the only part of the unit panel that answers the pointer, so
+   it opts back into hit testing the way the tactical minimap already does. */
+.hud-status-item { position: relative; width: 38px; height: 30px; pointer-events: auto; }
 .hud-status-item img { position: absolute; left: 0; top: 0; display: block; width: 40px; height: 31px; image-rendering: var(--image-rendering, pixelated); }
 .hud-status-item > span { position: absolute; z-index: 1; left: -6px; top: 20px; min-width: 8px; color: #fff; font: 700 9px/10px "Arial Narrow", sans-serif; text-align: right; text-shadow: 1px 1px #000, -1px 0 #000; }
+/* Reading aid for a native readout that only ever showed an icon and a counter.
+   Every column anchors the plate's right edge to the panel's left edge, so the
+   four columns open in one place instead of walking across the map. */
+.hud-status-tooltip {
+  position: absolute;
+  z-index: 2;
+  right: calc(100% + var(--status-column, 0) * 38px + 6px);
+  top: 50%;
+  display: none;
+  width: 224px;
+  padding: 5px 8px 6px;
+  border: 1px solid #d4a62d;
+  color: #fff4c7;
+  background: #160d0eef;
+  text-align: left;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.hud-status-item:hover .hud-status-tooltip { display: block; }
+.hud-status-tooltip b { color: var(--gold); font: 700 13px/16px "PMingLiU", serif; letter-spacing: .06em; }
+.hud-status-tooltip i { margin-left: 6px; color: #e7d7ac; font: 10px/16px "PMingLiU", serif; font-style: normal; }
+.hud-status-tooltip em { display: block; margin-top: 2px; color: #fff; font: 11px/1.35 system-ui, sans-serif; font-style: normal; }
 .hud-tactical { position: absolute; left: -4px; top: -4px; width: 160px; height: 321px; overflow: hidden; }
 .terrain-detail {
   position: absolute;
