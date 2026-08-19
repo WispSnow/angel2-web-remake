@@ -107,6 +107,7 @@ const CODE_SIGNATURES = [
   { address: "0000:7BFC", offset: 0x07bfc, hex: "e80100cb" },
 ];
 
+const CONTEXTUAL_BATTLE_LINE_COUNT = 35;
 const PLAYER_CONFUSION_DIALOGUE_SELECTOR = 0x1c;
 const EXPECTED_PLAYER_CONFUSION_LINE = "我的頭好昏，無法思考．";
 
@@ -339,6 +340,106 @@ function parseAiTechniqueDialogue(buffer, actionEntries) {
 }
 
 /**
+ * Every call site that can reach the contextual battle-line renderer, with the
+ * selector each one loads. `0000:C97A` is a far-callable thunk into
+ * `0000:C97E`; `1000:254F` is the ＡＩ對話-gated wrapper. A site whose selector
+ * comes from the AI action table reports `dynamic`.
+ */
+function scanContextualLineCallSites(buffer) {
+  const sites = [];
+  const record = (fileOffset, target) => {
+    const address = fileOffset < 0x10000
+      ? `0000:${hex(fileOffset)}`
+      : `1000:${hex(fileOffset - 0x10000)}`;
+    let selector = null;
+    for (let back = 3; back < 40; back += 1) {
+      const at = fileOffset - back;
+      if (at < 0) break;
+      if (buffer[at] === 0xb8 && buffer[at + 2] === 0x00) {
+        selector = buffer[at + 1];
+        break;
+      }
+    }
+    sites.push({ address, target, selector });
+  };
+  for (let at = 0; at < buffer.length - 4; at += 1) {
+    if (buffer[at] === 0xe8) {
+      const base = at < 0x10000 ? 0 : 0x10000;
+      if (at >= 0x20000) continue;
+      const destination = (at + 3 + buffer.readInt16LE(at + 1)) & 0xffff;
+      if (base === 0 && (destination === 0xc97a || destination === 0xc97e)) {
+        record(at, `0000:${hex(destination)}`);
+      } else if (base === 0x10000 && destination === 0x254f) {
+        record(at, "1000:254F");
+      }
+      continue;
+    }
+    if (buffer[at] !== 0x9a) continue;
+    const linear = buffer.readUInt16LE(at + 3) * 16 + buffer.readUInt16LE(at + 1);
+    if (linear === 0xc97a || linear === 0xc97e) record(at, `0000:${hex(linear)} [far]`);
+    else if (linear === 0x1254f) record(at, "1000:254F [far]");
+  }
+  // The thunk and the gate forward whatever AX their caller set, so they are not
+  // emitters of their own.
+  return sites.filter(({ address }) => address !== "0000:C97A" && address !== "1000:2557");
+}
+
+/**
+ * The complete DS:84BB contextual battle-line table. Entries 0Ah..17h are the AI
+ * technique notices; everything else belongs to a separate trigger, and two
+ * entries have no call site at all in the release build.
+ */
+function parseContextualBattleLines(buffer) {
+  const decoder = new TextDecoder("big5", { fatal: true });
+  const callSites = scanContextualLineCallSites(buffer);
+  const entries = [];
+  for (let selector = 0; selector < CONTEXTUAL_BATTLE_LINE_COUNT; selector += 1) {
+    const pointerEntry = AI_CONTEXT_DIALOGUE_POINTER_TABLE + selector * 2;
+    const stringAddress = buffer.readUInt16LE(dataOffset(pointerEntry, 2, buffer));
+    const stringFileOffset = dataOffset(stringAddress, 1, buffer);
+    const terminator = buffer.indexOf(0x24, stringFileOffset);
+    if (terminator < stringFileOffset) {
+      throw new Error(`DS:${hex(stringAddress)}: contextual line has no dollar terminator`);
+    }
+    const emitters = callSites
+      .filter((site) => site.selector === selector)
+      .map(({ address, target }) => ({ address, target }));
+    entries.push({
+      selector: `${hex(selector, 2)}h`,
+      pointerEntry: `DS:${hex(pointerEntry)}`,
+      address: `DS:${hex(stringAddress)}`,
+      text: decoder.decode(buffer.subarray(stringFileOffset, terminator)),
+      emitters,
+      reachable: emitters.length > 0,
+    });
+  }
+  const dynamicSites = callSites.filter(({ selector }) => selector === null);
+  const unreachable = entries.filter(({ reachable }) => !reachable).map(({ selector }) => selector);
+  // 0Ah..17h are reached through the action table's presentation group, so they
+  // are covered by the two dynamic sites rather than by a literal selector.
+  const expectedUnreachable = ["06h", "19h", ...Array.from(
+    { length: 14 },
+    (_, index) => `${hex(index + 10, 2)}h`,
+  )];
+  if (unreachable.join(",") !== expectedUnreachable.sort().join(",")) {
+    throw new Error(`contextual line reachability changed: ${unreachable.join(",")}`);
+  }
+  if (entries[34]?.text !== "我．．．我好難過．．．|頭好痛啊！") {
+    throw new Error("contextual battle-line table no longer ends at the scenario-30 line");
+  }
+  return {
+    pointerTable: `DS:${hex(AI_CONTEXT_DIALOGUE_POINTER_TABLE)}`,
+    renderer: "0000:C97E, reached directly or through the 0000:C97A thunk and the ＡＩ對話-gated 1000:254F",
+    count: entries.length,
+    entries,
+    dynamicSites: dynamicSites.map(({ address, target }) => ({ address, target })),
+    dynamicSelectorSource: "the 33-row AI action table's presentationGroup field, which only ever holds 0Ah..17h",
+    unusedInRelease: ["06h", "19h"],
+    unusedNote: "no call site loads these selectors, so 有我守在此處,沒人可以通過. and SOUND CARD BREAK . are unreachable archive strings in the release build",
+  };
+}
+
+/**
  * The player-side confusion route. `0000:55D3` accepts the clicked cell on the
  * usual four conditions and hands it to `0000:66F4`, which re-reads the
  * confusion word through the same `SI=31A5h+8` arithmetic as the AI input
@@ -484,7 +585,13 @@ function summarizeBehaviorTemplates(templates, templatePath) {
   };
 }
 
-function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue, playerConfusionRoute) {
+function nativeRules(
+  descriptorsByCode,
+  behaviorTemplates,
+  aiTechniqueDialogue,
+  playerConfusionRoute,
+  contextualBattleLines,
+) {
   return {
     phaseConfiguration: {
       side2: { side: 2, baseMovementMode: "Y", pursuitMode: "FY", entry: "1000:14D8" },
@@ -567,6 +674,7 @@ function nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue, 
       evidence: ["1000:1E51", "1000:1E6B", "1000:254F", "0000:7BFC", "DS:111C", "DS:84BB[0Ah]", "DS:85CA", "DS:84BB[0Fh]", "DS:860C"],
     },
     playerConfusionRoute,
+    contextualBattleLines,
     shooting: {
       sharedRange: { mode: "2", minimumManhattanRange: 2 },
       targetRule: "minimum effective defense, then minimum current life",
@@ -738,6 +846,7 @@ async function extract(runtimePath, descriptorPath, guideComparisonPath, battleT
   const actionEntries = parseActionTable(buffer);
   const aiTechniqueDialogue = parseAiTechniqueDialogue(buffer, actionEntries);
   const playerConfusionRoute = parsePlayerConfusionRoute(buffer);
+  const contextualBattleLines = parseContextualBattleLines(buffer);
   const poolCodes = new Set(classPools.flatMap((entry) => entry.tiers.flatMap((tier) => tier.actions)));
   const dispatchCodes = new Set(actionEntries.map((entry) => entry.actionCode));
   const dormantVPoolCodes = ["1V", "2V", "3V"].filter((code) => poolCodes.has(code));
@@ -767,7 +876,13 @@ async function extract(runtimePath, descriptorPath, guideComparisonPath, battleT
     },
     addressModel: { dataSegment: hex(DATA_SEGMENT), dataLinearBase: DATA_LINEAR_BASE, code1000FileBase: 0x10000 },
     battleTemplates: battleTemplatePath,
-    rules: nativeRules(descriptorsByCode, behaviorTemplates, aiTechniqueDialogue, playerConfusionRoute),
+    rules: nativeRules(
+      descriptorsByCode,
+      behaviorTemplates,
+      aiTechniqueDialogue,
+      playerConfusionRoute,
+      contextualBattleLines,
+    ),
     techniqueSelection: {
       classPoolTable: `${hex(DATA_SEGMENT)}:${hex(AI_CLASS_POOL_TABLE)}`,
       tierSelector: "current DATA row count at DS:0D45, minus one and clamped to tier index 0..2",

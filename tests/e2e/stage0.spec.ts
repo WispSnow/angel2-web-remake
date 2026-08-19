@@ -2399,10 +2399,14 @@ test("S00-I: native range dither and ordinary attack target-count branches", asy
   await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
-  // Nia has no adjacent target at the untouched opening: remain in the
-  // profession menu and restore the neutral fully bright map.
+  // Nia has no adjacent target at the untouched opening: she says so in the
+  // native words, then the profession menu returns over a fully bright map.
   await page.keyboard.press(" ");
   await page.getByTestId("unit-command-attack").click();
+  const emptyReachLine = page.getByTestId("dialogue-layer");
+  await expect(emptyReachLine).toHaveAttribute("data-source-record", "no-target-in-range");
+  await expect(emptyReachLine).toContainText("沒有人在我的攻擊範圍內．");
+  await expect(emptyReachLine).toBeHidden({ timeout: 15_000 });
   expect((await debugState(page))).toMatchObject({ actionMode: "actionMenu", targets: [] });
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
   await page.keyboard.press("Enter");

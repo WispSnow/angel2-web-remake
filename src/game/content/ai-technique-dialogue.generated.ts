@@ -343,14 +343,73 @@ export const NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE: Readonly<Record<string, Nativ
   }
 };
 
+export interface NativeContextualBattleLine {
+  readonly record: string;
+  readonly selector: number;
+  readonly pointerEntry: `DS:${string}`;
+  readonly address: `DS:${string}`;
+  readonly text: string;
+  /** Native call sites that play this line. */
+  readonly emitters: readonly string[];
+}
+
 /**
- * Contextual line `DS:84BB[1Ch]`. `0000:66F4` plays it with the clicked unit's
- * portrait before handing a confused player unit to the single-unit AI entry,
- * and it calls `0000:C97E` directly, so the ＡＩ對話 switch never gates it.
+ * DS:84BB entries outside the AI technique groups. Each reaches
+ * `0000:C97E` directly rather than through the ＡＩ對話-gated `1000:254F`,
+ * so none of them is silenced by that switch.
  */
-export const NATIVE_CONFUSED_ACTOR_DIALOGUE = {
-  "selector": 28,
-  "pointerEntry": "DS:84F3",
-  "address": "DS:86AB",
-  "text": "我的頭好昏，無法思考．"
+export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
+  "spellSealed": {
+    "record": "spell-sealed",
+    "selector": 26,
+    "pointerEntry": "DS:84EF",
+    "address": "DS:8677",
+    "text": "我中了禁咒，無法使用法術．",
+    "emitters": [
+      "0000:701F"
+    ]
+  },
+  "noTargetInRange": {
+    "record": "no-target-in-range",
+    "selector": 27,
+    "pointerEntry": "DS:84F1",
+    "address": "DS:8692",
+    "text": "沒有人在我的攻擊範圍內．",
+    "emitters": [
+      "0000:70ED"
+    ]
+  },
+  "confusedActor": {
+    "record": "confused-actor",
+    "selector": 28,
+    "pointerEntry": "DS:84F3",
+    "address": "DS:86AB",
+    "text": "我的頭好昏，無法思考．",
+    "emitters": [
+      "0000:671D"
+    ]
+  },
+  "dodgedShot": {
+    "record": "dodged-shot",
+    "selector": 29,
+    "pointerEntry": "DS:84F5",
+    "address": "DS:86C2",
+    "text": "要打中我沒那麼容易．",
+    "emitters": [
+      "0000:7260",
+      "1000:1FB2"
+    ]
+  },
+  "counterattack": {
+    "record": "counterattack",
+    "selector": 30,
+    "pointerEntry": "DS:84F7",
+    "address": "DS:86D7",
+    "text": "妳竟敢打我．",
+    "emitters": [
+      "0000:92C1"
+    ]
+  }
 } as const;
+
+export const NATIVE_CONFUSED_ACTOR_DIALOGUE = NATIVE_CONTEXTUAL_BATTLE_LINES.confusedActor;

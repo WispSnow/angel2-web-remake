@@ -212,7 +212,12 @@ export interface DialoguePage {
       | "battle-command"
       | "ai-technique"
       | "battle-context"
-      | "confused-actor";
+      // DS:84BB contextual battle lines outside the AI technique groups.
+      | "spell-sealed"
+      | "no-target-in-range"
+      | "confused-actor"
+      | "dodged-shot"
+      | "counterattack";
     wait: number;
     address?: string;
     /** Native PP background record active at this KY checkpoint. */

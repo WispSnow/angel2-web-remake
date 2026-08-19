@@ -4,6 +4,7 @@ import {
   NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
   NATIVE_CONFUSED_ACTOR_DIALOGUE,
+  NATIVE_CONTEXTUAL_BATTLE_LINES,
   type NativeAiTechniqueDialogueRecord,
 } from "./ai-technique-dialogue.generated";
 import type { BattleUnit, DialoguePage } from "../types";
@@ -13,7 +14,9 @@ import type { BattleUnit, DialoguePage } from "../types";
  * parameter rows. Both side-1 autonomous actors and side-2 enemies use them.
  */
 export { NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE, NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS };
-export { NATIVE_CONFUSED_ACTOR_DIALOGUE };
+export { NATIVE_CONFUSED_ACTOR_DIALOGUE, NATIVE_CONTEXTUAL_BATTLE_LINES };
+
+export type ContextualBattleLineKey = keyof typeof NATIVE_CONTEXTUAL_BATTLE_LINES;
 
 export function nativeAiTechniqueDialogueForCode(
   nativeCode: string,
@@ -51,27 +54,40 @@ export function aiTechniqueDialogueFor(
 }
 
 /**
- * `0000:66F4` plays contextual line `1Ch` with the clicked unit's own portrait
- * before the confused unit is handed to the single-unit AI entry. It reaches
- * `0000:C97E` directly rather than through `1000:254F`, so unlike every AI
- * technique line it is not gated by the ＡＩ對話 switch.
+ * DS:84BB contextual lines that are not AI technique notices. Every one of them
+ * is spoken by a single unit in that unit's own side window, with its own
+ * portrait, and closes on the native per-character timing without a confirmation
+ * menu. They all reach `0000:C97E` directly rather than through `1000:254F`, so
+ * the ＡＩ對話 switch does not silence them.
  */
-export function confusedActorDialogueFor(
+export function contextualBattleDialogueFor(
   actor: Pick<BattleUnit, "name" | "portrait" | "side">,
+  line: ContextualBattleLineKey,
 ): DialoguePage {
+  const native = NATIVE_CONTEXTUAL_BATTLE_LINES[line];
   const window = {
     portrait: actor.portrait,
     speaker: actor.name,
-    text: NATIVE_CONFUSED_ACTOR_DIALOGUE.text,
+    text: native.text,
   };
   return {
     activeSlot: actor.side === 1 ? "upper" : "lower",
     upper: actor.side === 1 ? window : undefined,
     lower: actor.side === 2 ? window : undefined,
     source: {
-      record: "confused-actor",
-      wait: NATIVE_CONFUSED_ACTOR_DIALOGUE.selector,
-      address: NATIVE_CONFUSED_ACTOR_DIALOGUE.address,
+      record: native.record,
+      wait: native.selector,
+      address: native.address,
     },
   };
+}
+
+/**
+ * `0000:66F4` plays contextual line `1Ch` with the clicked unit's own portrait
+ * before the confused unit is handed to the single-unit AI entry.
+ */
+export function confusedActorDialogueFor(
+  actor: Pick<BattleUnit, "name" | "portrait" | "side">,
+): DialoguePage {
+  return contextualBattleDialogueFor(actor, "confusedActor");
 }

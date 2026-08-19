@@ -18,10 +18,15 @@ import {
   techniqueActionIdsFor,
   type IceActionId,
 } from "./content/actions";
-import { aiTechniqueDialogueFor, confusedActorDialogueFor } from "./content/ai-technique-dialogue";
+import {
+  aiTechniqueDialogueFor,
+  contextualBattleDialogueFor,
+  type ContextualBattleLineKey,
+} from "./content/ai-technique-dialogue";
 import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
 import {
   classDefinition,
+  immuneToPhysicalShootingFor,
   className,
   promotionTargetsFor,
   unitDisplayName,
@@ -247,9 +252,14 @@ export interface AiTechniqueDialoguePresentation {
   page: DialoguePage;
 }
 
-/** `0000:66F4`'s contextual line for a clicked unit that is still confused. */
-export interface ConfusedActorDialoguePresentation {
+/**
+ * A DS:84BB contextual line spoken by one unit — the confused actor, the sealed
+ * caster, the unit with nothing in reach, the target that shrugged off a shot,
+ * the defender that counters. None of these is gated by the ＡＩ對話 switch.
+ */
+export interface ContextualLineDialoguePresentation {
   actor: BattleUnit;
+  line: ContextualBattleLineKey;
   page: DialoguePage;
 }
 
@@ -378,6 +388,18 @@ const atomicObjectiveConditions = (
   ? condition.conditions.flatMap(atomicObjectiveConditions)
   : [condition];
 
+/**
+ * `REMAKE-099`'s deterministic replacement for the native swift-dragon PIT coin
+ * flip covers exactly the three single-target physical shots; the magic archer
+ * is magic damage and is answered by `magicGuard` instead.
+ */
+function isPhysicalShotDodgedBy(actionId: BattleActionId, target: BattleUnit): boolean {
+  const physical = actionId === "archer-shot"
+    || actionId === "crossbow-shot"
+    || actionId === WATER_WARRIOR_SHOT_ACTION_ID;
+  return physical && immuneToPhysicalShootingFor(target.classId);
+}
+
 export class GameController {
   battle: Stage0Battle;
   difficulty: Difficulty;
@@ -456,7 +478,7 @@ export class GameController {
   turnTransitionPresentation?: TurnTransitionPresentation;
   turnTransitionPresentationTrace: TurnTransitionPresentation[] = [];
   aiTechniqueDialogue?: AiTechniqueDialoguePresentation;
-  confusedActorDialogue?: ConfusedActorDialoguePresentation;
+  contextualLineDialogue?: ContextualLineDialoguePresentation;
   private battleContextDialogue?: { page: DialoguePage; resume: () => void };
   movementPresentation?: MovementPresentation;
   statusMessage = "";
@@ -793,7 +815,7 @@ export class GameController {
   get currentDialogue(): DialoguePage | undefined {
     if (this.battleContextDialogue) return this.battleContextDialogue.page;
     if (this.aiTechniqueDialogue) return this.aiTechniqueDialogue.page;
-    if (this.confusedActorDialogue) return this.confusedActorDialogue.page;
+    if (this.contextualLineDialogue) return this.contextualLineDialogue.page;
     if (this.groupCommandDialogueId) {
       return groupCommandDialogueFor(this.groupCommandDialogueId, this.groupCommandSpeaker);
     }
@@ -871,8 +893,8 @@ export class GameController {
     return this.aiTechniqueDialogue !== undefined;
   }
 
-  get confusedActorDialogueActive(): boolean {
-    return this.confusedActorDialogue !== undefined;
+  get contextualLineDialogueActive(): boolean {
+    return this.contextualLineDialogue !== undefined;
   }
 
   get promotionChoiceVisible(): boolean {
@@ -924,7 +946,7 @@ export class GameController {
       || this.retreatConfirmOpen
       || this.battleContextDialogue !== undefined
       || this.aiTechniqueDialogueActive
-      || this.confusedActorDialogueActive
+      || this.contextualLineDialogueActive
       || this.groupCommandDialogueActive
       || this.promotionUnitIds.length > 0;
   }
@@ -978,10 +1000,10 @@ export class GameController {
     const selectedClassCommand = this.selectedUnit
       ? classCommandFor(this.selectedUnit.classId, this.selectedUnit.side)
       : undefined;
-    const classCommand = selectedClassCommand?.id === "technique"
-      && this.selectedUnit?.statuses.techniqueSeal
-      ? undefined
-      : selectedClassCommand;
+    // `0000:6FFD` still lists and accepts 技術 while the caster is sealed; the
+    // refusal happens on selection, as contextual line 1Ah. Removing the entry
+    // here would hide a player-visible native response.
+    const classCommand = selectedClassCommand;
     if (this.commandMenuKind === "postMove") {
       return classCommand?.id === "shoot"
         ? [POST_MOVE_COMMANDS[0], classCommand, ...POST_MOVE_COMMANDS.slice(1)]
@@ -1796,10 +1818,9 @@ export class GameController {
         && manhattan(unit, candidate) === 1)
       .map(({ x, y }) => ({ x, y }));
     if (this.targets.length === 0) {
-      this.statusMessage = this.commandMenuKind === "postMove"
-        ? "攻擊範圍內沒有敵人。請結束行動或返悔。"
-        : "攻擊範圍內沒有敵人。請選擇移動或休息。";
-      this.emit();
+      // `0000:70B6` answers an empty target list with contextual line 1Bh and
+      // returns to the command menu, so the unit says it rather than the strip.
+      void this.reportNoAttackTarget(unit);
       return;
     }
     if (this.targets.length === 1) {
@@ -1832,8 +1853,14 @@ export class GameController {
       || this.commandMenuKind !== "initial"
       || !unit
       || this.techniqueActions.length === 0
-      || unit.statuses.techniqueSeal > 0
+      || this.busy
     ) return;
+    if (unit.statuses.techniqueSeal > 0) {
+      // `0000:7005` reads DS:31B5h before the menu opens: a sealed caster says
+      // so and stays on the command menu without spending anything.
+      void this.refuseSealedTechnique(unit);
+      return;
+    }
     this.techniqueIndex = 0;
     this.actionMode = "techniqueMenu";
     this.statusMessage = `選擇${unit.className}要施展的技術。`;
@@ -2225,6 +2252,7 @@ export class GameController {
       }
 
       await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
+      await this.presentShotDodgeLine(actionId, targetPresentation);
       this.lastSpecialAction = this.battle.commitPreparedAction(prepared);
       const result = this.lastSpecialAction;
       for (const affected of result.affectedUnits.filter(({ died }) => died)) {
@@ -3372,7 +3400,11 @@ export class GameController {
     this.battle.focusId = unit.id;
     this.cursor = { x: unit.x, y: unit.y };
     this.centerCamera(unit);
-    await this.presentConfusedActorDialogue(unit);
+    await this.presentContextualLine(
+      unit,
+      "confusedActor",
+      `${unit.name}混亂中，無法聽從指揮。`,
+    );
     const action = this.battle.planAlliedAiAction(unit.id);
     if (action) {
       await this.runAlliedAiAction(action, "allyAuto", `${unit.name}混亂中，無法聽從指揮。`);
@@ -3384,10 +3416,57 @@ export class GameController {
     this.emit();
   }
 
-  private async presentConfusedActorDialogue(actor: BattleUnit): Promise<void> {
-    const page = confusedActorDialogueFor(actor);
-    this.confusedActorDialogue = { actor, page };
-    this.statusMessage = `${actor.name}混亂中，無法聽從指揮。`;
+  /**
+   * Native `0000:7005`: the sealed caster answers the 技術 command with line
+   * `1Ah` and the command menu stays open. Nothing is spent, so the player can
+   * still move, attack or rest with the same unit.
+   */
+  private async refuseSealedTechnique(unit: BattleUnit): Promise<void> {
+    this.busy = true;
+    this.emit();
+    await this.presentContextualLine(unit, "spellSealed");
+    this.busy = false;
+    this.statusMessage = `${unit.name}被禁咒封住法術，本回合不能施展技術。`;
+    this.emit();
+  }
+
+  /**
+   * Native `0000:70B6`: an empty adjacent-target list is answered by line `1Bh`
+   * from the acting unit, then the command menu comes back.
+   */
+  private async reportNoAttackTarget(unit: BattleUnit): Promise<void> {
+    this.busy = true;
+    this.emit();
+    await this.presentContextualLine(unit, "noTargetInRange");
+    this.busy = false;
+    this.statusMessage = this.commandMenuKind === "postMove"
+      ? `${unit.name}的攻擊範圍內沒有敵人。請結束行動或返悔。`
+      : `${unit.name}的攻擊範圍內沒有敵人。請選擇移動或休息。`;
+    this.emit();
+  }
+
+  /**
+   * Native `0000:722B` / `1000:1FB2`: when a physical shot lands on a class that
+   * shrugs it off, the *target* speaks line `1Dh` after the shot presentation.
+   * `REMAKE-099` replaced the native PIT coin flip with a deterministic
+   * immunity, so the line now accompanies every such blocked shot.
+   */
+  private async presentShotDodgeLine(
+    actionId: BattleActionId,
+    target: BattleUnit | undefined,
+  ): Promise<void> {
+    if (!target || !isPhysicalShotDodgedBy(actionId, target)) return;
+    await this.presentContextualLine(target, "dodgedShot");
+  }
+
+  private async presentContextualLine(
+    actor: BattleUnit,
+    line: ContextualBattleLineKey,
+    statusText?: string,
+  ): Promise<void> {
+    const page = contextualBattleDialogueFor(actor, line);
+    this.contextualLineDialogue = { actor, line, page };
+    if (statusText !== undefined) this.statusMessage = statusText;
     this.emit();
     const text = page.activeSlot ? page[page.activeSlot]?.text ?? "" : "";
     // The native window closes on its own after the per-character wait; there is
@@ -3397,7 +3476,7 @@ export class GameController {
       : this.presentationFast
         ? Math.max(360, text.length * 20 + 120)
         : Math.max(1_200, text.length * 80 + 220));
-    this.confusedActorDialogue = undefined;
+    this.contextualLineDialogue = undefined;
     this.emit();
   }
 
@@ -3476,6 +3555,7 @@ export class GameController {
             prepared.result.target,
           );
           await this.presentSpecialAction(actorPresentation, targetPresentation, prepared.result);
+          await this.presentShotDodgeLine(action.actionId, targetPresentation);
           const result = this.battle.commitPreparedAction(prepared);
           this.lastSpecialAction = result;
           for (const affected of result.affectedUnits.filter(({ died }) => died)) {
@@ -3705,6 +3785,10 @@ export class GameController {
         displayedLifeByUnitId,
       );
     } else if (result.counterOccurred) {
+      // `0000:9289` plays contextual line 1Eh from the defender between the
+      // attack damage and the counter, and only on the map route: the
+      // full-screen branch at `0000:9296` never calls it.
+      await this.presentContextualLine(defender, "counterattack");
       for (let frame = 0; frame < hitFrames.length; frame += 1) {
         if (frame === 0 || frame === 4) this.queueAudioCue(38, `map-counter-hit-${frame === 0 ? "first" : "second"}`);
         this.setCombatPresentation(
@@ -4702,7 +4786,7 @@ export class GameController {
     this.restPresentation = undefined;
     this.restPresentationTrace = [];
     this.aiTechniqueDialogue = undefined;
-    this.confusedActorDialogue = undefined;
+    this.contextualLineDialogue = undefined;
     this.busy = false;
     this.resetAction();
     this.statusMessage = message;
@@ -4957,7 +5041,7 @@ export class GameController {
     this.specialActionPresentation = undefined;
     this.restPresentation = undefined;
     this.aiTechniqueDialogue = undefined;
-    this.confusedActorDialogue = undefined;
+    this.contextualLineDialogue = undefined;
     const completedOrdinal = this.stageRuntime.ordinal;
     const destination = this.stageRuntime.nextStageId;
     if (isPlayableStageId(destination)) {
@@ -5754,12 +5838,13 @@ export class GameController {
         center: { ...this.aiTechniqueDialogue.center },
         page: { ...this.aiTechniqueDialogue.page },
       } : undefined,
-      confusedActorDialogue: this.confusedActorDialogue ? {
+      contextualLineDialogue: this.contextualLineDialogue ? {
+        line: this.contextualLineDialogue.line,
         actor: {
-          ...this.confusedActorDialogue.actor,
-          statuses: { ...this.confusedActorDialogue.actor.statuses },
+          ...this.contextualLineDialogue.actor,
+          statuses: { ...this.contextualLineDialogue.actor.statuses },
         },
-        page: { ...this.confusedActorDialogue.page },
+        page: { ...this.contextualLineDialogue.page },
       } : undefined,
       movementPresentation: this.movementPresentation ? {
         ...this.movementPresentation,

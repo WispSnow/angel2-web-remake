@@ -697,3 +697,213 @@ test("a confused player unit answers a click with the native line and its own mo
   expect(after?.actionMode).not.toBe("actionMenu");
   expect(pageErrors).toEqual([]);
 });
+
+test("a sealed caster still gets the 技術 command and refuses it in the native words", async ({ page }) => {
+  // Several full enemy technique presentations have to play before the seal
+  // outlives the confusion it arrives with.
+  test.setTimeout(180_000);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    // One tier-three curse master lands LA first and only reaches SN in the next
+    // round, so the seal outlives the confusion by exactly one round. Clicking a
+    // confused unit runs its own route, so the test needs that clear-headed gap.
+    arena.setSide(2);
+    arena.setClass("curse-master");
+    arena.setLevel(3);
+    const casters = [arena.interact(24, 30)];
+    arena.setSide(1);
+    arena.setClass("magician");
+    arena.setLevel(3);
+    const player = arena.interact(20, 30);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const reserve = arena.interact(20, 32);
+    return [...casters, player, reserve];
+  });
+  expect(placed).toEqual([true, true, true]);
+  await page.getByTestId("arena-start").click();
+
+  const magicianStatuses = async () => (await arenaBattleState(page))
+    ?.units.find(({ id }) => id === "arena-1-0")?.statuses;
+  const sealedAndClearHeaded = async () => {
+    const statuses = await magicianStatuses();
+    return (statuses?.techniqueSeal ?? 0) > 0 && (statuses?.confusion ?? 0) === 0;
+  };
+  for (let round = 0; round < 8 && !await sealedAndClearHeaded(); round += 1) {
+    const before = await arenaBattleState(page);
+    // 全部休息 spends every remaining ally and runs the rest of the round, which
+    // keeps confused units on their own automatic route. The side-panel hotspots
+    // only appear once nothing is focused, so hover empty ground first.
+    await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+    await expect(page.getByTestId("game-screen"))
+      .toHaveAttribute("data-side-panel-hotspots", "active");
+    await page.getByTestId("all-rest-hotspot").click();
+    const layer = page.getByTestId("dialogue-layer");
+    await expect(layer).toHaveAttribute("data-source-record", "battle-command");
+    await layer.click();
+    await expect.poll(async () => (await arenaBattleState(page))?.groupCommandDialogueId)
+      .toBeUndefined();
+    await page.waitForFunction((previous) => {
+      const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+      return current?.phase === "player" && current.round > previous;
+    }, before?.round ?? 0, { timeout: 40_000 });
+  }
+  expect(await sealedAndClearHeaded()).toBe(true);
+
+  const magician = (await arenaBattleState(page))?.units.find(({ id }) => id === "arena-1-0");
+  await clickArenaWorldCell(page, magician!.x, magician!.y);
+  // `0000:6FFD` keeps listing 技術 while sealed; the refusal is spoken on use.
+  const technique = page.getByTestId("unit-command-technique");
+  await expect(technique).toBeVisible();
+  await technique.click();
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "spell-sealed");
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:8677");
+  await expect(dialogue).toContainText("我中了禁咒，無法使用法術．");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-spell-sealed-line.png`,
+  });
+
+  // Nothing was spent: the command menu comes back and the unit can still act.
+  await expect(dialogue).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByTestId("unit-command-rest")).toBeVisible();
+  const after = await arenaBattleState(page);
+  expect(after?.units.find(({ id }) => id === "arena-1-0")?.acted).toBe(false);
+  expect(after?.actionMode).toBe("actionMenu");
+  expect(pageErrors).toEqual([]);
+});
+
+test("attacking with an empty reach speaks the native line instead of a strip note", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const player = arena.interact(20, 30);
+    arena.setSide(2);
+    const distant = arena.interact(30, 30);
+    return [player, distant];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-attack").click();
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "no-target-in-range");
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:8692");
+  await expect(dialogue).toContainText("沒有人在我的攻擊範圍內．");
+
+  await expect(dialogue).toBeHidden({ timeout: 15_000 });
+  const after = await arenaBattleState(page);
+  expect(after?.units.find(({ id }) => id === "arena-1-0")?.acted).toBe(false);
+  expect(after?.actionMode).toBe("actionMenu");
+  expect(pageErrors).toEqual([]);
+});
+
+test("a counterattacking defender speaks between the hit and its counter", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const attacker = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    arena.setLevel(3);
+    const defender = arena.interact(21, 30);
+    return [attacker, defender];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+
+  // The native counter line lives on the map branch only: `0000:9296`, the
+  // full-screen route, never reaches `0000:92B3`. Turn 戰鬥動畫 off first.
+  expect((await arenaBattleState(page))?.battlePresentation).toBe("full");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await page.getByTestId("battle-presentation-hotspot").click();
+  await expect.poll(async () => (await arenaBattleState(page))?.battlePresentation).toBe("map");
+
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-attack").click();
+  await clickArenaWorldCell(page, 21, 30);
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "counterattack");
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:86D7");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
+  await expect(dialogue).toContainText("妳竟敢打我．");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-counterattack-line.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return current?.lastCombat?.attackerId === "arena-1-0" && current.combatPresentation === undefined;
+  }, undefined, { timeout: 30_000 });
+  const after = await arenaBattleState(page);
+  expect(after?.lastCombat?.counterOccurred).toBe(true);
+  expect(after?.lastCombat?.counterDamage).toBeGreaterThan(0);
+  expect(pageErrors).toEqual([]);
+});
+
+test("a physical shot that cannot land makes the target say so", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("archer");
+    arena.setLevel(1);
+    const archer = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("swift-dragon-knight");
+    arena.setLevel(1);
+    const dragon = arena.interact(24, 30);
+    return [archer, dragon];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+
+  const dragonBefore = (await arenaBattleState(page))
+    ?.units.find(({ id }) => id === "arena-2-0");
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-shoot").click();
+  await clickArenaWorldCell(page, 24, 30);
+
+  // REMAKE-099 made the native PIT coin flip a deterministic immunity, so every
+  // such shot now reaches `0000:7260`'s line, spoken by the target.
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "dodged-shot");
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:86C2");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
+  await expect(dialogue).toContainText("要打中我沒那麼容易．");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-dodged-shot-line.png`,
+  });
+
+  await expect(dialogue).toBeHidden({ timeout: 15_000 });
+  const after = await arenaBattleState(page);
+  const dragonAfter = after?.units.find(({ id }) => id === "arena-2-0");
+  expect(after?.lastSpecialAction?.damage).toBe(0);
+  expect(dragonAfter?.life).toBe(dragonBefore?.life);
+  expect(pageErrors).toEqual([]);
+});

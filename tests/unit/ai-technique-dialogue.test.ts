@@ -2,10 +2,12 @@ import { beforeAll, describe, expect, test } from "vitest";
 import {
   aiTechniqueDialogueFor,
   confusedActorDialogueFor,
+  contextualBattleDialogueFor,
   nativeAiTechniqueDialogueForCode,
   NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
   NATIVE_CONFUSED_ACTOR_DIALOGUE,
+  NATIVE_CONTEXTUAL_BATTLE_LINES,
 } from "../../src/game/content/ai-technique-dialogue";
 import { HALF_DRAGON_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
 import { activateStage1Content } from "../../src/game/content/stage1";
@@ -174,19 +176,30 @@ describe("native AI technique dialogue", () => {
   });
 });
 
-describe("native confused-actor dialogue", () => {
-  test("publishes contextual entry 1Ch outside the technique groups", () => {
-    expect(NATIVE_CONFUSED_ACTOR_DIALOGUE).toEqual({
-      selector: 0x1c,
-      pointerEntry: "DS:84F3",
-      address: "DS:86AB",
-      text: "我的頭好昏，無法思考．",
-    });
-    // 0Ah..17h belong to the 33 AI action rows; the confused-actor line is a
-    // player-side route and must not join them.
+describe("native contextual battle lines", () => {
+  test("publishes the DS:84BB entries that sit outside the technique groups", () => {
+    expect(Object.entries(NATIVE_CONTEXTUAL_BATTLE_LINES).map(([key, line]) => [
+      key,
+      line.selector,
+      line.address,
+      line.text,
+      line.emitters,
+    ])).toEqual([
+      ["spellSealed", 0x1a, "DS:8677", "我中了禁咒，無法使用法術．", ["0000:701F"]],
+      ["noTargetInRange", 0x1b, "DS:8692", "沒有人在我的攻擊範圍內．", ["0000:70ED"]],
+      ["confusedActor", 0x1c, "DS:86AB", "我的頭好昏，無法思考．", ["0000:671D"]],
+      ["dodgedShot", 0x1d, "DS:86C2", "要打中我沒那麼容易．", ["0000:7260", "1000:1FB2"]],
+      ["counterattack", 0x1e, "DS:86D7", "妳竟敢打我．", ["0000:92C1"]],
+    ]);
+
+    // 0Ah..17h belong to the 33 AI action rows; these lines have their own
+    // triggers and must not join them.
     const techniqueSelectors: readonly number[] = NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS
       .map(({ selector }) => selector);
-    expect(techniqueSelectors).not.toContain(NATIVE_CONFUSED_ACTOR_DIALOGUE.selector);
+    for (const { selector } of Object.values(NATIVE_CONTEXTUAL_BATTLE_LINES)) {
+      expect(techniqueSelectors).not.toContain(selector);
+    }
+    expect(NATIVE_CONFUSED_ACTOR_DIALOGUE).toBe(NATIVE_CONTEXTUAL_BATTLE_LINES.confusedActor);
   });
 
   test("speaks in the acting unit's own window with its own portrait", () => {
@@ -196,9 +209,24 @@ describe("native confused-actor dialogue", () => {
       lower: undefined,
       source: { record: "confused-actor", wait: 0x1c, address: "DS:86AB" },
     });
-    expect(confusedActorDialogueFor({ name: "邪法師", portrait: 53, side: 2 })).toMatchObject({
-      activeSlot: "lower",
-      lower: { portrait: 53, speaker: "邪法師" },
-    });
+    expect(contextualBattleDialogueFor({ name: "邪法師", portrait: 53, side: 2 }, "spellSealed"))
+      .toEqual({
+        activeSlot: "lower",
+        upper: undefined,
+        lower: { portrait: 53, speaker: "邪法師", text: "我中了禁咒，無法使用法術．" },
+        source: { record: "spell-sealed", wait: 0x1a, address: "DS:8677" },
+      });
+    expect(contextualBattleDialogueFor({ name: "迅龍騎士", portrait: 59, side: 2 }, "dodgedShot"))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: { speaker: "迅龍騎士", text: "要打中我沒那麼容易．" },
+        source: { record: "dodged-shot", wait: 0x1d },
+      });
+    expect(contextualBattleDialogueFor({ name: "士兵", portrait: 60, side: 1 }, "counterattack"))
+      .toMatchObject({
+        activeSlot: "upper",
+        upper: { speaker: "士兵", text: "妳竟敢打我．" },
+        source: { record: "counterattack", wait: 0x1e },
+      });
   });
 });

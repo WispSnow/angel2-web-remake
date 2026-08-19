@@ -1036,8 +1036,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (page) {
       const pageKey = controller.aiTechniqueDialogue
         ? `ai-technique:${controller.aiTechniqueDialogue.actor.id}:${controller.aiTechniqueDialogue.actionId}`
-        : controller.confusedActorDialogue
-        ? `confused-actor:${controller.confusedActorDialogue.actor.id}`
+        : controller.contextualLineDialogue
+        ? `contextual-line:${controller.contextualLineDialogue.line}:${controller.contextualLineDialogue.actor.id}`
         : controller.groupCommandDialogueId
         ? `group-command:${controller.groupCommandDialogueId}`
           : controller.promotionDialogueActive
@@ -1061,11 +1061,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       dialogueLayer.classList.toggle("prebattle", controller.phase === "prebattleStory");
       dialogueLayer.classList.toggle("promotion-dialogue", controller.promotionDialogueActive);
       dialogueLayer.classList.toggle("group-command-dialogue", controller.groupCommandDialogueActive);
-      // The confused-actor line reuses the same contextual battle window as the
-      // AI technique lines, so it shares their layout, not the story layout.
+      // The DS:84BB contextual lines reuse the same battle window as the AI
+      // technique notices, so they share that layout, not the story layout.
       dialogueLayer.classList.toggle(
         "ai-technique-dialogue",
-        controller.aiTechniqueDialogueActive || controller.confusedActorDialogueActive,
+        controller.aiTechniqueDialogueActive || controller.contextualLineDialogueActive,
       );
       for (const slot of ["upper", "lower"] as const) {
         const elements = dialogueWindows[slot];
