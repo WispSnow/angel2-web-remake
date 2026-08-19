@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import { STARTUP_FONT } from "../../src/game/content/startup.generated";
 import { createStage0Units, initialEnemyExperience, statsFor } from "../../src/game/content/stage0";
+import { INTRO_BAND } from "../../src/game/startup";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -235,8 +237,11 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
     lines.some((line) => !line.hasAttribute("hidden") && (line.textContent?.trim().length ?? 0) > 0),
   )).toBe(true);
   // Rows only ever show between the two colour-0 bars 0000:11DA paints at
-  // DS:07C0 and DS:07CA; the band above 273 and below 316 has to stay black
-  // while the rows ramp in and out of it, one scanline per scroll update.
+  // DS:07C0 and DS:07CA, shifted down as one by REMAKE-113. Both bar footprints
+  // have to stay black while the rows ramp in and out, a scanline per update;
+  // a clipped row can only leave ink within one glyph of either edge.
+  const reach = STARTUP_FONT.glyphHeight;
+  const bars = [[INTRO_BAND.top - reach, reach], [INTRO_BAND.bottom, reach]];
   const introWhite = (y: number, height: number) => page.evaluate(([top, rows]) => {
     const canvas = document.querySelector("#startup-canvas") as HTMLCanvasElement;
     const { data } = canvas.getContext("2d")!.getImageData(160, top, 400, rows);
@@ -246,15 +251,16 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
     }
     return white;
   }, [y, height]);
-  await expect.poll(() => introWhite(273, 44)).toBeGreaterThan(0);
+  await expect.poll(() => introWhite(INTRO_BAND.top, INTRO_BAND.bottom - INTRO_BAND.top))
+    .toBeGreaterThan(0);
   await captureVisualAudit(startup, { path: "artifacts/playwright/startup-opening-intro.png" });
-  const maskedWhite = await page.evaluate(async () => {
+  const maskedWhite = await page.evaluate(async (regions) => {
     const canvas = document.querySelector("#startup-canvas") as HTMLCanvasElement;
     const context = canvas.getContext("2d")!;
     let worst = 0;
     for (let frame = 0; frame < 120; frame += 1) {
       await new Promise((resolve) => requestAnimationFrame(resolve));
-      for (const [top, rows] of [[257, 16], [317, 16]]) {
+      for (const [top, rows] of regions) {
         const { data } = context.getImageData(160, top, 400, rows);
         let white = 0;
         for (let index = 0; index < data.length; index += 4) {
@@ -264,7 +270,7 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
       }
     }
     return worst;
-  });
+  }, bars.map(([top, rows]) => [top, rows]));
   expect(maskedWhite).toBe(0);
 
   await skipOpeningToTitle(page);

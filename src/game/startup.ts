@@ -70,9 +70,17 @@ const INTRO_UPDATE_MS = STARTUP_INTRO.ticksPerScrollUpdate * NATIVE_TICK_MS;
  * bounds are enforced here: every native row starts at x=160 and is at most 400
  * pixels wide, so the bars never trim a row horizontally.
  */
-const INTRO_BAND = {
-  top: STARTUP_INTRO.visibleWindow.y,
-  bottom: STARTUP_INTRO.visibleWindow.y + STARTUP_INTRO.visibleWindow.height,
+/**
+ * [DD REMAKE-113] The native band is not centred in the black below the plate:
+ * BK/41..48 end at row 256, leaving a 16-pixel gutter above the window and 33
+ * rows below it. The whole band — rows and masks together — is pushed down by
+ * this many pixels so the two gutters read as 24 and 25 instead. Nothing else
+ * changes: the rows still enter and leave one scanline per scroll update.
+ */
+export const INTRO_BAND_OFFSET = 8;
+export const INTRO_BAND = {
+  top: STARTUP_INTRO.visibleWindow.y + INTRO_BAND_OFFSET,
+  bottom: STARTUP_INTRO.visibleWindow.y + STARTUP_INTRO.visibleWindow.height + INTRO_BAND_OFFSET,
 } as const;
 
 const required = <T extends HTMLElement>(root: ParentNode, selector: string): T => {
@@ -718,10 +726,11 @@ export function mountStartup(
       if (candidate.slot === slot && candidate.update <= scrollUpdate) assignment = candidate;
     }
     if (!assignment) return undefined;
-    const y = STARTUP_INTRO.resetY - (scrollUpdate - assignment.update);
-    if (y < STARTUP_INTRO.visibleTopY || y > STARTUP_INTRO.visibleBottomY) return undefined;
+    const nativeY = STARTUP_INTRO.resetY - (scrollUpdate - assignment.update);
+    if (nativeY < STARTUP_INTRO.visibleTopY || nativeY > STARTUP_INTRO.visibleBottomY) return undefined;
     // A row exists for its whole 316..258 run, but the masks decide how much of
     // it is on screen, so the paragraph mirror follows the visible slice.
+    const y = nativeY + INTRO_BAND_OFFSET;
     return { assignment, y, slice: clipStartupGlyphRow(y, INTRO_BAND) };
   };
 

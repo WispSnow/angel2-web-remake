@@ -10,8 +10,10 @@ import {
   STARTUP_INTRO,
   STARTUP_MENU_LABELS,
   STARTUP_PRETITLE,
+  STARTUP_SCREEN,
   STARTUP_TITLE,
 } from "../../src/game/content/startup.generated";
+import { INTRO_BAND, INTRO_BAND_OFFSET } from "../../src/game/startup";
 import { clipStartupGlyphRow } from "../../src/game/startup-screen";
 import { readPlatePixels } from "./postgame-plate-support";
 
@@ -77,26 +79,45 @@ describe("module 23 startup presentation", () => {
     expect(STARTUP_INTRO.visibleWindow).toEqual(draw.visibleWindow);
     expect(draw.upperMask).toMatchObject({ y: 257, height: 16, colorIndex: 0 });
     expect(draw.lowerMask).toMatchObject({ y: 317, height: 16, colorIndex: 0 });
-    const band = {
-      top: STARTUP_INTRO.visibleWindow.y,
-      bottom: STARTUP_INTRO.visibleWindow.y + STARTUP_INTRO.visibleWindow.height,
-    };
+    expect(INTRO_BAND.bottom - INTRO_BAND.top).toBe(draw.visibleWindow.height);
+    // REMAKE-113 slides the whole band down, so the ramp is measured off the
+    // runtime window with every native row Y carried by the same offset.
+    const row = (nativeY: number) => clipStartupGlyphRow(nativeY + INTRO_BAND_OFFSET, INTRO_BAND);
     // The reset row and the update after the last visible one stay fully masked.
-    expect(clipStartupGlyphRow(STARTUP_INTRO.resetY, band)).toBeUndefined();
-    expect(clipStartupGlyphRow(STARTUP_INTRO.visibleTopY - 1, band)).toBeUndefined();
-    expect(clipStartupGlyphRow(STARTUP_INTRO.visibleBottomY, band))
-      .toEqual({ sourceY: 0, y: 316, height: 1 });
-    expect(clipStartupGlyphRow(STARTUP_INTRO.visibleTopY + 1, band))
-      .toEqual({ sourceY: STARTUP_FONT.glyphHeight - 1, y: 273, height: 1 });
+    expect(row(STARTUP_INTRO.resetY)).toBeUndefined();
+    expect(row(STARTUP_INTRO.visibleTopY - 1)).toBeUndefined();
+    expect(row(STARTUP_INTRO.visibleBottomY))
+      .toEqual({ sourceY: 0, y: INTRO_BAND.bottom - 1, height: 1 });
+    expect(row(STARTUP_INTRO.visibleTopY + 1))
+      .toEqual({ sourceY: STARTUP_FONT.glyphHeight - 1, y: INTRO_BAND.top, height: 1 });
     const run = STARTUP_INTRO.visibleBottomY - STARTUP_INTRO.visibleTopY + 1;
     const heights = Array.from({ length: run }, (_, index) =>
-      clipStartupGlyphRow(STARTUP_INTRO.visibleBottomY - index, band)?.height ?? 0);
+      row(STARTUP_INTRO.visibleBottomY - index)?.height ?? 0);
     const ramp = STARTUP_FONT.glyphHeight;
     expect(heights.slice(0, ramp)).toEqual(Array.from({ length: ramp }, (_, index) => index + 1));
     expect(heights.slice(ramp - 1, run - ramp)).toEqual(new Array(run - 2 * ramp + 1).fill(ramp));
     expect(heights.slice(run - ramp)).toEqual(Array.from({ length: ramp }, (_, index) => ramp - 1 - index));
     // Every row still spends its whole 316..258 run inside the cleared band.
     expect(heights.filter((height) => height > 0)).toHaveLength(run - 1);
+  });
+
+  /**
+   * REMAKE-113: the native window sits 16 rows under the plate but 33 rows above
+   * the screen bottom. The remake shifts the band, masks included, until those
+   * two gutters match; nothing else about the scroll changes.
+   */
+  it("balances the shifted band between the plate and the screen bottom", async () => {
+    const plate = await readPlatePixels(STARTUP_INTRO.backgrounds[0].src);
+    expect(STARTUP_INTRO.backgrounds[0].y).toBe(0);
+    const nativeTop = STARTUP_INTRO.visibleWindow.y;
+    expect(INTRO_BAND.top).toBe(nativeTop + INTRO_BAND_OFFSET);
+    expect(nativeTop - plate.height).toBe(16);
+    expect(STARTUP_SCREEN.height - (nativeTop + STARTUP_INTRO.visibleWindow.height)).toBe(33);
+    const above = INTRO_BAND.top - plate.height;
+    const below = STARTUP_SCREEN.height - INTRO_BAND.bottom;
+    expect(Math.abs(above - below)).toBeLessThanOrEqual(1);
+    // The lowest row a glyph can reach still fits on the 350-line screen.
+    expect(INTRO_BAND.bottom - 1 + STARTUP_FONT.glyphHeight).toBeLessThan(STARTUP_SCREEN.height);
   });
 
   /** Every visible string is drawn with A/23+A/24, so the layouts must decode

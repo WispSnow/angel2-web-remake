@@ -59,7 +59,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | “遊戲功能”原版“子 選 單”的五项顺序、`ON/OFF`、面板／命中行几何、原版调色板与手形光标，以及键盘和鼠标切换 | 无独立模拟数值测试 | `game-functions-menu.spec.ts` |
 | `src/game/scaling.ts`、`display-settings.ts` 的宿主「畫面縮放」偏好：`sharp`／`smooth`／`integer` 的取值校验、整数倍按装置像素吸附与留边取整，以及逻辑屏外的选择器位置与持久化 | `scaling.test.ts`、`preferences.test.ts` 的「display preferences」 | `display-scaling.spec.ts` |
 | `styles.css` 的战场层序（底板 → 画布 → `A/0000` 边框 → `A/0005` 雕像前景）：「平滑」缩放会把相机视口 `(40,23,400,308)` 的硬透明边缘向外晕开，边框必须最后绘制 | 无独立单元测试（纯合成顺序） | `display-scaling.spec.ts` 的「the battlefield never bleeds through the window frame」，像素解码见 `screenshot-pixels.ts` |
-| 模块 23 啟動流程：Softstar Logo、加法式调色板淡入、開場背景淡出淡入与 `A/23`+`A/24` 点阵滚动文字、標題 8×8 抖动溶解、点阵菜单文字与 50% 棋盘高亮、两套素材与 1608 tick 空闲重播、`Esc`／鼠标右键共用的取消语义与 `REMAKE-112` 的 `MUSIC/1` 循环与取消续播 | `startup.test.ts` | `startup.spec.ts`；各关卡通过 `startup-controls.ts` 复用真实跳過开场路径——Logo 期间的按键只缩短停留，必须等滚动開場接管后再送一次动作 |
+| 模块 23 啟動流程：Softstar Logo、加法式调色板淡入、開場背景淡出淡入与 `A/23`+`A/24` 点阵滚动文字（行按 `DS:07C0`/`DS:07CA` 两条遮挡条逐扫描线揭开与遮住、左起点 `x=160`、`REMAKE-113` 的整体下移 8 像素）、標題 8×8 抖动溶解、点阵菜单文字与 50% 棋盘高亮、两套素材与 1608 tick 空闲重播、`Esc`／鼠标右键共用的取消语义与 `REMAKE-112` 的 `MUSIC/1` 循环与取消续播 | `startup.test.ts` | `startup.spec.ts`；各关卡通过 `startup-controls.ts` 复用真实跳過开场路径——Logo 期间的按键只缩短停留，必须等滚动開場接管后再送一次动作 |
 | 存档 schema 与迁移 | `save.test.ts` | `startup.spec.ts` 或对应关卡的存读档用例 |
 | 第 4 关内容、行为 12 结界路线与 `route-pulse.ts`／`route-pulse-presentation.ts` 的两层力场电波 | `stage4-content.test.ts`、`stage4-battle.test.ts`、`route-pulse-presentation.test.ts`、`stage-runtime.test.ts` | `stage4.spec.ts` |
 | 第 7 关内容、部署与战斗合同 | `stage7-content.test.ts`、`stage7-battle.test.ts`、`stage-runtime.test.ts` | `stage7.spec.ts` |
