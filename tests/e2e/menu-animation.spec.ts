@@ -18,9 +18,18 @@ interface MenuAnimationState {
   units: Array<{ id: string; side: number; x: number; y: number }>;
 }
 
+interface GlideSample {
+  spriteHidden: boolean;
+  left: string;
+  top: string;
+  menuHidden: boolean;
+  cursorYielded: boolean;
+}
+
 declare global {
   interface Window {
     __menuMutations?: MenuMutation[];
+    __glideSamples?: GlideSample[];
   }
 }
 
@@ -118,13 +127,98 @@ test("menus zoom open and stay inert while the close animation plays", async ({ 
   await expect(actionMenu).toBeVisible();
 });
 
+/**
+ * 原生開選單前先把指標滑到第一行（`0000:566A` → `0000:57C5`），滑完才畫外框。Web 用
+ * 畫面內的手形精靈演出這段手勢，所以要守住：滑行期間方框不出現、宿主游標讓位、落點是
+ * 原生的第一行指標點，以及滑完一定會收乾淨。
+ */
+async function recordGlide(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const sprite = document.querySelector<HTMLElement>("#command-menu-pointer")!;
+    const menu = document.querySelector<HTMLElement>("#action-menu")!;
+    const screen = document.querySelector<HTMLElement>("#logical-screen")!;
+    const log: GlideSample[] = [];
+    window.__glideSamples = log;
+    const snapshot = () => log.push({
+      spriteHidden: sprite.hidden,
+      left: sprite.style.left,
+      top: sprite.style.top,
+      menuHidden: menu.hidden,
+      cursorYielded: screen.dataset.pointerGlide === "true",
+    });
+    const observer = new MutationObserver(snapshot);
+    observer.observe(sprite, { attributes: true, attributeFilter: ["style", "hidden"] });
+    observer.observe(menu, { attributes: true, attributeFilter: ["hidden"] });
+    observer.observe(screen, { attributes: true, attributeFilter: ["data-pointer-glide"] });
+  });
+}
+
+const glideSamples = (page: Page) => page.evaluate(() => window.__glideSamples ?? []);
+
+test("the command menu opens only after the native pointer glide lands", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+
+  const actionMenu = page.getByTestId("action-menu");
+  await recordGlide(page);
+  await clickUnit(page, "1:0");
+  await expect(actionMenu).toBeVisible();
+
+  const samples = await glideSamples(page);
+  const gliding = samples.filter((sample) => sample.cursorYielded);
+  expect(gliding.length).toBeGreaterThan(0);
+  // 滑行期間方框還沒出現，宿主游標也已經讓位給精靈。
+  for (const sample of gliding) {
+    expect(sample.menuHidden).toBe(true);
+    expect(sample.spriteHidden).toBe(false);
+  }
+  expect(new Set(gliding.map((sample) => `${sample.left}|${sample.top}`)).size)
+    .toBeGreaterThan(1);
+
+  // 落點是原生第一行指標點；精靈熱區與 `--native-cursor-hand` 同為 (3, 2)。收起後行內
+  // 樣式仍留著最後一格，直接讀它比從變動紀錄回推可靠。
+  const landing = await page.getByTestId("command-menu-pointer").evaluate((sprite) => ({
+    left: (sprite as HTMLElement).style.left,
+    top: (sprite as HTMLElement).style.top,
+  }));
+  const menuBox = await actionMenu.evaluate((menu) => ({
+    left: (menu as HTMLElement).offsetLeft,
+    top: (menu as HTMLElement).offsetTop,
+  }));
+  expect(landing.left).toBe(`${menuBox.left + 120 - 3}px`);
+  expect(landing.top).toBe(`${menuBox.top + 28 - 2}px`);
+
+  // 收乾淨：精靈收起、游標交還瀏覽器。
+  await expect(page.getByTestId("command-menu-pointer")).toBeHidden();
+  await expect(page.locator("#logical-screen")).not.toHaveAttribute("data-pointer-glide", "true");
+});
+
+// `test.use({ reducedMotion })` 在本套件不會落到頁面上（實測 `matchMedia` 仍回報
+// `no-preference`），所以逐個用例顯式 `emulateMedia`，斷言才真的跑在減少動態的路徑上。
 test.describe("reduced motion", () => {
-  test.use({ reducedMotion: "reduce" });
+  test("the pointer glide is skipped when motion is reduced", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    expect(await page.evaluate(() =>
+      matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
+
+    await recordGlide(page);
+    await clickUnit(page, "1:0");
+    await expect(page.getByTestId("action-menu")).toBeVisible();
+    expect((await glideSamples(page)).some((sample) => sample.cursorYielded)).toBe(false);
+    await expect(page.getByTestId("command-menu-pointer")).toBeHidden();
+  });
 
   test("menus still finish closing when motion is reduced", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
     const canvas = page.getByTestId("battle-canvas");
     await expect(canvas).toBeVisible();
+    // 收合動畫被壓到近乎瞬時，收尾仍必須把 `hidden` 與收合類名處理乾淨。
+    expect(await page.getByTestId("action-menu").evaluate((menu) =>
+      getComputedStyle(menu).animationDuration)).toBe("1e-06s");
 
     const actionMenu = page.getByTestId("action-menu");
     await clickUnit(page, "1:0");

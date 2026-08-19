@@ -33,13 +33,23 @@ import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
 import { finishMenuClose, setMenuOpen } from "./menu-animation";
 import {
+  createMenuPointerGlide,
+  NATIVE_GLIDE_FRAME_MS,
+  NATIVE_MENU_POINTER_OFFSET,
+  type PointerPosition,
+} from "./menu-pointer-glide";
+import {
   animatedPortraitMarkup,
   configureAnimatedPortrait,
   nativeMouthFrameAfterGlyph,
   nativeStoryGlyphMovesMouth,
   startPortraitAnimations,
 } from "./portrait";
-import { configureGameScaling } from "./scaling";
+import {
+  configureGameScaling,
+  LOGICAL_SCREEN_HEIGHT,
+  LOGICAL_SCREEN_WIDTH,
+} from "./scaling";
 import {
   implementedSidePanelHotspots,
   SIDE_PANEL_TOGGLE_VISUALS,
@@ -166,6 +176,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               </div>
             </section>
             <div class="action-menu native-command-menu" id="action-menu" data-testid="action-menu" role="menu" aria-label="單位行動" hidden></div>
+            <span class="command-menu-pointer" id="command-menu-pointer"
+              data-testid="command-menu-pointer" aria-hidden="true" hidden></span>
             <div class="status-strip" id="status-strip" data-testid="status-strip" aria-live="polite"></div>
             <section class="combat-presentation" id="combat-presentation" data-testid="combat-presentation" hidden></section>
             <section class="promotion-layer" id="promotion-layer" data-testid="promotion-layer"
@@ -265,6 +277,50 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const groupCommandMenu = required(root, "#group-command-menu");
   const retreatConfirm = required(root, "#retreat-confirm");
   const resultLayer = required(root, "#result-layer");
+  const commandMenuPointer = required(root, "#command-menu-pointer");
+  /**
+   * 原生開選單前先把指標滑到第一行（`0000:566A` → `0000:57C5`），滑完才畫外框。
+   * 瀏覽器不能移動宿主指標，所以由畫面內的手形精靈演出這段手勢：滑行期間宿主游標
+   * 藏起來，畫面上只有一隻手，落點就是原生的第一行指標位置。
+   */
+  let commandMenuGliding = false;
+  let commandMenuWasOpen = false;
+  let lastScreenPointer: PointerPosition | undefined;
+  const menuPointerGlide = createMenuPointerGlide({
+    screen,
+    sprite: commandMenuPointer,
+    frameMs: () => controller.isTestMode
+      ? 1
+      : controller.presentationFast
+        ? NATIVE_GLIDE_FRAME_MS / 3.2
+        : NATIVE_GLIDE_FRAME_MS,
+    onSettled: () => {
+      commandMenuGliding = false;
+      render();
+    },
+  });
+  const trackScreenPointer = (event: PointerEvent) => {
+    if (!(event.target as Element | null)?.closest("#logical-screen")) return;
+    const bounds = screen.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    lastScreenPointer = {
+      x: (event.clientX - bounds.left) * LOGICAL_SCREEN_WIDTH / bounds.width,
+      y: (event.clientY - bounds.top) * LOGICAL_SCREEN_HEIGHT / bounds.height,
+    };
+  };
+  /** 玩家在滑行途中操作時直接跳到終點：演出不能擋住輸入。 */
+  const settleMenuPointerGlide = () => {
+    if (commandMenuGliding) menuPointerGlide.settle();
+  };
+  const startCommandMenuGlide = (position: PointerPosition): boolean => {
+    // 沒有已知指標位置（鍵盤或手把選的單位）就沒有可以滑的起點，直接開選單。
+    if (!lastScreenPointer) return false;
+    if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return false;
+    return menuPointerGlide.start(lastScreenPointer, {
+      x: position.x + NATIVE_MENU_POINTER_OFFSET.x,
+      y: position.y + NATIVE_MENU_POINTER_OFFSET.y,
+    });
+  };
   // 收合動畫會讓選單比控制器狀態多留在 DOM 一小段時間；卸載時必須立刻結清，
   // 否則等待中的收尾回呼會作用在已被替換的畫面上。
   const animatedMenus = [
@@ -572,6 +628,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   }, { signal: eventController.signal, passive: false });
 
   root.addEventListener("pointermove", (event) => {
+    trackScreenPointer(event);
     const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
     if (command) controller.selectCommand(Number(command.dataset.commandIndex));
     const technique = (event.target as Element).closest<HTMLElement>("[data-technique-index]");
@@ -637,6 +694,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
    */
   let rightPressStartedOnCanvas = false;
   root.addEventListener("pointerdown", (event) => {
+    trackScreenPointer(event);
+    settleMenuPointerGlide();
     if (event.button === 2) rightPressStartedOnCanvas = event.target instanceof HTMLCanvasElement;
   }, { capture: true, signal: eventController.signal });
 
@@ -649,6 +708,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   }, { signal: eventController.signal });
 
   window.addEventListener("keydown", (event) => {
+    settleMenuPointerGlide();
     const key = event.key;
     const lower = key.toLowerCase();
     const focusedHotspot = document.activeElement instanceof HTMLButtonElement
@@ -749,7 +809,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     const actionMenuVisible = controller.phase === "player"
       && (controller.actionMode === "actionMenu" || controller.actionMode === "techniqueMenu");
-    if (setMenuOpen(actionMenu, actionMenuVisible)) {
+    if (actionMenuVisible && !commandMenuWasOpen) {
+      commandMenuGliding = startCommandMenuGlide(controller.commandMenuPosition);
+    } else if (!actionMenuVisible && commandMenuGliding) {
+      menuPointerGlide.cancel();
+      commandMenuGliding = false;
+    }
+    commandMenuWasOpen = actionMenuVisible;
+    if (setMenuOpen(actionMenu, actionMenuVisible && !commandMenuGliding)) {
       const position = controller.commandMenuPosition;
       actionMenu.style.left = `${position.x}px`;
       actionMenu.style.top = `${position.y}px`;
@@ -1233,6 +1300,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     stopFeedbackTimer();
     hideSidePanelHint();
     for (const menu of animatedMenus) finishMenuClose(menu);
+    menuPointerGlide.dispose();
   };
 }
 

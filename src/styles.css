@@ -672,6 +672,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   box-shadow: 3px 4px 0 #0009;
   image-rendering: var(--image-rendering, pixelated);
 }
+/* 方框從第一行的指標落點長出來，接住剛滑到那裡的手形指標；座標與
+   `NATIVE_MENU_POINTER_OFFSET` 同一組原生偏移。 */
+.action-menu.native-command-menu { transform-origin: 120px 28px; }
 .action-menu.native-command-menu::before,
 .action-menu.native-command-menu::after { content: none; }
 .action-menu.native-command-menu button {
@@ -778,6 +781,22 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 /* 收合中的選單已經不是可操作狀態：不能吃掉玩家投向戰場的下一次點擊。 */
 .is-menu-closing { pointer-events: none; }
+
+/* 開選單前的指標滑行（模組 29 `0000:566A` → `0000:57C5`）。原版滑的是真的滑鼠指標，
+   瀏覽器做不到，所以由這個手形精靈演出：它從玩家指標當下的位置出發，落在原生的第一行
+   指標點，落地後才顯示選單。滑行期間把宿主游標藏起來，畫面上才只有一隻手，起點也才
+   接得上——精靈用的圖與熱區和 `--native-cursor-hand` 完全相同。 */
+.command-menu-pointer {
+  position: absolute;
+  z-index: 10;
+  width: 24px;
+  height: 24px;
+  background: url("/assets/original/command-menu-pointer.png") left top / 24px 24px no-repeat;
+  image-rendering: var(--image-rendering, pixelated);
+  pointer-events: none;
+}
+.logical-screen[data-pointer-glide="true"],
+.logical-screen[data-pointer-glide="true"] * { cursor: none !important; }
 
 /* 戰鬥中「儲存記錄／讀取記錄」與戰後「儲存遊戲進度」是原版的彈出式資料面板，不套用
    `A/0001` 通用選單外框：奶白外框、深棕面板底、逐槽凸起橫條、當前槽綠色高亮，並列出

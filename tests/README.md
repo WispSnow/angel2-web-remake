@@ -53,6 +53,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `content/full-combat-backgrounds*` 的关卡表、受击方地形改写与 `C.SWF` 背景素材 | `full-combat-backgrounds.test.ts` | `full-combat-background.spec.ts`，第 0 关表值路径另见 `stage0.spec.ts` |
 | 调试中心与场景目录 | `debug-roster-profiles.test.ts` | `debug.spec.ts` |
 | `src/styles.css` 的胜负条件／出击提示面板安全区、长文排版与滚动兜底 | 无独立模拟数值测试 | `objective-panel-layout.spec.ts` |
+| `src/game/menu-pointer-glide.ts` 的原生开菜单指针滑行：`0000:580F`／`0000:5851` 的「四分之一剩余距离、至少 1 px、差 1 px 就停」步进、`0000:57F9` 的精确落点收尾，与`0000:56C8` 的 `(0x78, 0x1C)` 第一行落点 | `menu-pointer-glide.test.ts` | `menu-animation.spec.ts` 的滑行用例（含减少动态跳过） |
 | `src/game/menu-animation.ts` 与 `src/styles.css` 的选单开闔动画：开启由 CSS 在 `hidden` 解除时重播，关闭先播收合动画再真正隐藏，收合期间标 `aria-hidden`、不接收指针、不重建内容 | 无独立单元测试（Vitest 运行在 node 环境，无 DOM） | `menu-animation.spec.ts`；量测选单几何的用例先调 `menu-controls.ts` 的 `settleMenuAnimation`，关掉再开同一个选单的流程改用同一文件的 `expectMenuOpen`（收合动画期间旧方框仍可见，`toBeVisible()` 会提前成立）；两者的现有调用点见 `game-functions-menu.spec.ts`、`objective-panel-layout.spec.ts`、`stage0.spec.ts` |
 | “遊戲功能”原版“子 選 單”的五项顺序、`ON/OFF`、面板／命中行几何、原版调色板与手形光标，以及键盘和鼠标切换 | 无独立模拟数值测试 | `game-functions-menu.spec.ts` |
 | `src/game/scaling.ts`、`display-settings.ts` 的宿主「畫面縮放」偏好：`sharp`／`smooth`／`integer` 的取值校验、整数倍按装置像素吸附与留边取整，以及逻辑屏外的选择器位置与持久化 | `scaling.test.ts`、`preferences.test.ts` 的「display preferences」 | `display-scaling.spec.ts` |
