@@ -1,5 +1,6 @@
 import {
   DIFFICULTY_OPTIONS,
+  difficultyHintFor,
   STARTUP_ASSETS,
 } from "./content/startup";
 import {
@@ -69,12 +70,11 @@ const INTRO_UPDATE_MS = STARTUP_INTRO.ticksPerScrollUpdate * NATIVE_TICK_MS;
  * update, so the rows are drawn clipped to what they leave open. Only the Y
  * bounds are enforced here: every native row starts at x=160 and is at most 400
  * pixels wide, so the bars never trim a row horizontally.
- */
-/**
- * [DD REMAKE-113] The native band is not centred in the black below the plate:
+ *
+ * [DD REMAKE-113] That native band is not centred in the black below the plate:
  * BK/41..48 end at row 256, leaving a 16-pixel gutter above the window and 33
  * rows below it. The whole band — rows and masks together — is pushed down by
- * this many pixels so the two gutters read as 24 and 25 instead. Nothing else
+ * `INTRO_BAND_OFFSET` so the two gutters read as 24 and 25 instead. Nothing else
  * changes: the rows still enter and leave one scanline per scroll update.
  */
 export const INTRO_BAND_OFFSET = 8;
@@ -107,6 +107,8 @@ export function mountStartup(
   let phase: StartupPhase = "pretitle";
   let titleIndex = 0;
   let difficultyIndex = 0;
+  /** Set while the difficulty highlight is being moved by the keyboard. */
+  let difficultyHintByKeyboard = false;
   let recordIndex = 0;
   let recordSlots: SaveSlotReadResult[] = [];
   let animationFrame = 0;
@@ -159,10 +161,20 @@ export function mountStartup(
               </div>
               <div class="startup-menu difficulty-menu" data-testid="difficulty-menu" role="menu"
                 aria-label="難度選擇" hidden>
-                ${DIFFICULTY_OPTIONS.map((option, index) => `
+                ${DIFFICULTY_OPTIONS.map((option, index) => {
+                  const hint = difficultyHintFor(option.value);
+                  // `aria-label` keeps the option's name to the native label so
+                  // the hint below reads only as its description.
+                  return `
                   <button type="button" role="menuitem" data-startup-action="difficulty" data-menu-index="${index}"
-                    data-difficulty="${option.value}" data-testid="difficulty-${option.value}">${option.label}</button>
-                `).join("")}
+                    data-difficulty="${option.value}" data-testid="difficulty-${option.value}"
+                    aria-label="${option.label}" aria-describedby="difficulty-hint-${option.value}"
+                    >${option.label}<span class="difficulty-hint" role="tooltip"
+                      id="difficulty-hint-${option.value}" data-testid="difficulty-hint-${option.value}"
+                      data-difficulty-source="${hint.growth === "legacy" ? "native" : "remake"}"
+                      ><b>${hint.label}</b><i>${hint.sourceLabel}</i><em>${hint.detail}</em></span></button>
+                `;
+                }).join("")}
               </div>
               <section class="startup-record-selector" data-testid="title-record-menu"
                 aria-label="讀取遊戲進度" hidden>
@@ -324,6 +336,9 @@ export function mountStartup(
     for (const button of difficultyMenu.querySelectorAll<HTMLButtonElement>("button")) {
       const selected = Number(button.dataset.menuIndex) === difficultyIndex;
       button.classList.toggle("is-selected", selected);
+      // Hovering already moves the highlight, so the pointer gets its hint from
+      // `:hover`; arrow keys never move DOM focus and need this class instead.
+      button.classList.toggle("is-hinted", selected && difficultyHintByKeyboard);
       button.setAttribute("aria-current", String(selected));
     }
     for (const button of recordSlotList.querySelectorAll<HTMLButtonElement>("button")) {
@@ -494,6 +509,7 @@ export function mountStartup(
     phase = "difficulty";
     idleSince = performance.now();
     difficultyIndex = 0;
+    difficultyHintByKeyboard = false;
     screen.dataset.startupPhase = phase;
     titleMenuFrame.hidden = true;
     difficultyMenuFrame.hidden = false;
@@ -626,6 +642,7 @@ export function mountStartup(
       event.preventDefault();
       const delta = event.key === "ArrowUp" ? -1 : 1;
       difficultyIndex = (difficultyIndex + delta + DIFFICULTY_OPTIONS.length) % DIFFICULTY_OPTIONS.length;
+      difficultyHintByKeyboard = true;
       updateMenuSelection();
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -641,7 +658,10 @@ export function mountStartup(
     if (button.dataset.startupAction === "record-page") return;
     const index = Number(button.dataset.menuIndex);
     if (button.dataset.startupAction === "title") titleIndex = index;
-    else if (button.dataset.startupAction === "difficulty") difficultyIndex = index;
+    else if (button.dataset.startupAction === "difficulty") {
+      difficultyIndex = index;
+      difficultyHintByKeyboard = false;
+    }
     else {
       setRecordIndex(index);
       return;

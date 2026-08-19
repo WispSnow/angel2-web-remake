@@ -13,6 +13,8 @@ import {
   STARTUP_SCREEN,
   STARTUP_TITLE,
 } from "../../src/game/content/startup.generated";
+import { DIFFICULTY_OPTIONS, difficultyHintFor } from "../../src/game/content/startup";
+import { enemyScalingFor } from "../../src/game/content/enemy-scaling";
 import { INTRO_BAND, INTRO_BAND_OFFSET } from "../../src/game/startup";
 import { clipStartupGlyphRow } from "../../src/game/startup-screen";
 import { readPlatePixels } from "./postgame-plate-support";
@@ -118,6 +120,39 @@ describe("module 23 startup presentation", () => {
     expect(Math.abs(above - below)).toBeLessThanOrEqual(1);
     // The lowest row a glyph can reach still fits on the 350-line screen.
     expect(INTRO_BAND.bottom - 1 + STARTUP_FONT.glyphHeight).toBeLessThan(STARTUP_SCREEN.height);
+  });
+
+  /**
+   * The four difficulty names predate `REMAKE-103`, which only rebuilt rungs 1
+   * and 2. The menu hint has to keep saying which rung still ships the native
+   * side-2 numbers, so every part of it but the closing sentence is derived from
+   * the scaling table rather than written out a second time.
+   */
+  it("keeps each difficulty hint in step with the enemy scaling table", () => {
+    const notes = [
+      "適合懷舊原版劇情，不會卡關。",
+      "最推薦的均衡難度，比原版「困難重重」略難。",
+      "比較有挑戰，但不至於繁瑣，比原版「無法無天」略易。",
+      "骨灰挑戰，敵方數值和原版一致，比原版「無法無天」略難。",
+    ];
+    const hints = DIFFICULTY_OPTIONS.map(({ value }) => difficultyHintFor(value));
+    expect(hints.map(({ growth }) => growth)).toEqual(["legacy", "linear", "linear", "legacy"]);
+    expect(hints.map(({ sourceLabel }) => sourceLabel))
+      .toEqual(["原版數值", "複刻調整", "複刻調整", "原版數值"]);
+    expect(new Set(hints.map(({ detail }) => detail)).size).toBe(DIFFICULTY_OPTIONS.length);
+    for (const [index, option] of DIFFICULTY_OPTIONS.entries()) {
+      const hint = hints[index];
+      const rule = enemyScalingFor(option.value);
+      expect(hint.label).toBe(option.label);
+      expect(hint.growth).toBe(rule.growth);
+      expect(hint.sourceLabel).toBe(rule.growth === "legacy" ? "原版數值" : "複刻調整");
+      expect(hint.detail).toContain(`敵方等級 ${rule.level}`);
+      // Only difficulty 3 carries the native x1.5, and only 1 and 2 say that the
+      // player's own growth is untouched.
+      expect(hint.detail.includes("×1.5")).toBe(rule.statMultiplierPercent === 150);
+      expect(hint.detail.includes("我方成長不變")).toBe(rule.growth === "linear");
+      expect(hint.detail.endsWith(notes[index])).toBe(true);
+    }
   });
 
   /** Every visible string is drawn with A/23+A/24, so the layouts must decode

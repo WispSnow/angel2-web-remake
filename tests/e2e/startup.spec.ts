@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { STARTUP_FONT } from "../../src/game/content/startup.generated";
 import { createStage0Units, initialEnemyExperience, statsFor } from "../../src/game/content/stage0";
+import { difficultyHintFor } from "../../src/game/content/startup";
 import { INTRO_BAND } from "../../src/game/startup";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -299,6 +300,25 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
     return element.complete && element.naturalWidth === 144 && element.naturalHeight === 150;
   })).toBe(true);
   await captureVisualAudit(startup, { path: "artifacts/playwright/startup-difficulty-menu.png" });
+
+  // Each option carries the hint that separates the two native rungs from the
+  // two REMAKE-103 ones. The pointer opens it by hovering, which is also how the
+  // native menu moves its highlight.
+  for (const value of [0, 1, 2, 3] as const) {
+    const hint = page.getByTestId(`difficulty-hint-${value}`);
+    await expect(hint).toBeHidden();
+    await page.getByTestId(`difficulty-${value}`).hover();
+    await expect(hint).toBeVisible();
+    await expect(hint).toHaveText(new RegExp(difficultyHintFor(value).detail.slice(0, 12)));
+    await expect(hint).toHaveAttribute("data-difficulty-source", value === 1 || value === 2 ? "remake" : "native");
+  }
+  await captureVisualAudit(startup, { path: "artifacts/playwright/startup-difficulty-hint.png" });
+  // Arrow keys never move DOM focus, so the hint follows the highlight instead.
+  await page.mouse.move(16, 340);
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("difficulty-0")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("difficulty-hint-0")).toBeVisible();
+  await expect(page.getByTestId("difficulty-hint-3")).toBeHidden();
 
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");

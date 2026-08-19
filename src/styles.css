@@ -116,6 +116,48 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   cursor: var(--native-cursor-hand, pointer);
 }
 .startup-menu button:focus-visible { outline: 1px solid #fff; outline-offset: -2px; }
+.startup-menu.difficulty-menu button { position: relative; }
+/* The four names cannot say that REMAKE-103 only rebuilt the middle two rungs,
+   so each option carries a hint plate. It opens to the left of the 96px column
+   and never covers the row it belongs to. The pointer already moves the
+   highlight on hover; `is-hinted` is the arrow-key path, which never focuses. */
+.difficulty-hint {
+  position: absolute;
+  z-index: 5;
+  right: calc(100% + 8px);
+  top: 50%;
+  display: none;
+  width: 268px;
+  padding: 5px 8px 6px;
+  border: 1px solid #d4a62d;
+  color: #fff4c7;
+  background: #160d0eef;
+  text-align: left;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.difficulty-menu button:hover .difficulty-hint,
+.difficulty-menu button:focus-visible .difficulty-hint,
+.difficulty-menu button.is-hinted .difficulty-hint { display: block; }
+.difficulty-hint b { color: var(--gold); font: 700 13px/17px "PMingLiU", "MingLiU", serif; letter-spacing: .06em; }
+.difficulty-hint i {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid currentcolor;
+  color: #e7d7ac;
+  font: 10px/14px "PMingLiU", "MingLiU", serif;
+  font-style: normal;
+  letter-spacing: .04em;
+}
+.difficulty-hint[data-difficulty-source="remake"] i { color: #8fd3ff; }
+.difficulty-hint em {
+  display: block;
+  margin-top: 3px;
+  color: #fff;
+  font: 11px/1.45 "PMingLiU", "MingLiU", serif;
+  font-style: normal;
+  letter-spacing: .02em;
+}
 .startup-menu-status {
   position: absolute;
   z-index: 4;
