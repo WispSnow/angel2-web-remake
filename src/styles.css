@@ -258,7 +258,13 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   text-align: center;
 }
 
-.battle-chrome { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: #0a0708; }
+/* 边框图必须画在画布之上。Phaser 的相机视口是 (40,23,400,308) 且带不透明底色，
+ * 画布在这个矩形之外完全透明；「平滑」缩放会对整张画布做双线性重采样，把这条硬
+ * 透明边缘向外晕开约一个装置像素，正好落在左右雕像、顶栏和底栏上——玩家看到的
+ * 就是雕像中间那条战场颜色的细纹。让不透明的边框图最后绘制即可挡住这段外溢；
+ * 底板留在画布下方，否则会盖住战场。 */
+.battle-backdrop { position: absolute; inset: 0; z-index: 0; background: #0a0708; pointer-events: none; }
+.battle-chrome { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
 .battle-chrome > img { position: absolute; display: block; image-rendering: var(--image-rendering, pixelated); }
 .chrome-top { left: 0; top: 0; width: 480px; height: 23px; }
 .chrome-corner-left { left: 0; top: 23px; width: 40px; height: 34px; }
@@ -291,7 +297,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 #phaser-root canvas[data-native-pointer-cursor="right"] {
   cursor: url("/assets/original/native-cursor-right.png") 23 9, e-resize;
 }
-.battle-foreground { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.battle-foreground { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .battle-foreground > img { position: absolute; top: 140px; width: 32px; height: 191px; image-rendering: var(--image-rendering, pixelated); }
 .statue-foreground-left { left: 40px; }
 .statue-foreground-right { left: 408px; }

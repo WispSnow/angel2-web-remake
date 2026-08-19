@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { columnGreenExcess, decodeScreenshot } from "./screenshot-pixels";
 
 const screenMetrics = (page: Page) => page.getByTestId("startup-screen").evaluate((element) => {
   const style = getComputedStyle(element);
@@ -71,6 +72,52 @@ test.describe("fractional device pixel ratio", () => {
       (snapped.viewportWidth - snapped.screenWidth) / 2,
       1,
     );
+  });
+});
+
+test.describe("smooth scaling on a HiDPI panel", () => {
+  test.use({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
+
+  test("the battlefield never bleeds through the window frame", async ({ page }) => {
+    // 画布只在相机视口 (40,23,400,308) 内绘制，外面完全透明。「平滑」会对整张
+    // 画布做双线性重采样，把这条硬透明边缘向外晕开约一个装置像素；边框图必须画
+    // 在画布之上才挡得住，否则左右雕像中间会出现一条战场颜色的细纹。
+    await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    await page.getByTestId("image-scaling-smooth").click();
+    await expect.poll(() => page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--image-rendering").trim(),
+    )).toBe("auto");
+
+    const paintOrder = await page.evaluate(() => {
+      const layer = (selector: string) => Number(
+        getComputedStyle(document.querySelector(selector) as HTMLElement).zIndex,
+      );
+      return {
+        backdrop: layer(".battle-backdrop"),
+        canvas: layer("#phaser-root"),
+        chrome: layer(".battle-chrome"),
+        statues: layer(".battle-foreground"),
+      };
+    });
+    expect(paintOrder.backdrop).toBeLessThan(paintOrder.canvas);
+    expect(paintOrder.chrome).toBeGreaterThan(paintOrder.canvas);
+    expect(paintOrder.statues).toBeGreaterThanOrEqual(paintOrder.chrome);
+
+    const shot = decodeScreenshot(await page.getByTestId("game-screen").screenshot());
+    expect(shot.width).toBe(1280);
+    // 雕像所在的装置像素行；两侧视口边界落在装置列 80 与 880。
+    const firstRow = 300;
+    const lastRow = 640;
+    const greenExcess = (x: number) => columnGreenExcess(shot, x, firstRow, lastRow);
+
+    // 夹具校验：这些行的战场确实是绿色地形，否则下面的断言会空跑。
+    expect(greenExcess(200)).toBeGreaterThan(8);
+
+    // 视口边界两侧的边框列必须和它们的邻列一样中性。修复前左侧为 10.9、右侧为 4.5。
+    for (const x of [79, 80, 880, 881]) {
+      expect(greenExcess(x), `device column ${x} carries battlefield colour`).toBeLessThan(3);
+    }
   });
 });
 

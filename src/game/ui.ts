@@ -89,6 +89,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         <div class="game-viewport" id="game-viewport">
           <section class="logical-screen" id="logical-screen" data-testid="game-screen"
             style="${dialoguePortraitFrameStyle}" aria-label="天使帝國 II ${stage.name}遊戲畫面">
+            <div class="battle-backdrop" aria-hidden="true"></div>
             <div class="battle-chrome" data-testid="battle-chrome" aria-hidden="true">
               <img class="chrome-top" src="${ASSETS.battleChrome.top}" alt="" />
               <img class="chrome-corner-left" src="${ASSETS.battleChrome.cornerLeft}" alt="" />
