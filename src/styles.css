@@ -1612,12 +1612,28 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   color: var(--ink);
   background: var(--gold);
 }
+/* 右對齊槽：屬於頁面而不屬於邏輯螢幕的入口都掛在同一行的右端。 */
+.display-settings-extras { display: flex; margin-left: auto; }
+.remake-notes-triggers { display: flex; gap: 4px; }
+.remake-notes-triggers > button {
+  padding: 3px 10px;
+  border: 1px solid #4b3527;
+  border-radius: 2px;
+  color: #c9b590;
+  background: linear-gradient(#1d1519, #140e11);
+  cursor: pointer;
+  font: 12px/1.5 system-ui, sans-serif;
+  white-space: nowrap;
+}
+.remake-notes-triggers > button:hover { border-color: var(--gold-dark); color: var(--gold); }
 .display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
 
 @media (max-width: 560px) {
   .page-shell { width: 100%; padding: 12px 0 28px; }
   .eyebrow { font-size: 9px; }
   .display-settings { padding: 0 12px; }
+  .display-settings-extras { margin-left: 0; }
+  .remake-notes-triggers { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; transition-duration: .001ms !important; }

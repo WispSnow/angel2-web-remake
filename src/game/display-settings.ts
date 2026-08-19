@@ -57,6 +57,17 @@ export function onImageScalingChange(listener: (mode: ImageScalingMode) => void)
 }
 
 /**
+ * Right-aligned slot on the same host-chrome row as the scaling picker. Anything
+ * that belongs to the page rather than the 640x350 logical screen lands here, so
+ * the row is built once and its owners stay independent of each other.
+ */
+export function hostChromeExtrasSlot(viewport: HTMLElement): HTMLElement | undefined {
+  return viewport.parentElement
+    ?.querySelector<HTMLElement>(":scope > .display-settings .display-settings-extras")
+    ?? undefined;
+}
+
+/**
  * Mounts the scaling picker as a sibling of the viewport. Every surface rebuilds
  * `#app` on mount, so the controls are rebuilt with it rather than persisted.
  */
@@ -77,6 +88,7 @@ export function mountImageScalingControls(viewport: HTMLElement): () => void {
           data-testid="image-scaling-${mode}" title="${hint}">${label}</button>
       `).join("")}
     </div>
+    <div class="display-settings-extras"></div>
     <p class="display-settings-hint" data-testid="image-scaling-hint"></p>`;
   host.insertBefore(panel, viewport.nextSibling);
 

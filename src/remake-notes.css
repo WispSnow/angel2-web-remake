@@ -1,0 +1,335 @@
+/* 「復刻說明」覆蓋層。宿主頁面的附屬介面，不屬於 640×350 邏輯螢幕，因此使用頁面字體
+   與現代排版，只借用專案的酒紅／鎏金配色與遊戲保持同一調性。 */
+
+.rn-overlay {
+  position: fixed;
+  z-index: 9000;
+  inset: 0;
+  display: none;
+}
+.rn-overlay.is-open { display: block; }
+
+.rn-scrim {
+  position: absolute;
+  inset: 0;
+  background: #050308cc;
+  backdrop-filter: blur(2px);
+}
+
+.rn-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: min(1120px, calc(100vw - 32px));
+  height: min(880px, calc(100vh - 32px));
+  flex-direction: column;
+  border: 1px solid #6a4a24;
+  border-radius: 4px;
+  background: linear-gradient(160deg, #1b1218, #100b0e 55%);
+  box-shadow: 0 30px 90px #000c, 0 0 0 1px #2b1c1f inset;
+  color: #efe0c2;
+  font: 14px/1.7 "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+  transform: translate(-50%, -50%);
+}
+.rn-dialog:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 3px; }
+
+.rn-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid #3b2820;
+  gap: 16px;
+}
+.rn-eyebrow {
+  margin: 0;
+  color: #dba638;
+  font: 700 10px/1.2 system-ui, sans-serif;
+  letter-spacing: .22em;
+}
+.rn-head h2 { margin: 6px 0 2px; color: var(--gold); font-size: 20px; font-weight: 700; }
+.rn-subtitle { margin: 0; color: #a9967a; font-size: 12px; }
+.rn-close {
+  padding: 4px 10px;
+  border: 1px solid #4b3527;
+  border-radius: 2px;
+  color: #c9b590;
+  background: #1a1214;
+  cursor: pointer;
+  font: 14px/1 system-ui, sans-serif;
+}
+.rn-close:hover { border-color: var(--gold-dark); color: var(--gold); }
+
+.rn-tabs { display: flex; padding: 10px 20px 0; gap: 6px; }
+.rn-tabs > button {
+  padding: 6px 16px;
+  border: 1px solid #4b3527;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  color: #c9b590;
+  background: #17101300;
+  cursor: pointer;
+  font: 13px/1.5 system-ui, sans-serif;
+}
+.rn-tabs > button:hover { color: #f3dcae; }
+.rn-tabs > button.is-selected {
+  border-color: var(--gold-dark);
+  color: var(--gold);
+  background: #221619;
+}
+
+.rn-body {
+  min-height: 0;
+  flex: 1;
+  padding: 18px 20px 24px;
+  border-top: 1px solid #3b2820;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rn-foot {
+  padding: 10px 20px;
+  border-top: 1px solid #3b2820;
+  color: #7f7059;
+  font: 11px/1.5 system-ui, sans-serif;
+}
+
+.rn-intro { margin: 0 0 6px; max-width: 76ch; color: #d6c5a4; }
+.rn-count { margin: 0 0 20px; color: #8d7c65; font: 11px/1.6 system-ui, sans-serif; }
+
+.rn-group { margin: 0 0 26px; }
+.rn-group > h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #3b2820;
+  color: var(--gold);
+  font-size: 15px;
+  gap: 12px;
+}
+.rn-group > h3 > span { color: #8d7c65; font: 11px/1.5 system-ui, sans-serif; }
+
+.rn-note {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border: 1px solid #33231f;
+  border-left: 3px solid var(--gold-dark);
+  border-radius: 3px;
+  background: #17101380;
+}
+.rn-note > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-bottom: 8px;
+  gap: 10px;
+}
+.rn-note-id {
+  color: #8d7c65;
+  font: 600 10px/1.6 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  letter-spacing: .06em;
+}
+.rn-note > header > h4 { margin: 0; color: #f6e8c6; font-size: 15px; font-weight: 700; }
+.rn-note-tags { display: flex; gap: 4px; }
+.rn-note-tags > span {
+  padding: 1px 7px;
+  border: 1px solid #3d2a24;
+  border-radius: 999px;
+  color: #a08b6c;
+  font: 10px/1.6 system-ui, sans-serif;
+}
+
+.rn-note dl { margin: 0; display: grid; gap: 6px; }
+.rn-note dl > div { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: 12px; }
+.rn-note dt {
+  color: #9d8a6b;
+  font: 600 11px/1.9 system-ui, sans-serif;
+  letter-spacing: .1em;
+}
+.rn-note dd { margin: 0; max-width: 82ch; color: #ddcdae; font-size: 13px; }
+
+.rn-body code {
+  padding: 0 4px;
+  border-radius: 2px;
+  background: #2a1d20;
+  color: #e3b95c;
+  font: 12px/1.5 ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+/* ── 職業圖鑑 ───────────────────────────────────────────────── */
+
+/* 圖鑑分頁兩欄各自捲動：左欄要一直看得到轉職樹，右欄才是長內容。 */
+.rn-body[data-tab="classes"] { display: flex; padding-bottom: 18px; overflow: hidden; }
+.rn-compendium {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
+  gap: 18px;
+}
+.rn-class-index {
+  min-height: 0;
+  padding-right: 6px;
+  border-right: 1px solid #33231f;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rn-class-group {
+  margin: 14px 0 6px;
+  color: #8d7c65;
+  font: 600 10px/1.6 system-ui, sans-serif;
+  letter-spacing: .12em;
+}
+.rn-class-group:first-child { margin-top: 0; }
+.rn-class-row {
+  display: block;
+  width: 100%;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: #c4b18f;
+  background: none;
+  cursor: pointer;
+  font: 13px/1.6 "Noto Serif TC", "Songti TC", serif;
+  text-align: left;
+}
+/* 縮排本身讀不出層級關係，補一條與縮排對齊的導引線。 */
+.rn-class-row[data-depth="2"] {
+  padding-left: 20px;
+  background: linear-gradient(#3b2820, #3b2820) 11px 0 / 1px 100% no-repeat;
+}
+.rn-class-row[data-depth="3"] {
+  padding-left: 34px;
+  background: linear-gradient(#3b2820, #3b2820) 25px 0 / 1px 100% no-repeat;
+}
+.rn-class-row[data-depth="4"] {
+  padding-left: 48px;
+  background: linear-gradient(#3b2820, #3b2820) 39px 0 / 1px 100% no-repeat;
+}
+.rn-class-row:hover { border-color: #4b3527; color: #f3dcae; }
+.rn-class-row[aria-current="true"] {
+  border-color: var(--gold-dark);
+  color: var(--ink);
+  background: var(--gold);
+  font-weight: 700;
+}
+
+.rn-class-detail {
+  min-width: 0;
+  min-height: 0;
+  padding-right: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rn-class-detail:focus-visible { outline: none; }
+
+.rn-class-head { display: flex; align-items: center; margin-bottom: 16px; gap: 16px; }
+.rn-figure {
+  display: grid;
+  width: 104px;
+  height: 104px;
+  flex: none;
+  align-items: center;
+  justify-items: center;
+  border: 1px solid #3b2820;
+  border-radius: 3px;
+  background:
+    repeating-conic-gradient(#1d1518 0 25%, #17111400 0 50%) 0 0 / 16px 16px,
+    #140e11;
+}
+.rn-figure > img {
+  image-rendering: pixelated;
+  transform: scale(2);
+  transform-origin: center;
+}
+.rn-class-title > h3 { margin: 0 0 4px; color: var(--gold); font-size: 22px; font-weight: 700; }
+.rn-class-meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  color: #a9967a;
+  font: 11px/1.9 system-ui, sans-serif;
+  gap: 4px 14px;
+}
+
+.rn-block { margin: 0 0 18px; }
+.rn-block > h4 {
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #33231f;
+  color: #dba638;
+  font: 700 11px/1.6 system-ui, sans-serif;
+  letter-spacing: .16em;
+}
+.rn-block p { margin: 0 0 6px; color: #ddcdae; font-size: 13px; }
+.rn-block-trait {
+  padding: 10px 14px;
+  border: 1px solid #4b3527;
+  border-left: 3px solid var(--gold);
+  border-radius: 3px;
+  background: #201519;
+}
+.rn-block-trait > h4 { border-bottom: none; margin-bottom: 4px; padding-bottom: 0; }
+.rn-traits, .rn-notes { margin: 0; padding-left: 18px; color: #ddcdae; font-size: 13px; }
+.rn-traits > li { margin-bottom: 4px; }
+.rn-traits strong { color: var(--gold); margin-right: 8px; }
+.rn-notes > li { margin-bottom: 3px; }
+
+.rn-field {
+  display: inline-block;
+  min-width: 8.5em;
+  color: #9d8a6b;
+  font: 600 11px/1.9 system-ui, sans-serif;
+  letter-spacing: .08em;
+}
+.rn-hint { color: #8d7c65 !important; font-size: 12px !important; }
+
+.rn-stats {
+  width: 100%;
+  margin: 0 0 14px;
+  border-collapse: collapse;
+  font: 12px/1.6 system-ui, sans-serif;
+}
+.rn-stats caption {
+  margin-bottom: 5px;
+  color: #8d7c65;
+  font-size: 11px;
+  text-align: left;
+}
+.rn-stats th, .rn-stats td {
+  padding: 4px 10px;
+  border-bottom: 1px solid #2a1d20;
+  text-align: right;
+}
+.rn-stats thead th { color: #9d8a6b; font-weight: 600; }
+.rn-stats tbody th { color: #d6c5a4; font-weight: 600; text-align: left; }
+.rn-stats td { color: #efe0c2; font-variant-numeric: tabular-nums; }
+
+.rn-class-link {
+  margin: 0 6px 4px 0;
+  padding: 2px 10px;
+  border: 1px solid #4b3527;
+  border-radius: 2px;
+  color: #d6c5a4;
+  background: #1a1214;
+  cursor: pointer;
+  font: 12px/1.6 "Noto Serif TC", "Songti TC", serif;
+}
+.rn-class-link:hover { border-color: var(--gold-dark); color: var(--gold); }
+
+@media (max-width: 900px) {
+  .rn-compendium { grid-template-columns: minmax(0, 1fr); grid-template-rows: 200px minmax(0, 1fr); }
+  .rn-class-index {
+    padding-right: 0;
+    padding-bottom: 10px;
+    border-right: none;
+    border-bottom: 1px solid #33231f;
+  }
+  .rn-note dl > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+@media (max-width: 560px) {
+  .rn-dialog { width: 100vw; max-height: 100vh; border: none; border-radius: 0; }
+  .rn-head, .rn-tabs, .rn-body, .rn-foot { padding-inline: 14px; }
+}
