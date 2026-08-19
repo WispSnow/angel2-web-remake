@@ -590,11 +590,11 @@ export function mountStartup(
     }
     if (screen.dataset.startupPhase === "title-assemble") return;
     if (phase === "difficulty") {
-      // [OF] The native `menus/difficulty/audioRule` issues the RIX stop on cancel
-      // as well as on confirm, so returning to the title menu leaves it silent for
-      // the rest of the visit. `REMAKE-114` restored that; only the idle replay
-      // brings music back, and it brings back MUSIC/14.
-      stopTitleMusic();
+      // [DD REMAKE-115] The native `menus/difficulty/audioRule` issues the RIX
+      // stop on cancel as well as on confirm, which cuts MUSIC/1 off mid-bar for
+      // a move that never leaves the title. `REMAKE-114` dropped the loop but
+      // kept that stop; this one keeps the single play running through a cancel,
+      // so only leaving the startup flow — or the idle replay — ends it.
       showTitleMenu();
       return;
     }

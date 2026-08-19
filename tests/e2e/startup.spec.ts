@@ -156,11 +156,12 @@ test("title artwork dissolves in over its background before the menu appears", a
 /**
  * The host right button is the second mapping of the one native cancel flag, so
  * it has to back out of both sub-menus and never raise the browser context menu.
- * `REMAKE-114` then restores the native audio rule the loop in `REMAKE-112` had
- * papered over: MUSIC/1 plays once, and the difficulty cancel takes the same RIX
- * stop as the confirm, so the title menu stays silent for the rest of the visit.
+ * `REMAKE-114` dropped the MUSIC/1 loop `REMAKE-112` had inferred and
+ * `REMAKE-115` keeps that single play running through a cancel: the native RIX
+ * stop on cancel would cut the track off mid-bar for a move that never leaves
+ * the title, and the play must not restart from the top either.
  */
-test("right click cancels the startup sub-menus and takes the native MUSIC/1 stop", async ({ page }) => {
+test("right click cancels the startup sub-menus without restarting or cutting MUSIC/1", async ({ page }) => {
   await page.goto("/?test=1");
   await skipOpeningToTitle(page);
   const startup = page.getByTestId("startup-screen");
@@ -175,17 +176,17 @@ test("right click cancels the startup sub-menus and takes the native MUSIC/1 sto
   await expect(startup).toHaveAttribute("data-startup-phase", "title");
   await expect(page.getByTestId("difficulty-menu")).toBeHidden();
   await expect(page.getByTestId("title-menu")).toBeVisible();
-  await expect(startup).toHaveAttribute("data-title-music-playing", "false");
+  // A stopped transport shows the cut; a second play shows a restart from the top.
+  await expect(startup).toHaveAttribute("data-title-music-playing", "true");
   await expect(startup).toHaveAttribute("data-title-music-play-count", "1");
 
-  // Neither the record menu nor any later input may resurrect the stopped track.
   await page.getByTestId("continue-game").click();
   await expect(page.getByTestId("title-record-menu")).toBeVisible();
   await startup.click({ button: "right" });
   await expect(startup).toHaveAttribute("data-startup-phase", "title");
   await expect(page.getByTestId("title-record-menu")).toBeHidden();
   await expect(page.getByTestId("title-menu")).toBeVisible();
-  await expect(startup).toHaveAttribute("data-title-music-playing", "false");
+  await expect(startup).toHaveAttribute("data-title-music-playing", "true");
   await expect(startup).toHaveAttribute("data-title-music-play-count", "1");
 });
 
