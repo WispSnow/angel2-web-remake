@@ -43,6 +43,8 @@ const CODE_SIGNATURES = [
   ["0000:1A91", 0x1a91, 0x1aee, "title-option-label-render", "2172b3ca8aa9d084163acf12b78337069035c1cc5b463a6a71f333fd5ef6e874"],
   ["0000:1B7E", 0x1b7e, 0x1bd3, "difficulty-menu-init", "54081fcefbfd5d1d8f9a5170060a91894fed4a1800882d446c31d7fc57b674ca"],
   ["0000:1C23", 0x1c23, 0x1c80, "difficulty-label-render", "daf68e672a82602aea4af9b257c2f6c0c241ca394d183aea94a1749a80eca3d0"],
+  ["0000:2CCE", 0x2cce, 0x2da4, "glyph-string-draw-with-outline", "a5d7b28f94b3d8169accc7173af67a7d080fa796999829ad8551860a7c3c3687"],
+  ["0000:2F96", 0x2f96, 0x2fcd, "outline-mask-vertical-dilation", "351ce49ed0abb464413edc97b1ea855b0b470bf7920812d3f194e2b1ccee46f1"],
   ["0000:31B4", 0x31b4, 0x31e0, "64-step-fade-in-and-63-step-fade-out", "f154922106e0fd2c380bb56412e816313bc92ae08796e4e4cd320ef6dbe235e5"],
   ["0000:31E0", 0x31e0, 0x3220, "16-color-dac-step", "175b5415d5158f7e696626b3c68b0e66dbc6ab4b1cd2d7663d5589482e76aaaf"],
 ];
@@ -253,6 +255,64 @@ async function render(module23Path, decodedRoot, renderRoot) {
   await writeFile(path.join(renderRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`rendered ${manifest.renderedImages} palette-correct title images from ${manifest.renderedRecords} records`);
   return manifest;
+}
+
+/**
+ * `0000:2CCE` never draws a glyph once. Per character it blits a vertically
+ * dilated copy of the cell twice in colour DS:5192 — at `(x, y)` and `(x+2, y)`
+ * — and only then the cell itself in colour DS:5190 at `(x+1, y+1)`, so every
+ * module-23 string carries a one-pixel outline and sits one pixel down and right
+ * of the requested cursor. `0000:2F96` builds that mask by OR-ing the 15 glyph
+ * rows into a cleared 17-row buffer at row offsets 0, 1 and 2; the descriptors at
+ * DS:5114 and DS:513A record the two shapes as 2 bytes x 15 and 2 bytes x 17.
+ *
+ * Both colours are static data, and index 0 is black while index 15 is white in
+ * every palette the module ships — which is why the outline is invisible on the
+ * intro's black band and is exactly what keeps a highlighted menu label readable
+ * over the 50% stipple the highlight bar paints under it.
+ */
+function parseGlyphTextDraw(module23) {
+  const word = (offset) => module23.readUInt16LE(MODULE23_DATA_BASE + offset);
+  const shape = (offset, label) => ({
+    descriptor: `DS:${offset.toString(16).toUpperCase().padStart(4, "0")}`,
+    role: label,
+    widthBytes: word(offset),
+    rows: word(offset + 2),
+  });
+  const glyph = shape(0x5114, "the A/24 cell as decoded");
+  const outline = shape(0x513a, "the same cell OR-ed into a 17-row buffer at rows 0, 1 and 2");
+  const colorIndex = word(0x5190);
+  const outlineColorIndex = word(0x5192);
+  assert(glyph.widthBytes === 2 && glyph.rows === 15, "module 23 glyph descriptor changed");
+  assert(outline.widthBytes === 2 && outline.rows === 17, "module 23 outline descriptor changed");
+  assert(colorIndex === 15, "module 23 text colour changed");
+  assert(outlineColorIndex === 0, "module 23 text outline colour changed");
+  const offsets = [...new Set(RENDER_SPECS.map((spec) => spec.paletteOffset))];
+  for (const offset of offsets) {
+    const palette = dacPalette(moduleData(module23, offset, 48));
+    for (const index of [colorIndex, outlineColorIndex]) {
+      assert(
+        palette[index].join(",") === (index === 0 ? "0,0,0" : "255,255,255"),
+        `palette DS:${offset.toString(16)} entry ${index} is not the expected text colour`,
+      );
+    }
+  }
+  return {
+    entry: "0000:2CCE",
+    outlineBuilder: "0000:2F96",
+    blit: "0000:2B16",
+    colorIndex,
+    outlineColorIndex,
+    glyph,
+    outline,
+    outlineDilationRowOffsets: [0, 1, 2],
+    passes: [
+      { shape: "outline", dx: 0, dy: 0, colorIndex: outlineColorIndex },
+      { shape: "outline", dx: 2, dy: 0, colorIndex: outlineColorIndex },
+      { shape: "glyph", dx: 1, dy: 1, colorIndex },
+    ],
+    paletteOffsetsChecked: offsets.map((offset) => `DS:${offset.toString(16).toUpperCase().padStart(4, "0")}`),
+  };
 }
 
 /**
@@ -516,6 +576,7 @@ async function extract(module23Path, audioManifestPath, decodedRoot, renderRoot,
       },
     },
     dissolve: parseDissolvePatterns(module23),
+    glyphText: parseGlyphTextDraw(module23),
     titleMenuLabels: {
       textX: 520,
       rowPitch: 24,

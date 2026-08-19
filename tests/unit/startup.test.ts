@@ -11,6 +11,7 @@ import {
   STARTUP_MENU_LABELS,
   STARTUP_PRETITLE,
   STARTUP_SCREEN,
+  STARTUP_TEXT,
   STARTUP_TITLE,
 } from "../../src/game/content/startup.generated";
 import { DIFFICULTY_OPTIONS, difficultyHintFor } from "../../src/game/content/startup";
@@ -82,25 +83,59 @@ describe("module 23 startup presentation", () => {
     expect(draw.upperMask).toMatchObject({ y: 257, height: 16, colorIndex: 0 });
     expect(draw.lowerMask).toMatchObject({ y: 317, height: 16, colorIndex: 0 });
     expect(INTRO_BAND.bottom - INTRO_BAND.top).toBe(draw.visibleWindow.height);
-    // REMAKE-113 slides the whole band down, so the ramp is measured off the
-    // runtime window with every native row Y carried by the same offset.
-    const row = (nativeY: number) => clipStartupGlyphRow(nativeY + INTRO_BAND_OFFSET, INTRO_BAND);
+    // REMAKE-113 slides the whole band down and 0000:2CCE puts the white cell one
+    // row below the cursor, so the visible ramp is measured off that pass.
+    const ramp = STARTUP_FONT.glyphHeight;
+    const white = (nativeY: number) => clipStartupGlyphRow(
+      nativeY + INTRO_BAND_OFFSET + STARTUP_TEXT.glyphOffset.dy, INTRO_BAND);
     // The reset row and the update after the last visible one stay fully masked.
-    expect(row(STARTUP_INTRO.resetY)).toBeUndefined();
-    expect(row(STARTUP_INTRO.visibleTopY - 1)).toBeUndefined();
-    expect(row(STARTUP_INTRO.visibleBottomY))
+    expect(white(STARTUP_INTRO.resetY)).toBeUndefined();
+    expect(white(STARTUP_INTRO.visibleTopY - 1)).toBeUndefined();
+    // The first row the lower bar lets through shows a single scanline, and the
+    // last one before the upper bar swallows it shows a single scanline too.
+    expect(white(STARTUP_INTRO.visibleBottomY - 1))
       .toEqual({ sourceY: 0, y: INTRO_BAND.bottom - 1, height: 1 });
-    expect(row(STARTUP_INTRO.visibleTopY + 1))
-      .toEqual({ sourceY: STARTUP_FONT.glyphHeight - 1, y: INTRO_BAND.top, height: 1 });
+    expect(white(STARTUP_INTRO.visibleTopY))
+      .toEqual({ sourceY: ramp - 1, y: INTRO_BAND.top, height: 1 });
     const run = STARTUP_INTRO.visibleBottomY - STARTUP_INTRO.visibleTopY + 1;
     const heights = Array.from({ length: run }, (_, index) =>
-      row(STARTUP_INTRO.visibleBottomY - index)?.height ?? 0);
-    const ramp = STARTUP_FONT.glyphHeight;
-    expect(heights.slice(0, ramp)).toEqual(Array.from({ length: ramp }, (_, index) => index + 1));
-    expect(heights.slice(ramp - 1, run - ramp)).toEqual(new Array(run - 2 * ramp + 1).fill(ramp));
-    expect(heights.slice(run - ramp)).toEqual(Array.from({ length: ramp }, (_, index) => ramp - 1 - index));
-    // Every row still spends its whole 316..258 run inside the cleared band.
-    expect(heights.filter((height) => height > 0)).toHaveLength(run - 1);
+      white(STARTUP_INTRO.visibleBottomY - index)?.height ?? 0);
+    expect(Math.max(...heights)).toBe(ramp);
+    expect(heights[0]).toBe(0);
+    expect(heights[1]).toBe(1);
+    expect(heights.at(-1)).toBe(1);
+    for (let index = 1; index < heights.length; index += 1) {
+      expect(Math.abs(heights[index] - heights[index - 1])).toBeLessThanOrEqual(1);
+    }
+    // Fully readable for exactly the updates that fit inside the window.
+    const window = INTRO_BAND.bottom - INTRO_BAND.top;
+    expect(heights.filter((height) => height === ramp)).toHaveLength(window - ramp + 1);
+  });
+
+  /**
+   * 0000:2CCE never draws a cell once: `0000:2F96` OR-s the 15 glyph rows into a
+   * 17-row buffer at offsets 0, 1 and 2, that mask goes down twice in colour 0 at
+   * (x, y) and (x+2, y), and only then the cell itself in colour 15 at
+   * (x+1, y+1). The outline is invisible on the intro's black band but is what
+   * keeps a highlighted menu label readable over the stipple painted under it.
+   */
+  it("carries the native outline pass on every drawn string", () => {
+    const draw = titlePresentations.glyphText;
+    expect(draw.colorIndex).toBe(15);
+    expect(draw.outlineColorIndex).toBe(0);
+    expect(draw.glyph).toMatchObject({ widthBytes: 2, rows: STARTUP_FONT.glyphHeight });
+    expect(draw.outline).toMatchObject({ widthBytes: 2, rows: STARTUP_FONT.glyphHeight + 2 });
+    expect(STARTUP_TEXT.outlineRows).toBe(draw.outline.rows);
+    expect(STARTUP_TEXT.dilationRowOffsets).toEqual(draw.outlineDilationRowOffsets);
+    expect(STARTUP_TEXT.outlinePasses).toEqual([{ dx: 0, dy: 0 }, { dx: 2, dy: 0 }]);
+    expect(STARTUP_TEXT.glyphOffset).toEqual({ dx: 1, dy: 1 });
+    expect(STARTUP_TEXT.color).toBe("#ffffff");
+    expect(STARTUP_TEXT.outlineColor).toBe("#000000");
+    // The mask reaches one row above and one below the cell it wraps.
+    expect(STARTUP_TEXT.dilationRowOffsets.length - 1).toBe(2 * STARTUP_TEXT.glyphOffset.dy);
+    // 0000:1AB1 lifts the highlight bar two rows above the cursor, which leaves
+    // the outlined cell centred in the 20-row stipple.
+    expect(STARTUP_MENU_LABELS.highlight.yOffset).toBe(-2);
   });
 
   /**

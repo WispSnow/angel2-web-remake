@@ -285,6 +285,26 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await expect.poll(() => page.getByTestId("title-screen").locator("img:not([hidden])").evaluateAll((images) =>
     images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
   )).toBe(true);
+  // 0000:1ABF paints the 50% stipple under the selected label and 0000:2CCE then
+  // outlines the cell in colour 0, so the leftmost white pixel of the highlighted
+  // row always has black — never stipple or artwork — immediately to its left.
+  const highlightedRow = await page.evaluate(([left, top, width, height]) => {
+    const canvas = document.querySelector("#startup-canvas") as HTMLCanvasElement;
+    const { data } = canvas.getContext("2d")!.getImageData(left, top, width, height);
+    const at = (x: number, y: number) => {
+      const offset = (y * width + x) * 4;
+      return [data[offset], data[offset + 1], data[offset + 2]];
+    };
+    for (let x = 1; x < width; x += 1) {
+      for (let y = 0; y < height; y += 1) {
+        const [red, green, blue] = at(x, y);
+        if (red > 200 && green > 200 && blue > 200) return { found: true, left: at(x - 1, y) };
+      }
+    }
+    return { found: false, left: [] as number[] };
+  }, [500, 71, 104, 24]);
+  expect(highlightedRow.found).toBe(true);
+  expect(highlightedRow.left).toEqual([0, 0, 0]);
   await captureVisualAudit(startup, { path: "artifacts/playwright/startup-title-menu.png" });
 
   await page.keyboard.press("Enter");

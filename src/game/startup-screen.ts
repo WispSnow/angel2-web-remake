@@ -1,6 +1,7 @@
 import {
   STARTUP_DISSOLVE_PATTERNS,
   STARTUP_FONT,
+  STARTUP_TEXT,
 } from "./content/startup.generated";
 
 /**
@@ -136,27 +137,68 @@ export interface StartupGlyphBand {
 }
 
 /**
- * The slice of a glyph row at `y` that survives `band`, or `undefined` when the
- * whole row is masked. The scrolling intro needs this because 0000:11DA paints
- * two colour-0 bars over the ends of the text band after drawing the rows: a row
- * entering at Y=316 shows only its top scanline, gains one more per scroll
- * update until it clears the lower bar, and slides back under the upper bar the
- * same way, so lines are uncovered and covered a scanline at a time.
+ * The slice of a `rows`-tall row at `y` that survives `band`, or `undefined`
+ * when it is masked away completely. The scrolling intro needs this because
+ * 0000:11DA paints two colour-0 bars over the ends of the text band after
+ * drawing the rows: a row entering at the bottom shows only its top scanline,
+ * gains one more per scroll update until it clears the lower bar, and slides
+ * back under the upper bar the same way.
  */
 export function clipStartupGlyphRow(
   y: number,
   band: StartupGlyphBand,
+  rows: number = STARTUP_FONT.glyphHeight,
 ): { sourceY: number; y: number; height: number } | undefined {
   const top = Math.max(y, band.top);
-  const bottom = Math.min(y + STARTUP_FONT.glyphHeight, band.bottom);
+  const bottom = Math.min(y + rows, band.bottom);
   if (bottom <= top) return undefined;
   return { sourceY: top - y, y: top, height: bottom - top };
 }
 
 /**
- * Draws a generated `[glyphIndex, x, ...]` pair list at `y`, keeping only the
- * scanlines inside `band` when one is given. Module 23 uses palette index 15,
- * which is pure white in every startup palette.
+ * The black outline 0000:2F96 builds per glyph: the cell OR-ed into a cleared
+ * 17-row buffer at row offsets 0, 1 and 2. Cached per font image, laid out on
+ * the same column grid as the white atlas but with the taller row pitch.
+ */
+let outlineAtlas: { source: HTMLImageElement; canvas: HTMLCanvasElement } | undefined;
+
+function outlineAtlasFor(font: HTMLImageElement): HTMLCanvasElement {
+  if (outlineAtlas?.source === font) return outlineAtlas.canvas;
+  const { glyphWidth, glyphHeight, columns, glyphCount } = STARTUP_FONT;
+  const { outlineRows, dilationRowOffsets, outlineColor } = STARTUP_TEXT;
+  const canvas = document.createElement("canvas");
+  canvas.width = columns * glyphWidth;
+  canvas.height = Math.ceil(glyphCount / columns) * outlineRows;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("startup text outline needs a 2D context");
+  context.imageSmoothingEnabled = false;
+  for (let glyph = 0; glyph < glyphCount; glyph += 1) {
+    const sourceX = (glyph % columns) * glyphWidth;
+    const sourceY = Math.floor(glyph / columns) * glyphHeight;
+    const targetY = Math.floor(glyph / columns) * outlineRows;
+    for (const offset of dilationRowOffsets) {
+      context.drawImage(
+        font, sourceX, sourceY, glyphWidth, glyphHeight,
+        sourceX, targetY + offset, glyphWidth, glyphHeight,
+      );
+    }
+  }
+  // The atlas is white on transparent; recolour the union in one pass.
+  context.globalCompositeOperation = "source-in";
+  context.fillStyle = outlineColor;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  outlineAtlas = { source: font, canvas };
+  return canvas;
+}
+
+/**
+ * Draws a generated `[glyphIndex, x, ...]` pair list for a cursor at `y`,
+ * keeping only the scanlines inside `band` when one is given.
+ *
+ * 0000:2CCE draws each character three times: the dilated outline in colour 0 at
+ * `(x, y)` and `(x+2, y)`, then the cell itself in colour 15 at `(x+1, y+1)`. On
+ * the intro's black band the outline is invisible, but it is the whole reason a
+ * highlighted menu label stays readable over the 50% stipple drawn under it.
  */
 export function drawStartupGlyphs(
   context: CanvasRenderingContext2D,
@@ -166,20 +208,33 @@ export function drawStartupGlyphs(
   band?: StartupGlyphBand,
 ): void {
   const { glyphWidth, glyphHeight, columns } = STARTUP_FONT;
-  const slice = band ? clipStartupGlyphRow(y, band) : { sourceY: 0, y, height: glyphHeight };
-  if (!slice) return;
-  for (let index = 0; index < glyphs.length; index += 2) {
-    const glyph = glyphs[index];
-    context.drawImage(
-      font,
-      (glyph % columns) * glyphWidth,
-      Math.floor(glyph / columns) * glyphHeight + slice.sourceY,
-      glyphWidth,
-      slice.height,
-      glyphs[index + 1],
-      slice.y,
-      glyphWidth,
-      slice.height,
-    );
-  }
+  const { outlineRows, outlinePasses, glyphOffset } = STARTUP_TEXT;
+  const outline = outlineAtlasFor(font);
+  const blit = (
+    atlas: CanvasImageSource,
+    rows: number,
+    dx: number,
+    dy: number,
+  ) => {
+    const slice = band
+      ? clipStartupGlyphRow(y + dy, band, rows)
+      : { sourceY: 0, y: y + dy, height: rows };
+    if (!slice) return;
+    for (let index = 0; index < glyphs.length; index += 2) {
+      const glyph = glyphs[index];
+      context.drawImage(
+        atlas,
+        (glyph % columns) * glyphWidth,
+        Math.floor(glyph / columns) * rows + slice.sourceY,
+        glyphWidth,
+        slice.height,
+        glyphs[index + 1] + dx,
+        slice.y,
+        glyphWidth,
+        slice.height,
+      );
+    }
+  };
+  for (const pass of outlinePasses) blit(outline, outlineRows, pass.dx, pass.dy);
+  blit(font, glyphHeight, glyphOffset.dx, glyphOffset.dy);
 }

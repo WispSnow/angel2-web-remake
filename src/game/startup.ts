@@ -8,6 +8,7 @@ import {
   STARTUP_MENU_LABELS,
   STARTUP_PRETITLE,
   STARTUP_SCREEN,
+  STARTUP_TEXT,
   STARTUP_TITLE,
 } from "./content/startup.generated";
 import {
@@ -762,7 +763,10 @@ export function mountStartup(
     // A row exists for its whole 316..258 run, but the masks decide how much of
     // it is on screen, so the paragraph mirror follows the visible slice.
     const y = nativeY + INTRO_BAND_OFFSET;
-    return { assignment, y, slice: clipStartupGlyphRow(y, INTRO_BAND) };
+    // 0000:2CCE puts the white cell one row below the cursor, so the paragraph
+    // mirror follows that pass rather than the black outline around it.
+    const slice = clipStartupGlyphRow(y + STARTUP_TEXT.glyphOffset.dy, INTRO_BAND);
+    return { assignment, y, slice };
   };
 
   const clearScreen = () => {
