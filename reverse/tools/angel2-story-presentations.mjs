@@ -301,6 +301,43 @@ function blit(target, source, x0, y0) {
   }
 }
 
+// The expansion loop is not a plain accumulation of blits. Module 25 `0000:1032` first
+// restores both moving edges from the saved background band (`DS:03FD`/`DS:041D`,
+// 56x100 latch copies, scratch y=200 -> compose y=0) and only afterwards draws the four
+// tile columns; the step then publishes just those two strips to the visible page
+// (`DS:040D`/`DS:042D`, compose y=0 -> screen y=2). Replaying the blits without the
+// restore leaves every step's corner cap behind and smears 11 caps per side across the
+// window top. `0000:1B50` copies whole bytes, so each strip snaps to an 8 px grid.
+const WINDOW_PAGE = Object.freeze({ width: 640, height: 100, byteGranularity: 8 });
+const WINDOW_EDGE_STRIP = Object.freeze({
+  width: 56,
+  leftOffsetFromLeftOuter: -17,
+  rightOffsetFromRightInner: 7,
+});
+
+function byteAlignedSpan(x, width, limit) {
+  const granularity = WINDOW_PAGE.byteGranularity;
+  const start = Math.max(0, Math.floor(x / granularity) * granularity);
+  const end = Math.min(limit, (Math.floor((x + width - 1) / granularity) + 1) * granularity);
+  return [start, end];
+}
+
+// The saved band holds the scene without the window, so restoring it clears the overlay.
+function clearWindowStrip(page, x, width) {
+  const [start, end] = byteAlignedSpan(x, width, page.width);
+  for (let y = 0; y < page.height; y++) {
+    page.pixels.fill(0, (y * page.width + start) * 4, (y * page.width + end) * 4);
+  }
+}
+
+function copyWindowStrip(target, source, x, width) {
+  const [start, end] = byteAlignedSpan(x, width, source.width);
+  for (let y = 0; y < source.height; y++) {
+    const row = y * source.width;
+    source.pixels.copy(target.pixels, (row + start) * 4, (row + start) * 4, (row + end) * 4);
+  }
+}
+
 function composeDialogueTextWindow(windowGraphics) {
   const frames = new Map(windowGraphics.map((frame) => [frame.imageIndex, frame]));
   const frame = (imageIndex) => {
@@ -308,32 +345,44 @@ function composeDialogueTextWindow(windowGraphics) {
     assert(value, `missing A/18 frame ${imageIndex} for dialogue-window composition`);
     return value;
   };
-  const target = rgba(400, 86, [0, 0, 0, 0]);
+  const compose = rgba(WINDOW_PAGE.width, WINDOW_PAGE.height, [0, 0, 0, 0]);
+  const visible = rgba(WINDOW_PAGE.width, WINDOW_PAGE.height, [0, 0, 0, 0]);
   const originX = 153;
   let leftOuter = 313;
   let leftInner = 337;
   let rightInner = 345;
   let rightOuter = 361;
   for (let iteration = 0; iteration < 11; iteration++) {
-    blit(target, frame(3), leftOuter - originX, 0);
-    blit(target, frame(6), leftInner - originX, 0);
-    blit(target, frame(6), rightInner - originX, 0);
-    blit(target, frame(9), rightOuter - originX, 0);
+    const leftStripX = leftOuter + WINDOW_EDGE_STRIP.leftOffsetFromLeftOuter;
+    const rightStripX = rightInner + WINDOW_EDGE_STRIP.rightOffsetFromRightInner;
+    clearWindowStrip(compose, leftStripX, WINDOW_EDGE_STRIP.width);
+    clearWindowStrip(compose, rightStripX, WINDOW_EDGE_STRIP.width);
+    blit(compose, frame(3), leftOuter, 0);
+    blit(compose, frame(6), leftInner, 0);
+    blit(compose, frame(6), rightInner, 0);
+    blit(compose, frame(9), rightOuter, 0);
     for (let row = 0; row < 3; row++) {
       const y = 24 + row * 16;
-      blit(target, frame(4), leftOuter - originX, y);
-      blit(target, frame(7), leftInner - originX, y);
-      blit(target, frame(7), rightInner - originX, y);
-      blit(target, frame(10), rightOuter - originX, y);
+      blit(compose, frame(4), leftOuter, y);
+      blit(compose, frame(7), leftInner, y);
+      blit(compose, frame(7), rightInner, y);
+      blit(compose, frame(10), rightOuter, y);
     }
-    blit(target, frame(5), leftOuter - originX, 72);
-    blit(target, frame(8), leftInner - originX, 72);
-    blit(target, frame(8), rightInner - originX, 72);
-    blit(target, frame(11), rightOuter - originX, 72);
+    blit(compose, frame(5), leftOuter, 72);
+    blit(compose, frame(8), leftInner, 72);
+    blit(compose, frame(8), rightInner, 72);
+    blit(compose, frame(11), rightOuter, 72);
+    copyWindowStrip(visible, compose, leftStripX, WINDOW_EDGE_STRIP.width);
+    copyWindowStrip(visible, compose, rightStripX, WINDOW_EDGE_STRIP.width);
     leftOuter -= 16;
     leftInner -= 16;
     rightInner += 16;
     rightOuter += 16;
+  }
+  const target = rgba(400, 86, [0, 0, 0, 0]);
+  for (let y = 0; y < target.height; y++) {
+    const source = (y * visible.width + originX) * 4;
+    visible.pixels.copy(target.pixels, y * target.width * 4, source, source + target.width * 4);
   }
   return target;
 }
@@ -431,6 +480,15 @@ async function render(module25Path, decodedRoot, dialogueDirectory, renderRoot) 
         finalDrawBounds: [153, 0, 553, 86],
         middleRowsY: [24, 40, 56],
         bottomY: 72,
+        edgeStrips: {
+          width: WINDOW_EDGE_STRIP.width,
+          height: WINDOW_PAGE.height,
+          byteGranularity: WINDOW_PAGE.byteGranularity,
+          leftOffsetFromLeftOuter: WINDOW_EDGE_STRIP.leftOffsetFromLeftOuter,
+          rightOffsetFromRightInner: WINDOW_EDGE_STRIP.rightOffsetFromRightInner,
+          backgroundRestore: { descriptors: ["DS:03FD", "DS:041D"], sourceY: 200, targetY: 0 },
+          visiblePublish: { descriptors: ["DS:040D", "DS:042D"], sourceY: 0, targetY: 2 },
+        },
       },
     },
     contactSheets: sheets,
@@ -642,6 +700,15 @@ function dialogueTextWindowContract(renderManifest) {
     finalDrawBounds: [153, 0, 553, 86],
     middleRowsY: [24, 40, 56],
     bottomY: 72,
+    edgeStrips: {
+      width: 56,
+      height: 100,
+      byteGranularity: 8,
+      leftOffsetFromLeftOuter: -17,
+      rightOffsetFromRightInner: 7,
+      backgroundRestore: { descriptors: ["DS:03FD", "DS:041D"], sourceY: 200, targetY: 0 },
+      visiblePublish: { descriptors: ["DS:040D", "DS:042D"], sourceY: 0, targetY: 2 },
+    },
   });
   return {
     resource: "A/18",
