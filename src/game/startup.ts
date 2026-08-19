@@ -228,13 +228,13 @@ export function mountStartup(
   titleAudio.volume = 0.32;
   titleAudio.preload = "auto";
   /**
-   * [H] The evidence records only explicit MUSIC/1 stops — the idle replay, the
-   * difficulty confirm and the difficulty cancel — while MUSIC/14 separately gets
-   * "stop on natural completion or any skip input". The native RIX driver is read
-   * as repeating MUSIC/1 until one of those stops, so the 13.37 s decode loops
-   * rather than leaving the title silent. Needs a playtest against the original.
+   * [OF] `REMAKE-114` withdrew the loop `REMAKE-112` had inferred: MUSIC/1 plays
+   * once through its 13.37 s decode and the title screen then stays silent until
+   * the idle replay swaps in MUSIC/14. The three explicit stops the evidence
+   * records — idle replay, difficulty confirm, difficulty cancel — only ever cut
+   * that single play short.
    */
-  titleAudio.loop = true;
+  titleAudio.loop = false;
 
   const play = (audio: HTMLAudioElement) => {
     void audio.play().catch(() => undefined);
@@ -272,6 +272,16 @@ export function mountStartup(
     play(titleAudio);
     updateTitleMusicDebugState();
   };
+  /**
+   * A blocked autoplay is the only thing worth retrying. Once the single native
+   * play has run out there is nothing to resume, so the natural end has to close
+   * the retry window as firmly as an explicit stop — otherwise the next click
+   * would start MUSIC/1 over and rebuild the loop `REMAKE-114` removed.
+   */
+  titleAudio.addEventListener("ended", () => {
+    titleMusicStopped = true;
+    updateTitleMusicDebugState();
+  });
 
   const recordDescription = (result: SaveSlotReadResult, slot: number): string => {
     if (result.kind === "empty") return `記錄 ${slot}：此處沒有記錄。`;
@@ -579,10 +589,11 @@ export function mountStartup(
     }
     if (screen.dataset.startupPhase === "title-assemble") return;
     if (phase === "difficulty") {
-      // [DD] The native `menus/difficulty/audioRule` issues the RIX stop on cancel
-      // as well as on confirm, which leaves the title menu silent for the rest of
-      // the visit. The remake keeps MUSIC/1 running through a cancel; only the
-      // confirm that actually leaves the startup flow stops it.
+      // [OF] The native `menus/difficulty/audioRule` issues the RIX stop on cancel
+      // as well as on confirm, so returning to the title menu leaves it silent for
+      // the rest of the visit. `REMAKE-114` restored that; only the idle replay
+      // brings music back, and it brings back MUSIC/14.
+      stopTitleMusic();
       showTitleMenu();
       return;
     }

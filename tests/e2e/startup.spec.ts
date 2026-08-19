@@ -156,16 +156,17 @@ test("title artwork dissolves in over its background before the menu appears", a
 /**
  * The host right button is the second mapping of the one native cancel flag, so
  * it has to back out of both sub-menus and never raise the browser context menu.
- * `REMAKE-112` then keeps MUSIC/1 running across that cancel instead of taking
- * the native RIX stop, and the track loops for as long as the title is up.
+ * `REMAKE-114` then restores the native audio rule the loop in `REMAKE-112` had
+ * papered over: MUSIC/1 plays once, and the difficulty cancel takes the same RIX
+ * stop as the confirm, so the title menu stays silent for the rest of the visit.
  */
-test("right click cancels the startup sub-menus without interrupting MUSIC/1", async ({ page }) => {
+test("right click cancels the startup sub-menus and takes the native MUSIC/1 stop", async ({ page }) => {
   await page.goto("/?test=1");
   await skipOpeningToTitle(page);
   const startup = page.getByTestId("startup-screen");
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await expect(startup).toHaveAttribute("data-title-music-playing", "true");
-  await expect(startup).toHaveAttribute("data-title-music-loop", "true");
+  await expect(startup).toHaveAttribute("data-title-music-loop", "false");
   await expect(startup).toHaveAttribute("data-title-music-play-count", "1");
 
   await page.getByTestId("new-game").click();
@@ -174,18 +175,17 @@ test("right click cancels the startup sub-menus without interrupting MUSIC/1", a
   await expect(startup).toHaveAttribute("data-startup-phase", "title");
   await expect(page.getByTestId("difficulty-menu")).toBeHidden();
   await expect(page.getByTestId("title-menu")).toBeVisible();
-  // The pre-REMAKE-112 cancel stopped MUSIC/1 here, and the next input restarted
-  // it from the top; both show up as a stopped transport or a second play.
-  await expect(startup).toHaveAttribute("data-title-music-playing", "true");
+  await expect(startup).toHaveAttribute("data-title-music-playing", "false");
   await expect(startup).toHaveAttribute("data-title-music-play-count", "1");
 
+  // Neither the record menu nor any later input may resurrect the stopped track.
   await page.getByTestId("continue-game").click();
   await expect(page.getByTestId("title-record-menu")).toBeVisible();
   await startup.click({ button: "right" });
   await expect(startup).toHaveAttribute("data-startup-phase", "title");
   await expect(page.getByTestId("title-record-menu")).toBeHidden();
   await expect(page.getByTestId("title-menu")).toBeVisible();
-  await expect(startup).toHaveAttribute("data-title-music-playing", "true");
+  await expect(startup).toHaveAttribute("data-title-music-playing", "false");
   await expect(startup).toHaveAttribute("data-title-music-play-count", "1");
 });
 
