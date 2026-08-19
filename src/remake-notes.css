@@ -150,6 +150,7 @@
 }
 .rn-note dd { margin: 0; max-width: 82ch; color: #ddcdae; font-size: 13px; }
 
+.rn-body strong { color: #f6e8c6; font-weight: 700; }
 .rn-body code {
   padding: 0 4px;
   border-radius: 2px;
