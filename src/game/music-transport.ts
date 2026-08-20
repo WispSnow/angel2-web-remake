@@ -49,10 +49,6 @@ const PROGRAM_CROSSFADE_SECONDS = 0.005;
 const VOLUME_RAMP_SECONDS = 0.015;
 const DECODER_SEAM_CROSSFADE_SECONDS = 256 / 44_100;
 
-const programUrls = (program: MusicProgram): string[] => program.kind === "loop"
-  ? [program.source, program.seamlessLoop]
-  : [program.entry, program.seamlessLoop];
-
 export class MusicTransport {
   private context?: AudioContext;
   private masterGain?: GainNode;
@@ -78,12 +74,6 @@ export class MusicTransport {
     private readonly onStateChange: (state: MusicTransportState) => void,
   ) {
     this.gain = initialGain;
-  }
-
-  preload(programs: readonly MusicProgram[]): void {
-    for (const program of programs) {
-      for (const url of programUrls(program)) this.preloadUrl(url);
-    }
   }
 
   select(program: MusicProgram | undefined, restart = false): void {

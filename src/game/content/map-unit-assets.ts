@@ -1,4 +1,5 @@
 import type { UnitClassId } from "../types";
+import { promotionTargetsFor } from "./classes";
 
 /**
  * Shared player-side map figures currently reachable in the released campaign
@@ -46,6 +47,28 @@ export const ALLY_MAP_UNIT_ASSETS = {
 
 export function allyMapUnitAsset(classId: UnitClassId): string | undefined {
   return ALLY_MAP_UNIT_ASSETS[classId as keyof typeof ALLY_MAP_UNIT_ASSETS];
+}
+
+/**
+ * Phaser only needs figures already present on the board plus the immediate
+ * promotion choices that can replace one of them during this stage. Later
+ * promotion tiers and unrelated campaign classes stay out of the texture
+ * manager until a stage actually needs them.
+ */
+export function allyMapUnitAssetsForClasses(
+  classIds: Iterable<UnitClassId>,
+): ReadonlyMap<UnitClassId, string> {
+  const required = new Set<UnitClassId>();
+  for (const classId of classIds) {
+    required.add(classId);
+    for (const target of promotionTargetsFor(classId)) required.add(target.id);
+  }
+  const assets = new Map<UnitClassId, string>();
+  for (const classId of required) {
+    const source = allyMapUnitAsset(classId);
+    if (source) assets.set(classId, source);
+  }
+  return assets;
 }
 
 /**

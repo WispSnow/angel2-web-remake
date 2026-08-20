@@ -129,10 +129,14 @@ import {
   stageRuntimeSourceForDestination,
   type LoadedStageRuntime,
 } from "./stage-runtime";
-import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, Position, SaveData, StageId, UnitStats } from "./types";
+import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, Position, SaveData, StageId, UnitClassId, UnitStats } from "./types";
 
 type Listener = () => void;
 type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
+export type StageAssetGate = (
+  stageId: StageId,
+  allyClassIds: readonly UnitClassId[],
+) => Promise<void>;
 
 // The native walk sound is per movement, not per step, and every reason has to
 // keep the "movement" substring so it routes to the 移動 category switch.
@@ -528,7 +532,10 @@ export class GameController {
   private readonly mapCombatRealTime = import.meta.env.MODE !== "release"
     && new URLSearchParams(location.search).has("slowMap");
 
-  constructor(difficulty: Difficulty = 0) {
+  constructor(
+    difficulty: Difficulty = 0,
+    private stageAssetGate?: StageAssetGate,
+  ) {
     this.difficulty = difficulty;
     this.battle = new Stage0Battle(difficulty);
     this.stageEntrySnapshot = cloneCampaignState(this.battle.campaignSnapshot());
@@ -549,8 +556,16 @@ export class GameController {
     this.initializeStageEventProgress();
   }
 
-  static async fromSave(save: SaveData, slot: number): Promise<GameController> {
-    const controller = new GameController(save.difficulty);
+  setStageAssetGate(stageAssetGate: StageAssetGate): void {
+    this.stageAssetGate = stageAssetGate;
+  }
+
+  static async fromSave(
+    save: SaveData,
+    slot: number,
+    stageAssetGate?: StageAssetGate,
+  ): Promise<GameController> {
+    const controller = new GameController(save.difficulty, stageAssetGate);
     await controller.restoreSave(save, `已讀取記錄 ${slot}。`);
     return controller;
   }
@@ -720,12 +735,20 @@ export class GameController {
     };
   }
 
+  private async loadRuntime(
+    stageId: StageId,
+    allyClassIds: readonly UnitClassId[],
+  ): Promise<LoadedStageRuntime> {
+    await this.stageAssetGate?.(stageId, allyClassIds);
+    return loadStageRuntime(stageId);
+  }
+
   async enterStage(
     stageId: StageId,
     campaign: CampaignState = { ...this.battle.campaignSnapshot(), stageId },
     options: StageEntryOptions = {},
   ): Promise<void> {
-    const runtime = await loadStageRuntime(stageId);
+    const runtime = await this.loadRuntime(stageId, campaign.roster.map(({ classId }) => classId));
     this.stageRuntime = runtime;
     this.completedProgressMetadata = undefined;
     this.stage49Ending = undefined;
@@ -4707,7 +4730,10 @@ export class GameController {
       if (!isPlayableStageId(save.stageId)) {
         const source = stageRuntimeSourceForDestination(save.stageId);
         if (source) {
-          const runtime = await loadStageRuntime(source.id);
+          const runtime = await this.loadRuntime(
+            source.id,
+            save.roster.map(({ classId }) => classId),
+          );
           const campaign = {
             stageId: source.id,
             ruleset: save.ruleset,
@@ -4773,7 +4799,10 @@ export class GameController {
       rngState: save.rngState,
       rngCalls: save.rngCalls,
     };
-    const runtime = await loadStageRuntime(save.stageId);
+    const runtime = await this.loadRuntime(
+      save.stageId,
+      save.roster.map(({ classId }) => classId),
+    );
     const battle = runtime.restoreBattle(campaign, save.battle);
     this.stageRuntime = runtime;
     this.completedProgressMetadata = undefined;

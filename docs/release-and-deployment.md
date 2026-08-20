@@ -64,6 +64,21 @@ pnpm build:release
 对应 PNG 与 Phaser JSON Hash 全部存在后，才从玩家包删除已经迁移的零碎 PNG。不要在
 `public/` 或 `release/` 手工拼图、改帧名或先删来源。
 
+分段加载清单必须在所有资源生成器之后生成：
+
+```bash
+pnpm content:resource-manifest
+```
+
+该命令输出 `public/assets/original/resource-manifest.v1.json` 与只含版本／身份／URL 的 TypeScript
+目录。清单按发布清理后的最终路径登记每个资源的 URL、字节、SHA-256 和资源包；不要手工编辑。
+任何被登记的图片、音频、JSON 或字体变化后都必须重跑。`prepare-release.mjs` 会先清掉已迁移的
+零碎来源，再逐项检查清单 URL 存在且字节／哈希与生成时一致；旧清单会让发布构建明确失败。
+
+当前加载策略只使用普通 HTTP 缓存：开场包完成后后台准备第 0 关，关卡切换只强制下一关并
+预取再后两关。没有 Service Worker 或 R2；不要在发布步骤临时加离线缓存，也不要把全战役包
+改成首屏依赖。预取只读取编码响应，不代表图片或音乐已全部解码进内存。
+
 重建后做最小包体检查：
 
 ```bash

@@ -21,6 +21,7 @@ const generators = [
   "generate-music-assets.mjs",
   "generate-stage38-runtime.mjs",
   "generate-credits-runtime.mjs",
+  "generate-resource-manifest.mjs",
 ];
 
 const scriptsDirectory = fileURLToPath(new URL(".", import.meta.url));

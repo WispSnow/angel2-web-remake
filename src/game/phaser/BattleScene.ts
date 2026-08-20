@@ -5,7 +5,7 @@ import {
   actionPresentationAssetCatalog,
   actionPresentationCatalog,
 } from "../content/actions";
-import { ALLY_MAP_UNIT_ASSETS, allyMapUnitAsset } from "../content/map-unit-assets";
+import { allyMapUnitAsset, allyMapUnitAssetsForClasses } from "../content/map-unit-assets";
 import type { GameController } from "../controller";
 import type { BattleUnit, Position } from "../types";
 import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-technique-presentation";
@@ -311,13 +311,21 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         "terrain-obstacle",
         `/assets/original/map-actions/obstacle/${controller.battle.stage.id}.png`,
       );
-      Object.entries(ALLY_MAP_UNIT_ASSETS).forEach(([classId, source]) =>
-        this.load.image(`ally-${classId}`, source));
+      const allyMapAssets = allyMapUnitAssetsForClasses(
+        controller.battle.units
+          .filter(({ side }) => side === 1)
+          .map(({ classId }) => classId),
+      );
+      const scheduledAllyKeys = new Set<string>();
+      for (const [classId, source] of allyMapAssets) {
+        const key = `ally-${classId}`;
+        scheduledAllyKeys.add(key);
+        this.load.image(key, source);
+      }
       this.load.image("enemy-soldier", ASSETS.enemySoldier);
       this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
       Object.entries(stageAssets?.unitSprites ?? {}).forEach(([key, source]) => {
-        const classId = key.startsWith("ally-") ? key.slice("ally-".length) : undefined;
-        if (classId && allyMapUnitAsset(classId as BattleUnit["classId"])) return;
+        if (scheduledAllyKeys.has(key)) return;
         this.load.image(key, source);
       });
       const battleSpriteSources = [

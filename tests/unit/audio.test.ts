@@ -8,7 +8,7 @@ import {
   type SoundEffectChannel,
 } from "../../src/game/audio-settings";
 import {
-  PRELOAD_STAGE_MUSIC_PROGRAMS,
+  STAGE_MUSIC_PROGRAMS,
   musicProgramFor,
 } from "../../src/game/content/music";
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
@@ -78,7 +78,7 @@ describe("independent five-level sound-effect gain", () => {
 
 describe("stage music registry", () => {
   test("resolves stage 0 programs through stable stage-definition IDs", () => {
-    expect(PRELOAD_STAGE_MUSIC_PROGRAMS).toHaveLength(3);
+    expect(Object.values(STAGE_MUSIC_PROGRAMS)).toHaveLength(3);
     expect(musicProgramFor(STAGE0_DEFINITION.music.story)).toMatchObject({
       id: "stage0-story",
       track: "MAGIC/73",

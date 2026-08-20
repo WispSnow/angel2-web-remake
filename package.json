@@ -80,6 +80,7 @@
     "content:map-atlases": "node scripts/generate-map-action-atlases.mjs",
     "content:full-combat-atlases": "node scripts/generate-full-combat-atlases.mjs",
     "content:battle-sprite-atlases": "node scripts/generate-battle-sprite-atlases.mjs",
+    "content:resource-manifest": "node scripts/generate-resource-manifest.mjs",
     "content:terrain-actions": "node scripts/generate-dynamic-terrain-assets.mjs",
     "content:backgrounds": "node scripts/generate-full-combat-backgrounds.mjs",
     "content:ai-dialogue": "node scripts/generate-ai-technique-dialogue.mjs",

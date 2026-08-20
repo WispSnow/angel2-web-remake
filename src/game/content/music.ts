@@ -50,9 +50,6 @@ export function registerStageMusicPrograms(
   }
 }
 
-export const PRELOAD_STAGE_MUSIC_PROGRAMS: readonly MusicProgram[] =
-  Object.values(STAGE_MUSIC_PROGRAMS);
-
 export function musicProgramFor(id?: StageMusicId): MusicProgram | undefined {
   return id ? STAGE_MUSIC_REGISTRY[id] : undefined;
 }

@@ -1,9 +1,6 @@
 import { ASSETS, SPEECH_RECORD_BY_CHARACTER } from "./content/stage0";
 import { BATTLE_ACTION_AUDIO_ASSETS } from "./content/actions";
-import {
-  PRELOAD_STAGE_MUSIC_PROGRAMS,
-  musicProgramFor,
-} from "./content/music";
+import { musicProgramFor } from "./content/music";
 import type { GameController } from "./controller";
 import {
   MusicTransport,
@@ -84,7 +81,6 @@ export class AudioManager {
       MUSIC_GAIN_BY_VOLUME[controller.musicVolume],
       (state) => this.updateMusicDebugState(state),
     );
-    this.music.preload(PRELOAD_STAGE_MUSIC_PROGRAMS);
     this.updateEffectDebugState();
     root.addEventListener("pointerdown", () => this.unlock(), {
       capture: true,

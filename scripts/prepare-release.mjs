@@ -154,6 +154,41 @@ for (const actionId of mapActionAtlasIds) {
   }
 }
 
+// The staged loader consumes the generated final-path manifest. Validate it
+// only after fragmented development sources have been pruned so a published
+// build can never advertise a URL that release cleanup removed.
+const resourceManifestPath = path.join(
+  releaseDirectory,
+  "assets",
+  "original",
+  "resource-manifest.v1.json",
+);
+if (!(await pathExists(resourceManifestPath))) {
+  throw new Error("release build is missing the versioned resource manifest");
+}
+const resourceManifest = JSON.parse(await readFile(resourceManifestPath, "utf8"));
+if (resourceManifest.version !== 1 || !/^[0-9a-f]{64}$/u.test(resourceManifest.identity)
+  || !Array.isArray(resourceManifest.assets) || !Array.isArray(resourceManifest.packs)) {
+  throw new Error("release build has an invalid versioned resource manifest");
+}
+for (const asset of resourceManifest.assets) {
+  if (typeof asset.url !== "string" || !asset.url.startsWith("/assets/original/")
+    || asset.url.includes("..") || !Number.isSafeInteger(asset.bytes) || asset.bytes < 0
+    || typeof asset.sha256 !== "string" || !/^[0-9a-f]{64}$/u.test(asset.sha256)) {
+    throw new Error("release build has an invalid resource manifest asset");
+  }
+  const relativeUrl = asset.url.replace(/^\//u, "");
+  const releasedPath = path.join(releaseDirectory, relativeUrl);
+  if (!(await pathExists(releasedPath))) {
+    throw new Error(`resource manifest points to a missing release asset: ${asset.url}`);
+  }
+  const released = await readFile(releasedPath);
+  const releasedHash = createHash("sha256").update(released).digest("hex");
+  if (released.byteLength !== asset.bytes || releasedHash !== asset.sha256) {
+    throw new Error(`resource manifest differs from the release asset: ${asset.url}`);
+  }
+}
+
 const files = await collectFiles(releaseDirectory);
 const musicManifestPath = path.join(releaseDirectory, "assets/original/music/music-manifest.json");
 if (!(await pathExists(musicManifestPath))) {

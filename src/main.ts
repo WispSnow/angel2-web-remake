@@ -1,6 +1,7 @@
 import "./styles.css";
 import "./stage49-ending.css";
-import { GameController, exposeDebugApi } from "./game/controller";
+import "./resource-loading.css";
+import { GameController, exposeDebugApi, type StageAssetGate } from "./game/controller";
 import { startPhaser } from "./game/phaser/BattleScene";
 import { mountUi } from "./game/ui";
 import { AudioManager } from "./game/audio";
@@ -8,16 +9,30 @@ import { mountStartup, type StartupSelection } from "./game/startup";
 import { mountStage49EndingUi } from "./game/stage49-ending-ui";
 import { mountCreditsUi } from "./game/credits-ui";
 import "./credits.css";
+import { ResourcePackLoader } from "./game/resource-loader";
+import { allyMapUnitAssetsForClasses } from "./game/content/map-unit-assets";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
 const releaseBuild = import.meta.env.MODE === "release";
+const resourceLoader = new ResourcePackLoader();
+const stageAssetGate: StageAssetGate = (stageId, allyClassIds) =>
+  resourceLoader.ensureStage(
+    stageId,
+    `讀取 ${stageId} 關卡資料`,
+    [...allyMapUnitAssetsForClasses(allyClassIds).values()],
+  );
 
-const mountController = (controller: GameController, userActivated: boolean) => {
+const mountController = (
+  controller: GameController,
+  userActivated: boolean,
+  stagedResources?: ResourcePackLoader,
+) => {
   const audio = new AudioManager(controller, root, userActivated);
   let surfaceKey = "";
   let surfaceGeneration = 0;
   let destroySurface: () => void = () => undefined;
+  let observedStageId = controller.battle.stage.id;
 
   const mountBattleSurface = () => {
     const destroyUi = mountUi(root, controller, audio);
@@ -79,6 +94,10 @@ const mountController = (controller: GameController, userActivated: boolean) => 
   };
 
   const syncSurface = () => {
+    if (controller.battle.stage.id !== observedStageId) {
+      observedStageId = controller.battle.stage.id;
+      void stagedResources?.prefetchFollowing(observedStageId);
+    }
     const nextKey = controller.phase === "ending"
       ? "ending:stage49"
       : controller.phase === "credits"
@@ -91,11 +110,23 @@ const mountController = (controller: GameController, userActivated: boolean) => 
     const generation = ++surfaceGeneration;
     surfaceKey = nextKey;
     if (controller.phase === "ending") {
-      destroySurface = mountStage49EndingUi(root, controller);
+      destroySurface = () => undefined;
+      const mount = async () => {
+        await stagedResources?.ensureRoute("ending", "讀取主線結局資料");
+        if (generation !== surfaceGeneration || controller.phase !== "ending") return;
+        destroySurface = mountStage49EndingUi(root, controller);
+      };
+      void mount();
       return;
     }
     if (controller.phase === "credits") {
-      destroySurface = mountCreditsUi(root, controller);
+      destroySurface = () => undefined;
+      const mount = async () => {
+        await stagedResources?.ensureRoute("credits", "讀取製作人員表資料");
+        if (generation !== surfaceGeneration || controller.phase !== "credits") return;
+        destroySurface = mountCreditsUi(root, controller);
+      };
+      void mount();
       return;
     }
     if (controller.phase === "deployment") {
@@ -119,9 +150,10 @@ const mountController = (controller: GameController, userActivated: boolean) => 
 
 const startGame = async (selection: StartupSelection) => {
   const controller = selection.kind === "continue"
-    ? await GameController.fromSave(selection.save, selection.slot)
-    : new GameController(selection.difficulty);
-  mountController(controller, selection.userActivated);
+    ? await GameController.fromSave(selection.save, selection.slot, stageAssetGate)
+    : await resourceLoader.ensureStage("stage-00", "讀取第 0 關資料")
+      .then(() => new GameController(selection.difficulty, stageAssetGate));
+  mountController(controller, selection.userActivated, resourceLoader);
 };
 
 const renderDebugLoadError = (title: string, message: string) => {
@@ -167,7 +199,8 @@ if (!releaseBuild && debugScenario) {
       storage: localStorage,
       perStageGrowth,
     });
-    mountController(controller, false);
+    controller.setStageAssetGate(stageAssetGate);
+    mountController(controller, false, resourceLoader);
     debug.mountDebugToolbar(
       controller,
       debugScenario,
@@ -184,4 +217,9 @@ if (!releaseBuild && debugScenario) {
 else if (!releaseBuild && parameters.has("skipStartup")) {
   void startGame({ kind: "new", difficulty: 0, userActivated: false });
 }
-else mountStartup(root, startGame);
+else {
+  void resourceLoader.ensureBoot().then(() => {
+    mountStartup(root, startGame);
+    resourceLoader.prefetchStage("stage-00");
+  });
+}
