@@ -64,6 +64,7 @@ const DATA_SIGNATURES = [
   ["DS:0DC0-0DE5", 0x0dc0, 0x0de6, "portrait metadata pointer list C", "a9c6db857dae8c8643e78b5b97b42f376100fb2a889aaa839b80cac152ee3eb7"],
   ["DS:0DE6-0E15", 0x0de6, 0x0e16, "story VGA DAC palette", "ef715fef1e930ed4f07c893215a635a5096de04ac3f82c57b71ec49ca4ee6a6f"],
   ["DS:0E16-0E79", 0x0e16, 0x0e7a, "50-entry stage story-record table", "bf3ee2518715aadba2bae6211a5e9bfbbdadc8bdf89f1e849b0d062703fefe04"],
+  ["DS:02DF-02EE", 0x02df, 0x02ef, "story backdrop band-copy descriptor", "cabc209451ee14697d45c16df77818a91dbafb4c1e74f15c3bf75f3480bd25f0"],
   ["DS:02EF-03DC", 0x02ef, 0x03dd, "portrait outline-column descriptor and 112x8 shadow dither pattern", "7f534811bb05387b37f097787dc2255aec1cba0cc1b43c23bc2206d8ee61369d"],
   ["DS:0E82-0ED1", 0x0e82, 0x0ed2, "portrait clear-region descriptors", "6876d99461ce5e97ab5dd3b8a97a5bd397fc1984cc9c89fc91faae1e28e23b94"],
   ["DS:0F88-1037", 0x0f88, 0x1038, "stage-to-MAGIC table and terminator", "22e36c748369975524564b0acbfc3ffc45fa6d1f976b0b945b80e38bbc45b8f4"],
@@ -744,6 +745,70 @@ function dialoguePortraitFrameContract(renderManifest, module25, module29) {
   };
 }
 
+/**
+ * `0000:05F2` loads A/20 before it interprets any SAY record, so every module-25
+ * interstitial story starts from the same tiled backdrop; the routine at `0000:0B5B`
+ * paints one 16-tile row at y=0 and then latch-copies a 640x40 band down the page.
+ * The immediates below live inside the already hashed `0000:0B5B..0CD1` signature.
+ */
+function storyBackdropContract(module25, renderManifest) {
+  const code = module25.subarray(0x0b5b, 0x0b98);
+  const expectAt = (offset, bytes, label) =>
+    assert.deepEqual([...code.subarray(offset, offset + bytes.length)], bytes, `story backdrop tiler: ${label}`);
+  expectAt(0, [0x2e, 0xc7, 0x06, 0x77, 0x0a, 0x00, 0x00], "row origin x is no longer 0");
+  expectAt(7, [0xb9], "row tile count");
+  expectAt(27, [0x2e, 0x83, 0x06, 0x77, 0x0a], "row horizontal step");
+  expectAt(36, [0xc7, 0x06, 0xe9, 0x02], "band copy target y");
+  expectAt(42, [0xb9], "band copy count");
+  expectAt(46, [0xbe], "band copy descriptor address");
+  expectAt(53, [0x83, 0x06, 0xe9, 0x02], "band copy target step");
+  const rowTiles = code.readUInt16LE(8);
+  const horizontalStep = code[32];
+  const firstTargetY = code.readUInt16LE(40);
+  const bandCopies = code.readUInt16LE(43);
+  const descriptorAddress = code.readUInt16LE(47);
+  const targetStep = code[57];
+  assert.equal(descriptorAddress, 0x02df, "band copy no longer uses the DS:02DF descriptor");
+  const descriptor = dataSlice(module25, 0x02df, 0x02ef);
+  const bandSize = [descriptor.readUInt16LE(4), descriptor.readUInt16LE(6)];
+  assert.deepEqual(
+    [descriptor.readUInt16LE(0), descriptor.readUInt16LE(2)],
+    [0, 0],
+    "the band copy no longer reads from the top of the page",
+  );
+  assert.deepEqual(bandSize, [640, 40], "band copy size changed");
+  const entry = renderManifest.groups.windowGraphics
+    .find((candidate) => candidate.group === "A" && candidate.record === 20 && candidate.imageIndex === 0);
+  assert(entry, "missing the A/20 backdrop tile in the story render manifest");
+  assert.deepEqual([entry.width, entry.height, entry.maskUsed], [40, 41, false], "A/20 geometry changed");
+  return {
+    resource: "A/20",
+    loadedBy: "0000:05F2",
+    drawnBy: "0000:0B5B",
+    appliesTo: "every module-25 interstitial story; the entry runs once per module load, before the per-stage SAY record",
+    tile: {
+      imageIndex: entry.imageIndex,
+      size: [entry.width, entry.height],
+      maskUsed: entry.maskUsed,
+      output: entry.output,
+      sha256: entry.sha256,
+    },
+    row: { origin: [0, 0], tiles: rowTiles, horizontalStep },
+    bandCopy: {
+      descriptorAddress: "DS:02DF",
+      size: bandSize,
+      sourceOrigin: [0, 0],
+      firstTargetY,
+      targetStep,
+      iterations: bandCopies,
+    },
+    coverage: [rowTiles * horizontalStep, firstTargetY + bandCopies * targetStep],
+    // The first band copy lands on y=40, so the tile's own 41st row is never visible
+    // and the repeating unit the player sees is 40x40.
+    effectiveTile: [horizontalStep, targetStep],
+  };
+}
+
 function dialogueTextWindowContract(renderManifest) {
   const expectedAssets = [
     [3, 24, 24, "8a0929e44be9556fd687416646ba4103dddcc75fe1ceb6ddc072aaaa4bad878b"],
@@ -827,6 +892,7 @@ async function extract(module25Path, module29Path, stageEventsPath, audioManifes
   assert.equal(renderManifest.contactSheets.length, 4);
   const dialoguePortraitFrame = dialoguePortraitFrameContract(renderManifest, module25, module29);
   const dialogueTextWindow = dialogueTextWindowContract(renderManifest);
+  const storyBackdrop = storyBackdropContract(module25, renderManifest);
   const paletteBytes = dataSlice(module25, 0x0de6, 0x0e16);
   const selectedMagic = stageEvents.module25CampaignStory.stageMagicRecords.entries.filter((entry) => entry.selected);
   const musicRecords = [...new Set(selectedMagic.map((entry) => entry.magicRecord))].sort((a, b) => a - b);
@@ -844,6 +910,7 @@ async function extract(module25Path, module29Path, stageEventsPath, audioManifes
     },
     verifiedCodeSignatures: signatures.code, verifiedDataSignatures: signatures.data,
     dialoguePortraitFrame,
+    storyBackdrop,
     dialogueTextWindow,
     commandDispatch: {
       module25: { interpreter: "0000:0736", dispatcher: "0000:07C7", recognizedFormalCommands: 15 },

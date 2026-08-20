@@ -351,7 +351,25 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .battle-foreground > img { position: absolute; top: 140px; width: 32px; height: 191px; image-rendering: var(--image-rendering, pixelated); }
 .statue-foreground-left { left: 40px; }
 .statue-foreground-right { left: 408px; }
-.story-background { position: absolute; z-index: 8; inset: 0; background: #000 url("/assets/original/story-palace.png") center / 320px 200px no-repeat; }
+/* `BK/<id>` 的落點是原生寫死的 `(160,80)`（模組 25 `0000:098C`、模組 29 同值），不是把
+   `320×200` 在 `640×350` 裡置中——置中會落在 `(160,75)`，上下留白剛好差 5 px。 */
+.story-background {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  background: #000 var(--story-illustration) 160px 80px / 320px 200px no-repeat;
+  image-rendering: var(--image-rendering, pixelated);
+}
+/* 模組 25 在解釋任何 SAY 記錄之前就載入 `A/20` 並鋪滿整頁：`0000:05F2` 載入後由
+   `0000:0B5B` 在 y=0 貼一列 16 塊 40 px 寬的圖磚，再把 `(0,0)` 起的 `640×40` 條帶用
+   DS:`02DF` 描述子複製到 y=40..360。因此每一段關卡間過場劇情共用同一張底紋，而且第一次
+   條帶複製就蓋掉了原圖第 41 列，玩家看到的重複單元是 `40×40`（圖樣本身 8×8 週期）。
+   模組 29 的戰場內 `PP` 沒有這一層——它把 `BK` 直接畫在活的戰場上——所以只掛在關前階段。 */
+.logical-screen[data-phase="prebattleStory"] .story-background {
+  background:
+    var(--story-illustration) 160px 80px / 320px 200px no-repeat,
+    var(--story-backdrop) 0 0 / 40px 40px repeat;
+}
 .logical-screen[data-phase="prebattleStory"] .unit-hud,
 .logical-screen[data-phase="prebattleStory"] .side-panel-hotspot,
 .logical-screen[data-phase="prebattleStory"] .system-menu,

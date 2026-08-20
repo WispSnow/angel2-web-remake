@@ -2,6 +2,7 @@ import { ASSETS, nextExperienceThresholdFor } from "./content/stage0";
 import {
   DIALOGUE_PORTRAIT_FRAME_ASSETS,
   DIALOGUE_TEXT_WINDOW_ASSET,
+  STORY_BACKDROP_ASSET,
   PORTRAIT_CATALOG,
   portraitSourceFor,
 } from "./content/portrait-catalog.generated";
@@ -70,11 +71,13 @@ import { DIFFICULTY_OPTIONS } from "./content/startup";
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
   ASSETS.allyPromotionTargets;
-const dialoguePortraitFrameStyle = [
+// 原生表現資源以 CSS 變數掛在邏輯螢幕上，樣式表只引用變數、不硬寫資產路徑。
+const nativePresentationAssetStyle = [
   `--dialogue-portrait-frame-top:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.top}')`,
   `--dialogue-portrait-frame-nameplate:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate}')`,
   `--dialogue-portrait-frame-side:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.side}')`,
   `--dialogue-text-window:url('${DIALOGUE_TEXT_WINDOW_ASSET}')`,
+  `--story-backdrop:url('${STORY_BACKDROP_ASSET}')`,
 ].join(";");
 const niaPortraitDisplayName = (PORTRAIT_CATALOG[46].displayName ?? "妮雅").trim();
 
@@ -93,7 +96,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       <div class="game-stage">
         <div class="game-viewport" id="game-viewport">
           <section class="logical-screen" id="logical-screen" data-testid="game-screen"
-            style="${dialoguePortraitFrameStyle}" aria-label="天使帝國 II ${stage.name}遊戲畫面">
+            style="${nativePresentationAssetStyle}" aria-label="天使帝國 II ${stage.name}遊戲畫面">
             <div class="battle-backdrop" aria-hidden="true"></div>
             <div class="battle-chrome" data-testid="battle-chrome" aria-hidden="true">
               <img class="chrome-top" src="${ASSETS.battleChrome.top}" alt="" />
@@ -267,7 +270,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const dialogueSkipConfirm = required(root, "#dialogue-skip-confirm");
   const storyBackground = required(root, "#story-background");
   const defaultStoryBackgroundSource = stageAssets?.storyBackground ?? ASSETS.storyBackground;
-  storyBackground.style.backgroundImage = `url("${defaultStoryBackgroundSource}")`;
+  storyBackground.style.setProperty("--story-illustration", `url("${defaultStoryBackgroundSource}")`);
   const objectivePanel = required(root, "#objective-panel");
   const objectiveRoundLimit = required(root, "[data-testid=objective-round-limit]");
   const roundBox = required(root, "#bottom-round");
@@ -776,7 +779,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const source = page?.source.backgroundId === undefined
       ? defaultStoryBackgroundSource
       : stageAssets?.storyBackgrounds?.[page.source.backgroundId] ?? defaultStoryBackgroundSource;
-    storyBackground.style.backgroundImage = `url("${source}")`;
+    storyBackground.style.setProperty("--story-illustration", `url("${source}")`);
     if (page?.source.backgroundId === undefined) delete storyBackground.dataset.backgroundId;
     else storyBackground.dataset.backgroundId = String(page.source.backgroundId);
   };

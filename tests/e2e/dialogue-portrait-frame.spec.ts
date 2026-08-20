@@ -216,3 +216,22 @@ test("the A/18 outcome feedback portrait casts the same shadow at the upper anch
     path: `${ARTIFACT_DIR}/dialogue-portrait-shadow-feedback.png`,
   });
 });
+
+test("the module-25 interstitial story portrait casts the shadow onto the A/20 backdrop", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-00-prebattle&difficulty=0&test=1");
+  const portrait = page.locator("#dialogue-portrait-upper");
+  // 關前劇情的第一頁沒有肖像；逐頁推進到第一個掛肖像的頁面。
+  await expect.poll(async () => {
+    if (await portrait.isVisible()) return true;
+    await page.locator("#logical-screen").click({ noWaitAfter: true }).catch(() => {});
+    return false;
+  }, { timeout: 30_000 }).toBe(true);
+  await freezePresentation(page);
+
+  // 關前版面的投影與黑邊完全落在 A/20 底紋上，是唯一能同時看到兩層的原生畫面。
+  await expectNativePortraitComposite(page, portrait, { x: 8, y: 18 });
+
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/dialogue-portrait-shadow-prebattle.png`,
+  });
+});
