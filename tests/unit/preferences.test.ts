@@ -68,7 +68,7 @@ describe("presentation preferences", () => {
 });
 
 describe("sound preferences", () => {
-  test("uses four enabled original-compatible defaults and rejects malformed fields", () => {
+  test("uses a softer Web effect level with four enabled original-compatible gates", () => {
     const storage = new MemoryStorage();
     expect(loadSoundPreferences(storage)).toEqual(DEFAULT_SOUND_PREFERENCES);
     storage.setItem(SOUND_PREFERENCES_KEY, JSON.stringify({
@@ -78,6 +78,7 @@ describe("sound preferences", () => {
       keySoundEnabled: 1,
     }));
     expect(loadSoundPreferences(storage)).toEqual({
+      soundEffectVolume: 2,
       speechEnabled: false,
       movementSoundEnabled: true,
       combatSoundEnabled: false,
@@ -87,9 +88,10 @@ describe("sound preferences", () => {
     expect(loadSoundPreferences(storage)).toEqual(DEFAULT_SOUND_PREFERENCES);
   });
 
-  test("round-trips sound categories independently from battle saves", () => {
+  test("round-trips effect volume and sound categories independently from battle saves", () => {
     const storage = new MemoryStorage();
     const preferences = {
+      soundEffectVolume: 3 as const,
       speechEnabled: false,
       movementSoundEnabled: true,
       combatSoundEnabled: false,
@@ -97,6 +99,27 @@ describe("sound preferences", () => {
     };
     saveSoundPreferences(storage, preferences);
     expect(loadSoundPreferences(storage)).toEqual(preferences);
+  });
+
+  test("rejects invalid effect levels and migrates the existing four-gate payload", () => {
+    const storage = new MemoryStorage();
+    for (const invalid of [-1, 5, 2.5, "3", null]) {
+      storage.setItem(SOUND_PREFERENCES_KEY, JSON.stringify({ soundEffectVolume: invalid }));
+      expect(loadSoundPreferences(storage).soundEffectVolume).toBe(2);
+    }
+    storage.setItem(SOUND_PREFERENCES_KEY, JSON.stringify({
+      speechEnabled: false,
+      movementSoundEnabled: true,
+      combatSoundEnabled: false,
+      keySoundEnabled: true,
+    }));
+    expect(loadSoundPreferences(storage)).toEqual({
+      soundEffectVolume: 2,
+      speechEnabled: false,
+      movementSoundEnabled: true,
+      combatSoundEnabled: false,
+      keySoundEnabled: true,
+    });
   });
 });
 

@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
   isSoundEffectChannelEnabled,
   MUSIC_GAIN_BY_VOLUME,
+  SOUND_EFFECT_GAIN_BY_VOLUME,
+  soundEffectOutputVolume,
   soundEffectChannelForCue,
   type SoundEffectChannel,
 } from "../../src/game/audio-settings";
@@ -56,6 +58,21 @@ describe("five-level music gain", () => {
       3: 0.24,
       4: 0.32,
     });
+  });
+});
+
+describe("independent five-level sound-effect gain", () => {
+  test("halves the established cue mix by default while preserving the original mix at maximum", () => {
+    expect(SOUND_EFFECT_GAIN_BY_VOLUME).toEqual({
+      0: 0,
+      1: 0.25,
+      2: 0.5,
+      3: 0.75,
+      4: 1,
+    });
+    expect(soundEffectOutputVolume(0.55, 2)).toBeCloseTo(0.275);
+    expect(soundEffectOutputVolume(0.55, 4)).toBeCloseTo(0.55);
+    expect(soundEffectOutputVolume(0.55, 0)).toBe(0);
   });
 });
 

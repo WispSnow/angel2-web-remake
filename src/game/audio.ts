@@ -13,6 +13,8 @@ import {
 import {
   isSoundEffectChannelEnabled,
   MUSIC_GAIN_BY_VOLUME,
+  SOUND_EFFECT_GAIN_BY_VOLUME,
+  soundEffectOutputVolume,
   soundEffectChannelForCue,
   type SoundEffectChannel,
 } from "./audio-settings";
@@ -69,6 +71,8 @@ export class AudioManager {
   };
   private walkEffect?: HTMLAudioElement;
   private readonly releasingWalkEffects = new Set<HTMLAudioElement>();
+  private readonly activeEffects = new Set<HTMLAudioElement>();
+  private readonly effectCueVolumes = new WeakMap<HTMLAudioElement, number>();
   constructor(
     private readonly controller: GameController,
     private readonly root: HTMLElement,
@@ -101,9 +105,10 @@ export class AudioManager {
     this.unsubscribe();
     // Teardown cuts immediately: a release fade would keep its timer running
     // against an element nothing owns any more.
-    for (const effect of [this.walkEffect, ...this.releasingWalkEffects]) effect?.pause();
+    for (const effect of this.activeEffects) effect.pause();
     this.walkEffect = undefined;
     this.releasingWalkEffects.clear();
+    this.activeEffects.clear();
     this.music.select(undefined);
   }
 
@@ -121,6 +126,7 @@ export class AudioManager {
 
   private sync(): void {
     this.syncMusic();
+    this.applySoundEffectVolume();
     const cue = this.controller.audioCue;
     if (cue && cue.sequence !== this.previousCueSequence) {
       this.previousCueSequence = cue.sequence;
@@ -176,7 +182,7 @@ export class AudioManager {
       clearInterval(timer);
       effect.pause();
       effect.currentTime = 0;
-      this.releasingWalkEffects.delete(effect);
+      this.finishEffect(effect);
       this.updateWalkDebugState();
     }, WALK_FADE_STEP_MS);
   }
@@ -258,6 +264,17 @@ export class AudioManager {
     this.music.setGain(MUSIC_GAIN_BY_VOLUME[this.controller.musicVolume]);
   }
 
+  private applySoundEffectVolume(): void {
+    for (const effect of this.activeEffects) {
+      if (this.releasingWalkEffects.has(effect)) continue;
+      const cueVolume = this.effectCueVolumes.get(effect);
+      if (cueVolume !== undefined) {
+        effect.volume = soundEffectOutputVolume(cueVolume, this.controller.soundEffectVolume);
+      }
+    }
+    this.updateEffectDebugState();
+  }
+
   private updateMusicDebugState(state: MusicTransportState): void {
     if (!this.controller.isTestMode) return;
     this.root.dataset.musicTrack = state.track ?? "none";
@@ -282,7 +299,19 @@ export class AudioManager {
       this.root.dataset[`${name}EffectRequestCount`] = String(this.effectRequestCounts[name]);
       this.root.dataset[`${name}EffectCount`] = String(this.effectPlaybackCounts[name]);
     }
+    this.root.dataset.soundEffectVolumeLevel = String(this.controller.soundEffectVolume);
+    this.root.dataset.soundEffectGain = String(
+      SOUND_EFFECT_GAIN_BY_VOLUME[this.controller.soundEffectVolume],
+    );
     if (channel) this.root.dataset.lastEffectChannel = channel;
+  }
+
+  private finishEffect(effect: HTMLAudioElement): void {
+    this.activeEffects.delete(effect);
+    this.releasingWalkEffects.delete(effect);
+    this.effectCueVolumes.delete(effect);
+    if (this.walkEffect === effect) this.walkEffect = undefined;
+    this.updateWalkDebugState();
   }
 
   private playEffect(
@@ -297,8 +326,11 @@ export class AudioManager {
     this.effectPlaybackCounts[channel] += 1;
     this.updateEffectDebugState(channel);
     const effect = new Audio(source);
-    effect.volume = volume;
-    void effect.play().catch(() => undefined);
+    this.activeEffects.add(effect);
+    this.effectCueVolumes.set(effect, volume);
+    effect.volume = soundEffectOutputVolume(volume, this.controller.soundEffectVolume);
+    effect.addEventListener("ended", () => this.finishEffect(effect), { once: true });
+    void effect.play().catch(() => this.finishEffect(effect));
     return effect;
   }
 }

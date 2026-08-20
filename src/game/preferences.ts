@@ -7,13 +7,16 @@ export interface PresentationPreferences {
 }
 
 export interface SoundPreferences {
+  soundEffectVolume: SoundEffectVolume;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
   combatSoundEnabled: boolean;
   keySoundEnabled: boolean;
 }
 
-export type MusicVolume = 0 | 1 | 2 | 3 | 4;
+export type VolumeLevel = 0 | 1 | 2 | 3 | 4;
+export type MusicVolume = VolumeLevel;
+export type SoundEffectVolume = VolumeLevel;
 
 /**
  * How the 640x350 logical screen is resampled on its way to the host display.
@@ -55,6 +58,7 @@ export const DEFAULT_PRESENTATION_PREFERENCES: Readonly<PresentationPreferences>
 };
 
 export const DEFAULT_SOUND_PREFERENCES: Readonly<SoundPreferences> = {
+  soundEffectVolume: 2,
   speechEnabled: true,
   movementSoundEnabled: true,
   combatSoundEnabled: true,
@@ -72,8 +76,13 @@ export const DEFAULT_DISPLAY_PREFERENCES: Readonly<DisplayPreferences> = {
 export const isImageScalingMode = (value: unknown): value is ImageScalingMode =>
   value === "sharp" || value === "smooth" || value === "integer";
 
-export const isMusicVolume = (value: unknown): value is MusicVolume =>
+const isVolumeLevel = (value: unknown): value is VolumeLevel =>
   Number.isInteger(value) && typeof value === "number" && value >= 0 && value <= 4;
+
+export const isMusicVolume = (value: unknown): value is MusicVolume => isVolumeLevel(value);
+
+export const isSoundEffectVolume = (value: unknown): value is SoundEffectVolume =>
+  isVolumeLevel(value);
 
 export function loadPresentationPreferences(storage: PreferenceStorage): PresentationPreferences {
   const raw = storage.getItem(PRESENTATION_PREFERENCES_KEY);
@@ -115,6 +124,9 @@ export function loadSoundPreferences(storage: PreferenceStorage): SoundPreferenc
   try {
     const candidate = JSON.parse(raw) as Partial<SoundPreferences>;
     return {
+      soundEffectVolume: isSoundEffectVolume(candidate.soundEffectVolume)
+        ? candidate.soundEffectVolume
+        : DEFAULT_SOUND_PREFERENCES.soundEffectVolume,
       speechEnabled: typeof candidate.speechEnabled === "boolean"
         ? candidate.speechEnabled
         : DEFAULT_SOUND_PREFERENCES.speechEnabled,

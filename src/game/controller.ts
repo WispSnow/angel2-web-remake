@@ -103,6 +103,7 @@ import type {
 } from "./simulation/actions/types";
 import {
   isMusicVolume,
+  isSoundEffectVolume,
   loadMusicPreferences,
   loadPresentationPreferences,
   loadSoundPreferences,
@@ -110,6 +111,7 @@ import {
   savePresentationPreferences,
   saveSoundPreferences,
   type MusicVolume,
+  type SoundEffectVolume,
 } from "./preferences";
 import {
   moveSaveSlotIndex,
@@ -448,6 +450,7 @@ export class GameController {
   portraitsEnabled: boolean;
   aiDialogueEnabled: boolean;
   musicVolume: MusicVolume;
+  soundEffectVolume: SoundEffectVolume;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
   combatSoundEnabled: boolean;
@@ -538,6 +541,7 @@ export class GameController {
     this.aiDialogueEnabled = preferences.aiDialogueEnabled;
     this.musicVolume = loadMusicPreferences(localStorage).musicVolume;
     const soundPreferences = loadSoundPreferences(localStorage);
+    this.soundEffectVolume = soundPreferences.soundEffectVolume;
     this.speechEnabled = soundPreferences.speechEnabled;
     this.movementSoundEnabled = soundPreferences.movementSoundEnabled;
     this.combatSoundEnabled = soundPreferences.combatSoundEnabled;
@@ -4372,6 +4376,13 @@ export class GameController {
     this.emit();
   }
 
+  setSoundEffectVolume(volume: number): void {
+    if (!isSoundEffectVolume(volume) || volume === this.soundEffectVolume) return;
+    this.soundEffectVolume = volume;
+    this.persistSoundPreferences();
+    this.emit();
+  }
+
   toggleSpeechSound(): void {
     this.speechEnabled = !this.speechEnabled;
     this.persistSoundPreferences();
@@ -5731,6 +5742,7 @@ export class GameController {
       promotionSelectionIndex: this.promotionSelectionIndex,
       promotionTargets: this.promotionTargets.map((target) => ({ ...target })),
       musicVolume: this.musicVolume,
+      soundEffectVolume: this.soundEffectVolume,
       speechEnabled: this.speechEnabled,
       movementSoundEnabled: this.movementSoundEnabled,
       combatSoundEnabled: this.combatSoundEnabled,
@@ -6007,6 +6019,7 @@ export class GameController {
 
   private persistSoundPreferences(): void {
     saveSoundPreferences(localStorage, {
+      soundEffectVolume: this.soundEffectVolume,
       speechEnabled: this.speechEnabled,
       movementSoundEnabled: this.movementSoundEnabled,
       combatSoundEnabled: this.combatSoundEnabled,

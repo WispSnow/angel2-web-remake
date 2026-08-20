@@ -147,6 +147,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <section class="sound-settings-menu modal-panel" id="sound-settings-menu"
               data-testid="sound-settings-menu" role="dialog" aria-label="音效開關" hidden>
               <span class="panel-kicker">SOUND</span><h2>音效開關</h2>
+              <div class="sound-volume-control">
+                <span class="sound-volume-label" id="sound-volume-label">音效音量</span>
+                <div class="sound-volume-list" role="radiogroup" aria-labelledby="sound-volume-label">
+                  ${["無聲", "1", "2", "3", "最大"].map((label, level) =>
+                    `<button role="radio" data-action="sound-effect-volume" data-sound-effect-level="${level}"
+                      data-testid="sound-effect-volume-${level}" aria-label="音效音量 ${label}">${label}</button>`).join("")}
+                </div>
+              </div>
               <div class="sound-settings-grid" role="group" aria-label="音效分類">
                 <button data-action="toggle-sound-speech" data-testid="sound-speech-button">說話 開</button>
                 <button data-action="toggle-sound-movement" data-testid="sound-movement-button">移動 開</button>
@@ -587,6 +595,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "toggle-sound-movement") controller.toggleMovementSound();
     else if (action === "toggle-sound-combat") controller.toggleCombatSound();
     else if (action === "toggle-sound-key") controller.toggleKeySound();
+    else if (action === "sound-effect-volume") {
+      controller.setSoundEffectVolume(Number(button.dataset.soundEffectLevel));
+    }
     else if (action === "open-music-settings") controller.openMusicSettings();
     else if (action === "close-music-settings") controller.closeMusicSettings();
     else if (action === "close-terrain-inspection") controller.closeTerrainInspection();
@@ -1119,6 +1130,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     for (const button of root.querySelectorAll<HTMLButtonElement>("[data-music-level]")) {
       const selected = Number(button.dataset.musicLevel) === controller.musicVolume;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-checked", String(selected));
+    }
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-sound-effect-level]")) {
+      const selected = Number(button.dataset.soundEffectLevel) === controller.soundEffectVolume;
       button.classList.toggle("is-selected", selected);
       button.setAttribute("aria-checked", String(selected));
     }

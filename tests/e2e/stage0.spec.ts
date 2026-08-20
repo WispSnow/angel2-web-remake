@@ -48,6 +48,7 @@ interface DebugState {
   retreatConfirmOpen: boolean;
   retreatConfirmIndex: number;
   musicVolume: 0 | 1 | 2 | 3 | 4;
+  soundEffectVolume: 0 | 1 | 2 | 3 | 4;
   speechEnabled: boolean;
   movementSoundEnabled: boolean;
   combatSoundEnabled: boolean;
@@ -2074,7 +2075,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   });
 });
 
-test("RHP-05: sound desk object exposes four persistent request gates", async ({ page }) => {
+test("RHP-05: sound desk object exposes independent volume and four persistent request gates", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => localStorage.removeItem("angel2.preferences.sound.v1"));
   await page.reload();
@@ -2083,6 +2084,8 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   await expect(app).toHaveAttribute("data-movement-effect-count", "0");
   await expect(app).toHaveAttribute("data-combat-effect-count", "0");
   await expect(app).toHaveAttribute("data-key-effect-count", "0");
+  await expect(app).toHaveAttribute("data-sound-effect-volume-level", "2");
+  await expect(app).toHaveAttribute("data-sound-effect-gain", "0.5");
 
   await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
@@ -2092,6 +2095,7 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
 
   const baseline = await debugState(page);
   expect(baseline).toMatchObject({
+    soundEffectVolume: 2,
     speechEnabled: true,
     movementSoundEnabled: true,
     combatSoundEnabled: true,
@@ -2111,6 +2115,7 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   await expect(page.getByTestId("sound-movement-button")).toHaveText("移動 開");
   await expect(page.getByTestId("sound-combat-button")).toHaveText("戰鬥 開");
   await expect(page.getByTestId("sound-key-button")).toHaveText("按鍵 開");
+  await expect(page.getByTestId("sound-effect-volume-2")).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("m");
   await page.keyboard.press("Tab");
   await page.keyboard.press("o");
@@ -2123,6 +2128,12 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-sound-settings.png",
   });
+
+  await page.getByTestId("sound-effect-volume-1").click();
+  expect((await debugState(page)).soundEffectVolume).toBe(1);
+  await expect(app).toHaveAttribute("data-sound-effect-volume-level", "1");
+  await expect(app).toHaveAttribute("data-sound-effect-gain", "0.25");
+  await expect(page.getByTestId("sound-effect-volume-1")).toHaveAttribute("aria-checked", "true");
 
   await page.getByTestId("sound-speech-button").click();
   await page.getByTestId("sound-combat-button").click();
@@ -2149,6 +2160,7 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   await expect(page.getByTestId("system-menu")).toBeHidden();
 
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.preferences.sound.v1") ?? "null"))).toEqual({
+    soundEffectVolume: 1,
     speechEnabled: false,
     movementSoundEnabled: true,
     combatSoundEnabled: false,
@@ -2157,6 +2169,7 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
 
   await page.reload();
   expect(await debugState(page)).toMatchObject({
+    soundEffectVolume: 1,
     speechEnabled: false,
     movementSoundEnabled: true,
     combatSoundEnabled: false,
@@ -2164,6 +2177,8 @@ test("RHP-05: sound desk object exposes four persistent request gates", async ({
   });
   await expect(app).toHaveAttribute("data-speech-effect-count", "0");
   await expect(app).toHaveAttribute("data-key-effect-count", "0");
+  await expect(app).toHaveAttribute("data-sound-effect-volume-level", "1");
+  await expect(app).toHaveAttribute("data-sound-effect-gain", "0.25");
   await expect.poll(async () => Number(await app.getAttribute("data-speech-effect-request-count"))).toBeGreaterThan(0);
   await expect(app).toHaveAttribute("data-speech-effect-count", "0");
   await skipStoryDialogue(page);
