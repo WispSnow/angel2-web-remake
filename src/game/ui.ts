@@ -72,6 +72,11 @@ import {
   saveSlotPageIndex,
   saveSlotPageStart,
 } from "./save";
+import {
+  mountRecordSaveBackupUi,
+  RECORD_SAVE_BACKUP_CONFIRM_MARKUP,
+  type SaveBackupUi,
+} from "./save-backup-ui";
 import { DIFFICULTY_OPTIONS } from "./content/startup";
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
@@ -156,6 +161,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               </div>
             </section>
             <section class="record-menu record-panel" id="record-menu" data-testid="record-menu" role="menu" aria-label="戰役記錄" hidden></section>
+            ${RECORD_SAVE_BACKUP_CONFIRM_MARKUP}
             <section class="quit-confirm native-feedback-confirm" id="quit-confirm" data-testid="quit-confirm" role="dialog" aria-label="離開遊戲確認" hidden>
               ${animatedPortraitMarkup(46, {
                 alt: "妮雅肖像",
@@ -289,6 +295,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const musicSettingsMenu = required(root, "#music-settings-menu");
   const sidePanelTooltip = required(root, "#side-panel-tooltip");
   const recordMenu = required(root, "#record-menu");
+  let recordBackupStatus = "";
+  let recordBackupUi: SaveBackupUi;
   const quitConfirm = required(root, "#quit-confirm");
   const groupCommandMenu = required(root, "#group-command-menu");
   const retreatConfirm = required(root, "#retreat-confirm");
@@ -552,6 +560,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }
       return;
     }
+    if (recordBackupUi.handleClick(button)) return;
     if (button.matches("[data-side-panel-hotspot]")) hideSidePanelHint();
     if (button.dataset.settingsIndex !== undefined) {
       controller.selectSettingsMenuItem(Number(button.dataset.settingsIndex));
@@ -644,6 +653,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
 
   root.addEventListener("pointermove", (event) => {
     trackScreenPointer(event);
+    const recordBackupButton = (event.target as Element).closest<HTMLElement>(
+      "[data-action^=record-backup]",
+    );
+    if (recordBackupButton && recordBackupUi.handlePointerOver(recordBackupButton)) return;
     const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
     if (command) controller.selectCommand(Number(command.dataset.commandIndex));
     const technique = (event.target as Element).closest<HTMLElement>("[data-technique-index]");
@@ -706,24 +719,39 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
    * cursor, `contextmenu` reports the fresh button instead of the canvas and the
    * fallback cancels a second level. Latching the target at press time keeps one
    * physical right-click worth exactly one cancel wherever the menu lands.
-   */
+  */
   let rightPressStartedOnCanvas = false;
+  let rightPressHandledByRecordBackup = false;
   root.addEventListener("pointerdown", (event) => {
     trackScreenPointer(event);
     settleMenuPointerGlide();
-    if (event.button === 2) rightPressStartedOnCanvas = event.target instanceof HTMLCanvasElement;
+    rightPressHandledByRecordBackup = false;
+    if (event.button !== 2) return;
+    if (recordBackupUi.cancel()) {
+      rightPressHandledByRecordBackup = true;
+      rightPressStartedOnCanvas = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    rightPressStartedOnCanvas = event.target instanceof HTMLCanvasElement;
   }, { capture: true, signal: eventController.signal });
 
   root.addEventListener("contextmenu", (event) => {
     if (!(event.target as Element).closest("#logical-screen")) return;
     event.preventDefault();
+    const handledByRecordBackup = rightPressHandledByRecordBackup;
+    rightPressHandledByRecordBackup = false;
+    if (handledByRecordBackup) return;
     const handledByCanvas = rightPressStartedOnCanvas;
     rightPressStartedOnCanvas = false;
+    if (recordBackupUi.cancel()) return;
     if (!handledByCanvas) void controller.rightClickAction();
   }, { signal: eventController.signal });
 
   window.addEventListener("keydown", (event) => {
     settleMenuPointerGlide();
+    if (recordBackupUi.handleKeyDown(event)) return;
     const key = event.key;
     const lower = key.toLowerCase();
     const focusedHotspot = document.activeElement instanceof HTMLButtonElement
@@ -1043,6 +1071,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         slotAttributes: (index) => `data-record-index="${index}"`,
         disableEmptySlots: mode === "load",
         cancelAction: "close-record-menu",
+        showBackupTools: true,
+        backupStatus: recordBackupStatus,
       });
     }
     if (setMenuOpen(quitConfirm, controller.quitConfirmOpen)) {
@@ -1359,6 +1389,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }
     renderCombat(combatPresentation, controller);
   };
+  recordBackupUi = mountRecordSaveBackupUi(root, {
+    storage: localStorage,
+    onRecordsRestored: () => render(),
+    onStatus: (message) => {
+      recordBackupStatus = message;
+      const status = recordMenu.querySelector<HTMLElement>("[data-testid=record-backup-status]");
+      if (status) status.textContent = message;
+    },
+  });
   const unsubscribe = controller.onChange(render);
   render();
   const stopScaling = configureGameScaling(required(root, "#game-viewport"), screen);
@@ -1368,6 +1407,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     unsubscribe();
     stopScaling();
     stopGamepad();
+    recordBackupUi.dispose();
     nativeText.dispose();
     stopPortraitAnimations();
     stopDialogueTimer();
@@ -1965,6 +2005,9 @@ interface RecordPanelConfig {
   /** 读取模式下空槽不可确认；储存模式允许覆盖。 */
   readonly disableEmptySlots: boolean;
   readonly cancelAction?: string;
+  /** 戰中記錄面板可直接備份全部二十槽；戰後單次存檔面板不顯示這組宿主工具。 */
+  readonly showBackupTools?: boolean;
+  readonly backupStatus?: string;
 }
 
 // 战中「儲存記錄／讀取記錄」与战后「儲存遊戲進度」共用同一张面板：原版这两处是
@@ -1995,13 +2038,26 @@ function renderRecordPanel(controller: GameController, config: RecordPanelConfig
   const cancel = config.cancelAction
     ? `<button type="button" class="record-panel-cancel" data-action="${config.cancelAction}">取 消</button>`
     : "";
-  return `<strong class="record-panel-title">${config.title}</strong>
+  const backupStatus = config.showBackupTools
+    ? `<span class="record-panel-backup-status" data-testid="record-backup-status"
+        aria-live="polite">${config.backupStatus ?? ""}</span>`
+    : "";
+  const backupTools = config.showBackupTools
+    ? `<div class="record-panel-backup-tools" role="group" aria-label="記錄備份">
+        <button type="button" data-action="record-backup-export"
+          data-testid="record-backup-export">匯 出</button>
+        <button type="button" data-action="record-backup-import"
+          data-testid="record-backup-import">匯 入</button>
+      </div>`
+    : "";
+  return `<div class="record-panel-title"><strong>${config.title}</strong>${backupStatus}</div>
     <div class="record-panel-header" aria-hidden="true"><span class="record-cell-index">槽</span><span
       class="record-slot-bar"><span class="record-cell-name">關卡名</span><span
         class="record-cell-round">回合數</span><span class="record-cell-count">儲存次數</span><span
         class="record-cell-difficulty">難度</span></span></div>
     <div class="record-panel-slots">${rows}</div>
     <div class="record-panel-foot">
+      ${backupTools}
       <div class="record-panel-pagination">
         <button type="button" data-action="${config.pageAction}" ${config.pageDeltaAttribute}="-1"
           data-testid="${config.pageTestIdPrefix}-previous-page" aria-label="上一頁">◀</button>

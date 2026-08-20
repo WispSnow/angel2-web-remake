@@ -30,12 +30,28 @@ export const SAVE_BACKUP_CONFIRM_MARKUP = `
     </div>
   </section>`;
 
+export const RECORD_SAVE_BACKUP_CONFIRM_MARKUP = `
+  <input class="visually-hidden" type="file" accept="application/json,.json"
+    data-testid="record-backup-file" aria-label="選擇記錄備份檔" />
+  <section class="record-backup-confirm record-panel" data-testid="record-backup-confirm"
+    role="dialog" aria-modal="true" aria-labelledby="record-backup-confirm-title" hidden>
+    <h3 id="record-backup-confirm-title">還原全部記錄？</h3>
+    <p data-testid="record-backup-summary"></p>
+    <p>備份內的空槽也會清空目前同號槽。此動作不會改變備份檔。</p>
+    <div class="record-backup-confirm-actions" role="menu" aria-label="還原記錄選擇">
+      <button type="button" role="menuitem" data-action="record-backup-import-confirm"
+        data-import-confirm-index="0" data-testid="record-backup-confirm-import">確 定</button>
+      <button type="button" role="menuitem" data-action="record-backup-import-confirm"
+        data-import-confirm-index="1" data-testid="record-backup-cancel-import">取 消</button>
+    </div>
+  </section>`;
+
 export interface SaveBackupUi {
   cancel(): boolean;
   dispose(): void;
-  handleClick(button: HTMLButtonElement): boolean;
+  handleClick(button: HTMLElement): boolean;
   handleKeyDown(event: KeyboardEvent): boolean;
-  handlePointerOver(button: HTMLButtonElement): boolean;
+  handlePointerOver(button: HTMLElement): boolean;
 }
 
 interface SaveBackupUiOptions {
@@ -44,22 +60,35 @@ interface SaveBackupUiOptions {
   onStatus: (message: string) => void;
 }
 
+interface SaveBackupSurface {
+  readonly contentSelector: string;
+  readonly importButtonSelector: string;
+  readonly fileInputSelector: string;
+  readonly confirmSelector: string;
+  readonly summarySelector: string;
+  readonly cancelButtonSelector: string;
+  readonly actionDataset: "action" | "startupAction";
+  readonly exportAction: string;
+  readonly importAction: string;
+  readonly confirmAction: string;
+}
+
 const required = <T extends Element>(root: ParentNode, selector: string): T => {
   const element = root.querySelector<T>(selector);
   if (!element) throw new Error(`missing save backup element ${selector}`);
   return element;
 };
 
-export function mountSaveBackupUi(
+function mountSaveBackupSurface(
   root: HTMLElement,
   options: SaveBackupUiOptions,
+  surface: SaveBackupSurface,
 ): SaveBackupUi {
-  const content = required<HTMLElement>(root, ".startup-record-content");
-  const importButton = required<HTMLButtonElement>(root, "[data-testid=import-save-backup]");
-  const fileInput = required<HTMLInputElement>(root, "[data-testid=import-save-file]");
-  const confirm = required<HTMLElement>(root, ".startup-import-confirm");
-  const summary = required<HTMLParagraphElement>(root, "[data-testid=import-save-summary]");
-  const cancelButton = required<HTMLButtonElement>(root, "[data-testid=cancel-save-import]");
+  const content = required<HTMLElement>(root, surface.contentSelector);
+  const fileInput = required<HTMLInputElement>(root, surface.fileInputSelector);
+  const confirm = required<HTMLElement>(root, surface.confirmSelector);
+  const summary = required<HTMLParagraphElement>(root, surface.summarySelector);
+  const cancelButton = required<HTMLButtonElement>(root, surface.cancelButtonSelector);
   let pendingBackup: SaveBackupData | undefined;
   /** The destructive import confirmation defaults to cancel (index 1). */
   let confirmIndex = 1;
@@ -77,7 +106,7 @@ export function mountSaveBackupUi(
     pendingBackup = undefined;
     confirm.hidden = true;
     content.inert = false;
-    if (restoreFocus) importButton.focus();
+    if (restoreFocus) root.querySelector<HTMLButtonElement>(surface.importButtonSelector)?.focus();
   };
 
   const exportBackup = () => {
@@ -129,11 +158,12 @@ export function mountSaveBackupUi(
       options.onStatus(result.rollbackSucceeded
         ? "匯入失敗，原有記錄已完整保留。"
         : "匯入失敗，且瀏覽器未能完整還原原有記錄；請重新整理後檢查。");
-      importButton.focus();
+      root.querySelector<HTMLButtonElement>(surface.importButtonSelector)?.focus();
       return;
     }
     options.onRecordsRestored(saveCount);
-    importButton.focus();
+    options.onStatus(`已從備份還原 ${saveCount} 筆記錄。`);
+    root.querySelector<HTMLButtonElement>(surface.importButtonSelector)?.focus();
   };
 
   const onFileChange = async () => {
@@ -165,36 +195,95 @@ export function mountSaveBackupUi(
     },
     dispose: () => fileInput.removeEventListener("change", onFileChange),
     handleClick: (button) => {
-      const action = button.dataset.startupAction;
-      if (action === "record-export") {
+      const action = button.dataset[surface.actionDataset];
+      if (pendingBackup && action !== surface.confirmAction) return true;
+      if (action === surface.exportAction) {
         exportBackup();
         return true;
       }
-      if (action === "record-import") {
+      if (action === surface.importAction) {
         fileInput.click();
         return true;
       }
-      if (action !== "record-import-confirm") return false;
+      if (action !== surface.confirmAction) return pendingBackup !== undefined;
       setConfirmIndex(Number(button.dataset.importConfirmIndex));
       activateConfirm();
       return true;
     },
     handleKeyDown: (event) => {
-      if (!pendingBackup) return false;
+      if (!pendingBackup) {
+        const focused = document.activeElement instanceof HTMLButtonElement
+          ? document.activeElement
+          : undefined;
+        const action = focused?.dataset[surface.actionDataset];
+        if (
+          !focused
+          || focused.offsetParent === null
+          || (action !== surface.exportAction && action !== surface.importAction)
+        ) {
+          return false;
+        }
+        if (event.key === "Tab") return true;
+        if (event.key !== "Enter" && event.key !== " ") return false;
+        event.preventDefault();
+        if (!event.repeat) focused.click();
+        return true;
+      }
       if (event.key === "Escape") closeConfirm();
       else if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
         setConfirmIndex(confirmIndex === 0 ? 1 : 0);
+      } else if (event.key === "Tab") {
+        setConfirmIndex(confirmIndex === 0 ? 1 : 0);
+        confirm.querySelector<HTMLButtonElement>(
+          `[data-import-confirm-index="${confirmIndex}"]`,
+        )?.focus();
       } else if (event.key === "Enter" || event.key === " ") activateConfirm();
       else return true;
       event.preventDefault();
       return true;
     },
     handlePointerOver: (button) => {
-      const action = button.dataset.startupAction;
-      if (action === "record-import-confirm") setConfirmIndex(Number(button.dataset.importConfirmIndex));
-      return action === "record-import-confirm"
-        || action === "record-export"
-        || action === "record-import";
+      const action = button.dataset[surface.actionDataset];
+      if (action === surface.confirmAction) setConfirmIndex(Number(button.dataset.importConfirmIndex));
+      return action === surface.confirmAction
+        || action === surface.exportAction
+        || action === surface.importAction;
     },
   };
+}
+
+export function mountSaveBackupUi(
+  root: HTMLElement,
+  options: SaveBackupUiOptions,
+): SaveBackupUi {
+  return mountSaveBackupSurface(root, options, {
+    contentSelector: ".startup-record-content",
+    importButtonSelector: "[data-testid=import-save-backup]",
+    fileInputSelector: "[data-testid=import-save-file]",
+    confirmSelector: ".startup-import-confirm",
+    summarySelector: "[data-testid=import-save-summary]",
+    cancelButtonSelector: "[data-testid=cancel-save-import]",
+    actionDataset: "startupAction",
+    exportAction: "record-export",
+    importAction: "record-import",
+    confirmAction: "record-import-confirm",
+  });
+}
+
+export function mountRecordSaveBackupUi(
+  root: HTMLElement,
+  options: SaveBackupUiOptions,
+): SaveBackupUi {
+  return mountSaveBackupSurface(root, options, {
+    contentSelector: "#record-menu",
+    importButtonSelector: "[data-testid=record-backup-import]",
+    fileInputSelector: "[data-testid=record-backup-file]",
+    confirmSelector: ".record-backup-confirm",
+    summarySelector: "[data-testid=record-backup-summary]",
+    cancelButtonSelector: "[data-testid=record-backup-cancel-import]",
+    actionDataset: "action",
+    exportAction: "record-backup-export",
+    importAction: "record-backup-import",
+    confirmAction: "record-backup-import-confirm",
+  });
 }

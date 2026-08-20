@@ -1,5 +1,11 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import {
+  SAVE_BACKUP_FORMAT,
+  SAVE_BACKUP_VERSION,
+  SAVE_CONTENT_VERSION,
+  SAVE_SLOT_COUNT,
+  SAVE_VERSION,
+} from "../../src/game/save";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
 import { skipOpeningToTitle } from "./startup-controls";
@@ -1791,6 +1797,113 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-record-hotspots.png",
   });
+});
+
+test("RHP-03b: in-game record pages export and safely replace all manual slots", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+
+  const battleBeforeBackup = await debugState(page);
+  await page.getByTestId("save-hotspot").click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await expect(page.getByTestId("record-backup-export")).toBeVisible();
+  await expect(page.getByTestId("record-backup-import")).toBeVisible();
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-record-backup-tools.png",
+  });
+  await page.getByTestId("record-slot-1").click();
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+
+  await page.getByTestId("load-hotspot").click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByTestId("record-backup-export").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^angel2-records-\d{8}-\d{6}Z\.json$/);
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const exported = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
+    format: string;
+    version: number;
+    slots: Array<{ version: number } | null>;
+  };
+  expect(exported).toMatchObject({
+    format: SAVE_BACKUP_FORMAT,
+    version: SAVE_BACKUP_VERSION,
+  });
+  expect(exported.slots).toHaveLength(SAVE_SLOT_COUNT);
+  expect(exported.slots[0]?.version).toBe(SAVE_VERSION);
+  await expect(page.getByTestId("record-backup-status")).toHaveText("已匯出 1 筆記錄。");
+
+  const fileInput = page.getByTestId("record-backup-file");
+  await fileInput.setInputFiles({
+    name: "not-a-save.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"format":"wrong"}'),
+  });
+  await expect(page.getByTestId("record-backup-status"))
+    .toHaveText("匯入失敗：檔案格式、版本或記錄內容不相容。");
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).not.toBeNull();
+
+  const currentSave = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as Record<string, unknown>);
+  const slots = Array.from<Record<string, unknown> | null>(
+    { length: SAVE_SLOT_COUNT },
+    () => null,
+  );
+  slots[2] = currentSave;
+  const backup = JSON.stringify({
+    format: SAVE_BACKUP_FORMAT,
+    version: SAVE_BACKUP_VERSION,
+    exportedAt: "2026-08-20T12:34:56.000Z",
+    slots,
+  });
+  const selectBackup = () => fileInput.setInputFiles({
+    name: "angel2-records.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(backup),
+  });
+
+  await selectBackup();
+  const confirm = page.getByTestId("record-backup-confirm");
+  await expect(confirm).toBeVisible();
+  await expect(page.getByTestId("record-backup-cancel-import"))
+    .toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("record-backup-summary"))
+    .toHaveText("備份時間 2026-08-20 12:34 UTC，共 1 筆有效記錄。");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-record-backup-confirm.png",
+  });
+
+  // 批次還原預設停在「取消」，而且取消後仍留在原本的讀取頁。
+  await page.keyboard.press("Enter");
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).not.toBeNull();
+
+  await selectBackup();
+  await page.getByTestId("record-backup-confirm-import").click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await expect(page.getByTestId("record-backup-status")).toHaveText("已從備份還原 1 筆記錄。");
+  await expect(page.getByTestId("record-slot-1")).toContainText("此處沒有記錄");
+  await expect(page.getByTestId("record-slot-1")).toBeDisabled();
+  await expect(page.getByTestId("record-slot-3")).not.toBeDisabled();
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.3"))).not.toBeNull();
+
+  const battleAfterBackup = await debugState(page);
+  expect(battleAfterBackup.units).toEqual(battleBeforeBackup.units);
+  expect(battleAfterBackup.rngState).toBe(battleBeforeBackup.rngState);
+  expect(battleAfterBackup.round).toBe(battleBeforeBackup.round);
+  expect(battleAfterBackup.cursor).toEqual(battleBeforeBackup.cursor);
+  expect(battleAfterBackup.cameraOrigin).toEqual(battleBeforeBackup.cameraOrigin);
 });
 
 test("RHP-04: grid, edge-scroll and portrait objects control persistent presentation only", async ({ page }) => {

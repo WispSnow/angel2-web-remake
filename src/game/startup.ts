@@ -384,11 +384,10 @@ export function mountStartup(
 
   saveBackupUi = mountSaveBackupUi(recordSelector, {
     storage: localStorage,
-    onRecordsRestored: (saveCount) => {
+    onRecordsRestored: () => {
       refreshRecordSlots();
       renderRecordSlots();
       updateMenuSelection();
-      recordDetail.textContent = `已從備份還原 ${saveCount} 筆記錄。`;
     },
     onStatus: (message) => { recordDetail.textContent = message; },
   });

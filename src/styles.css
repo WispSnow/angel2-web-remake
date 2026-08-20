@@ -992,13 +992,27 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .post-save-panel { z-index: 2; }
 .record-panel-title {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   height: 22px;
   color: #ffeab4;
   font-size: 16px;
   line-height: 22px;
   font-weight: 400;
   letter-spacing: .1em;
+}
+.record-panel-title > strong { flex: none; font: inherit; }
+.record-panel-backup-status {
+  min-width: 0;
+  overflow: hidden;
+  color: #fff4c9;
+  font-size: 9px;
+  letter-spacing: 0;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* 標題列與槽位列共用同一套欄寬，表頭才能對齊凸起橫條裡的資料欄。 */
 .record-panel-header,
@@ -1102,6 +1116,34 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .record-panel-pagination > button:hover,
 .record-panel-pagination > button:focus-visible { color: #fff; background: #a8865c; outline: none; }
+.record-panel-backup-tools {
+  grid-column: 1;
+  justify-self: start;
+  display: flex;
+  gap: 4px;
+}
+.record-panel-backup-tools > button,
+.record-backup-confirm-actions > button {
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid #46331f;
+  border-radius: 0;
+  color: #ffeab4;
+  background: #8a6c48;
+  box-shadow: inset 1px 1px 0 #b8996f, inset -1px -1px 0 #543c22;
+  font: 11px/18px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+  text-shadow: 1px 1px #000;
+  cursor: var(--native-cursor-hand, pointer);
+}
+.record-panel-backup-tools > button:hover,
+.record-panel-backup-tools > button:focus-visible,
+.record-backup-confirm-actions > button:hover,
+.record-backup-confirm-actions > button:focus-visible,
+.record-backup-confirm-actions > button.is-selected {
+  color: #fff;
+  background: #a8865c;
+  outline: none;
+}
 .record-panel-cancel {
   grid-column: 3;
   justify-self: end;
@@ -1119,6 +1161,41 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .record-panel-cancel:hover,
 .record-panel-cancel:focus-visible { color: #fff; background: #a8865c; outline: none; }
+.record-backup-confirm.record-panel {
+  z-index: 17;
+  left: 82px;
+  top: 82px;
+  width: 356px;
+  height: auto;
+  min-height: 176px;
+  padding: 15px 18px 14px;
+  text-align: center;
+  box-shadow:
+    0 0 0 1px #150c06,
+    0 0 0 999px #0007,
+    inset 0 0 0 1px #46331f,
+    6px 7px 0 #0009;
+}
+.record-backup-confirm h3 {
+  margin: 0 0 11px;
+  color: #ffeab4;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: .12em;
+}
+.record-backup-confirm p {
+  margin: 6px 0;
+  color: #f0e2c1;
+  font-size: 11px;
+  line-height: 17px;
+}
+.record-backup-confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 13px;
+}
+.record-backup-confirm-actions > button { min-width: 72px; }
 /* Anchored inside the map viewport's top-right corner (right edge 440px, top
    edge 23px) instead of across its floor, where the strip used to sit on top of
    the pieces the player is about to command. The box shrinks to its text and

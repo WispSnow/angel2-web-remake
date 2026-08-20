@@ -64,7 +64,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `styles.css` 的战场层序（底板 → 画布 → `A/0000` 边框 → `A/0005` 雕像前景）：「平滑」缩放会把相机视口 `(40,23,400,308)` 的硬透明边缘向外晕开，边框必须最后绘制 | 无独立单元测试（纯合成顺序） | `display-scaling.spec.ts` 的「the battlefield never bleeds through the window frame」，像素解码见 `screenshot-pixels.ts` |
 | 模块 23 啟動流程：Softstar Logo、加法式调色板淡入、開場背景淡出淡入与 `A/23`+`A/24` 点阵滚动文字（行按 `DS:07C0`/`DS:07CA` 两条遮挡条逐扫描线揭开与遮住、左起点 `x=160`、`REMAKE-113` 的整体下移 8 像素）、標題 8×8 抖动溶解、点阵菜单文字与 50% 棋盘高亮、两套素材与 1608 tick 空闲重播、`Esc`／鼠标右键共用的取消语义与 `REMAKE-114`／`REMAKE-115` 的 `MUSIC/1` 只播一次、取消不打断 | `startup.test.ts` | `startup.spec.ts`；各关卡通过 `startup-controls.ts` 复用真实跳過开场路径——Logo 期间的按键只缩短停留，必须等滚动開場接管后再送一次动作 |
 | 存档 schema 与迁移 | `save.test.ts` | `startup.spec.ts` 或对应关卡的存读档用例 |
-| `src/game/save/backup.ts`、`src/game/save-backup-ui.ts` 的版本化 20 槽备份、逐槽严格迁移校验、完整还原、失败回滚与标题确认表面 | `save-backup.test.ts` | `startup.spec.ts` 的 `BOOT-B backup/restore` |
+| `src/game/save/backup.ts`、`src/game/save-backup-ui.ts` 的版本化 20 槽备份、逐槽严格迁移校验、完整还原、失败回滚，以及标题与战中记录确认表面 | `save-backup.test.ts` | `startup.spec.ts` 的 `BOOT-B backup/restore`；`stage0.spec.ts` 的 `RHP-03b` |
 | 第 4 关内容、行为 12 结界路线与 `route-pulse.ts`／`route-pulse-presentation.ts` 的两层力场电波 | `stage4-content.test.ts`、`stage4-battle.test.ts`、`route-pulse-presentation.test.ts`、`stage-runtime.test.ts` | `stage4.spec.ts` |
 | 第 7 关内容、部署与战斗合同 | `stage7-content.test.ts`、`stage7-battle.test.ts`、`stage-runtime.test.ts` | `stage7.spec.ts` |
 | 第 8 关内容、固定军团与战斗合同 | `stage8-content.test.ts`、`stage8-battle.test.ts`、`stage-runtime.test.ts` | `stage8.spec.ts` |
