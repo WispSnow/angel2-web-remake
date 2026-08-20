@@ -26,6 +26,7 @@
    - 设计解冻门槛：`design/remake-gdd/09-design-acceptance.md`
    - 第 0 关合同：`design/remake-gdd/vertical-slices/stage-00.md`
    - 第 0 关 UI 状态：`design/remake-gdd/ui/stage-00-ui-flow.md`
+   - 游戏发布与 Cloudflare Pages 更新：`docs/release-and-deployment.md`
 4. 修改具体系统时，再阅读 `reverse/notes/` 中相应专题及其链接的机器 JSON，不要只依赖代码注释或记忆。
 
 ## 证据、设计与实现的优先级

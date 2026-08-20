@@ -119,10 +119,12 @@ Agent 负责复核证据，不能仅因反馈看起来合理就改写 `[OF]`。
 | `pnpm exec playwright test <file>` | 定向浏览器验收 | 修改 UI、输入、剧情或玩家流程后 |
 | `pnpm test:e2e:visual <file>` | 生成显式视觉审计证据 | Canvas、动画、HUD 或布局改变后 |
 | `pnpm build` | TypeScript 与生产构建 | 源码、类型、资源引用或打包改变后 |
+| `pnpm build:release` | 重建只含玩家入口的 `release/` | 用户确认形成发布候选后 |
 | `pnpm check` | 完整覆盖率、构建和 E2E 门禁 | 发布候选或用户明确要求全量验证时 |
 
 日常任务默认运行定向测试，不把每次小改动都升级成完整 `pnpm check`。具体源码到测试文件的
-责任映射见 [`tests/README.md`](tests/README.md)。
+责任映射见 [`tests/README.md`](tests/README.md)。Cloudflare Pages 的发布授权、release 预览、
+上传、线上验证与回滚见 [`docs/release-and-deployment.md`](docs/release-and-deployment.md)。
 
 蓝图中出现的 `pnpm gate:spec`、`gate:implement`、`gate:accept` 和 `milestone:set` 是未来候选，
 当前项目没有实现这些命令。

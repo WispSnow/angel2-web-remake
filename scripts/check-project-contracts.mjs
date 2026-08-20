@@ -102,6 +102,7 @@ async function checkMarkdownLinks() {
     "WORKFLOW.md",
     "AGENTS.md",
     "tests/README.md",
+    "docs",
     "planning",
     "design/remake-gdd",
     "reverse/gdd",

@@ -35,6 +35,8 @@ pnpm preview:release
 发布构建输出到 `release/`，只包含主游戏入口和其运行时资源，不生成 `debug.html`、实验室页面或
 调试场景动态模块；技能实验室的落雷帧与实验音频也不会进入发布目录，但战役地图实际使用的职业棋子会保留。
 `release/` 是可重复生成的编译产物，不应手工编辑；正式部署时上传该目录的内容。
+当前线上站点使用 Cloudflare Pages Direct Upload；项目名、授权边界、完整发布、线上验证与回滚
+步骤见 [`docs/release-and-deployment.md`](docs/release-and-deployment.md)。
 
 ## 战役调试中心
 
