@@ -72,6 +72,8 @@ const classSpecs = classIds.map((id, nativeRecord) => ({ id, nativeRecord }));
 const fullCombatProfiles = {};
 const fullCombatAssets = { left: {}, right: {} };
 const fullCombatFrameMeta = { left: {}, right: {} };
+const fullCombatFrameName = (side, classId, set, index) =>
+  `${side}/${classId}/${set}/${String(index).padStart(2, "0")}`;
 const planarManifests = new Map();
 
 async function numberedPngs(directory) {
@@ -158,7 +160,8 @@ for (const spec of classSpecs) {
         path.join(publicRoot, "full-combat", `${side}-${spec.id}-${set}`),
         `/assets/original/full-combat/${side}-${spec.id}-${set}`,
       );
-      fullCombatAssets[side][spec.id][set] = copied.paths;
+      fullCombatAssets[side][spec.id][set] = copied.paths.map((_, index) =>
+        fullCombatFrameName(side, spec.id, set, index));
       fullCombatFrameMeta[side][spec.nativeRecord][set] = copied.images.map(
         (image, index) => ({
           w: image.width,
@@ -177,7 +180,7 @@ const fullCombatCommonEffects = {
     26,
     path.join(publicRoot, "full-combat", "common-trail"),
     "/assets/original/full-combat/common-trail",
-  )).paths,
+  )).paths.map((_, index) => `common/trail/${String(index).padStart(2, "0")}`),
 };
 
 const fullCombatDeath = {

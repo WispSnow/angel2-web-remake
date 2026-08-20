@@ -32340,581 +32340,581 @@ export const STAGE0_FULL_COMBAT_ASSETS = {
   "left": {
     "soldier": {
       "direct": [
-        "/assets/original/full-combat/left-soldier-direct/00.png",
-        "/assets/original/full-combat/left-soldier-direct/01.png",
-        "/assets/original/full-combat/left-soldier-direct/02.png",
-        "/assets/original/full-combat/left-soldier-direct/03.png"
+        "left/soldier/direct/00",
+        "left/soldier/direct/01",
+        "left/soldier/direct/02",
+        "left/soldier/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-soldier-plus50/00.png",
-        "/assets/original/full-combat/left-soldier-plus50/01.png",
-        "/assets/original/full-combat/left-soldier-plus50/02.png",
-        "/assets/original/full-combat/left-soldier-plus50/03.png",
-        "/assets/original/full-combat/left-soldier-plus50/04.png",
-        "/assets/original/full-combat/left-soldier-plus50/05.png"
+        "left/soldier/plus50/00",
+        "left/soldier/plus50/01",
+        "left/soldier/plus50/02",
+        "left/soldier/plus50/03",
+        "left/soldier/plus50/04",
+        "left/soldier/plus50/05"
       ]
     },
     "magic-sword-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-magic-sword-warrior-direct/00.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-direct/01.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-direct/02.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-direct/03.png"
+        "left/magic-sword-warrior/direct/00",
+        "left/magic-sword-warrior/direct/01",
+        "left/magic-sword-warrior/direct/02",
+        "left/magic-sword-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/04.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/05.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/06.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/07.png",
-        "/assets/original/full-combat/left-magic-sword-warrior-plus50/08.png"
+        "left/magic-sword-warrior/plus50/00",
+        "left/magic-sword-warrior/plus50/01",
+        "left/magic-sword-warrior/plus50/02",
+        "left/magic-sword-warrior/plus50/03",
+        "left/magic-sword-warrior/plus50/04",
+        "left/magic-sword-warrior/plus50/05",
+        "left/magic-sword-warrior/plus50/06",
+        "left/magic-sword-warrior/plus50/07",
+        "left/magic-sword-warrior/plus50/08"
       ]
     },
     "jungle-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-jungle-warrior-direct/00.png",
-        "/assets/original/full-combat/left-jungle-warrior-direct/01.png",
-        "/assets/original/full-combat/left-jungle-warrior-direct/02.png",
-        "/assets/original/full-combat/left-jungle-warrior-direct/03.png"
+        "left/jungle-warrior/direct/00",
+        "left/jungle-warrior/direct/01",
+        "left/jungle-warrior/direct/02",
+        "left/jungle-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-jungle-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-jungle-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-jungle-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-jungle-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-jungle-warrior-plus50/04.png"
+        "left/jungle-warrior/plus50/00",
+        "left/jungle-warrior/plus50/01",
+        "left/jungle-warrior/plus50/02",
+        "left/jungle-warrior/plus50/03",
+        "left/jungle-warrior/plus50/04"
       ]
     },
     "magic-priest": {
       "direct": [
-        "/assets/original/full-combat/left-magic-priest-direct/00.png",
-        "/assets/original/full-combat/left-magic-priest-direct/01.png",
-        "/assets/original/full-combat/left-magic-priest-direct/02.png",
-        "/assets/original/full-combat/left-magic-priest-direct/03.png"
+        "left/magic-priest/direct/00",
+        "left/magic-priest/direct/01",
+        "left/magic-priest/direct/02",
+        "left/magic-priest/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-magic-priest-plus50/00.png",
-        "/assets/original/full-combat/left-magic-priest-plus50/01.png",
-        "/assets/original/full-combat/left-magic-priest-plus50/02.png",
-        "/assets/original/full-combat/left-magic-priest-plus50/03.png"
+        "left/magic-priest/plus50/00",
+        "left/magic-priest/plus50/01",
+        "left/magic-priest/plus50/02",
+        "left/magic-priest/plus50/03"
       ]
     },
     "prayer-guide": {
       "direct": [
-        "/assets/original/full-combat/left-prayer-guide-direct/00.png",
-        "/assets/original/full-combat/left-prayer-guide-direct/01.png",
-        "/assets/original/full-combat/left-prayer-guide-direct/02.png",
-        "/assets/original/full-combat/left-prayer-guide-direct/03.png"
+        "left/prayer-guide/direct/00",
+        "left/prayer-guide/direct/01",
+        "left/prayer-guide/direct/02",
+        "left/prayer-guide/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-prayer-guide-plus50/00.png",
-        "/assets/original/full-combat/left-prayer-guide-plus50/01.png",
-        "/assets/original/full-combat/left-prayer-guide-plus50/02.png",
-        "/assets/original/full-combat/left-prayer-guide-plus50/03.png",
-        "/assets/original/full-combat/left-prayer-guide-plus50/04.png"
+        "left/prayer-guide/plus50/00",
+        "left/prayer-guide/plus50/01",
+        "left/prayer-guide/plus50/02",
+        "left/prayer-guide/plus50/03",
+        "left/prayer-guide/plus50/04"
       ]
     },
     "curse-master": {
       "direct": [
-        "/assets/original/full-combat/left-curse-master-direct/00.png",
-        "/assets/original/full-combat/left-curse-master-direct/01.png",
-        "/assets/original/full-combat/left-curse-master-direct/02.png",
-        "/assets/original/full-combat/left-curse-master-direct/03.png"
+        "left/curse-master/direct/00",
+        "left/curse-master/direct/01",
+        "left/curse-master/direct/02",
+        "left/curse-master/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-curse-master-plus50/00.png",
-        "/assets/original/full-combat/left-curse-master-plus50/01.png",
-        "/assets/original/full-combat/left-curse-master-plus50/02.png",
-        "/assets/original/full-combat/left-curse-master-plus50/03.png",
-        "/assets/original/full-combat/left-curse-master-plus50/04.png",
-        "/assets/original/full-combat/left-curse-master-plus50/05.png",
-        "/assets/original/full-combat/left-curse-master-plus50/06.png"
+        "left/curse-master/plus50/00",
+        "left/curse-master/plus50/01",
+        "left/curse-master/plus50/02",
+        "left/curse-master/plus50/03",
+        "left/curse-master/plus50/04",
+        "left/curse-master/plus50/05",
+        "left/curse-master/plus50/06"
       ]
     },
     "magician": {
       "direct": [
-        "/assets/original/full-combat/left-magician-direct/00.png",
-        "/assets/original/full-combat/left-magician-direct/01.png",
-        "/assets/original/full-combat/left-magician-direct/02.png",
-        "/assets/original/full-combat/left-magician-direct/03.png"
+        "left/magician/direct/00",
+        "left/magician/direct/01",
+        "left/magician/direct/02",
+        "left/magician/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-magician-plus50/00.png",
-        "/assets/original/full-combat/left-magician-plus50/01.png",
-        "/assets/original/full-combat/left-magician-plus50/02.png",
-        "/assets/original/full-combat/left-magician-plus50/03.png",
-        "/assets/original/full-combat/left-magician-plus50/04.png",
-        "/assets/original/full-combat/left-magician-plus50/05.png",
-        "/assets/original/full-combat/left-magician-plus50/06.png",
-        "/assets/original/full-combat/left-magician-plus50/07.png"
+        "left/magician/plus50/00",
+        "left/magician/plus50/01",
+        "left/magician/plus50/02",
+        "left/magician/plus50/03",
+        "left/magician/plus50/04",
+        "left/magician/plus50/05",
+        "left/magician/plus50/06",
+        "left/magician/plus50/07"
       ]
     },
     "great-axe-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-great-axe-warrior-direct/00.png",
-        "/assets/original/full-combat/left-great-axe-warrior-direct/01.png",
-        "/assets/original/full-combat/left-great-axe-warrior-direct/02.png",
-        "/assets/original/full-combat/left-great-axe-warrior-direct/03.png"
+        "left/great-axe-warrior/direct/00",
+        "left/great-axe-warrior/direct/01",
+        "left/great-axe-warrior/direct/02",
+        "left/great-axe-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-great-axe-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-great-axe-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-great-axe-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-great-axe-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-great-axe-warrior-plus50/04.png",
-        "/assets/original/full-combat/left-great-axe-warrior-plus50/05.png",
-        "/assets/original/full-combat/left-great-axe-warrior-plus50/06.png"
+        "left/great-axe-warrior/plus50/00",
+        "left/great-axe-warrior/plus50/01",
+        "left/great-axe-warrior/plus50/02",
+        "left/great-axe-warrior/plus50/03",
+        "left/great-axe-warrior/plus50/04",
+        "left/great-axe-warrior/plus50/05",
+        "left/great-axe-warrior/plus50/06"
       ]
     },
     "half-dragon-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-half-dragon-warrior-direct/00.png",
-        "/assets/original/full-combat/left-half-dragon-warrior-direct/01.png",
-        "/assets/original/full-combat/left-half-dragon-warrior-direct/02.png",
-        "/assets/original/full-combat/left-half-dragon-warrior-direct/03.png"
+        "left/half-dragon-warrior/direct/00",
+        "left/half-dragon-warrior/direct/01",
+        "left/half-dragon-warrior/direct/02",
+        "left/half-dragon-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-half-dragon-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-half-dragon-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-half-dragon-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-half-dragon-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-half-dragon-warrior-plus50/04.png",
-        "/assets/original/full-combat/left-half-dragon-warrior-plus50/05.png"
+        "left/half-dragon-warrior/plus50/00",
+        "left/half-dragon-warrior/plus50/01",
+        "left/half-dragon-warrior/plus50/02",
+        "left/half-dragon-warrior/plus50/03",
+        "left/half-dragon-warrior/plus50/04",
+        "left/half-dragon-warrior/plus50/05"
       ]
     },
     "magic-armor-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-magic-armor-warrior-direct/00.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-direct/01.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-direct/02.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-direct/03.png"
+        "left/magic-armor-warrior/direct/00",
+        "left/magic-armor-warrior/direct/01",
+        "left/magic-armor-warrior/direct/02",
+        "left/magic-armor-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-magic-armor-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-plus50/04.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-plus50/05.png",
-        "/assets/original/full-combat/left-magic-armor-warrior-plus50/06.png"
+        "left/magic-armor-warrior/plus50/00",
+        "left/magic-armor-warrior/plus50/01",
+        "left/magic-armor-warrior/plus50/02",
+        "left/magic-armor-warrior/plus50/03",
+        "left/magic-armor-warrior/plus50/04",
+        "left/magic-armor-warrior/plus50/05",
+        "left/magic-armor-warrior/plus50/06"
       ]
     },
     "magic-guide": {
       "direct": [
-        "/assets/original/full-combat/left-magic-guide-direct/00.png",
-        "/assets/original/full-combat/left-magic-guide-direct/01.png",
-        "/assets/original/full-combat/left-magic-guide-direct/02.png",
-        "/assets/original/full-combat/left-magic-guide-direct/03.png"
+        "left/magic-guide/direct/00",
+        "left/magic-guide/direct/01",
+        "left/magic-guide/direct/02",
+        "left/magic-guide/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-magic-guide-plus50/00.png",
-        "/assets/original/full-combat/left-magic-guide-plus50/01.png",
-        "/assets/original/full-combat/left-magic-guide-plus50/02.png",
-        "/assets/original/full-combat/left-magic-guide-plus50/03.png",
-        "/assets/original/full-combat/left-magic-guide-plus50/04.png",
-        "/assets/original/full-combat/left-magic-guide-plus50/05.png"
+        "left/magic-guide/plus50/00",
+        "left/magic-guide/plus50/01",
+        "left/magic-guide/plus50/02",
+        "left/magic-guide/plus50/03",
+        "left/magic-guide/plus50/04",
+        "left/magic-guide/plus50/05"
       ]
     },
     "evil-mage": {
       "direct": [
-        "/assets/original/full-combat/left-evil-mage-direct/00.png",
-        "/assets/original/full-combat/left-evil-mage-direct/01.png",
-        "/assets/original/full-combat/left-evil-mage-direct/02.png",
-        "/assets/original/full-combat/left-evil-mage-direct/03.png"
+        "left/evil-mage/direct/00",
+        "left/evil-mage/direct/01",
+        "left/evil-mage/direct/02",
+        "left/evil-mage/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-evil-mage-plus50/00.png",
-        "/assets/original/full-combat/left-evil-mage-plus50/01.png",
-        "/assets/original/full-combat/left-evil-mage-plus50/02.png",
-        "/assets/original/full-combat/left-evil-mage-plus50/03.png",
-        "/assets/original/full-combat/left-evil-mage-plus50/04.png",
-        "/assets/original/full-combat/left-evil-mage-plus50/05.png"
+        "left/evil-mage/plus50/00",
+        "left/evil-mage/plus50/01",
+        "left/evil-mage/plus50/02",
+        "left/evil-mage/plus50/03",
+        "left/evil-mage/plus50/04",
+        "left/evil-mage/plus50/05"
       ]
     },
     "magic-archer": {
       "direct": [
-        "/assets/original/full-combat/left-magic-archer-direct/00.png",
-        "/assets/original/full-combat/left-magic-archer-direct/01.png",
-        "/assets/original/full-combat/left-magic-archer-direct/02.png",
-        "/assets/original/full-combat/left-magic-archer-direct/03.png"
+        "left/magic-archer/direct/00",
+        "left/magic-archer/direct/01",
+        "left/magic-archer/direct/02",
+        "left/magic-archer/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-magic-archer-plus50/00.png",
-        "/assets/original/full-combat/left-magic-archer-plus50/01.png",
-        "/assets/original/full-combat/left-magic-archer-plus50/02.png",
-        "/assets/original/full-combat/left-magic-archer-plus50/03.png"
+        "left/magic-archer/plus50/00",
+        "left/magic-archer/plus50/01",
+        "left/magic-archer/plus50/02",
+        "left/magic-archer/plus50/03"
       ]
     },
     "land-knight": {
       "direct": [
-        "/assets/original/full-combat/left-land-knight-direct/00.png",
-        "/assets/original/full-combat/left-land-knight-direct/01.png",
-        "/assets/original/full-combat/left-land-knight-direct/02.png",
-        "/assets/original/full-combat/left-land-knight-direct/03.png"
+        "left/land-knight/direct/00",
+        "left/land-knight/direct/01",
+        "left/land-knight/direct/02",
+        "left/land-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-land-knight-plus50/00.png",
-        "/assets/original/full-combat/left-land-knight-plus50/01.png",
-        "/assets/original/full-combat/left-land-knight-plus50/02.png",
-        "/assets/original/full-combat/left-land-knight-plus50/03.png",
-        "/assets/original/full-combat/left-land-knight-plus50/04.png",
-        "/assets/original/full-combat/left-land-knight-plus50/05.png",
-        "/assets/original/full-combat/left-land-knight-plus50/06.png",
-        "/assets/original/full-combat/left-land-knight-plus50/07.png"
+        "left/land-knight/plus50/00",
+        "left/land-knight/plus50/01",
+        "left/land-knight/plus50/02",
+        "left/land-knight/plus50/03",
+        "left/land-knight/plus50/04",
+        "left/land-knight/plus50/05",
+        "left/land-knight/plus50/06",
+        "left/land-knight/plus50/07"
       ]
     },
     "demon-dragon-knight": {
       "direct": [
-        "/assets/original/full-combat/left-demon-dragon-knight-direct/00.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-direct/01.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-direct/02.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-direct/03.png"
+        "left/demon-dragon-knight/direct/00",
+        "left/demon-dragon-knight/direct/01",
+        "left/demon-dragon-knight/direct/02",
+        "left/demon-dragon-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/00.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/01.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/02.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/03.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/04.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/05.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/06.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/07.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/08.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/09.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/10.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/11.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/12.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/13.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/14.png",
-        "/assets/original/full-combat/left-demon-dragon-knight-plus50/15.png"
+        "left/demon-dragon-knight/plus50/00",
+        "left/demon-dragon-knight/plus50/01",
+        "left/demon-dragon-knight/plus50/02",
+        "left/demon-dragon-knight/plus50/03",
+        "left/demon-dragon-knight/plus50/04",
+        "left/demon-dragon-knight/plus50/05",
+        "left/demon-dragon-knight/plus50/06",
+        "left/demon-dragon-knight/plus50/07",
+        "left/demon-dragon-knight/plus50/08",
+        "left/demon-dragon-knight/plus50/09",
+        "left/demon-dragon-knight/plus50/10",
+        "left/demon-dragon-knight/plus50/11",
+        "left/demon-dragon-knight/plus50/12",
+        "left/demon-dragon-knight/plus50/13",
+        "left/demon-dragon-knight/plus50/14",
+        "left/demon-dragon-knight/plus50/15"
       ]
     },
     "flying-dragon-knight": {
       "direct": [
-        "/assets/original/full-combat/left-flying-dragon-knight-direct/00.png",
-        "/assets/original/full-combat/left-flying-dragon-knight-direct/01.png",
-        "/assets/original/full-combat/left-flying-dragon-knight-direct/02.png",
-        "/assets/original/full-combat/left-flying-dragon-knight-direct/03.png"
+        "left/flying-dragon-knight/direct/00",
+        "left/flying-dragon-knight/direct/01",
+        "left/flying-dragon-knight/direct/02",
+        "left/flying-dragon-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-flying-dragon-knight-plus50/00.png",
-        "/assets/original/full-combat/left-flying-dragon-knight-plus50/01.png",
-        "/assets/original/full-combat/left-flying-dragon-knight-plus50/02.png",
-        "/assets/original/full-combat/left-flying-dragon-knight-plus50/03.png"
+        "left/flying-dragon-knight/plus50/00",
+        "left/flying-dragon-knight/plus50/01",
+        "left/flying-dragon-knight/plus50/02",
+        "left/flying-dragon-knight/plus50/03"
       ]
     },
     "beast-knight": {
       "direct": [
-        "/assets/original/full-combat/left-beast-knight-direct/00.png",
-        "/assets/original/full-combat/left-beast-knight-direct/01.png",
-        "/assets/original/full-combat/left-beast-knight-direct/02.png",
-        "/assets/original/full-combat/left-beast-knight-direct/03.png"
+        "left/beast-knight/direct/00",
+        "left/beast-knight/direct/01",
+        "left/beast-knight/direct/02",
+        "left/beast-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-beast-knight-plus50/00.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/01.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/02.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/03.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/04.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/05.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/06.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/07.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/08.png",
-        "/assets/original/full-combat/left-beast-knight-plus50/09.png"
+        "left/beast-knight/plus50/00",
+        "left/beast-knight/plus50/01",
+        "left/beast-knight/plus50/02",
+        "left/beast-knight/plus50/03",
+        "left/beast-knight/plus50/04",
+        "left/beast-knight/plus50/05",
+        "left/beast-knight/plus50/06",
+        "left/beast-knight/plus50/07",
+        "left/beast-knight/plus50/08",
+        "left/beast-knight/plus50/09"
       ]
     },
     "bone-knight": {
       "direct": [
-        "/assets/original/full-combat/left-bone-knight-direct/00.png",
-        "/assets/original/full-combat/left-bone-knight-direct/01.png",
-        "/assets/original/full-combat/left-bone-knight-direct/02.png",
-        "/assets/original/full-combat/left-bone-knight-direct/03.png"
+        "left/bone-knight/direct/00",
+        "left/bone-knight/direct/01",
+        "left/bone-knight/direct/02",
+        "left/bone-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-bone-knight-plus50/00.png",
-        "/assets/original/full-combat/left-bone-knight-plus50/01.png",
-        "/assets/original/full-combat/left-bone-knight-plus50/02.png",
-        "/assets/original/full-combat/left-bone-knight-plus50/03.png",
-        "/assets/original/full-combat/left-bone-knight-plus50/04.png"
+        "left/bone-knight/plus50/00",
+        "left/bone-knight/plus50/01",
+        "left/bone-knight/plus50/02",
+        "left/bone-knight/plus50/03",
+        "left/bone-knight/plus50/04"
       ]
     },
     "swift-dragon-knight": {
       "direct": [
-        "/assets/original/full-combat/left-swift-dragon-knight-direct/00.png",
-        "/assets/original/full-combat/left-swift-dragon-knight-direct/01.png",
-        "/assets/original/full-combat/left-swift-dragon-knight-direct/02.png",
-        "/assets/original/full-combat/left-swift-dragon-knight-direct/03.png"
+        "left/swift-dragon-knight/direct/00",
+        "left/swift-dragon-knight/direct/01",
+        "left/swift-dragon-knight/direct/02",
+        "left/swift-dragon-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-swift-dragon-knight-plus50/00.png",
-        "/assets/original/full-combat/left-swift-dragon-knight-plus50/01.png",
-        "/assets/original/full-combat/left-swift-dragon-knight-plus50/02.png",
-        "/assets/original/full-combat/left-swift-dragon-knight-plus50/03.png",
-        "/assets/original/full-combat/left-swift-dragon-knight-plus50/04.png"
+        "left/swift-dragon-knight/plus50/00",
+        "left/swift-dragon-knight/plus50/01",
+        "left/swift-dragon-knight/plus50/02",
+        "left/swift-dragon-knight/plus50/03",
+        "left/swift-dragon-knight/plus50/04"
       ]
     },
     "great-dragon-knight": {
       "direct": [
-        "/assets/original/full-combat/left-great-dragon-knight-direct/00.png",
-        "/assets/original/full-combat/left-great-dragon-knight-direct/01.png",
-        "/assets/original/full-combat/left-great-dragon-knight-direct/02.png",
-        "/assets/original/full-combat/left-great-dragon-knight-direct/03.png"
+        "left/great-dragon-knight/direct/00",
+        "left/great-dragon-knight/direct/01",
+        "left/great-dragon-knight/direct/02",
+        "left/great-dragon-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-great-dragon-knight-plus50/00.png",
-        "/assets/original/full-combat/left-great-dragon-knight-plus50/01.png",
-        "/assets/original/full-combat/left-great-dragon-knight-plus50/02.png",
-        "/assets/original/full-combat/left-great-dragon-knight-plus50/03.png",
-        "/assets/original/full-combat/left-great-dragon-knight-plus50/04.png"
+        "left/great-dragon-knight/plus50/00",
+        "left/great-dragon-knight/plus50/01",
+        "left/great-dragon-knight/plus50/02",
+        "left/great-dragon-knight/plus50/03",
+        "left/great-dragon-knight/plus50/04"
       ]
     },
     "archer": {
       "direct": [
-        "/assets/original/full-combat/left-archer-direct/00.png",
-        "/assets/original/full-combat/left-archer-direct/01.png",
-        "/assets/original/full-combat/left-archer-direct/02.png",
-        "/assets/original/full-combat/left-archer-direct/03.png"
+        "left/archer/direct/00",
+        "left/archer/direct/01",
+        "left/archer/direct/02",
+        "left/archer/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-archer-plus50/00.png",
-        "/assets/original/full-combat/left-archer-plus50/01.png",
-        "/assets/original/full-combat/left-archer-plus50/02.png",
-        "/assets/original/full-combat/left-archer-plus50/03.png",
-        "/assets/original/full-combat/left-archer-plus50/04.png",
-        "/assets/original/full-combat/left-archer-plus50/05.png",
-        "/assets/original/full-combat/left-archer-plus50/06.png",
-        "/assets/original/full-combat/left-archer-plus50/07.png",
-        "/assets/original/full-combat/left-archer-plus50/08.png"
+        "left/archer/plus50/00",
+        "left/archer/plus50/01",
+        "left/archer/plus50/02",
+        "left/archer/plus50/03",
+        "left/archer/plus50/04",
+        "left/archer/plus50/05",
+        "left/archer/plus50/06",
+        "left/archer/plus50/07",
+        "left/archer/plus50/08"
       ]
     },
     "crossbow": {
       "direct": [
-        "/assets/original/full-combat/left-crossbow-direct/00.png",
-        "/assets/original/full-combat/left-crossbow-direct/01.png",
-        "/assets/original/full-combat/left-crossbow-direct/02.png",
-        "/assets/original/full-combat/left-crossbow-direct/03.png"
+        "left/crossbow/direct/00",
+        "left/crossbow/direct/01",
+        "left/crossbow/direct/02",
+        "left/crossbow/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-crossbow-plus50/00.png",
-        "/assets/original/full-combat/left-crossbow-plus50/01.png",
-        "/assets/original/full-combat/left-crossbow-plus50/02.png",
-        "/assets/original/full-combat/left-crossbow-plus50/03.png",
-        "/assets/original/full-combat/left-crossbow-plus50/04.png",
-        "/assets/original/full-combat/left-crossbow-plus50/05.png"
+        "left/crossbow/plus50/00",
+        "left/crossbow/plus50/01",
+        "left/crossbow/plus50/02",
+        "left/crossbow/plus50/03",
+        "left/crossbow/plus50/04",
+        "left/crossbow/plus50/05"
       ]
     },
     "cavalry": {
       "direct": [
-        "/assets/original/full-combat/left-cavalry-direct/00.png",
-        "/assets/original/full-combat/left-cavalry-direct/01.png",
-        "/assets/original/full-combat/left-cavalry-direct/02.png",
-        "/assets/original/full-combat/left-cavalry-direct/03.png"
+        "left/cavalry/direct/00",
+        "left/cavalry/direct/01",
+        "left/cavalry/direct/02",
+        "left/cavalry/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-cavalry-plus50/00.png",
-        "/assets/original/full-combat/left-cavalry-plus50/01.png",
-        "/assets/original/full-combat/left-cavalry-plus50/02.png",
-        "/assets/original/full-combat/left-cavalry-plus50/03.png",
-        "/assets/original/full-combat/left-cavalry-plus50/04.png",
-        "/assets/original/full-combat/left-cavalry-plus50/05.png",
-        "/assets/original/full-combat/left-cavalry-plus50/06.png",
-        "/assets/original/full-combat/left-cavalry-plus50/07.png",
-        "/assets/original/full-combat/left-cavalry-plus50/08.png"
+        "left/cavalry/plus50/00",
+        "left/cavalry/plus50/01",
+        "left/cavalry/plus50/02",
+        "left/cavalry/plus50/03",
+        "left/cavalry/plus50/04",
+        "left/cavalry/plus50/05",
+        "left/cavalry/plus50/06",
+        "left/cavalry/plus50/07",
+        "left/cavalry/plus50/08"
       ]
     },
     "pegasus-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-pegasus-warrior-direct/00.png",
-        "/assets/original/full-combat/left-pegasus-warrior-direct/01.png",
-        "/assets/original/full-combat/left-pegasus-warrior-direct/02.png",
-        "/assets/original/full-combat/left-pegasus-warrior-direct/03.png"
+        "left/pegasus-warrior/direct/00",
+        "left/pegasus-warrior/direct/01",
+        "left/pegasus-warrior/direct/02",
+        "left/pegasus-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-pegasus-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-pegasus-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-pegasus-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-pegasus-warrior-plus50/03.png"
+        "left/pegasus-warrior/plus50/00",
+        "left/pegasus-warrior/plus50/01",
+        "left/pegasus-warrior/plus50/02",
+        "left/pegasus-warrior/plus50/03"
       ]
     },
     "sister": {
       "direct": [
-        "/assets/original/full-combat/left-sister-direct/00.png",
-        "/assets/original/full-combat/left-sister-direct/01.png",
-        "/assets/original/full-combat/left-sister-direct/02.png",
-        "/assets/original/full-combat/left-sister-direct/03.png"
+        "left/sister/direct/00",
+        "left/sister/direct/01",
+        "left/sister/direct/02",
+        "left/sister/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-sister-plus50/00.png",
-        "/assets/original/full-combat/left-sister-plus50/01.png",
-        "/assets/original/full-combat/left-sister-plus50/02.png",
-        "/assets/original/full-combat/left-sister-plus50/03.png",
-        "/assets/original/full-combat/left-sister-plus50/04.png",
-        "/assets/original/full-combat/left-sister-plus50/05.png",
-        "/assets/original/full-combat/left-sister-plus50/06.png"
+        "left/sister/plus50/00",
+        "left/sister/plus50/01",
+        "left/sister/plus50/02",
+        "left/sister/plus50/03",
+        "left/sister/plus50/04",
+        "left/sister/plus50/05",
+        "left/sister/plus50/06"
       ]
     },
     "monk": {
       "direct": [
-        "/assets/original/full-combat/left-monk-direct/00.png",
-        "/assets/original/full-combat/left-monk-direct/01.png",
-        "/assets/original/full-combat/left-monk-direct/02.png",
-        "/assets/original/full-combat/left-monk-direct/03.png"
+        "left/monk/direct/00",
+        "left/monk/direct/01",
+        "left/monk/direct/02",
+        "left/monk/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-monk-plus50/00.png",
-        "/assets/original/full-combat/left-monk-plus50/01.png",
-        "/assets/original/full-combat/left-monk-plus50/02.png",
-        "/assets/original/full-combat/left-monk-plus50/03.png",
-        "/assets/original/full-combat/left-monk-plus50/04.png",
-        "/assets/original/full-combat/left-monk-plus50/05.png",
-        "/assets/original/full-combat/left-monk-plus50/06.png",
-        "/assets/original/full-combat/left-monk-plus50/07.png",
-        "/assets/original/full-combat/left-monk-plus50/08.png",
-        "/assets/original/full-combat/left-monk-plus50/09.png",
-        "/assets/original/full-combat/left-monk-plus50/10.png"
+        "left/monk/plus50/00",
+        "left/monk/plus50/01",
+        "left/monk/plus50/02",
+        "left/monk/plus50/03",
+        "left/monk/plus50/04",
+        "left/monk/plus50/05",
+        "left/monk/plus50/06",
+        "left/monk/plus50/07",
+        "left/monk/plus50/08",
+        "left/monk/plus50/09",
+        "left/monk/plus50/10"
       ]
     },
     "water-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-water-warrior-direct/00.png",
-        "/assets/original/full-combat/left-water-warrior-direct/01.png",
-        "/assets/original/full-combat/left-water-warrior-direct/02.png",
-        "/assets/original/full-combat/left-water-warrior-direct/03.png"
+        "left/water-warrior/direct/00",
+        "left/water-warrior/direct/01",
+        "left/water-warrior/direct/02",
+        "left/water-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-water-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-water-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-water-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-water-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-water-warrior-plus50/04.png",
-        "/assets/original/full-combat/left-water-warrior-plus50/05.png",
-        "/assets/original/full-combat/left-water-warrior-plus50/06.png"
+        "left/water-warrior/plus50/00",
+        "left/water-warrior/plus50/01",
+        "left/water-warrior/plus50/02",
+        "left/water-warrior/plus50/03",
+        "left/water-warrior/plus50/04",
+        "left/water-warrior/plus50/05",
+        "left/water-warrior/plus50/06"
       ]
     },
     "divine-sword-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-divine-sword-warrior-direct/00.png",
-        "/assets/original/full-combat/left-divine-sword-warrior-direct/01.png",
-        "/assets/original/full-combat/left-divine-sword-warrior-direct/02.png",
-        "/assets/original/full-combat/left-divine-sword-warrior-direct/03.png"
+        "left/divine-sword-warrior/direct/00",
+        "left/divine-sword-warrior/direct/01",
+        "left/divine-sword-warrior/direct/02",
+        "left/divine-sword-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-divine-sword-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-divine-sword-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-divine-sword-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-divine-sword-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-divine-sword-warrior-plus50/04.png",
-        "/assets/original/full-combat/left-divine-sword-warrior-plus50/05.png"
+        "left/divine-sword-warrior/plus50/00",
+        "left/divine-sword-warrior/plus50/01",
+        "left/divine-sword-warrior/plus50/02",
+        "left/divine-sword-warrior/plus50/03",
+        "left/divine-sword-warrior/plus50/04",
+        "left/divine-sword-warrior/plus50/05"
       ]
     },
     "warrior": {
       "direct": [
-        "/assets/original/full-combat/left-warrior-direct/00.png",
-        "/assets/original/full-combat/left-warrior-direct/01.png",
-        "/assets/original/full-combat/left-warrior-direct/02.png",
-        "/assets/original/full-combat/left-warrior-direct/03.png"
+        "left/warrior/direct/00",
+        "left/warrior/direct/01",
+        "left/warrior/direct/02",
+        "left/warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-warrior-plus50/04.png"
+        "left/warrior/plus50/00",
+        "left/warrior/plus50/01",
+        "left/warrior/plus50/02",
+        "left/warrior/plus50/03",
+        "left/warrior/plus50/04"
       ]
     },
     "steel-armor-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-steel-armor-warrior-direct/00.png",
-        "/assets/original/full-combat/left-steel-armor-warrior-direct/01.png",
-        "/assets/original/full-combat/left-steel-armor-warrior-direct/02.png",
-        "/assets/original/full-combat/left-steel-armor-warrior-direct/03.png"
+        "left/steel-armor-warrior/direct/00",
+        "left/steel-armor-warrior/direct/01",
+        "left/steel-armor-warrior/direct/02",
+        "left/steel-armor-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-steel-armor-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-steel-armor-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-steel-armor-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-steel-armor-warrior-plus50/03.png"
+        "left/steel-armor-warrior/plus50/00",
+        "left/steel-armor-warrior/plus50/01",
+        "left/steel-armor-warrior/plus50/02",
+        "left/steel-armor-warrior/plus50/03"
       ]
     },
     "priest": {
       "direct": [
-        "/assets/original/full-combat/left-priest-direct/00.png",
-        "/assets/original/full-combat/left-priest-direct/01.png",
-        "/assets/original/full-combat/left-priest-direct/02.png",
-        "/assets/original/full-combat/left-priest-direct/03.png"
+        "left/priest/direct/00",
+        "left/priest/direct/01",
+        "left/priest/direct/02",
+        "left/priest/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-priest-plus50/00.png",
-        "/assets/original/full-combat/left-priest-plus50/01.png",
-        "/assets/original/full-combat/left-priest-plus50/02.png",
-        "/assets/original/full-combat/left-priest-plus50/03.png",
-        "/assets/original/full-combat/left-priest-plus50/04.png",
-        "/assets/original/full-combat/left-priest-plus50/05.png",
-        "/assets/original/full-combat/left-priest-plus50/06.png",
-        "/assets/original/full-combat/left-priest-plus50/07.png",
-        "/assets/original/full-combat/left-priest-plus50/08.png",
-        "/assets/original/full-combat/left-priest-plus50/09.png",
-        "/assets/original/full-combat/left-priest-plus50/10.png",
-        "/assets/original/full-combat/left-priest-plus50/11.png",
-        "/assets/original/full-combat/left-priest-plus50/12.png",
-        "/assets/original/full-combat/left-priest-plus50/13.png"
+        "left/priest/plus50/00",
+        "left/priest/plus50/01",
+        "left/priest/plus50/02",
+        "left/priest/plus50/03",
+        "left/priest/plus50/04",
+        "left/priest/plus50/05",
+        "left/priest/plus50/06",
+        "left/priest/plus50/07",
+        "left/priest/plus50/08",
+        "left/priest/plus50/09",
+        "left/priest/plus50/10",
+        "left/priest/plus50/11",
+        "left/priest/plus50/12",
+        "left/priest/plus50/13"
       ]
     },
     "wizard": {
       "direct": [
-        "/assets/original/full-combat/left-wizard-direct/00.png",
-        "/assets/original/full-combat/left-wizard-direct/01.png",
-        "/assets/original/full-combat/left-wizard-direct/02.png",
-        "/assets/original/full-combat/left-wizard-direct/03.png"
+        "left/wizard/direct/00",
+        "left/wizard/direct/01",
+        "left/wizard/direct/02",
+        "left/wizard/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-wizard-plus50/00.png",
-        "/assets/original/full-combat/left-wizard-plus50/01.png",
-        "/assets/original/full-combat/left-wizard-plus50/02.png"
+        "left/wizard/plus50/00",
+        "left/wizard/plus50/01",
+        "left/wizard/plus50/02"
       ]
     },
     "magic-master": {
       "direct": [
-        "/assets/original/full-combat/left-magic-master-direct/00.png",
-        "/assets/original/full-combat/left-magic-master-direct/01.png",
-        "/assets/original/full-combat/left-magic-master-direct/02.png",
-        "/assets/original/full-combat/left-magic-master-direct/03.png"
+        "left/magic-master/direct/00",
+        "left/magic-master/direct/01",
+        "left/magic-master/direct/02",
+        "left/magic-master/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-magic-master-plus50/00.png",
-        "/assets/original/full-combat/left-magic-master-plus50/01.png",
-        "/assets/original/full-combat/left-magic-master-plus50/02.png"
+        "left/magic-master/plus50/00",
+        "left/magic-master/plus50/01",
+        "left/magic-master/plus50/02"
       ]
     },
     "evil-sword-warrior": {
       "direct": [
-        "/assets/original/full-combat/left-evil-sword-warrior-direct/00.png",
-        "/assets/original/full-combat/left-evil-sword-warrior-direct/01.png",
-        "/assets/original/full-combat/left-evil-sword-warrior-direct/02.png",
-        "/assets/original/full-combat/left-evil-sword-warrior-direct/03.png"
+        "left/evil-sword-warrior/direct/00",
+        "left/evil-sword-warrior/direct/01",
+        "left/evil-sword-warrior/direct/02",
+        "left/evil-sword-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-evil-sword-warrior-plus50/00.png",
-        "/assets/original/full-combat/left-evil-sword-warrior-plus50/01.png",
-        "/assets/original/full-combat/left-evil-sword-warrior-plus50/02.png",
-        "/assets/original/full-combat/left-evil-sword-warrior-plus50/03.png",
-        "/assets/original/full-combat/left-evil-sword-warrior-plus50/04.png"
+        "left/evil-sword-warrior/plus50/00",
+        "left/evil-sword-warrior/plus50/01",
+        "left/evil-sword-warrior/plus50/02",
+        "left/evil-sword-warrior/plus50/03",
+        "left/evil-sword-warrior/plus50/04"
       ]
     },
     "engineer": {
       "direct": [
-        "/assets/original/full-combat/left-engineer-direct/00.png",
-        "/assets/original/full-combat/left-engineer-direct/01.png",
-        "/assets/original/full-combat/left-engineer-direct/02.png",
-        "/assets/original/full-combat/left-engineer-direct/03.png"
+        "left/engineer/direct/00",
+        "left/engineer/direct/01",
+        "left/engineer/direct/02",
+        "left/engineer/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/left-engineer-plus50/00.png",
-        "/assets/original/full-combat/left-engineer-plus50/01.png",
-        "/assets/original/full-combat/left-engineer-plus50/02.png"
+        "left/engineer/plus50/00",
+        "left/engineer/plus50/01",
+        "left/engineer/plus50/02"
       ]
     },
     "empress": {
@@ -32925,638 +32925,638 @@ export const STAGE0_FULL_COMBAT_ASSETS = {
   "right": {
     "soldier": {
       "direct": [
-        "/assets/original/full-combat/right-soldier-direct/00.png",
-        "/assets/original/full-combat/right-soldier-direct/01.png",
-        "/assets/original/full-combat/right-soldier-direct/02.png",
-        "/assets/original/full-combat/right-soldier-direct/03.png"
+        "right/soldier/direct/00",
+        "right/soldier/direct/01",
+        "right/soldier/direct/02",
+        "right/soldier/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-soldier-plus50/00.png",
-        "/assets/original/full-combat/right-soldier-plus50/01.png",
-        "/assets/original/full-combat/right-soldier-plus50/02.png",
-        "/assets/original/full-combat/right-soldier-plus50/03.png",
-        "/assets/original/full-combat/right-soldier-plus50/04.png",
-        "/assets/original/full-combat/right-soldier-plus50/05.png"
+        "right/soldier/plus50/00",
+        "right/soldier/plus50/01",
+        "right/soldier/plus50/02",
+        "right/soldier/plus50/03",
+        "right/soldier/plus50/04",
+        "right/soldier/plus50/05"
       ]
     },
     "magic-sword-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-magic-sword-warrior-direct/00.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-direct/01.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-direct/02.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-direct/03.png"
+        "right/magic-sword-warrior/direct/00",
+        "right/magic-sword-warrior/direct/01",
+        "right/magic-sword-warrior/direct/02",
+        "right/magic-sword-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/04.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/05.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/06.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/07.png",
-        "/assets/original/full-combat/right-magic-sword-warrior-plus50/08.png"
+        "right/magic-sword-warrior/plus50/00",
+        "right/magic-sword-warrior/plus50/01",
+        "right/magic-sword-warrior/plus50/02",
+        "right/magic-sword-warrior/plus50/03",
+        "right/magic-sword-warrior/plus50/04",
+        "right/magic-sword-warrior/plus50/05",
+        "right/magic-sword-warrior/plus50/06",
+        "right/magic-sword-warrior/plus50/07",
+        "right/magic-sword-warrior/plus50/08"
       ]
     },
     "jungle-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-jungle-warrior-direct/00.png",
-        "/assets/original/full-combat/right-jungle-warrior-direct/01.png",
-        "/assets/original/full-combat/right-jungle-warrior-direct/02.png",
-        "/assets/original/full-combat/right-jungle-warrior-direct/03.png"
+        "right/jungle-warrior/direct/00",
+        "right/jungle-warrior/direct/01",
+        "right/jungle-warrior/direct/02",
+        "right/jungle-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-jungle-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-jungle-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-jungle-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-jungle-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-jungle-warrior-plus50/04.png"
+        "right/jungle-warrior/plus50/00",
+        "right/jungle-warrior/plus50/01",
+        "right/jungle-warrior/plus50/02",
+        "right/jungle-warrior/plus50/03",
+        "right/jungle-warrior/plus50/04"
       ]
     },
     "magic-priest": {
       "direct": [
-        "/assets/original/full-combat/right-magic-priest-direct/00.png",
-        "/assets/original/full-combat/right-magic-priest-direct/01.png",
-        "/assets/original/full-combat/right-magic-priest-direct/02.png",
-        "/assets/original/full-combat/right-magic-priest-direct/03.png"
+        "right/magic-priest/direct/00",
+        "right/magic-priest/direct/01",
+        "right/magic-priest/direct/02",
+        "right/magic-priest/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-magic-priest-plus50/00.png",
-        "/assets/original/full-combat/right-magic-priest-plus50/01.png",
-        "/assets/original/full-combat/right-magic-priest-plus50/02.png",
-        "/assets/original/full-combat/right-magic-priest-plus50/03.png"
+        "right/magic-priest/plus50/00",
+        "right/magic-priest/plus50/01",
+        "right/magic-priest/plus50/02",
+        "right/magic-priest/plus50/03"
       ]
     },
     "prayer-guide": {
       "direct": [
-        "/assets/original/full-combat/right-prayer-guide-direct/00.png",
-        "/assets/original/full-combat/right-prayer-guide-direct/01.png",
-        "/assets/original/full-combat/right-prayer-guide-direct/02.png",
-        "/assets/original/full-combat/right-prayer-guide-direct/03.png"
+        "right/prayer-guide/direct/00",
+        "right/prayer-guide/direct/01",
+        "right/prayer-guide/direct/02",
+        "right/prayer-guide/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-prayer-guide-plus50/00.png",
-        "/assets/original/full-combat/right-prayer-guide-plus50/01.png",
-        "/assets/original/full-combat/right-prayer-guide-plus50/02.png",
-        "/assets/original/full-combat/right-prayer-guide-plus50/03.png",
-        "/assets/original/full-combat/right-prayer-guide-plus50/04.png"
+        "right/prayer-guide/plus50/00",
+        "right/prayer-guide/plus50/01",
+        "right/prayer-guide/plus50/02",
+        "right/prayer-guide/plus50/03",
+        "right/prayer-guide/plus50/04"
       ]
     },
     "curse-master": {
       "direct": [
-        "/assets/original/full-combat/right-curse-master-direct/00.png",
-        "/assets/original/full-combat/right-curse-master-direct/01.png",
-        "/assets/original/full-combat/right-curse-master-direct/02.png",
-        "/assets/original/full-combat/right-curse-master-direct/03.png"
+        "right/curse-master/direct/00",
+        "right/curse-master/direct/01",
+        "right/curse-master/direct/02",
+        "right/curse-master/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-curse-master-plus50/00.png",
-        "/assets/original/full-combat/right-curse-master-plus50/01.png",
-        "/assets/original/full-combat/right-curse-master-plus50/02.png",
-        "/assets/original/full-combat/right-curse-master-plus50/03.png",
-        "/assets/original/full-combat/right-curse-master-plus50/04.png",
-        "/assets/original/full-combat/right-curse-master-plus50/05.png",
-        "/assets/original/full-combat/right-curse-master-plus50/06.png"
+        "right/curse-master/plus50/00",
+        "right/curse-master/plus50/01",
+        "right/curse-master/plus50/02",
+        "right/curse-master/plus50/03",
+        "right/curse-master/plus50/04",
+        "right/curse-master/plus50/05",
+        "right/curse-master/plus50/06"
       ]
     },
     "magician": {
       "direct": [
-        "/assets/original/full-combat/right-magician-direct/00.png",
-        "/assets/original/full-combat/right-magician-direct/01.png",
-        "/assets/original/full-combat/right-magician-direct/02.png",
-        "/assets/original/full-combat/right-magician-direct/03.png"
+        "right/magician/direct/00",
+        "right/magician/direct/01",
+        "right/magician/direct/02",
+        "right/magician/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-magician-plus50/00.png",
-        "/assets/original/full-combat/right-magician-plus50/01.png",
-        "/assets/original/full-combat/right-magician-plus50/02.png",
-        "/assets/original/full-combat/right-magician-plus50/03.png",
-        "/assets/original/full-combat/right-magician-plus50/04.png",
-        "/assets/original/full-combat/right-magician-plus50/05.png",
-        "/assets/original/full-combat/right-magician-plus50/06.png",
-        "/assets/original/full-combat/right-magician-plus50/07.png"
+        "right/magician/plus50/00",
+        "right/magician/plus50/01",
+        "right/magician/plus50/02",
+        "right/magician/plus50/03",
+        "right/magician/plus50/04",
+        "right/magician/plus50/05",
+        "right/magician/plus50/06",
+        "right/magician/plus50/07"
       ]
     },
     "great-axe-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-great-axe-warrior-direct/00.png",
-        "/assets/original/full-combat/right-great-axe-warrior-direct/01.png",
-        "/assets/original/full-combat/right-great-axe-warrior-direct/02.png",
-        "/assets/original/full-combat/right-great-axe-warrior-direct/03.png"
+        "right/great-axe-warrior/direct/00",
+        "right/great-axe-warrior/direct/01",
+        "right/great-axe-warrior/direct/02",
+        "right/great-axe-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-great-axe-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-great-axe-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-great-axe-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-great-axe-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-great-axe-warrior-plus50/04.png",
-        "/assets/original/full-combat/right-great-axe-warrior-plus50/05.png",
-        "/assets/original/full-combat/right-great-axe-warrior-plus50/06.png"
+        "right/great-axe-warrior/plus50/00",
+        "right/great-axe-warrior/plus50/01",
+        "right/great-axe-warrior/plus50/02",
+        "right/great-axe-warrior/plus50/03",
+        "right/great-axe-warrior/plus50/04",
+        "right/great-axe-warrior/plus50/05",
+        "right/great-axe-warrior/plus50/06"
       ]
     },
     "half-dragon-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-half-dragon-warrior-direct/00.png",
-        "/assets/original/full-combat/right-half-dragon-warrior-direct/01.png",
-        "/assets/original/full-combat/right-half-dragon-warrior-direct/02.png",
-        "/assets/original/full-combat/right-half-dragon-warrior-direct/03.png"
+        "right/half-dragon-warrior/direct/00",
+        "right/half-dragon-warrior/direct/01",
+        "right/half-dragon-warrior/direct/02",
+        "right/half-dragon-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-half-dragon-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-half-dragon-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-half-dragon-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-half-dragon-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-half-dragon-warrior-plus50/04.png",
-        "/assets/original/full-combat/right-half-dragon-warrior-plus50/05.png"
+        "right/half-dragon-warrior/plus50/00",
+        "right/half-dragon-warrior/plus50/01",
+        "right/half-dragon-warrior/plus50/02",
+        "right/half-dragon-warrior/plus50/03",
+        "right/half-dragon-warrior/plus50/04",
+        "right/half-dragon-warrior/plus50/05"
       ]
     },
     "magic-armor-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-magic-armor-warrior-direct/00.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-direct/01.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-direct/02.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-direct/03.png"
+        "right/magic-armor-warrior/direct/00",
+        "right/magic-armor-warrior/direct/01",
+        "right/magic-armor-warrior/direct/02",
+        "right/magic-armor-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-magic-armor-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-plus50/04.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-plus50/05.png",
-        "/assets/original/full-combat/right-magic-armor-warrior-plus50/06.png"
+        "right/magic-armor-warrior/plus50/00",
+        "right/magic-armor-warrior/plus50/01",
+        "right/magic-armor-warrior/plus50/02",
+        "right/magic-armor-warrior/plus50/03",
+        "right/magic-armor-warrior/plus50/04",
+        "right/magic-armor-warrior/plus50/05",
+        "right/magic-armor-warrior/plus50/06"
       ]
     },
     "magic-guide": {
       "direct": [
-        "/assets/original/full-combat/right-magic-guide-direct/00.png",
-        "/assets/original/full-combat/right-magic-guide-direct/01.png",
-        "/assets/original/full-combat/right-magic-guide-direct/02.png",
-        "/assets/original/full-combat/right-magic-guide-direct/03.png"
+        "right/magic-guide/direct/00",
+        "right/magic-guide/direct/01",
+        "right/magic-guide/direct/02",
+        "right/magic-guide/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-magic-guide-plus50/00.png",
-        "/assets/original/full-combat/right-magic-guide-plus50/01.png",
-        "/assets/original/full-combat/right-magic-guide-plus50/02.png",
-        "/assets/original/full-combat/right-magic-guide-plus50/03.png",
-        "/assets/original/full-combat/right-magic-guide-plus50/04.png",
-        "/assets/original/full-combat/right-magic-guide-plus50/05.png"
+        "right/magic-guide/plus50/00",
+        "right/magic-guide/plus50/01",
+        "right/magic-guide/plus50/02",
+        "right/magic-guide/plus50/03",
+        "right/magic-guide/plus50/04",
+        "right/magic-guide/plus50/05"
       ]
     },
     "evil-mage": {
       "direct": [
-        "/assets/original/full-combat/right-evil-mage-direct/00.png",
-        "/assets/original/full-combat/right-evil-mage-direct/01.png",
-        "/assets/original/full-combat/right-evil-mage-direct/02.png",
-        "/assets/original/full-combat/right-evil-mage-direct/03.png"
+        "right/evil-mage/direct/00",
+        "right/evil-mage/direct/01",
+        "right/evil-mage/direct/02",
+        "right/evil-mage/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-evil-mage-plus50/00.png",
-        "/assets/original/full-combat/right-evil-mage-plus50/01.png",
-        "/assets/original/full-combat/right-evil-mage-plus50/02.png",
-        "/assets/original/full-combat/right-evil-mage-plus50/03.png",
-        "/assets/original/full-combat/right-evil-mage-plus50/04.png",
-        "/assets/original/full-combat/right-evil-mage-plus50/05.png"
+        "right/evil-mage/plus50/00",
+        "right/evil-mage/plus50/01",
+        "right/evil-mage/plus50/02",
+        "right/evil-mage/plus50/03",
+        "right/evil-mage/plus50/04",
+        "right/evil-mage/plus50/05"
       ]
     },
     "magic-archer": {
       "direct": [
-        "/assets/original/full-combat/right-magic-archer-direct/00.png",
-        "/assets/original/full-combat/right-magic-archer-direct/01.png",
-        "/assets/original/full-combat/right-magic-archer-direct/02.png",
-        "/assets/original/full-combat/right-magic-archer-direct/03.png"
+        "right/magic-archer/direct/00",
+        "right/magic-archer/direct/01",
+        "right/magic-archer/direct/02",
+        "right/magic-archer/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-magic-archer-plus50/00.png",
-        "/assets/original/full-combat/right-magic-archer-plus50/01.png",
-        "/assets/original/full-combat/right-magic-archer-plus50/02.png",
-        "/assets/original/full-combat/right-magic-archer-plus50/03.png"
+        "right/magic-archer/plus50/00",
+        "right/magic-archer/plus50/01",
+        "right/magic-archer/plus50/02",
+        "right/magic-archer/plus50/03"
       ]
     },
     "land-knight": {
       "direct": [
-        "/assets/original/full-combat/right-land-knight-direct/00.png",
-        "/assets/original/full-combat/right-land-knight-direct/01.png",
-        "/assets/original/full-combat/right-land-knight-direct/02.png",
-        "/assets/original/full-combat/right-land-knight-direct/03.png"
+        "right/land-knight/direct/00",
+        "right/land-knight/direct/01",
+        "right/land-knight/direct/02",
+        "right/land-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-land-knight-plus50/00.png",
-        "/assets/original/full-combat/right-land-knight-plus50/01.png",
-        "/assets/original/full-combat/right-land-knight-plus50/02.png",
-        "/assets/original/full-combat/right-land-knight-plus50/03.png",
-        "/assets/original/full-combat/right-land-knight-plus50/04.png",
-        "/assets/original/full-combat/right-land-knight-plus50/05.png",
-        "/assets/original/full-combat/right-land-knight-plus50/06.png",
-        "/assets/original/full-combat/right-land-knight-plus50/07.png"
+        "right/land-knight/plus50/00",
+        "right/land-knight/plus50/01",
+        "right/land-knight/plus50/02",
+        "right/land-knight/plus50/03",
+        "right/land-knight/plus50/04",
+        "right/land-knight/plus50/05",
+        "right/land-knight/plus50/06",
+        "right/land-knight/plus50/07"
       ]
     },
     "demon-dragon-knight": {
       "direct": [
-        "/assets/original/full-combat/right-demon-dragon-knight-direct/00.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-direct/01.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-direct/02.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-direct/03.png"
+        "right/demon-dragon-knight/direct/00",
+        "right/demon-dragon-knight/direct/01",
+        "right/demon-dragon-knight/direct/02",
+        "right/demon-dragon-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/00.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/01.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/02.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/03.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/04.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/05.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/06.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/07.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/08.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/09.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/10.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/11.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/12.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/13.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/14.png",
-        "/assets/original/full-combat/right-demon-dragon-knight-plus50/15.png"
+        "right/demon-dragon-knight/plus50/00",
+        "right/demon-dragon-knight/plus50/01",
+        "right/demon-dragon-knight/plus50/02",
+        "right/demon-dragon-knight/plus50/03",
+        "right/demon-dragon-knight/plus50/04",
+        "right/demon-dragon-knight/plus50/05",
+        "right/demon-dragon-knight/plus50/06",
+        "right/demon-dragon-knight/plus50/07",
+        "right/demon-dragon-knight/plus50/08",
+        "right/demon-dragon-knight/plus50/09",
+        "right/demon-dragon-knight/plus50/10",
+        "right/demon-dragon-knight/plus50/11",
+        "right/demon-dragon-knight/plus50/12",
+        "right/demon-dragon-knight/plus50/13",
+        "right/demon-dragon-knight/plus50/14",
+        "right/demon-dragon-knight/plus50/15"
       ]
     },
     "flying-dragon-knight": {
       "direct": [
-        "/assets/original/full-combat/right-flying-dragon-knight-direct/00.png",
-        "/assets/original/full-combat/right-flying-dragon-knight-direct/01.png",
-        "/assets/original/full-combat/right-flying-dragon-knight-direct/02.png",
-        "/assets/original/full-combat/right-flying-dragon-knight-direct/03.png"
+        "right/flying-dragon-knight/direct/00",
+        "right/flying-dragon-knight/direct/01",
+        "right/flying-dragon-knight/direct/02",
+        "right/flying-dragon-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-flying-dragon-knight-plus50/00.png",
-        "/assets/original/full-combat/right-flying-dragon-knight-plus50/01.png",
-        "/assets/original/full-combat/right-flying-dragon-knight-plus50/02.png",
-        "/assets/original/full-combat/right-flying-dragon-knight-plus50/03.png"
+        "right/flying-dragon-knight/plus50/00",
+        "right/flying-dragon-knight/plus50/01",
+        "right/flying-dragon-knight/plus50/02",
+        "right/flying-dragon-knight/plus50/03"
       ]
     },
     "beast-knight": {
       "direct": [
-        "/assets/original/full-combat/right-beast-knight-direct/00.png",
-        "/assets/original/full-combat/right-beast-knight-direct/01.png",
-        "/assets/original/full-combat/right-beast-knight-direct/02.png",
-        "/assets/original/full-combat/right-beast-knight-direct/03.png"
+        "right/beast-knight/direct/00",
+        "right/beast-knight/direct/01",
+        "right/beast-knight/direct/02",
+        "right/beast-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-beast-knight-plus50/00.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/01.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/02.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/03.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/04.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/05.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/06.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/07.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/08.png",
-        "/assets/original/full-combat/right-beast-knight-plus50/09.png"
+        "right/beast-knight/plus50/00",
+        "right/beast-knight/plus50/01",
+        "right/beast-knight/plus50/02",
+        "right/beast-knight/plus50/03",
+        "right/beast-knight/plus50/04",
+        "right/beast-knight/plus50/05",
+        "right/beast-knight/plus50/06",
+        "right/beast-knight/plus50/07",
+        "right/beast-knight/plus50/08",
+        "right/beast-knight/plus50/09"
       ]
     },
     "bone-knight": {
       "direct": [
-        "/assets/original/full-combat/right-bone-knight-direct/00.png",
-        "/assets/original/full-combat/right-bone-knight-direct/01.png",
-        "/assets/original/full-combat/right-bone-knight-direct/02.png",
-        "/assets/original/full-combat/right-bone-knight-direct/03.png"
+        "right/bone-knight/direct/00",
+        "right/bone-knight/direct/01",
+        "right/bone-knight/direct/02",
+        "right/bone-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-bone-knight-plus50/00.png",
-        "/assets/original/full-combat/right-bone-knight-plus50/01.png",
-        "/assets/original/full-combat/right-bone-knight-plus50/02.png",
-        "/assets/original/full-combat/right-bone-knight-plus50/03.png",
-        "/assets/original/full-combat/right-bone-knight-plus50/04.png"
+        "right/bone-knight/plus50/00",
+        "right/bone-knight/plus50/01",
+        "right/bone-knight/plus50/02",
+        "right/bone-knight/plus50/03",
+        "right/bone-knight/plus50/04"
       ]
     },
     "swift-dragon-knight": {
       "direct": [
-        "/assets/original/full-combat/right-swift-dragon-knight-direct/00.png",
-        "/assets/original/full-combat/right-swift-dragon-knight-direct/01.png",
-        "/assets/original/full-combat/right-swift-dragon-knight-direct/02.png",
-        "/assets/original/full-combat/right-swift-dragon-knight-direct/03.png"
+        "right/swift-dragon-knight/direct/00",
+        "right/swift-dragon-knight/direct/01",
+        "right/swift-dragon-knight/direct/02",
+        "right/swift-dragon-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-swift-dragon-knight-plus50/00.png",
-        "/assets/original/full-combat/right-swift-dragon-knight-plus50/01.png",
-        "/assets/original/full-combat/right-swift-dragon-knight-plus50/02.png",
-        "/assets/original/full-combat/right-swift-dragon-knight-plus50/03.png",
-        "/assets/original/full-combat/right-swift-dragon-knight-plus50/04.png"
+        "right/swift-dragon-knight/plus50/00",
+        "right/swift-dragon-knight/plus50/01",
+        "right/swift-dragon-knight/plus50/02",
+        "right/swift-dragon-knight/plus50/03",
+        "right/swift-dragon-knight/plus50/04"
       ]
     },
     "great-dragon-knight": {
       "direct": [
-        "/assets/original/full-combat/right-great-dragon-knight-direct/00.png",
-        "/assets/original/full-combat/right-great-dragon-knight-direct/01.png",
-        "/assets/original/full-combat/right-great-dragon-knight-direct/02.png",
-        "/assets/original/full-combat/right-great-dragon-knight-direct/03.png"
+        "right/great-dragon-knight/direct/00",
+        "right/great-dragon-knight/direct/01",
+        "right/great-dragon-knight/direct/02",
+        "right/great-dragon-knight/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-great-dragon-knight-plus50/00.png",
-        "/assets/original/full-combat/right-great-dragon-knight-plus50/01.png",
-        "/assets/original/full-combat/right-great-dragon-knight-plus50/02.png",
-        "/assets/original/full-combat/right-great-dragon-knight-plus50/03.png",
-        "/assets/original/full-combat/right-great-dragon-knight-plus50/04.png"
+        "right/great-dragon-knight/plus50/00",
+        "right/great-dragon-knight/plus50/01",
+        "right/great-dragon-knight/plus50/02",
+        "right/great-dragon-knight/plus50/03",
+        "right/great-dragon-knight/plus50/04"
       ]
     },
     "archer": {
       "direct": [
-        "/assets/original/full-combat/right-archer-direct/00.png",
-        "/assets/original/full-combat/right-archer-direct/01.png",
-        "/assets/original/full-combat/right-archer-direct/02.png",
-        "/assets/original/full-combat/right-archer-direct/03.png"
+        "right/archer/direct/00",
+        "right/archer/direct/01",
+        "right/archer/direct/02",
+        "right/archer/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-archer-plus50/00.png",
-        "/assets/original/full-combat/right-archer-plus50/01.png",
-        "/assets/original/full-combat/right-archer-plus50/02.png",
-        "/assets/original/full-combat/right-archer-plus50/03.png",
-        "/assets/original/full-combat/right-archer-plus50/04.png",
-        "/assets/original/full-combat/right-archer-plus50/05.png",
-        "/assets/original/full-combat/right-archer-plus50/06.png",
-        "/assets/original/full-combat/right-archer-plus50/07.png",
-        "/assets/original/full-combat/right-archer-plus50/08.png"
+        "right/archer/plus50/00",
+        "right/archer/plus50/01",
+        "right/archer/plus50/02",
+        "right/archer/plus50/03",
+        "right/archer/plus50/04",
+        "right/archer/plus50/05",
+        "right/archer/plus50/06",
+        "right/archer/plus50/07",
+        "right/archer/plus50/08"
       ]
     },
     "crossbow": {
       "direct": [
-        "/assets/original/full-combat/right-crossbow-direct/00.png",
-        "/assets/original/full-combat/right-crossbow-direct/01.png",
-        "/assets/original/full-combat/right-crossbow-direct/02.png",
-        "/assets/original/full-combat/right-crossbow-direct/03.png"
+        "right/crossbow/direct/00",
+        "right/crossbow/direct/01",
+        "right/crossbow/direct/02",
+        "right/crossbow/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-crossbow-plus50/00.png",
-        "/assets/original/full-combat/right-crossbow-plus50/01.png",
-        "/assets/original/full-combat/right-crossbow-plus50/02.png",
-        "/assets/original/full-combat/right-crossbow-plus50/03.png",
-        "/assets/original/full-combat/right-crossbow-plus50/04.png",
-        "/assets/original/full-combat/right-crossbow-plus50/05.png"
+        "right/crossbow/plus50/00",
+        "right/crossbow/plus50/01",
+        "right/crossbow/plus50/02",
+        "right/crossbow/plus50/03",
+        "right/crossbow/plus50/04",
+        "right/crossbow/plus50/05"
       ]
     },
     "cavalry": {
       "direct": [
-        "/assets/original/full-combat/right-cavalry-direct/00.png",
-        "/assets/original/full-combat/right-cavalry-direct/01.png",
-        "/assets/original/full-combat/right-cavalry-direct/02.png",
-        "/assets/original/full-combat/right-cavalry-direct/03.png"
+        "right/cavalry/direct/00",
+        "right/cavalry/direct/01",
+        "right/cavalry/direct/02",
+        "right/cavalry/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-cavalry-plus50/00.png",
-        "/assets/original/full-combat/right-cavalry-plus50/01.png",
-        "/assets/original/full-combat/right-cavalry-plus50/02.png",
-        "/assets/original/full-combat/right-cavalry-plus50/03.png",
-        "/assets/original/full-combat/right-cavalry-plus50/04.png",
-        "/assets/original/full-combat/right-cavalry-plus50/05.png",
-        "/assets/original/full-combat/right-cavalry-plus50/06.png",
-        "/assets/original/full-combat/right-cavalry-plus50/07.png",
-        "/assets/original/full-combat/right-cavalry-plus50/08.png"
+        "right/cavalry/plus50/00",
+        "right/cavalry/plus50/01",
+        "right/cavalry/plus50/02",
+        "right/cavalry/plus50/03",
+        "right/cavalry/plus50/04",
+        "right/cavalry/plus50/05",
+        "right/cavalry/plus50/06",
+        "right/cavalry/plus50/07",
+        "right/cavalry/plus50/08"
       ]
     },
     "pegasus-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-pegasus-warrior-direct/00.png",
-        "/assets/original/full-combat/right-pegasus-warrior-direct/01.png",
-        "/assets/original/full-combat/right-pegasus-warrior-direct/02.png",
-        "/assets/original/full-combat/right-pegasus-warrior-direct/03.png"
+        "right/pegasus-warrior/direct/00",
+        "right/pegasus-warrior/direct/01",
+        "right/pegasus-warrior/direct/02",
+        "right/pegasus-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-pegasus-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-pegasus-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-pegasus-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-pegasus-warrior-plus50/03.png"
+        "right/pegasus-warrior/plus50/00",
+        "right/pegasus-warrior/plus50/01",
+        "right/pegasus-warrior/plus50/02",
+        "right/pegasus-warrior/plus50/03"
       ]
     },
     "sister": {
       "direct": [
-        "/assets/original/full-combat/right-sister-direct/00.png",
-        "/assets/original/full-combat/right-sister-direct/01.png",
-        "/assets/original/full-combat/right-sister-direct/02.png",
-        "/assets/original/full-combat/right-sister-direct/03.png"
+        "right/sister/direct/00",
+        "right/sister/direct/01",
+        "right/sister/direct/02",
+        "right/sister/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-sister-plus50/00.png",
-        "/assets/original/full-combat/right-sister-plus50/01.png",
-        "/assets/original/full-combat/right-sister-plus50/02.png",
-        "/assets/original/full-combat/right-sister-plus50/03.png",
-        "/assets/original/full-combat/right-sister-plus50/04.png",
-        "/assets/original/full-combat/right-sister-plus50/05.png",
-        "/assets/original/full-combat/right-sister-plus50/06.png"
+        "right/sister/plus50/00",
+        "right/sister/plus50/01",
+        "right/sister/plus50/02",
+        "right/sister/plus50/03",
+        "right/sister/plus50/04",
+        "right/sister/plus50/05",
+        "right/sister/plus50/06"
       ]
     },
     "monk": {
       "direct": [
-        "/assets/original/full-combat/right-monk-direct/00.png",
-        "/assets/original/full-combat/right-monk-direct/01.png",
-        "/assets/original/full-combat/right-monk-direct/02.png",
-        "/assets/original/full-combat/right-monk-direct/03.png"
+        "right/monk/direct/00",
+        "right/monk/direct/01",
+        "right/monk/direct/02",
+        "right/monk/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-monk-plus50/00.png",
-        "/assets/original/full-combat/right-monk-plus50/01.png",
-        "/assets/original/full-combat/right-monk-plus50/02.png",
-        "/assets/original/full-combat/right-monk-plus50/03.png",
-        "/assets/original/full-combat/right-monk-plus50/04.png",
-        "/assets/original/full-combat/right-monk-plus50/05.png",
-        "/assets/original/full-combat/right-monk-plus50/06.png",
-        "/assets/original/full-combat/right-monk-plus50/07.png",
-        "/assets/original/full-combat/right-monk-plus50/08.png",
-        "/assets/original/full-combat/right-monk-plus50/09.png",
-        "/assets/original/full-combat/right-monk-plus50/10.png"
+        "right/monk/plus50/00",
+        "right/monk/plus50/01",
+        "right/monk/plus50/02",
+        "right/monk/plus50/03",
+        "right/monk/plus50/04",
+        "right/monk/plus50/05",
+        "right/monk/plus50/06",
+        "right/monk/plus50/07",
+        "right/monk/plus50/08",
+        "right/monk/plus50/09",
+        "right/monk/plus50/10"
       ]
     },
     "water-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-water-warrior-direct/00.png",
-        "/assets/original/full-combat/right-water-warrior-direct/01.png",
-        "/assets/original/full-combat/right-water-warrior-direct/02.png",
-        "/assets/original/full-combat/right-water-warrior-direct/03.png"
+        "right/water-warrior/direct/00",
+        "right/water-warrior/direct/01",
+        "right/water-warrior/direct/02",
+        "right/water-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-water-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-water-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-water-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-water-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-water-warrior-plus50/04.png",
-        "/assets/original/full-combat/right-water-warrior-plus50/05.png",
-        "/assets/original/full-combat/right-water-warrior-plus50/06.png"
+        "right/water-warrior/plus50/00",
+        "right/water-warrior/plus50/01",
+        "right/water-warrior/plus50/02",
+        "right/water-warrior/plus50/03",
+        "right/water-warrior/plus50/04",
+        "right/water-warrior/plus50/05",
+        "right/water-warrior/plus50/06"
       ]
     },
     "divine-sword-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-divine-sword-warrior-direct/00.png",
-        "/assets/original/full-combat/right-divine-sword-warrior-direct/01.png",
-        "/assets/original/full-combat/right-divine-sword-warrior-direct/02.png",
-        "/assets/original/full-combat/right-divine-sword-warrior-direct/03.png"
+        "right/divine-sword-warrior/direct/00",
+        "right/divine-sword-warrior/direct/01",
+        "right/divine-sword-warrior/direct/02",
+        "right/divine-sword-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-divine-sword-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-divine-sword-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-divine-sword-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-divine-sword-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-divine-sword-warrior-plus50/04.png",
-        "/assets/original/full-combat/right-divine-sword-warrior-plus50/05.png"
+        "right/divine-sword-warrior/plus50/00",
+        "right/divine-sword-warrior/plus50/01",
+        "right/divine-sword-warrior/plus50/02",
+        "right/divine-sword-warrior/plus50/03",
+        "right/divine-sword-warrior/plus50/04",
+        "right/divine-sword-warrior/plus50/05"
       ]
     },
     "warrior": {
       "direct": [
-        "/assets/original/full-combat/right-warrior-direct/00.png",
-        "/assets/original/full-combat/right-warrior-direct/01.png",
-        "/assets/original/full-combat/right-warrior-direct/02.png",
-        "/assets/original/full-combat/right-warrior-direct/03.png"
+        "right/warrior/direct/00",
+        "right/warrior/direct/01",
+        "right/warrior/direct/02",
+        "right/warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-warrior-plus50/04.png"
+        "right/warrior/plus50/00",
+        "right/warrior/plus50/01",
+        "right/warrior/plus50/02",
+        "right/warrior/plus50/03",
+        "right/warrior/plus50/04"
       ]
     },
     "steel-armor-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-steel-armor-warrior-direct/00.png",
-        "/assets/original/full-combat/right-steel-armor-warrior-direct/01.png",
-        "/assets/original/full-combat/right-steel-armor-warrior-direct/02.png",
-        "/assets/original/full-combat/right-steel-armor-warrior-direct/03.png"
+        "right/steel-armor-warrior/direct/00",
+        "right/steel-armor-warrior/direct/01",
+        "right/steel-armor-warrior/direct/02",
+        "right/steel-armor-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-steel-armor-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-steel-armor-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-steel-armor-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-steel-armor-warrior-plus50/03.png"
+        "right/steel-armor-warrior/plus50/00",
+        "right/steel-armor-warrior/plus50/01",
+        "right/steel-armor-warrior/plus50/02",
+        "right/steel-armor-warrior/plus50/03"
       ]
     },
     "priest": {
       "direct": [
-        "/assets/original/full-combat/right-priest-direct/00.png",
-        "/assets/original/full-combat/right-priest-direct/01.png",
-        "/assets/original/full-combat/right-priest-direct/02.png",
-        "/assets/original/full-combat/right-priest-direct/03.png"
+        "right/priest/direct/00",
+        "right/priest/direct/01",
+        "right/priest/direct/02",
+        "right/priest/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-priest-plus50/00.png",
-        "/assets/original/full-combat/right-priest-plus50/01.png",
-        "/assets/original/full-combat/right-priest-plus50/02.png",
-        "/assets/original/full-combat/right-priest-plus50/03.png",
-        "/assets/original/full-combat/right-priest-plus50/04.png",
-        "/assets/original/full-combat/right-priest-plus50/05.png",
-        "/assets/original/full-combat/right-priest-plus50/06.png",
-        "/assets/original/full-combat/right-priest-plus50/07.png",
-        "/assets/original/full-combat/right-priest-plus50/08.png",
-        "/assets/original/full-combat/right-priest-plus50/09.png",
-        "/assets/original/full-combat/right-priest-plus50/10.png",
-        "/assets/original/full-combat/right-priest-plus50/11.png",
-        "/assets/original/full-combat/right-priest-plus50/12.png",
-        "/assets/original/full-combat/right-priest-plus50/13.png"
+        "right/priest/plus50/00",
+        "right/priest/plus50/01",
+        "right/priest/plus50/02",
+        "right/priest/plus50/03",
+        "right/priest/plus50/04",
+        "right/priest/plus50/05",
+        "right/priest/plus50/06",
+        "right/priest/plus50/07",
+        "right/priest/plus50/08",
+        "right/priest/plus50/09",
+        "right/priest/plus50/10",
+        "right/priest/plus50/11",
+        "right/priest/plus50/12",
+        "right/priest/plus50/13"
       ]
     },
     "wizard": {
       "direct": [
-        "/assets/original/full-combat/right-wizard-direct/00.png",
-        "/assets/original/full-combat/right-wizard-direct/01.png",
-        "/assets/original/full-combat/right-wizard-direct/02.png",
-        "/assets/original/full-combat/right-wizard-direct/03.png"
+        "right/wizard/direct/00",
+        "right/wizard/direct/01",
+        "right/wizard/direct/02",
+        "right/wizard/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-wizard-plus50/00.png",
-        "/assets/original/full-combat/right-wizard-plus50/01.png",
-        "/assets/original/full-combat/right-wizard-plus50/02.png"
+        "right/wizard/plus50/00",
+        "right/wizard/plus50/01",
+        "right/wizard/plus50/02"
       ]
     },
     "magic-master": {
       "direct": [
-        "/assets/original/full-combat/right-magic-master-direct/00.png",
-        "/assets/original/full-combat/right-magic-master-direct/01.png",
-        "/assets/original/full-combat/right-magic-master-direct/02.png",
-        "/assets/original/full-combat/right-magic-master-direct/03.png"
+        "right/magic-master/direct/00",
+        "right/magic-master/direct/01",
+        "right/magic-master/direct/02",
+        "right/magic-master/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-magic-master-plus50/00.png",
-        "/assets/original/full-combat/right-magic-master-plus50/01.png",
-        "/assets/original/full-combat/right-magic-master-plus50/02.png"
+        "right/magic-master/plus50/00",
+        "right/magic-master/plus50/01",
+        "right/magic-master/plus50/02"
       ]
     },
     "evil-sword-warrior": {
       "direct": [
-        "/assets/original/full-combat/right-evil-sword-warrior-direct/00.png",
-        "/assets/original/full-combat/right-evil-sword-warrior-direct/01.png",
-        "/assets/original/full-combat/right-evil-sword-warrior-direct/02.png",
-        "/assets/original/full-combat/right-evil-sword-warrior-direct/03.png"
+        "right/evil-sword-warrior/direct/00",
+        "right/evil-sword-warrior/direct/01",
+        "right/evil-sword-warrior/direct/02",
+        "right/evil-sword-warrior/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-evil-sword-warrior-plus50/00.png",
-        "/assets/original/full-combat/right-evil-sword-warrior-plus50/01.png",
-        "/assets/original/full-combat/right-evil-sword-warrior-plus50/02.png",
-        "/assets/original/full-combat/right-evil-sword-warrior-plus50/03.png",
-        "/assets/original/full-combat/right-evil-sword-warrior-plus50/04.png"
+        "right/evil-sword-warrior/plus50/00",
+        "right/evil-sword-warrior/plus50/01",
+        "right/evil-sword-warrior/plus50/02",
+        "right/evil-sword-warrior/plus50/03",
+        "right/evil-sword-warrior/plus50/04"
       ]
     },
     "engineer": {
       "direct": [
-        "/assets/original/full-combat/right-engineer-direct/00.png",
-        "/assets/original/full-combat/right-engineer-direct/01.png",
-        "/assets/original/full-combat/right-engineer-direct/02.png",
-        "/assets/original/full-combat/right-engineer-direct/03.png"
+        "right/engineer/direct/00",
+        "right/engineer/direct/01",
+        "right/engineer/direct/02",
+        "right/engineer/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-engineer-plus50/00.png",
-        "/assets/original/full-combat/right-engineer-plus50/01.png",
-        "/assets/original/full-combat/right-engineer-plus50/02.png"
+        "right/engineer/plus50/00",
+        "right/engineer/plus50/01",
+        "right/engineer/plus50/02"
       ]
     },
     "empress": {
       "direct": [
-        "/assets/original/full-combat/right-empress-direct/00.png",
-        "/assets/original/full-combat/right-empress-direct/01.png",
-        "/assets/original/full-combat/right-empress-direct/02.png",
-        "/assets/original/full-combat/right-empress-direct/03.png"
+        "right/empress/direct/00",
+        "right/empress/direct/01",
+        "right/empress/direct/02",
+        "right/empress/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-empress-plus50/00.png",
-        "/assets/original/full-combat/right-empress-plus50/01.png",
-        "/assets/original/full-combat/right-empress-plus50/02.png",
-        "/assets/original/full-combat/right-empress-plus50/03.png",
-        "/assets/original/full-combat/right-empress-plus50/04.png",
-        "/assets/original/full-combat/right-empress-plus50/05.png"
+        "right/empress/plus50/00",
+        "right/empress/plus50/01",
+        "right/empress/plus50/02",
+        "right/empress/plus50/03",
+        "right/empress/plus50/04",
+        "right/empress/plus50/05"
       ]
     },
     "dragon": {
       "direct": [
-        "/assets/original/full-combat/right-dragon-direct/00.png",
-        "/assets/original/full-combat/right-dragon-direct/01.png",
-        "/assets/original/full-combat/right-dragon-direct/02.png",
-        "/assets/original/full-combat/right-dragon-direct/03.png"
+        "right/dragon/direct/00",
+        "right/dragon/direct/01",
+        "right/dragon/direct/02",
+        "right/dragon/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-dragon-plus50/00.png",
-        "/assets/original/full-combat/right-dragon-plus50/01.png"
+        "right/dragon/plus50/00",
+        "right/dragon/plus50/01"
       ]
     },
     "head": {
       "direct": [
-        "/assets/original/full-combat/right-head-direct/00.png",
-        "/assets/original/full-combat/right-head-direct/01.png",
-        "/assets/original/full-combat/right-head-direct/02.png",
-        "/assets/original/full-combat/right-head-direct/03.png"
+        "right/head/direct/00",
+        "right/head/direct/01",
+        "right/head/direct/02",
+        "right/head/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-head-plus50/00.png",
-        "/assets/original/full-combat/right-head-plus50/01.png",
-        "/assets/original/full-combat/right-head-plus50/02.png",
-        "/assets/original/full-combat/right-head-plus50/03.png",
-        "/assets/original/full-combat/right-head-plus50/04.png",
-        "/assets/original/full-combat/right-head-plus50/05.png",
-        "/assets/original/full-combat/right-head-plus50/06.png"
+        "right/head/plus50/00",
+        "right/head/plus50/01",
+        "right/head/plus50/02",
+        "right/head/plus50/03",
+        "right/head/plus50/04",
+        "right/head/plus50/05",
+        "right/head/plus50/06"
       ]
     },
     "hand": {
       "direct": [
-        "/assets/original/full-combat/right-hand-direct/00.png",
-        "/assets/original/full-combat/right-hand-direct/01.png",
-        "/assets/original/full-combat/right-hand-direct/02.png",
-        "/assets/original/full-combat/right-hand-direct/03.png"
+        "right/hand/direct/00",
+        "right/hand/direct/01",
+        "right/hand/direct/02",
+        "right/hand/direct/03"
       ],
       "plus50": [
-        "/assets/original/full-combat/right-hand-plus50/00.png",
-        "/assets/original/full-combat/right-hand-plus50/01.png"
+        "right/hand/plus50/00",
+        "right/hand/plus50/01"
       ]
     }
   }
@@ -38645,12 +38645,12 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
 
 export const STAGE0_FULL_COMBAT_COMMON_EFFECTS = {
   "trail": [
-    "/assets/original/full-combat/common-trail/00.png",
-    "/assets/original/full-combat/common-trail/01.png",
-    "/assets/original/full-combat/common-trail/02.png",
-    "/assets/original/full-combat/common-trail/03.png",
-    "/assets/original/full-combat/common-trail/04.png",
-    "/assets/original/full-combat/common-trail/05.png"
+    "common/trail/00",
+    "common/trail/01",
+    "common/trail/02",
+    "common/trail/03",
+    "common/trail/04",
+    "common/trail/05"
   ]
 } as const;
 

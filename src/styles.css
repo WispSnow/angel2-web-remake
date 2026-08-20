@@ -1303,24 +1303,24 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   width: 0;
   height: 0;
 }
-.full-combat-sprite img {
+.full-combat-frame {
+  display: block;
+  max-width: none;
+  background-repeat: no-repeat;
+  image-rendering: var(--image-rendering, pixelated);
+}
+.full-combat-sprite .full-combat-frame {
   position: absolute;
   left: 0;
   bottom: 0;
-  display: block;
-  max-width: none;
-  image-rendering: var(--image-rendering, pixelated);
 }
 .full-combat-lance,
-.full-combat-projectile { position: absolute; z-index: 4; left: 0; top: 0; max-width: none; image-rendering: var(--image-rendering, pixelated); }
+.full-combat-projectile { position: absolute; z-index: 4; left: 0; top: 0; }
 .full-combat-particles { position: absolute; z-index: 2; inset: 0; }
-.full-combat-particles img {
+.full-combat-particles .full-combat-frame {
   position: absolute;
   left: 0;
   top: 0;
-  display: block;
-  max-width: none;
-  image-rendering: var(--image-rendering, pixelated);
 }
 .full-combat-strip {
   position: absolute;

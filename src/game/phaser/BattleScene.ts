@@ -23,6 +23,10 @@ import {
   collectMapActionSources,
   preloadMapActionAtlases,
 } from "./map-action-atlas";
+import {
+  addBattleSpriteImageFromSource,
+  preloadBattleSpriteAtlases,
+} from "./battle-sprite-atlas";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
@@ -211,6 +215,22 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
   ] as const)
     .some((actionId) => presentationActionIds.has(actionId));
   const stageAssets = controller.currentStageAssets;
+  const routePulseFrameSource = (presentationId: string, frame: number): string => {
+    const source = stageAssets?.routePulsePresentations
+      ?.find(({ id }) => id === presentationId)?.frames[frame];
+    if (!source) throw new Error(`Missing ${presentationId} route-pulse frame ${frame}`);
+    return source;
+  };
+  const enemyPhaseTailFrameSource = (
+    presentationId: string,
+    resource: "phase1" | "phase2",
+    frame: number,
+  ): string => {
+    const source = stageAssets?.enemyPhaseTailPresentations
+      ?.find(({ id }) => id === presentationId)?.[resource].frames[frame];
+    if (!source) throw new Error(`Missing ${presentationId} ${resource} frame ${frame}`);
+    return source;
+  };
   const objectiveDestinationCells = controller.currentObjectiveDestinationCells;
   const mapTextureKey = `${controller.battle.stage.id}-map`;
   const presentationCatalog = hasExtendedActions ? actionPresentationCatalog() : undefined;
@@ -300,13 +320,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         if (classId && allyMapUnitAsset(classId as BattleUnit["classId"])) return;
         this.load.image(key, source);
       });
-      ASSETS.mapCombat.hit.forEach((source, frame) => this.load.image(`map-hit-${frame}`, source));
-      ASSETS.mapCombat.death.forEach((source, frame) => this.load.image(`map-death-${frame}`, source));
-      this.load.image("turn-transition-player", ASSETS.turnTransition.player);
-      this.load.image("turn-transition-enemy", ASSETS.turnTransition.enemy);
-      this.load.image("turn-transition-shadow", ASSETS.turnTransition.shadow);
-      ASSETS.turnTransition.dust.forEach((source, frame) =>
-        this.load.image(`turn-transition-dust-${frame}`, source));
+      const battleSpriteSources = [
+        ...ASSETS.mapCombat.hit,
+        ...ASSETS.mapCombat.death,
+        ASSETS.turnTransition.player,
+        ASSETS.turnTransition.enemy,
+        ASSETS.turnTransition.shadow,
+        ...ASSETS.turnTransition.dust,
+      ];
       const mapActionSources = collectMapActionSources(STAGE0_ACTION_PRESENTATION_ASSETS);
       if (presentationAssets) {
         const selectedDirectories = new Set(
@@ -320,21 +341,12 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       }
       preloadMapActionAtlases(this, mapActionSources);
       for (const presentation of stageAssets?.routePulsePresentations ?? []) {
-        presentation.frames.forEach((source, frame) =>
-          this.load.image(routePulseTextureKey(presentation.id, frame), source));
+        battleSpriteSources.push(...presentation.frames);
       }
       for (const presentation of stageAssets?.enemyPhaseTailPresentations ?? []) {
-        presentation.phase1.frames.forEach((source, frame) =>
-          this.load.image(
-            enemyPhaseTailTextureKey(presentation.id, "phase1", frame),
-            source,
-          ));
-        presentation.phase2.frames.forEach((source, frame) =>
-          this.load.image(
-            enemyPhaseTailTextureKey(presentation.id, "phase2", frame),
-            source,
-          ));
+        battleSpriteSources.push(...presentation.phase1.frames, ...presentation.phase2.frames);
       }
+      preloadBattleSpriteAtlases(this, battleSpriteSources);
     }
 
     create(): void {
@@ -1163,9 +1175,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           const column = index % descriptor.width;
           const row = Math.floor(index / descriptor.width);
           this.combatEffects.push(
-            this.add.image(
+            addBattleSpriteImageFromSource(
+              this,
               (origin.x + descriptor.xOffset + column) * TILE_WIDTH,
               (origin.y + descriptor.yOffset + row) * TILE_HEIGHT,
+              enemyPhaseTailFrameSource(
+                prepared.presentationId,
+                enemyPhaseTail.resource,
+                sourceFrame,
+              ),
               enemyPhaseTailTextureKey(
                 prepared.presentationId,
                 enemyPhaseTail.resource,
@@ -1192,9 +1210,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         const presentationId = routePulse.result.definition.presentationId;
         const drawPulseCell = (position: Position, frame: number): void => {
           this.combatEffects.push(
-            this.add.image(
+            addBattleSpriteImageFromSource(
+              this,
               position.x * TILE_WIDTH + TILE_WIDTH / 2,
               position.y * TILE_HEIGHT + TILE_HEIGHT / 2,
+              routePulseFrameSource(presentationId, frame),
               routePulseTextureKey(presentationId, frame),
             ).setOrigin(.5).setDepth(8),
           );
@@ -1698,9 +1718,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             const column = index % descriptor.width;
             const row = Math.floor(index / descriptor.width);
             this.combatEffects.push(
-              this.add.image(
+              addBattleSpriteImageFromSource(
+                this,
                 (target.x + descriptor.xOffset + column) * TILE_WIDTH,
                 (target.y + descriptor.yOffset + row) * TILE_HEIGHT,
+                ASSETS.mapCombat.death[sourceFrame],
                 `map-death-${sourceFrame}`,
               ).setOrigin(0).setDepth(8),
             );
@@ -1848,7 +1870,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       if (presentation.phase === "primaryHit" || presentation.phase === "counterHit") {
         const sourceFrame = MAP_HIT_FRAME_TIMELINE[presentation.frame] ?? 0;
         this.combatEffects.push(
-          this.add.image(target.x * TILE_WIDTH, target.y * TILE_HEIGHT, `map-hit-${sourceFrame}`)
+          addBattleSpriteImageFromSource(
+            this,
+            target.x * TILE_WIDTH,
+            target.y * TILE_HEIGHT,
+            ASSETS.mapCombat.hit[sourceFrame],
+            `map-hit-${sourceFrame}`,
+          )
             .setOrigin(0)
             .setDepth(8),
         );
@@ -1859,9 +1887,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           const column = index % descriptor.width;
           const row = Math.floor(index / descriptor.width);
           this.combatEffects.push(
-            this.add.image(
+            addBattleSpriteImageFromSource(
+              this,
               (target.x + descriptor.xOffset + column) * TILE_WIDTH,
               (target.y + descriptor.yOffset + row) * TILE_HEIGHT,
+              ASSETS.mapCombat.death[sourceFrame],
               `map-death-${sourceFrame}`,
             ).setOrigin(0).setDepth(8),
           );
@@ -1950,26 +1980,53 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       const transitionMask = this.turnTransitionMaskShape.createGeometryMask();
       this.turnTransitionMask = transitionMask;
 
-      const addFixedImage = (x: number, y: number, texture: string, depth: number) => {
+      const addFixedImage = (
+        x: number,
+        y: number,
+        source: string,
+        debugTextureKey: string,
+        depth: number,
+      ) => {
         const screenX = x + BATTLE_INPUT_LEFT;
         const screenY = y - TURN_TRANSITION_BUFFER_SOURCE_Y + TURN_TRANSITION_SCREEN_Y;
-        const image = this.add.image(
+        const image = addBattleSpriteImageFromSource(
+          this,
           screenX - this.cameras.main.x,
           screenY - this.cameras.main.y,
-          texture,
+          source,
+          debugTextureKey,
         ).setOrigin(0).setScrollFactor(0).setDepth(depth).setMask(transitionMask);
         this.turnTransitionEffects.push(image);
       };
 
-      addFixedImage(presentation.x + 16, 322, "turn-transition-shadow", 11);
+      addFixedImage(
+        presentation.x + 16,
+        322,
+        ASSETS.turnTransition.shadow,
+        "turn-transition-shadow",
+        11,
+      );
+      const actorSource = presentation.side === "player"
+        ? ASSETS.turnTransition.player
+        : ASSETS.turnTransition.enemy;
+      const actorTextureKey = presentation.side === "player"
+        ? "turn-transition-player"
+        : "turn-transition-enemy";
       addFixedImage(
         presentation.x,
         presentation.y,
-        presentation.side === "player" ? "turn-transition-player" : "turn-transition-enemy",
+        actorSource,
+        actorTextureKey,
         12,
       );
       for (const dust of TURN_TRANSITION_DUST) {
-        addFixedImage(dust.x, dust.y, `turn-transition-dust-${dust.frame}`, 13);
+        addFixedImage(
+          dust.x,
+          dust.y,
+          ASSETS.turnTransition.dust[dust.frame],
+          `turn-transition-dust-${dust.frame}`,
+          13,
+        );
       }
 
       if (controller.isTestMode) {

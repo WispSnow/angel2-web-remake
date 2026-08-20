@@ -10,6 +10,7 @@ import {
 import { enemyScalingFor, scriptedBossStatsFor } from "./enemy-scaling";
 import { emptyUnitStatuses } from "../simulation/status";
 import { musicAsset, STAGE0_SEAMLESS_MUSIC_ASSETS } from "./music-assets";
+import { STAGE0_FULL_COMBAT_ASSETS } from "./stage0-actions.generated";
 
 export { classStatsFor, nextExperienceThresholdFor };
 
@@ -253,16 +254,16 @@ export const ASSETS = {
     // `C.SWF` record per attack from the stage table and the defender's
     // terrain. See content/full-combat-backgrounds.ts.
     left: {
-      soldierDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/left-soldier-direct/${String(frame).padStart(2, "0")}.png`),
-      soldierPlus50: [0, 1, 2, 3, 4, 5].map((frame) => `/assets/original/full-combat/left-soldier-plus50/${String(frame).padStart(2, "0")}.png`),
-      cavalryDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/left-cavalry-direct/${String(frame).padStart(2, "0")}.png`),
-      cavalryPlus50: Array.from({ length: 9 }, (_, frame) => `/assets/original/full-combat/left-cavalry-plus50/${String(frame).padStart(2, "0")}.png`),
+      soldierDirect: STAGE0_FULL_COMBAT_ASSETS.left.soldier.direct,
+      soldierPlus50: STAGE0_FULL_COMBAT_ASSETS.left.soldier.plus50,
+      cavalryDirect: STAGE0_FULL_COMBAT_ASSETS.left.cavalry.direct,
+      cavalryPlus50: STAGE0_FULL_COMBAT_ASSETS.left.cavalry.plus50,
     },
     right: {
-      soldierDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/right-soldier-direct/${String(frame).padStart(2, "0")}.png`),
-      soldierPlus50: [0, 1, 2, 3, 4, 5].map((frame) => `/assets/original/full-combat/right-soldier-plus50/${String(frame).padStart(2, "0")}.png`),
-      cavalryDirect: [0, 1, 2, 3].map((frame) => `/assets/original/full-combat/right-cavalry-direct/${String(frame).padStart(2, "0")}.png`),
-      cavalryPlus50: Array.from({ length: 9 }, (_, frame) => `/assets/original/full-combat/right-cavalry-plus50/${String(frame).padStart(2, "0")}.png`),
+      soldierDirect: STAGE0_FULL_COMBAT_ASSETS.right.soldier.direct,
+      soldierPlus50: STAGE0_FULL_COMBAT_ASSETS.right.soldier.plus50,
+      cavalryDirect: STAGE0_FULL_COMBAT_ASSETS.right.cavalry.direct,
+      cavalryPlus50: STAGE0_FULL_COMBAT_ASSETS.right.cavalry.plus50,
     },
   },
   audio: {

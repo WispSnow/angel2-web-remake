@@ -28,6 +28,7 @@ import {
   FULL_COMBAT_FRAME_META,
   type FullCombatSpriteState,
 } from "./full-combat";
+import { applyFullCombatAtlasFrame } from "./full-combat-atlas";
 import type { BattleUnit, DialoguePage, UnitClassId, UnitStats } from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
@@ -1445,7 +1446,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
 }
 
 function fullSpriteAsset(sprite: FullCombatSpriteState): {
-  src: string;
+  frameName: string;
   meta: { w: number; anchor: number; h?: number; yOffset?: number };
 } {
   const classId = classIdFromNativeRecord(sprite.classId);
@@ -1476,7 +1477,7 @@ function fullSpriteAsset(sprite: FullCombatSpriteState): {
       `Missing frame metadata for native class ${sprite.classId} ${sprite.side} ${sprite.set} frame ${sprite.frame}`,
     );
   }
-  return { src: frames[sprite.frame], meta };
+  return { frameName: frames[sprite.frame], meta };
 }
 
 function buildFullCombatSkeleton(
@@ -1517,15 +1518,15 @@ function buildFullCombatSkeleton(
             <img class="near copy" src="${background}" alt="" />
           </div>
           <div class="full-combat-particles" aria-hidden="true"></div>
-          <img class="full-combat-lance" alt="" hidden />
-          <img class="full-combat-projectile" data-testid="full-combat-projectile" alt="" hidden />
-          <div class="full-combat-sprite slot-victim" hidden><img alt="" data-testid="full-victim-sprite" /></div>
-          <div class="full-combat-sprite slot-actor" hidden><img alt="" data-testid="full-actor-sprite" /></div>
-          <div class="full-combat-sprite slot-effect-G1" hidden><img alt="" data-testid="full-effect-G1-sprite" /></div>
-          <div class="full-combat-sprite slot-effect-G2" hidden><img alt="" data-testid="full-effect-G2-sprite" /></div>
-          <div class="full-combat-sprite slot-effect-G3" hidden><img alt="" data-testid="full-effect-G3-sprite" /></div>
-          <div class="full-combat-sprite slot-effect-G4" hidden><img alt="" data-testid="full-effect-G4-sprite" /></div>
-          <div class="full-combat-sprite slot-effect-G5" hidden><img alt="" data-testid="full-effect-G5-sprite" /></div>
+          <i class="full-combat-frame full-combat-lance" aria-hidden="true" hidden></i>
+          <i class="full-combat-frame full-combat-projectile" data-testid="full-combat-projectile" aria-hidden="true" hidden></i>
+          <div class="full-combat-sprite slot-victim" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-victim-sprite"></i></div>
+          <div class="full-combat-sprite slot-actor" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-actor-sprite"></i></div>
+          <div class="full-combat-sprite slot-effect-G1" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G1-sprite"></i></div>
+          <div class="full-combat-sprite slot-effect-G2" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G2-sprite"></i></div>
+          <div class="full-combat-sprite slot-effect-G3" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G3-sprite"></i></div>
+          <div class="full-combat-sprite slot-effect-G4" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G4-sprite"></i></div>
+          <div class="full-combat-sprite slot-effect-G5" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G5-sprite"></i></div>
         </div>
         <div class="full-combat-strip" aria-hidden="true">
           <div class="full-life-gauge left" data-testid="full-left-life-gauge">
@@ -1638,12 +1639,13 @@ export function renderCombat(
   ];
   for (const { selector, sprite } of slots) {
     const holder = query<HTMLElement>(selector);
-    const image = holder.querySelector("img") as HTMLImageElement;
+    const image = holder.querySelector<HTMLElement>(".full-combat-frame");
+    if (!image) throw new Error(`Missing atlas frame element for ${selector}`);
     if (!sprite) {
       holder.hidden = true;
       continue;
     }
-    const { src, meta } = fullSpriteAsset(sprite);
+    const { frameName, meta } = fullSpriteAsset(sprite);
     holder.hidden = false;
     image.dataset.side = sprite.side;
     image.dataset.set = sprite.set;
@@ -1657,7 +1659,7 @@ export function renderCombat(
     else delete image.dataset.channel;
     if (sprite.reaction) image.dataset.reaction = sprite.reaction;
     else delete image.dataset.reaction;
-    if (image.getAttribute("src") !== src) image.setAttribute("src", src);
+    applyFullCombatAtlasFrame(image, frameName);
     const anchor = sprite.mirror ? meta.w - meta.anchor : meta.anchor;
     const topOffset = -sprite.lift + (meta.yOffset ?? 0) + yOffsetCorrection;
     image.dataset.projectedYOffset = String(Math.round(topOffset));
@@ -1666,7 +1668,7 @@ export function renderCombat(
     image.style.transform = sprite.mirror ? "scaleX(-1)" : "";
   }
 
-  const lance = query<HTMLImageElement>(".full-combat-lance");
+  const lance = query<HTMLElement>(".full-combat-lance");
   if (scene.lance) {
     const frames = STAGE0_FULL_COMBAT_ASSETS[scene.lance.side].cavalry.plus50;
     const frame = scene.lance.frame;
@@ -1674,9 +1676,9 @@ export function renderCombat(
       throw new Error(`Cavalry lance frame ${frame} is outside the native 6..8 range`);
     }
     const meta = FULL_COMBAT_FRAME_META[scene.lance.side][22].plus50[frame];
-    const src = frames[frame];
+    const frameName = frames[frame];
     lance.hidden = false;
-    if (lance.getAttribute("src") !== src) lance.setAttribute("src", src);
+    applyFullCombatAtlasFrame(lance, frameName);
     // G1 uses the same native bottom-anchor projection as the archer arrow:
     // subtract the current bitmap height, then apply its y-offset. A fixed
     // eight-pixel adjustment puts the 42/43 px diagonal lance frames far
@@ -1695,7 +1697,7 @@ export function renderCombat(
     lance.removeAttribute("data-y");
   }
 
-  const projectile = query<HTMLImageElement>(".full-combat-projectile");
+  const projectile = query<HTMLElement>(".full-combat-projectile");
   if (scene.projectile) {
     const frames = STAGE0_FULL_COMBAT_ASSETS[scene.projectile.side].archer.plus50;
     const frame = scene.projectile.frame;
@@ -1703,9 +1705,9 @@ export function renderCombat(
       throw new Error(`Archer projectile frame ${frame} is outside the native 5..8 range`);
     }
     const meta = FULL_COMBAT_FRAME_META[scene.projectile.side][20].plus50[frame];
-    const src = frames[frame];
+    const frameName = frames[frame];
     projectile.hidden = false;
-    if (projectile.getAttribute("src") !== src) projectile.setAttribute("src", src);
+    applyFullCombatAtlasFrame(projectile, frameName);
     // Module 29's full-screen renderer treats y as the bitmap's bottom
     // anchor (B0FF/B29B): subtract height, then add the per-frame y offset.
     const top = scene.projectile.y - (meta.h ?? 0) + (meta.yOffset ?? 0);
@@ -1721,21 +1723,22 @@ export function renderCombat(
   const particleLayer = query<HTMLElement>(".full-combat-particles");
   const needed = scene.particles.length;
   while (particleLayer.children.length < needed) {
-    const particle = document.createElement("img");
-    particle.setAttribute("alt", "");
+    const particle = document.createElement("i");
+    particle.className = "full-combat-frame";
+    particle.setAttribute("aria-hidden", "true");
     particleLayer.appendChild(particle);
   }
   for (let index = 0; index < particleLayer.children.length; index += 1) {
-    const particle = particleLayer.children[index] as HTMLImageElement;
+    const particle = particleLayer.children[index] as HTMLElement;
     const data = scene.particles[index];
     if (!data) {
       particle.hidden = true;
       continue;
     }
-    const src = STAGE0_FULL_COMBAT_COMMON_EFFECTS.trail[data.frame];
-    if (!src) throw new Error(`Native common trail frame ${data.frame} is outside 0..5`);
+    const frameName = STAGE0_FULL_COMBAT_COMMON_EFFECTS.trail[data.frame];
+    if (!frameName) throw new Error(`Native common trail frame ${data.frame} is outside 0..5`);
     particle.hidden = false;
-    if (particle.getAttribute("src") !== src) particle.setAttribute("src", src);
+    applyFullCombatAtlasFrame(particle, frameName);
     particle.dataset.frame = String(data.frame);
     const x = Math.round(data.x);
     const y = Math.round(data.y);

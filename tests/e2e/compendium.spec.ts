@@ -72,8 +72,8 @@ test("職業圖鑑：默认静态站立，棋子与全景共用阵营且四种�
   await expect(stage).toHaveAttribute("data-static", "true");
   await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute("data-side", "left");
   await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute(
-    "src",
-    /left-soldier-direct/,
+    "data-frame-source",
+    /left\/soldier\/direct/,
   );
   await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "0");
   await expect(detail.getByTestId("compendium-preview-direction"))
@@ -100,8 +100,8 @@ test("職業圖鑑：默认静态站立，棋子与全景共用阵营且四种�
   await expect(detail.getByTestId("compendium-combat-stage")).toHaveAttribute("data-side", "enemy");
   await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute("data-side", "right");
   await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute(
-    "src",
-    /right-soldier-direct/,
+    "data-frame-source",
+    /right\/soldier\/direct/,
   );
   await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "0");
   await expect(detail.getByTestId("compendium-preview-direction"))
@@ -138,8 +138,8 @@ test("職業圖鑑：默认静态站立，棋子与全景共用阵营且四种�
   await expect(stage).toHaveAttribute("data-phase", "fullDefenderDeath");
   const [deathVictimX, deathDustX] = await Promise.all([
     detail.getByTestId("full-victim-sprite").getAttribute("data-x"),
-    detail.locator(".full-combat-particles img:not([hidden])").evaluateAll((images) =>
-      images.map((image) => Number((image as HTMLImageElement).dataset.x))),
+    detail.locator(".full-combat-particles .full-combat-frame:not([hidden])").evaluateAll((frames) =>
+      frames.map((frame) => Number((frame as HTMLElement).dataset.x))),
   ]);
   expect(deathVictimX).not.toBeNull();
   expect(deathDustX).toHaveLength(3);

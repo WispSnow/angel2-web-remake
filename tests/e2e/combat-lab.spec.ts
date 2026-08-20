@@ -45,9 +45,40 @@ const waitForVisibleSpriteImages = (page: Page) => page.waitForFunction(() => {
     document.querySelectorAll<HTMLElement>(".full-combat-sprite:not([hidden])"),
   );
   return holders.length > 0 && holders.every((holder) => {
-    const image = holder.querySelector("img");
-    return image?.complete === true && image.naturalWidth > 0;
+    const frame = holder.querySelector<HTMLElement>(".full-combat-frame");
+    return frame !== null
+      && frame.offsetWidth > 0
+      && frame.offsetHeight > 0
+      && getComputedStyle(frame).backgroundImage !== "none";
   });
+});
+
+test("a soldier panorama requests bounded atlases instead of individual frame PNGs", async ({ page }) => {
+  const requestedSpritePaths = new Set<string>();
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.includes("/assets/original/full-combat/")) {
+      requestedSpritePaths.add(path);
+    }
+    if (path.includes("/assets/original/full-combat-atlases/")) {
+      requestedSpritePaths.add(path);
+    }
+  });
+
+  await page.goto(
+    "/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_200));
+  await waitForVisibleSpriteImages(page);
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_100));
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
+
+  await expect.poll(() => [...requestedSpritePaths].sort()).toEqual([
+    "/assets/original/full-combat-atlases/common-trail.png",
+    "/assets/original/full-combat-atlases/left-soldier.png",
+    "/assets/original/full-combat-atlases/right-soldier.png",
+    "/assets/original/full-combat/backgrounds/05.png",
+  ]);
 });
 
 test("record 35 empress exposes only the original right-side soldier fallback", async ({ page }) => {
@@ -70,7 +101,7 @@ test("record 35 empress exposes only the original right-side soldier fallback", 
   expect(impactAt).toBeDefined();
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 40);
   await expect(page.getByTestId("full-actor-sprite"))
-    .toHaveAttribute("src", /right-empress-plus50\/0[45]\.png$/);
+    .toHaveAttribute("data-frame-source", /right\/empress\/plus50\/0[45]$/);
   await waitForVisibleSpriteImages(page);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-35-original-boundary.png",
@@ -87,7 +118,7 @@ test("record 0 soldier passes attack, guard, hurt and death visual gates", async
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_500));
   await expect(page.getByTestId("full-actor-sprite"))
-    .toHaveAttribute("src", /left-soldier-plus50\/0[45]\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/soldier\/plus50\/0[45]$/);
   await expect(page.getByTestId("combat-lab-attacker-life")).toHaveValue("260");
   await expect(page.getByTestId("combat-lab-defender-life")).toHaveValue("500");
   await expect(page.getByTestId("full-left-life-gauge")).toHaveAttribute("data-life", "260");
@@ -135,7 +166,7 @@ test("right-side soldier dust trail mirrors the left-side attack direction", asy
   );
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_200));
 
-  const particles = page.locator(".full-combat-particles img:not([hidden])");
+  const particles = page.locator(".full-combat-particles .full-combat-frame:not([hidden])");
   await expect(particles).toHaveCount(3);
   const particleXs = await particles.evaluateAll((elements) => elements.map((element) => {
     const match = element.getAttribute("style")?.match(/translate\((-?\d+)px/u);
@@ -172,9 +203,9 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
 
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(620));
   await expect(page.getByTestId("full-actor-sprite"))
-    .toHaveAttribute("src", /left-magic-sword-warrior-plus50\/00\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/magic-sword-warrior\/plus50\/00$/);
   await expect(page.getByTestId("full-effect-G1-sprite"))
-    .toHaveAttribute("src", /left-magic-sword-warrior-plus50\/03\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/magic-sword-warrior\/plus50\/03$/);
   await expect(page.getByTestId("full-effect-G1-sprite")).toHaveAttribute("data-channel", "G1");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-01-attack.png",
@@ -184,7 +215,7 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_760));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
   await expect(page.getByTestId("full-effect-G1-sprite"))
-    .toHaveAttribute("src", /left-magic-sword-warrior-plus50\/07\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/magic-sword-warrior\/plus50\/07$/);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-01-hurt.png",
     fullPage: true,
@@ -194,7 +225,7 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_800));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "guard");
   await expect(page.getByTestId("full-effect-G1-sprite"))
-    .toHaveAttribute("src", /left-magic-sword-warrior-plus50\/04\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/magic-sword-warrior\/plus50\/04$/);
   await expect(page.getByTestId("full-effect-G1-sprite"))
     .toHaveAttribute("data-y-offset", "-18");
   await captureVisualAudit(page, {
@@ -207,7 +238,7 @@ test("record 1 magic sword warrior keeps its body and G1 effect channels synchro
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(2_460));
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
   await expect(page.getByTestId("full-victim-sprite"))
-    .toHaveAttribute("src", /right-soldier-direct\/02\.png$/);
+    .toHaveAttribute("data-frame-source", /right\/soldier\/direct\/02$/);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-01-death.png",
     fullPage: true,
@@ -221,14 +252,14 @@ test("record 2 jungle warrior passes attack, guard, hurt and death visual gates"
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_361));
   await expect(page.getByTestId("full-combat-viewport-content"))
     .toHaveAttribute("data-y-offset", "-4");
-  const particles = page.locator(".full-combat-particles img:not([hidden])");
+  const particles = page.locator(".full-combat-particles .full-combat-frame:not([hidden])");
   await expect(particles).toHaveCount(3);
   expect(await particles.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-frame"))))
     .toEqual(["1", "3", "5"]);
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_400));
   await expect(page.getByTestId("full-actor-sprite"))
-    .toHaveAttribute("src", /left-jungle-warrior-plus50\/04\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/jungle-warrior\/plus50\/04$/);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-02-attack.png",
     fullPage: true,
@@ -265,9 +296,9 @@ test("record 3 magic priest passes body, G1, reaction and death visual gates", a
   );
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(800));
   await expect(page.getByTestId("full-actor-sprite"))
-    .toHaveAttribute("src", /left-magic-priest-plus50\/01\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/magic-priest\/plus50\/01$/);
   await expect(page.getByTestId("full-effect-G1-sprite"))
-    .toHaveAttribute("src", /left-magic-priest-plus50\/02\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/magic-priest\/plus50\/02$/);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-03-attack.png",
     fullPage: true,
@@ -304,7 +335,7 @@ test("record 4 prayer guide passes attack, guard, hurt and death visual gates", 
   );
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_120));
   await expect(page.getByTestId("full-actor-sprite"))
-    .toHaveAttribute("src", /left-prayer-guide-plus50\/02\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/prayer-guide\/plus50\/02$/);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-04-attack.png",
     fullPage: true,
@@ -341,9 +372,9 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
   );
   await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.seek(1_400));
   await expect(page.getByTestId("full-actor-sprite"))
-    .toHaveAttribute("src", /left-curse-master-plus50\/05\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/curse-master\/plus50\/05$/);
   await expect(page.getByTestId("full-effect-G1-sprite"))
-    .toHaveAttribute("src", /left-curse-master-plus50\/06\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/curse-master\/plus50\/06$/);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-05-attack.png",
     fullPage: true,
@@ -399,8 +430,8 @@ test("swift dragon knight guard stays grounded on both physical sides", async ({
     await expect(sprite).toHaveAttribute("data-frame", "3");
     await expect(sprite).toHaveAttribute("data-side", side === "left" ? "right" : "left");
     await expect(sprite).toHaveAttribute(
-      "src",
-      new RegExp(`${side === "left" ? "right" : "left"}-swift-dragon-knight-direct/03\\.png$`),
+      "data-frame-source",
+      new RegExp(`${side === "left" ? "right" : "left"}/swift-dragon-knight/direct/03$`),
     );
     await waitForVisibleSpriteImages(page);
     await captureVisualAudit(page, {
@@ -524,7 +555,7 @@ test("record 20 archer passes release, flight, guard, hurt and death visual gate
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), releaseAt! + 40);
   await expect(page.getByTestId("full-combat-projectile")).toBeVisible();
   await expect(page.getByTestId("full-combat-projectile"))
-    .toHaveAttribute("src", /left-archer-plus50\/05\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/archer\/plus50\/05$/);
   await expect(page.getByTestId("full-combat-projectile"))
     .toHaveAttribute("data-top", "91");
   await captureVisualAudit(page, {
@@ -579,7 +610,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   );
   await expect(page.locator(".full-combat-lance")).toBeVisible();
   await expect(page.locator(".full-combat-lance"))
-    .toHaveAttribute("src", /left-cavalry-plus50\/0[67]\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/cavalry\/plus50\/0[67]$/);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-attack.png",
     fullPage: true,
@@ -696,7 +727,7 @@ for (const side of ["left", "right"] as const) {
     await waitForVisibleSpriteImages(page);
     const contact = await page.evaluate(() => {
       const box = (selector: string) => {
-        const image = document.querySelector<HTMLElement>(`${selector} img`);
+        const image = document.querySelector<HTMLElement>(`${selector} .full-combat-frame`);
         if (!image) throw new Error(`${selector} is not rendered`);
         return image.getBoundingClientRect();
       };
@@ -734,7 +765,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
   await page.getByRole("button", { name: "重傷（24）" }).click();
   await waitForVictim(page, "warrior", "hurt", 1);
   await expect(page.getByTestId("full-victim-sprite"))
-    .toHaveAttribute("src", /right-warrior-direct\/01\.png$/);
+    .toHaveAttribute("data-frame-source", /right\/warrior\/direct\/01$/);
   await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullImpact");
   await expect(page.getByRole("button", { name: "重傷（24）" }))
     .toHaveAttribute("aria-pressed", "true");
@@ -754,7 +785,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
   await page.getByRole("button", { name: "死亡（當前生命）" }).click();
   await waitForVictim(page, "warrior", "death", 2);
   await expect(page.getByTestId("full-victim-sprite"))
-    .toHaveAttribute("src", /right-warrior-direct\/02\.png$/);
+    .toHaveAttribute("data-frame-source", /right\/warrior\/direct\/02$/);
   await expect(page.getByTestId("combat-lab-phase")).toHaveText("fullDefenderDeath");
   await expect(page.getByTestId("combat-lab-reaction")).toBeDisabled();
   await captureVisualAudit(page, {
@@ -768,7 +799,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
   await page.getByRole("button", { name: "重傷（24）" }).click();
   await waitForVictim(page, "archer", "hurt", 1);
   await expect(page.getByTestId("full-victim-sprite"))
-    .toHaveAttribute("src", /right-archer-direct\/01\.png$/);
+    .toHaveAttribute("data-frame-source", /right\/archer\/direct\/01$/);
   expect((await labState(page)).config).toMatchObject({
     attackerClass: "warrior",
     defenderClass: "archer",
@@ -782,7 +813,7 @@ test("combat lab outcome shortcuts preserve the selected classes and editable li
   await page.getByRole("button", { name: "死亡（當前生命）" }).click();
   await waitForVictim(page, "archer", "death", 2);
   await expect(page.getByTestId("full-victim-sprite"))
-    .toHaveAttribute("src", /right-archer-direct\/02\.png$/);
+    .toHaveAttribute("data-frame-source", /right\/archer\/direct\/02$/);
   await expect(page.getByTestId("full-right-life-gauge")).toHaveAttribute("data-life", "0");
   await expect(page).toHaveURL(/defender=archer.*reaction=hurt.*death=1/);
   await captureVisualAudit(page, {
@@ -814,7 +845,7 @@ test("combat lab controls direction, guard branch, pause and semantic timeline j
       && state.victimFrame === 3;
   });
   await expect(page.getByTestId("full-victim-sprite"))
-    .toHaveAttribute("src", /left-sister-direct\/03\.png$/);
+    .toHaveAttribute("data-frame-source", /left\/sister\/direct\/03$/);
 
   await page.getByTestId("combat-lab-toggle").click();
   expect((await labState(page)).playing).toBe(false);

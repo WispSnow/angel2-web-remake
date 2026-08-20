@@ -307,7 +307,7 @@ test("great dragon knight counter guard keeps its wide shield centered", async (
   await expect(victim).toHaveAttribute("data-frame", "3");
   await expect(victim).toHaveAttribute("data-reaction", "guard");
   await expect(victim).toHaveAttribute("data-x", "146");
-  const particles = page.locator(".full-combat-particles img:not([hidden])");
+  const particles = page.locator(".full-combat-particles .full-combat-frame:not([hidden])");
   await expect(particles).toHaveCount(3);
   const particleXs = await particles.evaluateAll((elements) => elements.map((element) => {
     const match = element.getAttribute("style")?.match(/translate\((-?\d+)px/u);

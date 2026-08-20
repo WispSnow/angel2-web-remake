@@ -58,6 +58,12 @@ pnpm build:release
 `debug.html`、竞技场、对阵场或各实验室入口。不要手工修改、增删或复制文件到 `release/`；
 需要修正时回到源码或生成流程重建。
 
+资源图集也必须走生成与发布清理边界：全景职业动作帧来自
+`pnpm content:full-combat-atlases`，地图命中／死亡、回合切换及逐关连续特效来自
+`pnpm content:battle-sprite-atlases`。开发目录保留逐帧来源；`prepare-release.mjs` 只有在
+对应 PNG 与 Phaser JSON Hash 全部存在后，才从玩家包删除已经迁移的零碎 PNG。不要在
+`public/` 或 `release/` 手工拼图、改帧名或先删来源。
+
 重建后做最小包体检查：
 
 ```bash

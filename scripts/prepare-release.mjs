@@ -77,6 +77,74 @@ for (const actionId of mapActionAtlasIds) {
   });
 }
 
+const fullCombatAtlasDirectory = path.join(
+  releaseDirectory,
+  "assets",
+  "original",
+  "full-combat-atlases",
+);
+const fullCombatAtlasFiles = await readdir(fullCombatAtlasDirectory);
+const fullCombatAtlasIds = new Set(
+  fullCombatAtlasFiles.map((file) => file.replace(/\.(?:png|json)$/u, "")),
+);
+if (fullCombatAtlasIds.size !== 75) {
+  throw new Error(`release build has ${fullCombatAtlasIds.size} full-combat atlases; expected 75`);
+}
+for (const atlasId of fullCombatAtlasIds) {
+  for (const extension of ["png", "json"]) {
+    if (!(await pathExists(path.join(fullCombatAtlasDirectory, `${atlasId}.${extension}`)))) {
+      throw new Error(`release build is missing full-combat atlas ${atlasId}.${extension}`);
+    }
+  }
+}
+const fullCombatDirectory = path.join(releaseDirectory, "assets", "original", "full-combat");
+for (const entry of await readdir(fullCombatDirectory, { withFileTypes: true })) {
+  if (entry.isDirectory() && entry.name !== "backgrounds") {
+    await rm(path.join(fullCombatDirectory, entry.name), { recursive: true, force: true });
+  }
+}
+
+const battleSpriteAtlasIds = [
+  "map-combat",
+  "turn-transition",
+  "stage4-force-field-pulse",
+  "stage26-column-push",
+];
+const battleSpriteAtlasDirectory = path.join(
+  releaseDirectory,
+  "assets",
+  "original",
+  "battle-sprite-atlases",
+);
+for (const atlasId of battleSpriteAtlasIds) {
+  for (const extension of ["png", "json"]) {
+    if (!(await pathExists(path.join(battleSpriteAtlasDirectory, `${atlasId}.${extension}`)))) {
+      throw new Error(`release build is missing battle-sprite atlas ${atlasId}.${extension}`);
+    }
+  }
+}
+await rm(path.join(releaseDirectory, "assets", "original", "map-combat"), {
+  recursive: true,
+  force: true,
+});
+await rm(path.join(releaseDirectory, "assets", "original", "stage4-force-field-pulse"), {
+  recursive: true,
+  force: true,
+});
+await rm(path.join(releaseDirectory, "assets", "original", "stage26-column-push"), {
+  recursive: true,
+  force: true,
+});
+for (const file of [
+  "turn-transition-player.png",
+  "turn-transition-enemy.png",
+  "turn-transition-shadow.png",
+  ...Array.from({ length: 6 }, (_, frame) =>
+    `turn-transition-dust-${String(frame).padStart(2, "0")}.png`),
+]) {
+  await rm(path.join(releaseDirectory, "assets", "original", file), { force: true });
+}
+
 const atlasDirectory = path.join(releaseDirectory, "assets", "original", "map-action-atlases");
 for (const actionId of mapActionAtlasIds) {
   for (const extension of ["png", "json"]) {
