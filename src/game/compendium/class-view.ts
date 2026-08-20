@@ -12,6 +12,39 @@ import type { ClassId } from "../content/classes";
 
 const DIFFICULTY_LABELS = ["簡單", "普通", "困難", "無法無天"] as const;
 
+export type ClassPreviewSide = "ally" | "enemy";
+export type ClassPreviewAnimation = "stand" | "attack" | "guard" | "hurt" | "death";
+
+export interface ClassPreviewSelection {
+  readonly side: ClassPreviewSide;
+  readonly animation: ClassPreviewAnimation;
+}
+
+export const DEFAULT_CLASS_PREVIEW_SELECTION: ClassPreviewSelection = {
+  side: "ally",
+  animation: "stand",
+};
+
+const PREVIEW_ANIMATION_LABELS: Readonly<Record<ClassPreviewAnimation, string>> = {
+  stand: "站立",
+  attack: "攻擊",
+  guard: "格擋",
+  hurt: "重傷",
+  death: "死亡",
+};
+
+const PREVIEW_ANIMATIONS = Object.keys(PREVIEW_ANIMATION_LABELS) as ClassPreviewAnimation[];
+
+export function normalizeClassPreviewSelection(
+  id: ClassId,
+  selection: ClassPreviewSelection,
+): ClassPreviewSelection {
+  const entry = compendiumEntry(id);
+  return selection.side === "ally" && !entry.mapSprites.ally
+    ? { ...selection, side: "enemy" }
+    : selection;
+}
+
 function classButton(id: ClassId, name: string, depth: number, selected: ClassId): string {
   const isSelected = id === selected;
   return `<button type="button" class="rn-class-row" data-class="${id}" data-depth="${depth}"
@@ -170,16 +203,72 @@ function noteSection(entry: CompendiumEntry): string {
   return `<section class="rn-block"><h4>備註</h4><ul class="rn-notes">${items}</ul></section>`;
 }
 
-export function renderClassDetail(id: ClassId): string {
+function previewDirection(selection: ClassPreviewSelection): string {
+  const side = selection.side === "ally" ? "我軍 · 左側" : "敵軍 · 右側";
+  if (selection.animation === "stand") return `${side} · 靜態站立`;
+  if (selection.animation === "attack") {
+    return `${side} · ${selection.side === "ally" ? "由左向右" : "由右向左"}攻擊`;
+  }
+  return `${side}受擊 · ${PREVIEW_ANIMATION_LABELS[selection.animation]}`;
+}
+
+function previewSection(
+  entry: CompendiumEntry,
+  selection: ClassPreviewSelection,
+): string {
+  const fullCombatAvailable = selection.side === "enemy" || entry.fullCombatReach === "both-sides";
+  const actionButtons = PREVIEW_ANIMATIONS.map((animation) => {
+    const selected = animation === selection.animation;
+    return `<button type="button" data-class-preview-animation="${animation}"
+      data-testid="compendium-animation-${animation}" aria-pressed="${selected}"
+      ${fullCombatAvailable ? "" : "disabled"}>${PREVIEW_ANIMATION_LABELS[animation]}</button>`;
+  }).join("");
+  const stage = fullCombatAvailable
+    ? `<div class="rn-class-combat-stage" data-testid="compendium-combat-stage"
+        data-class-combat-available="true">
+        <div class="rn-class-combat-native">
+          <div class="rn-class-combat-presentation"></div>
+        </div>
+      </div>`
+    : `<div class="rn-class-combat-stage is-unavailable" data-testid="compendium-combat-stage"
+        data-class-combat-available="false">
+        <p>原版沒有這個職業的我方左側普通全景圖形；切換「敵軍」可查看唯一可重放版本。</p>
+      </div>`;
+  const hint = selection.animation === "stand"
+    ? "靜態展示正式全景戰鬥腳本中，角色受擊前的 direct frame 0 常態姿勢。"
+    : "使用正式全景戰鬥腳本；再次點擊目前動作可從頭重播。";
+  return `<section class="rn-block rn-class-preview" aria-labelledby="compendium-combat-title">
+    <div class="rn-class-preview-toolbar">
+      <h4 id="compendium-combat-title">全景動畫</h4>
+      <div class="rn-class-animation-switch" role="group" aria-label="全景動畫動作">
+        ${actionButtons}
+      </div>
+    </div>
+    ${stage}
+    <p class="rn-class-preview-direction" data-testid="compendium-preview-direction">
+      ${escapeHtml(previewDirection(selection))}
+    </p>
+    <p class="rn-hint">${hint}</p>
+  </section>`;
+}
+
+export function renderClassDetail(
+  id: ClassId,
+  requestedSelection: ClassPreviewSelection = DEFAULT_CLASS_PREVIEW_SELECTION,
+): string {
   const entry = compendiumEntry(id);
+  const selection = normalizeClassPreviewSelection(id, requestedSelection);
   const codes = entry.codeSide1 === entry.codeSide2
     ? entry.codeSide1
     : `${entry.codeSide1}／${entry.codeSide2}`;
-  const sideLabel = entry.spriteSide === "ally" ? "我方棋子" : "敵方棋子";
+  const mapSprite = entry.mapSprites[selection.side];
+  if (!mapSprite) throw new Error(`class ${id} does not have a ${selection.side} map sprite`);
+  const sideLabel = selection.side === "ally" ? "我軍棋子" : "敵軍棋子";
   return `
     <header class="rn-class-head">
-      <div class="rn-figure" data-side="${entry.spriteSide}">
-        <img src="${entry.sprite}" alt="${escapeHtml(entry.name)}的${sideLabel}" />
+      <div class="rn-figure" data-side="${selection.side}">
+        <img src="${mapSprite}" alt="${escapeHtml(entry.name)}的${sideLabel}"
+          data-testid="compendium-map-sprite" />
       </div>
       <div class="rn-class-title">
         <h3>${escapeHtml(entry.name)}</h3>
@@ -195,7 +284,18 @@ export function renderClassDetail(id: ClassId): string {
           <span>擊殺經驗 ${entry.killReward}</span>
         </p>
       </div>
+      <div class="rn-class-side-switch" role="group" aria-label="棋子與全景動畫陣營">
+        <span>預覽陣營</span>
+        <div>
+          <button type="button" data-class-preview-side="ally"
+            data-testid="compendium-side-ally" aria-pressed="${selection.side === "ally"}"
+            ${entry.mapSprites.ally ? "" : "disabled"}>我軍</button>
+          <button type="button" data-class-preview-side="enemy"
+            data-testid="compendium-side-enemy" aria-pressed="${selection.side === "enemy"}">敵軍</button>
+        </div>
+      </div>
     </header>
+    ${previewSection(entry, selection)}
     ${traitSection(entry)}
     <section class="rn-block">
       <h4>屬性與成長</h4>

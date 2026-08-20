@@ -29,6 +29,10 @@ export interface OverlayPanelConfig<Id extends string> {
   readonly render: (tab: Id) => string;
   /** 分頁內容自己的點擊處理；分頁切換與關閉已由骨架處理。 */
   readonly onBodyClick?: (target: HTMLElement, body: HTMLElement) => void;
+  /** 內容完成換頁或首次繪製後，用於掛載只存在於目前分頁的動態表現。 */
+  readonly onBodyRendered?: (body: HTMLElement, tab: Id) => void;
+  readonly onClose?: () => void;
+  readonly onDestroy?: () => void;
 }
 
 export interface OverlayPanel<Id extends string> {
@@ -69,6 +73,7 @@ export function createOverlayPanel<Id extends string>(
       button.setAttribute("aria-selected", String(selected));
       button.tabIndex = selected ? 0 : -1;
     }
+    config.onBodyRendered?.(panel.body, activeTab);
   }
 
   function build(): PanelHandles {
@@ -155,6 +160,7 @@ export function createOverlayPanel<Id extends string>(
 
   function close(): void {
     if (!panel) return;
+    config.onClose?.();
     panel.root.classList.remove("is-open");
     previouslyFocused?.focus();
     previouslyFocused = undefined;
@@ -167,6 +173,7 @@ export function createOverlayPanel<Id extends string>(
     /** 表面切換時整個拆掉：面板不應該跨越關卡或畫面存活。 */
     destroy: () => {
       if (!panel) return;
+      config.onDestroy?.();
       panel.events.abort();
       panel.root.remove();
       panel = undefined;

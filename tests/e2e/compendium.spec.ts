@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 type CompendiumTab = "classes" | "characters";
 
@@ -54,6 +55,157 @@ test("職業圖鑑：轉職樹選取與轉職連結都切換右欄", async ({ pa
   await expect(detail).toContainText("6 級之後每檔");
 });
 
+test("職業圖鑑：默认静态站立，棋子与全景共用阵营且四种动作可重播", async ({ page }) => {
+  await page.goto("/");
+  await openCompendium(page, "classes");
+  const detail = page.getByTestId("compendium-detail");
+  const mapSprite = detail.getByTestId("compendium-map-sprite");
+
+  // 普通职业默认以我军左侧出现，棋子和全景保持同一阵营与方向。
+  await expect(detail.getByTestId("compendium-side-ally")).toHaveAttribute("aria-pressed", "true");
+  await expect(mapSprite).toHaveAttribute("src", /ally-soldier\.png$/);
+  const stage = detail.getByTestId("compendium-combat-stage");
+  await expect(detail.getByTestId("compendium-animation-stand"))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(stage).toHaveAttribute("data-side", "ally");
+  await expect(stage).toHaveAttribute("data-animation", "stand");
+  await expect(stage).toHaveAttribute("data-static", "true");
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute("data-side", "left");
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute(
+    "src",
+    /left-soldier-direct/,
+  );
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "0");
+  await expect(detail.getByTestId("compendium-preview-direction"))
+    .toContainText("靜態站立");
+  const standingFrame = await detail.getByTestId("full-victim-sprite").evaluate((image) => ({
+    src: image.getAttribute("src"),
+    frame: image.dataset.frame,
+    x: image.dataset.x,
+  }));
+  await page.waitForTimeout(350);
+  await expect.poll(() => detail.getByTestId("full-victim-sprite").evaluate((image) => ({
+    src: image.getAttribute("src"),
+    frame: image.dataset.frame,
+    x: image.dataset.x,
+  }))).toEqual(standingFrame);
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/compendium-class-preview-desktop.png",
+    animations: "allow",
+  });
+
+  await detail.getByTestId("compendium-side-enemy").click();
+  await expect(detail.getByTestId("compendium-side-enemy")).toHaveAttribute("aria-pressed", "true");
+  await expect(mapSprite).toHaveAttribute("src", /enemy-soldier\.png$/);
+  await expect(detail.getByTestId("compendium-combat-stage")).toHaveAttribute("data-side", "enemy");
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute("data-side", "right");
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute(
+    "src",
+    /right-soldier-direct/,
+  );
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "0");
+  await expect(detail.getByTestId("compendium-preview-direction"))
+    .toContainText("靜態站立");
+
+  await detail.getByTestId("compendium-animation-attack").click();
+  await expect(detail.getByTestId("compendium-combat-stage")).toHaveAttribute("data-static", "false");
+  await expect(detail.getByTestId("compendium-preview-direction"))
+    .toContainText("由右向左攻擊");
+
+  // 防守动作由当前职业担任受击者；阈值直接走正式脚本的 guard / hurt / death 流。
+  await detail.getByTestId("compendium-animation-guard").click();
+  await expect(detail.getByTestId("compendium-animation-guard"))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(detail.getByTestId("compendium-combat-stage")).toHaveAttribute(
+    "data-animation",
+    "guard",
+  );
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute(
+    "data-reaction",
+    "guard",
+  );
+
+  await detail.getByTestId("compendium-animation-hurt").click();
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute(
+    "data-reaction",
+    "hurt",
+  );
+  await detail.getByTestId("compendium-animation-death").click();
+  await expect(detail.getByTestId("full-victim-sprite")).toHaveAttribute(
+    "data-reaction",
+    "death",
+  );
+  await expect(stage).toHaveAttribute("data-phase", "fullDefenderDeath");
+  const [deathVictimX, deathDustX] = await Promise.all([
+    detail.getByTestId("full-victim-sprite").getAttribute("data-x"),
+    detail.locator(".full-combat-particles img:not([hidden])").evaluateAll((images) =>
+      images.map((image) => Number((image as HTMLImageElement).dataset.x))),
+  ]);
+  expect(deathVictimX).not.toBeNull();
+  expect(deathDustX).toHaveLength(3);
+  expect(deathDustX.every((x) => x < Number(deathVictimX))).toBe(true);
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/compendium-class-preview-right-death.png",
+    animations: "allow",
+  });
+
+  // 龍没有我方棋子；女帝有我方棋子但没有对应的左侧普通全景图形。
+  await page.getByTestId("compendium-class-dragon").click();
+  await expect(detail.getByTestId("compendium-side-ally")).toBeDisabled();
+  await expect(detail.getByTestId("compendium-side-enemy")).toHaveAttribute("aria-pressed", "true");
+  await expect(mapSprite).toHaveAttribute("src", /enemy-dragon\.png$/);
+
+  await page.getByTestId("compendium-class-empress").click();
+  await detail.getByTestId("compendium-side-ally").click();
+  await expect(mapSprite).toHaveAttribute("src", /ally-empress\.png$/);
+  await expect(detail.getByTestId("compendium-combat-stage"))
+    .toHaveAttribute("data-class-combat-available", "false");
+  await expect(detail.getByTestId("compendium-combat-stage"))
+    .toContainText("原版沒有這個職業的我方左側普通全景圖形");
+  await expect(detail.getByTestId("compendium-animation-attack")).toBeDisabled();
+
+  await detail.getByTestId("compendium-side-enemy").click();
+  await detail.getByTestId("compendium-animation-attack").click();
+  await expect(detail.getByTestId("compendium-combat-stage"))
+    .toHaveAttribute("data-class-combat-available", "true");
+  await expect(detail.getByTestId("full-actor-sprite")).toHaveAttribute("data-side", "right");
+
+  // 关闭后重新进入职业图鉴，总是回到静态站立默认页。
+  await page.getByTestId("compendium-close").click();
+  await page.getByTestId("compendium-open").click();
+  await expect(page.getByTestId("compendium-animation-stand"))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("compendium-combat-stage")).toHaveAttribute("data-static", "true");
+});
+
+test("職業圖鑑：窄屏的阵营与动作控件不会挤出详情栏", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await openCompendium(page, "classes");
+  const detail = page.getByTestId("compendium-detail");
+  const preview = detail.locator(".rn-class-preview");
+  await preview.scrollIntoViewIfNeeded();
+  await expect(preview).toBeVisible();
+  await expect(detail.getByTestId("compendium-side-ally")).toBeVisible();
+  await expect(detail.getByTestId("compendium-animation-stand"))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(detail.getByTestId("compendium-animation-death")).toBeVisible();
+  const [detailBox, actionBox] = await Promise.all([
+    detail.boundingBox(),
+    detail.locator(".rn-class-animation-switch").boundingBox(),
+  ]);
+  expect(detailBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  if (detailBox && actionBox) {
+    expect(actionBox.x).toBeGreaterThanOrEqual(detailBox.x);
+    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(detailBox.x + detailBox.width + 1);
+  }
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/compendium-class-preview-mobile.png",
+    animations: "allow",
+  });
+});
+
 test("職業圖鑑覆蓋全部職業，每一項都畫得出屬性", async ({ page }) => {
   await page.goto("/");
   await openCompendium(page, "classes");
@@ -70,7 +222,7 @@ test("職業圖鑑覆蓋全部職業，每一項都畫得出屬性", async ({ pa
     await expect(detail.getByRole("heading", { level: 3 })).toHaveText(name);
     await expect(detail.locator("table.rn-stats").first()).toBeVisible();
     // 棋子圖必須真的存在：缺一張素材在畫面上只是空白，不會報錯。
-    await expect.poll(() => detail.locator("img")
+    await expect.poll(() => detail.getByTestId("compendium-map-sprite")
       .evaluate((image: HTMLImageElement) => image.naturalWidth), { message: name })
       .toBeGreaterThan(0);
   }

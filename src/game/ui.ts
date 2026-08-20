@@ -1711,7 +1711,11 @@ export function renderCombat(
     particle.hidden = false;
     if (particle.getAttribute("src") !== src) particle.setAttribute("src", src);
     particle.dataset.frame = String(data.frame);
-    particle.style.transform = `translate(${Math.round(data.x)}px, ${Math.round(data.y)}px)`;
+    const x = Math.round(data.x);
+    const y = Math.round(data.y);
+    particle.dataset.x = String(x);
+    particle.dataset.y = String(y);
+    particle.style.transform = `translate(${x}px, ${y}px)`;
   }
 
   const damage = query<HTMLElement>(".full-damage-number");

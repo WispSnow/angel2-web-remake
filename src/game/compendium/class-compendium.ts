@@ -9,7 +9,8 @@ import {
 } from "../content/classes";
 import { classTraitsFor, type ClassTrait } from "../content/class-traits";
 import { SCRIPTED_BOSS_STATS } from "../content/enemy-scaling";
-import { allyMapUnitAsset } from "../content/map-unit-assets";
+import { allyMapUnitAsset, enemyMapUnitAsset } from "../content/map-unit-assets";
+import { FULL_COMBAT_ACCEPTANCE, type FullCombatReach } from "../content/full-combat-acceptance";
 import { BATTLE_ACTION_DEFINITIONS, shootingActionIdFor } from "../content/actions";
 
 /**
@@ -73,8 +74,11 @@ export interface CompendiumEntry {
   readonly nativeRecord: number;
   readonly codeSide1: string;
   readonly codeSide2: string;
-  readonly sprite: string;
-  readonly spriteSide: "ally" | "enemy";
+  readonly mapSprites: Readonly<{
+    ally?: string;
+    enemy: string;
+  }>;
+  readonly fullCombatReach: FullCombatReach;
   readonly movement: number;
   readonly role: "melee" | "ranged";
   readonly actionLabel: string;
@@ -298,15 +302,13 @@ const CLASS_NOTES: Readonly<Partial<Record<ClassId, readonly string[]>>> = {
   hand: ["劇情首領：只以敵方登場，原版沒有 side 1 地圖圖形。", "免疫普通命中與技術施加的混亂、毒。"],
 };
 
-function spriteFor(id: ClassId): { sprite: string; spriteSide: "ally" | "enemy" } {
-  const ally = allyMapUnitAsset(id);
-  if (ally) return { sprite: ally, spriteSide: "ally" };
-  return { sprite: `/assets/original/technique-lab/units/enemy-${id}.png`, spriteSide: "enemy" };
-}
-
 function buildEntry(id: ClassId): CompendiumEntry {
   const definition = classDefinition(id);
-  const { sprite, spriteSide } = spriteFor(id);
+  const allySprite = allyMapUnitAsset(id);
+  const acceptance = FULL_COMBAT_ACCEPTANCE[definition.nativeRecord];
+  if (!acceptance || acceptance.classId !== id) {
+    throw new Error(`full-combat acceptance does not match class ${id}`);
+  }
   const rows = definition.dataRows.slice(0, 3).map((row, index) => ({
     level: index + 1,
     experience: row.experienceThreshold,
@@ -323,8 +325,11 @@ function buildEntry(id: ClassId): CompendiumEntry {
     nativeRecord: definition.nativeRecord,
     codeSide1: definition.codes.side1,
     codeSide2: definition.codes.side2,
-    sprite,
-    spriteSide,
+    mapSprites: {
+      ...(allySprite ? { ally: allySprite } : {}),
+      enemy: enemyMapUnitAsset(id),
+    },
+    fullCombatReach: acceptance.reach,
     movement: definition.dataRows[0].movement,
     role: classCombatRole(id),
     actionLabel: ACTION_LABELS[definition.actionCategory] ?? definition.actionCategory,

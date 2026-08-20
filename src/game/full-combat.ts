@@ -1295,11 +1295,16 @@ function advanceNativePresentationPhase(
     // trail extends left. A few classes emit guard dust from the actor channel
     // instead; those are recoil effects and must reverse that actor's attack
     // trail direction.
-    const towardRight = phase === "guard"
-      ? effectRole === "actor"
-        ? !state.attackTrailTowardRight
-        : subjectSide === "left"
-      : nativeTowardRight;
+    const towardRight = phase === "death"
+      // B683/B6BD install the same UE command on the physical left/right
+      // sprite stream. B3BD then takes its left-U (+40/+24) or right-U
+      // (-40/-24) branch directly, so both death trails point inward.
+      ? subjectSide === "left"
+      : phase === "guard"
+        ? effectRole === "actor"
+          ? !state.attackTrailTowardRight
+          : subjectSide === "left"
+        : nativeTowardRight;
     if (phase === "attack") state.attackTrailTowardRight = towardRight;
     const direction = towardRight ? 24 : -24;
     state.trailX[0] = subjectX + (towardRight ? 40 + state.trailOffset : -40 - state.trailOffset);

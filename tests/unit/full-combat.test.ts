@@ -354,11 +354,16 @@ function referencePresentationFrames(
       const nativeTowardRight = subjectSide === "right"
         ? !effectTowardRight
         : effectTowardRight;
-      const towardRight = phase === "guard"
-        ? effectRole === "actor"
-          ? !state.attackTrailTowardRight
-          : subjectSide === "left"
-        : nativeTowardRight;
+      const towardRight = phase === "death"
+        // B683/B6BD install UE on the physical left/right sprite stream.
+        // B3BD therefore uses its left-U (+40/+24) or right-U (-40/-24)
+        // branch directly: both death trails point toward the window centre.
+        ? subjectSide === "left"
+        : phase === "guard"
+          ? effectRole === "actor"
+            ? !state.attackTrailTowardRight
+            : subjectSide === "left"
+          : nativeTowardRight;
       if (phase === "attack") state.attackTrailTowardRight = towardRight;
       const direction = towardRight ? 24 : -24;
       state.trailX[0] = subjectX
@@ -909,6 +914,12 @@ describe("Full-screen ordinary combat choreography", () => {
         );
         expect(state.viewportYOffset).toBe(deathPresentation.frames[index].viewportYOffset);
         expect(state.particles).toEqual(deathPresentation.frames[index].particles);
+        const inwardOffset = state.particles[0].x - victimMark;
+        expect(Math.sign(inwardOffset)).toBe(victimSide === "left" ? 1 : -1);
+        expect(Math.abs(inwardOffset)).toBeGreaterThanOrEqual(40);
+        expect(Math.abs(inwardOffset)).toBeLessThanOrEqual(64);
+        expect(state.particles[1].x - state.particles[0].x)
+          .toBe(victimSide === "left" ? 24 : -24);
       }
     },
   );

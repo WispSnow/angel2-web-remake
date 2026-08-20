@@ -334,7 +334,13 @@
 }
 .rn-class-detail:focus-visible { outline: none; }
 
-.rn-class-head { display: flex; align-items: center; margin-bottom: 16px; gap: 16px; }
+.rn-class-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 14px 16px;
+}
 .rn-figure {
   display: grid;
   width: 104px;
@@ -348,11 +354,20 @@
     repeating-conic-gradient(#1d1518 0 25%, #17111400 0 50%) 0 0 / 16px 16px,
     #140e11;
 }
+.rn-figure[data-side="ally"] {
+  border-color: #304b66;
+  box-shadow: inset 0 0 18px rgba(54, 125, 179, .13);
+}
+.rn-figure[data-side="enemy"] {
+  border-color: #704038;
+  box-shadow: inset 0 0 18px rgba(177, 58, 45, .14);
+}
 .rn-figure > img {
   image-rendering: pixelated;
   transform: scale(2);
   transform-origin: center;
 }
+.rn-class-title { min-width: 190px; flex: 1; }
 .rn-class-title > h3 { margin: 0 0 4px; color: var(--gold); font-size: 22px; font-weight: 700; }
 .rn-class-meta {
   display: flex;
@@ -362,6 +377,122 @@
   font: 11px/1.9 system-ui, sans-serif;
   gap: 4px 14px;
 }
+.rn-class-side-switch {
+  display: grid;
+  flex: none;
+  align-self: flex-start;
+  gap: 5px;
+}
+.rn-class-side-switch > span {
+  color: #8d7c65;
+  font: 600 10px/1.4 system-ui, sans-serif;
+  letter-spacing: .12em;
+  text-align: center;
+}
+.rn-class-side-switch > div,
+.rn-class-animation-switch { display: flex; gap: 4px; }
+.rn-class-side-switch button,
+.rn-class-animation-switch button {
+  min-width: 56px;
+  padding: 5px 11px;
+  border: 1px solid #4b3527;
+  border-radius: 2px;
+  color: #cbb894;
+  background: #171012;
+  cursor: pointer;
+  font: 600 11px/1.4 system-ui, sans-serif;
+}
+.rn-class-side-switch button:hover:not(:disabled),
+.rn-class-animation-switch button:hover:not(:disabled) {
+  border-color: var(--gold-dark);
+  color: #f5dfb1;
+}
+.rn-class-side-switch button[aria-pressed="true"],
+.rn-class-animation-switch button[aria-pressed="true"] {
+  border-color: #c08a26;
+  color: #160e0c;
+  background: linear-gradient(#edc665, #b97a19);
+  box-shadow: inset 0 1px rgba(255, 250, 204, .45);
+}
+.rn-class-side-switch button:disabled,
+.rn-class-animation-switch button:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+
+.rn-class-preview {
+  padding: 12px;
+  border: 1px solid #3e2c26;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #21161a, #150f12);
+}
+.rn-class-preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 8px 14px;
+}
+.rn-class-preview-toolbar > h4 {
+  margin: 0;
+  color: #dba638;
+  font: 700 11px/1.6 system-ui, sans-serif;
+  letter-spacing: .16em;
+}
+.rn-class-combat-stage {
+  position: relative;
+  width: 100%;
+  max-width: 454px;
+  height: 163px;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid #6d4a22;
+  background: #080607;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .36);
+}
+.rn-class-combat-native {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 454px;
+  height: 163px;
+  transform: translateX(-50%) scale(var(--rn-class-combat-scale, 1));
+  transform-origin: top center;
+}
+/* 正式渲染器仍以 640×350 邏輯螢幕定位；這裡只裁出原版 454×163 全景窗。 */
+.rn-class-combat-native > .full-combat {
+  right: auto;
+  bottom: auto;
+  left: -93px;
+  top: -155px;
+}
+.rn-class-combat-stage.is-unavailable {
+  display: grid;
+  min-height: 116px;
+  height: auto;
+  place-items: center;
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(135deg, rgba(69, 47, 41, .12) 0 8px, transparent 8px 16px),
+    #110c0e;
+}
+.rn-class-combat-stage.is-unavailable > p {
+  max-width: 33em;
+  margin: 0;
+  padding: 24px;
+  color: #a99473;
+  font: 12px/1.8 system-ui, sans-serif;
+  text-align: center;
+}
+.rn-class-preview-direction {
+  margin: 8px 0 2px !important;
+  color: #dec38e !important;
+  font: 600 11px/1.6 system-ui, sans-serif !important;
+  letter-spacing: .06em;
+  text-align: center;
+}
+.rn-class-preview > .rn-hint { margin: 0 !important; text-align: center; }
 
 .rn-block { margin: 0 0 18px; }
 .rn-block > h4 {
@@ -447,6 +578,15 @@
   .rn-tabs > button { flex: none; padding-inline: 12px; }
   .rn-roadmap-grid { grid-template-columns: minmax(0, 1fr); }
   .rn-roadmap-item { min-height: 0; }
+  .rn-class-head { align-items: flex-start; }
+  .rn-class-title { min-width: calc(100% - 120px); }
+  .rn-class-side-switch { width: 100%; }
+  .rn-class-side-switch > span { text-align: left; }
+  .rn-class-side-switch > div { width: 100%; }
+  .rn-class-side-switch button { flex: 1; }
+  .rn-class-preview { padding: 9px; }
+  .rn-class-animation-switch { display: grid; width: 100%; grid-template-columns: repeat(5, 1fr); }
+  .rn-class-animation-switch button { min-width: 0; padding-inline: 5px; }
 }
 
 /* 角色圖鑑。左欄多一欄首次登場關卡，右欄把出場關卡排成可掃視的網格。 */

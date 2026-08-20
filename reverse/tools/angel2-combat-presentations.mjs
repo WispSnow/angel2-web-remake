@@ -924,6 +924,12 @@ async function extract(
         rendererSubsteps: deathStepCounts.values.reduce((sum, value) => sum + value, 0),
         leftScript: parseSimpleDeathScript(moduleBuffer, 0x7d5a, 6),
         rightScript: parseSimpleDeathScript(moduleBuffer, 0x7d84, 6),
+        commonTrailPlacement: {
+          leftHandlerSlots: "B683 assigns DS:7A84=7D5A and DS:7B0A=7DAE, so UE is parsed by the physical-left stream",
+          rightHandlerSlots: "B6BD assigns DS:7B0A=7D84 and DS:7A84=7DAE, so UE is parsed by the physical-right stream",
+          leftDeath: "B3BD left-U branch: subjectX + 40 + phase, then +24 spacing (toward the window centre)",
+          rightDeath: "B3BD right-U branch: subjectX - 40 - phase, then -24 spacing (toward the window centre)",
+        },
         soundSynchronization: "both scripts begin with V1, so E/11 is requested when the first death pose is advanced; the request still passes the DS:10ED sound-setting gate",
       },
       classRecordCount: classRecords.length,

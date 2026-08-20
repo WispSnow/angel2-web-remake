@@ -47,3 +47,13 @@ export const ALLY_MAP_UNIT_ASSETS = {
 export function allyMapUnitAsset(classId: UnitClassId): string | undefined {
   return ALLY_MAP_UNIT_ASSETS[classId as keyof typeof ALLY_MAP_UNIT_ASSETS];
 }
+
+/**
+ * The published technique-lab catalog contains the native side-2 map figure
+ * for every class record, including the four runtime-only records. Keep the
+ * path rule here so read-only surfaces such as the compendium do not each
+ * invent their own enemy asset lookup.
+ */
+export function enemyMapUnitAsset(classId: UnitClassId): string {
+  return `/assets/original/technique-lab/units/enemy-${classId}.png`;
+}
