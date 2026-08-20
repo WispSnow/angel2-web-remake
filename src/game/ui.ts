@@ -1628,13 +1628,16 @@ export function renderCombat(
     image.dataset.lift = String(sprite.lift);
     image.dataset.x = String(Math.round(sprite.x));
     image.dataset.yOffset = String(meta.yOffset ?? 0);
+    const yOffsetCorrection = sprite.yOffsetCorrection ?? 0;
+    image.dataset.yOffsetCorrection = String(yOffsetCorrection);
     if (sprite.channel) image.dataset.channel = sprite.channel;
     else delete image.dataset.channel;
     if (sprite.reaction) image.dataset.reaction = sprite.reaction;
     else delete image.dataset.reaction;
     if (image.getAttribute("src") !== src) image.setAttribute("src", src);
     const anchor = sprite.mirror ? meta.w - meta.anchor : meta.anchor;
-    const topOffset = -sprite.lift + (meta.yOffset ?? 0);
+    const topOffset = -sprite.lift + (meta.yOffset ?? 0) + yOffsetCorrection;
+    image.dataset.projectedYOffset = String(Math.round(topOffset));
     holder.style.transform = `translate(${Math.round(sprite.x - anchor)}px, ${Math.round(topOffset)}px)`;
     holder.style.opacity = String(sprite.opacity);
     image.style.transform = sprite.mirror ? "scaleX(-1)" : "";

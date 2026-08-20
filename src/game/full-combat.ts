@@ -66,6 +66,8 @@ export interface FullCombatSpriteState {
   x: number;
   /** Signed native-pixel lift above the ground anchor; negative sinks below it. */
   lift: number;
+  /** Explicit remake-only correction applied after the original frame y-offset. */
+  yOffsetCorrection?: number;
   mirror: boolean;
   opacity: number;
 }
@@ -936,7 +938,20 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
       lift = 0;
     }
   }
-  return { ...base, frame, reaction, x: spec.victimSpriteX, lift, opacity: 1 };
+  // Record 18's original direct frame 3 table contains yOffset=-16 on both
+  // physical sides, and module 29 applies it literally. That makes the swift
+  // dragon knight hover only while guarding. Keep the evidence table intact
+  // and neutralize the inherited defect at the remake projection boundary.
+  const yOffsetCorrection = spec.victimClass === 18 && reaction === "guard" ? 16 : undefined;
+  return {
+    ...base,
+    frame,
+    reaction,
+    x: spec.victimSpriteX,
+    lift,
+    yOffsetCorrection,
+    opacity: 1,
+  };
 }
 
 function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {

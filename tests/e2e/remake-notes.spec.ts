@@ -46,6 +46,9 @@ test("三個分頁各載入自己的內容，Esc 關閉並交還焦點", async (
   await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
     .toHaveText(["Bug 修復", "功能增強", "平衡性調整"]);
   await expect(page.getByTestId("remake-note-REMAKE-004")).toContainText("毒不再把生命打到 0");
+  const swiftGuardFix = page.getByTestId("remake-note-swift-dragon-guard-ground");
+  await expect(swiftGuardFix).toContainText("迅龍騎士格擋不再懸空");
+  await expect(swiftGuardFix.locator(".rn-note-id")).toHaveCount(0);
 
   await page.getByTestId("remake-notes-tab-features").click();
   await expect(page.getByTestId("remake-note-REMAKE-015")).toContainText("地形特性");

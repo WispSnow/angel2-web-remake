@@ -693,6 +693,12 @@ async function extract(
       };
     }
   }
+  const swiftDragonPlacement = classRecords.find((record) => record.record === 18);
+  assert(swiftDragonPlacement !== undefined, "missing swift dragon knight record 18");
+  for (const side of [swiftDragonPlacement.side1, swiftDragonPlacement.side2]) {
+    assert(side.framePlacement?.yOffset[3] === -16,
+      "swift dragon knight direct frame 3 must retain the original -16 y-offset");
+  }
 
   const voiceRecords = classRecords.flatMap((record) =>
     [record.side1, record.side2].flatMap((side) =>

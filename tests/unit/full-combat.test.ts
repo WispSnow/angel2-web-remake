@@ -1372,6 +1372,49 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(rightTrail).toEqual(rightReference.sample(rightReferenceCounterImpact + 200).particles);
   });
 
+  it("grounds the swift dragon knight guard while retaining its original frame offsets", () => {
+    expect(FULL_COMBAT_FRAME_META.left[18].direct[3].yOffset).toBe(-16);
+    expect(FULL_COMBAT_FRAME_META.right[18].direct[3].yOffset).toBe(-16);
+
+    const rightVictim = buildFullCombatScript(
+      unit(1, 0, "測試攻方"),
+      unit(2, 48, "測試守方", "swift-dragon-knight"),
+      result({ damage: 8, counterOccurred: false, counterDamage: 0 }),
+    );
+    expect(rightVictim.sample(markTime(rightVictim, "fullImpact") + 50).sprites
+      .find(({ channel }) => channel === "victim"))
+      .toMatchObject({
+        side: "right",
+        classId: 18,
+        frame: 3,
+        reaction: "guard",
+        lift: 0,
+        yOffsetCorrection: 16,
+      });
+
+    const leftVictim = buildFullCombatScript(
+      unit(2, 48, "測試攻方"),
+      unit(1, 0, "測試守方", "swift-dragon-knight"),
+      result({
+        attackerId: "2:48",
+        defenderId: "1:0",
+        damage: 8,
+        counterOccurred: false,
+        counterDamage: 0,
+      }),
+    );
+    expect(leftVictim.sample(markTime(leftVictim, "fullImpact") + 50).sprites
+      .find(({ channel }) => channel === "victim"))
+      .toMatchObject({
+        side: "left",
+        classId: 18,
+        frame: 3,
+        reaction: "guard",
+        lift: 0,
+        yOffsetCorrection: 16,
+      });
+  });
+
   it("drops the crossbow bolt from above the window onto the native ground anchor", () => {
     const left = buildFullCombatScript(
       unit(1, 0, "測試攻方", "crossbow"),

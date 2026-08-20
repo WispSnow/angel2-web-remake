@@ -375,6 +375,52 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
   });
 });
 
+test("swift dragon knight guard stays grounded on both physical sides", async ({ page }) => {
+  const observed: Array<{
+    side: "left" | "right";
+    nativeYOffset: string | null;
+    correction: string | null;
+    projectedYOffset: string | null;
+  }> = [];
+
+  for (const side of ["left", "right"] as const) {
+    await page.goto(
+      `/combat-lab.html?attacker=soldier&defender=swift-dragon-knight`
+        + `&reaction=guard&side=${side}&speed=4`,
+    );
+    await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+    const state = await labState(page);
+    const impactAt = state.marks.find(({ phase }) => phase === "fullImpact")?.t;
+    expect(impactAt).toBeDefined();
+    await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 50);
+
+    const sprite = page.getByTestId("full-victim-sprite");
+    await expect(sprite).toHaveAttribute("data-reaction", "guard");
+    await expect(sprite).toHaveAttribute("data-frame", "3");
+    await expect(sprite).toHaveAttribute("data-side", side === "left" ? "right" : "left");
+    await expect(sprite).toHaveAttribute(
+      "src",
+      new RegExp(`${side === "left" ? "right" : "left"}-swift-dragon-knight-direct/03\\.png$`),
+    );
+    await waitForVisibleSpriteImages(page);
+    await captureVisualAudit(page, {
+      path: `artifacts/playwright/combat-lab-swift-dragon-guard-${side}.png`,
+      fullPage: true,
+    });
+    observed.push(await sprite.evaluate((image) => ({
+      side: image.dataset.side as "left" | "right",
+      nativeYOffset: image.getAttribute("data-y-offset"),
+      correction: image.getAttribute("data-y-offset-correction"),
+      projectedYOffset: image.getAttribute("data-projected-y-offset"),
+    })));
+  }
+
+  expect(observed).toEqual([
+    { side: "right", nativeYOffset: "-16", correction: "16", projectedYOffset: "0" },
+    { side: "left", nativeYOffset: "-16", correction: "16", projectedYOffset: "0" },
+  ]);
+});
+
 test.describe.serial("native records sequential visual acceptance", () => {
   const records = [
     { record: 6, classId: "magician" },
