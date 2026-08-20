@@ -1,4 +1,5 @@
 import { STAGE0_DEFINITION, type InteractiveDeploymentDefinition, type StageDefinition } from "./content/stages";
+import { STAGE_INDEX } from "./content/stage-index";
 import type { CampaignRouteId } from "./content/stage-effects";
 import type { EnemyPhaseTailPresentationDefinition } from "./enemy-phase-tail-presentation";
 import { createStage0Units } from "./content/stage0";
@@ -1927,9 +1928,7 @@ function createStage11SaveEnemyClasses(): readonly (readonly [string, UnitClassI
 
 export const STAGE_RUNTIME_MANIFEST = {
   "stage-00": {
-    id: "stage-00",
-    ordinal: 0,
-    label: "瓦爾克麗宮",
+    ...STAGE_INDEX["stage-00"],
     nextStageId: "stage-01",
     focusUnitId: "1:0",
     mapPresentationActionIds: ["archer-shot", "fire-1", "heal-1"],
@@ -1961,9 +1960,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: async () => stage0Module,
   },
   "stage-01": {
-    id: "stage-01",
-    ordinal: 1,
-    label: "騎士城堡前",
+    ...STAGE_INDEX["stage-01"],
     nextStageId: "stage-02",
     focusUnitId: "1:0",
     mapPresentationActionIds: [
@@ -2055,9 +2052,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage1Module,
   },
   "stage-02": {
-    id: "stage-02",
-    ordinal: 2,
-    label: "攻打騎士堡",
+    ...STAGE_INDEX["stage-02"],
     nextStageId: "stage-03",
     focusUnitId: "1:0",
     mapPresentationActionIds: [
@@ -2138,9 +2133,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage2Module,
   },
   "stage-03": {
-    id: "stage-03",
-    ordinal: 3,
-    label: "救援友軍",
+    ...STAGE_INDEX["stage-03"],
     nextStageId: "stage-04",
     focusUnitId: "1:1",
     mapPresentationActionIds: [
@@ -2236,9 +2229,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage3Module,
   },
   "stage-04": {
-    id: "stage-04",
-    ordinal: 4,
-    label: "通過力場",
+    ...STAGE_INDEX["stage-04"],
     nextStageId: "stage-05",
     focusUnitId: "1:0",
     mapPresentationActionIds: [
@@ -2325,9 +2316,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage4Module,
   },
   "stage-05": {
-    id: "stage-05",
-    ordinal: 5,
-    label: "遭遇丁塔琪",
+    ...STAGE_INDEX["stage-05"],
     nextStageId: "stage-42-portal",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2379,9 +2368,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage5Module,
   },
   "stage-42-portal": {
-    id: "stage-42-portal",
-    ordinal: 5,
-    label: "異世界之門",
+    ...STAGE_INDEX["stage-42-portal"],
     nextStageId: "stage-06",
     focusUnitId: "1:0",
     mapPresentationActionIds: ["lightning-4"],
@@ -2424,9 +2411,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage42PortalModule,
   },
   "stage-06": {
-    id: "stage-06",
-    ordinal: 6,
-    label: "過異世界之門",
+    ...STAGE_INDEX["stage-06"],
     nextStageId: "stage-07",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2482,9 +2467,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage6Module,
   },
   "stage-07": {
-    id: "stage-07",
-    ordinal: 7,
-    label: "來到異世界",
+    ...STAGE_INDEX["stage-07"],
     nextStageId: "stage-08",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2535,9 +2518,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage7Module,
   },
   "stage-08": {
-    id: "stage-08",
-    ordinal: 8,
-    label: "營地遭到偷襲",
+    ...STAGE_INDEX["stage-08"],
     nextStageId: "stage-09",
     focusUnitId: "1:8",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2585,9 +2566,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage8Module,
   },
   "stage-09": {
-    id: "stage-09",
-    ordinal: 9,
-    label: "找尋傳說中的飛船",
+    ...STAGE_INDEX["stage-09"],
     nextStageId: "stage-11",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2640,9 +2619,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage9Module,
   },
   "stage-11": {
-    id: "stage-11",
-    ordinal: 10,
-    label: "拯救蘇蘭達",
+    ...STAGE_INDEX["stage-11"],
     nextStageId: "stage-10",
     focusUnitId: "1:8",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2685,9 +2662,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage11Module,
   },
   "stage-10": {
-    id: "stage-10",
-    ordinal: 11,
-    label: "飛船上遭遇敵人",
+    ...STAGE_INDEX["stage-10"],
     nextStageId: "stage-12",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2739,9 +2714,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage10Module,
   },
   "stage-12": {
-    id: "stage-12",
-    ordinal: 12,
-    label: "落入沼澤",
+    ...STAGE_INDEX["stage-12"],
     nextStageId: "stage-13",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2796,9 +2769,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage12Module,
   },
   "stage-13": {
-    id: "stage-13",
-    ordinal: 13,
-    label: "龍塔外",
+    ...STAGE_INDEX["stage-13"],
     nextStageId: "stage-14",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2854,9 +2825,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage13Module,
   },
   "stage-14": {
-    id: "stage-14",
-    ordinal: 14,
-    label: "龍塔第一層",
+    ...STAGE_INDEX["stage-14"],
     nextStageId: "stage-15",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2910,9 +2879,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage14Module,
   },
   "stage-15": {
-    id: "stage-15",
-    ordinal: 15,
-    label: "龍塔第二層",
+    ...STAGE_INDEX["stage-15"],
     nextStageId: "stage-16",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -2969,9 +2936,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage15Module,
   },
   "stage-16": {
-    id: "stage-16",
-    ordinal: 16,
-    label: "龍塔第三層",
+    ...STAGE_INDEX["stage-16"],
     nextStageId: "stage-17",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3031,9 +2996,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage16Module,
   },
   "stage-17": {
-    id: "stage-17",
-    ordinal: 17,
-    label: "龍塔第四層",
+    ...STAGE_INDEX["stage-17"],
     nextStageId: "stage-18",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3092,9 +3055,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage17Module,
   },
   "stage-18": {
-    id: "stage-18",
-    ordinal: 18,
-    label: "龍塔第五層",
+    ...STAGE_INDEX["stage-18"],
     nextStageId: "stage-19",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3157,9 +3118,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage18Module,
   },
   "stage-19": {
-    id: "stage-19",
-    ordinal: 19,
-    label: "龍塔第六層",
+    ...STAGE_INDEX["stage-19"],
     nextStageId: "stage-20",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3227,9 +3186,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage19Module,
   },
   "stage-20": {
-    id: "stage-20",
-    ordinal: 20,
-    label: "龍塔頂部",
+    ...STAGE_INDEX["stage-20"],
     nextStageId: "stage-21",
     focusUnitId: "1:0",
     mapPresentationActionIds: STAGE20_MAP_ACTION_IDS,
@@ -3293,9 +3250,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage20Module,
   },
   "stage-21": {
-    id: "stage-21",
-    ordinal: 21,
-    label: "焦土森林村莊外",
+    ...STAGE_INDEX["stage-21"],
     nextStageId: "stage-22",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3335,9 +3290,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage21Module,
   },
   "stage-22": {
-    id: "stage-22",
-    ordinal: 22,
-    label: "焦土森林村莊中",
+    ...STAGE_INDEX["stage-22"],
     nextStageId: "stage-23",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3417,9 +3370,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage22Module,
   },
   "stage-23": {
-    id: "stage-23",
-    ordinal: 23,
-    label: "死亡之谷中",
+    ...STAGE_INDEX["stage-23"],
     nextStageId: "stage-24",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3487,9 +3438,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage23Module,
   },
   "stage-24": {
-    id: "stage-24",
-    ordinal: 24,
-    label: "死亡之谷城堡前",
+    ...STAGE_INDEX["stage-24"],
     nextStageId: "stage-26",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3559,9 +3508,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage24Module,
   },
   "stage-26": {
-    id: "stage-26",
-    ordinal: 25,
-    label: "遭遇碧娜維姬",
+    ...STAGE_INDEX["stage-26"],
     nextStageId: "stage-27",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3617,9 +3564,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage26Module,
   },
   "stage-27": {
-    id: "stage-27",
-    ordinal: 26,
-    label: "趕回瓦爾克麗城",
+    ...STAGE_INDEX["stage-27"],
     nextStageId: "stage-28",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3672,9 +3617,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage27Module,
   },
   "stage-28": {
-    id: "stage-28",
-    ordinal: 27,
-    label: "保衛瓦爾克麗城",
+    ...STAGE_INDEX["stage-28"],
     nextStageId: "stage-29",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3741,9 +3684,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage28Module,
   },
   "stage-29": {
-    id: "stage-29",
-    ordinal: 28,
-    label: "騎士城堡前",
+    ...STAGE_INDEX["stage-29"],
     nextStageId: "stage-30",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3812,9 +3753,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage29Module,
   },
   "stage-30": {
-    id: "stage-30",
-    ordinal: 29,
-    label: "治癒維斯塔女帝",
+    ...STAGE_INDEX["stage-30"],
     nextStageId: "stage-31",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3871,9 +3810,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage30Module,
   },
   "stage-31": {
-    id: "stage-31",
-    ordinal: 30,
-    label: "前往斯德林海峽",
+    ...STAGE_INDEX["stage-31"],
     nextStageId: "stage-32",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -3938,9 +3875,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage31Module,
   },
   "stage-32": {
-    id: "stage-32",
-    ordinal: 31,
-    label: "斯德林海峽",
+    ...STAGE_INDEX["stage-32"],
     nextStageId: "stage-33",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -4006,9 +3941,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage32Module,
   },
   "stage-33": {
-    id: "stage-33",
-    ordinal: 32,
-    label: "拉那洛城外",
+    ...STAGE_INDEX["stage-33"],
     nextStageId: "stage-34",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -4084,9 +4017,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage33Module,
   },
   "stage-34": {
-    id: "stage-34",
-    ordinal: 33,
-    label: "拉那洛城內",
+    ...STAGE_INDEX["stage-34"],
     nextStageId: "stage-35",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -4152,9 +4083,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage34Module,
   },
   "stage-35": {
-    id: "stage-35",
-    ordinal: 34,
-    label: "時空異變",
+    ...STAGE_INDEX["stage-35"],
     nextStageId: "stage-36",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -4204,9 +4133,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage35Module,
   },
   "stage-36": {
-    id: "stage-36",
-    ordinal: 35,
-    label: "異世界的碧娜維姬",
+    ...STAGE_INDEX["stage-36"],
     nextStageId: "stage-37",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -4283,9 +4210,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage36Module,
   },
   "stage-37": {
-    id: "stage-37",
-    ordinal: 36,
-    label: "究極女神",
+    ...STAGE_INDEX["stage-37"],
     nextStageId: "stage-49",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
@@ -4343,9 +4268,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     load: loadStage37Module,
   },
   "stage-38": {
-    id: "stage-38",
-    ordinal: 37,
-    label: "異世界",
+    ...STAGE_INDEX["stage-38"],
     nextStageId: "stage-39",
     focusUnitId: "1:0",
     mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,

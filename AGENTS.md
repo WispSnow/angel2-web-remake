@@ -215,6 +215,11 @@ pnpm exec playwright install ffmpeg
   `scripts/generate-portrait-catalog.mjs` 生成；修改肖像来源或布局证据后运行
   `pnpm content:portraits`，不要手工登记角色动画。`D/63` 无原版覆盖帧/布局，`D/67`
   依证据沿用 `D/56` 布局。
+- `src/game/content/character-catalog.generated.ts` 由 `scripts/generate-character-catalog.mjs`
+  生成，来源是原版角色描述子表、关卡模板、胜负条件表、逐关事件处理器与对白语料；修改证据后
+  运行 `pnpm content:characters`。角色出场关卡必须同时合并静态模板、名单候选、事件生成与对白
+  肖像四条通道，不要只按开局编成推断；玩家可见的简介写在 `src/game/compendium/character-notes.ts`，
+  只写剧情真的演出过的事。
 - 保留原版调色板、像素边缘、透明索引、锚点和帧顺序。像素素材默认最近邻缩放，
   平滑缩放只能作为玩家显式选择的宿主显示偏好（`src/game/display-settings.ts` 的
   「畫面縮放」开关），不得成为任何默认值、生成流程或素材本身的处理方式。

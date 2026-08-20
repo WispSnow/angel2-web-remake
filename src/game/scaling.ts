@@ -4,7 +4,7 @@ import {
   mountImageScalingControls,
   onImageScalingChange,
 } from "./display-settings";
-import { mountRemakeNotes } from "./remake-notes";
+import { mountHostOverlays } from "./host-overlays";
 import type { ImageScalingMode } from "./preferences";
 
 export const LOGICAL_SCREEN_WIDTH = 640;
@@ -90,14 +90,14 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
 
   const unmountControls = mountImageScalingControls(viewport);
   const extras = hostChromeExtrasSlot(viewport);
-  const unmountNotes = extras ? mountRemakeNotes(extras) : () => undefined;
+  const unmountOverlays = extras ? mountHostOverlays(extras) : () => undefined;
   resize();
   return () => {
     disposed = true;
     ratioQuery?.removeEventListener("change", onRatioChange);
     observer.disconnect();
     unsubscribe();
-    unmountNotes();
+    unmountOverlays();
     unmountControls();
   };
 }

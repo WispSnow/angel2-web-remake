@@ -7,7 +7,7 @@ import {
   type CompendiumEntry,
   type CompendiumGrowthSegment,
 } from "./class-compendium";
-import { escapeHtml, inlineMarkup } from "./markup";
+import { escapeHtml, inlineMarkup } from "../overlay/markup";
 import type { ClassId } from "../content/classes";
 
 const DIFFICULTY_LABELS = ["簡單", "普通", "困難", "無法無天"] as const;
@@ -97,7 +97,7 @@ function scriptedTable(entry: CompendiumEntry): string {
     </tr>`).join("");
   return `
     <table class="rn-stats">
-      <caption>劇情首領逐難度屬性（不套用成長曲線，見 <code>REMAKE-103</code>）</caption>
+      <caption>劇情首領逐難度屬性（不套用成長曲線，見「復刻說明 › 平衡性調整」<code>REMAKE-103</code>）</caption>
       <thead>
         <tr><th scope="col">難度</th><th scope="col">攻擊</th>
           <th scope="col">防禦</th><th scope="col">最大生命</th></tr>
@@ -203,8 +203,8 @@ export function renderClassDetail(id: ClassId): string {
       ${statTable(entry)}
       ${growthTable(entry)}
       ${entry.scriptedStats.length > 0 ? "" : '<p class="rn-hint">本表是我方口徑。敵方單位另有難度縮放：'
-        + "難度 0／3 逐字保持原版，難度 1／2 改用線性成長曲線並提高出場等級（見平衡性調整 "
-        + "<code>REMAKE-103</code>）。</p>"}
+        + "難度 0／3 逐字保持原版，難度 1／2 改用線性成長曲線並提高出場等級"
+        + "（見「復刻說明 › 平衡性調整」<code>REMAKE-103</code>）。</p>"}
     </section>
     ${actionSection(entry)}
     ${promotionSection(entry)}

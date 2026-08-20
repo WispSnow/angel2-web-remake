@@ -1902,8 +1902,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 /* 右對齊槽：屬於頁面而不屬於邏輯螢幕的入口都掛在同一行的右端。 */
 .display-settings-extras { display: flex; margin-left: auto; }
-.remake-notes-triggers { display: flex; gap: 4px; }
-.remake-notes-triggers > button {
+.host-overlay-triggers { display: flex; gap: 4px; }
+.host-overlay-triggers > button {
   padding: 3px 10px;
   border: 1px solid #4b3527;
   border-radius: 2px;
@@ -1913,7 +1913,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   font: 12px/1.5 system-ui, sans-serif;
   white-space: nowrap;
 }
-.remake-notes-triggers > button:hover { border-color: var(--gold-dark); color: var(--gold); }
+.host-overlay-triggers > button:hover { border-color: var(--gold-dark); color: var(--gold); }
 .display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
 
 @media (max-width: 560px) {
@@ -1921,7 +1921,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   .eyebrow { font-size: 9px; }
   .display-settings { padding: 0 12px; }
   .display-settings-extras { margin-left: 0; }
-  .remake-notes-triggers { flex-wrap: wrap; }
+  .host-overlay-triggers { flex-wrap: wrap; }
 }
 /* `[DD]` 本作不跟隨系統「減少動態效果」。原版所有演出都是玩法節奏的一部分——`A/18`
    對話窗的開闔、選單方框的縮放、指針滑行、地圖脈動——把它們壓成瞬時等於換掉遊戲的

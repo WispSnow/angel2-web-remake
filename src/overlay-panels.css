@@ -1,5 +1,6 @@
-/* 「復刻說明」覆蓋層。宿主頁面的附屬介面，不屬於 640×350 邏輯螢幕，因此使用頁面字體
-   與現代排版，只借用專案的酒紅／鎏金配色與遊戲保持同一調性。 */
+/* 宿主覆蓋層（「復刻說明」與「圖鑑」）共用的樣式。兩者都是宿主頁面的附屬介面，不屬於
+   640×350 邏輯螢幕，因此使用頁面字體與現代排版，只借用專案的酒紅／鎏金配色與遊戲保持
+   同一調性。`rn-` 前綴是這一整套覆蓋層的命名空間，不專屬於復刻說明。 */
 
 .rn-overlay {
   position: fixed;
@@ -162,7 +163,8 @@
 /* ── 職業圖鑑 ───────────────────────────────────────────────── */
 
 /* 圖鑑分頁兩欄各自捲動：左欄要一直看得到轉職樹，右欄才是長內容。 */
-.rn-body[data-tab="classes"] { display: flex; padding-bottom: 18px; overflow: hidden; }
+.rn-body[data-tab="classes"],
+.rn-body[data-tab="characters"] { display: flex; padding-bottom: 18px; overflow: hidden; }
 .rn-compendium {
   display: grid;
   min-height: 0;
@@ -333,4 +335,79 @@
 @media (max-width: 560px) {
   .rn-dialog { width: 100vw; max-height: 100vh; border: none; border-radius: 0; }
   .rn-head, .rn-tabs, .rn-body, .rn-foot { padding-inline: 14px; }
+}
+
+/* 角色圖鑑。左欄多一欄首次登場關卡，右欄把出場關卡排成可掃視的網格。 */
+.rn-character-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rn-character-row > em {
+  flex: none;
+  color: #8d7c65;
+  font: 11px/1.5 system-ui, sans-serif;
+  font-style: normal;
+}
+.rn-character-row[aria-current="true"] > em { color: #c9a86a; }
+/* 肖像原本就是 112×112 的點陣圖，不像地圖棋子那樣需要放大兩倍。 */
+.rn-figure-portrait, .rn-figure-empty { width: 114px; height: 114px; }
+.rn-figure-portrait > img { width: 112px; height: 112px; transform: none; }
+.rn-figure-empty {
+  padding: 0 8px;
+  color: #6f6152;
+  text-align: center;
+  font: 11px/1.4 system-ui, sans-serif;
+}
+.rn-character-count {
+  margin-left: 8px;
+  color: #8d7c65;
+  font: 11px/1.5 system-ui, sans-serif;
+  font-weight: 400;
+}
+.rn-character-stages {
+  display: grid;
+  margin: 0 0 8px;
+  padding: 0;
+  gap: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  list-style: none;
+}
+.rn-character-stage {
+  padding: 5px 8px;
+  border: 1px solid #2b1f1c;
+  border-radius: 2px;
+  background: #16101299;
+}
+.rn-character-stage[data-objective="true"] { border-color: #4b3527; background: #1d1519; }
+.rn-character-stage > strong {
+  display: block;
+  color: #efe0c2;
+  font-size: 12px;
+  font-weight: 600;
+}
+.rn-character-stage > span {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  gap: 3px;
+}
+.rn-character-stage > span > em {
+  padding: 0 5px;
+  border: 1px solid #33231f;
+  border-radius: 2px;
+  color: #9d8a6b;
+  font: 11px/1.6 system-ui, sans-serif;
+  font-style: normal;
+}
+.rn-character-stage > span > em[data-objective="true"] {
+  border-color: #6a4b28;
+  color: #d9b978;
+}
+.rn-character-class {
+  display: block;
+  margin-top: 3px;
+  color: #7f6f5b;
+  font: 11px/1.5 system-ui, sans-serif;
 }

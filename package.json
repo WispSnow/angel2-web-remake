@@ -33,6 +33,7 @@
     "content": "node scripts/generate-content.mjs",
     "content:classes": "node scripts/generate-class-catalog.mjs",
     "content:portraits": "node scripts/generate-portrait-catalog.mjs",
+    "content:characters": "node scripts/generate-character-catalog.mjs",
     "content:stage0": "node scripts/generate-stage0-runtime.mjs",
     "content:stage1": "node scripts/generate-stage1-runtime.mjs",
     "content:stage2": "node scripts/generate-stage2-runtime.mjs",
