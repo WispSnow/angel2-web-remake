@@ -3612,6 +3612,13 @@ export const STAGE_RUNTIME_MANIFEST = {
         ["2:43", "magic-armor-warrior"],
         ["2:42", "curse-master"],
       ],
+      namedUnits: [{
+        // REMAKE-120 keeps Eliola's descriptor name while retaining the class portrait.
+        match: { kind: "unit", unitId: "1:22", side: 1, slot: 22 },
+        displayIdentity: "named-class-portrait",
+        name: "愛莉歐拉",
+        portrait: "class-fallback",
+      }],
       enemyAi: "none",
     },
     load: loadStage27Module,

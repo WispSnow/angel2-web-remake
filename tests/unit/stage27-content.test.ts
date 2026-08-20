@@ -10,6 +10,7 @@ import {
   STAGE27,
   STAGE27_ASSETS,
   STAGE27_DEFINITION,
+  STAGE27_ELIOLA_IDENTITY,
   STAGE27_EVENT_PROGRAM,
   STAGE27_MUSIC_PROGRAMS,
   STAGE27_SEMANTIC_ALLIED_UNITS,
@@ -63,19 +64,22 @@ describe("stage 27 generated content", () => {
       .toHaveLength(7);
     expect(STAGE27_SEMANTIC_ALLIED_UNITS.filter(({ aiBehavior }) => aiBehavior === 0))
       .toHaveLength(32);
-    // 十名固定棋盘单位的 side-1 角色描述符肖像都是 FFh，原版 `0000:51B9` 因此把肖像和
-    // 单位名一起换成职业回退。槽 22 描述符里的「愛莉歐拉」全战役没有肖像记录，也从不是
-    // 玩家向显示名，不得作为城防军主将登记。
+    // 原版 `0000:51B9` 因 FFh 肖像把姓名与肖像一起回退；REMAKE-120 只恢复槽 22 的
+    // 描述符姓名，肖像仍随职业且不赋予城防军主将语义。
     const fixedBoardOnly = STAGE27_SEMANTIC_ALLIED_UNITS
       .filter(({ slot }) => [22, 40, 41, 42, 43, 44, 45, 56, 57, 58].includes(slot));
     expect(fixedBoardOnly).toHaveLength(10);
     expect(fixedBoardOnly.filter((unit) => "portrait" in unit)).toEqual([]);
     expect(fixedBoardOnly.map(({ name }) => name)).toEqual([
-      "巨斧戰士", "魔祭師", "魔術士", "咒術師", "士兵", "祈導師", "魔劍戰士",
+      "愛莉歐拉", "魔祭師", "魔術士", "咒術師", "士兵", "祈導師", "魔劍戰士",
       "工兵", "工兵", "工兵",
     ]);
+    expect(STAGE27_ELIOLA_IDENTITY).toEqual({
+      slot: 22, normalizedName: "愛莉歐拉", portraitRecord: 0xff,
+    });
     expect(STAGE27_SEMANTIC_ALLIED_UNITS.find(({ slot }) => slot === 22)).toMatchObject({
-      name: "巨斧戰士",
+      name: "愛莉歐拉",
+      displayIdentity: "named-class-portrait",
       forcedClassId: "great-axe-warrior",
       aiBehavior: 2,
       untouchedExperience: 0,
@@ -129,7 +133,7 @@ describe("stage 27 generated content", () => {
       },
       enemyReinforcements: { kind: "none", initialSide2: 5 },
       completedRoute: { module: 25, stage: 28, replayPresentation: false },
-      stableRemakeDecisions: ["REMAKE-064", "REMAKE-067"],
+      stableRemakeDecisions: ["REMAKE-064", "REMAKE-067", "REMAKE-120"],
     });
     expect(STAGE27_EVENT_PROGRAM.enemyReinforcements.auditedSources).toEqual([
       "initial-template", "round-event-handler", "dynamic-board-catalog",

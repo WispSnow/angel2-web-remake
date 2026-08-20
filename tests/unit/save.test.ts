@@ -3170,9 +3170,24 @@ describe("Web save validation", () => {
         "1:57", "1:56", "1:58", "1:0",
       ]);
     expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(5);
+    expect(save.battle.units.find(({ id }) => id === "1:22")).toMatchObject({
+      classId: "great-axe-warrior",
+      name: "愛莉歐拉",
+      portrait: 57,
+      displayIdentity: "named-class-portrait",
+    });
     expect(isSaveData({
       ...save,
       consumedEventIds: save.consumedEventIds.slice(0, -1),
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "1:22"
+          ? { ...unit, name: "巨斧戰士", displayIdentity: undefined }
+          : unit),
+      },
     })).toBe(false);
     expect(isSaveData({
       ...save,
@@ -5102,6 +5117,39 @@ describe("Web save validation", () => {
       ...completed,
       version: 91,
       contentVersion: "named-leader-line-hold-1",
+    }))).toEqual(completed);
+  });
+
+  it("restores Eliola's stage-27 name while migrating version-92 saves", () => {
+    const legacy = stage27BattleSave();
+    legacy.battle.units = legacy.battle.units.map((unit) => {
+      if (unit.id !== "1:22") return unit;
+      const { displayIdentity: _displayIdentity, ...generic } = unit;
+      return { ...generic, name: "巨斧戰士" };
+    });
+    const migrated = parseSaveData(JSON.stringify({
+      ...legacy,
+      version: 92,
+      contentVersion: "stage-33-named-enemies-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-27",
+    });
+    if (!migrated || migrated.kind !== "battle") throw new Error("stage 27 v92 migration failed");
+    expect(migrated.battle.units.find(({ id }) => id === "1:22")).toMatchObject({
+      name: "愛莉歐拉",
+      portrait: 57,
+      displayIdentity: "named-class-portrait",
+    });
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 92,
+      contentVersion: "stage-33-named-enemies-1",
     }))).toEqual(completed);
   });
 

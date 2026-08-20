@@ -12,6 +12,7 @@ import {
   STAGE27_CONTENT_IDENTITY,
   STAGE27_DEPLOYMENT,
   STAGE27_DEPLOYMENT_ACTORS,
+  STAGE27_ELIOLA_IDENTITY,
   STAGE27_ENEMY_UNITS,
   STAGE27_EVENT_PROGRAM,
   STAGE27_FIXED_ALLIED_UNITS,
@@ -130,17 +131,23 @@ const campaignActors = STAGE27_DEPLOYMENT_ACTORS.map((actor) => ({
 export const STAGE27_SEMANTIC_DEPLOYMENT_ROSTER_UNITS = campaignActors;
 
 // 十名固定棋盘单位的 side-1 角色描述符肖像都是 FFh，因此原版 `0000:51B9` 用职业回退
-// 同时替换肖像与单位名：槽 22 描述符虽然写着「愛莉歐拉」，玩家向身份仍是「巨斧戰士」
-// 加通用戰士肖像，与其余六名城防军和三名工兵一致。这里不得登记逐单位姓名或肖像。
+// 同时替换肖像与单位名。REMAKE-120 只为槽 22 恢复描述符姓名「愛莉歐拉」；原版没有她的
+// 专属肖像，所以仍从当前职业解析通用肖像，也不赋予主将或保护目标语义。
 const fixedAllies = STAGE27_FIXED_ALLIED_UNITS.map((unit) => {
   const classId = unit.nativeClassRecord === null
     ? undefined
     : semanticClassId(unit.nativeClassRecord);
+  const keepsNamedClassPortrait = unit.slot === STAGE27_ELIOLA_IDENTITY.slot;
   return {
     slot: unit.slot,
-    name: classId ? className(classId) : "士兵",
+    name: keepsNamedClassPortrait
+      ? STAGE27_ELIOLA_IDENTITY.normalizedName
+      : classId ? className(classId) : "士兵",
     aiBehavior: unit.aiBehavior,
     untouchedExperience: 0,
+    ...(keepsNamedClassPortrait
+      ? { displayIdentity: "named-class-portrait" as const }
+      : {}),
     ...(classId === undefined ? {} : { forcedClassId: classId }),
   };
 });
@@ -222,6 +229,7 @@ export function activateStage27Content(): void {
 
 export {
   STAGE27_CONTENT_IDENTITY,
+  STAGE27_ELIOLA_IDENTITY,
   STAGE27_EVENT_PROGRAM,
   STAGE27_SOURCES,
   STAGE27_STORY_PAGES,

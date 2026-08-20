@@ -14,6 +14,7 @@ interface Stage27State {
   focusId: string;
   statusMessage: string;
   campaignRoute?: string;
+  cursor: { x: number; y: number };
   cameraOrigin: { x: number; y: number };
   consumedEventIds: string[];
   units: Array<{
@@ -100,7 +101,7 @@ test("S27-C–E: opening story preserves the mixed 31-allied-unit force and five
   expect(opening.units.filter(({ side }) => side === 1)).toHaveLength(31);
   expect(opening.units.filter(({ side }) => side === 2)).toHaveLength(5);
   expect(opening.units).toEqual(expect.arrayContaining([
-    expect.objectContaining({ id: "1:22", name: "巨斧戰士", portrait: 57, classId: "great-axe-warrior", x: 20, y: 11 }),
+    expect.objectContaining({ id: "1:22", name: "愛莉歐拉", portrait: 57, classId: "great-axe-warrior", x: 20, y: 11 }),
     expect.objectContaining({ id: "1:57", classId: "engineer", x: 35, y: 35 }),
     expect.objectContaining({ id: "1:0", name: "妮雅", x: 39, y: 37 }),
     expect.objectContaining({ id: "2:40", classId: "magic-sword-warrior", x: 33, y: 11 }),
@@ -113,6 +114,15 @@ test("S27-C–E: opening story preserves the mixed 31-allied-unit force and five
 
   await skipStoryDialogue(page);
   await waitForPhase(page, "player");
+  for (let step = 0; step < 26; step += 1) await page.keyboard.press("ArrowUp");
+  for (let step = 0; step < 19; step += 1) await page.keyboard.press("ArrowLeft");
+  expect((await state(page)).cursor).toEqual({ x: 20, y: 11 });
+  await expect(page.locator(".hud-identity-name")).toHaveText("巨斧戰士／愛莉歐拉");
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "57");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage27-eliola.png`,
+  });
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」回到瓦爾克麗城");
   await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");

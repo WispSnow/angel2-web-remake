@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { techniqueActionIdsFor } from "../../src/game/content/actions";
-import { movementRulesFor } from "../../src/game/content/classes";
+import { movementRulesFor, usesClassIdentity } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import {
   STAGE27_DEFINITION,
@@ -57,12 +57,15 @@ describe("stage 27 battle simulation", () => {
     expect(battle.unit("1:0")).toMatchObject({
       classId: "land-knight", name: "妮雅", portrait: 46, x: 39, y: 37, life: 380,
     });
-    // 槽 22 的原版角色描述符肖像是 FFh，玩家向身份按职业回退成「巨斧戰士」加通用戰士
-    // 肖像 57。全景战斗状态面板与地形参照行直接读 `name`，因此这里不能留描述符姓名。
-    expect(battle.unit("1:22")).toMatchObject({
-      classId: "great-axe-warrior", className: "巨斧戰士", name: "巨斧戰士", portrait: 57,
+    // REMAKE-120 保留描述符姓名；原版不存在专属肖像，所以仍使用当前职业的通用肖像 57。
+    const eliola = battle.unit("1:22");
+    expect(eliola).toMatchObject({
+      classId: "great-axe-warrior", className: "巨斧戰士", name: "愛莉歐拉", portrait: 57,
+      displayIdentity: "named-class-portrait",
       x: 20, y: 11,
     });
+    if (!eliola) throw new Error("stage 27 test is missing Eliola");
+    expect(usesClassIdentity(eliola)).toBe(false);
     expect(battle.unit("1:45")).toMatchObject({ classId: "crossbow", x: 21, y: 14 });
     expect(battle.units.filter(({ side, classId }) => side === 1 && classId === "engineer"))
       .toHaveLength(3);

@@ -311,6 +311,31 @@ function addStage29EliolaDisplayIdentity(value: unknown): unknown {
   };
 }
 
+/** REMAKE-120 applies the same named/class-portrait split to stage 27's fixed defender. */
+function addStage27EliolaDisplayIdentity(value: unknown): unknown {
+  if (!isRecord(value)
+    || value.kind !== "battle"
+    || value.stageId !== "stage-27"
+    || !isRecord(value.battle)
+    || !Array.isArray(value.battle.units)) return value;
+  return {
+    ...value,
+    battle: {
+      ...value.battle,
+      units: value.battle.units.map((unit) => isRecord(unit)
+        && unit.id === "1:22"
+        && unit.side === 1
+        && unit.slot === 22
+        ? {
+            ...unit,
+            name: "愛莉歐拉",
+            displayIdentity: "named-class-portrait",
+          }
+        : unit),
+    },
+  };
+}
+
 function finalizeDirectMigration(value: unknown): SaveData | undefined {
   if (isRecord(value)
     && (value.stageId === "stage-49"
@@ -407,6 +432,23 @@ function normalizeStage3OpeningEvents(value: unknown): unknown {
       ...consumedEventIds.slice(storyIndex + 1),
     ],
   };
+}
+
+/**
+ * REMAKE-120 restores Eliola's descriptor name in stage 27 while retaining
+ * the saved class portrait. The raw identity normalizer runs before every
+ * legacy migration, so older stage-27 battle saves receive the same repair.
+ */
+function migrateVersion92Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 92
+    || value.contentVersion !== "stage-33-named-enemies-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
 }
 
 /**
@@ -2649,7 +2691,9 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
-  const value = normalizeStage3OpeningEvents(raw);
+  const value = addStage27EliolaDisplayIdentity(normalizeStage3OpeningEvents(raw));
+  const migratedVersion92 = migrateVersion92Save(value);
+  if (migratedVersion92) return migratedVersion92;
   const migratedVersion91 = migrateVersion91Save(value);
   if (migratedVersion91) return migratedVersion91;
   const migratedVersion90 = migrateVersion90Save(value);
