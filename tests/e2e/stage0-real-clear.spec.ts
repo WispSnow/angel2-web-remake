@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { activeDialogueRecord } from "./dialogue-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -8,7 +9,10 @@ const ARTIFACT_DIR = "artifacts/playwright";
 async function waitForPlayerOrStory(page: Page): Promise<"player" | "story"> {
   return page.waitForFunction(() => {
     const dialogue = document.querySelector<HTMLElement>("[data-testid=dialogue-layer]");
-    if (dialogue && !dialogue.hidden) return "story";
+    // 收合中的殘影還在畫面上，但對話已經結束，不能算成新的一段劇情。
+    if (dialogue && !dialogue.hidden && dialogue.dataset.dialogueClosing === undefined) {
+      return "story";
+    }
     const screen = document.querySelector<HTMLElement>("[data-testid=game-screen]");
     if (screen?.dataset.phase === "player") return "player";
     return false;
@@ -83,13 +87,11 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
         path: `${ARTIFACT_DIR}/stage0-real-all-rest-command-dialogue.png`,
       });
     }
-    if (await dialogue.isVisible() && await dialogue.getAttribute("data-source-record") === "battle-command") {
+    if (await activeDialogueRecord(page) === "battle-command") {
       try {
         await page.getByTestId("dialogue-layer").click({ timeout: 1_000 });
       } catch (error) {
-        const commandStillVisible = await dialogue.isVisible()
-          && await dialogue.getAttribute("data-source-record") === "battle-command";
-        if (commandStillVisible) throw error;
+        if (await activeDialogueRecord(page) === "battle-command") throw error;
       }
     }
 

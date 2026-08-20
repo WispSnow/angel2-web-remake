@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 /**
  * 選單開闔動畫是純表現層的複刻決定：方框自己縮放進出，模擬狀態、輸入語義與存檔不變。
  * 這裡守住三件會真的傷到玩家的事——收合動畫期間選單不能吃掉投向戰場的點擊、動畫播完
- * 一定要真的 `hidden`（含 `prefers-reduced-motion` 路徑），以及開啟動畫沒有被誤刪。
+ * 一定要真的 `hidden`，以及開啟動畫沒有被誤刪、也沒有被系統「減少動態效果」關掉。
  */
 
 interface MenuMutation {
@@ -195,36 +195,35 @@ test("the command menu opens only after the native pointer glide lands", async (
 });
 
 // `test.use({ reducedMotion })` 在本套件不會落到頁面上（實測 `matchMedia` 仍回報
-// `no-preference`），所以逐個用例顯式 `emulateMedia`，斷言才真的跑在減少動態的路徑上。
+// `no-preference`），所以顯式 `emulateMedia`，斷言才真的跑在系統要求減少動態的路徑上。
 test.describe("reduced motion", () => {
-  test("the pointer glide is skipped when motion is reduced", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
-    await expect(page.getByTestId("battle-canvas")).toBeVisible();
-    expect(await page.evaluate(() =>
-      matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
-
-    await recordGlide(page);
-    await clickUnit(page, "1:0");
-    await expect(page.getByTestId("action-menu")).toBeVisible();
-    expect((await glideSamples(page)).some((sample) => sample.cursorYielded)).toBe(false);
-    await expect(page.getByTestId("command-menu-pointer")).toBeHidden();
-  });
-
-  test("menus still finish closing when motion is reduced", async ({ page }) => {
+  /**
+   * 本作刻意不跟隨系統「減少動態效果」：原版的演出是玩法節奏的一部分，壓成瞬時等於
+   * 換掉遊戲，而不是保留同一個遊戲的無障礙版本。這裡守住這個決定不被 CSS 或 JS 悄悄
+   * 加回一條分支。
+   */
+  test("the system preference does not switch off the remake's motion", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
     const canvas = page.getByTestId("battle-canvas");
     await expect(canvas).toBeVisible();
-    // 收合動畫被壓到近乎瞬時，收尾仍必須把 `hidden` 與收合類名處理乾淨。
-    expect(await page.getByTestId("action-menu").evaluate((menu) =>
-      getComputedStyle(menu).animationDuration)).toBe("1e-06s");
+    expect(await page.evaluate(() =>
+      matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
 
     const actionMenu = page.getByTestId("action-menu");
+    await recordGlide(page);
     await clickUnit(page, "1:0");
     await expect(actionMenu).toBeVisible();
+    // 指針滑行照常演出，方框開闔動畫也保有真正的時長。
+    expect((await glideSamples(page)).some((sample) => sample.cursorYielded)).toBe(true);
+    await expectZoomOpenDeclared(actionMenu);
+
+    // 收尾仍必須把 `hidden` 與收合類名處理乾淨。
+    await recordMenuMutations(actionMenu);
     await canvas.click({ button: "right", position: { x: 420, y: 45 } });
     await expect(actionMenu).toBeHidden();
     await expect(actionMenu).not.toHaveClass(/is-menu-closing/);
+    expect((await menuMutations(page)).some((entry) =>
+      entry.className.includes("is-menu-closing") && !entry.hidden)).toBe(true);
   });
 });

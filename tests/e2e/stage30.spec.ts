@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
-import { skipStoryDialogue } from "./dialogue-controls";
+import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -54,8 +54,7 @@ async function clickCell(page: Page, x: number, y: number): Promise<void> {
 async function acknowledgeBattleContext(page: Page): Promise<void> {
   const dialogue = page.getByTestId("dialogue-layer");
   await dialogue.click();
-  if (await dialogue.isVisible()
-    && await dialogue.getAttribute("data-source-record") === "battle-context") {
+  if (await activeDialogueRecord(page) === "battle-context") {
     await dialogue.click();
   }
 }

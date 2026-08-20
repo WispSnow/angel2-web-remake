@@ -1218,6 +1218,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 
 .dialogue-layer { position: absolute; z-index: 12; inset: 0; background: transparent; }
+/* 對話已經結束、只剩窗體在收回時，這一層是殘影：不能再吃掉投向戰場或轉職選單的點擊。 */
+.dialogue-layer[data-dialogue-closing] { pointer-events: none; }
 .dialogue-box {
   position: absolute;
   left: 0;
@@ -1225,7 +1227,6 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   height: 147px;
   color: #fff;
   pointer-events: none;
-  animation: dialogue-window-open 110ms steps(11);
 }
 .dialogue-box.upper {
   --dialogue-portrait-left: 32px;
@@ -1325,6 +1326,56 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   box-shadow: none;
   image-rendering: var(--image-rendering, pixelated);
 }
+/* 原版 `WU`／`WD` 只讓 `A/18` 文字窗以中心為軸橫向展開，肖像是 `HU`／`HD` 另外整塊
+   貼上的，不參與展開；動畫因此掛在文字窗而不是整個方框。收合改由
+   `dialogue-window-animation.ts` 加上 `.is-dialogue-window-closing`，等動畫播完才真
+   的 `hidden`。`.dialogue-layer` 前綴把勝負／撤退反饋窗（同樣複用 `.dialogue-copy`
+   的 `A/18` 幾何，但走另一條原生繪製路徑）排除在外。
+
+   展開途中原版畫的是一個完整的小窗：左端一直是 24 px 的 `A/18` frame 3／4／5，右端
+   一直是 32 px 的 frame 9／10／11，中間才是重複貼上的 frame 6／7／8。單純裁切合成圖
+   會把兩端框邊留在原位，所以窗框改由兩個各佔一半的偽元素繪製：左半把合成圖靠左貼、
+   右半靠右貼，兩邊一起往內縮就等於兩端框邊跟著收攏。`--dialogue-window-inset` 為 0
+   時左半是合成圖第 0–200 px、右半是第 200–400 px，接縫與原本的單張背景逐像素相同。 */
+@property --dialogue-window-inset {
+  syntax: "<length>";
+  /* 必須可繼承：偽元素得拿到本體上正在動畫的值，否則框邊會停在完全展開的位置。 */
+  inherits: true;
+  initial-value: 0px;
+}
+.dialogue-layer .dialogue-copy {
+  /* 建立層疊環境：`z-index: -1` 的框邊要壓在本體背景之上、文字之下，而不是掉到劇情
+     背景後面。本體背景保留原本那張完整合成圖，兩片框邊在任何一格都剛好把它蓋滿，
+     所以它只在縮放取整讓接縫差半像素時露出正確的像素，不會自己被看到。 */
+  isolation: isolate;
+  /* 框邊由偽元素自己收攏，這道裁切負責讓窗內文字跟著窗體一起被吃掉。 */
+  clip-path: inset(0 var(--dialogue-window-inset, 0px));
+  animation: dialogue-window-open 220ms steps(11, jump-none);
+}
+.dialogue-layer .dialogue-copy.is-dialogue-window-closing {
+  animation: dialogue-window-close 240ms steps(11, jump-none) both;
+}
+.dialogue-layer .dialogue-copy::before,
+.dialogue-layer .dialogue-copy::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  width: calc(200px - var(--dialogue-window-inset, 0px));
+  height: 86px;
+  background-image: var(--dialogue-text-window);
+  background-repeat: no-repeat;
+  background-size: 400px 86px;
+  image-rendering: var(--image-rendering, pixelated);
+}
+.dialogue-layer .dialogue-copy::before {
+  left: var(--dialogue-window-inset, 0px);
+  background-position: left top;
+}
+.dialogue-layer .dialogue-copy::after {
+  right: var(--dialogue-window-inset, 0px);
+  background-position: right top;
+}
 .dialogue-speaker {
   position: absolute;
   width: 1px;
@@ -1395,12 +1446,19 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   height: 76px;
 }
 @keyframes bob { 50% { transform: translateY(3px); } }
+/* 展開的 11 步：四列貼圖從 `[313,337,345,361]` 每步外移 16 px，窗體寬度依序是
+   80、112、…、400 px。左右各縮 160 px 就是 400 px 窗體裡的 80 px，`jump-none` 讓 11
+   個取樣點正好落在那一串原版寬度上；三段列高從第一步就是完整的 86 px，故不裁縱向。 */
 @keyframes dialogue-window-open {
-  from { clip-path: inset(50% 49%); }
-  to { clip-path: inset(0); }
+  from { --dialogue-window-inset: 160px; }
+  to { --dialogue-window-inset: 0px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .dialogue-box { animation: none; }
+/* 收合是同一個繪製體反向跑 12 次。第 1 次把窗框畫在左右各外擴 16 px 的位置，那是把
+   框邊重貼到窗外、只為了擦掉背景，不是窗體真的變寬，故不重現；其後 11 格的
+   400…80 px 照跑，並把那一格的時長併回總時長，維持原版 12 步的長度。 */
+@keyframes dialogue-window-close {
+  from { --dialogue-window-inset: 0px; }
+  to { --dialogue-window-inset: 160px; }
 }
 
 .modal-panel { border: 5px ridge #e2b633; color: #fff4d1; background: radial-gradient(circle at top, #52242a, #170d10 72%); box-shadow: 0 15px 40px #000c, inset 0 0 0 2px #6d3c26; text-align: center; }
@@ -1635,6 +1693,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   .display-settings-extras { margin-left: 0; }
   .remake-notes-triggers { flex-wrap: wrap; }
 }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; transition-duration: .001ms !important; }
-}
+/* `[DD]` 本作不跟隨系統「減少動態效果」。原版所有演出都是玩法節奏的一部分——`A/18`
+   對話窗的開闔、選單方框的縮放、指針滑行、地圖脈動——把它們壓成瞬時等於換掉遊戲的
+   節奏，而不是保留同一個遊戲的無障礙版本。這裡刻意沒有 `prefers-reduced-motion`
+   分支：需要減少動態時請用瀏覽器或系統層級的手段，不由本作自行猜測。 */

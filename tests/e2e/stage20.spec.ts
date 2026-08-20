@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
-import { skipStoryDialogue } from "./dialogue-controls";
+import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -143,9 +143,7 @@ test("S20-E: demon dragon casts the native-timed WD path and defeats Nia", async
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   for (let input = 0; input < 8; input += 1) {
-    const dialogue = page.getByTestId("dialogue-layer");
-    if (!await dialogue.isVisible()
-      || await dialogue.getAttribute("data-source-record") !== "battle-command") break;
+    if (await activeDialogueRecord(page) !== "battle-command") break;
     await page.keyboard.press("Enter");
     await page.waitForTimeout(20);
   }

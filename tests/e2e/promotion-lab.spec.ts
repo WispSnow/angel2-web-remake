@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { activeDialogueRecord } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -49,18 +50,18 @@ async function clickWorldCell(page: Page, x: number, y: number): Promise<void> {
 
 async function finishPromotionDialogue(page: Page): Promise<void> {
   const layer = page.getByTestId("dialogue-layer");
-  while (await layer.isVisible() && await layer.getAttribute("data-source-record") === "promotion") {
+  while (await activeDialogueRecord(page) === "promotion") {
     const before = await layer.getAttribute("data-source-wait");
     await page.getByTestId("dialogue-layer").click();
     if (
-      await layer.isVisible()
-      && await layer.getAttribute("data-source-record") === "promotion"
+      await activeDialogueRecord(page) === "promotion"
       && await layer.getAttribute("data-source-wait") === before
     ) {
       await page.getByTestId("dialogue-layer").click();
     }
     await expect.poll(async () =>
-      !await layer.isVisible() || await layer.getAttribute("data-source-wait") !== before,
+      await activeDialogueRecord(page) === null
+      || await layer.getAttribute("data-source-wait") !== before,
     ).toBe(true);
   }
   await expect(layer).toBeHidden();

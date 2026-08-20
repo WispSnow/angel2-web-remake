@@ -27,10 +27,15 @@ import {
   FULL_COMBAT_FRAME_META,
   type FullCombatSpriteState,
 } from "./full-combat";
-import type { BattleUnit, Position, UnitClassId, UnitStats } from "./types";
+import type { BattleUnit, DialoguePage, Position, UnitClassId, UnitStats } from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
+import {
+  finishDialogueWindowClose,
+  isDialogueWindowClosing,
+  setDialogueWindowOpen,
+} from "./dialogue-window-animation";
 import { finishMenuClose, setMenuOpen } from "./menu-animation";
 import {
   createMenuPointerGlide,
@@ -314,7 +319,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const startCommandMenuGlide = (position: PointerPosition): boolean => {
     // 沒有已知指標位置（鍵盤或手把選的單位）就沒有可以滑的起點，直接開選單。
     if (!lastScreenPointer) return false;
-    if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return false;
     return menuPointerGlide.start(lastScreenPointer, {
       x: position.x + NATIVE_MENU_POINTER_OFFSET.x,
       y: position.y + NATIVE_MENU_POINTER_OFFSET.y,
@@ -763,6 +767,48 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (lower === "o") controller.objectiveOpen ? controller.closeObjectives() : controller.openObjectives();
   }, { signal: eventController.signal });
 
+  const renderStoryBackground = (page: DialoguePage | undefined) => {
+    // Module 29 can invoke the same PP background renderer from an in-battle
+    // opening story (stage 12 / SAY 30 uses BK/14). An explicit page background
+    // therefore takes precedence over the phase label.
+    storyBackground.hidden = controller.phase !== "prebattleStory"
+      && page?.source.backgroundId === undefined;
+    const source = page?.source.backgroundId === undefined
+      ? defaultStoryBackgroundSource
+      : stageAssets?.storyBackgrounds?.[page.source.backgroundId] ?? defaultStoryBackgroundSource;
+    storyBackground.style.backgroundImage = `url("${source}")`;
+    if (page?.source.backgroundId === undefined) delete storyBackground.dataset.backgroundId;
+    else storyBackground.dataset.backgroundId = String(page.source.backgroundId);
+  };
+
+  /**
+   * 一扇 `A/18` 窗體收完後的收尾。
+   *
+   * 刻意不重跑整個 `render()`：那會連側欄一起重建，把小地圖預覽這類由指標事件直接
+   * 寫進 DOM 的狀態一起洗掉，而收合結束的時點與玩家的指標動作無關。
+   */
+  const settleDialogueSlot = (slot: "upper" | "lower") => {
+    const page = controller.currentDialogue;
+    // 腳本沒再給這個槽內容就連肖像方框一起收起——原版是 `CU` 收完窗體才輪到 `PU`。
+    if (page?.[slot] === undefined) dialogueWindows[slot].box.hidden = true;
+    if (page !== undefined) return;
+    if (isDialogueWindowClosing(dialogueWindows.upper.copy)
+      || isDialogueWindowClosing(dialogueWindows.lower.copy)) return;
+    // 整段對話結束、最後一扇窗也收完了：原版要到這時才由 `ED` 還原畫面。
+    delete dialogueLayer.dataset.dialogueClosing;
+    dialogueLayer.classList.remove("promotion-dialogue");
+    dialogueLayer.classList.remove("group-command-dialogue");
+    dialogueLayer.classList.remove("ai-technique-dialogue");
+    delete dialogueLayer.dataset.actionId;
+    delete dialogueLayer.dataset.effectCenter;
+    dialogueLayer.hidden = true;
+    renderStoryBackground(undefined);
+  };
+  const settleDialogueWindow = {
+    upper: () => settleDialogueSlot("upper"),
+    lower: () => settleDialogueSlot("lower"),
+  } as const;
+
   const render = () => {
     screen.dataset.phase = controller.phase;
     screen.dataset.actionMode = controller.actionMode;
@@ -1083,19 +1129,27 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     }`;
 
     const page = controller.currentDialogue;
-    const dialogueVisible = page !== undefined;
+    // Native CU/CD collapse the A/18 panel over 12 steps before the script ends,
+    // and 92 of the 93 command scripts close every window they opened before ED.
+    // The layer therefore has to outlive `currentDialogue` by that collapse.
+    for (const slot of ["upper", "lower"] as const) {
+      setDialogueWindowOpen(
+        dialogueWindows[slot].copy,
+        page?.[slot]?.text !== undefined,
+        settleDialogueWindow[slot],
+      );
+    }
+    const dialogueClosing = isDialogueWindowClosing(dialogueWindows.upper.copy)
+      || isDialogueWindowClosing(dialogueWindows.lower.copy);
+    const dialogueVisible = page !== undefined || dialogueClosing;
     dialogueLayer.hidden = !dialogueVisible;
-    // Module 29 can invoke the same PP background renderer from an in-battle
-    // opening story (stage 12 / SAY 30 uses BK/14). An explicit page background
-    // therefore takes precedence over the phase label.
-    storyBackground.hidden = controller.phase !== "prebattleStory"
-      && page?.source.backgroundId === undefined;
-    const storyBackgroundSource = page?.source.backgroundId === undefined
-      ? defaultStoryBackgroundSource
-      : stageAssets?.storyBackgrounds?.[page.source.backgroundId] ?? defaultStoryBackgroundSource;
-    storyBackground.style.backgroundImage = `url("${storyBackgroundSource}")`;
-    if (page?.source.backgroundId === undefined) delete storyBackground.dataset.backgroundId;
-    else storyBackground.dataset.backgroundId = String(page.source.backgroundId);
+    // 收合中的殘影不再是有效的對話：既不該吃掉點擊，其他消費者也要能分辨「還在對話」
+    // 與「窗體正在收回」。窗口在腳本中途關閉時對話仍在進行，所以只看整段結束。
+    if (page === undefined && dialogueClosing) dialogueLayer.dataset.dialogueClosing = "true";
+    else delete dialogueLayer.dataset.dialogueClosing;
+    // While the last panel is still collapsing the native script has only run
+    // CU: ED has not restored the map yet, so the story background stays too.
+    if (page !== undefined || !dialogueClosing) renderStoryBackground(page);
     if (page) {
       const pageKey = controller.aiTechniqueDialogue
         ? `ai-technique:${controller.aiTechniqueDialogue.actor.id}:${controller.aiTechniqueDialogue.actionId}`
@@ -1134,24 +1188,29 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const elements = dialogueWindows[slot];
         const state = page[slot];
         const active = page.activeSlot === slot;
-        elements.box.hidden = state === undefined;
+        const closing = isDialogueWindowClosing(elements.copy);
+        // A slot whose panel is still collapsing keeps its portrait and
+        // nameplate: native PU only erases the face once CU has finished.
+        elements.box.hidden = state === undefined && !closing;
         elements.box.classList.toggle("is-active", active);
         elements.box.dataset.openSteps = "11";
+        elements.box.dataset.closeSteps = "12";
         elements.text.removeAttribute("id");
         elements.portrait.removeAttribute("data-testid");
         elements.portraitName.removeAttribute("data-testid");
         if (!state) {
           stopSpeaking(elements.portrait);
-          elements.copy.hidden = false;
-          elements.portraitName.hidden = true;
-          elements.portraitName.textContent = "";
+          if (!closing) {
+            elements.portraitName.hidden = true;
+            elements.portraitName.textContent = "";
+          }
           continue;
         }
         elements.speaker.textContent = state.speaker ?? "";
         // A slot with no text is a portrait the script left on screen after
         // closing its window; only .dialogue-copy carries the A/18 text panel,
-        // so hiding it leaves the framed portrait and nameplate alone.
-        elements.copy.hidden = state.text === undefined;
+        // so collapsing it leaves the framed portrait and nameplate alone.
+        // `setDialogueWindowOpen` above owns that panel's `hidden`.
         elements.box.setAttribute(
           "aria-label",
           state.text === undefined
@@ -1215,11 +1274,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         revealedCharacters = 0;
       }
     } else {
-      dialogueLayer.classList.remove("promotion-dialogue");
-      dialogueLayer.classList.remove("group-command-dialogue");
-      dialogueLayer.classList.remove("ai-technique-dialogue");
-      delete dialogueLayer.dataset.actionId;
-      delete dialogueLayer.dataset.effectCenter;
+      // These variants change the panel's layout and colours, so they can only
+      // be dropped once the collapse they are still styling has finished.
+      if (!dialogueClosing) {
+        dialogueLayer.classList.remove("promotion-dialogue");
+        dialogueLayer.classList.remove("group-command-dialogue");
+        dialogueLayer.classList.remove("ai-technique-dialogue");
+        delete dialogueLayer.dataset.actionId;
+        delete dialogueLayer.dataset.effectCenter;
+      }
       stopDialogueTimer();
       stopSpeaking(activeDialoguePortrait);
       activeDialogueKey = "";
@@ -1288,6 +1351,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     stopFeedbackTimer();
     hideSidePanelHint();
     for (const menu of animatedMenus) finishMenuClose(menu);
+    for (const slot of ["upper", "lower"] as const) {
+      finishDialogueWindowClose(dialogueWindows[slot].copy);
+    }
     menuPointerGlide.dispose();
   };
 }

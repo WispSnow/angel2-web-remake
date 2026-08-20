@@ -792,16 +792,4 @@
   .deployment-lab-notes { grid-template-columns: 1fr; gap: 6px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .deployment-ui-root *:not(.deployment-map-blink),
-  .deployment-screen *:not(.deployment-map-blink) {
-    animation: none !important;
-    transition: none !important;
-  }
-
-  /* The current landing cell is state feedback rather than decoration. Keep
-     its original hard colour toggle even when the surrounding UI is static. */
-  .deployment-map-blink {
-    animation: deployment-cell-blink 1s step-end infinite !important;
-  }
-}
+/* 見 `styles.css`：本作不跟隨系統「減少動態效果」。 */

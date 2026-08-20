@@ -477,11 +477,4 @@ body.debug-hub-page {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition: none !important;
-  }
-}
+/* 見 `styles.css`：本作不跟隨系統「減少動態效果」。 */

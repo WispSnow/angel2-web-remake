@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
-import { skipStoryDialogue } from "./dialogue-controls";
+import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -220,29 +220,25 @@ const finishGroupCommandDialogue = async (page: Page) => {
 };
 const finishPromotionDialogue = async (page: Page) => {
   const layer = page.getByTestId("dialogue-layer");
-  while (await layer.isVisible() && await layer.getAttribute("data-source-record") === "promotion") {
+  while (await activeDialogueRecord(page) === "promotion") {
     const before = await layer.getAttribute("data-source-wait");
     await page.getByTestId("dialogue-layer").click();
     if (
-      await layer.isVisible()
-      && await layer.getAttribute("data-source-record") === "promotion"
+      await activeDialogueRecord(page) === "promotion"
       && await layer.getAttribute("data-source-wait") === before
     ) {
       await page.getByTestId("dialogue-layer").click();
     }
     await expect.poll(async () =>
-      !await layer.isVisible() || await layer.getAttribute("data-source-wait") !== before,
+      await activeDialogueRecord(page) === null
+      || await layer.getAttribute("data-source-wait") !== before,
     ).toBe(true);
   }
   await expect(layer).toBeHidden();
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
 };
 const confirmPromotion = async (page: Page, classId = "cavalry") => {
-  const dialogueLayer = page.getByTestId("dialogue-layer");
-  if (
-    await dialogueLayer.isVisible()
-    && await dialogueLayer.getAttribute("data-source-record") === "promotion"
-  ) {
+  if (await activeDialogueRecord(page) === "promotion") {
     await finishPromotionDialogue(page);
   }
   await expect(page.getByTestId("promotion-layer")).toBeVisible();

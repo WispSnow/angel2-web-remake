@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
-import { skipStoryDialogue } from "./dialogue-controls";
+import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -170,8 +170,7 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
 async function completeBattleCommandDialogue(page: Page): Promise<void> {
   for (let input = 0; input < 6; input += 1) {
     const dialogue = page.getByTestId("dialogue-layer");
-    if (!await dialogue.isVisible()
-      || await dialogue.getAttribute("data-source-record") !== "battle-command") return;
+    if (await activeDialogueRecord(page) !== "battle-command") return;
     await dialogue.click();
     await page.waitForTimeout(20);
   }
@@ -182,8 +181,7 @@ async function finishPendingPromotions(page: Page): Promise<void> {
     const current = await state(page);
     if (current.phase === "player" && current.round === 2) return;
     const dialogue = page.getByTestId("dialogue-layer");
-    if (await dialogue.isVisible()
-      && await dialogue.getAttribute("data-source-record") === "promotion") {
+    if (await activeDialogueRecord(page) === "promotion") {
       await dialogue.click();
       continue;
     }

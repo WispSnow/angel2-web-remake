@@ -50,12 +50,10 @@
   object-fit: cover;
 }
 
-.stage49-dialogue-window {
+/* 結局道別以 innerHTML 重建每一頁，文字窗每次都是新元素，會無條件重播共用的展開
+   動畫；只有原版真的重跑 `WU`／`WD` 的那一頁才該展開，其餘各行必須靜止。 */
+.dialogue-layer .stage49-dialogue-window:not(.is-opening) .dialogue-copy {
   animation: none;
-}
-
-.stage49-dialogue-window.is-opening {
-  animation: dialogue-window-open 110ms steps(11);
 }
 
 .stage49-dialogue-copy {

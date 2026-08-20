@@ -4,6 +4,7 @@ import { debugRosterForProfile } from "../../src/game/debug-roster-profiles";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
+import { activeDialogueRecord } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -975,9 +976,7 @@ test("the magician outer-ring fixture pushes once and releases after one enemy p
     await page.getByTestId("group-command-allRest").click();
     await expect(page.getByTestId("dialogue-layer")).toBeVisible();
     for (let input = 0; input < 6; input += 1) {
-      const dialogue = page.getByTestId("dialogue-layer");
-      if (!await dialogue.isVisible()
-        || await dialogue.getAttribute("data-source-record") !== "battle-command") break;
+      if (await activeDialogueRecord(page) !== "battle-command") break;
       await page.keyboard.press("Enter");
       await page.waitForTimeout(20);
     }

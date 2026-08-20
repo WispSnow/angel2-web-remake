@@ -181,8 +181,4 @@ body.portrait-lab-page {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    transition: none !important;
-  }
-}
+/* 見 `styles.css`：本作不跟隨系統「減少動態效果」。 */

@@ -416,7 +416,8 @@ let script: FullCombatScript;
 let scene: FullCombatSceneState;
 let phase: FullCombatPhaseName = "fullOpen";
 let currentTime = 0;
-let playing = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+// 見 `styles.css`：本作不跟隨系統「減少動態效果」，時間軸一律自動播放。
+let playing = true;
 let previousFrameTime = performance.now();
 const activeAudio = new Set<HTMLAudioElement>();
 

@@ -5,6 +5,7 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { activeDialogueRecord } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 test("arena edits both rosters and starts a formal-rule battle without touching saves", async ({ page }) => {
@@ -177,7 +178,7 @@ test("free action gives an allied magician the shared expert technique planner",
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "battle-command");
   await dialogue.click();
-  if (await dialogue.getAttribute("data-source-record") === "battle-command") {
+  if (await activeDialogueRecord(page) === "battle-command") {
     await dialogue.click();
   }
 
