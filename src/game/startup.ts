@@ -23,6 +23,12 @@ import { classStatsFor } from "./content/stage0";
 import { className } from "./content/classes";
 import { configureGameScaling } from "./scaling";
 import {
+  mountSaveBackupUi,
+  SAVE_BACKUP_CONFIRM_MARKUP,
+  SAVE_BACKUP_TOOLS_MARKUP,
+  type SaveBackupUi,
+} from "./save-backup-ui";
+import {
   moveSaveSlotIndex,
   moveSaveSlotPage,
   readSaveSlot,
@@ -112,6 +118,7 @@ export function mountStartup(
   let difficultyHintByKeyboard = false;
   let recordIndex = 0;
   let recordSlots: SaveSlotReadResult[] = [];
+  let saveBackupUi: SaveBackupUi;
   let animationFrame = 0;
   let phaseStartedAt = performance.now();
   let titleAssembled = false;
@@ -179,21 +186,25 @@ export function mountStartup(
               </div>
               <section class="startup-record-selector" data-testid="title-record-menu"
                 aria-label="讀取遊戲進度" hidden>
-                <h2>讀取遊戲進度</h2>
-                <div class="startup-record-header" aria-hidden="true">
-                  <span>槽</span><span>職業</span><span>等級</span><span>經驗值</span><span>儲存次數</span><span>難度</span>
+                <div class="startup-record-content">
+                  <h2>讀取遊戲進度</h2>
+                  <div class="startup-record-header" aria-hidden="true">
+                    <span>槽</span><span>職業</span><span>等級</span><span>經驗值</span><span>儲存次數</span><span>難度</span>
+                  </div>
+                  <div class="startup-record-slots" role="menu"
+                    aria-label="二十個手動遊戲進度槽，每頁五個"></div>
+                  <div class="startup-record-pagination" aria-label="記錄槽分頁">
+                    <button type="button" data-startup-action="record-page" data-page-delta="-1"
+                      data-testid="title-record-previous-page" aria-label="上一頁">◀</button>
+                    <span data-testid="title-record-page"></span>
+                    <button type="button" data-startup-action="record-page" data-page-delta="1"
+                      data-testid="title-record-next-page" aria-label="下一頁">▶</button>
+                  </div>
+                  <p class="startup-record-detail" data-testid="title-record-detail" aria-live="polite"></p>
+                  ${SAVE_BACKUP_TOOLS_MARKUP}
+                  <p class="startup-record-help">↑↓ 選擇　←→ 翻頁　確認讀取　Esc 返回</p>
                 </div>
-                <div class="startup-record-slots" role="menu"
-                  aria-label="二十個手動遊戲進度槽，每頁五個"></div>
-                <div class="startup-record-pagination" aria-label="記錄槽分頁">
-                  <button type="button" data-startup-action="record-page" data-page-delta="-1"
-                    data-testid="title-record-previous-page" aria-label="上一頁">◀</button>
-                  <span data-testid="title-record-page"></span>
-                  <button type="button" data-startup-action="record-page" data-page-delta="1"
-                    data-testid="title-record-next-page" aria-label="下一頁">▶</button>
-                </div>
-                <p class="startup-record-detail" data-testid="title-record-detail" aria-live="polite"></p>
-                <p class="startup-record-help">↑↓ 選擇　←→ 翻頁　確認讀取　Esc 返回</p>
+                ${SAVE_BACKUP_CONFIRM_MARKUP}
               </section>
               <p class="startup-menu-status" data-testid="title-status" aria-live="polite"></p>
             </section>
@@ -338,6 +349,11 @@ export function mountStartup(
     updateMenuSelection();
   };
 
+  const refreshRecordSlots = () => {
+    recordSlots = Array.from({ length: SAVE_SLOT_COUNT }, (_, index) =>
+      readSaveSlot(localStorage, index + 1));
+  };
+
   const updateMenuSelection = () => {
     for (const button of titleMenu.querySelectorAll<HTMLButtonElement>("button")) {
       const selected = Number(button.dataset.menuIndex) === titleIndex;
@@ -365,6 +381,17 @@ export function mountStartup(
     }
     if (titleAssembled) paintTitleStatic();
   };
+
+  saveBackupUi = mountSaveBackupUi(recordSelector, {
+    storage: localStorage,
+    onRecordsRestored: (saveCount) => {
+      refreshRecordSlots();
+      renderRecordSlots();
+      updateMenuSelection();
+      recordDetail.textContent = `已從備份還原 ${saveCount} 筆記錄。`;
+    },
+    onStatus: (message) => { recordDetail.textContent = message; },
+  });
 
   const showTitleMenu = () => {
     phase = "title";
@@ -534,8 +561,7 @@ export function mountStartup(
   const showRecordMenu = () => {
     phase = "records";
     recordIndex = 0;
-    recordSlots = Array.from({ length: SAVE_SLOT_COUNT }, (_, index) =>
-      readSaveSlot(localStorage, index + 1));
+    refreshRecordSlots();
     screen.dataset.startupPhase = phase;
     titleMenuFrame.hidden = true;
     difficultyMenuFrame.hidden = true;
@@ -580,6 +606,7 @@ export function mountStartup(
    * so both run this and nothing else.
    */
   const cancelInput = () => {
+    if (saveBackupUi.cancel()) return;
     if (phase === "pretitle") {
       skipPretitleHold();
       return;
@@ -617,6 +644,7 @@ export function mountStartup(
     }
     resumeBlockedTitleMusic();
     if (screen.dataset.startupPhase === "title-assemble") return;
+    if (saveBackupUi.handleKeyDown(event)) return;
     if (phase === "title") {
       if (event.key === "ArrowUp" || event.key === "ArrowDown") {
         event.preventDefault();
@@ -667,10 +695,12 @@ export function mountStartup(
     idleSince = performance.now();
     const button = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action]");
     if (!button) return;
-    if (button.dataset.startupAction === "record-page") return;
+    if (saveBackupUi.handlePointerOver(button)) return;
+    const action = button.dataset.startupAction;
+    if (action === "record-page") return;
     const index = Number(button.dataset.menuIndex);
-    if (button.dataset.startupAction === "title") titleIndex = index;
-    else if (button.dataset.startupAction === "difficulty") {
+    if (action === "title") titleIndex = index;
+    else if (action === "difficulty") {
       difficultyIndex = index;
       difficultyHintByKeyboard = false;
     }
@@ -686,16 +716,18 @@ export function mountStartup(
     const button = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action]");
     if (!button) return;
     resumeBlockedTitleMusic();
-    if (button.dataset.startupAction === "record-page") {
+    if (saveBackupUi.handleClick(button)) return;
+    const action = button.dataset.startupAction;
+    if (action === "record-page") {
       setRecordIndex(moveSaveSlotPage(recordIndex, Number(button.dataset.pageDelta)));
       return;
     }
     const index = Number(button.dataset.menuIndex);
-    if (button.dataset.startupAction === "title") {
+    if (action === "title") {
       titleIndex = index;
       updateMenuSelection();
       activateTitleOption();
-    } else if (button.dataset.startupAction === "difficulty") {
+    } else if (action === "difficulty") {
       difficultyIndex = index;
       updateMenuSelection();
       finishStartup();
@@ -864,6 +896,7 @@ export function mountStartup(
     root.removeEventListener("click", onClick);
     root.removeEventListener("pointerdown", onPointerDown);
     root.removeEventListener("contextmenu", onContextMenu);
+    saveBackupUi.dispose();
   };
 
   window.addEventListener("keydown", onKeyDown);

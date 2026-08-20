@@ -179,6 +179,10 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   text-shadow: 1px 1px #000;
 }
 .startup-record-selector {
+  --record-panel-edge: #ded7c4;
+  --record-panel-muted: #bdb3c4;
+  --record-panel-button: rgba(23, 18, 33, .92);
+  --record-panel-button-active: #5a4f7b;
   position: absolute;
   inset: 0;
   z-index: 5;
@@ -194,10 +198,10 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   content: "";
   position: absolute;
   left: 62px;
-  top: 28px;
+  top: 8px;
   width: 516px;
-  height: 292px;
-  border: 3px ridge #ded7c4;
+  height: 334px;
+  border: 3px ridge var(--record-panel-edge);
   box-shadow: inset 0 0 0 2px #2c2440, 0 4px 18px #000;
   pointer-events: none;
 }
@@ -290,12 +294,44 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .startup-record-detail {
   position: relative;
   width: 500px;
-  min-height: 32px;
+  min-height: 23px;
   margin: 2px auto 0;
   color: #fff4ba;
   font-size: 11px;
   line-height: 15px;
   text-align: center;
+}
+.startup-record-tools {
+  position: absolute;
+  left: 0;
+  bottom: 25px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 23px;
+}
+.startup-record-tools button,
+.startup-import-confirm-actions button {
+  min-width: 112px;
+  height: 21px;
+  padding: 0 10px;
+  border: 1px solid #82748f;
+  color: #f3f0df;
+  background: var(--record-panel-button);
+  font: 12px/19px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+  text-shadow: 1px 1px #000;
+  cursor: var(--native-cursor-hand, pointer);
+}
+.startup-record-tools button:hover,
+.startup-record-tools button:focus-visible,
+.startup-import-confirm-actions button:hover,
+.startup-import-confirm-actions button:focus-visible,
+.startup-import-confirm-actions button.is-selected {
+  border-color: #f1e9d3;
+  color: #fff;
+  background: var(--record-panel-button-active);
+  outline: none;
 }
 .startup-record-help {
   position: absolute;
@@ -303,9 +339,42 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   bottom: 8px;
   width: 100%;
   margin: 0;
-  color: #bdb3c4;
+  color: var(--record-panel-muted);
   font-size: 11px;
   text-align: center;
+}
+.startup-import-confirm {
+  position: absolute;
+  z-index: 2;
+  left: 116px;
+  top: 75px;
+  width: 408px;
+  min-height: 194px;
+  padding: 22px 24px 18px;
+  border: 3px ridge var(--record-panel-edge);
+  color: #f3f0df;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(62, 52, 86, .98), rgba(12, 9, 18, .99) 76%);
+  box-shadow: 0 8px 24px #000d, inset 0 0 0 2px #2c2440;
+  text-align: center;
+}
+.startup-import-confirm h3 {
+  margin: 0 0 13px;
+  color: #f6e36b;
+  font-size: 17px;
+  letter-spacing: .12em;
+}
+.startup-import-confirm p {
+  margin: 6px 0;
+  color: #eee9dc;
+  font-size: 12px;
+  line-height: 18px;
+}
+.startup-import-confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 /* 边框图必须画在画布之上。Phaser 的相机视口是 (40,23,400,308) 且带不透明底色，

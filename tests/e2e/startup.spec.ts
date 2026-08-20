@@ -2,6 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { STARTUP_FONT } from "../../src/game/content/startup.generated";
 import { createStage0Units, initialEnemyExperience, statsFor } from "../../src/game/content/stage0";
 import { difficultyHintFor } from "../../src/game/content/startup";
+import {
+  SAVE_BACKUP_FORMAT,
+  SAVE_BACKUP_VERSION,
+  SAVE_SLOT_COUNT,
+  SAVE_VERSION,
+} from "../../src/game/save";
 import { INTRO_BAND } from "../../src/game/startup";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -446,6 +452,95 @@ test("BOOT-B: persisted battle slots survive reload and migrate version 2 from t
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/startup-title-record-restored-battle.png",
   });
+});
+
+test("BOOT-B backup: the title exports every readable manual slot", async ({ page }) => {
+  await page.goto("/?test=1");
+  await writeLocalSave(page, 1, legacyBattleSave());
+  await writeLocalSave(page, 2, "{");
+  await page.reload();
+  await skipOpeningToTitle(page);
+  await page.getByTestId("continue-game").click();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByTestId("export-save-backup").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^angel2-records-\d{8}-\d{6}Z\.json$/);
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const backup = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
+    format: string;
+    version: number;
+    slots: Array<{ version: number } | null>;
+  };
+  expect(backup.format).toBe(SAVE_BACKUP_FORMAT);
+  expect(backup.version).toBe(SAVE_BACKUP_VERSION);
+  expect(backup.slots).toHaveLength(SAVE_SLOT_COUNT);
+  expect(backup.slots[0]?.version).toBe(SAVE_VERSION);
+  expect(backup.slots[1]).toBeNull();
+  await expect(page.getByTestId("title-record-detail"))
+    .toHaveText("已匯出 1 筆記錄；損壞的記錄 2 未包含。");
+});
+
+test("BOOT-B restore: import validates, confirms safely, and replaces all twenty slots", async ({ page }) => {
+  await page.goto("/?test=1");
+  await writeLocalSave(page, 1, legacyBattleSave());
+  await page.reload();
+  await skipOpeningToTitle(page);
+  await page.getByTestId("continue-game").click();
+
+  const fileInput = page.getByTestId("import-save-file");
+  await fileInput.setInputFiles({
+    name: "not-a-save.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"format":"wrong"}'),
+  });
+  await expect(page.getByTestId("title-record-detail"))
+    .toHaveText("匯入失敗：檔案格式、版本或記錄內容不相容。");
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).not.toBeNull();
+
+  const slots = Array.from<ReturnType<typeof completedSave> | null>(
+    { length: SAVE_SLOT_COUNT },
+    () => null,
+  );
+  slots[2] = completedSave();
+  const backup = JSON.stringify({
+    format: SAVE_BACKUP_FORMAT,
+    version: SAVE_BACKUP_VERSION,
+    exportedAt: "2026-08-20T12:34:56.000Z",
+    slots,
+  });
+  const selectBackup = () => fileInput.setInputFiles({
+    name: "angel2-records.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(backup),
+  });
+
+  await selectBackup();
+  const confirm = page.getByTestId("import-save-confirm");
+  await expect(confirm).toBeVisible();
+  await expect(page.getByTestId("cancel-save-import")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("import-save-summary"))
+    .toHaveText("備份時間 2026-08-20 12:34 UTC，共 1 筆有效記錄。");
+  await captureVisualAudit(confirm, {
+    path: "artifacts/playwright/startup-save-import-confirm.png",
+  });
+
+  // The destructive confirmation defaults to cancel and has not touched storage.
+  await page.keyboard.press("Enter");
+  await expect(confirm).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).not.toBeNull();
+
+  await selectBackup();
+  await page.getByTestId("confirm-save-import").click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("title-record-detail")).toHaveText("已從備份還原 1 筆記錄。");
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBeNull();
+  const restored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("angel2.save.3") ?? "null") as { version: number; kind: string });
+  expect(restored).toMatchObject({ version: SAVE_VERSION, kind: "completed" });
+  await expect(page.getByTestId("title-record-slot-3")).toHaveAttribute("data-slot-state", "valid");
 });
 
 test("BOOT-C: a normal reconnect migrates a stage-0 clear into stage-1 prebattle", async ({ page }) => {
