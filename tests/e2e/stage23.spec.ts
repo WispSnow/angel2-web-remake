@@ -244,3 +244,65 @@ test("S23-G/H: Nia reaches the top with every guard alive, saves, and opens stag
     consumedEventIds: ["stage-24-enter-deployment"],
   });
 });
+
+test("stage 24's deployment screen does not inherit stage 23's battle music", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-23-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await expect(page.locator("#app")).toHaveAttribute("data-music-track", /MUSIC\/(18|19)/u);
+
+  await clickCell(page, 25, 10);
+  await page.getByTestId("unit-command-move").click();
+  await clickCell(page, 25, 9);
+  await expect(page.getByTestId("unit-command-end")).toBeVisible();
+  await page.getByTestId("unit-command-end").click();
+  await waitForPhase(page, "victoryFeedback");
+  // Nothing stops the battle track at victory; it keeps playing through the
+  // feedback and save-prompt screens, same as every other stage.
+  await expect(page.locator("#app")).toHaveAttribute("data-music-track", /MUSIC\/(18|19)/u);
+
+  await page.getByTestId("victory-continue").click();
+  if ((await state(page)).phase === "victoryFeedback") await page.getByTestId("victory-continue").click();
+  await waitForPhase(page, "savePrompt");
+  await page.getByTestId("save-yes").click();
+  await page.getByTestId("save-slot-1").click();
+  await waitForPhase(page, "deployment");
+
+  expect(await state(page)).toMatchObject({ stageId: "stage-24", phase: "deployment" });
+  // Stage 24 has no prebattle story and so no dedicated pre-battle track of
+  // its own; the roster screen must fall silent instead of carrying stage
+  // 23's player-phase battle music straight through the stage boundary.
+  await expect(page.locator("#app")).toHaveAttribute("data-music-track", "none");
+});
+
+test("toggling 確定/取消 in the save-confirm menu reuses its DOM node instead of replaying the pop-in", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-23-victory-ready&difficulty=0&test=1");
+  await waitForPhase(page, "victoryFeedback");
+  await page.getByTestId("victory-continue").click();
+  if ((await state(page)).phase === "victoryFeedback") await page.getByTestId("victory-continue").click();
+  await waitForPhase(page, "savePrompt");
+
+  const menu = page.getByTestId("save-confirm-menu");
+  await expect(page.getByTestId("save-yes")).toHaveClass(/is-selected/);
+  await menu.evaluate((element) => {
+    (element as unknown as { __regressionMarker?: boolean }).__regressionMarker = true;
+  });
+
+  // Clicking a button commits it immediately (`save-yes`/`save-no` call
+  // `showSaveSlots`/`skipSave` straight away); only arrow keys toggle
+  // `savePromptIndex` without committing (see `moveCursor` in
+  // controller.ts), so the toggle has to be driven by keyboard here.
+  // `renderResult` used to rebuild this menu from a template string on every
+  // selection change, replacing the DOM node and replaying
+  // `native-menu-zoom-in` each time the player switched 確定/取消. A reused
+  // node keeps the JS-only marker; a freshly templated one would not.
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("save-no")).toHaveClass(/is-selected/);
+  await expect(page.getByTestId("save-yes")).not.toHaveClass(/is-selected/);
+  expect(await menu.evaluate((element) =>
+    (element as unknown as { __regressionMarker?: boolean }).__regressionMarker)).toBe(true);
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("save-yes")).toHaveClass(/is-selected/);
+  expect(await menu.evaluate((element) =>
+    (element as unknown as { __regressionMarker?: boolean }).__regressionMarker)).toBe(true);
+});
