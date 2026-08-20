@@ -618,6 +618,18 @@ describe("stage runtime manifest", () => {
     expect(stage33.preparation?.presentation.enemies).toHaveLength(29);
     expect(stage33.save.enemyClassById).toHaveLength(29);
     expect(stage33.save.enemyClassById).toContainEqual(["2:55", "demon-dragon-knight"]);
+    expect(stage33.save.namedUnits).toEqual([
+      {
+        match: { kind: "unit", unitId: "2:23", side: 2, slot: 23 },
+        name: "阿莉絲",
+        portrait: 30,
+      },
+      {
+        match: { kind: "unit", unitId: "2:24", side: 2, slot: 24 },
+        name: "瑪西爾",
+        portrait: 31,
+      },
+    ]);
     expect(stage33.assets?.storyBackground).toBeUndefined();
     expect(stage33.assets?.map).toBe("/assets/original/stage33-map.png");
     expect(stage33.retry.mode).toBe("preparation");

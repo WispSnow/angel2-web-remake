@@ -410,6 +410,44 @@ function normalizeStage3OpeningEvents(value: unknown): unknown {
 }
 
 /**
+ * REMAKE-119 restores the two character descriptors that the first stage-33
+ * runtime generator dropped. Existing v91 battle saves already contain the
+ * right unit slots, classes, positions, and combat state, so only their
+ * display identities need repair. The named-leader landing rule is replanned
+ * from public state and stores no pending action.
+ */
+function migrateVersion91Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 91
+    || value.contentVersion !== "named-leader-line-hold-1") return undefined;
+  const battle = value.kind === "battle"
+    && value.stageId === "stage-33"
+    && isRecord(value.battle)
+    && Array.isArray(value.battle.units)
+    ? {
+        ...value.battle,
+        units: value.battle.units.map((unit) => {
+          if (!isRecord(unit) || unit.side !== 2) return unit;
+          if (unit.id === "2:23" && unit.slot === 23) {
+            return { ...unit, name: "阿莉絲", portrait: 30 };
+          }
+          if (unit.id === "2:24" && unit.slot === 24) {
+            return { ...unit, name: "瑪西爾", portrait: 31 };
+          }
+          return unit;
+        }),
+      }
+    : value.battle;
+  const migrated = {
+    ...value,
+    ...(battle === undefined ? {} : { battle }),
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-118 gives a named side-2 leader its move-then-attack back and bounds
  * where it may land instead. Both halves are replanned from public battle
  * state every phase and neither is stored, so a v90 save carries over as it
@@ -2612,6 +2650,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
   const value = normalizeStage3OpeningEvents(raw);
+  const migratedVersion91 = migrateVersion91Save(value);
+  if (migratedVersion91) return migratedVersion91;
   const migratedVersion90 = migrateVersion90Save(value);
   if (migratedVersion90) return migratedVersion90;
   const migratedVersion89 = migrateVersion89Save(value);

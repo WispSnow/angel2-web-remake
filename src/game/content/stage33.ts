@@ -125,7 +125,7 @@ export const STAGE33_SEMANTIC_ENEMY_UNITS = STAGE33_ENEMY_UNITS.map((unit) => {
     slot: unit.slot,
     position: unit.position,
     classId,
-    name: className(classId),
+    name: "name" in unit ? unit.name : className(classId),
     portrait: ("portraitRecord" in unit
       ? unit.portraitRecord
       : classFallbackPortraitFor(classId, 2)) as PortraitRecord,

@@ -54,6 +54,20 @@ describe("stage 33 generated content", () => {
     expect(STAGE33_SEMANTIC_ENEMY_UNITS).toEqual(expect.arrayContaining([
       expect.objectContaining({ slot: 55, classId: "demon-dragon-knight", aiBehavior: 0 }),
       expect.objectContaining({ slot: 39, classId: "great-axe-warrior", aiBehavior: 2 }),
+      expect.objectContaining({
+        slot: 23,
+        classId: "swift-dragon-knight",
+        name: "阿莉絲",
+        portrait: 30,
+        aiBehavior: 0,
+      }),
+      expect.objectContaining({
+        slot: 24,
+        classId: "swift-dragon-knight",
+        name: "瑪西爾",
+        portrait: 31,
+        aiBehavior: 0,
+      }),
       expect.objectContaining({ slot: 47, classId: "evil-mage", aiBehavior: 1 }),
       expect.objectContaining({ slot: 49, classId: "wizard", aiBehavior: 1 }),
       expect.objectContaining({ slot: 54, classId: "magic-master", aiBehavior: 1 }),
@@ -106,7 +120,7 @@ describe("stage 33 generated content", () => {
         narrativeCallsThemReinforcements: false,
       },
       completedRoute: { module: 27, stage: 34, replayPresentation: false },
-      stableRemakeDecisions: ["REMAKE-074"],
+      stableRemakeDecisions: ["REMAKE-074", "REMAKE-119"],
     });
     expect(STAGE33_EVENT_PROGRAM.enemyReinforcements.auditedSources).toEqual([
       "initial-template", "round-event-handler", "dynamic-board-catalog",

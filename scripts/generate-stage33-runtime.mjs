@@ -101,6 +101,11 @@ const actorFor = (slot) => requireEntry(
   (actor) => actor.slot === slot,
   `campaign actor ${slot}`,
 );
+const enemyActorFor = (slot) => requireEntry(
+  campaignRoster.displayResolution.enemyActors,
+  (actor) => actor.slot === slot,
+  `enemy actor ${slot}`,
+);
 const deploymentActors = eligibleSlots.map((slot) => {
   const actor = actorFor(slot);
   return { slot, portraitRecord: actor.portraitRecord, normalizedName: actor.normalizedName };
@@ -197,6 +202,12 @@ const enemyUnits = template.activeUnitInstances
     nativeClassRecord: unit.effectiveClass,
     position: { x: unit.x, y: unit.y },
     aiBehavior: unit.perSlotBehavior,
+    ...([23, 24].includes(unit.unitSlot)
+      ? {
+          name: enemyActorFor(unit.unitSlot).normalizedName,
+          portraitRecord: enemyActorFor(unit.unitSlot).portraitRecord,
+        }
+      : {}),
   }));
 assertEqual(enemyUnits, [
   { slot: 55, nativeClassRecord: 14, position: { x: 18, y: 8 }, aiBehavior: 0 },
@@ -206,8 +217,8 @@ assertEqual(enemyUnits, [
   { slot: 36, nativeClassRecord: 7, position: { x: 28, y: 10 }, aiBehavior: 0 },
   { slot: 38, nativeClassRecord: 7, position: { x: 29, y: 10 }, aiBehavior: 2 },
   { slot: 31, nativeClassRecord: 16, position: { x: 20, y: 12 }, aiBehavior: 2 },
-  { slot: 23, nativeClassRecord: 18, position: { x: 25, y: 12 }, aiBehavior: 0 },
-  { slot: 24, nativeClassRecord: 18, position: { x: 27, y: 12 }, aiBehavior: 0 },
+  { slot: 23, nativeClassRecord: 18, position: { x: 25, y: 12 }, aiBehavior: 0, name: "阿莉絲", portraitRecord: 30 },
+  { slot: 24, nativeClassRecord: 18, position: { x: 27, y: 12 }, aiBehavior: 0, name: "瑪西爾", portraitRecord: 31 },
   { slot: 30, nativeClassRecord: 16, position: { x: 32, y: 12 }, aiBehavior: 2 },
   { slot: 34, nativeClassRecord: 7, position: { x: 22, y: 15 }, aiBehavior: 2 },
   { slot: 35, nativeClassRecord: 7, position: { x: 30, y: 15 }, aiBehavior: 2 },
@@ -291,7 +302,7 @@ const sources = Object.entries(inputPaths).map(([id, file]) => ({
   bytes: inputBuffers[id].length,
 }));
 const identityHash = createHash("sha256");
-identityHash.update("stableRemake\0REMAKE-074\0");
+identityHash.update("stableRemake\0REMAKE-074\0REMAKE-119\0");
 for (const source of sources) identityHash.update(`${source.path}\0${source.sha256}\n`);
 const contentIdentity = `stage-33/evidence-${identityHash.digest("hex")}`;
 const eventProgram = {
@@ -301,7 +312,7 @@ const eventProgram = {
   victoryStoryRecord: null,
   enemyReinforcements,
   completedRoute: { module: 27, stage: 34, replayPresentation: false },
-  stableRemakeDecisions: ["REMAKE-074"],
+  stableRemakeDecisions: ["REMAKE-074", "REMAKE-119"],
 };
 const deployment = {
   kind: "interactive",

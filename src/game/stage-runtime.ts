@@ -4012,6 +4012,18 @@ export const STAGE_RUNTIME_MANIFEST = {
         ["2:43", "magic-armor-warrior"],
         ["2:44", "magic-armor-warrior"],
       ],
+      namedUnits: [
+        {
+          match: { kind: "unit", unitId: "2:23", side: 2, slot: 23 },
+          name: "阿莉絲",
+          portrait: 30,
+        },
+        {
+          match: { kind: "unit", unitId: "2:24", side: 2, slot: 24 },
+          name: "瑪西爾",
+          portrait: 31,
+        },
+      ],
       enemyAi: "none",
     },
     load: loadStage33Module,

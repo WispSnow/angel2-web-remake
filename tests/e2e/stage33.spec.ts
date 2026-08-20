@@ -12,6 +12,7 @@ interface Stage33State {
   round: number;
   activeStoryId?: string;
   campaignRoute?: string;
+  cursor: { x: number; y: number };
   cameraOrigin: { x: number; y: number };
   consumedEventIds: string[];
   units: Array<{
@@ -86,6 +87,12 @@ test("S33-A–E: the stage-32 route enters direct deployment before SAY/0065 and
   expect(opening.units).toEqual(expect.arrayContaining([
     expect.objectContaining({ id: "1:0", name: "妮雅", x: 27, y: 44 }),
     expect.objectContaining({ id: "2:55", classId: "demon-dragon-knight", x: 18, y: 8 }),
+    expect.objectContaining({
+      id: "2:23", classId: "swift-dragon-knight", name: "阿莉絲", portrait: 30, x: 25, y: 12,
+    }),
+    expect.objectContaining({
+      id: "2:24", classId: "swift-dragon-knight", name: "瑪西爾", portrait: 31, x: 27, y: 12,
+    }),
     expect.objectContaining({ id: "2:44", classId: "magic-armor-warrior", x: 32, y: 38 }),
   ]));
   if (process.env.VISUAL_AUDIT === "1") await page.waitForTimeout(1_000);
@@ -119,6 +126,20 @@ test("S33-A–E: the stage-32 route enters direct deployment before SAY/0065 and
     "prayer-guide": 2,
     "magic-master": 2,
     "magic-armor-warrior": 5,
+  });
+  for (let step = 0; step < 32; step += 1) await page.keyboard.press("ArrowUp");
+  expect((await state(page)).cursor).toEqual({ x: 27, y: 12 });
+  await expect(page.locator(".hud-identity-name")).toHaveText("迅龍騎士／瑪西爾");
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "31");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  expect((await state(page)).cursor).toEqual({ x: 25, y: 12 });
+  await expect(page.locator(".hud-identity-name")).toHaveText("迅龍騎士／阿莉絲");
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "30");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage33-named-guards.png`,
   });
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toContainText("打敗所有的敵人");
@@ -181,7 +202,7 @@ test("S33-G: Nia defeat retries directly from deployment", async ({ page }) => {
   });
 });
 
-test("S33-H/I: ordinary victory saves v63 and enters the playable stage-34 deployment", async ({ page }) => {
+test("S33-H/I: ordinary victory uses the current save identity and enters playable stage 34", async ({ page }) => {
   await page.goto("/?debugScenario=stage-33-victory-ready&difficulty=0&test=1");
   await waitForPhase(page, "victoryFeedback");
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();

@@ -3570,11 +3570,19 @@ describe("Web save validation", () => {
 
   it("validates stage 33's ten-unit deployment, 29 static guards, and resume identity", () => {
     const save = stage33BattleSave();
+    const swiftDragonPortrait = classFallbackPortraitFor("swift-dragon-knight", 2);
+    if (swiftDragonPortrait === undefined) throw new Error("missing swift-dragon enemy portrait");
     expect(isSaveData(save)).toBe(true);
     expect(save.battle.units.filter(({ side }) => side === 1)).toHaveLength(10);
     expect(save.battle.units.filter(({ side }) => side === 2)).toHaveLength(29);
     expect(save.battle.units.find(({ id }) => id === "2:55")).toMatchObject({
       classId: "demon-dragon-knight",
+    });
+    expect(save.battle.units.find(({ id }) => id === "2:23")).toMatchObject({
+      classId: "swift-dragon-knight", name: "阿莉絲", portrait: 30,
+    });
+    expect(save.battle.units.find(({ id }) => id === "2:24")).toMatchObject({
+      classId: "swift-dragon-knight", name: "瑪西爾", portrait: 31,
     });
     expect(save.battle.units.filter(
       ({ side, classId }) => side === 2 && classId === "magic-armor-warrior",
@@ -3588,6 +3596,15 @@ describe("Web save validation", () => {
       battle: {
         ...save.battle,
         units: save.battle.units.filter(({ id }) => id !== "1:0"),
+      },
+    })).toBe(false);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:23"
+          ? { ...unit, name: "迅龍騎士", portrait: swiftDragonPortrait }
+          : unit),
       },
     })).toBe(false);
     expect(isSaveData({
@@ -5051,6 +5068,40 @@ describe("Web save validation", () => {
       ...completed,
       version: 90,
       contentVersion: "expert-attack-down-melee-targeting-1",
+    }))).toEqual(completed);
+  });
+
+  it("repairs stage 33's omitted named enemies while migrating version-91 saves", () => {
+    const legacy = stage33BattleSave();
+    const genericPortrait = classFallbackPortraitFor("swift-dragon-knight", 2);
+    if (genericPortrait === undefined) throw new Error("missing swift-dragon enemy portrait");
+    legacy.battle.units = legacy.battle.units.map((unit) => unit.id === "2:23" || unit.id === "2:24"
+      ? { ...unit, name: "迅龍騎士", portrait: genericPortrait }
+      : unit);
+    const migrated = parseSaveData(JSON.stringify({
+      ...legacy,
+      version: 91,
+      contentVersion: "named-leader-line-hold-1",
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-33",
+    });
+    if (!migrated || migrated.kind !== "battle") throw new Error("stage 33 v91 migration failed");
+    expect(migrated.battle.units.find(({ id }) => id === "2:23")).toMatchObject({
+      name: "阿莉絲", portrait: 30,
+    });
+    expect(migrated.battle.units.find(({ id }) => id === "2:24")).toMatchObject({
+      name: "瑪西爾", portrait: 31,
+    });
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 91,
+      contentVersion: "named-leader-line-hold-1",
     }))).toEqual(completed);
   });
 

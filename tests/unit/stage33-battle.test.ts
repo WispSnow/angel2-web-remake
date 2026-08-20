@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { usesClassIdentity } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import {
   STAGE33_DEFINITION,
@@ -54,6 +55,17 @@ describe("stage 33 battle simulation", () => {
     expect(battle.forceForUnit("2:55")).toMatchObject({
       id: "lannal-outskirts-garrison", control: "independent-ai",
     });
+    const alice = battle.unit("2:23");
+    const marciel = battle.unit("2:24");
+    expect(alice).toMatchObject({
+      classId: "swift-dragon-knight", name: "阿莉絲", portrait: 30, x: 25, y: 12,
+    });
+    expect(marciel).toMatchObject({
+      classId: "swift-dragon-knight", name: "瑪西爾", portrait: 31, x: 27, y: 12,
+    });
+    if (!alice || !marciel) throw new Error("missing stage 33 named guards");
+    expect(usesClassIdentity(alice)).toBe(false);
+    expect(usesClassIdentity(marciel)).toBe(false);
     expect(battle.campaignSnapshot().roster[22]).toMatchObject({ classId: "great-axe-warrior" });
     expect(battle.campaignSnapshot().roster[23]).toMatchObject({ classId: "empress" });
     expect(battle.outcome()).toBe("ongoing");
