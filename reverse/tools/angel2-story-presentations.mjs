@@ -35,6 +35,7 @@ const CODE_SIGNATURES = Object.freeze({
     ["0000:023E", 0x023e, 0x0295, "speech-setting gate, VOC request, and completion wait", "bc2f2388764136d67937b64d5cd8917a861de592ff6bb6582429a83979e0f97b"],
     ["0000:BAB8", 0xbab8, 0xbac6, "battle-SAY mode wrapper", "3235bffcd9af721b3fbf6385e6f6f17080745d523ffa69fc180da75d66b108b5"],
     ["0000:BAC6", 0xbac6, 0xbe14, "battle SAY/NUM/CHA load and setup", "c7006a88c472fd8670b90addfe863e776e6dc9ae71e4496799fea40391317da0"],
+    ["0000:BBEC", 0xbbec, 0xbd31, "battle portrait compositor: dither shadow, portrait, A/18 frame, outline columns and name", "1288d46d9ef77f884c0fd3bdecbef871cbcf86662fe6e9bd736feb1bb0541814"],
     ["0000:BE14", 0xbe14, 0xbec3, "battle story interpreter loop", "ab92494eab6e3d5a21bfc9d8712a4a9a166efdb8b693be3f98c76db2e86148f8"],
     ["0000:BEC3", 0xbec3, 0xc082, "battle SAY dispatcher including DL", "b1f6cdce3cc261b3b839baa31d378d0300f475277588c62ddb724d60d287271b"],
     ["0000:C082", 0xc082, 0xc172, "battle portrait hiding and BK background load/draw", "f4cb07f7a4cf365edb5734a46d02effabeb92b1ada54bb0da4ddfd6b0a37283c"],
@@ -63,11 +64,13 @@ const DATA_SIGNATURES = [
   ["DS:0DC0-0DE5", 0x0dc0, 0x0de6, "portrait metadata pointer list C", "a9c6db857dae8c8643e78b5b97b42f376100fb2a889aaa839b80cac152ee3eb7"],
   ["DS:0DE6-0E15", 0x0de6, 0x0e16, "story VGA DAC palette", "ef715fef1e930ed4f07c893215a635a5096de04ac3f82c57b71ec49ca4ee6a6f"],
   ["DS:0E16-0E79", 0x0e16, 0x0e7a, "50-entry stage story-record table", "bf3ee2518715aadba2bae6211a5e9bfbbdadc8bdf89f1e849b0d062703fefe04"],
+  ["DS:02EF-03DC", 0x02ef, 0x03dd, "portrait outline-column descriptor and 112x8 shadow dither pattern", "7f534811bb05387b37f097787dc2255aec1cba0cc1b43c23bc2206d8ee61369d"],
   ["DS:0E82-0ED1", 0x0e82, 0x0ed2, "portrait clear-region descriptors", "6876d99461ce5e97ab5dd3b8a97a5bd397fc1984cc9c89fc91faae1e28e23b94"],
   ["DS:0F88-1037", 0x0f88, 0x1038, "stage-to-MAGIC table and terminator", "22e36c748369975524564b0acbfc3ffc45fa6d1f976b0b945b80e38bbc45b8f4"],
 ];
 
 const MODULE29_DATA_SIGNATURES = [
+  ["DS:837A-8467", 0x837a, 0x8468, "portrait outline-column descriptor and 112x8 shadow dither pattern", "7f534811bb05387b37f097787dc2255aec1cba0cc1b43c23bc2206d8ee61369d"],
   ["DS:1273-131E", 0x1273, 0x131f, "42-entry alternate key-to-dialogue table plus terminator", "5fae677f54a16eb0c280fc843308f9119ccac649d04d87351a45a38f09a0340e"],
   ["DS:30BA-3169", 0x30ba, 0x316a, "43-entry post-battle key-to-dialogue table plus terminator", "f68057ef4b136bccd6521720fc562b5a54ac67bda5e2564e227926430b766fc0"],
 ];
@@ -592,7 +595,76 @@ function voiceAudioEntry(manifest, record) {
   };
 }
 
-function dialoguePortraitFrameContract(renderManifest) {
+/**
+ * The portrait compositor (`0000:0B98` in module 25, `0000:BBEC` in module 29) draws
+ * two colour-0 layers around the A/18 art. Both modules carry a byte-identical
+ * descriptor block: an outline-column descriptor `{x, y, width, height, colourIndex}`
+ * whose x/y the caller rewrites per column, followed by a `{bytesPerRow, rows}` header
+ * and the 1bpp mask that `0000:248E`/`0000:E84C` clocks into the VGA bit-mask register.
+ */
+function portraitCompositorLayers(module25, module29) {
+  const blocks = [
+    { module: 25, outlineAddress: "DS:02EF", shadowAddress: "DS:02F9", bytes: dataSlice(module25, 0x02ef, 0x03dd) },
+    {
+      module: 29,
+      outlineAddress: "DS:837A",
+      shadowAddress: "DS:8384",
+      bytes: module29.subarray(MODULE29_DATA_BASE + 0x837a, MODULE29_DATA_BASE + 0x8468),
+    },
+  ];
+  const [primary, secondary] = blocks;
+  assert.equal(
+    sha256(primary.bytes),
+    sha256(secondary.bytes),
+    "the two interpreters no longer share one outline/shadow descriptor block",
+  );
+  const block = primary.bytes;
+  // `+0`/`+2` are the per-call x/y the compositor writes before each 0000:16B2 fill.
+  const outlineSize = [block.readUInt16LE(4), block.readUInt16LE(6)];
+  const outlineColourIndex = block[8];
+  assert.deepEqual(outlineSize, [1, 147], "outline column geometry changed");
+  assert.equal(outlineColourIndex, 0, "outline columns are no longer drawn in colour 0");
+  const bytesPerRow = block.readUInt16LE(10);
+  const rows = block.readUInt16LE(12);
+  assert.deepEqual([bytesPerRow, rows], [14, 8], "shadow tile geometry changed");
+  // Even rows keep the even pixel of every byte, odd rows the odd pixel, so the
+  // dither is phase-locked to screen coordinates rather than to the tile.
+  const rowMasks = Array.from({ length: rows }, (_, row) => {
+    const start = 14 + row * bytesPerRow;
+    const slice = block.subarray(start, start + bytesPerRow);
+    const value = slice[0];
+    assert(slice.every((byte) => byte === value), `shadow pattern row ${row} is not a single repeated byte`);
+    return value;
+  });
+  assert.deepEqual(
+    rowMasks,
+    Array.from({ length: rows }, (_, row) => (row % 2 === 0 ? 0xaa : 0x55)),
+    "shadow pattern is no longer a 50% checkerboard",
+  );
+  return {
+    shadow: {
+      descriptorAddress: Object.fromEntries(blocks.map((entry) => [`module${entry.module}`, entry.shadowAddress])),
+      tile: { bytesPerRow, rows, size: [bytesPerRow * 8, rows] },
+      rowMaskBytes: rowMasks.map((value) => `0x${value.toString(16).toUpperCase()}`),
+      colourIndex: 0,
+      repeatCount: 18,
+      verticalStep: rows,
+      drawOffset: [8, 0],
+      size: [bytesPerRow * 8, rows * 18],
+      ditherRule: "colour 0 lands on every pixel whose screen x + y is even",
+      blockSha256: sha256(block),
+    },
+    outlineColumns: {
+      descriptorAddress: Object.fromEntries(blocks.map((entry) => [`module${entry.module}`, entry.outlineAddress])),
+      size: outlineSize,
+      colourIndex: outlineColourIndex,
+      drawOffsets: [[-1, -15], [5, -15], [106, -15], [112, -15]],
+      coveredByFrameArt: "the 112px top ornament and nameplate are drawn after the columns, so x+5 and x+106 only survive on row y+131",
+    },
+  };
+}
+
+function dialoguePortraitFrameContract(renderManifest, module25, module29) {
   const expectedAssets = [
     {
       imageIndex: 0, width: 112, height: 17, maskUsed: false,
@@ -638,15 +710,26 @@ function dialoguePortraitFrameContract(renderManifest) {
       sha256: entry.sha256,
     };
   };
+  const layers = portraitCompositorLayers(module25, module29);
   return {
     resource: "A/18",
     portraitSize: [112, 112],
-    compositedBoundsRelativeToPortrait: {
+    frameArtBoundsRelativeToPortrait: {
       left: 0,
       top: -15,
       rightExclusive: 115,
       bottomExclusive: 131,
     },
+    // The compositor also paints an outline column at x-1 and a 112x144 dither
+    // shadow that reaches x+119/y+143, so the drawn composite is wider and taller
+    // than the A/18 art alone.
+    compositedBoundsRelativeToPortrait: {
+      left: -1,
+      top: -15,
+      rightExclusive: 120,
+      bottomExclusive: 144,
+    },
+    ...layers,
     top: { ...asset(0), drawOffset: [0, -15] },
     nameplate: { ...asset(1), drawOffset: [0, 108] },
     side: {
@@ -742,7 +825,7 @@ async function extract(module25Path, module29Path, stageEventsPath, audioManifes
   const globalReachabilityAudit = auditGlobalDialogueReachability(module29, corpus, dialogues);
   assert.equal(renderManifest.renderedImages, 97);
   assert.equal(renderManifest.contactSheets.length, 4);
-  const dialoguePortraitFrame = dialoguePortraitFrameContract(renderManifest);
+  const dialoguePortraitFrame = dialoguePortraitFrameContract(renderManifest, module25, module29);
   const dialogueTextWindow = dialogueTextWindowContract(renderManifest);
   const paletteBytes = dataSlice(module25, 0x0de6, 0x0e16);
   const selectedMagic = stageEvents.module25CampaignStory.stageMagicRecords.entries.filter((entry) => entry.selected);

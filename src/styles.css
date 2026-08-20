@@ -1262,23 +1262,64 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   height: 112px;
   overflow: visible;
 }
+/* 原生肖像合成體（模組 25 `0000:0B98`、模組 29 `0000:BBEC`）的第一步就是投影：以
+   DS:`02F9`／DS:`8384` 的 `{14 byte, 8 row}` 描述子帶著 112×8 的 `AA/55` 位遮罩，用
+   色 0 連畫 18 次，得到 `(x+8, y)` 起 112×144 的 50% 網點黑塊；主圖、頂飾與姓名牌
+   隨後蓋掉大半，只在右側 7 px 與下方 13 px 露出，和文字窗那圈已烘進 A/18 圖形的
+   網點投影是同一種表現。
+
+   網點相位跟著螢幕座標走：`AA` 在偶數列塗偶數 X、`55` 在奇數列塗奇數 X，也就是
+   `(X+Y)` 為偶數才塗黑。兩個肖像錨點 `(32,26)`／`(504,200)` 與關前版面的
+   `(8,18)`／`(512,210)` 加上 `+8` 位移後和都是偶數，所以本層左上角一律是黑點，
+   位置可以寫死。 */
+.dialogue-portrait-underlay { display: none; }
+.dialogue-portrait > .dialogue-portrait-underlay,
+.feedback-portrait > .dialogue-portrait-underlay {
+  position: absolute;
+  /* 與 `.portrait-base` 同層，但排在它前面，所以主圖照原生把投影蓋住。 */
+  z-index: 0;
+  display: block;
+  left: 8px;
+  top: 0;
+  width: 112px;
+  height: 144px;
+  background-image: conic-gradient(#0000 0 25%, #000 0 50%, #0000 0 75%, #000 0);
+  background-size: 2px 2px;
+  pointer-events: none;
+}
 /* Native A/18 frames 0..2: top at y-15, nameplate at y+108, and the
-   8x8 masked side motif repeated 15 times at x and x+107. */
+   8x8 masked side motif repeated 15 times at x and x+107.
+
+   合成體另外用 `0000:0C2B`／`0000:BC85` 起的四次 1×147 色 0 填充，在 x-1、x+5、
+   x+106、x+112 各畫一道黑邊；它們畫在側飾之後、頂飾與姓名牌之前，所以 x+5 與
+   x+106 只在姓名牌下緣那一列 `y+131` 露出，x-1 與 x+112 則是整條可見的框外黑邊。
+   因為只有頂飾／姓名牌需要壓在上面，四道線和它們併在同一個偽元素裡，靠圖層順序
+   保持原生的先後關係。
+
+   合成體的貼圖順序是側飾 → 黑邊 → 頂飾 → 姓名牌，所以本層必須壓在側飾之上：
+   `112` 寬的頂飾覆蓋 `y+0..y+1`、姓名牌覆蓋 `y+108..y+119`，那兩段側飾在原版是看
+   不到的。反過來疊會讓框角多出側飾的棕色缺口。 */
 .dialogue-portrait::before,
 .feedback-portrait::before {
   content: "";
   position: absolute;
-  z-index: 2;
-  left: 0;
+  z-index: 3;
+  left: -1px;
   top: -15px;
-  width: 112px;
-  height: 146px;
+  width: 114px;
+  height: 147px;
   border: 0;
   background-image:
     var(--dialogue-portrait-frame-top),
-    var(--dialogue-portrait-frame-nameplate);
-  background-position: 0 0, 0 123px;
-  background-size: 112px 17px, 112px 23px;
+    var(--dialogue-portrait-frame-nameplate),
+    linear-gradient(#000, #000),
+    linear-gradient(#000, #000),
+    linear-gradient(#000, #000),
+    linear-gradient(#000, #000);
+  background-position: 1px 0, 1px 123px, 0 0, 6px 0, 107px 0, 113px 0;
+  background-size:
+    112px 17px, 112px 23px,
+    1px 147px, 1px 147px, 1px 147px, 1px 147px;
   background-repeat: no-repeat;
   image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
@@ -1287,7 +1328,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .feedback-portrait::after {
   content: "";
   position: absolute;
-  z-index: 3;
+  /* 側飾先貼，頂飾／姓名牌後貼；眨眼與口型覆蓋幀最遠只到 x=16..103，不會被側飾吃掉。 */
+  z-index: 2;
   left: 0;
   top: 0;
   width: 115px;

@@ -55,10 +55,18 @@ export function nativeMouthFrameAfterGlyph(
   return normalizedFrame === "1" ? "2" : "1";
 }
 
+/**
+ * 原生肖像合成體（模組 25 `0000:0B98`、模組 29 `0000:BBEC`）在貼主圖之前先畫一塊
+ * `(x+8, y)` 起 112×144 的 50% 網點黑影，主圖、頂飾與姓名牌隨後蓋住大半，只在右側
+ * 與下方露出。該層必須壓在主圖之下，所以放進肖像元素的第一個子節點；只有掛上 A/18
+ * 邊框的對話／反饋肖像會在樣式表裡把它顯示出來。
+ */
+const PORTRAIT_UNDERLAY = '<i class="dialogue-portrait-underlay" aria-hidden="true"></i>';
+
 function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string): string {
   const portraitSource = portraitSourceFor(portrait);
   const animation = PORTRAIT_CATALOG[portrait].animation;
-  const base = `<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${portraitSource}" alt="${alt}" />`;
+  const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${portraitSource}" alt="${alt}" />`;
   if (!animation) return base;
   const eyeStyle = [
     `left:${percentage(animation.eyeOrigin.x)}`,

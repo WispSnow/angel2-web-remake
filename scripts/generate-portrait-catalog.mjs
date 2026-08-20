@@ -63,6 +63,25 @@ assert.deepEqual(dialogueFrameContract.side.rightOrigin, [107, 0]);
 assert.equal(dialogueFrameContract.side.repeatCount, 15);
 assert.equal(dialogueFrameContract.side.verticalStep, 8);
 assert.deepEqual(dialogueFrameContract.displayNameOrigin, [24, 111]);
+// `src/styles.css` 的 `.dialogue-portrait-underlay` 與 `.dialogue-portrait::before`
+// 直接複刻這兩層：`(x+8, y)` 起 112×144 的 50% 網點投影，以及 x-1／x+5／x+106／x+112
+// 四道 1×147 黑邊。任一項漂移都必須先重新審計原生合成體再改樣式。
+assert.deepEqual(dialogueFrameContract.shadow.drawOffset, [8, 0]);
+assert.deepEqual(dialogueFrameContract.shadow.size, [112, 144]);
+assert.equal(dialogueFrameContract.shadow.colourIndex, 0);
+assert.equal(
+  dialogueFrameContract.shadow.ditherRule,
+  "colour 0 lands on every pixel whose screen x + y is even",
+);
+assert.deepEqual(dialogueFrameContract.outlineColumns.size, [1, 147]);
+assert.equal(dialogueFrameContract.outlineColumns.colourIndex, 0);
+assert.deepEqual(
+  dialogueFrameContract.outlineColumns.drawOffsets,
+  [[-1, -15], [5, -15], [106, -15], [112, -15]],
+);
+assert.deepEqual(dialogueFrameContract.compositedBoundsRelativeToPortrait, {
+  left: -1, top: -15, rightExclusive: 120, bottomExclusive: 144,
+});
 const dialogueFrameSources = {
   top: dialogueFrameContract.top,
   nameplate: dialogueFrameContract.nameplate,
