@@ -1,5 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// `reuseExistingServer` 会接管 4173 上任何一个已在跑的开发服务器。在 worktree 里
+// 跑验收时，那通常是主工作区的服务器，测试就会静默地验到另一份代码。设定
+// `ANGEL2_E2E_PORT` 可以让这次运行拥有自己的端口和服务器；不设时行为不变。
+const port = Number(process.env.ANGEL2_E2E_PORT ?? 4173);
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
@@ -14,14 +20,14 @@ export default defineConfig({
   timeout: 60_000,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
   webServer: {
-    command: "pnpm dev",
-    url: "http://127.0.0.1:4173",
+    command: `pnpm exec vite --host 127.0.0.1 --port ${port} --strictPort`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
   },
   projects: [

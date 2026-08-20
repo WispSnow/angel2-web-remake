@@ -2392,6 +2392,66 @@ test("RHP-07: all twelve desk objects are discoverable, accessible and coordinat
   await expect.poll(async () => (await debugState(page)).phase).not.toBe("player");
 });
 
+test("RHP-08: the battle text layer draws the original bitmap font at native coordinates", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+
+  const screen = page.getByTestId("game-screen");
+  await expect(screen).toHaveAttribute("data-hud-mode", "unit");
+  const layer = page.locator(".native-text-layer");
+  await expect(layer).toHaveJSProperty("width", 640);
+  await expect(layer).toHaveJSProperty("height", 350);
+
+  /** First and last column inside `[left, right)` that any ink or outline touches. */
+  const inkColumns = async (left: number, right: number, top: number, height: number) =>
+    layer.evaluate((canvas, box) => {
+      const width = box.right - box.left;
+      const { data } = (canvas as HTMLCanvasElement).getContext("2d")!
+        .getImageData(box.left, box.top, width, box.height);
+      const columns: number[] = [];
+      for (let x = 0; x < width; x += 1) {
+        for (let y = 0; y < box.height; y += 1) {
+          if (data[(y * width + x) * 4 + 3] !== 0) { columns.push(box.left + x); break; }
+        }
+      }
+      return { first: columns[0], last: columns.at(-1) };
+    }, { left, right, top, height });
+
+  // 圖集是非同步解碼的，第一批像素落下之前先等一次。
+  await expect.poll(async () => (await inkColumns(470, 640, 124, 17)).first).not.toBeUndefined();
+
+  // 身分列：職業靠右填進八位元組欄（0000:EFFE），所以「士兵」從 x=516 起、末格貼著
+  // x=552 的全形斜線；名字靠左（0000:F051）從 x=564 起。
+  expect(await inkColumns(470, 640, 124, 17)).toEqual({ first: 516, last: 596 });
+
+  // 五行數值是一整條原生字串：標籤永遠從 x=488 起，五字元數值欄用空白補前導零，
+  // 因此整行停在面板內緣之前，而不是把數值齊右靠到 x=637。
+  for (const top of [154, 175, 196, 217, 238]) {
+    const row = await inkColumns(470, 640, top, 17);
+    // 外框畫在 x 與 x+2，而「等」的最左一欄是空的，所以起點是 488 或 489。
+    expect(row.first, `row at y=${top}`).toBeGreaterThanOrEqual(488);
+    expect(row.first, `row at y=${top}`).toBeLessThanOrEqual(489);
+    expect(row.last, `row at y=${top}`).toBeLessThan(630);
+  }
+
+  // 回合框只有 DS:600B 一條樣板，起點固定在 x=516。
+  expect((await inkColumns(470, 640, 327, 18)).first).toBe(516);
+  // 關卡名跑的是 SAY/119 自己的定位字元：游標 120 加一個 72 像素的 tab，五格全形字。
+  expect(await inkColumns(0, 470, 333, 18)).toEqual({ first: 192, last: 272 });
+
+  // DOM 仍是無障礙名稱、實況區與驗收讀取的來源，只是字形透明。
+  await expect(page.locator(".hud-identity-name")).toHaveText("士兵／妮雅");
+  await expect(page.locator("#bottom-round-text")).toHaveText("第 1 回合");
+  await expect(page.locator(".bottom-location")).toHaveText("瓦爾克麗宮");
+  expect(await page.locator(".hud-identity-name").evaluate((element) =>
+    getComputedStyle(element).color)).toBe("rgba(0, 0, 0, 0)");
+
+  await captureVisualAudit(screen, { path: "artifacts/playwright/stage0-native-battle-text.png" });
+});
+
 test("S00-I: native range dither and ordinary attack target-count branches", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await skipStoryDialogue(page);

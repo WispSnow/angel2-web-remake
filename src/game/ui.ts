@@ -38,6 +38,11 @@ import {
 } from "./dialogue-window-animation";
 import { finishMenuClose, setMenuOpen } from "./menu-animation";
 import {
+  createNativeTextLayer,
+  type NativeUnitDetailText,
+} from "./native-hud-text";
+import { NATIVE_CONCEALED_FIELD, nativeNumericField } from "./native-text";
+import {
   createMenuPointerGlide,
   NATIVE_GLIDE_FRAME_MS,
   NATIVE_MENU_POINTER_OFFSET,
@@ -239,6 +244,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     </div>`;
 
   const screen = required(root, "#logical-screen");
+  // Appended last so it stacks over the panel chrome at the same z-index while
+  // every overlay above z-index 7 still covers it.
+  const nativeText = createNativeTextLayer();
+  screen.append(nativeText.element);
   const hud = required(root, "#unit-hud");
   const round = required(root, "#bottom-round-text");
   const actionMenu = required(root, "#action-menu");
@@ -1127,6 +1136,16 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           ? renderTerrainInspection(terrain)
           : ""
     }`;
+    // 開場劇情把整條右欄和底部收起來，所以文字層跟著同一個條件清空。
+    const battleChromeVisible = controller.phase !== "prebattleStory";
+    nativeText.render({
+      unitDetail: focus && battleChromeVisible
+        ? nativeUnitDetailText(controller, focus.unit, focus.stats)
+        : undefined,
+      round: battleChromeVisible ? controller.battle.displayRound : undefined,
+      roundLimitWarning: controller.battle.roundLimitWarningActive,
+      stageLabel: battleChromeVisible ? stage.name : undefined,
+    });
 
     const page = controller.currentDialogue;
     // Native CU/CD collapse the A/18 panel over 12 steps before the script ends,
@@ -1346,6 +1365,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     unsubscribe();
     stopScaling();
     stopGamepad();
+    nativeText.dispose();
     stopPortraitAnimations();
     stopDialogueTimer();
     stopFeedbackTimer();
@@ -1783,6 +1803,35 @@ function skillCastHint(
   return `<span class="skill-cast-hint" data-testid="${testId}"${describedBy}>${items
     .map((item) => `<span>${item}</span>`)
     .join('<i class="selected-unit-separator" aria-hidden="true">・</i>')}</span>`;
+}
+
+/**
+ * The same snapshot `renderHud` puts in the DOM, formatted the way module 29
+ * formats it before drawing: every number is a five-character field whose
+ * leading zeroes became spaces, and the identity halves are padded into the two
+ * eight-byte buffers rather than centred.
+ */
+function nativeUnitDetailText(
+  controller: GameController,
+  unit: BattleUnit,
+  stats: UnitStats,
+): NativeUnitDetailText {
+  const baseStats = controller.battle.statsFor(unit);
+  const concealed = controller.battle.stage.id === "stage-37" && unit.side === 2;
+  const field = (value: number) => concealed ? NATIVE_CONCEALED_FIELD : nativeNumericField(value);
+  return {
+    occupation: unit.className,
+    name: unitDisplayName(unit),
+    statFields: {
+      life: [field(unit.life), field(stats.maxLife)],
+      attack: [field(stats.attack), field(baseStats.attack)],
+      defense: [field(stats.defense), field(baseStats.defense)],
+      levelGrowthRow: [field(stats.level)],
+      experience: [field(unit.experience), field(nextExperienceThresholdFor(unit))],
+    },
+    statusCounters: activeUnitStatusPresentations(unit.statuses)
+      .map(({ remainingRounds }) => remainingRounds),
+  };
 }
 
 function renderHud(

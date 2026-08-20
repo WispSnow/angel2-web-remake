@@ -206,6 +206,11 @@ pnpm exec playwright install ffmpeg
 - 浏览器运行时不得读取 `ref/`、`reverse/decoded/`、`reverse/extracted/` 或其他工作目录。
 - 运行时所需内容必须经脚本固化到 `src/game/content/` 或 `public/assets/original/`。
 - `src/game/content/stage0-runtime.generated.ts` 是生成文件；修改来源或生成脚本后运行 `pnpm content:stage0`，不要手工编辑生成结果。
+- `src/game/content/native-font.generated.ts` 与 `public/assets/original/native-font.png` 由
+  `scripts/generate-native-font.mjs` 生成，来源是 `reverse/parsed/native/battle-text.json`、
+  同目录的 `battle-text-font.json` 与 `reverse/dumps/bios-font-8x8.bin`；修改证据后运行
+  `pnpm content:font`。右栏、回合框与关卡名的文字全部由这套原版点阵字绘制，不要改回宿主
+  CJK 字体，也不要手抄字符表。
 - `src/game/content/portrait-catalog.generated.ts` 与 `public/assets/original/portraits/` 由
   `scripts/generate-portrait-catalog.mjs` 生成；修改肖像来源或布局证据后运行
   `pnpm content:portraits`，不要手工登记角色动画。`D/63` 无原版覆盖帧/布局，`D/67`
