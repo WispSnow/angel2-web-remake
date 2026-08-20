@@ -23,6 +23,11 @@ import { classStatsFor } from "./content/stage0";
 import { className } from "./content/classes";
 import { configureGameScaling } from "./scaling";
 import {
+  isKeyboardCancel,
+  isKeyboardConfirm,
+  keyboardDirection,
+} from "./input-bindings";
+import {
   mountSaveBackupUi,
   SAVE_BACKUP_CONFIRM_MARKUP,
   SAVE_BACKUP_TOOLS_MARKUP,
@@ -653,46 +658,44 @@ export function mountStartup(
     resumeBlockedTitleMusic();
     if (screen.dataset.startupPhase === "title-assemble") return;
     if (saveBackupUi.handleKeyDown(event)) return;
+    const direction = keyboardDirection(event.key);
     if (phase === "title") {
-      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      if (direction?.y) {
         event.preventDefault();
         titleIndex = titleIndex === 0 ? 1 : 0;
         titleStatus.textContent = "";
         updateMenuSelection();
-      } else if (event.key === "Enter" || event.key === " ") {
+      } else if (isKeyboardConfirm(event.key)) {
         event.preventDefault();
         activateTitleOption();
       }
       return;
     }
     if (phase === "records") {
-      if (event.key === "Escape") {
+      if (isKeyboardCancel(event.key)) {
         event.preventDefault();
         cancelInput();
-      } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      } else if (direction?.y) {
         event.preventDefault();
-        const delta = event.key === "ArrowUp" ? -1 : 1;
-        setRecordIndex(moveSaveSlotIndex(recordIndex, delta));
-      } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        setRecordIndex(moveSaveSlotIndex(recordIndex, direction.y));
+      } else if (direction?.x) {
         event.preventDefault();
-        const delta = event.key === "ArrowLeft" ? -1 : 1;
-        setRecordIndex(moveSaveSlotPage(recordIndex, delta));
-      } else if (event.key === "Enter" || event.key === " ") {
+        setRecordIndex(moveSaveSlotPage(recordIndex, direction.x));
+      } else if (isKeyboardConfirm(event.key)) {
         event.preventDefault();
         activateRecordOption();
       }
       return;
     }
-    if (event.key === "Escape") {
+    if (isKeyboardCancel(event.key)) {
       event.preventDefault();
       cancelInput();
-    } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+    } else if (direction?.y) {
       event.preventDefault();
-      const delta = event.key === "ArrowUp" ? -1 : 1;
-      difficultyIndex = (difficultyIndex + delta + DIFFICULTY_OPTIONS.length) % DIFFICULTY_OPTIONS.length;
+      difficultyIndex = (difficultyIndex + direction.y + DIFFICULTY_OPTIONS.length) % DIFFICULTY_OPTIONS.length;
       difficultyHintByKeyboard = true;
       updateMenuSelection();
-    } else if (event.key === "Enter" || event.key === " ") {
+    } else if (isKeyboardConfirm(event.key)) {
       event.preventDefault();
       finishStartup();
     }

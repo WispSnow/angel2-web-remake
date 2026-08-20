@@ -90,7 +90,7 @@ test("deployment projection keeps native roster topology, semantic focus and fee
 
   await ui.press("Tab");
   expect((await deploymentState(page))?.focus).toEqual({ kind: "map" });
-  await ui.press("Enter");
+  await ui.press("Escape");
   await expect(page.getByTestId("deployment-canvas"))
     .toHaveAttribute("data-deployment-current-cell", "25,33");
   await ui.press("Space");

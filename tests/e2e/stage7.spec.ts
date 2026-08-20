@@ -193,7 +193,7 @@ test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v25, and enters
     await page.getByTestId("deployment-finish").click();
   }
   await waitForPhase(page, "player");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-retreat").click();
   await page.locator("[data-action=retreat-confirm]").click();
   await page.locator("[data-action=retreat-confirm]").click();

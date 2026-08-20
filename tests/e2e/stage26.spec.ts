@@ -127,7 +127,7 @@ test("S26-F: enemy phase runs two complete presentations before committing each 
   await waitForPhase(page, "player");
   expect((await state(page)).units.find(({ id }) => id === "1:0")).toMatchObject({ x: 22, y: 20 });
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();

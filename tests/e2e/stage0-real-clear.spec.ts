@@ -68,7 +68,7 @@ test("S00-O: a normal build clears stage zero and reaches stage one through play
       await captureVisualAudit(page.getByTestId("game-screen"), {
         path: `${ARTIFACT_DIR}/stage0-real-follow-leader-hotspot-menu.png`,
       });
-      await page.keyboard.press("Tab");
+      await page.keyboard.press("g");
       await expect(page.getByTestId("group-command-menu")).toBeHidden();
       await page.getByTestId("all-rest-hotspot").click();
     } else {

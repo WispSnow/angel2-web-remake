@@ -928,7 +928,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
 
   // S00-B: the native all-rest group command replaces a side-effect-free
   // generic end turn, then behavior 12 moves every enemy.
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   expect((await debugState(page))).toMatchObject({
     groupCommandOpen: true,
@@ -945,7 +945,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("group-command-menu")).toHaveCSS("width", "144px");
   await expect(page.getByTestId("group-command-menu")).toHaveCSS("height", "124px");
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-group-command-menu.png" });
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeHidden();
   const beforeAllRest = await debugState(page);
   await page.getByTestId("all-rest-hotspot").click();
@@ -1004,9 +1004,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await page.getByTestId("unit-command-move").click();
   expect((await debugState(page)).actionMode).toBe("move");
   expect((await debugState(page)).reachable.length).toBeGreaterThan(1);
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   expect((await debugState(page)).actionMode).toBe("actionMenu");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await clickCanvas(page, 180, 133);
   expect((await debugState(page)).actionMode).toBe("actionMenu");
   await page.getByTestId("unit-command-move").click();
@@ -1140,10 +1140,10 @@ test("REMAKE-015: clicking empty terrain shows class-specific traits in the side
   await page.keyboard.press(" ");
   await expect(page.getByTestId("terrain-detail")).toBeVisible();
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("terrain-detail")).toBeHidden();
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.keyboard.press(" ");
   await expect(page.getByTestId("terrain-detail")).toBeVisible();
 
@@ -1176,26 +1176,26 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
 
   await page.keyboard.press("o");
   await expect(page.getByTestId("objective-panel")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("objective-panel")).toBeHidden();
 
   const inputBaseline = await debugState(page);
   await page.keyboard.press("w");
-  await page.keyboard.press("z");
-  await page.keyboard.press("a");
+  await page.keyboard.press("d");
   await page.keyboard.press("s");
+  await page.keyboard.press("a");
   await page.keyboard.press("Home");
   await page.keyboard.press("PageDown");
   expect((await debugState(page)).cursor).toEqual(inputBaseline.cursor);
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeHidden();
 
   await page.keyboard.press("F4");
   await expect(page.getByTestId("retreat-confirm")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("retreat-confirm")).toBeHidden();
 
   await page.keyboard.press("e");
@@ -1207,12 +1207,12 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
     combatSoundEnabled: inputBaseline.combatSoundEnabled,
     keySoundEnabled: inputBaseline.keySoundEnabled,
   });
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("sound-settings-menu")).toBeHidden();
   await page.keyboard.press("m");
   await expect(page.getByTestId("music-settings-menu")).toBeVisible();
   expect((await debugState(page)).musicVolume).toBe(inputBaseline.musicVolume);
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("music-settings-menu")).toBeHidden();
 
   await page.keyboard.press(" ");
@@ -1252,10 +1252,9 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   expect(afterRightCycle.units).toEqual(beforeRightCycle.units);
   expect(afterRightCycle.rngState).toBe(beforeRightCycle.rngState);
 
-  // Only Esc opens the battle system menu. The keyboard secondary action does
-  // not reuse that shortcut; mouse right-click cycles allies only after the
-  // currently open action layer has consumed its own cancel.
-  await page.keyboard.press("Enter");
+  // Backspace performs the contextual cancel without opening the system menu;
+  // once the action layer is gone, Esc opens the battle system menu.
+  await page.keyboard.press("Backspace");
   await expect(page.getByTestId("system-menu")).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("system-menu")).toBeVisible();
@@ -1309,7 +1308,7 @@ test("turn handoff replays the native A/19 runners, hops, shadow and A/26 edge d
   await skipStoryDialogue(page);
   await waitForPhase(page, "player");
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   await finishGroupCommandDialogue(page);
@@ -1433,7 +1432,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
     retreatConfirmOpen: false,
   });
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-retreat").click();
   await page.locator("[data-action=retreat-confirm]").click();
   await page.locator("[data-action=retreat-confirm]").click();
@@ -1446,7 +1445,7 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
 
   await skipStoryDialogue(page);
   await waitForPhase(page, "player");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.keyboard.press("F3");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:8716");
   await expect(page.getByTestId("dialogue-window-upper")).toContainText(
@@ -1495,7 +1494,7 @@ test("REMAKE-014: side-1 autonomous techniques use the upper native dialogue win
   await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("sister"));
   const before = await debugState(page);
   const allyBefore = before.units.find(({ id }) => id === "1:1")!;
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.keyboard.press("F3");
   await finishGroupCommandDialogue(page);
   await page.waitForFunction(() =>
@@ -1627,7 +1626,7 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
   await expect(page.getByTestId("hud-identity").locator("span")).toHaveCount(0);
   await captureVisualAudit(screen, { path: "artifacts/playwright/stage0-selected-unit-context-strip.png" });
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("action-menu")).toBeHidden();
 
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
@@ -2431,7 +2430,7 @@ test("RHP-07: all twelve desk objects are discoverable, accessible and coordinat
   await expect(tooltip).toHaveText("讀取記錄");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("record-menu")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("record-menu")).toBeHidden();
 
   const logicalClick = async (x: number, y: number) => {
@@ -2456,17 +2455,17 @@ test("RHP-07: all twelve desk objects are discoverable, accessible and coordinat
   const baseline = await debugState(page);
   await clickHotspot("save");
   await expect(page.getByTestId("record-menu")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await clickHotspot("load");
   await expect(page.getByTestId("record-menu")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
 
   await clickHotspot("grid");
   expect((await debugState(page)).gridEnabled).toBe(true);
   await clickHotspot("grid");
   await clickHotspot("sound");
   await expect(page.getByTestId("sound-settings-menu")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await clickHotspot("edgeScroll");
   expect((await debugState(page)).edgeScrollEnabled).toBe(false);
   await clickHotspot("edgeScroll");
@@ -2478,16 +2477,16 @@ test("RHP-07: all twelve desk objects are discoverable, accessible and coordinat
   await clickHotspot("battleAnimation");
   await clickHotspot("music");
   await expect(page.getByTestId("music-settings-menu")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await clickHotspot("groupCommands");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await clickHotspot("objectives");
   await expect(page.getByTestId("objective-panel")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await clickHotspot("systemMenu");
   await expect(page.getByTestId("system-menu")).toBeVisible();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
 
   const afterNonRuleActions = await debugState(page);
   expect(afterNonRuleActions.units).toEqual(baseline.units);
@@ -2582,7 +2581,7 @@ test("S00-I: native range dither and ordinary attack target-count branches", asy
   await expect(emptyReachLine).toBeHidden({ timeout: 15_000 });
   expect((await debugState(page))).toMatchObject({ actionMode: "actionMenu", targets: [] });
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-native-dither-cell-count", "0");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
 
   // Two legal targets enter manual target selection. Only those two cells
   // remain bright; every other visible cell uses the exact 1/4 dither mask.
@@ -3449,10 +3448,10 @@ test("S00-P: stage zero uses native entry-to-loop music pairs and preserves them
   await page.getByTestId("music-volume-4").click();
   await expect(app).toHaveAttribute("data-music-volume", "0.32");
   await expect(app).toHaveAttribute("data-music-play-request-count", loopPlayRequests ?? "");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("music-settings-menu")).toBeHidden();
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-allRest").click();
   await waitForPhase(page, "enemy");
   await expect(app).toHaveAttribute("data-music-track", "MUSIC/5");

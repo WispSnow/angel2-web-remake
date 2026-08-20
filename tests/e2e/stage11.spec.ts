@@ -143,7 +143,7 @@ test("S11-H: every player-to-enemy transition adds one immediately active lower-
     }, 5);
     Object.assign(window, { __stage11ReinforcementTrace: trace, __stage11TraceInterval: interval });
   });
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-allRest").click();
   await page.getByTestId("dialogue-layer").click();
   await page.waitForFunction(() => {

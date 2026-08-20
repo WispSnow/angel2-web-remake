@@ -172,7 +172,7 @@ test("free action gives an allied magician the shared expert technique planner",
   expect(placed).toEqual([true, true, true, true]);
   await page.getByTestId("arena-start").click();
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-freeAction").click();
   const dialogue = page.getByTestId("dialogue-layer");

@@ -113,7 +113,7 @@ test("S02-C/D: all-rest spends only manual units, then every automatic ally acts
     Object.assign(window, { __stage2Trace: trace, __stage2TraceInterval: interval });
   });
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
@@ -173,7 +173,7 @@ test("S02-K: the native `N` badge marks unspent automatic allies and yields to `
     Object.assign(window, { __stage2BadgeTrace: trace, __stage2BadgeInterval: interval });
   });
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
@@ -319,7 +319,7 @@ test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign"
   };
 
   await loadMutatedBattle();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-retreat").click();
   await page.locator("[data-action=retreat-confirm]").click();
   await page.locator("[data-action=retreat-confirm]").click();

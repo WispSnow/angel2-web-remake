@@ -28,7 +28,7 @@ import {
   FULL_COMBAT_FRAME_META,
   type FullCombatSpriteState,
 } from "./full-combat";
-import type { BattleUnit, DialoguePage, Position, UnitClassId, UnitStats } from "./types";
+import type { BattleUnit, DialoguePage, UnitClassId, UnitStats } from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
@@ -38,6 +38,11 @@ import {
   setDialogueWindowOpen,
 } from "./dialogue-window-animation";
 import { finishMenuClose, setMenuOpen } from "./menu-animation";
+import {
+  isKeyboardCancel,
+  isKeyboardConfirm,
+  keyboardDirection,
+} from "./input-bindings";
 import {
   createNativeTextLayer,
   type NativeUnitDetailText,
@@ -304,12 +309,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const commandMenuPointer = required(root, "#command-menu-pointer");
   /**
    * 原生開選單前先把指標滑到第一行（`0000:566A` → `0000:57C5`），滑完才畫外框。
-   * 瀏覽器不能移動宿主指標，所以由畫面內的手形精靈演出這段手勢：滑行期間宿主游標
-   * 藏起來，畫面上只有一隻手，落點就是原生的第一行指標位置。
+   * 瀏覽器不能移動宿主指標；若這次是鼠標／觸控開選單，虛擬手形滑走只會錯誤暗示真實
+   * 指標也被移動，因此直接顯示選單。鍵盤／手把開啟且畫面內已有可用指標位置時，才由手形
+   * 精靈保留這段原版節奏。
    */
   let commandMenuGliding = false;
   let commandMenuWasOpen = false;
   let lastScreenPointer: PointerPosition | undefined;
+  let lastInputSource: "pointer" | "keyboard-or-gamepad" = "keyboard-or-gamepad";
   const menuPointerGlide = createMenuPointerGlide({
     screen,
     sprite: commandMenuPointer,
@@ -337,8 +344,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (commandMenuGliding) menuPointerGlide.settle();
   };
   const startCommandMenuGlide = (position: PointerPosition): boolean => {
-    // 沒有已知指標位置（鍵盤或手把選的單位）就沒有可以滑的起點，直接開選單。
-    if (!lastScreenPointer) return false;
+    // 指標啟動時必須保留真實位置；鍵盤或手把啟動若沒有已知起點也直接開選單。
+    if (lastInputSource === "pointer" || !lastScreenPointer) return false;
     return menuPointerGlide.start(lastScreenPointer, {
       x: position.x + NATIVE_MENU_POINTER_OFFSET.x,
       y: position.y + NATIVE_MENU_POINTER_OFFSET.y,
@@ -724,6 +731,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let rightPressHandledByRecordBackup = false;
   root.addEventListener("pointerdown", (event) => {
     trackScreenPointer(event);
+    lastInputSource = "pointer";
     settleMenuPointerGlide();
     rightPressHandledByRecordBackup = false;
     if (event.button !== 2) return;
@@ -750,6 +758,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   }, { signal: eventController.signal });
 
   window.addEventListener("keydown", (event) => {
+    lastInputSource = "keyboard-or-gamepad";
     settleMenuPointerGlide();
     if (recordBackupUi.handleKeyDown(event)) return;
     const key = event.key;
@@ -764,26 +773,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       return;
     }
     if (focusedHotspot && key === "Tab") return;
-    const navigation: Record<string, Position> = {
-      ArrowUp: { x: 0, y: -1 },
-      w: { x: 0, y: -1 },
-      ArrowDown: { x: 0, y: 1 },
-      z: { x: 0, y: 1 },
-      ArrowLeft: { x: -1, y: 0 },
-      a: { x: -1, y: 0 },
-      ArrowRight: { x: 1, y: 0 },
-      s: { x: 1, y: 0 },
-      Home: { x: -1, y: -1 },
-      PageUp: { x: 1, y: -1 },
-      End: { x: -1, y: 1 },
-      PageDown: { x: 1, y: 1 },
-    };
-    const delta = navigation[key] ?? navigation[lower];
+    const delta = keyboardDirection(key);
     const routeCycle = controller.actionMode === "shotRoute"
       && (lower === "q" || lower === "e");
     const handled = Boolean(delta)
-      || ["Control", "Insert", " ", "Alt", "Delete", "Enter", "Escape", "Tab", "F1", "F2", "F3", "F4"].includes(key)
+      || isKeyboardConfirm(key)
+      || isKeyboardCancel(key)
+      || ["Tab", "F1", "F2", "F3", "F4"].includes(key)
       || lower === "e"
+      || lower === "g"
       || routeCycle
       || lower === "m"
       || lower === "o";
@@ -791,13 +789,19 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (delta) controller.moveCursor(delta);
     else if (event.repeat) return;
     else if (routeCycle) controller.cycleMagicArcherRoute(lower === "q" ? -1 : 1);
-    else if (key === "Control" || key === "Insert" || key === " ") {
+    else if (isKeyboardConfirm(key)) {
       if (controller.dialogueSkipConfirmOpen
         || (!finishDialogueTyping() && !finishFeedbackTyping())) controller.primaryAtCursor();
     }
-    else if (key === "Alt" || key === "Delete" || key === "Enter") controller.secondaryAction();
-    else if (key === "Escape") controller.systemAction();
-    else if (key === "Tab") controller.groupCommandOpen ? controller.closeGroupCommands() : controller.openGroupCommands();
+    else if (isKeyboardCancel(key)) {
+      const cancelled = controller.secondaryAction();
+      if (!cancelled && key === "Escape") controller.systemAction();
+    }
+    else if (key === "Tab") void controller.focusNextUnactedAlly();
+    else if (lower === "g") {
+      if (controller.groupCommandOpen) controller.closeGroupCommands();
+      else controller.openGroupCommands();
+    }
     else if (key === "F1") void controller.allRest();
     else if (key === "F2") void controller.followLeader();
     else if (key === "F3") void controller.freeAction();
@@ -1401,7 +1405,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const unsubscribe = controller.onChange(render);
   render();
   const stopScaling = configureGameScaling(required(root, "#game-viewport"), screen);
-  const stopGamepad = bindGamepad(controller);
+  const stopGamepad = bindGamepad(controller, () => {
+    lastInputSource = "keyboard-or-gamepad";
+    settleMenuPointerGlide();
+  });
   return () => {
     eventController.abort();
     unsubscribe();
@@ -2208,7 +2215,7 @@ function required<T extends HTMLElement = HTMLElement>(root: ParentNode, selecto
   return element;
 }
 
-function bindGamepad(controller: GameController): () => void {
+function bindGamepad(controller: GameController, onInput: () => void): () => void {
   let priorButtons: boolean[] = [];
   let lastNavigation = 0;
   let animationFrame = 0;
@@ -2216,20 +2223,39 @@ function bindGamepad(controller: GameController): () => void {
     const pad = navigator.getGamepads?.()[0];
     if (pad) {
       const pressed = pad.buttons.map((button) => button.pressed);
-      if (pressed[0] && !priorButtons[0]) controller.primaryAtCursor();
-      if (pressed[1] && !priorButtons[1]) controller.secondaryAction();
+      const newlyPressed = (button: number) => pressed[button] && !priorButtons[button];
+      if (newlyPressed(0)) { onInput(); controller.primaryAtCursor(); }
+      if (newlyPressed(1)) { onInput(); controller.secondaryAction(); }
       if (controller.actionMode === "shotRoute") {
-        if (pressed[4] && !priorButtons[4]) controller.cycleMagicArcherRoute(-1);
-        if (pressed[5] && !priorButtons[5]) controller.cycleMagicArcherRoute(1);
-      } else if (pressed[4] && !priorButtons[4]) controller.openObjectives();
-      if (pressed[9] && !priorButtons[9]) controller.openGroupCommands();
-      const x = pad.axes[0] ?? 0;
-      const y = pad.axes[1] ?? 0;
+        if (newlyPressed(4)) { onInput(); controller.cycleMagicArcherRoute(-1); }
+        if (newlyPressed(5)) { onInput(); controller.cycleMagicArcherRoute(1); }
+      } else if (newlyPressed(5)) {
+        onInput();
+        void controller.focusNextUnactedAlly();
+      }
+      if (newlyPressed(3)) {
+        onInput();
+        if (controller.groupCommandOpen) controller.closeGroupCommands();
+        else controller.openGroupCommands();
+      }
+      if (controller.actionMode !== "shotRoute" && (newlyPressed(4) || newlyPressed(8))) {
+        onInput();
+        if (controller.objectiveOpen) controller.closeObjectives();
+        else controller.openObjectives();
+      }
+      if (newlyPressed(9)) {
+        onInput();
+        if (!controller.secondaryAction()) controller.systemAction();
+      }
+      const axisX = pad.axes[0] ?? 0;
+      const axisY = pad.axes[1] ?? 0;
+      const x = pressed[14] ? -1 : pressed[15] ? 1 : axisX;
+      const y = pressed[12] ? -1 : pressed[13] ? 1 : axisY;
       if (time - lastNavigation > 150) {
-        if (x < -0.6) { controller.moveCursor({ x: -1, y: 0 }); lastNavigation = time; }
-        else if (x > 0.6) { controller.moveCursor({ x: 1, y: 0 }); lastNavigation = time; }
-        else if (y < -0.6) { controller.moveCursor({ x: 0, y: -1 }); lastNavigation = time; }
-        else if (y > 0.6) { controller.moveCursor({ x: 0, y: 1 }); lastNavigation = time; }
+        if (x < -0.6) { onInput(); controller.moveCursor({ x: -1, y: 0 }); lastNavigation = time; }
+        else if (x > 0.6) { onInput(); controller.moveCursor({ x: 1, y: 0 }); lastNavigation = time; }
+        else if (y < -0.6) { onInput(); controller.moveCursor({ x: 0, y: -1 }); lastNavigation = time; }
+        else if (y > 0.6) { onInput(); controller.moveCursor({ x: 0, y: 1 }); lastNavigation = time; }
       }
       priorButtons = pressed;
     }

@@ -14,6 +14,12 @@ import {
   type DeploymentMinimapMarker,
 } from "./deployment-minimap";
 import { DEPLOYMENT_FEEDBACK_TEXT } from "./simulation/deployment";
+import {
+  isKeyboardCancel,
+  isKeyboardConfirm,
+  keyboardDirection,
+  MODERN_KEYBOARD_HELP,
+} from "./input-bindings";
 import type { Position } from "./types";
 import type { StageDeploymentPresentation } from "./stage-runtime";
 
@@ -173,7 +179,7 @@ export function mountDeploymentUi(
 ): () => void {
   root.tabIndex = 0;
   root.setAttribute("role", "application");
-  root.setAttribute("aria-label", `${presentation.title}出擊準備；方向鍵移動，Control、Insert 或空白鍵主操作，Alt、Delete 或 Enter 次操作，Tab 切換落點焦點`);
+  root.setAttribute("aria-label", `${presentation.title}出擊準備；${MODERN_KEYBOARD_HELP.move}移動，${MODERN_KEYBOARD_HELP.confirm}確認，${MODERN_KEYBOARD_HELP.cancel}返回，Tab 切換名單與落點`);
 
   const denseOpenCells = session.state.definition.openCells.length > 8;
   const minimap = new DeploymentMinimap({
@@ -309,7 +315,7 @@ export function mountDeploymentUi(
             ? `部署完成：${state.placements.length} 人編隊已建立。`
             : `選擇出場人物；${presentation.minimumUnits}至${state.definition.maximumUnits}人均可完成。`)}
         </p>
-        <p class="deployment-hint">方向鍵／WZAS 移動 · Ctrl/Ins/Space 主操作 · Alt/Del/Enter 次操作 · Tab 落點</p>
+        <p class="deployment-hint">${MODERN_KEYBOARD_HELP.move} 移動 · ${MODERN_KEYBOARD_HELP.confirm} 確認 · ${MODERN_KEYBOARD_HELP.cancel} 返回 · Tab 切換落點</p>
         <button type="button" tabindex="-1" data-finish data-testid="deployment-finish"
           class="deployment-finish${state.focus.kind === "finish" ? " is-focused" : ""}">${presentation.finishLabel}</button>
       </footer>
@@ -366,21 +372,19 @@ export function mountDeploymentUi(
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    const direction = ({
-      ArrowUp: "up",
-      ArrowDown: "down",
-      ArrowLeft: "left",
-      ArrowRight: "right",
-      w: "up",
-      z: "down",
-      a: "left",
-      s: "right",
-    } as Readonly<Record<string, "up" | "down" | "left" | "right">>)[
-      event.key.length === 1 ? event.key.toLowerCase() : event.key
-    ];
+    const delta = keyboardDirection(event.key);
+    const direction = delta?.y === -1
+      ? "up"
+      : delta?.y === 1
+        ? "down"
+        : delta?.x === -1
+          ? "left"
+          : delta?.x === 1
+            ? "right"
+            : undefined;
     if (direction) session.moveFocus(direction);
-    else if (event.key === "Control" || event.key === "Insert" || event.key === " ") session.primary();
-    else if (event.key === "Alt" || event.key === "Delete" || event.key === "Enter") session.secondary();
+    else if (isKeyboardConfirm(event.key)) session.primary();
+    else if (isKeyboardCancel(event.key)) session.secondary();
     else if (event.key === "Tab") {
       if (session.state.focus.kind === "map") session.leaveMap();
       else session.focusMap();

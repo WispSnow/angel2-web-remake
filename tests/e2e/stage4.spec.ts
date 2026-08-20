@@ -114,7 +114,7 @@ const waitForSweepFrame = (page: Page, frame: string) => page.waitForFunction(
 );
 
 async function endManualPhase(page: Page): Promise<void> {
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
@@ -185,13 +185,13 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
     path: `${ARTIFACT_DIR}/stage4-safe-area-preview.png`,
   });
 
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await clickUnit(page, "1:1");
   await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
   await expect(page.getByTestId("route-pulse-safety")).toHaveText("力場危險");
   await expect(page.getByTestId("route-pulse-safety")).toHaveAttribute("data-safety", "danger");
   await expect(canvas).toHaveAttribute("data-route-pulse-safe-cell-count", "13");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await endManualPhase(page);
   await waitForSweepFrame(page, "4");
   await expect(canvas).toHaveAttribute("data-map-combat-phase", "route-pulse");

@@ -154,7 +154,7 @@ test("S08-D/REMAKE-038: all eight allies are manual and all-rest skips NPC actio
   await expect.poll(async () =>
     (await state(page)).units.find(({ id }) => id === "1:42")?.acted).toBe(true);
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-allRest").click();
   await page.getByTestId("dialogue-layer").click();
   await waitForPhase(page, "enemy");
@@ -230,7 +230,7 @@ test("S08-G/H: retry and retreat replay SAY/21, while completion enters stage 9 
   await waitForPhase(page, "openingStory");
   await skipStoryDialogue(page);
   await waitForPhase(page, "player");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-retreat").click();
   await page.locator("[data-action=retreat-confirm]").click();
   await page.locator("[data-action=retreat-confirm]").click();

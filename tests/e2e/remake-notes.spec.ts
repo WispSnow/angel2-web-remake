@@ -4,7 +4,7 @@ import { captureVisualAudit } from "./visual-audit";
 const cursorOf = (page: Page) => page.evaluate(() =>
   (window.__ANGEL2__?.getState() as { cursor: { x: number; y: number } } | undefined)?.cursor);
 
-type NotesTab = "fixes" | "features" | "balance" | "disclaimer";
+type NotesTab = "fixes" | "features" | "balance" | "controls" | "disclaimer";
 
 /** 宿主只有一顆入口按鈕且固定開在第一個分頁，其餘分頁要再點一次頁籤。 */
 const openNotes = async (page: Page, tab: NotesTab): Promise<void> => {
@@ -41,11 +41,11 @@ test("三個覆蓋層入口並排在宿主工具列上，靠在縮放選項右�
   if (row) expect(row.x + row.width - (notes.x + notes.width)).toBeLessThan(4);
 });
 
-test("四個分頁各載入自己的內容，免責聲明交代權利與非商業邊界", async ({ page }) => {
+test("五個分頁各載入自己的內容，操作與免責說明都可獨立查閱", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "fixes");
   await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
-    .toHaveText(["Bug 修復", "功能增強", "平衡性調整", "免責聲明"]);
+    .toHaveText(["Bug 修復", "功能增強", "平衡性調整", "操作說明", "免責聲明"]);
   await expect(page.getByTestId("remake-note-REMAKE-004")).toContainText("毒不再把生命打到 0");
   const swiftGuardFix = page.getByTestId("remake-note-swift-dragon-guard-ground");
   await expect(swiftGuardFix).toContainText("迅龍騎士格擋不再懸空");
@@ -68,6 +68,20 @@ test("四個分頁各載入自己的內容，免責聲明交代權利與非商�
     await expect(page.getByTestId(`remake-note-${id}`)).toHaveCount(0);
   }
   await expect(page.getByTestId("remake-note-REMAKE-015")).toHaveCount(0);
+
+  await page.getByTestId("remake-notes-tab-controls").click();
+  const controls = page.getByTestId("remake-controls");
+  await expect(controls).toBeVisible();
+  const keyboard = controls.locator(".rn-control-card.is-keyboard");
+  for (const key of ["方向鍵", "WASD", "Enter", "Space", "Esc", "Backspace"]) {
+    await expect(keyboard.getByText(key, { exact: true })).toBeVisible();
+  }
+  await expect(controls).toContainText("下一名待行動角色");
+  await expect(controls).toContainText("標準手把");
+  await expect(controls).toContainText("Menu");
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/remake-controls-desktop.png",
+  });
 
   await page.getByTestId("remake-notes-tab-disclaimer").click();
   await expect(page.getByTestId("remake-disclaimer")).toBeVisible();
@@ -129,6 +143,22 @@ test("免責聲明在窄螢幕使用單欄並可完整捲動", async ({ page }) 
   });
 });
 
+test("操作說明在窄螢幕收為單欄且分頁列可橫向捲動", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await openNotes(page, "controls");
+
+  const cards = page.getByTestId("remake-controls").locator(".rn-control-card");
+  await expect(cards).toHaveCount(4);
+  const [first, second] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+  expect(first).not.toBeNull();
+  expect(second).not.toBeNull();
+  if (first && second) expect(second.y).toBeGreaterThan(first.y + first.height);
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/remake-controls-mobile.png",
+  });
+});
+
 test("面板打開時鍵盤不會操作戰場，敵方階段照常跑完", async ({ page }) => {
   await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
@@ -156,7 +186,7 @@ test("面板打開時鍵盤不會操作戰場，敵方階段照常跑完", async
   // 焦點刻意留在入口按鈕上，所以要先移開再用鍵盤操作戰場。
   await page.getByTestId("remake-notes-open").blur();
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   const dialogue = page.getByTestId("dialogue-layer");

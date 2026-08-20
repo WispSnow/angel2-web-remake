@@ -126,7 +126,7 @@ test("S09-D/E: the corrected objective and Dori route trigger SAY/23 without sta
   const before = await state(page);
   const doriBefore = before.units.find(({ id }) => id === "1:9");
   expect(doriBefore && doriBefore.y * 50 + doriBefore.x).toBeGreaterThan(933);
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-allRest").click();
   await page.getByTestId("dialogue-layer").click();
   await waitForPhase(page, "victoryStory");

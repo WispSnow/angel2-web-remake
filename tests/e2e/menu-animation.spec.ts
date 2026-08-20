@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
+
+const ARTIFACT_DIR = "artifacts/playwright";
 
 /**
  * 選單開闔動畫是純表現層的複刻決定：方框自己縮放進出，模擬狀態、輸入語義與存檔不變。
@@ -37,15 +40,19 @@ const state = (page: Page) => page.evaluate(
   () => window.__ANGEL2__?.getState() as MenuAnimationState,
 );
 
-async function clickUnit(page: Page, id: string): Promise<void> {
+async function unitCanvasPosition(page: Page, id: string): Promise<{ x: number; y: number }> {
   const current = await state(page);
   const unit = current.units.find((candidate) => candidate.id === id);
   if (!unit) throw new Error(`missing unit ${id}`);
+  return {
+    x: 40 + (unit.x - current.cameraOrigin.x) * 40 + 20,
+    y: 23 + (unit.y - current.cameraOrigin.y) * 44 + 22,
+  };
+}
+
+async function clickUnit(page: Page, id: string): Promise<void> {
   await page.getByTestId("battle-canvas").click({
-    position: {
-      x: 40 + (unit.x - current.cameraOrigin.x) * 40 + 20,
-      y: 23 + (unit.y - current.cameraOrigin.y) * 44 + 22,
-    },
+    position: await unitCanvasPosition(page, id),
   });
 }
 
@@ -127,11 +134,7 @@ test("menus zoom open and stay inert while the close animation plays", async ({ 
   await expect(actionMenu).toBeVisible();
 });
 
-/**
- * 原生開選單前先把指標滑到第一行（`0000:566A` → `0000:57C5`），滑完才畫外框。Web 用
- * 畫面內的手形精靈演出這段手勢，所以要守住：滑行期間方框不出現、宿主游標讓位、落點是
- * 原生的第一行指標點，以及滑完一定會收乾淨。
- */
+/** 記錄畫面內手形精靈、宿主游標讓位與選單出現的先後。 */
 async function recordGlide(page: Page): Promise<void> {
   await page.evaluate(() => {
     const sprite = document.querySelector<HTMLElement>("#command-menu-pointer")!;
@@ -155,7 +158,7 @@ async function recordGlide(page: Page): Promise<void> {
 
 const glideSamples = (page: Page) => page.evaluate(() => window.__glideSamples ?? []);
 
-test("the command menu opens only after the native pointer glide lands", async ({ page }) => {
+test("a pointer-opened command menu keeps the real cursor position and skips the glide", async ({ page }) => {
   await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
   const canvas = page.getByTestId("battle-canvas");
   await expect(canvas).toBeVisible();
@@ -163,6 +166,28 @@ test("the command menu opens only after the native pointer glide lands", async (
   const actionMenu = page.getByTestId("action-menu");
   await recordGlide(page);
   await clickUnit(page, "1:0");
+  await expect(actionMenu).toBeVisible();
+
+  const samples = await glideSamples(page);
+  expect(samples.some((sample) => sample.cursorYielded)).toBe(false);
+  expect(samples.some((sample) => !sample.spriteHidden)).toBe(false);
+  await expect(page.getByTestId("command-menu-pointer")).toBeHidden();
+  await expect(page.locator("#logical-screen")).not.toHaveAttribute("data-pointer-glide", "true");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/menu-pointer-open-without-glide.png`,
+  });
+});
+
+test("keyboard activation retains the native pointer glide when a start point is known", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible();
+
+  // 先把戰場焦點與已知宿主指標都放到妮雅，再用鍵盤開選單。
+  await canvas.hover({ position: await unitCanvasPosition(page, "1:0") });
+  const actionMenu = page.getByTestId("action-menu");
+  await recordGlide(page);
+  await page.keyboard.press("Space");
   await expect(actionMenu).toBeVisible();
 
   const samples = await glideSamples(page);
@@ -211,10 +236,11 @@ test.describe("reduced motion", () => {
       matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
 
     const actionMenu = page.getByTestId("action-menu");
+    await canvas.hover({ position: await unitCanvasPosition(page, "1:0") });
     await recordGlide(page);
-    await clickUnit(page, "1:0");
+    await page.keyboard.press("Space");
     await expect(actionMenu).toBeVisible();
-    // 指針滑行照常演出，方框開闔動畫也保有真正的時長。
+    // 鍵盤啟動的指針滑行照常演出，方框開闔動畫也保有真正的時長。
     expect((await glideSamples(page)).some((sample) => sample.cursorYielded)).toBe(true);
     await expectZoomOpenDeclared(actionMenu);
 

@@ -141,7 +141,7 @@ test("S27-F/REMAKE-064: seven city defenders act as independent allied AI", asyn
   expect(before.units.filter(({ side, id, acted }) => side === 1 && !defenderIds.includes(id) && acted))
     .toHaveLength(24);
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-allRest").click();
   await page.getByTestId("dialogue-layer").click();
   await waitForPhase(page, "allyAuto");

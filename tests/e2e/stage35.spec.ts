@@ -99,7 +99,7 @@ test("S35-F: behavior-12 enemies consume a phase without moving or attacking", a
   const allyLifeBefore = before.units.filter(({ side }) => side === 1)
     .map(({ id, life }) => ({ id, life }));
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-allRest").click();
   const confirmation = page.getByTestId("dialogue-layer");
   if (await confirmation.isVisible()) await confirmation.click();

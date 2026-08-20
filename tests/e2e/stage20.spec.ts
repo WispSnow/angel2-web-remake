@@ -139,7 +139,7 @@ test("S20-C/D: round one replaces the 16-unit tableau with the WD dragon", async
 test("S20-E: demon dragon casts the native-timed WD path and defeats Nia", async ({ page }) => {
   await page.goto("/?debugScenario=stage-20-near-defeat&difficulty=0&test=1&slowMap=1");
   await waitForPhase(page, "player");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
   await page.getByTestId("group-command-allRest").click();
   for (let input = 0; input < 8; input += 1) {

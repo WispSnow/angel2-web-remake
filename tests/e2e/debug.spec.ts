@@ -971,7 +971,7 @@ test("the magician outer-ring fixture pushes once and releases after one enemy p
     specialActionPresentation?: object;
   });
   const finishPlayerPhase = async (round: number) => {
-    await page.keyboard.press("Tab");
+    await page.keyboard.press("g");
     await expect(page.getByTestId("group-command-menu")).toBeVisible();
     await page.getByTestId("group-command-allRest").click();
     await expect(page.getByTestId("dialogue-layer")).toBeVisible();

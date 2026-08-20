@@ -202,7 +202,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
     path: `${ARTIFACT_DIR}/stage3-auto-ally-hud.png`,
   });
 
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await moveCursorTo(page, 30, 13);
   await page.keyboard.press("Space");
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
@@ -211,7 +211,7 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
     path: `${ARTIFACT_DIR}/stage3-tactical-unit-hud.png`,
   });
 
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await moveCursorTo(page, 33, 20);
   await page.keyboard.press("Space");
   await expect(page.getByTestId("unit-tactic")).toHaveText("戰術阻擊救援隊");
@@ -319,7 +319,7 @@ test("S03-F: debug fixtures prove that either protected commander triggers defea
 
 test("stage 3 group commands use Himi as the fixed commander while Nia is absent", async ({ page }) => {
   await openStage3(page, "stage-03-player&difficulty=0&test=1");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
   expect((await state(page)).groupLeaderId).toBe("1:1");
   await page.getByTestId("group-command-allRest").click();
@@ -398,7 +398,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
   expect(afterEnemyPhase.audioCueLog.filter(
     ({ record, reason }) => record === 14 && reason.includes("movement"),
   )).toEqual(walkCuesBeforeEnemyPhase);
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
   expect((await state(page)).groupLeaderId).toBe("1:1");
   await page.getByTestId("group-command-followLeader").click();
@@ -412,7 +412,7 @@ test("S03-N/O: free action hands off player units first and round two still foll
 
 test("S03-C/L: hard-mode automatic allies finish their first phase inside the defense area", async ({ page }) => {
   await openStage3(page, "stage-03-player&difficulty=3&test=1");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-allRest").click();
   await page.getByTestId("dialogue-layer").click();
   await waitForPhaseThroughPromotions(page, "enemy");

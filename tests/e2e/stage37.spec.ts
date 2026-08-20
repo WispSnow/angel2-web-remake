@@ -126,7 +126,7 @@ test("S37-G: the ice round lets both immobile hands act before the head", async 
   const bossPositions = (await state(page)).units.filter(({ side }) => side === 2)
     .map(({ id, x, y }) => ({ id, x, y }));
   await page.evaluate(() => window.__ANGEL2__?.setPresentationFast(true));
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("g");
   await page.getByTestId("group-command-allRest").click();
   const confirmation = page.getByTestId("dialogue-layer");
   if (await confirmation.isVisible()) await confirmation.click();

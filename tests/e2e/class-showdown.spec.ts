@@ -269,7 +269,7 @@ test("determinized traits show exact wording in the selected-unit strip", async 
     path: `${ARTIFACT_DIR}/class-showdown-determinized-traits.png`,
   });
 
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("action-menu")).toBeHidden();
   for (let step = 0; step < 12; step += 1) await page.keyboard.press("ArrowRight");
   for (let step = 0; step < 17; step += 1) await page.keyboard.press("ArrowUp");

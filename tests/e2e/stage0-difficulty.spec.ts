@@ -89,7 +89,7 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
     await captureVisualAudit(page.getByTestId("game-screen"), { path: scenario.screenshot });
 
     if (scenario.difficulty === 3) {
-      await page.keyboard.press("Tab");
+      await page.keyboard.press("g");
       await page.getByTestId("group-command-retreat").click();
       await page.locator("[data-action=retreat-confirm]").click();
       await page.locator("[data-action=retreat-confirm]").click();
