@@ -142,3 +142,27 @@ test("keyboard focus inside the picker never reaches the battlefield", async ({ 
   }
   expect(await cursor()).toEqual(before);
 });
+
+test("the logical screen clips its overflow without becoming scrollable", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-04-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  // 邏輯畫面是純裁切，不是可捲區。用 `overflow: hidden` 時它其實有捲動餘量：位置牌
+  // 的 17px 文字撐在 16px 行高裡，行內盒比 640x350 的下緣多出 2px。Chrome 只要想露出
+  // 畫面裡剛被指向或取得焦點的控件（Playwright 點擊前的捲動、或選單開闔動畫還在跑時
+  // 就被點到的按鈕都會觸發），就會把那 2px 捲掉，整個畫面連同肖像、對話窗與棋盤一起
+  // 上移 2px 並停在那裡。`overflow: clip` 讓它根本不能捲。
+  expect(await page.getByTestId("game-screen").evaluate((screen) => {
+    const plate = document.querySelector(".bottom-location") as HTMLElement;
+    const plateTop = () => plate.getBoundingClientRect().top - screen.getBoundingClientRect().top;
+    const settled = plateTop();
+    screen.scrollTop = 999;
+    screen.scrollLeft = 999;
+    return {
+      settled,
+      afterScrollAttempt: plateTop(),
+      scrollTop: screen.scrollTop,
+      scrollLeft: screen.scrollLeft,
+    };
+  })).toEqual({ settled: 331, afterScrollAttempt: 331, scrollTop: 0, scrollLeft: 0 });
+});

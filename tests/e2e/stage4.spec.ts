@@ -63,19 +63,21 @@ const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
   phase,
 );
 
-async function boundsInLogicalScreen(page: Page, element: Locator) {
-  const [bounds, screen] = await Promise.all([
-    element.boundingBox(),
-    page.locator("#logical-screen").boundingBox(),
-  ]);
-  expect(bounds).not.toBeNull();
-  expect(screen).not.toBeNull();
-  return {
-    x: bounds!.x - screen!.x,
-    y: bounds!.y - screen!.y,
-    width: bounds!.width,
-    height: bounds!.height,
-  };
+// 目標與畫面原點必須在同一次量測裡取得：分兩趟讀會讓中途的版面變動把兩個矩形湊成
+// 不同時點，量出來的差值不屬於任何一幀。
+async function boundsInLogicalScreen(element: Locator) {
+  return element.evaluate((node) => {
+    const screen = document.querySelector("#logical-screen");
+    if (!screen) throw new Error("missing #logical-screen");
+    const bounds = node.getBoundingClientRect();
+    const origin = screen.getBoundingClientRect();
+    return {
+      x: bounds.x - origin.x,
+      y: bounds.y - origin.y,
+      width: bounds.width,
+      height: bounds.height,
+    };
+  });
 }
 
 async function insetWithinParent(element: Locator) {
@@ -350,9 +352,8 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
   const regularNiaPortrait = page.getByTestId("dialogue-portrait-composite");
   await expect(regularNiaPortrait).toHaveAttribute("data-portrait-record", "46");
   await page.waitForTimeout(130);
-  const regularNiaBounds = await boundsInLogicalScreen(page, regularNiaPortrait);
+  const regularNiaBounds = await boundsInLogicalScreen(regularNiaPortrait);
   const regularUpperCopyBounds = await boundsInLogicalScreen(
-    page,
     page.getByTestId("dialogue-window-upper").locator(".dialogue-copy"),
   );
   const regularNiaNativeAnchor = await regularNiaPortrait.evaluate((portrait) => ({
@@ -373,9 +374,8 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
   await waitForPhase(page, "victoryFeedback");
   const feedbackPortrait = page.getByTestId("feedback-portrait");
   await expect(feedbackPortrait).toHaveAttribute("data-portrait-record", "46");
-  expect(await boundsInLogicalScreen(page, feedbackPortrait)).toEqual(regularNiaBounds);
+  expect(await boundsInLogicalScreen(feedbackPortrait)).toEqual(regularNiaBounds);
   expect(await boundsInLogicalScreen(
-    page,
     page.getByTestId("native-feedback").locator(".native-feedback-copy"),
   ))
     .toEqual(regularUpperCopyBounds);
@@ -392,9 +392,8 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
   const savePromptPortrait = page.getByTestId("feedback-portrait");
   await expect(savePromptPortrait).toHaveAttribute("data-portrait-record", "46");
   const [savePromptPortraitBounds, savePromptCopyBounds] = await Promise.all([
-    boundsInLogicalScreen(page, savePromptPortrait),
+    boundsInLogicalScreen(savePromptPortrait),
     boundsInLogicalScreen(
-      page,
       page.getByTestId("native-feedback").locator(".native-feedback-copy"),
     ),
   ]);

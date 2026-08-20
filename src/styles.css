@@ -38,7 +38,15 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   position: relative;
   width: 640px;
   height: 350px;
-  overflow: hidden;
+  /* `clip`, not `hidden`: both hide what sticks out, but `hidden` also makes the
+     screen a scroll container, and it does have a scroll range — the location
+     plate's 17px text in a 16px line box leaves an inline box 2px past the
+     640x350 bottom edge, and the combat lab's settings column is 80px wider than
+     the frame. Chrome spends that range whenever it reveals a control inside the
+     screen (Playwright's pre-click scroll, or a menu button reached while its
+     open animation is still running is enough), which slides the whole frame off
+     its origin. A clipped box cannot scroll, so the frame stays put. */
+  overflow: clip;
   transform: translateX(var(--game-offset-x, 0px)) scale(var(--game-scale, 1));
   transform-origin: left top;
   background: #050405;
