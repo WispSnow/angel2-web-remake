@@ -160,6 +160,64 @@
   font: 12px/1.5 ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
+/* ── 復刻說明：免責聲明 ───────────────────────────────────── */
+
+.rn-disclaimer { max-width: 940px; margin-inline: auto; }
+.rn-disclaimer-lead {
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border: 1px solid #6a4a24;
+  border-left: 3px solid var(--gold);
+  border-radius: 3px;
+  background: linear-gradient(115deg, #2b1c1d, #191114 72%);
+  box-shadow: 0 1px 0 #8a652b2b inset;
+}
+.rn-disclaimer-lead > p {
+  max-width: 78ch;
+  margin: 0 0 11px;
+  color: #ead8b7;
+  font-size: 14px;
+}
+.rn-disclaimer-labels { display: flex; flex-wrap: wrap; gap: 6px; }
+.rn-disclaimer-labels > span {
+  padding: 2px 9px;
+  border: 1px solid #614823;
+  border-radius: 999px;
+  color: #e0bc69;
+  background: #140e10;
+  font: 700 10px/1.6 system-ui, sans-serif;
+  letter-spacing: .08em;
+}
+.rn-disclaimer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.rn-disclaimer-item {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #33231f;
+  border-radius: 3px;
+  background:
+    linear-gradient(145deg, #211619b3, #151013e6),
+    repeating-linear-gradient(135deg, #8b642309 0 1px, transparent 1px 9px);
+}
+.rn-disclaimer-item > h3 {
+  margin: 0 0 7px;
+  color: #e3b95c;
+  font-size: 14px;
+}
+.rn-disclaimer-item > p {
+  margin: 0;
+  color: #cdbb9c;
+  font: 12px/1.8 system-ui, sans-serif;
+}
+.rn-disclaimer-closing {
+  margin: 14px 2px 0;
+  color: #82735f;
+  font: 11px/1.7 system-ui, sans-serif;
+}
+
 /* ── RoadMap ─────────────────────────────────────────────────── */
 
 .rn-body[data-tab="presentation"],
@@ -576,6 +634,8 @@
   .rn-head, .rn-tabs, .rn-body, .rn-foot { padding-inline: 14px; }
   .rn-tabs { overflow-x: auto; }
   .rn-tabs > button { flex: none; padding-inline: 12px; }
+  .rn-disclaimer-lead { padding: 14px; }
+  .rn-disclaimer-grid { grid-template-columns: minmax(0, 1fr); }
   .rn-roadmap-grid { grid-template-columns: minmax(0, 1fr); }
   .rn-roadmap-item { min-height: 0; }
   .rn-class-head { align-items: flex-start; }

@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import { captureVisualAudit } from "./visual-audit";
 
 const cursorOf = (page: Page) => page.evaluate(() =>
   (window.__ANGEL2__?.getState() as { cursor: { x: number; y: number } } | undefined)?.cursor);
 
-type NotesTab = "fixes" | "features" | "balance";
+type NotesTab = "fixes" | "features" | "balance" | "disclaimer";
 
 /** 宿主只有一顆入口按鈕且固定開在第一個分頁，其餘分頁要再點一次頁籤。 */
 const openNotes = async (page: Page, tab: NotesTab): Promise<void> => {
@@ -40,11 +41,11 @@ test("三個覆蓋層入口並排在宿主工具列上，靠在縮放選項右�
   if (row) expect(row.x + row.width - (notes.x + notes.width)).toBeLessThan(4);
 });
 
-test("三個分頁各載入自己的內容，Esc 關閉並交還焦點", async ({ page }) => {
+test("四個分頁各載入自己的內容，免責聲明交代權利與非商業邊界", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "fixes");
   await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
-    .toHaveText(["Bug 修復", "功能增強", "平衡性調整"]);
+    .toHaveText(["Bug 修復", "功能增強", "平衡性調整", "免責聲明"]);
   await expect(page.getByTestId("remake-note-REMAKE-004")).toContainText("毒不再把生命打到 0");
   const swiftGuardFix = page.getByTestId("remake-note-swift-dragon-guard-ground");
   await expect(swiftGuardFix).toContainText("迅龍騎士格擋不再懸空");
@@ -68,6 +69,23 @@ test("三個分頁各載入自己的內容，Esc 關閉並交還焦點", async (
   }
   await expect(page.getByTestId("remake-note-REMAKE-015")).toHaveCount(0);
 
+  await page.getByTestId("remake-notes-tab-disclaimer").click();
+  await expect(page.getByTestId("remake-disclaimer")).toBeVisible();
+  await expect(page.getByTestId("remake-disclaimer-rights"))
+    .toContainText("大宇資訊股份有限公司");
+  await expect(page.getByTestId("remake-disclaimer-noncommercial"))
+    .toContainText("僅供學習、研究、保存與交流使用");
+  await expect(page.getByTestId("remake-disclaimer-unofficial"))
+    .toContainText("不存在隸屬、合作、贊助或授權關係");
+  await expect(page.getByTestId("remake-disclaimer-redistribution"))
+    .toContainText("本聲明不授予任何人");
+  await expect(page.getByTestId("remake-disclaimer-contact"))
+    .toContainText("RoadMap");
+  await expect(page.getByTestId("remake-note-REMAKE-100")).toHaveCount(0);
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/remake-disclaimer-desktop.png",
+  });
+
   // 圖鑑已經搬到自己的入口，說明面板不得再帶著它。
   await expect(page.getByTestId("remake-notes-tab-classes")).toHaveCount(0);
   await expect(page.getByTestId("compendium-index")).toHaveCount(0);
@@ -79,6 +97,36 @@ test("三個分頁各載入自己的內容，Esc 關閉並交還焦點", async (
   // 入口固定開在第一個分頁，不記住上次停在哪一頁。
   await page.getByTestId("remake-notes-open").click();
   await expect(page.getByTestId("remake-notes-tab-fixes")).toHaveAttribute("aria-selected", "true");
+});
+
+test("免責聲明在窄螢幕使用單欄並可完整捲動", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await openNotes(page, "disclaimer");
+
+  const disclaimer = page.getByTestId("remake-disclaimer");
+  const rights = page.getByTestId("remake-disclaimer-rights");
+  const noncommercial = page.getByTestId("remake-disclaimer-noncommercial");
+  const [disclaimerBox, rightsBox, noncommercialBox] = await Promise.all([
+    disclaimer.boundingBox(),
+    rights.boundingBox(),
+    noncommercial.boundingBox(),
+  ]);
+  expect(disclaimerBox).not.toBeNull();
+  expect(rightsBox).not.toBeNull();
+  expect(noncommercialBox).not.toBeNull();
+  if (disclaimerBox && rightsBox && noncommercialBox) {
+    expect(rightsBox.width).toBeGreaterThan(disclaimerBox.width - 2);
+    expect(noncommercialBox.y).toBeGreaterThan(rightsBox.y + rightsBox.height);
+  }
+
+  await page.getByTestId("remake-notes-body").evaluate((body) => {
+    body.scrollTop = body.scrollHeight;
+  });
+  await expect(page.getByTestId("remake-disclaimer-contact")).toBeVisible();
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/remake-disclaimer-mobile.png",
+  });
 });
 
 test("面板打開時鍵盤不會操作戰場，敵方階段照常跑完", async ({ page }) => {

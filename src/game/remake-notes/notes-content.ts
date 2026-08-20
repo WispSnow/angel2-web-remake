@@ -19,6 +19,7 @@
  * - `FEATURE_SECTION` 收不改變合法操作與結算的資訊、表現與操作增強——玩家看得更清楚，
  *   但同一組操作打出同一個結果；
  * - `BALANCE_SECTION` 收 `[DD]` 產品決定——原版沒壞，是複刻主動改了手感。
+ * - `DISCLAIMER_SECTION` 不是規則比較表，只陳述非官方、非商業身分、權利歸屬與聯絡方式。
  *
  * 一條決定同時有規則面與顯示面時，按玩家實際感受到的那一面歸類：`REMAKE-101` 只是在
  * 提交前把範圍畫出來、沒有動冰雪的任何判定，所以歸「功能增強」；`REMAKE-035` 改變了誰
@@ -80,6 +81,19 @@ export interface RemakeNoteGroup {
 export interface RemakeNoteSection {
   readonly intro: string;
   readonly groups: readonly RemakeNoteGroup[];
+}
+
+export interface DisclaimerItem {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+}
+
+export interface DisclaimerSection {
+  readonly intro: string;
+  readonly labels: readonly string[];
+  readonly items: readonly DisclaimerItem[];
+  readonly closing: string;
 }
 
 const BUG_FIX_INTRO =
@@ -787,4 +801,51 @@ export const FEATURE_SECTION: RemakeNoteSection = {
 export const BALANCE_SECTION: RemakeNoteSection = {
   intro: BALANCE_INTRO,
   groups: BALANCE_GROUPS,
+};
+
+export const DISCLAIMER_SECTION: DisclaimerSection = {
+  intro: "本作是非官方、非商業的愛好者復刻。以下說明素材權利與使用目的；"
+    + "本聲明不代表已取得官方授權，也不構成對任何原作素材的再授權。",
+  labels: ["非官方", "非商業", "僅供學習交流"],
+  items: [
+    {
+      id: "rights",
+      title: "原作與素材權利",
+      body: "本復刻版所使用的遊戲素材均由製作者自公開網路資料蒐集、整理。"
+        + "《天使帝國 II》原作及相關圖像、音樂、音效、文字、角色與商標之著作權、商標權及其他"
+        + "智慧財產權，歸 **大宇資訊股份有限公司** 及其他依法享有權利者所有。"
+        + "素材可自網路取得，不代表已獲授權。",
+    },
+    {
+      id: "noncommercial",
+      title: "個人同人製作，非商業使用",
+      body: "本復刻版由個人愛好者製作，僅供學習、研究、保存與交流使用，是非商業項目；"
+        + "不收費、不含付費內容，也不以本作或原作素材獲利。",
+    },
+    {
+      id: "unofficial",
+      title: "非官方作品",
+      body: "本作與大宇資訊股份有限公司不存在隸屬、合作、贊助或授權關係，"
+        + "亦不代表其立場。請勿將本作誤認、宣傳或標示為官方版本。",
+    },
+    {
+      id: "support-original",
+      title: "支持正版",
+      body: "本作無意取代原版遊戲、官方重製或其他官方產品。若原作有合法購買或使用管道，"
+        + "請優先支持正版與官方作品。",
+    },
+    {
+      id: "redistribution",
+      title: "請勿商業利用或冒充官方",
+      body: "請勿將本作或其中的原作素材用於出售、付費下載、商業宣傳、募資回饋、"
+        + "冒充官方或其他營利用途；本聲明不授予任何人複製、散布或商業使用原作素材的權利。",
+    },
+    {
+      id: "contact",
+      title: "權利人聯絡與處理",
+      body: "如權利人認為本作內容不妥或涉及權利問題，請透過「RoadMap」頁所列交流群聯絡製作者。"
+        + "收到可核實通知後，製作者會盡快核對，並配合調整或移除相關內容。",
+    },
+  ],
+  closing: "這份說明旨在清楚交代本作的同人性質與使用邊界；它不取代適用法律，也不是法律意見。",
 };

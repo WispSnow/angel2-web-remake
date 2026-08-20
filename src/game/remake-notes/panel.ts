@@ -1,7 +1,9 @@
 import {
   BALANCE_SECTION,
   BUG_FIX_SECTION,
+  DISCLAIMER_SECTION,
   FEATURE_SECTION,
+  type DisclaimerSection,
   type RemakeNote,
   type RemakeNoteSection,
 } from "./notes-content";
@@ -9,21 +11,23 @@ import { createOverlayPanel, type OverlayTab } from "../overlay/panel";
 import { escapeHtml, inlineMarkup } from "../overlay/markup";
 
 /**
- * 「複刻說明」覆蓋層：三個敘述型分頁，逐條說明複刻版和原版哪裡不同。
+ * 「複刻說明」覆蓋層：三個規則／表現比較分頁，加上一個非官方同人免責聲明分頁。
  *
  * 資料表型的內容（職業、角色）不在這裡，它們有自己的「圖鑑」入口。覆蓋層本身的行為
  * 與輸入隔離見 `../overlay/panel.ts`。
  */
 
-export type RemakeNotesTab = "fixes" | "features" | "balance";
+export type RemakeNotesTab = "fixes" | "features" | "balance" | "disclaimer";
+type ComparisonTab = Exclude<RemakeNotesTab, "disclaimer">;
 
 export const REMAKE_NOTES_TABS: readonly OverlayTab<RemakeNotesTab>[] = [
   { id: "fixes", label: "Bug 修復", title: "原版缺陷與複刻修復" },
   { id: "features", label: "功能增強", title: "不改變戰果的資訊、表現與操作增強" },
   { id: "balance", label: "平衡性調整", title: "複刻版的平衡決定" },
+  { id: "disclaimer", label: "免責聲明", title: "非官方同人復刻的權利、用途與聯絡說明" },
 ];
 
-const NOTE_SECTIONS: Readonly<Record<RemakeNotesTab, RemakeNoteSection>> = {
+const NOTE_SECTIONS: Readonly<Record<ComparisonTab, RemakeNoteSection>> = {
   fixes: BUG_FIX_SECTION,
   features: FEATURE_SECTION,
   balance: BALANCE_SECTION,
@@ -66,13 +70,36 @@ function renderSection({ intro, groups }: RemakeNoteSection): string {
     ${sections}`;
 }
 
+function renderDisclaimer({ intro, labels, items, closing }: DisclaimerSection): string {
+  return `
+    <section class="rn-disclaimer" data-testid="remake-disclaimer">
+      <header class="rn-disclaimer-lead">
+        <p>${inlineMarkup(intro)}</p>
+        <div class="rn-disclaimer-labels" aria-label="作品性質">
+          ${labels.map((label) => `<span>${escapeHtml(label)}</span>`).join("")}
+        </div>
+      </header>
+      <div class="rn-disclaimer-grid">
+        ${items.map((item) => `
+          <article class="rn-disclaimer-item"
+            data-testid="remake-disclaimer-${escapeHtml(item.id)}">
+            <h3>${escapeHtml(item.title)}</h3>
+            <p>${inlineMarkup(item.body)}</p>
+          </article>`).join("")}
+      </div>
+      <p class="rn-disclaimer-closing">${inlineMarkup(closing)}</p>
+    </section>`;
+}
+
 const panel = createOverlayPanel<RemakeNotesTab>({
   testid: "remake-notes",
   eyebrow: "復刻說明",
   heading: "《天使帝國 II》Web 復刻版",
   footer: "遊戲仍在背後正常進行；本視窗只讀取內容資料，不會改變戰局、存檔或隨機序列。",
   tabs: REMAKE_NOTES_TABS,
-  render: (tab) => renderSection(NOTE_SECTIONS[tab]),
+  render: (tab) => tab === "disclaimer"
+    ? renderDisclaimer(DISCLAIMER_SECTION)
+    : renderSection(NOTE_SECTIONS[tab]),
 });
 
 export const openRemakeNotes = panel.open;

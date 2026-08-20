@@ -18,7 +18,7 @@ const TRIGGERS: readonly OverlayTrigger[] = [
   {
     id: "remake-notes",
     label: "復刻說明",
-    hint: "Bug 修復、功能增強與平衡性調整",
+    hint: "Bug 修復、功能增強、平衡性調整與免責聲明",
     open: async (button) => {
       const panel = await import("./remake-notes/panel");
       panel.openRemakeNotes(panel.REMAKE_NOTES_TABS[0].id, button);
