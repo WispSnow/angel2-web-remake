@@ -64,10 +64,15 @@ function renderNote(note: RemakeNote): string {
   const row = (term: string, value: string | undefined): string => value
     ? `<div><dt>${escapeHtml(term)}</dt><dd>${inlineMarkup(value)}</dd></div>`
     : "";
+  // 標題只做 HTML 轉義，不走行內標記：標題不接受反引號或 `**`，寫了只會原樣印在畫面上。
+  // 沒有決定編號的顯示增強不畫徽章：發行版不附決定記錄，玩家查不到那個編號。
+  const badge = note.badge === false
+    ? ""
+    : `<span class="rn-note-id">${escapeHtml(note.id)}</span>`;
   return `
     <article class="rn-note" data-testid="remake-note-${note.slug ?? note.id}">
       <header>
-        <span class="rn-note-id">${escapeHtml(note.id)}</span>
+        ${badge}
         <h4>${escapeHtml(note.title)}</h4>
         <span class="rn-note-tags">${note.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</span>
       </header>
@@ -79,7 +84,7 @@ function renderNote(note: RemakeNote): string {
     </article>`;
 }
 
-function renderSection({ intro, reference, groups }: RemakeNoteSection): string {
+function renderSection({ intro, groups }: RemakeNoteSection): string {
   const total = groups.reduce((count, group) => count + group.notes.length, 0);
   const sections = groups.map((group) => `
     <section class="rn-group" data-testid="remake-group-${group.id}">
@@ -88,7 +93,7 @@ function renderSection({ intro, reference, groups }: RemakeNoteSection): string 
     </section>`).join("");
   return `
     <p class="rn-intro">${inlineMarkup(intro)}</p>
-    <p class="rn-count">共 ${total} 條。${inlineMarkup(reference)}</p>
+    <p class="rn-count">共 ${total} 條。</p>
     ${sections}`;
 }
 

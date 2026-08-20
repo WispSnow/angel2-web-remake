@@ -41,6 +41,15 @@ import {
 } from "./save";
 import type { Difficulty, SaveData } from "./types";
 
+/**
+ * 規則集在存檔裡是代號（`stableRemake`），而發行版只有遊戲本體、不附任何決定記錄或設計
+ * 文件，所以記錄面板顯示玩家看得懂的名稱而不是代號本身。標籤讀存檔自己的欄位，未來真的
+ * 出現第二套規則集時只要在這裡補一行。
+ */
+const RULESET_LABELS: Record<SaveData["ruleset"], string> = {
+  stableRemake: "標準規則",
+};
+
 type StartupPhase = "pretitle" | "intro" | "title" | "difficulty" | "records";
 
 export interface NewGameSelection {
@@ -301,7 +310,7 @@ export function mountStartup(
     const { save } = result;
     const progress = save.kind === "battle" ? `第 ${save.battle.round} 回合` : "戰役完成";
     const savedAt = `${save.savedAt.slice(0, 16).replace("T", " ")} UTC`;
-    return `記錄 ${slot}：${save.stageLabel}・${progress}・stableRemake・${savedAt}`;
+    return `記錄 ${slot}：${save.stageLabel}・${progress}・${RULESET_LABELS[save.ruleset]}・${savedAt}`;
   };
 
   const recordCells = (result: SaveSlotReadResult): readonly string[] => {

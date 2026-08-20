@@ -49,8 +49,12 @@ test("四個分頁各載入自己的內容，Esc 關閉並交還焦點", async (
 
   await page.getByTestId("remake-notes-tab-features").click();
   await expect(page.getByTestId("remake-note-REMAKE-015")).toContainText("地形特性");
-  // 沒有規則決策編號的顯示增強統一標成 `UI [DD]`，並靠 slug 分辨。
-  await expect(page.getByTestId("remake-note-status-icon-tooltip")).toContainText("UI [DD]");
+  // 發行版不附決定記錄：沒有決定編號的顯示增強不得畫出玩家查不到的徽章。
+  const tooltipNote = page.getByTestId("remake-note-status-icon-tooltip");
+  await expect(tooltipNote).toBeVisible();
+  await expect(tooltipNote.locator(".rn-note-id")).toHaveCount(0);
+  await expect(page.getByTestId("remake-note-REMAKE-015").locator(".rn-note-id"))
+    .toHaveText("REMAKE-015");
   await expect(page.getByTestId("remake-note-REMAKE-004")).toHaveCount(0);
 
   await page.getByTestId("remake-notes-tab-balance").click();
