@@ -3,17 +3,24 @@ import { expect, test, type Page } from "@playwright/test";
 const cursorOf = (page: Page) => page.evaluate(() =>
   (window.__ANGEL2__?.getState() as { cursor: { x: number; y: number } } | undefined)?.cursor);
 
-const openNotes = async (page: Page, tab: "fixes" | "balance" | "classes"): Promise<void> => {
-  await page.getByTestId(`remake-notes-open-${tab}`).click();
+type NotesTab = "fixes" | "features" | "balance" | "classes";
+
+/** 宿主只有一顆入口按鈕且固定開在第一個分頁，其餘分頁要再點一次頁籤。 */
+const openNotes = async (page: Page, tab: NotesTab): Promise<void> => {
+  await page.getByTestId("remake-notes-open").click();
   await expect(page.getByTestId("remake-notes-body")).toBeVisible();
+  await expect(page.getByTestId("remake-notes-tab-fixes")).toHaveAttribute("aria-selected", "true");
+  if (tab === "fixes") return;
+  await page.getByTestId(`remake-notes-tab-${tab}`).click();
   await expect(page.getByTestId(`remake-notes-tab-${tab}`)).toHaveAttribute("aria-selected", "true");
 };
 
-test("the 復刻說明 entries sit in the host chrome, right of the scaling picker", async ({ page }) => {
+test("the 復刻說明 entry sits in the host chrome, right of the scaling picker", async ({ page }) => {
   await page.goto("/");
   const triggers = page.getByTestId("remake-notes-triggers");
   await expect(triggers).toBeVisible();
-  await expect(triggers.getByRole("button")).toHaveText(["Bug 修復", "平衡性調整", "職業圖鑑"]);
+  // 單一入口：分頁在覆蓋層自己的頁籤列，宿主那一行不再逐分頁開按鈕。
+  await expect(triggers.getByRole("button")).toHaveText(["復刻說明"]);
 
   // 與「畫面縮放」同一條界線：原版沒有這個畫面，它不得畫進 640×350 邏輯螢幕。
   await expect(triggers.locator("xpath=ancestor::*[@data-testid='startup-screen']")).toHaveCount(0);
@@ -33,21 +40,37 @@ test("the 復刻說明 entries sit in the host chrome, right of the scaling pick
   if (row) expect(row.x + row.width - (notes.x + notes.width)).toBeLessThan(4);
 });
 
-test("每個分頁都載入自己的內容，Esc 關閉並交還焦點", async ({ page }) => {
+test("四個分頁各載入自己的內容，Esc 關閉並交還焦點", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "fixes");
+  await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
+    .toHaveText(["Bug 修復", "功能增強", "平衡性調整", "職業圖鑑"]);
   await expect(page.getByTestId("remake-note-REMAKE-004")).toContainText("毒不再把生命打到 0");
+
+  await page.getByTestId("remake-notes-tab-features").click();
+  await expect(page.getByTestId("remake-note-REMAKE-015")).toContainText("地形特性");
+  // 沒有規則決策編號的顯示增強統一標成 `UI [DD]`，並靠 slug 分辨。
+  await expect(page.getByTestId("remake-note-status-icon-tooltip")).toContainText("UI [DD]");
+  await expect(page.getByTestId("remake-note-REMAKE-004")).toHaveCount(0);
 
   await page.getByTestId("remake-notes-tab-balance").click();
   await expect(page.getByTestId("remake-note-REMAKE-100")).toContainText("魔鎧戰士");
-  await expect(page.getByTestId("remake-note-REMAKE-004")).toHaveCount(0);
+  // 三條已改列「功能增強」的條目不得同時留在平衡分頁。
+  for (const id of ["REMAKE-101", "REMAKE-106", "REMAKE-107"]) {
+    await expect(page.getByTestId(`remake-note-${id}`)).toHaveCount(0);
+  }
+  await expect(page.getByTestId("remake-note-REMAKE-015")).toHaveCount(0);
 
   await page.getByTestId("remake-notes-tab-classes").click();
   await expect(page.getByTestId("compendium-index")).toBeVisible();
 
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("remake-notes-body")).toBeHidden();
-  await expect(page.getByTestId("remake-notes-open-fixes")).toBeFocused();
+  await expect(page.getByTestId("remake-notes-open")).toBeFocused();
+
+  // 入口固定開在第一個分頁，不記住上次停在哪一頁。
+  await page.getByTestId("remake-notes-open").click();
+  await expect(page.getByTestId("remake-notes-tab-fixes")).toHaveAttribute("aria-selected", "true");
 });
 
 test("職業圖鑑：轉職樹選取與轉職連結都切換右欄", async ({ page }) => {
@@ -100,9 +123,9 @@ test("面板打開時鍵盤不會操作戰場，敵方階段照常跑完", async
   // 說明視窗不暫停模擬：關掉之後戰場停在原處，玩家繼續打同一個回合。
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("remake-notes-body")).toBeHidden();
-  await expect(page.getByTestId("remake-notes-open-classes")).toBeFocused();
+  await expect(page.getByTestId("remake-notes-open")).toBeFocused();
   // 焦點刻意留在入口按鈕上，所以要先移開再用鍵盤操作戰場。
-  await page.getByTestId("remake-notes-open-classes").blur();
+  await page.getByTestId("remake-notes-open").blur();
 
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();

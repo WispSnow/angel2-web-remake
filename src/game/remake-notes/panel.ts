@@ -1,11 +1,10 @@
 import "../../remake-notes.css";
 import {
-  BALANCE_GROUPS,
-  BALANCE_INTRO,
-  BUG_FIX_GROUPS,
-  BUG_FIX_INTRO,
+  BALANCE_SECTION,
+  BUG_FIX_SECTION,
+  FEATURE_SECTION,
   type RemakeNote,
-  type RemakeNoteGroup,
+  type RemakeNoteSection,
 } from "./notes-content";
 import { COMPENDIUM_DEFAULT_CLASS_ID } from "./class-compendium";
 import { renderClassDetail, renderClassIndex } from "./compendium-view";
@@ -23,7 +22,7 @@ import { isClassId, type ClassId } from "../content/classes";
  * 上，未攔截的按鍵會在玩家只是翻閱說明時移動戰場游標，所以覆蓋層內的按鍵一律停在這裡。
  */
 
-export type RemakeNotesTab = "fixes" | "balance" | "classes";
+export type RemakeNotesTab = "fixes" | "features" | "balance" | "classes";
 
 interface TabDefinition {
   readonly id: RemakeNotesTab;
@@ -33,9 +32,21 @@ interface TabDefinition {
 
 export const REMAKE_NOTES_TABS: readonly TabDefinition[] = [
   { id: "fixes", label: "Bug 修復", title: "原版缺陷與複刻修復" },
+  { id: "features", label: "功能增強", title: "不改變戰果的資訊、表現與操作增強" },
   { id: "balance", label: "平衡性調整", title: "複刻版的平衡決定" },
   { id: "classes", label: "職業圖鑑", title: "全 39 個職業的屬性、成長與特性" },
 ];
+
+/** 只有敘述型分頁有 `RemakeNoteSection`；「職業圖鑑」由生成目錄自己派生。 */
+const NOTE_SECTIONS: Partial<Record<RemakeNotesTab, RemakeNoteSection>> = {
+  fixes: BUG_FIX_SECTION,
+  features: FEATURE_SECTION,
+  balance: BALANCE_SECTION,
+};
+
+function isRemakeNotesTab(value: string | undefined): value is RemakeNotesTab {
+  return REMAKE_NOTES_TABS.some((tab) => tab.id === value);
+}
 
 interface PanelHandles {
   readonly root: HTMLElement;
@@ -68,7 +79,7 @@ function renderNote(note: RemakeNote): string {
     </article>`;
 }
 
-function renderGroups(intro: string, groups: readonly RemakeNoteGroup[]): string {
+function renderSection({ intro, reference, groups }: RemakeNoteSection): string {
   const total = groups.reduce((count, group) => count + group.notes.length, 0);
   const sections = groups.map((group) => `
     <section class="rn-group" data-testid="remake-group-${group.id}">
@@ -77,7 +88,7 @@ function renderGroups(intro: string, groups: readonly RemakeNoteGroup[]): string
     </section>`).join("");
   return `
     <p class="rn-intro">${inlineMarkup(intro)}</p>
-    <p class="rn-count">共 ${total} 條，逐條對應 <code>reverse/gdd/web-remake-rule-decisions.md</code> 的決策編號。</p>
+    <p class="rn-count">共 ${total} 條。${inlineMarkup(reference)}</p>
     ${sections}`;
 }
 
@@ -98,11 +109,8 @@ function renderBody(): void {
   const tab = REMAKE_NOTES_TABS.find((definition) => definition.id === activeTab);
   panel.subtitle.textContent = tab?.title ?? "";
   panel.body.dataset.tab = activeTab;
-  panel.body.innerHTML = activeTab === "fixes"
-    ? renderGroups(BUG_FIX_INTRO, BUG_FIX_GROUPS)
-    : activeTab === "balance"
-      ? renderGroups(BALANCE_INTRO, BALANCE_GROUPS)
-      : renderCompendium();
+  const section = NOTE_SECTIONS[activeTab];
+  panel.body.innerHTML = section ? renderSection(section) : renderCompendium();
   panel.body.scrollTop = 0;
   for (const button of panel.root.querySelectorAll<HTMLButtonElement>("[data-notes-tab]")) {
     const selected = button.dataset.notesTab === activeTab;
@@ -141,7 +149,7 @@ function buildPanel(): PanelHandles {
         <button type="button" class="rn-close" data-notes-dismiss data-testid="remake-notes-close"
           aria-label="關閉復刻說明">✕</button>
       </header>
-      <div class="rn-tabs" role="tablist" aria-label="復刻說明分頁">
+      <div class="rn-tabs" role="tablist" aria-label="復刻說明分頁" data-testid="remake-notes-tabs">
         ${REMAKE_NOTES_TABS.map((tab) => `
           <button type="button" role="tab" data-notes-tab="${tab.id}"
             data-testid="remake-notes-tab-${tab.id}">${escapeHtml(tab.label)}</button>`).join("")}
@@ -168,7 +176,7 @@ function buildPanel(): PanelHandles {
       return;
     }
     const tab = target?.closest<HTMLElement>("[data-notes-tab]")?.dataset.notesTab;
-    if (tab === "fixes" || tab === "balance" || tab === "classes") {
+    if (isRemakeNotesTab(tab)) {
       activeTab = tab;
       renderBody();
       return;
