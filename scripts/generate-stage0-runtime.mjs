@@ -247,8 +247,22 @@ function composeUnitTopChrome(output) {
   runMagick(args);
 }
 
+/**
+ * 0000:8962 先用 DS:5FD1 的 `20x2` 图案把 `(480,150)` 起的 86 段扫描线套上色 0
+ * 50% 棋盘点阵，再画外框与五行分隔框。棋盘不是不透明底：它压在刚画完的战术小地图
+ * 上，所以浏览器这一张也保留透明像素，让小地图从点阵缝隙里透出来。
+ *
+ * DS:5F49（色 15 的行底白线）与 DS:5F7B 只被 0000:89DC 写入 y，整个模块镜像里没有
+ * 任何一处把它们送进矩形绘制器，所以原版每行**没有**下缘白线。
+ */
 function composeUnitBodyFrame(output) {
-  const args = ["-size", "160x171", "canvas:none"];
+  // 图案行 0 是 AAh、行 1 是 55h，且 (480,150) 两个原点都是偶数，因此屏幕上
+  // 「(x + y) 为偶数」的像素才落笔——正好是一张 2x2 贴砖。
+  const args = [
+    "(", "-size", "2x2", "xc:none", "-fill", gameplayPalette[0],
+    "-draw", "point 0,0", "-draw", "point 1,1", "-write", "mpr:body-dither", "+delete", ")",
+    "-size", "160x171", "tile:mpr:body-dither",
+  ];
   const drawRectangle = (x, y, width, height, colorIndex) => {
     args.push("-fill", gameplayPalette[colorIndex], "-draw", `rectangle ${x},${y} ${x + width - 1},${y + height - 1}`);
   };
@@ -261,7 +275,6 @@ function composeUnitBodyFrame(output) {
     drawRectangle(2, y + 1, 156, 1, 0);
     drawRectangle(2, y + 1, 1, 20, 0);
     drawRectangle(157, y + 1, 1, 20, 0);
-    drawRectangle(2, y + 20, 156, 1, 15);
   }
   drawRectangle(0, 106, 160, 1, 14);
   drawRectangle(2, 107, 156, 1, 0);

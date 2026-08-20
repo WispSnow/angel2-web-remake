@@ -209,6 +209,12 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
     "src",
     "/assets/original/status-icons/06.png",
   );
+  // 剩餘回合是原版點陣字畫在 (圖示X-6, 圖示Y+20)＝(478,279) 的緊湊模式數字，
+  // DOM 的那一份只留給無障礙名稱。
+  await expect.poll(() => page.locator(".native-text-layer").evaluate((canvas) => {
+    const { data } = (canvas as HTMLCanvasElement).getContext("2d")!.getImageData(477, 279, 12, 16);
+    return data.reduce((total, value, index) => index % 4 === 3 && value !== 0 ? total + 1 : total, 0);
+  })).toBeGreaterThan(0);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-jungle-poison-status-icon.png`,
   });

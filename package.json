@@ -71,6 +71,7 @@
     "content:stage36": "node scripts/generate-stage36-runtime.mjs",
     "content:stage37": "node scripts/generate-stage37-runtime.mjs",
     "content:stage38": "node scripts/generate-stage38-runtime.mjs",
+    "content:font": "node scripts/generate-native-font.mjs",
     "content:startup": "node scripts/generate-startup-runtime.mjs",
     "content:credits": "node scripts/generate-credits-runtime.mjs",
     "content:stage49": "node scripts/generate-stage49-ending.mjs",

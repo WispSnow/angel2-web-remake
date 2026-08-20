@@ -377,13 +377,27 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .logical-screen[data-phase="prebattleStory"] .bottom-round,
 .logical-screen[data-phase="prebattleStory"] .status-strip { display: none; }
 
-.bottom-location { position: absolute; z-index: 6; left: 80px; top: 331px; width: 320px; height: 19px; border-block: 1px solid #d8aa2c; color: #fff; background: #5d3b2b; text-align: center; font-size: 17px; line-height: 16px; text-shadow: 1px 1px #000; pointer-events: none; }
-.bottom-round { position: absolute; z-index: 7; left: 480px; top: 322px; width: 160px; height: 28px; color: #fff; text-align: center; font-size: 16px; pointer-events: none; }
+/* REMAKE-117: DS:3051 是 480x18 的色 14 外框，DS:305B 是 320x16 的色 1 內底，
+   A/0 的 6/7 兩張底角圖隨後蓋掉 x<80 與 x>=400，所以只剩 y=332 與 y=349 兩條金線。
+   關卡名本身由原版點陣字畫在文字層上，這裡的文字只留給輔助技術與驗收讀取。 */
+.bottom-location { position: absolute; z-index: 6; left: 80px; top: 332px; width: 320px; height: 18px; border-block: 1px solid #ffdf10; color: transparent; background: #5d4131; text-align: center; font-size: 17px; line-height: 16px; pointer-events: none; }
+.bottom-round { position: absolute; z-index: 7; left: 480px; top: 322px; width: 160px; height: 28px; color: transparent; text-align: center; font-size: 16px; pointer-events: none; }
 .bottom-round img { position: absolute; inset: 0; display: block; width: 160px; height: 28px; image-rendering: var(--image-rendering, pixelated); }
-.bottom-round span { position: absolute; left: 16px; top: 5px; width: 128px; height: 20px; line-height: 20px; text-shadow: 1px 1px #000; }
-/* REMAKE-110: 回合框只有三个字符的原版位置，倒数放不进去，所以警告只改字色。
-   不做闪烁——那需要额外的减少动态分支，而且这里要的是持续可读，不是吸引注意。 */
-.bottom-round[data-round-limit-warning="true"] span { color: #ffb7a8; }
+.bottom-round span { position: absolute; left: 16px; top: 5px; width: 128px; height: 20px; line-height: 20px; }
+/* 模組 29 用自己的 16x15 點陣字畫右欄身分列、五行數值、狀態剩餘回合、回合框與
+   關卡名（`0000:EA04`）。宿主 CJK 字型畫不出固定像素前進量與兩次外框描邊，所以
+   這些字的像素全部落在這張畫布上；DOM 只留透明文字承載無障礙名稱與驗收讀取。 */
+.native-text-layer {
+  position: absolute;
+  z-index: 7;
+  left: 0;
+  top: 0;
+  display: block;
+  width: 640px;
+  height: 350px;
+  image-rendering: var(--image-rendering, pixelated);
+  pointer-events: none;
+}
 
 .animated-portrait { position: relative; display: block; overflow: hidden; image-rendering: var(--image-rendering, pixelated); }
 .animated-portrait > img { position: absolute; display: block; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
@@ -407,13 +421,14 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 
 .unit-hud { position: absolute; z-index: 7; left: 484px; top: 4px; width: 152px; height: 317px; pointer-events: none; }
 .hud-tactical { z-index: 0; }
-.hud-tactical.under-unit .tactical-minimap { filter: brightness(.38); }
 .unit-detail { position: absolute; z-index: 1; inset: 0; width: 152px; height: 317px; }
-.unit-detail-shade { position: absolute; z-index: 0; left: -4px; top: -4px; width: 160px; height: 321px; background: linear-gradient(#5d4131 0 146px, rgba(3, 2, 3, .72) 146px); }
+/* REMAKE-117: 只有上半是 DS:5EB3 的不透明色 1 底（480,0,160,149）。下半的暗色
+   不是半透明遮罩，而是 DS:5FD1 的 50% 棋盘点阵，已经烧进身体框素材里。 */
+.unit-detail-shade { position: absolute; z-index: 0; left: -4px; top: -4px; width: 160px; height: 150px; background: #5d4131; }
 .hud-portrait { position: absolute; z-index: 1; left: 4px; top: 4px; width: 112px; height: 112px; }
 .hud-unit-top-chrome { position: absolute; z-index: 2; left: -4px; top: -4px; display: block; width: 160px; height: 149px; image-rendering: var(--image-rendering, pixelated); }
 .hud-unit-body-frame { position: absolute; z-index: 2; left: -4px; top: 146px; display: block; width: 160px; height: 171px; image-rendering: var(--image-rendering, pixelated); }
-.hud-identity { position: absolute; z-index: 3; left: 0; top: 119px; display: flex; width: 152px; height: 22px; align-items: center; color: #fff; text-align: center; }
+.hud-identity { position: absolute; z-index: 3; left: 0; top: 119px; display: flex; width: 152px; height: 22px; align-items: center; color: transparent; text-align: center; }
 .hud-identity b {
   display: block;
   width: 100%;
@@ -424,7 +439,6 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-shadow: 1px 1px #000;
 }
 .hud-identity b.is-compact { font-size: 14px; }
 .hud-identity b.is-tight { font-size: 12px; }
@@ -434,15 +448,17 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .hp-bar i { background: #e8272d; }
 .exp-bar { left: 135px; }
 .exp-bar i { background: #17209a; }
-.stat-list { position: absolute; z-index: 3; left: 4px; top: 150px; width: 144px; margin: 0; color: white; font: 13px/21px "Arial Narrow", sans-serif; }
+/* REMAKE-117: 五行數值是原版點陣字畫的單一字串（DS:5E64..5EA2 的樣板），
+   不是「標籤欄＋靠右數值欄」。這個列表只保留無障礙名稱、實況區與驗收讀取用的文字。 */
+.stat-list { position: absolute; z-index: 3; left: 4px; top: 150px; width: 144px; margin: 0; color: transparent; font: 13px/21px "Arial Narrow", sans-serif; }
 .stat-list div { display: grid; grid-template-columns: 47px 1fr; height: 21px; align-items: center; }
-.stat-list dt { color: #f4efcf; } .stat-list dd { margin: 0; text-align: right; font-size: 15px; font-weight: 700; }
+.stat-list dd { margin: 0; text-align: right; font-size: 15px; font-weight: 700; }
 .hud-status-list { position: absolute; z-index: 3; left: 0; top: 255px; display: grid; grid-template-columns: repeat(4, 38px); grid-auto-rows: 30px; width: 156px; height: 61px; margin: 0; padding: 0; overflow: visible; list-style: none; }
 /* The icon row is the only part of the unit panel that answers the pointer, so
    it opts back into hit testing the way the tactical minimap already does. */
 .hud-status-item { position: relative; width: 38px; height: 30px; pointer-events: auto; }
 .hud-status-item img { position: absolute; left: 0; top: 0; display: block; width: 40px; height: 31px; image-rendering: var(--image-rendering, pixelated); }
-.hud-status-item > span { position: absolute; z-index: 1; left: -6px; top: 20px; min-width: 8px; color: #fff; font: 700 9px/10px "Arial Narrow", sans-serif; text-align: right; text-shadow: 1px 1px #000, -1px 0 #000; }
+.hud-status-item > span { position: absolute; z-index: 1; left: -6px; top: 20px; min-width: 8px; color: transparent; font: 700 9px/10px "Arial Narrow", sans-serif; text-align: right; }
 /* Reading aid for a native readout that only ever showed an icon and a counter.
    Every column anchors the plate's right edge to the panel's left edge, so the
    four columns open in one place instead of walking across the map. */

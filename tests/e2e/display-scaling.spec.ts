@@ -164,5 +164,5 @@ test("the logical screen clips its overflow without becoming scrollable", async 
       scrollTop: screen.scrollTop,
       scrollLeft: screen.scrollLeft,
     };
-  })).toEqual({ settled: 331, afterScrollAttempt: 331, scrollTop: 0, scrollLeft: 0 });
+  })).toEqual({ settled: 332, afterScrollAttempt: 332, scrollTop: 0, scrollLeft: 0 });
 });
