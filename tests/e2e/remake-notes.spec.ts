@@ -15,12 +15,12 @@ const openNotes = async (page: Page, tab: NotesTab): Promise<void> => {
   await expect(page.getByTestId(`remake-notes-tab-${tab}`)).toHaveAttribute("aria-selected", "true");
 };
 
-test("兩個覆蓋層入口並排在宿主工具列上，靠在縮放選項右側", async ({ page }) => {
+test("三個覆蓋層入口並排在宿主工具列上，靠在縮放選項右側", async ({ page }) => {
   await page.goto("/");
   const triggers = page.getByTestId("host-overlay-triggers");
   await expect(triggers).toBeVisible();
-  // 分頁在各自覆蓋層的頁籤列，宿主這一行只有兩顆入口：說明一顆、圖鑑一顆。
-  await expect(triggers.getByRole("button")).toHaveText(["復刻說明", "圖鑑"]);
+  // 分頁在各自覆蓋層的頁籤列，宿主這一行只保留三個表面的單一入口。
+  await expect(triggers.getByRole("button")).toHaveText(["復刻說明", "圖鑑", "RoadMap"]);
 
   // 與「畫面縮放」同一條界線：原版沒有這些畫面，它們不得畫進 640×350 邏輯螢幕。
   await expect(triggers.locator("xpath=ancestor::*[@data-testid='startup-screen']")).toHaveCount(0);

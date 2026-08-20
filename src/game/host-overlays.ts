@@ -1,8 +1,8 @@
 /**
- * 宿主工具列上的覆蓋層入口：「復刻說明」與「圖鑑」。
+ * 宿主工具列上的覆蓋層入口：「復刻說明」、「圖鑑」與「RoadMap」。
  *
- * 兩顆按鈕都固定開在自己面板的第一個分頁，不記住上次停在哪一頁。這個模組刻意保持很小：
- * 面板本體、策展文字、職業與角色資料都由第一次點擊時動態載入，因此普通遊玩不為兩個
+ * 三顆按鈕都固定開在自己面板的第一個分頁，不記住上次停在哪一頁。這個模組刻意保持很小：
+ * 面板本體、策展文字、職業與角色資料都由第一次點擊時動態載入，因此普通遊玩不為三個
  * 參考視窗付出任何主包體積。
  */
 
@@ -33,6 +33,16 @@ const TRIGGERS: readonly OverlayTrigger[] = [
       const panel = await import("./compendium/panel");
       panel.openCompendium(panel.COMPENDIUM_TABS[0].id, button);
       return panel.destroyCompendium;
+    },
+  },
+  {
+    id: "roadmap",
+    label: "RoadMap",
+    hint: "復刻版候選願景與 QQ 交流群",
+    open: async (button) => {
+      const panel = await import("./roadmap/panel");
+      panel.openRoadmap(panel.ROADMAP_TABS[0].id, button);
+      return panel.destroyRoadmap;
     },
   },
 ];

@@ -1,4 +1,4 @@
-/* 宿主覆蓋層（「復刻說明」與「圖鑑」）共用的樣式。兩者都是宿主頁面的附屬介面，不屬於
+/* 宿主覆蓋層（「復刻說明」、「圖鑑」與「RoadMap」）共用的樣式。它們都是宿主頁面的附屬介面，不屬於
    640×350 邏輯螢幕，因此使用頁面字體與現代排版，只借用專案的酒紅／鎏金配色與遊戲保持
    同一調性。`rn-` 前綴是這一整套覆蓋層的命名空間，不專屬於復刻說明。 */
 
@@ -158,6 +158,112 @@
   background: #2a1d20;
   color: #e3b95c;
   font: 12px/1.5 ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+/* ── RoadMap ─────────────────────────────────────────────────── */
+
+.rn-body[data-tab="presentation"],
+.rn-body[data-tab="story"],
+.rn-body[data-tab="community"] { padding-bottom: 20px; }
+.rn-roadmap {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: 20px;
+}
+.rn-roadmap-main { min-width: 0; }
+.rn-roadmap-notice {
+  display: grid;
+  margin-bottom: 14px;
+  padding: 11px 14px;
+  border: 1px solid #59401f;
+  border-left: 3px solid var(--gold);
+  border-radius: 3px;
+  background: linear-gradient(100deg, #291b19, #1b1316);
+  gap: 2px;
+}
+.rn-roadmap-notice strong { color: #f3dcae; font-size: 13px; }
+.rn-roadmap-notice span { color: #aa9778; font: 11px/1.6 system-ui, sans-serif; }
+.rn-roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.rn-roadmap-item {
+  min-height: 154px;
+  padding: 14px;
+  border: 1px solid #33231f;
+  border-radius: 3px;
+  background:
+    linear-gradient(135deg, #24171b99, #151012cc),
+    repeating-linear-gradient(135deg, #8b64230a 0 1px, transparent 1px 9px);
+  box-shadow: 0 1px 0 #6a4a242b inset;
+}
+.rn-roadmap-label {
+  margin: 0 0 8px !important;
+  color: #dba638 !important;
+  font: 700 10px/1.4 system-ui, sans-serif !important;
+  letter-spacing: .16em;
+}
+.rn-roadmap-item h3 { margin: 0 0 7px; color: #f6e8c6; font-size: 16px; }
+.rn-roadmap-item > p:last-child {
+  margin: 0;
+  color: #cdbb9c;
+  font: 12px/1.7 system-ui, sans-serif;
+}
+.rn-roadmap-community {
+  position: sticky;
+  top: 0;
+  padding: 16px;
+  border: 1px solid #59401f;
+  border-radius: 3px;
+  background: linear-gradient(155deg, #25181c, #151013 68%);
+  box-shadow: 0 12px 30px #0005, 0 0 0 1px #2f2021 inset;
+}
+.rn-roadmap-community-kicker {
+  margin: 0 0 5px;
+  color: #dba638;
+  font: 700 9px/1.4 system-ui, sans-serif;
+  letter-spacing: .24em;
+}
+.rn-roadmap-community h3 { margin: 0 0 6px; color: var(--gold); font-size: 17px; }
+.rn-roadmap-community > p:not(.rn-roadmap-community-kicker) {
+  margin: 0 0 12px;
+  color: #b9a686;
+  font: 12px/1.6 system-ui, sans-serif;
+}
+.rn-roadmap-group-number {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid #493323;
+  background: #130d10;
+  gap: 12px;
+  font-family: system-ui, sans-serif;
+}
+.rn-roadmap-group-number span { color: #9d8a6b; font-size: 11px; }
+.rn-roadmap-group-number strong {
+  color: #f3dcae;
+  font: 700 16px/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  letter-spacing: .04em;
+}
+.rn-roadmap-qr { margin: 0; }
+.rn-roadmap-qr img {
+  display: block;
+  width: 100%;
+  height: min(380px, 48vh);
+  border: 1px solid #493323;
+  background: #f3f3f5;
+  object-fit: cover;
+  object-position: center 45%;
+}
+.rn-roadmap-qr figcaption {
+  margin-top: 6px;
+  color: #7f7059;
+  font: 10px/1.5 system-ui, sans-serif;
+  text-align: center;
 }
 
 /* ── 職業圖鑑 ───────────────────────────────────────────────── */
@@ -323,6 +429,8 @@
 .rn-class-link:hover { border-color: var(--gold-dark); color: var(--gold); }
 
 @media (max-width: 900px) {
+  .rn-roadmap { grid-template-columns: minmax(0, 1fr); }
+  .rn-roadmap-community { position: static; }
   .rn-compendium { grid-template-columns: minmax(0, 1fr); grid-template-rows: 200px minmax(0, 1fr); }
   .rn-class-index {
     padding-right: 0;
@@ -335,6 +443,10 @@
 @media (max-width: 560px) {
   .rn-dialog { width: 100vw; max-height: 100vh; border: none; border-radius: 0; }
   .rn-head, .rn-tabs, .rn-body, .rn-foot { padding-inline: 14px; }
+  .rn-tabs { overflow-x: auto; }
+  .rn-tabs > button { flex: none; padding-inline: 12px; }
+  .rn-roadmap-grid { grid-template-columns: minmax(0, 1fr); }
+  .rn-roadmap-item { min-height: 0; }
 }
 
 /* 角色圖鑑。左欄多一欄首次登場關卡，右欄把出場關卡排成可掃視的網格。 */
