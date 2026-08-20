@@ -410,6 +410,24 @@ function normalizeStage3OpeningEvents(value: unknown): unknown {
 }
 
 /**
+ * REMAKE-118 gives a named side-2 leader its move-then-attack back and bounds
+ * where it may land instead. Both halves are replanned from public battle
+ * state every phase and neither is stored, so a v90 save carries over as it
+ * stands and the next automatic plan simply uses the new boundary.
+ */
+function migrateVersion90Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 90
+    || value.contentVersion !== "expert-attack-down-melee-targeting-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-111 only changes how stage 3's fourth corps plans its own phase. That
  * plan is recomputed from public battle state every round and never saved, so a
  * v88 save carries over as it stands: the corps simply holds its ground from
@@ -2594,6 +2612,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
   const value = normalizeStage3OpeningEvents(raw);
+  const migratedVersion90 = migrateVersion90Save(value);
+  if (migratedVersion90) return migratedVersion90;
   const migratedVersion89 = migrateVersion89Save(value);
   if (migratedVersion89) return migratedVersion89;
   const migratedVersion88 = migrateVersion88Save(value);

@@ -13,6 +13,13 @@ const ENEMY_PHASE_TABLE_OFFSET = 0x1e46;
 const MUSIC_ALIAS_COUNT = 31;
 const MUSIC_ALIAS_BYTES = 11;
 
+const MODULE27_SHA256 = "498d0d9c4609317bf3177ed07985053d0b23bc5b5cbae22f553c079b8a868e60";
+const MUSIC_CONTAINER_INDEX = 8;
+// 模块 27 出场准备例程：交互名单门、选曲分支和 RIX 提交点。
+const DEPLOYMENT_SCREEN_GATE_OFFSET = 0x0584;
+const DEPLOYMENT_MUSIC_SELECT_OFFSET = 0x06a1;
+const DEPLOYMENT_MUSIC_PLAY_OFFSET = 0x0591;
+
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -62,6 +69,89 @@ function parseStageTable(module29, offset) {
     });
   }
   return entries;
+}
+
+const hex = (value, digits = 4) => value.toString(16).toUpperCase().padStart(digits, "0");
+
+/**
+ * 模块 27 拥有整个出场准备界面，并在画名单前给 RIX 驱动提交自己的循环曲。
+ * 这里逐字节核验三段代码，而不是靠人工标注：
+ *
+ * - `0000:0584` 用 DS:`0FF6`（当前空部署格）判断本关是否显示交互名单；
+ * - `0000:06A1` 比较当前场景与阈值，分别把两条 `MUSIC` 记录读进 DS:`00B3` 缓冲；
+ * - `0000:0591` 以驱动命令 1、模式 1（无限循环）提交该缓冲。
+ */
+function parseDeploymentScreenMusic(module27) {
+  const gate = module27.subarray(DEPLOYMENT_SCREEN_GATE_OFFSET, DEPLOYMENT_SCREEN_GATE_OFFSET + 7);
+  assert(
+    gate.equals(Buffer.from([0x83, 0x3e, 0xf6, 0x0f, 0x00, 0x75, 0x03])),
+    "module 27 deployment screen gate does not test DS:0FF6",
+  );
+
+  const select = module27.subarray(DEPLOYMENT_MUSIC_SELECT_OFFSET, DEPLOYMENT_MUSIC_SELECT_OFFSET + 0x2c);
+  assert(select[0] === 0xa1 && select.readUInt16LE(1) === 0x02b6, "expected `mov ax,[scene]`");
+  assert(select[3] === 0x3d && select[6] === 0x77, "expected `cmp ax,imm16` + `ja`");
+  const threshold = select.readUInt16LE(4);
+  const branches = [
+    { start: 0x08, atOrBelowThreshold: true },
+    { start: 0x1a, atOrBelowThreshold: false },
+  ].map(({ start, atOrBelowThreshold }) => {
+    const branch = select.subarray(start, start + 0x12);
+    assert(branch[0] === 0xa1 && branch.readUInt16LE(1) === 0x00b3, "expected `mov ax,[musicBuffer]`");
+    assert(branch[8] === 0xb9 && branch[11] === 0xbb, "expected `mov cx,record` + `mov bx,container`");
+    assert(
+      branch.readUInt16LE(12) === MUSIC_CONTAINER_INDEX,
+      "deployment music must load from the MUSIC container",
+    );
+    return { record: branch.readUInt16LE(9), atOrBelowThreshold };
+  });
+
+  const play = module27.subarray(DEPLOYMENT_MUSIC_PLAY_OFFSET, DEPLOYMENT_MUSIC_PLAY_OFFSET + 0x0f);
+  assert(
+    play.subarray(0, 4).equals(Buffer.from([0xff, 0x36, 0xb3, 0x00])),
+    "expected the music buffer segment to be pushed first",
+  );
+  assert(
+    play.subarray(4, 10).equals(Buffer.from([0x6a, 0x00, 0x6a, 0x01, 0x6a, 0x01])),
+    "expected RIX command 1 with loop mode 1 and a zero far-pointer offset",
+  );
+  assert(play[10] === 0x9a, "expected a far call into the RIX driver");
+
+  return {
+    gate: {
+      address: `0000:${hex(DEPLOYMENT_SCREEN_GATE_OFFSET)}`,
+      variable: "DS:0FF6",
+      meaning: "当前空部署格为 0 的关卡不显示交互名单，也不播放这条曲子。",
+    },
+    select: {
+      address: `0000:${hex(DEPLOYMENT_MUSIC_SELECT_OFFSET)}`,
+      sceneVariable: "DS:02B6",
+      threshold,
+      atOrBelowThresholdRecord: branches.find((branch) => branch.atOrBelowThreshold).record,
+      aboveThresholdRecord: branches.find((branch) => !branch.atOrBelowThreshold).record,
+    },
+    play: {
+      address: `0000:${hex(DEPLOYMENT_MUSIC_PLAY_OFFSET)}`,
+      command: 1,
+      mode: 1,
+      meaning: "单曲无限循环，不是入场/循环曲对。",
+    },
+  };
+}
+
+function deploymentRoles(record, deployment) {
+  const { threshold, atOrBelowThresholdRecord, aboveThresholdRecord } = deployment.select;
+  const isEarly = record === atOrBelowThresholdRecord;
+  if (!isEarly && record !== aboveThresholdRecord) return [];
+  return [{
+    id: isEarly ? "deploymentScreenEarlyScenes" : "deploymentScreenLateScenes",
+    function: isEarly
+      ? `场景 0..${threshold} 的出场准备界面音乐`
+      : `场景 ${threshold + 1} 起的出场准备界面音乐`,
+    confidence: "confirmed",
+    evidence: `模块 27 ${deployment.select.address} 选曲分支与 ${deployment.play.address} RIX 提交`,
+    note: "以命令 1／模式 1 单曲循环，随模块 27 退出而停止；无交互名单的关卡不播放。",
+  }];
 }
 
 function stageUses(entries, loopRecord) {
@@ -127,34 +217,15 @@ function battleRoles(record, playerTable, enemyTable) {
   }];
 }
 
-function additionalRoles(record) {
-  if (record === 25) {
-    return [{
-      id: "stage6BridgePreload",
-      function: "场景 6 返回模块 25 时的桥接预载",
-      confidence: "confirmed",
-      evidence: "模块 27 0000:00DC–00F7 特例",
-      note: "这不替代 MUSIC/25 作为战斗曲对 24/25 的短入场用途。",
-    }];
-  }
-  if (record === 29) {
-    return [{
-      id: "ordinaryBattleHandoffPreload",
-      function: "普通战斗准备结束后的模块 29 交接预载",
-      confidence: "confirmed",
-      evidence: "模块 27 0000:00DC–00F7",
-      note: "这是模块交接/准备资源，不代表第 0 关玩家阶段实际使用 MUSIC/29。",
-    }];
-  }
-  return [];
-}
-
-async function extract(modulePath, audioManifestPath, outputPath) {
-  const [module29, audioManifestBuffer] = await Promise.all([
+async function extract(modulePath, module27Path, audioManifestPath, outputPath) {
+  const [module29, module27, audioManifestBuffer] = await Promise.all([
     readFile(modulePath),
+    readFile(module27Path),
     readFile(audioManifestPath),
   ]);
   assert(sha256(module29) === MODULE29_SHA256, "module 29 hash mismatch");
+  assert(sha256(module27) === MODULE27_SHA256, "module 27 hash mismatch");
+  const deployment = parseDeploymentScreenMusic(module27);
   const audioManifest = JSON.parse(audioManifestBuffer);
   const musicEntries = audioManifest.entries
     .filter((entry) => entry.group === "MUSIC")
@@ -173,18 +244,9 @@ async function extract(modulePath, audioManifestPath, outputPath) {
     const roles = [
       ...(fixedRoles.get(entry.record) ?? []),
       ...battleRoles(entry.record, playerPhase, enemyPhase),
-      ...additionalRoles(entry.record),
+      ...deploymentRoles(entry.record, deployment),
     ];
-    const unresolved = roles.length === 0 || [15, 16, 17].includes(entry.record);
-    if ([16, 17].includes(entry.record)) {
-      roles.push({
-        id: "internalMusicBrowserOnly",
-        function: "仅确认存在于模块 29 内置曲目浏览/测试表",
-        confidence: "confirmed",
-        evidence: `模块 29 DS:19F6 别名 ${musicAliases.get(entry.record)?.legacyName}`,
-        note: "尚未找到发布流程中的剧情或战斗场景调用。",
-      });
-    }
+    const unresolved = roles.length === 0;
     return {
       record: entry.record,
       key: `MUSIC/${entry.record}`,
@@ -197,10 +259,7 @@ async function extract(modulePath, audioManifestPath, outputPath) {
       status: unresolved ? "unknown-needs-manual-test" : "confirmed",
       roles,
       ...(entry.record === 15 ? {
-        unknownReason: "模块 29 别名表、两张战斗逐关表和已闭合标题/密码/结局调用均未引用此记录。",
-      } : {}),
-      ...([16, 17].includes(entry.record) ? {
-        unknownReason: "有原生别名和内置曲目浏览入口，但尚未绑定发布流程中的玩家可见场景。",
+        unknownReason: "模块 29 别名表、两张战斗逐关表和已闭合标题/密码/结局/出场准备调用均未引用此记录；原始 RIX 与 MUSIC/16 字节完全相同。",
       } : {}),
     };
   });
@@ -213,6 +272,10 @@ async function extract(modulePath, audioManifestPath, outputPath) {
         path: path.relative(process.cwd(), modulePath),
         sha256: sha256(module29),
         dataSegmentFileBase: `0x${MODULE29_DATA_BASE.toString(16)}`,
+      },
+      module27: {
+        path: path.relative(process.cwd(), module27Path),
+        sha256: sha256(module27),
       },
       audioManifest: {
         path: path.relative(process.cwd(), audioManifestPath),
@@ -238,6 +301,11 @@ async function extract(modulePath, audioManifestPath, outputPath) {
       },
       duplicateBoundary: "两表尾部各保留一个被前项遮蔽的 stage 38 重复项；按原生首次命中规则标为 reachable=false。",
     },
+    deploymentScreen: {
+      module: 27,
+      ...deployment,
+      lifetime: "模块 25 在剧情结束时关闭 RIX 驱动，模块 27 重新初始化后才起这条曲；它随模块 27 退出而停止，随后由模块 29 起本关战斗曲对。",
+    },
     nativeAliases: aliases,
     records,
     unresolvedRecords: records.filter((record) => record.status !== "confirmed").map((record) => record.record),
@@ -248,9 +316,9 @@ async function extract(modulePath, audioManifestPath, outputPath) {
       empiricalConfirmation: "用户于 2026-07-19 实机确认第 0 关进入玩家阶段先播 MUSIC/7，再循环 MUSIC/6。",
     },
     evidenceBoundary: {
-      confirmed: "MUSIC/0、1、2..14、18..40 的功能已由原生调用/逐关表绑定；第 0 关玩家阶段顺序另有实机确认。",
-      unknown: "MUSIC/15 未见运行时别名或场景调用；MUSIC/16、17 只确认原生别名及内置曲目浏览入口，发布流程用途待手测。",
-      caution: "模块 27 的 MUSIC/29 交接预载不能替代模块 29 内部的逐关回合选曲表。",
+      confirmed: "MUSIC/0、1、2..14、16..40 的功能已由原生调用/逐关表绑定；第 0 关玩家阶段顺序另有实机确认。",
+      unknown: "MUSIC/15 未见运行时别名或场景调用。",
+      caution: "模块 27 0000:00DC–00F7 的 0x1D/0x19 是写给父接口偏移 8 的下一模块号（29／25），不是 MUSIC 记录号；模块 27 真正的音乐调用在 0000:06A1 与 0000:0591。",
     },
   };
 
@@ -260,12 +328,14 @@ async function extract(modulePath, audioManifestPath, outputPath) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
-  const [command, modulePath, audioManifestPath, outputPath] = process.argv.slice(2);
-  if (command !== "--extract" || !modulePath || !audioManifestPath || !outputPath) {
-    console.error("usage: angel2-music-catalog.mjs --extract <0029-unpacked.bin> <audio-manifest.json> <output.json>");
+  const [command, modulePath, module27Path, audioManifestPath, outputPath] = process.argv.slice(2);
+  if (command !== "--extract" || !modulePath || !module27Path || !audioManifestPath || !outputPath) {
+    console.error(
+      "usage: angel2-music-catalog.mjs --extract <0029-unpacked.bin> <0027-unpacked.bin> <audio-manifest.json> <output.json>",
+    );
     process.exit(1);
   }
-  await extract(modulePath, audioManifestPath, outputPath);
+  await extract(modulePath, module27Path, audioManifestPath, outputPath);
 }
 
-export { extract, parseAliases, parseStageTable };
+export { extract, parseAliases, parseStageTable, parseDeploymentScreenMusic };

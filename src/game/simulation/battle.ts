@@ -185,6 +185,17 @@ const clonePendingUnitTransformation = (
   context: { ...pending.context },
 });
 
+/**
+ * REMAKE-118's escort radius, in orthogonal steps: how far a named side-2
+ * leader may end an action from its nearest surviving squadmate. The number is
+ * a tuned product decision, not an original fact — the original never let a
+ * pursuit attack at all, so it had no need for one. Three is what the reported
+ * stage-34 case wants: it refuses 芙瑪羅妮's ten-cell dive to `(18,20)` while
+ * still letting her advance six cells behind her escort, and a player who steps
+ * within two cells of her is still attacked in the action that moves.
+ */
+export const NAMED_LEADER_ESCORT_RADIUS = 3;
+
 interface RangedPositionRisk {
   adjacentEnemyCount: number;
   meleeContactCount: number;
@@ -2089,7 +2100,7 @@ export class Stage0Battle {
         this.planOrdinaryAiAction(candidate, opponentSide, behavior, {
           ...options,
           expertRanking: true,
-          namedLeaderCaution: this.isEnemyNamedLeader(candidate),
+          namedLeaderLineHold: this.isEnemyNamedLeader(candidate),
         }),
       compareExpertActions: (candidate, left, right) => {
         const leftUtility = this.expertUtilityForAction(candidate, left);
@@ -2221,7 +2232,7 @@ export class Stage0Battle {
     } else {
       fallbackAction = this.planOrdinaryAiAction(unit, opponentSide, options.behavior, {
         expertRanking: true,
-        namedLeaderCaution: this.isEnemyNamedLeader(unit),
+        namedLeaderLineHold: this.isEnemyNamedLeader(unit),
         targetFilter: options.targetFilter,
       });
     }
@@ -2606,14 +2617,41 @@ export class Stage0Battle {
   }
 
   /**
-   * REMAKE-090's named side-2 leader. The content identity boundary already
-   * separates them from rank and file: a generic unit carries its profession's
-   * fallback portrait, a named general keeps a character portrait. Victory
-   * slots are not a sufficient test on their own — the wipe-out stages name
-   * nobody, yet that is exactly where a named general used to charge alone.
+   * The named side-2 leader of REMAKE-090/118. The content identity boundary
+   * already separates them from rank and file: a generic unit carries its
+   * profession's fallback portrait, a named general keeps a character
+   * portrait. Victory slots are not a sufficient test on their own — the
+   * wipe-out stages name nobody, yet that is exactly where a named general
+   * used to charge alone.
    */
   private isEnemyNamedLeader(unit: BattleUnit): boolean {
     return unit.side === 2 && !usesClassIdentity(unit);
+  }
+
+  /**
+   * REMAKE-118: a named leader may only land where its own line still stands
+   * beside it — some surviving squadmate within `NAMED_LEADER_ESCORT_RADIUS`.
+   * Escorts are measured where they stand *now*, before they take their own
+   * turn, so the leader advances at the pace its line has already set instead
+   * of at the pace its own movement value allows. That one bound covers both
+   * halves of the rule: you cannot outrun your escort, and you therefore
+   * cannot end up deeper in the player formation than your escort is.
+   *
+   * The bound relaxes to whatever gap the leader already stands at, so a
+   * leader that starts the stage detached is never frozen in place: it may
+   * hold that gap while it acts, but it may not widen it. A leader with no
+   * surviving squadmate at all has no line left to hold and is unconstrained.
+   * Frozen squadmates still anchor, because losing an escort to ice should
+   * pull the leader back, not turn it loose.
+   */
+  private namedLeaderLineFilter(unit: BattleUnit): (position: Position) => boolean {
+    const escorts = this.units.filter((candidate) =>
+      candidate.side === unit.side && candidate.id !== unit.id);
+    if (escorts.length === 0) return () => true;
+    const lineDistance = (position: Position): number =>
+      Math.min(...escorts.map((escort) => manhattan(position, escort)));
+    const bound = Math.max(NAMED_LEADER_ESCORT_RADIUS, lineDistance(unit));
+    return (position: Position): boolean => lineDistance(position) <= bound;
   }
 
   /**
@@ -2750,9 +2788,9 @@ export class Stage0Battle {
 
   /**
    * Exact one-enemy-phase melee reach, used by ranged positioning and by the
-   * REMAKE-090 named-leader landing. Unlike the broad exposure estimate, this
-   * projects the candidate occupant, honors terrain entry costs, blockers and
-   * ZOC, and only counts front-line roles.
+   * REMAKE-090/118 named-leader landing. Unlike the broad exposure estimate,
+   * this projects the candidate occupant, honors terrain entry costs, blockers
+   * and ZOC, and only counts front-line roles.
    */
   private rangedRiskEvaluator(actor: BattleUnit): (position: Position) => RangedPositionRisk {
     const opponents = this.units.filter((opponent) => opponent.side !== actor.side);
@@ -3001,6 +3039,9 @@ export class Stage0Battle {
       return this.tagLowLifeRest(unit, { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] });
     }
 
+    const lineHoldFilter = options.namedLeaderLineHold
+      ? this.namedLeaderLineFilter(unit)
+      : undefined;
     const reachable = this.reachableCells(unit.id)
       .filter((position) => options.destinationFilter?.(position) ?? true);
     const reachableKeys = new Set(reachable.map(positionKey));
@@ -3034,11 +3075,12 @@ export class Stage0Battle {
         const candidate = { x: enemy.x + offset.x, y: enemy.y + offset.y };
         const candidateKey = positionKey(candidate);
         if (!reachableKeys.has(candidateKey) || occupied.has(candidateKey)) continue;
-        // REMAKE-090: a named leader keeps the native pursuit boundary and
-        // strikes only from the cell it already holds, exactly like a guard.
-        if (options.expertRanking
-          && (behavior === 1 || options.namedLeaderCaution)
-          && candidateKey !== positionKey(unit)) continue;
+        // A guard strikes only from the cell it already holds.
+        if (options.expertRanking && behavior === 1 && candidateKey !== positionKey(unit)) continue;
+        // REMAKE-118: a named leader attacks after moving exactly like the rank
+        // and file. What it may not do is take the swing from a cell that has
+        // left its own escort behind.
+        if (lineHoldFilter && !lineHoldFilter(candidate)) continue;
         const path = candidateKey === positionKey(unit)
           ? [{ x: unit.x, y: unit.y }]
           : this.movementPath(unit.id, candidate);
@@ -3134,11 +3176,11 @@ export class Stage0Battle {
         return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
       }
       const targets = enemies.flatMap((enemy) => neighbors(enemy, this.dynamicBattlefield));
-      // REMAKE-090: a named leader ranks its pursuit landing by the exact
+      // REMAKE-090/118: a named leader ranks its pursuit landing by the exact
       // next-phase melee threat first, so it advances behind its escort
       // instead of spending the whole movement budget on the deepest cell.
       // Progress still gates every candidate, so the advance never stalls.
-      const cautiousRiskAt = options.namedLeaderCaution
+      const cautiousRiskAt = options.namedLeaderLineHold
         ? this.rangedRiskEvaluator(unit)
         : undefined;
       const compareCautiousLanding = (
@@ -3188,9 +3230,10 @@ export class Stage0Battle {
             defense: terrainDefensePercentFor(unit.classId, this.terrainSlotAt(position)),
             cautiousRisk: cautiousRiskAt?.(position),
           }))
-          .filter(({ path, distance }) => enemies.length > 0
+          .filter(({ position, path, distance }) => enemies.length > 0
             && path.length > 1
             && distance < originDistance
+            && (lineHoldFilter?.(position) ?? true)
             && (options.pathFilter?.(path) ?? true))
           .sort((left, right) => compareCautiousLanding(left.cautiousRisk, right.cautiousRisk)
             || left.distance - right.distance
@@ -3226,6 +3269,7 @@ export class Stage0Battle {
           candidate.remainingCost !== undefined
           && candidate.path.length > 1
           && candidate.traveledCost + candidate.remainingCost === originCost
+          && (lineHoldFilter?.(candidate.position) ?? true)
           && (options.pathFilter?.(candidate.path) ?? true))
         .sort((left, right) => compareCautiousLanding(left.cautiousRisk, right.cautiousRisk)
           || left.remainingCost - right.remainingCost

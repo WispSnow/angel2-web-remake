@@ -49,13 +49,14 @@ export interface OrdinaryAiPlanningOptions {
   /** Uses REMAKE-033 utility ranking and its 40% rest boundary. */
   expertRanking?: boolean;
   /**
-   * REMAKE-090 restores the native pursuit boundary for named side-2 leaders:
-   * `longPursuit`/`behaviorTwoPursuit` never attack in the action that moves,
-   * so the actor only strikes from the cell it already holds, and a pursuit
-   * action ranks landings by exact next-phase melee contact before progress.
-   * Rank and file keep the REMAKE-012 move-then-attack pursuit.
+   * REMAKE-118 keeps a named side-2 leader on its own line. It fights exactly
+   * like the rank and file — REMAKE-012 move-then-attack included — but every
+   * cell it may land on has to stay within reach of a surviving squadmate, and
+   * a pursuit landing still ranks exact next-phase melee contact before raw
+   * progress. Together those stop the lone charge REMAKE-090 was aimed at
+   * without taking the leader's attack away.
    */
-  namedLeaderCaution?: boolean;
+  namedLeaderLineHold?: boolean;
   targetFilter?: (target: BattleUnit) => boolean;
   destinationFilter?: (position: Position) => boolean;
   pathFilter?: (path: readonly Position[]) => boolean;

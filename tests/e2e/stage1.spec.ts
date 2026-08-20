@@ -129,6 +129,9 @@ async function enterStage1PlayerPhase(page: Page): Promise<void> {
   await skipStoryDialogue(page);
 
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
+  // Module 27 replaces the story track with its own roster loop, and scenes
+  // 0..5 take the MUSIC/16 branch of `0000:06A1`.
+  await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MUSIC/16");
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 5／8");
   await expect(page.getByTestId("deployment-roster-4")).toContainText("葛蒂拉斯");
   await page.getByTestId("deployment-roster-4").click();

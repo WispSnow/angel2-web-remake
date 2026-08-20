@@ -22,6 +22,7 @@ import {
   STAGE49_EPILOGUE_MUSIC_BY_SELECTOR,
 } from "./content/stage49-ending";
 import { CREDITS_MUSIC_PROGRAM } from "./content/credits";
+import { deploymentMusicProgramFor } from "./content/deployment-music";
 
 type BattleMusicSide = "player" | "enemy";
 
@@ -213,13 +214,20 @@ export class AudioManager {
       }
       else if (ending?.section === "stage38-boundary") desired = undefined;
     }
-    else if (this.controller.phase === "prebattleStory" || this.controller.phase === "deployment") {
-      // Some stages route straight into deployment with no prebattle story
-      // of their own (the connecting narrative already played at the end of
-      // the previous stage). Without this branch the roster screen would
-      // just keep whichever battle-phase track happened to be playing when
-      // the previous stage was won, instead of this stage's own pre-battle
-      // music (or silence, for stages that have none).
+    else if (this.controller.phase === "deployment") {
+      // The roster screen is its own native module. Module 25 shuts the RIX
+      // driver down when the pre-battle story ends, and module 27 starts a
+      // scene-selected looping track of its own before drawing the roster,
+      // so deployment never inherits the story or battle track.
+      desired = deploymentMusicProgramFor(this.controller.battle.stage.nativeStage);
+    }
+    else if (this.controller.phase === "prebattleStory") {
+      // Some stages route straight into the story with no track of their own
+      // (the connecting narrative already played at the end of the previous
+      // stage). Without this branch the story would just keep whichever
+      // battle-phase track happened to be playing when the previous stage was
+      // won, instead of this stage's own pre-battle music — or the silence
+      // that stages without a story record are supposed to have.
       desired = musicProgramFor(this.controller.battle.stage.music.story);
     }
     else if (side && (side !== previousSide || !desired)) {

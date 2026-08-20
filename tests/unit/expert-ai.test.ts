@@ -9,13 +9,15 @@ import { classCombatRole, classDefinition } from "../../src/game/content/classes
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
 import { STAGE34_DEFINITION } from "../../src/game/content/stage34";
+import { NAMED_LEADER_ESCORT_RADIUS } from "../../src/game/simulation/battle";
+import { loadStageRuntime } from "../../src/game/stage-runtime";
 import { manhattan } from "../../src/game/simulation/grid";
 import { expertSpecialUtility } from "../../src/game/simulation/expert-ai";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
 import { Stage34Battle } from "../../src/game/simulation/stage34-battle";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
-import type { CampaignState } from "../../src/game/types";
+import type { BattleUnit, CampaignState, Position } from "../../src/game/types";
 
 /** Stage 19 names side-2 slot 13 as the victory target; every other enemy is rank and file. */
 const stage19Campaign: CampaignState = {
@@ -72,6 +74,15 @@ const stage34Deployment = {
     })),
   ],
 };
+
+/** How far a named leader's landing sits from the nearest surviving squadmate. */
+const namedLeaderLineGap = (
+  battle: { units: readonly BattleUnit[] },
+  leaderId: string,
+  at: Position,
+): number => Math.min(...battle.units
+  .filter((unit) => unit.side === 2 && unit.id !== leaderId)
+  .map((mate) => manhattan(at, mate)));
 
 const placements = () => [
   { id: "ally-a", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
@@ -445,28 +456,88 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
   });
 
   /**
-   * REMAKE-090. Before this rule the leader spent its whole movement budget on
-   * the deepest engagement cell and attacked from it, landing alone inside the
-   * player formation with its escort left several cells behind.
+   * REMAKE-118. The reported charge: 芙瑪羅妮 spent her whole movement budget
+   * reaching `(18,20)`, attacked from it, and ended the phase alone inside the
+   * player formation with her escort six cells behind. The attack is no longer
+   * what stops her — the landing is.
    */
-  it("advances a named leader without attacking and keeps it out of the deepest cell", () => {
+  it("refuses the lone charge even when the attack is inside its movement budget", () => {
     const battle = new Stage34Battle(stage34Campaign, stage34Deployment);
     const leader = battle.unit("2:6");
-    if (!leader) throw new Error("leader missing");
+    const bait = battle.unit("1:0");
+    if (!leader || !bait) throw new Error("units missing");
     expect(leader.name).toBe("芙瑪羅妮");
     // The stage wipes side 2 out, so no victory slot marks her as a commander.
+    for (const other of battle.units.filter(({ side, id }) => side === 1 && id !== bait.id)) {
+      other.x = 2;
+      other.y = 47;
+    }
+    // The reported charge cell is `(18,20)`; bait her with its neighbour.
+    bait.x = 18;
+    bait.y = 21;
+    expect(battle.reachableCells("2:6").some(({ x, y }) => x === 18 && y === 20)).toBe(true);
+
     const action = battle.planEnemyAiAction("2:6");
     expect(action).toMatchObject({ kind: "move" });
     expect(action).not.toHaveProperty("targetId");
-
     const destination = action!.path.at(-1)!;
-    const players = battle.units.filter(({ side }) => side === 1);
-    const nearestPlayerAfter = Math.min(...players.map((player) => manhattan(destination, player)));
-    const squad = battle.units.filter((unit) => unit.side === 2 && unit.id !== leader.id);
-    const nearestSquadmateAfter = Math.min(...squad.map((mate) => manhattan(destination, mate)));
-    // She stops behind her own escort instead of outrunning it into contact.
-    expect(nearestPlayerAfter).toBeGreaterThan(nearestSquadmateAfter);
-    expect(battle.expertAiDecisionTrace("2:6")?.chosen?.reasons).toContain("暴露 1");
+    expect(destination).not.toEqual({ x: 18, y: 20 });
+    // She still advances, just no further than her own line stands.
+    expect(manhattan(destination, leader)).toBeGreaterThan(0);
+    expect(namedLeaderLineGap(battle, "2:6", destination))
+      .toBeLessThanOrEqual(NAMED_LEADER_ESCORT_RADIUS);
+  });
+
+  it("lets a named leader attack after moving while its line stands beside it", () => {
+    const battle = new Stage34Battle(stage34Campaign, stage34Deployment);
+    const leader = battle.unit("2:6");
+    const bait = battle.unit("1:0");
+    if (!leader || !bait) throw new Error("units missing");
+    bait.x = leader.x;
+    bait.y = leader.y + 2;
+
+    const action = battle.planEnemyAiAction("2:6");
+    expect(action).toMatchObject({ kind: "attack", targetId: "1:0" });
+    expect(action?.path.length).toBeGreaterThan(1);
+    expect(namedLeaderLineGap(battle, "2:6", action!.path.at(-1)!))
+      .toBeLessThanOrEqual(NAMED_LEADER_ESCORT_RADIUS);
+  });
+
+  /**
+   * REMAKE-118's escape hatch. Stage 31 opens with 菲伊魯茵 posted ten cells
+   * ahead of her own army and six from the player's, so the escort radius is
+   * unreachable by construction. The bound relaxes to the gap she already
+   * stands at rather than freezing her: she may hold it, but not widen it.
+   */
+  it("lets a detached named leader keep its posted gap but never widen it", async () => {
+    const runtime = await loadStageRuntime("stage-31");
+    const entry = {
+      ...stage34Campaign,
+      stageId: "stage-31" as const,
+      roster: completeCampaignRoster([]),
+    };
+    const battle = runtime.createBattle(entry, runtime.preparation?.createInitialResult());
+    const leader = battle.unit("2:5");
+    if (!leader) throw new Error("leader missing");
+    expect(leader.name).toBe("菲伊魯茵");
+    const gapAt = (at: Position) => namedLeaderLineGap(battle, "2:5", at);
+    const posted = gapAt(leader);
+    expect(posted).toBeGreaterThan(NAMED_LEADER_ESCORT_RADIUS);
+
+    // Advancing on the player force would widen the posted gap, so she holds.
+    const held = battle.planEnemyAiAction("2:5");
+    expect(gapAt(held!.path.at(-1)!)).toBeLessThanOrEqual(posted);
+
+    // She is not frozen: a player who steps in from her own army's side is
+    // closed on and struck in the action that moves.
+    const bait = battle.unit("1:3");
+    if (!bait) throw new Error("bait missing");
+    bait.x = leader.x;
+    bait.y = leader.y + 4;
+    const action = battle.planEnemyAiAction("2:5");
+    expect(action).toMatchObject({ kind: "attack", targetId: "1:3" });
+    expect(action?.path.length).toBeGreaterThan(1);
+    expect(gapAt(action!.path.at(-1)!)).toBeLessThanOrEqual(posted);
   });
 
   it("still lets a named leader strike from the cell it already holds", () => {

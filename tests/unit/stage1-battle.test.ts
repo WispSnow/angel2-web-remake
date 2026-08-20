@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STAGE1_DEFINITION } from "../../src/game/content/stage1";
+import { NAMED_LEADER_ESCORT_RADIUS } from "../../src/game/simulation/battle";
 import { finishDeployment, createDeploymentState, reduceDeployment } from "../../src/game/simulation/deployment";
 import { Stage1Battle } from "../../src/game/simulation/stage1-battle";
 import type { CampaignState } from "../../src/game/types";
@@ -237,13 +238,18 @@ describe("stage 1 battle construction", () => {
     expect(sisterAction?.path.length).toBeGreaterThan(1);
     expect(sisterAction).not.toHaveProperty("actionId");
     pursuing.startNextRound();
-    // REMAKE-090: the delay still turns the named boss into a pursuer, but a
-    // named leader keeps the native pursuit boundary and never attacks in the
-    // action that moves.
+    // REMAKE-118: the delay still turns the named boss into a pursuer, and she
+    // strikes in the action that moves like anyone else. What she may not do is
+    // land outside her own line — here her escort walked up with her, so the
+    // move-then-attack is exactly the one the rule allows.
     const fangAction = pursuing.planEnemyAiAction("2:16");
-    expect(fangAction).toMatchObject({ kind: "move" });
+    expect(fangAction).toMatchObject({ kind: "attack", targetId: "1:0" });
     expect(fangAction?.path.length).toBeGreaterThan(1);
-    expect(fangAction).not.toHaveProperty("targetId");
+    const landing = fangAction!.path.at(-1)!;
+    const escort = pursuing.units.filter(({ side, id }) => side === 2 && id !== "2:16");
+    expect(Math.min(...escort.map(({ x, y }) =>
+      Math.abs(landing.x - x) + Math.abs(landing.y - y))))
+      .toBeLessThanOrEqual(NAMED_LEADER_ESCORT_RADIUS);
   });
 
   it("activates the second group when a member can move and ordinary-attack this turn", () => {

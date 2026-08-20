@@ -245,7 +245,7 @@ test("S23-G/H: Nia reaches the top with every guard alive, saves, and opens stag
   });
 });
 
-test("stage 24's deployment screen does not inherit stage 23's battle music", async ({ page }) => {
+test("stage 24's deployment screen plays module 27's own roster track", async ({ page }) => {
   await page.goto("/?debugScenario=stage-23-near-victory&difficulty=0&test=1");
   await waitForPhase(page, "player");
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", /MUSIC\/(18|19)/u);
@@ -268,10 +268,11 @@ test("stage 24's deployment screen does not inherit stage 23's battle music", as
   await waitForPhase(page, "deployment");
 
   expect(await state(page)).toMatchObject({ stageId: "stage-24", phase: "deployment" });
-  // Stage 24 has no prebattle story and so no dedicated pre-battle track of
-  // its own; the roster screen must fall silent instead of carrying stage
-  // 23's player-phase battle music straight through the stage boundary.
-  await expect(page.locator("#app")).toHaveAttribute("data-music-track", "none");
+  // Native module 27 owns the roster screen and starts its own looping track
+  // there (`0000:06A1`): MUSIC/17 from scene 6 on. Stage 24 has no prebattle
+  // story of its own, so without that track the screen would still be
+  // carrying stage 23's player-phase battle music across the stage boundary.
+  await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MUSIC/17");
 });
 
 test("toggling 確定/取消 in the save-confirm menu reuses its DOM node instead of replaying the pop-in", async ({ page }) => {
