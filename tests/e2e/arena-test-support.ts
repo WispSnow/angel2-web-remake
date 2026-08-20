@@ -72,6 +72,7 @@ export interface ArenaBattleDebugState {
     phase: string;
     frame: number;
     nativeTicks: number;
+    displayedLifeByUnitId: Record<string, number>;
     lifeChangeUnitId?: string;
   }>;
   audioCueLog: Array<{ group: string; record: number; reason: string }>;

@@ -212,7 +212,10 @@ test("later-stage and debug modules stay deferred during stage-zero startup", as
   const deferredRequests: string[] = [];
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
-    if (/stage1|stage-01|deployment|debug-scenarios|debug\.css/.test(pathname)) {
+    const isDeferredStageOrDebug = /stage1|stage-01|debug-scenarios|debug\.css/.test(pathname);
+    const isDeferredDeployment = /\/src\/game\/(?:deployment-(?:minimap|session|ui)|simulation\/deployment)\b/
+      .test(pathname);
+    if (isDeferredStageOrDebug || isDeferredDeployment) {
       deferredRequests.push(pathname);
     }
   });

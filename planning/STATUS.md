@@ -138,7 +138,7 @@
 - `pnpm build` 保留开发构建并包含调试中心、竞技场和各实验室；`pnpm build:release` 使用
   `release` 模式，仅输出主游戏入口到 `release/`，并在构建期禁用 `debugScenario`、`?test`、
   `?skipStartup` 和开发专用动态模块。
-- `release/` 是可重复生成的发布产物，当前为 2,105 个文件、58.6 MiB；音乐运行时统一使用
+- `release/` 是可重复生成的发布产物，当前为 2,113 个文件、59.1 MiB；音乐运行时统一使用
   `public/assets/original/music/` 下的 54 个去重 OGG 母版和 3 个 Stage 0 无缝 OGG 派生文件。
   地图技能的 1,029 个原始动作帧在开发版继续保留，只供逆向证据与图集像素对照；正式战斗、
   debug 战役、竞技场与技术实验室运行时统一使用按技能族生成的 26 组 Phaser JSON Hash 图集

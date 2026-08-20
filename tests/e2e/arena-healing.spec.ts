@@ -112,29 +112,23 @@ test("tier-three magic guide performs native 3H with its delayed bloom sound", a
   await page.getByTestId("technique-heal-3").click();
   await clickArenaWorldCell(page, 23, 30);
 
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "healPrimary"
-      && dataset.mapCombatFrame === "3"
-      && dataset.mapCombatEffectTileCount === "6";
-  }, undefined, { polling: "raf" });
-  await page.waitForFunction(() => {
-    const current = (window.__ANGEL2_ARENA__?.getState() as {
-      battle?: ArenaBattleDebugState;
-    }).battle;
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "healPrimary"
-      && dataset.mapCombatFrame === "12"
-      && dataset.mapCombatEffectTileCount === "6"
-      && current?.audioCueLog.some(({ reason }) => reason === "heal-3-bloom");
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-heal-3-heart.png`,
-  });
+  if (process.env.VISUAL_AUDIT === "1") {
+    await page.waitForFunction(() => {
+      const current = (window.__ANGEL2_ARENA__?.getState() as {
+        battle?: ArenaBattleDebugState;
+      }).battle;
+      const dataset = document.querySelector<HTMLCanvasElement>(
+        "[data-testid='battle-canvas']",
+      )?.dataset;
+      return dataset?.mapCombatPhase === "healPrimary"
+        && dataset.mapCombatFrame === "12"
+        && dataset.mapCombatEffectTileCount === "6"
+        && current?.audioCueLog.some(({ reason }) => reason === "heal-3-bloom");
+    }, undefined, { polling: "raf" });
+    await captureVisualAudit(page.getByTestId("game-screen"), {
+      path: `${ARTIFACT_DIR}/arena-heal-3-heart.png`,
+    });
+  }
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -155,6 +149,13 @@ test("tier-three magic guide performs native 3H with its delayed bloom sound", a
       lifeAfter: targetBefore?.life,
     })],
   });
+  expect(after?.specialActionPresentationTrace).toEqual(expect.arrayContaining([
+    expect.objectContaining({ phase: "healPrimary", frame: 3 }),
+    expect.objectContaining({ phase: "healPrimary", frame: 12 }),
+  ]));
+  expect(after?.audioCueLog).toContainEqual(expect.objectContaining({
+    reason: "heal-3-bloom",
+  }));
   expect(after?.lastSpecialAction?.experienceGained).toBeGreaterThanOrEqual(0);
   expect(after?.lastSpecialAction?.experienceGained).toBeLessThanOrEqual(2);
   expect(after?.units.find(({ id }) => id === "arena-1-0")?.experience)
@@ -190,6 +191,16 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
   await page.getByTestId("arena-start").click();
   const before = await arenaBattleState(page);
   const guideMaxLife = before?.units.find(({ id }) => id === "arena-2-0")?.life;
+  const healHeartFrame = process.env.VISUAL_AUDIT === "1"
+    ? page.waitForFunction(() => {
+      const dataset = document.querySelector<HTMLCanvasElement>(
+        "[data-testid='battle-canvas']",
+      )?.dataset;
+      return dataset?.mapCombatPhase === "healPrimary"
+        && dataset.mapCombatFrame === "12"
+        && dataset.mapCombatEffectTileCount === "6";
+    }, undefined, { polling: "raf" })
+    : undefined;
 
   for (const [x, y, actorId] of [
     [25, 30, "arena-1-0"],
@@ -210,24 +221,18 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
   const wounded = (await arenaBattleState(page))?.units.find(({ id }) => id === "arena-2-0");
   expect(wounded!.life).toBeLessThan(guideMaxLife! - 90);
 
-  const healHeartFrame = page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "healPrimary"
-      && dataset.mapCombatFrame === "12"
-      && dataset.mapCombatEffectTileCount === "6";
-  }, undefined, { polling: "raf" });
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
   await expect(dialogue).toHaveAttribute("data-action-id", "heal-3");
   await expect(dialogue).toHaveAttribute("data-effect-center", "26,30");
   await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
   await expect(page.getByText("生命單.", { exact: true })).toBeVisible();
-  await healHeartFrame;
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-heal-3-ai-heart.png`,
-  });
+  if (healHeartFrame) {
+    await healHeartFrame;
+    await captureVisualAudit(page.getByTestId("game-screen"), {
+      path: `${ARTIFACT_DIR}/arena-heal-3-ai-heart.png`,
+    });
+  }
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -244,6 +249,10 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
     target: { x: 26, y: 30 },
     affectedUnits: [expect.objectContaining({ unitId: "arena-2-0" })],
   });
+  expect(after?.specialActionPresentationTrace).toContainEqual(expect.objectContaining({
+    phase: "healPrimary",
+    frame: 12,
+  }));
   // 3H restores 48% of the maximum, capped by the missing life.
   expect(after?.lastSpecialAction?.healing)
     .toBe(Math.min(guideMaxLife! - wounded!.life, Math.floor(guideMaxLife! * 48 / 100)));

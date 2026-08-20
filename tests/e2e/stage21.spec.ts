@@ -88,7 +88,7 @@ test("S21-A–D: four scouts enter, cross the forest, discover the dolls, and ro
   ]);
   for (const unit of (await state(page)).units) expect(unit.classId).not.toBe("soldier");
   // The interlude never reaches a side phase, so nobody wears the 已行動 badge.
-  await expect(page.locator("canvas")).toHaveAttribute("data-acted-badge-count", "0");
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-acted-badge-count", "0");
   await expect(page.getByTestId("unit-hud")).toContainText("妮雅");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage21-scout-arrival.png`,

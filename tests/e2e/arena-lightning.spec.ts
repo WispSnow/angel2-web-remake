@@ -263,32 +263,31 @@ test("tier-three magic master descends native 4L before planting its inherited-a
   await expect(page.getByTestId("technique-lightning-3")).toHaveCount(0);
   await page.getByTestId("technique-lightning-4").click();
   await clickArenaWorldCell(page, 23, 33);
+  if (process.env.VISUAL_AUDIT === "1") {
+    await page.waitForFunction(() => {
+      const dataset = document.querySelector<HTMLCanvasElement>(
+        "[data-testid='battle-canvas']",
+      )?.dataset;
+      return dataset?.mapCombatPhase === "lightningMain"
+        && dataset.mapCombatFrame === "16"
+        && dataset.mapCombatAnchorOffset === "0,0";
+    }, undefined, { polling: "raf" });
+    await captureVisualAudit(page.getByTestId("game-screen"), {
+      path: `${ARTIFACT_DIR}/arena-lightning-4-descending.png`,
+    });
 
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "lightningMain"
-      && dataset.mapCombatFrame === "16"
-      && dataset.mapCombatAnchorOffset === "0,0";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-4-descending.png`,
-  });
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "lightningMain"
-      && dataset.mapCombatFrame === "21"
-      && dataset.mapCombatAnchorOffset === "0,1";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(centerBefore);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-4-column.png`,
-  });
+    await page.waitForFunction(() => {
+      const dataset = document.querySelector<HTMLCanvasElement>(
+        "[data-testid='battle-canvas']",
+      )?.dataset;
+      return dataset?.mapCombatPhase === "lightningMain"
+        && dataset.mapCombatFrame === "21"
+        && dataset.mapCombatAnchorOffset === "0,1";
+    }, undefined, { polling: "raf" });
+    await captureVisualAudit(page.getByTestId("game-screen"), {
+      path: `${ARTIFACT_DIR}/arena-lightning-4-column.png`,
+    });
+  }
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -305,6 +304,14 @@ test("tier-three magic master descends native 4L before planting its inherited-a
     damage: 230,
     experienceGained: 0,
   });
+  expect(after?.specialActionPresentationTrace).toEqual(expect.arrayContaining([
+    expect.objectContaining({ phase: "lightningMain", frame: 16 }),
+    expect.objectContaining({
+      phase: "lightningMain",
+      frame: 21,
+      displayedLifeByUnitId: expect.objectContaining({ "arena-2-0": centerBefore }),
+    }),
+  ]));
   expect(after?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(centerBefore! - 110);
   expect(after?.units.find(({ id }) => id === "arena-2-1")?.life).toBe(innerBefore! - 90);
   expect(after?.units.find(({ id }) => id === "arena-2-2")?.life).toBe(outerBefore! - 30);
