@@ -2113,7 +2113,22 @@ function renderTactical(controller: GameController, underUnit = false): string {
 function renderResult(layer: HTMLElement, controller: GameController): void {
   const phase = controller.phase;
   layer.hidden = !["defeat", "victoryFeedback", "savePrompt", "saveSlots", "quit", "nextStage"].includes(phase);
-  if (layer.hidden) return;
+  if (layer.hidden) {
+    delete layer.dataset.resultPhase;
+    return;
+  }
+  if (phase === "savePrompt" && layer.dataset.resultPhase === "savePrompt") {
+    // 選單本體已經在畫面上，這次重繪只是確定／取消的選取索引變了：原地切換
+    // `is-selected`，不要整段換新節點，否則方框會被當成剛掛上的元素，
+    // 讓 `native-menu-zoom-in` 的彈出動畫每次切換都重播一次。
+    for (const button of layer.querySelectorAll<HTMLButtonElement>("[data-save-prompt-index]")) {
+      const selected = Number(button.dataset.savePromptIndex) === controller.savePromptIndex;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-current", String(selected));
+    }
+    return;
+  }
+  layer.dataset.resultPhase = phase;
   if (phase === "defeat") {
     const text = "啊！．．．竟然失敗了？\n我太低辜敵人的實力，再給我一次機會吧！";
     layer.innerHTML = nativeFeedbackMarkup(text, "retry", "retry-button");

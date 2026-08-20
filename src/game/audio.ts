@@ -213,7 +213,13 @@ export class AudioManager {
       }
       else if (ending?.section === "stage38-boundary") desired = undefined;
     }
-    else if (this.controller.phase === "prebattleStory") {
+    else if (this.controller.phase === "prebattleStory" || this.controller.phase === "deployment") {
+      // Some stages route straight into deployment with no prebattle story
+      // of their own (the connecting narrative already played at the end of
+      // the previous stage). Without this branch the roster screen would
+      // just keep whichever battle-phase track happened to be playing when
+      // the previous stage was won, instead of this stage's own pre-battle
+      // music (or silence, for stages that have none).
       desired = musicProgramFor(this.controller.battle.stage.music.story);
     }
     else if (side && (side !== previousSide || !desired)) {

@@ -57,6 +57,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `src/styles.css` 的胜负条件／出击提示面板安全区、长文排版与滚动兜底 | 无独立模拟数值测试 | `objective-panel-layout.spec.ts` |
 | `src/game/menu-pointer-glide.ts` 的原生开菜单指针滑行：`0000:580F`／`0000:5851` 的「四分之一剩余距离、至少 1 px、差 1 px 就停」步进、`0000:57F9` 的精确落点收尾，与`0000:56C8` 的 `(0x78, 0x1C)` 第一行落点 | `menu-pointer-glide.test.ts` | `menu-animation.spec.ts` 的滑行用例（含减少动态跳过） |
 | `src/game/menu-animation.ts` 与 `src/styles.css` 的选单开闔动画：开启由 CSS 在 `hidden` 解除时重播，关闭先播收合动画再真正隐藏，收合期间标 `aria-hidden`、不接收指针、不重建内容 | 无独立单元测试（Vitest 运行在 node 环境，无 DOM） | `menu-animation.spec.ts`；量测选单几何的用例先调 `menu-controls.ts` 的 `settleMenuAnimation`，关掉再开同一个选单的流程改用同一文件的 `expectMenuOpen`（收合动画期间旧方框仍可见，`toBeVisible()` 会提前成立）；两者的现有调用点见 `game-functions-menu.spec.ts`、`objective-panel-layout.spec.ts`、`stage0.spec.ts` |
+| `src/game/ui.ts` 的 `renderResult`：`savePrompt` 的確定／取消選單只在剛進入該畫面時建立節點，選取索引變動只原地切換 `is-selected`／`aria-current`，不重建節點（否則會被當成新掛上的 `.action-menu` 而重播 `native-menu-zoom-in`） | 无独立单元测试（同上，需要 DOM） | `stage23.spec.ts` 的「toggling 確定／取消 in the save-confirm menu reuses its DOM node instead of replaying the pop-in」 |
 | “遊戲功能”原版“子 選 單”的五项顺序、`ON/OFF`、面板／命中行几何、原版调色板与手形光标，以及键盘和鼠标切换 | 无独立模拟数值测试 | `game-functions-menu.spec.ts` |
 | `src/game/scaling.ts`、`display-settings.ts` 的宿主「畫面縮放」偏好：`sharp`／`smooth`／`integer` 的取值校验、整数倍按装置像素吸附与留边取整，以及逻辑屏外的选择器位置与持久化 | `scaling.test.ts`、`preferences.test.ts` 的「display preferences」 | `display-scaling.spec.ts` |
 | `src/game/remake-notes.ts` 与 `src/game/remake-notes/` 的「復刻說明」宿主覆盖层：单一入口按钮与「畫面縮放」同行右对齐且固定开在第一个分页、四个分页各自的内容、按键不得抵达战场、`Esc` 关闭并交还焦点、面板打开时敌方阶段照常推进，以及职业图鉴对全部 39 个职业目录记录的覆盖与平衡覆写派生 | 无独立单元测试（视图模型全部由 `class-catalog.generated.ts` 与 `classes.ts` 的公开函数派生，数值本身由 `class-balance-overrides.test.ts`、`enemy-scaling.test.ts` 覆盖） | `remake-notes.spec.ts` |
@@ -108,6 +109,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 模块 25 过场底纹：`A/20` 以 `40×40` 为重复单元铺满 `640×350`（全部关卡共用一张）、`BK/<id>` 画在原生 `(160,80)`，以及模块 29 战场内 `PP` 不得长出底纹 | 无独立模拟数值测试；证据在 `story-presentations.json#storyBackdrop`，运行时图块由 `scripts/generate-portrait-catalog.mjs` 裁出并断言 | `story-backdrop.spec.ts` |
 | `audio.ts`、`audio-settings.ts` 的四类音效请求门与走路声 `E/14`：玩家／我方自动／工兵構築／半龍戰士傳送／逐关脚本移动各请求一次，返悔与 `REMAKE-106` 的敌方阶段静音，走路声随移动演出结束淡出收尾（`data-walk-effect-active`） | `audio.test.ts` 的通道路由 | `stage0.spec.ts` 的 `RHP-05`／`RHP-05b` 与 `S00-A` 移动段、我方自动见 `stage2.spec.ts`、敌方静音见 `stage3.spec.ts` 的 `S03-N/O` |
 | 逆向 RIX WAV 到运行时去重 OGG、Stage 0 无缝派生、源/输出哈希和发布目录禁用旧音乐 WAV | `music-assets.test.ts`、`credits.test.ts`、`stage49-ending.test.ts` | `stage0.spec.ts` 的 `S00-P`、`startup.spec.ts` 音频激活、`stage49-ending.spec.ts` 的音乐阶段 |
+| `audio.ts` 的 `syncMusic` 逐阶段选曲：`deployment` 与 `prebattleStory` 同样播放本关 `music.story`（无关前剧情的关卡直接进入部署时也要重新选曲，不能沿用上一关战斗阶段还在播的曲目；没有 `music.story` 的关卡则回到靜音，而不是继续放上一关的曲子） | 无独立单元测试（`AudioManager` 需要 DOM／Web Audio） | `stage23.spec.ts` 的「stage 24's deployment screen does not inherit stage 23's battle music」 |
 | 部署 | `deployment*.test.ts` | `deployment-lab.spec.ts` 或对应关卡部署用例 |
 | 肖像目录与职业通用头像回退 | `portrait.test.ts`、`arena.test.ts`、对应 `stageN-battle.test.ts`、`promotion.test.ts` | `portrait-lab.spec.ts`、`arena.spec.ts` 或具体关卡肖像用例 |
 
