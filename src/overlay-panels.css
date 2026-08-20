@@ -255,7 +255,7 @@
   width: 100%;
   height: min(380px, 48vh);
   border: 1px solid #493323;
-  background: #f3f3f5;
+  background: #0d0c11;
   object-fit: cover;
   object-position: center 45%;
 }
