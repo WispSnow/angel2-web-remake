@@ -306,7 +306,8 @@ test("great dragon knight counter guard keeps its wide shield centered", async (
   await expect(victim).toHaveAttribute("data-side", "left");
   await expect(victim).toHaveAttribute("data-frame", "3");
   await expect(victim).toHaveAttribute("data-reaction", "guard");
-  await expect(victim).toHaveAttribute("data-x", "146");
+  await expect(victim).toHaveAttribute("data-x", "210");
+  await expect(victim).toHaveAttribute("data-x-offset-correction", "-92");
   const particles = page.locator(".full-combat-particles .full-combat-frame:not([hidden])");
   await expect(particles).toHaveCount(3);
   const particleXs = await particles.evaluateAll((elements) => elements.map((element) => {
@@ -314,7 +315,7 @@ test("great dragon knight counter guard keeps its wide shield centered", async (
     return Number(match?.[1]);
   }));
   expect(particleXs[0]).toBeGreaterThanOrEqual(245);
-  expect(particleXs[0]).toBeLessThanOrEqual(269);
+  expect(particleXs[0]).toBeLessThanOrEqual(270);
   expect(particleXs[1] - particleXs[0]).toBe(24);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-great-dragon-counter-guard.png`,

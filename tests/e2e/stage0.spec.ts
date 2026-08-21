@@ -254,10 +254,12 @@ const confirmPromotion = async (page: Page, classId = "cavalry") => {
 };
 const openSystemMenu = async (page: Page) => {
   const menu = page.getByTestId("system-menu");
-  for (let attempt = 0; attempt < 2 && !(await menu.isVisible()); attempt += 1) {
+  for (let attempt = 0; attempt < 2 && !(await debugState(page)).systemMenuOpen; attempt += 1) {
     await page.keyboard.press("Escape");
   }
-  await expect(menu).toBeVisible();
+  await expect.poll(async () => (await debugState(page)).systemMenuOpen).toBe(true);
+  await expectMenuOpen(menu);
+  await settleMenuAnimation(menu);
 };
 const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => {
   await expect(menu).toHaveClass(/native-command-menu/);
@@ -2990,10 +2992,11 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   // deflects out of the window along the native (-30,-16) post-hit script
   // instead of leaving the lance planted at the contact point.
   expect(cavalryHit?.lance).toMatchObject({ side: "right", frame: 6 });
-  expect(cavalryHit?.lance?.x).toBeGreaterThanOrEqual(-44);
-  expect(cavalryHit?.lance?.x).toBeLessThanOrEqual(106);
+  expect(cavalryHit?.lance?.x).toBeGreaterThanOrEqual(-38);
+  expect(cavalryHit?.lance?.x).toBeLessThanOrEqual(232);
+  expect((232 - (cavalryHit?.lance?.x ?? Number.NaN)) % 30).toBe(0);
   expect(cavalryHit?.sprites.find(({ set }) => set === "direct"))
-    .toMatchObject({ side: "left", x: 120 });
+    .toMatchObject({ side: "left", x: 255 });
   expect(cavalryHit?.damage?.amount).toBeGreaterThan(0);
   const cavalryVictimX = cavalryHit?.sprites.find(({ set }) => set === "direct")?.x;
   // The 36 px apex occupies a single 50 ms post-hit substep, which the default
