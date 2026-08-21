@@ -1,0 +1,4 @@
+# Release asset hashes are computed from repository bytes. Keep text files
+# byte-identical on Windows runners instead of allowing CRLF checkout conversion.
+* text=auto eol=lf
+

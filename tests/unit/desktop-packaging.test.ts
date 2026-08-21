@@ -55,6 +55,7 @@ describe("desktop packaging contract", () => {
 
   it("keeps Windows packaging manual and separate from Cloudflare deployment", () => {
     const workflow = readText(".github/workflows/desktop-windows.yml");
+    const gitAttributes = readText(".gitattributes");
     const packageJson = readJson("package.json");
     const appTypeScriptConfig = readJson("tsconfig.app.json");
     const testTypeScriptConfig = readJson("tsconfig.tests.json");
@@ -66,6 +67,7 @@ describe("desktop packaging contract", () => {
     expect(workflow).toContain("pnpm desktop:build:windows");
     expect(workflow).toContain("actions/upload-artifact@v4");
     expect(workflow).not.toMatch(/cloudflare|wrangler/i);
+    expect(gitAttributes).toContain("* text=auto eol=lf");
     expect(appTypeScriptConfig.include).toEqual(["src"]);
     expect(testTypeScriptConfig.include).toEqual(["src", "tests/unit"]);
     expect(scripts["typecheck:tests"]).toBe("tsc -p tsconfig.tests.json");
