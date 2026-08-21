@@ -1852,13 +1852,20 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   appearance: none;
   cursor: var(--native-cursor-hand, pointer);
 }
-.promotion-art {
+.promotion-art-slot {
   position: absolute;
-  left: 3px;
-  top: 3px;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.promotion-art {
   display: block;
-  width: 40px;
-  height: 43px;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
   image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }

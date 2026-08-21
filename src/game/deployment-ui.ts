@@ -193,7 +193,9 @@ function rosterEntryHtml(view: RosterEntryView): string {
       style="left:${x}px;top:${y}px;--detail-left:${tooltip.left}px;--detail-top:${tooltip.top}px">
     <span class="deployment-entry-base" aria-hidden="true"></span>
     <span class="deployment-entry-figure-frame" aria-hidden="true"></span>
-    <img class="deployment-entry-figure" src="${figureSourceFor(unit.classId)}" alt="" aria-hidden="true" />
+    <span class="deployment-entry-figure-slot" aria-hidden="true">
+      <img class="deployment-entry-figure" src="${figureSourceFor(unit.classId)}" alt="" />
+    </span>
     <button class="deployment-entry-hitbox" type="button" tabindex="-1"
       data-roster-index="${index}" data-unit-slot="${unit.slot}" data-testid="deployment-roster-${index}"
       aria-label="${escapeHtml(label)}" aria-pressed="${deployed}">

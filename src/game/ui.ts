@@ -1048,9 +1048,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           data-testid="promotion-target-${target.id}" role="menuitem"
           aria-label="${optionLabel}" aria-current="${selected}">
           ${imageUrl
-            ? `<img class="promotion-art" src="${stagedRenderAssetSource(imageUrl)}"
-                data-source-url="${imageUrl}" data-source-resource="A/0002"
-                alt="" data-testid="promotion-image-${target.id}" />`
+            ? `<span class="promotion-art-slot" aria-hidden="true">
+                <img class="promotion-art" src="${stagedRenderAssetSource(imageUrl)}"
+                  data-source-url="${imageUrl}" data-source-resource="A/0002"
+                  alt="" data-testid="promotion-image-${target.id}" />
+              </span>`
             : `<span class="promotion-art-missing" aria-hidden="true">${definition.nativeName}</span>`}
           <span class="promotion-option-details" role="tooltip"
             data-testid="promotion-details-${target.id}">

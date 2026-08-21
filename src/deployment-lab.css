@@ -162,14 +162,24 @@
   background: var(--native-7);
 }
 
-.deployment-entry-figure {
+.deployment-entry-figure-slot {
   position: absolute;
   z-index: 2;
-  left: 12px;
-  top: 4px;
+  left: 8px;
+  top: 1px;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  pointer-events: none;
+}
+
+.deployment-entry-figure {
   display: block;
-  width: 40px;
-  height: 43px;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
   image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }
