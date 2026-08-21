@@ -43,3 +43,26 @@ export function fullCombatBackgroundAsset(record: number): string {
   const assetRecord = record === 29 ? 19 : record;
   return `/assets/original/full-combat/backgrounds/${String(assetRecord).padStart(2, "0")}.png`;
 }
+
+/**
+ * The stage entry plus every terrain substitution the native selector can
+ * reach. Keeping this stage-scoped avoids decoding all campaign backdrops,
+ * while guaranteeing that the first ordinary attack never starts on a cold
+ * DOM image.
+ */
+export function fullCombatBackgroundAssetsForStage(nativeStage: number): readonly string[] {
+  const records = new Set<number>();
+  const stageEntry = FULL_COMBAT_BACKGROUND_STAGE_TABLE.find(
+    (entry) => entry.nativeStage === nativeStage,
+  );
+  records.add(stageEntry?.record ?? FULL_COMBAT_BACKGROUND_FALLBACK_RECORD);
+  if (!FULL_COMBAT_BACKGROUND_TERRAIN_EXEMPT_STAGES.includes(nativeStage)) {
+    for (const terrainEntry of FULL_COMBAT_BACKGROUND_TERRAIN_TABLE) {
+      const override = terrainEntry.stageOverrides.find(
+        (entry) => entry.nativeStage === nativeStage,
+      );
+      records.add(override?.record ?? terrainEntry.record);
+    }
+  }
+  return [...new Set([...records].map(fullCombatBackgroundAsset))].sort();
+}

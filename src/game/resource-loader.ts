@@ -5,6 +5,11 @@ import {
 } from "./content/resource-manifest.generated";
 import type { StageId } from "./types";
 import { isMusicResourceUrl, primeEncodedMusic } from "./music-resource-cache";
+import {
+  acquireFullCombatImages,
+  isFullCombatImageUrl,
+  type FullCombatImageLease,
+} from "./full-combat-image-cache";
 
 export interface ResourceManifestAsset {
   url: string;
@@ -33,6 +38,7 @@ interface AssetLoadState {
   loadedBytes: number;
   complete: boolean;
   promise?: Promise<void>;
+  encodedFullCombatImage?: Uint8Array;
 }
 
 type FetchAsset = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -89,6 +95,8 @@ export class ResourcePackLoader {
   private detail?: HTMLElement;
   private retry?: HTMLButtonElement;
   private overlayFailed = false;
+  private fullCombatImageLease?: FullCombatImageLease;
+  private fullCombatImageUrls = new Set<string>();
 
   constructor(
     private readonly fetchAsset: FetchAsset = globalThis.fetch.bind(globalThis),
@@ -145,6 +153,7 @@ export class ResourcePackLoader {
       const manifest = await this.loadManifest();
       const urls = [...new Set([...this.resolvePackUrls(manifest, packId), ...supplementalUrls])];
       await this.loadUrls(manifest, urls);
+      await this.replaceFullCombatImageLease(supplementalUrls);
     } catch (error) {
       console.warn(`background resource prefetch failed for ${packId}`, error);
     }
@@ -167,6 +176,7 @@ export class ResourcePackLoader {
           this.activeUrls = urls;
           this.renderProgress(manifest);
           await this.loadUrls(manifest, urls);
+          await this.replaceFullCombatImageLease(supplementalUrls);
           this.hideOverlay();
           resolve();
         } catch (error) {
@@ -226,35 +236,37 @@ export class ResourcePackLoader {
     const pending = this.fetchAsset(asset.url).then(async (response) => {
       if (!response.ok) throw new Error(`讀取失敗（${response.status}）：${asset.url}`);
       const reader = response.body?.getReader();
-      const musicChunks: Uint8Array[] | undefined = isMusicResourceUrl(asset.url) ? [] : undefined;
-      let musicBytes = 0;
+      const collectEncoded = isMusicResourceUrl(asset.url) || isFullCombatImageUrl(asset.url);
+      const encodedChunks: Uint8Array[] | undefined = collectEncoded ? [] : undefined;
+      let encodedByteLength = 0;
       if (!reader) {
         const encoded = await response.arrayBuffer();
-        if (musicChunks) {
-          musicChunks.push(new Uint8Array(encoded));
-          musicBytes = encoded.byteLength;
+        if (encodedChunks) {
+          encodedChunks.push(new Uint8Array(encoded));
+          encodedByteLength = encoded.byteLength;
         }
       } else {
         while (true) {
           const result = await reader.read();
           if (result.done) break;
-          if (musicChunks) {
-            musicChunks.push(result.value);
-            musicBytes += result.value.byteLength;
+          if (encodedChunks) {
+            encodedChunks.push(result.value);
+            encodedByteLength += result.value.byteLength;
           }
           state.loadedBytes = Math.min(asset.bytes, state.loadedBytes + result.value.byteLength);
           this.renderProgress(manifest);
         }
       }
-      if (musicChunks) {
-        const encoded = new ArrayBuffer(musicBytes);
+      if (encodedChunks) {
+        const encoded = new ArrayBuffer(encodedByteLength);
         const encodedView = new Uint8Array(encoded);
         let offset = 0;
-        for (const chunk of musicChunks) {
+        for (const chunk of encodedChunks) {
           encodedView.set(chunk, offset);
           offset += chunk.byteLength;
         }
-        primeEncodedMusic(asset.url, encoded);
+        if (isMusicResourceUrl(asset.url)) primeEncodedMusic(asset.url, encoded);
+        if (isFullCombatImageUrl(asset.url)) state.encodedFullCombatImage = encodedView;
       }
       state.loadedBytes = asset.bytes;
       state.complete = true;
@@ -264,11 +276,56 @@ export class ResourcePackLoader {
       state.loadedBytes = 0;
       state.complete = false;
       state.promise = undefined;
+      state.encodedFullCombatImage = undefined;
       throw error;
     });
     state.promise = pending;
     this.states.set(asset.url, state);
     return pending;
+  }
+
+  private async replaceFullCombatImageLease(urls: readonly string[]): Promise<void> {
+    const imageUrls = [...new Set(urls.filter(isFullCombatImageUrl))].sort();
+    if (imageUrls.length === 0) return;
+    const encodedBytes = new Map<string, Uint8Array>();
+    for (const url of imageUrls) {
+      const encoded = this.states.get(url)?.encodedFullCombatImage;
+      if (encoded) encodedBytes.set(url, encoded);
+    }
+    let nextLease: FullCombatImageLease;
+    try {
+      nextLease = await acquireFullCombatImages(imageUrls, {
+        encodedBytes,
+        fetchImage: this.fetchAsset,
+        ownerDocument: this.ownerDocument,
+      });
+    } catch (error) {
+      for (const url of imageUrls) {
+        const state = this.states.get(url);
+        if (!state) continue;
+        state.loadedBytes = 0;
+        state.complete = false;
+        state.encodedFullCombatImage = undefined;
+      }
+      throw error;
+    }
+    const previousLease = this.fullCombatImageLease;
+    const previousUrls = this.fullCombatImageUrls;
+    this.fullCombatImageLease = nextLease;
+    this.fullCombatImageUrls = new Set(imageUrls);
+    for (const url of imageUrls) {
+      const state = this.states.get(url);
+      if (state) state.encodedFullCombatImage = undefined;
+    }
+    previousLease?.release();
+    for (const url of previousUrls) {
+      if (this.fullCombatImageUrls.has(url)) continue;
+      const state = this.states.get(url);
+      if (!state) continue;
+      state.loadedBytes = 0;
+      state.complete = false;
+      state.encodedFullCombatImage = undefined;
+    }
   }
 
   private showOverlay(packId: string, label: string): void {

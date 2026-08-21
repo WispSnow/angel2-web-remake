@@ -4,12 +4,15 @@ import { promotionTargetsFor } from "./classes";
 import { FULL_COMBAT_ATLASES } from "./full-combat-atlases.generated";
 import { allyMapUnitAssetsForClasses } from "./map-unit-assets";
 import { mapActionAtlasAssetsForActions } from "./map-action-assets";
+import { fullCombatBackgroundAssetsForStage } from "./full-combat-backgrounds";
 
 export interface StageClassPresentationRequirements {
   /** Player roster classes; immediate promotion choices are included. */
   allyClassIds: readonly UnitClassId[];
   /** Every class known to the stage, including fixed and enemy figures. */
   encounterClassIds: readonly UnitClassId[];
+  /** Native scenario number used to bound the possible panorama backdrops. */
+  nativeStage?: number;
 }
 
 const fullCombatAtlasById = new Map<string, (typeof FULL_COMBAT_ATLASES)[number]>(
@@ -28,6 +31,9 @@ export function classPresentationAssetUrls(
     ...allyClasses,
   ]);
   const urls = new Set<string>(allyMapUnitAssetsForClasses(requirements.allyClassIds).values());
+  if (requirements.nativeStage !== undefined) {
+    for (const url of fullCombatBackgroundAssetsForStage(requirements.nativeStage)) urls.add(url);
+  }
   const commonTrail = fullCombatAtlasById.get("common-trail");
   if (encounterClasses.size > 0 && commonTrail) urls.add(commonTrail.image);
 

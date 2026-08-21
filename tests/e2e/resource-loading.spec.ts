@@ -105,22 +105,47 @@ test("stage music finishes before the scene mounts and playback reuses the stage
   expect(musicRequests).toBe(1);
 });
 
-test("current class full-combat textures cross the resource gate before Phaser", async ({ page }) => {
+test("current class full-combat textures decode before the first panorama frame", async ({ page }) => {
+  let atlasRequests = 0;
+  let backdropRequests = 0;
   let releaseFullCombat = () => undefined;
   const fullCombatGate = new Promise<void>((resolve) => {
     releaseFullCombat = resolve;
   });
   await page.route("**/full-combat-atlases/left-soldier.png", async (route) => {
+    atlasRequests += 1;
     await fullCombatGate;
     await route.continue();
   });
+  await page.route("**/full-combat/backgrounds/05.png", async (route) => {
+    backdropRequests += 1;
+    await route.continue();
+  });
 
-  await page.goto("/?test=1&skipStartup=1");
+  await page.goto("/?test=1&slowFull=1&skipStartup=1");
   await expect(page.getByTestId("resource-loading-overlay")).toBeVisible();
   await expect(page.locator("#phaser-root canvas")).toHaveCount(0);
   releaseFullCombat();
   await expect(page.getByTestId("resource-loading-overlay")).toBeHidden({ timeout: 15_000 });
   await expect(page.locator("#phaser-root canvas")).toBeVisible({ timeout: 15_000 });
+  await page.waitForFunction(() => window.__ANGEL2__?.getState() !== undefined);
+  await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("soldier", true));
+  await page.getByTestId("battle-canvas").click({ position: { x: 220, y: 177 } });
+  await page.getByTestId("unit-command-attack").click();
+  const actor = page.getByTestId("full-actor-sprite");
+  await expect(actor).toBeVisible();
+  await expect(actor).toHaveAttribute("data-atlas", "left-soldier");
+  await expect(actor).toHaveAttribute("data-atlas-image-ready", "true");
+  expect(await actor.evaluate((element) => getComputedStyle(element).backgroundImage))
+    .toMatch(/^url\(["']?blob:/u);
+  const backdrop = page.getByTestId("full-combat-background");
+  await expect(backdrop).toHaveAttribute("data-image-ready", "true");
+  expect(await backdrop.getAttribute("src")).toMatch(/^blob:/u);
+  expect(atlasRequests).toBe(1);
+  expect(backdropRequests).toBe(1);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/resource-loading-full-combat-first-frame.png",
+  });
 });
 
 test("a failed stage resource stays on a readable retry surface and retries the URL", async ({ page }) => {

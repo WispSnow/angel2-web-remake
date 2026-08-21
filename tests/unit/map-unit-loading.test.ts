@@ -32,12 +32,15 @@ describe("stage-scoped Phaser map-unit loading", () => {
     const urls = new Set(classPresentationAssetUrls({
       allyClassIds: ["magician"],
       encounterClassIds: ["magician"],
+      nativeStage: 1,
     }));
     expect(urls).toContain(ALLY_MAP_UNIT_ASSETS.magician);
     expect(urls).toContain("/assets/original/full-combat-atlases/left-magician.png");
     expect(urls).toContain("/assets/original/full-combat-atlases/right-magician.png");
     expect([...urls].some((url) => url.startsWith("/assets/original/full-combat-atlases/")
       && url.endsWith(".json"))).toBe(false);
+    expect(urls).toContain("/assets/original/full-combat/backgrounds/08.png");
+    expect(urls).toContain("/assets/original/full-combat/backgrounds/18.png");
 
     const actionIds = new Set([
       ...presentationActionIdsForClass("magician", 1),

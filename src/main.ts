@@ -29,11 +29,13 @@ const controllerAssetRequirements = (controller: GameController) => ({
     .filter(({ side }) => side === 1)
     .map(({ classId }) => classId),
   encounterClassIds: controller.battle.units.map(({ classId }) => classId),
+  nativeStage: controller.battle.stage.nativeStage,
 });
 const stage0Units = createStage0Units();
 const stage0PresentationAssets = classPresentationAssetUrls({
   allyClassIds: stage0Units.filter(({ side }) => side === 1).map(({ classId }) => classId),
   encounterClassIds: stage0Units.map(({ classId }) => classId),
+  nativeStage: 0,
 });
 
 const mountController = (

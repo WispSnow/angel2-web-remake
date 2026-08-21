@@ -29,6 +29,7 @@ import {
   type FullCombatSpriteState,
 } from "./full-combat";
 import { applyFullCombatAtlasFrame } from "./full-combat-atlas";
+import { fullCombatImageSource } from "./full-combat-image-cache";
 import type { BattleUnit, DialoguePage, UnitClassId, UnitStats } from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
@@ -1487,7 +1488,8 @@ function buildFullCombatSkeleton(
   backgroundRecord: number,
 ): void {
   const { attacker, defender } = presentation;
-  const background = fullCombatBackgroundAsset(backgroundRecord);
+  const backgroundAsset = fullCombatBackgroundAsset(backgroundRecord);
+  const background = fullCombatImageSource(backgroundAsset);
   const leftUnit = attacker.side === 1 ? attacker : defender;
   const rightUnit = attacker.side === 2 ? attacker : defender;
   const statusPanel = (side: "left" | "right", unit: typeof attacker) => {
@@ -1512,7 +1514,7 @@ function buildFullCombatSkeleton(
       <div class="full-combat-viewport-content" data-testid="full-combat-viewport-content">
         <div class="full-combat-scene" data-testid="full-combat-scene" hidden>
           <div class="full-combat-backdrop">
-            <img class="far" src="${background}" alt="" data-testid="full-combat-background" data-record="${backgroundRecord}" />
+            <img class="far" src="${background}" alt="" data-testid="full-combat-background" data-record="${backgroundRecord}" data-image-ready="${background !== backgroundAsset}" />
             <img class="far copy" src="${background}" alt="" />
             <img class="near" src="${background}" alt="" />
             <img class="near copy" src="${background}" alt="" />

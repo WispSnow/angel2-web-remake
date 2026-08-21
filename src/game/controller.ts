@@ -137,6 +137,7 @@ type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
 export interface StageAssetRequirements {
   allyClassIds: readonly UnitClassId[];
   encounterClassIds: readonly UnitClassId[];
+  nativeStage: number;
 }
 
 export type StageAssetGate = (
@@ -756,6 +757,7 @@ export class GameController {
     await this.stageAssetGate?.(stageId, {
       allyClassIds,
       encounterClassIds: [...encounterClassIds],
+      nativeStage: runtime.definition.nativeStage,
     });
     return runtime;
   }
@@ -5528,7 +5530,7 @@ export class GameController {
   }
 
   forceClassActionSetupForTest(
-    classId: "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
+    classId: "soldier" | "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
     ordinaryCombat = false,
     stage1Target: "boss" | "pursuing" = "boss",
   ): void {
@@ -6278,7 +6280,7 @@ export interface Angel2DebugApi {
   forceRestSetup: () => void;
   forceRoundLimitSetup: () => void;
   forceClassActionSetup: (
-    classId: "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
+    classId: "soldier" | "archer" | "cavalry" | "magician" | "monk" | "sister" | "warrior",
     ordinaryCombat?: boolean,
   ) => void;
   clearSaves: () => void;

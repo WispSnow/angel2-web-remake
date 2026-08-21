@@ -10,6 +10,7 @@ import {
 } from "../../src/game/content/full-combat-backgrounds.generated";
 import {
   fullCombatBackgroundAsset,
+  fullCombatBackgroundAssetsForStage,
   fullCombatBackgroundRecord,
 } from "../../src/game/content/full-combat-backgrounds";
 import { STAGE_RUNTIME_MANIFEST, loadStageRuntime } from "../../src/game/stage-runtime";
@@ -92,6 +93,18 @@ describe("native full-screen battle backdrop selection", () => {
     expect(fullCombatBackgroundRecord(24, 12)).toBe(31);
     // The neighbouring stages are not exempt and must still swap.
     expect(fullCombatBackgroundRecord(22, 1)).toBe(18);
+  });
+
+  it("bounds decoded backdrop candidates to the current native stage", () => {
+    expect(fullCombatBackgroundAssetsForStage(6)).toEqual([
+      "/assets/original/full-combat/backgrounds/22.png",
+    ]);
+    const stage10 = new Set(fullCombatBackgroundAssetsForStage(10));
+    expect(stage10).toContain("/assets/original/full-combat/backgrounds/27.png");
+    expect(stage10).toContain("/assets/original/full-combat/backgrounds/28.png");
+    expect(stage10).toContain("/assets/original/full-combat/backgrounds/17.png");
+    expect(stage10).not.toContain("/assets/original/full-combat/backgrounds/22.png");
+    expect(stage10.size).toBeLessThan(FULL_COMBAT_BACKGROUND_RECORDS.length);
   });
 
   it("ships a decodable 448x148 backdrop for every reachable stage and slot", async () => {

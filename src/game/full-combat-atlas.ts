@@ -2,6 +2,7 @@ import {
   FULL_COMBAT_ATLAS_FRAMES,
   FULL_COMBAT_ATLASES,
 } from "./content/full-combat-atlases.generated";
+import { fullCombatImageSource } from "./full-combat-image-cache";
 
 export interface FullCombatAtlasFrame {
   readonly image: string;
@@ -38,11 +39,13 @@ export function applyFullCombatAtlasFrame(
   frameName: string,
 ): FullCombatAtlasFrame {
   const frame = fullCombatAtlasFrame(frameName);
+  const imageSource = fullCombatImageSource(frame.image);
   element.dataset.frameSource = frameName;
   element.dataset.atlas = frame.atlasId;
+  element.dataset.atlasImageReady = String(imageSource !== frame.image);
   element.style.width = `${frame.width}px`;
   element.style.height = `${frame.height}px`;
-  element.style.backgroundImage = `url("${frame.image}")`;
+  element.style.backgroundImage = `url("${imageSource}")`;
   element.style.backgroundPosition = `${-frame.x}px ${-frame.y}px`;
   return frame;
 }
