@@ -64,7 +64,9 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
     "打開此視窗不會暫停遊戲；敵方階段仍會繼續。視窗內的按鍵不會操作戰場。",
   );
   for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
-  await expect(page.getByTestId("remake-note-REMAKE-004")).toContainText("毒不再把生命打到 0");
+  const poisonFix = page.getByTestId("remake-note-REMAKE-004");
+  await expect(poisonFix).toContainText("毒不再留下 0 生命的存活單位");
+  await expect(poisonFix).toContainText("但這一步不會觸發死亡");
   const swiftGuardFix = page.getByTestId("remake-note-swift-dragon-guard-ground");
   await expect(swiftGuardFix).toContainText("迅龍騎士格擋不再懸空");
   await expect(swiftGuardFix.locator(".rn-note-id")).toHaveCount(0);
@@ -86,6 +88,13 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   await page.getByTestId("remake-notes-tab-balance").click();
   for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
   await expect(page.getByTestId("remake-note-REMAKE-100")).toContainText("魔鎧戰士");
+  const leaderCaution = page.getByTestId("remake-note-REMAKE-012-118");
+  await expect(leaderCaution).toContainText("敵方主將會守住護衛陣線");
+  await expect(leaderCaution).toContainText("原版沒有一套專門辨識具名敵將");
+  await expect(leaderCaution).not.toContainText("遠追只移動");
+  await captureVisualAudit(leaderCaution, {
+    path: "artifacts/playwright/remake-notes-leader-caution.png",
+  });
   // 三條已改列「功能增強」的條目不得同時留在平衡分頁。
   for (const id of ["REMAKE-101", "REMAKE-106", "REMAKE-107"]) {
     await expect(page.getByTestId(`remake-note-${id}`)).toHaveCount(0);

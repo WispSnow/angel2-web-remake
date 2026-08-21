@@ -13,6 +13,8 @@ const LEVEL_DIFFERENCE_TABLE_WORDS = 13;
 const GROWTH_CODE_SEGMENT_FILE_BASE = 0x18b60;
 const GROWTH_TABLE_CS_OFFSET = 0x036a;
 const SENTINEL = 0xffff;
+const DEATH_REMOVAL_FILE_OFFSET = 0x96c2;
+const EXPECTED_DEATH_REMOVAL_NEAR_CALL_SITES = [0x63d2, 0x9156, 0x91e6, 0x92a6];
 
 const CODE_SIGNATURES = [
   { address: "0000:90D8", offset: 0x90d8, hex: "ff360460c70604604e00" },
@@ -40,10 +42,18 @@ const CODE_SIGNATURES = [
   { address: "0000:A10C", offset: 0xa10c, hex: "a1ea7a8b1ed77c2bc37204" },
   { address: "0000:A122", offset: 0xa122, hex: "a1647a8b1e667a8907" },
   { address: "0000:A17B", offset: 0xa17b, hex: "e86601e8420dc7062d7d96a0" },
-  { address: "0000:4DCD", offset: 0x4dcd, hex: "9a9b005d139aac009d13c6067cfa4e" },
-  { address: "1000:35DC", offset: 0x135dc, hex: "e85400c706ca1cd045e80a00c706ca1cec4b" },
+  {
+    address: "0000:4DCD",
+    offset: 0x4dcd,
+    hex: "9a9b005d139aac009d13c6067cfa4ec6067dfa4ee81c2e9a9d006813ff06832fe8f43a9a0c005d139a08002a14b82e009a5a013418c3",
+  },
+  { address: "1000:35DC", offset: 0x135dc, hex: "e85400c706ca1cd045e80a00c706ca1cec4be80100cb" },
   { address: "1000:35F2", offset: 0x135f2, hex: "b8ba1e8ed88ec033ffb93a00518b1eca1c8b31bb0800b90800" },
-  { address: "1000:3633", offset: 0x13633, hex: "bb0000b9c40951539a58500000833ec93100" },
+  {
+    address: "1000:3633",
+    offset: 0x13633,
+    hex: "bb0000b9c40951539a58500000833ec931007417bea53183c60e8b04a90080740a8b1eb9318b07d1e889075b5943e2d6c3",
+  },
   { address: "1000:2300", offset: 0x12300, hex: "2e833e7f015974092e833e7f01417401c38b1e161f9a58500000a1f63ba33f0da1c531a3470da1bd31a3450dbea53183c6088b04a900807406c7063f0dff00a19d31c3" },
   { address: "1000:8CC1", offset: 0x18cc1, hex: "8b36b9318b440cb8018089440ccb" },
   { address: "1000:8CCF", offset: 0x18ccf, hex: "8b36b9318b440cb8000089440ccb" },
@@ -95,6 +105,60 @@ function validateCodeSignatures(buffer) {
       sha256: sha256(expected),
     };
   });
+}
+
+function nativeCodeAddress(fileOffset) {
+  if (fileOffset < 0x10000) return `0000:${hex(fileOffset)}`;
+  return `1000:${hex(fileOffset - 0x10000)}`;
+}
+
+function findNearCallSites(buffer, targetFileOffset) {
+  const sites = [];
+  for (let offset = 0; offset + 2 < buffer.length; offset += 1) {
+    if (buffer[offset] !== 0xe8) continue;
+    if (offset + 3 + buffer.readInt16LE(offset + 1) === targetFileOffset) sites.push(offset);
+  }
+  return sites;
+}
+
+function findFarCallSites(buffer, targetSegment, targetOffset) {
+  const sites = [];
+  for (let offset = 0; offset + 4 < buffer.length; offset += 1) {
+    if (
+      buffer[offset] === 0x9a
+      && buffer.readUInt16LE(offset + 1) === targetOffset
+      && buffer.readUInt16LE(offset + 3) === targetSegment
+    ) {
+      sites.push(offset);
+    }
+  }
+  return sites;
+}
+
+function validatePoisonDeathCallTopology(buffer) {
+  const nearCallSites = findNearCallSites(buffer, DEATH_REMOVAL_FILE_OFFSET);
+  if (
+    nearCallSites.length !== EXPECTED_DEATH_REMOVAL_NEAR_CALL_SITES.length
+    || nearCallSites.some(
+      (offset, index) => offset !== EXPECTED_DEATH_REMOVAL_NEAR_CALL_SITES[index],
+    )
+  ) {
+    throw new Error("0000:96C2 death-removal near-call topology no longer matches the recovered runtime");
+  }
+
+  const farCallSites = findFarCallSites(buffer, 0x0000, DEATH_REMOVAL_FILE_OFFSET);
+  if (farCallSites.length !== 0) {
+    throw new Error("unexpected far call to 0000:96C2 in the recovered runtime");
+  }
+
+  return {
+    deathRemovalFunction: "0000:96C2",
+    directNearCallSites: nearCallSites.map(nativeCodeAddress),
+    directFarCallSites: [],
+    poisonRoundChain: ["0000:4DCD", "1000:35DC", "1000:3633"],
+    poisonRoundChainCallsDeathRemoval: false,
+    interpretation: "poison can write zero life, but reaching zero in the status tick is not itself a death event; a later damage finalizer that invokes 0000:96C2 can remove the still-present zero-life unit",
+  };
 }
 
 function descriptorIndex(descriptors) {
@@ -184,6 +248,7 @@ async function extract(runtimePath, descriptorPath, outputPath) {
   ]);
   const descriptorsByCode = descriptorIndex(descriptors);
   const signatures = validateCodeSignatures(buffer);
+  const poisonDeathCallTopology = validatePoisonDeathCallTopology(buffer);
   const killRewards = parseKillRewards(buffer, descriptorsByCode);
   if (killRewards.entryCount !== 35) {
     throw new Error(`expected 35 normal-unit kill rewards, got ${killRewards.entryCount}`);
@@ -275,6 +340,7 @@ async function extract(runtimePath, descriptorPath, outputPath) {
         function: "0000:96C2",
         behavior: "scan all 2500 cells; when current life is zero, clear the current board unit through the removal path",
         poisonBoundaryQuirk: "the full-round poison/status chain never calls this removal function; a poison tick can leave a zero-life unit present on both board maps",
+        callTopology: poisonDeathCallTopology,
       },
     },
     statusLifecycle: {
@@ -332,9 +398,11 @@ async function extract(runtimePath, descriptorPath, outputPath) {
         orderRelativeToCountdown: "poison damage is applied before the status counter is decremented at the same round boundary",
         zeroLifeBehavior: {
           removedByStatusChain: false,
+          diesWhenPoisonWritesZero: false,
           playerSelectable: true,
           objectivePresence: "absence/all-defeated checks inspect board side/slot maps, so a zero-life poison victim still counts as present",
           aiBehavior: "a zero-life AI unit evaluates to 0% life and enters the low-life rest policy",
+          laterRemoval: "any later attack, technique or scripted damage finalizer that invokes the global 0000:96C2 scan can remove the zero-life unit even when that later damage targeted somebody else",
           fidelityWarning: "do not treat poison reaching zero as ordinary attack death unless intentionally fixing this native quirk",
         },
       },
