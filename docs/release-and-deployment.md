@@ -38,6 +38,8 @@ Account ID、Wrangler 上传或推送即上线逻辑。
 ## Windows Tauri 开发包
 
 Windows 桌面版和 Web 版共享同一套 TypeScript、模拟、内容与 `pnpm build:release` 玩家包。
+发布构建只类型检查 `src/`；依赖本机逆向证据的单元测试另由 `pnpm typecheck:tests` 检查，
+避免不含 `reverse/parsed/` 工作产物的干净 GitHub 检出阻断玩家包构建。
 `src-tauri/` 只是受限桌面壳，不接入 Node.js、文件系统或其他 Tauri 插件；它从内置协议加载
 `release/`，因此调试中心和实验室仍被现有发布审计排除。稳定应用标识
 `com.wispsnow.angel2-web-remake` 同时决定 WebView 数据目录；发布后不得随意更名，否则桌面

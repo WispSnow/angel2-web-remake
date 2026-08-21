@@ -18,6 +18,7 @@
     "dev:portraits": "vite --host 127.0.0.1 --open /portrait-lab.html",
     "dev:techniques": "vite --host 127.0.0.1 --open /technique-lab.html",
     "typecheck": "tsc -b",
+    "typecheck:tests": "tsc -p tsconfig.tests.json",
     "build": "tsc -b && vite build",
     "build:release": "pnpm run typecheck && vite build --mode release && node scripts/prepare-release.mjs",
     "desktop:dev": "tauri dev",

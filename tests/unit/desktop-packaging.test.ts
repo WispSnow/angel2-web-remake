@@ -56,6 +56,8 @@ describe("desktop packaging contract", () => {
   it("keeps Windows packaging manual and separate from Cloudflare deployment", () => {
     const workflow = readText(".github/workflows/desktop-windows.yml");
     const packageJson = readJson("package.json");
+    const appTypeScriptConfig = readJson("tsconfig.app.json");
+    const testTypeScriptConfig = readJson("tsconfig.tests.json");
     const scripts = packageJson.scripts as Record<string, unknown>;
 
     expect(scripts["desktop:build:windows"]).toBe("tauri build --bundles nsis");
@@ -64,5 +66,8 @@ describe("desktop packaging contract", () => {
     expect(workflow).toContain("pnpm desktop:build:windows");
     expect(workflow).toContain("actions/upload-artifact@v4");
     expect(workflow).not.toMatch(/cloudflare|wrangler/i);
+    expect(appTypeScriptConfig.include).toEqual(["src"]);
+    expect(testTypeScriptConfig.include).toEqual(["src", "tests/unit"]);
+    expect(scripts["typecheck:tests"]).toBe("tsc -p tsconfig.tests.json");
   });
 });
