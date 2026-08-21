@@ -1,6 +1,26 @@
 import { expect, test, type Page } from "@playwright/test";
 import { captureVisualAudit } from "./visual-audit";
 
+test("the laboratory schedules prepared full-combat sounds without media requests", async ({ page }) => {
+  const wavRequests: Array<{ path: string; type: string }> = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith(".wav")) wavRequests.push({ path, type: request.resourceType() });
+  });
+  await page.goto("/combat-lab.html");
+  const app = page.locator("#app");
+  await expect(app).toHaveAttribute("data-sound-effect-ready", "true");
+  const preparedRequestCount = wavRequests.length;
+  await page.locator('input[name="sound"]').check();
+
+  await expect.poll(async () => Number(
+    await app.getAttribute("data-sound-effect-schedule-count"),
+  )).toBeGreaterThan(0);
+  await expect(app).toHaveAttribute("data-sound-effect-context", "running");
+  expect(wavRequests).toHaveLength(preparedRequestCount);
+  expect(wavRequests.some(({ type }) => type === "media")).toBe(false);
+});
+
 interface CombatLabState {
   config: {
     attackerClass: string;

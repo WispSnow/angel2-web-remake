@@ -141,20 +141,30 @@ test("intermediate, advanced and ultimate lightning preserve distinct native vis
 });
 
 test("the laboratory plays lightning sounds from the formal campaign audio mapping", async ({ page }) => {
-  const audioRequests: string[] = [];
+  const audioRequests: Array<{ path: string; type: string }> = [];
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
-    if (pathname.endsWith(".wav")) audioRequests.push(pathname);
+    if (pathname.endsWith(".wav")) {
+      audioRequests.push({ path: pathname, type: request.resourceType() });
+    }
   });
   await page.goto("/technique-lab.html");
+  await expect(page.locator("#app")).toHaveAttribute("data-sound-effect-ready", "true");
+  const preparedRequestCount = audioRequests.length;
   await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
   await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("3L"));
   await page.locator("#technique-lab-sound").check();
   await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.play());
 
-  await expect.poll(() => audioRequests).toContain("/assets/original/audio/e/9.wav");
-  expect(audioRequests).toContain("/assets/original/audio/e/41.wav");
-  expect(audioRequests.some((source) => source.includes("/technique-lab/audio/"))).toBe(false);
+  await expect.poll(async () => Number(
+    await page.locator("#app").getAttribute("data-sound-effect-schedule-count"),
+  )).toBeGreaterThanOrEqual(2);
+  await expect(page.locator("#app")).toHaveAttribute("data-sound-effect-context", "running");
+  expect(audioRequests).toHaveLength(preparedRequestCount);
+  expect(audioRequests).toContainEqual({ path: "/assets/original/audio/e/9.wav", type: "fetch" });
+  expect(audioRequests).toContainEqual({ path: "/assets/original/audio/e/41.wav", type: "fetch" });
+  expect(audioRequests.some(({ path }) => path.includes("/technique-lab/audio/"))).toBe(false);
+  expect(audioRequests.some(({ type }) => type === "media")).toBe(false);
 });
 
 test("lightning hit waves advance one range threshold after every native draw", async ({ page }) => {

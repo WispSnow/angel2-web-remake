@@ -334,6 +334,11 @@ test("stage music finishes before the scene mounts and playback reuses the stage
 test("current class full-combat textures decode before the first panorama frame", async ({ page }) => {
   let atlasRequests = 0;
   let backdropRequests = 0;
+  const wavRequests: Array<{ path: string; type: string }> = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith(".wav")) wavRequests.push({ path, type: request.resourceType() });
+  });
   let releaseFullCombat = () => undefined;
   const fullCombatGate = new Promise<void>((resolve) => {
     releaseFullCombat = resolve;
@@ -362,6 +367,11 @@ test("current class full-combat textures decode before the first panorama frame"
   await expect(actor).toBeVisible();
   await expect(actor).toHaveAttribute("data-atlas", "left-soldier");
   await expect(actor).toHaveAttribute("data-atlas-image-ready", "true");
+  await expect(page.locator("#app")).toHaveAttribute("data-sound-effect-engine", "web-audio");
+  await expect(page.locator("#app")).toHaveAttribute("data-sound-effect-context", "running");
+  await expect.poll(async () => Number(
+    await page.locator("#app").getAttribute("data-combat-effect-count"),
+  )).toBeGreaterThan(0);
   expect(await actor.evaluate((element) => getComputedStyle(element).backgroundImage))
     .toMatch(/^url\(["']?blob:/u);
   const backdrop = page.getByTestId("full-combat-background");
@@ -369,6 +379,7 @@ test("current class full-combat textures decode before the first panorama frame"
   expect(await backdrop.getAttribute("src")).toMatch(/^blob:/u);
   expect(atlasRequests).toBe(1);
   expect(backdropRequests).toBe(1);
+  expect(wavRequests.filter(({ type }) => type === "media")).toEqual([]);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/resource-loading-full-combat-first-frame.png",
   });
@@ -383,6 +394,11 @@ test("formal map skills reuse staged map, unit and atlas bytes through Phaser", 
     "/assets/original/map-action-atlases/fire-1.json",
   ] as const;
   const requests = new Map(tracked.map((url) => [url, 0]));
+  const wavRequests: Array<{ path: string; type: string }> = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith(".wav")) wavRequests.push({ path, type: request.resourceType() });
+  });
   for (const url of tracked) {
     await page.route(`**${url}`, async (route) => {
       const count = (requests.get(url) ?? 0) + 1;
@@ -424,6 +440,11 @@ test("formal map skills reuse staged map, unit and atlas bytes through Phaser", 
   expect(Object.fromEntries(requests)).toEqual(Object.fromEntries(
     tracked.map((url) => [url, 1]),
   ));
+  await expect(page.locator("#app")).toHaveAttribute("data-sound-effect-engine", "web-audio");
+  await expect(page.locator("#app")).toHaveAttribute("data-sound-effect-context", "running");
+  expect(wavRequests.some(({ path, type }) =>
+    path === "/assets/original/audio/magic/83.wav" && type === "fetch")).toBe(true);
+  expect(wavRequests.filter(({ type }) => type === "media")).toEqual([]);
 });
 
 test("a failed stage resource stays on a readable retry surface and retries the URL", async ({ page }) => {

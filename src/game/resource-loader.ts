@@ -6,6 +6,11 @@ import {
 import type { StageId } from "./types";
 import { isMusicResourceUrl, primeEncodedMusic } from "./music-resource-cache";
 import {
+  isSoundEffectResourceUrl,
+  prepareSoundEffectBuffers,
+  primeEncodedSoundEffect,
+} from "./sound-effect-cache";
+import {
   acquireFullCombatImages,
   isFullCombatImageUrl,
   type FullCombatImageLease,
@@ -185,6 +190,7 @@ export class ResourcePackLoader {
       const manifest = await this.loadManifest();
       const urls = [...new Set([...this.resolvePackUrls(manifest, packId), ...supplementalUrls])];
       await this.loadUrls(manifest, urls);
+      await prepareSoundEffectBuffers(urls);
       this.rememberPrefetchedRenderUrls(packId, urls);
       await this.replaceFullCombatImageLease(supplementalUrls);
     } catch (error) {
@@ -211,6 +217,7 @@ export class ResourcePackLoader {
           this.activeUrls = urls;
           this.renderProgress(manifest);
           await this.loadUrls(manifest, urls);
+          await prepareSoundEffectBuffers(urls);
           this.replaceStagedRenderAssetLease(packId, urls);
           if (predecodeRenderImages === "all") await decodeStagedRenderImages(urls);
           else if (predecodeRenderImages.length > 0) {
@@ -280,7 +287,9 @@ export class ResourcePackLoader {
     const pending = this.responseForAsset(asset.url).then(async ({ response, cacheWrite }) => {
       if (!response.ok) throw new Error(`讀取失敗（${response.status}）：${asset.url}`);
       const reader = response.body?.getReader();
-      const collectEncoded = isMusicResourceUrl(asset.url) || isStagedRenderAssetUrl(asset.url);
+      const collectEncoded = isMusicResourceUrl(asset.url)
+        || isSoundEffectResourceUrl(asset.url)
+        || isStagedRenderAssetUrl(asset.url);
       const encodedChunks: Uint8Array[] | undefined = collectEncoded ? [] : undefined;
       let encodedByteLength = 0;
       if (!reader) {
@@ -310,6 +319,7 @@ export class ResourcePackLoader {
           offset += chunk.byteLength;
         }
         if (isMusicResourceUrl(asset.url)) primeEncodedMusic(asset.url, encoded);
+        if (isSoundEffectResourceUrl(asset.url)) primeEncodedSoundEffect(asset.url, encoded);
         if (isStagedRenderAssetUrl(asset.url)) state.encodedRenderAsset = encodedView;
       }
       await cacheWrite;

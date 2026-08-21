@@ -54,6 +54,12 @@ import {
   stompPresentationStepAtTime,
   type StompPresentationStep,
 } from "./game/stomp-presentation";
+import { prepareSoundEffectBuffers } from "./game/sound-effect-cache";
+import {
+  SoundEffectTransport,
+  type SoundEffectPlayback,
+  type SoundEffectTransportState,
+} from "./game/sound-effect-transport";
 
 interface LabPlaybackState {
   readonly actionCode: TechniqueLabNativeCode;
@@ -207,6 +213,27 @@ let timelineActionCode: TechniqueLabNativeCode | undefined;
 let iceOutcomeCleared = false;
 let iceOutcomeApplied = false;
 let frozenUnitIds = new Set<string>();
+const activeAudio = new Set<SoundEffectPlayback>();
+const updateSoundEffectDebugState = (state: SoundEffectTransportState): void => {
+  root.dataset.soundEffectEngine = "web-audio";
+  root.dataset.soundEffectContext = state.contextState;
+  root.dataset.soundEffectBufferCount = String(state.bufferCount);
+  root.dataset.soundEffectScheduleCount = String(state.scheduledCount);
+  root.dataset.soundEffectActiveCount = String(state.activeCount);
+  if (state.error) root.dataset.soundEffectError = state.error;
+  else delete root.dataset.soundEffectError;
+};
+const soundEffects = new SoundEffectTransport(1, updateSoundEffectDebugState);
+root.dataset.soundEffectReady = "false";
+soundInput.disabled = true;
+root.addEventListener("pointerdown", () => soundEffects.unlock(), { capture: true });
+try {
+  await prepareSoundEffectBuffers(Object.values(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS));
+  root.dataset.soundEffectReady = "true";
+  soundInput.disabled = false;
+} catch (error: unknown) {
+  root.dataset.soundEffectError = error instanceof Error ? error.message : String(error);
+}
 
 function iceFrozenUnitIds(): readonly string[] {
   if (!session.state.actionCode.endsWith("C")) return [];
@@ -497,6 +524,19 @@ function visualFrameAt(currentTimeMs: number): TechniqueLabVisualFrame {
   };
 }
 
+function stopAudio(): void {
+  for (const playback of activeAudio) playback.stop();
+  activeAudio.clear();
+}
+
+function playSource(source: string): void {
+  let playback: SoundEffectPlayback | undefined;
+  playback = soundEffects.play(source, 1, () => {
+    if (playback) activeAudio.delete(playback);
+  });
+  if (playback) activeAudio.add(playback);
+}
+
 function playAudioBetween(previousMs: number, currentMs: number): void {
   if (!sound) return;
   if (isFireCode(session.state.actionCode)) {
@@ -508,7 +548,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[
         request.resource as keyof typeof TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS
       ];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     });
     return;
   }
@@ -523,15 +563,14 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[
         request.resource as keyof typeof TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS
       ];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     });
     return;
   }
   if (isRecoveryCode(session.state.actionCode)) {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
-      void new Audio(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/36"])
-        .play().catch(() => undefined);
+      playSource(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/36"]);
     }
     return;
   }
@@ -539,7 +578,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/51"];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     }
     return;
   }
@@ -547,7 +586,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/52"];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     }
     return;
   }
@@ -555,7 +594,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/51"];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     }
     return;
   }
@@ -565,7 +604,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       if (playedAudioCues.has(index) || cueMs < previousMs || cueMs > currentMs) return;
       playedAudioCues.add(index);
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[request.resource];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     });
     return;
   }
@@ -573,7 +612,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/8"];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     }
     return;
   }
@@ -588,7 +627,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[
         request.resource as keyof typeof TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS
       ];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     });
     return;
   }
@@ -603,7 +642,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[
         TECHNIQUE_LAB_STOMPS[session.state.actionCode].audioResource
       ];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     }
     return;
   }
@@ -618,7 +657,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       if (playedAudioCues.has(cycle) || cueMs < previousMs || cueMs > currentMs) continue;
       playedAudioCues.add(cycle);
       const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[definition.audioResource];
-      if (source) void new Audio(source).play().catch(() => undefined);
+      if (source) playSource(source);
     }
   }
 }
@@ -844,6 +883,7 @@ function render(): void {
 }
 
 function restart(autoplay = true): void {
+  stopAudio();
   timeMs = 0;
   iceOutcomeCleared = false;
   if (session.state.actionCode.endsWith("C")) {
@@ -858,6 +898,7 @@ function restart(autoplay = true): void {
 }
 
 function seek(nextTimeMs: number): void {
+  stopAudio();
   timeMs = Math.max(0, Math.min(durationMs, nextTimeMs));
   if (timeMs < durationMs && session.state.actionCode.endsWith("C")) {
     iceOutcomeCleared = false;
@@ -989,6 +1030,7 @@ speedSelect.addEventListener("change", () => {
 });
 soundInput.addEventListener("change", () => {
   sound = soundInput.checked;
+  if (!sound) stopAudio();
   playedAudioCues = new Set();
   if (sound) playAudioBetween(-1, timeMs);
   render();
@@ -1014,7 +1056,11 @@ function animate(now: number): void {
 restart(true);
 requestAnimationFrame(animate);
 
-window.addEventListener("pagehide", () => renderer.game.destroy(true), { once: true });
+window.addEventListener("pagehide", () => {
+  stopAudio();
+  soundEffects.destroy();
+  renderer.game.destroy(true);
+}, { once: true });
 
 declare global {
   interface Window {

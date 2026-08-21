@@ -25,6 +25,12 @@ import {
   renderCombat,
   type CombatPresentationRenderSource,
 } from "./game/ui";
+import { prepareSoundEffectBuffers } from "./game/sound-effect-cache";
+import {
+  SoundEffectTransport,
+  type SoundEffectPlayback,
+  type SoundEffectTransportState,
+} from "./game/sound-effect-transport";
 
 const LAB_CLASSES = [
   "soldier",
@@ -419,7 +425,32 @@ let currentTime = 0;
 // 見 `styles.css`：本作不跟隨系統「減少動態效果」，時間軸一律自動播放。
 let playing = true;
 let previousFrameTime = performance.now();
-const activeAudio = new Set<HTMLAudioElement>();
+const activeAudio = new Set<SoundEffectPlayback>();
+const updateSoundEffectDebugState = (state: SoundEffectTransportState): void => {
+  root.dataset.soundEffectEngine = "web-audio";
+  root.dataset.soundEffectContext = state.contextState;
+  root.dataset.soundEffectBufferCount = String(state.bufferCount);
+  root.dataset.soundEffectScheduleCount = String(state.scheduledCount);
+  root.dataset.soundEffectActiveCount = String(state.activeCount);
+  if (state.error) root.dataset.soundEffectError = state.error;
+  else delete root.dataset.soundEffectError;
+};
+const soundEffects = new SoundEffectTransport(1, updateSoundEffectDebugState);
+const soundInput = field<HTMLInputElement>("sound");
+const soundEffectUrls = [...new Set([
+  ...Object.values(STAGE0_ACTION_AUDIO_ASSETS),
+  ...Object.values(ASSETS.audio.effects),
+])];
+root.dataset.soundEffectReady = "false";
+soundInput.disabled = true;
+root.addEventListener("pointerdown", () => soundEffects.unlock(), { capture: true });
+try {
+  await prepareSoundEffectBuffers(soundEffectUrls);
+  root.dataset.soundEffectReady = "true";
+  soundInput.disabled = false;
+} catch (error: unknown) {
+  root.dataset.soundEffectError = error instanceof Error ? error.message : String(error);
+}
 
 const renderSource: CombatPresentationRenderSource = {
   battlePresentation: "full",
@@ -524,8 +555,7 @@ function makeUnit(
 
 function stopAudio(): void {
   for (const audio of activeAudio) {
-    audio.pause();
-    audio.currentTime = 0;
+    audio.stop();
   }
   activeAudio.clear();
 }
@@ -536,11 +566,11 @@ function playCue(record: number): void {
   const baseEffects = ASSETS.audio.effects as Readonly<Partial<Record<number, string>>>;
   const source = generated[`e-${record}`] ?? baseEffects[record];
   if (!source) return;
-  const audio = new Audio(source);
-  audio.volume = record === 11 ? 0.5 : 0.55;
-  activeAudio.add(audio);
-  audio.addEventListener("ended", () => activeAudio.delete(audio), { once: true });
-  void audio.play().catch(() => activeAudio.delete(audio));
+  let playback: SoundEffectPlayback | undefined;
+  playback = soundEffects.play(source, record === 11 ? 0.5 : 0.55, () => {
+    if (playback) activeAudio.delete(playback);
+  });
+  if (playback) activeAudio.add(playback);
 }
 
 function crossedCues(from: number, to: number): void {
@@ -788,3 +818,7 @@ configureGameScaling(
 );
 updateToggleLabel();
 requestAnimationFrame(tick);
+window.addEventListener("pagehide", () => {
+  stopAudio();
+  soundEffects.destroy();
+}, { once: true });

@@ -11,10 +11,14 @@ import {
   isSoundEffectChannelEnabled,
   MUSIC_GAIN_BY_VOLUME,
   SOUND_EFFECT_GAIN_BY_VOLUME,
-  soundEffectOutputVolume,
   soundEffectChannelForCue,
   type SoundEffectChannel,
 } from "./audio-settings";
+import {
+  SoundEffectTransport,
+  type SoundEffectPlayback,
+  type SoundEffectTransportState,
+} from "./sound-effect-transport";
 import type { GamePhase } from "./types";
 import {
   STAGE49_ENDING_MUSIC,
@@ -40,8 +44,7 @@ const battleMusicSide = (phase: GamePhase): BattleMusicSide | undefined => {
   return undefined;
 };
 
-// Total release is 4 × 15 ms, short enough to stay inside one walk step.
-const WALK_FADE_STEP_MS = 15;
+const WALK_FADE_MS = 60;
 
 const isWalkCue = (cue: { group: string; record: number; reason: string }): boolean =>
   cue.group === "e" && cue.record === 14 && soundEffectChannelForCue(cue.reason) === "movement";
@@ -54,6 +57,7 @@ export class AudioManager {
   private previousCueSequence = 0;
   private selectedMusic?: MusicProgram;
   private readonly music: MusicTransport;
+  private readonly effects: SoundEffectTransport;
   private readonly effectRequestCounts: Record<SoundEffectChannel, number> = {
     speech: 0,
     movement: 0,
@@ -66,10 +70,9 @@ export class AudioManager {
     combat: 0,
     key: 0,
   };
-  private walkEffect?: HTMLAudioElement;
-  private readonly releasingWalkEffects = new Set<HTMLAudioElement>();
-  private readonly activeEffects = new Set<HTMLAudioElement>();
-  private readonly effectCueVolumes = new WeakMap<HTMLAudioElement, number>();
+  private walkEffect?: SoundEffectPlayback;
+  private readonly releasingWalkEffects = new Set<SoundEffectPlayback>();
+  private readonly activeEffects = new Set<SoundEffectPlayback>();
   constructor(
     private readonly controller: GameController,
     private readonly root: HTMLElement,
@@ -80,6 +83,10 @@ export class AudioManager {
     this.music = new MusicTransport(
       MUSIC_GAIN_BY_VOLUME[controller.musicVolume],
       (state) => this.updateMusicDebugState(state),
+    );
+    this.effects = new SoundEffectTransport(
+      SOUND_EFFECT_GAIN_BY_VOLUME[controller.soundEffectVolume],
+      (state) => this.updateEffectTransportDebugState(state),
     );
     this.updateEffectDebugState();
     root.addEventListener("pointerdown", () => this.unlock(), {
@@ -93,15 +100,16 @@ export class AudioManager {
     }, { capture: true, signal: this.events.signal });
     this.unsubscribe = controller.onChange(() => this.sync());
     this.syncMusic();
-    if (this.unlocked) this.music.unlock();
+    if (this.unlocked) {
+      this.music.unlock();
+      this.effects.unlock();
+    }
   }
 
   destroy(): void {
     this.events.abort();
     this.unsubscribe();
-    // Teardown cuts immediately: a release fade would keep its timer running
-    // against an element nothing owns any more.
-    for (const effect of this.activeEffects) effect.pause();
+    this.effects.destroy();
     this.walkEffect = undefined;
     this.releasingWalkEffects.clear();
     this.activeEffects.clear();
@@ -118,6 +126,7 @@ export class AudioManager {
   private unlock(): void {
     this.unlocked = true;
     this.music.unlock();
+    this.effects.unlock();
   }
 
   private sync(): void {
@@ -162,25 +171,11 @@ export class AudioManager {
     this.updateWalkDebugState();
   }
 
-  // Cutting a footstep clip mid-waveform clicks, so let it down over a few
-  // frames. Each clip owns its own timer: a walk that starts while an earlier
-  // one is still releasing must not cancel that release and strand it playing.
-  private releaseWalkEffect(effect: HTMLAudioElement): void {
-    if (effect.paused) return;
+  // Cutting a footstep clip mid-waveform clicks, so give each source its own
+  // short gain release. A new walk cannot cancel an older source's ramp.
+  private releaseWalkEffect(effect: SoundEffectPlayback): void {
     this.releasingWalkEffects.add(effect);
-    let remaining = 4;
-    const timer = setInterval(() => {
-      remaining -= 1;
-      if (remaining > 0) {
-        effect.volume = Math.max(0, effect.volume * (remaining / (remaining + 1)));
-        return;
-      }
-      clearInterval(timer);
-      effect.pause();
-      effect.currentTime = 0;
-      this.finishEffect(effect);
-      this.updateWalkDebugState();
-    }, WALK_FADE_STEP_MS);
+    effect.fadeOut(WALK_FADE_MS);
   }
 
   // Derived rather than pushed, so a late release callback cannot report on a
@@ -261,13 +256,7 @@ export class AudioManager {
   }
 
   private applySoundEffectVolume(): void {
-    for (const effect of this.activeEffects) {
-      if (this.releasingWalkEffects.has(effect)) continue;
-      const cueVolume = this.effectCueVolumes.get(effect);
-      if (cueVolume !== undefined) {
-        effect.volume = soundEffectOutputVolume(cueVolume, this.controller.soundEffectVolume);
-      }
-    }
+    this.effects.setGain(SOUND_EFFECT_GAIN_BY_VOLUME[this.controller.soundEffectVolume]);
     this.updateEffectDebugState();
   }
 
@@ -302,10 +291,21 @@ export class AudioManager {
     if (channel) this.root.dataset.lastEffectChannel = channel;
   }
 
-  private finishEffect(effect: HTMLAudioElement): void {
+  private updateEffectTransportDebugState(state: SoundEffectTransportState): void {
+    if (!this.controller.isTestMode) return;
+    this.root.dataset.soundEffectEngine = "web-audio";
+    this.root.dataset.soundEffectContext = state.contextState;
+    this.root.dataset.soundEffectBufferCount = String(state.bufferCount);
+    this.root.dataset.soundEffectScheduleCount = String(state.scheduledCount);
+    this.root.dataset.soundEffectActiveCount = String(state.activeCount);
+    this.root.dataset.soundEffectReady = String(state.bufferCount > 0);
+    if (state.error) this.root.dataset.soundEffectError = state.error;
+    else delete this.root.dataset.soundEffectError;
+  }
+
+  private finishEffect(effect: SoundEffectPlayback): void {
     this.activeEffects.delete(effect);
     this.releasingWalkEffects.delete(effect);
-    this.effectCueVolumes.delete(effect);
     if (this.walkEffect === effect) this.walkEffect = undefined;
     this.updateWalkDebugState();
   }
@@ -314,19 +314,19 @@ export class AudioManager {
     source: string,
     volume: number,
     channel: SoundEffectChannel,
-  ): HTMLAudioElement | undefined {
+  ): SoundEffectPlayback | undefined {
     this.effectRequestCounts[channel] += 1;
     if (this.controller.isTestMode) this.root.dataset.lastEffectRequestChannel = channel;
     this.updateEffectDebugState();
     if (!this.unlocked || !isSoundEffectChannelEnabled(this.controller, channel)) return undefined;
+    let effect: SoundEffectPlayback | undefined;
+    effect = this.effects.play(source, volume, () => {
+      if (effect) this.finishEffect(effect);
+    });
+    if (!effect) return undefined;
+    this.activeEffects.add(effect);
     this.effectPlaybackCounts[channel] += 1;
     this.updateEffectDebugState(channel);
-    const effect = new Audio(source);
-    this.activeEffects.add(effect);
-    this.effectCueVolumes.set(effect, volume);
-    effect.volume = soundEffectOutputVolume(volume, this.controller.soundEffectVolume);
-    effect.addEventListener("ended", () => this.finishEffect(effect), { once: true });
-    void effect.play().catch(() => this.finishEffect(effect));
     return effect;
   }
 }

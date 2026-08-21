@@ -96,6 +96,12 @@ describe("versioned resource manifest", () => {
     expect(stage0).not.toContain("/assets/original/full-combat-atlases/left-soldier.png");
     expect(stage0).not.toContain("/assets/original/portraits/D-46-base.png");
 
+    const soundEffects = resolvedPackUrls(manifest, "audio:effects");
+    expect(soundEffects).toContain("/assets/original/audio/e/2.wav");
+    expect(soundEffects).toContain("/assets/original/audio/magic/83.wav");
+    expect(soundEffects).toContain("/assets/original/speech-57.wav");
+    expect(soundEffects).toContain("/assets/original/ui-confirm.wav");
+
     const stage4 = resolvedPackUrls(manifest, "stage:stage-04");
     expect(stage4).toContain("/assets/original/battle-sprite-atlases/stage4-force-field-pulse.png");
     expect(stage4).not.toContain("/assets/original/stage26-map.png");
@@ -108,6 +114,7 @@ describe("versioned resource manifest", () => {
         `/assets/original/music/MUSIC/${deploymentTrack}.ogg`,
       );
       expect([...stageUrls].filter((url) => url.includes("/music/")).length).toBeGreaterThanOrEqual(5);
+      for (const sound of soundEffects) expect(stageUrls).toContain(sound);
     }
 
     const ending = resolvedPackUrls(manifest, "ending");

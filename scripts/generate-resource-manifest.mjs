@@ -57,6 +57,8 @@ const finalReleaseAsset = (relative) => {
 };
 
 const assetUrl = (relative) => `/assets/original/${relative}`;
+const isSoundEffectAsset = (relative) => relative.startsWith("audio/")
+  || /^(?:speech-\d+|ui-confirm|combat-(?:death|hit|soldier))\.wav$/u.test(relative);
 const musicUrl = (container, record) =>
   assetUrl(`music/${container}/${String(record).padStart(4, "0")}.ogg`);
 
@@ -104,9 +106,6 @@ for (const stageId of stageIds) {
 const stage0Assets = stageAssetUrls.get("stage-00");
 for (const suffix of ["story", "player", "enemy"]) {
   stage0Assets.add(assetUrl(`music/generated/stage0-${suffix}-seamless.ogg`));
-}
-for (let record = 57; record <= 71; record += 1) {
-  stage0Assets.add(assetUrl(`speech-${record}.wav`));
 }
 if (stageAssetUrls.get("stage-04")) {
   stageAssetUrls.get("stage-04").add(assetUrl("battle-sprite-atlases/stage4-force-field-pulse.png"));
@@ -159,14 +158,17 @@ for (const { relative } of allFiles) {
     if (!relative.includes("stage4-") && !relative.includes("stage26-")) addToPack("battle:core", url);
   } else if (relative.startsWith("technique-lab/units/") || /^unit-(?:ally|enemy)-/u.test(relative)) {
     addToPack("stream:map-units", url);
-  } else if (relative.startsWith("audio/")) addToPack("actions:stage-00", url);
+  } else if (isSoundEffectAsset(relative)) addToPack("audio:effects", url);
   else if (relative === "music/MUSIC/0014.ogg" || relative === "music/MUSIC/0001.ogg") {
     addToPack("boot", url);
   }
 }
 
 for (const [stageId, urls] of stageAssetUrls) {
-  for (const url of urls) addToPack(`stage:${stageId}`, url);
+  for (const url of urls) {
+    const relative = url.slice("/assets/original/".length);
+    if (!isSoundEffectAsset(relative)) addToPack(`stage:${stageId}`, url);
+  }
 }
 const endingSource = await readFile(path.join(root, "src/game/content/stage49-ending.ts"), "utf8");
 for (const url of sourceAssetUrls(endingSource)) addToPack("ending", url);
@@ -188,9 +190,7 @@ for (const { relative } of allFiles) {
     throw new Error(`stage asset was not assigned to a stage pack: ${url}`);
   }
   if (relative.startsWith("music/")) addToPack("stream:music", url);
-  else if (/^(?:speech-\d+|ui-confirm|combat-(?:death|hit|soldier))\.wav$/u.test(relative)) {
-    addToPack("stage:stage-00", url);
-  } else if (relative.startsWith("dialogue/") || relative.startsWith("status-icons/")
+  else if (relative.startsWith("dialogue/") || relative.startsWith("status-icons/")
     || relative.startsWith("story/")
     || /^(?:battle-|command-menu-|hud-|native-|tactical-panel)/u.test(relative)) {
     addToPack("battle:core", url);
@@ -209,6 +209,7 @@ const addPack = (id, label, dependsOn = [], next = []) => {
 };
 addPack("boot", "開場資料");
 addPack("battle:core", "戰場共用資料");
+addPack("audio:effects", "共用音效");
 addPack("actions:stage-00", "第 0 關動作資料");
 addPack("actions:campaign", "戰役動作資料", ["actions:stage-00"]);
 for (let index = 0; index < stageIds.length; index += 1) {
@@ -217,7 +218,11 @@ for (let index = 0; index < stageIds.length; index += 1) {
   addPack(
     `stage:${stageId}`,
     `${stageId} 關卡資料`,
-    ["battle:core", stageId === "stage-00" ? "actions:stage-00" : "actions:campaign"],
+    [
+      "battle:core",
+      "audio:effects",
+      stageId === "stage-00" ? "actions:stage-00" : "actions:campaign",
+    ],
     next,
   );
 }
