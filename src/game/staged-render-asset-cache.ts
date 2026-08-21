@@ -24,6 +24,7 @@ interface ActiveStagedRenderAssets {
 }
 
 let activeAssets: ActiveStagedRenderAssets | undefined;
+const MAX_PARALLEL_IMAGE_DECODES = 6;
 
 const contentTypeFor = (url: string): string => {
   if (url.endsWith(".png")) return "image/png";
@@ -60,11 +61,30 @@ export function activateStagedRenderAssets(
     const ownerDocument = options.ownerDocument
       ?? (typeof document === "undefined" ? undefined : document);
     if (!ownerDocument) throw new Error(`cannot decode staged render asset ${source}`);
-    const image = ownerDocument.createElement("img");
-    image.decoding = "sync";
-    image.dataset.stagedAssetUrl = originalUrl;
-    image.src = source;
-    await image.decode();
+    const createImage = () => {
+      const image = ownerDocument.createElement("img");
+      image.decoding = "sync";
+      image.dataset.stagedAssetUrl = originalUrl;
+      image.src = source;
+      return image;
+    };
+    let image = createImage();
+    try {
+      await image.decode();
+    } catch (firstError) {
+      // Chromium can reject a detached image's first decode while an old route
+      // is releasing many blob URLs. A fresh decoder for the same retained
+      // source distinguishes that transition race from genuinely invalid PNG.
+      image = createImage();
+      try {
+        await image.decode();
+      } catch (secondError) {
+        const reason = secondError instanceof Error ? secondError.message : String(secondError);
+        throw new Error(`staged render asset failed to decode: ${originalUrl}: ${reason}`, {
+          cause: firstError,
+        });
+      }
+    }
     if (image.naturalWidth === 0 || image.naturalHeight === 0) {
       throw new Error(`staged render asset decoded empty: ${source}`);
     }
@@ -135,9 +155,19 @@ export function loadStagedRenderImage(url: string): Promise<HTMLImageElement> | 
  * or unrelated prefetched packs. Failures propagate to the resource retry UI.
  */
 export async function decodeStagedRenderImages(urls: readonly string[]): Promise<void> {
-  await Promise.all(urls.filter((url) => url.endsWith(".png")).map((url) => {
-    const pending = loadStagedRenderImage(url);
-    if (!pending) throw new Error(`staged render image is not active: ${url}`);
-    return pending;
-  }));
+  const imageUrls = [...new Set(urls.filter((url) => url.endsWith(".png")))];
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < imageUrls.length) {
+      const url = imageUrls[cursor];
+      cursor += 1;
+      const pending = loadStagedRenderImage(url);
+      if (!pending) throw new Error(`staged render image is not active: ${url}`);
+      await pending;
+    }
+  };
+  await Promise.all(Array.from(
+    { length: Math.min(MAX_PARALLEL_IMAGE_DECODES, imageUrls.length) },
+    () => worker(),
+  ));
 }

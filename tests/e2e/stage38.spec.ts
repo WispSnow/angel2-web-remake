@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { CREDITS_NAME_FRAMES, CREDITS_ROLE_FRAMES } from "../../src/game/content/credits";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -191,6 +192,7 @@ test("S38-F/G: victory saves stage 39, shows seven credit pages, then loops on T
   await expect(creditsRoll).toBeVisible();
   await page.waitForFunction(() =>
     (document.querySelector(".credits-roll")?.getAnimations().length ?? 0) > 0);
+  await expect(page.getByTestId("credits-screen")).toHaveAttribute("data-segment-ready", "true");
   await page.evaluate(async () => {
     const animation = document.querySelector(".credits-roll")?.getAnimations()[0];
     if (!animation) throw new Error("credits scroll animation not found");
@@ -266,6 +268,7 @@ test("S38-F/G: victory saves stage 39, shows seven credit pages, then loops on T
     }
   }
   await expect(page.getByTestId("credits-final")).toBeVisible();
+  await expect(page.getByTestId("credits-screen")).toHaveAttribute("data-segment-ready", "true");
   expect(await state(page)).toMatchObject({
     phase: "credits",
     campaignRoute: "stage-39",
@@ -277,4 +280,59 @@ test("S38-F/G: victory saves stage 39, shows seven credit pages, then loops on T
   await page.getByTestId("credits-screen").click();
   await page.keyboard.press("Enter");
   expect((await state(page)).credits).toEqual({ section: "the-end", pageIndex: 6, transitionIndex: 7 });
+});
+
+test("S38-H: each credits transition waits for decoded frames and reuses staged responses", async ({ page }) => {
+  await page.addInitScript(() => {
+    const target = window as Window & {
+      __releaseCreditsImages?: () => void;
+      __creditsDecodeAttempts?: number;
+    };
+    const originalDecode = HTMLImageElement.prototype.decode;
+    const gate = new Promise<void>((resolve) => {
+      target.__releaseCreditsImages = resolve;
+    });
+    target.__creditsDecodeAttempts = 0;
+    HTMLImageElement.prototype.decode = function decodeCreditsImageAfterGate() {
+      if (!this.closest("#credits-screen")) return originalDecode.call(this);
+      target.__creditsDecodeAttempts = (target.__creditsDecodeAttempts ?? 0) + 1;
+      return gate.then(() => originalDecode.call(this));
+    };
+  });
+  const tracked = [CREDITS_ROLE_FRAMES[0].src, CREDITS_NAME_FRAMES[0].src];
+  const requests = new Map(tracked.map((url) => [url, 0]));
+  for (const url of tracked) {
+    await page.route(`**${url}`, async (route) => {
+      const count = (requests.get(url) ?? 0) + 1;
+      requests.set(url, count);
+      if (count > 1) await route.abort("failed");
+      else await route.continue();
+    });
+  }
+
+  await page.goto("/?debugScenario=stage-38-cleared&difficulty=0&test=1");
+  const screen = page.getByTestId("credits-screen");
+  await expect(screen).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => (
+    window as Window & { __creditsDecodeAttempts?: number }
+  ).__creditsDecodeAttempts ?? 0)).toBeGreaterThan(0);
+  await expect(screen).toHaveAttribute("data-segment-ready", "false");
+  expect(await screen.evaluate((element) => element.querySelector(".credits-roll")?.getAnimations().length ?? 0))
+    .toBe(0);
+  expect((await state(page)).credits?.transitionIndex).toBe(0);
+
+  await page.evaluate(() => (
+    window as Window & { __releaseCreditsImages?: () => void }
+  ).__releaseCreditsImages?.());
+  await expect(screen).toHaveAttribute("data-segment-ready", "true");
+  await expect.poll(() => screen.evaluate((element) =>
+    element.querySelector(".credits-roll")?.getAnimations().length ?? 0,
+  )).toBeGreaterThan(0);
+  await expect.poll(() => page.getByTestId("credits-page").locator("img").evaluateAll((images) =>
+    images.every((image) => (image as HTMLImageElement).src.startsWith("blob:")
+      && (image as HTMLImageElement).naturalWidth > 0),
+  )).toBe(true);
+  expect(Object.fromEntries(requests)).toEqual(Object.fromEntries(
+    tracked.map((url) => [url, 1]),
+  ));
 });

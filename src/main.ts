@@ -20,6 +20,7 @@ import { createStage0Units } from "./game/content/stage0";
 import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
 import { STAGE0_DEFINITION } from "./game/content/stages";
 import type { PortraitRecord } from "./game/types";
+import { STAGE49_ENDING_SUPPLEMENTAL_ASSETS } from "./game/content/stage49-ending";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
@@ -145,7 +146,11 @@ const mountController = (
     if (controller.phase === "ending") {
       destroySurface = () => undefined;
       const mount = async () => {
-        await stagedResources?.ensureRoute("ending", "讀取主線結局資料");
+        await stagedResources?.ensureRoute(
+          "ending",
+          "讀取主線結局資料",
+          STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
+        );
         if (generation !== surfaceGeneration || controller.phase !== "ending") return;
         destroySurface = mountStage49EndingUi(root, controller);
       };

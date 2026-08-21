@@ -73,4 +73,30 @@ describe("staged render asset cache", () => {
     expect(loadStagedRenderImage("/assets/original/map-action-atlases/fire-1.json"))
       .toBeUndefined();
   });
+
+  it("bounds parallel image decoding when a route carries many portrait layers", async () => {
+    let active = 0;
+    let maximumActive = 0;
+    const decoded = { naturalWidth: 24, naturalHeight: 16 } as HTMLImageElement;
+    const decodeImage = vi.fn(async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 2));
+      active -= 1;
+      return decoded;
+    });
+    const urls = Array.from(
+      { length: 14 },
+      (_, index) => `/assets/original/portraits/0046/layer-${index}.png`,
+    );
+    const lease = activateStagedRenderAssets(new Map(
+      urls.map((url) => [url, new Uint8Array([1, 2, 3])]),
+    ), { decodeImage });
+    release = lease.release;
+
+    await decodeStagedRenderImages(urls);
+    expect(decodeImage).toHaveBeenCalledTimes(urls.length);
+    expect(maximumActive).toBeGreaterThan(1);
+    expect(maximumActive).toBeLessThanOrEqual(6);
+  });
 });

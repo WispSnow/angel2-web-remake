@@ -36,3 +36,16 @@
 .credits-final-base { position: absolute; left: 160px; top: 27px; width: 408px; height: 301px; }
 .credits-final-overlay { position: absolute; left: 352px; top: 161px; width: 48px; height: 56px; }
 .credits-final-overlay img { position: absolute; inset: 0; }
+.credits-asset-error {
+  position: absolute;
+  z-index: 10;
+  left: 120px;
+  right: 120px;
+  bottom: 24px;
+  padding: 10px 12px;
+  border: 2px solid #e5ba62;
+  background: #130b27;
+  color: #fff4c4;
+  font: 700 16px/1.4 sans-serif;
+  text-align: center;
+}

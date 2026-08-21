@@ -11,14 +11,17 @@ import {
 } from "./content/stage49-ending";
 import type { GameController } from "./controller";
 import { drawEpilogueGlyphs, loadEpilogueFont } from "./epilogue-text";
+import { prepareDomImageElements } from "./dom-image-readiness";
 import { renderNativeDialogueText } from "./dialogue-text";
 import {
   animatedPortraitMarkup,
   nativeMouthFrameAfterGlyph,
   nativeStoryGlyphMovesMouth,
+  prepareAnimatedPortrait,
   startPortraitAnimations,
 } from "./portrait";
 import { configureGameScaling } from "./scaling";
+import { decodeStagedRenderImages, stagedRenderAssetSource } from "./staged-render-asset-cache";
 import type { DialoguePage } from "./types";
 
 const escapeHtml = (value: string): string => value
@@ -27,12 +30,18 @@ const escapeHtml = (value: string): string => value
   .replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;");
 
-const dialoguePortraitFrameStyle = [
-  `--dialogue-portrait-frame-top:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.top}')`,
-  `--dialogue-portrait-frame-nameplate:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate}')`,
-  `--dialogue-portrait-frame-side:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.side}')`,
-  `--dialogue-text-window:url('${DIALOGUE_TEXT_WINDOW_ASSET}')`,
+const dialoguePortraitFrameStyle = () => [
+  `--dialogue-portrait-frame-top:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.top)}')`,
+  `--dialogue-portrait-frame-nameplate:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate)}')`,
+  `--dialogue-portrait-frame-side:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.side)}')`,
+  `--dialogue-text-window:url('${stagedRenderAssetSource(DIALOGUE_TEXT_WINDOW_ASSET)}')`,
+  `--stage49-roster-background:url('${stagedRenderAssetSource(STAGE49_ENDING_ASSETS.rosterBackground)}')`,
 ].join(";");
+
+const dialogueFrameAssetUrls = [
+  ...Object.values(DIALOGUE_PORTRAIT_FRAME_ASSETS),
+  DIALOGUE_TEXT_WINDOW_ASSET,
+] as const;
 
 function dialogueWindow(
   slot: "upper" | "lower",
@@ -69,7 +78,7 @@ function storyMarkup(controller: GameController): string {
   const previousPage: DialoguePage | undefined = STAGE49_STORY_PAGES[session.index - 1];
   return `<div class="stage49-story dialogue-layer prebattle" data-testid="stage49-story"
       aria-label="戰後道別 ${session.index + 1}／17">
-    <img class="stage49-story-background" src="${STAGE49_ENDING_ASSETS.storyBackground}" alt="">
+    <img class="stage49-story-background" src="${stagedRenderAssetSource(STAGE49_ENDING_ASSETS.storyBackground)}" alt="">
     ${dialogueWindow("upper", page.upper, page.activeSlot === "upper", Boolean(page.upper && !previousPage?.upper))}
     ${dialogueWindow("lower", page.lower, page.activeSlot === "lower", Boolean(page.lower && !previousPage?.lower))}
   </div>`;
@@ -79,15 +88,18 @@ function rosterMarkup(controller: GameController): string {
   const session = controller.stage49Ending;
   const card = session?.rosterCard;
   if (!card || !session) return "";
+  const decorationSource = STAGE49_ENDING_ASSETS.decoration(card.actor.decorationRecord);
+  const portraitSource = portraitSourceFor(card.actor.portraitRecord);
+  const classIllustrationSource = STAGE49_ENDING_ASSETS.classIllustration(card.nativeClassRecord);
   return `<div class="stage49-roster" data-testid="stage49-roster"
       aria-label="戰後記錄 ${session.index + 1}／22">
     <div class="stage49-roster-stripe" aria-hidden="true"></div>
     <img class="stage49-decoration" data-testid="stage49-roster-decoration"
-      src="${STAGE49_ENDING_ASSETS.decoration(card.actor.decorationRecord)}" alt="">
+      src="${stagedRenderAssetSource(decorationSource)}" data-source-url="${decorationSource}" alt="">
     <img class="stage49-roster-portrait" data-testid="stage49-roster-portrait"
-      src="${portraitSourceFor(card.actor.portraitRecord)}" alt="${escapeHtml(card.actor.name)}肖像">
+      src="${stagedRenderAssetSource(portraitSource)}" data-source-url="${portraitSource}" alt="${escapeHtml(card.actor.name)}肖像">
     <img class="stage49-roster-class-illustration" data-testid="stage49-roster-class-illustration"
-      src="${STAGE49_ENDING_ASSETS.classIllustration(card.nativeClassRecord)}"
+      src="${stagedRenderAssetSource(classIllustrationSource)}" data-source-url="${classIllustrationSource}"
       alt="${escapeHtml(card.className)}全景戰鬥圖形">
     <dl class="stage49-roster-fields">
       <div class="is-name"><dt>姓名：</dt><dd>${escapeHtml(card.actor.name)}</dd></div>
@@ -118,8 +130,8 @@ function epilogueMarkup(controller: GameController): string {
   const { screenWidth, screenHeight } = STAGE49_EPILOGUE_LAYOUT;
   return `<div class="stage49-epilogue" data-testid="stage49-epilogue"
       data-segment="${presentation.segment.id}" data-selector="${presentation.variant.selector}">
-    <img class="stage49-epilogue-left" src="${STAGE49_ENDING_ASSETS.epilogue(left)}" alt="">
-    <img class="stage49-epilogue-right" src="${STAGE49_ENDING_ASSETS.epilogue(right)}" alt="">
+    <img class="stage49-epilogue-left" src="${stagedRenderAssetSource(STAGE49_ENDING_ASSETS.epilogue(left))}" alt="">
+    <img class="stage49-epilogue-right" src="${stagedRenderAssetSource(STAGE49_ENDING_ASSETS.epilogue(right))}" alt="">
     <canvas class="stage49-epilogue-text" data-testid="stage49-epilogue-text"
       width="${screenWidth}" height="${screenHeight}" aria-hidden="true"></canvas>
     <p class="visually-hidden">${escapeHtml(presentation.variant.text)}</p>
@@ -145,7 +157,7 @@ export function mountStage49EndingUi(
     <div class="game-stage">
       <div class="game-viewport stage49-viewport" id="stage49-viewport">
         <button type="button" class="logical-screen stage49-screen" id="stage49-screen"
-          data-testid="ending-advance" style="${dialoguePortraitFrameStyle}"
+          data-testid="ending-advance" style="${dialoguePortraitFrameStyle()}"
           aria-label="推進主線結局"></button>
       </div>
     </div>
@@ -165,6 +177,9 @@ export function mountStage49EndingUi(
   let epilogueTimer: number | undefined;
   let epilogueGeneration = 0;
   let finishEpilogueTyping: (() => boolean) | undefined;
+  let renderGeneration = 0;
+  let segmentReady = false;
+  let segmentFailed = false;
 
   const stopEpilogueTyping = () => {
     if (epilogueTimer !== undefined) window.clearTimeout(epilogueTimer);
@@ -191,52 +206,55 @@ export function mountStage49EndingUi(
     screen.dataset.storyTyping = "false";
     return true;
   };
-  const startStoryTyping = () => {
+  const primeStoryTyping = (): (() => void) | undefined => {
     const session = controller.stage49Ending;
     const page: DialoguePage | undefined = session?.storyPage;
-    if (!session || session.section !== "story" || !page) return;
+    if (!session || session.section !== "story" || !page) return undefined;
     const slot = page.activeSlot;
     if (!slot) {
       screen.dataset.storyTyping = "false";
-      return;
+      return undefined;
     }
     const line = page[slot];
     if (!line?.text) {
       screen.dataset.storyTyping = "false";
-      return;
+      return undefined;
     }
     storyText = screen.querySelector<HTMLElement>(`[data-stage49-dialogue-slot="${slot}"] p`) ?? undefined;
     storyPortrait = screen.querySelector<HTMLElement>(`[data-testid="stage49-story-portrait-${slot}"]`) ?? undefined;
-    if (!storyText) return;
+    if (!storyText) return undefined;
     storyFullText = line.text;
     storyRevealedCharacters = Math.max(0, Math.min(storyFullText.length, page.revealStart ?? 0));
     renderNativeDialogueText(storyText, storyFullText.slice(0, storyRevealedCharacters));
-    const speaking = storyRevealedCharacters < storyFullText.length;
-    if (storyPortrait) storyPortrait.dataset.speaking = String(speaking);
-    screen.dataset.storyTyping = String(speaking);
-    const tick = () => {
-      if (!storyText || storyRevealedCharacters >= storyFullText.length) {
-        stopSpeaking(storyPortrait);
-        screen.dataset.storyTyping = "false";
-        storyTimer = undefined;
-        return;
-      }
-      const character = storyFullText[storyRevealedCharacters];
-      storyRevealedCharacters += 1;
-      renderNativeDialogueText(storyText, storyFullText.slice(0, storyRevealedCharacters));
-      if (storyPortrait && nativeStoryGlyphMovesMouth(character)) {
-        storyPortrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(
-          storyPortrait.dataset.mouthFrame,
-          character,
+    screen.dataset.storyTyping = "false";
+    return () => {
+      const speaking = storyRevealedCharacters < storyFullText.length;
+      if (storyPortrait) storyPortrait.dataset.speaking = String(speaking);
+      screen.dataset.storyTyping = String(speaking);
+      const tick = () => {
+        if (!storyText || storyRevealedCharacters >= storyFullText.length) {
+          stopSpeaking(storyPortrait);
+          screen.dataset.storyTyping = "false";
+          storyTimer = undefined;
+          return;
+        }
+        const character = storyFullText[storyRevealedCharacters];
+        storyRevealedCharacters += 1;
+        renderNativeDialogueText(storyText, storyFullText.slice(0, storyRevealedCharacters));
+        if (storyPortrait && nativeStoryGlyphMovesMouth(character)) {
+          storyPortrait.dataset.mouthFrame = nativeMouthFrameAfterGlyph(
+            storyPortrait.dataset.mouthFrame,
+            character,
+          );
+          storyPortrait.dataset.talkCount = String(Number(storyPortrait.dataset.talkCount ?? "0") + 1);
+        }
+        storyTimer = window.setTimeout(
+          tick,
+          controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80,
         );
-        storyPortrait.dataset.talkCount = String(Number(storyPortrait.dataset.talkCount ?? "0") + 1);
-      }
-      storyTimer = window.setTimeout(
-        tick,
-        controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80,
-      );
+      };
+      tick();
     };
-    tick();
   };
   /**
    * Reproduces module 35 0000:069E: the plates are already on screen and the
@@ -326,6 +344,7 @@ export function mountStage49EndingUi(
     });
   };
   const render = () => {
+    const generation = ++renderGeneration;
     if (timer !== undefined) window.clearTimeout(timer);
     stopStoryTimer();
     stopEpilogueTyping();
@@ -337,6 +356,10 @@ export function mountStage49EndingUi(
     const session = controller.stage49Ending;
     if (!session) return;
     screen.disabled = false;
+    segmentReady = false;
+    segmentFailed = false;
+    screen.dataset.segmentReady = "false";
+    delete screen.dataset.segmentError;
     screen.innerHTML = session.section === "story"
       ? storyMarkup(controller)
       : session.section === "roster"
@@ -346,29 +369,76 @@ export function mountStage49EndingUi(
           : boundaryMarkup();
     screen.dataset.storyTyping = "false";
     screen.dataset.epilogueTyping = "false";
+    let beginStoryTyping: (() => void) | undefined;
     if (session.section === "story") {
       for (const text of screen.querySelectorAll<HTMLElement>(".stage49-dialogue-copy p")) {
         renderNativeDialogueText(text, text.textContent ?? "");
       }
-      startStoryTyping();
+      beginStoryTyping = primeStoryTyping();
     }
-    // The epilogue owns its own advance timer: the hold only starts once the
-    // text has finished typing, and typing may be cut short by a key press.
-    if (session.section === "epilogue") {
-      startEpilogueTyping(performance.now());
-      return;
+    const portraits = [...screen.querySelectorAll<HTMLElement>(".animated-portrait")];
+    const ordinaryImages = [...screen.querySelectorAll<HTMLImageElement>("img")]
+      .filter((image) => !image.closest(".animated-portrait"));
+    const readiness = [
+      prepareDomImageElements(ordinaryImages),
+      ...portraits.map((portrait) => prepareAnimatedPortrait(portrait)),
+    ];
+    if (session.section === "story") readiness.push(decodeStagedRenderImages(dialogueFrameAssetUrls));
+    if (session.section === "roster") {
+      readiness.push(decodeStagedRenderImages([STAGE49_ENDING_ASSETS.rosterBackground]));
     }
-    const delay = session.autoAdvanceMilliseconds;
-    if (delay !== undefined && session.section !== "stage38-boundary") {
-      timer = window.setTimeout(
-        () => controller.advanceStage49Ending(),
-        controller.presentationFast ? Math.min(30, delay) : delay,
+    if (session.section === "epilogue") readiness.push(loadEpilogueFont().then(() => undefined));
+    void Promise.all(readiness).then(() => {
+      if (generation !== renderGeneration) return;
+      segmentReady = true;
+      screen.dataset.segmentReady = "true";
+      beginStoryTyping?.();
+      // The epilogue owns its own advance timer: the hold only starts once the
+      // images and font are ready, and typing may be cut short by a key press.
+      if (session.section === "epilogue") {
+        startEpilogueTyping(performance.now());
+        return;
+      }
+      const delay = session.autoAdvanceMilliseconds;
+      if (delay !== undefined && session.section !== "stage38-boundary") {
+        timer = window.setTimeout(
+          () => controller.advanceStage49Ending(),
+          controller.presentationFast ? Math.min(30, delay) : delay,
+        );
+      }
+    }).catch((error: unknown) => {
+      if (generation !== renderGeneration) return;
+      segmentFailed = true;
+      screen.dataset.segmentReady = "error";
+      screen.dataset.segmentError = error instanceof Error ? error.message : String(error);
+      screen.insertAdjacentHTML(
+        "beforeend",
+        '<span class="stage49-asset-error" role="alert">圖像載入失敗，點擊畫面重試。</span>',
       );
-    }
+    });
   };
   const advance = () => {
+    if (segmentFailed) {
+      render();
+      return;
+    }
+    if (!segmentReady) return;
     if (finishStoryTyping()) return;
     if (finishEpilogueTyping?.()) return;
+    if (controller.stage49Ending?.section === "stage38-boundary") {
+      // Drop the ending route's many decoded blob references before the next
+      // stage swaps the active lease and starts its own portrait decode gate.
+      // The resource retry overlay remains authoritative if that gate fails.
+      renderGeneration += 1;
+      screen.replaceChildren();
+      for (const property of [
+        "--dialogue-portrait-frame-top",
+        "--dialogue-portrait-frame-nameplate",
+        "--dialogue-portrait-frame-side",
+        "--dialogue-text-window",
+        "--stage49-roster-background",
+      ]) screen.style.removeProperty(property);
+    }
     controller.advanceStage49Ending();
   };
   const keydown = (event: KeyboardEvent) => {

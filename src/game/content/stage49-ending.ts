@@ -3,9 +3,17 @@ import type { LoopMusicProgram, MusicProgram } from "../music-transport";
 import { fullCombatBackgroundAsset } from "./full-combat-backgrounds";
 import {
   STAGE49_EPILOGUE_ENTRY_MUSIC,
+  STAGE49_ROSTER_ACTORS,
   STAGE49_SHARED_DECORATION_RECORDS,
+  STAGE49_STORY_PAGES,
 } from "./stage49-ending.generated";
 import { musicAsset } from "./music-assets";
+import {
+  DIALOGUE_PORTRAIT_FRAME_ASSETS,
+  DIALOGUE_TEXT_WINDOW_ASSET,
+  portraitSourceFor,
+} from "./portrait-catalog.generated";
+import { dialoguePortraitRecords, portraitAssetUrlsForRecords } from "./portrait-assets";
 
 export {
   STAGE49_CLASS_FAMILIES,
@@ -39,6 +47,14 @@ export const STAGE49_ENDING_ASSETS = {
     decline: musicAsset("UN", 49),
   },
 } as const;
+
+/** Assets outside `ending/` that the route gate must retain for its DOM surface. */
+export const STAGE49_ENDING_SUPPLEMENTAL_ASSETS = [...new Set([
+  ...Object.values(DIALOGUE_PORTRAIT_FRAME_ASSETS),
+  DIALOGUE_TEXT_WINDOW_ASSET,
+  ...portraitAssetUrlsForRecords(dialoguePortraitRecords(STAGE49_STORY_PAGES)),
+  ...STAGE49_ROSTER_ACTORS.map(({ portraitRecord }) => portraitSourceFor(portraitRecord)),
+])].sort();
 
 const loopProgram = (id: string, track: string, source: string): LoopMusicProgram => ({
   id,

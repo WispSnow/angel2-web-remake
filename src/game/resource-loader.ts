@@ -50,6 +50,7 @@ interface AssetLoadState {
 type FetchAsset = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 const MAX_PARALLEL_REQUESTS = 6;
+const PORTRAIT_ASSET_PREFIX = "/assets/original/portraits/";
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((entry) => typeof entry === "string");
@@ -126,8 +127,12 @@ export class ResourcePackLoader {
     await this.ensurePackVisible(`stage:${stageId}`, label, supplementalUrls, portraitUrls);
   }
 
-  async ensureRoute(route: "ending" | "credits", label: string): Promise<void> {
-    await this.ensurePackVisible(route, label);
+  async ensureRoute(
+    route: "ending" | "credits",
+    label: string,
+    supplementalUrls: readonly string[] = [],
+  ): Promise<void> {
+    await this.ensurePackVisible(route, label, supplementalUrls);
   }
 
   prefetchStage(stageId: StageId, supplementalUrls: readonly string[] = []): void {
@@ -342,6 +347,11 @@ export class ResourcePackLoader {
     for (const urls of this.prefetchedRenderUrls.values()) {
       if (urls.has(url)) return;
     }
+    // Portrait textures are decoded only for the current surface, but their
+    // entire campaign stream is just ~400 KiB. Retaining already-read encoded
+    // layers avoids a second fetch when the ending hands directly to stage 38,
+    // while object URLs and decoded images still leave with the route lease.
+    if (url.startsWith(PORTRAIT_ASSET_PREFIX)) return;
     const state = this.states.get(url);
     if (state) state.encodedRenderAsset = undefined;
   }

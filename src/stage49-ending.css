@@ -76,7 +76,7 @@
 /* A/9 is an 8x349 stripe and the postgame screen is 350 tall, so tile on both
    axes: repeat-x alone leaves an unpainted row, and scaling to fit would smooth
    the original pixels. */
-.stage49-roster-stripe { position: absolute; z-index: 0; inset: 0; background: url("/assets/original/ending/roster-background.png") repeat; }
+.stage49-roster-stripe { position: absolute; z-index: 0; inset: 0; background: var(--stage49-roster-background) repeat; }
 .stage49-decoration { position: absolute; z-index: 1; left: 148px; top: 50px; width: 448px; height: 148px; }
 .stage49-roster-portrait { position: absolute; z-index: 2; left: 16px; top: 50px; width: 112px; height: 112px; }
 .stage49-roster-class-illustration { position: absolute; z-index: 3; left: 200px; top: 186px; max-width: none; transform: translate(-50%, -100%); }
@@ -108,4 +108,5 @@
 .stage49-boundary h2 { margin: 0; color: #ffe49a; font-size: 36px; letter-spacing: 8px; }
 .stage49-boundary p { margin: 0; color: #e8e8f1; font-size: 15px; line-height: 1.7; }
 .stage49-boundary strong { color: #e8c772; letter-spacing: 2px; }
+.stage49-asset-error { position: absolute; z-index: 20; left: 120px; right: 120px; bottom: 24px; padding: 10px 12px; border: 2px solid #f4d45b; background: #160b2e; color: #fff2a8; font: 700 16px/1.4 sans-serif; text-align: center; }
 .stage49-help { margin: 18px auto 0; color: #bac0d8; text-align: center; }

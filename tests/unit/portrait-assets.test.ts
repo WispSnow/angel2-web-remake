@@ -5,8 +5,16 @@ import {
   portraitAssetUrlsForRecords,
   stageDialoguePortraitRecords,
 } from "../../src/game/content/portrait-assets";
-import { PORTRAIT_CATALOG } from "../../src/game/content/portrait-catalog.generated";
+import {
+  DIALOGUE_PORTRAIT_FRAME_ASSETS,
+  DIALOGUE_TEXT_WINDOW_ASSET,
+  PORTRAIT_CATALOG,
+} from "../../src/game/content/portrait-catalog.generated";
 import { STAGE0_DEFINITION } from "../../src/game/content/stages";
+import {
+  STAGE49_ENDING_SUPPLEMENTAL_ASSETS,
+  STAGE49_ROSTER_ACTORS,
+} from "../../src/game/content/stage49-ending";
 
 describe("stage-scoped portrait assets", () => {
   test("keeps a layered portrait's base, eyes, and mouths in native catalog order", () => {
@@ -36,5 +44,20 @@ describe("stage-scoped portrait assets", () => {
     for (const url of expected) expect(urls).toContain(url);
     expect(urls.filter((url) => url === PORTRAIT_CATALOG[46].source)).toHaveLength(1);
     expect(urls).not.toContain(PORTRAIT_CATALOG[45].source);
+  });
+
+  test("retains ending dialogue layers and roster bases without taking the full portrait stream", () => {
+    for (const url of portraitAssetUrls(46)) {
+      expect(STAGE49_ENDING_SUPPLEMENTAL_ASSETS).toContain(url);
+    }
+    for (const url of Object.values(DIALOGUE_PORTRAIT_FRAME_ASSETS)) {
+      expect(STAGE49_ENDING_SUPPLEMENTAL_ASSETS).toContain(url);
+    }
+    expect(STAGE49_ENDING_SUPPLEMENTAL_ASSETS).toContain(DIALOGUE_TEXT_WINDOW_ASSET);
+    for (const actor of STAGE49_ROSTER_ACTORS) {
+      expect(STAGE49_ENDING_SUPPLEMENTAL_ASSETS)
+        .toContain(PORTRAIT_CATALOG[actor.portraitRecord].source);
+    }
+    expect(STAGE49_ENDING_SUPPLEMENTAL_ASSETS.length).toBeLessThan(100);
   });
 });

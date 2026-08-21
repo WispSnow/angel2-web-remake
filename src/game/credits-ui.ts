@@ -7,7 +7,9 @@ import {
   CREDITS_TRANSITION,
 } from "./content/credits";
 import type { GameController } from "./controller";
+import { prepareDomImageElements } from "./dom-image-readiness";
 import { configureGameScaling } from "./scaling";
+import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 
 const escapeHtml = (value: string): string => value
   .replaceAll("&", "&amp;")
@@ -27,7 +29,7 @@ function pageMarkup(pageIndex: number, offset: number, testId = false): string {
   const frames = page.frames.map((frame) => {
     const image = frame.resource.startsWith("B.") ? roles.get(frame.frame) : names.get(frame.frame);
     if (!image) return "";
-    return `<img class="credits-frame" src="${image.src}" alt="${escapeHtml(image.text)}"
+    return `<img class="credits-frame" src="${stagedRenderAssetSource(image.src)}" alt="${escapeHtml(image.text)}"
       style="left:${frame.x}px;top:${frame.y - 400 + offset}px">`;
   }).join("");
   return `<div class="credits-page"${testId ? ' data-testid="credits-page"' : ""}
@@ -49,9 +51,9 @@ function scrollMarkup(transitionIndex: number): string {
 
 function finalMarkup(): string {
   return `<div class="credits-final" data-testid="credits-final" aria-label="The End">
-    <img class="credits-final-base" src="${CREDITS_FINAL_SCREEN.base}" alt="The End">
+    <img class="credits-final-base" src="${stagedRenderAssetSource(CREDITS_FINAL_SCREEN.base)}" alt="The End">
     <div class="credits-final-overlay" aria-hidden="true">
-      ${CREDITS_FINAL_SCREEN.overlays.map((src, index) => `<img data-credit-frame="${index + 1}" src="${src}" alt="">`).join("")}
+      ${CREDITS_FINAL_SCREEN.overlays.map((src, index) => `<img data-credit-frame="${index + 1}" src="${stagedRenderAssetSource(src)}" alt="">`).join("")}
     </div>
   </div>`;
 }
@@ -70,6 +72,8 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
   let scrollAnimation: Animation | undefined;
   let finalTimer: number | undefined;
   let finalStepIndex = 0;
+  let renderGeneration = 0;
+  let segmentFailed = false;
 
   const stopFinalAnimation = () => {
     if (finalTimer !== undefined) window.clearTimeout(finalTimer);
@@ -128,27 +132,50 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
   };
 
   const render = () => {
+    const generation = ++renderGeneration;
     stopFinalAnimation();
     stopScrollAnimation();
     const credits = controller.credits;
     if (!credits) return;
+    segmentFailed = false;
+    screen.dataset.segmentReady = "false";
+    delete screen.dataset.segmentError;
     if (credits.section === "the-end") {
       screen.innerHTML = finalMarkup();
       screen.setAttribute("aria-label", "The End");
-      startFinalAnimation();
-      return;
+    } else {
+      screen.innerHTML = scrollMarkup(credits.transitionIndex);
+      screen.setAttribute("aria-label", `製作人員表轉場 ${credits.transitionIndex + 1}／${CREDITS_TRANSITION.count}`);
     }
-    screen.innerHTML = scrollMarkup(credits.transitionIndex);
-    screen.setAttribute("aria-label", `製作人員表轉場 ${credits.transitionIndex + 1}／${CREDITS_TRANSITION.count}`);
-    startScrollAnimation();
+    void prepareDomImageElements(screen.querySelectorAll<HTMLImageElement>("img")).then(() => {
+      if (generation !== renderGeneration) return;
+      screen.dataset.segmentReady = "true";
+      if (credits.section === "the-end") startFinalAnimation();
+      else startScrollAnimation();
+    }).catch((error: unknown) => {
+      if (generation !== renderGeneration) return;
+      segmentFailed = true;
+      screen.dataset.segmentReady = "error";
+      screen.dataset.segmentError = error instanceof Error ? error.message : String(error);
+      screen.insertAdjacentHTML(
+        "beforeend",
+        '<span class="credits-asset-error" role="alert">圖像載入失敗，點擊畫面重試。</span>',
+      );
+    });
+  };
+
+  const retryFailedSegment = () => {
+    if (segmentFailed) render();
   };
 
   const unsubscribe = controller.onChange(render);
+  screen.addEventListener("click", retryFailedSegment);
   render();
   return () => {
     stopFinalAnimation();
     stopScrollAnimation();
     unsubscribe();
+    screen.removeEventListener("click", retryFailedSegment);
     destroyScaling();
   };
 }

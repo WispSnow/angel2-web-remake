@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { portraitAssetUrls } from "../../src/game/content/portrait-assets";
+import { STAGE49_ENDING_ASSETS } from "../../src/game/content/stage49-ending";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
 import { skipStoryDialogue } from "./dialogue-controls";
@@ -117,6 +119,7 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then ent
     stage49Ending: { section: "story", index: 0, saveCount: 1, recordTotal: 0 },
   });
   await expect(page.getByTestId("stage49-story")).toContainText("恭禧妳！妮雅");
+  await expect(page.getByTestId("ending-advance")).toHaveAttribute("data-segment-ready", "true");
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MAGIC/77");
   const storyPortrait = page.getByTestId("stage49-story-portrait-lower");
   await expect(storyPortrait.locator(".portrait-eye")).toHaveCount(3);
@@ -165,10 +168,9 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then ent
     width: 400,
     height: 86,
   });
-  expect(originalDialoguePresentation.portraitTopAndNameplate).toContain("portrait-top.png");
-  expect(originalDialoguePresentation.portraitTopAndNameplate).toContain("portrait-nameplate.png");
-  expect(originalDialoguePresentation.portraitSides).toContain("portrait-side.png");
-  expect(originalDialoguePresentation.textWindow).toContain("text-window.png");
+  expect(originalDialoguePresentation.portraitTopAndNameplate.match(/blob:/gu)).toHaveLength(2);
+  expect(originalDialoguePresentation.portraitSides).toContain("blob:");
+  expect(originalDialoguePresentation.textWindow).toContain("blob:");
   await expect(page.getByText(/戰後道別 \d+／17/)).toHaveCount(0);
   const centerDelta = await page.getByTestId("ending-advance").evaluate((element) => {
     const bounds = element.getBoundingClientRect();
@@ -239,11 +241,14 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then ent
   await advance(page, 3);
   await waitForEnding(page, "roster", 0);
   await expect(page.getByTestId("stage49-roster")).toContainText("妮雅");
+  await expect(page.getByTestId("ending-advance")).toHaveAttribute("data-segment-ready", "true");
   // Native card field is 兵種 with 戰績：00000 人.
   await expect(page.getByTestId("stage49-roster")).toContainText("兵種");
   await expect(page.getByTestId("stage49-record")).toHaveText("00000 人");
   await expect(page.getByTestId("stage49-roster-class-illustration"))
-    .toHaveAttribute("src", "/assets/original/ending/class-illustrations/00.png");
+    .toHaveAttribute("data-source-url", "/assets/original/ending/class-illustrations/00.png");
+  await expect(page.getByTestId("stage49-roster-class-illustration"))
+    .toHaveAttribute("src", /^blob:/u);
   await expect.poll(() => page.getByTestId("stage49-roster-class-illustration")
     .evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   const rosterGeometry = await page.getByTestId("ending-advance").evaluate((screen) => {
@@ -283,6 +288,7 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then ent
     "data-segment",
     "dominantClassFamily",
   );
+  await expect(page.getByTestId("ending-advance")).toHaveAttribute("data-segment-ready", "true");
   // Native module 35 starts the record-total branch track before segment 1, so
   // the whole epilogue plays over it rather than switching at segment 4.
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", "MUSIC/40");
@@ -443,6 +449,7 @@ test("S49-G: the epilogue types its native bitmap text and the first press only 
   const screen = page.locator("#stage49-screen");
   const epilogue = page.getByTestId("stage49-epilogue");
   await expect(epilogue).toHaveAttribute("data-segment", "warriorStatue");
+  await expect(screen).toHaveAttribute("data-segment-ready", "true");
   await expect(screen).toHaveAttribute("data-epilogue-typing", "true");
 
   const inkPixels = () => page.getByTestId("stage49-epilogue-text")
@@ -475,6 +482,74 @@ test("S49-G: the epilogue types its native bitmap text and the first press only 
 
   await screen.click();
   await expect(epilogue).toHaveAttribute("data-segment", "saveCountOutcome");
+});
+
+test("S49-I: each ending segment waits for its decoded DOM layers and reuses staged responses", async ({ page }) => {
+  await page.addInitScript(() => {
+    const target = window as Window & {
+      __releaseEndingImages?: () => void;
+      __endingDecodeAttempts?: number;
+      __gateEndingImages?: boolean;
+    };
+    const originalDecode = HTMLImageElement.prototype.decode;
+    const gate = new Promise<void>((resolve) => {
+      target.__releaseEndingImages = resolve;
+    });
+    target.__endingDecodeAttempts = 0;
+    HTMLImageElement.prototype.decode = function decodeEndingImageAfterGate() {
+      if (!target.__gateEndingImages
+        || (!this.closest("#stage49-screen") && !this.dataset.stagedAssetUrl)) {
+        return originalDecode.call(this);
+      }
+      target.__endingDecodeAttempts = (target.__endingDecodeAttempts ?? 0) + 1;
+      return gate.then(() => originalDecode.call(this));
+    };
+  });
+  const tracked = [
+    STAGE49_ENDING_ASSETS.storyBackground,
+    ...portraitAssetUrls(46),
+  ];
+  const requests = new Map(tracked.map((url) => [url, 0]));
+  for (const url of tracked) {
+    await page.route(`**${url}`, async (route) => {
+      const count = (requests.get(url) ?? 0) + 1;
+      requests.set(url, count);
+      if (count > 1) await route.abort("failed");
+      else await route.continue();
+    });
+  }
+
+  await page.goto("/?debugScenario=stage-37-cleared&difficulty=0&test=1");
+  const startEnding = page.getByTestId("start-stage49-ending");
+  await expect(startEnding).toBeVisible({ timeout: 15_000 });
+  await page.evaluate(() => {
+    (window as Window & { __gateEndingImages?: boolean }).__gateEndingImages = true;
+  });
+  await startEnding.click();
+  await waitForEnding(page, "story", 0);
+  const screen = page.getByTestId("ending-advance");
+  const portrait = page.getByTestId("stage49-story-portrait-lower");
+  await expect.poll(() => page.evaluate(() => (
+    window as Window & { __endingDecodeAttempts?: number }
+  ).__endingDecodeAttempts ?? 0)).toBeGreaterThan(0);
+  await expect(screen).toHaveAttribute("data-segment-ready", "false");
+  await expect(screen).toHaveAttribute("data-story-typing", "false");
+  await expect(portrait).toHaveAttribute("data-talk-count", "0");
+  await screen.click();
+  await expect.poll(async () => (await state(page)).stage49Ending?.index).toBe(0);
+
+  await page.evaluate(() => (
+    window as Window & { __releaseEndingImages?: () => void }
+  ).__releaseEndingImages?.());
+  await expect(screen).toHaveAttribute("data-segment-ready", "true");
+  await expect.poll(async () => Number(await portrait.getAttribute("data-talk-count")))
+    .toBeGreaterThan(0);
+  expect(Object.fromEntries(requests)).toEqual(Object.fromEntries(
+    tracked.map((url) => [url, 1]),
+  ));
+  await captureVisualAudit(screen, {
+    path: `${ARTIFACT_DIR}/stage49-story-assets-ready.png`,
+  });
 });
 
 test("S49-H: the epilogue keeps its native trailing pause after the last glyph", async ({ page }) => {

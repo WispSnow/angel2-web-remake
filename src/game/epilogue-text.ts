@@ -2,6 +2,8 @@ import {
   STAGE49_EPILOGUE_FONT,
   STAGE49_EPILOGUE_LAYOUT,
 } from "./content/stage49-ending";
+import { prepareDomImageElements } from "./dom-image-readiness";
+import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 
 /**
  * Native module 35 renders the epilogue with the 258-glyph `UN/9`+`UN/10`
@@ -20,17 +22,20 @@ let fontPromise: Promise<HTMLImageElement> | undefined;
 const tintedAtlases = new Map<string, HTMLCanvasElement>();
 
 export function loadEpilogueFont(): Promise<HTMLImageElement> {
-  fontPromise ??= new Promise<HTMLImageElement>((resolve, reject) => {
+  if (fontPromise) return fontPromise;
+  const pending = (async () => {
     const image = new Image();
-    image.addEventListener("load", () => resolve(image), { once: true });
-    image.addEventListener(
-      "error",
-      () => reject(new Error(`epilogue font ${STAGE49_EPILOGUE_FONT.src} failed to load`)),
-      { once: true },
-    );
-    image.src = STAGE49_EPILOGUE_FONT.src;
+    image.decoding = "sync";
+    image.dataset.stagedAssetUrl = STAGE49_EPILOGUE_FONT.src;
+    image.src = stagedRenderAssetSource(STAGE49_EPILOGUE_FONT.src);
+    await prepareDomImageElements([image]);
+    return image;
+  })();
+  fontPromise = pending;
+  void pending.catch(() => {
+    if (fontPromise === pending) fontPromise = undefined;
   });
-  return fontPromise;
+  return pending;
 }
 
 function tintedAtlas(font: HTMLImageElement, color: string): HTMLCanvasElement {
