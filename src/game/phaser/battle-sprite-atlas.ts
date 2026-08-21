@@ -3,6 +3,7 @@ import {
   BATTLE_SPRITE_ATLAS_FRAMES,
   BATTLE_SPRITE_ATLASES,
 } from "../content/battle-sprite-atlases.generated";
+import { stagedRenderAssetSource } from "../staged-render-asset-cache";
 
 export interface BattleSpriteTextureRef {
   readonly texture: string;
@@ -35,7 +36,11 @@ export function preloadBattleSpriteAtlases(
     const atlas = BATTLE_SPRITE_ATLASES.find(({ textureKey }) => textureKey === ref.texture);
     if (!atlas) throw new Error(`Missing battle-sprite atlas for ${source}`);
     if (!scene.textures.exists(atlas.textureKey)) {
-      scene.load.atlas(atlas.textureKey, atlas.image, atlas.data);
+      scene.load.atlas(
+        atlas.textureKey,
+        stagedRenderAssetSource(atlas.image),
+        stagedRenderAssetSource(atlas.data),
+      );
     }
   }
 }
