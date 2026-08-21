@@ -10,6 +10,11 @@ import {
   isFullCombatImageUrl,
   type FullCombatImageLease,
 } from "./full-combat-image-cache";
+import {
+  activateStagedRenderAssets,
+  isStagedRenderAssetUrl,
+  type StagedRenderAssetLease,
+} from "./staged-render-asset-cache";
 
 export interface ResourceManifestAsset {
   url: string;
@@ -38,7 +43,7 @@ interface AssetLoadState {
   loadedBytes: number;
   complete: boolean;
   promise?: Promise<void>;
-  encodedFullCombatImage?: Uint8Array;
+  encodedRenderAsset?: Uint8Array;
 }
 
 type FetchAsset = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -97,6 +102,9 @@ export class ResourcePackLoader {
   private overlayFailed = false;
   private fullCombatImageLease?: FullCombatImageLease;
   private fullCombatImageUrls = new Set<string>();
+  private stagedRenderAssetLease?: StagedRenderAssetLease;
+  private stagedRenderAssetUrls = new Set<string>();
+  private readonly prefetchedRenderUrls = new Map<string, ReadonlySet<string>>();
 
   constructor(
     private readonly fetchAsset: FetchAsset = globalThis.fetch.bind(globalThis),
@@ -153,6 +161,7 @@ export class ResourcePackLoader {
       const manifest = await this.loadManifest();
       const urls = [...new Set([...this.resolvePackUrls(manifest, packId), ...supplementalUrls])];
       await this.loadUrls(manifest, urls);
+      this.rememberPrefetchedRenderUrls(packId, urls);
       await this.replaceFullCombatImageLease(supplementalUrls);
     } catch (error) {
       console.warn(`background resource prefetch failed for ${packId}`, error);
@@ -176,6 +185,7 @@ export class ResourcePackLoader {
           this.activeUrls = urls;
           this.renderProgress(manifest);
           await this.loadUrls(manifest, urls);
+          this.replaceStagedRenderAssetLease(packId, urls);
           await this.replaceFullCombatImageLease(supplementalUrls);
           this.hideOverlay();
           resolve();
@@ -230,13 +240,16 @@ export class ResourcePackLoader {
 
   private loadAsset(asset: ResourceManifestAsset, manifest: ResourceManifest): Promise<void> {
     const current = this.states.get(asset.url);
-    if (current?.complete) return Promise.resolve();
+    if (current?.complete
+      && (!isStagedRenderAssetUrl(asset.url) || current.encodedRenderAsset)) {
+      return Promise.resolve();
+    }
     if (current?.promise) return current.promise;
     const state: AssetLoadState = current ?? { loadedBytes: 0, complete: false };
     const pending = this.fetchAsset(asset.url).then(async (response) => {
       if (!response.ok) throw new Error(`讀取失敗（${response.status}）：${asset.url}`);
       const reader = response.body?.getReader();
-      const collectEncoded = isMusicResourceUrl(asset.url) || isFullCombatImageUrl(asset.url);
+      const collectEncoded = isMusicResourceUrl(asset.url) || isStagedRenderAssetUrl(asset.url);
       const encodedChunks: Uint8Array[] | undefined = collectEncoded ? [] : undefined;
       let encodedByteLength = 0;
       if (!reader) {
@@ -266,7 +279,7 @@ export class ResourcePackLoader {
           offset += chunk.byteLength;
         }
         if (isMusicResourceUrl(asset.url)) primeEncodedMusic(asset.url, encoded);
-        if (isFullCombatImageUrl(asset.url)) state.encodedFullCombatImage = encodedView;
+        if (isStagedRenderAssetUrl(asset.url)) state.encodedRenderAsset = encodedView;
       }
       state.loadedBytes = asset.bytes;
       state.complete = true;
@@ -276,7 +289,7 @@ export class ResourcePackLoader {
       state.loadedBytes = 0;
       state.complete = false;
       state.promise = undefined;
-      state.encodedFullCombatImage = undefined;
+      state.encodedRenderAsset = undefined;
       throw error;
     });
     state.promise = pending;
@@ -284,12 +297,53 @@ export class ResourcePackLoader {
     return pending;
   }
 
+  private replaceStagedRenderAssetLease(packId: string, urls: readonly string[]): void {
+    const encodedBytes = new Map<string, Uint8Array>();
+    for (const url of urls) {
+      if (!isStagedRenderAssetUrl(url)) continue;
+      const encoded = this.states.get(url)?.encodedRenderAsset;
+      if (!encoded) throw new Error(`已下載的繪圖資源缺少可重用內容：${url}`);
+      encodedBytes.set(url, encoded);
+    }
+    const previousLease = this.stagedRenderAssetLease;
+    const previousUrls = this.stagedRenderAssetUrls;
+    this.stagedRenderAssetLease = activateStagedRenderAssets(encodedBytes, {
+      ownerDocument: this.ownerDocument,
+    });
+    this.stagedRenderAssetUrls = new Set(encodedBytes.keys());
+    this.prefetchedRenderUrls.delete(packId);
+    previousLease?.release();
+    for (const url of previousUrls) this.releaseUnreferencedEncodedRenderAsset(url);
+  }
+
+  private rememberPrefetchedRenderUrls(packId: string, urls: readonly string[]): void {
+    const renderUrls = new Set(urls.filter(isStagedRenderAssetUrl));
+    this.prefetchedRenderUrls.delete(packId);
+    this.prefetchedRenderUrls.set(packId, renderUrls);
+    while (this.prefetchedRenderUrls.size > 2) {
+      const oldestPackId = this.prefetchedRenderUrls.keys().next().value as string | undefined;
+      if (!oldestPackId) break;
+      const evicted = this.prefetchedRenderUrls.get(oldestPackId);
+      this.prefetchedRenderUrls.delete(oldestPackId);
+      for (const url of evicted ?? []) this.releaseUnreferencedEncodedRenderAsset(url);
+    }
+  }
+
+  private releaseUnreferencedEncodedRenderAsset(url: string): void {
+    if (this.stagedRenderAssetUrls.has(url)) return;
+    for (const urls of this.prefetchedRenderUrls.values()) {
+      if (urls.has(url)) return;
+    }
+    const state = this.states.get(url);
+    if (state) state.encodedRenderAsset = undefined;
+  }
+
   private async replaceFullCombatImageLease(urls: readonly string[]): Promise<void> {
     const imageUrls = [...new Set(urls.filter(isFullCombatImageUrl))].sort();
     if (imageUrls.length === 0) return;
     const encodedBytes = new Map<string, Uint8Array>();
     for (const url of imageUrls) {
-      const encoded = this.states.get(url)?.encodedFullCombatImage;
+      const encoded = this.states.get(url)?.encodedRenderAsset;
       if (encoded) encodedBytes.set(url, encoded);
     }
     let nextLease: FullCombatImageLease;
@@ -305,7 +359,7 @@ export class ResourcePackLoader {
         if (!state) continue;
         state.loadedBytes = 0;
         state.complete = false;
-        state.encodedFullCombatImage = undefined;
+        state.encodedRenderAsset = undefined;
       }
       throw error;
     }
@@ -313,10 +367,7 @@ export class ResourcePackLoader {
     const previousUrls = this.fullCombatImageUrls;
     this.fullCombatImageLease = nextLease;
     this.fullCombatImageUrls = new Set(imageUrls);
-    for (const url of imageUrls) {
-      const state = this.states.get(url);
-      if (state) state.encodedFullCombatImage = undefined;
-    }
+    for (const url of imageUrls) this.releaseUnreferencedEncodedRenderAsset(url);
     previousLease?.release();
     for (const url of previousUrls) {
       if (this.fullCombatImageUrls.has(url)) continue;
@@ -324,7 +375,7 @@ export class ResourcePackLoader {
       if (!state) continue;
       state.loadedBytes = 0;
       state.complete = false;
-      state.encodedFullCombatImage = undefined;
+      state.encodedRenderAsset = undefined;
     }
   }
 

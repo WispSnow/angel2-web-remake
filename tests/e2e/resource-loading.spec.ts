@@ -148,6 +148,58 @@ test("current class full-combat textures decode before the first panorama frame"
   });
 });
 
+test("formal map skills reuse staged map, unit and atlas bytes through Phaser", async ({ page }) => {
+  const tracked = [
+    "/assets/original/stage0-map.png",
+    "/assets/original/unit-ally-soldier.png",
+    "/assets/original/unit-enemy-soldier.png",
+    "/assets/original/map-action-atlases/fire-1.png",
+    "/assets/original/map-action-atlases/fire-1.json",
+  ] as const;
+  const requests = new Map(tracked.map((url) => [url, 0]));
+  for (const url of tracked) {
+    await page.route(`**${url}`, async (route) => {
+      const count = (requests.get(url) ?? 0) + 1;
+      requests.set(url, count);
+      // Before the staged-object-URL bridge, these aborts exhausted Phaser's
+      // retries after the resource gate had already hidden its retry surface.
+      if (count > 1) await route.abort("failed");
+      else await route.continue();
+    });
+  }
+
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible({ timeout: 15_000 });
+  await page.waitForFunction(() => window.__ANGEL2__?.getState() !== undefined);
+  await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("sister"));
+  await canvas.click({ position: { x: 220, y: 177 } });
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-fire-1").click();
+  await canvas.click({ position: { x: 380, y: 177 } });
+  await page.waitForFunction(() => {
+    const state = window.__ANGEL2__?.getState() as {
+      specialActionPresentation?: { phase: string; frame: number };
+    } | undefined;
+    return state?.specialActionPresentation?.phase === "fireEffect";
+  });
+  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", /[1-9]/u);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/resource-loading-staged-map-skill.png",
+  });
+  await page.waitForFunction(() => {
+    const state = window.__ANGEL2__?.getState() as {
+      lastSpecialAction?: { actionId: string };
+      specialActionPresentation?: object;
+    } | undefined;
+    return state?.lastSpecialAction?.actionId === "fire-1"
+      && state.specialActionPresentation === undefined;
+  });
+  expect(Object.fromEntries(requests)).toEqual(Object.fromEntries(
+    tracked.map((url) => [url, 1]),
+  ));
+});
+
 test("a failed stage resource stays on a readable retry surface and retries the URL", async ({ page }) => {
   let stage0MapRequests = 0;
   await page.route("**/assets/original/stage0-map.png", async (route) => {

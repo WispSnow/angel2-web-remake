@@ -28,6 +28,7 @@ import {
   addBattleSpriteImageFromSource,
   preloadBattleSpriteAtlases,
 } from "./battle-sprite-atlas";
+import { stagedRenderAssetSource } from "../staged-render-asset-cache";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
@@ -302,15 +303,19 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     preload(): void {
       this.load.image(
         mapTextureKey,
-        stageAssets?.map ?? ASSETS.map,
+        stagedRenderAssetSource(stageAssets?.map ?? ASSETS.map),
       );
       this.load.image(
         "terrain-iron-plate",
-        `/assets/original/map-actions/iron-plate/${controller.battle.stage.id}.png`,
+        stagedRenderAssetSource(
+          `/assets/original/map-actions/iron-plate/${controller.battle.stage.id}.png`,
+        ),
       );
       this.load.image(
         "terrain-obstacle",
-        `/assets/original/map-actions/obstacle/${controller.battle.stage.id}.png`,
+        stagedRenderAssetSource(
+          `/assets/original/map-actions/obstacle/${controller.battle.stage.id}.png`,
+        ),
       );
       const allyMapAssets = allyMapUnitAssetsForClasses(
         controller.battle.units
@@ -321,13 +326,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       for (const [classId, source] of allyMapAssets) {
         const key = `ally-${classId}`;
         scheduledAllyKeys.add(key);
-        this.load.image(key, source);
+        this.load.image(key, stagedRenderAssetSource(source));
       }
-      this.load.image("enemy-soldier", ASSETS.enemySoldier);
-      this.load.image("enemy-cavalry", ASSETS.enemyCavalry);
+      this.load.image("enemy-soldier", stagedRenderAssetSource(ASSETS.enemySoldier));
+      this.load.image("enemy-cavalry", stagedRenderAssetSource(ASSETS.enemyCavalry));
       Object.entries(stageAssets?.unitSprites ?? {}).forEach(([key, source]) => {
         if (scheduledAllyKeys.has(key)) return;
-        this.load.image(key, source);
+        this.load.image(key, stagedRenderAssetSource(source));
       });
       const battleSpriteSources = [
         ...ASSETS.mapCombat.hit,

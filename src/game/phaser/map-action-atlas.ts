@@ -3,6 +3,7 @@ import {
   MAP_ACTION_ATLAS_IDS,
   MAP_ACTION_ATLASES,
 } from "../content/map-action-atlases.generated";
+import { stagedRenderAssetSource } from "../staged-render-asset-cache";
 export { mapActionAtlasIdForAction } from "../content/map-action-assets";
 
 const MAP_ACTION_PREFIX = "/assets/original/map-actions/";
@@ -114,7 +115,11 @@ export function preloadMapActionAtlases(
     const atlas = MAP_ACTION_ATLASES.find((candidate) => candidate.textureKey === ref.texture);
     if (!atlas) throw new Error(`missing map action atlas for ${source}`);
     if (!scene.textures.exists(atlas.textureKey)) {
-      scene.load.atlas(atlas.textureKey, atlas.image, atlas.data);
+      scene.load.atlas(
+        atlas.textureKey,
+        stagedRenderAssetSource(atlas.image),
+        stagedRenderAssetSource(atlas.data),
+      );
     }
   }
 }
