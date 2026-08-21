@@ -28,6 +28,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 
 | 改动区域 | 首选单元测试 | 首选浏览器测试 |
 | --- | --- | --- |
+| `src-tauri/`、`package.json#desktop:*` 与 `.github/workflows/desktop-windows.yml` 的 Windows 桌面包边界：稳定应用标识、只消费审计后的 `release/`、Evergreen WebView2、当前用户 NSIS、手动／标签构建、私有 artifact 与 Cloudflare 分离 | `desktop-packaging.test.ts` | Windows runner 构建 artifact；面向玩家发布前另做真实 Windows WebView2 标题至进关、音画、缩放、输入与存档人工验收 |
 | `src/game/simulation/actions/`、动作数值与 PRNG | `actions.test.ts` | 对应 `arena-*.spec.ts` 技能族文件；魔弓线路见 `arena-magic-archer-route.spec.ts` |
 | `src/game/simulation/battle.ts` 的普通伤害、地形防御、反击与经验 | `battle.test.ts`，职业特例另见 `classes.test.ts` | 对应关卡或 `class-showdown.spec.ts` |
 | `src/game/simulation/objectives.ts` 的胜负条件、到达区展开与 Phaser 目的地标记 | `objectives.test.ts` | 到达型关卡 `stage4.spec.ts`、`stage9.spec.ts`、`stage11.spec.ts`、`stage23.spec.ts`、`stage24.spec.ts` |

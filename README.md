@@ -38,6 +38,22 @@ pnpm preview:release
 当前线上站点使用 Cloudflare Pages Direct Upload；项目名、授权边界、完整发布、线上验证与回滚
 步骤见 [`docs/release-and-deployment.md`](docs/release-and-deployment.md)。
 
+Windows 本地版复用同一个玩家 `release/`，再由 Tauri 2 封装为 NSIS 安装包。正式 Windows 包
+不在 Mac 本地交叉编译；私有 GitHub 仓库中的 `Windows desktop package` 工作流使用真正的
+`windows-latest` runner 构建，并把安装程序保存为仅仓库成员可下载的 Actions artifact。该工作流
+只允许手动触发或 `desktop-v*` 标签触发，不会部署 Cloudflare：
+
+```bash
+pnpm desktop:dev             # 本机 Tauri 调试，需要本机 Rust 工具链
+pnpm desktop:build           # 构建当前操作系统的桌面包
+pnpm desktop:build:windows   # 仅供 Windows runner 生成 NSIS 安装包
+```
+
+当前 Windows 开发包使用系统 Evergreen WebView2；缺失时安装程序静默调用联网引导程序。桌面版
+使用稳定 Tauri 应用标识保存自己的 `localStorage`，不会自动读取网页来源下的存档；玩家可通过
+现有 20 槽备份导出／导入在 Web 与桌面版之间迁移。完整触发、下载、签名和验收边界仍见
+[`docs/release-and-deployment.md`](docs/release-and-deployment.md)。
+
 ## 战役调试中心
 
 需要直接选择关卡、部署、玩家回合或结算状态时运行：

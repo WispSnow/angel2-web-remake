@@ -19,6 +19,10 @@
 Pages 项目或第二个站点来替代它，除非用户明确要求迁移托管方案。Cloudflare 的 Direct Upload
 项目以后不能原地切换成 Git 集成；若将来要自动部署，需要另行设计迁移并取得用户确认。
 
+GitHub 只用于私有开发仓库、普通 CI 与 Windows Tauri 安装包构建。Cloudflare 继续严格按本文
+后续步骤从本地运行 Wrangler Direct Upload；不要在 GitHub Actions 中添加 Cloudflare Token、
+Account ID、Wrangler 上传或推送即上线逻辑。
+
 线上实际部署版本以 Cloudflare 的部署列表为准，不能仅根据本地 `HEAD`、`release/` 的修改
 时间或本文档推断。`release/`、`dist/` 和 `artifacts/` 都是被忽略的本地产物，不进入 Git。
 
@@ -30,6 +34,48 @@ Pages 项目或第二个站点来替代它，除非用户明确要求迁移托�
 - 若 Cloudflare 登录失效、账号不对、找不到既有项目或需要创建新项目，停止并请用户处理；
   不要自行创建同名或近似项目。
 - 不把 Cloudflare API Token、账号 ID、OAuth 配置或其他凭据写入仓库、命令输出摘要或发布文档。
+
+## Windows Tauri 开发包
+
+Windows 桌面版和 Web 版共享同一套 TypeScript、模拟、内容与 `pnpm build:release` 玩家包。
+`src-tauri/` 只是受限桌面壳，不接入 Node.js、文件系统或其他 Tauri 插件；它从内置协议加载
+`release/`，因此调试中心和实验室仍被现有发布审计排除。稳定应用标识
+`com.wispsnow.angel2-web-remake` 同时决定 WebView 数据目录；发布后不得随意更名，否则桌面
+`localStorage` 存档会落入另一个来源。网页和桌面来源的存档不会自动共享，迁移使用游戏内已有的
+20 槽 JSON 备份导出／导入。
+
+私有 GitHub 仓库中的 `.github/workflows/desktop-windows.yml` 只在以下情况运行：
+
+- Actions 页面手动触发 `Windows desktop package`；
+- 推送 `desktop-v*` 版本标签。
+
+工作流在真正的 `windows-latest` x64 runner 上安装锁定的 pnpm 依赖和 Rust stable，调用：
+
+```bash
+pnpm desktop:build:windows
+```
+
+Tauri 随后先调用 `pnpm build:release`，再只生成当前用户安装模式的 NSIS `*-setup.exe`。工作流
+要求产物精确为一个安装程序，并以 `angel2-windows-x64-<commit>` 名称保留 14 天；私有仓库
+artifact 只有获授权的仓库成员可以下载。它不会创建 GitHub Release，也不会更新 Cloudflare。
+
+Windows 开发包采用 Tauri 默认的小体积 Evergreen WebView2 路径：Windows 10/11 已有运行时时
+直接复用，缺失时由安装程序静默调用联网 bootstrapper。当前没有附带 127 MiB 离线安装程序或
+约 180 MiB 固定 WebView2，也没有配置 Windows 代码签名。因此内部验证包可以安装，但从浏览器
+下载后可能显示 SmartScreen 未知发布者警告；面向公众发布前必须另行取得代码签名方案并完成
+真实 Windows x64 验收，不能把 Actions 构建成功当作玩家接受。
+
+手动触发和下载可以使用 GitHub UI，也可以在已登录且有权限的终端执行：
+
+```bash
+gh workflow run desktop-windows.yml --ref main
+gh run list --workflow desktop-windows.yml
+gh run download <run-id> --name <artifact-name>
+```
+
+桌面包至少要在 Windows 上检查：标题至进关资源加载、地图与全景 WebGL、音乐／音效激活、
+全屏与窗口缩放、键鼠／手柄、存档重启保留、备份导入导出、安装升级和卸载。Mac 上的浏览器
+或 Tauri 构建不能替代这组 Windows 验收。
 
 ## 标准发布流程
 

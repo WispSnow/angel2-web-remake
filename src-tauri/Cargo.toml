@@ -1,0 +1,21 @@
+[package]
+name = "angel2-desktop"
+version = "0.1.0"
+description = "Desktop shell for the Angel2 Web Remake"
+authors = ["WispSnow"]
+license = ""
+repository = "https://github.com/WispSnow/angel2-web-remake"
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "angel2_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "=2.11.3", features = [] }

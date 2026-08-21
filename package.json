@@ -20,6 +20,9 @@
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build",
     "build:release": "pnpm run typecheck && vite build --mode release && node scripts/prepare-release.mjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "desktop:build:windows": "tauri build --bundles nsis",
     "preview": "vite preview --host 127.0.0.1",
     "preview:release": "vite preview --mode release --host 127.0.0.1",
     "test": "vitest run",
@@ -93,6 +96,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",
+    "@tauri-apps/cli": "2.11.4",
     "@types/node": "24.10.1",
     "@vitest/coverage-v8": "4.0.18",
     "iconv-lite": "0.7.3",
