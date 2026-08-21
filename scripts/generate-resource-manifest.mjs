@@ -61,6 +61,7 @@ const isSoundEffectAsset = (relative) => relative.startsWith("audio/")
   || /^(?:speech-\d+|ui-confirm|combat-(?:death|hit|soldier))\.wav$/u.test(relative);
 const isSharedBattleSurfaceAsset = (relative) =>
   relative === "story-palace.png"
+  || relative === "promotion-menu-frame.png"
   || /^(?:battle-chrome-|battle-statue-|hud-|tactical-panel)/u.test(relative);
 const musicUrl = (container, record) =>
   assetUrl(`music/${container}/${String(record).padStart(4, "0")}.ogg`);

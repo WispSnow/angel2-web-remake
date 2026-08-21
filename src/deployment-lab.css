@@ -1,7 +1,4 @@
-.deployment-lab-page {
-  min-height: 100vh;
-  color: #f7ecd2;
-}
+.deployment-lab-page { min-height: 100vh; color: #f7ecd2; }
 
 .deployment-lab-shell {
   width: min(960px, calc(100% - 32px));
@@ -31,12 +28,7 @@
   font: 13px/1.55 system-ui, sans-serif;
 }
 
-.deployment-lab-nav {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: end;
-  gap: 6px;
-}
+.deployment-lab-nav { display: flex; flex-wrap: wrap; justify-content: end; gap: 6px; }
 
 .deployment-lab-back {
   padding: 7px 10px;
@@ -46,17 +38,9 @@
   font-size: 12px;
 }
 
-.deployment-lab-stage {
-  width: min(640px, 100%);
-  margin: 0 auto;
-}
-
-.deployment-viewport { background: #050405; }
-
-.deployment-screen {
-  isolation: isolate;
-  box-shadow: inset 0 0 0 1px #a47d44;
-}
+.deployment-lab-stage { width: min(640px, 100%); margin: 0 auto; }
+.deployment-viewport { background: #000; }
+.deployment-screen { isolation: isolate; box-shadow: none; }
 
 #deployment-phaser-root,
 #deployment-phaser-root canvas,
@@ -71,516 +55,314 @@
 #deployment-phaser-root canvas { image-rendering: var(--image-rendering, pixelated); }
 
 /* ---------------------------------------------------------------------------
-   Deployment screen (REMAKE-011)
+   Native deployment screen
 
-   The 2026-08-02 native roster geometry was replaced by a modern preparation
-   layout on user request: a card roster on the left, an evidence-accurate
-   terrain minimap plus a full character read-out on the right, and a single
-   status/primary-action footer. Keyboard topology still follows the native
-   five cyclic columns (three roster columns, the page column, the finish
-   column) because that is `[OF]`; only the pixel placement is remade.
+   Module 27 does not use a large frame texture. It builds every roster item,
+   page control, finish control and error bar from nested palette rectangles;
+   A/0002 supplies the 40x43 profession figures and the native bitmap font
+   supplies names, professions and labels. All coordinates below are the
+   original 640x350 coordinates recovered from `0000:08EA..0C5E/165B..17EE`.
 --------------------------------------------------------------------------- */
 
 .deployment-ui-root {
-  --panel-edge: #7c4d2e;
-  --panel-edge-bright: #d7ab5b;
-  --gold-bright: #ffe37b;
-  --ink-deep: #0b0709;
-
+  --native-0: #000000;
+  --native-7: #baaa9a;
+  --native-8: #0000a6;
+  --native-9: #4d8aff;
+  --native-11: #ef2024;
+  --native-14: #ffdf10;
+  --native-15: #ffffff;
   z-index: 2;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 142px;
-  grid-template-rows: 24px minmax(0, 1fr) 25px;
-  gap: 4px 6px;
-  padding: 3px 6px 4px;
   outline: none;
-  color: #fff4cf;
-  background:
-    radial-gradient(120% 90% at 26% -10%, rgba(140, 52, 46, .55), transparent 62%),
-    linear-gradient(158deg, #241318 0%, #150d11 46%, #0a0709 100%);
-  font-family: "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+  color: var(--native-15);
+  background: var(--native-0);
   pointer-events: none;
 }
 
-.deployment-ui-root button { pointer-events: auto; }
+.deployment-ui-root button { appearance: none; font: inherit; cursor: var(--native-cursor-hand); }
 .deployment-ui-root h2,
-.deployment-ui-root h3,
 .deployment-ui-root p,
 .deployment-ui-root dl { margin: 0; }
 
-/* --- shared panel chrome --- */
-
-.deployment-roster-panel,
-.deployment-map-panel,
-.deployment-detail {
-  min-height: 0;
-  border: 1px solid var(--panel-edge);
-  background: linear-gradient(180deg, rgba(58, 28, 33, .82), rgba(15, 10, 13, .9));
-  box-shadow: inset 0 0 0 1px rgba(255, 219, 150, .07), 0 1px 0 #000;
-}
-
-.deployment-panel-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 13px;
-  border-bottom: 1px solid rgba(215, 171, 91, .28);
-}
-
-.deployment-panel-bar h3 {
-  flex: none;
-  padding-left: 4px;
-  color: var(--gold-bright);
-  font: 700 10px/13px "PMingLiU", "MingLiU", serif;
-  letter-spacing: .06em;
-}
-
-.deployment-panel-note {
-  flex: 1;
-  overflow: hidden;
-  color: #b6a488;
-  font: 8px/13px system-ui, sans-serif;
-  white-space: nowrap;
-}
-
-/* --- header --- */
-
-.deployment-header {
-  display: flex;
-  grid-column: 1 / -1;
-  align-items: baseline;
-  gap: 7px;
-  padding: 0 2px 2px;
-  border-bottom: 1px solid rgba(215, 171, 91, .3);
-}
-
-.deployment-kicker {
-  flex: none;
-  color: #dba638;
-  font: 700 8px/1 system-ui, sans-serif;
-  letter-spacing: .18em;
-}
-
-.deployment-title {
-  flex: none;
-  color: #fff6da;
-  font: 700 15px/1 "PMingLiU", "MingLiU", serif;
-  letter-spacing: .04em;
-  text-shadow: 1px 1px #000;
-}
-
-.deployment-objective {
-  flex: 1;
-  overflow: hidden;
-  color: #b8a68a;
-  font: 9px/1 system-ui, sans-serif;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.deployment-guidance {
-  flex: 0 1 170px;
-  overflow: hidden;
-  color: #f0b76b;
-  font: 7px/9px system-ui, sans-serif;
-  text-overflow: ellipsis;
-}
-
-.deployment-capacity {
-  display: flex;
-  flex: none;
-  align-items: baseline;
-  gap: 4px;
-  color: #cbb894;
-  font: 9px/1 system-ui, sans-serif;
-}
-
-.deployment-capacity b {
-  color: #fff;
-  font: 700 13px/1 "PMingLiU", "MingLiU", serif;
-}
-
-.deployment-pips { display: flex; gap: 2px; align-self: center; }
-
-.deployment-pips i {
-  width: 5px;
-  height: 8px;
-  border: 1px solid #6b4a2c;
-  background: #1b1013;
-}
-
-.deployment-pips i.is-on {
-  border-color: #f2cd63;
-  background: linear-gradient(#ffe895, #d09a2c);
-}
-
-/* --- roster --- */
-
-.deployment-roster-panel {
-  display: grid;
-  grid-template-rows: 13px minmax(0, 1fr);
-  gap: 4px;
-  padding: 0 4px 4px;
-}
-
-.deployment-pages { display: flex; flex: none; gap: 2px; }
-
-.deployment-page {
-  width: 26px;
-  height: 13px;
-  padding: 0;
-  color: #c6b291;
-  border: 1px solid #6b4a2c;
-  border-bottom: 0;
-  background: linear-gradient(#3a1f24, #1c1013);
-  font: 10px/12px "PMingLiU", "MingLiU", serif;
-  cursor: var(--native-cursor-hand);
-}
-
-.deployment-page.is-active {
-  color: #1b0f0d;
-  border-color: #f0cf72;
-  background: linear-gradient(#ffe9a2, #d8a63c);
-}
-
-/* Roster indices are `column * 5 + row`, matching the native five cyclic
-   keyboard columns, so the grid must flow down each column before wrapping. */
-.deployment-roster {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(5, minmax(0, 1fr));
-  grid-auto-flow: column;
-  gap: 4px;
-  min-height: 0;
-}
+.deployment-roster,
+.deployment-pages { position: absolute; inset: 0; }
 
 .deployment-entry {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-items: end;
-  gap: 3px;
-  min-width: 0;
-  padding: 2px 4px 3px 2px;
-  color: #f2e6cd;
-  border: 1px solid #59392a;
-  border-left: 3px solid #59392a;
-  background: linear-gradient(158deg, rgba(70, 36, 38, .78), rgba(15, 10, 13, .86));
-  text-align: left;
-  cursor: var(--native-cursor-hand);
-}
-
-.deployment-entry > * { pointer-events: none; }
-
-.deployment-entry-figure {
-  display: block;
-  align-self: end;
-  height: 100%;
-  min-height: 0;
-}
-
-.deployment-entry-figure img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
-  filter: saturate(.5) brightness(.66);
-  image-rendering: var(--image-rendering, pixelated);
-}
-
-.deployment-entry-body {
-  display: grid;
-  grid-template-rows: 15px 11px 6px;
-  gap: 2px;
-  align-content: center;
-  min-width: 0;
-}
-
-.deployment-entry-head {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  min-width: 0;
-}
-
-.deployment-entry-name {
-  flex: 1;
-  overflow: hidden;
-  color: #d9caab;
-  font: 400 13px/15px "PMingLiU", "MingLiU", serif;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.deployment-entry-badge {
-  flex: none;
-  padding: 0 3px;
-  color: #a2907a;
-  border: 1px solid #4f3a2c;
-  font: 7px/9px system-ui, sans-serif;
-  font-style: normal;
-  letter-spacing: .04em;
-}
-
-.deployment-entry-class {
-  overflow: hidden;
-  color: #a2947c;
-  font: 8px/11px system-ui, sans-serif;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.deployment-entry-life {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-}
-
-.deployment-entry-life-value {
-  flex: none;
-  color: #9c8f78;
-  font: 7px/7px ui-monospace, monospace;
-}
-
-.deployment-meter {
-  flex: 1;
-  min-width: 0;
-  height: 5px;
-  border: 1px solid #513628;
-  background: #180e11;
-}
-
-.deployment-meter i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #4d7a3c, #7fae51);
-}
-
-.deployment-entry.is-deployed {
-  border-color: #a97c33;
-  border-left-color: var(--gold-bright);
-  background: linear-gradient(158deg, rgba(116, 62, 42, .82), rgba(26, 14, 15, .9));
-}
-
-.deployment-entry.is-deployed .deployment-entry-name { color: #fff3cd; }
-.deployment-entry.is-deployed .deployment-entry-class { color: #d4bd8f; }
-.deployment-entry.is-deployed .deployment-entry-figure img { filter: none; }
-.deployment-entry.is-deployed .deployment-entry-badge {
-  color: #21140f;
-  border-color: #f0cf72;
-  background: linear-gradient(#ffe9a2, #d8a63c);
-}
-.deployment-entry.is-deployed .deployment-meter i {
-  background: linear-gradient(90deg, #7fc25b, #cfe97f);
-}
-
-.deployment-entry.is-fixed .deployment-entry-badge {
-  color: #ffdf90;
-  border-color: #8a6a2c;
-  background: rgba(66, 42, 16, .8);
-}
-
-.deployment-entry.is-empty {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  place-items: center;
-  border: 1px dashed #3d2c26;
-  border-left: 3px solid #2a1e1c;
-  background: rgba(10, 7, 9, .55);
-}
-
-.deployment-entry-empty {
-  color: #5f5348;
-  font: 10px/1 "PMingLiU", "MingLiU", serif;
-  letter-spacing: .12em;
-}
-
-.deployment-entry.is-focused,
-.deployment-page.is-focused,
-.deployment-open-cell.is-focused,
-.deployment-finish.is-focused {
-  outline: 2px solid var(--gold-bright);
-  outline-offset: -1px;
-  box-shadow: 0 0 0 1px #1a0f12, 0 0 9px rgba(255, 214, 108, .55);
-}
-
-.deployment-entry.is-focused .deployment-entry-name { color: #fff; }
-
-/* --- right rail --- */
-
-.deployment-rail {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 4px;
-  min-width: 0;
-  min-height: 0;
-}
-
-.deployment-map-panel {
-  min-width: 0;
-  padding: 0 3px 3px;
-}
-
-.deployment-legend {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 2px;
-  padding-right: 3px;
-  color: #a4947a;
-  font: 7px/13px system-ui, sans-serif;
-}
-
-.deployment-legend em {
-  width: 5px;
-  height: 5px;
-  margin-left: 3px;
-  border: 1px solid #000;
-}
-
-.deployment-legend em.is-ally { background: #5555ff; }
-.deployment-legend em.is-enemy { background: #ff5555; }
-.deployment-legend em.is-open { background: #fff; }
-
-/* Sized by the canvas itself: the preview crops the battlefield to its drawn
-   terrain and scales by whole pixels, so the frame must not stretch it. */
-.deployment-map-frame {
-  position: relative;
-  width: max-content;
-  margin: 2px auto 0;
-  box-shadow: 0 0 0 1px #000, 0 0 0 2px rgba(215, 171, 91, .45);
-}
-
-.deployment-map-frame.is-focused {
-  box-shadow: 0 0 0 1px #000, 0 0 0 2px var(--gold-bright), 0 0 10px rgba(255, 214, 108, .5);
-}
-
-.deployment-map {
-  display: block;
-  background: #0a0f08;
-  image-rendering: var(--image-rendering, pixelated);
-}
-
-/* Half-second hard toggle between ally blue and the white `FFh` open-cell
-   colour. The white base still shows an honest marker if animation support is
-   unavailable. */
-.deployment-map-blink {
   position: absolute;
-  z-index: 1;
-  background: #fff;
-  animation: deployment-cell-blink 1s step-end infinite;
-  will-change: background-color;
+  width: 130px;
+  height: 50px;
   pointer-events: none;
 }
 
-@keyframes deployment-cell-blink {
-  0% { background-color: #5555ff; }
-  50% { background-color: #fff; }
-}
-
-.deployment-open-cells {
-  display: flex;
-  gap: 2px;
-  min-width: 0;
-  margin-top: 3px;
-}
-
-/* Stage 10 exposes twelve landing cells. Keeping them in one flex row gives
-   the panel a 300 px min-content width and pushes the centred minimap beyond
-   the fixed 142 px rail. Wrap dense pickers without changing the 3–8 cell
-   presentation used by earlier stages. */
-.deployment-open-cells.is-dense {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.deployment-open-cell {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  height: 12px;
-  padding: 0;
-  color: #d3c3a2;
-  border: 1px solid #6f5335;
-  background: rgba(14, 9, 11, .92);
-  font: 7px/10px ui-monospace, monospace;
-  cursor: var(--native-cursor-hand);
-}
-
-.deployment-open-cell.is-danger {
-  color: #ffd2c8;
-  border-color: #c75548;
-  box-shadow: inset 0 0 0 1px rgba(255, 85, 85, .16);
-}
-
-.deployment-open-cell.is-danger em {
+.deployment-entry-base {
   position: absolute;
-  top: -8px;
-  right: -1px;
-  padding: 0 1px;
-  color: #fff;
-  background: #9f302e;
-  font: 700 5px/7px system-ui, sans-serif;
-  font-style: normal;
+  z-index: 0;
+  inset: 0;
+  background: var(--native-0);
+  pointer-events: none;
 }
 
-.deployment-open-cell.is-danger.is-current {
-  color: #240705;
-  border-color: #ff6b5f;
-  background: linear-gradient(#ffd2c8, #df6559);
+.deployment-entry-base::before,
+.deployment-entry-base::after,
+.deployment-entry-figure-frame::before,
+.deployment-entry-figure-frame::after,
+.deployment-entry-hitbox::before,
+.deployment-entry-hitbox::after,
+.deployment-page::before,
+.deployment-page::after,
+.deployment-finish::before,
+.deployment-finish::after,
+.deployment-error-frame::before,
+.deployment-error-frame::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
 }
 
-.deployment-open-cell.is-current {
-  color: #1c1009;
-  border-color: #ffe37b;
-  background: linear-gradient(#ffe9a2, #d8a63c);
-  font-weight: 700;
+.deployment-entry-base::before {
+  left: 1px;
+  top: 1px;
+  width: 129px;
+  height: 49px;
+  background: var(--native-15);
 }
 
-.deployment-open-cell.is-occupied {
-  color: #6d6154;
-  border-color: #3a2f27;
-  background: rgba(8, 5, 7, .9);
-  text-decoration: line-through;
-  cursor: default;
+.deployment-entry-base::after {
+  left: 1px;
+  top: 1px;
+  width: 128px;
+  height: 48px;
+  background: var(--native-7);
 }
 
-/* --- character detail --- */
-
-.deployment-detail {
-  display: grid;
-  align-content: start;
-  gap: 3px;
-  min-height: 0;
-  padding: 4px;
+.deployment-entry-figure-frame {
+  position: absolute;
+  z-index: 1;
+  left: 8px;
+  top: 1px;
+  width: 48px;
+  height: 48px;
+  background: var(--native-15);
+  pointer-events: none;
 }
 
-.deployment-detail:has(.deployment-detail-hint) { align-content: center; }
-
-.deployment-detail-hint {
-  padding: 0 4px;
-  color: #9c8d76;
-  font: 9px/1.45 "PMingLiU", "MingLiU", serif;
-  text-align: center;
+.deployment-entry-figure-frame::before {
+  left: 1px;
+  top: 1px;
+  width: 47px;
+  height: 47px;
+  background: var(--native-0);
 }
 
-.deployment-detail-head {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
-  gap: 5px;
-  height: 46px;
-}
-
-.deployment-detail-figure { position: relative; display: block; width: 46px; height: 46px; }
-
-.deployment-detail-portrait {
-  display: block;
+.deployment-entry-figure-frame::after {
+  left: 1px;
+  top: 1px;
   width: 46px;
   height: 46px;
+  background: var(--native-7);
+}
+
+.deployment-entry-figure {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  top: 4px;
+  display: block;
+  width: 40px;
+  height: 43px;
+  image-rendering: var(--image-rendering, pixelated);
+  pointer-events: none;
+}
+
+.deployment-entry-hitbox,
+.deployment-page,
+.deployment-finish {
+  position: absolute;
+  z-index: 3;
+  box-sizing: border-box;
+  width: 80px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--native-15);
+  pointer-events: auto;
+}
+
+.deployment-entry-hitbox {
+  left: 56px;
+  top: 24px;
+  width: 74px;
+}
+
+.deployment-entry-hitbox::before,
+.deployment-page::before,
+.deployment-finish::before {
+  left: 1px;
+  top: 1px;
+  width: 79px;
+  height: 23px;
+  background: var(--native-0);
+}
+
+.deployment-entry-hitbox::after,
+.deployment-page::after,
+.deployment-finish::after {
+  left: 1px;
+  top: 1px;
+  width: 78px;
+  height: 22px;
+  background: var(--native-7);
+}
+
+.deployment-entry-hitbox::before { width: 73px; }
+.deployment-entry-hitbox::after { width: 72px; }
+
+.deployment-entry.is-deployed .deployment-entry-figure-frame,
+.deployment-entry.is-deployed .deployment-entry-hitbox,
+.deployment-page.is-active {
+  background: var(--native-0);
+}
+
+.deployment-entry.is-deployed .deployment-entry-figure-frame::before,
+.deployment-entry.is-deployed .deployment-entry-hitbox::before,
+.deployment-page.is-active::before {
+  background: var(--native-15);
+}
+
+.deployment-entry.is-deployed .deployment-entry-figure-frame::after,
+.deployment-entry.is-deployed .deployment-entry-hitbox::after,
+.deployment-page.is-active::after {
+  background: var(--native-8);
+}
+
+.deployment-page:focus-visible,
+.deployment-entry-hitbox:focus-visible,
+.deployment-finish:focus-visible { outline: none; }
+
+.deployment-native-text {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: block;
+  width: 640px;
+  height: 350px;
+  image-rendering: var(--image-rendering, pixelated);
+  pointer-events: none;
+}
+
+.deployment-native-focus-pointer {
+  position: absolute;
+  z-index: 7;
+  display: none;
+  width: 24px;
+  height: 24px;
+  background: var(--native-command-menu-pointer-image, url("/assets/original/command-menu-pointer.png")) 0 0 / 24px 24px no-repeat;
+  image-rendering: var(--image-rendering, pixelated);
+  pointer-events: none;
+}
+
+.deployment-ui-root[data-input-mode="keyboard"] .deployment-native-focus-pointer { display: block; }
+
+/* Full native 50x50 deployment map: (440,125), four pixels per cell. */
+.deployment-rail,
+.deployment-map-panel,
+.deployment-map-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 200px;
+  height: 200px;
+}
+
+.deployment-rail { z-index: 1; left: 440px; top: 125px; }
+.deployment-map { display: block; width: 200px; height: 200px; image-rendering: var(--image-rendering, pixelated); }
+.deployment-open-cells { position: absolute; z-index: 3; inset: 0; }
+
+.deployment-open-cell {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0 !important;
+  background: transparent;
+  filter: none !important;
+  pointer-events: auto;
+}
+
+.deployment-map-blink {
+  position: absolute;
+  z-index: 2;
+  background: var(--native-0);
+  animation: deployment-native-cell-outer 1s step-end infinite;
+  pointer-events: none;
+}
+
+.deployment-map-blink::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 2px;
+  height: 2px;
+  background: var(--native-15);
+  animation: deployment-native-cell-core 1s step-end infinite;
+}
+
+@keyframes deployment-native-cell-outer {
+  0% { background-color: var(--native-0); }
+  50% { background-color: var(--native-15); }
+}
+
+@keyframes deployment-native-cell-core {
+  0% { background-color: var(--native-15); }
+  50% { background-color: var(--native-0); }
+}
+
+/* Modern information is deliberately absent from the steady frame. It appears
+   only after real pointer motion over the native 80x24 profession button, or
+   after keyboard/gamepad navigation has made a roster item current. */
+.deployment-detail {
+  position: absolute;
+  z-index: 20;
+  left: var(--detail-left);
+  top: var(--detail-top);
+  box-sizing: border-box;
+  display: grid;
+  width: 284px;
+  max-height: 116px;
+  gap: 2px;
+  padding: 5px 7px;
+  overflow: hidden;
+  visibility: hidden;
+  opacity: 0;
+  color: #fff4d1;
+  border: 2px solid var(--native-14);
+  background: #170d10f2;
+  box-shadow: 4px 4px 0 var(--native-0);
+  font: 8px/1.2 system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.deployment-ui-root[data-pointer-details="true"] .deployment-entry-hitbox:hover ~ .deployment-detail,
+.deployment-ui-root[data-input-mode="keyboard"] .deployment-entry.is-focused .deployment-detail {
+  visibility: visible;
+  opacity: 1;
+}
+
+.deployment-ui-root:not([data-feedback=""]) .deployment-detail { visibility: hidden !important; opacity: 0 !important; }
+
+.deployment-detail-head { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 6px; height: 42px; }
+.deployment-detail-portrait-frame { position: relative; display: block; width: 42px; height: 42px; }
+.deployment-detail-portrait {
+  display: block;
+  width: 42px;
+  height: 42px;
   object-fit: cover;
   object-position: center top;
-  border: 1px solid var(--panel-edge-bright);
+  border: 1px solid #d7ab5b;
   image-rendering: var(--image-rendering, pixelated);
 }
 
@@ -590,183 +372,57 @@
   bottom: 1px;
   left: 1px;
   color: #ffe9ae;
-  background: rgba(9, 5, 7, .82);
-  font: 7px/10px system-ui, sans-serif;
+  background: #090507d9;
+  font: 7px/9px system-ui, sans-serif;
   font-style: normal;
   text-align: center;
 }
 
-.deployment-detail-copy {
-  display: grid;
-  grid-template-rows: 15px 10px 9px 6px;
-  align-content: center;
-  gap: 2px;
-  min-width: 0;
-}
+.deployment-detail-copy { display: grid; grid-template-rows: 14px 9px 9px 5px; align-content: center; gap: 1px; min-width: 0; }
+.deployment-detail-copy strong { overflow: hidden; color: #ffe37b; font: 700 13px/14px "PMingLiU", "MingLiU", serif; text-overflow: ellipsis; white-space: nowrap; }
+.deployment-detail-copy > span { overflow: hidden; color: #c8b996; text-overflow: ellipsis; white-space: nowrap; }
+.deployment-detail-copy > span b { color: #fff; }
 
-.deployment-detail-name {
-  overflow: hidden;
-  color: #fff3cd;
-  font: 13px/15px "PMingLiU", "MingLiU", serif;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.deployment-detail-meter { display: block; min-width: 0; height: 5px; border: 1px solid #513628; background: #180e11; }
+.deployment-detail-meter > i { display: block; height: 100%; background: #7fae51; }
+.deployment-detail-meter.is-exp > i { background: #86c2e8; }
 
-.deployment-detail-class {
-  overflow: hidden;
-  color: #b5a486;
-  font: 8px/10px system-ui, sans-serif;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.deployment-detail-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.deployment-detail-stats div { display: flex; align-items: baseline; justify-content: center; gap: 4px; height: 19px; border: 1px solid #4e3527; background: #09060899; }
+.deployment-detail-stats dt { color: #a4947a; font-size: 7px; }
+.deployment-detail-stats dd { margin: 0; color: #ffe8b4; font: 700 11px/17px "PMingLiU", "MingLiU", serif; }
+.deployment-detail-exp { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px; color: #9c8d76; }
+.deployment-detail-exp b { color: #cfe0f4; font: 700 8px/1 ui-monospace, monospace; }
+.deployment-detail-actions { display: grid; grid-template-columns: auto 1fr; gap: 4px; overflow: hidden; color: #9c8d76; }
+.deployment-detail-actions b { max-height: 18px; overflow: hidden; color: #e2c2ee; font: 9px/9px "PMingLiU", "MingLiU", serif; }
 
-.deployment-detail-life {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  color: #9c8d76;
-  font: 7px/9px system-ui, sans-serif;
-}
-
-.deployment-detail-life b {
-  color: #f4e6c4;
-  font: 700 9px/9px ui-monospace, monospace;
-}
-
-.deployment-meter.is-life { height: 6px; }
-.deployment-meter.is-life i { background: linear-gradient(90deg, #59a13f, #b8e06a); }
-
-.deployment-detail-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-}
-
-.deployment-detail-stats div {
-  display: grid;
-  align-content: center;
-  height: 22px;
-  border: 1px solid #4e3527;
-  background: rgba(9, 6, 8, .6);
-  text-align: center;
-}
-
-.deployment-detail-stats dt { color: #a4947a; font: 7px/8px system-ui, sans-serif; }
-.deployment-detail-stats dd { margin: 0; color: #ffe8b4; font: 700 12px/12px "PMingLiU", "MingLiU", serif; }
-
-.deployment-detail-exp {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #9c8d76;
-  font: 7px/9px system-ui, sans-serif;
-}
-
-.deployment-detail-exp > span:first-child,
-.deployment-detail-actions > span:first-child { flex: none; }
-
-.deployment-detail-exp b { flex: none; color: #cfe0f4; font: 700 8px/9px ui-monospace, monospace; }
-.deployment-meter.is-exp { height: 5px; }
-.deployment-meter.is-exp i { background: linear-gradient(90deg, #3f6f9c, #86c2e8); }
-
-.deployment-detail-actions {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  overflow: hidden;
-  color: #9c8d76;
-  font: 7px/11px system-ui, sans-serif;
-}
-
-.deployment-detail-actions b {
-  max-height: 22px;
-  overflow: hidden;
-  color: #e2c2ee;
-  font: 9px/11px "PMingLiU", "MingLiU", serif;
-}
-
-/* --- footer --- */
-
-.deployment-footer {
-  display: flex;
-  grid-column: 1 / -1;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.deployment-status {
-  flex: none;
-  max-width: 250px;
-  overflow: hidden;
-  color: #f8e9bd;
-  font: 11px/25px "PMingLiU", "MingLiU", serif;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.deployment-status.is-error {
-  flex: 1;
-  max-width: none;
-  padding: 0 8px;
-  color: #fff;
-  border: 1px solid #e08a8a;
-  background: #741f28;
-  line-height: 23px;
-}
-
-/* The native error line owns the bar while it is up; the control hint is
-   redundant there because every key except a new primary action is blocked. */
-.deployment-footer:has(.is-error) .deployment-hint { display: none; }
-
-.deployment-hint {
-  flex: 1;
-  overflow: hidden;
-  color: #8b7d69;
-  font: 7px/25px system-ui, sans-serif;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.deployment-finish {
-  flex: none;
-  width: 162px;
-  height: 25px;
-  padding: 0;
-  color: #2a1608;
-  border: 1px solid #ffe9a2;
-  background: linear-gradient(#ffe9a2, #d09a2c 55%, #b57f22);
-  box-shadow: inset 0 1px 0 #fff6d2, 0 1px 0 #000;
-  font: 700 14px/23px "PMingLiU", "MingLiU", serif;
-  letter-spacing: .3em;
-  text-indent: .3em;
-  cursor: var(--native-cursor-hand);
-}
-
-.deployment-finish:hover { background: linear-gradient(#fff3c4, #e0ab38 55%, #c48c26); }
-
-/* --- submitted overlay --- */
-
-.deployment-submitted {
+/* Module 27 `0000:0E81`: 636x20 nested error bar at (2,328), text at (160,330). */
+.deployment-error-frame {
   position: absolute;
-  z-index: 7;
-  left: 144px;
-  top: 137px;
-  display: grid;
-  width: 352px;
-  min-height: 76px;
-  place-content: center;
-  gap: 7px;
-  color: #fff8db;
-  border: 3px ridge #e0c48b;
-  background: rgba(39, 15, 21, .96);
-  text-align: center;
-  box-shadow: 0 8px 30px #000;
+  z-index: 4;
+  left: 2px;
+  top: 328px;
+  width: 636px;
+  height: 20px;
+  background: var(--native-0);
+  pointer-events: none;
 }
 
-.deployment-submitted strong { color: #ffe36d; font-size: 18px; }
-.deployment-submitted span { font-size: 10px; }
+.deployment-error-frame::before {
+  left: 1px;
+  top: 1px;
+  width: 635px;
+  height: 19px;
+  background: var(--native-15);
+}
+
+.deployment-error-frame::after {
+  left: 1px;
+  top: 1px;
+  width: 634px;
+  height: 18px;
+  background: var(--native-7);
+}
 
 .deployment-lab-notes {
   display: grid;
@@ -792,4 +448,5 @@
   .deployment-lab-notes { grid-template-columns: 1fr; gap: 6px; }
 }
 
-/* 見 `styles.css`：本作不跟隨系統「減少動態效果」。 */
+/* The one-second current-cell hard switch remains under reduced-motion so the
+   selected FF cell never loses its only dynamic feedback. */

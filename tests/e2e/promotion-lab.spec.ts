@@ -131,8 +131,43 @@ test("promotion lab exposes all twelve threshold pairs and the formal choice UI"
   await finishPromotionDialogue(page);
 
   const promotionLayer = page.getByTestId("promotion-layer");
-  await expect(promotionLayer.locator("h2")).toHaveText("妮雅・士兵轉職");
-  await expect(promotionLayer.locator(".promotion-current")).toContainText("目前：等級 4");
+  const promotionMenu = page.getByTestId("promotion-native-menu");
+  await expect(promotionLayer.locator("h2, .promotion-current")).toHaveCount(0);
+  await expect(promotionLayer).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(page.getByRole("menu", { name: /妮雅・士兵轉職/u })).toBeVisible();
+  await expect(promotionMenu).toHaveAttribute("data-source-address", "0000:0794");
+  await expect(page.getByTestId("promotion-native-frame")).toHaveAttribute(
+    "data-source-url",
+    "/assets/original/promotion-menu-frame.png",
+  );
+  expect(await promotionMenu.evaluate((menu) => {
+    const options = menu.querySelector<HTMLElement>(".promotion-options");
+    return {
+      left: (menu as HTMLElement).offsetLeft,
+      top: (menu as HTMLElement).offsetTop,
+      width: (menu as HTMLElement).offsetWidth,
+      height: (menu as HTMLElement).offsetHeight,
+      optionsOrigin: options ? [options.offsetLeft, options.offsetTop] : null,
+      options: [...menu.querySelectorAll<HTMLElement>(".promotion-option")].map((option) => ({
+        left: option.offsetLeft,
+        top: option.offsetTop,
+        width: option.offsetWidth,
+        height: option.offsetHeight,
+      })),
+    };
+  })).toEqual({
+    left: 160,
+    top: 110,
+    width: 332,
+    height: 126,
+    optionsOrigin: [20, 20],
+    options: [0, 1, 2, 3].map((index) => ({
+      left: index * 56,
+      top: 0,
+      width: 48,
+      height: 52,
+    })),
+  });
   await expect(promotionLayer.locator(".promotion-option")).toHaveCount(4);
   await expect(page.getByTestId("promotion-target-cavalry")).toHaveAccessibleName(
     /騎兵.*等級 1.*攻擊 55/u,
@@ -142,8 +177,21 @@ test("promotion lab exposes all twelve threshold pairs and the formal choice UI"
   }
   await page.keyboard.press("Escape");
   await expect(promotionLayer).toBeVisible();
+  const cavalryDetails = page.getByTestId("promotion-details-cavalry");
+  for (const details of await promotionLayer.locator(".promotion-option-details").all()) {
+    await expect(details).toBeHidden();
+  }
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/promotion-lab-choice.png`,
+  });
+  await page.getByTestId("promotion-target-cavalry").hover();
+  await expect(cavalryDetails).toBeVisible();
+  await expect(cavalryDetails.locator(".promotion-trait")).toHaveCount(0);
+  await expect(cavalryDetails).toContainText("目前　等級 4");
+  await expect(cavalryDetails).toContainText("轉職後　等級 1　攻 55");
+  await expect(cavalryDetails).not.toContainText("選擇後經驗歸零");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/promotion-lab-choice-hover.png`,
   });
 
   await page.getByTestId("promotion-target-cavalry").click();
@@ -186,8 +234,43 @@ test("generic land knight promotes with its beast figure and canonical professio
   await finishPromotionDialogue(page);
 
   const promotionLayer = page.getByTestId("promotion-layer");
-  await expect(promotionLayer.locator("h2")).toHaveText("陸戰騎士轉職");
-  await page.getByTestId("promotion-target-beast-knight").click();
+  await expect(page.getByRole("menu", { name: /陸戰騎士轉職/u })).toBeVisible();
+  for (const [classId, trait] of [
+    ["swift-dragon-knight", "免疫物理射擊"],
+    ["beast-knight", "命中降攻"],
+    ["bone-knight", "以牙還牙"],
+    ["great-dragon-knight", "龍踏技術"],
+  ] as const) {
+    await expect(page.getByTestId(`promotion-details-${classId}`).locator(".promotion-trait"))
+      .toContainText(trait);
+  }
+  const beastOption = page.getByTestId("promotion-target-beast-knight");
+  const beastDetails = page.getByTestId("promotion-details-beast-knight");
+  await beastOption.hover();
+  await expect(beastDetails).toBeVisible();
+  await expect(beastDetails.locator(".promotion-action")).toHaveText("普通攻擊");
+  await expect(beastDetails.locator(".promotion-trait")).toHaveText(
+    "特性　命中降攻：普通攻擊命中後使目標攻擊力下降 20，持續 3 回合。",
+  );
+  await expect(beastOption).toHaveAccessibleName(
+    /普通攻擊，特性 命中降攻：普通攻擊命中後使目標攻擊力下降 20/u,
+  );
+  const beastGeometry = await Promise.all([
+    beastOption.boundingBox(),
+    beastDetails.boundingBox(),
+  ]);
+  expect(beastGeometry[0]).not.toBeNull();
+  expect(beastGeometry[1]).not.toBeNull();
+  expect(beastGeometry[1]!.x + beastGeometry[1]!.width / 2).toBeCloseTo(
+    beastGeometry[0]!.x + beastGeometry[0]!.width / 2,
+    0,
+  );
+  expect(beastGeometry[1]!.y - (beastGeometry[0]!.y + beastGeometry[0]!.height))
+    .toBeCloseTo(5, 0);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/promotion-lab-beast-knight-choice-hover.png`,
+  });
+  await beastOption.click();
   await expect(promotionLayer).toBeHidden();
 
   const state = await promotionLabState(page);

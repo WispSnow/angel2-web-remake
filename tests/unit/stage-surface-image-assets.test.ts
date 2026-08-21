@@ -5,6 +5,7 @@ describe("current stage DOM image selection", () => {
   test("predecodes bounded UI, minimap and ally figures without retaining campaign textures", () => {
     const selected = stageSurfaceImageUrls([
       "/assets/original/battle-chrome-top.png",
+      "/assets/original/promotion-menu-frame.png",
       "/assets/original/native-font.png",
       "/assets/original/status-icons/06.png",
       "/assets/original/story-stage03-camp.png",
@@ -22,6 +23,7 @@ describe("current stage DOM image selection", () => {
 
     expect(selected).toEqual([
       "/assets/original/battle-chrome-top.png",
+      "/assets/original/promotion-menu-frame.png",
       "/assets/original/native-font.png",
       "/assets/original/status-icons/06.png",
       "/assets/original/story-stage03-camp.png",

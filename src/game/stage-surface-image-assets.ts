@@ -18,6 +18,7 @@ const COMMON_STAGE_SURFACE_IMAGES = new Set<string>([
   DIALOGUE_TEXT_WINDOW_ASSET,
   STORY_BACKDROP_ASSET,
   ASSETS.storyBackground,
+  ASSETS.promotionMenu.frame,
   NATIVE_FONT.src,
   ...UNIT_STATUS_PRESENTATIONS.map(({ source }) => source),
   ...NATIVE_UI_CSS_ASSET_URLS,

@@ -895,6 +895,7 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   });
   await page.getByTestId("dialogue-layer").click();
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
+  await expect(promotionDialogue).toBeHidden();
   expect((await debugState(page))).toMatchObject({
     phase: "player",
     promotionUnitIds: ["1:0"],
@@ -904,6 +905,51 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       { id: "archer", optionIndex: 2 },
       { id: "sister", optionIndex: 3 },
     ],
+  });
+  const promotionLayer = page.getByTestId("promotion-layer");
+  const promotionMenu = page.getByTestId("promotion-native-menu");
+  const promotionFrame = page.getByTestId("promotion-native-frame");
+  await expect(promotionLayer.locator("h2, .promotion-current")).toHaveCount(0);
+  await expect(promotionLayer).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(promotionMenu).toHaveAttribute("data-source-address", "0000:0794");
+  await expect(promotionMenu).toHaveAttribute("data-source-resource", "A/0006");
+  await expect(promotionFrame).toHaveAttribute("src", /^blob:/u);
+  await expect(promotionFrame).toHaveAttribute(
+    "data-source-url",
+    "/assets/original/promotion-menu-frame.png",
+  );
+  expect(await promotionMenu.evaluate((menu) => ({
+    left: (menu as HTMLElement).offsetLeft,
+    top: (menu as HTMLElement).offsetTop,
+    width: (menu as HTMLElement).offsetWidth,
+    height: (menu as HTMLElement).offsetHeight,
+    frame: (() => {
+      const image = menu.querySelector<HTMLImageElement>(".promotion-native-frame");
+      return image ? [image.naturalWidth, image.naturalHeight] : null;
+    })(),
+    optionsOrigin: (() => {
+      const options = menu.querySelector<HTMLElement>(".promotion-options");
+      return options ? [options.offsetLeft, options.offsetTop] : null;
+    })(),
+    options: [...menu.querySelectorAll<HTMLElement>(".promotion-option")].map((option) => ({
+      left: option.offsetLeft,
+      top: option.offsetTop,
+      width: option.offsetWidth,
+      height: option.offsetHeight,
+    })),
+  }))).toEqual({
+    left: 160,
+    top: 110,
+    width: 332,
+    height: 126,
+    frame: [332, 126],
+    optionsOrigin: [20, 20],
+    options: [0, 1, 2, 3].map((index) => ({
+      left: index * 56,
+      top: 0,
+      width: 48,
+      height: 52,
+    })),
   });
   for (const classId of ["cavalry", "warrior", "archer", "sister"] as const) {
     const image = page.getByTestId(`promotion-image-${classId}`);
@@ -926,17 +972,52 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("promotion-target-cavalry")).toHaveAccessibleName(
     /騎兵.*等級 1.*攻擊 55（\+9）.*生命上限 200（\+10）/,
   );
+  await expect(page.getByTestId("promotion-target-cavalry")).toHaveCSS(
+    "background-color",
+    "rgb(40, 130, 0)",
+  );
+  await expect(page.getByTestId("promotion-target-warrior")).toHaveCSS(
+    "background-color",
+    "rgb(93, 65, 49)",
+  );
+  const cavalryDetails = page.getByTestId("promotion-details-cavalry");
+  for (const details of await promotionLayer.locator(".promotion-option-details").all()) {
+    await expect(details).toBeHidden();
+  }
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-promotion-choice.png",
+  });
+  await page.getByTestId("promotion-target-cavalry").hover();
+  await expect(cavalryDetails).toBeVisible();
+  await expect(cavalryDetails).toContainText("轉職後　等級 1　攻 55（+9）");
+  await expect(cavalryDetails).not.toContainText("選擇後經驗歸零");
+  const cavalryGeometry = await Promise.all([
+    page.getByTestId("promotion-target-cavalry").boundingBox(),
+    cavalryDetails.boundingBox(),
+  ]);
+  expect(cavalryGeometry[0]).not.toBeNull();
+  expect(cavalryGeometry[1]).not.toBeNull();
+  expect(cavalryGeometry[1]!.x + cavalryGeometry[1]!.width / 2).toBeCloseTo(
+    cavalryGeometry[0]!.x + cavalryGeometry[0]!.width / 2,
+    0,
+  );
+  expect(cavalryGeometry[1]!.y - (cavalryGeometry[0]!.y + cavalryGeometry[0]!.height))
+    .toBeCloseTo(5, 0);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-promotion-hover-details.png",
+  });
+  await page.mouse.move(0, 0);
+  await expect(cavalryDetails).toBeHidden();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("promotion-target-warrior")).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByTestId("promotion-target-sister")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("promotion-target-archer")).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("ArrowUp");
   await expect(page.getByTestId("promotion-target-warrior")).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByTestId("promotion-target-cavalry")).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("Alt");
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
-  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-promotion-choice.png" });
   await confirmPromotion(page);
   state = await debugState(page);
   expect(state.lastCombat?.counterOccurred).toBe(true);
@@ -3442,9 +3523,12 @@ test("S00-R: Ximi independently enters the shared promotion tree and commits a s
   });
   await page.getByTestId("dialogue-layer").click();
   await expect(page.getByTestId("promotion-layer")).toBeVisible();
-  await expect(page.getByTestId("promotion-layer").locator("h2")).toContainText("希蜜・士兵轉職");
+  await expect(page.getByRole("menu", { name: /希蜜・士兵轉職/u })).toBeVisible();
   await expect(page.getByTestId("promotion-layer").locator(".promotion-option")).toHaveCount(4);
-  const currentPromotionText = await page.getByTestId("promotion-layer").locator(".promotion-current").innerText();
+  const sisterDetails = page.getByTestId("promotion-details-sister");
+  await page.getByTestId("promotion-target-sister").hover();
+  await expect(sisterDetails).toBeVisible();
+  const currentPromotionText = await sisterDetails.innerText();
   const lifeMatch = currentPromotionText.match(/生命 (\d+)\//);
   expect(lifeMatch).not.toBeNull();
   const ximiLifeAtPromotion = lifeMatch![1];

@@ -748,7 +748,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const postSaveSlot = (event.target as Element).closest<HTMLElement>("[data-post-save-index]");
     if (postSaveSlot) controller.selectPostSaveSlot(Number(postSaveSlot.dataset.postSaveIndex));
     const promotionTarget = (event.target as Element).closest<HTMLElement>("[data-promotion-index]");
-    if (promotionTarget) controller.selectPromotionTarget(Number(promotionTarget.dataset.promotionIndex));
+    if (promotionTarget) {
+      controller.selectPromotionTarget(Number(promotionTarget.dataset.promotionIndex));
+      promotionLayer.dataset.pointerDetails = "true";
+    }
     const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
     if (!minimap) {
       if (controller.minimapPreviewOrigin) controller.clearMinimapPreview();
@@ -1022,6 +1025,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       const options = controller.promotionTargets.map((target, index) => {
         const definition = classDefinition(target.id);
         const stats = classStatsFor({ classId: target.id, experience: 0 });
+        const traits = classTraitsFor(target.id);
+        const traitLabel = traits
+          .map((trait) => `${trait.shortDescription}：${trait.description}`)
+          .join("；");
         const selected = index === controller.promotionSelectionIndex;
         const imageUrl = promotionImageByClass[target.id]
           ?? allyMapUnitAsset(target.id)
@@ -1029,6 +1036,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const optionLabel = [
           `${index + 1}．${definition.nativeName}`,
           actionLabels[definition.actionCategory],
+          ...(traitLabel ? [`特性 ${traitLabel}`] : []),
           `等級 ${stats.level}`,
           `攻擊 ${stats.attack}（${delta(stats.attack, currentStats.attack)}）`,
           `防禦 ${stats.defense}（${delta(stats.defense, currentStats.defense)}）`,
@@ -1039,29 +1047,32 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           data-action="promotion-target" data-promotion-index="${index}"
           data-testid="promotion-target-${target.id}" role="menuitem"
           aria-label="${optionLabel}" aria-current="${selected}">
-          <span class="promotion-art" aria-hidden="true">
-            ${imageUrl
-              ? `<img src="${stagedRenderAssetSource(imageUrl)}" data-source-url="${imageUrl}"
-                  alt="" data-testid="promotion-image-${target.id}" />`
-              : `<span class="promotion-art-missing">${definition.nativeName}</span>`}
-          </span>
-          <span class="promotion-option-copy">
+          ${imageUrl
+            ? `<img class="promotion-art" src="${stagedRenderAssetSource(imageUrl)}"
+                data-source-url="${imageUrl}" data-source-resource="A/0002"
+                alt="" data-testid="promotion-image-${target.id}" />`
+            : `<span class="promotion-art-missing" aria-hidden="true">${definition.nativeName}</span>`}
+          <span class="promotion-option-details" role="tooltip"
+            data-testid="promotion-details-${target.id}">
             <strong>${index + 1}．${definition.nativeName}</strong>
             <span class="promotion-action">${actionLabels[definition.actionCategory]}</span>
-            <span>等級 ${stats.level}　攻 ${stats.attack}（${delta(stats.attack, currentStats.attack)}）</span>
-            <span>防 ${stats.defense}（${delta(stats.defense, currentStats.defense)}）　生命上限 ${stats.maxLife}（${delta(stats.maxLife, currentStats.maxLife)}）</span>
-            <span>移動 ${stats.movement}（${delta(stats.movement, currentStats.movement)}）</span>
+            ${traitLabel ? `<span class="promotion-trait">特性　${traitLabel}</span>` : ""}
+            <span>目前　等級 ${currentStats.level}　攻 ${currentStats.attack}　防 ${currentStats.defense}　生命 ${promotionUnit.life}/${currentStats.maxLife}　移動 ${currentStats.movement}</span>
+            <span>轉職後　等級 ${stats.level}　攻 ${stats.attack}（${delta(stats.attack, currentStats.attack)}）　防 ${stats.defense}（${delta(stats.defense, currentStats.defense)}）</span>
+            <span>生命上限 ${stats.maxLife}（${delta(stats.maxLife, currentStats.maxLife)}）　移動 ${stats.movement}（${delta(stats.movement, currentStats.movement)}）</span>
           </span>
         </button>`;
       }).join("");
-      promotionLayer.innerHTML = `<div class="promotion-panel">
-        <span class="panel-kicker">CLASS CHANGE</span>
-        <h2>${promotionTitle}</h2>
-        <p class="promotion-current">目前：等級 ${currentStats.level}　攻 ${currentStats.attack}　防 ${currentStats.defense}　生命 ${promotionUnit.life}/${currentStats.maxLife}　移動 ${currentStats.movement}</p>
-        <div class="promotion-options" role="menu" aria-label="${promotionDisplayName}的轉職候選">${options}</div>
-        <p class="promotion-warning">選擇後經驗歸零；目前生命不恢復。此選擇不能取消。</p>
+      const promotionFrameUrl = ASSETS.promotionMenu.frame;
+      promotionLayer.innerHTML = `<div class="promotion-native-menu" data-testid="promotion-native-menu"
+          data-source-address="0000:0794" data-source-resource="A/0006">
+        <img class="promotion-native-frame" src="${stagedRenderAssetSource(promotionFrameUrl)}"
+          data-source-url="${promotionFrameUrl}" alt="" aria-hidden="true"
+          data-testid="promotion-native-frame" />
+        <div class="promotion-options" role="menu" aria-label="${promotionTitle}：${promotionDisplayName}的轉職候選">${options}</div>
       </div>`;
     } else {
+      delete promotionLayer.dataset.pointerDetails;
       promotionLayer.replaceChildren();
     }
     setMenuOpen(objectivePanel, controller.objectiveOpen);

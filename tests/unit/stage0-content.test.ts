@@ -64,6 +64,9 @@ describe("stage 0 evidence-backed content", () => {
       sister: "/assets/original/unit-ally-sister.png",
       warrior: "/assets/original/unit-ally-warrior.png",
     });
+    expect(ASSETS.promotionMenu).toEqual({
+      frame: "/assets/original/promotion-menu-frame.png",
+    });
   });
 
   it("decodes the complete 50×50 terrain model", () => {

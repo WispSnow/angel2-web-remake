@@ -12,12 +12,23 @@ const MODULE29_DATA_BASE = MODULE29_DATA_SEGMENT * 16;
 const SENTINEL = 0xffff;
 
 const CODE_SIGNATURES = [
+  { module: 27, address: "0000:05C2", offset: 0x005c2, role: "load A/0002 profession-figure resource for deployment roster", hex: "a184268ec0bf0000b90200bb0000e8032ca18426be8b009a0800d703" },
+  { module: 27, address: "0000:08EA", offset: 0x008ea, role: "deployment presentation composition: roster frames, entries, then controls", hex: "e80700e8c800e8b602c3c706d8090800c706dc090000b903" },
+  { module: 27, address: "0000:0927", offset: 0x00927, role: "nested palette-rectangle roster item frame builder", hex: "a1d809a3de0940a3e809a3f209a1da09a3e00940a3ea09a3f409" },
+  { module: 27, address: "0000:09B8", offset: 0x009b8, role: "three-column by five-row deployment roster renderer", hex: "33d2a1760abb0f00f7e3a3780ac706d8090800b9030051" },
+  { module: 27, address: "0000:0A1B", offset: 0x00a1b, role: "single roster item state, text and A/0002 profession-figure renderer", hex: "8b16d8098b1eda0983c25083c3038916560a891e580abe560a" },
+  { module: 27, address: "0000:0BA9", offset: 0x00ba9, role: "three page controls and independent finish-control placement", hex: "c706d809b801c706da092300c706dc090000b9030051e81c00" },
+  { module: 27, address: "0000:0BDE", offset: 0x00bde, role: "nested palette-rectangle page/finish control renderer", hex: "c706400a0f00c7064a0a0000c706540a0700a1760a3b06dc09" },
   { module: 27, address: "0000:0C60", offset: 0x00c60, role: "deployment input/render/toggle/page loop", hex: "e86f02e8420ae8f800e8720083fa597414e81200a18426bb" },
   { module: 27, address: "0000:0C86", offset: 0x00c86, role: "deployment-map primary/secondary action dispatch", hex: "8b16492a8b1e4b2abed80ee8ba11833eca255975168b1649" },
   { module: 27, address: "0000:0CDE", offset: 0x00cde, role: "deployment page or finish control", hex: "8b16492a8b1e4b2abed80ee86211833eca25597419803e3f" },
   { module: 27, address: "0000:0D61", offset: 0x00d61, role: "deployment roster primary-button toggle", hex: "8b16492a8b1e4b2abe400ee8df10833eca25597416803e3e" },
   { module: 27, address: "0000:0ED2", offset: 0x00ed2, role: "keyboard-only deployment navigation adapter", hex: "803e422a4e7401c3e86700e88500e8c500e8a200e80700e8" },
   { module: 27, address: "0000:0FC8", offset: 0x00fc8, role: "deployment navigation index to pointer coordinates", hex: "8b1e7e0f03db8b97800f83c23c8916492a8b1e8a0f03db8b" },
+  { module: 27, address: "0000:0E81", offset: 0x00e81, role: "deployment native error bar and bitmap-text feedback loop", hex: "c706660f0000be5e0fe88d0bbe680fe8870bbe720fe8810b" },
+  { module: 27, address: "0000:165B", offset: 0x0165b, role: "complete 50x50 deployment minimap row/column scan at four-pixel steps", hex: "c70604100000c706fe0f7d00c706f80f0000b9320051e80e00" },
+  { module: 27, address: "0000:1701", offset: 0x01701, role: "deployment minimap terrain 4x4 cell renderer", hex: "a14b008ec08b36fa0f33db268a1c03db8b9fb80233c08a87ae10" },
+  { module: 27, address: "0000:1731", offset: 0x01731, role: "deployment minimap side-2/side-1/FF occupancy renderer", hex: "a151008ec08b36fa0f268a043c0274093c01742c3cff744f" },
   { module: 27, address: "0000:1884", offset: 0x01884, role: "select next FF deployment cell", hex: "e8800083fa597407c706f60f0000c3ba4e008b1ef60f4326" },
   { module: 27, address: "0000:18B2", offset: 0x018b2, role: "select previous FF deployment cell", hex: "e8520083fa597407c706f60f0000c3ba4e008b1ef60f4b26" },
   { module: 27, address: "0000:1CAA", offset: 0x01caa, role: "INT 09h keyboard IRQ wrapper", hex: "505351521e06575616e80e00b020e620175e5f071f5a595b58cfb85a098ed8e4" },
@@ -233,6 +244,125 @@ function dataOffset(module, dsOffset, bytes, buffer) {
 
 function readWord(module, buffer, dsOffset) {
   return buffer.readUInt16LE(dataOffset(module, dsOffset, 2, buffer));
+}
+
+function readPaletteRect(module, buffer, dsOffset) {
+  const [x, y, width, height, colorIndex] = Array.from(
+    { length: 5 },
+    (_, index) => readWord(module, buffer, dsOffset + index * 2),
+  );
+  return {
+    address: `${module === 27 ? hex(MODULE27_DATA_SEGMENT) : hex(MODULE29_DATA_SEGMENT)}:${hex(dsOffset)}`,
+    x,
+    y,
+    width,
+    height,
+    colorIndex,
+  };
+}
+
+function assertPaletteRect(actual, expected, label) {
+  for (const [field, value] of Object.entries(expected)) {
+    if (actual[field] !== value) {
+      throw new Error(`${label}: expected ${field}=${value}, got ${actual[field]}`);
+    }
+  }
+}
+
+function parseDeploymentPresentation(module27) {
+  const minimapDescriptors = {
+    sharedOuter: readPaletteRect(27, module27, 0x19bc),
+    side2Core: readPaletteRect(27, module27, 0x19c6),
+    side1Core: readPaletteRect(27, module27, 0x19d0),
+    openCore: readPaletteRect(27, module27, 0x19da),
+    currentOuter: readPaletteRect(27, module27, 0x19e4),
+    currentCore: readPaletteRect(27, module27, 0x19ee),
+  };
+  assertPaletteRect(minimapDescriptors.sharedOuter, { width: 4, height: 4, colorIndex: 0 }, "deployment minimap outer");
+  assertPaletteRect(minimapDescriptors.side2Core, { width: 2, height: 2, colorIndex: 11 }, "deployment minimap side-2 core");
+  assertPaletteRect(minimapDescriptors.side1Core, { width: 2, height: 2, colorIndex: 9 }, "deployment minimap side-1 core");
+  assertPaletteRect(minimapDescriptors.openCore, { width: 2, height: 2, colorIndex: 15 }, "deployment minimap FF core");
+  assertPaletteRect(minimapDescriptors.currentOuter, { width: 4, height: 4, colorIndex: 15 }, "deployment minimap current outer");
+  assertPaletteRect(minimapDescriptors.currentCore, { width: 2, height: 2, colorIndex: 0 }, "deployment minimap current core");
+
+  const errorDescriptors = [0x0f5e, 0x0f68, 0x0f72].map((offset) => readPaletteRect(27, module27, offset));
+  [
+    { x: 2, y: 328, width: 636, height: 20, colorIndex: 0 },
+    { x: 3, y: 329, width: 635, height: 19, colorIndex: 15 },
+    { x: 3, y: 329, width: 634, height: 18, colorIndex: 7 },
+  ].forEach((expected, index) => assertPaletteRect(errorDescriptors[index], expected, `deployment error rectangle ${index}`));
+
+  return {
+    screen: { width: 640, height: 350, backgroundPaletteIndex: 0 },
+    roster: {
+      columns: 3,
+      rows: 5,
+      entriesPerPage: 15,
+      itemOrigins: {
+        x: [8, 152, 296],
+        y: [35, 95, 155, 215, 275],
+      },
+      itemFrame: [
+        { relative: { x: 0, y: 0 }, size: { width: 130, height: 50 }, colorIndex: 0 },
+        { relative: { x: 1, y: 1 }, size: { width: 129, height: 49 }, colorIndex: 15 },
+        { relative: { x: 1, y: 1 }, size: { width: 128, height: 48 }, colorIndex: 7 },
+      ],
+      figureFrame: {
+        relative: { x: 8, y: 1 },
+        layers: [
+          { size: { width: 48, height: 48 }, colorIndex: 15 },
+          { relative: { x: 1, y: 1 }, size: { width: 47, height: 47 }, colorIndex: 0 },
+          { relative: { x: 1, y: 1 }, size: { width: 46, height: 46 }, colorIndex: 7 },
+        ],
+      },
+      selectableProfessionBar: {
+        relative: { x: 49, y: 24 },
+        layers: [
+          { size: { width: 80, height: 24 }, colorIndex: 15 },
+          { relative: { x: 1, y: 1 }, size: { width: 79, height: 23 }, colorIndex: 0 },
+          { relative: { x: 1, y: 1 }, size: { width: 78, height: 22 }, colorIndex: 7 },
+        ],
+        selectedLayers: [
+          { size: { width: 80, height: 24 }, colorIndex: 0 },
+          { relative: { x: 1, y: 1 }, size: { width: 79, height: 23 }, colorIndex: 15 },
+          { relative: { x: 1, y: 1 }, size: { width: 78, height: 22 }, colorIndex: 8 },
+        ],
+      },
+      figure: {
+        resource: "A/0002",
+        descriptorOffset: "0x008B",
+        relativeOrigin: { x: 3, y: 2 },
+        dimensions: { width: 40, height: 43 },
+      },
+      text: {
+        drawFunction: "0000:271C",
+        unitNameRelativeOrigin: { x: 72, y: 3 },
+        professionRelativeOrigin: { x: 56, y: 27 },
+        inkPaletteIndex: 15,
+        outlinePaletteIndex: 0,
+      },
+    },
+    controls: {
+      pages: { origins: [{ x: 440, y: 35 }, { x: 440, y: 65 }, { x: 440, y: 95 }], size: { width: 80, height: 24 }, labels: ["Ⅰ", "Ⅱ", "Ⅲ"] },
+      finish: { origin: { x: 540, y: 35 }, size: { width: 80, height: 24 }, label: "結束" },
+      normalLayers: [15, 0, 7],
+      activePageLayers: [0, 15, 8],
+      labelRelativeOrigin: { x: 16, y: 3 },
+    },
+    minimap: {
+      origin: { x: 440, y: 125 },
+      grid: { width: 50, height: 50, cellSize: 4 },
+      dimensions: { width: 200, height: 200 },
+      occupancyValues: { side1: 1, side2: 2, openDeploymentCell: 255 },
+      descriptors: minimapDescriptors,
+      currentCell: "when the linear cell equals DS:0FF6, XOR both normal/current descriptor colours with palette index 15 and repaint; the input loop waits four module-delay ticks between refreshes",
+    },
+    feedback: {
+      frameDescriptors: errorDescriptors,
+      textOrigin: { x: 160, y: 330 },
+      dismissal: "primary action only",
+    },
+  };
 }
 
 function decodeAction(word) {
@@ -499,6 +629,7 @@ async function extract(module27Path, module29Path, outputPath) {
   const deploymentRoster = parseHitboxes(27, module27, 0x0e40, "originSizeValue");
   const deploymentControls = parseHitboxes(27, module27, 0x0ed8, "originSizeValue");
   assertDeploymentHitboxes(deploymentRoster, deploymentControls);
+  const deploymentPresentation = parseDeploymentPresentation(module27);
 
   const actionMenus = ACTION_MENU_SPECS.map((spec) => parseMenu(module29, spec));
   const systemMenu = parseMenu(module29, SYSTEM_MENU_SPEC);
@@ -545,7 +676,7 @@ async function extract(module27Path, module29Path, outputPath) {
 
   const output = {
     format: "ANGEL2 native input and battle UI",
-    semanticVersion: 5,
+    semanticVersion: 6,
     sources: [
       { module: 27, path: module27Path, bytes: module27.length, sha256: sha256(module27) },
       { module: 29, path: module29Path, bytes: module29.length, sha256: sha256(module29) },
@@ -604,6 +735,7 @@ async function extract(module27Path, module29Path, outputPath) {
       },
     },
     deployment: {
+      presentation: deploymentPresentation,
       navigation: {
         keyboardOnlyWhen: "095A:2A42 == 'N'",
         topology: "five cyclic columns: three 5-row roster columns, one 3-row page column, and one 1-row finish column",
@@ -748,6 +880,7 @@ async function extract(module27Path, module29Path, outputPath) {
       verifiedCodeSignatureCount: verifiedCodeSignatures.length,
       deploymentRosterHitboxes: deploymentRoster.entries.length,
       deploymentControlHitboxes: deploymentControls.entries.length,
+      parsedDeploymentPresentation: true,
       parsedActionMenus: actionMenus.length,
       parsedSidePanelHitboxes: sidePanelHitboxes.entries.length,
       parsedSidePanelDispatches: sidePanelDispatch.entries.length,

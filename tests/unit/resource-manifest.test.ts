@@ -100,6 +100,7 @@ describe("versioned resource manifest", () => {
     const stage3 = resolvedPackUrls(manifest, "stage:stage-03");
     for (const sharedSurface of [
       "/assets/original/battle-chrome-top.png",
+      "/assets/original/promotion-menu-frame.png",
       "/assets/original/hud-unit-body-frame.png",
       "/assets/original/tactical-panel.png",
       "/assets/original/native-font.png",

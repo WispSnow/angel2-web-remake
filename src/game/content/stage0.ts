@@ -236,6 +236,9 @@ export const ASSETS = {
     sister: "/assets/original/unit-ally-sister.png",
     warrior: "/assets/original/unit-ally-warrior.png",
   },
+  promotionMenu: {
+    frame: "/assets/original/promotion-menu-frame.png",
+  },
   enemySoldier: "/assets/original/unit-enemy-soldier.png",
   enemyCavalry: "/assets/original/unit-enemy-cavalry.png",
   turnTransition: {

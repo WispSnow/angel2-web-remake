@@ -9,6 +9,7 @@ const root = path.resolve(import.meta.dirname, "..");
 const templatePath = path.join(root, "reverse/decoded/B/0001/00.raw");
 const terrainMappingPath = path.join(root, "reverse/parsed/native/terrain-token-map.json");
 const hudPresentationPath = path.join(root, "reverse/parsed/native/hud-presentations.json");
+const promotionTablePath = path.join(root, "reverse/parsed/native/promotion-table.json");
 const outputPath = path.join(root, "src/game/content/stage0-runtime.generated.ts");
 const planarAssetPath = path.join(root, "reverse/renders/planar/A");
 const portraitAssetPath = path.join(root, "reverse/renders/planar/D");
@@ -60,10 +61,11 @@ const turnTransitionAssets = {
   ])),
 };
 
-const [template, mappingDocument, hudPresentation, ...dialogueDocuments] = await Promise.all([
+const [template, mappingDocument, hudPresentation, promotionTable, ...dialogueDocuments] = await Promise.all([
   readFile(templatePath),
   readFile(terrainMappingPath, "utf8").then(JSON.parse),
   readFile(hudPresentationPath, "utf8").then(JSON.parse),
+  readFile(promotionTablePath, "utf8").then(JSON.parse),
   ...[0, 1, 2, 3].map((record) => readFile(
     path.join(root, `reverse/parsed/dialogue/${String(record).padStart(4, "0")}.json`),
     "utf8",
@@ -74,6 +76,16 @@ if (hudPresentation.format !== "ANGEL2 hovered-unit HUD presentation specificati
   || hudPresentation.sidePanelChrome?.resource !== "A/6"
   || hudPresentation.sidePanelChrome.frames?.length !== 15) {
   throw new Error("hud-presentations.json lacks the verified A/6 side-panel chrome contract");
+}
+
+const promotionMenu = promotionTable.runtimeEvidence?.promotionMenuPresentation;
+if (promotionMenu?.panel?.resource !== "A/0006"
+  || promotionMenu?.options?.resource !== "A/0002"
+  || promotionMenu.panel.compositeBounds?.width !== 332
+  || promotionMenu.panel.compositeBounds?.height !== 126
+  || promotionMenu.options.normalInnerPaletteIndex !== 1
+  || promotionMenu.options.selectedInnerPaletteIndex !== 12) {
+  throw new Error("promotion-table.json lacks the verified native promotion-menu presentation contract");
 }
 
 if (template.length !== 8506) {
@@ -303,11 +315,57 @@ function composeRoundFrame(output) {
   runMagick(args);
 }
 
+function composePromotionMenuFrame(output) {
+  const { panel } = promotionMenu;
+  const origin = panel.compositeBounds;
+  const args = ["-size", `${origin.width}x${origin.height}`, "canvas:none"];
+  const drawRectangle = ({ x, y, width, height, paletteIndex }) => {
+    const localX = x - origin.x;
+    const localY = y - origin.y;
+    args.push(
+      "-fill", gameplayPalette[paletteIndex],
+      "-draw", `rectangle ${localX},${localY} ${localX + width - 1},${localY + height - 1}`,
+    );
+  };
+  drawRectangle(panel.shadow);
+  drawRectangle(panel.body);
+  for (const [index, paletteIndex] of panel.leftVerticalPaletteIndices.entries()) {
+    args.push(
+      "-fill", gameplayPalette[paletteIndex],
+      "-draw", `rectangle ${index},0 ${index},${panel.body.height - 1}`,
+    );
+  }
+  for (const [index, paletteIndex] of panel.rightVerticalPaletteIndices.entries()) {
+    const x = panel.body.width + index;
+    args.push(
+      "-fill", gameplayPalette[paletteIndex],
+      "-draw", `rectangle ${x},0 ${x},${panel.body.height - 1}`,
+    );
+  }
+  for (const edge of [panel.topEdge, panel.bottomEdge]) {
+    appendRepeatedComposite(
+      args,
+      edge.imageIndex,
+      edge.start[0] - origin.x,
+      edge.start[1] - origin.y,
+      edge.step[0],
+      edge.step[1],
+      edge.repeats,
+    );
+  }
+  for (const [x, y] of panel.corners.positions) {
+    appendComposite(args, panel.corners.imageIndex, x - origin.x, y - origin.y);
+  }
+  args.push(output);
+  runMagick(args);
+}
+
 composeTacticalPanelFoundation(path.join(publicAssetPath, "tactical-panel.png"));
 composeUnitTopChrome(path.join(publicAssetPath, "hud-unit-top-chrome.png"));
 composeUnitBodyFrame(path.join(publicAssetPath, "hud-unit-body-frame.png"));
 composeMinimapFrame(path.join(publicAssetPath, "hud-minimap-frame.png"));
 composeRoundFrame(path.join(publicAssetPath, "hud-round-frame.png"));
+composePromotionMenuFrame(path.join(publicAssetPath, "promotion-menu-frame.png"));
 
 // A/0003 carries the enemy colors but no stored mask. The same-pose A/0002
 // frames provide the exact map-sprite alpha used by the native compositor.
@@ -337,4 +395,4 @@ composeStatueForeground(
 );
 
 console.log(`wrote ${path.relative(root, outputPath)} (${terrain.length} terrain cells)`);
-console.log("wrote stage 0 battle chrome/statue foreground, native cursors/command-menu chrome, stateful tactical panel, side-panel chrome, turn-transition graphics, map sprites and ordinary-combat VOC assets");
+console.log("wrote stage 0 battle chrome/statue foreground, native cursors/command-menu chrome, promotion frame, stateful tactical panel, side-panel chrome, turn-transition graphics, map sprites and ordinary-combat VOC assets");

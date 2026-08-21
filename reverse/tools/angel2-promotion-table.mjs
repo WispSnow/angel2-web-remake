@@ -34,6 +34,43 @@ const PROMOTION_DIALOGUE = [
     expected: "我的經驗值已達到轉職的目標，|請主將授我新的職業．",
   },
 ];
+const PROMOTION_MENU_CODE_REGIONS = [
+  {
+    address: "0000:03A0",
+    offset: 0x03a0,
+    bytes: 0x38,
+    role: "redraw the previous and newly selected profession frames",
+    sha256: "302fb298291ab7ec77be6edf3a53bbeb07f8e249840825c2dab86b73053968ab",
+  },
+  {
+    address: "0000:0693",
+    offset: 0x0693,
+    bytes: 0xb1,
+    role: "build the single-row profession image menu",
+    sha256: "21c0c4b662c8726f2fd4988c423012d5cb29245c8a9fea65d05f94cadccc194b",
+  },
+  {
+    address: "0000:0794",
+    offset: 0x0794,
+    bytes: 0x149,
+    role: "draw the complete promotion panel and A/0006 border",
+    sha256: "a9a2ba01259ed06a591a4f6c179c7ec3a96590649bd0bf1a0c37d3542a0951fc",
+  },
+  {
+    address: "0000:4AE1",
+    offset: 0x4ae1,
+    bytes: 0x18,
+    role: "load A/0002 and store its resource pointer at DS:0219h",
+    sha256: "f75ab7c8df5fcaae5b16d5e3b36fb090208ed4e839aad659823b306cfea954da",
+  },
+  {
+    address: "0000:4E9B",
+    offset: 0x4e9b,
+    bytes: 0x18,
+    role: "load A/0006 and store its resource pointer at DS:02A5h",
+    sha256: "6ba944d575afe5121ff59789d02cfb6e1975c28d04ce089ceca0b19b5300a200",
+  },
+];
 const CODE_SIGNATURES = [
   { address: "0000:029A", offset: 0x029a, hex: "b9c409bb00005153a124008ec0268a073c017503e806005b5943e2eac3" },
   { address: "0000:02B7", offset: 0x02b7, hex: "e8704da1bd31833ebd31037701c3833ec931017401c3e80807a1b706833eb706637409c706c3075b04e8f500c3c7060b" },
@@ -117,6 +154,107 @@ function extractPromotionDialogue(buffer) {
       byRole["teammate-requests-class"],
       byRole["nia-grants-teammate-class"],
     ],
+  };
+}
+
+function wordsAt(buffer, address, count, label) {
+  const start = linearOffset(buffer, address, count * 2, label);
+  return Array.from({ length: count }, (_, index) => buffer.readUInt16LE(start + index * 2));
+}
+
+function exactWords(buffer, address, expected, label) {
+  const actual = wordsAt(buffer, address, expected.length, label);
+  if (actual.some((value, index) => value !== expected[index])) {
+    throw new Error(
+      `${label}: expected [${expected.join(", ")}], found [${actual.join(", ")}]`,
+    );
+  }
+  return actual;
+}
+
+function validatePromotionMenuCode(buffer) {
+  return PROMOTION_MENU_CODE_REGIONS.map((region) => {
+    const bytes = buffer.subarray(region.offset, region.offset + region.bytes);
+    const actualSha256 = sha256(bytes);
+    if (actualSha256 !== region.sha256) {
+      throw new Error(`${region.address}: ${region.role} signature mismatch`);
+    }
+    return {
+      address: region.address,
+      fileOffset: region.offset,
+      bytes: region.bytes,
+      role: region.role,
+      sha256: actualSha256,
+    };
+  });
+}
+
+function extractPromotionMenuPresentation(buffer) {
+  const shadow = exactWords(buffer, 0x04d4, [176, 126, 316, 110, 0], "promotion shadow rectangle");
+  const panel = exactWords(buffer, 0x04de, [160, 110, 316, 110, 1], "promotion panel rectangle");
+  const optionOuter = exactWords(buffer, 0x0697, [180, 130, 48, 52, 0], "promotion option outer frame");
+  const optionMiddle = exactWords(buffer, 0x06a1, [181, 131, 47, 51, 15], "promotion option middle frame");
+  const optionInner = exactWords(buffer, 0x06ab, [181, 131, 46, 50, 1], "promotion option inner frame");
+  const hitBoxWords = exactWords(buffer, 0x078d, [
+    184, 134, 48, 52, 0,
+    240, 134, 48, 52, 1,
+    296, 134, 48, 52, 2,
+    352, 134, 48, 52, 3,
+    408, 134, 48, 52, 4,
+  ], "promotion option hit boxes");
+  const hitBoxes = Array.from({ length: 5 }, (_, index) => ({
+    x: hitBoxWords[index * 5],
+    y: hitBoxWords[index * 5 + 1],
+    width: hitBoxWords[index * 5 + 2],
+    height: hitBoxWords[index * 5 + 3],
+    optionIndex: hitBoxWords[index * 5 + 4],
+  }));
+  const rectangle = ([x, y, width, height, paletteIndex]) => ({
+    x,
+    y,
+    width,
+    height,
+    paletteIndex,
+  });
+  return {
+    screen: { width: 640, height: 400 },
+    presentationEntry: "0000:045B",
+    panel: {
+      sourceFunction: "0000:0794",
+      resource: "A/0006",
+      resourcePointer: "DS:02A5h",
+      resourceLoader: "0000:4E9B",
+      compositeBounds: { x: 160, y: 110, width: 332, height: 126 },
+      shadow: rectangle(shadow),
+      body: rectangle(panel),
+      leftVerticalPaletteIndices: [14, 0, 11, 14, 0],
+      rightVerticalPaletteIndices: [0, 14, 11, 0, 14],
+      topEdge: { imageIndex: 1, start: [160, 110], step: [8, 0], repeats: 39 },
+      bottomEdge: { imageIndex: 0, start: [160, 220], step: [8, 0], repeats: 39 },
+      corners: {
+        imageIndex: 5,
+        positions: [[160, 110], [160, 218], [473, 110], [473, 218]],
+      },
+    },
+    options: {
+      sourceFunction: "0000:0693",
+      resource: "A/0002",
+      resourcePointer: "DS:0219h",
+      resourceLoader: "0000:4AE1",
+      layout: "one horizontal row in native promotion-table order",
+      firstImagePosition: [184, 134],
+      imageStep: [56, 0],
+      nativeImageSize: [40, 43],
+      outerFrame: rectangle(optionOuter),
+      middleFrame: rectangle(optionMiddle),
+      innerFrame: rectangle(optionInner),
+      normalInnerPaletteIndex: 1,
+      selectedInnerPaletteIndex: 12,
+      hitBoxes,
+      defaultMousePosition: [224, 179],
+      visibleText: "none",
+    },
+    verifiedCodeSignatures: validatePromotionMenuCode(buffer),
   };
 }
 
@@ -439,6 +577,7 @@ async function extract(
     runtimeEvidence: {
       callGraphAudit,
       promotionDialogue: extractPromotionDialogue(buffer),
+      promotionMenuPresentation: extractPromotionMenuPresentation(buffer),
       copyOptions: "0000:09D8 copies six words from the class-indexed pointer table",
       buildMenu: "0000:0693 stops at sentinel 99 and builds one menu item per preceding word",
       commitSelection: "0000:0744 decrements the selected word and writes the target class record",
