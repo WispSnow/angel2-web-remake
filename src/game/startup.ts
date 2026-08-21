@@ -4,6 +4,7 @@ import {
   STARTUP_ASSETS,
 } from "./content/startup";
 import {
+  STARTUP_FONT,
   STARTUP_INTRO,
   STARTUP_MENU_LABELS,
   STARTUP_PRETITLE,
@@ -16,9 +17,10 @@ import {
   drawDissolvedImage,
   drawFadedImage,
   drawStartupGlyphs,
-  loadStartupFont,
   loadStartupImage,
+  STARTUP_IMAGE_URLS,
 } from "./startup-screen";
+import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { classStatsFor } from "./content/stage0";
 import { className } from "./content/classes";
 import { configureGameScaling } from "./scaling";
@@ -134,7 +136,7 @@ export function mountStartup(
   let recordSlots: SaveSlotReadResult[] = [];
   let saveBackupUi: SaveBackupUi;
   let animationFrame = 0;
-  let phaseStartedAt = performance.now();
+  let phaseStartedAt = 0;
   let titleAssembled = false;
   /** 0000:0480 flips this on every idle replay, alternating BK/52+53 and 54+55. */
   let titleVariant = 0;
@@ -170,11 +172,11 @@ export function mountStartup(
             <section class="startup-title" data-testid="title-screen" aria-label="標題畫面" hidden>
               <img class="startup-menu-frame startup-title-menu-frame" data-testid="startup-title-menu-frame"
                 style="left:${STARTUP_MENU_LABELS.title.frame.x}px;top:${STARTUP_MENU_LABELS.title.frame.y}px"
-                src="${STARTUP_MENU_LABELS.title.frame.src}" alt="" hidden />
+                src="${stagedRenderAssetSource(STARTUP_MENU_LABELS.title.frame.src)}" alt="" hidden />
               <img class="startup-menu-frame startup-difficulty-menu-frame"
                 data-testid="startup-difficulty-menu-frame"
                 style="left:${STARTUP_MENU_LABELS.difficulty.frame.x}px;top:${STARTUP_MENU_LABELS.difficulty.frame.y}px"
-                src="${STARTUP_MENU_LABELS.difficulty.frame.src}" alt="" hidden />
+                src="${stagedRenderAssetSource(STARTUP_MENU_LABELS.difficulty.frame.src)}" alt="" hidden />
               <div class="startup-menu title-menu" data-testid="title-menu" role="menu" aria-label="標題選單" hidden>
                 ${TITLE_OPTIONS.map((label, index) => `
                   <button type="button" role="menuitem" data-startup-action="title" data-menu-index="${index}"
@@ -916,18 +918,24 @@ export function mountStartup(
   root.addEventListener("pointerdown", onPointerDown);
   root.addEventListener("contextmenu", onContextMenu);
   updateMenuSelection();
+  screen.dataset.startupAssetsReady = "false";
   void Promise.all([
-    loadStartupFont().then((image) => { font = image; }),
-    ...[
-      STARTUP_PRETITLE.src,
-      STARTUP_TITLE.background,
-      ...STARTUP_TITLE.variants.flatMap(({ upper, lower }) => [upper, lower]),
-      ...STARTUP_INTRO.backgrounds.map(({ src }) => src),
-    ].map(async (src) => {
+    ...STARTUP_IMAGE_URLS.map(async (src) => {
       loadedImages.set(src, await loadStartupImage(src));
     }),
-  ]).catch(() => undefined);
-  animationFrame = requestAnimationFrame(animate);
+    titleMenuFrame.decode(),
+    difficultyMenuFrame.decode(),
+  ]).then(() => {
+    if (disposed) return;
+    font = loadedImages.get(STARTUP_FONT.src);
+    if (!font) throw new Error("startup font did not reach the decode barrier");
+    screen.dataset.startupAssetsReady = "true";
+    phaseStartedAt = performance.now();
+    animationFrame = requestAnimationFrame(animate);
+  }).catch((error: unknown) => {
+    screen.dataset.startupAssetsReady = "false";
+    console.error("startup assets failed to decode", error);
+  });
 
   return cleanup;
 }

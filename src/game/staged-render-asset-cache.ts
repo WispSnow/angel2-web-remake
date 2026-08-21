@@ -2,6 +2,7 @@ interface StagedRenderAssetEntry {
   readonly bytes: Uint8Array;
   readonly contentType: string;
   source?: string;
+  imagePromise?: Promise<HTMLImageElement>;
 }
 
 export interface StagedRenderAssetLease {
@@ -11,12 +12,14 @@ export interface StagedRenderAssetLease {
 
 export interface StagedRenderAssetOptions {
   readonly ownerDocument?: Document;
+  readonly decodeImage?: (source: string) => Promise<HTMLImageElement>;
 }
 
 interface ActiveStagedRenderAssets {
   readonly entries: ReadonlyMap<string, StagedRenderAssetEntry>;
   readonly urlApi: Pick<typeof URL, "createObjectURL" | "revokeObjectURL">;
   readonly blobConstructor: typeof Blob;
+  readonly decodeImage: (source: string) => Promise<HTMLImageElement>;
   released: boolean;
 }
 
@@ -53,6 +56,19 @@ export function activateStagedRenderAssets(
   const ownerWindow = options.ownerDocument?.defaultView;
   const urlApi = ownerWindow?.URL ?? globalThis.URL;
   const blobConstructor = ownerWindow?.Blob ?? globalThis.Blob;
+  const decodeImage = options.decodeImage ?? (async (source: string) => {
+    const ownerDocument = options.ownerDocument
+      ?? (typeof document === "undefined" ? undefined : document);
+    if (!ownerDocument) throw new Error(`cannot decode staged render asset ${source}`);
+    const image = ownerDocument.createElement("img");
+    image.decoding = "sync";
+    image.src = source;
+    await image.decode();
+    if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+      throw new Error(`staged render asset decoded empty: ${source}`);
+    }
+    return image;
+  });
   const entries = new Map<string, StagedRenderAssetEntry>();
   for (const [url, bytes] of encodedBytes) {
     if (!isStagedRenderAssetUrl(url)) continue;
@@ -62,6 +78,7 @@ export function activateStagedRenderAssets(
     entries,
     urlApi,
     blobConstructor,
+    decodeImage,
     released: false,
   };
   const previous = activeAssets;
@@ -94,4 +111,32 @@ export function stagedRenderAssetSource(url: string): string {
     ));
   }
   return entry.source;
+}
+
+/** Returns the decoded image owned by the current surface, when it staged `url`. */
+export function loadStagedRenderImage(url: string): Promise<HTMLImageElement> | undefined {
+  const assets = activeAssets;
+  if (!assets || assets.released || !url.endsWith(".png")) return undefined;
+  const entry = assets.entries.get(url);
+  if (!entry) return undefined;
+  if (!entry.imagePromise) {
+    const pending = assets.decodeImage(stagedRenderAssetSource(url));
+    entry.imagePromise = pending;
+    void pending.catch(() => {
+      if (entry.imagePromise === pending) entry.imagePromise = undefined;
+    });
+  }
+  return entry.imagePromise;
+}
+
+/**
+ * Establishes the decode barrier for a visible surface without decoding JSON
+ * or unrelated prefetched packs. Failures propagate to the resource retry UI.
+ */
+export async function decodeStagedRenderImages(urls: readonly string[]): Promise<void> {
+  await Promise.all(urls.filter((url) => url.endsWith(".png")).map((url) => {
+    const pending = loadStagedRenderImage(url);
+    if (!pending) throw new Error(`staged render image is not active: ${url}`);
+    return pending;
+  }));
 }

@@ -1,8 +1,16 @@
 import {
   STARTUP_DISSOLVE_PATTERNS,
   STARTUP_FONT,
+  STARTUP_INTRO,
+  STARTUP_MENU_LABELS,
+  STARTUP_PRETITLE,
   STARTUP_TEXT,
+  STARTUP_TITLE,
 } from "./content/startup.generated";
+import {
+  loadStagedRenderImage,
+  stagedRenderAssetSource,
+} from "./staged-render-asset-cache";
 
 /**
  * Drawing primitives for module 23's startup screens. All three are things the
@@ -22,16 +30,32 @@ import {
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 let scratch: HTMLCanvasElement | undefined;
 
+export const STARTUP_IMAGE_URLS = [
+  STARTUP_FONT.src,
+  STARTUP_PRETITLE.src,
+  ...STARTUP_INTRO.backgrounds.map(({ src }) => src),
+  STARTUP_TITLE.background,
+  ...STARTUP_TITLE.variants.flatMap(({ upper, lower }) => [upper, lower]),
+  STARTUP_MENU_LABELS.title.frame.src,
+  STARTUP_MENU_LABELS.difficulty.frame.src,
+] as const;
+
 export function loadStartupImage(src: string): Promise<HTMLImageElement> {
+  const staged = loadStagedRenderImage(src);
+  if (staged) return staged;
   const cached = imageCache.get(src);
   if (cached) return cached;
   const pending = new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
-    image.addEventListener("load", () => resolve(image), { once: true });
-    image.addEventListener("error", () => reject(new Error(`startup asset ${src} failed to load`)), { once: true });
-    image.src = src;
+    image.src = stagedRenderAssetSource(src);
+    void image.decode().then(() => resolve(image), () => {
+      reject(new Error(`startup asset ${src} failed to decode`));
+    });
   });
   imageCache.set(src, pending);
+  void pending.catch(() => {
+    if (imageCache.get(src) === pending) imageCache.delete(src);
+  });
   return pending;
 }
 

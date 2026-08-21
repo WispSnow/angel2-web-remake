@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activateStagedRenderAssets,
+  decodeStagedRenderImages,
   isStagedRenderAssetUrl,
+  loadStagedRenderImage,
   stagedRenderAssetSource,
 } from "../../src/game/staged-render-asset-cache";
 
@@ -52,5 +54,22 @@ describe("staged render asset cache", () => {
       .toBe(true);
     expect(isStagedRenderAssetUrl("/assets/original/music/MUSIC/0001.ogg")).toBe(false);
     expect(isStagedRenderAssetUrl("/debug/fixture.png")).toBe(false);
+  });
+
+  it("decodes each active PNG once and never treats JSON as an image", async () => {
+    const decoded = { naturalWidth: 24, naturalHeight: 16 } as HTMLImageElement;
+    const decodeImage = vi.fn(async () => decoded);
+    const imageUrl = "/assets/original/startup/pretitle.png";
+    const lease = activateStagedRenderAssets(new Map([
+      [imageUrl, new Uint8Array([1, 2, 3])],
+      ["/assets/original/map-action-atlases/fire-1.json", new Uint8Array([4, 5, 6])],
+    ]), { decodeImage });
+    release = lease.release;
+
+    await decodeStagedRenderImages([imageUrl]);
+    expect(await loadStagedRenderImage(imageUrl)).toBe(decoded);
+    expect(decodeImage).toHaveBeenCalledTimes(1);
+    expect(loadStagedRenderImage("/assets/original/map-action-atlases/fire-1.json"))
+      .toBeUndefined();
   });
 });

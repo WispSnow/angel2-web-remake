@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { STARTUP_IMAGE_URLS } from "../../src/game/startup-screen";
 import type { CompletedSaveData } from "../../src/game/types";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -47,6 +48,72 @@ test("boot shows only opening resources while stage 0 warms in the background", 
   await expect(page.getByTestId("resource-loading-overlay")).toBeHidden();
   expect(requested.has("/assets/original/stage1-map.png")).toBe(false);
   releaseStage0();
+});
+
+test("boot keeps its retry surface until startup PNGs decode and reuses every response", async ({ page }) => {
+  await page.addInitScript(() => {
+    const target = window as Window & {
+      __startupDecodeAttempts?: number;
+      __releaseStartupDecode?: () => void;
+    };
+    const originalDecode = HTMLImageElement.prototype.decode;
+    const decodeGate = new Promise<void>((resolve) => {
+      target.__releaseStartupDecode = resolve;
+    });
+    target.__startupDecodeAttempts = 0;
+    HTMLImageElement.prototype.decode = function decodeAfterGate() {
+      if (!this.src.startsWith("blob:")) return originalDecode.call(this);
+      target.__startupDecodeAttempts = (target.__startupDecodeAttempts ?? 0) + 1;
+      return decodeGate.then(() => originalDecode.call(this));
+    };
+  });
+  const requests = new Map(STARTUP_IMAGE_URLS.map((url) => [url, 0]));
+  for (const url of STARTUP_IMAGE_URLS) {
+    await page.route(`**${url}`, async (route) => {
+      const count = (requests.get(url) ?? 0) + 1;
+      requests.set(url, count);
+      if (count > 1) await route.abort("failed");
+      else await route.continue();
+    });
+  }
+
+  await page.goto("/?test=1");
+  const overlay = page.getByTestId("resource-loading-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toHaveAttribute("data-resource-pack", "boot");
+  await expect.poll(() => page.evaluate(() => (
+    window as Window & { __startupDecodeAttempts?: number }
+  ).__startupDecodeAttempts ?? 0)).toBeGreaterThan(0);
+  await expect(page.getByTestId("startup-screen")).toHaveCount(0);
+
+  await page.evaluate(() => (
+    window as Window & { __releaseStartupDecode?: () => void }
+  ).__releaseStartupDecode?.());
+  await expect(overlay).toBeHidden({ timeout: 15_000 });
+  const startup = page.getByTestId("startup-screen");
+  await expect(startup).toBeVisible();
+  await expect(startup).toHaveAttribute("data-startup-assets-ready", "true");
+  await expect(startup).toHaveAttribute("data-startup-phase", "intro");
+  await expect.poll(() => page.getByTestId("startup-canvas").evaluate((canvas) => {
+    const element = canvas as HTMLCanvasElement;
+    const pixels = element.getContext("2d")!.getImageData(0, 0, element.width, element.height).data;
+    let visible = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index] !== 0 || pixels[index + 1] !== 0 || pixels[index + 2] !== 0) visible += 1;
+    }
+    return visible;
+  })).toBeGreaterThan(100);
+  await captureVisualAudit(startup, {
+    path: "artifacts/playwright/resource-loading-startup-decoded.png",
+  });
+
+  await skipOpeningToTitle(page);
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("startup-difficulty-menu-frame")).toBeVisible();
+  expect(Object.fromEntries(requests)).toEqual(Object.fromEntries(
+    STARTUP_IMAGE_URLS.map((url) => [url, 1]),
+  ));
 });
 
 test("new game waits for the byte-counted stage 0 pack before mounting Phaser", async ({ page }) => {

@@ -12,6 +12,7 @@ import {
 } from "./full-combat-image-cache";
 import {
   activateStagedRenderAssets,
+  decodeStagedRenderImages,
   isStagedRenderAssetUrl,
   type StagedRenderAssetLease,
 } from "./staged-render-asset-cache";
@@ -112,7 +113,7 @@ export class ResourcePackLoader {
   ) {}
 
   async ensureBoot(): Promise<void> {
-    await this.ensurePackVisible("boot", "讀取開場資料");
+    await this.ensurePackVisible("boot", "讀取開場資料", [], true);
   }
 
   async ensureStage(
@@ -172,6 +173,7 @@ export class ResourcePackLoader {
     packId: string,
     label: string,
     supplementalUrls: readonly string[] = [],
+    predecodeRenderImages = false,
   ): Promise<void> {
     return new Promise((resolve) => {
       const attempt = async () => {
@@ -186,6 +188,7 @@ export class ResourcePackLoader {
           this.renderProgress(manifest);
           await this.loadUrls(manifest, urls);
           this.replaceStagedRenderAssetLease(packId, urls);
+          if (predecodeRenderImages) await decodeStagedRenderImages(urls);
           await this.replaceFullCombatImageLease(supplementalUrls);
           this.hideOverlay();
           resolve();
