@@ -488,6 +488,10 @@ test("S49-H: the epilogue keeps its native trailing pause after the last glyph",
   await page.goto(
     "/?debugScenario=stage-49-warrior-statue&difficulty=0&roster=representative-growth&growth=100",
   );
+  const epilogue = page.getByTestId("stage49-epilogue");
+  await expect(epilogue).toHaveAttribute("data-segment", "warriorStatue");
+  await expect(page.locator("#stage49-screen")).toHaveAttribute("data-epilogue-typing", "true");
+  await expect(page.getByTestId("stage49-epilogue-text")).toBeAttached();
   const timeline = await page.evaluate(() => new Promise<{
     firstInkAt: number;
     typingEndedAt: number;

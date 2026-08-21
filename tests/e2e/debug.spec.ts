@@ -937,13 +937,13 @@ test("debug scenarios can enter player phases and directly complete either imple
 });
 
 test("a completed stage-three save enters the playable stage-four prebattle", async ({ page }) => {
+  const resourceRequests: string[] = [];
+  page.on("request", (request) => resourceRequests.push(new URL(request.url()).pathname));
   await page.goto("/?debugScenario=stage-03-cleared&difficulty=0");
   await expect(page.getByTestId("game-screen"))
     .toHaveAttribute("aria-label", "天使帝國 II 通過力場遊戲畫面");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "7");
-  const resources = await page.evaluate(() =>
-    performance.getEntriesByType("resource").map(({ name }) => name));
-  expect(resources.some((url) => url.includes("stage4-map.png"))).toBe(true);
+  expect(resourceRequests).toContain("/assets/original/stage4-map.png");
 });
 
 test("the magician outer-ring fixture pushes once and releases after one enemy phase", async ({ page }) => {

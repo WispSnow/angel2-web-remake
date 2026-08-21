@@ -143,6 +143,7 @@ test("S09-D/E: the corrected objective and Dori route trigger SAY/23 without sta
 
 test("S09-D: eliminating the blockade is an independent alternative victory", async ({ page }) => {
   await page.goto("/?debugScenario=stage-09-near-elimination&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   const prepared = await state(page);
   expect(prepared.units.filter(({ side }) => side === 2)).toHaveLength(1);
   expect(prepared.units.find(({ side }) => side === 2)?.life).toBe(1);

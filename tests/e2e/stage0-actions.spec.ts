@@ -78,15 +78,22 @@ interface ActionDebugState {
 const state = (page: Page) =>
   page.evaluate(() => window.__ANGEL2__?.getState() as ActionDebugState);
 
-const forceSetup = (
+const waitForGameReady = (page: Page) => page.waitForFunction(
+  () => window.__ANGEL2__?.getState() !== undefined,
+);
+
+const forceSetup = async (
   page: Page,
   classId: PromotedClassId,
   ordinaryCombat = false,
-) => page.evaluate(
-  ({ selectedClass, ordinary }) =>
-    window.__ANGEL2__?.forceClassActionSetup(selectedClass, ordinary),
-  { selectedClass: classId, ordinary: ordinaryCombat },
-);
+): Promise<void> => {
+  await waitForGameReady(page);
+  await page.evaluate(
+    ({ selectedClass, ordinary }) =>
+      window.__ANGEL2__?.forceClassActionSetup(selectedClass, ordinary),
+    { selectedClass: classId, ordinary: ordinaryCombat },
+  );
+};
 
 const clickMapCell = (
   page: Page,
@@ -105,6 +112,7 @@ const openActorMenu = async (page: Page) => {
 
 test("individual player rest reuses the silent MAGIC/0 healing finish", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
+  await waitForGameReady(page);
   await page.evaluate(() => window.__ANGEL2__?.forceRestSetup());
   const before = await state(page);
   const allyBefore = before.units.find(({ id }) => id === "1:0")!;
@@ -365,9 +373,11 @@ for (const [classId, nativeRecord, voiceRecord] of [
       return current.combatPresentation?.fullScene?.sprites
         .some(({ classId: record, set }) => record === expectedRecord && set === "plus50");
     }, nativeRecord);
-    await expect(page.getByTestId("full-actor-sprite")).toHaveAttribute(
-      "src",
-      new RegExp(`${classId}-plus50/\\d\\d\\.png$`),
+    const actorSprite = page.getByTestId("full-actor-sprite");
+    await expect(actorSprite).toHaveAttribute("data-atlas", `left-${classId}`);
+    await expect(actorSprite).toHaveAttribute(
+      "data-frame-source",
+      new RegExp(`left/${classId}/plus50/\\d\\d$`),
     );
     await captureVisualAudit(page.getByTestId("game-screen"), {
       path: `artifacts/playwright/stage0-full-combat-${classId}.png`,

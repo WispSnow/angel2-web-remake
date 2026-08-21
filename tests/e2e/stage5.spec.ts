@@ -182,6 +182,7 @@ test("S05-E/F: either named boss ends the battle while the other remains", async
 
 test("S05-G/H: battle saves use the current schema and victory saves enter the live portal scene", async ({ page }) => {
   await page.goto("/?debugScenario=stage-05-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   const before = await state(page);
   await page.keyboard.press("Escape");
   await page.getByTestId("system-command-save").click();

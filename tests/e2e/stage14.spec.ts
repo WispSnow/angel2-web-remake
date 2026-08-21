@@ -140,6 +140,7 @@ test("S14-H: SAY/33 keeps Fang's first line visible while appending the order to
 
 test("S14-J: Fang is visibly identified as a sentry before the round-six release", async ({ page }) => {
   await page.goto("/?debugScenario=stage-14-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   const battle = await state(page);
   await page.getByTestId("battle-canvas").click({
     position: {

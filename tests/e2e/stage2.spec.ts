@@ -292,7 +292,14 @@ test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign"
     await page.keyboard.press("Escape");
     await page.getByTestId("system-command-load").click();
     await page.getByTestId("record-slot-1").click();
-    await waitForPhase(page, "player");
+    await page.waitForFunction(() => {
+      const loaded = window.__ANGEL2__?.getState() as Stage2State | undefined;
+      const nia = loaded?.units.find(({ id }) => id === "1:0");
+      return loaded?.phase === "player"
+        && loaded.rngState === 0x2468_ace0
+        && nia?.classId === "cavalry"
+        && nia.life === 123;
+    });
     const loaded = await state(page);
     expect(loaded).toMatchObject({ rngState: 0x2468_ace0 });
     expect(loaded.units.find(({ id }) => id === "1:0")).toMatchObject({

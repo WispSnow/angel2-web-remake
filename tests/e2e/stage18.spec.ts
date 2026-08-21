@@ -123,6 +123,7 @@ test("S18-H: SAY/37 keeps Li and Nia in independent battle dialogue windows", as
 
 test("S18-J: Li begins as a native sentry", async ({ page }) => {
   await page.goto("/?debugScenario=stage-18-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   const battle = await state(page);
   await page.getByTestId("battle-canvas").click({
     position: {
@@ -138,7 +139,9 @@ test("S18-J: Li begins as a native sentry", async ({ page }) => {
 
 test("S18-D/E: the machine objective defeats Li without requiring the other fifteen guards", async ({ page }) => {
   await page.goto("/?debugScenario=stage-18-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   await page.keyboard.press("o");
+  await expect(page.getByTestId("objective-panel")).toBeVisible();
   await expect(page.getByTestId("objective-panel")).toContainText("擊敗「麗」");
   await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
   await captureVisualAudit(page.getByTestId("game-screen"), {

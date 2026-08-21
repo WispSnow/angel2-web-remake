@@ -663,6 +663,10 @@ test("S01-J: every stage-1 camera entry stays inside the drawn map", async ({ pa
   // Presentation-only camera data from a previously written v11 save is
   // normalized on restore; simulation and save versions do not change.
   await page.keyboard.press("Escape");
+  if (!(await page.getByTestId("system-menu").isVisible())) {
+    await page.keyboard.press("Escape");
+  }
+  await expect(page.getByTestId("system-menu")).toBeVisible();
   await page.getByTestId("system-command-save").click();
   await page.getByTestId("record-slot-3").click();
   await page.evaluate(() => {
@@ -675,6 +679,13 @@ test("S01-J: every stage-1 camera entry stays inside the drawn map", async ({ pa
   await page.keyboard.press("Escape");
   await page.getByTestId("system-command-load").click();
   await page.getByTestId("record-slot-3").click();
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
+    return current?.cameraOrigin.x === 26
+      && current.cameraOrigin.y === 31
+      && current.cursor.x === 35
+      && current.cursor.y === 37;
+  });
   expect(await state(page)).toMatchObject({
     cameraOrigin: { x: 26, y: 31 },
     cursor: { x: 35, y: 37 },

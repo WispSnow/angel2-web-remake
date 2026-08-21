@@ -20,6 +20,10 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 的用例会自动等这段动画，不需要手动 sleep；但量测几何或「关掉再开同一个选单」的用例要用
 `menu-controls.ts` 的 `settleMenuAnimation` 与 `expectMenuOpen`，见责任映射对应行。
 
+分段资源门会在 `goto`、`reload` 与战中读档后异步替换游戏表面。E2E 必须等待目标控制器阶段、
+目标 DOM 或读档独有的状态组合；若读档前后阶段相同，不能只等 `phase`。资源请求断言应在导航前
+注册 Playwright `request` 监听，不依赖容量有限、可能淘汰早期条目的 Resource Timing 缓冲区。
+
 ## 责任映射
 
 | 改动区域 | 首选单元测试 | 首选浏览器测试 |

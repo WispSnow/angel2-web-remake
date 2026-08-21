@@ -159,11 +159,12 @@ test("S04-A/B/C: stage 4 enters SAY/7 and exposes an evidence-driven deployment 
 });
 
 test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the full pulse", async ({ page }) => {
+  const resourceRequests: string[] = [];
+  page.on("request", (request) => resourceRequests.push(new URL(request.url()).pathname));
   await page.goto(`/?debugScenario=stage-04-first-pulse&difficulty=0&test=1${SLOW_PULSE_QUERY}`);
   const canvas = page.getByTestId("battle-canvas");
   await expect(canvas).toBeVisible();
-  await page.waitForFunction(() => performance.getEntriesByType("resource")
-    .some(({ name }) => name.endsWith("/assets/original/unit-ally-magician.png")));
+  expect(resourceRequests).toContain("/assets/original/unit-ally-magician.png");
   const initial = await state(page);
   expect(initial.units.filter(({ side }) => side === 1)).toHaveLength(8);
   expect(initial.units.find(({ id }) => id === "1:24")).toMatchObject({

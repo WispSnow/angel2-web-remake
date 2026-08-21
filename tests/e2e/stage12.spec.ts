@@ -182,6 +182,7 @@ test("S12-D: the formal battle restores and renders a shared-life water-warrior 
 
 test("S12-D2: map combat defers shared-copy life until the ordinary battle ends", async ({ page }) => {
   await page.goto("/?debugScenario=stage-12-split&difficulty=0&test=1&slowMap=1");
+  await waitForPhase(page, "player");
   await setBattlePresentation(page, "map");
   const lifeBefore = await startPreparedWaterWarriorAttack(page);
 
@@ -220,6 +221,7 @@ test("S12-D2: map combat defers shared-copy life until the ordinary battle ends"
 
 test("S12-D3: full combat keeps every shared body at pre-battle life until returning to the map", async ({ page }) => {
   await page.goto("/?debugScenario=stage-12-split&difficulty=0&test=1&slowFull=1");
+  await waitForPhase(page, "player");
   await setBattlePresentation(page, "full");
   const lifeBefore = await startPreparedWaterWarriorAttack(page);
 

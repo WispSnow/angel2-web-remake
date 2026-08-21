@@ -139,6 +139,7 @@ test("S16-H: SAY/35 keeps Sha's accusation visible while appending her closing l
 
 test("S16-J: Sha is a sentry while the flanking divine sword warriors already pursue", async ({ page }) => {
   await page.goto("/?debugScenario=stage-16-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   const battle = await state(page);
   await page.getByTestId("battle-canvas").click({
     position: {

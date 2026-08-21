@@ -253,8 +253,11 @@ const confirmPromotion = async (page: Page, classId = "cavalry") => {
   await expect(page.getByTestId("promotion-layer")).toBeHidden();
 };
 const openSystemMenu = async (page: Page) => {
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("system-menu")).toBeVisible();
+  const menu = page.getByTestId("system-menu");
+  for (let attempt = 0; attempt < 2 && !(await menu.isVisible()); attempt += 1) {
+    await page.keyboard.press("Escape");
+  }
+  await expect(menu).toBeVisible();
 };
 const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => {
   await expect(menu).toHaveClass(/native-command-menu/);
@@ -1910,6 +1913,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => localStorage.removeItem("angel2.preferences.presentation.v1"));
   await page.reload();
+  await waitForPhase(page, "prebattleStory");
   await skipStoryDialogue(page);
   await waitForPhase(page, "openingStory");
   await skipStoryDialogue(page);
@@ -2066,6 +2070,7 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   expect((await debugState(page)).aiDialogueEnabled).toBe(false);
 
   await page.reload();
+  await waitForPhase(page, "prebattleStory");
   expect(await debugState(page)).toMatchObject({
     battlePresentation: "map",
     gridEnabled: true,
@@ -2079,6 +2084,7 @@ test("RHP-05: sound desk object exposes independent volume and four persistent r
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => localStorage.removeItem("angel2.preferences.sound.v1"));
   await page.reload();
+  await waitForPhase(page, "prebattleStory");
   const app = page.locator("#app");
   await expect(app).toHaveAttribute("data-speech-effect-count", "0");
   await expect(app).toHaveAttribute("data-movement-effect-count", "0");
@@ -2168,6 +2174,7 @@ test("RHP-05: sound desk object exposes independent volume and four persistent r
   });
 
   await page.reload();
+  await waitForPhase(page, "prebattleStory");
   expect(await debugState(page)).toMatchObject({
     soundEffectVolume: 1,
     speechEnabled: false,
@@ -2213,6 +2220,7 @@ test("RHP-05b: the 移動 switch gates the ordinary player walk, not only script
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => localStorage.removeItem("angel2.preferences.sound.v1"));
   await page.reload();
+  await waitForPhase(page, "prebattleStory");
   const app = page.locator("#app");
 
   await skipStoryDialogue(page);
@@ -2284,6 +2292,7 @@ test("RHP-06: music desk object selects five persistent levels without restartin
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => localStorage.removeItem("angel2.preferences.music.v1"));
   await page.reload();
+  await waitForPhase(page, "prebattleStory");
   const app = page.locator("#app");
   await expect(app).toHaveAttribute("data-music-volume-level", "4");
   await expect(app).toHaveAttribute("data-music-volume", "0.32");
@@ -2341,6 +2350,7 @@ test("RHP-06: music desk object selects five persistent levels without restartin
     musicVolume: 3,
   });
   await page.reload();
+  await waitForPhase(page, "prebattleStory");
   expect((await debugState(page)).musicVolume).toBe(3);
   await expect(app).toHaveAttribute("data-music-volume-level", "3");
   await expect(app).toHaveAttribute("data-music-volume", "0.24");

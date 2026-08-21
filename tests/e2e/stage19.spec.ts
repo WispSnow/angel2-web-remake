@@ -126,6 +126,7 @@ test("S19-H: SAY/38 keeps Ai and Sulanda in independent battle dialogue windows"
 
 test("S19-J: Ai begins as a native sentry", async ({ page }) => {
   await page.goto("/?debugScenario=stage-19-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   const battle = await state(page);
   await page.getByTestId("battle-canvas").click({
     position: {
@@ -141,7 +142,9 @@ test("S19-J: Ai begins as a native sentry", async ({ page }) => {
 
 test("S19-D/E: the machine objective defeats Ai without requiring the other twenty guards", async ({ page }) => {
   await page.goto("/?debugScenario=stage-19-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   await page.keyboard.press("o");
+  await expect(page.getByTestId("objective-panel")).toBeVisible();
   await expect(page.getByTestId("objective-panel")).toContainText("擊敗「愛」");
   await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
   await captureVisualAudit(page.getByTestId("game-screen"), {

@@ -216,6 +216,7 @@ test("S08-E/F: the last raider triggers the REMAKE-032 SAY/157 victory story", a
 
 test("S08-G/H: retry and retreat replay SAY/21, while completion enters stage 9 deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-08-near-defeat&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   const entry = await state(page);
   await page.getByRole("button", { name: "戰敗測試" }).click();
   await waitForPhase(page, "defeat");

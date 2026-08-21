@@ -187,6 +187,10 @@ test("S38-F/G: victory saves stage 39, shows seven credit pages, then loops on T
   await page.getByTestId("save-yes").click();
   await page.getByTestId("save-slot-1").click();
   await waitForPhase(page, "credits");
+  const creditsRoll = page.locator(".credits-roll");
+  await expect(creditsRoll).toBeVisible();
+  await page.waitForFunction(() =>
+    (document.querySelector(".credits-roll")?.getAnimations().length ?? 0) > 0);
   await page.evaluate(async () => {
     const animation = document.querySelector(".credits-roll")?.getAnimations()[0];
     if (!animation) throw new Error("credits scroll animation not found");

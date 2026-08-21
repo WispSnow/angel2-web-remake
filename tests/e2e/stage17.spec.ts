@@ -136,6 +136,7 @@ test("S17-H: SAY/36 keeps Qian's threat visible while appending her closing line
 
 test("S17-J: Qian is a sentry while the other behavior groups already pursue", async ({ page }) => {
   await page.goto("/?debugScenario=stage-17-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
   const battle = await state(page);
   await page.getByTestId("battle-canvas").click({
     position: {
