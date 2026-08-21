@@ -23,7 +23,7 @@ type ComparisonTab = Exclude<RemakeNotesTab, "controls" | "disclaimer">;
 export const REMAKE_NOTES_TABS: readonly OverlayTab<RemakeNotesTab>[] = [
   { id: "fixes", label: "Bug 修復", title: "原版缺陷與複刻修復" },
   { id: "features", label: "功能增強", title: "不改變戰果的資訊、表現與操作增強" },
-  { id: "balance", label: "平衡性調整", title: "複刻版的平衡決定" },
+  { id: "balance", label: "平衡性調整", title: "與原版不同的戰術與平衡調整" },
   { id: "controls", label: "操作說明", title: "鍵盤、滑鼠與標準手把操作" },
   { id: "disclaimer", label: "免責聲明", title: "非官方同人復刻的權利、用途與聯絡說明" },
 ];
@@ -114,7 +114,7 @@ function renderControlRows(rows: ReadonlyArray<{
 function renderControls(): string {
   return `
     <section class="rn-controls" data-testid="remake-controls">
-      <p class="rn-controls-lead">核心鍵位採用現代電腦遊戲的常見配置；相同按鍵在戰場、選單與對話中都保持同一語意。</p>
+      <p class="rn-controls-lead">核心鍵位採用現代電腦遊戲的常見配置；同一按鍵在戰場、選單與對話中的用法保持一致。</p>
       <div class="rn-controls-grid">
         <article class="rn-control-card is-keyboard">
           <header><span>KEYBOARD</span><h3>鍵盤</h3></header>
@@ -175,7 +175,7 @@ const panel = createOverlayPanel<RemakeNotesTab>({
   testid: "remake-notes",
   eyebrow: "復刻說明",
   heading: "《天使帝國 II》Web 復刻版",
-  footer: "遊戲仍在背後正常進行；本視窗只讀取內容資料，不會改變戰局、存檔或隨機序列。",
+  footer: "打開此視窗不會暫停遊戲；敵方階段仍會繼續。視窗內的按鍵不會操作戰場。",
   tabs: REMAKE_NOTES_TABS,
   render: (tab) => tab === "disclaimer"
     ? renderDisclaimer(DISCLAIMER_SECTION)

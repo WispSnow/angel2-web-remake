@@ -44,14 +44,36 @@ test("三個覆蓋層入口並排在宿主工具列上，靠在縮放選項右�
 test("五個分頁各載入自己的內容，操作與免責說明都可獨立查閱", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "fixes");
+  const body = page.getByTestId("remake-notes-body");
+  const playerFacingDevTerms = [
+    "模擬隨機",
+    "存檔語義",
+    "原子提交",
+    "宿主工具列",
+    "處理器",
+    "渲染器",
+    "戰鬥動畫實驗室",
+  ];
   await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
     .toHaveText(["Bug 修復", "功能增強", "平衡性調整", "操作說明", "免責聲明"]);
+  await expect(body.locator(".rn-intro")).toHaveText(
+    "這裡列出複刻版修正的原版問題。每一項都會說明原版的狀況與複刻版的改法；"
+      + "戰鬥動畫、聲音與加速設定只影響演出，不會改變遊戲規則。",
+  );
+  await expect(page.locator(".rn-foot")).toHaveText(
+    "打開此視窗不會暫停遊戲；敵方階段仍會繼續。視窗內的按鍵不會操作戰場。",
+  );
+  for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
   await expect(page.getByTestId("remake-note-REMAKE-004")).toContainText("毒不再把生命打到 0");
   const swiftGuardFix = page.getByTestId("remake-note-swift-dragon-guard-ground");
   await expect(swiftGuardFix).toContainText("迅龍騎士格擋不再懸空");
   await expect(swiftGuardFix.locator(".rn-note-id")).toHaveCount(0);
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/remake-notes-fixes-desktop.png",
+  });
 
   await page.getByTestId("remake-notes-tab-features").click();
+  for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
   await expect(page.getByTestId("remake-note-REMAKE-015")).toContainText("地形特性");
   // 發行版不附決定記錄：沒有決定編號的顯示增強不得畫出玩家查不到的徽章。
   const tooltipNote = page.getByTestId("remake-note-status-icon-tooltip");
@@ -62,6 +84,7 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   await expect(page.getByTestId("remake-note-REMAKE-004")).toHaveCount(0);
 
   await page.getByTestId("remake-notes-tab-balance").click();
+  for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
   await expect(page.getByTestId("remake-note-REMAKE-100")).toContainText("魔鎧戰士");
   // 三條已改列「功能增強」的條目不得同時留在平衡分頁。
   for (const id of ["REMAKE-101", "REMAKE-106", "REMAKE-107"]) {
