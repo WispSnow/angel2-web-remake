@@ -219,7 +219,6 @@ test("S22-G: Nia defeat returns to a clean stage 22 deployment", async ({ page }
   });
 
   await page.getByTestId("retry-button").click();
-  if ((await state(page)).phase === "defeat") await page.getByTestId("retry-button").click();
   await waitForPhase(page, "deployment");
   await expect(page.getByRole("heading", { name: "焦土森林村莊中 · 出擊準備" })).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／19");

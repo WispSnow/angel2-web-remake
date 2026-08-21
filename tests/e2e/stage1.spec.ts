@@ -267,7 +267,9 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.keyboard.press("ArrowRight");
   await expect(page.getByText("修女／修女", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "49");
-  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0049\/base\.png$/u);
+  await expect(page.getByTestId("unit-portrait"))
+    .toHaveAttribute("data-source-url", "/assets/original/portraits/0049/base.png");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /^blob:/u);
   await expect(page.getByTestId("unit-control-summary")).toHaveCount(0);
   await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
   await captureVisualAudit(page.getByTestId("game-screen"), {
@@ -280,7 +282,9 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   // 芳/34 came from quoting another stage's SAY record.
   await expect(page.getByText("騎兵／娜米", { exact: true })).toBeVisible();
   await expect(page.getByTestId("unit-portrait-composite")).toHaveAttribute("data-portrait-record", "20");
-  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0020\/base\.png$/u);
+  await expect(page.getByTestId("unit-portrait"))
+    .toHaveAttribute("data-source-url", "/assets/original/portraits/0020/base.png");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /^blob:/u);
   await expect(page.getByTestId("unit-tactic")).toHaveCount(0);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-fang-portrait.png`,
@@ -430,6 +434,9 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.keyboard.press("Escape");
   await page.getByTestId("system-command-load").click();
   await page.getByTestId("record-slot-2").click();
+  await expect.poll(async () => JSON.stringify((await state(page)).units)).toBe(
+    JSON.stringify(checkpoint.units),
+  );
 
   await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("magician"));
   const lightningBefore = await state(page);
@@ -576,6 +583,9 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.keyboard.press("Escape");
   await page.getByTestId("system-command-load").click();
   await page.getByTestId("record-slot-2").click();
+  await expect.poll(async () => JSON.stringify((await state(page)).units)).toBe(
+    JSON.stringify(checkpoint.units),
+  );
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await clickMapCell(page, 220, 177);
   await page.getByTestId("unit-command-attack").click();

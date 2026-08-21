@@ -315,7 +315,9 @@ test("great dragon knight counter guard keeps its wide shield centered", async (
     return Number(match?.[1]);
   }));
   expect(particleXs[0]).toBeGreaterThanOrEqual(245);
-  expect(particleXs[0]).toBeLessThanOrEqual(270);
+  // Native trailOffset cycles through 0..24 in four-pixel steps, so the last
+  // legal counter-guard sample is four pixels beyond the earlier test bound.
+  expect(particleXs[0]).toBeLessThanOrEqual(274);
   expect(particleXs[1] - particleXs[0]).toBe(24);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-great-dragon-counter-guard.png`,

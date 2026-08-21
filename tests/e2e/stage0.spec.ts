@@ -1163,6 +1163,8 @@ test("S00-E: keyboard objectives and responsive reduced-motion layout preserve t
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?test=1&skipStartup=1");
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await expect(page.locator("#dialogue-text")).toBeVisible();
   await page.keyboard.press(" ");
   expect((await debugState(page)).dialogueIndex).toBe(0);
   await expect(page.locator("#dialogue-text")).toContainText("寬廣走廊");
@@ -1289,7 +1291,9 @@ test("S00-F: named cavalry identity and route evacuation are visible end to end"
   for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowLeft");
   for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
   await expect(page.getByText("騎兵／哈釘", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /portraits\/0015\/base\.png$/);
+  await expect(page.getByTestId("unit-portrait"))
+    .toHaveAttribute("data-source-url", "/assets/original/portraits/0015/base.png");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /^blob:/u);
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-hading.png" });
 
   await page.evaluate(() => window.__ANGEL2__?.forceEvacuationSetup());
@@ -1786,6 +1790,8 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByTestId("record-page")).toHaveText("第 4／4 頁");
   await page.getByTestId("record-slot-20").click();
+  await expect.poll(async () => (await debugState(page)).statusMessage)
+    .toBe("已讀取記錄 20。");
   const restored = await debugState(page);
   expect(restored.round).toBe(initial.round);
   expect(restored.units).toEqual(initial.units);
@@ -2844,7 +2850,8 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   // the 964E override chain, so the palace backdrop stands for every battle.
   await expect(page.getByTestId("full-combat-background")).toHaveAttribute("data-record", "5");
   await expect(page.getByTestId("full-combat-background"))
-    .toHaveAttribute("src", "/assets/original/full-combat/backgrounds/05.png");
+    .toHaveAttribute("data-source-url", "/assets/original/full-combat/backgrounds/05.png");
+  await expect(page.getByTestId("full-combat-background")).toHaveAttribute("src", /^blob:/u);
   await expect(page.getByTestId("full-left-status")).toBeVisible();
   await expect(page.getByTestId("full-right-status")).toBeVisible();
   await expect(page.getByTestId("full-combat-window")).toBeVisible();
@@ -3220,6 +3227,8 @@ test("S00-M: native system records restore battle state and combat cues follow p
   await page.getByTestId("system-command-load").click();
   await expect(page.getByTestId("record-menu")).toBeVisible();
   await page.getByTestId("record-slot-1").click();
+  await expect.poll(async () => (await debugState(page)).statusMessage)
+    .toBe("已讀取記錄 1。");
   const restored = await debugState(page);
   expect(restored.phase).toBe("player");
   expect(restored.round).toBe(initial.round);

@@ -71,7 +71,7 @@ const PORTRAIT_UNDERLAY = '<i class="dialogue-portrait-underlay" aria-hidden="tr
 function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string): string {
   const portraitSource = portraitSourceFor(portrait);
   const animation = PORTRAIT_CATALOG[portrait].animation;
-  const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${stagedRenderAssetSource(portraitSource)}" alt="${alt}" />`;
+  const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${stagedRenderAssetSource(portraitSource)}" data-source-url="${portraitSource}" alt="${alt}" />`;
   if (!animation) return base;
   const eyeStyle = [
     `left:${percentage(animation.eyeOrigin.x)}`,
@@ -88,10 +88,10 @@ function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: stri
   return `
     ${base}
     ${animation.eyes.map((source, index) =>
-      `<img class="portrait-eye portrait-eye-${index + 1}" style="${eyeStyle}" src="${stagedRenderAssetSource(source)}" alt="" aria-hidden="true" />`,
+      `<img class="portrait-eye portrait-eye-${index + 1}" style="${eyeStyle}" src="${stagedRenderAssetSource(source)}" data-source-url="${source}" alt="" aria-hidden="true" />`,
     ).join("")}
     ${animation.mouths.map((source, index) =>
-      `<img class="portrait-mouth portrait-mouth-${index + 1}" style="${mouthStyle}" src="${stagedRenderAssetSource(source)}" alt="" aria-hidden="true" />`,
+      `<img class="portrait-mouth portrait-mouth-${index + 1}" style="${mouthStyle}" src="${stagedRenderAssetSource(source)}" data-source-url="${source}" alt="" aria-hidden="true" />`,
     ).join("")}`;
 }
 

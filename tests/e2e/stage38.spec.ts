@@ -93,7 +93,8 @@ test("S38-C/D: the battle uses 20 allies, 44 enemies, and the all-enemy objectiv
   await expect(page.getByTestId("unit-portrait-composite"))
     .toHaveAttribute("data-portrait-record", "31");
   await expect(page.getByTestId("unit-portrait"))
-    .toHaveAttribute("src", /portraits\/0031\/base\.png$/u);
+    .toHaveAttribute("data-source-url", "/assets/original/portraits/0031/base.png");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /^blob:/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage38-named-enemy-hud.png`,
   });

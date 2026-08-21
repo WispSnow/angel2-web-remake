@@ -33,9 +33,15 @@ const planWithinBudget = (
   plan: () => unknown,
   budgetMs: number,
 ): { elapsedMs: number } => {
-  const startedAt = performance.now();
+  // The full coverage gate runs many files concurrently. Wall time there also
+  // counts periods when this worker is descheduled by unrelated tests, which
+  // made the unchanged 1.5 s planning budget fail while isolated runs stayed
+  // near 1.1 s. AI planning is synchronous, so current-thread CPU time measures
+  // the work this regression owns without weakening the production budget.
+  const startedAt = process.threadCpuUsage();
   plan();
-  const elapsedMs = performance.now() - startedAt;
+  const elapsed = process.threadCpuUsage(startedAt);
+  const elapsedMs = (elapsed.user + elapsed.system) / 1_000;
   expect(elapsedMs).toBeLessThan(budgetMs);
   return { elapsedMs };
 };

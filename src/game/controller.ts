@@ -751,10 +751,21 @@ export class GameController {
     restoredUnits: readonly Pick<BattleUnit, "classId" | "portrait">[] = [],
   ): Promise<LoadedStageRuntime> {
     const runtime = await loadStageRuntime(stageId);
+    // A stage module can assign semantic portraits while constructing its
+    // fixed board (for example stage 1's Nami) without duplicating them in the
+    // generic save metadata. Build the same deterministic initial snapshot
+    // here so those current-stage identities cross the asset gate before the
+    // surface mounts. Restored battles already provide their exact unit set.
+    const presentationUnits = restoredUnits.length > 0
+      ? restoredUnits
+      : runtime.createBattle(
+        campaign,
+        runtime.preparation?.createInitialResult(),
+      ).units;
     const allyClassIds = campaign.roster.map(({ classId }) => classId);
     const encounterClassIds = new Set<UnitClassId>([
       ...allyClassIds,
-      ...restoredUnits.map(({ classId }) => classId),
+      ...presentationUnits.map(({ classId }) => classId),
     ]);
     for (const spriteKey of Object.keys(runtime.assets?.unitSprites ?? {})) {
       const separator = spriteKey.indexOf("-");
@@ -764,7 +775,7 @@ export class GameController {
     const portraitRecords = new Set<PortraitRecord>([
       46,
       ...stageDialoguePortraitRecords(runtime.definition),
-      ...restoredUnits.map(({ portrait }) => portrait),
+      ...presentationUnits.map(({ portrait }) => portrait),
       ...(runtime.preparation?.createRoster(campaign).map(({ portrait }) => portrait) ?? []),
     ]);
     for (const rule of runtime.save.namedUnits ?? []) {

@@ -104,7 +104,8 @@ test("S37-F: boss HUD conceals all numeric fields while preserving the gauges", 
   await expect(detail).toHaveAttribute("data-concealed-stats", "true");
   await expect(detail).toContainText("?????／?????");
   await expect(page.getByTestId("unit-portrait"))
-    .toHaveAttribute("src", "/assets/original/portraits/0008/base.png");
+    .toHaveAttribute("data-source-url", "/assets/original/portraits/0008/base.png");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /^blob:/u);
   await expect(page.getByTestId("hp-bar")).toHaveAttribute("aria-label", "生命數值隱藏");
   await expect(page.getByTestId("exp-bar")).toHaveAttribute("aria-label", "經驗數值隱藏");
   await expect(page.getByTestId("hp-bar").locator("i")).toHaveAttribute("style", /height:100%/u);
@@ -114,7 +115,8 @@ test("S37-F: boss HUD conceals all numeric fields while preserving the gauges", 
 
   await clickCell(page, 22, 12);
   await expect(page.getByTestId("unit-portrait"))
-    .toHaveAttribute("src", "/assets/original/portraits/0008/base.png");
+    .toHaveAttribute("data-source-url", "/assets/original/portraits/0008/base.png");
+  await expect(page.getByTestId("unit-portrait")).toHaveAttribute("src", /^blob:/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage37-hand-bina-portrait.png`,
   });

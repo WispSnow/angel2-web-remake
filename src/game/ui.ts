@@ -1552,10 +1552,10 @@ function buildFullCombatSkeleton(
       <div class="full-combat-viewport-content" data-testid="full-combat-viewport-content">
         <div class="full-combat-scene" data-testid="full-combat-scene" hidden>
           <div class="full-combat-backdrop">
-            <img class="far" src="${background}" alt="" data-testid="full-combat-background" data-record="${backgroundRecord}" data-image-ready="${background !== backgroundAsset}" />
-            <img class="far copy" src="${background}" alt="" />
-            <img class="near" src="${background}" alt="" />
-            <img class="near copy" src="${background}" alt="" />
+            <img class="far" src="${background}" data-source-url="${backgroundAsset}" alt="" data-testid="full-combat-background" data-record="${backgroundRecord}" data-image-ready="${background !== backgroundAsset}" />
+            <img class="far copy" src="${background}" data-source-url="${backgroundAsset}" alt="" />
+            <img class="near" src="${background}" data-source-url="${backgroundAsset}" alt="" />
+            <img class="near copy" src="${background}" data-source-url="${backgroundAsset}" alt="" />
           </div>
           <div class="full-combat-particles" aria-hidden="true"></div>
           <i class="full-combat-frame full-combat-lance" aria-hidden="true" hidden></i>

@@ -49,9 +49,10 @@ test("stage-1 full-screen battles use the defender's terrain backdrop, not the s
   const backdrop = page.getByTestId("full-combat-background");
   await expect(backdrop).toHaveAttribute("data-record", "17");
   await expect(backdrop).toHaveAttribute(
-    "src",
+    "data-source-url",
     "/assets/original/full-combat/backgrounds/17.png",
   );
+  await expect(backdrop).toHaveAttribute("src", /^blob:/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage1-full-combat-terrain-background.png`,
   });
