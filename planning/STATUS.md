@@ -1484,6 +1484,15 @@ v74／`stage-49-ending-kill-records-1`，v73 与 v72 同样迁移到零基线；
   片尾解码时语义索引保持不动，解除后代表资源各精确一次请求；完整结局到 stage 38、七页片尾、
   The End 以及代表性截图均通过。本次未重建 `release/` 或部署。
 
+- 2026-08-21：用户授权后从 `main@8b184d7` 重新生成并发布正式玩家包。发布门禁完整通过
+  `pnpm check`（1399 个 Vitest 与 478 个 Chromium 用例）、`git diff --check` 和
+  `pnpm build:release`；最终 `release/` 共 1388 个文件、逻辑体积 59.6 MiB，仅含顶层
+  `index.html`，没有单文件超过 25 MiB。门禁期间补齐 stage 1 固定棋盘娜米肖像的当前关解码
+  集合，并把依赖异步资源门的旧浏览器断言改为等待正式完成信号。Cloudflare Pages 生产部署为
+  `https://285d7cbc.angel2-web-remake.pages.dev`，稳定入口仍为
+  `https://angel2-web-remake.pages.dev/`。两条线上入口均从普通开场进入标题与第 0 关剧情，
+  没有脚本错误或 HTTP 失败；冷加载强制 stage-00 包在本次验收中分别约 23 秒与 15 秒完成。
+
 已规格化的后续改进：
 
 - [`M00-native-side-panel-hotspots.md`](work-items/M00-native-side-panel-hotspots.md)：依据原版 12 个鼠标热区、17 个动作分发和 14 个设置项，按“热点基础层 → 现有功能直达 → 显示开关 → 音效分类 → 音乐五档 → 整体验收”推进。
