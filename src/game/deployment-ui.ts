@@ -8,6 +8,7 @@ import {
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import { allyMapUnitAsset } from "./content/map-unit-assets";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { applyStagedNativeUiAssets } from "./native-ui-assets";
 import type { DeploymentRosterUnit, DeploymentSession } from "./deployment-session";
 import {
   DeploymentMinimap,
@@ -36,8 +37,9 @@ const ACTION_CATEGORY_LABEL = {
   special_runtime: "特殊",
 } as const;
 
-const figureSourceFor = (classId: ClassId): string =>
-  allyMapUnitAsset(classId) ?? "/assets/original/unit-ally-soldier.png";
+const figureSourceFor = (classId: ClassId): string => stagedRenderAssetSource(
+  allyMapUnitAsset(classId) ?? "/assets/original/unit-ally-soldier.png",
+);
 
 const positionKey = ({ x, y }: Position): string => `${x},${y}`;
 
@@ -178,13 +180,14 @@ export function mountDeploymentUi(
   session: DeploymentSession,
   presentation: StageDeploymentPresentation,
 ): () => void {
+  applyStagedNativeUiAssets(root.closest<HTMLElement>(".logical-screen") ?? root);
   root.tabIndex = 0;
   root.setAttribute("role", "application");
   root.setAttribute("aria-label", `${presentation.title}出擊準備；${MODERN_KEYBOARD_HELP.move}移動，${MODERN_KEYBOARD_HELP.confirm}確認，${MODERN_KEYBOARD_HELP.cancel}返回，Tab 切換名單與落點`);
 
   const denseOpenCells = session.state.definition.openCells.length > 8;
   const minimap = new DeploymentMinimap({
-    source: presentation.minimap,
+    source: stagedRenderAssetSource(presentation.minimap),
     viewBox: terrainContentBounds(
       presentation.terrain,
       presentation.gridWidth,

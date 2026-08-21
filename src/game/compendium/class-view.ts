@@ -9,6 +9,7 @@ import {
 } from "./class-compendium";
 import { escapeHtml, inlineMarkup } from "../overlay/markup";
 import type { ClassId } from "../content/classes";
+import { stagedRenderAssetSource } from "../staged-render-asset-cache";
 
 const DIFFICULTY_LABELS = ["簡單", "普通", "困難", "無法無天"] as const;
 
@@ -267,7 +268,7 @@ export function renderClassDetail(
   return `
     <header class="rn-class-head">
       <div class="rn-figure" data-side="${selection.side}">
-        <img src="${mapSprite}" alt="${escapeHtml(entry.name)}的${sideLabel}"
+        <img src="${stagedRenderAssetSource(mapSprite)}" alt="${escapeHtml(entry.name)}的${sideLabel}"
           data-testid="compendium-map-sprite" />
       </div>
       <div class="rn-class-title">

@@ -8,6 +8,7 @@ import {
 } from "./character-compendium";
 import { escapeHtml } from "../overlay/markup";
 import type { CharacterId } from "../content/character-catalog.generated";
+import { stagedRenderAssetSource } from "../staged-render-asset-cache";
 
 const NO_NOTE = "原版沒有給這名角色台詞或專屬橋段，所以圖鑑只列出身分與出場關卡。";
 
@@ -72,7 +73,7 @@ function figure(entry: CharacterEntry): string {
   }
   return `
     <div class="rn-figure rn-figure-portrait" data-side="ally">
-      <img src="${entry.portrait}" alt="${escapeHtml(entry.name)}的肖像" />
+      <img src="${stagedRenderAssetSource(entry.portrait)}" alt="${escapeHtml(entry.name)}的肖像" />
     </div>`;
 }
 

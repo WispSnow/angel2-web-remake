@@ -86,17 +86,23 @@ import {
   type SaveBackupUi,
 } from "./save-backup-ui";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { applyStagedNativeUiAssets } from "./native-ui-assets";
 import { DIFFICULTY_OPTIONS } from "./content/startup";
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
   ASSETS.allyPromotionTargets;
 // 原生表現資源以 CSS 變數掛在邏輯螢幕上，樣式表只引用變數、不硬寫資產路徑。
-const nativePresentationAssetStyle = [
-  `--dialogue-portrait-frame-top:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.top}')`,
-  `--dialogue-portrait-frame-nameplate:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate}')`,
-  `--dialogue-portrait-frame-side:url('${DIALOGUE_PORTRAIT_FRAME_ASSETS.side}')`,
-  `--dialogue-text-window:url('${DIALOGUE_TEXT_WINDOW_ASSET}')`,
-  `--story-backdrop:url('${STORY_BACKDROP_ASSET}')`,
+const nativePresentationAssetStyle = () => [
+  `--dialogue-portrait-frame-top:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.top)}')`,
+  `--dialogue-portrait-frame-top-source:'${DIALOGUE_PORTRAIT_FRAME_ASSETS.top}'`,
+  `--dialogue-portrait-frame-nameplate:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate)}')`,
+  `--dialogue-portrait-frame-nameplate-source:'${DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate}'`,
+  `--dialogue-portrait-frame-side:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.side)}')`,
+  `--dialogue-portrait-frame-side-source:'${DIALOGUE_PORTRAIT_FRAME_ASSETS.side}'`,
+  `--dialogue-text-window:url('${stagedRenderAssetSource(DIALOGUE_TEXT_WINDOW_ASSET)}')`,
+  `--dialogue-text-window-source:'${DIALOGUE_TEXT_WINDOW_ASSET}'`,
+  `--story-backdrop:url('${stagedRenderAssetSource(STORY_BACKDROP_ASSET)}')`,
+  `--story-backdrop-source:'${STORY_BACKDROP_ASSET}'`,
 ].join(";");
 const niaPortraitDisplayName = (PORTRAIT_CATALOG[46].displayName ?? "妮雅").trim();
 
@@ -107,6 +113,7 @@ export interface CombatPresentationRenderSource {
 }
 
 export function mountUi(root: HTMLElement, controller: GameController, audio: AudioManager): () => void {
+  applyStagedNativeUiAssets(root);
   const stage = controller.battle.stage;
   const stageAssets = controller.currentStageAssets;
   const eventController = new AbortController();
@@ -115,30 +122,30 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       <div class="game-stage">
         <div class="game-viewport" id="game-viewport">
           <section class="logical-screen" id="logical-screen" data-testid="game-screen"
-            style="${nativePresentationAssetStyle}" aria-label="天使帝國 II ${stage.name}遊戲畫面">
+            style="${nativePresentationAssetStyle()}" aria-label="天使帝國 II ${stage.name}遊戲畫面">
             <div class="battle-backdrop" aria-hidden="true"></div>
             <div class="battle-chrome" data-testid="battle-chrome" aria-hidden="true">
-              <img class="chrome-top" src="${ASSETS.battleChrome.top}" alt="" />
-              <img class="chrome-corner-left" src="${ASSETS.battleChrome.cornerLeft}" alt="" />
-              <img class="chrome-corner-right" src="${ASSETS.battleChrome.cornerRight}" alt="" />
-              <img class="chrome-glass-left" src="${ASSETS.battleChrome.glass}" alt="" />
-              <img class="chrome-glass-right" src="${ASSETS.battleChrome.glass}" alt="" />
-              <img class="chrome-side-left" src="${ASSETS.battleChrome.sideLeft}" alt="" />
-              <img class="chrome-side-right" src="${ASSETS.battleChrome.sideRight}" alt="" />
-              <img class="chrome-bottom-left" src="${ASSETS.battleChrome.bottomLeft}" alt="" />
-              <img class="chrome-bottom-right" src="${ASSETS.battleChrome.bottomRight}" alt="" />
+              <img class="chrome-top" src="${stagedRenderAssetSource(ASSETS.battleChrome.top)}" alt="" />
+              <img class="chrome-corner-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.cornerLeft)}" alt="" />
+              <img class="chrome-corner-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.cornerRight)}" alt="" />
+              <img class="chrome-glass-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.glass)}" alt="" />
+              <img class="chrome-glass-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.glass)}" alt="" />
+              <img class="chrome-side-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.sideLeft)}" alt="" />
+              <img class="chrome-side-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.sideRight)}" alt="" />
+              <img class="chrome-bottom-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.bottomLeft)}" alt="" />
+              <img class="chrome-bottom-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.bottomRight)}" alt="" />
               <div class="right-panel-backdrop"></div>
             </div>
             <div id="phaser-root"></div>
             <div class="battle-foreground" data-testid="battle-foreground" aria-hidden="true">
-              <img class="statue-foreground-left" src="${ASSETS.battleChrome.statueForegroundLeft}" alt="" />
-              <img class="statue-foreground-right" src="${ASSETS.battleChrome.statueForegroundRight}" alt="" />
+              <img class="statue-foreground-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.statueForegroundLeft)}" alt="" />
+              <img class="statue-foreground-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.statueForegroundRight)}" alt="" />
             </div>
             <div class="story-background" id="story-background"></div>
             <section class="unit-hud" id="unit-hud" data-testid="unit-hud" aria-live="polite"></section>
             <div class="bottom-location">${stage.name}</div>
             <div class="bottom-round" id="bottom-round">
-              <img src="${ASSETS.sidePanelChrome.round}" alt="" aria-hidden="true" />
+              <img src="${stagedRenderAssetSource(ASSETS.sidePanelChrome.round)}" alt="" aria-hidden="true" />
               <span id="bottom-round-text"></span>
             </div>
             ${renderSidePanelHotspots()}
@@ -302,7 +309,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const dialogueSkipConfirm = required(root, "#dialogue-skip-confirm");
   const storyBackground = required(root, "#story-background");
   const defaultStoryBackgroundSource = stageAssets?.storyBackground ?? ASSETS.storyBackground;
-  storyBackground.style.setProperty("--story-illustration", `url("${defaultStoryBackgroundSource}")`);
+  storyBackground.style.setProperty(
+    "--story-illustration",
+    `url("${stagedRenderAssetSource(defaultStoryBackgroundSource)}")`,
+  );
+  storyBackground.style.setProperty("--story-illustration-source", defaultStoryBackgroundSource);
   const objectivePanel = required(root, "#objective-panel");
   const objectiveRoundLimit = required(root, "[data-testid=objective-round-limit]");
   const roundBox = required(root, "#bottom-round");
@@ -866,7 +877,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const source = page?.source.backgroundId === undefined
       ? defaultStoryBackgroundSource
       : stageAssets?.storyBackgrounds?.[page.source.backgroundId] ?? defaultStoryBackgroundSource;
-    storyBackground.style.setProperty("--story-illustration", `url("${source}")`);
+    storyBackground.style.setProperty(
+      "--story-illustration",
+      `url("${stagedRenderAssetSource(source)}")`,
+    );
+    storyBackground.style.setProperty("--story-illustration-source", source);
     if (page?.source.backgroundId === undefined) delete storyBackground.dataset.backgroundId;
     else storyBackground.dataset.backgroundId = String(page.source.backgroundId);
   };
@@ -1026,7 +1041,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           aria-label="${optionLabel}" aria-current="${selected}">
           <span class="promotion-art" aria-hidden="true">
             ${imageUrl
-              ? `<img src="${imageUrl}" alt="" data-testid="promotion-image-${target.id}" />`
+              ? `<img src="${stagedRenderAssetSource(imageUrl)}" data-source-url="${imageUrl}"
+                  alt="" data-testid="promotion-image-${target.id}" />`
               : `<span class="promotion-art-missing">${definition.nativeName}</span>`}
           </span>
           <span class="promotion-option-copy">
@@ -1987,7 +2003,7 @@ function renderHud(
           data-status-key="${key}" data-remaining-rounds="${remainingRounds}"
           aria-label="${label}，剩餘 ${remainingRounds} 回合"
           aria-describedby="status-tooltip-${key}">
-          <img src="${source}" alt="" aria-hidden="true" />
+          <img src="${stagedRenderAssetSource(source)}" alt="" aria-hidden="true" />
           <span aria-hidden="true">${remainingRounds}</span>
           <div class="hud-status-tooltip" id="status-tooltip-${key}" role="tooltip"
             data-testid="status-tooltip-${key}">
@@ -2006,9 +2022,9 @@ function renderHud(
         baseTestId: "unit-portrait",
       })}
       <img class="hud-unit-top-chrome" data-testid="hud-unit-top-chrome"
-        src="${ASSETS.sidePanelChrome.unitTop}" alt="" aria-hidden="true" />
+        src="${stagedRenderAssetSource(ASSETS.sidePanelChrome.unitTop)}" alt="" aria-hidden="true" />
       <img class="hud-unit-body-frame" data-testid="hud-unit-body-frame"
-        src="${ASSETS.sidePanelChrome.unitBody}" alt="" aria-hidden="true" />
+        src="${stagedRenderAssetSource(ASSETS.sidePanelChrome.unitBody)}" alt="" aria-hidden="true" />
       <div class="hud-identity" data-testid="hud-identity">
         <b class="${identityClass}" title="${identity}">${identity}</b>
       </div>
@@ -2161,7 +2177,7 @@ function renderTactical(controller: GameController, underUnit = false): string {
     const frame = visual.nativeFrames[state];
     return `<img
       class="tactical-panel-state"
-      src="${ASSETS.tacticalPanel.states[visual.id][state]}"
+      src="${stagedRenderAssetSource(ASSETS.tacticalPanel.states[visual.id][state])}"
       style="left:${visual.origin.x}px;top:${visual.origin.y}px;width:${visual.size.width}px;height:${visual.size.height}px"
       data-testid="tactical-panel-${visual.id}-state"
       data-state="${state}"
@@ -2172,16 +2188,16 @@ function renderTactical(controller: GameController, underUnit = false): string {
   }).join("");
   return `
     <div class="hud-tactical${underUnit ? " under-unit" : ""}" data-testid="tactical-hud" aria-label="戰術輔助與即時小地圖">
-      <img class="tactical-panel-art" src="${ASSETS.tacticalPanel.foundation}" alt="戰術桌、卷軸與照明器具" />
+      <img class="tactical-panel-art" src="${stagedRenderAssetSource(ASSETS.tacticalPanel.foundation)}" alt="戰術桌、卷軸與照明器具" />
       ${statePatches}
       <div class="tactical-minimap" data-testid="tactical-minimap" aria-label="${controller.battle.stage.name}即時小地圖">
-        <img src="${minimap}" alt="" />
+        <img src="${stagedRenderAssetSource(minimap)}" alt="" />
         ${underUnit ? "" : `<span class="minimap-viewport" style="left:${viewport.x * 3}px;top:${viewport.y * 3}px" aria-hidden="true"></span>`}
         ${underUnit ? "" : `<span class="minimap-preview" data-testid="minimap-preview" aria-hidden="true" hidden></span>`}
         ${markers}
       </div>
       <img class="tactical-minimap-frame" data-testid="tactical-minimap-frame"
-        src="${ASSETS.sidePanelChrome.minimap}" alt="" aria-hidden="true" />
+        src="${stagedRenderAssetSource(ASSETS.sidePanelChrome.minimap)}" alt="" aria-hidden="true" />
     </div>`;
 }
 

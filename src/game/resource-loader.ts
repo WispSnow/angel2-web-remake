@@ -25,6 +25,7 @@ import {
   openPersistentResourceCache,
   type PersistentResourceCache,
 } from "./persistent-resource-cache";
+import { stageSurfaceImageUrls } from "./stage-surface-image-assets";
 
 export interface ResourceManifestAsset {
   url: string;
@@ -62,6 +63,10 @@ interface AssetResponse {
   readonly response: Response;
   readonly cacheWrite: Promise<void>;
 }
+
+type RenderImagePredecodeSelection = "all"
+  | readonly string[]
+  | ((urls: readonly string[]) => readonly string[]);
 
 const MAX_PARALLEL_REQUESTS = 6;
 const PORTRAIT_ASSET_PREFIX = "/assets/original/portraits/";
@@ -145,7 +150,12 @@ export class ResourcePackLoader {
   ): Promise<void> {
     const portraitUrls = supplementalUrls.filter((url) =>
       url.startsWith("/assets/original/portraits/") && url.endsWith(".png"));
-    await this.ensurePackVisible(`stage:${stageId}`, label, supplementalUrls, portraitUrls);
+    await this.ensurePackVisible(
+      `stage:${stageId}`,
+      label,
+      supplementalUrls,
+      (urls) => [...new Set([...portraitUrls, ...stageSurfaceImageUrls(urls)])],
+    );
   }
 
   async ensureRoute(
@@ -202,7 +212,7 @@ export class ResourcePackLoader {
     packId: string,
     label: string,
     supplementalUrls: readonly string[] = [],
-    predecodeRenderImages: "all" | readonly string[] = [],
+    predecodeRenderImages: RenderImagePredecodeSelection = [],
     afterLoad?: () => Promise<void>,
   ): Promise<void> {
     return new Promise((resolve) => {
@@ -220,8 +230,11 @@ export class ResourcePackLoader {
           await prepareSoundEffectBuffers(urls);
           this.replaceStagedRenderAssetLease(packId, urls);
           if (predecodeRenderImages === "all") await decodeStagedRenderImages(urls);
-          else if (predecodeRenderImages.length > 0) {
-            await decodeStagedRenderImages(predecodeRenderImages);
+          else {
+            const selected = typeof predecodeRenderImages === "function"
+              ? predecodeRenderImages(urls)
+              : predecodeRenderImages;
+            if (selected.length > 0) await decodeStagedRenderImages(selected);
           }
           await this.replaceFullCombatImageLease(supplementalUrls);
           await afterLoad?.();

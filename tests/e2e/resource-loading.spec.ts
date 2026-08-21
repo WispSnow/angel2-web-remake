@@ -215,6 +215,80 @@ test("new game waits for the byte-counted stage 0 pack before mounting Phaser", 
   await expect(page.locator("#phaser-root canvas")).toBeVisible({ timeout: 15_000 });
 });
 
+test("formal battle, deployment and promotion DOM images reuse the current staged lease", async ({ page }) => {
+  const originalImageRequests: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (request.resourceType() === "image" && path.startsWith("/assets/original/")) {
+      originalImageRequests.push(path);
+    }
+  });
+  const expectOnlyObjectUrlImages = async (selector: string) => {
+    await expect.poll(() => page.locator(selector).locator("img").evaluateAll((images) =>
+      images.length > 0 && images.every((image) => (image as HTMLImageElement).src.startsWith("blob:")),
+    )).toBe(true);
+  };
+  const expectNoOriginalImagesSince = async (start: number, surface: string) => {
+    await page.waitForTimeout(120);
+    expect(originalImageRequests.slice(start), surface).toEqual([]);
+  };
+
+  let start = originalImageRequests.length;
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  const canvas = page.getByTestId("battle-canvas");
+  await expect(canvas).toBeVisible({ timeout: 15_000 });
+  await page.waitForFunction(() => window.__ANGEL2__?.getState() !== undefined);
+  await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("soldier"));
+  await canvas.click({ position: { x: 220, y: 177 } });
+  await expect(page.getByTestId("unit-command-attack")).toBeVisible();
+  await expectOnlyObjectUrlImages("[data-testid=game-screen]");
+  await expect.poll(() => page.getByTestId("game-screen").evaluate((screen) => ({
+    commandMenu: getComputedStyle(screen).getPropertyValue("--native-command-menu-top-image"),
+    dialogue: getComputedStyle(screen).getPropertyValue("--dialogue-text-window"),
+  }))).toEqual({
+    commandMenu: expect.stringContaining("blob:"),
+    dialogue: expect.stringContaining("blob:"),
+  });
+  await expectNoOriginalImagesSince(start, "stage 0 battle");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/resource-loading-staged-battle-dom.png",
+  });
+
+  start = originalImageRequests.length;
+  await page.goto("/?debugScenario=stage-01-deployment&difficulty=0&test=1");
+  const deployment = page.getByTestId("deployment-screen");
+  await expect(deployment).toBeVisible({ timeout: 15_000 });
+  await expectOnlyObjectUrlImages("[data-testid=deployment-screen]");
+  await expectNoOriginalImagesSince(start, "stage 1 deployment");
+  await captureVisualAudit(deployment, {
+    path: "artifacts/playwright/resource-loading-staged-deployment-dom.png",
+  });
+
+  start = originalImageRequests.length;
+  await page.goto("/?debugScenario=stage-03-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible({ timeout: 15_000 });
+  await page.waitForFunction(() => {
+    const state = window.__ANGEL2__?.getState() as
+      { promotionUnitIds?: readonly string[] } | undefined;
+    return (state?.promotionUnitIds?.length ?? 0) > 0;
+  });
+  for (let pageIndex = 0; pageIndex < 20; pageIndex += 1) {
+    const state = await page.evaluate(() => window.__ANGEL2__?.getState() as
+      { promotionUnitIds?: readonly string[]; promotionDialogueIndex?: number } | undefined);
+    if ((state?.promotionUnitIds?.length ?? 0) > 0
+      && state?.promotionDialogueIndex === undefined) break;
+    await page.evaluate(() => window.__ANGEL2__?.advanceDialogue());
+  }
+  const promotion = page.getByTestId("promotion-layer");
+  await expect(promotion).toBeVisible();
+  await expect(promotion.locator("[data-testid^=promotion-image-]")).toHaveCount(4);
+  await expectOnlyObjectUrlImages("[data-testid=game-screen]");
+  await expectNoOriginalImagesSince(start, "stage 3 promotion");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/resource-loading-staged-promotion-dom.png",
+  });
+});
+
 test("current dialogue portrait layers decode before stage clocks and reuse staged bytes", async ({ page }) => {
   await page.addInitScript(() => {
     const target = window as Window & {

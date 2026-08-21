@@ -86,6 +86,7 @@ describe("versioned resource manifest", () => {
 
     const boot = resolvedPackUrls(manifest, "boot");
     expect(boot).toContain("/assets/original/startup/title/background.png");
+    expect(boot).toContain("/assets/original/command-menu-pointer.png");
     expect(boot).not.toContain("/assets/original/stage0-map.png");
 
     const stage0 = resolvedPackUrls(manifest, "stage:stage-00");
@@ -95,6 +96,15 @@ describe("versioned resource manifest", () => {
     expect(stage0).not.toContain("/assets/original/stage1-map.png");
     expect(stage0).not.toContain("/assets/original/full-combat-atlases/left-soldier.png");
     expect(stage0).not.toContain("/assets/original/portraits/D-46-base.png");
+
+    const stage3 = resolvedPackUrls(manifest, "stage:stage-03");
+    for (const sharedSurface of [
+      "/assets/original/battle-chrome-top.png",
+      "/assets/original/hud-unit-body-frame.png",
+      "/assets/original/tactical-panel.png",
+      "/assets/original/native-font.png",
+      "/assets/original/story-palace.png",
+    ]) expect(stage3).toContain(sharedSurface);
 
     const soundEffects = resolvedPackUrls(manifest, "audio:effects");
     expect(soundEffects).toContain("/assets/original/audio/e/2.wav");

@@ -137,6 +137,13 @@ pnpm content:resource-manifest
 JS／CSS 由 `public/_headers` 设为一年 `immutable`。这不是离线应用：没有 Service Worker 或 R2，没有完整缓存的
 资源仍须网络可用；不要在发布步骤改成全战役首屏下载。
 
+Cache Storage 不会自动拦截 `<img>`、CSS `url()`、Phaser 或 `new Image()`；正式运行时必须先把
+当前资源包的 PNG／JSON 响应交给 staged render lease，再由 DOM、CSS 与 Phaser 使用同一次响应
+建立的对象 URL。战场边框、HUD、战术面板、对话框、点阵字体、命令菜单／指针和状态图标属于
+`battle:core`，不得重新塞回第 0 关包；当前小地图、剧情插画、部署／转职我方棋子随当前关进入
+有限预解码集合。图鉴中不属于当前包的职业／肖像仍按需读取，全景、地图技能、敌方纹理、结局
+与制作人员表继续使用各自既有租约，禁止为了消除原始 URL 而把全战役 PNG 同时解码常驻。
+
 开场包同时包含 `MUSIC/14` 与 `MUSIC/1`。加载页完成图像解码和两首乐曲的 PCM 解码后，才显示
 「进入游戏」的音频激活门；玩家的按键／指针手势解锁 Web Audio 后，Softstar Logo 和原版开场时间线才起步，
 因此不得跳过音乐去追赶画面。开场后后台准备第 0 关，关卡切换只强制下一关并预取再后两关。每关包必须

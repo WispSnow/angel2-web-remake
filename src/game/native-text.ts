@@ -4,6 +4,7 @@ import {
   NATIVE_GAMEPLAY_PALETTE,
   NATIVE_TEXT,
 } from "./content/native-font.generated";
+import { loadStagedRenderImage } from "./staged-render-asset-cache";
 
 /**
  * Module 29's string drawer (`0000:EA04`), reproduced for the battle HUD, the
@@ -51,7 +52,12 @@ let font: HTMLImageElement | undefined;
 
 /** Resolves once the atlas is decoded; `nativeFont()` returns it synchronously after that. */
 export function loadNativeFont(): Promise<HTMLImageElement> {
-  fontPromise ??= new Promise<HTMLImageElement>((resolve, reject) => {
+  if (fontPromise) return fontPromise;
+  const staged = loadStagedRenderImage(NATIVE_FONT.src);
+  fontPromise = staged?.then((image) => {
+    font = image;
+    return image;
+  }) ?? new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.addEventListener("load", () => {
       font = image;

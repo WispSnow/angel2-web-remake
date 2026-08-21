@@ -274,6 +274,11 @@ const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => 
       chrome: getComputedStyle(element).backgroundImage,
       selection: selected ? getComputedStyle(selected, "::before").backgroundImage : "",
       pointer: selected ? getComputedStyle(selected).cursor : "",
+      chromeSources: ["top", "side", "bottom"].map((part) =>
+        getComputedStyle(element).getPropertyValue(`--native-command-menu-${part}-source`)),
+      selectionSource: getComputedStyle(element)
+        .getPropertyValue("--native-command-menu-selection-source"),
+      pointerSource: getComputedStyle(element).getPropertyValue("--native-cursor-hand-source"),
       labelCenterOffset: selected && label
         ? label.getBoundingClientRect().left + label.getBoundingClientRect().width / 2
           - (
@@ -285,11 +290,16 @@ const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => 
     };
   });
   expect(presentation).toMatchObject({ width: 144, height: expectedHeight });
-  expect(presentation.chrome).toContain("command-menu-top.png");
-  expect(presentation.chrome).toContain("command-menu-side.png");
-  expect(presentation.chrome).toContain("command-menu-bottom.png");
-  expect(presentation.selection).toContain("command-menu-selection.png");
-  expect(presentation.pointer).toContain("command-menu-pointer.png");
+  expect(presentation.chrome).toContain("blob:");
+  expect(presentation.selection).toContain("blob:");
+  expect(presentation.pointer).toContain("blob:");
+  expect(presentation.chromeSources).toEqual([
+    expect.stringContaining("command-menu-top.png"),
+    expect.stringContaining("command-menu-side.png"),
+    expect.stringContaining("command-menu-bottom.png"),
+  ]);
+  expect(presentation.selectionSource).toContain("command-menu-selection.png");
+  expect(presentation.pointerSource).toContain("command-menu-pointer.png");
   expect(Math.abs(presentation.labelCenterOffset)).toBeLessThanOrEqual(0.5);
 };
 const openSettingsMenu = async (page: Page) => {
@@ -432,26 +442,42 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   const frameBackgrounds = await dialoguePortrait.evaluate((portrait) => ({
     horizontal: getComputedStyle(portrait, "::before").backgroundImage,
     sides: getComputedStyle(portrait, "::after").backgroundImage,
+    topSource: getComputedStyle(portrait).getPropertyValue("--dialogue-portrait-frame-top-source"),
+    nameplateSource: getComputedStyle(portrait)
+      .getPropertyValue("--dialogue-portrait-frame-nameplate-source"),
+    sideSource: getComputedStyle(portrait).getPropertyValue("--dialogue-portrait-frame-side-source"),
   }));
-  expect(frameBackgrounds.horizontal).toContain("/assets/original/dialogue/portrait-top.png");
-  expect(frameBackgrounds.horizontal).toContain("/assets/original/dialogue/portrait-nameplate.png");
-  expect(frameBackgrounds.sides).toContain("/assets/original/dialogue/portrait-side.png");
+  expect(frameBackgrounds.horizontal).toContain("blob:");
+  expect(frameBackgrounds.sides).toContain("blob:");
+  expect(frameBackgrounds.topSource).toContain("/assets/original/dialogue/portrait-top.png");
+  expect(frameBackgrounds.nameplateSource)
+    .toContain("/assets/original/dialogue/portrait-nameplate.png");
+  expect(frameBackgrounds.sideSource).toContain("/assets/original/dialogue/portrait-side.png");
   await expect(page.locator("#dialogue-copy-upper")).toHaveCSS(
     "background-image",
+    /blob:/u,
+  );
+  await expect(page.locator("#dialogue-copy-upper")).toHaveCSS(
+    "--dialogue-text-window-source",
     /\/assets\/original\/dialogue\/text-window\.png/u,
   );
-  const dialogueFrameSizes = await page.evaluate(async (sources) => Promise.all(sources.map((source) =>
-    new Promise<[number, number]>((resolve, reject) => {
+  const dialogueFrameSizes = await dialoguePortrait.evaluate(async (portrait) => {
+    const style = getComputedStyle(portrait);
+    const sourceFor = (property: string) => style.getPropertyValue(property).trim()
+      .replace(/^url\(["']?/u, "").replace(/["']?\)$/u, "");
+    const sources = [
+      "--dialogue-portrait-frame-top",
+      "--dialogue-portrait-frame-nameplate",
+      "--dialogue-portrait-frame-side",
+      "--dialogue-text-window",
+    ].map(sourceFor);
+    return Promise.all(sources.map((source) => new Promise<[number, number]>((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve([image.naturalWidth, image.naturalHeight]);
       image.onerror = () => reject(new Error(`failed to load ${source}`));
       image.src = source;
-    }))), [
-    "/assets/original/dialogue/portrait-top.png",
-    "/assets/original/dialogue/portrait-nameplate.png",
-    "/assets/original/dialogue/portrait-side.png",
-    "/assets/original/dialogue/text-window.png",
-  ]);
+    })));
+  });
   expect(dialogueFrameSizes).toEqual([[112, 17], [112, 23], [8, 8], [400, 86]]);
   await expect(dialoguePortrait.locator(".portrait-eye")).toHaveCount(3);
   await expect(dialoguePortrait.locator(".portrait-mouth")).toHaveCount(3);
@@ -719,6 +745,11 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       lightTexture: getComputedStyle(menu).getPropertyValue("--native-menu-light").trim(),
       selection: selected ? getComputedStyle(selected, "::before").backgroundImage : "",
       pointer: selected ? getComputedStyle(selected).cursor : "",
+      chromeSources: ["top", "side", "bottom"].map((part) =>
+        getComputedStyle(menu).getPropertyValue(`--native-command-menu-${part}-source`)),
+      selectionSource: getComputedStyle(menu)
+        .getPropertyValue("--native-command-menu-selection-source"),
+      pointerSource: getComputedStyle(menu).getPropertyValue("--native-cursor-hand-source"),
       duplicatePointer: label ? getComputedStyle(label, "::after").content : "",
       labelInkCenterOffset: selected && label
         ? label.getBoundingClientRect().left + label.getBoundingClientRect().width / 2
@@ -731,15 +762,20 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
     };
   });
   expect(nativeMenuArt).toMatchObject({ width: 144, height: 100 });
-  expect(nativeMenuArt.chrome).toContain("command-menu-top.png");
-  expect(nativeMenuArt.chrome).toContain("command-menu-side.png");
-  expect(nativeMenuArt.chrome).toContain("command-menu-bottom.png");
+  expect(nativeMenuArt.chrome).toContain("blob:");
   expect(nativeMenuArt.chrome).toContain("conic-gradient");
   expect(nativeMenuArt.backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(nativeMenuArt.darkTexture).toBe("rgb(95 0 0 / 50%)");
   expect(nativeMenuArt.lightTexture).toBe("rgb(231 138 69 / 50%)");
-  expect(nativeMenuArt.selection).toContain("command-menu-selection.png");
-  expect(nativeMenuArt.pointer).toContain("command-menu-pointer.png");
+  expect(nativeMenuArt.selection).toContain("blob:");
+  expect(nativeMenuArt.pointer).toContain("blob:");
+  expect(nativeMenuArt.chromeSources).toEqual([
+    expect.stringContaining("command-menu-top.png"),
+    expect.stringContaining("command-menu-side.png"),
+    expect.stringContaining("command-menu-bottom.png"),
+  ]);
+  expect(nativeMenuArt.selectionSource).toContain("command-menu-selection.png");
+  expect(nativeMenuArt.pointerSource).toContain("command-menu-pointer.png");
   expect(nativeMenuArt.duplicatePointer).toBe("none");
   expect(Math.abs(nativeMenuArt.labelInkCenterOffset)).toBeLessThan(0.5);
   const commandMenuPlacement = await page.getByTestId("action-menu").evaluate((menu) => {
@@ -872,7 +908,11 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   for (const classId of ["cavalry", "warrior", "archer", "sister"] as const) {
     const image = page.getByTestId(`promotion-image-${classId}`);
     await expect(image).toBeVisible();
-    await expect(image).toHaveAttribute("src", new RegExp(`unit-ally-${classId}\\.png$`));
+    await expect(image).toHaveAttribute("src", /^blob:/u);
+    await expect(image).toHaveAttribute(
+      "data-source-url",
+      new RegExp(`unit-ally-${classId}\\.png$`),
+    );
     expect(await image.evaluate((element: HTMLImageElement) => ({
       naturalWidth: element.naturalWidth,
       naturalHeight: element.naturalHeight,
@@ -1949,7 +1989,15 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
     await canvas.hover({ position });
     await expect(canvas).toHaveAttribute("data-native-pointer-cursor", cursor);
     await expect(canvas).toHaveAttribute("data-native-pointer-frame", String(frame));
-    expect(await canvas.evaluate((element) => getComputedStyle(element).cursor)).toContain(asset);
+    const presentation = await canvas.evaluate((element, cursorName) => {
+      const style = getComputedStyle(element);
+      const property = cursorName === "hand"
+        ? "--native-cursor-hand-source"
+        : `--native-cursor-${cursorName}-source`;
+      return { rendered: style.cursor, source: style.getPropertyValue(property) };
+    }, cursor);
+    expect(presentation.rendered).toContain("blob:");
+    expect(presentation.source).toContain(asset);
   };
   await expectNativePointer({ x: 420, y: 45 }, "hand", 0, "command-menu-pointer.png");
 

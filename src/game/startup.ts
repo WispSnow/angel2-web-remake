@@ -20,6 +20,7 @@ import {
   STARTUP_IMAGE_URLS,
 } from "./startup-screen";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { applyStagedNativeUiAssets } from "./native-ui-assets";
 import { classStatsFor } from "./content/stage0";
 import { className } from "./content/classes";
 import { configureGameScaling } from "./scaling";
@@ -117,6 +118,7 @@ export function mountStartup(
   startGame: (selection: StartupSelection) => void,
   startupMusic: PreparedStartupMusic,
 ): () => void {
+  applyStagedNativeUiAssets(root);
   const testMode = new URLSearchParams(location.search).has("test");
   const introDuration = testMode
     ? 8_000

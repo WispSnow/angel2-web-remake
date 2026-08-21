@@ -34,7 +34,10 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
 .game-viewport { width: 100%; max-width: 640px; overflow: hidden; background: #050405; box-shadow: 0 22px 70px #000b, 0 0 0 1px #3e2921; }
 .logical-screen {
   --game-scale: 1;
-  --native-cursor-hand: url("/assets/original/command-menu-pointer.png") 3 2, pointer;
+  --native-cursor-hand: var(
+    --native-cursor-hand-image,
+    url("/assets/original/command-menu-pointer.png")
+  ) 3 2, pointer;
   position: relative;
   width: 640px;
   height: 350px;
@@ -500,16 +503,16 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   cursor: var(--native-cursor-hand);
 }
 #phaser-root canvas[data-native-pointer-cursor="up"] {
-  cursor: url("/assets/original/native-cursor-up.png") 12 0, n-resize;
+  cursor: var(--native-cursor-up-image, url("/assets/original/native-cursor-up.png")) 12 0, n-resize;
 }
 #phaser-root canvas[data-native-pointer-cursor="down"] {
-  cursor: url("/assets/original/native-cursor-down.png") 12 18, s-resize;
+  cursor: var(--native-cursor-down-image, url("/assets/original/native-cursor-down.png")) 12 18, s-resize;
 }
 #phaser-root canvas[data-native-pointer-cursor="left"] {
-  cursor: url("/assets/original/native-cursor-left.png") 0 9, w-resize;
+  cursor: var(--native-cursor-left-image, url("/assets/original/native-cursor-left.png")) 0 9, w-resize;
 }
 #phaser-root canvas[data-native-pointer-cursor="right"] {
-  cursor: url("/assets/original/native-cursor-right.png") 23 9, e-resize;
+  cursor: var(--native-cursor-right-image, url("/assets/original/native-cursor-right.png")) 23 9, e-resize;
 }
 .battle-foreground { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .battle-foreground > img { position: absolute; top: 140px; width: 32px; height: 191px; image-rendering: var(--image-rendering, pixelated); }
@@ -931,9 +934,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   padding: 16px 4px 12px;
   border: 0;
   background:
-    url("/assets/original/command-menu-top.png") left top / 144px 17px no-repeat,
-    url("/assets/original/command-menu-bottom.png") left bottom / 144px 30px no-repeat,
-    url("/assets/original/command-menu-side.png") left 17px / 144px 15px repeat-y,
+    var(--native-command-menu-top-image, url("/assets/original/command-menu-top.png")) left top / 144px 17px no-repeat,
+    var(--native-command-menu-bottom-image, url("/assets/original/command-menu-bottom.png")) left bottom / 144px 30px no-repeat,
+    var(--native-command-menu-side-image, url("/assets/original/command-menu-side.png")) left 17px / 144px 15px repeat-y,
     conic-gradient(
       from 90deg at 1px 1px,
       var(--native-menu-dark) 25%,
@@ -983,7 +986,10 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   top: -6px;
   width: 144px;
   height: 37px;
-  background: url("/assets/original/command-menu-selection.png") left top / 144px 37px no-repeat;
+  background: var(
+    --native-command-menu-selection-image,
+    url("/assets/original/command-menu-selection.png")
+  ) left top / 144px 37px no-repeat;
   opacity: 0;
   pointer-events: none;
   image-rendering: var(--image-rendering, pixelated);
@@ -1064,7 +1070,10 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   z-index: 10;
   width: 24px;
   height: 24px;
-  background: url("/assets/original/command-menu-pointer.png") left top / 24px 24px no-repeat;
+  background: var(
+    --native-command-menu-pointer-image,
+    url("/assets/original/command-menu-pointer.png")
+  ) left top / 24px 24px no-repeat;
   image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }

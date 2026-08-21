@@ -59,6 +59,9 @@ const finalReleaseAsset = (relative) => {
 const assetUrl = (relative) => `/assets/original/${relative}`;
 const isSoundEffectAsset = (relative) => relative.startsWith("audio/")
   || /^(?:speech-\d+|ui-confirm|combat-(?:death|hit|soldier))\.wav$/u.test(relative);
+const isSharedBattleSurfaceAsset = (relative) =>
+  relative === "story-palace.png"
+  || /^(?:battle-chrome-|battle-statue-|hud-|tactical-panel)/u.test(relative);
 const musicUrl = (container, record) =>
   assetUrl(`music/${container}/${String(record).padStart(4, "0")}.ogg`);
 
@@ -167,9 +170,15 @@ for (const { relative } of allFiles) {
 for (const [stageId, urls] of stageAssetUrls) {
   for (const url of urls) {
     const relative = url.slice("/assets/original/".length);
-    if (!isSoundEffectAsset(relative)) addToPack(`stage:${stageId}`, url);
+    if (!isSoundEffectAsset(relative) && !isSharedBattleSurfaceAsset(relative)) {
+      addToPack(`stage:${stageId}`, url);
+    }
   }
 }
+// The opening already exposes the native hand cursor. Sharing its encoded bytes
+// with `battle:core` prevents the first stage prefetch from fetching it again.
+addToPack("boot", assetUrl("command-menu-pointer.png"));
+addToPack("battle:core", assetUrl("command-menu-pointer.png"));
 const endingSource = await readFile(path.join(root, "src/game/content/stage49-ending.ts"), "utf8");
 for (const url of sourceAssetUrls(endingSource)) addToPack("ending", url);
 for (const { relative } of allFiles) {
@@ -190,7 +199,8 @@ for (const { relative } of allFiles) {
     throw new Error(`stage asset was not assigned to a stage pack: ${url}`);
   }
   if (relative.startsWith("music/")) addToPack("stream:music", url);
-  else if (relative.startsWith("dialogue/") || relative.startsWith("status-icons/")
+  else if (isSharedBattleSurfaceAsset(relative)
+    || relative.startsWith("dialogue/") || relative.startsWith("status-icons/")
     || relative.startsWith("story/")
     || /^(?:battle-|command-menu-|hud-|native-|tactical-panel)/u.test(relative)) {
     addToPack("battle:core", url);
