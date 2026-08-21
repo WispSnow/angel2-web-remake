@@ -3,6 +3,7 @@ import {
   MAP_ACTION_ATLAS_IDS,
   MAP_ACTION_ATLASES,
 } from "../content/map-action-atlases.generated";
+export { mapActionAtlasIdForAction } from "../content/map-action-assets";
 
 const MAP_ACTION_PREFIX = "/assets/original/map-actions/";
 
@@ -55,13 +56,6 @@ function sourceForLegacyKey(key: string): string | undefined {
   match = /^map-wd-(\d+)$/u.exec(key);
   if (match) return `${MAP_ACTION_PREFIX}wd/effect/${paddedFrame(match[1])}.png`;
   return undefined;
-}
-
-export function mapActionAtlasIdForAction(actionId: string): string {
-  if (actionId.startsWith("ice-")) return "ice-1";
-  if (actionId.startsWith("recovery-")) return "recovery-1";
-  if (actionId === "magic-guard") return "attack-up";
-  return actionId;
 }
 
 export function collectMapActionSources(value: unknown): string[] {

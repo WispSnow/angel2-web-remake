@@ -78,6 +78,51 @@ test("new game waits for the byte-counted stage 0 pack before mounting Phaser", 
   await expect(page.locator("#phaser-root canvas")).toBeVisible({ timeout: 15_000 });
 });
 
+test("stage music finishes before the scene mounts and playback reuses the staged bytes", async ({ page }) => {
+  let musicRequests = 0;
+  let releaseMusic = () => undefined;
+  const musicGate = new Promise<void>((resolve) => {
+    releaseMusic = resolve;
+  });
+  await page.route("**/music/generated/stage0-story-seamless.ogg", async (route) => {
+    musicRequests += 1;
+    await musicGate;
+    await route.continue();
+  });
+
+  await page.goto("/?test=1&skipStartup=1");
+  await expect(page.getByTestId("resource-loading-overlay")).toBeVisible();
+  await expect(page.locator("#phaser-root canvas")).toHaveCount(0);
+  await expect.poll(() => musicRequests).toBe(1);
+
+  releaseMusic();
+  await expect(page.getByTestId("resource-loading-overlay")).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByTestId("game-screen")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("game-screen").click({ position: { x: 620, y: 340 } });
+  await expect(page.locator("#app")).toHaveAttribute("data-music-playing", "true", {
+    timeout: 15_000,
+  });
+  expect(musicRequests).toBe(1);
+});
+
+test("current class full-combat textures cross the resource gate before Phaser", async ({ page }) => {
+  let releaseFullCombat = () => undefined;
+  const fullCombatGate = new Promise<void>((resolve) => {
+    releaseFullCombat = resolve;
+  });
+  await page.route("**/full-combat-atlases/left-soldier.png", async (route) => {
+    await fullCombatGate;
+    await route.continue();
+  });
+
+  await page.goto("/?test=1&skipStartup=1");
+  await expect(page.getByTestId("resource-loading-overlay")).toBeVisible();
+  await expect(page.locator("#phaser-root canvas")).toHaveCount(0);
+  releaseFullCombat();
+  await expect(page.getByTestId("resource-loading-overlay")).toBeHidden({ timeout: 15_000 });
+  await expect(page.locator("#phaser-root canvas")).toBeVisible({ timeout: 15_000 });
+});
+
 test("a failed stage resource stays on a readable retry surface and retries the URL", async ({ page }) => {
   let stage0MapRequests = 0;
   await page.route("**/assets/original/stage0-map.png", async (route) => {

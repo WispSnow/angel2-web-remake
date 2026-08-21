@@ -10,18 +10,31 @@ import { mountStage49EndingUi } from "./game/stage49-ending-ui";
 import { mountCreditsUi } from "./game/credits-ui";
 import "./credits.css";
 import { ResourcePackLoader } from "./game/resource-loader";
-import { allyMapUnitAssetsForClasses } from "./game/content/map-unit-assets";
+import { classPresentationAssetUrls } from "./game/content/class-presentation-assets";
+import { createStage0Units } from "./game/content/stage0";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
 const releaseBuild = import.meta.env.MODE === "release";
 const resourceLoader = new ResourcePackLoader();
-const stageAssetGate: StageAssetGate = (stageId, allyClassIds) =>
+const stageAssetGate: StageAssetGate = (stageId, requirements) =>
   resourceLoader.ensureStage(
     stageId,
     `讀取 ${stageId} 關卡資料`,
-    [...allyMapUnitAssetsForClasses(allyClassIds).values()],
+    classPresentationAssetUrls(requirements),
   );
+
+const controllerAssetRequirements = (controller: GameController) => ({
+  allyClassIds: controller.battle.units
+    .filter(({ side }) => side === 1)
+    .map(({ classId }) => classId),
+  encounterClassIds: controller.battle.units.map(({ classId }) => classId),
+});
+const stage0Units = createStage0Units();
+const stage0PresentationAssets = classPresentationAssetUrls({
+  allyClassIds: stage0Units.filter(({ side }) => side === 1).map(({ classId }) => classId),
+  encounterClassIds: stage0Units.map(({ classId }) => classId),
+});
 
 const mountController = (
   controller: GameController,
@@ -149,10 +162,13 @@ const mountController = (
 };
 
 const startGame = async (selection: StartupSelection) => {
-  const controller = selection.kind === "continue"
-    ? await GameController.fromSave(selection.save, selection.slot, stageAssetGate)
-    : await resourceLoader.ensureStage("stage-00", "讀取第 0 關資料")
-      .then(() => new GameController(selection.difficulty, stageAssetGate));
+  let controller: GameController;
+  if (selection.kind === "continue") {
+    controller = await GameController.fromSave(selection.save, selection.slot, stageAssetGate);
+  } else {
+    controller = new GameController(selection.difficulty, stageAssetGate);
+    await stageAssetGate("stage-00", controllerAssetRequirements(controller));
+  }
   mountController(controller, selection.userActivated, resourceLoader);
 };
 
@@ -200,6 +216,7 @@ if (!releaseBuild && debugScenario) {
       perStageGrowth,
     });
     controller.setStageAssetGate(stageAssetGate);
+    await stageAssetGate(controller.battle.stage.id, controllerAssetRequirements(controller));
     mountController(controller, false, resourceLoader);
     debug.mountDebugToolbar(
       controller,
@@ -220,6 +237,6 @@ else if (!releaseBuild && parameters.has("skipStartup")) {
 else {
   void resourceLoader.ensureBoot().then(() => {
     mountStartup(root, startGame);
-    resourceLoader.prefetchStage("stage-00");
+    resourceLoader.prefetchStage("stage-00", stage0PresentationAssets);
   });
 }

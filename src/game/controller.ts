@@ -27,6 +27,7 @@ import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
 import {
   classDefinition,
   immuneToPhysicalShootingFor,
+  isClassId,
   className,
   promotionTargetsFor,
   unitDisplayName,
@@ -133,9 +134,14 @@ import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage,
 
 type Listener = () => void;
 type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
+export interface StageAssetRequirements {
+  allyClassIds: readonly UnitClassId[];
+  encounterClassIds: readonly UnitClassId[];
+}
+
 export type StageAssetGate = (
   stageId: StageId,
-  allyClassIds: readonly UnitClassId[],
+  requirements: StageAssetRequirements,
 ) => Promise<void>;
 
 // The native walk sound is per movement, not per step, and every reason has to
@@ -738,9 +744,20 @@ export class GameController {
   private async loadRuntime(
     stageId: StageId,
     allyClassIds: readonly UnitClassId[],
+    restoredClassIds: readonly UnitClassId[] = [],
   ): Promise<LoadedStageRuntime> {
-    await this.stageAssetGate?.(stageId, allyClassIds);
-    return loadStageRuntime(stageId);
+    const runtime = await loadStageRuntime(stageId);
+    const encounterClassIds = new Set<UnitClassId>([...allyClassIds, ...restoredClassIds]);
+    for (const spriteKey of Object.keys(runtime.assets?.unitSprites ?? {})) {
+      const separator = spriteKey.indexOf("-");
+      const classId = separator >= 0 ? spriteKey.slice(separator + 1) : spriteKey;
+      if (isClassId(classId)) encounterClassIds.add(classId);
+    }
+    await this.stageAssetGate?.(stageId, {
+      allyClassIds,
+      encounterClassIds: [...encounterClassIds],
+    });
+    return runtime;
   }
 
   async enterStage(
@@ -4802,6 +4819,7 @@ export class GameController {
     const runtime = await this.loadRuntime(
       save.stageId,
       save.roster.map(({ classId }) => classId),
+      save.battle.units.map(({ classId }) => classId),
     );
     const battle = runtime.restoreBattle(campaign, save.battle);
     this.stageRuntime = runtime;

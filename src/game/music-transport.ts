@@ -2,6 +2,7 @@ import {
   buildIntroLoopMusicSchedule,
   buildLoopMusicSchedule,
 } from "./music-schedule";
+import { loadEncodedMusic, releaseEncodedMusic } from "./music-resource-cache";
 
 export type MusicPart = "entry" | "loop";
 
@@ -151,13 +152,7 @@ export class MusicTransport {
   private preloadUrl(url: string): Promise<ArrayBuffer> {
     const existing = this.encoded.get(url);
     if (existing) return existing;
-    const request = fetch(url).then(async (response) => {
-      if (!response.ok) throw new Error(`music request failed (${response.status}): ${url}`);
-      return response.arrayBuffer();
-    });
-    // Preloading is intentionally speculative. Keep its rejection observed;
-    // schedule() will surface the same cached failure when the track is needed.
-    void request.catch(() => undefined);
+    const request = loadEncodedMusic(url);
     this.encoded.set(url, request);
     return request;
   }
@@ -167,11 +162,13 @@ export class MusicTransport {
     const existing = this.decoded.get(cacheKey);
     if (existing) return existing;
     const context = this.ensureContext();
-    const decoded = this.preloadUrl(url).then(async (encoded) => {
+    const encodedRequest = this.preloadUrl(url);
+    const decoded = encodedRequest.then(async (encoded) => {
       const source = await context.decodeAudioData(encoded.slice(0));
       // The decoded AudioBuffer is the long-lived runtime copy. Releasing the
       // fetched PCM bytes avoids retaining both 16-bit and float representations.
       this.encoded.delete(url);
+      releaseEncodedMusic(url, encodedRequest);
       return periodic ? this.createPeriodicBuffer(source) : source;
     });
     void decoded.catch(() => undefined);

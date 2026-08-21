@@ -184,6 +184,41 @@ export function techniqueActionIdsFor(
   });
 }
 
+/**
+ * Presentation loading cannot assume a unit stays on its current growth row:
+ * it may gain a technique tier during the battle. Return every action this
+ * class can expose on the requested side so its visual atlas is ready before
+ * the scene starts, without pulling unrelated professions into the pack.
+ */
+export function presentationActionIdsForClass(
+  classId: ClassId,
+  side: BattleUnit["side"],
+): readonly BattleActionId[] {
+  const actionIds = new Set<BattleActionId>();
+  const shooting = shootingActionIdFor(classId, side);
+  if (shooting) actionIds.add(shooting);
+  const definition = classDefinition(classId);
+  if (definition.directTechnique) {
+    const direct = DIRECT_TECHNIQUE_ACTION_BY_CLASS[
+      classId as keyof typeof DIRECT_TECHNIQUE_ACTION_BY_CLASS
+    ];
+    if (direct) actionIds.add(direct as BattleActionId);
+  }
+  for (const tier of definition.technique?.tiers ?? []) {
+    for (const action of tier.actions) {
+      const actionId = TECHNIQUE_ACTION_BY_NATIVE_CODE[
+        action.actionCode as keyof typeof TECHNIQUE_ACTION_BY_NATIVE_CODE
+      ];
+      if (!actionId) throw new Error(`unsupported native technique code ${action.actionCode}`);
+      actionIds.add(actionId);
+    }
+  }
+  // The 0P/1P dispatcher uses the WD presentation outside the ordinary tier
+  // table. It remains a shared action-family atlas, not a bespoke class image.
+  if (classId === "empress" || classId === "dragon") actionIds.add("wd");
+  return [...actionIds];
+}
+
 export type IceActionId = Extract<BattleActionId, "ice-1" | "ice-2" | "ice-3" | "ice-4">;
 
 export function isIceActionId(actionId: BattleActionId | undefined): actionId is IceActionId {

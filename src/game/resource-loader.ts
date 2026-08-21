@@ -4,6 +4,7 @@ import {
   RESOURCE_MANIFEST_VERSION,
 } from "./content/resource-manifest.generated";
 import type { StageId } from "./types";
+import { isMusicResourceUrl, primeEncodedMusic } from "./music-resource-cache";
 
 export interface ResourceManifestAsset {
   url: string;
@@ -110,8 +111,8 @@ export class ResourcePackLoader {
     await this.ensurePackVisible(route, label);
   }
 
-  prefetchStage(stageId: StageId): void {
-    void this.prefetchPack(`stage:${stageId}`);
+  prefetchStage(stageId: StageId, supplementalUrls: readonly string[] = []): void {
+    void this.prefetchPack(`stage:${stageId}`, supplementalUrls);
   }
 
   async prefetchFollowing(stageId: StageId): Promise<void> {
@@ -136,10 +137,13 @@ export class ResourcePackLoader {
     }
   }
 
-  private async prefetchPack(packId: string): Promise<void> {
+  private async prefetchPack(
+    packId: string,
+    supplementalUrls: readonly string[] = [],
+  ): Promise<void> {
     try {
       const manifest = await this.loadManifest();
-      const urls = this.resolvePackUrls(manifest, packId);
+      const urls = [...new Set([...this.resolvePackUrls(manifest, packId), ...supplementalUrls])];
       await this.loadUrls(manifest, urls);
     } catch (error) {
       console.warn(`background resource prefetch failed for ${packId}`, error);
@@ -222,15 +226,35 @@ export class ResourcePackLoader {
     const pending = this.fetchAsset(asset.url).then(async (response) => {
       if (!response.ok) throw new Error(`讀取失敗（${response.status}）：${asset.url}`);
       const reader = response.body?.getReader();
+      const musicChunks: Uint8Array[] | undefined = isMusicResourceUrl(asset.url) ? [] : undefined;
+      let musicBytes = 0;
       if (!reader) {
-        await response.arrayBuffer();
+        const encoded = await response.arrayBuffer();
+        if (musicChunks) {
+          musicChunks.push(new Uint8Array(encoded));
+          musicBytes = encoded.byteLength;
+        }
       } else {
         while (true) {
           const result = await reader.read();
           if (result.done) break;
+          if (musicChunks) {
+            musicChunks.push(result.value);
+            musicBytes += result.value.byteLength;
+          }
           state.loadedBytes = Math.min(asset.bytes, state.loadedBytes + result.value.byteLength);
           this.renderProgress(manifest);
         }
+      }
+      if (musicChunks) {
+        const encoded = new ArrayBuffer(musicBytes);
+        const encodedView = new Uint8Array(encoded);
+        let offset = 0;
+        for (const chunk of musicChunks) {
+          encodedView.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        primeEncodedMusic(asset.url, encoded);
       }
       state.loadedBytes = asset.bytes;
       state.complete = true;

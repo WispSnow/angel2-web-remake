@@ -87,6 +87,7 @@ describe("versioned resource manifest", () => {
     const stage0 = resolvedPackUrls(manifest, "stage:stage-00");
     expect(stage0).toContain("/assets/original/stage0-map.png");
     expect(stage0).toContain("/assets/original/music/generated/stage0-player-seamless.ogg");
+    expect(stage0).toContain("/assets/original/music/MUSIC/0016.ogg");
     expect(stage0).not.toContain("/assets/original/stage1-map.png");
     expect(stage0).not.toContain("/assets/original/full-combat-atlases/left-soldier.png");
     expect(stage0).not.toContain("/assets/original/portraits/D-46-base.png");
@@ -94,6 +95,27 @@ describe("versioned resource manifest", () => {
     const stage4 = resolvedPackUrls(manifest, "stage:stage-04");
     expect(stage4).toContain("/assets/original/battle-sprite-atlases/stage4-force-field-pulse.png");
     expect(stage4).not.toContain("/assets/original/stage26-map.png");
+
+    for (const stageId of stageIds) {
+      const nativeStage = Number(stageId === "stage-42-portal" ? 42 : stageId.slice("stage-".length));
+      const deploymentTrack = String(nativeStage > 5 ? 17 : 16).padStart(4, "0");
+      const stageUrls = resolvedPackUrls(manifest, `stage:${stageId}`);
+      expect(stageUrls).toContain(
+        `/assets/original/music/MUSIC/${deploymentTrack}.ogg`,
+      );
+      expect([...stageUrls].filter((url) => url.includes("/music/")).length).toBeGreaterThanOrEqual(5);
+    }
+
+    const ending = resolvedPackUrls(manifest, "ending");
+    for (const url of [
+      "/assets/original/music/MAGIC/0077.ogg",
+      "/assets/original/music/MUSIC/0040.ogg",
+      "/assets/original/music/UN/0006.ogg",
+      "/assets/original/music/UN/0049.ogg",
+    ]) expect(ending).toContain(url);
+    expect(resolvedPackUrls(manifest, "credits")).toContain(
+      "/assets/original/music/UN/0055.ogg",
+    );
 
     expect(resolvedPackUrls(manifest, "stream:full-combat").size).toBe(172);
     expect(resolvedPackUrls(manifest, "stream:portraits").size).toBe(500);

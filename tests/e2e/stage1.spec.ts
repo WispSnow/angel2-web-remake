@@ -318,6 +318,9 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   await page.keyboard.press("Escape");
   await page.getByTestId("system-command-load").click();
   await page.getByTestId("record-slot-2").click();
+  await expect.poll(async () => JSON.stringify((await state(page)).units)).toBe(
+    JSON.stringify(checkpoint.units),
+  );
   const restored = await state(page);
   expect(restored).toMatchObject({
     stageId: "stage-01",

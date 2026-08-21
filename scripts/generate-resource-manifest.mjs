@@ -90,6 +90,12 @@ for (const stageId of stageIds) {
     selectedSource = source.slice(source.indexOf("export const STAGE42_ASSETS"), source.indexOf("export const STAGE5_MUSIC_PROGRAMS"));
   }
   const urls = sourceAssetUrls(selectedSource);
+  const nativeStage = Number(stageId === "stage-42-portal" ? 42 : stageId.slice("stage-".length));
+  // Module 27 selects one of two standalone deployment loops by native scene
+  // number. It lives outside the per-stage content modules, so attach it here
+  // explicitly or the preparation scene could become visible before its BGM
+  // has crossed the staged resource gate.
+  urls.add(musicUrl("MUSIC", nativeStage > 5 ? 17 : 16));
   urls.add(assetUrl(`map-actions/iron-plate/${stageId}.png`));
   urls.add(assetUrl(`map-actions/obstacle/${stageId}.png`));
   stageAssetUrls.set(stageId, urls);
