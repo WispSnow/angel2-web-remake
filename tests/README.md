@@ -57,7 +57,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 半龍戰士 `1N` 直连技術「傳送」：seed 200／模式 `0` 传播、空格落点、行动消耗与移動路径表现 | `half-dragon-teleport.test.ts`，职业菜单口径另见 `classes.test.ts` | `stage22.spec.ts` 的 `S22-J`、`class-showdown.spec.ts` 的傳送用例 |
 | `promotion-lab-session.ts`、转职触发阈值与全候选 UI | `promotion-lab.test.ts`、`promotion.test.ts` | `promotion-lab.spec.ts`，入口另见 `debug.spec.ts` |
 | 踩踏与目标落点 | `technique-lab.test.ts` 的 stomp 用例 | `technique-lab.spec.ts`、`arena-stomp.spec.ts`、`class-showdown.spec.ts` 的 stomp 用例 |
-| 全景普通战斗（含迅龍騎士原版 frame 3 `-16` 证据保留与仅格挡投影 `+16 px` 落地补偿） | `full-combat.test.ts` | `combat-lab.spec.ts` 的左右迅龍格挡视觉用例，或相关关卡用例 |
+| 全景普通战斗（含原生 `(250,135)/(650,-150)` 先攻／反击通道初始化、骑兵 G1 1:1 投影、`REMAKE-121` reaction 画布中心校正，以及迅龍 frame 3 `-16` 证据保留／仅格挡 `+16 px` 落地补偿） | `full-combat.test.ts` | `combat-lab.spec.ts` 的骑兵／弩兵／左右迅龍用例、`compendium.spec.ts` 的 reaction 注册用例，或相关关卡用例 |
 | 普通战斗信息栏时序：地图与全景表现期间只显示叙述行，战果在演出结束后才写入（玩家攻击与敌我 AI 攻击共用） | 无独立模拟数值测试（信息栏是派生表现） | `stage0.spec.ts` 的「the status strip reports ordinary-combat damage only after the presentation」 |
 | `content/full-combat-backgrounds*` 的关卡表、受击方地形改写与 `C.SWF` 背景素材 | `full-combat-backgrounds.test.ts` | `full-combat-background.spec.ts`，第 0 关表值路径另见 `stage0.spec.ts` |
 | 调试中心与场景目录 | `debug-roster-profiles.test.ts` | `debug.spec.ts` |

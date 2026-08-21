@@ -1299,7 +1299,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   position: absolute;
   z-index: 3;
   left: 0;
-  bottom: 21px;
+  bottom: 13px;
   width: 0;
   height: 0;
 }

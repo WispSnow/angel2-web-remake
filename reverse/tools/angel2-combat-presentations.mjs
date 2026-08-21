@@ -808,6 +808,25 @@ async function extract(
       sequenceEntry: "0000:A17B",
       strikeEntry: "0000:A1E8",
       commandInterpreter: "0000:A77F",
+      coordinateSystem: {
+        compositor: {
+          leftEntry: "0000:B0FF",
+          rightEntry: "0000:B29B",
+          xFormula: "channelX - frameXAnchor",
+          yFormula: "channelY - bitmapHeight + frameYOffset",
+          conclusion: "both physical sides consume the same channel coordinate system; apparent per-frame registration differences come from their independent frame anchor tables",
+        },
+        characterInitialization: {
+          primaryEntry: "0000:A2E4",
+          counterEntry: "0000:A377",
+          actor: { x: 250, y: 135 },
+          opponentByActorSide: {
+            left: { x: 650, y: 135 },
+            right: { x: -150, y: 135 },
+          },
+          counterBehavior: "A377 initializes the counter actor at x=250 and the opponent at the opposite off-screen entry exactly like A2E4; it does not inherit either primary-strike character x",
+        },
+      },
       commonTrail: {
         drawEntry: "0000:B3BD",
         graphicResource: "A/26",
@@ -972,7 +991,7 @@ async function extract(
       ],
     },
     evidenceBoundary: {
-      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
+      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, shared full-screen channel/compositor coordinates and primary/counter initialization, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
       preservedUnknown: "the original design names of many embedded full-screen command fields and the host/VGA duration of one full-screen renderer substep; the released nominal native timer tick is 10.000151 ms",
       implementation: "none; this export is phase-1 evidence only",
     },
@@ -987,6 +1006,13 @@ async function extract(
     "MAGIC/12 must render 38 frames");
   assert(result.fullScreenPresentation.sideVoiceSlotDifferenceRecords.join(",") === "17,23",
     "unexpected side voice-slot differences");
+  assert(result.fullScreenPresentation.coordinateSystem.characterInitialization.actor.x === 250
+    && result.fullScreenPresentation.coordinateSystem.characterInitialization.actor.y === 135
+    && result.fullScreenPresentation.coordinateSystem.characterInitialization
+      .opponentByActorSide.left.x === 650
+    && result.fullScreenPresentation.coordinateSystem.characterInitialization
+      .opponentByActorSide.right.x === -150,
+  "unexpected full-screen character initialization coordinates");
   assert(
     classRecords.filter((record) => !record.side1.available)
       .map((record) => record.record).join(",") === SIDE1_ONLY_UNAVAILABLE_RECORDS.join(","),

@@ -178,6 +178,60 @@ test("職業圖鑑：默认静态站立，棋子与全景共用阵营且四种�
   await expect(page.getByTestId("compendium-combat-stage")).toHaveAttribute("data-static", "true");
 });
 
+test("職業圖鑑：REMAKE-121 让点名的受击画布保持同侧站立中心", async ({ page }) => {
+  await page.goto("/");
+  await openCompendium(page, "classes");
+  const detail = page.getByTestId("compendium-detail");
+  const victim = detail.getByTestId("full-victim-sprite");
+  const visualRegistration = () => victim.evaluate((image) => {
+    const box = image.getBoundingClientRect();
+    const scene = image.closest(".full-combat-scene")?.getBoundingClientRect();
+    if (!scene) throw new Error("full-combat scene is missing");
+    const scale = scene.width / 448;
+    return ((box.left + box.width / 2) - scene.left) / scale - Number(image.dataset.x);
+  });
+  const cases = [
+    { classId: "beast-knight", side: "ally", correction: "37" },
+    { classId: "magic-priest", side: "ally", correction: "51" },
+    { classId: "wizard", side: "enemy", correction: "37" },
+  ] as const;
+
+  for (const entry of cases) {
+    await page.getByTestId(`compendium-class-${entry.classId}`).click();
+    await detail.getByTestId(`compendium-side-${entry.side}`).click();
+    await detail.getByTestId("compendium-animation-stand").click();
+    await expect(victim).toHaveAttribute("data-frame", "0");
+    const standingRegistration = await visualRegistration();
+    await detail.getByTestId("compendium-animation-death").click();
+    await expect(victim).toHaveAttribute("data-reaction", "death");
+    await expect(victim).toHaveAttribute("data-x-offset-correction", entry.correction);
+    expect(Math.abs((await visualRegistration()) - standingRegistration)).toBeLessThanOrEqual(1);
+    await captureVisualAudit(page.locator(".rn-dialog"), {
+      path: `artifacts/playwright/compendium-${entry.classId}-${entry.side}-death-registration.png`,
+      animations: "allow",
+    });
+  }
+
+  await page.getByTestId("compendium-class-great-dragon-knight").click();
+  await detail.getByTestId("compendium-side-enemy").click();
+  await detail.getByTestId("compendium-animation-stand").click();
+  const standingRegistration = await visualRegistration();
+  for (const reaction of [
+    { action: "guard", correction: "33" },
+    { action: "hurt", correction: "69" },
+    { action: "death", correction: "65" },
+  ] as const) {
+    await detail.getByTestId(`compendium-animation-${reaction.action}`).click();
+    await expect(victim).toHaveAttribute("data-reaction", reaction.action);
+    await expect(victim).toHaveAttribute("data-x-offset-correction", reaction.correction);
+    expect(Math.abs((await visualRegistration()) - standingRegistration)).toBeLessThanOrEqual(1);
+  }
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/compendium-great-dragon-reaction-registration.png",
+    animations: "allow",
+  });
+});
+
 test("職業圖鑑：窄屏的阵营与动作控件不会挤出详情栏", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

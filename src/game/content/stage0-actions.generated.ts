@@ -32336,6 +32336,35 @@ export const STAGE0_FULL_COMBAT_PROFILES = {
   }
 } as const;
 
+export const STAGE0_FULL_COMBAT_GEOMETRY = {
+  "compositor": {
+    "leftEntry": "0000:B0FF",
+    "rightEntry": "0000:B29B",
+    "xFormula": "channelX - frameXAnchor",
+    "yFormula": "channelY - bitmapHeight + frameYOffset",
+    "conclusion": "both physical sides consume the same channel coordinate system; apparent per-frame registration differences come from their independent frame anchor tables"
+  },
+  "characterInitialization": {
+    "primaryEntry": "0000:A2E4",
+    "counterEntry": "0000:A377",
+    "actor": {
+      "x": 250,
+      "y": 135
+    },
+    "opponentByActorSide": {
+      "left": {
+        "x": 650,
+        "y": 135
+      },
+      "right": {
+        "x": -150,
+        "y": 135
+      }
+    },
+    "counterBehavior": "A377 initializes the counter actor at x=250 and the opponent at the opposite off-screen entry exactly like A2E4; it does not inherit either primary-strike character x"
+  }
+} as const;
+
 export const STAGE0_FULL_COMBAT_ASSETS = {
   "left": {
     "soldier": {

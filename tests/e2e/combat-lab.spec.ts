@@ -618,11 +618,11 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
 
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt!);
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
-  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-x", "328");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-x", "245");
   // Contact returns the surviving G1 channel to the up-canted frame 6 and the
   // lance deflects out of the window instead of driving frame 8 into the floor.
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
-  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "349");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "260");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "118");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-hurt.png",
@@ -631,7 +631,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
 
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 100);
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
-  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "409");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "320");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "86");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-contact-follow-through.png",
@@ -639,7 +639,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   });
 
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 200);
-  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "469");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "380");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "54");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-deflection-exit.png",
@@ -647,6 +647,8 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
   });
 
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 250);
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "410");
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 400);
   await expect(page.locator(".full-combat-lance")).toBeHidden();
   await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), holdAt!);
   await expect(page.locator(".full-combat-lance")).toBeHidden();
@@ -677,9 +679,9 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
     (time) => window.__ANGEL2_COMBAT_LAB__?.seek(time),
     mirroredImpactAt!,
   );
-  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-x", "120");
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-x", "255");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
-  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "106");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "232");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-record-22-mirrored-contact.png",
     fullPage: true,
@@ -690,7 +692,7 @@ test("record 22 cavalry passes throw, flight, guard, hurt and death visual gates
     mirroredImpactAt! + 100,
   );
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-frame", "6");
-  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "46");
+  await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-x", "172");
   await expect(page.locator(".full-combat-lance")).toHaveAttribute("data-y", "86");
 });
 
@@ -708,21 +710,21 @@ for (const side of ["left", "right"] as const) {
     // reached the ground line yet.
     await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 200);
     await expect(actor).toHaveAttribute("data-frame", "4");
-    await expect(actor).toHaveAttribute("data-lift", "107");
+    await expect(actor).toHaveAttribute("data-lift", "115");
 
     // `:S` y=120 is a battle-window bottom anchor, so the last descent substep
-    // and the landed frame 5 both sit 7 px above the y=127 ground line. The
+    // and the landed frame 5 both sit 15 px above the y=135 ground line. The
     // old ground-relative reading buried them 120 px under the floor.
     await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 40);
     await expect(actor).toHaveAttribute("data-frame", "4");
-    await expect(actor).toHaveAttribute("data-lift", "7");
+    await expect(actor).toHaveAttribute("data-lift", "15");
 
     await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt!);
     await expect(actor).toHaveAttribute("data-frame", "5");
-    await expect(actor).toHaveAttribute("data-lift", "7");
+    await expect(actor).toHaveAttribute("data-lift", "15");
     await expect(actor).toHaveAttribute("data-x", side === "left" ? "266" : "216");
     await expect(page.getByTestId("full-victim-sprite"))
-      .toHaveAttribute("data-x", side === "left" ? "250" : "198");
+      .toHaveAttribute("data-x", "250");
 
     await waitForVisibleSpriteImages(page);
     const contact = await page.evaluate(() => {

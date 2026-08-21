@@ -1,7 +1,8 @@
 // Full-screen ordinary-combat choreography, calibrated frame-by-frame against
 // the 75 fps DOSBox-X capture of the two stage-0 battles
 // (ref/战斗场景视频.mp4). All positions are battle-window scene coordinates:
-// a 448×134 viewport at game position (96,158) whose ground line is y≈127.
+// a 448×148 viewport at game position (96,158) whose character-channel ground
+// line is y=135 (A2E4/A377 initialize both physical sides with BX=0087h).
 // The scene background is a 448-cycle with two parallax layers: rows 0..109
 // scroll with the camera at 1×, rows 110..147 (near floor) at 2×.
 //
@@ -34,6 +35,7 @@
 import {
   STAGE0_FULL_COMBAT_DEATH,
   STAGE0_FULL_COMBAT_FRAME_META,
+  STAGE0_FULL_COMBAT_GEOMETRY,
   STAGE0_FULL_COMBAT_PROFILES,
 } from "./content/stage0-actions.generated";
 import { FULL_COMBAT_BACKGROUND_FALLBACK_RECORD } from "./content/full-combat-backgrounds.generated";
@@ -51,7 +53,7 @@ export const FULL_SCENE = {
   width: 448,
   height: 134,
   stripHeight: 14,
-  groundY: 127,
+  groundY: STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization.actor.y,
   nearLayerTop: 110,
 } as const;
 
@@ -68,6 +70,8 @@ export interface FullCombatSpriteState {
   lift: number;
   /** Explicit remake-only correction applied after the original frame y-offset. */
   yOffsetCorrection?: number;
+  /** Explicit remake-only correction applied after the original frame x-anchor. */
+  xOffsetCorrection?: number;
   mirror: boolean;
   opacity: number;
 }
@@ -193,11 +197,6 @@ const OPEN = {
   sceneAt: 600,
 } as const;
 
-const RANGED = {
-  /** Screen gap between a thrower and its target when the strike is ranged. */
-  separation: 182,
-} as const;
-
 // Module 29 drives class scripts with discrete renderer substeps. The stage-0
 // capture calibrates the strike stream to about 40 ms per substep; post-hit
 // streams include the renderer's hit-feedback overhead and land at about
@@ -208,21 +207,6 @@ const NATIVE_POST_HIT_SUBSTEP = 50;
 // The remake uses the user-approved two-thirds tuning for both exchange and
 // final nonfatal holds, keeping those two exits perceptually consistent.
 const FULL_COMBAT_HOLD = 667;
-// The captured right-hand G1 bitmap is the calibrated source. Mirroring its
-// frame-8 trimmed bounds into the 448 px viewport places the left anchor 37 px
-// before the raw left-script projection.
-const CAVALRY_LEFT_LANCE_MIRROR_OFFSET = -37;
-
-const ATTACKER_ANCHOR = 253; // left-side primary attacker windup mark
-// Record 22's absolute G1 coordinates contact x=328/120 in the capture. Its
-// primary rider therefore begins 182 px opposite that mark instead of using
-// the melee-oriented common attacker anchor.
-const CAVALRY_ATTACKER_ANCHOR = 146;
-const PRIMARY_VICTIM_MARK = 302; // victim mark when attacked from the left
-const COUNTER_VICTIM_MARK = 205; // victim mark when attacked from the right
-// Record 21's defender stream runs -400/+400 px from the native 650/-202 entry
-// mark, so the crossbow's target settles at 250/198 no matter which side fires.
-const CROSSBOW_VICTIM_MARK = 250;
 // Measured on the capture: the number lands on the floor about 60 px to the
 // victim's far side, its baseline just under the scene's bottom edge.
 const DAMAGE_OFFSET = 60;
@@ -233,10 +217,10 @@ interface StrikeSpec {
   actorClass: FullCombatClass;
   victimClass: FullCombatClass;
   actorX: number;
+  /** Native off-screen entry x assigned by A2E4/A377. */
+  victimStartX: number;
   /** Shared main-channel x consumed by native movement and common effects. */
   victimX: number;
-  /** Renderer-only correction for unusually wide reaction bitmaps. */
-  victimSpriteX: number;
   cameraFrom: number;
   damage: number;
   victimDies: boolean;
@@ -513,6 +497,43 @@ function nativeFrameIntersectsViewport(
   if (!meta) return true;
   const left = x - meta.anchor;
   return left < FULL_SCENE.width && left + meta.w > 0;
+}
+
+type FullCombatVictimReaction = NonNullable<FullCombatSpriteState["reaction"]>;
+
+// REMAKE-121 keeps the original placement tables as evidence, but neutralizes
+// the specific reaction-frame registration defects reported through the class
+// compendium. The correction aligns the affected bitmap canvas centre with its
+// own side's direct standing frame; logical channels, shared trails, damage
+// numbers, camera motion and simulation state continue to use the native x.
+const STABLE_REMAKE_REACTION_CENTERING = {
+  death: {
+    left: [0, 3, 5, 16, 19, 27, 29, 31, 32],
+    right: [2, 16, 19, 25, 29, 31, 32],
+  },
+  hurt: { left: [19], right: [19] },
+  guard: { left: [19], right: [19] },
+} as const satisfies Record<
+  FullCombatVictimReaction,
+  Record<"left" | "right", readonly number[]>
+>;
+
+function victimReactionXOffsetCorrection(
+  classRecord: FullCombatClass,
+  side: "left" | "right",
+  reaction: FullCombatVictimReaction,
+  frame: number,
+): number | undefined {
+  const records = STABLE_REMAKE_REACTION_CENTERING[reaction][side] as readonly number[];
+  if (!records.includes(classRecord)) return undefined;
+  const frames = FULL_COMBAT_FRAME_META[side][classRecord]?.direct;
+  const standing = frames?.[0];
+  const current = frames?.[frame];
+  if (!standing || !current) return undefined;
+  const standingCenter = standing.w / 2 - standing.anchor;
+  const currentCenter = current.w / 2 - current.anchor;
+  const correction = standingCenter - currentCenter;
+  return correction === 0 ? undefined : correction;
 }
 
 type NativeAnimationMode = "none" | "alternate" | "cycle4" | "cycle6";
@@ -830,7 +851,7 @@ function nativeClassActorSprite(
       // Crossbow step 5 hands the character channel absolute window
       // coordinates: the giant bolt falls from y=-105, well above the window,
       // down to the y=120 ground anchor. Reading that as a ground-relative
-      // lift buries the whole descent 127 px below the floor.
+      // lift buries the whole descent 135 px below the floor.
       lift: nativeActorLift(pose),
     };
   }
@@ -883,22 +904,14 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
       spec.actorSide,
       "mainRightOrDefender",
     );
-    const duration = nativeStreamDuration(stream, NATIVE_STRIKE_SUBSTEP);
-    const endPose = sampleNativeStream(
-      stream,
-      duration,
-      NATIVE_STRIKE_SUBSTEP,
-      0,
-      0,
-    );
     const pose = sampleNativeStream(
       stream,
       t - spec.start,
       NATIVE_STRIKE_SUBSTEP,
-      0,
+      spec.victimStartX,
       0,
     );
-    const x = spec.victimSpriteX + pose.x - endPose.x;
+    const x = pose.x;
     if (!nativeFrameIntersectsViewport(
       base.side,
       spec.victimClass,
@@ -925,7 +938,7 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
     reactionStream,
     t - times.impact,
     NATIVE_POST_HIT_SUBSTEP,
-    spec.victimSpriteX,
+    spec.victimX,
     0,
   );
   let frame = pose.frame;
@@ -943,13 +956,20 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
   // dragon knight hover only while guarding. Keep the evidence table intact
   // and neutralize the inherited defect at the remake projection boundary.
   const yOffsetCorrection = spec.victimClass === 18 && reaction === "guard" ? 16 : undefined;
+  const xOffsetCorrection = victimReactionXOffsetCorrection(
+    spec.victimClass,
+    victimSide,
+    reaction,
+    frame,
+  );
   return {
     ...base,
     frame,
     reaction,
-    x: spec.victimSpriteX,
+    x: spec.victimX,
     lift,
     yOffsetCorrection,
+    xOffsetCorrection,
     opacity: 1,
   };
 }
@@ -960,21 +980,6 @@ function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSce
   const main = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
   const linked = nativeLinkedCommand(main, "G1", NATIVE_STRIKE_SUBSTEP);
   if (!linked) return undefined;
-  const startPose = sampleNativeStream(
-    linked.steps,
-    0,
-    NATIVE_STRIKE_SUBSTEP,
-    0,
-    0,
-  );
-  // Flight-only stretch that keeps the four-unit script increments reaching the
-  // current cavalry contact geometry. The capture actually projects G1 at one
-  // pixel per script unit, so this factor stands until the open cavalry-geometry
-  // conflict in reverse/notes/ordinary-combat-presentations.md is decided.
-  const flightX = (scriptX: number): number =>
-    startPose.x + (scriptX - startPose.x) * 2.5
-      + (spec.actorSide === "left" ? CAVALRY_LEFT_LANCE_MIRROR_OFFSET : 0);
-
   const present = (pose: NativeStreamSample, x: number): FullCombatSceneState["lance"] =>
     nativeFrameIntersectsViewport(spec.actorSide, spec.actorClass, "plus50", pose.frame, x)
       ? { x, y: pose.y, frame: pose.frame, side: spec.actorSide }
@@ -982,13 +987,11 @@ function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSce
 
   if (t < times.lanceTo) {
     const pose = sampleNativeStream(linked.steps, t - times.lanceFrom, NATIVE_STRIKE_SUBSTEP, 0, 0);
-    return present(pose, flightX(pose.x));
+    return present(pose, pose.x);
   }
   const deflection = cavalryLanceDeflection(linked, times, t);
   if (!deflection) return undefined;
-  // The capture projects the deflection one screen pixel per script unit, so the
-  // exit keeps the native slope measured from the contact point.
-  return present(deflection, flightX(deflection.contactX) + (deflection.x - deflection.contactX));
+  return present(deflection, deflection.x);
 }
 
 /**
@@ -1367,13 +1370,6 @@ function nativePresentationAt(
   };
   const mainActor = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
   const mainVictim = nativeMainStream(spec.actorClass, spec.actorSide, "mainRightOrDefender");
-  const mainVictimEnd = sampleNativeStream(
-    mainVictim,
-    nativeStreamDuration(mainVictim, NATIVE_STRIKE_SUBSTEP),
-    NATIVE_STRIKE_SUBSTEP,
-    0,
-    0,
-  );
   const mainAge = Math.min(t - spec.start, times.impact - spec.start);
   advanceNativePresentationPhase(
     state,
@@ -1385,10 +1381,16 @@ function nativePresentationAt(
     (substep) => {
       const age = substep * NATIVE_STRIKE_SUBSTEP;
       const actor = sampleNativeStream(mainActor, age, NATIVE_STRIKE_SUBSTEP, spec.actorX, 0);
-      const victim = sampleNativeStream(mainVictim, age, NATIVE_STRIKE_SUBSTEP, 0, 0);
+      const victim = sampleNativeStream(
+        mainVictim,
+        age,
+        NATIVE_STRIKE_SUBSTEP,
+        spec.victimStartX,
+        0,
+      );
       return {
         actorX: actor.x,
-        victimX: spec.victimX + victim.x - mainVictimEnd.x,
+        victimX: victim.x,
       };
     },
   );
@@ -1446,7 +1448,7 @@ function nativePresentationAt(
 function damageAt(spec: StrikeSpec, times: StrikeTimes, t: number, holdEnd: number): FullCombatSceneState["damage"] {
   if (t < times.impact || t > holdEnd) return undefined;
   const attackDir = spec.actorSide === "left" ? 1 : -1;
-  return { amount: spec.damage, x: spec.victimSpriteX + attackDir * DAMAGE_OFFSET };
+  return { amount: spec.damage, x: spec.victimX + attackDir * DAMAGE_OFFSET };
 }
 
 function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
@@ -1562,59 +1564,22 @@ function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
 
 let battleKeyCounter = 0;
 
-/**
- * Where the target stands when the blow lands. A melee attacker closes to its
- * measured contact mark; a thrower keeps the whole javelin flight between
- * them, so the target waits far across the window.
- */
-function victimMark(actorClass: FullCombatClass, actorX: number, dir: 1 | -1, meleeMark: number): number {
-  if (actorClass === 20) {
-    // Archer G1 travels 21 native substeps from x=146/336 to x=272/210.
-    // The direct target stream enters to the corresponding x=290/158 mark,
-    // leaving the frame-5 arrow head at the target body on contact.
-    return actorX + dir * 37;
-  }
-  if (actorClass === 24) {
-    // Native setup starts both sister attacks at x=250 and leaves the target
-    // four pixels toward the attack direction (254/246). The orb itself ends
-    // 45 px behind that anchor; its 88 px frame then overlaps the target's
-    // reaction bitmap instead of landing in the empty space before it.
-    return actorX + dir * 4;
-  }
-  if (actorClass === 21) {
-    // The crossbow bolt is the only strike whose contact point is written as
-    // an absolute `:S` coordinate (266/216), so it cannot be moved to meet the
-    // target — the target has to stand on its own native mark. Running the
-    // -400/+400 px defender stream from the native 650/-202 entry leaves it at
-    // 250/198, which plants the bolt just past the victim's ground anchor.
-    return dir === 1 ? CROSSBOW_VICTIM_MARK : FULL_SCENE.width - CROSSBOW_VICTIM_MARK;
-  }
-  if (!isRanged(actorClass)) return meleeMark;
-  const ranged = actorX + dir * RANGED.separation;
-  return Math.max(70, Math.min(FULL_SCENE.width - 70, ranged));
-}
-
-/**
- * The great dragon knight's direct guard frame is a 160 px shield bitmap,
- * rather than a body-sized reaction frame. Keep its accepted centering as a
- * renderer-only projection: module 29's common B3BD trail always reads the
- * shared main-channel x and never applies a class or frame-specific offset.
- */
-function guardVictimSpriteMark(
-  victimClass: FullCombatClass,
-  victimSide: "left" | "right",
-  damage: number,
-  fallback: number,
-): number {
-  if (victimClass !== 19 || damage > 10) return fallback;
-  return victimSide === "left"
-    ? FULL_SCENE.width - PRIMARY_VICTIM_MARK
-    : PRIMARY_VICTIM_MARK;
-}
-
-function primaryActorMark(actorClass: FullCombatClass, attackerLeft: boolean): number {
-  const leftMark = actorClass === 22 ? CAVALRY_ATTACKER_ANCHOR : ATTACKER_ANCHOR;
-  return attackerLeft ? leftMark : FULL_SCENE.width - leftMark;
+function nativeStrikeCoordinates(
+  actorClass: FullCombatClass,
+  actorSide: "left" | "right",
+): Pick<StrikeSpec, "actorX" | "victimStartX" | "victimX"> {
+  const initialization = STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization;
+  const actorX = initialization.actor.x;
+  const victimStartX = initialization.opponentByActorSide[actorSide].x;
+  const victimStream = nativeMainStream(actorClass, actorSide, "mainRightOrDefender");
+  const victimEnd = sampleNativeStream(
+    victimStream,
+    nativeStreamDuration(victimStream, NATIVE_STRIKE_SUBSTEP),
+    NATIVE_STRIKE_SUBSTEP,
+    victimStartX,
+    0,
+  );
+  return { actorX, victimStartX, victimX: victimEnd.x };
 }
 
 export function buildFullCombatScript(
@@ -1625,30 +1590,16 @@ export function buildFullCombatScript(
 ): FullCombatScript {
   const battleKey = ++battleKeyCounter;
   const attackerLeft = attacker.side === 1;
-  const primaryDir: 1 | -1 = attackerLeft ? 1 : -1;
   const primaryClass = fullCombatClass(attacker.classId);
-  const primaryActorX = primaryActorMark(primaryClass, attackerLeft);
-  const primaryVictimSide: "left" | "right" = attackerLeft ? "right" : "left";
   const primaryVictimClass = fullCombatClass(defender.classId);
-  const primaryVictimX = victimMark(
-    primaryClass,
-    primaryActorX,
-    primaryDir,
-    attackerLeft ? PRIMARY_VICTIM_MARK : FULL_SCENE.width - PRIMARY_VICTIM_MARK,
-  );
+  const primaryActorSide = attackerLeft ? "left" : "right";
+  const primaryCoordinates = nativeStrikeCoordinates(primaryClass, primaryActorSide);
   const primary: StrikeSpec = {
     start: OPEN.sceneAt,
-    actorSide: attackerLeft ? "left" : "right",
+    actorSide: primaryActorSide,
     actorClass: primaryClass,
     victimClass: primaryVictimClass,
-    actorX: primaryActorX,
-    victimX: primaryVictimX,
-    victimSpriteX: guardVictimSpriteMark(
-      primaryVictimClass,
-      primaryVictimSide,
-      result.damage,
-      primaryVictimX,
-    ),
+    ...primaryCoordinates,
     cameraFrom: 0,
     damage: result.damage,
     victimDies: result.defenderDied,
@@ -1660,30 +1611,17 @@ export function buildFullCombatScript(
   let counter: StrikeSpec | undefined;
   let counterTimes: StrikeTimes | undefined;
   if (!primary.final) {
-    const counterDir: 1 | -1 = attackerLeft ? -1 : 1;
     const primaryCameraEnd = cameraAt(primary, primaryTimes, primaryTimes.end);
-    const counterVictimSide: "left" | "right" = attackerLeft ? "left" : "right";
     const counterVictimClass = fullCombatClass(attacker.classId);
-    const counterActorX = primary.victimSpriteX;
-    const counterVictimX = victimMark(
-      fullCombatClass(defender.classId),
-      counterActorX,
-      counterDir,
-      attackerLeft ? COUNTER_VICTIM_MARK : FULL_SCENE.width - COUNTER_VICTIM_MARK,
-    );
+    const counterActorClass = fullCombatClass(defender.classId);
+    const counterActorSide = attackerLeft ? "right" : "left";
+    const counterCoordinates = nativeStrikeCoordinates(counterActorClass, counterActorSide);
     counter = {
       start: primaryTimes.end + FULL_COMBAT_HOLD,
-      actorSide: attackerLeft ? "right" : "left",
-      actorClass: fullCombatClass(defender.classId),
+      actorSide: counterActorSide,
+      actorClass: counterActorClass,
       victimClass: counterVictimClass,
-      actorX: counterActorX,
-      victimX: counterVictimX,
-      victimSpriteX: guardVictimSpriteMark(
-        counterVictimClass,
-        counterVictimSide,
-        result.counterDamage,
-        counterVictimX,
-      ),
+      ...counterCoordinates,
       cameraFrom: primaryCameraEnd,
       damage: result.counterDamage,
       victimDies: result.attackerDied,

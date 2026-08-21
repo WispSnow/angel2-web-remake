@@ -1655,6 +1655,8 @@ export function renderCombat(
     image.dataset.yOffset = String(meta.yOffset ?? 0);
     const yOffsetCorrection = sprite.yOffsetCorrection ?? 0;
     image.dataset.yOffsetCorrection = String(yOffsetCorrection);
+    const xOffsetCorrection = sprite.xOffsetCorrection ?? 0;
+    image.dataset.xOffsetCorrection = String(xOffsetCorrection);
     if (sprite.channel) image.dataset.channel = sprite.channel;
     else delete image.dataset.channel;
     if (sprite.reaction) image.dataset.reaction = sprite.reaction;
@@ -1663,7 +1665,7 @@ export function renderCombat(
     const anchor = sprite.mirror ? meta.w - meta.anchor : meta.anchor;
     const topOffset = -sprite.lift + (meta.yOffset ?? 0) + yOffsetCorrection;
     image.dataset.projectedYOffset = String(Math.round(topOffset));
-    holder.style.transform = `translate(${Math.round(sprite.x - anchor)}px, ${Math.round(topOffset)}px)`;
+    holder.style.transform = `translate(${Math.round(sprite.x - anchor + xOffsetCorrection)}px, ${Math.round(topOffset)}px)`;
     holder.style.opacity = String(sprite.opacity);
     image.style.transform = sprite.mirror ? "scaleX(-1)" : "";
   }
