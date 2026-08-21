@@ -1,0 +1,2 @@
+export const LOGICAL_SCREEN_WIDTH = 640;
+export const LOGICAL_SCREEN_HEIGHT = 350;

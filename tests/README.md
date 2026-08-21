@@ -28,7 +28,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 
 | 改动区域 | 首选单元测试 | 首选浏览器测试 |
 | --- | --- | --- |
-| `src-tauri/`、`package.json#desktop:*` 与 `.github/workflows/desktop-windows.yml` 的 Windows 桌面包边界：稳定应用标识、只消费审计后的 `release/`、Evergreen WebView2、当前用户 NSIS、手动／标签构建、私有 artifact 与 Cloudflare 分离 | `desktop-packaging.test.ts` | Windows runner 构建 artifact；面向玩家发布前另做真实 Windows WebView2 标题至进关、音画、缩放、输入与存档人工验收 |
+| `src-tauri/`、`package.json#desktop:*` 与 `.github/workflows/desktop-windows.yml` 的 Windows 桌面包边界：稳定应用标识、只消费审计后的 `release/`、Evergreen WebView2、当前用户 NSIS、受限窗口尺寸能力、手动／标签构建、私有 artifact 与 Cloudflare 分离 | `desktop-packaging.test.ts` | Windows runner 构建 artifact；面向玩家发布前另做真实 Windows WebView2 标题至进关、音画、缩放、输入与存档人工验收 |
 | `src/game/simulation/actions/`、动作数值与 PRNG | `actions.test.ts` | 对应 `arena-*.spec.ts` 技能族文件；魔弓线路见 `arena-magic-archer-route.spec.ts` |
 | `src/game/simulation/battle.ts` 的普通伤害、地形防御、反击与经验 | `battle.test.ts`，职业特例另见 `classes.test.ts` | 对应关卡或 `class-showdown.spec.ts` |
 | `src/game/simulation/objectives.ts` 的胜负条件、到达区展开与 Phaser 目的地标记 | `objectives.test.ts` | 到达型关卡 `stage4.spec.ts`、`stage9.spec.ts`、`stage11.spec.ts`、`stage23.spec.ts`、`stage24.spec.ts` |
@@ -69,7 +69,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `src/game/ui.ts` 的 `renderResult`：`savePrompt` 的確定／取消選單只在剛進入該畫面時建立節點，選取索引變動只原地切換 `is-selected`／`aria-current`，不重建節點（否則會被當成新掛上的 `.action-menu` 而重播 `native-menu-zoom-in`） | 无独立单元测试（同上，需要 DOM） | `stage23.spec.ts` 的「toggling 確定／取消 in the save-confirm menu reuses its DOM node instead of replaying the pop-in」 |
 | `src/game/input-bindings.ts`、`startup.ts`、`deployment-ui.ts` 与 `ui.ts` 的现代默认键位：方向键／WASD、Enter／Space、Esc／Backspace、Tab 下一待行动单位、G 集体命令、O 胜负条件，以及不冲突的原版相容键和标准手柄战场映射 | `input-bindings.test.ts` | `keyboard-controls.spec.ts`；标题与部署表面另见 `startup.spec.ts`、`deployment-lab.spec.ts` |
 | “遊戲功能”原版“子 選 單”的五项顺序、`ON/OFF`、面板／命中行几何、原版调色板与手形光标，以及键盘和鼠标切换 | 无独立模拟数值测试 | `game-functions-menu.spec.ts` |
-| `src/game/scaling.ts`、`display-settings.ts` 的宿主「畫面縮放」偏好：`sharp`／`smooth`／`integer` 的取值校验、整数倍按装置像素吸附与留边取整，以及逻辑屏外的选择器位置与持久化 | `scaling.test.ts`、`preferences.test.ts` 的「display preferences」 | `display-scaling.spec.ts` |
+| `src/game/scaling.ts`、`desktop-runtime.ts`、`display-settings.ts` 的宿主「畫面縮放」偏好：Web 的最多 1 倍与整数倍留边；桌面客户区按宽高等比自适应、跨 DPR 整数因子、显示器边界及原生窗口目标；逻辑屏外选择器的位置与持久化 | `scaling.test.ts`、`desktop-runtime.test.ts`、`preferences.test.ts` 的「display preferences」 | `display-scaling.spec.ts`，桌面视觉审计用 `VISUAL_AUDIT=1` 生成 `tauri-desktop-1280x800.png` |
 | `src/game/host-overlays.ts` 与 `src/game/overlay/` 的宿主覆盖层骨架，以及 `src/game/remake-notes/` 的「復刻說明」内容：三个入口按钮与「畫面縮放」同行右对齐、各自固定开在第一个分页、说明的五个分页（含键盘／鼠标／手柄操作说明，以及免責聲明的权利归属、非官方／非商业边界与宽窄屏排版）、按键不得抵达战场、`Esc` 关闭并交还焦点、面板打开时敌方阶段照常推进 | 无独立单元测试（策展文字为常量，覆盖层需要 DOM） | `remake-notes.spec.ts` |
 | `src/game/compendium/` 的「圖鑑」覆盖层：职业图鉴对全部 39 个职业目录记录的覆盖、平衡覆写派生、敌我棋子切换及正式全景受击前 `direct frame 0` 静态站立、攻击／格挡／重伤／死亡预览（含右侧限定素材边界），角色图鉴对全部 51 名具名角色的分组、肖像、简介与出场关卡，以及两个分页各自保留选中项 | `character-compendium.test.ts`（角色目录派生、勝負條件槽、事件生成登场、简介引用的关卡序数）；职业视图无独立单元测试（数值全部由 `class-catalog.generated.ts` 与 `classes.ts` 的公开函数派生，全景预览复用 `full-combat.test.ts` 已覆盖的正式脚本） | `compendium.spec.ts` |
 | `src/game/roadmap/` 的「RoadMap」覆盖层：三个候选愿景分页、非承诺提示、QQ 交流群 `1107513111`、原始二维码加载、宽窄屏布局与关闭后焦点交还 | 无独立单元测试（愿景文字为常量，覆盖层需要 DOM） | `roadmap.spec.ts` |

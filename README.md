@@ -51,7 +51,10 @@ pnpm desktop:build:windows   # 仅供 Windows runner 生成 NSIS 安装包
 
 当前 Windows 开发包使用系统 Evergreen WebView2；缺失时安装程序静默调用联网引导程序。桌面版
 使用稳定 Tauri 应用标识保存自己的 `localStorage`，不会自动读取网页来源下的存档；玩家可通过
-现有 20 槽备份导出／导入在 Web 与桌面版之间迁移。完整触发、下载、签名和验收边界仍见
+现有 20 槽备份导出／导入在 Web 与桌面版之间迁移。桌面窗口中的「銳利」与「平滑」会按客户区
+宽高等比放大 640×350 逻辑画面，拖动窗口或切换全屏都会立即重新适配；「整數倍」会退出最大化／
+全屏，并把外部窗口调整到当前显示器可容纳、最接近现有大小的完整装置像素倍数。Web 版继续保留
+原有最多 1 倍和整数倍留边规则。完整触发、下载、签名和验收边界仍见
 [`docs/release-and-deployment.md`](docs/release-and-deployment.md)。
 
 ## 战役调试中心

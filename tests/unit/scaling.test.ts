@@ -46,6 +46,21 @@ describe("logical screen scaling", () => {
     }
   });
 
+  test("desktop surfaces can upscale while fitting both client dimensions", () => {
+    expect(computeGameScale(1280, 1, "sharp", {
+      availableHeight: 740,
+      allowUpscale: true,
+    })).toBe(2);
+    expect(computeGameScale(1600, 1, "smooth", {
+      availableHeight: 700,
+      allowUpscale: true,
+    })).toBe(2);
+    expect(computeGameScale(1280, 1.25, "integer", {
+      availableHeight: 740,
+      allowUpscale: true,
+    })).toBeCloseTo(1.6, 10);
+  });
+
   test("letterboxes on whole device pixels so the screen stays on the grid", () => {
     expect(computeGameOffset(640, 1, 1)).toBe(0);
     expect(computeGameOffset(640, 2, .5)).toBe(160);

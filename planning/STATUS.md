@@ -6,7 +6,7 @@
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| Windows Tauri 私有开发包 | `verified` | Tauri 2 复用经 `build:release` 审计的玩家包，稳定应用标识与当前用户 NSIS 安装已配置；2026-08-21 已由私有 GitHub Actions `windows-latest` 从干净检出生成并校验唯一 NSIS 安装程序，私有压缩 artifact 为 58.5 MB、保留 14 天。工作流只手动或 `desktop-v*` 标签触发，不接入 Cloudflare 自动发布；真实 Windows WebView2 试玩与面向公众的代码签名仍待完成 |
+| Windows Tauri 私有开发包 | `verified` | Tauri 2 复用经 `build:release` 审计的玩家包，稳定应用标识与当前用户 NSIS 安装已配置；2026-08-21 已由私有 GitHub Actions `windows-latest` 从干净检出生成并校验唯一 NSIS 安装程序，私有压缩 artifact 保留 14 天。桌面客户区现按宽高自适应，「整數倍」会以受限原生能力自动调整外部窗口；双轴／DPI 数学、模拟 Tauri Chromium、视觉截图与生产构建已通过，真实 Windows WebView2 仍需复测拖动、全屏和跨屏。工作流只手动或 `desktop-v*` 标签触发，不接入 Cloudflare 自动发布；面向公众的代码签名仍待完成 |
 | 正式 Phaser 地图／棋子／技能资源复用 | `verified` | 资源门现在为当前表面和最多两个预取包保留 PNG／JSON 压缩字节，正式 `BattleScene` 的地图、棋子、地形动作及地图技能图集统一改用同一次响应生成的惰性对象 URL；慢请求仍由 Phaser `preload` 阻挡，源 URL 不再发生第二轮 XHR／重试耗尽后施法卡在第 0 帧。初級炎暴故障注入、单请求计数与实际特效截图通过；实验室无资源门时仍使用原路径 |
 | 战斗连续特效图集资源复用 | `verified` | 地图命中／死亡、回合交接、第 4 关力场与第 26 关推柱图集也统一消费资源门已下载的 PNG／JSON，不再在 Phaser 建立纹理时重新验证源 URL。第 0／4／26 关精确请求边界、拒绝重复请求后的命中／死亡／回合演出及三张 Canvas 证据均通过；实验室无资源门时保持原路径 |
 | 开场图像解码门 | `verified` | `boot` 加载页现在用同一次响应为全部 16 张开场／标题 PNG 建立对象 URL，并在隐藏加载页前完成解码；`mountStartup` 也会等 Canvas 图片与两个实际菜单 `<img>` 就绪后才设置时间原点并启动 RAF。冻结解码时加载页不会消失或挂载开场，解除后每个源 URL 精确一次且实际开场截图正常 |

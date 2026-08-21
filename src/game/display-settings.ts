@@ -19,7 +19,7 @@ export const IMAGE_SCALING_OPTIONS: readonly {
 }[] = [
   { mode: "sharp", label: "銳利", hint: "最近鄰取樣，忠於原版；非整數倍時像素大小不均。" },
   { mode: "smooth", label: "平滑", hint: "雙線性取樣，非整數倍時邊緣均勻，但畫面偏柔。" },
-  { mode: "integer", label: "整數倍", hint: "鎖定整數倍裝置像素，像素完全均勻，畫面略小並留邊。" },
+  { mode: "integer", label: "整數倍", hint: "鎖定整數倍裝置像素；桌面版會同步調整外部視窗，Web 版保留留邊。" },
 ];
 
 const listeners = new Set<(mode: ImageScalingMode) => void>();

@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { columnGreenExcess, decodeScreenshot } from "./screenshot-pixels";
+import { captureVisualAudit } from "./visual-audit";
 
-const screenMetrics = (page: Page) => page.getByTestId("startup-screen").evaluate((element) => {
+const screenMetrics = (page: Page) => page.locator(".logical-screen").evaluate((element) => {
   const style = getComputedStyle(element);
   const viewport = element.parentElement as HTMLElement;
   return {
@@ -165,4 +166,82 @@ test("the logical screen clips its overflow without becoming scrollable", async 
       scrollLeft: screen.scrollLeft,
     };
   })).toEqual({ settled: 332, afterScrollAttempt: 332, scrollTop: 0, scrollLeft: 0 });
+});
+
+test.describe("Tauri desktop window scaling", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const calls: unknown[] = [];
+      Object.defineProperty(window, "__TAURI_TEST_RESIZE_CALLS__", { value: calls });
+      Object.defineProperties(window.screen, {
+        availWidth: { value: 1920 },
+        availHeight: { value: 1080 },
+      });
+      Object.defineProperty(window, "__TAURI_INTERNALS__", {
+        value: {
+          metadata: { currentWindow: { label: "main" } },
+          invoke: async (command: string, args: Record<string, unknown>) => {
+            if (command === "plugin:window|is_fullscreen" || command === "plugin:window|is_maximized") {
+              return false;
+            }
+            if (command === "plugin:window|set_size") {
+              const value = args.value as { toJSON?: () => unknown } | undefined;
+              calls.push(value?.toJSON?.() ?? value);
+            }
+            return null;
+          },
+        },
+      });
+    });
+  });
+
+  test("fills a freely resized desktop client and integer mode sizes the native window", async ({ page }) => {
+    await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("data-desktop-runtime", "true");
+    await page.getByTestId("image-scaling-sharp").click();
+    await expect.poll(() => screenMetrics(page)).toMatchObject({
+      scale: 2,
+      screenWidth: 1280,
+      viewportWidth: 1280,
+    });
+    const panelBounds = await page.getByTestId("display-settings").evaluate((panel) => {
+      const rect = panel.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom };
+    });
+    expect(panelBounds.top).toBe(700);
+    expect(panelBounds.bottom).toBeGreaterThan(panelBounds.top);
+    expect(panelBounds.bottom).toBeLessThanOrEqual(800);
+    await captureVisualAudit(page, {
+      path: "artifacts/playwright/tauri-desktop-1280x800.png",
+    });
+
+    await page.setViewportSize({ width: 960, height: 600 });
+    await expect.poll(async () => (await screenMetrics(page)).scale).toBeCloseTo(1.5, 6);
+    expect((await screenMetrics(page)).screenWidth).toBe(960);
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.evaluate(() => {
+      const calls = (window as Window & { __TAURI_TEST_RESIZE_CALLS__?: unknown[] })
+        .__TAURI_TEST_RESIZE_CALLS__;
+      calls?.splice(0);
+    });
+    await page.getByTestId("image-scaling-integer").click();
+    await expect.poll(() => page.evaluate(() => {
+      const calls = (window as Window & { __TAURI_TEST_RESIZE_CALLS__?: unknown[] })
+        .__TAURI_TEST_RESIZE_CALLS__ ?? [];
+      return calls.length;
+    })).toBe(1);
+    const logical = await page.evaluate(() => {
+      const calls = (window as Window & { __TAURI_TEST_RESIZE_CALLS__: Array<{
+        Logical: { width: number; height: number };
+      }> }).__TAURI_TEST_RESIZE_CALLS__;
+      return calls.at(-1)?.Logical;
+    });
+    expect(logical?.width).toBe(1280);
+    expect(logical?.height).toBeGreaterThan(700);
+    expect(logical?.height).toBeLessThan(800);
+  });
 });

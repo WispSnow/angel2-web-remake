@@ -59,6 +59,7 @@ describe("desktop packaging contract", () => {
     const packageJson = readJson("package.json");
     const appTypeScriptConfig = readJson("tsconfig.app.json");
     const testTypeScriptConfig = readJson("tsconfig.tests.json");
+    const capability = readJson("src-tauri/capabilities/main.json");
     const scripts = packageJson.scripts as Record<string, unknown>;
 
     expect(scripts["desktop:build:windows"]).toBe("tauri build --bundles nsis");
@@ -71,5 +72,12 @@ describe("desktop packaging contract", () => {
     expect(appTypeScriptConfig.include).toEqual(["src"]);
     expect(testTypeScriptConfig.include).toEqual(["src", "tests/unit"]);
     expect(scripts["typecheck:tests"]).toBe("tsc -p tsconfig.tests.json");
+    expect(packageJson.dependencies).toMatchObject({ "@tauri-apps/api": "2.11.1" });
+    expect(capability.windows).toEqual(["main"]);
+    expect(capability.permissions).toEqual(expect.arrayContaining([
+      "core:window:allow-set-size",
+      "core:window:allow-set-fullscreen",
+      "core:window:allow-unmaximize",
+    ]));
   });
 });

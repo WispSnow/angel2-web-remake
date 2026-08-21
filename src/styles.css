@@ -55,6 +55,43 @@ button:disabled { cursor: var(--native-cursor-hand, wait); filter: grayscale(.7)
   cursor: var(--native-cursor-hand);
 }
 
+/* Tauri owns a real game window, so it consumes the full client area instead of
+ * inheriting the browser build's 640px cap. The 640x350 logical surface still
+ * scales as one unit; host controls remain unscaled and reserve their own row. */
+html[data-desktop-runtime="true"],
+html[data-desktop-runtime="true"] body,
+html[data-desktop-runtime="true"] #app {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+html[data-desktop-runtime="true"] .page-shell,
+html[data-desktop-runtime="true"] .stage49-page,
+html[data-desktop-runtime="true"] .credits-page-shell {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+html[data-desktop-runtime="true"] .game-stage {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+html[data-desktop-runtime="true"] .game-viewport,
+html[data-desktop-runtime="true"] .stage49-viewport,
+html[data-desktop-runtime="true"] .credits-viewport {
+  width: 100%;
+  max-width: none;
+}
+html[data-desktop-runtime="true"] .display-settings {
+  margin-top: 0;
+  padding: 8px 12px;
+  background: #0b080be8;
+}
+html[data-desktop-runtime="true"] .stage49-help { display: none; }
+
 /* Phaser writes `image-rendering: pixelated` straight onto its canvas element
  * whenever `pixelArt` is enabled, and an inline declaration outranks the
  * inherited one. The host preference has to win over it, so this is the one

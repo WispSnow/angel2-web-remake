@@ -6,9 +6,14 @@ import {
 } from "./display-settings";
 import { mountHostOverlays } from "./host-overlays";
 import type { ImageScalingMode } from "./preferences";
+import {
+  applyDesktopWindowTarget,
+  computeDesktopIntegerWindowTarget,
+  initializeDesktopRuntime,
+} from "./desktop-runtime";
+import { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
 
-export const LOGICAL_SCREEN_WIDTH = 640;
-export const LOGICAL_SCREEN_HEIGHT = 350;
+export { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
 
 const CSS_IMAGE_RENDERING: Readonly<Record<ImageScalingMode, string>> = {
   sharp: "pixelated",
@@ -31,8 +36,17 @@ export function computeGameScale(
   availableWidth: number,
   devicePixelRatio: number,
   mode: ImageScalingMode,
+  options: {
+    availableHeight?: number;
+    allowUpscale?: boolean;
+  } = {},
 ): number {
-  const fitted = Math.min(1, availableWidth / LOGICAL_SCREEN_WIDTH);
+  const maximumScale = options.allowUpscale ? Number.POSITIVE_INFINITY : 1;
+  const fitted = Math.max(0, Math.min(
+    maximumScale,
+    availableWidth / LOGICAL_SCREEN_WIDTH,
+    (options.availableHeight ?? Number.POSITIVE_INFINITY) / LOGICAL_SCREEN_HEIGHT,
+  ));
   if (mode !== "integer") return fitted;
   const ratio = devicePixelRatio > 0 ? devicePixelRatio : 1;
   const deviceFactor = Math.floor(fitted * ratio);
@@ -55,21 +69,61 @@ export function computeGameOffset(
 }
 
 export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement): () => void {
+  const desktop = initializeDesktopRuntime();
+  const unmountControls = mountImageScalingControls(viewport);
+  const panel = viewport.parentElement
+    ?.querySelector<HTMLElement>(":scope > .display-settings");
+  const extras = hostChromeExtrasSlot(viewport);
+  const unmountOverlays = extras ? mountHostOverlays(extras) : () => undefined;
+  let integerResizeTimer: number | undefined;
+
+  const availableDesktopHeight = (): number => Math.max(
+    1,
+    document.documentElement.clientHeight
+      - viewport.getBoundingClientRect().top
+      - (panel?.getBoundingClientRect().height ?? 0),
+  );
+
+  const scheduleIntegerWindowResize = () => {
+    if (!desktop) return;
+    if (integerResizeTimer !== undefined) window.clearTimeout(integerResizeTimer);
+    integerResizeTimer = window.setTimeout(() => {
+      integerResizeTimer = undefined;
+      const chromeHeight = panel?.getBoundingClientRect().height ?? 0;
+      const target = computeDesktopIntegerWindowTarget({
+        viewportWidth: viewport.clientWidth,
+        availableGameHeight: availableDesktopHeight(),
+        chromeHeight,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        screenAvailableWidth: window.screen.availWidth,
+        screenAvailableHeight: window.screen.availHeight,
+      });
+      void applyDesktopWindowTarget(target).catch((error: unknown) => {
+        console.warn("Unable to synchronize the integer-scale desktop window", error);
+      });
+    }, 180);
+  };
+
   const resize = () => {
     const mode = imageScalingMode();
     const ratio = window.devicePixelRatio || 1;
-    const scale = computeGameScale(viewport.clientWidth, ratio, mode);
+    const scale = computeGameScale(viewport.clientWidth, ratio, mode, {
+      availableHeight: desktop ? availableDesktopHeight() : undefined,
+      allowUpscale: desktop,
+    });
     const offset = computeGameOffset(viewport.clientWidth, ratio, scale);
     viewport.style.height = `${LOGICAL_SCREEN_HEIGHT * scale}px`;
     screen.style.setProperty("--game-scale", String(scale));
     screen.style.setProperty("--game-offset-x", `${offset}px`);
     document.documentElement.style.setProperty("--image-rendering", CSS_IMAGE_RENDERING[mode]);
     document.documentElement.dataset.imageScaling = mode;
+    if (mode === "integer") scheduleIntegerWindowResize();
   };
 
   const observer = new ResizeObserver(resize);
   observer.observe(viewport);
   const unsubscribe = onImageScalingChange(resize);
+  window.addEventListener("resize", resize);
 
   // `devicePixelRatio` changes when the window moves between displays or the user
   // zooms the browser, and neither fires a resize on the viewport. A resolution
@@ -88,13 +142,12 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
   }
   watchRatio();
 
-  const unmountControls = mountImageScalingControls(viewport);
-  const extras = hostChromeExtrasSlot(viewport);
-  const unmountOverlays = extras ? mountHostOverlays(extras) : () => undefined;
   resize();
   return () => {
     disposed = true;
+    if (integerResizeTimer !== undefined) window.clearTimeout(integerResizeTimer);
     ratioQuery?.removeEventListener("change", onRatioChange);
+    window.removeEventListener("resize", resize);
     observer.disconnect();
     unsubscribe();
     unmountOverlays();

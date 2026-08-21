@@ -16,8 +16,8 @@
         "title": "天使帝國 II Web 復刻版",
         "width": 1280,
         "height": 800,
-        "minWidth": 800,
-        "minHeight": 600,
+        "minWidth": 480,
+        "minHeight": 360,
         "center": true,
         "resizable": true,
         "fullscreen": false
