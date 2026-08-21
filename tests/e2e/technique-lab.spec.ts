@@ -140,6 +140,23 @@ test("intermediate, advanced and ultimate lightning preserve distinct native vis
   }
 });
 
+test("the laboratory plays lightning sounds from the formal campaign audio mapping", async ({ page }) => {
+  const audioRequests: string[] = [];
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.endsWith(".wav")) audioRequests.push(pathname);
+  });
+  await page.goto("/technique-lab.html");
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.setActionCode("3L"));
+  await page.locator("#technique-lab-sound").check();
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.play());
+
+  await expect.poll(() => audioRequests).toContain("/assets/original/audio/e/9.wav");
+  expect(audioRequests).toContain("/assets/original/audio/e/41.wav");
+  expect(audioRequests.some((source) => source.includes("/technique-lab/audio/"))).toBe(false);
+});
+
 test("lightning hit waves advance one range threshold after every native draw", async ({ page }) => {
   await page.goto("/technique-lab.html");
   const canvas = page.locator("#technique-lab-canvas canvas");
@@ -285,6 +302,10 @@ test("advanced fire composes 51 tiles into thirteen draws with a blank 15-tick t
   await seek(page, 1500);
   await expect(canvas).toHaveAttribute("data-technique-frame", "10");
   await expect(canvas).toHaveAttribute("data-effect-tile-count", "6");
+  await expect(canvas).toHaveAttribute(
+    "data-effect-atlas-frames",
+    [39, 40, 41, 42, 43, 44].map((frame) => `fire-3__effect__${frame}`).join(","),
+  );
   await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-fire-3-wave.png",
     fullPage: true,
@@ -1285,7 +1306,7 @@ test("SA plays eleven E/8-backed 1x2 descriptors and remains visible below a per
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("攻擊 -20 · 狀態 3");
   await expect.poll(() => audioRequests.length).toBe(1);
-  expect(audioRequests[0]).toMatch(/\/assets\/original\/technique-lab\/audio\/8\.wav$/u);
+  expect(audioRequests[0]).toMatch(/\/assets\/original\/audio\/e\/8\.wav$/u);
   for (const [time, frame] of [[0, "0"], [750, "5"], [1500, "10"], [1649, "10"]] as const) {
     await seek(page, time);
     await expect(canvas).toHaveAttribute("data-technique-phase", "status");
@@ -1356,7 +1377,7 @@ test("SD plays ten E/8-backed 2x2 descriptors and remains visible below a persis
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("防禦 -20 · 狀態 3");
   await expect.poll(() => audioRequests.length).toBe(1);
-  expect(audioRequests[0]).toMatch(/\/assets\/original\/technique-lab\/audio\/8\.wav$/u);
+  expect(audioRequests[0]).toMatch(/\/assets\/original\/audio\/e\/8\.wav$/u);
   for (const [time, frame] of [[0, "0"], [750, "5"], [1350, "9"], [1499, "9"]] as const) {
     await seek(page, time);
     await expect(canvas).toHaveAttribute("data-technique-phase", "status");

@@ -19,6 +19,7 @@ import { renderPrayerPresentation } from "./PrayerRenderer";
 import {
   addMapActionImage,
   mapActionAtlasIdForAction,
+  mapActionAtlasFrame,
   mapActionDebugTextureKey,
   collectMapActionSources,
   preloadMapActionAtlases,
@@ -1207,6 +1208,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
           canvas.dataset.mapCombatEffectTextureKeys = this.combatEffects.flatMap((effect) =>
             effect instanceof Phaser.GameObjects.Image ? [mapActionDebugTextureKey(effect)] : []).join(",");
+          canvas.dataset.mapCombatEffectAtlasFrames = this.combatEffects.flatMap((effect) => {
+            if (!(effect instanceof Phaser.GameObjects.Image)) return [];
+            const atlasFrame = mapActionAtlasFrame(effect);
+            return atlasFrame ? [atlasFrame] : [];
+          }).join(",");
           canvas.dataset.enemyPhaseTailExecution = String(enemyPhaseTail.execution);
           canvas.dataset.enemyPhaseTailNativeTicks = String(enemyPhaseTail.nativeTicks);
           canvas.dataset.enemyPhaseTailOrigin = `${origin.x},${origin.y}`;
@@ -1744,6 +1750,11 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           canvas.dataset.mapCombatEffectTileCount = String(this.combatEffects.length);
           canvas.dataset.mapCombatEffectTextureKeys = this.combatEffects.flatMap((effect) =>
             effect instanceof Phaser.GameObjects.Image ? [mapActionDebugTextureKey(effect)] : []).join(",");
+          canvas.dataset.mapCombatEffectAtlasFrames = this.combatEffects.flatMap((effect) => {
+            if (!(effect instanceof Phaser.GameObjects.Image)) return [];
+            const atlasFrame = mapActionAtlasFrame(effect);
+            return atlasFrame ? [atlasFrame] : [];
+          }).join(",");
           if (special.phase === "prayerEffect") {
             const prayer = special.result.affectedUnits.find(
               ({ unitId }) => unitId === special.lifeChangeUnitId,
@@ -1857,6 +1868,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           delete canvas.dataset.routePulseSweepCellCount;
           canvas.dataset.mapCombatEffectTileCount = "0";
           delete canvas.dataset.mapCombatEffectTextureKeys;
+          delete canvas.dataset.mapCombatEffectAtlasFrames;
           delete canvas.dataset.enemyPhaseTailExecution;
           delete canvas.dataset.enemyPhaseTailNativeTicks;
           delete canvas.dataset.enemyPhaseTailOrigin;

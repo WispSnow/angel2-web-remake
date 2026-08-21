@@ -13814,6 +13814,7 @@ export const STAGE1_ACTION_AUDIO_ASSETS = {
   "e-43": "/assets/original/audio/e/43.wav",
   "e-63": "/assets/original/audio/e/63.wav",
   "e-41": "/assets/original/audio/e/41.wav",
+  "e-9": "/assets/original/audio/e/9.wav",
   "e-51": "/assets/original/audio/e/51.wav",
   "e-58": "/assets/original/audio/e/58.wav",
   "e-8": "/assets/original/audio/e/8.wav",

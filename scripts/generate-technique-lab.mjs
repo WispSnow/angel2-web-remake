@@ -612,117 +612,9 @@ const techniques = rules.techniqueMenu.uniqueVisibleActionCodes.map((nativeCode)
   implementationId: implementedByCode[nativeCode] ?? null,
 }));
 
-const graphicEntries = [
-  ...presentations.resourceCatalog.graphicEntries,
-  ...remainingPresentations.resourceCatalog.graphicEntries,
-];
-const requiredResources = [...new Set(lightningActions.flatMap((action) => [
-  ...action.phases.map(({ resource }) => resource),
-  action.commonHit.resource,
-  action.commonHit.cleanup.resource,
-])), ...fireActions
-  .filter(({ code }) => implementedFireCodes.includes(code))
-  .flatMap((action) => action.phases.map(({ resource }) => resource)),
-...healActions
-  .filter(({ code }) => implementedHealCodes.includes(code))
-  .flatMap((action) => action.phases.map(({ resource }) => resource)),
-...attackUpPresentation.phases.map(({ resource }) => resource),
-...magicGuardPresentation.phases.map(({ resource }) => resource),
-...poisonPresentation.phases.map(({ resource }) => resource),
-...confusionPresentation.phases.map(({ resource }) => resource),
-...attackDownPresentation.phases.map(({ resource }) => resource),
-...defenseDownPresentation.phases.map(({ resource }) => resource),
-...spellSealPresentation.phases.map(({ resource }) => resource),
-...defenseUpPresentation.phases.map(({ resource }) => resource),
-dispelPresentation.dynamicPresentation.resource,
-...Object.values(stompDefinitions).flatMap(({ action }) => [
-  action.graphicByTargetSide.side1,
-  action.graphicByTargetSide.side2,
-])];
-const mapActionSourceByResource = {
-  "MAGIC/8": "lightning-1/main",
-  "MAGIC/31": "lightning-1/hit",
-  "MAGIC/6": "lightning-1/cleanup",
-  "MAGIC/47": "lightning-2/primary",
-  "MAGIC/48": "lightning-2/column",
-  "MAGIC/24": "lightning-2/hit",
-  "MAGIC/3": "lightning-3/cloud",
-  "MAGIC/4": "lightning-3/column",
-  "MAGIC/25": "lightning-3/hit",
-  "MAGIC/39": "lightning-4/primary",
-  "MAGIC/40": "lightning-4/column",
-  "MAGIC/26": "lightning-4/hit",
-  "MAGIC/10": "ice-1/expansion",
-  "MAGIC/22": "fire-1",
-  "MAGIC/23": "fire-2/effect",
-  "MAGIC/27": "fire-3/effect",
-  "MAGIC/30": "fire-4/ground",
-  "MAGIC/28": "fire-4/column",
-  "MAGIC/29": "fire-4/finish",
-  "UN/61": "heal-1/primary",
-  "MAGIC/0": "heal-1/tail",
-  "MAGIC/37": "heal-2/primary",
-  "MAGIC/42": "heal-3/outer",
-  "MAGIC/41": "heal-3/loop",
-  "MAGIC/20": "recovery-1/effect",
-  "MAGIC/16": "attack-up/effect",
-  "MAGIC/17": "poison/rise",
-  "MAGIC/18": "poison/cloud",
-  "MAGIC/44": "confusion/effect",
-  "MAGIC/46": "attack-down/effect",
-  "MAGIC/45": "defense-down/effect",
-  "MAGIC/36": "spell-seal/effect",
-  "MAGIC/33": "defense-up/effect",
-  "UN/57": "dispel/effect",
-  "MAGIC/50": "stomp-1/side-1",
-  "MAGIC/49": "stomp-1/side-2",
-  "MAGIC/52": "stomp-2/side-1",
-  "MAGIC/51": "stomp-2/side-2",
-  "MAGIC/54": "stomp-3/side-1",
-  "MAGIC/53": "stomp-3/side-2",
-  "MAGIC/19": "wd/effect",
-};
-const techniqueGraphicAssets = {};
+// Remove the pre-atlas laboratory-only export if it exists. Map effects now
+// consume the formal campaign presentation catalogs directly.
 await rm(path.join(publicRoot, "lightning"), { recursive: true, force: true });
-for (const resource of requiredResources) {
-  const entry = graphicEntries.find(({ key }) => key === resource);
-  if (!entry) throw new Error(`missing ${resource} graphic entry`);
-  const directory = mapActionSourceByResource[resource];
-  if (!directory) throw new Error(`missing map-action source mapping for ${resource}`);
-  if (entry.renderedPaths.length === 0) throw new Error(`${resource} has no rendered frames`);
-  techniqueGraphicAssets[resource] = entry.renderedPaths.map((_, index) =>
-    `/assets/original/map-actions/${directory}/${String(index).padStart(2, "0")}.png`);
-}
-
-const audioResources = [...new Set([
-  ...lightningActions.flatMap((action) => action.audioRequests.map(({ resource }) => resource)),
-  ...fireActions
-    .filter(({ code }) => implementedFireCodes.includes(code))
-    .flatMap((action) => action.audioRequests.map(({ resource }) => resource)),
-  ...healActions
-    .filter(({ code }) => implementedHealCodes.includes(code))
-    .flatMap((action) => action.audioRequests.map(({ resource }) => resource)),
-  ...attackUpPresentation.audioRequests.map(({ resource }) => resource),
-  ...magicGuardPresentation.audioRequests.map(({ resource }) => resource),
-  ...poisonPresentation.audioRequests.map(({ resource }) => resource),
-  ...attackDownPresentation.audioRequests.map(({ resource }) => resource),
-  ...defenseDownPresentation.audioRequests.map(({ resource }) => resource),
-  ...spellSealPresentation.audioRequests.map(({ resource }) => resource),
-  ...defenseUpPresentation.audioRequests.map(({ resource }) => resource),
-  icePresentation.audioResource,
-  stompPresentation.audioResource,
-])];
-const techniqueAudioAssets = {};
-await mkdir(path.join(publicRoot, "audio"), { recursive: true });
-for (const resource of audioResources) {
-  const [group, number] = resource.split("/");
-  const filename = group === "E" ? `${number}.wav` : `${group.toLowerCase()}-${number}.wav`;
-  await copyFile(
-    path.join(root, "reverse/converted/audio/wav", group, `${number.padStart(4, "0")}.wav`),
-    path.join(publicRoot, "audio", filename),
-  );
-  techniqueAudioAssets[resource] = `/assets/original/technique-lab/audio/${filename}`;
-}
 
 function imageDimensions(source) {
   const dimensions = execFileSync("magick", ["identify", "-format", "%w %h", source], {
@@ -1155,8 +1047,6 @@ const source = `// Generated by scripts/generate-technique-lab.mjs from native t
     tile: "/assets/original/map-actions/obstacle/stage-01.png",
     logicalTerrainSlot: 3,
   }, null, 2)} as const;\n\n`
-  + `export const TECHNIQUE_LAB_GRAPHIC_ASSETS = ${JSON.stringify(techniqueGraphicAssets, null, 2)} as const;\n\n`
-  + `export const TECHNIQUE_LAB_AUDIO_ASSETS = ${JSON.stringify(techniqueAudioAssets, null, 2)} as const;\n\n`
   + `export const TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS = ${JSON.stringify(terminalHoldNativeTicks, null, 2)} as const;\n\n`
   + `export const TECHNIQUE_LAB_UNIT_ASSETS = ${JSON.stringify(unitAssets, null, 2)} as const;\n`;
 

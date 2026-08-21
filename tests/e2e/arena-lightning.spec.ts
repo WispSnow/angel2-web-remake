@@ -135,7 +135,12 @@ test("enemy tier-one magic master uses 2L and the native group-11 dialogue", asy
 
 test("tier-two magic master raises the native 3L cloud before landing its inherited-anchor column", async ({ page }) => {
   const pageErrors: string[] = [];
+  const audioRequests: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.endsWith(".wav")) audioRequests.push(pathname);
+  });
   await page.goto("/arena.html?test=1");
   await page.getByTestId("arena-clear").click();
   const placed = await page.evaluate(() => {
@@ -219,6 +224,8 @@ test("tier-two magic master raises the native 3L cloud before landing its inheri
     damage: 165,
     experienceGained: 0,
   });
+  expect(audioRequests).toContain("/assets/original/audio/e/41.wav");
+  expect(audioRequests).toContain("/assets/original/audio/e/9.wav");
   expect(after?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(centerBefore! - 90);
   expect(after?.units.find(({ id }) => id === "arena-2-1")?.life).toBe(innerBefore! - 75);
   expect(after?.units.find(({ id }) => id === "arena-2-2")?.life).toBe(outsideBefore);

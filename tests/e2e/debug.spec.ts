@@ -31,6 +31,9 @@ test("animation and deployment labs link back to the debug hub", async ({ page }
 test("debug hub selects a difficulty and opens the formal stage-one deployment", async ({ page }) => {
   await page.goto("/debug.html");
   await expect(page.getByTestId("debug-hub")).toBeVisible();
+  await expect(page.locator(".debug-hub-header")).toContainText(
+    "全部場景沿用正式戰役的關卡資源包與資源映射",
+  );
   const scenarioIds = await page.locator("[data-debug-scenario-id]").evaluateAll((links) =>
     links.map((link) => link.getAttribute("data-debug-scenario-id")));
   expect(scenarioIds.length).toBeGreaterThan(0);
@@ -345,6 +348,9 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.getByTestId("debug-technique-lab-link")).toHaveAttribute(
     "href",
     "/technique-lab.html",
+  );
+  await expect(page.getByTestId("debug-technique-lab-link")).toContainText(
+    "正式戰役資源映射",
   );
   const arenaLink = page.getByTestId("debug-arena-link");
   await expect(arenaLink).toHaveAttribute("href", "/arena.html");

@@ -167,6 +167,44 @@ test("all-class showdown applies one level to every mirror and enters formal bat
   expect(pageErrors).toEqual([]);
 });
 
+test("advanced fire uses the formal campaign atlas mapping in the all-class showdown", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/class-showdown.html?test=1");
+  await page.getByTestId("class-showdown-level").selectOption("2");
+  await page.getByTestId("class-showdown-apply-level").click();
+  await page.getByTestId("class-showdown-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  for (let step = 0; step < 11; step += 1) await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 17, y: 26 });
+  await page.keyboard.press("Space");
+  await page.getByTestId("unit-command-technique").click();
+  await expect(page.getByTestId("technique-fire-3")).toContainText("高級炎暴");
+  await page.getByTestId("technique-fire-3").click();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
+
+  const canvas = page.getByTestId("battle-canvas");
+  await page.waitForFunction(() => {
+    const dataset = document.querySelector<HTMLCanvasElement>(
+      "[data-testid='battle-canvas']",
+    )?.dataset;
+    return dataset?.mapCombatPhase === "fireEffect"
+      && dataset.mapCombatFrame === "10"
+      && dataset.mapCombatEffectTileCount === "6";
+  }, undefined, { polling: "raf" });
+  await expect(canvas).toHaveAttribute(
+    "data-map-combat-effect-atlas-frames",
+    [39, 40, 41, 42, 43, 44].map((frame) => `fire-3__effect__${frame}`).join(","),
+  );
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-fire-3-formal-atlas.png`,
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test("jungle warrior melee poison is direct and leaves the persistent native status icon", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));

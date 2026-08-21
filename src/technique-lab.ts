@@ -5,16 +5,11 @@ import {
   className,
   isClassId,
 } from "./game/content/classes";
+import { STAGE0_ACTION_PRESENTATION_ASSETS } from "./game/content/stage0-actions.generated";
 import {
-  STAGE0_ACTION_AUDIO_ASSETS,
-  STAGE0_ACTION_PRESENTATION_ASSETS,
-} from "./game/content/stage0-actions.generated";
-import {
-  STAGE1_ACTION_AUDIO_ASSETS,
   STAGE1_ACTION_PRESENTATION,
 } from "./game/content/stage1-actions.generated";
 import {
-  TECHNIQUE_LAB_AUDIO_ASSETS,
   TECHNIQUE_LAB_ATTACK_UP,
   TECHNIQUE_LAB_DEFENSE_UP,
   TECHNIQUE_LAB_MAGIC_GUARD,
@@ -34,6 +29,9 @@ import {
   TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS,
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "./game/content/technique-lab.generated";
+import {
+  TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS,
+} from "./game/content/technique-lab-formal-assets";
 import {
   buildLightningTimeline,
   iceFrameAtGlobalIndex,
@@ -88,7 +86,7 @@ root.innerHTML = `
       <div>
         <span class="eyebrow">MAP PRESENTATION TOOL</span>
         <h1>地圖技能動畫實驗室</h1>
-        <p>任意配置敵我職業，直接重放原版地圖技能腳本；不建立關卡、不提交傷害或存檔。</p>
+        <p>任意配置敵我職業，以正式戰役資源映射直接重放原版地圖技能腳本；不建立關卡、不提交傷害或存檔。</p>
       </div>
       <nav class="technique-lab-nav" aria-label="返回入口">
         <a href="/debug.html" class="technique-lab-back" data-testid="technique-lab-debug-link">戰役調試中心</a>
@@ -507,11 +505,9 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const cueMs = request.afterFixedWaitNativeTicks * 10;
       if (playedAudioCues.has(index) || cueMs < previousMs || cueMs > currentMs) return;
       playedAudioCues.add(index);
-      const source = request.resource === "MAGIC/83"
-        ? STAGE0_ACTION_AUDIO_ASSETS["magic-83"]
-        : TECHNIQUE_LAB_AUDIO_ASSETS[
-          request.resource as keyof typeof TECHNIQUE_LAB_AUDIO_ASSETS
-        ];
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[
+        request.resource as keyof typeof TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS
+      ];
       if (source) void new Audio(source).play().catch(() => undefined);
     });
     return;
@@ -524,8 +520,8 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const cueMs = request.afterFixedWaitNativeTicks * 10;
       if (playedAudioCues.has(index) || cueMs < previousMs || cueMs > currentMs) return;
       playedAudioCues.add(index);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS[
-        request.resource as keyof typeof TECHNIQUE_LAB_AUDIO_ASSETS
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[
+        request.resource as keyof typeof TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS
       ];
       if (source) void new Audio(source).play().catch(() => undefined);
     });
@@ -534,14 +530,15 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
   if (isRecoveryCode(session.state.actionCode)) {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
-      void new Audio(STAGE1_ACTION_AUDIO_ASSETS["e-36"]).play().catch(() => undefined);
+      void new Audio(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/36"])
+        .play().catch(() => undefined);
     }
     return;
   }
   if (session.state.actionCode === "AA") {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS["UN/51"];
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/51"];
       if (source) void new Audio(source).play().catch(() => undefined);
     }
     return;
@@ -549,7 +546,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
   if (session.state.actionCode === "AD") {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS["UN/52"];
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/52"];
       if (source) void new Audio(source).play().catch(() => undefined);
     }
     return;
@@ -557,7 +554,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
   if (session.state.actionCode === "FM") {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS["UN/51"];
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/51"];
       if (source) void new Audio(source).play().catch(() => undefined);
     }
     return;
@@ -567,7 +564,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const cueMs = request.afterFixedWaitNativeTicks * 10;
       if (playedAudioCues.has(index) || cueMs < previousMs || cueMs > currentMs) return;
       playedAudioCues.add(index);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS[request.resource];
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[request.resource];
       if (source) void new Audio(source).play().catch(() => undefined);
     });
     return;
@@ -575,7 +572,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
   if (session.state.actionCode === "SA" || session.state.actionCode === "SD") {
     if (!playedAudioCues.has(0) && previousMs <= 0 && currentMs >= 0) {
       playedAudioCues.add(0);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS["E/8"];
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/8"];
       if (source) void new Audio(source).play().catch(() => undefined);
     }
     return;
@@ -588,8 +585,8 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const cueMs = request.afterFixedWaitNativeTicks * 10;
       if (playedAudioCues.has(index) || cueMs < previousMs || cueMs > currentMs) return;
       playedAudioCues.add(index);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS[
-        request.resource as keyof typeof TECHNIQUE_LAB_AUDIO_ASSETS
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[
+        request.resource as keyof typeof TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS
       ];
       if (source) void new Audio(source).play().catch(() => undefined);
     });
@@ -603,7 +600,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
         || cueMs < previousMs
         || cueMs > currentMs) continue;
       playedAudioCues.add(step.index);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS[
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[
         TECHNIQUE_LAB_STOMPS[session.state.actionCode].audioResource
       ];
       if (source) void new Audio(source).play().catch(() => undefined);
@@ -620,7 +617,7 @@ function playAudioBetween(previousMs: number, currentMs: number): void {
       const cueMs = cycle * cycleMs;
       if (playedAudioCues.has(cycle) || cueMs < previousMs || cueMs > currentMs) continue;
       playedAudioCues.add(cycle);
-      const source = TECHNIQUE_LAB_AUDIO_ASSETS[definition.audioResource];
+      const source = TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS[definition.audioResource];
       if (source) void new Audio(source).play().catch(() => undefined);
     }
   }

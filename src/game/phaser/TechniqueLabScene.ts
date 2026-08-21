@@ -5,7 +5,6 @@ import {
   STAGE1_ACTION_PRESENTATION_ASSETS,
 } from "../content/stage1-actions.generated";
 import {
-  TECHNIQUE_LAB_GRAPHIC_ASSETS,
   TECHNIQUE_LAB_ATTACK_UP,
   TECHNIQUE_LAB_DEFENSE_UP,
   TECHNIQUE_LAB_MAGIC_GUARD,
@@ -23,6 +22,7 @@ import {
   TECHNIQUE_LAB_STOMPS,
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "../content/technique-lab.generated";
+import { TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS } from "../content/technique-lab-formal-assets";
 import type { LightningPresentationFrame } from "../map-technique-presentation";
 import {
   TECHNIQUE_LAB_MAP,
@@ -37,6 +37,7 @@ import {
 import {
   addMapActionImageFromSource,
   collectMapActionSources,
+  mapActionAtlasFrame,
   mapActionDebugTextureKey,
   preloadMapActionAtlases,
 } from "./map-action-atlas";
@@ -49,7 +50,8 @@ const TILE_HEIGHT = 44;
 const WIDTH = TECHNIQUE_LAB_MAP.width * TILE_WIDTH;
 const HEIGHT = TECHNIQUE_LAB_MAP.height * TILE_HEIGHT;
 
-const techniqueLabGraphicAssets: MapTechniqueGraphicAssets = TECHNIQUE_LAB_GRAPHIC_ASSETS;
+const techniqueLabGraphicAssets: MapTechniqueGraphicAssets =
+  TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS;
 
 const techniqueLabLightningAssets: Readonly<
   Record<keyof typeof TECHNIQUE_LAB_LIGHTNING, MapTechniqueGraphicAssets>
@@ -592,6 +594,11 @@ export function startTechniqueLabPhaser(
       canvas.dataset.effectTileCount = String(count);
       canvas.dataset.effectTextureKeys = this.effectObjects.flatMap((object) =>
         object instanceof Phaser.GameObjects.Image ? [mapActionDebugTextureKey(object)] : []).join(",");
+      canvas.dataset.effectAtlasFrames = this.effectObjects.flatMap((object) => {
+        if (!(object instanceof Phaser.GameObjects.Image)) return [];
+        const atlasFrame = mapActionAtlasFrame(object);
+        return atlasFrame ? [atlasFrame] : [];
+      }).join(",");
       canvas.dataset.constructionTerrainCount = frame.kind === "construction" && frame.completed
         ? String(session.effectCells().length)
         : "0";

@@ -189,6 +189,10 @@ test("tier-two evil mage commits native 3F through the formal technique flow", a
       && dataset.mapCombatFrame === "10"
       && dataset.mapCombatEffectTileCount === "6";
   }, undefined, { polling: "raf" });
+  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
+    "data-map-combat-effect-atlas-frames",
+    [39, 40, 41, 42, 43, 44].map((frame) => `fire-3__effect__${frame}`).join(","),
+  );
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-fire-3-wave.png`,
   });

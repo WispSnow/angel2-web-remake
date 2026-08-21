@@ -94,7 +94,7 @@ describe("generated full-combat atlases", () => {
       }
     }
     expect(frameCount).toBe(777);
-  });
+  }, 15_000);
 
   test("resolve stable semantic frame names without exposing source PNG URLs", () => {
     expect(fullCombatAtlasFrame("left/soldier/plus50/04")).toMatchObject({

@@ -45,7 +45,7 @@ root.innerHTML = `
       <div>
         <p class="debug-kicker">DEVELOPER SCENE SELECT</p>
         <h1>戰役調試中心</h1>
-        <p>直接選擇關卡、階段、成長檔案或快速結算場景。調試會話與普通入口隔離，正式記錄只讀且不會被改寫。</p>
+        <p>直接選擇關卡、階段、成長檔案或快速結算場景。全部場景沿用正式戰役的關卡資源包與資源映射；調試會話與普通入口隔離，正式記錄只讀且不會被改寫。</p>
       </div>
       <a href="/" class="debug-back-link">返回普通遊戲</a>
     </header>
@@ -82,7 +82,7 @@ root.innerHTML = `
       <a href="/promotion-lab.html" data-testid="debug-promotion-lab-link"><b>轉職觸發實驗室</b><span>12 組可轉職來源職業只差 1 經驗，檢查觸發、對話與候選 UI</span></a>
       <a href="/portrait-lab.html"><b>肖像動畫實驗室</b><span>一次檢查 D/0–67 的眨眼、口型與原版落點</span></a>
       <a href="/combat-lab.html"><b>戰鬥動畫實驗室</b><span>組合職業、方向、格擋、重傷與死亡</span></a>
-      <a href="/technique-lab.html" data-testid="debug-technique-lab-link"><b>地圖技能動畫實驗室</b><span>檢查落雷、冰雪、治療等地圖技能的原版時間線</span></a>
+      <a href="/technique-lab.html" data-testid="debug-technique-lab-link"><b>地圖技能動畫實驗室</b><span>以正式戰役資源映射檢查落雷、炎暴、冰雪與治療時間線</span></a>
       <a href="/deployment-lab.html"><b>部署實驗室</b><span>獨立檢查通用部署名單與輸入</span></a>
     </nav>
     <main class="debug-stage-list" data-testid="debug-hub">

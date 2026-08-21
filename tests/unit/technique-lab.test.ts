@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  TECHNIQUE_LAB_AUDIO_ASSETS,
   TECHNIQUE_LAB_ATTACK_DOWN,
   TECHNIQUE_LAB_ATTACK_UP,
   TECHNIQUE_LAB_CONFUSION,
@@ -16,7 +15,6 @@ import {
   TECHNIQUE_LAB_CATALOG,
   TECHNIQUE_LAB_DISPEL,
   TECHNIQUE_LAB_FIRE,
-  TECHNIQUE_LAB_GRAPHIC_ASSETS,
   TECHNIQUE_LAB_HEAL,
   TECHNIQUE_LAB_ICE,
   TECHNIQUE_LAB_IRON_PLATE,
@@ -27,6 +25,10 @@ import {
   TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS,
   TECHNIQUE_LAB_UNIT_ASSETS,
 } from "../../src/game/content/technique-lab.generated";
+import {
+  TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS,
+  TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS,
+} from "../../src/game/content/technique-lab-formal-assets";
 import {
   buildLightningTimeline,
   iceFrameAtGlobalIndex,
@@ -46,8 +48,8 @@ describe("map technique laboratory evidence", () => {
     // it is the one tier whose markers are not the final pair.
     expect(Object.values(TECHNIQUE_LAB_LIGHTNING).map((definition) => {
       const { resource, sweepWidth, runtimeTileCodes } = definition.commonHit;
-      const frames = TECHNIQUE_LAB_GRAPHIC_ASSETS[
-        resource as keyof typeof TECHNIQUE_LAB_GRAPHIC_ASSETS
+      const frames = TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS[
+        resource as keyof typeof TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS
       ].length;
       return {
         code: definition.code,
@@ -64,8 +66,8 @@ describe("map technique laboratory evidence", () => {
     ]);
     for (const definition of Object.values(TECHNIQUE_LAB_LIGHTNING)) {
       const { resource, sweepWidth, runtimeTileCodes } = definition.commonHit;
-      const frames = TECHNIQUE_LAB_GRAPHIC_ASSETS[
-        resource as keyof typeof TECHNIQUE_LAB_GRAPHIC_ASSETS
+      const frames = TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS[
+        resource as keyof typeof TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS
       ].length;
       for (const tileCode of runtimeTileCodes) {
         expect(tileCode - 1).toBeGreaterThanOrEqual(0);
@@ -166,8 +168,8 @@ describe("map technique laboratory evidence", () => {
         expect.objectContaining({ cycleIndex: 1, sourceFrame: 5, rangeValue: 1, distanceFromCenter: 2 }),
       ]);
     expect(iceFrameAtGlobalIndex(ice1, 12)).toBeUndefined();
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["UN/50"])
-      .toBe("/assets/original/technique-lab/audio/un-50.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/50"])
+      .toBe("/assets/original/audio/un/50.wav");
     expect(Object.values(TECHNIQUE_LAB_ICE).every(({ centerMode }) => centerMode === "actor position"))
       .toBe(true);
   });
@@ -284,8 +286,8 @@ describe("map technique laboratory evidence", () => {
       ...Array.from({ length: 42 }, (_, index) => index),
       ...Array.from({ length: 42 }, (_, index) => index),
     ]);
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["E/36"])
-      .toBe("/assets/original/technique-lab/audio/36.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/36"])
+      .toBe("/assets/original/audio/e/36.wav");
   });
 
   it("keeps all seventeen shared recovery stages for 2I while changing only its rules", () => {
@@ -353,8 +355,8 @@ describe("map technique laboratory evidence", () => {
       waitPerDrawNativeTicks: 15,
       descriptor: { xOffset: 0, yOffset: -1, width: 1, height: 2 },
     });
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["UN/51"])
-      .toBe("/assets/original/technique-lab/audio/un-51.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/51"])
+      .toBe("/assets/original/audio/un/51.wav");
   });
 
   it("keeps AD as the eleven four-tile MAGIC/33 shield states over 165 ticks with UN/52", () => {
@@ -389,8 +391,8 @@ describe("map technique laboratory evidence", () => {
     expect(phase.descriptorSequence.map(({ low7BitFrameIndices }) => low7BitFrameIndices))
       .toEqual([0, 4, 8, 12, 16, 20, 16, 12, 8, 4, 0]
         .map((frame) => [frame, frame + 1, frame + 2, frame + 3]));
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["UN/52"])
-      .toBe("/assets/original/technique-lab/audio/un-52.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["UN/52"])
+      .toBe("/assets/original/audio/un/52.wav");
   });
 
   it("keeps all 1D stomp draws, page flips, audio requests, and explicit waits distinct", () => {
@@ -418,8 +420,8 @@ describe("map technique laboratory evidence", () => {
       .toEqual([25, 55, 85, 115, 145, 175]);
     expect(steps.filter(({ phase }) => phase === "quake").map(({ y }) => y))
       .toEqual(Array.from({ length: 3 }, () => [145, 125, 110, 125, 145, 175]).flat());
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["MAGIC/82"])
-      .toBe("/assets/original/technique-lab/audio/magic-82.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["MAGIC/82"])
+      .toBe("/assets/original/audio/magic/82.wav");
   });
 
   it("keeps 2D on the shared stomp timeline but uses its native shadow y and 15..29 damage", () => {
@@ -599,7 +601,8 @@ describe("map technique laboratory evidence", () => {
       { resource: "MAGIC/18", drawCount: 16, waitPerDrawNativeTicks: 10 },
     ]);
     expect(TECHNIQUE_LAB_POISON.phases[0].runtimeTileCodeStates.at(-1)).toEqual([1, 2, 3, 4]);
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["E/58"]).toBe("/assets/original/technique-lab/audio/58.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/58"])
+      .toBe("/assets/original/audio/e/58.wav");
     expect(TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS.IP).toBe(10);
   });
 
@@ -667,8 +670,8 @@ describe("map technique laboratory evidence", () => {
     })));
     expect(phase.descriptorSequence.map(({ low7BitFrameIndices }) => low7BitFrameIndices))
       .toEqual(Array.from({ length: 11 }, (_, index) => [index * 2, index * 2 + 1]));
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["E/8"])
-      .toBe("/assets/original/technique-lab/audio/8.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/8"])
+      .toBe("/assets/original/audio/e/8.wav");
     expect(TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS.SA).toBe(15);
   });
 
@@ -704,8 +707,8 @@ describe("map technique laboratory evidence", () => {
     expect(phase.descriptorSequence.map(({ low7BitFrameIndices }) => low7BitFrameIndices))
       .toEqual(Array.from({ length: 10 }, (_, index) =>
         Array.from({ length: 4 }, (_, frame) => index * 4 + frame)));
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["E/8"])
-      .toBe("/assets/original/technique-lab/audio/8.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/8"])
+      .toBe("/assets/original/audio/e/8.wav");
     expect(TECHNIQUE_LAB_TERMINAL_HOLD_NATIVE_TICKS.SD).toBe(15);
   });
 
@@ -777,7 +780,8 @@ describe("map technique laboratory evidence", () => {
       { resource: "MAGIC/83", entry: "0000:0224", afterFixedWaitNativeTicks: 0 },
       { resource: "E/51", entry: "0000:0224", afterFixedWaitNativeTicks: 120 },
     ]);
-    expect(TECHNIQUE_LAB_AUDIO_ASSETS["E/51"]).toContain("51.wav");
+    expect(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS["E/51"])
+      .toBe("/assets/original/audio/e/51.wav");
   });
 
   it("preserves the exact 3H four-phase draw order, delayed sound, and common tail", () => {

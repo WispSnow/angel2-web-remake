@@ -7,6 +7,10 @@ import {
   RESOURCE_MANIFEST_IDENTITY,
   RESOURCE_MANIFEST_VERSION,
 } from "../../src/game/content/resource-manifest.generated";
+import {
+  DEBUG_SCENARIOS,
+  debugRosterStageId,
+} from "../../src/game/debug-scenario-catalog";
 import { STAGE_INDEX } from "../../src/game/content/stage-index";
 import {
   parseResourceManifest,
@@ -119,5 +123,18 @@ describe("versioned resource manifest", () => {
 
     expect(resolvedPackUrls(manifest, "stream:full-combat").size).toBe(172);
     expect(resolvedPackUrls(manifest, "stream:portraits").size).toBe(500);
+  });
+
+  test("gives every debug campaign scenario its formal campaign stage pack", async () => {
+    const manifest = await readManifest();
+    const packIds = new Set(manifest.packs.map(({ id }) => id));
+
+    for (const scenario of DEBUG_SCENARIOS) {
+      expect(
+        packIds.has(`stage:${debugRosterStageId(scenario.stageId)}`),
+        `${scenario.id} must resolve through a formal campaign stage pack`,
+      ).toBe(true);
+    }
+    expect(packIds.has("ending"), "ending debug fixtures must use the formal ending pack").toBe(true);
   });
 });

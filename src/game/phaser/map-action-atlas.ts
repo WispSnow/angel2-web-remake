@@ -26,8 +26,12 @@ function sourceForLegacyKey(key: string): string | undefined {
   let match = /^map-shoot-(\d+)$/u.exec(key);
   if (match) return `${MAP_ACTION_PREFIX}shoot/${paddedFrame(match[1])}.png`;
 
-  match = /^map-fire-([1-3])-(\d+)$/u.exec(key);
-  if (match) return `${MAP_ACTION_PREFIX}fire-${match[1]}/${paddedFrame(match[2])}.png`;
+  match = /^map-fire-1-(\d+)$/u.exec(key);
+  if (match) return `${MAP_ACTION_PREFIX}fire-1/${paddedFrame(match[1])}.png`;
+  match = /^map-fire-([23])-(\d+)$/u.exec(key);
+  if (match) {
+    return `${MAP_ACTION_PREFIX}fire-${match[1]}/effect/${paddedFrame(match[2])}.png`;
+  }
   match = /^map-fire-4-(ground|column|finish)-(\d+)$/u.exec(key);
   if (match) return `${MAP_ACTION_PREFIX}fire-4/${match[1]}/${paddedFrame(match[2])}.png`;
 
@@ -122,8 +126,12 @@ export function addMapActionImage(
   legacyKey: string,
 ): Phaser.GameObjects.Image {
   const ref = mapActionTextureRefFromLegacyKey(legacyKey);
+  if (!scene.textures.get(ref.texture).has(ref.frame)) {
+    throw new Error(`map action texture key ${legacyKey} resolved to missing frame ${ref.frame}`);
+  }
   const image = scene.add.image(x, y, ref.texture, ref.frame);
   image.setData("mapActionTextureKey", legacyKey);
+  image.setData("mapActionAtlasFrame", ref.frame);
   return image;
 }
 
@@ -136,8 +144,12 @@ export function addMapActionImageFromSource(
 ): Phaser.GameObjects.Image {
   const ref = mapActionTextureRefFromSource(source);
   if (!ref) throw new Error(`cannot atlas non-map-action image ${source}`);
+  if (!scene.textures.get(ref.texture).has(ref.frame)) {
+    throw new Error(`map action source ${source} resolved to missing frame ${ref.frame}`);
+  }
   const image = scene.add.image(x, y, ref.texture, ref.frame);
   image.setData("mapActionTextureSource", source);
+  image.setData("mapActionAtlasFrame", ref.frame);
   if (debugTextureKey) image.setData("mapActionTextureKey", debugTextureKey);
   return image;
 }
@@ -145,4 +157,9 @@ export function addMapActionImageFromSource(
 export function mapActionDebugTextureKey(image: Phaser.GameObjects.Image): string {
   const debugTextureKey = image.getData("mapActionTextureKey") as unknown;
   return typeof debugTextureKey === "string" ? debugTextureKey : image.texture.key;
+}
+
+export function mapActionAtlasFrame(image: Phaser.GameObjects.Image): string | undefined {
+  const atlasFrame = image.getData("mapActionAtlasFrame") as unknown;
+  return typeof atlasFrame === "string" ? atlasFrame : undefined;
 }

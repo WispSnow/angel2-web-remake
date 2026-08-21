@@ -6,8 +6,13 @@ import {
   MAP_ACTION_ATLAS_IDS,
   MAP_ACTION_ATLASES,
 } from "../../src/game/content/map-action-atlases.generated";
-import { TECHNIQUE_LAB_GRAPHIC_ASSETS } from "../../src/game/content/technique-lab.generated";
+import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../../src/game/content/stage0-actions.generated";
+import { STAGE1_ACTION_PRESENTATION_ASSETS } from "../../src/game/content/stage1-actions.generated";
 import {
+  TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS,
+} from "../../src/game/content/technique-lab-formal-assets";
+import {
+  collectMapActionSources,
   mapActionAtlasIdForAction,
   mapActionTextureRefFromLegacyKey,
   mapActionTextureRefFromSource,
@@ -105,6 +110,14 @@ describe("generated map-action atlases", () => {
       texture: "map-action-shoot",
       frame: "shoot__07",
     });
+    expect(mapActionTextureRefFromLegacyKey("map-fire-2-20")).toEqual({
+      texture: "map-action-fire-2",
+      frame: "fire-2__effect__20",
+    });
+    expect(mapActionTextureRefFromLegacyKey("map-fire-3-44")).toEqual({
+      texture: "map-action-fire-3",
+      frame: "fire-3__effect__44",
+    });
     expect(mapActionTextureRefFromLegacyKey("map-fire-4-ground-0")).toEqual({
       texture: "map-action-fire-4",
       frame: "fire-4__ground__00",
@@ -134,11 +147,26 @@ describe("generated map-action atlases", () => {
     expect(mapActionAtlasIdForAction("fire-4")).toBe("fire-4");
   });
 
-  test("keeps the technique laboratory on map-action source paths", () => {
-    const sources = Object.values(TECHNIQUE_LAB_GRAPHIC_ASSETS).flat();
+  test("keeps the technique laboratory on the formal campaign presentation mapping", () => {
+    expect(TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS["MAGIC/22"])
+      .toBe(STAGE0_ACTION_PRESENTATION_ASSETS.fire1.effect);
+    expect(TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS["MAGIC/23"])
+      .toBe(STAGE1_ACTION_PRESENTATION_ASSETS.fire2.effect);
+    expect(TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS["MAGIC/27"])
+      .toBe(STAGE1_ACTION_PRESENTATION_ASSETS.fire3.effect);
+
+    const formalSources = new Set([
+      ...collectMapActionSources(STAGE0_ACTION_PRESENTATION_ASSETS),
+      ...collectMapActionSources(STAGE1_ACTION_PRESENTATION_ASSETS),
+    ]);
+    const sources = Object.values(TECHNIQUE_LAB_FORMAL_GRAPHIC_ASSETS)
+      .flatMap((frames) => [...frames]);
     expect(sources.length).toBeGreaterThan(900);
     expect(sources.every((source) => source.startsWith("/assets/original/map-actions/"))).toBe(true);
     expect(sources.some((source) => source.includes("/technique-lab/lightning/"))).toBe(false);
-    for (const source of sources) expect(mapActionTextureRefFromSource(source)).toBeDefined();
+    for (const source of sources) {
+      expect(formalSources.has(source), source).toBe(true);
+      expect(mapActionTextureRefFromSource(source)).toBeDefined();
+    }
   });
 });
