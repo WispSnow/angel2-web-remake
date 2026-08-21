@@ -4,6 +4,7 @@ import {
   portraitSourceFor,
 } from "./content/portrait-catalog.generated";
 import type { PortraitRecord } from "./types";
+import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 
 type BlinkStage = "idle" | "closing" | "closed" | "opening";
 
@@ -30,6 +31,10 @@ const BLINK_IDLE_MAX_MS = 2_400;
 const TEST_BLINK_IDLE_MIN_MS = 220;
 const TEST_BLINK_IDLE_MAX_MS = 520;
 const PORTRAIT_SIZE = 112;
+const portraitPreparations = new WeakMap<HTMLElement, {
+  readonly portrait: string;
+  readonly promise: Promise<void>;
+}>();
 
 const percentage = (value: number) => `${(value / PORTRAIT_SIZE * 100).toFixed(6)}%`;
 const randomInteger = (minimum: number, maximum: number) =>
@@ -66,7 +71,7 @@ const PORTRAIT_UNDERLAY = '<i class="dialogue-portrait-underlay" aria-hidden="tr
 function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string): string {
   const portraitSource = portraitSourceFor(portrait);
   const animation = PORTRAIT_CATALOG[portrait].animation;
-  const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${portraitSource}" alt="${alt}" />`;
+  const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${stagedRenderAssetSource(portraitSource)}" alt="${alt}" />`;
   if (!animation) return base;
   const eyeStyle = [
     `left:${percentage(animation.eyeOrigin.x)}`,
@@ -83,10 +88,10 @@ function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: stri
   return `
     ${base}
     ${animation.eyes.map((source, index) =>
-      `<img class="portrait-eye portrait-eye-${index + 1}" style="${eyeStyle}" src="${source}" alt="" aria-hidden="true" />`,
+      `<img class="portrait-eye portrait-eye-${index + 1}" style="${eyeStyle}" src="${stagedRenderAssetSource(source)}" alt="" aria-hidden="true" />`,
     ).join("")}
     ${animation.mouths.map((source, index) =>
-      `<img class="portrait-mouth portrait-mouth-${index + 1}" style="${mouthStyle}" src="${source}" alt="" aria-hidden="true" />`,
+      `<img class="portrait-mouth portrait-mouth-${index + 1}" style="${mouthStyle}" src="${stagedRenderAssetSource(source)}" alt="" aria-hidden="true" />`,
     ).join("")}`;
 }
 
@@ -100,7 +105,8 @@ export function animatedPortraitMarkup(portrait: PortraitRecord, options: Portra
       data-blink-count="0"
       data-mouth-frame="1"
       data-talk-count="0"
-      data-speaking="false">
+      data-speaking="false"
+      data-portrait-ready="false">
       ${portraitLayers(portrait, options.alt, options.baseTestId)}
     </span>`;
 }
@@ -120,11 +126,40 @@ export function configureAnimatedPortrait(
     element.dataset.mouthFrame = "1";
     element.dataset.talkCount = "0";
     element.dataset.speaking = "false";
+    element.dataset.portraitReady = "false";
+    delete element.dataset.portraitError;
+    portraitPreparations.delete(element);
     element.innerHTML = portraitLayers(portrait, alt, baseTestId);
     return;
   }
   const base = element.querySelector<HTMLImageElement>(".portrait-base");
   if (base) base.alt = alt;
+}
+
+/** Waits for the actual DOM layers so blink, mouth and typing clocks share one barrier. */
+export function prepareAnimatedPortrait(element: HTMLElement): Promise<void> {
+  const portrait = element.dataset.portraitRecord ?? "";
+  const existing = portraitPreparations.get(element);
+  if (existing?.portrait === portrait) return existing.promise;
+  element.dataset.portraitReady = "false";
+  delete element.dataset.portraitError;
+  const images = [...element.querySelectorAll<HTMLImageElement>("img")];
+  const pending = Promise.all(images.map(async (image) => {
+    await image.decode();
+    if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+      throw new Error(`portrait layer decoded empty: ${image.src}`);
+    }
+  })).then(() => {
+    if (element.dataset.portraitRecord === portrait) element.dataset.portraitReady = "true";
+  }).catch((error: unknown) => {
+    if (element.dataset.portraitRecord === portrait) {
+      element.dataset.portraitReady = "false";
+      element.dataset.portraitError = error instanceof Error ? error.message : String(error);
+    }
+    throw error;
+  });
+  portraitPreparations.set(element, { portrait, promise: pending });
+  return pending;
 }
 
 export function startPortraitAnimations(
@@ -189,7 +224,10 @@ export function startPortraitAnimations(
         blinkState = resetBlinkState(portrait, now);
         blinkStates.set(channel, blinkState);
       }
-      if (paused) {
+      if (element.dataset.portraitReady !== "true") {
+        void prepareAnimatedPortrait(element).catch(() => undefined);
+      }
+      if (paused || element.dataset.portraitReady !== "true") {
         blinkState.stage = "idle";
         blinkState.transitionAt = now + blinkState.idleDelayMs;
         element.dataset.blinkFrame = "1";

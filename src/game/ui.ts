@@ -61,6 +61,7 @@ import {
   configureAnimatedPortrait,
   nativeMouthFrameAfterGlyph,
   nativeStoryGlyphMovesMouth,
+  prepareAnimatedPortrait,
   startPortraitAnimations,
 } from "./portrait";
 import {
@@ -84,6 +85,7 @@ import {
   RECORD_SAVE_BACKUP_CONFIRM_MARKUP,
   type SaveBackupUi,
 } from "./save-backup-ui";
+import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { DIFFICULTY_OPTIONS } from "./content/startup";
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
@@ -383,12 +385,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let revealedCharacters = 0;
   let activeDialogueText: HTMLElement | undefined;
   let activeDialoguePortrait: HTMLElement | undefined;
+  let activeDialoguePortraitReady = true;
   let feedbackTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let activeFeedbackKey = "";
   let feedbackFullText = "";
   let feedbackRevealedCharacters = 0;
   let activeFeedbackText: HTMLElement | undefined;
   let activeFeedbackPortrait: HTMLElement | undefined;
+  let activeFeedbackPortraitReady = true;
   let sidePanelHintTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let sidePanelHintTarget: HTMLElement | undefined;
   const stopPortraitAnimations = startPortraitAnimations(
@@ -452,7 +456,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     activeDialoguePortrait = portrait;
     revealedCharacters = Math.max(0, Math.min(fullText.length, revealStart));
     renderNativeDialogueText(target, fullText.slice(0, revealedCharacters));
-    startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length);
     const tick = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
         stopSpeaking(activeDialoguePortrait);
@@ -468,9 +471,25 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       const delay = controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80;
       dialogueTimer = globalThis.setTimeout(tick, delay);
     };
-    tick();
+    const begin = () => {
+      if (activeDialogueKey !== key || activeDialogueText !== target) return;
+      activeDialoguePortraitReady = true;
+      startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length);
+      tick();
+    };
+    activeDialoguePortraitReady = portrait === undefined;
+    if (!portrait) begin();
+    else void prepareAnimatedPortrait(portrait).then(begin).catch(() => {
+      if (activeDialogueKey !== key || activeDialogueText !== target) return;
+      activeDialoguePortraitReady = true;
+      revealedCharacters = dialogueFullText.length;
+      renderNativeDialogueText(target, dialogueFullText);
+      stopSpeaking(activeDialoguePortrait);
+      scheduleAutomaticDialogueAdvance(key);
+    });
   };
   const finishDialogueTyping = (): boolean => {
+    if (!activeDialoguePortraitReady && activeDialogueText) return true;
     if (!dialogueFullText || !activeDialogueText || revealedCharacters >= dialogueFullText.length) return false;
     stopDialogueTimer();
     revealedCharacters = dialogueFullText.length;
@@ -492,7 +511,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     activeFeedbackText = target;
     activeFeedbackPortrait = portrait;
     renderNativeDialogueText(target, "");
-    startSpeaking(activeFeedbackPortrait, fullText.length > 0);
     const tick = () => {
       if (activeFeedbackKey !== key || activeFeedbackText !== target || feedbackRevealedCharacters >= fullText.length) {
         stopSpeaking(activeFeedbackPortrait);
@@ -506,9 +524,24 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       drawSpeechGlyph(activeFeedbackPortrait, character);
       feedbackTimer = globalThis.setTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
     };
-    tick();
+    const begin = () => {
+      if (activeFeedbackKey !== key || activeFeedbackText !== target) return;
+      activeFeedbackPortraitReady = true;
+      startSpeaking(activeFeedbackPortrait, fullText.length > 0);
+      tick();
+    };
+    activeFeedbackPortraitReady = portrait === undefined;
+    if (!portrait) begin();
+    else void prepareAnimatedPortrait(portrait).then(begin).catch(() => {
+      if (activeFeedbackKey !== key || activeFeedbackText !== target) return;
+      activeFeedbackPortraitReady = true;
+      feedbackRevealedCharacters = fullText.length;
+      renderNativeDialogueText(target, fullText);
+      stopSpeaking(activeFeedbackPortrait);
+    });
   };
   const finishFeedbackTyping = (): boolean => {
+    if (!activeFeedbackPortraitReady && activeFeedbackText) return true;
     if (!feedbackFullText || !activeFeedbackText || feedbackRevealedCharacters >= feedbackFullText.length) return false;
     stopFeedbackTimer();
     feedbackRevealedCharacters = feedbackFullText.length;
@@ -1309,6 +1342,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             `dialogue-${slot}`,
             `dialogue-portrait-${slot}`,
           );
+          void prepareAnimatedPortrait(elements.portrait).catch(() => undefined);
           elements.portrait.hidden = false;
           elements.portrait.dataset.testid = active
             ? "dialogue-portrait-composite"
@@ -1344,6 +1378,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         activeDialogueKey = pageKey;
         activeDialogueText = undefined;
         activeDialoguePortrait = undefined;
+        activeDialoguePortraitReady = true;
         dialogueFullText = "";
         revealedCharacters = 0;
       }
@@ -1362,6 +1397,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       activeDialogueKey = "";
       activeDialogueText = undefined;
       activeDialoguePortrait = undefined;
+      activeDialoguePortraitReady = true;
       dialogueFullText = "";
       revealedCharacters = 0;
     }
@@ -1396,6 +1432,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         feedbackRevealedCharacters = fullText.length;
         activeFeedbackText = feedbackText;
         activeFeedbackPortrait = feedbackPortrait;
+        activeFeedbackPortraitReady = true;
         renderNativeDialogueText(feedbackText, fullText);
       } else if (activeFeedbackKey !== feedbackKey || activeFeedbackText !== feedbackText) {
         revealFeedback(fullText, feedbackKey, feedbackText, feedbackPortrait);
@@ -1408,6 +1445,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       feedbackRevealedCharacters = 0;
       activeFeedbackText = undefined;
       activeFeedbackPortrait = undefined;
+      activeFeedbackPortraitReady = true;
     }
     renderCombat(combatPresentation, controller);
   };
@@ -1497,7 +1535,7 @@ function buildFullCombatSkeleton(
     const life = unit.id === attacker.id ? presentation.displayedAttackerLife : presentation.displayedDefenderLife;
     return `
       <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
-        <img src="${portraitSourceFor(unit.portrait)}" alt="${unit.name}肖像" />
+        <img src="${stagedRenderAssetSource(portraitSourceFor(unit.portrait))}" alt="${unit.name}肖像" />
         <dl>
           <div><dt>經驗</dt><dd>${unit.experience}</dd></div>
           <div><dt>生命</dt><dd>${life}</dd></div>

@@ -113,7 +113,7 @@ export class ResourcePackLoader {
   ) {}
 
   async ensureBoot(): Promise<void> {
-    await this.ensurePackVisible("boot", "讀取開場資料", [], true);
+    await this.ensurePackVisible("boot", "讀取開場資料", [], "all");
   }
 
   async ensureStage(
@@ -121,7 +121,9 @@ export class ResourcePackLoader {
     label = "準備關卡資料",
     supplementalUrls: readonly string[] = [],
   ): Promise<void> {
-    await this.ensurePackVisible(`stage:${stageId}`, label, supplementalUrls);
+    const portraitUrls = supplementalUrls.filter((url) =>
+      url.startsWith("/assets/original/portraits/") && url.endsWith(".png"));
+    await this.ensurePackVisible(`stage:${stageId}`, label, supplementalUrls, portraitUrls);
   }
 
   async ensureRoute(route: "ending" | "credits", label: string): Promise<void> {
@@ -173,7 +175,7 @@ export class ResourcePackLoader {
     packId: string,
     label: string,
     supplementalUrls: readonly string[] = [],
-    predecodeRenderImages = false,
+    predecodeRenderImages: "all" | readonly string[] = [],
   ): Promise<void> {
     return new Promise((resolve) => {
       const attempt = async () => {
@@ -188,7 +190,10 @@ export class ResourcePackLoader {
           this.renderProgress(manifest);
           await this.loadUrls(manifest, urls);
           this.replaceStagedRenderAssetLease(packId, urls);
-          if (predecodeRenderImages) await decodeStagedRenderImages(urls);
+          if (predecodeRenderImages === "all") await decodeStagedRenderImages(urls);
+          else if (predecodeRenderImages.length > 0) {
+            await decodeStagedRenderImages(predecodeRenderImages);
+          }
           await this.replaceFullCombatImageLease(supplementalUrls);
           this.hideOverlay();
           resolve();

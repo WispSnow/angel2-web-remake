@@ -7,6 +7,7 @@ import {
 } from "./content/classes";
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import { allyMapUnitAsset } from "./content/map-unit-assets";
+import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 import type { DeploymentRosterUnit, DeploymentSession } from "./deployment-session";
 import {
   DeploymentMinimap,
@@ -149,7 +150,7 @@ function detailHtml(
 
   return `<div class="deployment-detail-head">
       <span class="deployment-detail-figure">
-        <img class="deployment-detail-portrait" src="${portraitSourceFor(unit.portrait)}" alt="" aria-hidden="true" />
+        <img class="deployment-detail-portrait" src="${stagedRenderAssetSource(portraitSourceFor(unit.portrait))}" alt="" aria-hidden="true" />
         <em class="deployment-detail-state">${status}</em>
       </span>
       <div class="deployment-detail-copy">

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { portraitAssetUrls } from "../../src/game/content/portrait-assets";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { STARTUP_IMAGE_URLS } from "../../src/game/startup-screen";
 import type { CompletedSaveData } from "../../src/game/types";
@@ -143,6 +144,95 @@ test("new game waits for the byte-counted stage 0 pack before mounting Phaser", 
   releaseStage0();
   await expect(overlay).toBeHidden({ timeout: 15_000 });
   await expect(page.locator("#phaser-root canvas")).toBeVisible({ timeout: 15_000 });
+});
+
+test("current dialogue portrait layers decode before stage clocks and reuse staged bytes", async ({ page }) => {
+  await page.addInitScript(() => {
+    const target = window as Window & {
+      __portraitDecodeAttempts?: number;
+      __releasePortraitDecode?: () => void;
+      __portraitDomDecodeAttempts?: number;
+      __releasePortraitDomDecode?: () => void;
+    };
+    const originalDecode = HTMLImageElement.prototype.decode;
+    const decodeGate = new Promise<void>((resolve) => {
+      target.__releasePortraitDecode = resolve;
+    });
+    const domDecodeGate = new Promise<void>((resolve) => {
+      target.__releasePortraitDomDecode = resolve;
+    });
+    target.__portraitDecodeAttempts = 0;
+    target.__portraitDomDecodeAttempts = 0;
+    HTMLImageElement.prototype.decode = function decodePortraitAfterGate() {
+      if (this.dataset.stagedAssetUrl?.startsWith("/assets/original/portraits/")) {
+        target.__portraitDecodeAttempts = (target.__portraitDecodeAttempts ?? 0) + 1;
+        return decodeGate.then(() => originalDecode.call(this));
+      }
+      if (this.closest(".animated-portrait")) {
+        target.__portraitDomDecodeAttempts = (target.__portraitDomDecodeAttempts ?? 0) + 1;
+        return domDecodeGate.then(() => originalDecode.call(this));
+      }
+      return originalDecode.call(this);
+    };
+  });
+  const portraitUrls = portraitAssetUrls(46);
+  const requests = new Map(portraitUrls.map((url) => [url, 0]));
+  for (const url of portraitUrls) {
+    await page.route(`**${url}`, async (route) => {
+      const count = (requests.get(url) ?? 0) + 1;
+      requests.set(url, count);
+      if (count > 1) await route.abort("failed");
+      else await route.continue();
+    });
+  }
+
+  await page.goto("/?test=1&skipStartup=1");
+  const overlay = page.getByTestId("resource-loading-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toHaveAttribute("data-resource-pack", "stage:stage-00");
+  await expect.poll(() => page.evaluate(() => (
+    window as Window & { __portraitDecodeAttempts?: number }
+  ).__portraitDecodeAttempts ?? 0)).toBeGreaterThan(0);
+  await expect(page.getByTestId("game-screen")).toHaveCount(0);
+
+  await page.evaluate(() => (
+    window as Window & { __releasePortraitDecode?: () => void }
+  ).__releasePortraitDecode?.());
+  await expect(overlay).toBeHidden({ timeout: 15_000 });
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toBeVisible({ timeout: 15_000 });
+  for (let action = 0; action < 4; action += 1) await dialogue.click();
+
+  const portrait = page.getByTestId("dialogue-portrait-composite");
+  await expect(portrait).toBeVisible();
+  await expect(portrait).toHaveAttribute("data-portrait-record", "46");
+  await expect(portrait).toHaveAttribute("data-portrait-ready", "false");
+  await expect(portrait).toHaveAttribute("data-talk-count", "0");
+  await expect.poll(() => page.evaluate(() => (
+    window as Window & { __portraitDomDecodeAttempts?: number }
+  ).__portraitDomDecodeAttempts ?? 0)).toBeGreaterThan(0);
+  await dialogue.click();
+  expect((await page.evaluate(() => window.__ANGEL2__?.getState()))?.dialogueIndex).toBe(2);
+
+  await page.evaluate(() => (
+    window as Window & { __releasePortraitDomDecode?: () => void }
+  ).__releasePortraitDomDecode?.());
+  await expect(portrait).toHaveAttribute("data-portrait-ready", "true");
+  await expect.poll(() => portrait.locator("img").evaluateAll((images) =>
+    images.every((image) => (image as HTMLImageElement).src.startsWith("blob:")
+      && (image as HTMLImageElement).naturalWidth > 0),
+  )).toBe(true);
+  await expect.poll(async () => Number(await portrait.getAttribute("data-talk-count")))
+    .toBeGreaterThan(0);
+  await expect.poll(() => page.locator("#dialogue-copy-upper").evaluate((panel) =>
+    panel.getAnimations().every((animation) => animation.playState === "finished"),
+  )).toBe(true);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/resource-loading-dialogue-portrait-ready.png",
+  });
+  expect(Object.fromEntries(requests)).toEqual(Object.fromEntries(
+    portraitUrls.map((url) => [url, 1]),
+  ));
 });
 
 test("stage music finishes before the scene mounts and playback reuses the staged bytes", async ({ page }) => {

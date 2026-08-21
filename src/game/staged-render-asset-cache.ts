@@ -12,14 +12,14 @@ export interface StagedRenderAssetLease {
 
 export interface StagedRenderAssetOptions {
   readonly ownerDocument?: Document;
-  readonly decodeImage?: (source: string) => Promise<HTMLImageElement>;
+  readonly decodeImage?: (source: string, originalUrl: string) => Promise<HTMLImageElement>;
 }
 
 interface ActiveStagedRenderAssets {
   readonly entries: ReadonlyMap<string, StagedRenderAssetEntry>;
   readonly urlApi: Pick<typeof URL, "createObjectURL" | "revokeObjectURL">;
   readonly blobConstructor: typeof Blob;
-  readonly decodeImage: (source: string) => Promise<HTMLImageElement>;
+  readonly decodeImage: (source: string, originalUrl: string) => Promise<HTMLImageElement>;
   released: boolean;
 }
 
@@ -56,12 +56,13 @@ export function activateStagedRenderAssets(
   const ownerWindow = options.ownerDocument?.defaultView;
   const urlApi = ownerWindow?.URL ?? globalThis.URL;
   const blobConstructor = ownerWindow?.Blob ?? globalThis.Blob;
-  const decodeImage = options.decodeImage ?? (async (source: string) => {
+  const decodeImage = options.decodeImage ?? (async (source: string, originalUrl: string) => {
     const ownerDocument = options.ownerDocument
       ?? (typeof document === "undefined" ? undefined : document);
     if (!ownerDocument) throw new Error(`cannot decode staged render asset ${source}`);
     const image = ownerDocument.createElement("img");
     image.decoding = "sync";
+    image.dataset.stagedAssetUrl = originalUrl;
     image.src = source;
     await image.decode();
     if (image.naturalWidth === 0 || image.naturalHeight === 0) {
@@ -120,7 +121,7 @@ export function loadStagedRenderImage(url: string): Promise<HTMLImageElement> | 
   const entry = assets.entries.get(url);
   if (!entry) return undefined;
   if (!entry.imagePromise) {
-    const pending = assets.decodeImage(stagedRenderAssetSource(url));
+    const pending = assets.decodeImage(stagedRenderAssetSource(url), url);
     entry.imagePromise = pending;
     void pending.catch(() => {
       if (entry.imagePromise === pending) entry.imagePromise = undefined;

@@ -25,6 +25,7 @@ import {
 } from "./content/ai-technique-dialogue";
 import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
 import {
+  classFallbackPortraitFor,
   classDefinition,
   immuneToPhysicalShootingFor,
   isClassId,
@@ -38,6 +39,7 @@ import {
   storyPhaseForStageStory,
   type StageStoryPhase,
 } from "./content/dialogue";
+import { stageDialoguePortraitRecords } from "./content/portrait-assets";
 import {
   stageSimulationEffectFor,
   type CampaignRouteId,
@@ -130,7 +132,7 @@ import {
   stageRuntimeSourceForDestination,
   type LoadedStageRuntime,
 } from "./stage-runtime";
-import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, Position, SaveData, StageId, UnitClassId, UnitStats } from "./types";
+import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, PortraitRecord, Position, SaveData, StageId, UnitClassId, UnitStats } from "./types";
 
 type Listener = () => void;
 type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
@@ -138,6 +140,7 @@ export interface StageAssetRequirements {
   allyClassIds: readonly UnitClassId[];
   encounterClassIds: readonly UnitClassId[];
   nativeStage: number;
+  portraitRecords: readonly PortraitRecord[];
 }
 
 export type StageAssetGate = (
@@ -744,20 +747,40 @@ export class GameController {
 
   private async loadRuntime(
     stageId: StageId,
-    allyClassIds: readonly UnitClassId[],
-    restoredClassIds: readonly UnitClassId[] = [],
+    campaign: CampaignState,
+    restoredUnits: readonly Pick<BattleUnit, "classId" | "portrait">[] = [],
   ): Promise<LoadedStageRuntime> {
     const runtime = await loadStageRuntime(stageId);
-    const encounterClassIds = new Set<UnitClassId>([...allyClassIds, ...restoredClassIds]);
+    const allyClassIds = campaign.roster.map(({ classId }) => classId);
+    const encounterClassIds = new Set<UnitClassId>([
+      ...allyClassIds,
+      ...restoredUnits.map(({ classId }) => classId),
+    ]);
     for (const spriteKey of Object.keys(runtime.assets?.unitSprites ?? {})) {
       const separator = spriteKey.indexOf("-");
       const classId = separator >= 0 ? spriteKey.slice(separator + 1) : spriteKey;
       if (isClassId(classId)) encounterClassIds.add(classId);
     }
+    const portraitRecords = new Set<PortraitRecord>([
+      46,
+      ...stageDialoguePortraitRecords(runtime.definition),
+      ...restoredUnits.map(({ portrait }) => portrait),
+      ...(runtime.preparation?.createRoster(campaign).map(({ portrait }) => portrait) ?? []),
+    ]);
+    for (const rule of runtime.save.namedUnits ?? []) {
+      if (typeof rule.portrait === "number") portraitRecords.add(rule.portrait);
+    }
+    for (const classId of encounterClassIds) {
+      for (const side of [1, 2] as const) {
+        const portrait = classFallbackPortraitFor(classId, side);
+        if (portrait !== undefined) portraitRecords.add(portrait);
+      }
+    }
     await this.stageAssetGate?.(stageId, {
       allyClassIds,
       encounterClassIds: [...encounterClassIds],
       nativeStage: runtime.definition.nativeStage,
+      portraitRecords: [...portraitRecords].sort((left, right) => left - right),
     });
     return runtime;
   }
@@ -767,7 +790,7 @@ export class GameController {
     campaign: CampaignState = { ...this.battle.campaignSnapshot(), stageId },
     options: StageEntryOptions = {},
   ): Promise<void> {
-    const runtime = await this.loadRuntime(stageId, campaign.roster.map(({ classId }) => classId));
+    const runtime = await this.loadRuntime(stageId, campaign);
     this.stageRuntime = runtime;
     this.completedProgressMetadata = undefined;
     this.stage49Ending = undefined;
@@ -4749,10 +4772,6 @@ export class GameController {
       if (!isPlayableStageId(save.stageId)) {
         const source = stageRuntimeSourceForDestination(save.stageId);
         if (source) {
-          const runtime = await this.loadRuntime(
-            source.id,
-            save.roster.map(({ classId }) => classId),
-          );
           const campaign = {
             stageId: source.id,
             ruleset: save.ruleset,
@@ -4762,6 +4781,7 @@ export class GameController {
             rngState: save.rngState,
             rngCalls: save.rngCalls,
           } as const;
+          const runtime = await this.loadRuntime(source.id, campaign);
           this.stageRuntime = runtime;
           this.battle = runtime.createBattle(
             campaign,
@@ -4818,11 +4838,7 @@ export class GameController {
       rngState: save.rngState,
       rngCalls: save.rngCalls,
     };
-    const runtime = await this.loadRuntime(
-      save.stageId,
-      save.roster.map(({ classId }) => classId),
-      save.battle.units.map(({ classId }) => classId),
-    );
+    const runtime = await this.loadRuntime(save.stageId, campaign, save.battle.units);
     const battle = runtime.restoreBattle(campaign, save.battle);
     this.stageRuntime = runtime;
     this.completedProgressMetadata = undefined;

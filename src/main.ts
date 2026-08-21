@@ -1,7 +1,12 @@
 import "./styles.css";
 import "./stage49-ending.css";
 import "./resource-loading.css";
-import { GameController, exposeDebugApi, type StageAssetGate } from "./game/controller";
+import {
+  GameController,
+  exposeDebugApi,
+  type StageAssetGate,
+  type StageAssetRequirements,
+} from "./game/controller";
 import { startPhaser } from "./game/phaser/BattleScene";
 import { mountUi } from "./game/ui";
 import { AudioManager } from "./game/audio";
@@ -12,6 +17,9 @@ import "./credits.css";
 import { ResourcePackLoader } from "./game/resource-loader";
 import { classPresentationAssetUrls } from "./game/content/class-presentation-assets";
 import { createStage0Units } from "./game/content/stage0";
+import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
+import { STAGE0_DEFINITION } from "./game/content/stages";
+import type { PortraitRecord } from "./game/types";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
@@ -24,18 +32,28 @@ const stageAssetGate: StageAssetGate = (stageId, requirements) =>
     classPresentationAssetUrls(requirements),
   );
 
-const controllerAssetRequirements = (controller: GameController) => ({
+const controllerAssetRequirements = (controller: GameController): StageAssetRequirements => ({
   allyClassIds: controller.battle.units
     .filter(({ side }) => side === 1)
     .map(({ classId }) => classId),
   encounterClassIds: controller.battle.units.map(({ classId }) => classId),
   nativeStage: controller.battle.stage.nativeStage,
+  portraitRecords: [...new Set<PortraitRecord>([
+    46,
+    ...controller.battle.units.map(({ portrait }) => portrait),
+    ...stageDialoguePortraitRecords(controller.battle.stage),
+  ])],
 });
 const stage0Units = createStage0Units();
 const stage0PresentationAssets = classPresentationAssetUrls({
   allyClassIds: stage0Units.filter(({ side }) => side === 1).map(({ classId }) => classId),
   encounterClassIds: stage0Units.map(({ classId }) => classId),
   nativeStage: 0,
+  portraitRecords: [...new Set<PortraitRecord>([
+    46,
+    ...stage0Units.map(({ portrait }) => portrait),
+    ...stageDialoguePortraitRecords(STAGE0_DEFINITION),
+  ])],
 });
 
 const mountController = (

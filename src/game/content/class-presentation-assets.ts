@@ -1,10 +1,11 @@
-import type { UnitClassId } from "../types";
+import type { PortraitRecord, UnitClassId } from "../types";
 import { presentationActionIdsForClass, type BattleActionId } from "./actions";
 import { promotionTargetsFor } from "./classes";
 import { FULL_COMBAT_ATLASES } from "./full-combat-atlases.generated";
 import { allyMapUnitAssetsForClasses } from "./map-unit-assets";
 import { mapActionAtlasAssetsForActions } from "./map-action-assets";
 import { fullCombatBackgroundAssetsForStage } from "./full-combat-backgrounds";
+import { portraitAssetUrlsForRecords } from "./portrait-assets";
 
 export interface StageClassPresentationRequirements {
   /** Player roster classes; immediate promotion choices are included. */
@@ -13,6 +14,8 @@ export interface StageClassPresentationRequirements {
   encounterClassIds: readonly UnitClassId[];
   /** Native scenario number used to bound the possible panorama backdrops. */
   nativeStage?: number;
+  /** Current board, deployment and story portraits; never the full campaign. */
+  portraitRecords?: readonly PortraitRecord[];
 }
 
 const fullCombatAtlasById = new Map<string, (typeof FULL_COMBAT_ATLASES)[number]>(
@@ -31,6 +34,7 @@ export function classPresentationAssetUrls(
     ...allyClasses,
   ]);
   const urls = new Set<string>(allyMapUnitAssetsForClasses(requirements.allyClassIds).values());
+  for (const url of portraitAssetUrlsForRecords(requirements.portraitRecords ?? [])) urls.add(url);
   if (requirements.nativeStage !== undefined) {
     for (const url of fullCombatBackgroundAssetsForStage(requirements.nativeStage)) urls.add(url);
   }

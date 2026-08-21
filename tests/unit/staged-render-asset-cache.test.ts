@@ -69,6 +69,7 @@ describe("staged render asset cache", () => {
     await decodeStagedRenderImages([imageUrl]);
     expect(await loadStagedRenderImage(imageUrl)).toBe(decoded);
     expect(decodeImage).toHaveBeenCalledTimes(1);
+    expect(decodeImage).toHaveBeenCalledWith(expect.stringMatching(/^blob:/u), imageUrl);
     expect(loadStagedRenderImage("/assets/original/map-action-atlases/fire-1.json"))
       .toBeUndefined();
   });
