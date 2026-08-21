@@ -9,7 +9,7 @@ import {
   SAVE_VERSION,
 } from "../../src/game/save";
 import { INTRO_BAND } from "../../src/game/startup";
-import { skipOpeningToTitle } from "./startup-controls";
+import { activateStartup, skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const battleSave = () => {
@@ -237,6 +237,7 @@ test("BOOT-A: opening story, title and difficulty selection enter stage zero", a
   await page.goto("/?test=1");
   const startup = page.getByTestId("startup-screen");
   const intro = page.getByTestId("opening-intro");
+  await activateStartup(page);
   // The Softstar logo runs first now, exactly as 0000:0CE2 does. It is too brief
   // under ?test=1 to catch by phase, so it leaves a marker behind.
   await expect(startup).toHaveAttribute("data-startup-phase", "intro");

@@ -1,7 +1,6 @@
 import {
   DIFFICULTY_OPTIONS,
   difficultyHintFor,
-  STARTUP_ASSETS,
 } from "./content/startup";
 import {
   STARTUP_FONT,
@@ -47,6 +46,7 @@ import {
   type SaveSlotReadResult,
 } from "./save";
 import type { Difficulty, SaveData } from "./types";
+import type { PreparedStartupMusic } from "./startup-music";
 
 /**
  * 規則集在存檔裡是代號（`stableRemake`），而發行版只有遊戲本體、不附任何決定記錄或設計
@@ -57,7 +57,7 @@ const RULESET_LABELS: Record<SaveData["ruleset"], string> = {
   stableRemake: "標準規則",
 };
 
-type StartupPhase = "pretitle" | "intro" | "title" | "difficulty" | "records";
+type StartupPhase = "ready" | "pretitle" | "intro" | "title" | "difficulty" | "records";
 
 export interface NewGameSelection {
   kind: "new";
@@ -115,6 +115,7 @@ const required = <T extends HTMLElement>(root: ParentNode, selector: string): T 
 export function mountStartup(
   root: HTMLElement,
   startGame: (selection: StartupSelection) => void,
+  startupMusic: PreparedStartupMusic,
 ): () => void {
   const testMode = new URLSearchParams(location.search).has("test");
   const introDuration = testMode
@@ -127,7 +128,7 @@ export function mountStartup(
   const preMusicHoldMs = testMode
     ? 20
     : STARTUP_TITLE.preMusicHoldNativeTicks * NATIVE_TICK_MS;
-  let phase: StartupPhase = "pretitle";
+  let phase: StartupPhase = "ready";
   let titleIndex = 0;
   let difficultyIndex = 0;
   /** Set while the difficulty highlight is being moved by the keyboard. */
@@ -142,15 +143,11 @@ export function mountStartup(
   let titleVariant = 0;
   let idleSince = 0;
   let font: HTMLImageElement | undefined;
+  /** MUSIC/1 remains a one-shot; the entry gate has already unlocked Web Audio. */
   let musicStarted = false;
-  /**
-   * MUSIC/1 starts inside the title assembly, which can finish before the page
-   * has ever seen a gesture, so a blocked autoplay has to be retried on the next
-   * input. This flag keeps that retry from resurrecting a track the native flow
-   * deliberately stopped.
-   */
-  let titleMusicStopped = false;
   let disposed = false;
+  let startupAssetsReady = false;
+  let activationPending = false;
   const loadedImages = new Map<string, HTMLImageElement>();
 
   root.innerHTML = `
@@ -158,9 +155,20 @@ export function mountStartup(
       <div class="game-stage">
         <div class="game-viewport" id="startup-viewport">
           <section class="logical-screen startup-screen" id="startup-screen" data-testid="startup-screen"
-            data-startup-phase="pretitle" aria-label="天使帝國 II 啟動畫面">
+            data-startup-phase="ready" aria-label="天使帝國 II 啟動畫面">
             <canvas class="startup-canvas" id="startup-canvas" data-testid="startup-canvas"
               width="${STARTUP_SCREEN.width}" height="${STARTUP_SCREEN.height}" aria-hidden="true"></canvas>
+            <section class="startup-activation" data-testid="startup-activation" role="dialog"
+              aria-labelledby="startup-activation-title" aria-describedby="startup-activation-detail">
+              <p class="startup-activation-kicker">ANGEL2 · WEB REMAKE</p>
+              <h1 id="startup-activation-title">開場準備完成</h1>
+              <p id="startup-activation-detail" data-testid="startup-activation-detail">
+                原版開場圖像與音樂已就緒。請確認進入，瀏覽器才會允許完整播放音樂。
+              </p>
+              <button type="button" data-startup-action="activate" data-testid="startup-enter" disabled>
+                進入遊戲
+              </button>
+            </section>
             <section class="startup-intro" data-testid="opening-intro" aria-label="開場劇情動畫">
               <div class="startup-intro-lines visually-hidden" aria-live="off">
                 <p data-intro-slot="0"></p>
@@ -248,13 +256,10 @@ export function mountStartup(
   const recordPage = required(root, "[data-testid=title-record-page]");
   const recordDetail = required<HTMLParagraphElement>(root, ".startup-record-detail");
   const titleStatus = required<HTMLParagraphElement>(root, ".startup-menu-status");
+  const activation = required<HTMLElement>(root, ".startup-activation");
+  const activationDetail = required<HTMLElement>(root, "[data-testid=startup-activation-detail]");
+  const activationButton = required<HTMLButtonElement>(root, "[data-testid=startup-enter]");
   const stopScaling = configureGameScaling(viewport, screen);
-  const introAudio = new Audio(STARTUP_ASSETS.audio.intro);
-  const titleAudio = new Audio(STARTUP_ASSETS.audio.title);
-  introAudio.volume = 0.32;
-  introAudio.preload = "auto";
-  titleAudio.volume = 0.32;
-  titleAudio.preload = "auto";
   /**
    * [OF] `REMAKE-114` withdrew the loop `REMAKE-112` had inferred: MUSIC/1 plays
    * once through its 13.37 s decode and the title screen then stays silent until
@@ -262,54 +267,32 @@ export function mountStartup(
    * records — idle replay, difficulty confirm, difficulty cancel — only ever cut
    * that single play short.
    */
-  titleAudio.loop = false;
-
-  const play = (audio: HTMLAudioElement) => {
-    void audio.play().catch(() => undefined);
-  };
-  const stopAudio = (audio: HTMLAudioElement) => {
-    audio.pause();
-    audio.currentTime = 0;
-  };
   /**
    * Mirrors `audio.ts#updateMusicDebugState`: MUSIC/1 lives in a detached `Audio`
    * element, so its transport is otherwise unobservable from a test. The count
    * separates "still the same playback" from "restarted from the top".
    */
   let titleMusicPlays = 0;
-  const updateTitleMusicDebugState = () => {
+  const updateStartupMusicDebugState = () => {
+    screen.dataset.startupMusicReady = "true";
+    screen.dataset.startupMusicContext = startupMusic.contextState;
+    screen.dataset.introMusicPlaying = String(startupMusic.introPlaying);
     if (!testMode) return;
-    screen.dataset.titleMusicPlaying = String(!titleAudio.paused);
+    screen.dataset.titleMusicPlaying = String(startupMusic.titlePlaying);
     screen.dataset.titleMusicPlayCount = String(titleMusicPlays);
-    screen.dataset.titleMusicLoop = String(titleAudio.loop);
+    screen.dataset.titleMusicLoop = "false";
   };
   const startTitleMusic = () => {
-    titleMusicStopped = false;
     titleMusicPlays += 1;
-    play(titleAudio);
-    updateTitleMusicDebugState();
+    startupMusic.playTitle(() => {
+      updateStartupMusicDebugState();
+    });
+    updateStartupMusicDebugState();
   };
   const stopTitleMusic = () => {
-    titleMusicStopped = true;
-    stopAudio(titleAudio);
-    updateTitleMusicDebugState();
+    startupMusic.stopTitle();
+    updateStartupMusicDebugState();
   };
-  /** Only retries a MUSIC/1 start the browser refused, never a native stop. */
-  const resumeBlockedTitleMusic = () => {
-    if (!musicStarted || titleMusicStopped || !titleAudio.paused) return;
-    play(titleAudio);
-    updateTitleMusicDebugState();
-  };
-  /**
-   * A blocked autoplay is the only thing worth retrying. Once the single native
-   * play has run out there is nothing to resume, so the natural end has to close
-   * the retry window as firmly as an explicit stop — otherwise the next click
-   * would start MUSIC/1 over and rebuild the loop `REMAKE-114` removed.
-   */
-  titleAudio.addEventListener("ended", () => {
-    titleMusicStopped = true;
-    updateTitleMusicDebugState();
-  });
 
   const recordDescription = (result: SaveSlotReadResult, slot: number): string => {
     if (result.kind === "empty") return `記錄 ${slot}：此處沒有記錄。`;
@@ -427,12 +410,14 @@ export function mountStartup(
     phase = "intro";
     phaseStartedAt = performance.now();
     screen.dataset.startupPhase = "intro";
-    play(introAudio);
+    startupMusic.playIntro();
+    updateStartupMusicDebugState();
   };
 
   const enterTitle = () => {
     if (phase !== "intro" && phase !== "pretitle") return;
-    stopAudio(introAudio);
+    startupMusic.stopIntro();
+    updateStartupMusicDebugState();
     phase = "title";
     titleAssembled = false;
     musicStarted = false;
@@ -445,6 +430,32 @@ export function mountStartup(
     titleMenuFrame.hidden = true;
     difficultyMenuFrame.hidden = true;
     titleMenu.hidden = true;
+  };
+
+  const activateStartup = () => {
+    if (phase !== "ready" || !startupAssetsReady || activationPending) return;
+    activationPending = true;
+    activationButton.disabled = true;
+    activationDetail.textContent = "正在開啟音樂……";
+    // resume() is invoked synchronously inside the gesture handler. Awaiting it
+    // only delays the native clocks until the browser confirms audible output.
+    void startupMusic.unlock().then(() => {
+      if (disposed) return;
+      activation.hidden = true;
+      phase = "pretitle";
+      screen.dataset.startupPhase = phase;
+      updateStartupMusicDebugState();
+      phaseStartedAt = performance.now();
+      animationFrame = requestAnimationFrame(animate);
+    }).catch((error: unknown) => {
+      if (disposed) return;
+      activationPending = false;
+      activationButton.disabled = false;
+      activationDetail.textContent = error instanceof Error
+        ? `${error.message} 請再確認一次。`
+        : "瀏覽器未允許音樂播放，請再確認一次。";
+      activationButton.focus({ preventScroll: true });
+    });
   };
 
   /**
@@ -465,7 +476,8 @@ export function mountStartup(
     titleMenuFrame.hidden = true;
     titleMenu.hidden = true;
     intro.hidden = false;
-    play(introAudio);
+    startupMusic.playIntro();
+    updateStartupMusicDebugState();
   };
 
   /**
@@ -646,6 +658,11 @@ export function mountStartup(
   const onKeyDown = (event: KeyboardEvent) => {
     if (disposed || event.repeat) return;
     idleSince = performance.now();
+    if (phase === "ready") {
+      event.preventDefault();
+      activateStartup();
+      return;
+    }
     if (phase === "pretitle") {
       // 0000:0D2F ends the hold early, but 0000:0D1C still runs the fade-out.
       event.preventDefault();
@@ -657,7 +674,6 @@ export function mountStartup(
       enterTitle();
       return;
     }
-    resumeBlockedTitleMusic();
     if (screen.dataset.startupPhase === "title-assemble") return;
     if (saveBackupUi.handleKeyDown(event)) return;
     const direction = keyboardDirection(event.key);
@@ -728,7 +744,10 @@ export function mountStartup(
   const onClick = (event: MouseEvent) => {
     const button = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action]");
     if (!button) return;
-    resumeBlockedTitleMusic();
+    if (button.dataset.startupAction === "activate") {
+      activateStartup();
+      return;
+    }
     if (saveBackupUi.handleClick(button)) return;
     const action = button.dataset.startupAction;
     if (action === "record-page") {
@@ -770,7 +789,6 @@ export function mountStartup(
     if (disposed || !(event.target as Element).closest("#startup-screen")) return;
     event.preventDefault();
     idleSince = performance.now();
-    resumeBlockedTitleMusic();
     cancelInput();
   };
 
@@ -901,8 +919,7 @@ export function mountStartup(
     if (disposed) return;
     disposed = true;
     cancelAnimationFrame(animationFrame);
-    stopAudio(introAudio);
-    stopAudio(titleAudio);
+    startupMusic.dispose();
     stopScaling();
     window.removeEventListener("keydown", onKeyDown);
     root.removeEventListener("pointerover", onPointerOver);
@@ -919,6 +936,7 @@ export function mountStartup(
   root.addEventListener("contextmenu", onContextMenu);
   updateMenuSelection();
   screen.dataset.startupAssetsReady = "false";
+  updateStartupMusicDebugState();
   void Promise.all([
     ...STARTUP_IMAGE_URLS.map(async (src) => {
       loadedImages.set(src, await loadStartupImage(src));
@@ -929,11 +947,14 @@ export function mountStartup(
     if (disposed) return;
     font = loadedImages.get(STARTUP_FONT.src);
     if (!font) throw new Error("startup font did not reach the decode barrier");
+    startupAssetsReady = true;
     screen.dataset.startupAssetsReady = "true";
-    phaseStartedAt = performance.now();
-    animationFrame = requestAnimationFrame(animate);
+    activationButton.disabled = false;
+    activationDetail.textContent = "原版開場圖像與音樂已就緒。請確認進入，瀏覽器才會允許完整播放音樂。";
+    activationButton.focus({ preventScroll: true });
   }).catch((error: unknown) => {
     screen.dataset.startupAssetsReady = "false";
+    activationDetail.textContent = "開場圖像未能完成準備，請重新整理後再試。";
     console.error("startup assets failed to decode", error);
   });
 

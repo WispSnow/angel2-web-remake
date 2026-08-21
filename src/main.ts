@@ -21,6 +21,10 @@ import { stageDialoguePortraitRecords } from "./game/content/portrait-assets";
 import { STAGE0_DEFINITION } from "./game/content/stages";
 import type { PortraitRecord } from "./game/types";
 import { STAGE49_ENDING_SUPPLEMENTAL_ASSETS } from "./game/content/stage49-ending";
+import {
+  prepareStartupMusic,
+  type PreparedStartupMusic,
+} from "./game/startup-music";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
@@ -260,8 +264,13 @@ else if (!releaseBuild && parameters.has("skipStartup")) {
   void startGame({ kind: "new", difficulty: 0, userActivated: false });
 }
 else {
-  void resourceLoader.ensureBoot().then(() => {
-    mountStartup(root, startGame);
+  let startupMusic: PreparedStartupMusic | undefined;
+  void resourceLoader.ensureBoot(async () => {
+    startupMusic?.dispose();
+    startupMusic = await prepareStartupMusic();
+  }).then(() => {
+    if (!startupMusic) throw new Error("開場音樂沒有通過資源準備門。");
+    mountStartup(root, startGame, startupMusic);
     resourceLoader.prefetchStage("stage-00", stage0PresentationAssets);
   });
 }

@@ -16,6 +16,10 @@ import {
   isStagedRenderAssetUrl,
   type StagedRenderAssetLease,
 } from "./staged-render-asset-cache";
+import {
+  openPersistentResourceCache,
+  type PersistentResourceCache,
+} from "./persistent-resource-cache";
 
 export interface ResourceManifestAsset {
   url: string;
@@ -48,6 +52,11 @@ interface AssetLoadState {
 }
 
 type FetchAsset = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+interface AssetResponse {
+  readonly response: Response;
+  readonly cacheWrite: Promise<void>;
+}
 
 const MAX_PARALLEL_REQUESTS = 6;
 const PORTRAIT_ASSET_PREFIX = "/assets/original/portraits/";
@@ -107,14 +116,21 @@ export class ResourcePackLoader {
   private stagedRenderAssetLease?: StagedRenderAssetLease;
   private stagedRenderAssetUrls = new Set<string>();
   private readonly prefetchedRenderUrls = new Map<string, ReadonlySet<string>>();
+  private readonly persistentCachePromise: Promise<PersistentResourceCache | undefined>;
 
   constructor(
     private readonly fetchAsset: FetchAsset = globalThis.fetch.bind(globalThis),
     private readonly ownerDocument: Document = document,
-  ) {}
+  ) {
+    this.persistentCachePromise = openPersistentResourceCache({
+      version: RESOURCE_MANIFEST_VERSION,
+      identity: RESOURCE_MANIFEST_IDENTITY,
+      baseUrl: ownerDocument.baseURI,
+    });
+  }
 
-  async ensureBoot(): Promise<void> {
-    await this.ensurePackVisible("boot", "讀取開場資料", [], "all");
+  async ensureBoot(afterLoad?: () => Promise<void>): Promise<void> {
+    await this.ensurePackVisible("boot", "讀取開場資料", [], "all", afterLoad);
   }
 
   async ensureStage(
@@ -181,6 +197,7 @@ export class ResourcePackLoader {
     label: string,
     supplementalUrls: readonly string[] = [],
     predecodeRenderImages: "all" | readonly string[] = [],
+    afterLoad?: () => Promise<void>,
   ): Promise<void> {
     return new Promise((resolve) => {
       const attempt = async () => {
@@ -200,6 +217,7 @@ export class ResourcePackLoader {
             await decodeStagedRenderImages(predecodeRenderImages);
           }
           await this.replaceFullCombatImageLease(supplementalUrls);
+          await afterLoad?.();
           this.hideOverlay();
           resolve();
         } catch (error) {
@@ -259,7 +277,7 @@ export class ResourcePackLoader {
     }
     if (current?.promise) return current.promise;
     const state: AssetLoadState = current ?? { loadedBytes: 0, complete: false };
-    const pending = this.fetchAsset(asset.url).then(async (response) => {
+    const pending = this.responseForAsset(asset.url).then(async ({ response, cacheWrite }) => {
       if (!response.ok) throw new Error(`讀取失敗（${response.status}）：${asset.url}`);
       const reader = response.body?.getReader();
       const collectEncoded = isMusicResourceUrl(asset.url) || isStagedRenderAssetUrl(asset.url);
@@ -294,6 +312,7 @@ export class ResourcePackLoader {
         if (isMusicResourceUrl(asset.url)) primeEncodedMusic(asset.url, encoded);
         if (isStagedRenderAssetUrl(asset.url)) state.encodedRenderAsset = encodedView;
       }
+      await cacheWrite;
       state.loadedBytes = asset.bytes;
       state.complete = true;
       state.promise = undefined;
@@ -308,6 +327,29 @@ export class ResourcePackLoader {
     state.promise = pending;
     this.states.set(asset.url, state);
     return pending;
+  }
+
+  private async responseForAsset(url: string): Promise<AssetResponse> {
+    const persistent = await this.persistentCachePromise;
+    if (persistent) {
+      try {
+        const cached = await persistent.match(url);
+        if (cached) return { response: cached, cacheWrite: Promise.resolve() };
+      } catch (error) {
+        console.warn(`persistent resource cache read failed for ${url}`, error);
+      }
+    }
+    const response = await this.fetchAsset(url);
+    let cacheWrite = Promise.resolve();
+    if (response.ok && persistent) {
+      // Cache.put consumes its own cloned branch of the response stream. The
+      // visible load keeps reading the original branch. Awaiting the caught
+      // write before completing the pack makes an immediate reload deterministic.
+      cacheWrite = persistent.put(url, response.clone()).catch((error) => {
+        console.warn(`persistent resource cache write failed for ${url}`, error);
+      });
+    }
+    return { response, cacheWrite };
   }
 
   private replaceStagedRenderAssetLease(packId: string, urls: readonly string[]): void {

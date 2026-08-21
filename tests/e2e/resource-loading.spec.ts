@@ -4,7 +4,7 @@ import { portraitAssetUrls } from "../../src/game/content/portrait-assets";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { STARTUP_IMAGE_URLS } from "../../src/game/startup-screen";
 import type { CompletedSaveData } from "../../src/game/types";
-import { skipOpeningToTitle } from "./startup-controls";
+import { activateStartup, skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const stage1CompletedSave = (): CompletedSaveData => ({
@@ -51,6 +51,73 @@ test("boot shows only opening resources while stage 0 warms in the background", 
   releaseStage0();
 });
 
+test("boot waits for prepared music and a player gesture before the original opening", async ({ page }) => {
+  const musicRequests = new Map([
+    ["/assets/original/music/MUSIC/0014.ogg", 0],
+    ["/assets/original/music/MUSIC/0001.ogg", 0],
+  ]);
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (musicRequests.has(pathname)) {
+      musicRequests.set(pathname, (musicRequests.get(pathname) ?? 0) + 1);
+    }
+  });
+
+  await page.goto("/?test=1");
+  const startup = page.getByTestId("startup-screen");
+  const enter = page.getByTestId("startup-enter");
+  await expect(startup).toHaveAttribute("data-startup-phase", "ready");
+  await expect(startup).toHaveAttribute("data-startup-music-ready", "true");
+  await expect(startup).toHaveAttribute("data-startup-music-context", "suspended");
+  await expect(enter).toBeVisible();
+  await expect(enter).toBeEnabled();
+  await expect(page.getByTestId("opening-intro")).toBeVisible();
+  await captureVisualAudit(startup, {
+    path: "artifacts/playwright/startup-audio-entry-gate.png",
+  });
+
+  await enter.click();
+  await expect(startup).toHaveAttribute("data-startup-music-context", "running");
+  await expect(startup).toHaveAttribute("data-startup-phase", "intro");
+  await expect(startup).toHaveAttribute("data-intro-music-playing", "true");
+  expect(Object.fromEntries(musicRequests)).toEqual({
+    "/assets/original/music/MUSIC/0014.ogg": 1,
+    "/assets/original/music/MUSIC/0001.ogg": 1,
+  });
+});
+
+test("versioned resource cache survives a reload without refetching completed packs", async ({ page }) => {
+  let loaderFetches = 0;
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (request.resourceType() === "fetch"
+      && pathname.startsWith("/assets/original/")
+      && pathname !== "/assets/original/resource-manifest.v1.json") {
+      loaderFetches += 1;
+    }
+  });
+
+  const enterStage0 = async () => {
+    await skipOpeningToTitle(page);
+    await expect(page.getByTestId("title-menu")).toBeVisible();
+    await page.getByTestId("new-game").click();
+    await page.getByTestId("difficulty-0").click();
+    await expect(page.getByTestId("dialogue-layer")).toBeVisible({ timeout: 30_000 });
+  };
+
+  await page.goto("/?test=1");
+  await enterStage0();
+  const firstLoadFetches = loaderFetches;
+  expect(firstLoadFetches).toBeGreaterThan(0);
+
+  await page.reload();
+  await enterStage0();
+  expect(loaderFetches).toBe(firstLoadFetches);
+  await expect.poll(() => page.evaluate(async () => (
+    (await caches.keys()).filter((name) => name.startsWith("angel2-resources-")).length
+  ))).toBe(1);
+});
+
 test("boot keeps its retry surface until startup PNGs decode and reuses every response", async ({ page }) => {
   await page.addInitScript(() => {
     const target = window as Window & {
@@ -94,6 +161,8 @@ test("boot keeps its retry surface until startup PNGs decode and reuses every re
   const startup = page.getByTestId("startup-screen");
   await expect(startup).toBeVisible();
   await expect(startup).toHaveAttribute("data-startup-assets-ready", "true");
+  await expect(startup).toHaveAttribute("data-startup-phase", "ready");
+  await activateStartup(page);
   await expect(startup).toHaveAttribute("data-startup-phase", "intro");
   await expect.poll(() => page.getByTestId("startup-canvas").evaluate((canvas) => {
     const element = canvas as HTMLCanvasElement;

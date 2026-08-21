@@ -112,6 +112,64 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 
 .startup-screen { color: #fff; background: #000; }
+.startup-activation {
+  position: absolute;
+  z-index: 12;
+  inset: 0;
+  display: grid;
+  box-sizing: border-box;
+  width: 360px;
+  height: 188px;
+  padding: 25px 30px 22px;
+  margin: auto;
+  border: 2px solid #b79a55;
+  outline: 1px solid #392b45;
+  outline-offset: -7px;
+  color: #f6e6bf;
+  background: linear-gradient(145deg, #21162efc, #0b0812fc);
+  box-shadow: 0 18px 54px #000, inset 0 0 30px #976bb21f;
+  text-align: center;
+  font-family: "PMingLiU", "MingLiU", "Noto Serif TC", serif;
+}
+.startup-activation[hidden] { display: none; }
+.startup-activation-kicker {
+  margin: 0;
+  color: #aa8fc0;
+  font: 600 9px/1.2 ui-monospace, monospace;
+  letter-spacing: .18em;
+}
+.startup-activation h1 {
+  margin: 7px 0 8px;
+  color: #fff2ca;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: .2em;
+  text-indent: .2em;
+  text-shadow: 0 2px #4e223b;
+}
+.startup-activation p:not(.startup-activation-kicker) {
+  min-height: 2.8em;
+  margin: 0;
+  color: #d6c6d8;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.startup-activation button {
+  justify-self: center;
+  min-width: 124px;
+  margin-top: 10px;
+  padding: 7px 18px;
+  border: 1px solid #b79a55;
+  color: #fff0c8;
+  background: #3b2147;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: .18em;
+  cursor: var(--native-cursor-hand, pointer);
+}
+.startup-activation button:disabled { opacity: .55; cursor: wait; }
+.startup-activation button:focus-visible { outline: 2px solid #f3dcad; outline-offset: 3px; }
 /* Both layers now only carry hidden narration, the menu frames and the menus;
  * the canvas underneath paints every startup pixel. */
 .startup-intro,
