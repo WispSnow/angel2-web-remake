@@ -179,6 +179,41 @@ Agent 负责复核证据，不能仅因反馈看起来合理就改写 `[OF]`。
 并行读操作可以共享当前工作区。确需并行写入时，必须使用独立 worktree／分支，明确各自允许
 路径和验收命令，最后由主 Agent 合并；不要让多个 Agent 在同一工作区修改同一真值文件。
 
+### 7.1 新建 worktree 后必须先补齐共享目录
+
+新建的 worktree 只包含 git 追踪的文件。`reverse/` 下的取证产物（`parsed/`、`unpacked/`、
+`extracted/`、`dumps/`、`renders/` 等）和 `ref/` 下的原始参考资料都被 gitignore，主检出
+有、worktree 没有。缺了它们，生成脚本会以 `ENOENT` 中断，`pnpm docs:check` 会报
+`ref/关卡列表.md` 链接缺失和 class stats 无法重建，开发服务器会 404，内容测试会整片失败——
+而这些失败看起来都像是本次改动引入的回归，排查成本远高于建链接本身。
+
+建好 worktree 后先跑一次：
+
+```bash
+bash scripts/setup-worktree.sh
+```
+
+脚本按 `reverse/.gitignore` 的实际条目和 `ref/` 的追踪状态推导要链接的路径，可重复运行，
+并把每条链接登记进**共享的** `.git/info/exclude`。这条登记不能省：worktree 私有的
+`info/exclude` 不会被读取，而 `dir/` 形式的忽略规则匹配不到符号链接，漏登记会让 worktree 的
+`git status` 永远不干净。若 worktree 建在脚本存在之前的提交上，就从主检出调用同一个脚本。
+
+还要注意：
+
+- **`node_modules` 要在 worktree 内自己装一次**（`pnpm install`），不要软链主检出的。
+  软链会让 `pnpm exec` 在非 TTY 下以 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` 中止；
+  真遇到这种情况，直接调用主检出的 `node_modules/.bin/playwright`。
+- **跑 e2e 必须给这次运行独立端口**：`playwright.config.ts` 的 `reuseExistingServer` 会接管
+  4173 上任何已在跑的开发服务器，于是 worktree 里的 e2e 实际测的是**主检出的当前工作区**，
+  结果看着正常却是假的。用 `ANGEL2_E2E_PORT=4199 pnpm exec playwright test <spec>`，
+  不要去杀主检出的服务器。
+- **`reverse/parsed/` 指向主检出，是活的**。另一个 session 重跑生成器后，worktree 里读到的
+  就是新证据；若它与本分支已提交的来源哈希不一致，`tests/unit/stage*-content.test.ts` 会在
+  字节长度断言上成片失败，和本次改动无关。先看文件 mtime 再怀疑自己的改动。
+- **`ref/ANGEL2` 是指向主检出同一批原始文件的符号链接**，不是副本。`ref/` 只读这条约束在
+  worktree 里同样成立而且更要紧：任何写入都会直接改到真正的原版文件。需要可写实验副本时，
+  按 `reverse/README.md` 生成 `reverse/work/ANGEL2/`。
+
 ## 8. 可直接使用的委派提示
 
 ### 下一关取证与规格

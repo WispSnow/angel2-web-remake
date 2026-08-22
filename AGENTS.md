@@ -96,7 +96,15 @@ pnpm test:e2e
 pnpm docs:check
 pnpm check
 node reverse/tools/angel2-phase1-verify.mjs
+bash scripts/setup-worktree.sh
 ```
+
+在 `git worktree` 里工作时，第一步先跑 `bash scripts/setup-worktree.sh`。新建的 worktree 只有
+git 追踪的文件，`reverse/` 的取证产物和 `ref/` 的原始资料都被 gitignore；缺了它们，生成脚本、
+`pnpm docs:check`、开发服务器和内容测试都会失败，且失败方式看起来像本次改动引入的回归。脚本
+还会把链接登记进共享的 `.git/info/exclude`，否则 worktree 的 `git status` 永远不干净。之后还要在
+worktree 内单独 `pnpm install`，跑 e2e 要用 `ANGEL2_E2E_PORT=<独立端口>`（否则会接管主检出
+在 4173 上的服务器，测到的是主检出的工作区）。完整注意事项见 `WORKFLOW.md` 第 7.1 节。
 
 `pnpm dev:combat` 会启动同一个 Vite 开发服务器并直接打开战斗动画实验室；若已经运行
 `pnpm dev`，直接访问 `/combat-lab.html` 即可。实验室用于组合攻守职业、格挡／重伤、
