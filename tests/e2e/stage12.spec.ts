@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -172,8 +173,10 @@ test("S12-D: the formal battle restores and renders a shared-life water-warrior 
   expect(current.units.filter(({ side }) => side === 2)).toHaveLength(6);
   await waitForBattleScene(page, 15);
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("擊退全部水戰士");
-  await expect(page.getByTestId("objective-panel")).not.toContainText("瓦爾克麗城");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[12].join("\n"));
   await page.locator("[data-action=close-objectives]").click();
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage12-water-warrior-split.png`,

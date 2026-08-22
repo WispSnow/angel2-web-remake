@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -115,8 +116,10 @@ test("S26-C–E: opening story hands 22 allies to Binaweiji and seven priests", 
     ],
   });
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("打敗「碧娜維姬」");
-  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[26].join("\n"));
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage26-objective-and-map.png`,
   });

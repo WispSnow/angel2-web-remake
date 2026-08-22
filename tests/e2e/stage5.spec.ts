@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
@@ -148,10 +149,10 @@ test("S05-E/F: either named boss ends the battle while the other remains", async
     await page.goto(`/?debugScenario=${fixture.scenario}&difficulty=0&test=1`);
     await expect(page.getByTestId("battle-canvas")).toBeVisible();
     await page.keyboard.press("o");
-    await expect(page.getByTestId("objective-panel"))
-      .toContainText("擊敗汀塔琪或萊茵任一人");
-    await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
-    await expect(page.getByTestId("objective-panel")).not.toContainText("麗");
+    // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+    // checked against that record rather than against remake objective wording.
+    await expect(page.getByTestId("objective-panel-text"))
+      .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[5].join("\n"));
     await page.locator("[data-action=close-objectives]").click();
 
     const prepared = await state(page);

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { CREDITS_NAME_FRAMES, CREDITS_ROLE_FRAMES } from "../../src/game/content/credits";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
@@ -99,8 +100,10 @@ test("S38-C/D: the battle uses 20 allies, 44 enemies, and the all-enemy objectiv
     path: `${ARTIFACT_DIR}/stage38-named-enemy-hud.png`,
   });
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("所有回到異世界的敵人");
-  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[38].join("\n"));
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage38-battle.png`,
   });

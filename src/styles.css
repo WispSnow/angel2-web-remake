@@ -960,12 +960,17 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 /* 原版每一列的字距寫在 Big5 字串本身（`移    動` 是兩個字夾四個半形空格，
    `input-ui.json` 的 `menus.actionMenus`），不是繪製時撐開的，所以這裡不再有
-   `letter-spacing`／`text-indent`。列的文字起點是 `0000:5C45` 的逐列記錄
-   `(選單左緣 + 0x10, 選單上緣 + 0x10 + 0x18n)`，換算成 136 px 列盒就是左緣 12 px；
-   17 px 高的字身在 24 px 列裡置中取整為 4 px（落點屬表現取整，非取證值）。 */
+   `letter-spacing`／`text-indent`。
+
+   逐列的落點來自 `0000:5A97` 的繪製迴圈本身：它把游標寫成
+   `DS:F8BA = 選單左緣 + 0x38 - 8`（`sub dx,8`）與 `DS:F8BC = 選單上緣 + 0x14`，
+   每畫完一列 `add word [3D4C8], 0x18`；`DS:F8BA/F8BC` 正是 `0000:EA04` 開頭讀走的
+   游標（`mov ax,[F8BA]`）。換算成 `136×24` 的列盒（起點是選單左上角 +(4,16)）就是
+   左緣 44 px、上緣 4 px。64 px 寬的字串因此以選單中線右側 9 px 為中心——原版截圖裡
+   「略偏右的置中」就是這 9 px，不是把字串塞在列首或真正置中。 */
 .action-menu.native-command-menu .native-command-label {
   position: absolute;
-  left: 12px;
+  left: 44px;
   top: 4px;
 }
 .action-menu.native-command-menu.system-menu {
@@ -1016,9 +1021,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
    開啟不需要 JS：選單以 `hidden` 收起時是 `display: none`，重新顯示會自動重播動畫。
    關閉由 `menu-animation.ts` 加上 `.is-menu-closing`，等動畫播完才真正 `hidden`。
 
-   `--menu-anchor` 讓本來就靠 transform 定位的面板（例如垂直置中的勝利條件面板）保住
-   它的定位量：關鍵幀寫死 `transform` 會整條覆蓋掉原本的 `translateY(-50%)`，面板就會
-   在動畫期間掉到畫面下半並被裁掉。 */
+   `--menu-anchor` 讓本來就靠 transform 定位的方框保住它的定位量：關鍵幀寫死
+   `transform` 會整條覆蓋掉原本的位移，方框就會在動畫期間掉出原位並被裁掉。目前沒有
+   方框需要它，預設 `translate(0)` 即可；規則保留給下一個以 transform 定位的面板。 */
 @keyframes native-menu-zoom-in {
   from { opacity: 0; transform: var(--menu-anchor, translate(0)) scale(.66); }
   55% { opacity: 1; }
@@ -1887,73 +1892,48 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   visibility: visible;
   opacity: 1;
 }
-/* 原版戰鬥面板的外框：色 1 底、黑外緣，內縮一圈白／黑再一圈黃／紅，右下一塊硬陰影。
-   `子 選 單` 用偽元素畫同一組線，這裡改用 `inset` 陰影，因為本面板自己會捲動而偽元素
-   會跟著捲走。取證只記下 `勝利條件` 由 `0000:BAA4` 開啟、主次操作皆可關閉，沒有留下
-   它自己的座標或底圖，所以外框沿用同一場戰鬥裡已取證的姊妹面板樣式。 */
-.native-battle-panel {
-  color: #fff;
-  background: #5d4131;
-  border: 1px solid #000;
-  box-shadow:
-    inset 1px 1px 0 #fff,
-    inset -1px -1px 0 #000,
-    inset 2px 2px 0 #ffdf10,
-    inset -2px -2px 0 #ef2024,
-    16px 16px 0 #0009;
-  image-rendering: var(--image-rendering, pixelated);
-}
+/* 勝利條件面板：`0000:BAA4` 寫下系統動作碼 `5931`，`0000:B97C` 遠呼 `12E7:0008`，
+   後者換上該關自己的 SAY/NUM/CHA 子集、畫框、逐字畫出整條記錄，然後等主／次操作。
+   幾何全部由 `pnpm content:objective-panel` 從模組映像讀出並斷言：
+   本體 `DS:1236` 是 `(80,40,320,175)` 色 1，`DS:122C` 是同尺寸、右下各外移 16 px 的
+   色 0 硬陰影（先畫陰影再蓋本體，所以看到的是那一道 L），左右各五道 1 px 邊柱的顏色
+   來自 `DS:1248` 的逐條立即數，文字原點是本體內縮 16 px 的 `(96,56)`。
+
+   未複現：`12E7:00D1` 末段用 `0000:D5CB`／`0000:D9FA`／`0000:D790` 這三個 8 px 對齊的
+   平面寫入器鋪上下緣圖樣與四角裝飾（色 1／色 0／色 5）。那三個原語的圖樣位元尚未取證，
+   與其編一組花紋，不如先只畫已經逐位元確認的部分。 */
 .objective-panel {
   position: absolute;
   z-index: 14;
-  left: 120px;
-  top: 50%;
-  width: 384px;
-  /* 16 px 的硬陰影要留在 640x350 內：上下各留 16 px 就正好等於陰影的位移。 */
-  max-height: calc(100% - 32px);
-  padding: 9px 16px 10px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-color: #ffdf10 #3b2a20;
-  scrollbar-width: thin;
-  transform: translateY(-50%);
-  /* 見 `native-menu-zoom-in`：開闔動畫要把這個置中位移接回去。 */
-  --menu-anchor: translateY(-50%);
+  left: 80px;
+  top: 40px;
+  width: 320px;
+  height: 175px;
+  background: #5d4131;
+  box-shadow: 16px 16px 0 #000;
+  image-rendering: var(--image-rendering, pixelated);
 }
-/* 關卡名與兩個條件標題是原版的用詞，用原版點陣字；條件內文、回合上限、出擊提示與
-   返回鍵都是複刻自己寫的說明，留在現代字體，玩家一眼就能分辨哪一半是原版的。 */
-.objective-panel > .objective-panel-stage {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 6px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #ef2024;
+.objective-panel-bevel { position: absolute; top: 0; bottom: 0; display: block; }
+.objective-panel-bevel.left { left: 0; }
+/* 右側五柱畫在本體之外（`x = 400..404`），與原版一樣蓋住那一道陰影的起頭。 */
+.objective-panel-bevel.right { left: 100%; }
+.objective-panel-text {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  margin: 0;
 }
-.objective-panel h2 { display: flex; margin: 8px 0 4px; }
-.objective-panel .objective-remake-heading {
-  margin: 10px 0 3px;
-  color: #ffdf10;
-  font: 600 12px/1.2 system-ui, sans-serif;
-  letter-spacing: .12em;
-}
-.objective-panel p {
-  margin: 0 0 6px;
-  overflow-wrap: anywhere;
-  font: 13px/1.5 system-ui, sans-serif;
-}
-.objective-panel button {
-  min-width: 90px;
-  margin-top: 6px;
-  padding: 5px 14px;
-  border: 1px solid #ffdf10;
-  color: #ffeab4;
-  background: #3b2a20;
+/* 原版按主操作或次操作都會關閉，沒有可見的返回鍵；這塊透明命中區把「點一下畫面就關」
+   還給滑鼠玩家，鍵盤與 Esc 走既有的取消路徑。 */
+.objective-panel-dismiss {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
   cursor: var(--native-cursor-hand, pointer);
-  font: 12px/1.2 system-ui, sans-serif;
 }
-.objective-panel button:hover,
-.objective-panel button:focus-visible { color: #fff; background: #6d5238; }
 .modal-panel button { min-width: 90px; padding: 7px 14px; }
 .result-layer { position: absolute; z-index: 16; inset: 0; background: transparent; }
 .result-card { position: absolute; left: 130px; top: 70px; width: 380px; padding: 27px 34px; }

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { stage3TerrainSlotAt } from "../../src/game/content/stage3";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -184,9 +185,10 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   await page.keyboard.press("o");
   // REMAKE-051: the machine victory slot is side-2 slot 17, whose enemy actor is
   // 梅蒂. The earlier 莎 came from quoting the wrong SAY record.
-  await expect(page.getByTestId("objective-panel")).toContainText("打敗敵將領「梅蒂」");
-  await expect(page.getByTestId("objective-panel")).toContainText("「希蜜」或「黛西」戰敗");
-  await expect(page.getByTestId("objective-panel")).not.toContainText("莎");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[3].join("\n"));
   await captureVisualAudit(page.getByTestId("objective-panel"), {
     path: `${ARTIFACT_DIR}/stage3-corrected-objective.png`,
   });

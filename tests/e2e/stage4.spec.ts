@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -327,9 +328,10 @@ test("S04-H/I/J: the escort objective plays SAY/174 and enters stage-05 deployme
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute("data-objective-destination-cell-count", "175");
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("護送葛蒂拉斯進入力場出口");
-  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」或「葛蒂拉斯」戰敗");
-  await expect(page.getByTestId("objective-guidance")).toContainText("防魔無效");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[4].join("\n"));
   await page.locator("[data-action=close-objectives]").click();
 
   await endManualPhase(page);

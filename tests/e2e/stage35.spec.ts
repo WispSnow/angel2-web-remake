@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -83,8 +84,10 @@ test("S35-A–E: the stage-34 route opens SAY/0067 on the fixed nine-versus-ten 
     consumedEventIds: ["stage-35-opening-story"],
   });
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("打敗所有的敵人");
-  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[35].join("\n"));
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage35-objective-and-map.png`,
   });

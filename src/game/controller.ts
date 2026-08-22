@@ -6,6 +6,7 @@ import {
   clampCameraOrigin,
 } from "./camera";
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
+import { nativeObjectivePanelText } from "./content/objective-panel";
 import {
   BATTLE_ACTION_DEFINITIONS,
   HALF_DRAGON_TELEPORT_ACTION_ID,
@@ -635,16 +636,6 @@ export class GameController {
 
   get currentMapPresentationActionIds() {
     return this.stageRuntime.mapPresentationActionIds;
-  }
-
-  /**
-   * The same deployment guidance the preparation screen shows, republished in
-   * the in-battle objective panel so the player can re-read it after the
-   * deployment surface is gone. It is stage-generic guidance, not force-field
-   * state; only stage 4 happens to describe a force field in its own text.
-   */
-  get deploymentGuidance(): string | undefined {
-    return this.stageRuntime.preparation?.presentation.guidanceText;
   }
 
   get currentRoutePulseSafeArea(): Position[] {
@@ -4160,9 +4151,20 @@ export class GameController {
     this.turnTransitionPresentation = undefined;
   }
 
+  /**
+   * `12E7:0008` draws the SAY record `DS:1273` names for this stage, so a surface
+   * with no native stage — the arena, the class showdown, the labs — has no panel
+   * to show. Refusing to open here rather than opening an empty frame also keeps
+   * `hasBlockingOverlay` false, so those surfaces never swallow their own input.
+   */
+  get hasObjectivePanel(): boolean {
+    return nativeObjectivePanelText(this.battle.stage.id) !== undefined;
+  }
+
   openObjectives(): void {
     if (
       this.busy
+      || !this.hasObjectivePanel
       || this.promotionUnitIds.length > 0
       || this.soundSettingsOpen
       || this.musicSettingsOpen

@@ -61,7 +61,12 @@ import {
   createNativeTextLayer,
   type NativeUnitDetailText,
 } from "./native-hud-text";
-import { NATIVE_IDENTITY_SEPARATOR } from "./content/native-font.generated";
+import {
+  NATIVE_GAMEPLAY_PALETTE,
+  NATIVE_IDENTITY_SEPARATOR,
+  NATIVE_TEXT,
+} from "./content/native-font.generated";
+import { NATIVE_OBJECTIVE_PANEL, nativeObjectivePanelText } from "./content/objective-panel";
 import { NATIVE_CONCEALED_FIELD, nativeNumericField } from "./native-text";
 import {
   createMenuPointerGlide,
@@ -260,17 +265,13 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 </div>
               </section>
             </section>
-            <section class="objective-panel native-battle-panel" id="objective-panel"
-              data-testid="objective-panel" hidden>
-              <b class="objective-panel-stage" data-native-text>${stage.name}</b>
-              <h2 data-native-text>勝利條件</h2><p>${stage.objective.victoryText}</p>
-              <h2 data-native-text>失敗條件</h2><p>${stage.objective.defeatText}</p>
-              <p data-testid="objective-round-limit"></p>
-              ${controller.deploymentGuidance
-                ? `<h3 class="objective-remake-heading">出擊提示</h3>
-                   <p data-testid="objective-guidance">${controller.deploymentGuidance}</p>`
-                : ""}
-              <button data-action="close-objectives">返回戰場</button>
+            <section class="objective-panel" id="objective-panel" role="dialog"
+              data-testid="objective-panel" aria-label="勝利條件" hidden>
+              <i class="objective-panel-bevel left" aria-hidden="true"></i>
+              <i class="objective-panel-bevel right" aria-hidden="true"></i>
+              <p class="objective-panel-text" data-testid="objective-panel-text"></p>
+              <button type="button" class="objective-panel-dismiss" data-action="close-objectives"
+                aria-label="關閉勝利條件"></button>
             </section>
             <section class="result-layer" id="result-layer" data-testid="result-layer" hidden></section>
           </section>
@@ -328,7 +329,32 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   );
   storyBackground.style.setProperty("--story-illustration-source", defaultStoryBackgroundSource);
   const objectivePanel = required(root, "#objective-panel");
-  const objectiveRoundLimit = required(root, "[data-testid=objective-round-limit]");
+  // `12E7:0008` draws the stage's own SAY record with that stage's font subset,
+  // so the panel's whole content is fixed once the stage is known. Surfaces with
+  // no native stage — the arena, the class showdown, the labs — have no recorded
+  // panel and simply show none.
+  // A surface with no native stage never opens the panel (`hasObjectivePanel`),
+  // so the frame simply stays empty rather than being torn out of the tree.
+  const objectivePanelText = nativeObjectivePanelText(stage.id);
+  if (objectivePanelText !== undefined) {
+    paintNativeDomText(
+      required(objectivePanel, ".objective-panel-text"),
+      objectivePanelText,
+      { mode: "story" },
+      objectivePanelText.replaceAll(NATIVE_TEXT.lineFeed.character, "\n"),
+    );
+    for (const [side, bevel] of [
+      ["left", NATIVE_OBJECTIVE_PANEL.leftBevel],
+      ["right", NATIVE_OBJECTIVE_PANEL.rightBevel],
+    ] as const) {
+      const element = required(objectivePanel, `.objective-panel-bevel.${side}`);
+      element.style.width = `${bevel.colors.length}px`;
+      element.style.background = `linear-gradient(90deg, ${bevel.colors
+        .map((index, column) =>
+          `${NATIVE_GAMEPLAY_PALETTE[index]} ${column}px ${column + 1}px`)
+        .join(", ")})`;
+    }
+  }
   const roundBox = required(root, "#bottom-round");
   const systemMenu = required(root, "#system-menu");
   const settingsMenu = required(root, "#settings-menu");
@@ -937,8 +963,6 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     // REMAKE-110: 原版回合框只有三个字符的位置，所以倒数不写进框里，改为整框进入
     // 警告态；具体剩余回合数由信息栏和胜负条件面板承担。
     roundBox.dataset.roundLimitWarning = String(controller.battle.roundLimitWarningActive);
-    objectiveRoundLimit.textContent =
-      `或 ${controller.battle.roundLimit} 回合內未達成勝利條件（剩餘 ${controller.battle.roundsRemaining} 回合）`;
     const selectedUnitContext = renderSelectedUnitContext(controller);
     const selectedRoute = controller.selectedMagicArcherRoute;
     const routeTarget = controller.magicArcherRouteTarget;

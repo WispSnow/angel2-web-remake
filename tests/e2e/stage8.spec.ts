@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -174,10 +175,10 @@ test("S08-E/F: the last raider triggers the REMAKE-032 SAY/157 victory story", a
   await page.goto("/?debugScenario=stage-08-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("擊退龍塔襲擊者");
-  await expect(page.getByTestId("objective-panel")).toContainText("「蘇蘭達」戰敗");
-  await expect(page.getByTestId("objective-panel")).not.toContainText("妖龍");
-  await expect(page.getByTestId("objective-panel")).not.toContainText("「妮雅」戰敗");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[8].join("\n"));
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage8-objective.png`,
   });

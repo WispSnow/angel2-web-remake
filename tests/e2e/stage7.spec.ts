@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -145,9 +146,10 @@ test("S07-D/E: the objective names Laili and removing slot 18 ends the battle", 
   await page.goto("/?debugScenario=stage-07-near-laili&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText("打敗入侵的敵首領「萊莉」");
-  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
-  await expect(page.getByTestId("objective-panel")).not.toContainText("妖龍");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[7].join("\n"));
   await page.locator("[data-action=close-objectives]").click();
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage7-battle-map.png`,

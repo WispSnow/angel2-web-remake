@@ -279,8 +279,8 @@ const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => 
       selectionSource: getComputedStyle(element)
         .getPropertyValue("--native-command-menu-selection-source"),
       pointerSource: getComputedStyle(element).getPropertyValue("--native-cursor-hand-source"),
-      // `0000:5C45` builds each row record at `(選單左緣 + 0x10, 選單上緣 + 0x10 + 0x18n)`,
-      // so the drawn run starts 16 px in from the frame — not centred in the row.
+      // `0000:5A97` writes the drawer's own cursor: `DS:F8BA = 選單左緣 + 0x38 - 8`
+      // and `DS:F8BC = 選單上緣 + 0x14 + 0x18n`.
       labelLeftOffset: selected && label
         ? label.getBoundingClientRect().left - element.getBoundingClientRect().left
         : Number.NaN,
@@ -304,7 +304,9 @@ const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => 
   expect(presentation.selectionSource).toContain("command-menu-selection.png");
   expect(presentation.pointerSource).toContain("command-menu-pointer.png");
   expect(presentation.labelIsBitmap).toBe(true);
-  expect(presentation.labelLeftOffset).toBe(16);
+  // The cursor origin is fixed, so every row starts here whatever it says; a
+  // shorter label such as 確 定 simply ends further left than a four-cell one.
+  expect(presentation.labelLeftOffset).toBe(48);
   expect(presentation.labelWidth).toBe(presentation.labelCanvasWidth);
 };
 const openSettingsMenu = async (page: Page) => {
@@ -770,9 +772,12 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       duplicatePointer: label ? getComputedStyle(label, "::after").content : "",
       // `移    動` is one native Big5 string: two glyphs around four half-width
       // spaces, so a correctly drawn row is 16 + 32 + 16 plus the outline's two
-      // extra columns, starting at the row record's own `選單左緣 + 0x10`.
+      // extra columns, starting at the drawer's own `選單左緣 + 0x38 - 8`.
       labelLeft: selected && label
         ? label.getBoundingClientRect().left - menu.getBoundingClientRect().left
+        : Number.NaN,
+      labelTopInRow: selected && label
+        ? label.getBoundingClientRect().top - selected.getBoundingClientRect().top
         : Number.NaN,
       labelCanvasWidth: label?.querySelector<HTMLCanvasElement>("canvas.native-text")?.width
         ?? Number.NaN,
@@ -795,8 +800,13 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(nativeMenuArt.selectionSource).toContain("command-menu-selection.png");
   expect(nativeMenuArt.pointerSource).toContain("command-menu-pointer.png");
   expect(nativeMenuArt.duplicatePointer).toBe("none");
-  expect(nativeMenuArt.labelLeft).toBe(16);
+  expect(nativeMenuArt.labelLeft).toBe(48);
+  expect(nativeMenuArt.labelTopInRow).toBe(4);
   expect(nativeMenuArt.labelCanvasWidth).toBe(66);
+  // 48 + 66/2 against the 144-wide frame: the four-cell rows read as centred and
+  // nine pixels to the right, which is what the original screenshots show.
+  expect(nativeMenuArt.labelLeft + nativeMenuArt.labelCanvasWidth / 2 - nativeMenuArt.width / 2)
+    .toBe(9);
   // The clipped accessible copy keeps the plain label, not the padded run.
   expect(nativeMenuArt.labelText).toBe("移動");
   const commandMenuPlacement = await page.getByTestId("action-menu").evaluate((menu) => {
@@ -3478,9 +3488,13 @@ test("S00-S: the 99-round cap warns on the final rounds and loses the stage at t
   await expect(page.locator("#bottom-round"))
     .toHaveAttribute("data-round-limit-warning", "true");
 
+  // REMAKE-110 的倒数由每回合开始的信息栏承担（`controller.roundLimitNotice`）；本夹具
+  // 直接把场面摆在第 99 回合，信息栏写的是夹具自己的说明，所以倒数在这里不出现。
+  // 勝利條件面板改为逐字复现 `DS:1273` 指定的原版记录后不再含复刻自撰内容，
+  // 因此这里验证的是面板仍画出该关原文。
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-round-limit"))
-    .toHaveText("或 99 回合內未達成勝利條件（剩餘 1 回合）");
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText("勝利條件：\n  清除瓦爾克麗宮內的敵人．\n\n失敗條件：\n　「妮雅 」戰敗．");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-round-limit-final-round.png",
   });

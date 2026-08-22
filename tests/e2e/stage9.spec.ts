@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -113,11 +114,10 @@ test("S09-D/E: the corrected objective and Dori route trigger SAY/23 without sta
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute("data-objective-destination-cell-count", "934");
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toContainText(
-    "護送「多莉」抵達死亡之谷頂端，或擊退全部敵軍",
-  );
-  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」或「多莉」戰敗");
-  await expect(page.getByTestId("objective-panel")).not.toContainText("「妮雅」到達");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[9].join("\n"));
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage9-objective-and-map.png`,
   });

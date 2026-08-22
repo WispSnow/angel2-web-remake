@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -144,9 +145,10 @@ test("S19-D/E: the machine objective defeats Ai without requiring the other twen
   await page.goto("/?debugScenario=stage-19-near-victory&difficulty=0&test=1");
   await waitForPhase(page, "player");
   await page.keyboard.press("o");
-  await expect(page.getByTestId("objective-panel")).toBeVisible();
-  await expect(page.getByTestId("objective-panel")).toContainText("擊敗「愛」");
-  await expect(page.getByTestId("objective-panel")).toContainText("「妮雅」戰敗");
+  // `12E7:0008` draws the stage's own SAY record verbatim, so the panel is
+  // checked against that record rather than against remake objective wording.
+  await expect(page.getByTestId("objective-panel-text"))
+    .toHaveText(NATIVE_OBJECTIVE_PANEL_TEXT[19].join("\n"));
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage19-objective-and-map.png`,
   });

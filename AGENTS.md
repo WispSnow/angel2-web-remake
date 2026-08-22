@@ -215,8 +215,14 @@ pnpm exec playwright install ffmpeg
   `A/18` 对白正文与姓名牌、全景状态框与伤害数字、祈禱结果、标题读取进度面板、離開遊戲画面、
   勝利條件面板的标题）都必须由这套点阵字绘制，不要改回宿主 CJK 字体，也不要手抄字符表或
   逐列字距——`移    動` 那四个半形空格写在原版 Big5 字串里，由 `NATIVE_MENU_LABEL_PADDING`
-  提供，不是用 `letter-spacing` 撑出来的。复刻自己新增的提示、说明与工具文字留在现代字体，
+  提供，不是用 `letter-spacing` 撑出来的；逐列落点也是取证值（`0000:5A97` 写
+  `DS:F8BA = 選單左緣 + 0x38 - 8`、`DS:F8BC = 選單上緣 + 0x14 + 0x18n`），四字列因此
+  看起来是「置中略偏右 9 px」，不要改成真正的居中或靠左。复刻自己新增的提示、说明与工具文字留在现代字体，
   这条分层与字库覆盖检查的要求见 `design/remake-gdd/07-ui-ux-and-presentation.md#字体分层`。
+- `src/game/content/objective-panel.generated.ts` 由 `scripts/generate-objective-panel.mjs` 生成，
+  来源是模组 29 映像与 `reverse/parsed/dialogue/`；修改证据后运行 `pnpm content:objective-panel`。
+  勝利條件面板的几何与逐关文字全部从映像读出并逐项断言，不要手抄坐标或改写记录原文，
+  也不要往这个面板里加复刻自撰内容。
 - `src/game/content/portrait-catalog.generated.ts` 与 `public/assets/original/portraits/` 由
   `scripts/generate-portrait-catalog.mjs` 生成；修改肖像来源或布局证据后运行
   `pnpm content:portraits`，不要手工登记角色动画。`D/63` 无原版覆盖帧/布局，`D/67`
