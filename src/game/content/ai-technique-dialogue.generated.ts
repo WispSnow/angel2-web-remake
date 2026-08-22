@@ -461,6 +461,23 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "emitters": [
       "0000:92C1"
     ]
+  },
+  "experienceGain": {
+    "record": "experience-gain",
+    "selector": 24,
+    "pointerEntry": "DS:84EB",
+    "address": "DS:8654",
+    "gate": "direct",
+    "text": "得經驗值00000 點",
+    "emitters": [
+      "0000:7678",
+      "0000:91C1",
+      "0000:924F"
+    ],
+    "numericField": {
+      "digits": "00000",
+      "writer": "0000:EF56"
+    }
   }
 } as const;
 

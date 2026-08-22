@@ -3,6 +3,8 @@ import {
   aiTechniqueDialogueFor,
   confusedActorDialogueFor,
   contextualBattleDialogueFor,
+  experienceGainDialogueFor,
+  nativeExperienceLineText,
   nativeAiTechniqueDialogueForCode,
   NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
@@ -199,6 +201,10 @@ describe("native contextual battle lines", () => {
       // The one line with both kinds of site, so the caller picks the gate.
       ["dodgedShot", 0x1d, "DS:86C2", "mixed", "要打中我沒那麼容易．", ["0000:7260", "1000:1FB2"]],
       ["counterattack", 0x1e, "DS:86D7", "direct", "妳竟敢打我．", ["0000:92C1"]],
+      // The only entry with a numeric field: two ordinary-combat kill branches
+      // and the player's own 技術 commit, all three writing the award first.
+      ["experienceGain", 0x18, "DS:8654", "direct", "得經驗值00000 點",
+        ["0000:7678", "0000:91C1", "0000:924F"]],
     ]);
 
     // 0Ah..17h belong to the 33 AI action rows; these lines have their own
@@ -250,7 +256,52 @@ describe("native contextual battle-line gates", () => {
     expect(byGate("aiDialogue"))
       .toEqual(["restingLowLife", "breakingContact", "surrounded", "shootingAnnounce"]);
     expect(byGate("direct"))
-      .toEqual(["spellSealed", "noTargetInRange", "confusedActor", "counterattack"]);
+      .toEqual([
+        "spellSealed",
+        "noTargetInRange",
+        "confusedActor",
+        "counterattack",
+        "experienceGain",
+      ]);
     expect(byGate("mixed")).toEqual(["dodgedShot"]);
+  });
+});
+
+describe("the experience window's numeric field", () => {
+  test("keeps the record verbatim and right-aligns the award in its five cells", () => {
+    const line = NATIVE_CONTEXTUAL_BATTLE_LINES.experienceGain;
+    expect(line).toMatchObject({
+      selector: 0x18,
+      pointerEntry: "DS:84EB",
+      address: "DS:8654",
+      gate: "direct",
+      text: "得經驗值00000 點",
+      emitters: ["0000:7678", "0000:91C1", "0000:924F"],
+      numericField: { digits: "00000", writer: "0000:EF56" },
+    });
+    // `0000:EF56` divides down from 10,000, then blanks leading zeros and puts
+    // a single `0` back when the whole field blanked out.
+    expect(nativeExperienceLineText(0)).toBe("得經驗值    0 點");
+    expect(nativeExperienceLineText(7)).toBe("得經驗值    7 點");
+    expect(nativeExperienceLineText(52)).toBe("得經驗值   52 點");
+    expect(nativeExperienceLineText(12_345)).toBe("得經驗值12345 點");
+    // The writer only ever sees a 16-bit register.
+    expect(nativeExperienceLineText(70_000)).toBe("得經驗值65535 點");
+    expect(nativeExperienceLineText(-3)).toBe("得經驗值    0 點");
+  });
+
+  test("speaks from the earner's own side window with that unit's portrait", () => {
+    expect(experienceGainDialogueFor({ name: "妮雅", portrait: 1, side: 1 }, 46))
+      .toMatchObject({
+        activeSlot: "upper",
+        upper: { speaker: "妮雅", portrait: 1, text: "得經驗值   46 點" },
+        source: { record: "experience-gain", wait: 0x18, address: "DS:8654" },
+      });
+    expect(experienceGainDialogueFor({ name: "士兵", portrait: 60, side: 2 }, 8))
+      .toMatchObject({
+        activeSlot: "lower",
+        lower: { speaker: "士兵", portrait: 60, text: "得經驗值    8 點" },
+        source: { record: "experience-gain", wait: 0x18 },
+      });
   });
 });

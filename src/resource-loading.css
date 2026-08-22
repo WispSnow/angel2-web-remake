@@ -19,8 +19,8 @@
 .resource-loading-panel {
   position: relative;
   box-sizing: border-box;
-  width: min(440px, calc(100vw - 40px));
-  padding: 34px 38px 30px;
+  width: min(384px, calc(100vw - 40px));
+  padding: 24px 30px 22px;
   text-align: center;
   border: 2px solid #b79a55;
   outline: 1px solid #392b45;
@@ -39,7 +39,7 @@
 .resource-loading-panel h1 {
   margin: 0;
   color: #fff2ca;
-  font-size: clamp(24px, 6vw, 34px);
+  font-size: clamp(22px, 5.4vw, 30px);
   font-weight: 500;
   letter-spacing: .24em;
   text-indent: .24em;
@@ -50,8 +50,8 @@
   display: grid;
   place-items: center;
   width: 68px;
-  height: 24px;
-  margin: 16px auto 12px;
+  height: 20px;
+  margin: 12px auto 10px;
 }
 
 .resource-loading-rune::before,
@@ -74,9 +74,9 @@
 
 .resource-loading-status {
   min-height: 1.5em;
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   color: #f3dcad;
-  font-size: 16px;
+  font-size: 15px;
   letter-spacing: .08em;
 }
 
@@ -105,8 +105,8 @@
 }
 
 .resource-loading-detail {
-  min-height: 2.8em;
-  margin: 10px 0 0;
+  min-height: 1.5em;
+  margin: 8px 0 0;
   color: #baa9bd;
   font: 12px/1.5 ui-monospace, monospace;
 }

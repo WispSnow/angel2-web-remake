@@ -191,9 +191,11 @@ export function mountStartup(
               aria-labelledby="startup-activation-title" aria-describedby="startup-activation-detail">
               <p class="startup-activation-kicker">ANGEL2 · WEB REMAKE</p>
               <h1 id="startup-activation-title">開場準備完成</h1>
-              <p id="startup-activation-detail" data-testid="startup-activation-detail">
-                原版開場圖像與音樂已就緒。請確認進入，瀏覽器才會允許完整播放音樂。
-              </p>
+              <!-- 就緒後這一行留空：標題與按鈕已經說明要做什麼，說明文字只是佔位。
+                   它仍然承載準備中、解鎖中與失敗訊息，所以保留一行高度，避免方框
+                   在玩家按下按鈕的當下抖動。 -->
+              <p id="startup-activation-detail" data-testid="startup-activation-detail"
+                aria-live="polite">正在準備開場圖像與音樂……</p>
               <button type="button" data-startup-action="activate" data-testid="startup-enter" disabled>
                 進入遊戲
               </button>
@@ -989,7 +991,7 @@ export function mountStartup(
     startupAssetsReady = true;
     screen.dataset.startupAssetsReady = "true";
     activationButton.disabled = false;
-    activationDetail.textContent = "原版開場圖像與音樂已就緒。請確認進入，瀏覽器才會允許完整播放音樂。";
+    activationDetail.textContent = "";
     activationButton.focus({ preventScroll: true });
   }).catch((error: unknown) => {
     screen.dataset.startupAssetsReady = "false";

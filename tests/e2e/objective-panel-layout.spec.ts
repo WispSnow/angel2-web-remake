@@ -5,6 +5,7 @@ import {
   NATIVE_OBJECTIVE_PANEL,
   NATIVE_OBJECTIVE_PANEL_TEXT,
 } from "../../src/game/content/objective-panel.generated";
+import { objectivePanelCornerPlacements } from "../../src/game/content/objective-panel";
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
@@ -157,7 +158,33 @@ for (const { scenario, nativeStage, artifact } of representativeStages) {
     ]);
 
     // One ornament per corner, all four the same masked 8x7 bank image.
-    expect(layout.corners).toEqual(corner.placements.map((placement) => ({
+    // REMAKE-123 moves the right and bottom pairs 1px outwards so every
+    // ornament's outer corner meets the frame's own outer corner; the native
+    // placements are still the ones the generator asserts.
+    const alignedPlacements = objectivePanelCornerPlacements();
+    expect(alignedPlacements.map(({ x, y }) => ({ x, y }))).toEqual([
+      { x: leftBevel.startX, y: topEdge.y },
+      { x: leftBevel.startX, y: bottomEdge.y + bottomEdge.height - corner.height },
+      {
+        x: rightBevel.startX + rightBevel.colors.length - corner.opaqueWidth,
+        y: topEdge.y,
+      },
+      {
+        x: rightBevel.startX + rightBevel.colors.length - corner.opaqueWidth,
+        y: bottomEdge.y + bottomEdge.height - corner.height,
+      },
+    ]);
+    // Only the top-left ornament was already flush; the other three moved.
+    expect(alignedPlacements.map((placement, index) => ({
+      x: placement.x - corner.placements[index].x,
+      y: placement.y - corner.placements[index].y,
+    }))).toEqual([
+      { x: 0, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+    ]);
+    expect(layout.corners).toEqual(alignedPlacements.map((placement) => ({
       left: placement.x - body.x,
       top: placement.y - body.y,
       width: corner.width,

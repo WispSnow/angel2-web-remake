@@ -63,12 +63,14 @@ export function aiTechniqueDialogueFor(
 export function contextualBattleDialogueFor(
   actor: Pick<BattleUnit, "name" | "portrait" | "side">,
   line: ContextualBattleLineKey,
+  /** Only `18h` has one: the record the native rewrites before it opens. */
+  text?: string,
 ): DialoguePage {
   const native = NATIVE_CONTEXTUAL_BATTLE_LINES[line];
   const window = {
     portrait: actor.portrait,
     speaker: actor.name,
-    text: native.text,
+    text: text ?? native.text,
   };
   return {
     activeSlot: actor.side === 1 ? "upper" : "lower",
@@ -80,6 +82,35 @@ export function contextualBattleDialogueFor(
       address: native.address,
     },
   };
+}
+
+/**
+ * `0000:EF56` writes the award into the five ASCII cells the record reserves:
+ * five decimal digits, then a loop that turns every leading `0` into a space and
+ * a final fix-up that puts a `0` back when the whole field blanked out. So the
+ * field is a fixed-width right-aligned slot and the native draws those spaces at
+ * 8 px each — trimming them would move the number and the trailing `點`.
+ *
+ * The writer divides a 16-bit register, so it can only ever show `0..65535`.
+ */
+export function nativeExperienceLineText(amount: number): string {
+  const { text, numericField } = NATIVE_CONTEXTUAL_BATTLE_LINES.experienceGain;
+  const width = numericField.digits.length;
+  const clamped = Math.max(0, Math.min(0xffff, Math.trunc(amount)));
+  return text.replace(numericField.digits, String(clamped).padStart(width, " "));
+}
+
+/**
+ * `0000:91F1`/`0000:9161` (an ordinary attack or its counter that killed) and
+ * `0000:7678` (a player technique whose death scan removed someone) all load the
+ * award into the record and then hand the killer's own cell to `0000:C97E`, so
+ * the line is spoken by the unit that gained the experience.
+ */
+export function experienceGainDialogueFor(
+  actor: Pick<BattleUnit, "name" | "portrait" | "side">,
+  amount: number,
+): DialoguePage {
+  return contextualBattleDialogueFor(actor, "experienceGain", nativeExperienceLineText(amount));
 }
 
 /**

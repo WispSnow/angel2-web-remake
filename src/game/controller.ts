@@ -22,6 +22,7 @@ import {
 import {
   aiTechniqueDialogueFor,
   contextualBattleDialogueFor,
+  experienceGainDialogueFor,
   type ContextualBattleLineKey,
 } from "./content/ai-technique-dialogue";
 import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
@@ -31,6 +32,7 @@ import {
   immuneToPhysicalShootingFor,
   isClassId,
   className,
+  killRewardFor,
   promotionTargetsFor,
   unitDisplayName,
   type PromotionTarget,
@@ -2337,6 +2339,12 @@ export class GameController {
         const presentation = affectedPresentations.find(({ id }) => id === affected.unitId);
         if (presentation) await this.presentSpecialDeath(actorPresentation, presentation, result);
       }
+      await this.presentTechniqueExperienceLine(
+        actorPresentation,
+        actionId,
+        result,
+        affectedPresentations,
+      );
       await this.presentPendingUnitTransformations();
       const moved = result.affectedUnits.filter(({ moved }) => moved).length;
       const frozen = result.affectedUnits.filter(({ actionDisabledBefore, actionDisabledAfter }) =>
@@ -3551,12 +3559,62 @@ export class GameController {
     await this.presentContextualLine(actor, line, statusText);
   }
 
+  /**
+   * Native `0000:91F1`/`0000:9161`/`0000:7678` all load the award into the
+   * record with `0000:EF56` and then hand the earner's own cell to
+   * `0000:C97E`, which plays selector `18h` unconditionally — it is one of the
+   * five selectors `0000:C981` lets through without the PIT gate every other
+   * contextual line has to pass.
+   */
+  private async presentExperienceGainLine(actor: BattleUnit, amount: number): Promise<void> {
+    await this.presentContextualLine(
+      actor,
+      "experienceGain",
+      undefined,
+      experienceGainDialogueFor(actor, amount),
+    );
+  }
+
+  /**
+   * `0000:75E4` — the player's 技術 commit — is the only action path that ever
+   * reports experience. Once the handler and its death scan return it tests the
+   * scan's flag DS:7990 and, when the scan removed at least one unit, writes the
+   * scan's own accumulator DS:7993 into the record and calls `0000:C97E` from
+   * `0000:7678`, after the MAGIC/12 removals rather than before them.
+   *
+   * Three native boundaries ride on that call site: the shot commit
+   * `0000:719B` and the `1N` direct technique `0000:7475` never reach it, the
+   * AI's technique entry `1000:1E51` never reaches it either, and the number is
+   * the death scan's raw sum of `0000:95DB` kill values — not the action's own
+   * base and random experience, which `0000:72FF` awards without showing it.
+   */
+  private async presentTechniqueExperienceLine(
+    actor: BattleUnit,
+    actionId: BattleActionId,
+    result: SpecialActionResult,
+    affectedPresentations: readonly BattleUnit[],
+  ): Promise<void> {
+    if (BATTLE_ACTION_DEFINITIONS[actionId].kind !== "technique") return;
+    if (actionId === HALF_DRAGON_TELEPORT_ACTION_ID) return;
+    const victims = result.affectedUnits.filter(({ died }) => died);
+    if (victims.length === 0) return;
+    // `0000:96C2` accumulates one kill value per *removed board cell*, so a
+    // shared water-warrior body pays once per cell exactly as it does here.
+    const killReward = victims.reduce((total, { unitId }) => {
+      const victim = affectedPresentations.find(({ id }) => id === unitId);
+      return total + (victim ? killRewardFor(victim.classId, victim.side) : 0);
+    }, 0);
+    await this.presentExperienceGainLine(actor, killReward);
+  }
+
   private async presentContextualLine(
     actor: BattleUnit,
     line: ContextualBattleLineKey,
     statusText?: string,
+    /** Only `18h` needs one: the record with its numeric field already written. */
+    prepared?: DialoguePage,
   ): Promise<void> {
-    const page = contextualBattleDialogueFor(actor, line);
+    const page = prepared ?? contextualBattleDialogueFor(actor, line);
     this.contextualLineDialogue = { actor, line, page };
     if (statusText !== undefined) this.statusMessage = statusText;
     this.emit();
@@ -3844,6 +3902,11 @@ export class GameController {
           displayedLifeByUnitId,
         );
       }
+      // `0000:9296` runs the death scan first and only then pays experience:
+      // `0000:9161` (the counter) before `0000:91F1` (the opening blow), so on
+      // this branch both `18h` windows come after MAGIC/12 rather than before
+      // it. Only one of the two can fire — a defender that dies never counters.
+      await this.presentOrdinaryCombatExperienceLines(attacker, defender, result);
       this.combatPresentation = undefined;
       return;
     }
@@ -3883,6 +3946,10 @@ export class GameController {
     }
 
     if (result.defenderDied) {
+      // `0000:91C5` pays the kill at `0000:91F1` — window `18h` included —
+      // before `0000:96C2` removes the body, so on the map route the earner
+      // speaks while the corpse is still standing and MAGIC/12 follows.
+      await this.presentExperienceGainLine(attacker, result.experienceGained);
       await this.presentMapCombatDeaths(
         attacker,
         defender,
@@ -3933,6 +4000,9 @@ export class GameController {
         await pause(this.mapCombatDelay(1));
       }
       if (result.attackerDied) {
+        // `0000:9135` mirrors the opening blow: `0000:9161` pays the counter
+        // kill and speaks `18h` before its own `0000:96C2` clears the body.
+        await this.presentExperienceGainLine(defender, result.counterExperienceGained);
         await this.presentMapCombatDeaths(
           attacker,
           defender,
@@ -3947,6 +4017,24 @@ export class GameController {
     }
 
     this.combatPresentation = undefined;
+  }
+
+  /**
+   * The full-screen route's own `18h` order. `0000:9296` calls `0000:9161`
+   * before `0000:91F1`, so the counter's window would precede the opening
+   * blow's; only one of them can ever have a kill to report.
+   */
+  private async presentOrdinaryCombatExperienceLines(
+    attacker: BattleUnit,
+    defender: BattleUnit,
+    result: AttackResult,
+  ): Promise<void> {
+    if (result.attackerDied) {
+      await this.presentExperienceGainLine(defender, result.counterExperienceGained);
+    }
+    if (result.defenderDied) {
+      await this.presentExperienceGainLine(attacker, result.experienceGained);
+    }
   }
 
   private async presentMapCombatDeaths(

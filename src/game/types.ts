@@ -221,7 +221,8 @@ export interface DialoguePage {
       | "no-target-in-range"
       | "confused-actor"
       | "dodged-shot"
-      | "counterattack";
+      | "counterattack"
+      | "experience-gain";
     wait: number;
     address?: string;
     /** Native PP background record active at this KY checkpoint. */

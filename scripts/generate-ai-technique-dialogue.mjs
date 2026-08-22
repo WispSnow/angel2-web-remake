@@ -58,7 +58,12 @@ const CONTEXTUAL_LINES = [
   // switch silences it only when the AI is the one shooting.
   { key: "dodgedShot", selector: "1Dh", record: "dodged-shot", gate: "mixed", text: "要打中我沒那麼容易．" },
   { key: "counterattack", selector: "1Eh", record: "counterattack", gate: "direct", text: "妳竟敢打我．" },
+  // The one entry with a numeric field: `0000:EF56` writes the award into the
+  // five ASCII digits before the window opens, so the digits ship verbatim and
+  // the runtime substitutes them the same way the native does.
+  { key: "experienceGain", selector: "18h", record: "experience-gain", gate: "direct", text: "得經驗值00000 點" },
 ];
+const NUMERIC_CONTEXTUAL_LINES = new Map([["experienceGain", { digits: "00000", writer: "0000:EF56" }]]);
 const contextualTable = evidence.rules?.contextualBattleLines;
 if (!contextualTable?.entries) throw new Error("missing native contextual battle-line evidence");
 const contextualBySelector = new Map(
@@ -80,6 +85,10 @@ const contextualLines = Object.fromEntries(CONTEXTUAL_LINES.map((line) => {
   if (gate !== line.gate) {
     throw new Error(`contextual line ${line.selector}: expected ${line.gate} gate, call sites say ${gate}`);
   }
+  const numeric = NUMERIC_CONTEXTUAL_LINES.get(line.key);
+  if (numeric && !entry.text.includes(numeric.digits)) {
+    throw new Error(`contextual line ${line.selector} lost its ${numeric.digits} numeric field`);
+  }
   return [line.key, {
     record: line.record,
     selector: Number.parseInt(entry.selector, 16),
@@ -89,6 +98,10 @@ const contextualLines = Object.fromEntries(CONTEXTUAL_LINES.map((line) => {
     // `|` is the native newline inside a single contextual string.
     text: entry.text.replaceAll("|", "\n"),
     emitters: entry.emitters.map(({ address }) => address),
+    // `0000:EF56` overwrites exactly these ASCII cells, blanking leading zeros
+    // to spaces, so the field is a fixed-width right-aligned slot rather than a
+    // free-form placeholder.
+    ...(numeric ? { numericField: { digits: numeric.digits, writer: numeric.writer } } : {}),
   }];
 }));
 

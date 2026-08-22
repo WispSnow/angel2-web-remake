@@ -115,15 +115,22 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 
 .startup-screen { color: #fff; background: #000; }
+/* 標題、按鈕、狀態三段由上而下等距排列；方框只要裝得下這三段，就不必再撐出
+   一段說明文字的高度。狀態行永遠保留一行，準備中、解鎖中與失敗訊息共用它。 */
 .startup-activation {
   position: absolute;
   z-index: 12;
   inset: 0;
   display: grid;
+  align-content: center;
+  gap: 8px;
   box-sizing: border-box;
-  width: 360px;
-  height: 188px;
-  padding: 25px 30px 22px;
+  width: 280px;
+  /* `fit-content` keeps `inset: 0; margin: auto` centring while still letting a
+     wrapped failure message grow the box instead of spilling past its border. */
+  height: fit-content;
+  min-height: 142px;
+  padding: 16px 24px 14px;
   margin: auto;
   border: 2px solid #b79a55;
   outline: 1px solid #392b45;
@@ -142,7 +149,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   letter-spacing: .18em;
 }
 .startup-activation h1 {
-  margin: 7px 0 8px;
+  margin: 0;
   color: #fff2ca;
   font-size: 22px;
   font-weight: 500;
@@ -151,16 +158,15 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   text-shadow: 0 2px #4e223b;
 }
 .startup-activation p:not(.startup-activation-kicker) {
-  min-height: 2.8em;
+  min-height: 1.5em;
   margin: 0;
   color: #d6c6d8;
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 11px;
+  line-height: 1.5;
 }
 .startup-activation button {
   justify-self: center;
   min-width: 124px;
-  margin-top: 10px;
   padding: 7px 18px;
   border: 1px solid #b79a55;
   color: #fff0c8;
@@ -1921,7 +1927,12 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
    用第 1 格畫在本體第一列，下緣用第 0 格畫在本體下方一列；最後四角各呼叫一次
    `0000:D9FA`（把第五串遮罩 AND 進四個平面）再呼叫 `0000:D790`（把四個顏色平面 OR
    回去），畫的都是同一枚 8×7 裝飾，其最右一列由遮罩留給背景。繪製順序決定疊放：
-   邊柱蓋住邊帶，四角又蓋住邊柱。 */
+   邊柱蓋住邊帶，四角又蓋住邊柱。
+
+   `REMAKE-123`：原版四角只有左上真的落在外框角上，右側兩枚停在 `403`（外框右緣是
+   `404`）、下方兩枚停在 `219`（外框下緣是 `220`）。複刻把這三枚各外移 1 px，讓四個
+   外角都與外框外角重合；落點由 `objectivePanelCornerPlacements()` 從同一份取證幾何
+   推出，原始落點仍逐字保留在 `NATIVE_OBJECTIVE_PANEL.corner.placements`。 */
 .objective-panel {
   position: absolute;
   z-index: 14;

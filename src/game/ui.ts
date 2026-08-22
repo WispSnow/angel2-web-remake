@@ -69,7 +69,11 @@ import {
   NATIVE_IDENTITY_SEPARATOR,
   NATIVE_TEXT,
 } from "./content/native-font.generated";
-import { NATIVE_OBJECTIVE_PANEL, nativeObjectivePanelText } from "./content/objective-panel";
+import {
+  NATIVE_OBJECTIVE_PANEL,
+  nativeObjectivePanelText,
+  objectivePanelCornerPlacements,
+} from "./content/objective-panel";
 import { NATIVE_CONCEALED_FIELD, nativeNumericField } from "./native-text";
 import {
   createMenuPointerGlide,
@@ -383,7 +387,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       element.style.height = `${edge.height}px`;
       element.style.backgroundSize = `${edge.width}px ${edge.height}px`;
     }
-    for (const [index, placement] of corner.placements.entries()) {
+    // REMAKE-123 只把右側／下方兩對外移 1 px，讓四角都貼齊外框角落；原始落點仍在
+    // `NATIVE_OBJECTIVE_PANEL.corner.placements` 逐字保留。
+    for (const [index, placement] of objectivePanelCornerPlacements().entries()) {
       const element = required(objectivePanel, `.objective-panel-corner[data-corner="${index}"]`);
       element.style.left = `${placement.x - body.x}px`;
       element.style.top = `${placement.y - body.y}px`;
