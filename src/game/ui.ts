@@ -19,6 +19,7 @@ import {
   usesClassIdentity,
 } from "./content/classes";
 import { allyMapUnitAsset } from "./content/map-unit-assets";
+import { mapUnitVisualOffset } from "./content/map-unit-presentation";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "./content/technique-lab.generated";
 import { classTraitsFor } from "./content/class-traits";
 import { fullCombatBackgroundAsset } from "./content/full-combat-backgrounds";
@@ -1033,6 +1034,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const imageUrl = promotionImageByClass[target.id]
           ?? allyMapUnitAsset(target.id)
           ?? TECHNIQUE_LAB_UNIT_ASSETS[target.id].ally;
+        const figureOffsetX = mapUnitVisualOffset(target.id, 1);
         const optionLabel = [
           `${index + 1}．${definition.nativeName}`,
           actionLabels[definition.actionCategory],
@@ -1048,7 +1050,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           data-testid="promotion-target-${target.id}" role="menuitem"
           aria-label="${optionLabel}" aria-current="${selected}">
           ${imageUrl
-            ? `<span class="promotion-art-slot" aria-hidden="true">
+            ? `<span class="promotion-art-slot" aria-hidden="true"
+                style="--map-unit-offset-x:${figureOffsetX}px">
                 <img class="promotion-art" src="${stagedRenderAssetSource(imageUrl)}"
                   data-source-url="${imageUrl}" data-source-resource="A/0002"
                   alt="" data-testid="promotion-image-${target.id}" />

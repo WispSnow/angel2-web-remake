@@ -6,6 +6,7 @@ import {
   actionPresentationCatalog,
 } from "../content/actions";
 import { allyMapUnitAsset, allyMapUnitAssetsForClasses } from "../content/map-unit-assets";
+import { mapUnitVisualOffset } from "../content/map-unit-presentation";
 import type { GameController } from "../controller";
 import type { BattleUnit, Position } from "../types";
 import { iceFrameAtGlobalIndex, lightningFrameAtMainIndex } from "../map-technique-presentation";
@@ -960,12 +961,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     }
 
     private unitVisualOffset(unit: BattleUnit): number {
-      // The stored frames are rectangular, but their opaque visual mass is not:
-      // the 32px soldier frames lean 2px right and the 40px cavalry frame 2px
-      // left. This offset belongs only to the character image; numeric HUD
-      // elements remain centered on the logical 40px cell.
-      if (unit.classId === "cavalry") return 2;
-      return unit.classId === "soldier" ? -2 : 0;
+      return mapUnitVisualOffset(unit.classId, unit.side);
     }
 
     private unitWorldX(unit: BattleUnit): number {
@@ -1132,9 +1128,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.unitViews.delete(id);
       }
       if (controller.isTestMode) {
+        const renderedVisualOffsetByUnitId = Object.fromEntries(
+          controller.battle.units.map((unit) => [unit.id, this.unitVisualOffset(unit)]),
+        );
         this.game.canvas.dataset.unitLifeLabelCount = String(visibleCount);
         this.game.canvas.dataset.unitDisplayedLifeById = JSON.stringify(renderedLifeByUnitId);
         this.game.canvas.dataset.unitTextureById = JSON.stringify(renderedTextureByUnitId);
+        this.game.canvas.dataset.unitVisualOffsetById = JSON.stringify(renderedVisualOffsetByUnitId);
         this.game.canvas.dataset.actedBadgeCount = String(controller.battle.units.filter((unit) => unit.acted).length);
         this.game.canvas.dataset.iceDisabledCount = String(
           controller.battle.units.filter((unit) => unit.actionDisabled).length,

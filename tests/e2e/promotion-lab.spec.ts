@@ -328,7 +328,12 @@ test("variable-size profession figures remain undistorted and centered in the na
     await clickWorldCell(page, target.x, target.y);
     await finishPromotionDialogue(page);
   };
-  const expectNativeFigure = async (classId: string, width: number, height: number) => {
+  const expectNativeFigure = async (
+    classId: string,
+    width: number,
+    height: number,
+    expectedOffsetX = 0,
+  ) => {
     const image = page.getByTestId(`promotion-image-${classId}`);
     await expect(image).toBeVisible();
     const metrics = await image.evaluate((element: HTMLImageElement) => {
@@ -353,15 +358,15 @@ test("variable-size profession figures remain undistorted and centered in the na
       renderedWidth: width,
       renderedHeight: height,
     });
-    expect(Math.abs(metrics.centerOffsetX)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(metrics.centerOffsetX - expectedOffsetX)).toBeLessThanOrEqual(0.5);
     expect(Math.abs(metrics.centerOffsetY)).toBeLessThanOrEqual(0.5);
   };
 
   await openChoices({ x: 17, y: 17 }, { x: 18, y: 17 });
   expect((await promotionLabState(page)).battle?.promotionTargets.map(({ id }) => id))
     .toEqual(["crossbow", "magic-archer"]);
-  await expectNativeFigure("crossbow", 32, 43);
-  await expectNativeFigure("magic-archer", 32, 43);
+  await expectNativeFigure("crossbow", 32, 43, -3);
+  await expectNativeFigure("magic-archer", 32, 43, -1);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/promotion-lab-variable-width-archers.png`,
   });
@@ -380,7 +385,7 @@ test("variable-size profession figures remain undistorted and centered in the na
   await openChoices({ x: 29, y: 19 }, { x: 30, y: 19 });
   expect((await promotionLabState(page)).battle?.promotionTargets.map(({ id }) => id))
     .toEqual(["magic-priest", "curse-master"]);
-  await expectNativeFigure("curse-master", 32, 43);
+  await expectNativeFigure("curse-master", 32, 43, 3);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/promotion-lab-variable-width-curse-master.png`,
   });

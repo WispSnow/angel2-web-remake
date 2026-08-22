@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ALLY_MAP_UNIT_ASSETS } from "../../src/game/content/map-unit-assets";
+import { mapUnitVisualOffset } from "../../src/game/content/map-unit-presentation";
 import { captureVisualAudit } from "./visual-audit";
 
 const deploymentState = (page: Page) => page.evaluate(() => {
@@ -96,13 +97,14 @@ test("deployment projection reproduces module-27 geometry and keeps semantic inp
   const soldierFrame = await rootRelativeBox(page, ".deployment-entry:nth-child(6) .deployment-entry-figure-frame");
   const soldierFigure = await rootRelativeBox(page, ".deployment-entry:nth-child(6) .deployment-entry-figure");
   const profession = await rootRelativeBox(page, '[data-testid="deployment-roster-0"]');
-  expect(figure.left + figure.width / 2).toBe(figureFrame.left + figureFrame.width / 2);
+  expect(figure.left + figure.width / 2
+    - (figureFrame.left + figureFrame.width / 2)).toBe(-2);
   expect(Math.abs(
     figure.top + figure.height / 2 - (figureFrame.top + figureFrame.height / 2),
   )).toBeLessThanOrEqual(0.5);
   expect(soldierFigure).toMatchObject({ width: 32, height: 43 });
-  expect(soldierFigure.left + soldierFigure.width / 2)
-    .toBe(soldierFrame.left + soldierFrame.width / 2);
+  expect(soldierFigure.left + soldierFigure.width / 2
+    - (soldierFrame.left + soldierFrame.width / 2)).toBe(-2);
   expect(Math.abs(
     soldierFigure.top + soldierFigure.height / 2
       - (soldierFrame.top + soldierFrame.height / 2),
@@ -186,6 +188,7 @@ test("all player profession figures keep their native proportions in deployment 
   const figures = Object.entries(ALLY_MAP_UNIT_ASSETS).map(([classId, source]) => ({
     classId,
     source,
+    offsetX: mapUnitVisualOffset(classId as keyof typeof ALLY_MAP_UNIT_ASSETS, 1),
   }));
   const metrics = await page.evaluate(async (assets) => {
     const host = document.createElement("div");
@@ -201,6 +204,7 @@ test("all player profession figures keep their native proportions in deployment 
       deploymentFrame.className = "deployment-entry-figure-frame";
       const deploymentSlot = document.createElement("span");
       deploymentSlot.className = "deployment-entry-figure-slot";
+      deploymentSlot.style.setProperty("--map-unit-offset-x", `${asset.offsetX}px`);
       const deploymentImage = document.createElement("img");
       deploymentImage.className = "deployment-entry-figure";
       deploymentImage.src = asset.source;
@@ -211,6 +215,7 @@ test("all player profession figures keep their native proportions in deployment 
       promotionOption.className = "promotion-option";
       const promotionSlot = document.createElement("span");
       promotionSlot.className = "promotion-art-slot";
+      promotionSlot.style.setProperty("--map-unit-offset-x", `${asset.offsetX}px`);
       const promotionImage = document.createElement("img");
       promotionImage.className = "promotion-art";
       promotionImage.src = asset.source;
@@ -225,6 +230,7 @@ test("all player profession figures keep their native proportions in deployment 
       const promotionOptionRect = promotionOption.getBoundingClientRect();
       results.push({
         classId: asset.classId,
+        expectedOffsetX: asset.offsetX,
         natural: [deploymentImage.naturalWidth, deploymentImage.naturalHeight],
         deployment: {
           width: deploymentRect.width,
@@ -253,13 +259,13 @@ test("all player profession figures keep their native proportions in deployment 
     const [naturalWidth, naturalHeight] = metric.natural;
     expect(metric.deployment.width, `${metric.classId} deployment width`).toBe(naturalWidth);
     expect(metric.deployment.height, `${metric.classId} deployment height`).toBe(naturalHeight);
-    expect(Math.abs(metric.deployment.centerOffsetX), `${metric.classId} deployment x center`)
+    expect(Math.abs(metric.deployment.centerOffsetX - metric.expectedOffsetX), `${metric.classId} deployment optical x`)
       .toBeLessThanOrEqual(0.5);
     expect(Math.abs(metric.deployment.centerOffsetY), `${metric.classId} deployment y center`)
       .toBeLessThanOrEqual(0.5);
     expect(metric.promotion.width, `${metric.classId} promotion width`).toBe(naturalWidth);
     expect(metric.promotion.height, `${metric.classId} promotion height`).toBe(naturalHeight);
-    expect(Math.abs(metric.promotion.centerOffsetX), `${metric.classId} promotion x center`)
+    expect(Math.abs(metric.promotion.centerOffsetX - metric.expectedOffsetX), `${metric.classId} promotion optical x`)
       .toBeLessThanOrEqual(0.5);
     expect(Math.abs(metric.promotion.centerOffsetY), `${metric.classId} promotion y center`)
       .toBeLessThanOrEqual(0.5);

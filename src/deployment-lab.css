@@ -181,6 +181,7 @@
   max-width: none;
   max-height: none;
   image-rendering: var(--image-rendering, pixelated);
+  transform: translateX(var(--map-unit-offset-x, 0px));
   pointer-events: none;
 }
 
