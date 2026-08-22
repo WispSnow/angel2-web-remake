@@ -248,10 +248,16 @@ test("stage-1 low-life enemy rest plays the same silent MAGIC/0 finish", async (
 test("S01-A through S01-E: deployment, techniques, save restore and victory route run in the main game", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
+  const failedRequests: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  // 「Failed to load resource」的 console 文字不帶網址，單看它無從判斷是哪個資源
+  // 掉了；把同一次失敗的請求記下來當作斷言訊息，回歸時才有下手的線索。
+  page.on("requestfailed", (request) => {
+    failedRequests.push(`${request.url()} ${request.failure()?.errorText ?? ""}`);
+  });
 
   await enterStage1PlayerPhase(page);
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", /MUSIC\/(10|11)/u);
@@ -621,7 +627,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     path: `${ARTIFACT_DIR}/stage1-complete-stage2-entry.png`,
   });
 
-  expect(consoleErrors).toEqual([]);
+  expect(consoleErrors, `failed requests: ${failedRequests.join(" | ")}`).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
 

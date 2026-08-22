@@ -444,13 +444,19 @@ const soundEffectUrls = [...new Set([
 root.dataset.soundEffectReady = "false";
 soundInput.disabled = true;
 root.addEventListener("pointerdown", () => soundEffects.unlock(), { capture: true });
-try {
-  await prepareSoundEffectBuffers(soundEffectUrls);
+// Decoding every effect buffer must not gate this module's own evaluation. A
+// top-level `await` does not hold the document's load event, so awaiting here
+// left the scene, the RAF loop and `window.__ANGEL2_COMBAT_LAB__` all missing
+// at the moment the page already reported itself loaded — the timeline simply
+// ran on without ever receiving a seek or a pause. Sound readiness stays
+// observable through `data-sound-effect-ready`, which is what the sound
+// acceptance waits on, so nothing that needs the buffers loses its gate.
+void prepareSoundEffectBuffers(soundEffectUrls).then(() => {
   root.dataset.soundEffectReady = "true";
   soundInput.disabled = false;
-} catch (error: unknown) {
+}).catch((error: unknown) => {
   root.dataset.soundEffectError = error instanceof Error ? error.message : String(error);
-}
+});
 
 const renderSource: CombatPresentationRenderSource = {
   battlePresentation: "full",

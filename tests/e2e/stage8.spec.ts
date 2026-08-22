@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -64,10 +65,7 @@ test("S08-A/B/C/D/F: stage 7 completion plays three SAY/21 backgrounds and enter
   await expect(dialogue).toHaveAttribute("data-source-record", "21");
   await expect(dialogue).toHaveAttribute("data-source-wait", "1");
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "7");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage7-background-7\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage7-background-7\.png/u);
   expect(await state(page)).toMatchObject({
     stageId: "stage-08",
     stageProgress: 0,
@@ -85,10 +83,7 @@ test("S08-A/B/C/D/F: stage 7 completion plays three SAY/21 backgrounds and enter
     await expect(dialogue).toHaveAttribute("data-source-wait", String(wait));
   }
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "6");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage7-background-6\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage7-background-6\.png/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage8-prebattle-background-6.png`,
   });
@@ -98,10 +93,7 @@ test("S08-A/B/C/D/F: stage 7 completion plays three SAY/21 backgrounds and enter
     await expect(dialogue).toHaveAttribute("data-source-wait", String(wait));
   }
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "8");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage8-background-8\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage8-background-8\.png/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage8-prebattle-background-8.png`,
   });

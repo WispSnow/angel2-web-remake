@@ -1,4 +1,4 @@
-import { stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { onStagedRenderAssetsChanged, stagedRenderAssetSource } from "./staged-render-asset-cache";
 
 /**
  * CSS cannot call the staged render bridge on its own. Keep the semantic source
@@ -20,9 +20,27 @@ export const NATIVE_UI_CSS_ASSETS = {
 
 export const NATIVE_UI_CSS_ASSET_URLS = [...new Set(Object.values(NATIVE_UI_CSS_ASSETS))];
 
-export function applyStagedNativeUiAssets(target: HTMLElement): void {
+// 這些變數寫在長命的宿主元素上（`#app`、邏輯螢幕），不會隨每次 render 重寫，因此
+// 換包時得自己回來重解一次；否則舊租約的物件網址會留在樣式裡，等到選單或游標
+// 下次要用才抓到已被回收的 `blob:`。
+const stagedNativeUiTargets = new Set<HTMLElement>();
+
+function writeStagedNativeUiAssets(target: HTMLElement): void {
   for (const [property, url] of Object.entries(NATIVE_UI_CSS_ASSETS)) {
     target.style.setProperty(property, `url(${JSON.stringify(stagedRenderAssetSource(url))})`);
     target.style.setProperty(property.replace(/-image$/u, "-source"), JSON.stringify(url));
   }
+}
+
+onStagedRenderAssetsChanged(() => {
+  for (const target of stagedNativeUiTargets) {
+    // 已離開文件的宿主不會再繪製，留著只會讓集合無限長大。
+    if (!target.isConnected) stagedNativeUiTargets.delete(target);
+    else writeStagedNativeUiAssets(target);
+  }
+});
+
+export function applyStagedNativeUiAssets(target: HTMLElement): void {
+  stagedNativeUiTargets.add(target);
+  writeStagedNativeUiAssets(target);
 }

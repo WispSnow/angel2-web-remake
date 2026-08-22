@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -54,10 +55,7 @@ test("S31-A–E: SAY/0060 leads through five fixed allies into the SAY/0061 ambu
   await expect(dialogue).toHaveAttribute("data-source-record", "60");
   await expect(dialogue).toHaveAttribute("data-source-wait", "1");
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "23");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage29-background-23\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage29-background-23\.png/u);
   await expect(page.getByTestId("dialogue-window-upper")).toContainText("外面的吵雜聲");
   expect(await state(page)).toMatchObject({
     stageId: "stage-31",

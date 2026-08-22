@@ -4,6 +4,7 @@ import {
   decodeStagedRenderImages,
   isStagedRenderAssetUrl,
   loadStagedRenderImage,
+  onStagedRenderAssetsChanged,
   stagedRenderAssetSource,
 } from "../../src/game/staged-render-asset-cache";
 
@@ -46,6 +47,34 @@ describe("staged render asset cache", () => {
     expect(stagedRenderAssetSource(
       "/assets/original/map-action-atlases/fire-1.png",
     )).toBe("/assets/original/map-action-atlases/fire-1.png");
+  });
+
+  it("re-resolves subscribed surfaces before the outgoing lease is revoked", () => {
+    const url = "/assets/original/command-menu-top.png";
+    const revoked: string[] = [];
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation((value: string) => {
+      revoked.push(value);
+    });
+
+    const first = activateStagedRenderAssets(new Map([[url, new Uint8Array([1])]]));
+    release = first.release;
+    // 模擬把物件網址抄進 CSS 變數的表面：只有換包時回來重解，才不會留著死網址。
+    let cssCopy = stagedRenderAssetSource(url);
+    const seenWhileResolving: string[] = [];
+    const unsubscribe = onStagedRenderAssetsChanged(() => {
+      seenWhileResolving.push(...revoked);
+      cssCopy = stagedRenderAssetSource(url);
+    });
+
+    const second = activateStagedRenderAssets(new Map([[url, new Uint8Array([2])]]));
+    release = second.release;
+    unsubscribe();
+
+    // 訂閱者跑的時候舊租約還沒回收，重寫下去的網址因此一定是活的。
+    expect(seenWhileResolving).toEqual([]);
+    expect(cssCopy).toMatch(/^blob:/u);
+    expect(revoked).not.toContain(cssCopy);
+    expect(cssCopy).toBe(stagedRenderAssetSource(url));
   });
 
   it("recognizes only generated player render paths", () => {

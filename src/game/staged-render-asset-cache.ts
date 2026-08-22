@@ -25,6 +25,26 @@ interface ActiveStagedRenderAssets {
 
 let activeAssets: ActiveStagedRenderAssets | undefined;
 const MAX_PARALLEL_IMAGE_DECODES = 6;
+const changeSubscribers = new Set<() => void>();
+
+/**
+ * Notifies surfaces that copied object URLs into CSS that those copies are now
+ * stale.
+ *
+ * A custom property can only hold the object URL that was current when it was
+ * written, and nothing in CSS can call back into this module. Once the next pack
+ * takes over, every such copy names a URL this module is about to revoke, and
+ * the first repaint that needs one — a menu opening, a cursor becoming active —
+ * fetches a dead `blob:` and logs `net::ERR_FILE_NOT_FOUND`. Subscribers run
+ * while the new lease is already current but the outgoing one is not yet
+ * revoked, so a rewritten property never names a URL that has already died.
+ */
+export function onStagedRenderAssetsChanged(subscriber: () => void): () => void {
+  changeSubscribers.add(subscriber);
+  return () => {
+    changeSubscribers.delete(subscriber);
+  };
+}
 
 const contentTypeFor = (url: string): string => {
   if (url.endsWith(".png")) return "image/png";
@@ -104,6 +124,9 @@ export function activateStagedRenderAssets(
   };
   const previous = activeAssets;
   activeAssets = next;
+  // Order matters: the surfaces have to re-resolve against `next` before
+  // `previous` revokes the URLs they are still holding.
+  for (const subscriber of changeSubscribers) subscriber();
   if (previous) releaseAssets(previous);
 
   let released = false;

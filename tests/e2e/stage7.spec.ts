@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -45,10 +46,7 @@ test("S07-A/B/C: accepted stage-6 completion plays SAY/17 and enters two-plus-fi
   await expect(dialogue).toHaveAttribute("data-source-record", "17");
   await expect(dialogue).toHaveAttribute("data-source-wait", "1");
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "6");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage7-background-6\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage7-background-6\.png/u);
   expect(await state(page)).toMatchObject({
     stageId: "stage-07",
     stageProgress: 0,
@@ -99,10 +97,7 @@ test("S07-A/B/C: accepted stage-6 completion plays SAY/17 and enters two-plus-fi
     }
   }
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "7");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage7-background-7\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage7-background-7\.png/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage7-prebattle-background-7.png`,
   });

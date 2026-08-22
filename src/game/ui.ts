@@ -103,25 +103,27 @@ import {
   RECORD_SAVE_BACKUP_CONFIRM_MARKUP,
   type SaveBackupUi,
 } from "./save-backup-ui";
-import { stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { onStagedRenderAssetsChanged, stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { applyStagedNativeUiAssets } from "./native-ui-assets";
 import { DIFFICULTY_OPTIONS } from "./content/startup";
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
   ASSETS.allyPromotionTargets;
 // 原生表現資源以 CSS 變數掛在邏輯螢幕上，樣式表只引用變數、不硬寫資產路徑。
-const nativePresentationAssetStyle = () => [
-  `--dialogue-portrait-frame-top:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.top)}')`,
-  `--dialogue-portrait-frame-top-source:'${DIALOGUE_PORTRAIT_FRAME_ASSETS.top}'`,
-  `--dialogue-portrait-frame-nameplate:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate)}')`,
-  `--dialogue-portrait-frame-nameplate-source:'${DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate}'`,
-  `--dialogue-portrait-frame-side:url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.side)}')`,
-  `--dialogue-portrait-frame-side-source:'${DIALOGUE_PORTRAIT_FRAME_ASSETS.side}'`,
-  `--dialogue-text-window:url('${stagedRenderAssetSource(DIALOGUE_TEXT_WINDOW_ASSET)}')`,
-  `--dialogue-text-window-source:'${DIALOGUE_TEXT_WINDOW_ASSET}'`,
-  `--story-backdrop:url('${stagedRenderAssetSource(STORY_BACKDROP_ASSET)}')`,
-  `--story-backdrop-source:'${STORY_BACKDROP_ASSET}'`,
-].join(";");
+const nativePresentationAssetEntries = (): ReadonlyArray<readonly [string, string]> => [
+  ["--dialogue-portrait-frame-top", `url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.top)}')`],
+  ["--dialogue-portrait-frame-top-source", `'${DIALOGUE_PORTRAIT_FRAME_ASSETS.top}'`],
+  ["--dialogue-portrait-frame-nameplate", `url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate)}')`],
+  ["--dialogue-portrait-frame-nameplate-source", `'${DIALOGUE_PORTRAIT_FRAME_ASSETS.nameplate}'`],
+  ["--dialogue-portrait-frame-side", `url('${stagedRenderAssetSource(DIALOGUE_PORTRAIT_FRAME_ASSETS.side)}')`],
+  ["--dialogue-portrait-frame-side-source", `'${DIALOGUE_PORTRAIT_FRAME_ASSETS.side}'`],
+  ["--dialogue-text-window", `url('${stagedRenderAssetSource(DIALOGUE_TEXT_WINDOW_ASSET)}')`],
+  ["--dialogue-text-window-source", `'${DIALOGUE_TEXT_WINDOW_ASSET}'`],
+  ["--story-backdrop", `url('${stagedRenderAssetSource(STORY_BACKDROP_ASSET)}')`],
+  ["--story-backdrop-source", `'${STORY_BACKDROP_ASSET}'`],
+];
+const nativePresentationAssetStyle = () => nativePresentationAssetEntries()
+  .map(([property, value]) => `${property}:${value}`).join(";");
 const niaPortraitDisplayName = (PORTRAIT_CATALOG[46].displayName ?? "妮雅").trim();
 
 export interface CombatPresentationRenderSource {
@@ -285,6 +287,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   paintNativeDomTextIn(root);
 
   const screen = required(root, "#logical-screen");
+  // 這串變數只在掛載時寫進 `style`，換包後就指向已回收的物件網址；資源租約換手時
+  // 逐項重寫，對話窗與肖像方框下次繪製才不會抓到死掉的 `blob:`。只能逐項覆寫：
+  // `scaling.ts` 把 `--game-scale` 與 `--game-offset-x` 寫在同一個元素上，整包換掉
+  // `style` 會連縮放一起洗掉。
+  const stopNativePresentationAssetRefresh = onStagedRenderAssetsChanged(() => {
+    for (const [property, value] of nativePresentationAssetEntries()) {
+      screen.style.setProperty(property, value);
+    }
+  });
   // 邊框圖磚各自合成在一張畫布上，非整數倍縮放時才不會在接縫處裂開；理由與
   // 落點見 `chrome-composite.ts`。右欄兩張由 `render` 重新掛回重建後的容器。
   const battleChrome = createChromeComposite(BATTLE_CHROME_COMPOSITE);
@@ -1549,6 +1560,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   return () => {
     eventController.abort();
     unsubscribe();
+    stopNativePresentationAssetRefresh();
     stopScaling();
     stopGamepad();
     recordBackupUi.dispose();

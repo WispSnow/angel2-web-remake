@@ -3,6 +3,7 @@ import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-pa
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { skipOpeningToTitle } from "./startup-controls";
+import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -75,10 +76,7 @@ test("S30-A–E: SAY/0057 and SAY/0058 lead through the Empress mutation into th
   await expect(dialogue).toHaveAttribute("data-source-record", "57");
   await expect(dialogue).toHaveAttribute("data-source-wait", "1");
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "23");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage29-background-23\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage29-background-23\.png/u);
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("收復騎士團堡");
   expect(await state(page)).toMatchObject({
     stageId: "stage-30",

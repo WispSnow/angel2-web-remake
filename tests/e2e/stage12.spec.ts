@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -99,10 +100,7 @@ test("S12-A/B/C: stage 10 completion plays the crash story, deploys 1–9, then 
   await expect(dialogue).toHaveAttribute("data-source-record", "29");
   await expect(dialogue).toHaveAttribute("data-source-wait", "1");
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "10");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage10-background-10\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage10-background-10\.png/u);
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("女帝現在的狀況");
   await waitForBackgroundImage(page);
   expect(await state(page)).toMatchObject({
@@ -136,10 +134,7 @@ test("S12-A/B/C: stage 10 completion plays the crash story, deploys 1–9, then 
   await expect(dialogue).toHaveAttribute("data-source-record", "30");
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "14");
   await expect(page.locator("#story-background")).toBeVisible();
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage12-background-14\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage12-background-14\.png/u);
   await waitForBackgroundImage(page);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage12-opening-story.png`,

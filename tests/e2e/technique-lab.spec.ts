@@ -1287,11 +1287,16 @@ test("SA plays eleven E/8-backed 1x2 descriptors and remains visible below a per
   const pageErrors: string[] = [];
   const audioRequests: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
-  await page.goto("/technique-lab.html");
-  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  // `E/8` 是開機就備妥的緩衝之一，不是按下發聲時才抓的檔案，所以唯一那次
+  // `8.wav` 請求發生在模組求值期間。監聽器掛在 `goto` 之後就只是在賭預抓
+  // 落在註冊之後，於是這條斷言隨機讀到 0 或 1；改成先掛監聽器、再等
+  // `data-sound-effect-ready`，量到的仍是同一次預抓，但不再看時序臉色。
   page.on("request", (request) => {
     if (/\/8\.wav(?:\?|$)/u.test(request.url())) audioRequests.push(request.url());
   });
+  await page.goto("/technique-lab.html");
+  await expect(page.locator("#app")).toHaveAttribute("data-sound-effect-ready", "true");
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
   const canvas = page.locator("#technique-lab-canvas canvas");
   await expect(canvas).toBeVisible();
   const clickCell = async (worldX: number, worldY: number) => {
@@ -1315,7 +1320,7 @@ test("SA plays eleven E/8-backed 1x2 descriptors and remains visible below a per
   await page.locator("#technique-lab-sound").check();
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("攻擊 -20 · 狀態 3");
-  await expect.poll(() => audioRequests.length).toBe(1);
+  expect(audioRequests).toHaveLength(1);
   expect(audioRequests[0]).toMatch(/\/assets\/original\/audio\/e\/8\.wav$/u);
   for (const [time, frame] of [[0, "0"], [750, "5"], [1500, "10"], [1649, "10"]] as const) {
     await seek(page, time);
@@ -1358,11 +1363,16 @@ test("SD plays ten E/8-backed 2x2 descriptors and remains visible below a persis
   const pageErrors: string[] = [];
   const audioRequests: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
-  await page.goto("/technique-lab.html");
-  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
+  // `E/8` 是開機就備妥的緩衝之一，不是按下發聲時才抓的檔案，所以唯一那次
+  // `8.wav` 請求發生在模組求值期間。監聽器掛在 `goto` 之後就只是在賭預抓
+  // 落在註冊之後，於是這條斷言隨機讀到 0 或 1；改成先掛監聽器、再等
+  // `data-sound-effect-ready`，量到的仍是同一次預抓，但不再看時序臉色。
   page.on("request", (request) => {
     if (/\/8\.wav(?:\?|$)/u.test(request.url())) audioRequests.push(request.url());
   });
+  await page.goto("/technique-lab.html");
+  await expect(page.locator("#app")).toHaveAttribute("data-sound-effect-ready", "true");
+  await page.evaluate(() => window.__ANGEL2_TECHNIQUE_LAB__?.pause());
   const canvas = page.locator("#technique-lab-canvas canvas");
   await expect(canvas).toBeVisible();
   const clickCell = async (worldX: number, worldY: number) => {
@@ -1386,7 +1396,7 @@ test("SD plays ten E/8-backed 2x2 descriptors and remains visible below a persis
   await page.locator("#technique-lab-sound").check();
   await expect(page.locator('[data-readout="affected"]'))
     .toContainText("防禦 -20 · 狀態 3");
-  await expect.poll(() => audioRequests.length).toBe(1);
+  expect(audioRequests).toHaveLength(1);
   expect(audioRequests[0]).toMatch(/\/assets\/original\/audio\/e\/8\.wav$/u);
   for (const [time, frame] of [[0, "0"], [750, "5"], [1350, "9"], [1499, "9"]] as const) {
     await seek(page, time);

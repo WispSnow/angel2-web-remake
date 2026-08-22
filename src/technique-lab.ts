@@ -227,13 +227,18 @@ const soundEffects = new SoundEffectTransport(1, updateSoundEffectDebugState);
 root.dataset.soundEffectReady = "false";
 soundInput.disabled = true;
 root.addEventListener("pointerdown", () => soundEffects.unlock(), { capture: true });
-try {
-  await prepareSoundEffectBuffers(Object.values(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS));
+// Decoding every effect buffer must not gate this module's own evaluation. A
+// top-level `await` does not hold the document's load event, so awaiting here
+// left the session, the RAF loop and `window.__ANGEL2_TECHNIQUE_LAB__` all
+// missing at the moment the page already reported itself loaded — every
+// `setActionCode` and `pause` from a freshly opened page was silently dropped.
+// Sound readiness stays observable through `data-sound-effect-ready`.
+void prepareSoundEffectBuffers(Object.values(TECHNIQUE_LAB_FORMAL_AUDIO_ASSETS)).then(() => {
   root.dataset.soundEffectReady = "true";
   soundInput.disabled = false;
-} catch (error: unknown) {
+}).catch((error: unknown) => {
   root.dataset.soundEffectError = error instanceof Error ? error.message : String(error);
-}
+});
 
 function iceFrozenUnitIds(): readonly string[] {
   if (!session.state.actionCode.endsWith("C")) return [];

@@ -44,8 +44,8 @@ test("S16-I: direct debug entry keeps mandatory campaign class baselines", async
   await expect(page.getByTestId("deployment-roster-8")).toContainText("咒術師");
   await expect(page.getByTestId("deployment-roster-9")).toContainText("瑪琳");
   await expect(page.getByTestId("deployment-roster-9")).toContainText("水戰士");
-  await expect(page.getByTestId("deployment-roster-9").locator("img")).toHaveAttribute(
-    "src",
+  await expect(page.getByTestId("deployment-roster-figure-9")).toHaveAttribute(
+    "data-source-url",
     /ally-water-warrior\.png$/u,
   );
   await expect(page.getByTestId("deployment-roster-10")).toContainText("摩莉娜");

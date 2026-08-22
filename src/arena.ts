@@ -14,7 +14,11 @@ import {
   type ArenaTool,
 } from "./game/arena-session";
 import { className, classStatsFor } from "./game/content/classes";
+import { ASSETS } from "./game/content/stage0";
+import { STAGE0_ACTION_AUDIO_ASSETS } from "./game/content/stage0-actions.generated";
+import { STAGE1_ACTION_AUDIO_ASSETS } from "./game/content/stage1-actions.generated";
 import { GameController } from "./game/controller";
+import { prepareSoundEffectBuffers } from "./game/sound-effect-cache";
 import { startArenaSetupPhaser } from "./game/phaser/ArenaSetupScene";
 import { startPhaser } from "./game/phaser/BattleScene";
 import {
@@ -32,6 +36,22 @@ function requiredDocumentElement<T extends HTMLElement>(selector: string): T {
 
 const root = requiredDocumentElement<HTMLElement>("#app");
 const toolbar = requiredDocumentElement<HTMLElement>("#arena-battle-toolbar");
+
+// `SoundEffectTransport.play` 只認已解碼好的緩衝，備不到就整個音效吞掉。正式戰役由
+// 資源閘門在換包時備妥，競技場不走那條路，得自己把 `AudioManager` 在獨立戰鬥裡會
+// 點到的音效備起來；漏了這一步，地圖技能與腳步聲會全程無聲。不能用頂層 await：那
+// 不會延後 load 事件，只會讓除錯把手在頁面宣告載入完成後才出現。
+//
+// 兩張動作音效表都直接讀生成檔，不讀 `BATTLE_ACTION_AUDIO_ASSETS`：後者要等
+// `activateStage1Content()` 併進第 1 關那批，而那要到 `startBattle()` 才發生，這裡
+// 讀到的會只有第 0 關的一半。競技場本來就開放全部職業與技術。
+void prepareSoundEffectBuffers([...new Set([
+  ASSETS.audio.confirm,
+  ...Object.values(ASSETS.audio.effects),
+  ...ASSETS.audio.speech,
+  ...Object.values(STAGE0_ACTION_AUDIO_ASSETS),
+  ...Object.values(STAGE1_ACTION_AUDIO_ASSETS),
+])]);
 
 const session = new ArenaSession();
 let mode: "setup" | "battle" = "setup";

@@ -156,6 +156,12 @@ export function prepareAnimatedPortrait(element: HTMLElement): Promise<void> {
       element.dataset.portraitReady = "false";
       element.dataset.portraitError = error instanceof Error ? error.message : String(error);
     }
+    // 失敗的準備不能留在快取裡。`startPortraitAnimations` 每幀都會再叫一次，可是拿回
+    // 的若還是同一個已拒絕的 Promise，這張肖像就永遠卡在 `portraitReady="false"`，
+    // tick 於是每幀把它的眨眼狀態壓回 idle，`blinkCount` 再也不會前進。Chromium 在
+    // 版面還在鋪好幾百張圖時會偶發地拒絕第一次 `decode()`（`staged-render-asset-cache`
+    // 對同一個現象是重試一次），丟掉這筆紀錄才能讓下一幀真的重試。
+    if (portraitPreparations.get(element)?.promise === pending) portraitPreparations.delete(element);
     throw error;
   });
   portraitPreparations.set(element, { portrait, promise: pending });

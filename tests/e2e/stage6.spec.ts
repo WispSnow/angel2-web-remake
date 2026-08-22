@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 
@@ -64,10 +65,7 @@ test("S06-A/B/C: portal completion enters nine-unit deployment and switches SAY/
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "14");
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "5");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage6-background-5\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage6-background-5\.png/u);
   expect(await state(page)).toMatchObject({
     stageId: "stage-06",
     phase: "prebattleStory",
@@ -86,10 +84,7 @@ test("S06-A/B/C: portal completion enters nine-unit deployment and switches SAY/
     await expect(dialogue).toHaveAttribute("data-source-wait", String(wait));
   }
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "31");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage6-background-31\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage6-background-31\.png/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage6-prebattle-background-31.png`,
   });

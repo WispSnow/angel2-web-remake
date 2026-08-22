@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { portraitAssetUrls } from "../../src/game/content/portrait-assets";
-import { STAGE49_ENDING_ASSETS } from "../../src/game/content/stage49-ending";
+import {
+  STAGE49_ENDING_ASSETS,
+  STAGE49_EPILOGUE_FONT,
+  STAGE49_EPILOGUE_LAYOUT,
+  STAGE49_EPILOGUE_SEGMENTS,
+} from "../../src/game/content/stage49-ending";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
 import { skipStoryDialogue } from "./dialogue-controls";
@@ -9,6 +14,57 @@ import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
+
+interface EpilogueInkCell {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * 一段尾聲字的落墨矩形，外加每個字自己的格子，全部由取證的字元落點算出。
+ *
+ * 字幕畫布是整張 640x350，但字只佔中間幾行；探針若每次都全掃就要讀 22 萬個像素，
+ * 那筆成本會落回它要量的打字計時器上。逐格判斷還讓「已經打出幾個字」不必靠
+ * 「看到幾次墨量變多」推——`0000:0725` 的等待掛在絕對時間上，主執行緒一忙就會有
+ * 兩個字擠進同一次重畫，數轉折的舊寫法於是隨機少算。
+ *
+ * 每格橫向從墨色第二欄起算：陰影相對墨色外擴 1 px（`shadowOffsets`），而字距正好
+ * 是字寬，所以前一個字的陰影會壓在下一格的第一欄上。行距 20 大於字高 15，直向沒有
+ * 這個問題。
+ */
+function epilogueInkProbe(segmentId: string): {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  cells: EpilogueInkCell[];
+} {
+  const variant = STAGE49_EPILOGUE_SEGMENTS
+    .find((segment) => segment.id === segmentId)?.variants[0];
+  if (!variant) throw new Error(`epilogue segment ${segmentId} is missing`);
+  const [inkX, inkY] = STAGE49_EPILOGUE_LAYOUT.inkOffset;
+  const { glyphWidth, glyphHeight } = STAGE49_EPILOGUE_FONT;
+  const origins: Array<{ x: number; y: number }> = [];
+  for (let index = 0; index < variant.glyphs.length; index += 3) {
+    origins.push({ x: variant.glyphs[index + 1], y: variant.glyphs[index + 2] });
+  }
+  const left = Math.min(...origins.map(({ x }) => x)) + inkX - 1;
+  const top = Math.min(...origins.map(({ y }) => y)) + inkY - 1;
+  return {
+    left,
+    top,
+    width: Math.max(...origins.map(({ x }) => x)) + inkX + glyphWidth + 1 - left,
+    height: Math.max(...origins.map(({ y }) => y)) + inkY + glyphHeight + 1 - top,
+    cells: origins.map(({ x, y }) => ({
+      left: x + inkX + 1 - left,
+      right: x + inkX + glyphWidth - left,
+      top: y + inkY - top,
+      bottom: y + inkY + glyphHeight - top,
+    })),
+  };
+}
 
 interface EndingState {
   phase: string;
@@ -567,32 +623,49 @@ test("S49-H: the epilogue keeps its native trailing pause after the last glyph",
   await expect(epilogue).toHaveAttribute("data-segment", "warriorStatue");
   await expect(page.locator("#stage49-screen")).toHaveAttribute("data-epilogue-typing", "true");
   await expect(page.getByTestId("stage49-epilogue-text")).toBeAttached();
-  const timeline = await page.evaluate(() => new Promise<{
+  const probe = epilogueInkProbe("warriorStatue");
+  const timeline = await page.evaluate((box) => new Promise<{
     firstInkAt: number;
     typingEndedAt: number;
     advancedAt: number;
-    glyphSteps: number;
+    revealedGlyphs: number;
+    partialSamples: number;
   }>((resolve) => {
     const screen = document.querySelector<HTMLElement>("#stage49-screen");
     const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=stage49-epilogue-text]");
     const context = canvas?.getContext("2d");
     if (!screen || !canvas || !context) throw new Error("epilogue surface not found");
     const ink = () => {
-      const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-      let opaque = 0;
-      for (let index = 3; index < data.length; index += 4) if (data[index] !== 0) opaque += 1;
-      return opaque;
+      const { data, width } = context.getImageData(box.left, box.top, box.width, box.height);
+      let revealed = 0;
+      for (const cell of box.cells) {
+        let inked = false;
+        for (let y = cell.top; y < cell.bottom && !inked; y += 1) {
+          for (let x = cell.left; x < cell.right; x += 1) {
+            if (data[(((y * width) + x) * 4) + 3] !== 0) {
+              inked = true;
+              break;
+            }
+          }
+        }
+        if (inked) revealed += 1;
+      }
+      return revealed;
     };
     const started = performance.now();
-    const marks = { firstInkAt: 0, typingEndedAt: 0, advancedAt: 0, glyphSteps: 0 };
-    let previous = -1;
+    const marks = {
+      firstInkAt: 0,
+      typingEndedAt: 0,
+      advancedAt: 0,
+      revealedGlyphs: 0,
+      partialSamples: 0,
+    };
     const poll = window.setInterval(() => {
       const current = ink();
       if (current > 0 && !marks.firstInkAt) marks.firstInkAt = performance.now() - started;
-      if (current > previous) {
-        marks.glyphSteps += 1;
-        previous = current;
-      }
+      marks.revealedGlyphs = Math.max(marks.revealedGlyphs, current);
+      // 至少看過一次「打到一半」，才算證明這段字是逐字打出來、而不是整段一次貼上。
+      if (current > 0 && current < box.cells.length) marks.partialSamples += 1;
       if (screen.dataset.epilogueTyping === "false" && !marks.typingEndedAt) {
         marks.typingEndedAt = performance.now() - started;
       }
@@ -606,11 +679,13 @@ test("S49-H: the epilogue keeps its native trailing pause after the last glyph",
     // 30 ms still resolves every 240 ms glyph while keeping this probe's own
     // `getImageData` cost off the timer the segment is being measured against.
     }, 30);
-  }));
+  }), probe);
 
   // The first glyph is drawn before the typing flag flips, not one wait later.
   expect(timeline.firstInkAt).toBeLessThan(200);
-  expect(timeline.glyphSteps).toBe(46);
+  // 46 個字格全部落過墨，而且中途至少被抓到過打了一半。
+  expect(timeline.revealedGlyphs).toBe(46);
+  expect(timeline.partialSamples).toBeGreaterThan(0);
   // 46 glyphs x 24 ticks = 1104; the last glyph lands one wait before the end.
   expect(timeline.typingEndedAt).toBeGreaterThan(9_000);
   expect(timeline.typingEndedAt).toBeLessThan(11_040);

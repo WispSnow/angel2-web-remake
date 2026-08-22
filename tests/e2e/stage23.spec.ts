@@ -68,8 +68,8 @@ test("S23-A/B: stage 22 postbattle save opens the 1–15 deployment directly", a
   await expect(page.getByTestId("deployment-guidance")).toContainText("不必全滅守軍");
   await expect(page.getByTestId("deployment-roster-7")).toContainText("琴斯");
   await expect(page.getByTestId("deployment-roster-7")).toContainText("魔祭師");
-  await expect(page.getByTestId("deployment-roster-7").locator("img")).toHaveAttribute(
-    "src",
+  await expect(page.getByTestId("deployment-roster-figure-7")).toHaveAttribute(
+    "data-source-url",
     "/assets/original/unit-ally-magic-priest.png",
   );
   expect(await state(page)).toMatchObject({
@@ -83,8 +83,8 @@ test("S23-A/B: stage 22 postbattle save opens the 1–15 deployment directly", a
   });
   await page.getByTestId("deployment-page-1").click();
   await expect(page.getByTestId("deployment-roster-7")).toContainText("半龍戰士");
-  await expect(page.getByTestId("deployment-roster-7").locator("img")).toHaveAttribute(
-    "src",
+  await expect(page.getByTestId("deployment-roster-figure-7")).toHaveAttribute(
+    "data-source-url",
     "/assets/original/technique-lab/units/ally-half-dragon-warrior.png",
   );
   await captureVisualAudit(page.getByTestId("deployment-screen"), {

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -64,10 +65,7 @@ test("S13-A/B/C: stage 12 completion plays SAY/32, deploys 1–12, and starts wi
   await expect(dialogue).toHaveAttribute("data-source-record", "32");
   await expect(dialogue).toHaveAttribute("data-source-wait", "1");
   await expect(page.locator("#story-background")).toHaveAttribute("data-background-id", "15");
-  await expect(page.locator("#story-background")).toHaveCSS(
-    "background-image",
-    /story-stage13-background-15\.png/u,
-  );
+  await expectStoryBackground(page, /story-stage13-background-15\.png/u);
   await expect(page.getByTestId("dialogue-window-lower")).toContainText("高聳入雲");
   expect(await state(page)).toMatchObject({
     stageId: "stage-13",

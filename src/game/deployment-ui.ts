@@ -49,9 +49,11 @@ const ACTION_CATEGORY_LABEL = {
   special_runtime: "特殊",
 } as const;
 
-const figureSourceFor = (classId: ClassId): string => stagedRenderAssetSource(
-  allyMapUnitAsset(classId) ?? "/assets/original/unit-ally-soldier.png",
-);
+const figureAssetFor = (classId: ClassId): string =>
+  allyMapUnitAsset(classId) ?? "/assets/original/unit-ally-soldier.png";
+
+const figureSourceFor = (classId: ClassId): string =>
+  stagedRenderAssetSource(figureAssetFor(classId));
 
 const positionKey = ({ x, y }: Position): string => `${x},${y}`;
 
@@ -197,7 +199,9 @@ function rosterEntryHtml(view: RosterEntryView): string {
     <span class="deployment-entry-figure-frame" aria-hidden="true"></span>
     <span class="deployment-entry-figure-slot" aria-hidden="true"
       style="--map-unit-offset-x:${figureOffsetX}px">
-      <img class="deployment-entry-figure" src="${figureSourceFor(unit.classId)}" alt="" />
+      <img class="deployment-entry-figure" data-testid="deployment-roster-figure-${index}"
+        src="${figureSourceFor(unit.classId)}" data-source-url="${figureAssetFor(unit.classId)}"
+        alt="" />
     </span>
     <button class="deployment-entry-hitbox" type="button" tabindex="-1"
       data-roster-index="${index}" data-unit-slot="${unit.slot}" data-testid="deployment-roster-${index}"
