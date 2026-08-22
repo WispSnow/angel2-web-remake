@@ -86,6 +86,12 @@ test("deployment projection reproduces module-27 geometry and keeps semantic inp
   await expect(page.getByTestId("deployment-canvas"))
     .toHaveAttribute("data-deployment-current-cell", "21,33");
 
+  // `0000:056E` clears the whole screen to palette index 7 before it draws any
+  // roster item, so the steady frame is a continuous grey field with only the
+  // minimap punched black — not black with grey tiles floating on it.
+  expect(await page.locator(".deployment-ui-root")
+    .evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(186, 170, 154)");
+
   expect(await rootRelativeBox(page, ".deployment-entry:nth-child(1)")).toEqual({ left: 8, top: 35, width: 130, height: 50 });
   expect(await rootRelativeBox(page, ".deployment-entry:nth-child(6)")).toEqual({ left: 152, top: 35, width: 130, height: 50 });
   expect(await rootRelativeBox(page, ".deployment-entry:nth-child(15)")).toEqual({ left: 296, top: 275, width: 130, height: 50 });
