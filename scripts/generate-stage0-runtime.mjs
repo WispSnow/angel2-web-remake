@@ -7,6 +7,7 @@ import path from "node:path";
 import iconv from "iconv-lite";
 import { decodeRgbaPng, encodeRgbaPng } from "./lib/png-atlas.mjs";
 import { composePlanarFrame, readPlanarRecord } from "./lib/planar-bitmap.mjs";
+import { assertIdenticalImage, removeDuplicateImage } from "./lib/shared-image-assets.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const templatePath = path.join(root, "reverse/decoded/B/0001/00.raw");
@@ -132,7 +133,12 @@ await Promise.all([
   copyFile(path.join(planarAssetPath, "0002/22.png"), path.join(publicAssetPath, "unit-ally-cavalry.png")),
   copyFile(path.join(planarAssetPath, "0002/24.png"), path.join(publicAssetPath, "unit-ally-sister.png")),
   copyFile(path.join(planarAssetPath, "0002/28.png"), path.join(publicAssetPath, "unit-ally-warrior.png")),
-  copyFile(path.join(portraitAssetPath, "0015/00.png"), path.join(publicAssetPath, "portrait-hading.png")),
+  assertIdenticalImage(
+    path.join(portraitAssetPath, "0015/00.png"),
+    path.join(publicAssetPath, "portraits/0015/base.png"),
+    "stage 0 portrait 15",
+  ),
+  removeDuplicateImage(path.join(publicAssetPath, "portrait-hading.png")),
   ...stage0EffectRecords.map((record) => copyFile(
     path.join(convertedEffectPath, `${String(record).padStart(4, "0")}.wav`),
     path.join(publicEffectPath, `${String(record).padStart(2, "0")}.wav`),

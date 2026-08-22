@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -58,6 +59,24 @@ describe("versioned resource manifest", () => {
       expect((await stat(localPath)).size, asset.url).toBe(asset.bytes);
       expect(createHash("sha256").update(body).digest("hex"), asset.url).toBe(asset.sha256);
     }
+  });
+
+  // The manifest sweeps the whole asset root, so a generator that still emits a
+  // retired duplicate quietly rejoins it to a pack and shifts the identity hash
+  // on the next regeneration. Requiring every packaged asset to come from the
+  // checkout keeps "rerun the generators" a no-op instead of a silent drift.
+  test("packages only assets the checkout tracks", async () => {
+    const manifest = await readManifest();
+    const tracked = new Set(
+      execFileSync("git", ["ls-files", "-z", "public/assets/original"], { cwd: root, encoding: "utf8" })
+        .split("\0")
+        .filter((entry) => entry.length > 0),
+    );
+    expect(
+      manifest.assets
+        .map(({ url }) => `public${url}`)
+        .filter((repositoryPath) => !tracked.has(repositoryPath)),
+    ).toEqual([]);
   });
 
   test("uses atlas outputs and never advertises fragmented release-pruned frames", async () => {
