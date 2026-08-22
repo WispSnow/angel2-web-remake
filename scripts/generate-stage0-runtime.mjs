@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import iconv from "iconv-lite";
+import { decodeRgbaPng, encodeRgbaPng } from "./lib/png-atlas.mjs";
+import { composePlanarFrame, readPlanarRecord } from "./lib/planar-bitmap.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const templatePath = path.join(root, "reverse/decoded/B/0001/00.raw");
@@ -153,9 +156,16 @@ function runMagick(args) {
   execFileSync("magick", ["-define", "png:exclude-chunk=date,time", ...args]);
 }
 
-// A/0001 uses palette index 0 as the native transparent compositing color.
-// The planar audit renders retain that index as opaque black, so the native
-// pointer set and every menu part restore that alpha before browser compositing.
+// A/0001 uses palette index 0 as the native transparent compositing color, and
+// this step knocks every palette-0 pixel out of the pointer set and the menu
+// parts. Since the planar audit started honouring masks per image, the A/1
+// renders already arrive with the record's own mask applied — but that mask
+// leaves a large share of the palette-0 pixels opaque (frame 07: 2149 opaque
+// against 1608 transparent), so the two rules disagree about the menu's black
+// interior. The outputs are byte-identical either way because this blanket
+// knock-out subsumes the mask, so the behaviour is left alone; deciding which
+// rule the native pointer and menu draws actually use needs its own evidence
+// pass on the writers those draws go through.
 for (const [output, source] of Object.entries({ ...nativeCursorAssets, ...commandMenuAssets })) {
   runMagick([
     path.join(planarAssetPath, "0001", source),
@@ -215,12 +225,61 @@ function composeTacticalPanelFoundation(output) {
 const gameplayPalette = hudPresentation.resourceValidation.paletteColors.map(
   ([red, green, blue]) => `#${[red, green, blue].map((value) => value.toString(16).padStart(2, "0")).join("")}`,
 );
+/**
+ * A/6 stores a real transparency mask for exactly the four images the native
+ * renderer draws through the masked writer: the outer corner (5), the portrait
+ * frame's left and right bevels (6, 7) and the centre ornament (8). Those draws
+ * call `0000:D9FA` first, which ANDs all four planes with the mask bitmap, and
+ * only then `0000:D790`, which ORs the colour in; every other A/6 image goes to
+ * the maskless writer `0000:D5CF` and is opaque by construction.
+ *
+ * `reverse/tools/angel2-planar.mjs` only honours a mask when the whole mask
+ * bundle mirrors the colour bundle's layout. A/6 fills its unmasked slots with
+ * one-row stubs, so that test fails for the record and the audited PNGs record
+ * `maskUsed: false` throughout — the four masked images come out with their
+ * transparent pixels as opaque palette-0 black. Compositing those renders paints
+ * black over pixels the original leaves standing, so the frames are recomposed
+ * here from the decoded streams with the per-image mask applied. The recomposed
+ * colours are asserted against the audited render byte for byte, which keeps
+ * `reverse/renders/planar` the baseline and limits this correction to alpha.
+ */
+const MASKED_CHROME_FRAMES = [5, 6, 7, 8];
+const maskedChromeDirectory = await mkdtemp(path.join(tmpdir(), "angel2-a6-chrome-"));
+const maskedChromeFrames = new Map();
+{
+  const record = await readPlanarRecord(path.join(root, "reverse/decoded/A/0006"));
+  for (const graphic of hudPresentation.sidePanelChrome.frames) {
+    const composed = composePlanarFrame(
+      record,
+      graphic.imageIndex,
+      hudPresentation.resourceValidation.paletteColors,
+    );
+    if (!composed.maskUsed) continue;
+    const audited = decodeRgbaPng(await readFile(path.join(root, graphic.path)), graphic.path);
+    if (composed.width !== graphic.width || composed.height !== graphic.height
+      || audited.width !== graphic.width || audited.height !== graphic.height) {
+      throw new Error(`A/6/${graphic.imageIndex}: masked frame no longer matches its audited size`);
+    }
+    for (let offset = 0; offset < composed.pixels.length; offset += 4) {
+      if (composed.pixels.readUIntBE(offset, 3) !== audited.pixels.readUIntBE(offset, 3)) {
+        throw new Error(`A/6/${graphic.imageIndex}: masked frame colours drifted from the audited render`);
+      }
+    }
+    const output = path.join(maskedChromeDirectory, `${String(graphic.imageIndex).padStart(2, "0")}.png`);
+    await writeFile(output, encodeRgbaPng(composed.width, composed.height, composed.pixels));
+    maskedChromeFrames.set(graphic.imageIndex, output);
+  }
+}
+if ([...maskedChromeFrames.keys()].join() !== MASKED_CHROME_FRAMES.join()) {
+  throw new Error("decoded A/6 no longer carries a per-image mask for exactly frames 5..8");
+}
+
 function hudChromeFrame(frame) {
   const graphic = hudPresentation.sidePanelChrome.frames.find(
     (candidate) => candidate.imageIndex === frame,
   );
   if (!graphic) throw new Error(`missing verified A/6/${frame} HUD chrome frame`);
-  return path.join(root, graphic.path);
+  return maskedChromeFrames.get(frame) ?? path.join(root, graphic.path);
 }
 
 function appendComposite(args, frame, x, y) {
@@ -367,8 +426,11 @@ composeMinimapFrame(path.join(publicAssetPath, "hud-minimap-frame.png"));
 composeRoundFrame(path.join(publicAssetPath, "hud-round-frame.png"));
 composePromotionMenuFrame(path.join(publicAssetPath, "promotion-menu-frame.png"));
 
-// A/0003 carries the enemy colors but no stored mask. The same-pose A/0002
-// frames provide the exact map-sprite alpha used by the native compositor.
+// A/0003 does store a per-image mask, and for these two frames it is exactly the
+// same-pose A/0002 alpha. Across the 18 side-2 records where the two resources
+// share a frame size, 15 agree pixel for pixel and the other three differ by at
+// most nine pixels, so keeping A/0002 as the alpha source both preserves the
+// established bytes and cross-checks the two records against each other.
 copyAlphaMask(
   path.join(planarAssetPath, "0003/00.png"),
   path.join(planarAssetPath, "0002/00.png"),
@@ -393,6 +455,8 @@ composeStatueForeground(
   5,
   [16, 8, 0, 16, 8],
 );
+
+await rm(maskedChromeDirectory, { recursive: true, force: true });
 
 console.log(`wrote ${path.relative(root, outputPath)} (${terrain.length} terrain cells)`);
 console.log("wrote stage 0 battle chrome/statue foreground, native cursors/command-menu chrome, promotion frame, stateful tactical panel, side-panel chrome, turn-transition graphics, map sprites and ordinary-combat VOC assets");
