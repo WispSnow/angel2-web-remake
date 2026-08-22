@@ -18,12 +18,15 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { decodeRgbaPng, encodeRgbaPng } from "./lib/png-atlas.mjs";
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reversePath = (...parts) => path.join(root, "reverse", ...parts);
+const publicAssetPath = path.join(root, "public", "assets", "original");
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
@@ -112,6 +115,256 @@ assert.equal(
 );
 
 /**
+ * `12E7:00E1..0117`: the edge band. The routine points the sprite bank at
+ * `DS:02A5` — the slot `0000:0493`'s loader fills from `A/0006`, already closed
+ * as the promotion menu's panel resource — then walks one 8-pixel cell at a
+ * time across the body, drawing one bank image at the body's top edge and
+ * another one body height lower.
+ *
+ * `0000:D5CB` is the opaque four-plane writer: it copies four plane pointers out
+ * of the bank descriptor and `rep movsw`s each one straight into video memory,
+ * consulting no mask. That is why `A/0006`'s mask stream carries only a 1-row
+ * placeholder for these two images.
+ */
+const EDGE_START = 0x12f51;
+const EDGE_END = 0x12f87;
+const BANK_POINTER = 0x2a5;
+assert.deepEqual(
+  immediates(0xf884, EDGE_START, EDGE_END),
+  [BANK_POINTER],
+  "the objective panel edge band no longer selects the A/0006 sprite bank",
+);
+
+/** `B9 imm16` / `BB imm16` — the per-call register arguments of the edge loop. */
+function registerImmediates(opcode, from, to) {
+  const found = [];
+  for (let address = from; address < to; address += 1) {
+    if (moduleImage[address] !== opcode) continue;
+    found.push(moduleImage.readUInt16LE(address + 1));
+  }
+  return found;
+}
+
+const edgeSeeds = immediates(0x124a, EDGE_START, EDGE_END);
+assert.deepEqual(edgeSeeds, [body.x], "the objective panel edge band no longer starts at the body's left edge");
+// `83 06 4A 12 imm8`: the cursor step the loop adds after each pair of cells.
+const edgeStepAddress = moduleImage.indexOf(
+  Buffer.from([0x83, 0x06, 0x4a, 0x12]),
+  EDGE_START,
+);
+assert(edgeStepAddress > 0 && edgeStepAddress < EDGE_END, "the objective panel edge band no longer steps its cursor");
+const edgeStep = moduleImage[edgeStepAddress + 4];
+const edgeCounts = registerImmediates(0xb9, EDGE_START, EDGE_END);
+const edgeRows = registerImmediates(0xbb, EDGE_START, EDGE_END);
+assert.equal(
+  edgeCounts.length,
+  3,
+  "the objective panel edge loop no longer sets exactly a cell count and two image indices",
+);
+assert.equal(
+  edgeRows.length,
+  2,
+  "the objective panel edge loop no longer draws exactly two rows of cells",
+);
+const [edgeCells, topEdgeImage, bottomEdgeImage] = edgeCounts;
+const [topEdgeY, bottomEdgeY] = edgeRows;
+assert.equal(
+  edgeCells * edgeStep,
+  body.width,
+  "the objective panel edge band no longer spans exactly the body width",
+);
+assert.equal(topEdgeY, body.y, "the objective panel top edge no longer sits on the body's first row");
+assert.equal(
+  bottomEdgeY,
+  body.y + body.height,
+  "the objective panel bottom edge no longer sits directly below the body",
+);
+
+/**
+ * `12E7:01CF..023F`: the four corner ornaments, eight fixed 14-byte blocks of
+ * `mov dx,x / mov bx,y / mov cx,image / call far`. Each corner is drawn twice —
+ * `0000:D9FA` ANDs the bank's fifth stream over all four planes (set bit keeps
+ * the background, so it punches the sprite's own silhouette black) and
+ * `0000:D790` ORs the four colour planes into the hole. That pair is the
+ * transparent blit; the edge band above uses neither.
+ */
+const CORNER_START = 0x1303f;
+const CORNER_END = 0x130af;
+const CORNER_BLOCK_BYTES = 14;
+const MASK_WRITER = 0xd9fa;
+const COLOR_WRITER = 0xd790;
+const cornerBlocks = [];
+for (let address = CORNER_START; address < CORNER_END; address += CORNER_BLOCK_BYTES) {
+  assert.deepEqual(
+    [moduleImage[address], moduleImage[address + 3], moduleImage[address + 6], moduleImage[address + 9]],
+    [0xba, 0xbb, 0xb9, 0x9a],
+    `the objective panel corner block at ${address.toString(16)} is no longer dx/bx/cx then a far call`,
+  );
+  cornerBlocks.push({
+    x: moduleImage.readUInt16LE(address + 1),
+    y: moduleImage.readUInt16LE(address + 4),
+    image: moduleImage.readUInt16LE(address + 7),
+    target: moduleImage.readUInt16LE(address + 12) * 16 + moduleImage.readUInt16LE(address + 10),
+  });
+}
+assert.equal(cornerBlocks.length, 8, "the objective panel no longer draws four masked corners");
+const corners = [];
+for (let index = 0; index < cornerBlocks.length; index += 2) {
+  const [mask, color] = cornerBlocks.slice(index, index + 2);
+  assert.equal(mask.target, MASK_WRITER, "an objective panel corner no longer starts with the mask writer");
+  assert.equal(color.target, COLOR_WRITER, "an objective panel corner no longer follows with the colour writer");
+  assert.deepEqual(
+    { x: mask.x, y: mask.y, image: mask.image },
+    { x: color.x, y: color.y, image: color.image },
+    "an objective panel corner draws its mask and its colours at different places",
+  );
+  corners.push({ x: mask.x, y: mask.y });
+}
+const cornerImage = cornerBlocks[0].image;
+assert(
+  cornerBlocks.every((block) => block.image === cornerImage),
+  "the four objective panel corners no longer share one bank image",
+);
+// The four ornaments are the cross product of two x and two y values, and they
+// are deliberately not symmetric about the body: the left/top pair sits exactly
+// on the body's own origin, while the right pair starts three pixels inside the
+// right edge and the bottom pair two rows above the last body row, so that each
+// ornament's seven opaque columns land over the bevel and the bottom band.
+const ascending = (left, right) => left - right;
+assert.deepEqual(
+  [...new Set(corners.map(({ x }) => x))].sort(ascending),
+  [body.x, body.x + body.width - 3],
+  "the objective panel corners no longer hug the body's left and right edges",
+);
+assert.deepEqual(
+  [...new Set(corners.map(({ y }) => y))].sort(ascending),
+  [body.y, body.y + body.height - 2],
+  "the objective panel corners no longer hug the body's top and bottom edges",
+);
+
+/**
+ * The bank images themselves. `A/0006` is a five-stream package: four colour
+ * planes plus the mask the transparent writer ANDs first. Each stream is a
+ * bitmap bundle — a `u16` offset table, then `u16` rows, `u16` bytes-per-row and
+ * the plane bits — which is exactly what `0000:D6D8` walks at runtime.
+ *
+ * The composited pixels come from the planar audit's own renders so the palette
+ * and plane order stay with the decoder that owns them; only the alpha is
+ * rebuilt here, because that audit skips the mask whenever its layout does not
+ * match the colour planes and `A/0006`'s mask covers just three images.
+ */
+const PLANAR_RECORD = "0006";
+const planarManifest = JSON.parse(
+  (await loadInput(path.join("renders", "planar", "A", "manifest.json"))).toString("utf8"),
+);
+assert.equal(planarManifest.palette, "gameplay", "the A planar renders are no longer in the gameplay palette");
+assert.equal(
+  planarManifest.maskRule,
+  "matching stream 4, set bit means transparent",
+  "the planar mask rule changed under the objective panel frame",
+);
+const planarRecord = planarManifest.entries.find((entry) => entry.record === 6);
+assert(planarRecord?.rendered, "A/0006 is no longer rendered by the planar audit");
+
+/** `0000:D6D8`'s view of one stream: offset table, then `rows`/`rowBytes`/bits. */
+function bitmapBundle(buffer, label) {
+  const directoryBytes = buffer.readUInt16LE(0);
+  assert.equal(directoryBytes % 2, 0, `${label}: odd bitmap directory size`);
+  const offsets = Array.from({ length: directoryBytes / 2 }, (_, index) => buffer.readUInt16LE(index * 2));
+  assert.equal(offsets[0], directoryBytes, `${label}: first bitmap does not follow the directory`);
+  return offsets.slice(0, -1).map((offset, index) => {
+    const height = buffer.readUInt16LE(offset);
+    const rowBytes = buffer.readUInt16LE(offset + 2);
+    assert.equal(
+      offset + 4 + height * rowBytes,
+      offsets[index + 1],
+      `${label}: bitmap ${index} does not match ${height} x ${rowBytes}`,
+    );
+    return { width: rowBytes * 8, height, rowBytes, bits: buffer.subarray(offset + 4, offsets[index + 1]) };
+  });
+}
+
+const maskStream = bitmapBundle(
+  await loadInput(path.join("decoded", "A", PLANAR_RECORD, "04.raw")),
+  "A/0006 mask stream",
+);
+
+async function bankImage(index, { masked }) {
+  const name = String(index).padStart(2, "0");
+  const rendered = decodeRgbaPng(
+    await loadInput(path.join("renders", "planar", "A", PLANAR_RECORD, `${name}.png`)),
+    `A/0006 image ${index}`,
+  );
+  const declared = planarRecord.images[index];
+  assert.deepEqual(
+    { width: rendered.width, height: rendered.height },
+    { width: declared.width, height: declared.height },
+    `A/0006 image ${index} no longer matches the planar manifest`,
+  );
+  const pixels = Buffer.from(rendered.pixels);
+  assert(
+    pixels.filter((_, offset) => offset % 4 === 3).every((alpha) => alpha === 255),
+    `A/0006 image ${index} arrived with alpha already applied`,
+  );
+  if (!masked) {
+    // The opaque writer never reads the mask, and the bank stores only a 1-row
+    // placeholder for these images — using it would erase most of the cell.
+    assert.equal(maskStream[index].height, 1, `A/0006 image ${index} grew a real mask`);
+    return { ...rendered, pixels };
+  }
+  const mask = maskStream[index];
+  assert.deepEqual(
+    { width: mask.width, height: mask.height },
+    { width: rendered.width, height: rendered.height },
+    `A/0006 image ${index} does not share its mask's shape`,
+  );
+  for (let y = 0; y < rendered.height; y += 1) {
+    for (let x = 0; x < rendered.width; x += 1) {
+      const transparent = (mask.bits[y * mask.rowBytes + (x >> 3)] >> (7 - (x % 8))) & 1;
+      if (transparent) pixels.writeUInt32BE(0, (y * rendered.width + x) * 4);
+    }
+  }
+  return { ...rendered, pixels };
+}
+
+const frameImages = {
+  "objective-panel-edge-top.png": await bankImage(topEdgeImage, { masked: false }),
+  "objective-panel-edge-bottom.png": await bankImage(bottomEdgeImage, { masked: false }),
+  "objective-panel-corner.png": await bankImage(cornerImage, { masked: true }),
+};
+const topEdgeCell = frameImages["objective-panel-edge-top.png"];
+const bottomEdgeCell = frameImages["objective-panel-edge-bottom.png"];
+const cornerCell = frameImages["objective-panel-corner.png"];
+assert.deepEqual(
+  [topEdgeCell.width, bottomEdgeCell.width],
+  [edgeStep, edgeStep],
+  "the objective panel edge cells are no longer as wide as the loop's cursor step",
+);
+assert.equal(
+  topEdgeCell.height,
+  bottomEdgeCell.height,
+  "the objective panel's two edge cells are no longer the same height",
+);
+/** The ornament without the columns its mask keeps transparent, in native pixels. */
+const cornerOpaqueWidth = (() => {
+  const opaqueColumn = (x) => Array.from({ length: cornerCell.height }, (_, y) => y)
+    .some((y) => cornerCell.pixels[((y * cornerCell.width) + x) * 4 + 3] !== 0);
+  let width = cornerCell.width;
+  while (width > 0 && !opaqueColumn(width - 1)) width -= 1;
+  return width;
+})();
+assert.equal(
+  body.x + body.width - 3 + cornerOpaqueWidth,
+  rightBevel.startX + 4,
+  "the right corner ornament no longer stops one column short of the bevel's outer edge",
+);
+
+await mkdir(publicAssetPath, { recursive: true });
+for (const [name, image] of Object.entries(frameImages)) {
+  await writeFile(path.join(publicAssetPath, name), encodeRgbaPng(image.width, image.height, image.pixels));
+}
+
+/**
  * `12E7:0240` sets its cursor from two `cs:` immediates and steps it itself:
  * `add cs:[02DF], 8` for an ASCII cell, `+0x10` for a Big5 pair, and on CR LF it
  * rewrites X and does `add cs:[02E1], 0x14`. `DS:F8BA/F8BC` is the very cursor
@@ -191,7 +444,31 @@ for (const { key, dialogueRecord, enabled } of recordTable.entries) {
 }
 
 const quote = (value) => JSON.stringify(value);
-const identity = sha256(Buffer.from(JSON.stringify({ sources, panelText })));
+const frame = {
+  topEdge: {
+    image: topEdgeImage,
+    y: topEdgeY,
+    width: topEdgeCell.width,
+    height: topEdgeCell.height,
+  },
+  bottomEdge: {
+    image: bottomEdgeImage,
+    y: bottomEdgeY,
+    width: bottomEdgeCell.width,
+    height: bottomEdgeCell.height,
+  },
+  edgeStartX: edgeSeeds[0],
+  edgeCells,
+  edgeStep,
+  corner: {
+    image: cornerImage,
+    width: cornerCell.width,
+    height: cornerCell.height,
+    opaqueWidth: cornerOpaqueWidth,
+    placements: corners,
+  },
+};
+const identity = sha256(Buffer.from(JSON.stringify({ sources, frame, panelText })));
 
 const module = `// Generated by scripts/generate-objective-panel.mjs from module-29 evidence.
 // Do not hand-edit: regenerate with \`pnpm content:objective-panel\`.
@@ -201,14 +478,25 @@ export const OBJECTIVE_PANEL_SOURCES = ${JSON.stringify(sources)} as const;
 
 /**
  * \`12E7:00D1\` and \`12E7:0240\`, in native 640x350 pixels. The panel is drawn
- * shadow first, then the body over it, then one single-pixel bevel column per
- * entry walking outwards from each edge.
+ * shadow first, then the body over it, then the two edge bands, then one
+ * single-pixel bevel column per entry walking outwards from each side, and last
+ * the four corner ornaments — which is why the ornaments sit on top of both the
+ * bands and the bevels.
+ *
+ * \`image\` is the index into the \`A/0006\` bank the routine points \`DS:F884\` at;
+ * the pixels themselves ship as \`objective-panel-*.png\`.
  */
 export const NATIVE_OBJECTIVE_PANEL = {
   body: ${JSON.stringify(body)},
   shadow: ${JSON.stringify(shadow)},
   leftBevel: ${JSON.stringify(leftBevel)},
   rightBevel: ${JSON.stringify(rightBevel)},
+  topEdge: ${JSON.stringify(frame.topEdge)},
+  bottomEdge: ${JSON.stringify(frame.bottomEdge)},
+  edgeStartX: ${frame.edgeStartX},
+  edgeCells: ${frame.edgeCells},
+  edgeStep: ${frame.edgeStep},
+  corner: ${JSON.stringify(frame.corner)},
   textOrigin: ${JSON.stringify(textOrigin)},
   lineAdvance: ${lineAdvance},
 } as const;
@@ -228,5 +516,6 @@ await writeFile(modulePath, module);
 
 console.log(
   `wrote ${path.relative(root, modulePath)} `
-  + `(${Object.keys(panelText).length} stages, body ${body.width}x${body.height} at ${body.x},${body.y})`,
+  + `(${Object.keys(panelText).length} stages, body ${body.width}x${body.height} at ${body.x},${body.y}, `
+  + `${Object.keys(frameImages).length} frame images)`,
 );

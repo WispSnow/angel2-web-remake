@@ -203,7 +203,7 @@ for (const { relative } of allFiles) {
   else if (isSharedBattleSurfaceAsset(relative)
     || relative.startsWith("dialogue/") || relative.startsWith("status-icons/")
     || relative.startsWith("story/")
-    || /^(?:battle-|command-menu-|hud-|native-|tactical-panel)/u.test(relative)) {
+    || /^(?:battle-|command-menu-|hud-|native-|objective-panel-|tactical-panel)/u.test(relative)) {
     addToPack("battle:core", url);
   } else addToPack("stream:misc", url);
 }

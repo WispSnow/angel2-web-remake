@@ -269,8 +269,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             </section>
             <section class="objective-panel" id="objective-panel" role="dialog"
               data-testid="objective-panel" aria-label="勝利條件" hidden>
+              <i class="objective-panel-edge top" aria-hidden="true"></i>
+              <i class="objective-panel-edge bottom" aria-hidden="true"></i>
               <i class="objective-panel-bevel left" aria-hidden="true"></i>
               <i class="objective-panel-bevel right" aria-hidden="true"></i>
+              ${[0, 1, 2, 3].map((index) =>
+                `<i class="objective-panel-corner" data-corner="${index}" aria-hidden="true"></i>`).join("")}
               <p class="objective-panel-text" data-testid="objective-panel-text"></p>
               <button type="button" class="objective-panel-dismiss" data-action="close-objectives"
                 aria-label="關閉勝利條件"></button>
@@ -364,6 +368,25 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         .map((index, column) =>
           `${NATIVE_GAMEPLAY_PALETTE[index]} ${column}px ${column + 1}px`)
         .join(", ")})`;
+    }
+    // 上下緣是同一格圖磚橫向鋪滿本體寬度，四角則是同一枚裝飾各畫一次；兩者的
+    // 落點都是原生絕對座標，這裡一律換算成相對本體左上角的位移。
+    const { body, topEdge, bottomEdge, corner } = NATIVE_OBJECTIVE_PANEL;
+    for (const [side, edge] of [["top", topEdge], ["bottom", bottomEdge]] as const) {
+      const element = required(objectivePanel, `.objective-panel-edge.${side}`);
+      element.style.left = `${NATIVE_OBJECTIVE_PANEL.edgeStartX - body.x}px`;
+      element.style.top = `${edge.y - body.y}px`;
+      element.style.width = `${NATIVE_OBJECTIVE_PANEL.edgeCells * NATIVE_OBJECTIVE_PANEL.edgeStep}px`;
+      element.style.height = `${edge.height}px`;
+      element.style.backgroundSize = `${edge.width}px ${edge.height}px`;
+    }
+    for (const [index, placement] of corner.placements.entries()) {
+      const element = required(objectivePanel, `.objective-panel-corner[data-corner="${index}"]`);
+      element.style.left = `${placement.x - body.x}px`;
+      element.style.top = `${placement.y - body.y}px`;
+      element.style.width = `${corner.width}px`;
+      element.style.height = `${corner.height}px`;
+      element.style.backgroundSize = `${corner.width}px ${corner.height}px`;
     }
   }
   const roundBox = required(root, "#bottom-round");

@@ -64,6 +64,10 @@
    original 640x350 coordinates recovered from `0000:08EA..0C5E/165B..17EE`.
 --------------------------------------------------------------------------- */
 
+/* 出場畫面的底色是色 7，不是黑：`0000:056E` 一進來就先 `DS:06CE = (0,0,640,400)`
+   色 7 鋪滿整個畫面，之後才畫名單、頁籤、結束鍵與小地圖。名單格與按鍵本來就是
+   「白邊 → 黑邊 → 色 7 內面」的三層方塊，底色留黑會讓它們看起來像浮在黑幕上的
+   貼片，而不是原版那面連續的灰底。 */
 .deployment-ui-root {
   --native-0: #000000;
   --native-7: #baaa9a;
@@ -75,7 +79,7 @@
   z-index: 2;
   outline: none;
   color: var(--native-15);
-  background: var(--native-0);
+  background: var(--native-7);
   pointer-events: none;
 }
 

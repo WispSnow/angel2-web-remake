@@ -8,6 +8,13 @@ import {
 
 const ARTIFACT_DIR = "artifacts/playwright";
 
+interface FrameBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 interface ObjectivePanelLayout {
   panel: { left: number; top: number; width: number; height: number };
   background: string;
@@ -16,6 +23,9 @@ interface ObjectivePanelLayout {
   canvas: { width: number; height: number };
   accessibleText: string;
   bevels: Array<{ side: string; left: number; width: number }>;
+  edges: Array<FrameBox & { side: string; repeat: string; size: string; source: string }>;
+  corners: Array<FrameBox & { source: string }>;
+  paintOrder: string[];
 }
 
 async function objectivePanelLayout(page: Page): Promise<ObjectivePanelLayout> {
@@ -45,6 +55,33 @@ async function objectivePanelLayout(page: Page): Promise<ObjectivePanelLayout> {
         left: bevel.getBoundingClientRect().left - panelBounds.left,
         width: bevel.getBoundingClientRect().width,
       })),
+      edges: [...panel.querySelectorAll<HTMLElement>(".objective-panel-edge")].map((edge) => {
+        const bounds = edge.getBoundingClientRect();
+        const side = edge.classList.contains("top") ? "top" : "bottom";
+        return {
+          side,
+          left: bounds.left - panelBounds.left,
+          top: bounds.top - panelBounds.top,
+          width: bounds.width,
+          height: bounds.height,
+          repeat: getComputedStyle(edge).backgroundRepeat,
+          size: getComputedStyle(edge).backgroundSize,
+          source: getComputedStyle(edge).getPropertyValue(`--native-objective-edge-${side}-source`),
+        };
+      }),
+      corners: [...panel.querySelectorAll<HTMLElement>(".objective-panel-corner")].map((corner) => {
+        const bounds = corner.getBoundingClientRect();
+        return {
+          left: bounds.left - panelBounds.left,
+          top: bounds.top - panelBounds.top,
+          width: bounds.width,
+          height: bounds.height,
+          source: getComputedStyle(corner).getPropertyValue("--native-objective-corner-source"),
+        };
+      }),
+      // `12E7:00D1` paints bands, then bevels, then ornaments, so each layer
+      // covers the one before it; in the DOM that is plain document order.
+      paintOrder: [...panel.children].map((child) => child.className.split(" ")[0] ?? ""),
     };
   });
 }
@@ -70,7 +107,9 @@ for (const { scenario, nativeStage, artifact } of representativeStages) {
     await settleMenuAnimation(page.getByTestId("objective-panel"));
 
     const layout = await objectivePanelLayout(page);
-    const { body, shadow, textOrigin, leftBevel, rightBevel } = NATIVE_OBJECTIVE_PANEL;
+    const {
+      body, shadow, textOrigin, leftBevel, rightBevel, topEdge, bottomEdge, corner,
+    } = NATIVE_OBJECTIVE_PANEL;
     expect(layout.panel).toEqual({
       left: body.x,
       top: body.y,
@@ -87,6 +126,53 @@ for (const { scenario, nativeStage, artifact } of representativeStages) {
     expect(layout.bevels).toEqual([
       { side: "left", left: leftBevel.startX - body.x, width: leftBevel.colors.length },
       { side: "right", left: rightBevel.startX - body.x, width: rightBevel.colors.length },
+    ]);
+
+    // `12E7:00E1` tiles one 8-pixel A/0006 cell across the body width at the
+    // body's own top row and again one body height lower, so the bottom band
+    // hangs below the frame and eats the first rows of the drop shadow.
+    const bandWidth = NATIVE_OBJECTIVE_PANEL.edgeCells * NATIVE_OBJECTIVE_PANEL.edgeStep;
+    expect(bandWidth).toBe(body.width);
+    expect(layout.edges).toEqual([
+      {
+        side: "top",
+        left: NATIVE_OBJECTIVE_PANEL.edgeStartX - body.x,
+        top: topEdge.y - body.y,
+        width: bandWidth,
+        height: topEdge.height,
+        repeat: "repeat-x",
+        size: `${topEdge.width}px ${topEdge.height}px`,
+        source: expect.stringContaining("objective-panel-edge-top.png"),
+      },
+      {
+        side: "bottom",
+        left: NATIVE_OBJECTIVE_PANEL.edgeStartX - body.x,
+        top: bottomEdge.y - body.y,
+        width: bandWidth,
+        height: bottomEdge.height,
+        repeat: "repeat-x",
+        size: `${bottomEdge.width}px ${bottomEdge.height}px`,
+        source: expect.stringContaining("objective-panel-edge-bottom.png"),
+      },
+    ]);
+
+    // One ornament per corner, all four the same masked 8x7 bank image.
+    expect(layout.corners).toEqual(corner.placements.map((placement) => ({
+      left: placement.x - body.x,
+      top: placement.y - body.y,
+      width: corner.width,
+      height: corner.height,
+      source: expect.stringContaining("objective-panel-corner.png"),
+    })));
+
+    expect(layout.paintOrder).toEqual([
+      "objective-panel-edge",
+      "objective-panel-edge",
+      "objective-panel-bevel",
+      "objective-panel-bevel",
+      ...corner.placements.map(() => "objective-panel-corner"),
+      "objective-panel-text",
+      "objective-panel-dismiss",
     ]);
 
     // The clipped copy is the record verbatim, one newline per drawn line.

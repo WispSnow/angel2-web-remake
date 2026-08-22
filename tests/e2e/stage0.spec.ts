@@ -422,6 +422,21 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   await expect(page.getByTestId("dialogue-skip-yes")).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("dialogue-skip-no")).toHaveAttribute("aria-current", "true");
+  // 「是」「否」是複刻自己加的兩項：沒有原版四格 Big5 字串可抄，照著原版的
+  // 「列內 44 px 起筆」畫單字會偏左 24 px。它們改成在同一個 66 px 字格框裡置中，
+  // 視覺中心因此與所有原版選單列一樣落在選單中線右側 9 px。
+  const skipLabels = await skipConfirm.locator(".dialogue-skip-menu").evaluate((menu) => {
+    const menuBounds = menu.getBoundingClientRect();
+    return [...menu.querySelectorAll<HTMLElement>(".native-command-label")].map((label) => {
+      const canvas = label.querySelector<HTMLCanvasElement>("canvas.native-text");
+      if (!canvas) throw new Error("跳過確認選單的標籤沒有點陣字畫布");
+      return Math.round(
+        canvas.getBoundingClientRect().left - menuBounds.left
+        + canvas.width / 2 - menuBounds.width / 2,
+      );
+    });
+  });
+  expect(skipLabels).toEqual([9, 9]);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-dialogue-skip-confirm.png",
   });

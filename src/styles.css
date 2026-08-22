@@ -1767,6 +1767,17 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   top: 154px;
   height: 76px;
 }
+/* 「是」「否」是複刻自己加的兩項，沒有可抄的原版 Big5 字串，也就沒有那組四格空白
+   字距。原版每一列都從列內 44 px 起筆、寫滿四格 16 px，畫出來連描邊右側兩欄共
+   66 px，看起來就是「以選單中線右側 9 px 為中心」；單字標籤照抄 44 px 起筆會整整
+   偏左 24 px，正是原本看到的靠左。把它放進同一個 66 px 的字格框置中即可：兩者的
+   畫布都是「字格寬 + 描邊 2 欄」，置中後字格中心自然落在同一點，也不必替複刻文案
+   偽造一組原版沒有的半形空白。 */
+.action-menu.native-command-menu.dialogue-skip-menu .native-command-label {
+  display: flex;
+  width: 66px;
+  justify-content: center;
+}
 /* 展開的 11 步：四列貼圖從 `[313,337,345,361]` 每步外移 16 px，窗體寬度依序是
    80、112、…、400 px。左右各縮 160 px 就是 400 px 窗體裡的 80 px，`jump-none` 讓 11
    個取樣點正好落在那一串原版寬度上；三段列高從第一步就是完整的 86 px，故不裁縱向。 */
@@ -1899,9 +1910,12 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
    色 0 硬陰影（先畫陰影再蓋本體，所以看到的是那一道 L），左右各五道 1 px 邊柱的顏色
    來自 `DS:1248` 的逐條立即數，文字原點是本體內縮 16 px 的 `(96,56)`。
 
-   未複現：`12E7:00D1` 末段用 `0000:D5CB`／`0000:D9FA`／`0000:D790` 這三個 8 px 對齊的
-   平面寫入器鋪上下緣圖樣與四角裝飾（色 1／色 0／色 5）。那三個原語的圖樣位元尚未取證，
-   與其編一組花紋，不如先只畫已經逐位元確認的部分。 */
+   `12E7:00E1` 之後還有兩層：先把 `DS:F884` 指向 `A/0006`（同一枚資源指標也餵轉職選單
+   面板），用不看遮罩的四平面寫入器 `0000:D5CB` 把一格 8×6 圖磚橫向鋪滿本體寬度——上緣
+   用第 1 格畫在本體第一列，下緣用第 0 格畫在本體下方一列；最後四角各呼叫一次
+   `0000:D9FA`（把第五串遮罩 AND 進四個平面）再呼叫 `0000:D790`（把四個顏色平面 OR
+   回去），畫的都是同一枚 8×7 裝飾，其最右一列由遮罩留給背景。繪製順序決定疊放：
+   邊柱蓋住邊帶，四角又蓋住邊柱。 */
 .objective-panel {
   position: absolute;
   z-index: 14;
@@ -1913,10 +1927,38 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   box-shadow: 16px 16px 0 #000;
   image-rendering: var(--image-rendering, pixelated);
 }
+/* 上下緣與四角都超出本體方框（下緣帶在本體之下、右側四角壓到邊柱之上），所以本體
+   不能裁切；它們蓋掉的那一塊硬陰影，原版也一樣被蓋掉。 */
+.objective-panel-edge {
+  position: absolute;
+  display: block;
+  background-repeat: repeat-x;
+}
+.objective-panel-edge.top {
+  background-image: var(
+    --native-objective-edge-top-image,
+    url("/assets/original/objective-panel-edge-top.png")
+  );
+}
+.objective-panel-edge.bottom {
+  background-image: var(
+    --native-objective-edge-bottom-image,
+    url("/assets/original/objective-panel-edge-bottom.png")
+  );
+}
 .objective-panel-bevel { position: absolute; top: 0; bottom: 0; display: block; }
 .objective-panel-bevel.left { left: 0; }
 /* 右側五柱畫在本體之外（`x = 400..404`），與原版一樣蓋住那一道陰影的起頭。 */
 .objective-panel-bevel.right { left: 100%; }
+.objective-panel-corner {
+  position: absolute;
+  display: block;
+  background-repeat: no-repeat;
+  background-image: var(
+    --native-objective-corner-image,
+    url("/assets/original/objective-panel-corner.png")
+  );
+}
 .objective-panel-text {
   position: absolute;
   left: 16px;

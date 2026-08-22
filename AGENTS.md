@@ -228,9 +228,11 @@ pnpm exec playwright install ffmpeg
   看起来是「置中略偏右 9 px」，不要改成真正的居中或靠左。复刻自己新增的提示、说明与工具文字留在现代字体，
   这条分层与字库覆盖检查的要求见 `design/remake-gdd/07-ui-ux-and-presentation.md#字体分层`。
 - `src/game/content/objective-panel.generated.ts` 由 `scripts/generate-objective-panel.mjs` 生成，
-  来源是模组 29 映像与 `reverse/parsed/dialogue/`；修改证据后运行 `pnpm content:objective-panel`。
-  勝利條件面板的几何与逐关文字全部从映像读出并逐项断言，不要手抄坐标或改写记录原文，
-  也不要往这个面板里加复刻自撰内容。
+  来源是模组 29 映像、`reverse/parsed/dialogue/` 以及 `A/0006` 的平面渲染与遮罩流；同一个脚本还写出
+  `public/assets/original/objective-panel-edge-top.png`、`-edge-bottom.png` 与 `-corner.png`，
+  修改证据后运行 `pnpm content:objective-panel`（新增素材后再跑 `pnpm content:resource-manifest`）。
+  勝利條件面板的几何、上下缘带与四角装饰的落点、逐关文字全部从映像读出并逐项断言，不要手抄坐标或
+  改写记录原文，也不要往这个面板里加复刻自撰内容。
 - `src/game/content/portrait-catalog.generated.ts` 与 `public/assets/original/portraits/` 由
   `scripts/generate-portrait-catalog.mjs` 生成；修改肖像来源或布局证据后运行
   `pnpm content:portraits`，不要手工登记角色动画。`D/63` 无原版覆盖帧/布局，`D/67`

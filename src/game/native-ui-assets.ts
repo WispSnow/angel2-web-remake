@@ -16,6 +16,9 @@ export const NATIVE_UI_CSS_ASSETS = {
   "--native-command-menu-side-image": "/assets/original/command-menu-side.png",
   "--native-command-menu-selection-image": "/assets/original/command-menu-selection.png",
   "--native-command-menu-pointer-image": "/assets/original/command-menu-pointer.png",
+  "--native-objective-edge-top-image": "/assets/original/objective-panel-edge-top.png",
+  "--native-objective-edge-bottom-image": "/assets/original/objective-panel-edge-bottom.png",
+  "--native-objective-corner-image": "/assets/original/objective-panel-corner.png",
 } as const;
 
 export const NATIVE_UI_CSS_ASSET_URLS = [...new Set(Object.values(NATIVE_UI_CSS_ASSETS))];
