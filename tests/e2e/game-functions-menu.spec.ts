@@ -58,6 +58,7 @@ test("game functions reproduces the native five-switch submenu", async ({ page }
       height: style.height,
       background: style.backgroundColor,
       shadow: style.boxShadow,
+      pointerSource: style.getPropertyValue("--native-cursor-hand-source"),
       buttons,
     };
   });
@@ -72,8 +73,13 @@ test("game functions reproduces the native five-switch submenu", async ({ page }
   expect(presentation.buttons).toHaveLength(5);
   for (const [index, button] of presentation.buttons.entries()) {
     expect(button).toMatchObject({ left: 8, top: 38 + index * 25, width: 112, height: 24 });
-    expect(button.cursor).toContain("command-menu-pointer.png");
+    // The stage pack stages the pointer art, so the cursor image is an opaque
+    // object URL; only the hotspot suffix and the companion `--*-source`
+    // variable still name the native hand chain.
+    expect(button.cursor).toContain("blob:");
+    expect(button.cursor).toContain("3 2, pointer");
   }
+  expect(presentation.pointerSource).toContain("command-menu-pointer.png");
 
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/game-functions-native-menu.png",
