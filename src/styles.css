@@ -1689,6 +1689,12 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .dialogue-layer .dialogue-copy.is-dialogue-window-closing {
   animation: dialogue-window-close 240ms steps(11, jump-none) both;
 }
+/* `CU`／`CD` 的每一格都由 `0000:1032` 用 `A/18` 的空白窗格重畫窗內，所以收合第一步就
+   把字擦掉了，字不會跟著窗體一起被收窄。逐字本體留在 DOM 裡（收合中的窗仍要能被
+   斷言、肖像與姓名牌也還活著），只是不再畫出來。 */
+.dialogue-layer .dialogue-copy.is-dialogue-window-closing > p {
+  visibility: hidden;
+}
 .dialogue-layer .dialogue-copy::before,
 .dialogue-layer .dialogue-copy::after {
   content: "";

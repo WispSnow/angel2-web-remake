@@ -227,13 +227,20 @@ export class AudioManager {
       // that stages without a story record are supposed to have.
       desired = musicProgramFor(this.controller.battle.stage.music.story);
     }
-    else if (side && (side !== previousSide || !desired)) {
+    // The battle track is re-derived on every sync rather than only when the
+    // side flips: 戰中「讀取記錄」 swaps the whole stage without leaving the
+    // player phase, so a side-gated branch would keep the previous stage's
+    // program playing over the loaded one. Re-deriving is idempotent — the
+    // select below only fires when the program identity actually changes.
+    else if (side) {
       desired = musicProgramFor(
         side === "player"
           ? this.controller.battle.stage.music.playerPhase
           : this.controller.battle.stage.music.enemyPhase,
       );
-      restart = desired?.id === this.selectedMusic?.id;
+      // Module 29 restarts the incoming side's program at the phase boundary
+      // even when both sides share one record; a mid-phase re-derive must not.
+      restart = side !== previousSide && desired?.id === this.selectedMusic?.id;
     }
     else if (this.controller.phase === "credits") {
       desired = CREDITS_MUSIC_PROGRAM;

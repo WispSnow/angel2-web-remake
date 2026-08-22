@@ -15,6 +15,8 @@ const EDGE_PAN_SETTLE_MS = 180;
 
 interface DebugState {
   phase: string;
+  stageId: string;
+  focusId?: string;
   campaignRoute?: "stage-01" | "stage-02" | "stage-03";
   activeStoryId?: string;
   consumedEventIds: string[];
@@ -1646,6 +1648,59 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-follow-leader.png" });
 });
 
+/**
+ * `REMAKE-122`：全軍號令由本關主將發出，不跟著上一個行動過的單位跑。
+ *
+ * 戰鬥層的 `focusId` 每次攻擊、施法、被打都會改寫，所以只要有人先動過，`全部休息`／
+ * `自由行動` 就會變成士兵在替妮雅下令。`跟隨主將` 講的是「跟著我來」，說話者必須仍然
+ * 是玩家剛指定的臨時主將本人，那條路徑不受這個決定影響。
+ */
+test("REMAKE-122: army-wide group commands are spoken by the stage commander", async ({ page }) => {
+  const enterPlayerPhaseWithFocusOffNia = async () => {
+    await page.goto("/?test=1&skipStartup=1");
+    await skipStoryDialogue(page);
+    await waitForPhase(page, "openingStory");
+    await skipStoryDialogue(page);
+    await waitForPhase(page, "player");
+    // Tab 走到下一名待行動單位；戰鬥層保留的單位焦點就此離開妮雅。
+    await page.keyboard.press("Tab");
+    await expect.poll(async () => (await debugState(page)).focusId).toBe("1:43");
+  };
+
+  await enterPlayerPhaseWithFocusOffNia();
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-allRest").click();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:86E4");
+  await expect(page.getByTestId("dialogue-window-upper")).toHaveAttribute("aria-label", "妮雅對話");
+  await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute("data-portrait-record", "46");
+  expect((await debugState(page))).toMatchObject({
+    focusId: "1:43",
+    statusMessage: "妮雅下令全軍休息。",
+  });
+
+  await enterPlayerPhaseWithFocusOffNia();
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-freeAction").click();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:8716");
+  await expect(page.getByTestId("dialogue-window-upper")).toHaveAttribute("aria-label", "妮雅對話");
+  await expect(page.getByTestId("dialogue-portrait-composite")).toHaveAttribute("data-portrait-record", "46");
+  expect((await debugState(page))).toMatchObject({
+    focusId: "1:43",
+    statusMessage: "妮雅下令其餘部隊自由行動。",
+  });
+
+  // 「跟隨主將」相反：說話的必須是剛被指定成臨時主將的那名單位。
+  await enterPlayerPhaseWithFocusOffNia();
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-followLeader").click();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:873C");
+  await expect(page.getByTestId("dialogue-window-upper")).toHaveAttribute("aria-label", "士兵D對話");
+  expect((await debugState(page))).toMatchObject({
+    groupLeaderId: "1:43",
+    statusMessage: "士兵D下令其餘部隊跟隨主將。",
+  });
+});
+
 test("REMAKE-014: side-1 autonomous techniques use the upper native dialogue window", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await skipStoryDialogue(page);
@@ -1980,6 +2035,39 @@ test("RHP-03: desk save and load objects preserve record data and return origin"
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/stage0-side-panel-record-hotspots.png",
   });
+});
+
+/**
+ * 戰中「讀取記錄」換掉的是整個關卡，音樂必須跟著換。
+ *
+ * `syncMusic` 原本只在我方／敵方陣營翻面時重選戰鬥曲，而讀檔前後都停在玩家階段，
+ * 於是上一關的曲子會一路蓋在讀進來的那一關上。走調試場景是為了拿兩個曲目集互斥的
+ * 關卡：第 0 關是 `MUSIC/7 → MUSIC/6`，第 1 關是 `MUSIC/10 → MUSIC/11`。
+ */
+test("loading a record from another stage switches the battle music to the loaded stage", async ({ page }) => {
+  const app = page.locator("#app");
+
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+  await expect(app).toHaveAttribute("data-music-track", /MUSIC\/(6|7)/u);
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await page.getByTestId("save-hotspot").click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await page.getByTestId("record-slot-1").click();
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+
+  await page.goto("/?debugScenario=stage-01-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await expect(app).toHaveAttribute("data-music-track", /MUSIC\/(10|11)/u);
+
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await page.getByTestId("load-hotspot").click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await page.getByTestId("record-slot-1").click();
+  // 讀檔前後都是玩家階段，只等 `phase` 會立刻成立；要等的是關卡真的換過來。
+  await expect.poll(async () => (await debugState(page)).stageId).toBe("stage-00");
+  await expect(app).toHaveAttribute("data-music-track", /MUSIC\/(6|7)/u);
 });
 
 test("RHP-03b: in-game record pages export and safely replace all manual slots", async ({ page }) => {

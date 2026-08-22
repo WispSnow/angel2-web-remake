@@ -15,6 +15,10 @@
  * 收合播完才能真的 `hidden`；而且原版是 `CU` 收完窗體之後才輪到 `PU` 擦肖像、`ED`
  * 還原畫面，所以肖像、姓名牌與劇情背景都得陪窗體活到最後一格。
  *
+ * 展開雖然不需要 JS 狀態，逐字卻要等它：SAY 腳本裡 `WU`／`WD` 是一條獨立命令，
+ * 解釋器跑完那 11 步才輪到下一條 `text`，所以原版不存在「窗體還在展開、字已經在打」
+ * 的畫面。`whenDialogueWindowOpened` 就是給逐字用的那道等待。
+ *
  * 機制與 `menu-animation.ts` 平行，但兩者收合的是不同的原版例程，也各自需要不同的
  * 收尾：選單要 `inert` 收回焦點，對話窗只是 `pointer-events: none` 的表現層，反而要
  * 回呼呼叫端重跑描繪，才能把祖先節點一起收起。
@@ -26,11 +30,17 @@ const CLOSING_CLASS = "is-dialogue-window-closing";
 /** CSS 收合動畫名。逐一比對可避免誤等到別的動畫，例如尚未播完的展開動畫。 */
 const CLOSE_ANIMATION_NAME = "dialogue-window-close";
 
+/** CSS 展開動畫名。 */
+const OPEN_ANIMATION_NAME = "dialogue-window-open";
+
 /**
  * 收尾保險絲，須明顯長於 CSS 收合時長。頁面不可見時瀏覽器不推進文檔時間軸，
  * `animation.finished` 可以永遠不落地；沒有這道保險絲，對話窗就會卡在收合態不消失。
  */
 const CLOSE_FALLBACK_MS = 400;
+
+/** 展開等待的同款保險絲：頁面不可見時不能讓整段對白永遠不開始逐字。 */
+const OPEN_FALLBACK_MS = 400;
 
 interface ClosingWindow {
   /** 世代序號：重複開闔時，只有最後一次的收尾算數，中途作廢的舊回呼要自行退出。 */
@@ -63,6 +73,46 @@ function finishClose(panel: HTMLElement): ClosingWindow | undefined {
 /** 收合是否仍在播放。播放中的面板不能被重建，其祖先也不能提前隱藏。 */
 export function isDialogueWindowClosing(panel: HTMLElement): boolean {
   return closingWindows.has(panel);
+}
+
+/**
+ * 面板正在播的展開動畫；沒有在播就回 `undefined`。
+ *
+ * 回 `undefined` 是常態而不是例外：同一個窗連放好幾頁時，原版第二次 `WU` 只重設文字
+ * 游標、不再跑 `0000:0F41`，複刻這邊的面板也一直是可見的，於是逐字要能同步開始。
+ */
+export function dialogueWindowOpenAnimation(panel: HTMLElement): Animation | undefined {
+  return panel.getAnimations().find((animation) =>
+    animation instanceof CSSAnimation
+    && animation.animationName === OPEN_ANIMATION_NAME
+    && animation.playState !== "finished");
+}
+
+/**
+ * 立刻把展開跳到最後一格。
+ *
+ * 玩家在展開途中按主操作要求補完逐字時用：字不能畫進還沒展開完的窗，所以窗體先到位。
+ * `finish()` 會讓 `animation.finished` 落地，等在上面的逐字因此自然接上。
+ */
+export function finishDialogueWindowOpen(panel: HTMLElement): void {
+  dialogueWindowOpenAnimation(panel)?.finish();
+}
+
+/**
+ * 等展開播完。`WU`／`WD` 在 SAY 腳本裡是獨立命令，跑完 11 步才輪到 `text`，所以逐字
+ * 必須等這道 Promise；窗體沒在展開時同步回一個已解決的 Promise，不額外拖慢。
+ */
+export function whenDialogueWindowOpened(panel: HTMLElement): Promise<void> {
+  const animation = dialogueWindowOpenAnimation(panel);
+  if (!animation) return Promise.resolve();
+  return new Promise((resolve) => {
+    const fallback = globalThis.setTimeout(resolve, OPEN_FALLBACK_MS);
+    // 中途被取消（面板又被收起）也算等到了：呼叫端自己會用世代鍵判斷該不該繼續。
+    void animation.finished.catch(() => undefined).then(() => {
+      globalThis.clearTimeout(fallback);
+      resolve();
+    });
+  });
 }
 
 /**
