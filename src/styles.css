@@ -475,23 +475,19 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   margin-top: 16px;
 }
 
-/* 边框图必须画在画布之上。Phaser 的相机视口是 (40,23,400,308) 且带不透明底色，
+/* 边框必须画在画布之上。Phaser 的相机视口是 (40,23,400,308) 且带不透明底色，
  * 画布在这个矩形之外完全透明；「平滑」缩放会对整张画布做双线性重采样，把这条硬
  * 透明边缘向外晕开约一个装置像素，正好落在左右雕像、顶栏和底栏上——玩家看到的
- * 就是雕像中间那条战场颜色的细纹。让不透明的边框图最后绘制即可挡住这段外溢；
- * 底板留在画布下方，否则会盖住战场。 */
+ * 就是雕像中间那条战场颜色的细纹。让不透明的边框最后绘制即可挡住这段外溢；
+ * 底板留在画布下方，否则会盖住战场。
+ *
+ * 画框的 11 块图磚（含原本单独一层的雕像前景）合成在 `.battle-chrome-frame`
+ * 这一张画布上：拆成 11 个 `<img>` 时，非整数倍缩放会给每块的目标矩形边界单独
+ * 抗锯齿，接缝处漏出下层颜色，形成一像素宽的裂纹。理由与落点见
+ * `chrome-composite.ts`。 */
 .battle-backdrop { position: absolute; inset: 0; z-index: 0; background: #0a0708; pointer-events: none; }
 .battle-chrome { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
-.battle-chrome > img { position: absolute; display: block; image-rendering: var(--image-rendering, pixelated); }
-.chrome-top { left: 0; top: 0; width: 480px; height: 23px; }
-.chrome-corner-left { left: 0; top: 23px; width: 40px; height: 34px; }
-.chrome-corner-right { left: 440px; top: 23px; width: 40px; height: 34px; }
-.chrome-glass-left { left: 0; top: 57px; width: 40px; height: 80px; }
-.chrome-glass-right { left: 440px; top: 57px; width: 40px; height: 80px; }
-.chrome-side-left { left: 0; top: 137px; width: 40px; height: 194px; }
-.chrome-side-right { left: 440px; top: 137px; width: 40px; height: 194px; }
-.chrome-bottom-left { left: 0; top: 331px; width: 80px; height: 19px; }
-.chrome-bottom-right { left: 400px; top: 331px; width: 80px; height: 19px; }
+.battle-chrome-frame { position: absolute; left: 0; top: 0; display: block; width: 480px; height: 350px; }
 .right-panel-backdrop { position: absolute; left: 480px; top: 0; width: 160px; height: 350px; background: #000; }
 
 #phaser-root { position: absolute; inset: 0; z-index: 3; }
@@ -514,10 +510,6 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 #phaser-root canvas[data-native-pointer-cursor="right"] {
   cursor: var(--native-cursor-right-image, url("/assets/original/native-cursor-right.png")) 23 9, e-resize;
 }
-.battle-foreground { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
-.battle-foreground > img { position: absolute; top: 140px; width: 32px; height: 191px; image-rendering: var(--image-rendering, pixelated); }
-.statue-foreground-left { left: 40px; }
-.statue-foreground-right { left: 408px; }
 /* `BK/<id>` 的落點是原生寫死的 `(160,80)`（模組 25 `0000:098C`、模組 29 同值），不是把
    `320×200` 在 `640×350` 裡置中——置中會落在 `(160,75)`，上下留白剛好差 5 px。 */
 .story-background {
@@ -590,11 +582,16 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .hud-tactical { z-index: 0; }
 .unit-detail { position: absolute; z-index: 1; inset: 0; width: 152px; height: 317px; }
 /* REMAKE-117: 只有上半是 DS:5EB3 的不透明色 1 底（480,0,160,149）。下半的暗色
-   不是半透明遮罩，而是 DS:5FD1 的 50% 棋盘点阵，已经烧进身体框素材里。 */
-.unit-detail-shade { position: absolute; z-index: 0; left: -4px; top: -4px; width: 160px; height: 150px; background: #5d4131; }
+   不是半透明遮罩，而是 DS:5FD1 的 50% 棋盘点阵，已经烧进身体框素材里。
+   底色画到 152 而不是原版的 150：`.hud-unit-frame` 在 y=149 那一列刻意留空让
+   这块底色透出来当上下半的分隔缝，底色的下缘就不能也落在 149/150 这个交界上——
+   非整数倍缩放时它会被抗锯齿掉半格，露出底下的黑色底板。往下多铺两列即可，
+   150 与 151 两列的框图是整列不透明的，多出来的底色看不见。 */
+.unit-detail-shade { position: absolute; z-index: 0; left: -4px; top: -4px; width: 160px; height: 152px; background: #5d4131; }
 .hud-portrait { position: absolute; z-index: 1; left: 4px; top: 4px; width: 112px; height: 112px; }
-.hud-unit-top-chrome { position: absolute; z-index: 2; left: -4px; top: -4px; display: block; width: 160px; height: 149px; image-rendering: var(--image-rendering, pixelated); }
-.hud-unit-body-frame { position: absolute; z-index: 2; left: -4px; top: 146px; display: block; width: 160px; height: 171px; image-rendering: var(--image-rendering, pixelated); }
+/* 上半的肖像框與下半的數值框合成在同一张画布上，非整数倍缩放才不会在 y=149
+   那条分隔缝的两侧各抗锯齿出半格；理由见 `chrome-composite.ts`。 */
+.hud-unit-frame { position: absolute; z-index: 2; left: -4px; top: -4px; display: block; width: 160px; height: 321px; }
 .hud-identity { position: absolute; z-index: 3; left: 0; top: 119px; display: flex; width: 152px; height: 22px; align-items: center; color: transparent; text-align: center; }
 .hud-identity b {
   display: block;
@@ -697,10 +694,12 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   cursor: var(--native-cursor-hand, pointer);
   pointer-events: auto;
 }
-.tactical-panel-art { position: absolute; z-index: 0; left: 0; top: 0; width: 160px; height: 149px; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
-.tactical-panel-state { position: absolute; z-index: 1; display: block; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
-.tactical-minimap { position: absolute; z-index: 1; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: var(--image-rendering, pixelated); }
-.tactical-minimap-frame { position: absolute; z-index: 2; left: 0; top: 150px; display: block; width: 160px; height: 171px; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
+/* 戰術桌底圖與小地圖框合成在同一张画布上，理由同 `.hud-unit-frame`。这两块原本
+   隔着开关状态图与小地图，所以小地圖降到 0、合成层占 1、开关升到 2——叠放次序
+   （小地圖 → 邊框 → 開關）与併层前完全相同。 */
+.tactical-minimap { position: absolute; z-index: 0; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: var(--image-rendering, pixelated); }
+.tactical-panel-frame { position: absolute; z-index: 1; left: 0; top: 0; display: block; width: 160px; height: 321px; pointer-events: none; }
+.tactical-panel-state { position: absolute; z-index: 2; display: block; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
 .hud-tactical:not(.under-unit) .tactical-minimap { pointer-events: auto; cursor: var(--native-cursor-hand); }
 .tactical-minimap > img { position: absolute; inset: 0; width: 150px; height: 150px; }
 .minimap-viewport { position: absolute; z-index: 1; width: 30px; height: 21px; border: 1px solid #000; box-shadow: 0 0 0 1px #b99b73; }

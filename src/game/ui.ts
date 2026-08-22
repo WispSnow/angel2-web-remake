@@ -23,6 +23,12 @@ import { TECHNIQUE_LAB_UNIT_ASSETS } from "./content/technique-lab.generated";
 import { classTraitsFor } from "./content/class-traits";
 import { fullCombatBackgroundAsset } from "./content/full-combat-backgrounds";
 import { activeUnitStatusPresentations } from "./content/status-presentations";
+import {
+  BATTLE_CHROME_COMPOSITE,
+  createChromeComposite,
+  TACTICAL_PANEL_CHROME_COMPOSITE,
+  UNIT_DETAIL_CHROME_COMPOSITE,
+} from "./chrome-composite";
 import type { CombatPresentation, GameController } from "./controller";
 import {
   FULL_COMBAT_FRAME_META,
@@ -125,22 +131,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             style="${nativePresentationAssetStyle()}" aria-label="天使帝國 II ${stage.name}遊戲畫面">
             <div class="battle-backdrop" aria-hidden="true"></div>
             <div class="battle-chrome" data-testid="battle-chrome" aria-hidden="true">
-              <img class="chrome-top" src="${stagedRenderAssetSource(ASSETS.battleChrome.top)}" alt="" />
-              <img class="chrome-corner-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.cornerLeft)}" alt="" />
-              <img class="chrome-corner-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.cornerRight)}" alt="" />
-              <img class="chrome-glass-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.glass)}" alt="" />
-              <img class="chrome-glass-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.glass)}" alt="" />
-              <img class="chrome-side-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.sideLeft)}" alt="" />
-              <img class="chrome-side-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.sideRight)}" alt="" />
-              <img class="chrome-bottom-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.bottomLeft)}" alt="" />
-              <img class="chrome-bottom-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.bottomRight)}" alt="" />
               <div class="right-panel-backdrop"></div>
             </div>
             <div id="phaser-root"></div>
-            <div class="battle-foreground" data-testid="battle-foreground" aria-hidden="true">
-              <img class="statue-foreground-left" src="${stagedRenderAssetSource(ASSETS.battleChrome.statueForegroundLeft)}" alt="" />
-              <img class="statue-foreground-right" src="${stagedRenderAssetSource(ASSETS.battleChrome.statueForegroundRight)}" alt="" />
-            </div>
             <div class="story-background" id="story-background"></div>
             <section class="unit-hud" id="unit-hud" data-testid="unit-hud" aria-live="polite"></section>
             <div class="bottom-location">${stage.name}</div>
@@ -277,6 +270,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     </div>`;
 
   const screen = required(root, "#logical-screen");
+  // 邊框圖磚各自合成在一張畫布上，非整數倍縮放時才不會在接縫處裂開；理由與
+  // 落點見 `chrome-composite.ts`。右欄兩張由 `render` 重新掛回重建後的容器。
+  const battleChrome = createChromeComposite(BATTLE_CHROME_COMPOSITE);
+  required(root, ".battle-chrome").append(battleChrome.element);
+  const unitDetailChrome = createChromeComposite(UNIT_DETAIL_CHROME_COMPOSITE);
+  const tacticalPanelChrome = createChromeComposite(TACTICAL_PANEL_CHROME_COMPOSITE);
   // Appended last so it stacks over the panel chrome at the same z-index while
   // every overlay above z-index 7 still covers it.
   const nativeText = createNativeTextLayer();
@@ -1251,6 +1250,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           ? renderTerrainInspection(terrain)
           : ""
     }`;
+    // `innerHTML` 丟掉了上一輪的容器，但畫布本身還被持有著，內容也還在——重新
+    // 掛回去即可，不必再合成一次。
+    hud.querySelector(".hud-tactical")?.append(tacticalPanelChrome.element);
+    hud.querySelector(".unit-detail")?.append(unitDetailChrome.element);
     // 開場劇情把整條右欄和底部收起來，所以文字層跟著同一個條件清空。
     const battleChromeVisible = controller.phase !== "prebattleStory";
     nativeText.render({
@@ -1498,6 +1501,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     stopScaling();
     stopGamepad();
     recordBackupUi.dispose();
+    battleChrome.dispose();
+    unitDetailChrome.dispose();
+    tacticalPanelChrome.dispose();
     nativeText.dispose();
     stopPortraitAnimations();
     stopDialogueTimer();
@@ -2032,10 +2038,6 @@ function renderHud(
         wrapperTestId: "unit-portrait-composite",
         baseTestId: "unit-portrait",
       })}
-      <img class="hud-unit-top-chrome" data-testid="hud-unit-top-chrome"
-        src="${stagedRenderAssetSource(ASSETS.sidePanelChrome.unitTop)}" alt="" aria-hidden="true" />
-      <img class="hud-unit-body-frame" data-testid="hud-unit-body-frame"
-        src="${stagedRenderAssetSource(ASSETS.sidePanelChrome.unitBody)}" alt="" aria-hidden="true" />
       <div class="hud-identity" data-testid="hud-identity">
         <b class="${identityClass}" title="${identity}">${identity}</b>
       </div>
@@ -2199,7 +2201,6 @@ function renderTactical(controller: GameController, underUnit = false): string {
   }).join("");
   return `
     <div class="hud-tactical${underUnit ? " under-unit" : ""}" data-testid="tactical-hud" aria-label="戰術輔助與即時小地圖">
-      <img class="tactical-panel-art" src="${stagedRenderAssetSource(ASSETS.tacticalPanel.foundation)}" alt="戰術桌、卷軸與照明器具" />
       ${statePatches}
       <div class="tactical-minimap" data-testid="tactical-minimap" aria-label="${controller.battle.stage.name}即時小地圖">
         <img src="${stagedRenderAssetSource(minimap)}" alt="" />
@@ -2207,8 +2208,6 @@ function renderTactical(controller: GameController, underUnit = false): string {
         ${underUnit ? "" : `<span class="minimap-preview" data-testid="minimap-preview" aria-hidden="true" hidden></span>`}
         ${markers}
       </div>
-      <img class="tactical-minimap-frame" data-testid="tactical-minimap-frame"
-        src="${stagedRenderAssetSource(ASSETS.sidePanelChrome.minimap)}" alt="" aria-hidden="true" />
     </div>`;
 }
 

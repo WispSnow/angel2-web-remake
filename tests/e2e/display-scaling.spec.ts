@@ -1,5 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { columnGreenExcess, decodeScreenshot } from "./screenshot-pixels";
+import {
+  columnGreenExcess,
+  columnMeanLuminance,
+  decodeScreenshot,
+  rowMeanLuminance,
+} from "./screenshot-pixels";
 import { captureVisualAudit } from "./visual-audit";
 
 const screenMetrics = (page: Page) => page.locator(".logical-screen").evaluate((element) => {
@@ -90,6 +95,8 @@ test.describe("smooth scaling on a HiDPI panel", () => {
       getComputedStyle(document.documentElement).getPropertyValue("--image-rendering").trim(),
     )).toBe("auto");
 
+    // 雕像前景已經和畫框合成在同一層（`chrome-composite.ts`），所以這裡只剩
+    // 底板／畫布／畫框三層要排序。
     const paintOrder = await page.evaluate(() => {
       const layer = (selector: string) => Number(
         getComputedStyle(document.querySelector(selector) as HTMLElement).zIndex,
@@ -98,12 +105,10 @@ test.describe("smooth scaling on a HiDPI panel", () => {
         backdrop: layer(".battle-backdrop"),
         canvas: layer("#phaser-root"),
         chrome: layer(".battle-chrome"),
-        statues: layer(".battle-foreground"),
       };
     });
     expect(paintOrder.backdrop).toBeLessThan(paintOrder.canvas);
     expect(paintOrder.chrome).toBeGreaterThan(paintOrder.canvas);
-    expect(paintOrder.statues).toBeGreaterThanOrEqual(paintOrder.chrome);
 
     const shot = decodeScreenshot(await page.getByTestId("game-screen").screenshot());
     expect(shot.width).toBe(1280);
@@ -119,6 +124,124 @@ test.describe("smooth scaling on a HiDPI panel", () => {
     for (const x of [79, 80, 880, 881]) {
       expect(greenExcess(x), `device column ${x} carries battlefield colour`).toBeLessThan(3);
     }
+  });
+});
+
+test.describe("a non-integer desktop scale", () => {
+  // 1020 / 640 = 1.59375：四条水平接缝（y=23/57/137/331）、两条垂直接缝
+  // （x=40/440）和右栏 y=149 的分隔缝，装置像素座标全部落在半个像素上，正是
+  // 桌面版出现裂纹的条件。高度留足余量，缩放才确定由宽度决定。
+  test.use({ viewport: { width: 1020, height: 900 }, deviceScaleFactor: 1 });
+
+  test("the window frame shows no seam where its tiles meet", async ({ page }) => {
+    // `scaling.ts` 只在桌面执行阶段解除 1 倍上限，浏览器版永远停在整数装置倍率，
+    // 所以复现这个缺陷必须先让执行阶段侦测认为自己在 Tauri 里。
+    await page.addInitScript(() => {
+      (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
+    });
+    await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    // 调试工具条盖在右栏上；不藏起来，下面量到的全是工具条而不是右栏面板。
+    await page.addStyleTag({ content: ".debug-toolbar { display: none !important; }" });
+
+    const scale = await page.locator(".logical-screen").evaluate((element) =>
+      Number(getComputedStyle(element).getPropertyValue("--game-scale")));
+    expect(scale).toBeCloseTo(1.59375, 6);
+    // 夹具校验：每条接缝都必须落在半个装置像素上。整数倍时接缝恰好压在装置像素
+    // 边界，浏览器不会为它抗锯齿，下面的断言就成了空跑。
+    for (const edge of [23, 57, 137, 149, 331, 40, 440]) {
+      const subpixel = edge * scale % 1;
+      expect(subpixel, `logical edge ${edge} lands on a whole device pixel`).toBeGreaterThan(.05);
+      expect(subpixel, `logical edge ${edge} lands on a whole device pixel`).toBeLessThan(.95);
+    }
+
+    // 垂直接缝：雕像被战场切成两半，接缝纵贯像身，是玩家最先看到的一条。修复前
+    // 边框栏与雕像前景分属两层，接缝那一列各覆盖半格，战场就从中间漏出来。
+    // 这里可以直接看亮度：接缝两侧本来就是同一尊雕像的左右半边，图本身连续，
+    // 所以任何比左右邻列都暗的单列都只能是漏光。y=144..330 之间两侧都不透明，
+    // 扫描带里不会混进会动的战场像素。
+    const shot = decodeScreenshot(await page.getByTestId("game-screen").screenshot());
+    const firstRow = Math.round(150 * scale);
+    const lastRow = Math.round(320 * scale);
+    const statueColumn = (x: number) => columnMeanLuminance(shot, x, firstRow, lastRow);
+    // 夹具校验：扫描带确实落在雕像上，而不是黑边。
+    expect(statueColumn(Math.round(50 * scale))).toBeGreaterThan(40);
+
+    for (const join of [40, 440]) {
+      let worst = 0;
+      for (let offset = -1; offset <= 1; offset += 1) {
+        const x = Math.round(join * scale) + offset;
+        worst = Math.max(worst, Math.min(statueColumn(x - 1), statueColumn(x + 1)) - statueColumn(x));
+      }
+      // 修复前在 1.234～3.17 倍之间实测为 13.6～29.8，本倍率下为 29.5。
+      expect(worst, `vertical tile join at logical x=${join}`).toBeLessThan(8);
+    }
+
+    // 水平接缝夹在两张不同的边框图之间，光看亮度分不出「接缝漏光」和图本身的
+    // 暗线（y=331 底座顶端就有一条）。改成差分量测：接缝漏出来的是画布下方的
+    // 底板，把底板换两种颜色各拍一张，不透光的边框栏就该逐位元组相同。
+    const frameColumnPixels = async (backdrop: string, frameVisible: boolean) => {
+      await page.addStyleTag({ content: `
+        .battle-backdrop { background: ${backdrop} !important; }
+        .battle-chrome-frame { visibility: ${frameVisible ? "visible" : "hidden"} !important; }` });
+      const frame = decodeScreenshot(await page.getByTestId("game-screen").screenshot());
+      // 只取逻辑 x<39 的边框栏：再往右会碰到会动的战场像素。
+      const lastColumn = Math.floor(39 * scale);
+      const band: number[] = [];
+      for (let y = 0; y < frame.height; y += 1) {
+        for (let x = 3; x < lastColumn; x += 1) {
+          const offset = (y * frame.width + x) * frame.channels;
+          band.push(frame.pixels[offset], frame.pixels[offset + 1], frame.pixels[offset + 2]);
+        }
+      }
+      return band;
+    };
+    const differingBytes = (left: readonly number[], right: readonly number[]) =>
+      left.reduce((count, value, index) => value === right[index] ? count : count + 1, 0);
+
+    // 正对照：藏起边框，同一条扫描带就完全由底板决定，两种底板必须拍出不同像素。
+    // 没有这一步，下面的「相同」可能只是量到了两张一样空的图。
+    expect(differingBytes(
+      await frameColumnPixels("#000000", false),
+      await frameColumnPixels("#ffffff", false),
+    )).toBeGreaterThan(0);
+
+    expect(differingBytes(
+      await frameColumnPixels("#000000", true),
+      await frameColumnPixels("#ffffff", true),
+    ), "the backdrop leaks through the frame column").toBe(0);
+
+    // 右栏 y=149 是原版刻意留的分隔缝：上下两张框图都不画那一列，让 `.unit-detail-shade`
+    // 的底色透出来。併层前两张框各自抗锯齿，把这条缝糊成一条又暗又不匀的线。
+    // 判据不看亮度而看「纯不纯」：把底色换成两种纯色各拍一张，缝里的每个像素要么
+    // 两张一样（框图挡着），要么两张分别是两种纯色（底色透出来），不该出现两者的混合。
+    const dividerPixels = async (shade: string) => {
+      await page.addStyleTag({ content: `.unit-detail-shade { background: ${shade} !important; }` });
+      const frame = decodeScreenshot(await page.getByTestId("game-screen").screenshot());
+      const band: number[] = [];
+      for (let y = Math.floor(147 * scale); y < Math.ceil(152 * scale); y += 1) {
+        for (let x = Math.round(483 * scale); x < Math.round(637 * scale); x += 1) {
+          const offset = (y * frame.width + x) * frame.channels;
+          band.push(frame.pixels[offset], frame.pixels[offset + 1], frame.pixels[offset + 2]);
+        }
+      }
+      return band;
+    };
+    const overMagenta = await dividerPixels("#ff00ff");
+    const overGreen = await dividerPixels("#00ff00");
+    let pureShade = 0;
+    let blended = 0;
+    for (let index = 0; index < overMagenta.length; index += 3) {
+      const [r, g, b] = overMagenta.slice(index, index + 3);
+      const [r2, g2, b2] = overGreen.slice(index, index + 3);
+      if (r === r2 && g === g2 && b === b2) continue;
+      if (r === 255 && g === 0 && b === 255 && r2 === 0 && g2 === 255 && b2 === 0) pureShade += 1;
+      else blended += 1;
+    }
+    // 夹具校验：分隔缝确实透出了底色，否则下面的断言会空跑。
+    expect(pureShade).toBeGreaterThan(0);
+    // 修复前实测为 380～734 个混合像素（1.234～2.38 倍）。
+    expect(blended, "the right panel divider is blended instead of a clean line").toBe(0);
   });
 });
 

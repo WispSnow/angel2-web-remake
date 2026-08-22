@@ -98,3 +98,41 @@ export function columnGreenExcess(
   }
   return total / (lastRow - firstRow);
 }
+
+/**
+ * Mean Rec. 709 luminance along one device-pixel row or column. Where two
+ * layers abut on a fractional device pixel, each side only half-covers the
+ * shared line and whatever sits behind shows through the rest, so the seam
+ * reads as a single line darker than both of its neighbours.
+ */
+export function rowMeanLuminance(
+  shot: ScreenshotPixels,
+  y: number,
+  firstColumn: number,
+  lastColumn: number,
+): number {
+  let total = 0;
+  for (let x = firstColumn; x < lastColumn; x += 1) {
+    const offset = (y * shot.width + x) * shot.channels;
+    total += .2126 * shot.pixels[offset]
+      + .7152 * shot.pixels[offset + 1]
+      + .0722 * shot.pixels[offset + 2];
+  }
+  return total / (lastColumn - firstColumn);
+}
+
+export function columnMeanLuminance(
+  shot: ScreenshotPixels,
+  x: number,
+  firstRow: number,
+  lastRow: number,
+): number {
+  let total = 0;
+  for (let y = firstRow; y < lastRow; y += 1) {
+    const offset = (y * shot.width + x) * shot.channels;
+    total += .2126 * shot.pixels[offset]
+      + .7152 * shot.pixels[offset + 1]
+      + .0722 * shot.pixels[offset + 2];
+  }
+  return total / (lastRow - firstRow);
+}

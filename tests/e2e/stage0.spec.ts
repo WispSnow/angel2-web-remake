@@ -366,16 +366,28 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
 
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => window.__ANGEL2__?.clearSaves());
-  const chromeImages = page.getByTestId("battle-chrome").locator("img");
-  await expect(chromeImages).toHaveCount(9);
-  await expect.poll(() => chromeImages.evaluateAll((images) =>
-    images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
-  )).toBe(true);
-  const statueForegrounds = page.getByTestId("battle-foreground").locator("img");
-  await expect(statueForegrounds).toHaveCount(2);
-  await expect.poll(() => statueForegrounds.evaluateAll((images) =>
-    images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth === 32),
-  )).toBe(true);
+  // 畫框的 11 塊圖磚合成在同一張畫布上，非整數倍縮放才不會在接縫處裂開（見
+  // `chrome-composite.ts` 與 `display-scaling.spec.ts` 的接縫回歸）。這裡確認
+  // 畫框本體與原本單獨一層的雕像前景都真的畫進了這一層。
+  const chromeFrame = page.getByTestId("battle-chrome-frame");
+  await expect(chromeFrame).toHaveJSProperty("width", 480);
+  await expect(chromeFrame).toHaveJSProperty("height", 350);
+  await expect.poll(() => chromeFrame.evaluate((canvas) => {
+    const context = (canvas as HTMLCanvasElement).getContext("2d");
+    if (!context) return undefined;
+    const opaquePixels = (x: number, y: number, width: number, height: number) => {
+      const { data } = context.getImageData(x, y, width, height);
+      let opaque = 0;
+      for (let index = 3; index < data.length; index += 4) if (data[index] === 255) opaque += 1;
+      return opaque;
+    };
+    return {
+      // 左欄邊框在 y=200 整列不透明。
+      frameColumnOpaque: opaquePixels(0, 200, 40, 1) === 40,
+      // 雕像伸出戰場的那半邊有 2614 個不透明像素，其餘透空讓戰場透出。
+      statueOverhangOpaque: opaquePixels(40, 140, 32, 191) > 2000,
+    };
+  })).toEqual({ frameColumnOpaque: true, statueOverhangOpaque: true });
   expect((await debugState(page))).toMatchObject({
     phase: "prebattleStory",
     activeStoryId: "stage-00-prebattle-story",
@@ -1725,10 +1737,6 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
     const target = element as HTMLElement;
     return { left, top, width: target.offsetWidth, height: target.offsetHeight };
   });
-  const naturalSize = (locator: Locator) => locator.evaluate((element) => ({
-    width: (element as HTMLImageElement).naturalWidth,
-    height: (element as HTMLImageElement).naturalHeight,
-  }));
 
   // Nia is initially focused, so her detail HUD covers the desk and the
   // underlying object hitboxes must not remain blindly clickable.
@@ -1740,14 +1748,27 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   await expect(page.getByTestId("hud-identity").locator("span")).toHaveCount(0);
   expect(await logicalElementBounds(page.getByTestId("hud-identity")))
     .toEqual({ left: 484, top: 123, width: 152, height: 22 });
-  const unitTopChrome = page.getByTestId("hud-unit-top-chrome");
-  const unitBodyFrame = page.getByTestId("hud-unit-body-frame");
-  await expect(unitTopChrome).toBeVisible();
-  await expect(unitBodyFrame).toBeVisible();
-  await expect.poll(() => naturalSize(unitTopChrome)).toEqual({ width: 160, height: 149 });
-  await expect.poll(() => naturalSize(unitBodyFrame)).toEqual({ width: 160, height: 171 });
-  expect(await logicalElementBounds(unitTopChrome)).toEqual({ left: 480, top: 0, width: 160, height: 149 });
-  expect(await logicalElementBounds(unitBodyFrame)).toEqual({ left: 480, top: 150, width: 160, height: 171 });
+  // 上半肖像框與下半數值框合成在同一張畫布上，非整數倍縮放才不會在兩者之間裂開
+  // （見 `chrome-composite.ts`）。y=149 那一列兩塊都不畫，讓底色透出來分隔上下半。
+  const unitFrame = page.getByTestId("hud-unit-frame");
+  await expect(unitFrame).toBeVisible();
+  expect(await logicalElementBounds(unitFrame)).toEqual({ left: 480, top: 0, width: 160, height: 321 });
+  await expect.poll(() => unitFrame.evaluate((canvas) => {
+    const context = (canvas as HTMLCanvasElement).getContext("2d");
+    if (!context) return undefined;
+    const alphaSum = (x: number, y: number, width: number, height: number) => {
+      const { data } = context.getImageData(x, y, width, height);
+      let total = 0;
+      for (let index = 3; index < data.length; index += 4) total += data[index];
+      return total;
+    };
+    return {
+      size: [(canvas as HTMLCanvasElement).width, (canvas as HTMLCanvasElement).height],
+      topPainted: alphaSum(0, 0, 160, 149) > 0,
+      dividerRowClear: alphaSum(0, 149, 160, 1),
+      bodyPainted: alphaSum(0, 150, 160, 171) > 0,
+    };
+  })).toEqual({ size: [160, 321], topPainted: true, dividerRowClear: 0, bodyPainted: true });
   expect(await logicalElementBounds(page.locator("#bottom-round"))).toEqual({ left: 480, top: 322, width: 160, height: 28 });
   await captureVisualAudit(screen, { path: "artifacts/playwright/stage0-side-panel-unit-chrome.png" });
 
@@ -1763,11 +1784,22 @@ test("RHP-01: native side-panel hitboxes share one gated coordinate layer", asyn
   await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
   await expect(screen).toHaveAttribute("data-hud-mode", "tactical");
   await expect(screen).toHaveAttribute("data-side-panel-hotspots", "active");
-  const minimapFrame = page.getByTestId("tactical-minimap-frame");
-  await expect(minimapFrame).toBeVisible();
-  await expect.poll(() => naturalSize(minimapFrame)).toEqual({ width: 160, height: 171 });
-  expect(await logicalElementBounds(minimapFrame)).toEqual({ left: 480, top: 150, width: 160, height: 171 });
+  // 戰術桌底圖與小地圖框同樣合成為一張。這兩塊原本隔著開關狀態圖與小地圖，
+  // 併層靠重排 z-index 維持「小地圖 → 邊框 → 開關」的疊放次序。
+  const tacticalFrame = page.getByTestId("tactical-panel-frame");
+  await expect(tacticalFrame).toBeVisible();
+  expect(await logicalElementBounds(tacticalFrame)).toEqual({ left: 480, top: 0, width: 160, height: 321 });
   expect(await logicalElementBounds(page.getByTestId("tactical-minimap"))).toEqual({ left: 485, top: 161, width: 150, height: 150 });
+  expect(await page.evaluate(() => {
+    const layer = (selector: string) => Number(
+      getComputedStyle(document.querySelector(selector) as HTMLElement).zIndex,
+    );
+    return {
+      minimap: layer(".tactical-minimap"),
+      frame: layer(".tactical-panel-frame"),
+      state: layer(".tactical-panel-state"),
+    };
+  })).toEqual({ minimap: 0, frame: 1, state: 2 });
 
   const logicalBounds = async (locator: Locator) => locator.evaluate((element) => {
     const bounds = getComputedStyle(element);
