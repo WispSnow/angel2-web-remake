@@ -4,6 +4,7 @@ import { portraitAssetUrls } from "../../src/game/content/portrait-assets";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { STARTUP_IMAGE_URLS } from "../../src/game/startup-screen";
 import type { CompletedSaveData } from "../../src/game/types";
+import { skipStoryDialogue } from "./dialogue-controls";
 import { activateStartup, skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -576,6 +577,38 @@ test("continue gates the saved target stage rather than assuming stage 0", async
   await expect(overlay).toBeHidden({ timeout: 15_000 });
   await expect(page.getByTestId("game-screen")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("game-screen")).toHaveAttribute("aria-label", /騎士城堡前/);
+});
+
+/**
+ * 部署介面是延後載入的，它的模組不在資源清單裡。原本要等「部署」階段真的開始才去抓，
+ * 而那時載入頁早就收起來了：慢速連線上玩家看到的是一片沒有進度、也沒有東西可畫的
+ * 部署表面，感覺就是卡死。載入頁收起之後、部署畫面出現之前，不該再有任何程式或樣式
+ * 請求——關卡資源門要把它們一起備妥。
+ */
+test("the deployment surface crosses the stage gate, not the phase switch", async ({ page }) => {
+  const lateModules: string[] = [];
+  let recording = false;
+  page.on("request", (request) => {
+    if (!recording) return;
+    const type = request.resourceType();
+    if (type !== "script" && type !== "stylesheet") return;
+    lateModules.push(new URL(request.url()).pathname);
+  });
+
+  await page.goto("/?test=1&debugScenario=stage-00-player");
+  await expect(page.getByTestId("game-screen")).toBeVisible();
+  await page.locator("[data-debug-complete]").click();
+  const overlay = page.getByTestId("resource-loading-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toHaveAttribute("data-resource-pack", "stage:stage-01");
+  await expect(overlay).toBeHidden({ timeout: 60_000 });
+
+  // 從這裡開始玩家看的是遊戲畫面，不是進度條。
+  recording = true;
+  await expect(page.getByTestId("dialogue-layer")).toBeVisible();
+  await skipStoryDialogue(page);
+  await expect(page.getByTestId("deployment-screen")).toBeVisible({ timeout: 60_000 });
+  expect(lateModules).toEqual([]);
 });
 
 test("clearing a stage forces only its successor, then prefetches the following two", async ({ page }) => {

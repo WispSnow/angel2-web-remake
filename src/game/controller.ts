@@ -144,6 +144,11 @@ export interface StageAssetRequirements {
   encounterClassIds: readonly UnitClassId[];
   nativeStage: number;
   portraitRecords: readonly PortraitRecord[];
+  /**
+   * 這一關會不會走到部署介面。部署表面是延後載入的，模組本身不在資源清單裡，因此得由
+   * 資源門一併備妥；否則慢速連線會在階段切過去之後才開始抓，而那時已經沒有載入頁了。
+   */
+  usesDeploymentSurface: boolean;
 }
 
 export type StageAssetGate = (
@@ -614,6 +619,11 @@ export class GameController {
     return controller;
   }
 
+  /** 目前這一關是否有部署階段；資源門用它決定要不要一併備妥部署介面模組。 */
+  get usesDeploymentSurface(): boolean {
+    return this.stageRuntime.preparation !== undefined;
+  }
+
   get deploymentRoster() {
     return this.preparationCampaign && this.stageRuntime.preparation
       ? this.stageRuntime.preparation.createRoster(this.preparationCampaign)
@@ -785,6 +795,7 @@ export class GameController {
       encounterClassIds: [...encounterClassIds],
       nativeStage: runtime.definition.nativeStage,
       portraitRecords: [...portraitRecords].sort((left, right) => left - right),
+      usesDeploymentSurface: runtime.preparation !== undefined,
     });
     return runtime;
   }

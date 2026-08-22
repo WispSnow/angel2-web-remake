@@ -137,6 +137,12 @@ pnpm content:resource-manifest
 JS／CSS 由 `public/_headers` 设为一年 `immutable`。这不是离线应用：没有 Service Worker 或 R2，没有完整缓存的
 资源仍须网络可用；不要在发布步骤改成全战役首屏下载。
 
+部署介面是正式流程里唯一延后加载的表面，它的模块与样式是打包产物，不在资源清单里。有部署阶段的
+关卡必须在关卡资源门内把这些模块一并备妥（`ensureStage` 的 `afterLoad`），载入页收起之后、玩家走到
+部署画面之前不得再有程式或样式请求；否则慢速连线会在阶段切过去、载入页已经收起时才开始抓，画面停在
+没有任何提示的空表面上，玩家看到的就是卡死。新增延后加载的正式表面时同样要接进这条门，不要只依赖
+掛載当下的 `import()`。
+
 Cache Storage 不会自动拦截 `<img>`、CSS `url()`、Phaser 或 `new Image()`；正式运行时必须先把
 当前资源包的 PNG／JSON 响应交给 staged render lease，再由 DOM、CSS 与 Phaser 使用同一次响应
 建立的对象 URL。战场边框、HUD、战术面板、对话框、点阵字体、命令菜单／指针和状态图标属于

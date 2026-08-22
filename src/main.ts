@@ -30,11 +30,46 @@ const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
 const releaseBuild = import.meta.env.MODE === "release";
 const resourceLoader = new ResourcePackLoader();
+/**
+ * 部署介面是正式流程裡唯一延後載入的表面。它的模組與樣式是打包產物，不在資源清單裡，
+ * 所以原本要等「部署」階段真的開始才去抓；慢速連線上那一刻載入頁已經收起，畫面停在
+ * 還沒有東西可畫的部署表面上，看起來就是卡死。改成由需要部署的關卡在資源門裡先備妥，
+ * 等待因此留在有進度條的載入頁。掛載時共用同一個 promise，不會重抓。
+ */
+type DeploymentSurfaceModules = readonly [
+  typeof import("./game/deployment-session"),
+  typeof import("./game/deployment-ui"),
+  typeof import("./game/phaser/DeploymentScene"),
+  typeof import("./game/simulation/deployment"),
+  typeof import("./game/scaling"),
+];
+let deploymentSurfaceModules: Promise<DeploymentSurfaceModules> | undefined;
+const loadDeploymentSurfaceModules = (): Promise<DeploymentSurfaceModules> => {
+  deploymentSurfaceModules ??= Promise.all([
+    import("./game/deployment-session"),
+    import("./game/deployment-ui"),
+    import("./game/phaser/DeploymentScene"),
+    import("./game/simulation/deployment"),
+    import("./game/scaling"),
+    import("./deployment-lab.css"),
+  ]).then(([session, ui, scene, simulation, scaling]) =>
+    [session, ui, scene, simulation, scaling] as const,
+  ).catch((error: unknown) => {
+    // 失敗的 promise 不能留著，否則資源門的「重試」只會重播同一個錯誤。
+    deploymentSurfaceModules = undefined;
+    throw error;
+  });
+  return deploymentSurfaceModules;
+};
+
 const stageAssetGate: StageAssetGate = (stageId, requirements) =>
   resourceLoader.ensureStage(
     stageId,
     `讀取 ${stageId} 關卡資料`,
     classPresentationAssetUrls(requirements),
+    requirements.usesDeploymentSurface
+      ? async () => { await loadDeploymentSurfaceModules(); }
+      : undefined,
   );
 
 const controllerAssetRequirements = (controller: GameController): StageAssetRequirements => ({
@@ -48,6 +83,7 @@ const controllerAssetRequirements = (controller: GameController): StageAssetRequ
     ...controller.battle.units.map(({ portrait }) => portrait),
     ...stageDialoguePortraitRecords(controller.battle.stage),
   ])],
+  usesDeploymentSurface: controller.usesDeploymentSurface,
 });
 const stage0Units = createStage0Units();
 const stage0PresentationAssets = classPresentationAssetUrls({
@@ -88,14 +124,7 @@ const mountController = (
       { startDeploymentPhaser },
       { finishDeployment },
       { configureGameScaling },
-    ] = await Promise.all([
-      import("./game/deployment-session"),
-      import("./game/deployment-ui"),
-      import("./game/phaser/DeploymentScene"),
-      import("./game/simulation/deployment"),
-      import("./game/scaling"),
-      import("./deployment-lab.css"),
-    ]);
+    ] = await loadDeploymentSurfaceModules();
     root.innerHTML = `
       <div class="page-shell">
         <div class="game-stage">

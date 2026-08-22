@@ -143,10 +143,16 @@ export class ResourcePackLoader {
     await this.ensurePackVisible("boot", "讀取開場資料", [], "all", afterLoad);
   }
 
+  /**
+   * `afterLoad` 讓呼叫端把「不在資源清單裡、但這一關的表面需要」的準備工作留在載入頁
+   * 收起之前完成——目前是部署介面那幾個延後載入的模組。慢速連線的等待因此仍然發生在
+   * 有進度條的畫面上，而不是在已經切過去、卻還沒有東西可畫的表面上。
+   */
   async ensureStage(
     stageId: StageId,
     label = "準備關卡資料",
     supplementalUrls: readonly string[] = [],
+    afterLoad?: () => Promise<void>,
   ): Promise<void> {
     const portraitUrls = supplementalUrls.filter((url) =>
       url.startsWith("/assets/original/portraits/") && url.endsWith(".png"));
@@ -155,6 +161,7 @@ export class ResourcePackLoader {
       label,
       supplementalUrls,
       (urls) => [...new Set([...portraitUrls, ...stageSurfaceImageUrls(urls)])],
+      afterLoad,
     );
   }
 
