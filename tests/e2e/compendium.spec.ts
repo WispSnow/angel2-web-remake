@@ -260,6 +260,62 @@ test("職業圖鑑：窄屏的阵营与动作控件不会挤出详情栏", async
   });
 });
 
+/**
+ * 瀏覽器縮放會等比縮小 CSS 視窗，所以「放大到 200% 以上」對版面來說就是一個又矮又窄的
+ * 橫向視窗：1920×1080 放大到 250% 正好是 768×432。既有的窄屏案例都是手機那種高視窗，
+ * 蓋不到這一格。
+ */
+test("職業圖鑑：放大後的矮視窗仍是雙欄，兩欄都拿得到高度", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 432 });
+  await page.goto("/");
+  await openCompendium(page, "classes");
+  const index = page.getByTestId("compendium-index");
+  const detail = page.getByTestId("compendium-detail");
+  await expect(detail.getByRole("heading", { name: "士兵" })).toBeVisible();
+
+  const [indexBox, detailBox] = await Promise.all([index.boundingBox(), detail.boundingBox()]);
+  expect(indexBox).not.toBeNull();
+  expect(detailBox).not.toBeNull();
+  if (indexBox && detailBox) {
+    // 並排，不是疊起來。
+    expect(detailBox.x).toBeGreaterThanOrEqual(indexBox.x + indexBox.width - 1);
+    expect(Math.abs(detailBox.y - indexBox.y)).toBeLessThan(2);
+    expect(indexBox.height).toBeGreaterThan(120);
+    expect(detailBox.height).toBeGreaterThan(120);
+  }
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/compendium-zoomed-landscape.png",
+    animations: "allow",
+  });
+});
+
+/**
+ * 再窄一階（560px 以下）才疊成單欄。索引欄原本吃固定 200px，比整格還高，詳情欄因此被
+ * 算成 0px；`.rn-body` 又是 overflow:hidden，玩家連捲都捲不到。改成按比例分配後兩段都留得住。
+ */
+test("職業圖鑑：疊成單欄時詳情欄仍分得到高度", async ({ page }) => {
+  await page.setViewportSize({ width: 520, height: 320 });
+  await page.goto("/");
+  await openCompendium(page, "classes");
+  const index = page.getByTestId("compendium-index");
+  const detail = page.getByTestId("compendium-detail");
+  await expect(detail.getByRole("heading", { name: "士兵" })).toBeVisible();
+
+  const [indexBox, detailBox] = await Promise.all([index.boundingBox(), detail.boundingBox()]);
+  expect(indexBox).not.toBeNull();
+  expect(detailBox).not.toBeNull();
+  if (indexBox && detailBox) {
+    expect(detailBox.y).toBeGreaterThanOrEqual(indexBox.y + indexBox.height - 1);
+    expect(indexBox.height).toBeGreaterThan(24);
+    // 索引最多只占 38%，剩下的都留給詳情。
+    expect(detailBox.height).toBeGreaterThan(indexBox.height);
+  }
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/compendium-zoomed-stacked.png",
+    animations: "allow",
+  });
+});
+
 test("職業圖鑑覆蓋全部職業，每一項都畫得出屬性", async ({ page }) => {
   await page.goto("/");
   await openCompendium(page, "classes");

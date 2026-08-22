@@ -51,6 +51,39 @@ test("RoadMap 展示候選方向、QQ 群與原始二維碼", async ({ page }) =
     .toHaveAttribute("aria-selected", "true");
 });
 
+/**
+ * 縮放到 200% 以上就是一個又矮又窄的橫向視窗（1920×1080 放大 300% = 640×360）。
+ * 社群卡疊到主欄下方時會落在捲動區外好幾百 px，等於看不見，所以這一格仍要保住雙欄，
+ * 只把兩欄收窄。
+ */
+test("RoadMap：放大後的矮視窗仍保留右欄社群卡", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 360 });
+  await page.goto("/");
+  await page.getByTestId("roadmap-open").click();
+
+  const main = page.locator(".rn-roadmap-main");
+  const community = page.locator(".rn-roadmap-community");
+  const item = page.getByTestId("roadmap-item-hd-portraits");
+  const [mainBox, communityBox, itemBox] = await Promise.all([
+    main.boundingBox(),
+    community.boundingBox(),
+    item.boundingBox(),
+  ]);
+  expect(mainBox).not.toBeNull();
+  expect(communityBox).not.toBeNull();
+  expect(itemBox).not.toBeNull();
+  if (mainBox && communityBox && itemBox) {
+    expect(communityBox.x).toBeGreaterThanOrEqual(mainBox.x + mainBox.width - 1);
+    // 主欄變窄之後卡片自己收成單欄，不必等視窗斷點。
+    expect(itemBox.width).toBeGreaterThan(mainBox.width - 2);
+  }
+  // 不必捲動就看得到群號。
+  await expect(page.getByTestId("roadmap-qq-group")).toBeInViewport();
+  await captureVisualAudit(page.locator(".rn-dialog"), {
+    path: "artifacts/playwright/roadmap-zoomed-landscape.png",
+  });
+});
+
 test("RoadMap 在窄螢幕改為單欄且仍可完整捲動", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

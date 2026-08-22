@@ -304,9 +304,11 @@
 }
 .rn-roadmap-notice strong { color: #f3dcae; font-size: 13px; }
 .rn-roadmap-notice span { color: #aa9778; font: 11px/1.6 system-ui, sans-serif; }
+/* 卡片按自己那一欄的實際寬度決定欄數：外層雙欄在縮放後會先變窄，
+   用視窗斷點切換會慢一拍，讓卡片先擠成兩欄再突然全部疊起來。 */
 .rn-roadmap-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 232px), 1fr));
   gap: 10px;
 }
 .rn-roadmap-item {
@@ -680,27 +682,38 @@
 .rn-class-link:hover { border-color: var(--gold-dark); color: var(--gold); }
 
 @media (max-width: 900px) {
+  .rn-note dl > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+/* 瀏覽器縮放會等比縮小 CSS 視窗，所以這裡的斷點同時決定「縮放到幾倍才失去雙欄」。
+   700px 以下先把兩欄各自收窄，還不疊起來：1920×1080 放大到 300% 就是 640px，
+   實測那個寬度的雙欄仍然讀得下去，塌成單欄反而把右欄推到捲動區外幾百 px。 */
+@media (max-width: 700px) {
+  .rn-roadmap { grid-template-columns: minmax(0, 1fr) minmax(216px, 268px); gap: 14px; }
+  .rn-compendium { grid-template-columns: minmax(160px, 208px) minmax(0, 1fr); gap: 12px; }
+}
+@media (max-width: 560px) {
+  .rn-dialog { width: 100vw; max-height: 100vh; border: none; border-radius: 0; }
+  .rn-head, .rn-tabs, .rn-body, .rn-foot { padding-inline: 14px; }
   .rn-roadmap { grid-template-columns: minmax(0, 1fr); }
   .rn-roadmap-community { position: static; }
-  .rn-compendium { grid-template-columns: minmax(0, 1fr); grid-template-rows: 200px minmax(0, 1fr); }
+  /* 疊起來之後索引不能再吃固定高度：矮視窗整格只剩一百多 px，固定 200px 會把詳情欄
+     算成 0px，而 `.rn-body` 是 overflow:hidden，被壓掉的那一欄連捲都捲不到。 */
+  .rn-compendium {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: min(200px, 38%) minmax(0, 1fr);
+  }
   .rn-class-index {
     padding-right: 0;
     padding-bottom: 10px;
     border-right: none;
     border-bottom: 1px solid #33231f;
   }
-  .rn-note dl > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
-}
-@media (max-width: 560px) {
-  .rn-dialog { width: 100vw; max-height: 100vh; border: none; border-radius: 0; }
-  .rn-head, .rn-tabs, .rn-body, .rn-foot { padding-inline: 14px; }
   .rn-tabs { overflow-x: auto; }
   .rn-tabs > button { flex: none; padding-inline: 12px; }
   .rn-controls-grid { grid-template-columns: minmax(0, 1fr); }
   .rn-control-row { grid-template-columns: minmax(100px, .75fr) minmax(0, 1.25fr); }
   .rn-disclaimer-lead { padding: 14px; }
   .rn-disclaimer-grid { grid-template-columns: minmax(0, 1fr); }
-  .rn-roadmap-grid { grid-template-columns: minmax(0, 1fr); }
   .rn-roadmap-item { min-height: 0; }
   .rn-class-head { align-items: flex-start; }
   .rn-class-title { min-width: calc(100% - 120px); }
@@ -711,6 +724,20 @@
   .rn-class-preview { padding: 9px; }
   .rn-class-animation-switch { display: grid; width: 100%; grid-template-columns: repeat(5, 1fr); }
   .rn-class-animation-switch button { min-width: 0; padding-inline: 5px; }
+}
+
+/* 橫向視窗放大到 200% 以上時，先見底的其實是高度：360px 的 CSS 視窗只給得出 328px 高的
+   對話框，而固定的頭、分頁與頁尾就佔掉 184px。矮視窗收掉副標與多餘留白，把高度讓回內容，
+   索引與詳情才都還剩得下幾行。選擇器帶上 `.rn-dialog` 是為了壓過 `[data-tab]` 的分頁留白。 */
+@media (max-height: 560px) {
+  .rn-dialog { height: calc(100vh - 16px); }
+  .rn-dialog .rn-head { padding: 9px 20px 7px; }
+  .rn-dialog .rn-head h2 { margin: 3px 0 0; font-size: 17px; }
+  .rn-dialog .rn-subtitle { display: none; }
+  .rn-dialog .rn-tabs { padding-top: 6px; }
+  .rn-dialog .rn-tabs > button { padding-block: 3px; }
+  .rn-dialog .rn-body { padding-top: 12px; padding-bottom: 14px; }
+  .rn-dialog .rn-foot { padding-block: 6px; }
 }
 
 /* 角色圖鑑。左欄多一欄首次登場關卡，右欄把出場關卡排成可掃視的網格。 */
