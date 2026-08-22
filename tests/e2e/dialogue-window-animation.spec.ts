@@ -22,11 +22,20 @@ interface WindowMutation {
   hidden: boolean;
   layerHidden: boolean;
   boxHidden: boolean;
+  /** 收合中窗內文字是否已經看不見；原版收合第一格就用空白窗格把字擦掉了。 */
+  textVisibility: string;
+}
+
+/** 逐字每寫一次，就記下當下窗體展開動畫還在不在播。 */
+interface RevealSample {
+  glyphs: number;
+  windowOpening: boolean;
 }
 
 declare global {
   interface Window {
     __dialogueWindowMutations?: WindowMutation[];
+    __dialogueRevealSamples?: RevealSample[];
   }
 }
 
@@ -36,6 +45,8 @@ const NATIVE_OPEN_INSETS = [
 ];
 
 const STORY_SCENARIO = "/?debugScenario=stage-00-prebattle&difficulty=0&test=1";
+/** 玩家回合可以隨時要一個全新的上方窗：集體命令對白每次都自己開一次窗。 */
+const PLAYER_SCENARIO = "/?debugScenario=stage-00-player&difficulty=0&test=1";
 
 const storyPanel = (page: Page): Locator => page.getByTestId("dialogue-layer")
   .locator(".dialogue-copy:not([hidden])")
@@ -52,11 +63,13 @@ async function recordWindowMutations(page: Page): Promise<void> {
     window.__dialogueWindowMutations = log;
     for (const id of ["dialogue-copy-upper", "dialogue-copy-lower"]) {
       const panel = document.getElementById(id)!;
+      const text = panel.querySelector<HTMLElement>("p")!;
       new MutationObserver(() => log.push({
         className: panel.className,
         hidden: (panel as HTMLElement).hidden,
         layerHidden: layer.hidden,
         boxHidden: panel.closest<HTMLElement>(".dialogue-box")!.hidden,
+        textVisibility: getComputedStyle(text).visibility,
       })).observe(panel, { attributes: true, attributeFilter: ["class", "hidden"] });
     }
   });
@@ -64,6 +77,33 @@ async function recordWindowMutations(page: Page): Promise<void> {
 
 const windowMutations = (page: Page) => page.evaluate(
   () => window.__dialogueWindowMutations ?? [],
+);
+
+/**
+ * 記錄上方窗的逐字進度，以及每一次寫入時窗體展開動畫還在不在播。
+ *
+ * 這是「先開窗、後打字」唯一測得準的角度：修好之前第一個字大約落在 220 ms 展開動畫的
+ * 第 12 ms，樣本裡就會出現「有字、動畫還在播」；修好之後不可能再有那種樣本。
+ */
+async function recordDialogueReveal(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const panel = document.getElementById("dialogue-copy-upper")!;
+    // 活動窗的 `p` 會被改名成 `#dialogue-text`，所以只能從面板本身往下找。
+    const text = panel.querySelector<HTMLElement>("p")!;
+    const log: RevealSample[] = [];
+    window.__dialogueRevealSamples = log;
+    new MutationObserver(() => log.push({
+      glyphs: text.querySelectorAll(".dialogue-glyph").length,
+      windowOpening: panel.getAnimations().some((animation) =>
+        animation instanceof CSSAnimation
+        && animation.animationName === "dialogue-window-open"
+        && animation.playState !== "finished"),
+    })).observe(text, { childList: true, subtree: true });
+  });
+}
+
+const dialogueRevealSamples = (page: Page) => page.evaluate(
+  () => window.__dialogueRevealSamples ?? [],
 );
 
 test("the A/18 window expands from the centre through the native step widths", async ({ page }) => {
@@ -159,10 +199,85 @@ test("the layer and its portrait outlive the closing window", async ({ page }) =
     expect(entry.layerHidden).toBe(false);
     expect(entry.boxHidden).toBe(false);
   }
+  // 收合期間窗內文字已經不見了：`0000:1032` 的每一格都用空白窗格重畫窗內，字不會跟著
+  // 窗體一起被收窄。節點本身留著，肖像與姓名牌才有東西可以陪窗體活到最後一格。
+  for (const entry of closing) {
+    if (entry.hidden) continue;
+    expect(entry.textVisibility).toBe("hidden");
+  }
   // 收尾必須把收合類名與圖層一起收乾淨，否則下次開啟會停在 80 px。
   const settled = log.find((entry) =>
     !entry.className.includes("is-dialogue-window-closing") && entry.hidden);
   expect(settled?.layerHidden).toBe(true);
+});
+
+/**
+ * `WU`／`WD` 在 SAY 腳本裡是一條獨立命令：解釋器把 `0000:0F41` 的 11 步跑完才輪到下一
+ * 條 `text`，所以原版沒有「窗體還在展開、字已經在打」的畫面。複刻此前一解除 `hidden`
+ * 就同時開始逐字，玩家看到的是字被 `clip-path` 裁在展開中的窗外、逐字音也提早響。
+ */
+test("the typewriter waits for the window to finish expanding", async ({ page }) => {
+  await page.goto(PLAYER_SCENARIO);
+  await page.waitForFunction(() => window.__ANGEL2__?.getState().phase === "player");
+  await recordDialogueReveal(page);
+
+  // 集體命令的「全部休息」對白每次都自己開一次上方窗，是最乾淨的單次展開。
+  await page.keyboard.press("g");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.getByTestId("group-command-allRest").click();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:86E4");
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("大家聽著！");
+
+  const samples = await dialogueRevealSamples(page);
+  expect(samples.some((sample) => sample.glyphs > 0)).toBe(true);
+  // 展開播完之前一個字都不能出現。
+  expect(samples.filter((sample) => sample.glyphs > 0 && sample.windowOpening)).toEqual([]);
+});
+
+/**
+ * 等待不能把玩家的按鍵吃掉。原版 `WU` 不讀輸入，那一下留在 DOS 鍵盤緩衝裡，等第一個
+ * 字形的 8 tick 等待才被讀走並快進其餘——所以按鍵次數與「窗早就開著」的情況一樣，
+ * 而且第一個字仍會畫出來。這裡把展開凍在原版第 4 格再送主操作，斷言就與機器快慢無關。
+ */
+test("a primary action during the expansion still costs a single press", async ({ page }) => {
+  await page.goto(STORY_SCENARIO);
+  const layer = page.getByTestId("dialogue-layer");
+  await expect(layer).toBeVisible();
+  const dialogueIndex = () => page.evaluate(() => window.__ANGEL2__?.getState().dialogueIndex);
+
+  // SAY/0000 前兩頁在下窗，第 3 頁換到上窗——那一次才會重新跑展開。
+  await expect.poll(dialogueIndex).toBe(0);
+  for (let press = 0; press < 4; press += 1) await layer.click();
+  await expect.poll(dialogueIndex).toBe(2);
+
+  await recordDialogueReveal(page);
+  const frozen = await page.evaluate(() => {
+    const panel = document.getElementById("dialogue-copy-upper")!;
+    const animation = panel.getAnimations().find((candidate) =>
+      candidate instanceof CSSAnimation && candidate.animationName === "dialogue-window-open");
+    if (!animation) return "already expanded";
+    animation.pause();
+    animation.currentTime = (220 / 11) * 4;
+    return getComputedStyle(panel).getPropertyValue("--dialogue-window-inset").trim();
+  });
+  expect(frozen).toBe("96px");
+
+  // 第一下：補完本頁，不推進；窗體同時被跳到最後一格。
+  await layer.click();
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText("吵吵鬧鬧");
+  expect(await dialogueIndex()).toBe(2);
+  expect(await page.evaluate(() => {
+    const panel = document.getElementById("dialogue-copy-upper")!;
+    return getComputedStyle(panel).getPropertyValue("--dialogue-window-inset").trim();
+  })).toBe("0px");
+  // 原版那一下是等第一個字畫完才被讀走的，所以逐字至少寫過一次、口型跟著動過。
+  expect((await dialogueRevealSamples(page)).some((sample) => sample.glyphs > 0)).toBe(true);
+  await expect(page.getByTestId("dialogue-portrait-composite"))
+    .toHaveAttribute("data-talk-count", /^[1-9][0-9]*$/);
+
+  // 第二下才推進，與窗早就開著時完全一樣。
+  await layer.click();
+  await expect.poll(dialogueIndex).toBe(3);
 });
 
 // `test.use({ reducedMotion })` 在本套件不會落到頁面上（見 `menu-animation.spec.ts`），

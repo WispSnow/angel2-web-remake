@@ -1042,13 +1042,23 @@ export class GameController {
       : undefined;
   }
 
+  /**
+   * `REMAKE-122`：集體命令的說話者。
+   *
+   * `跟隨主將` 講的是「跟著我來」，說話者必須是玩家剛指定的臨時主將本人。其餘兩項是
+   * 全軍號令，複刻決定（`[DD]`）由本關主將發出——即模組 29 `6D0C/6D4B/6DA1` 讀
+   * `DS:5788`（游標格）、由格上單位的描述子供肖像的那個原生取法，在複刻裡會退化成
+   * 「上一個行動過的單位」：`battle.focusId` 每次攻擊、施法、被打都會改寫，於是士兵
+   * 會替妮雅下令全軍休息。沒有明確 `commanderId` 的關卡（0／1／2／21／22）回退到槽
+   * `1:0`，那是全戰役的妮雅槽；主將不在場時才落回焦點。
+   */
   get groupCommandSpeaker(): BattleUnit | undefined {
     const leader = this.groupCommandLeaderId
       ? this.battle.unit(this.groupCommandLeaderId)
       : undefined;
     if (leader?.side === 1) return leader;
-    const fixedCommander = this.battle.groupCommander;
-    if (fixedCommander) return fixedCommander;
+    const commander = this.battle.groupCommander ?? this.battle.unit("1:0");
+    if (commander?.side === 1) return commander;
     const focus = this.battle.focus;
     return focus?.side === 1 ? focus : this.battle.units.find(({ side }) => side === 1);
   }

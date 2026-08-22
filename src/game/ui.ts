@@ -42,9 +42,12 @@ import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
 import {
+  dialogueWindowOpenAnimation,
   finishDialogueWindowClose,
+  finishDialogueWindowOpen,
   isDialogueWindowClosing,
   setDialogueWindowOpen,
+  whenDialogueWindowOpened,
 } from "./dialogue-window-animation";
 import { finishMenuClose, setMenuOpen } from "./menu-animation";
 import {
@@ -446,6 +449,14 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   let revealedCharacters = 0;
   let activeDialogueText: HTMLElement | undefined;
   let activeDialoguePortrait: HTMLElement | undefined;
+  /** 當前逐字所在的 `A/18` 面板；主操作要補完逐字時得先把它的展開跳到最後一格。 */
+  let activeDialoguePanel: HTMLElement | undefined;
+  /** 展開途中按下、待逐字開始才兌現的主操作；等同原版留在 DOS 鍵盤緩衝裡的那一下。 */
+  let pendingDialogueFastForward = false;
+  /** 本頁逐字是否已經起跑。只有還沒起跑的那一段才把主操作記到緩衝裡。 */
+  let dialogueRevealStarted = false;
+  // 肖像分層還沒解碼完時主操作只能被吃掉：那一段連字都還沒有，補完等於把整頁跳過去。
+  // 窗體展開不走這條——展開中的主操作照樣是「補完本頁」，只是要先讓窗體到位。
   let activeDialoguePortraitReady = true;
   let feedbackTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let activeFeedbackKey = "";
@@ -485,6 +496,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   };
   const scheduleAutomaticDialogueAdvance = (key: string) => {
     if (!controller.promotionDialogueActive && !controller.groupCommandDialogueActive) return;
+    // 玩家補完逐字與逐字自然跑完都會走到這裡，重複排程會讓同一頁被推進兩次。
+    if (dialogueAdvanceTimer !== undefined) globalThis.clearTimeout(dialogueAdvanceTimer);
     const delay = controller.groupCommandDialogueActive && controller.isTestMode
       ? 1_200
       : controller.isTestMode
@@ -508,13 +521,17 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     target: HTMLElement,
     revealStart = 0,
     portrait?: HTMLElement,
+    panel?: HTMLElement,
   ) => {
     stopDialogueTimer();
     stopSpeaking(activeDialoguePortrait);
+    pendingDialogueFastForward = false;
+    dialogueRevealStarted = false;
     activeDialogueKey = key;
     dialogueFullText = fullText;
     activeDialogueText = target;
     activeDialoguePortrait = portrait;
+    activeDialoguePanel = panel;
     revealedCharacters = Math.max(0, Math.min(fullText.length, revealStart));
     renderNativeDialogueText(target, fullText.slice(0, revealedCharacters), fullText);
     const tick = () => {
@@ -535,12 +552,36 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     const begin = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target) return;
       activeDialoguePortraitReady = true;
+      dialogueRevealStarted = true;
       startSpeaking(activeDialoguePortrait, revealedCharacters < dialogueFullText.length);
       tick();
+      // 展開途中按下的主操作在這裡兌現。原版是 DOS 鍵盤緩衝：`WU` 不讀輸入，那一下留
+      // 在緩衝區，等第一個字形的 8 tick 等待才被讀走並快進其餘。`tick()` 已經畫完第一
+      // 個字，所以這裡補完剩下的就與原版同拍。
+      if (pendingDialogueFastForward) {
+        pendingDialogueFastForward = false;
+        finishDialogueTyping();
+      }
     };
+    // 肖像解碼與窗體展開是兩道獨立的前置條件，只有肖像會把主操作整個吃掉：肖像沒到位
+    // 時連逐字都還不能開始，也沒有「本頁」可以補完。窗體展開則收下那一下、跳完展開後
+    // 由 `begin()` 兌現，所以玩家按下去仍然只補完本頁，不會白按一次。
     activeDialoguePortraitReady = portrait === undefined;
-    if (!portrait) begin();
-    else void prepareAnimatedPortrait(portrait).then(begin).catch(() => {
+    const portraitReady = portrait
+      ? prepareAnimatedPortrait(portrait).then(() => {
+        if (activeDialogueKey === key && activeDialogueText === target) {
+          activeDialoguePortraitReady = true;
+        }
+      })
+      : undefined;
+    // `WU`／`WD` 在 SAY 腳本裡是獨立命令，展開的 11 步跑完才輪到下一條 `text`，所以
+    // 逐字要等窗體展開；同一個窗接著放下一頁時沒有展開動畫，這裡也就同步開始。
+    const opening = panel && dialogueWindowOpenAnimation(panel)
+      ? whenDialogueWindowOpened(panel)
+      : undefined;
+    const prerequisites = [portraitReady, opening].filter((pending) => pending !== undefined);
+    if (prerequisites.length === 0) begin();
+    else void Promise.all(prerequisites).then(begin).catch(() => {
       if (activeDialogueKey !== key || activeDialogueText !== target) return;
       activeDialoguePortraitReady = true;
       revealedCharacters = dialogueFullText.length;
@@ -552,6 +593,17 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const finishDialogueTyping = (): boolean => {
     if (!activeDialoguePortraitReady && activeDialogueText) return true;
     if (!dialogueFullText || !activeDialogueText || revealedCharacters >= dialogueFullText.length) return false;
+    // 窗體還在展開、逐字也還沒起跑時字一個都還沒畫：把展開跳到最後一格，並把這一下記
+    // 到 `begin()` 去兌現，而不是在這裡把整頁一次補完——原版的鍵盤緩衝也是等逐字開始
+    // 才被讀走，第一個字仍會畫出來（口型因此至少動一次）。逐字已經起跑（含頁面不可見
+    // 時由保險絲放行的那條路）就走原本的即時補完，否則這一下會沒人兌現。
+    if (!dialogueRevealStarted
+      && activeDialoguePanel
+      && dialogueWindowOpenAnimation(activeDialoguePanel)) {
+      finishDialogueWindowOpen(activeDialoguePanel);
+      pendingDialogueFastForward = true;
+      return true;
+    }
     stopDialogueTimer();
     revealedCharacters = dialogueFullText.length;
     renderNativeDialogueText(activeDialogueText, dialogueFullText);
@@ -1463,14 +1515,26 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           ? dialogueWindows[page.activeSlot].portrait
           : undefined;
         target.id = "dialogue-text";
-        if (pageChanged) revealDialogue(activeState.text, pageKey, target, page.revealStart, portrait);
+        if (pageChanged) {
+          revealDialogue(
+            activeState.text,
+            pageKey,
+            target,
+            page.revealStart,
+            portrait,
+            dialogueWindows[page.activeSlot].copy,
+          );
+        }
       } else if (pageChanged) {
         stopDialogueTimer();
         stopSpeaking(activeDialoguePortrait);
         activeDialogueKey = pageKey;
         activeDialogueText = undefined;
         activeDialoguePortrait = undefined;
+        activeDialoguePanel = undefined;
         activeDialoguePortraitReady = true;
+        pendingDialogueFastForward = false;
+        dialogueRevealStarted = false;
         dialogueFullText = "";
         revealedCharacters = 0;
       }
@@ -1489,7 +1553,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       activeDialogueKey = "";
       activeDialogueText = undefined;
       activeDialoguePortrait = undefined;
+      activeDialoguePanel = undefined;
       activeDialoguePortraitReady = true;
+      pendingDialogueFastForward = false;
+      dialogueRevealStarted = false;
       dialogueFullText = "";
       revealedCharacters = 0;
     }
