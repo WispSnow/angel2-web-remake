@@ -313,3 +313,80 @@ test("advanced source options use published class figures", async ({ page }) => 
     await expect(image).toHaveAttribute("src", new RegExp(`ally-${classId}\\.png$`));
   }
 });
+
+test("variable-size profession figures remain undistorted and centered in the native choices", async ({ page }) => {
+  await page.goto("/promotion-lab.html?test=1");
+  await page.getByTestId("promotion-lab-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  const openChoices = async (
+    source: { x: number; y: number },
+    target: { x: number; y: number },
+  ) => {
+    await clickWorldCell(page, source.x, source.y);
+    await page.getByTestId("unit-command-attack").click();
+    await clickWorldCell(page, target.x, target.y);
+    await finishPromotionDialogue(page);
+  };
+  const expectNativeFigure = async (
+    classId: string,
+    width: number,
+    height: number,
+    expectedOffsetX = 0,
+  ) => {
+    const image = page.getByTestId(`promotion-image-${classId}`);
+    await expect(image).toBeVisible();
+    const metrics = await image.evaluate((element: HTMLImageElement) => {
+      const option = element.closest<HTMLElement>(".promotion-option");
+      if (!option) throw new Error("promotion option is missing");
+      const imageRect = element.getBoundingClientRect();
+      const optionRect = option.getBoundingClientRect();
+      return {
+        naturalWidth: element.naturalWidth,
+        naturalHeight: element.naturalHeight,
+        renderedWidth: element.offsetWidth,
+        renderedHeight: element.offsetHeight,
+        centerOffsetX: imageRect.left + imageRect.width / 2
+          - (optionRect.left + optionRect.width / 2),
+        centerOffsetY: imageRect.top + imageRect.height / 2
+          - (optionRect.top + optionRect.height / 2),
+      };
+    });
+    expect(metrics).toMatchObject({
+      naturalWidth: width,
+      naturalHeight: height,
+      renderedWidth: width,
+      renderedHeight: height,
+    });
+    expect(Math.abs(metrics.centerOffsetX - expectedOffsetX)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(metrics.centerOffsetY)).toBeLessThanOrEqual(0.5);
+  };
+
+  await openChoices({ x: 17, y: 17 }, { x: 18, y: 17 });
+  expect((await promotionLabState(page)).battle?.promotionTargets.map(({ id }) => id))
+    .toEqual(["crossbow", "magic-archer"]);
+  await expectNativeFigure("crossbow", 32, 43, -3);
+  await expectNativeFigure("magic-archer", 32, 43, -1);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/promotion-lab-variable-width-archers.png`,
+  });
+  await page.getByTestId("promotion-target-crossbow").click();
+  await expect(page.getByTestId("promotion-layer")).toBeHidden();
+
+  const canvas = page.getByTestId("battle-canvas");
+  const canvasBounds = await canvas.boundingBox();
+  if (!canvasBounds) throw new Error("promotion lab battle canvas is not ready");
+  await canvas.hover({ position: { x: 450, y: 180 } });
+  await expect.poll(async () => (await promotionLabState(page)).battle?.cameraOrigin.x)
+    .toBeGreaterThanOrEqual(21);
+  await page.mouse.move(canvasBounds.x + canvasBounds.width + 8, canvasBounds.y + 180);
+  await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");
+
+  await openChoices({ x: 29, y: 19 }, { x: 30, y: 19 });
+  expect((await promotionLabState(page)).battle?.promotionTargets.map(({ id }) => id))
+    .toEqual(["magic-priest", "curse-master"]);
+  await expectNativeFigure("curse-master", 32, 43, 3);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/promotion-lab-variable-width-curse-master.png`,
+  });
+});

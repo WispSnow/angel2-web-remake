@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { ALLY_MAP_UNIT_ASSETS } from "../../src/game/content/map-unit-assets";
+import { mapUnitVisualOffset } from "../../src/game/content/map-unit-presentation";
 import { captureVisualAudit } from "./visual-audit";
 
 const deploymentState = (page: Page) => page.evaluate(() => {
@@ -92,10 +94,20 @@ test("deployment projection reproduces module-27 geometry and keeps semantic inp
   expect(await rootRelativeBox(page, '[data-testid="deployment-roster-14"]')).toEqual({ left: 352, top: 299, width: 74, height: 24 });
   const figureFrame = await rootRelativeBox(page, ".deployment-entry:nth-child(1) .deployment-entry-figure-frame");
   const figure = await rootRelativeBox(page, ".deployment-entry:nth-child(1) .deployment-entry-figure");
+  const soldierFrame = await rootRelativeBox(page, ".deployment-entry:nth-child(6) .deployment-entry-figure-frame");
+  const soldierFigure = await rootRelativeBox(page, ".deployment-entry:nth-child(6) .deployment-entry-figure");
   const profession = await rootRelativeBox(page, '[data-testid="deployment-roster-0"]');
-  expect(figure.left + figure.width / 2).toBe(figureFrame.left + figureFrame.width / 2);
+  expect(figure.left + figure.width / 2
+    - (figureFrame.left + figureFrame.width / 2)).toBe(-2);
   expect(Math.abs(
     figure.top + figure.height / 2 - (figureFrame.top + figureFrame.height / 2),
+  )).toBeLessThanOrEqual(0.5);
+  expect(soldierFigure).toMatchObject({ width: 32, height: 43 });
+  expect(soldierFigure.left + soldierFigure.width / 2
+    - (soldierFrame.left + soldierFrame.width / 2)).toBe(-2);
+  expect(Math.abs(
+    soldierFigure.top + soldierFigure.height / 2
+      - (soldierFrame.top + soldierFrame.height / 2),
   )).toBeLessThanOrEqual(0.5);
   expect(profession.left).toBe(figureFrame.left + figureFrame.width);
 
@@ -169,6 +181,102 @@ test("deployment projection reproduces module-27 geometry and keeps semantic inp
     fullPage: true,
   });
   expect(pageErrors).toEqual([]);
+});
+
+test("all player profession figures keep their native proportions in deployment and promotion slots", async ({ page }) => {
+  await page.goto("/deployment-lab.html");
+  const figures = Object.entries(ALLY_MAP_UNIT_ASSETS).map(([classId, source]) => ({
+    classId,
+    source,
+    offsetX: mapUnitVisualOffset(classId as keyof typeof ALLY_MAP_UNIT_ASSETS, 1),
+  }));
+  const metrics = await page.evaluate(async (assets) => {
+    const host = document.createElement("div");
+    host.style.cssText = "position:absolute;left:0;top:0;width:200px;height:200px;";
+    document.body.append(host);
+
+    const results = [];
+    for (const asset of assets) {
+      const deploymentEntry = document.createElement("div");
+      deploymentEntry.className = "deployment-entry";
+      deploymentEntry.style.position = "relative";
+      const deploymentFrame = document.createElement("span");
+      deploymentFrame.className = "deployment-entry-figure-frame";
+      const deploymentSlot = document.createElement("span");
+      deploymentSlot.className = "deployment-entry-figure-slot";
+      deploymentSlot.style.setProperty("--map-unit-offset-x", `${asset.offsetX}px`);
+      const deploymentImage = document.createElement("img");
+      deploymentImage.className = "deployment-entry-figure";
+      deploymentImage.src = asset.source;
+      deploymentSlot.append(deploymentImage);
+      deploymentEntry.append(deploymentFrame, deploymentSlot);
+
+      const promotionOption = document.createElement("button");
+      promotionOption.className = "promotion-option";
+      const promotionSlot = document.createElement("span");
+      promotionSlot.className = "promotion-art-slot";
+      promotionSlot.style.setProperty("--map-unit-offset-x", `${asset.offsetX}px`);
+      const promotionImage = document.createElement("img");
+      promotionImage.className = "promotion-art";
+      promotionImage.src = asset.source;
+      promotionSlot.append(promotionImage);
+      promotionOption.append(promotionSlot);
+      host.replaceChildren(deploymentEntry, promotionOption);
+
+      await Promise.all([deploymentImage.decode(), promotionImage.decode()]);
+      const deploymentRect = deploymentImage.getBoundingClientRect();
+      const deploymentFrameRect = deploymentFrame.getBoundingClientRect();
+      const promotionRect = promotionImage.getBoundingClientRect();
+      const promotionOptionRect = promotionOption.getBoundingClientRect();
+      results.push({
+        classId: asset.classId,
+        expectedOffsetX: asset.offsetX,
+        natural: [deploymentImage.naturalWidth, deploymentImage.naturalHeight],
+        deployment: {
+          width: deploymentRect.width,
+          height: deploymentRect.height,
+          centerOffsetX: deploymentRect.left + deploymentRect.width / 2
+            - (deploymentFrameRect.left + deploymentFrameRect.width / 2),
+          centerOffsetY: deploymentRect.top + deploymentRect.height / 2
+            - (deploymentFrameRect.top + deploymentFrameRect.height / 2),
+        },
+        promotion: {
+          width: promotionRect.width,
+          height: promotionRect.height,
+          centerOffsetX: promotionRect.left + promotionRect.width / 2
+            - (promotionOptionRect.left + promotionOptionRect.width / 2),
+          centerOffsetY: promotionRect.top + promotionRect.height / 2
+            - (promotionOptionRect.top + promotionOptionRect.height / 2),
+        },
+      });
+    }
+    host.remove();
+    return results;
+  }, figures);
+
+  expect(metrics).toHaveLength(36);
+  for (const metric of metrics) {
+    const [naturalWidth, naturalHeight] = metric.natural;
+    expect(metric.deployment.width, `${metric.classId} deployment width`).toBe(naturalWidth);
+    expect(metric.deployment.height, `${metric.classId} deployment height`).toBe(naturalHeight);
+    expect(Math.abs(metric.deployment.centerOffsetX - metric.expectedOffsetX), `${metric.classId} deployment optical x`)
+      .toBeLessThanOrEqual(0.5);
+    expect(Math.abs(metric.deployment.centerOffsetY), `${metric.classId} deployment y center`)
+      .toBeLessThanOrEqual(0.5);
+    expect(metric.promotion.width, `${metric.classId} promotion width`).toBe(naturalWidth);
+    expect(metric.promotion.height, `${metric.classId} promotion height`).toBe(naturalHeight);
+    expect(Math.abs(metric.promotion.centerOffsetX - metric.expectedOffsetX), `${metric.classId} promotion optical x`)
+      .toBeLessThanOrEqual(0.5);
+    expect(Math.abs(metric.promotion.centerOffsetY), `${metric.classId} promotion y center`)
+      .toBeLessThanOrEqual(0.5);
+  }
+
+  expect(Object.fromEntries(metrics.map(({ classId, natural }) => [classId, natural])))
+    .toMatchObject({
+      "curse-master": [32, 43],
+      "magic-archer": [32, 43],
+      crossbow: [32, 43],
+    });
 });
 
 test("the current FF cell uses the native inverse 4x4 projection", async ({ page }) => {

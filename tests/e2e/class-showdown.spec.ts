@@ -154,8 +154,51 @@ test("all-class showdown applies one level to every mirror and enters formal bat
   expect(battleState.battle.units).toHaveLength(70);
   expect(battleState.battle.units.filter(({ side }) => side === 1)).toHaveLength(35);
   expect(battleState.battle.units.filter(({ side }) => side === 2)).toHaveLength(35);
+  const visualOffsets = await page.getByTestId("battle-canvas").evaluate((canvas) =>
+    JSON.parse(canvas.dataset.unitVisualOffsetById ?? "{}") as Record<string, number>);
+  expect(visualOffsets).toMatchObject({
+    "arena-1-0": -2,
+    "arena-2-0": -2,
+    "arena-1-5": 3,
+    "arena-2-5": -3,
+    "arena-1-12": -1,
+    "arena-2-12": -1,
+    "arena-1-21": -3,
+    "arena-2-21": -3,
+    "arena-1-22": 0,
+    "arena-2-22": 0,
+  });
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-battle.png`,
+  });
+
+  for (let step = 0; step < 5; step += 1) await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 17, y: 20 });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-curse-master-map-anchors.png`,
+  });
+
+  for (let step = 0; step < 7; step += 1) await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 17, y: 27 });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-magic-archer-map-anchors.png`,
+  });
+
+  for (let step = 0; step < 9; step += 1) await page.keyboard.press("ArrowUp");
+  for (let step = 0; step < 12; step += 1) await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 29, y: 18 });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-crossbow-map-anchors.png`,
+  });
+
+  await page.keyboard.press("ArrowDown");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.cursor)
+    .toEqual({ x: 29, y: 19 });
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-cavalry-map-anchors.png`,
   });
 
   await page.getByTestId("class-showdown-return").click();

@@ -7,6 +7,7 @@ import {
 } from "./content/classes";
 import { portraitSourceFor } from "./content/portrait-catalog.generated";
 import { allyMapUnitAsset } from "./content/map-unit-assets";
+import { mapUnitVisualOffset } from "./content/map-unit-presentation";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { applyStagedNativeUiAssets } from "./native-ui-assets";
 import { drawNativeText, layoutNativeText, loadNativeFont } from "./native-text";
@@ -187,13 +188,17 @@ function rosterEntryHtml(view: RosterEntryView): string {
   }
 
   const stats = classStatsFor(unit);
+  const figureOffsetX = mapUnitVisualOffset(unit.classId, 1);
   const status = statusLabelFor(view);
   const label = `${unit.name}，${unit.className}，等級 ${stats.level}，生命 ${unit.life}／${stats.maxLife}，${status}`;
   return `<div class="${classes.join(" ")}" data-unit-slot="${unit.slot}"
       style="left:${x}px;top:${y}px;--detail-left:${tooltip.left}px;--detail-top:${tooltip.top}px">
     <span class="deployment-entry-base" aria-hidden="true"></span>
     <span class="deployment-entry-figure-frame" aria-hidden="true"></span>
-    <img class="deployment-entry-figure" src="${figureSourceFor(unit.classId)}" alt="" aria-hidden="true" />
+    <span class="deployment-entry-figure-slot" aria-hidden="true"
+      style="--map-unit-offset-x:${figureOffsetX}px">
+      <img class="deployment-entry-figure" src="${figureSourceFor(unit.classId)}" alt="" />
+    </span>
     <button class="deployment-entry-hitbox" type="button" tabindex="-1"
       data-roster-index="${index}" data-unit-slot="${unit.slot}" data-testid="deployment-roster-${index}"
       aria-label="${escapeHtml(label)}" aria-pressed="${deployed}">
