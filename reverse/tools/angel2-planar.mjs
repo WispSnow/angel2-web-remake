@@ -237,8 +237,22 @@ function encodeRgbaPng(width, height, pixels) {
   ]);
 }
 
+/**
+ * The mask stream is honoured per image, not per bundle. Several records store a
+ * real mask only for the images the native draws through the masked writer
+ * (`0000:D9FA` ANDs all four planes, then `0000:D790` ORs the colour in) and a
+ * one-row stub for every slot that goes to the maskless writer `0000:D5CF`.
+ * A whole-bundle layout test drops the mask for the whole record and renders
+ * those transparent pixels as opaque palette 0; matching image by image keeps
+ * each slot on the rule its own native draw uses.
+ */
 function composePlanarImage(planes, imageIndex, mask = null, palette = PALETTES.gameplay.colors) {
   const image = planes[0].images[imageIndex];
+  const maskImage = mask?.images[imageIndex];
+  const maskUsed = maskImage !== undefined
+    && maskImage.width === image.width
+    && maskImage.height === image.height
+    && maskImage.rowBytes === image.rowBytes;
   const pixels = Buffer.alloc(image.width * image.height * 4);
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
@@ -255,11 +269,11 @@ function composePlanarImage(planes, imageIndex, mask = null, palette = PALETTES.
       pixels[target] = color[0];
       pixels[target + 1] = color[1];
       pixels[target + 2] = color[2];
-      pixels[target + 3] = mask !== null &&
-        (mask.images[imageIndex].pixels[byteOffset] & bit) !== 0 ? 0 : 255;
+      pixels[target + 3] = maskUsed &&
+        (maskImage.pixels[byteOffset] & bit) !== 0 ? 0 : 255;
     }
   }
-  return { width: image.width, height: image.height, pixels };
+  return { width: image.width, height: image.height, pixels, maskUsed };
 }
 
 async function renderResource(decodedDirectory, outputDirectory, paletteName = "gameplay") {
@@ -344,9 +358,7 @@ async function renderResource(decodedDirectory, outputDirectory, paletteName = "
       });
       continue;
     }
-    const mask = bundles[4] !== null && sameLayout(colorPlanes[0], bundles[4])
-      ? bundles[4]
-      : null;
+    const mask = bundles[4];
     const images = [];
     for (let index = 0; index < colorPlanes[0].images.length; index += 1) {
       const composed = composePlanarImage(colorPlanes, index, mask, palette.colors);
@@ -364,6 +376,7 @@ async function renderResource(decodedDirectory, outputDirectory, paletteName = "
         index,
         width: composed.width,
         height: composed.height,
+        maskUsed: composed.maskUsed,
         output: relativeOutput,
       });
       imageCount += 1;
@@ -378,7 +391,7 @@ async function renderResource(decodedDirectory, outputDirectory, paletteName = "
       trailingBytesPerPlane: layout.startsWith("raw_128_tiles_") ? 1024 : 0,
       trailingBytesRole: layout.startsWith("raw_128_tiles_") ? "zero_padding" : undefined,
       trailingBytesAllZero: layout.startsWith("raw_128_tiles_") ? trailingZeroPadding : undefined,
-      maskUsed: mask !== null,
+      maskUsed: images.some((image) => image.maskUsed),
       images,
     });
   }
@@ -390,7 +403,7 @@ async function renderResource(decodedDirectory, outputDirectory, paletteName = "
     paletteEvidence: palette.evidence,
     bitOrder: "MSB first",
     planeOrder: "streams 0..3 -> VGA color bits 3..0",
-    maskRule: "matching stream 4, set bit means transparent",
+    maskRule: "stream 4, per image: a set bit in a same-layout mask bitmap means transparent",
     sourceDirectory: decodedDirectory,
     renderedRecords: outputRecords.filter((record) => record.rendered).length,
     renderedImages: imageCount,

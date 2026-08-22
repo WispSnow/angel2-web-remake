@@ -32,22 +32,26 @@ const CODE_SIGNATURES = [
   ["0000:510C", 0x510c, 0x5230, "load selected unit state, display strings and presentation fields", "e0c39d4d53c8523629d00e260dcbdb1a3a26b236ac1ad1ee33e231cb7ce5cffd"],
 ];
 
+// `[frame, width, height, maskUsed, sha256]`. Only frames 5..8 carry a real
+// entry in the record's mask stream, and only those four are drawn by the
+// masked writer `0000:D9FA` + `0000:D790`; the rest go to the maskless
+// `0000:D5CF` and stay opaque. See `notes/unit-detail-hud-presentations.md`.
 const HUD_CHROME_FRAMES = [
-  [0, 8, 6, "09f3d4ae7625ce67de6ed9923aa9a5651a191476ef745b5f8f5b067f6ce3fbee"],
-  [1, 8, 6, "ba58841a23f90b85a68c0a9921769c91bae6f4a197145b38ad87b525fca7d9bf"],
-  [2, 8, 6, "91268191cadb0209aad297724ee3f9724860fe41fc586d113ab4c5114162b03d"],
-  [3, 8, 6, "749cca1e36c1dc9d4fe44954e9f6dbffecb8cdca47509b6152839b03653a1d28"],
-  [4, 8, 6, "100148b585eb60ffc851f399bded071364d0d1ee8e22fef1c2f80b33a3ebf909"],
-  [5, 8, 7, "43e8ac9a4c43b785b2b603b4a82413b1eb042dffb375ace3ec0922c40b95a152"],
-  [6, 8, 7, "6a1ee71ff1d6701b9eda37a7e249e27e1afa94419b6bc4e0dfc3e0aaafdf0f75"],
-  [7, 8, 7, "269483fcf4c25b41b5612b75edc11f9997297765f2e6d478fca3d991cef9983a"],
-  [8, 16, 9, "2de65e16374f4d44812310f9c74d62da9447515db6d754db61c2500e4b176508"],
-  [9, 160, 10, "5de38c5f7696fc517b3df97cf57cc1f030a206e24a64a26b92a77fe7be102103"],
-  [10, 160, 10, "8a5357c1b4c98217bb849488e82cde461eadd733bb774d52a62d32346cd0c0e1"],
-  [11, 16, 28, "1c52c30a8f785ff88c27db9dd53844208117d4b99a1aa911b9259cfce541dfb5"],
-  [12, 16, 28, "ebd9a194d8007c77d965703e48bcd72832dfa9d80876ff338958b093e88ec4eb"],
-  [13, 16, 28, "29969cbeacec8fc49184d0f2dc5e90a4caf32cacd7972c10f44a3e4e31cd97a8"],
-  [14, 40, 7, "521361da28f5408552093c03faf27b2a5cc72f9acffba72ea1c50d5f38554039"],
+  [0, 8, 6, false, "09f3d4ae7625ce67de6ed9923aa9a5651a191476ef745b5f8f5b067f6ce3fbee"],
+  [1, 8, 6, false, "ba58841a23f90b85a68c0a9921769c91bae6f4a197145b38ad87b525fca7d9bf"],
+  [2, 8, 6, false, "91268191cadb0209aad297724ee3f9724860fe41fc586d113ab4c5114162b03d"],
+  [3, 8, 6, false, "749cca1e36c1dc9d4fe44954e9f6dbffecb8cdca47509b6152839b03653a1d28"],
+  [4, 8, 6, false, "100148b585eb60ffc851f399bded071364d0d1ee8e22fef1c2f80b33a3ebf909"],
+  [5, 8, 7, true, "9e08e2c96eed1baf6808c628f7a6c443ecbcac843ba2fe1e71126edf32cedd43"],
+  [6, 8, 7, true, "090c5603cb9eb4c4ec217d8eeb248275c2cec358f577728f72ea3c83013def7d"],
+  [7, 8, 7, true, "1853baec88ccda48eb8a6baba2df0df047baca79b69901d313137d2352ac0c8d"],
+  [8, 16, 9, true, "9ade1479c2251171c1c6d0b8301903cd3e5b003aabacb2cf17c57fd929446533"],
+  [9, 160, 10, false, "5de38c5f7696fc517b3df97cf57cc1f030a206e24a64a26b92a77fe7be102103"],
+  [10, 160, 10, false, "8a5357c1b4c98217bb849488e82cde461eadd733bb774d52a62d32346cd0c0e1"],
+  [11, 16, 28, false, "1c52c30a8f785ff88c27db9dd53844208117d4b99a1aa911b9259cfce541dfb5"],
+  [12, 16, 28, false, "ebd9a194d8007c77d965703e48bcd72832dfa9d80876ff338958b093e88ec4eb"],
+  [13, 16, 28, false, "29969cbeacec8fc49184d0f2dc5e90a4caf32cacd7972c10f44a3e4e31cd97a8"],
+  [14, 40, 7, false, "521361da28f5408552093c03faf27b2a5cc72f9acffba72ea1c50d5f38554039"],
 ];
 
 const DATA_SIGNATURES = [
@@ -176,7 +180,7 @@ async function loadGraphic(planarRoot, manifest, group, record, imageIndex) {
     imageIndex,
     width: image.width,
     height: image.height,
-    maskUsed: entry.maskUsed,
+    maskUsed: image.maskUsed,
     path: normalizePath(path.join(planarRoot, group, image.output)),
     bytes: buffer.length,
     sha256: sha256(buffer),
@@ -294,13 +298,13 @@ async function extract(module29Path, planarRoot, outputJsonPath, outputSvgPath) 
   assert.equal(representativePortrait.height, 112);
   const chromeGraphics = await Promise.all(HUD_CHROME_FRAMES.map(([frame]) =>
     loadGraphic(planarRoot, aManifest, "A", 6, frame)));
-  HUD_CHROME_FRAMES.forEach(([frame, width, height, expectedSha256], index) => {
+  HUD_CHROME_FRAMES.forEach(([frame, width, height, maskUsed, expectedSha256], index) => {
     const graphic = chromeGraphics[index];
     assert.equal(graphic.imageIndex, frame);
     assert.equal(graphic.width, width, `A/6/${frame} width changed`);
     assert.equal(graphic.height, height, `A/6/${frame} height changed`);
     assert.equal(graphic.sha256, expectedSha256, `A/6/${frame} PNG changed`);
-    assert.equal(graphic.maskUsed, false);
+    assert.equal(graphic.maskUsed, maskUsed, `A/6/${frame} mask usage changed`);
   });
 
   const statRows = STAT_ROWS.map(([id, address, x, y, expectedTemplate, sources]) => {
