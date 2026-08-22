@@ -153,10 +153,23 @@ test("title artwork dissolves in over its background before the menu appears", a
   expect(await luminance(32, 0, 472, 200)).toBeGreaterThan(upperEarly);
   expect(await luminance(0, 216, 640, 123)).toBeGreaterThan(logoEarly);
 
-  expect(await page.getByTestId("title-screen").evaluate((element) => getComputedStyle(element).cursor))
-    .toContain("command-menu-pointer.png");
-  expect(await page.getByTestId("new-game").evaluate((element) => getComputedStyle(element).cursor))
-    .toContain("command-menu-pointer.png");
+  // `command-menu-pointer.png` ships in the boot pack, so the staged-resource
+  // lease is always live by the time the title mounts and the cursor image is an
+  // opaque object URL. The hotspot suffix is what identifies the hand chain in
+  // `.logical-screen`; the file behind the blob is read from the companion
+  // `--*-source` variable `applyStagedNativeUiAssets` writes for exactly this.
+  for (const testId of ["title-screen", "new-game"]) {
+    const pointer = await page.getByTestId(testId).evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        rendered: style.cursor,
+        source: style.getPropertyValue("--native-cursor-hand-source"),
+      };
+    });
+    expect(pointer.rendered).toContain("blob:");
+    expect(pointer.rendered).toContain("3 2, pointer");
+    expect(pointer.source).toContain("command-menu-pointer.png");
+  }
 });
 
 /**
