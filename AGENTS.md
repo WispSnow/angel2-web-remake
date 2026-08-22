@@ -209,9 +209,14 @@ pnpm exec playwright install ffmpeg
 - `src/game/content/stage0-runtime.generated.ts` 是生成文件；修改来源或生成脚本后运行 `pnpm content:stage0`，不要手工编辑生成结果。
 - `src/game/content/native-font.generated.ts` 与 `public/assets/original/native-font.png` 由
   `scripts/generate-native-font.mjs` 生成，来源是 `reverse/parsed/native/battle-text.json`、
-  同目录的 `battle-text-font.json` 与 `reverse/dumps/bios-font-8x8.bin`；修改证据后运行
-  `pnpm content:font`。右栏、回合框与关卡名的文字全部由这套原版点阵字绘制，不要改回宿主
-  CJK 字体，也不要手抄字符表。
+  同目录的 `battle-text-font.json`、`hud-presentations.json`、`story-presentations.json`、
+  `input-ui.json` 与 `reverse/dumps/bios-font-8x8.bin`；修改证据后运行 `pnpm content:font`。
+  凡是原版复现的表面（右栏、回合框、关卡名、命令／系统／集体／設定／確定取消选单、
+  `A/18` 对白正文与姓名牌、全景状态框与伤害数字、祈禱结果、标题读取进度面板、離開遊戲画面、
+  勝利條件面板的标题）都必须由这套点阵字绘制，不要改回宿主 CJK 字体，也不要手抄字符表或
+  逐列字距——`移    動` 那四个半形空格写在原版 Big5 字串里，由 `NATIVE_MENU_LABEL_PADDING`
+  提供，不是用 `letter-spacing` 撑出来的。复刻自己新增的提示、说明与工具文字留在现代字体，
+  这条分层与字库覆盖检查的要求见 `design/remake-gdd/07-ui-ux-and-presentation.md#字体分层`。
 - `src/game/content/portrait-catalog.generated.ts` 与 `public/assets/original/portraits/` 由
   `scripts/generate-portrait-catalog.mjs` 生成；修改肖像来源或布局证据后运行
   `pnpm content:portraits`，不要手工登记角色动画。`D/63` 无原版覆盖帧/布局，`D/67`

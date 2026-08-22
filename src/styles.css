@@ -289,6 +289,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   background:
     radial-gradient(ellipse at 50% 44%, rgba(38, 31, 57, .94), rgba(4, 3, 8, .98) 72%),
     rgba(4, 3, 8, .94);
+  /* 分頁鍵、備份工具與操作提示是複刻加的，留在現代字體；`0000:1455` 真的畫出來的
+     標題、表頭與逐槽資料改用原版點陣字。 */
   font-family: "PMingLiU", "MingLiU", "Noto Serif TC", serif;
   text-shadow: 1px 1px #000;
 }
@@ -305,13 +307,11 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .startup-record-selector h2 {
   position: relative;
+  display: flex;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
   margin: 0 0 8px;
-  color: #f6e36b;
-  font-size: 17px;
-  line-height: 22px;
-  font-weight: 700;
-  letter-spacing: .12em;
-  text-align: center;
 }
 .startup-record-header,
 .startup-record-slot {
@@ -323,10 +323,6 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   position: relative;
   height: 20px;
   margin: 0 auto 3px;
-  color: #d8cda9;
-  font-size: 12px;
-  line-height: 20px;
-  text-align: center;
   border-bottom: 1px solid #82748f;
 }
 .startup-record-slots {
@@ -367,27 +363,26 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   height: 27px;
   padding: 0;
   border: 0;
-  color: #eee9dc;
   background: rgba(10, 8, 14, .72);
-  font: 13px/27px "PMingLiU", "MingLiU", "Noto Serif TC", serif;
-  text-align: center;
-  text-shadow: 1px 1px #000;
   cursor: var(--native-cursor-hand, pointer);
 }
-.startup-record-slot span {
+/* 表頭與逐槽資料共用同一套欄寬；點陣畫布自己知道字寬，置中交給 flex。 */
+.startup-record-header > span,
+.startup-record-slot > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  white-space: nowrap;
   border-right: 1px solid rgba(157, 145, 169, .22);
 }
-.startup-record-slot span:last-child { border-right: 0; }
+.startup-record-header > span:last-child,
+.startup-record-slot > span:last-child { border-right: 0; }
+/* 選取只換底色與外框：字形已經是畫布，換 `color` 不會改變墨色。 */
 .startup-record-slot:hover,
 .startup-record-slot.is-selected {
-  color: #fff;
   background: linear-gradient(90deg, rgba(45, 38, 67, .65), #5a4f7b 12% 88%, rgba(45, 38, 67, .65));
   box-shadow: inset 0 0 0 1px #f1e9d3;
 }
-.startup-record-slot[data-slot-state="empty"] { color: #aaa4a8; }
-.startup-record-slot[data-slot-state="invalid"] { color: #ffb7a8; }
 .startup-record-slot:focus-visible { outline: 1px solid #fff; outline-offset: -2px; }
 .startup-record-detail {
   position: relative;
@@ -557,6 +552,14 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }
+
+/* 原版點陣字在 DOM 表面上的共用規則。`native-dom-text.ts` 把宿主字形換成
+ * `UN/58`+`UN/59` 合併字模畫成的畫布，字串本身留在被裁切的無障礙副本裡，所以每個
+ * 宿主盒子會收縮成實際畫出來的那一段像素——由 CSS 決定它落在哪，而不是由宿主字體
+ * 的字寬決定。文字既然不再由瀏覽器畫，殘留的 `text-shadow` 會照著看不見的字形畫出
+ * 一圈幽靈陰影，所以一併關掉。 */
+.has-native-text { color: transparent; text-shadow: none; }
+.native-text { display: block; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
 
 .animated-portrait { position: relative; display: block; overflow: hidden; image-rendering: var(--image-rendering, pixelated); }
 .animated-portrait > img { position: absolute; display: block; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
@@ -793,18 +796,15 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   box-shadow: inset 0 1px 0 #ffdf10;
   pointer-events: none;
 }
+/* 標題與五個項目都改由原版點陣字繪製，落點沿用原本這套已對齊面板貼圖的座標；
+   標題的畫布自己知道寬度，所以靠 `translateX` 在 96 px 標題欄裡置中。 */
 .native-settings-menu h2 {
   position: absolute;
-  left: 16px;
+  left: 64px;
   top: 8px;
-  width: 96px;
-  height: 24px;
   margin: 0;
   color: #fff;
-  font: 16px/20px "PMingLiU", "MingLiU", serif;
-  letter-spacing: .16em;
-  text-align: center;
-  text-shadow: 1px 1px 0 #000;
+  transform: translateX(-50%);
 }
 .native-settings-list {
   display: grid;
@@ -824,9 +824,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   color: #fff;
   background: transparent;
   cursor: var(--native-cursor-hand, pointer);
-  font: 16px/24px "PMingLiU", "MingLiU", serif;
   text-align: left;
-  text-shadow: 1px 1px 0 #000;
 }
 .native-settings-list > button:hover,
 .native-settings-list > button:focus-visible {
@@ -835,12 +833,10 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   outline: 1px dotted #ffdf10;
   outline-offset: -1px;
 }
-.native-settings-label { white-space: nowrap; }
-.native-settings-state {
-  font: 12px/24px "Courier New", monospace;
-  letter-spacing: 0;
-  text-align: left;
-}
+/* 兩欄都在 `grid-template-columns: 76px 28px` 的欄寬裡垂直置中；水平沿用原本的靠左，
+   `ON` 與 `OFF` 才會共用同一條左緣，而不是各自依字寬左右浮動。 */
+.native-settings-label,
+.native-settings-state { display: flex; align-items: center; }
 .sound-settings-menu { position: absolute; z-index: 15; left: 288px; top: 42px; width: 208px; padding: 12px 16px 14px; }
 .sound-settings-menu h2 { margin: 3px 0 8px; color: #f3d466; font-size: 18px; }
 .sound-volume-control { margin-bottom: 8px; }
@@ -960,22 +956,21 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   padding: 0;
   color: #fff;
   background: transparent;
-  font-size: 16px;
-  line-height: 24px;
-  text-shadow: 2px 2px #000;
   cursor: var(--native-cursor-hand);
 }
-.action-menu.native-command-menu[data-kind="initial"] button,
-.action-menu.native-command-menu[data-kind="postMove"] button { text-indent: .75em; }
+/* 原版每一列的字距寫在 Big5 字串本身（`移    動` 是兩個字夾四個半形空格，
+   `input-ui.json` 的 `menus.actionMenus`），不是繪製時撐開的，所以這裡不再有
+   `letter-spacing`／`text-indent`。列的文字起點是 `0000:5C45` 的逐列記錄
+   `(選單左緣 + 0x10, 選單上緣 + 0x10 + 0x18n)`，換算成 136 px 列盒就是左緣 12 px；
+   17 px 高的字身在 24 px 列裡置中取整為 4 px（落點屬表現取整，非取證值）。 */
+.action-menu.native-command-menu .native-command-label {
+  position: absolute;
+  left: 12px;
+  top: 4px;
+}
 .action-menu.native-command-menu.system-menu {
   width: 144px;
   height: 148px;
-}
-.action-menu.native-command-menu.system-menu > button,
-.action-menu.native-command-menu.native-confirm-menu > button {
-  font-size: 16px;
-  letter-spacing: 1px;
-  text-indent: 1px;
 }
 .action-menu.native-command-menu button::before {
   content: "";
@@ -996,7 +991,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .action-menu.native-command-menu button:hover,
 .action-menu.native-command-menu button.is-selected { color: #fff; background: transparent; }
 .action-menu.native-command-menu button.is-selected::before { opacity: 1; }
-.native-command-label { position: relative; display: inline-block; }
+.native-command-label { position: absolute; display: block; }
 .group-command-menu {
   left: 276px;
   top: 92px;
@@ -1007,9 +1002,6 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .group-command-menu button {
   width: 136px;
   height: 24px;
-  font-size: 16px;
-  letter-spacing: 1px;
-  text-indent: 1px;
 }
 .group-command-menu button:disabled {
   color: #81766d;
@@ -1488,18 +1480,15 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .full-status.left dl { right: 4px; }
 .full-status.right dl { left: 4px; }
 .full-status dl div { display: flex; height: 24px; align-items: center; justify-content: space-between; border-bottom: 1px solid #76511e; }
-.full-status dt, .full-status dd { margin: 0; }
-.full-status dd { font-family: "Arial Narrow", system-ui, sans-serif; font-weight: 800; }
+.full-status dt, .full-status dd { display: flex; align-items: center; margin: 0; }
 .full-status strong {
   position: absolute;
   left: 3px;
   right: 3px;
   bottom: 1px;
+  display: flex;
+  justify-content: center;
   overflow: hidden;
-  text-align: center;
-  font-size: 15px;
-  line-height: 20px;
-  white-space: nowrap;
 }
 /* Sits on the floor beside the victim and overhangs the scene's bottom edge
    into the black strip, so it lives in the window rather than the clipped
@@ -1509,12 +1498,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   z-index: 4;
   left: 0;
   bottom: 9px;
+  display: flex;
   width: 96px;
-  color: #ef3f41;
-  text-align: center;
-  font: 800 14px/1 "Arial Black", system-ui, sans-serif;
-  -webkit-text-stroke: 1px #4d0505;
-  text-shadow: 1px 1px #000;
+  justify-content: center;
 }
 
 .dialogue-layer { position: absolute; z-index: 12; inset: 0; background: transparent; }
@@ -1636,18 +1622,19 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   image-rendering: var(--image-rendering, pixelated);
   pointer-events: none;
 }
+/* 姓名牌是 `A/18` 合成體的最後一步（`+0x18/+0x6F`）：原版就在 `112 px` 的牌面上把
+   點陣字置中。畫布自己知道字寬，所以置中交給 flex，不再靠宿主字體的 `text-align`。 */
 .dialogue-portrait-name,
 .feedback-portrait-name {
   position: absolute;
   z-index: 4;
+  display: flex;
   width: 112px;
   height: 16px;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   color: #fff;
-  font: 700 16px/16px "PMingLiU", "Noto Serif TC", serif;
-  text-align: center;
-  text-shadow: 1px 1px #000;
-  white-space: pre;
   pointer-events: none;
 }
 .dialogue-portrait-name {
@@ -1726,13 +1713,16 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   clip-path: inset(50%);
   white-space: nowrap;
 }
+/* 逐字排版仍由每個字自己的空盒撐出來：`16 px` Big5／`8 px` ASCII／`20 px` 換行就是
+   SAY 游標本身的前進量，量得到才驗得到。字形改由 `.dialogue-native-text` 用原版點陣
+   畫在同一個原點上，兩邊吃的是同一個字串。 */
 .dialogue-copy p {
+  position: relative;
   margin: 0;
+  color: transparent;
   white-space: pre;
-  font-family: "Songti TC", "PMingLiU", "MingLiU", serif;
   font-size: 16px;
   line-height: 20px;
-  text-shadow: 1px 1px #000;
 }
 .dialogue-glyph {
   display: inline-block;
@@ -1740,24 +1730,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   text-align: center;
 }
 .dialogue-glyph.big5 { width: 16px; }
-.continue-mark { position: absolute; right: 8px; bottom: 1px; color: #ffd94a; animation: bob .8s steps(2) infinite; }
-.dialogue-box:not(.is-active) .continue-mark { display: none; }
-.dialogue-layer.ai-technique-dialogue .continue-mark { display: none; }
-.dialogue-layer.ai-technique-dialogue .dialogue-speaker {
-  position: static;
-  display: block;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  clip-path: none;
-  margin-bottom: 3px;
-  color: #ffd94a;
-  font-size: 12px;
-  line-height: 14px;
-  white-space: nowrap;
-  text-shadow: 1px 1px #000;
-}
-.dialogue-layer.ai-technique-dialogue .dialogue-copy p { color: #fff6d7; }
+/* 游標原點就是 `p` 的內容框左上角，也就是窗框的 `(12,12)`。 */
+.dialogue-native-text { position: absolute; left: 0; top: 0; }
+
 .dialogue-skip-confirm {
   --dialogue-skip-shade: rgb(4 2 5 / 72%);
   position: absolute;
@@ -1787,7 +1762,6 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   top: 154px;
   height: 76px;
 }
-@keyframes bob { 50% { transform: translateY(3px); } }
 /* 展開的 11 步：四列貼圖從 `[313,337,345,361]` 每步外移 16 px，窗體寬度依序是
    80、112、…、400 px。左右各縮 160 px 就是 400 px 窗體裡的 80 px，`jump-none` 讓 11
    個取樣點正好落在那一串原版寬度上；三段列高從第一步就是完整的 86 px，故不裁縱向。 */
@@ -1913,26 +1887,73 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   visibility: visible;
   opacity: 1;
 }
+/* 原版戰鬥面板的外框：色 1 底、黑外緣，內縮一圈白／黑再一圈黃／紅，右下一塊硬陰影。
+   `子 選 單` 用偽元素畫同一組線，這裡改用 `inset` 陰影，因為本面板自己會捲動而偽元素
+   會跟著捲走。取證只記下 `勝利條件` 由 `0000:BAA4` 開啟、主次操作皆可關閉，沒有留下
+   它自己的座標或底圖，所以外框沿用同一場戰鬥裡已取證的姊妹面板樣式。 */
+.native-battle-panel {
+  color: #fff;
+  background: #5d4131;
+  border: 1px solid #000;
+  box-shadow:
+    inset 1px 1px 0 #fff,
+    inset -1px -1px 0 #000,
+    inset 2px 2px 0 #ffdf10,
+    inset -2px -2px 0 #ef2024,
+    16px 16px 0 #0009;
+  image-rendering: var(--image-rendering, pixelated);
+}
 .objective-panel {
   position: absolute;
   z-index: 14;
-  left: 126px;
+  left: 120px;
   top: 50%;
-  width: 388px;
-  max-height: calc(100% - 16px);
-  padding: 7px 30px;
+  width: 384px;
+  /* 16 px 的硬陰影要留在 640x350 內：上下各留 16 px 就正好等於陰影的位移。 */
+  max-height: calc(100% - 32px);
+  padding: 9px 16px 10px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: #d4a62d #170d10;
+  scrollbar-color: #ffdf10 #3b2a20;
   scrollbar-width: thin;
   transform: translateY(-50%);
   /* 見 `native-menu-zoom-in`：開闔動畫要把這個置中位移接回去。 */
   --menu-anchor: translateY(-50%);
 }
-.objective-panel h2 { margin: 6px 0 2px; color: #f3d466; font-size: 18px; line-height: 1.2; }
-.objective-panel p { margin: 0 0 7px; overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; }
-.objective-panel button { margin-top: 2px; }
+/* 關卡名與兩個條件標題是原版的用詞，用原版點陣字；條件內文、回合上限、出擊提示與
+   返回鍵都是複刻自己寫的說明，留在現代字體，玩家一眼就能分辨哪一半是原版的。 */
+.objective-panel > .objective-panel-stage {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ef2024;
+}
+.objective-panel h2 { display: flex; margin: 8px 0 4px; }
+.objective-panel .objective-remake-heading {
+  margin: 10px 0 3px;
+  color: #ffdf10;
+  font: 600 12px/1.2 system-ui, sans-serif;
+  letter-spacing: .12em;
+}
+.objective-panel p {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+  font: 13px/1.5 system-ui, sans-serif;
+}
+.objective-panel button {
+  min-width: 90px;
+  margin-top: 6px;
+  padding: 5px 14px;
+  border: 1px solid #ffdf10;
+  color: #ffeab4;
+  background: #3b2a20;
+  cursor: var(--native-cursor-hand, pointer);
+  font: 12px/1.2 system-ui, sans-serif;
+}
+.objective-panel button:hover,
+.objective-panel button:focus-visible { color: #fff; background: #6d5238; }
 .modal-panel button { min-width: 90px; padding: 7px 14px; }
 .result-layer { position: absolute; z-index: 16; inset: 0; background: transparent; }
 .result-card { position: absolute; left: 130px; top: 70px; width: 380px; padding: 27px 34px; }
@@ -1964,7 +1985,6 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   --dialogue-text-inset-y: 20px;
   color: #fff;
 }
-.native-feedback-copy > .continue-mark { right: 5px; }
 .feedback-primary { position: absolute; inset: 0; width: 640px; height: 350px; padding: 0; border: 0; opacity: 0; pointer-events: auto; }
 /* 勝利存檔、全面撤退與離開遊戲的兩項確認選單沒有已取證的原版座標：證據只記下
    `DS:3F2C` 的兩項表、逐行 `136×24` 熱區與接受 x/y 參數的通用選單繪製例程，沒有
@@ -1998,13 +2018,13 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   inset: 0;
   display: grid;
   place-content: center;
+  justify-items: center;
+  gap: 12px;
   color: #e9c85b;
   background: #000;
-  text-align: center;
-  font-family: "PMingLiU", "Noto Serif TC", serif;
 }
-.quit-screen h2 { margin: 0; font-size: 28px; letter-spacing: .12em; }
-.quit-screen p { margin: 12px 0 0; color: #ddd0b4; font-size: 15px; }
+.quit-screen h2,
+.quit-screen p { margin: 0; }
 
 /* Host-display controls. These sit outside the 640x350 logical screen because
  * they choose how the browser resamples the finished frame - the same class of

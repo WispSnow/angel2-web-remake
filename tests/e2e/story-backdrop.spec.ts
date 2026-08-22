@@ -41,7 +41,7 @@ test("every interstitial story page tiles the native A/20 backdrop behind the il
   await advanceToPortraitPage(page);
   await hideDebugChrome(page);
   await page.addStyleTag({
-    content: ".portrait-eye, .portrait-mouth, .continue-mark { visibility: hidden !important; }",
+    content: ".portrait-eye, .portrait-mouth { visibility: hidden !important; }",
   });
 
   expect({ width: tile.width, height: tile.height }).toEqual({ width: BACKDROP_TILE, height: BACKDROP_TILE });

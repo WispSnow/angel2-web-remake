@@ -78,7 +78,7 @@ const compositeGeometry = (portrait: Locator) => portrait.evaluate((element) => 
 
 /** 眨眼與口型由 rAF 驅動，投影不受影響，但逐像素比對要一個穩定的表現時點。 */
 const freezePresentation = (page: Page) => page.addStyleTag({
-  content: ".portrait-eye, .portrait-mouth, .continue-mark { visibility: hidden !important; }",
+  content: ".portrait-eye, .portrait-mouth { visibility: hidden !important; }",
 });
 
 const expectNativePortraitComposite = async (

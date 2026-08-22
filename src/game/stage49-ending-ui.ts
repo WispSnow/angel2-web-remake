@@ -66,7 +66,7 @@ function dialogueWindow(
       aria-hidden="true">${escapeHtml(displayName)}</b>
     <div class="stage49-dialogue-copy dialogue-copy">
       <b class="dialogue-speaker">${escapeHtml(line.speaker)}</b>
-      <p>${escapeHtml(line.text)}</p><span class="continue-mark">▼</span>
+      <p>${escapeHtml(line.text)}</p>
     </div>
   </section>`;
 }

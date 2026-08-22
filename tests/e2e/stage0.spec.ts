@@ -279,14 +279,17 @@ const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => 
       selectionSource: getComputedStyle(element)
         .getPropertyValue("--native-command-menu-selection-source"),
       pointerSource: getComputedStyle(element).getPropertyValue("--native-cursor-hand-source"),
-      labelCenterOffset: selected && label
-        ? label.getBoundingClientRect().left + label.getBoundingClientRect().width / 2
-          - (
-            Number.parseFloat(getComputedStyle(selected).letterSpacing)
-            - Number.parseFloat(getComputedStyle(selected).textIndent)
-          ) / 2
-          - (element.getBoundingClientRect().left + element.getBoundingClientRect().width / 2)
+      // `0000:5C45` builds each row record at `(選單左緣 + 0x10, 選單上緣 + 0x10 + 0x18n)`,
+      // so the drawn run starts 16 px in from the frame — not centred in the row.
+      labelLeftOffset: selected && label
+        ? label.getBoundingClientRect().left - element.getBoundingClientRect().left
         : Number.NaN,
+      // The row spacing is inside the original Big5 string (`移    動`), so the
+      // label box has to be exactly as wide as the bitmap run that carries it.
+      labelIsBitmap: Boolean(label?.querySelector("canvas.native-text")),
+      labelWidth: label ? Math.round(label.getBoundingClientRect().width) : Number.NaN,
+      labelCanvasWidth: label?.querySelector<HTMLCanvasElement>("canvas.native-text")?.width
+        ?? Number.NaN,
     };
   });
   expect(presentation).toMatchObject({ width: 144, height: expectedHeight });
@@ -300,7 +303,9 @@ const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => 
   ]);
   expect(presentation.selectionSource).toContain("command-menu-selection.png");
   expect(presentation.pointerSource).toContain("command-menu-pointer.png");
-  expect(Math.abs(presentation.labelCenterOffset)).toBeLessThanOrEqual(0.5);
+  expect(presentation.labelIsBitmap).toBe(true);
+  expect(presentation.labelLeftOffset).toBe(16);
+  expect(presentation.labelWidth).toBe(presentation.labelCanvasWidth);
 };
 const openSettingsMenu = async (page: Page) => {
   await openSystemMenu(page);
@@ -763,14 +768,15 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
         .getPropertyValue("--native-command-menu-selection-source"),
       pointerSource: getComputedStyle(menu).getPropertyValue("--native-cursor-hand-source"),
       duplicatePointer: label ? getComputedStyle(label, "::after").content : "",
-      labelInkCenterOffset: selected && label
-        ? label.getBoundingClientRect().left + label.getBoundingClientRect().width / 2
-          - (
-            Number.parseFloat(getComputedStyle(selected).letterSpacing)
-            - Number.parseFloat(getComputedStyle(selected).textIndent)
-          ) / 2
-          - (menu.getBoundingClientRect().left + menu.getBoundingClientRect().width / 2)
+      // `移    動` is one native Big5 string: two glyphs around four half-width
+      // spaces, so a correctly drawn row is 16 + 32 + 16 plus the outline's two
+      // extra columns, starting at the row record's own `選單左緣 + 0x10`.
+      labelLeft: selected && label
+        ? label.getBoundingClientRect().left - menu.getBoundingClientRect().left
         : Number.NaN,
+      labelCanvasWidth: label?.querySelector<HTMLCanvasElement>("canvas.native-text")?.width
+        ?? Number.NaN,
+      labelText: label?.textContent ?? "",
     };
   });
   expect(nativeMenuArt).toMatchObject({ width: 144, height: 100 });
@@ -789,7 +795,10 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
   expect(nativeMenuArt.selectionSource).toContain("command-menu-selection.png");
   expect(nativeMenuArt.pointerSource).toContain("command-menu-pointer.png");
   expect(nativeMenuArt.duplicatePointer).toBe("none");
-  expect(Math.abs(nativeMenuArt.labelInkCenterOffset)).toBeLessThan(0.5);
+  expect(nativeMenuArt.labelLeft).toBe(16);
+  expect(nativeMenuArt.labelCanvasWidth).toBe(66);
+  // The clipped accessible copy keeps the plain label, not the padded run.
+  expect(nativeMenuArt.labelText).toBe("移動");
   const commandMenuPlacement = await page.getByTestId("action-menu").evaluate((menu) => {
     const bounds = menu.getBoundingClientRect();
     const screen = menu.closest("[data-testid=game-screen]")!.getBoundingClientRect();

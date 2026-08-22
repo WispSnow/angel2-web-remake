@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { NATIVE_TEXT } from "../../src/game/content/native-font.generated";
+import { layoutNativeText } from "../../src/game/native-text";
+import { prayerResultText } from "../../src/game/prayer-presentation";
 import {
   TECHNIQUE_LAB_ATTACK_DOWN,
   TECHNIQUE_LAB_ATTACK_UP,
@@ -981,6 +984,32 @@ describe("map technique laboratory session", () => {
     expect(session.damagePreviewFor(session.state.units.find(({ id }) => id === "lab-5")!))
       .toBe("生命 +8");
     expect(session.prayerPreview()).toEqual(session.prayerPreview());
+  });
+
+  it("draws OJ's result from the recorded template, with the native numeric field", () => {
+    // `1000:59AA` shows one of four recorded strings. `|` is the cursor's line
+    // feed, and the amount goes through `0000:EF56`, whose leading zeroes become
+    // spaces — so 8 reads as four spaces and an `8`, never as `00008`.
+    const { resultStrings } = TECHNIQUE_LAB_PRAYER.presentation;
+    expect(prayerResultText("healing", 8)).toBe(resultStrings.heal.replace("00000", "    8"));
+    expect(prayerResultText("experience", 14)).toBe(
+      resultStrings.experience.replace("00000", "   14"),
+    );
+    expect(prayerResultText("healing", 8)).toContain(NATIVE_TEXT.lineFeed.character);
+    expect(prayerResultText("attackUp")).toBe(resultStrings.attackUp);
+    expect(prayerResultText("defenseUp")).toBe(resultStrings.defenseUp);
+  });
+
+  it("lays OJ's two result lines out on the SAY cursor", () => {
+    const layout = layoutNativeText(prayerResultText("healing", 8), 0, 0, "story");
+    // Line 1 is 生(16) 空(8) 命(16) 空(8) 加(16); line 2 opens with the four
+    // spaces `0000:EF56` left where the leading zeroes were, so `8` starts at
+    // 32 and the trailing `.` is what sets the run's right edge.
+    expect(layout.right).toBe(74);
+    expect(layout.glyphs.find(({ y }) => y === 20)?.x).toBe(32);
+    // The line feed drops 20 scanlines; nothing reaches a third row.
+    expect(layout.bottom).toBe(37);
+    expect(new Set(layout.glyphs.map(({ y }) => y))).toEqual(new Set([0, 20]));
   });
 
   it("previews 1D as the target diamond unioned with the fixed 10x7 rules viewport", () => {

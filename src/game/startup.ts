@@ -21,6 +21,7 @@ import {
 } from "./startup-screen";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { applyStagedNativeUiAssets } from "./native-ui-assets";
+import { paintNativeDomTextIn } from "./native-dom-text";
 import { classStatsFor } from "./content/stage0";
 import { className } from "./content/classes";
 import { configureGameScaling } from "./scaling";
@@ -112,6 +113,32 @@ const required = <T extends HTMLElement>(root: ParentNode, selector: string): T 
   if (!element) throw new Error(`missing startup element ${selector}`);
   return element;
 };
+
+/**
+ * The record selector's ink used to come from `.startup-record-slot`'s own
+ * `color`; the bitmap drawer bakes the colour into the canvas instead, so the
+ * slot state picks the ink here.
+ */
+const RECORD_HEADER_INK = "#d8cda9";
+
+/**
+ * `0000:1455` draws only these five headings, the slot numbers and each valid
+ * slot's five fields. The slot column has no heading of its own in the
+ * original, so the first header cell stays empty.
+ */
+const RECORD_HEADINGS = ["職業", "等級", "經驗值", "儲存次數", "難度"] as const;
+const RECORD_SLOT_INK: Readonly<Record<SaveSlotReadResult["kind"], string>> = {
+  valid: "#eee9dc",
+  empty: "#aaa4a8",
+  invalid: "#ffb7a8",
+};
+
+/**
+ * `--` rather than `—`: the panel draws with the original font now, and an em
+ * dash was never in it. The ASCII pair uses the same BIOS half-width cells as
+ * the slot numbers beside it.
+ */
+const MISSING_FIELD = "--";
 
 export function mountStartup(
   root: HTMLElement,
@@ -213,9 +240,11 @@ export function mountStartup(
               <section class="startup-record-selector" data-testid="title-record-menu"
                 aria-label="讀取遊戲進度" hidden>
                 <div class="startup-record-content">
-                  <h2>讀取遊戲進度</h2>
+                  <h2 data-native-text data-native-ink="#f6e36b">讀取遊戲進度</h2>
                   <div class="startup-record-header" aria-hidden="true">
-                    <span>槽</span><span>職業</span><span>等級</span><span>經驗值</span><span>儲存次數</span><span>難度</span>
+                    <span></span>${RECORD_HEADINGS.map((heading) =>
+                      `<span data-native-text
+                        data-native-ink="${RECORD_HEADER_INK}">${heading}</span>`).join("")}
                   </div>
                   <div class="startup-record-slots" role="menu"
                     aria-label="二十個手動遊戲進度槽，每頁五個"></div>
@@ -238,6 +267,8 @@ export function mountStartup(
         </div>
       </div>
     </div>`;
+
+  paintNativeDomTextIn(root);
 
   const screen = required(root, "#startup-screen");
   const viewport = required(root, "#startup-viewport");
@@ -307,12 +338,14 @@ export function mountStartup(
 
   const recordCells = (result: SaveSlotReadResult): readonly string[] => {
     if (result.kind === "empty") return ["XX", "XX", "XX", "XX", "XX"];
-    if (result.kind === "invalid") return ["損壞", "—", "—", "—", "—"];
+    if (result.kind === "invalid") {
+      return ["損壞", MISSING_FIELD, MISSING_FIELD, MISSING_FIELD, MISSING_FIELD];
+    }
     const representative = result.save.roster[0];
     return [
-      representative ? className(representative.classId) : "—",
-      representative ? String(classStatsFor(representative).level) : "—",
-      representative ? String(representative.experience) : "—",
+      representative ? className(representative.classId) : MISSING_FIELD,
+      representative ? String(classStatsFor(representative).level) : MISSING_FIELD,
+      representative ? String(representative.experience) : MISSING_FIELD,
       String(result.save.saveCount),
       DIFFICULTY_OPTIONS[result.save.difficulty].label,
     ];
@@ -331,13 +364,17 @@ export function mountStartup(
       const index = start + localIndex;
       const slot = index + 1;
       const cells = recordCells(result);
+      const ink = RECORD_SLOT_INK[result.kind];
       return `
         <button type="button" role="menuitem" class="startup-record-slot"
           data-startup-action="record" data-menu-index="${index}" data-slot-state="${result.kind}"
           data-testid="title-record-slot-${slot}" aria-label="${escapeAttribute(recordDescription(result, slot))}">
-          <span>${slot}</span>${cells.map((cell) => `<span>${cell}</span>`).join("")}
+          <span data-native-text data-native-ink="${ink}">${slot}</span>${
+            cells.map((cell) =>
+              `<span data-native-text data-native-ink="${ink}">${cell}</span>`).join("")}
         </button>`;
     }).join("");
+    paintNativeDomTextIn(recordSlotList);
     const page = saveSlotPageIndex(recordIndex);
     recordPage.textContent = `第 ${page + 1}／${SAVE_SLOT_PAGE_COUNT} 頁`;
     recordSlotList.setAttribute("aria-label", `手動遊戲進度槽，第 ${page + 1} 頁，共 ${SAVE_SLOT_PAGE_COUNT} 頁`);

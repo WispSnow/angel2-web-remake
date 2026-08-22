@@ -1,4 +1,6 @@
 import * as Phaser from "phaser";
+import { nativeTextCanvas } from "../native-dom-text";
+import { loadNativeFont } from "../native-text";
 import {
   PRAYER_PROCEDURAL_PRESENTATION,
   prayerResultText,
@@ -57,19 +59,27 @@ export function renderPrayerPresentation(
     graphics.strokeCircle(corner.x, y(corner.y), 8);
   }
 
-  const text = scene.add.text(
-    spec.resultTextPosition.x,
-    y(spec.resultTextPosition.y),
-    prayerResultText(outcome, rolledAmount),
-    {
-      color: "#fff26a",
-      fontFamily: '"Noto Serif TC", "Songti TC", serif',
-      fontSize: "18px",
-      stroke: "#240b30",
-      strokeThickness: 3,
-      padding: { x: 8, y: 5 },
-      backgroundColor: "rgba(5, 2, 12, .86)",
-    },
-  ).setOrigin(0, .5).setScrollFactor(0).setDepth(8);
+  // The result line is the original's own two-line template drawn with the
+  // original font, so it goes through the shared bitmap drawer rather than a
+  // host face. Phaser gets it as a canvas texture, which keeps the glyphs at
+  // native scale under the scene's own nearest-neighbour filtering.
+  const canvas = nativeTextCanvas(prayerResultText(outcome, rolledAmount), { mode: "story" });
+  const key = `prayer-result-${scene.scene.key}`;
+  scene.textures.remove(key);
+  const texture = scene.textures.addCanvas(key, canvas);
+  // The lab and the battlefield both scale their canvas up; without this the
+  // 16x15 cells arrive bilinear-filtered and stop looking like the original.
+  texture?.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  const text = scene.add.image(spec.resultTextPosition.x, y(spec.resultTextPosition.y), key)
+    .setOrigin(0, .5)
+    .setScrollFactor(0)
+    .setDepth(8);
+  text.once(Phaser.GameObjects.Events.DESTROY, () => scene.textures.remove(key));
+  // The atlas is normally long decoded by the time anyone prays, but a canvas
+  // built before it resolves paints itself later, and the GPU copy has to be
+  // told. Re-upload once the font is in, unless this object is already gone.
+  void loadNativeFont().then(() => {
+    if (texture && scene.textures.exists(key)) texture.refresh();
+  }).catch(() => undefined);
   return [graphics, text];
 }

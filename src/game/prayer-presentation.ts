@@ -1,3 +1,5 @@
+import { TECHNIQUE_LAB_PRAYER } from "./content/technique-lab.generated";
+import { nativeNumericField } from "./native-text";
 import type { PrayerOutcomeKind } from "./simulation/actions/types";
 
 export const PRAYER_PROCEDURAL_PRESENTATION = {
@@ -23,12 +25,21 @@ export const PRAYER_PROCEDURAL_PRESENTATION = {
   resultHoldNativeTicks: 60,
 } as const;
 
+const RESULT_STRINGS = TECHNIQUE_LAB_PRAYER.presentation.resultStrings;
+
+/**
+ * `1000:59AA` shows one of four recorded strings. Two of them are two-line
+ * templates carrying the same five-character numeric field the rest of the
+ * native HUD uses, so the roll goes through `0000:EF56`'s formatting rather
+ * than through a zero pad: 7 reads as four spaces and a `7`, not as `00007`.
+ * The `|` stays put — it is the cursor's own line feed, not a character.
+ */
 export function prayerResultText(
   outcome: PrayerOutcomeKind,
   rolledAmount?: number,
 ): string {
-  if (outcome === "healing") return `生 命 加 ${String(rolledAmount ?? 0).padStart(5, "0")} 點.`;
-  if (outcome === "experience") return `經 驗 加 ${String(rolledAmount ?? 0).padStart(5, "0")} 點.`;
-  if (outcome === "attackUp") return "攻擊增加";
-  return "防禦增加";
+  if (outcome === "attackUp") return RESULT_STRINGS.attackUp;
+  if (outcome === "defenseUp") return RESULT_STRINGS.defenseUp;
+  const template = outcome === "healing" ? RESULT_STRINGS.heal : RESULT_STRINGS.experience;
+  return template.replace("00000", nativeNumericField(rolledAmount ?? 0));
 }

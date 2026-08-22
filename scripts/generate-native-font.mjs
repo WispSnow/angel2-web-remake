@@ -50,6 +50,8 @@ async function loadJson(relativePath) {
 const spec = await loadJson(path.join("parsed", "native", "battle-text.json"));
 const fontData = await loadJson(path.join("parsed", "native", "battle-text-font.json"));
 const hud = await loadJson(path.join("parsed", "native", "hud-presentations.json"));
+const story = await loadJson(path.join("parsed", "native", "story-presentations.json"));
+const inputUi = await loadJson(path.join("parsed", "native", "input-ui.json"));
 const romFont = await readFile(reversePath("dumps", "bios-font-8x8.bin"));
 sources.push({
   id: "bios-font",
@@ -147,6 +149,55 @@ const { xPositions, yPositions, counterOrigin } = hud.statuses.packing;
 assert.equal(counterOrigin, "(iconX-6, iconY+20)", "the status counter origin moved");
 const statusCounters = xPositions.values.map((x, index) => ({ x: x - 6, y: yPositions.values[index] + 20 }));
 
+/**
+ * The SAY interpreters draw through the HUD's own glyph routine — module 29's
+ * story glyph draw `0000:C23E` calls `0000:EA04` at `C25B` and `C280` — so the
+ * atlas, the dilated outline and the three passes are the same. What differs is
+ * the cursor: the interpreter advances a half-width character itself, by 8
+ * pixels rather than the drawer's 9. Both story modes and both windows agree on
+ * every value, so a disagreement here means the evidence changed shape.
+ */
+const storyModes = [story.module25StoryMode.text, story.module29BattleStoryMode.text];
+for (const text of storyModes) {
+  assert.equal(text.big5Advance, spec.cursor.advances.fullWidth, "the SAY Big5 advance left the shared font grid");
+  assert.equal(text.lineAdvance, spec.cursor.lineFeed.deltaY, "the SAY line advance no longer matches the HUD drawer");
+  assert.equal(text.asciiAdvance, storyModes[0].asciiAdvance, "the two SAY interpreters disagree on the ASCII advance");
+}
+const storyWindows = [story.module25StoryMode.windows, story.module29BattleStoryMode.windows];
+const storyTextInset = storyWindows.flatMap((windows) => Object.values(windows).map(
+  ({ frameAnchor, textOrigin }) => [textOrigin[0] - frameAnchor[0], textOrigin[1] - frameAnchor[1]],
+));
+for (const [x, y] of storyTextInset) {
+  assert.deepEqual([x, y], storyTextInset[0], "the A/18 windows no longer share one text inset");
+}
+
+/**
+ * Every native menu row carries its own spacing inside the Big5 string rather
+ * than in the drawing code: the action menus are `B2BE 20202020 B0CA`, two
+ * glyphs around four half-width spaces, while the system and group menus are
+ * four adjacent glyphs. Keyed by the visible text so the remake can keep using
+ * plain labels for its accessible names and look the padding up when drawing.
+ */
+const menuLabelPadding = {};
+const menuGroups = [
+  ...inputUi.menus.actionMenus,
+  inputUi.menus.confirmation,
+  inputUi.menus.system.menu,
+  inputUi.menus.phaseAndBattleCommands.menu,
+];
+for (const menu of menuGroups) {
+  for (const entry of menu.entries) {
+    const text = entry.label.text;
+    const visible = text.replaceAll(" ", "");
+    const existing = menuLabelPadding[visible];
+    assert(
+      existing === undefined || existing === text,
+      `menu label ${visible} has two different paddings`,
+    );
+    menuLabelPadding[visible] = text;
+  }
+}
+
 const publicPath = path.join(root, "public", "assets", "original", "native-font.png");
 await mkdir(path.dirname(publicPath), { recursive: true });
 await writeFile(publicPath, encodeRgbaPng(atlasWidth, atlasHeight, pixels));
@@ -217,6 +268,23 @@ export const NATIVE_STAT_ROWS = ${JSON.stringify(statRows, null, 2)} as const;
 
 /** Packed status counter origins; active statuses fill them in scan order. */
 export const NATIVE_STATUS_COUNTERS = ${JSON.stringify(statusCounters)} as const;
+
+/**
+ * Module 25 \`0000:0736\` and module 29 \`0000:BE14\`: the A/18 dialogue, promotion
+ * and outcome windows hand each glyph to the same \`0000:EA04\` drawer the HUD
+ * uses, but run their own cursor, whose half-width advance is 8 rather than 9.
+ * \`inset\` is the text origin relative to the window frame, identical for both
+ * interpreters and both windows.
+ */
+export const NATIVE_STORY_TEXT = {
+  halfWidthAdvance: ${storyModes[0].asciiAdvance},
+  inset: { x: ${storyTextInset[0][0]}, y: ${storyTextInset[0][1]} },
+} as const;
+
+/** Visible menu label to the space-padded original string the cursor ran on. */
+export const NATIVE_MENU_LABEL_PADDING: Readonly<Record<string, string>> = ${
+  JSON.stringify(menuLabelPadding, null, 2)
+};
 
 export const NATIVE_IDENTITY_SEPARATOR = ${quote(spec.identityRow.separator.text)};
 

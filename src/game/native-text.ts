@@ -2,6 +2,7 @@ import {
   NATIVE_FONT,
   NATIVE_FONT_CHARACTERS,
   NATIVE_GAMEPLAY_PALETTE,
+  NATIVE_STORY_TEXT,
   NATIVE_TEXT,
 } from "./content/native-font.generated";
 import { loadStagedRenderImage } from "./staged-render-asset-cache";
@@ -22,7 +23,7 @@ import { loadStagedRenderImage } from "./staged-render-asset-cache";
  * `DS:319F`-style words into its templates before drawing them.
  */
 
-export type NativeTextMode = "normal" | "compact";
+export type NativeTextMode = "normal" | "compact" | "story";
 
 export interface NativeTextStyle {
   /** Defaults to the battle ink colour, gameplay palette index 15. */
@@ -32,7 +33,8 @@ export interface NativeTextStyle {
   /**
    * `compact` is the `CS:ECAD = 'N'` mode the native HUD switches into for the
    * status counters: undoubled ROM rows, an extra four-way colour-0 halo and an
-   * 8-pixel advance.
+   * 8-pixel advance. `story` is the SAY interpreters' cursor: the same 8-pixel
+   * half-width advance without the halo, used by every A/18 window.
    */
   readonly mode?: NativeTextMode;
 }
@@ -154,8 +156,22 @@ export interface NativeTextLayout {
   /** Cursor position after the last consumed character, in native pixels. */
   readonly x: number;
   readonly y: number;
-  /** Rightmost pixel the ink pass touches, so callers can assert the fit. */
+  /** Rightmost pixel any pass touches, so callers can assert the fit. */
   readonly right: number;
+  /** Bottom pixel any pass touches; `y` when the run drew nothing. */
+  readonly bottom: number;
+}
+
+/**
+ * `0000:EA04` advances a drawn half-width cell by 9 and its `CS:ECAD = \'N\'` mode
+ * by 8. The SAY interpreters call the very same drawer one glyph at a time
+ * (`0000:C23E` → `0000:EA04`) but keep the cursor themselves, and theirs steps a
+ * half-width character by 8. The 8-pixel space is the same in every mode.
+ */
+function halfWidthAdvance(mode: NativeTextMode): number {
+  if (mode === "compact") return NATIVE_TEXT.advances.halfWidthCompact;
+  if (mode === "story") return NATIVE_STORY_TEXT.halfWidthAdvance;
+  return NATIVE_TEXT.advances.halfWidth;
 }
 
 function halfWidthCell(code: number): number | undefined {
@@ -179,6 +195,7 @@ export function layoutNativeText(
   let cursorX = x;
   let cursorY = y;
   let right = x;
+  let bottom = y;
   for (const character of text) {
     if ((NATIVE_TEXT.terminators as readonly string[]).includes(character)) break;
     if (character === NATIVE_TEXT.lineFeed.character) {
@@ -194,10 +211,9 @@ export function layoutNativeText(
       if (cell !== undefined) {
         glyphs.push({ cell, x: cursorX, y: cursorY, halfWidth: true });
         right = Math.max(right, cursorX + NATIVE_FONT.halfWidthWidth + 2);
+        bottom = Math.max(bottom, cursorY + NATIVE_TEXT.outline.halfWidth.maskRows);
       }
-      cursorX += mode === "compact"
-        ? NATIVE_TEXT.advances.halfWidthCompact
-        : NATIVE_TEXT.advances.halfWidth;
+      cursorX += halfWidthAdvance(mode);
       continue;
     }
     // A character the original font never carried has no bitmap to draw. The
@@ -207,10 +223,11 @@ export function layoutNativeText(
     if (cell !== undefined) {
       glyphs.push({ cell, x: cursorX, y: cursorY, halfWidth: false });
       right = Math.max(right, cursorX + NATIVE_FONT.cellWidth + 2);
+      bottom = Math.max(bottom, cursorY + NATIVE_TEXT.outline.fullWidth.maskRows);
     }
     cursorX += NATIVE_TEXT.advances.fullWidth;
   }
-  return { glyphs, x: cursorX, y: cursorY, right };
+  return { glyphs, x: cursorX, y: cursorY, right, bottom };
 }
 
 function blit(

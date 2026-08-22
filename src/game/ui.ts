@@ -53,9 +53,15 @@ import {
   keyboardDirection,
 } from "./input-bindings";
 import {
+  nativeMenuLabelText,
+  paintNativeDomText,
+  paintNativeDomTextIn,
+} from "./native-dom-text";
+import {
   createNativeTextLayer,
   type NativeUnitDetailText,
 } from "./native-hud-text";
+import { NATIVE_IDENTITY_SEPARATOR } from "./content/native-font.generated";
 import { NATIVE_CONCEALED_FIELD, nativeNumericField } from "./native-text";
 import {
   createMenuPointerGlide,
@@ -187,7 +193,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 className: "feedback-portrait",
               })}
               <b class="feedback-portrait-name" data-testid="feedback-portrait-name"
-                aria-hidden="true">${niaPortraitDisplayName}</b>
+                data-native-text>${niaPortraitDisplayName}</b>
               <div class="dialogue-copy native-feedback-copy"><p data-testid="quit-feedback-text" data-full-text="唉啊！．．．要休息了嗎？&#10;請再考慮一下吧！">唉啊！．．．要休息了嗎？
 請再考慮一下吧！</p></div>
               <div class="button-row action-menu native-command-menu native-confirm-menu"
@@ -204,7 +210,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 className: "feedback-portrait",
               })}
               <b class="feedback-portrait-name" data-testid="feedback-portrait-name"
-                aria-hidden="true">${niaPortraitDisplayName}</b>
+                data-native-text>${niaPortraitDisplayName}</b>
               <div class="dialogue-copy native-feedback-copy"><p data-testid="retreat-feedback-text" data-full-text="哦！．．．要撤退嗎？&#10;必竟是沒辦法的事，雙方的實力差太多了．">哦！．．．要撤退嗎？
 必竟是沒辦法的事，雙方的實力差太多了．</p></div>
               <div class="button-row action-menu native-command-menu native-confirm-menu"
@@ -228,7 +234,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                   aria-hidden="true" hidden></b>
                 <div class="dialogue-copy" id="dialogue-copy-upper">
                   <b class="dialogue-speaker" id="dialogue-speaker-upper"></b>
-                  <p id="dialogue-text-upper"></p><span class="continue-mark">▼</span>
+                  <p id="dialogue-text-upper"></p>
                 </div>
               </div>
               <div class="dialogue-box lower" id="dialogue-box-lower" data-testid="dialogue-window-lower" hidden>
@@ -238,7 +244,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                   aria-hidden="true" hidden></b>
                 <div class="dialogue-copy" id="dialogue-copy-lower">
                   <b class="dialogue-speaker" id="dialogue-speaker-lower"></b>
-                  <p id="dialogue-text-lower"></p><span class="continue-mark">▼</span>
+                  <p id="dialogue-text-lower"></p>
                 </div>
               </div>
               <section class="dialogue-skip-confirm" id="dialogue-skip-confirm"
@@ -254,13 +260,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
                 </div>
               </section>
             </section>
-            <section class="objective-panel modal-panel" id="objective-panel" data-testid="objective-panel" hidden>
-              <span class="panel-kicker">${stage.name}</span>
-              <h2>勝利條件</h2><p>${stage.objective.victoryText}</p>
-              <h2>失敗條件</h2><p>${stage.objective.defeatText}</p>
+            <section class="objective-panel native-battle-panel" id="objective-panel"
+              data-testid="objective-panel" hidden>
+              <b class="objective-panel-stage" data-native-text>${stage.name}</b>
+              <h2 data-native-text>勝利條件</h2><p>${stage.objective.victoryText}</p>
+              <h2 data-native-text>失敗條件</h2><p>${stage.objective.defeatText}</p>
               <p data-testid="objective-round-limit"></p>
               ${controller.deploymentGuidance
-                ? `<h2>出擊提示</h2><p data-testid="objective-guidance">${controller.deploymentGuidance}</p>`
+                ? `<h3 class="objective-remake-heading">出擊提示</h3>
+                   <p data-testid="objective-guidance">${controller.deploymentGuidance}</p>`
                 : ""}
               <button data-action="close-objectives">返回戰場</button>
             </section>
@@ -269,6 +277,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         </div>
       </div>
     </div>`;
+
+  // Every `data-native-text` element in the static markup — the two feedback
+  // nameplates and the retreat/quit prompts — is painted once here; the ones
+  // that re-render carry their own paint call.
+  paintNativeDomTextIn(root);
 
   const screen = required(root, "#logical-screen");
   // 邊框圖磚各自合成在一張畫布上，非整數倍縮放時才不會在接縫處裂開；理由與
@@ -466,7 +479,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     activeDialogueText = target;
     activeDialoguePortrait = portrait;
     revealedCharacters = Math.max(0, Math.min(fullText.length, revealStart));
-    renderNativeDialogueText(target, fullText.slice(0, revealedCharacters));
+    renderNativeDialogueText(target, fullText.slice(0, revealedCharacters), fullText);
     const tick = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target || revealedCharacters >= dialogueFullText.length) {
         stopSpeaking(activeDialoguePortrait);
@@ -476,7 +489,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }
       const character = dialogueFullText[revealedCharacters];
       revealedCharacters += 1;
-      renderNativeDialogueText(target, dialogueFullText.slice(0, revealedCharacters));
+      renderNativeDialogueText(target, dialogueFullText.slice(0, revealedCharacters), dialogueFullText);
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
       drawSpeechGlyph(activeDialoguePortrait, character);
       const delay = controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80;
@@ -521,7 +534,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     feedbackRevealedCharacters = 0;
     activeFeedbackText = target;
     activeFeedbackPortrait = portrait;
-    renderNativeDialogueText(target, "");
+    renderNativeDialogueText(target, "", fullText);
     const tick = () => {
       if (activeFeedbackKey !== key || activeFeedbackText !== target || feedbackRevealedCharacters >= fullText.length) {
         stopSpeaking(activeFeedbackPortrait);
@@ -530,7 +543,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }
       const character = fullText[feedbackRevealedCharacters];
       feedbackRevealedCharacters += 1;
-      renderNativeDialogueText(target, fullText.slice(0, feedbackRevealedCharacters));
+      renderNativeDialogueText(target, fullText.slice(0, feedbackRevealedCharacters), fullText);
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
       drawSpeechGlyph(activeFeedbackPortrait, character);
       feedbackTimer = globalThis.setTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
@@ -986,6 +999,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             data-technique-index="${index}" data-testid="technique-${actionId}"
             class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${BATTLE_ACTION_DEFINITIONS[actionId].label}</span></button>`;
         }).join("");
+        paintNativeCommandLabels(actionMenu);
       } else {
         actionMenu.dataset.kind = controller.commandMenuKind;
         actionMenu.style.height = `${controller.unitCommands.length * 24 + 28}px`;
@@ -1002,6 +1016,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           const selected = index === controller.commandIndex;
           return `<button type="button" role="menuitem" data-action="${action}" data-command-index="${index}" data-testid="unit-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${command.label}</span></button>`;
         }).join("");
+        paintNativeCommandLabels(actionMenu);
       }
     }
     const promotionUnit = controller.promotionChoiceVisible ? controller.promotionUnit : undefined;
@@ -1090,6 +1105,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const selected = index === controller.systemMenuIndex;
         return `<button type="button" role="menuitem" data-action="${action}" data-system-index="${index}" data-testid="system-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${command.label}</span></button>`;
       }).join("");
+      paintNativeCommandLabels(systemMenu);
     }
     if (setMenuOpen(settingsMenu, controller.settingsOpen)) {
       const settings = [
@@ -1125,17 +1141,19 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         },
       ] as const;
       settingsMenu.innerHTML = `
-        <h2>子 選 單</h2>
+        <h2 data-native-text>子 選 單</h2>
         <div class="native-settings-list">
           ${settings.map((setting, index) => {
             const selected = index === controller.settingsMenuIndex;
             return `<button type="button" role="menuitemcheckbox" data-action="${setting.action}"
               data-settings-index="${index}" data-testid="${setting.testId}"
               class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"
-              aria-checked="${setting.enabled}"><span class="native-settings-label">${setting.label}</span><span
-                class="native-settings-state">${setting.enabled ? "ON" : "OFF"}</span></button>`;
+              aria-checked="${setting.enabled}"><span class="native-settings-label"
+                data-native-text>${setting.label}</span><span
+                class="native-settings-state" data-native-text>${setting.enabled ? "ON" : "OFF"}</span></button>`;
           }).join("")}
         </div>`;
+      paintNativeDomTextIn(settingsMenu);
     }
     setMenuOpen(soundSettingsMenu, controller.soundSettingsOpen);
     setMenuOpen(musicSettingsMenu, controller.musicSettingsOpen);
@@ -1157,6 +1175,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       });
     }
     if (setMenuOpen(quitConfirm, controller.quitConfirmOpen)) {
+      paintNativeCommandLabels(quitConfirm);
       for (const button of quitConfirm.querySelectorAll<HTMLButtonElement>("[data-quit-index]")) {
         const selected = Number(button.dataset.quitIndex) === controller.quitConfirmIndex;
         button.classList.toggle("is-selected", selected);
@@ -1176,8 +1195,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         const disabled = command.id === "followLeader" && !controller.followLeaderAvailable;
         return `<button type="button" role="menuitem" data-action="${action}" data-group-command-index="${index}" data-testid="group-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}" ${disabled ? "disabled" : ""}><span class="native-command-label">${command.label}</span></button>`;
       }).join("");
+      paintNativeCommandLabels(groupCommandMenu);
     }
     if (setMenuOpen(retreatConfirm, controller.retreatConfirmOpen)) {
+      paintNativeCommandLabels(retreatConfirm);
       for (const button of retreatConfirm.querySelectorAll<HTMLButtonElement>("[data-retreat-index]")) {
         const selected = Number(button.dataset.retreatIndex) === controller.retreatConfirmIndex;
         button.classList.toggle("is-selected", selected);
@@ -1185,6 +1206,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       }
     }
     if (setMenuOpen(dialogueSkipConfirm, controller.dialogueSkipConfirmOpen)) {
+      paintNativeCommandLabels(dialogueSkipConfirm);
       for (const button of dialogueSkipConfirm.querySelectorAll<HTMLButtonElement>(
         "[data-dialogue-skip-index]",
       )) {
@@ -1382,11 +1404,11 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
           elements.portrait.dataset.testid = active
             ? "dialogue-portrait-composite"
             : `dialogue-portrait-composite-${slot}`;
-          elements.portraitName.textContent = (
+          paintNativeDomText(elements.portraitName, (
             controller.promotionDialogueActive
               ? state.speaker
               : PORTRAIT_CATALOG[state.portrait].displayName ?? state.speaker
-          )?.trim() ?? "";
+          )?.trim() ?? "");
           elements.portraitName.hidden = false;
           elements.portraitName.dataset.testid = active
             ? "dialogue-portrait-name"
@@ -1575,12 +1597,12 @@ function buildFullCombatSkeleton(
       <div class="full-status ${side}" data-testid="full-${side}-status" hidden>
         <img src="${stagedRenderAssetSource(portraitSourceFor(unit.portrait))}" alt="${unit.name}肖像" />
         <dl>
-          <div><dt>經驗</dt><dd>${unit.experience}</dd></div>
-          <div><dt>生命</dt><dd>${life}</dd></div>
-          <div><dt>攻擊</dt><dd>${stats.attack}</dd></div>
-          <div><dt>防禦</dt><dd>${stats.defense}</dd></div>
+          <div><dt data-native-text>經驗</dt><dd data-native-text>${unit.experience}</dd></div>
+          <div><dt data-native-text>生命</dt><dd data-native-text>${life}</dd></div>
+          <div><dt data-native-text>攻擊</dt><dd data-native-text>${stats.attack}</dd></div>
+          <div><dt data-native-text>防禦</dt><dd data-native-text>${stats.defense}</dd></div>
         </dl>
-        <strong>${unit.className}／${unit.name}</strong>
+        <strong data-native-text>${unit.className}${NATIVE_IDENTITY_SEPARATOR}${unit.name}</strong>
       </div>`;
   };
   layer.innerHTML = `
@@ -1617,6 +1639,7 @@ function buildFullCombatSkeleton(
         <b class="full-damage-number" data-testid="full-damage-number" hidden></b>
       </div>
     </div>`;
+  paintNativeDomTextIn(layer);
 }
 
 const FULL_COMBAT_PALETTE: Readonly<Record<number, string>> = {
@@ -1830,7 +1853,10 @@ export function renderCombat(
   const damage = query<HTMLElement>(".full-damage-number");
   if (scene.damage) {
     damage.hidden = false;
-    damage.textContent = `-${scene.damage.amount}`;
+    // 全景傷害數字是原版自己畫的（`A1E8` 格式化 `DS:7CD7` 後立刻顯示），所以走 BIOS
+    // 半形字模而不是宿主 sans-serif。取證沒有記下它的色號，因此沿用複刻既有的紅，
+    // 只換字形不換顏色。
+    paintNativeDomText(damage, `-${scene.damage.amount}`, { ink: FULL_DAMAGE_NUMBER_INK });
     damage.style.transform = `translateX(${Math.round(scene.damage.x - 48)}px)`;
   } else {
     damage.hidden = true;
@@ -2253,6 +2279,7 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
         <button type="button" role="menuitem" data-action="save-no" data-save-prompt-index="1" data-testid="save-no"
           class="${controller.savePromptIndex === 1 ? "is-selected" : ""}" aria-current="${controller.savePromptIndex === 1}"><span class="native-command-label">取 消</span></button>
       </div>`;
+    paintNativeCommandLabels(layer);
   } else if (phase === "saveSlots") {
     layer.innerHTML = `<div class="record-panel post-save-panel" role="menu" aria-label="儲存遊戲進度">${
       renderRecordPanel(controller, {
@@ -2268,7 +2295,11 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
       })
     }</div>`;
   } else if (phase === "quit") {
-    layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2>天使帝國 II</h2><p>已離開遊戲</p></div>`;
+    // 原版按下 `離開遊戲` 就寫 `DS:2E72='Q'` 直接回 DOS，沒有結束畫面（`input-ui.json`
+    // 的 `menus.system.quitConfirmed`）。這張卡是複刻補的收尾，但它站在原版流程的
+    // 終點上，所以用原版點陣字而不是宿主字體。
+    layer.innerHTML = `<div class="quit-screen" data-testid="quit-screen"><h2
+      data-native-text>天使帝國Ⅱ</h2><p data-native-text>已離開遊戲</p></div>`;
   } else if (phase === "nextStage") {
     if (!controller.isCampaignPersistenceEnabled) {
       layer.innerHTML = `<div class="modal-panel result-card next-card" data-testid="arena-complete-card"><span class="panel-kicker">ARENA COMPLETE</span><h2>競技場測試完成</h2><p>本次結果只存在記憶體中；請使用上方工具列返回編成或重開相同陣容。</p><div class="completion-seal">測試完成</div></div>`;
@@ -2283,6 +2314,7 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
     }
     layer.innerHTML = `<div class="modal-panel result-card next-card"><span class="panel-kicker">STAGE ${stageCode}</span><h2>第 ${progress.completedOrdinal} 關已完成</h2><p>戰役進度已寫入「${progress.destinationLabel}」（${progress.destinationId}）入口；該關仍在設計凍結範圍內，尚未接入可玩流程。</p><div class="completion-seal">第 ${progress.completedOrdinal} 關完成</div></div>`;
   }
+  paintNativeDomTextIn(layer);
 }
 
 function nativeFeedbackMarkup(text: string, action?: string, testId?: string): string {
@@ -2295,10 +2327,31 @@ function nativeFeedbackMarkup(text: string, action?: string, testId?: string): s
       wrapperTestId: "feedback-portrait",
     })}
     <b class="feedback-portrait-name" data-testid="feedback-portrait-name"
-      aria-hidden="true">${niaPortraitDisplayName}</b>
-    <div class="dialogue-copy native-feedback-copy"><p data-testid="feedback-text" data-full-text="${escapedText}"></p><span class="continue-mark">▼</span></div>
+      data-native-text>${niaPortraitDisplayName}</b>
+    <div class="dialogue-copy native-feedback-copy"><p data-testid="feedback-text" data-full-text="${escapedText}"></p></div>
     ${action ? `<button class="feedback-primary" data-action="${action}" ${testId ? `data-testid="${testId}"` : ""} aria-label="繼續"></button>` : ""}
   </div>`;
+}
+
+/** `.group-command-menu button:disabled`, kept in one place so both agree. */
+const DISABLED_COMMAND_INK = "#81766d";
+
+/** The red the full-screen damage number has always used; no native colour is on record. */
+const FULL_DAMAGE_NUMBER_INK = "#ef3f41";
+
+/**
+ * Repaints every command row under `menu` with the original bitmap font and the
+ * original row spacing. Disabled rows keep their own ink so the greyed-out
+ * 跟隨主將 still reads as unavailable without a host-font fallback.
+ */
+function paintNativeCommandLabels(menu: ParentNode): void {
+  for (const label of menu.querySelectorAll<HTMLElement>(".native-command-label")) {
+    const button = label.closest("button");
+    const text = label.textContent ?? "";
+    paintNativeDomText(label, nativeMenuLabelText(text), {
+      ink: button?.disabled ? DISABLED_COMMAND_INK : undefined,
+    }, text);
+  }
 }
 
 function required<T extends HTMLElement = HTMLElement>(root: ParentNode, selector: string): T {

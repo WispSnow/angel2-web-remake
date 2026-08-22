@@ -2,11 +2,13 @@ import { describe, expect, test } from "vitest";
 import {
   NATIVE_FONT,
   NATIVE_FONT_CHARACTERS,
+  NATIVE_MENU_LABEL_PADDING,
   NATIVE_ROUND_DIGIT_INDICES,
   NATIVE_ROUND_TEMPLATE,
   NATIVE_STAGE_LABEL_PADDING,
   NATIVE_STAT_ROWS,
   NATIVE_STATUS_COUNTERS,
+  NATIVE_STORY_TEXT,
   NATIVE_TEXT,
   NATIVE_TEXT_ORIGINS,
 } from "../../src/game/content/native-font.generated";
@@ -18,6 +20,7 @@ import {
   nativeRoundLine,
   nativeStatRow,
 } from "../../src/game/native-text";
+import { nativeMenuLabelText } from "../../src/game/native-dom-text";
 import { nativeStageLabelText } from "../../src/game/native-hud-text";
 
 const glyphCell = (character: string) => NATIVE_FONT_CHARACTERS.indexOf(character);
@@ -90,6 +93,46 @@ describe("0000:EA04 cursor", () => {
   test("compact mode advances 8 instead of 9, as the status counters do", () => {
     expect(layoutNativeText("12", 0, 0, "compact").x).toBe(16);
     expect(layoutNativeText("12", 0, 0).x).toBe(18);
+  });
+
+  test("story mode advances a half-width cell by 8 without the compact halo", () => {
+    // `0000:C23E` hands each glyph to the same `0000:EA04`, but the SAY
+    // interpreters run their own cursor: 8 px per ASCII cell, 16 per Big5.
+    expect(NATIVE_STORY_TEXT.halfWidthAdvance).toBe(8);
+    expect(layoutNativeText("12", 0, 0, "story").x).toBe(16);
+    expect(layoutNativeText("生命12", 0, 0, "story").x).toBe(48);
+    expect(NATIVE_TEXT.outline.compactHalo.mode).toBe("compact");
+  });
+
+  test("reports the box the drawn run occupies, line feeds included", () => {
+    // A Big5 cell is drawn through a 17-row mask; a half-width one through 16.
+    expect(layoutNativeText("生", 0, 0)).toMatchObject({ right: 18, bottom: 17 });
+    expect(layoutNativeText("1", 0, 0)).toMatchObject({ right: 10, bottom: 16 });
+    expect(layoutNativeText("生|命", 0, 0)).toMatchObject({ right: 18, bottom: 37 });
+    expect(layoutNativeText("  ", 0, 0)).toMatchObject({ right: 0, bottom: 0 });
+  });
+});
+
+describe("1EBA:3DD8 menu label padding", () => {
+  test("keeps the original spacing inside the Big5 string, not in the layout", () => {
+    // `移    動` is `B2BE 20202020 B0CA`: two glyphs around four half-width
+    // spaces, so a row is 16 + 4 * 8 + 16 wide however it is drawn.
+    expect(nativeMenuLabelText("移動")).toBe("移    動");
+    expect(layoutNativeText(nativeMenuLabelText("移動"), 0, 0, "story").x).toBe(64);
+    expect(nativeMenuLabelText("確 定")).toBe("確 定 ");
+    expect(nativeMenuLabelText("遊戲功能")).toBe("遊戲功能");
+  });
+
+  test("passes a label the original never had through unchanged", () => {
+    expect(nativeMenuLabelText("初級炎暴")).toBe("初級炎暴");
+  });
+
+  test("covers every label the command, system and group menus can show", () => {
+    const missing = Object.values(NATIVE_MENU_LABEL_PADDING)
+      .flatMap((label) => [...label])
+      .filter((character) =>
+        character.codePointAt(0)! > 0x7f && !NATIVE_FONT_CHARACTERS.includes(character));
+    expect(missing).toEqual([]);
   });
 });
 
