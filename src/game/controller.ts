@@ -144,6 +144,8 @@ export interface StageAssetRequirements {
   encounterClassIds: readonly UnitClassId[];
   nativeStage: number;
   portraitRecords: readonly PortraitRecord[];
+  /** 這一關 `unitSprites` 的原始 URL，見 `StageClassPresentationRequirements`。 */
+  unitSpriteUrls: readonly string[];
   /**
    * 這一關會不會走到部署介面。部署表面是延後載入的，模組本身不在資源清單裡，因此得由
    * 資源門一併備妥；否則慢速連線會在階段切過去之後才開始抓，而那時已經沒有載入頁了。
@@ -151,9 +153,14 @@ export interface StageAssetRequirements {
   usesDeploymentSurface: boolean;
 }
 
+/**
+ * `resolveRequirements` 由資源門在載入頁已經出現之後才呼叫。關卡運行模組本身就是這一步
+ * 裡匯入的：那是一筆延後載入的相依，先開載入頁再匯入，慢速連線才不會停在上一個畫面上
+ * 乾等，而且匯入失敗也能落到資源門的重試面。
+ */
 export type StageAssetGate = (
   stageId: StageId,
-  requirements: StageAssetRequirements,
+  resolveRequirements: () => Promise<StageAssetRequirements>,
 ) => Promise<void>;
 
 // The native walk sound is per movement, not per step, and every reason has to
@@ -619,6 +626,11 @@ export class GameController {
     return controller;
   }
 
+  /** 目前這一關 `unitSprites` 的原始 URL；資源門要把它們一起備妥。 */
+  get stageUnitSpriteUrls(): readonly string[] {
+    return Object.values(this.stageRuntime.assets?.unitSprites ?? {});
+  }
+
   /** 目前這一關是否有部署階段；資源門用它決定要不要一併備妥部署介面模組。 */
   get usesDeploymentSurface(): boolean {
     return this.stageRuntime.preparation !== undefined;
@@ -753,51 +765,59 @@ export class GameController {
     campaign: CampaignState,
     restoredUnits: readonly Pick<BattleUnit, "classId" | "portrait">[] = [],
   ): Promise<LoadedStageRuntime> {
-    const runtime = await loadStageRuntime(stageId);
-    // A stage module can assign semantic portraits while constructing its
-    // fixed board (for example stage 1's Nami) without duplicating them in the
-    // generic save metadata. Build the same deterministic initial snapshot
-    // here so those current-stage identities cross the asset gate before the
-    // surface mounts. Restored battles already provide their exact unit set.
-    const presentationUnits = restoredUnits.length > 0
-      ? restoredUnits
-      : runtime.createBattle(
-        campaign,
-        runtime.preparation?.createInitialResult(),
-      ).units;
-    const allyClassIds = campaign.roster.map(({ classId }) => classId);
-    const encounterClassIds = new Set<UnitClassId>([
-      ...allyClassIds,
-      ...presentationUnits.map(({ classId }) => classId),
-    ]);
-    for (const spriteKey of Object.keys(runtime.assets?.unitSprites ?? {})) {
-      const separator = spriteKey.indexOf("-");
-      const classId = separator >= 0 ? spriteKey.slice(separator + 1) : spriteKey;
-      if (isClassId(classId)) encounterClassIds.add(classId);
-    }
-    const portraitRecords = new Set<PortraitRecord>([
-      46,
-      ...stageDialoguePortraitRecords(runtime.definition),
-      ...presentationUnits.map(({ portrait }) => portrait),
-      ...(runtime.preparation?.createRoster(campaign).map(({ portrait }) => portrait) ?? []),
-    ]);
-    for (const rule of runtime.save.namedUnits ?? []) {
-      if (typeof rule.portrait === "number") portraitRecords.add(rule.portrait);
-    }
-    for (const classId of encounterClassIds) {
-      for (const side of [1, 2] as const) {
-        const portrait = classFallbackPortraitFor(classId, side);
-        if (portrait !== undefined) portraitRecords.add(portrait);
+    let loaded: LoadedStageRuntime | undefined;
+    const resolveRequirements = async (): Promise<StageAssetRequirements> => {
+      const runtime = await loadStageRuntime(stageId);
+      loaded = runtime;
+      // A stage module can assign semantic portraits while constructing its
+      // fixed board (for example stage 1's Nami) without duplicating them in the
+      // generic save metadata. Build the same deterministic initial snapshot
+      // here so those current-stage identities cross the asset gate before the
+      // surface mounts. Restored battles already provide their exact unit set.
+      const presentationUnits = restoredUnits.length > 0
+        ? restoredUnits
+        : runtime.createBattle(
+          campaign,
+          runtime.preparation?.createInitialResult(),
+        ).units;
+      const allyClassIds = campaign.roster.map(({ classId }) => classId);
+      const encounterClassIds = new Set<UnitClassId>([
+        ...allyClassIds,
+        ...presentationUnits.map(({ classId }) => classId),
+      ]);
+      for (const spriteKey of Object.keys(runtime.assets?.unitSprites ?? {})) {
+        const separator = spriteKey.indexOf("-");
+        const classId = separator >= 0 ? spriteKey.slice(separator + 1) : spriteKey;
+        if (isClassId(classId)) encounterClassIds.add(classId);
       }
-    }
-    await this.stageAssetGate?.(stageId, {
-      allyClassIds,
-      encounterClassIds: [...encounterClassIds],
-      nativeStage: runtime.definition.nativeStage,
-      portraitRecords: [...portraitRecords].sort((left, right) => left - right),
-      usesDeploymentSurface: runtime.preparation !== undefined,
-    });
-    return runtime;
+      const portraitRecords = new Set<PortraitRecord>([
+        46,
+        ...stageDialoguePortraitRecords(runtime.definition),
+        ...presentationUnits.map(({ portrait }) => portrait),
+        ...(runtime.preparation?.createRoster(campaign).map(({ portrait }) => portrait) ?? []),
+      ]);
+      for (const rule of runtime.save.namedUnits ?? []) {
+        if (typeof rule.portrait === "number") portraitRecords.add(rule.portrait);
+      }
+      for (const classId of encounterClassIds) {
+        for (const side of [1, 2] as const) {
+          const portrait = classFallbackPortraitFor(classId, side);
+          if (portrait !== undefined) portraitRecords.add(portrait);
+        }
+      }
+      return {
+        allyClassIds,
+        encounterClassIds: [...encounterClassIds],
+        unitSpriteUrls: Object.values(runtime.assets?.unitSprites ?? {}),
+        nativeStage: runtime.definition.nativeStage,
+        portraitRecords: [...portraitRecords].sort((left, right) => left - right),
+        usesDeploymentSurface: runtime.preparation !== undefined,
+      };
+    };
+    if (this.stageAssetGate) await this.stageAssetGate(stageId, resolveRequirements);
+    else await resolveRequirements();
+    if (!loaded) throw new Error(`${stageId} runtime did not cross the asset gate`);
+    return loaded;
   }
 
   async enterStage(

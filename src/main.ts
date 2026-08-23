@@ -62,27 +62,38 @@ const loadDeploymentSurfaceModules = (): Promise<DeploymentSurfaceModules> => {
   return deploymentSurfaceModules;
 };
 
-const stageAssetGate: StageAssetGate = (stageId, requirements) =>
-  resourceLoader.ensureStage(
+const stageAssetGate: StageAssetGate = (stageId, resolveRequirements) => {
+  let requirements: StageAssetRequirements | undefined;
+  return resourceLoader.ensureStage(
     stageId,
     `讀取 ${stageId} 關卡資料`,
-    classPresentationAssetUrls(requirements),
-    requirements.usesDeploymentSurface
-      ? async () => { await loadDeploymentSurfaceModules(); }
-      : undefined,
+    async () => {
+      requirements = await resolveRequirements();
+      return classPresentationAssetUrls(requirements);
+    },
+    async () => {
+      if (requirements?.usesDeploymentSurface) await loadDeploymentSurfaceModules();
+    },
   );
+};
 
 const controllerAssetRequirements = (controller: GameController): StageAssetRequirements => ({
-  allyClassIds: controller.battle.units
-    .filter(({ side }) => side === 1)
-    .map(({ classId }) => classId),
+  // 部署名單的候選還沒上場，職業與肖像都可能是棋盤上沒有的。正式流程由 `loadRuntime`
+  // 從戰役名冊併進來，這條路徑（新遊戲與調試場景）要跟上，否則部署畫面的棋子與肖像
+  // 會自己去要原始 URL——那條路不經過資源門，也不經過持久快取。
+  allyClassIds: [...new Set([
+    ...controller.battle.units.filter(({ side }) => side === 1).map(({ classId }) => classId),
+    ...controller.deploymentRoster.map(({ classId }) => classId),
+  ])],
   encounterClassIds: controller.battle.units.map(({ classId }) => classId),
   nativeStage: controller.battle.stage.nativeStage,
   portraitRecords: [...new Set<PortraitRecord>([
     46,
     ...controller.battle.units.map(({ portrait }) => portrait),
+    ...controller.deploymentRoster.map(({ portrait }) => portrait),
     ...stageDialoguePortraitRecords(controller.battle.stage),
   ])],
+  unitSpriteUrls: controller.stageUnitSpriteUrls,
   usesDeploymentSurface: controller.usesDeploymentSurface,
 });
 const stage0Units = createStage0Units();
@@ -225,7 +236,7 @@ const startGame = async (selection: StartupSelection) => {
     controller = await GameController.fromSave(selection.save, selection.slot, stageAssetGate);
   } else {
     controller = new GameController(selection.difficulty, stageAssetGate);
-    await stageAssetGate("stage-00", controllerAssetRequirements(controller));
+    await stageAssetGate("stage-00", async () => controllerAssetRequirements(controller));
   }
   mountController(controller, selection.userActivated, resourceLoader);
 };
@@ -274,7 +285,10 @@ if (!releaseBuild && debugScenario) {
       perStageGrowth,
     });
     controller.setStageAssetGate(stageAssetGate);
-    await stageAssetGate(controller.battle.stage.id, controllerAssetRequirements(controller));
+    await stageAssetGate(
+      controller.battle.stage.id,
+      async () => controllerAssetRequirements(controller),
+    );
     mountController(controller, false, resourceLoader);
     debug.mountDebugToolbar(
       controller,

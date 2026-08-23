@@ -261,6 +261,32 @@ test("職業圖鑑：窄屏的阵营与动作控件不会挤出详情栏", async
 });
 
 /**
+ * 面板是動態載入的，慢速連線上點下去到視窗出現之間有一段空窗。指標移上去會先暖模組，
+ * 但真的還沒到齊時按鈕要自己標成忙碌，玩家才看得出是在讀取而不是壞掉。
+ */
+test("圖鑑入口在面板還沒載入完成前標成忙碌", async ({ page }) => {
+  let releasePanel = () => undefined;
+  const panelGate = new Promise<void>((resolve) => {
+    releasePanel = resolve;
+  });
+  await page.route("**/compendium/panel*", async (route) => {
+    await panelGate;
+    await route.continue();
+  });
+
+  await page.goto("/?test=1&debugScenario=stage-00-player");
+  const trigger = page.getByTestId("compendium-open");
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("compendium-body")).toHaveCount(0);
+
+  releasePanel();
+  await expect(page.getByTestId("compendium-body")).toBeVisible();
+  await expect(trigger).not.toHaveAttribute("aria-busy", "true");
+});
+
+/**
  * 瀏覽器縮放會等比縮小 CSS 視窗，所以「放大到 200% 以上」對版面來說就是一個又矮又窄的
  * 橫向視窗：1920×1080 放大到 250% 正好是 768×432。既有的窄屏案例都是手機那種高視窗，
  * 蓋不到這一格。

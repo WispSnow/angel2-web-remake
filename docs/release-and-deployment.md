@@ -137,6 +137,15 @@ pnpm content:resource-manifest
 JS／CSS 由 `public/_headers` 设为一年 `immutable`。这不是离线应用：没有 Service Worker 或 R2，没有完整缓存的
 资源仍须网络可用；不要在发布步骤改成全战役首屏下载。
 
+关卡资源门必须覆盖该关卡表面真正会画的每一个文件。判断标准是可机检的：正式运行时里
+`/assets/original/...` 的原始 URL 不该由 Phaser（`xhr`）、`<img>`／CSS（`image`）或音频（`media`）发出——
+这些通道都不经过 Cache Storage，所以一旦漏了，慢速连线会在载入页收起之后才开始抓，而且每进一次关就
+重抓一次。已知的三种漏法都已修掉，新增关卡时要一并检查：`BattleScene` 每关都排入的共用棋子必须进
+`battle:core`（不能只挂在第 0 关模块上）；关卡模块用样板字串算出来的 `unitSprites` 清单生成器看不到，
+因此由 `StageAssetRequirements.unitSpriteUrls` 在运行时原样带过资源门；`.svg` 与 `.png`／`.json` 一样要能
+进 staged 租约。结局与制作人员表的租约还要覆盖 `native-ui-assets.ts` 里 CSS 自定义属性引用的图，否则
+换包之后那些属性会退回原始 URL。
+
 部署介面是正式流程里唯一延后加载的表面，它的模块与样式是打包产物，不在资源清单里。有部署阶段的
 关卡必须在关卡资源门内把这些模块一并备妥（`ensureStage` 的 `afterLoad`），载入页收起之后、玩家走到
 部署画面之前不得再有程式或样式请求；否则慢速连线会在阶段切过去、载入页已经收起时才开始抓，画面停在

@@ -2113,6 +2113,14 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   white-space: nowrap;
 }
 .host-overlay-triggers > button:hover { border-color: var(--gold-dark); color: var(--gold); }
+/* 面板是動態載入的。指標移上去就先暖模組，所以大多數情況按下去是立刻開；連線很慢時
+   仍可能有一段等待，這時按鈕自己標成忙碌，讓玩家看得出是在讀取而不是沒反應。 */
+.host-overlay-triggers > button[aria-busy="true"] {
+  border-color: var(--gold-dark);
+  color: var(--gold);
+  cursor: progress;
+  opacity: .72;
+}
 .display-settings-hint { flex: 1 1 100%; margin: 0; color: #8d7c65; font-size: 11px; }
 
 @media (max-width: 560px) {

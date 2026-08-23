@@ -4390,6 +4390,11 @@ export async function loadStageRuntime(stageId: StageId): Promise<LoadedStageRun
       const combined = combineRuntime(entry, runtime);
       loadedRuntimes.set(stageId, combined);
       return combined;
+    }).catch((error: unknown) => {
+      // 這個 import 現在跑在關卡載入頁裡，失敗會走資源門的重試面。留著被拒絕的 promise
+      // 會讓每一次重試都重播同一個錯誤，連線恢復也救不回來。
+      runtimePromises.delete(stageId);
+      throw error;
     });
     runtimePromises.set(stageId, pending);
   }

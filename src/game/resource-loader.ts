@@ -68,6 +68,13 @@ type RenderImagePredecodeSelection = "all"
   | readonly string[]
   | ((urls: readonly string[]) => readonly string[]);
 
+/**
+ * 補充清單可以是一個「解析函式」：載入頁會先出現，才去算這一關到底需要什麼。關卡運行
+ * 模組本身就是這樣一筆延後載入的相依——先開載入頁再匯入它，慢速連線才不會停在上一個
+ * 畫面上乾等。解析失敗一樣走重試面。
+ */
+type SupplementalUrls = readonly string[] | (() => Promise<readonly string[]>);
+
 const MAX_PARALLEL_REQUESTS = 6;
 const PORTRAIT_ASSET_PREFIX = "/assets/original/portraits/";
 
@@ -151,16 +158,24 @@ export class ResourcePackLoader {
   async ensureStage(
     stageId: StageId,
     label = "準備關卡資料",
-    supplementalUrls: readonly string[] = [],
+    supplementalUrls: SupplementalUrls = [],
     afterLoad?: () => Promise<void>,
   ): Promise<void> {
-    const portraitUrls = supplementalUrls.filter((url) =>
-      url.startsWith("/assets/original/portraits/") && url.endsWith(".png"));
+    let resolved: readonly string[] = [];
     await this.ensurePackVisible(
       `stage:${stageId}`,
       label,
-      supplementalUrls,
-      (urls) => [...new Set([...portraitUrls, ...stageSurfaceImageUrls(urls)])],
+      async () => {
+        resolved = typeof supplementalUrls === "function"
+          ? await supplementalUrls()
+          : supplementalUrls;
+        return resolved;
+      },
+      (urls) => {
+        const portraitUrls = resolved.filter((url) =>
+          url.startsWith(PORTRAIT_ASSET_PREFIX) && url.endsWith(".png"));
+        return [...new Set([...portraitUrls, ...stageSurfaceImageUrls(urls)])];
+      },
       afterLoad,
     );
   }
@@ -218,7 +233,7 @@ export class ResourcePackLoader {
   private ensurePackVisible(
     packId: string,
     label: string,
-    supplementalUrls: readonly string[] = [],
+    supplementalUrls: SupplementalUrls = [],
     predecodeRenderImages: RenderImagePredecodeSelection = [],
     afterLoad?: () => Promise<void>,
   ): Promise<void> {
@@ -226,10 +241,13 @@ export class ResourcePackLoader {
       const attempt = async () => {
         this.showOverlay(packId, label);
         try {
+          const supplemental = typeof supplementalUrls === "function"
+            ? await supplementalUrls()
+            : supplementalUrls;
           const manifest = await this.loadManifest();
           const urls = [...new Set([
             ...this.resolvePackUrls(manifest, packId),
-            ...supplementalUrls,
+            ...supplemental,
           ])];
           this.activeUrls = urls;
           this.renderProgress(manifest);
@@ -243,7 +261,7 @@ export class ResourcePackLoader {
               : predecodeRenderImages;
             if (selected.length > 0) await decodeStagedRenderImages(selected);
           }
-          await this.replaceFullCombatImageLease(supplementalUrls);
+          await this.replaceFullCombatImageLease(supplemental);
           await afterLoad?.();
           this.hideOverlay();
           resolve();

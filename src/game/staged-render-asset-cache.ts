@@ -49,12 +49,18 @@ export function onStagedRenderAssetsChanged(subscriber: () => void): () => void 
 const contentTypeFor = (url: string): string => {
   if (url.endsWith(".png")) return "image/png";
   if (url.endsWith(".json")) return "application/json";
+  if (url.endsWith(".svg")) return "image/svg+xml";
   throw new Error(`unsupported staged render asset ${url}`);
 };
 
+/**
+ * `.svg` is here for the same reason as `.png`: 第 20 關的劇情背景是向量圖，`<img>` 會照樣
+ * 去要原始 URL，而 Cache Storage 不攔截 `<img>`。少了這一行，那 180 KB 會被資源門抓一次、
+ * DOM 再抓一次，而且第二次落在載入頁收起之後。
+ */
 export function isStagedRenderAssetUrl(url: string): boolean {
   return url.startsWith("/assets/original/")
-    && (url.endsWith(".png") || url.endsWith(".json"));
+    && (url.endsWith(".png") || url.endsWith(".json") || url.endsWith(".svg"));
 }
 
 function releaseAssets(assets: ActiveStagedRenderAssets): void {

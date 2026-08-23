@@ -180,6 +180,13 @@ for (const [stageId, urls] of stageAssetUrls) {
 // with `battle:core` prevents the first stage prefetch from fetching it again.
 addToPack("boot", assetUrl("command-menu-pointer.png"));
 addToPack("battle:core", assetUrl("command-menu-pointer.png"));
+// `BattleScene` schedules the two generic side-2 figures for *every* stage, not
+// just stage 0 whose module happens to name them. Leaving them to that one module
+// kept them out of every later stage's lease, so Phaser pulled the raw URL right
+// after the loading page had gone — a silent re-download on each stage entry.
+for (const relative of ["unit-enemy-soldier.png", "unit-enemy-cavalry.png"]) {
+  addToPack("battle:core", assetUrl(relative));
+}
 const endingSource = await readFile(path.join(root, "src/game/content/stage49-ending.ts"), "utf8");
 for (const url of sourceAssetUrls(endingSource)) addToPack("ending", url);
 for (const { relative } of allFiles) {
@@ -206,6 +213,18 @@ for (const { relative } of allFiles) {
     || /^(?:battle-|command-menu-|hud-|native-|objective-panel-|tactical-panel)/u.test(relative)) {
     addToPack("battle:core", url);
   } else addToPack("stream:misc", url);
+}
+
+// CSS cannot reach the staged bridge on its own: the native cursor and menu
+// frames live in custom properties on long-lived host elements. When the ending
+// or credits lease takes over, any of those properties the new lease does not
+// cover falls back to the raw URL and the browser fetches it again on a surface
+// that has no loading page left. They are already downloaded with `battle:core`,
+// so joining these packs only keeps them inside the lease.
+const nativeUiSource = await readFile(path.join(root, "src/game/native-ui-assets.ts"), "utf8");
+for (const url of sourceAssetUrls(nativeUiSource)) {
+  addToPack("ending", url);
+  addToPack("credits", url);
 }
 
 const packDefinitions = [];

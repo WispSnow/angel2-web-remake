@@ -16,6 +16,14 @@ export interface StageClassPresentationRequirements {
   nativeStage?: number;
   /** Current board, deployment and story portraits; never the full campaign. */
   portraitRecords?: readonly PortraitRecord[];
+  /**
+   * The stage module's own `unitSprites` values, verbatim. A stage may build
+   * those URLs instead of writing them out — stage 30 derives one per boss form —
+   * and the manifest generator only sees literal strings, so such a stage would
+   * otherwise have figures in no pack at all and Phaser would pull the raw URL
+   * after the loading page had already gone.
+   */
+  unitSpriteUrls?: readonly string[];
 }
 
 const fullCombatAtlasById = new Map<string, (typeof FULL_COMBAT_ATLASES)[number]>(
@@ -34,6 +42,7 @@ export function classPresentationAssetUrls(
     ...allyClasses,
   ]);
   const urls = new Set<string>(allyMapUnitAssetsForClasses(requirements.allyClassIds).values());
+  for (const url of requirements.unitSpriteUrls ?? []) urls.add(url);
   for (const url of portraitAssetUrlsForRecords(requirements.portraitRecords ?? [])) urls.add(url);
   if (requirements.nativeStage !== undefined) {
     for (const url of fullCombatBackgroundAssetsForStage(requirements.nativeStage)) urls.add(url);

@@ -35,6 +35,6 @@ const isCurrentStageDomImage = (url: string): boolean =>
  * portraits and ending art so a stage gate never decodes the whole campaign.
  */
 export function stageSurfaceImageUrls(urls: readonly string[]): readonly string[] {
-  return [...new Set(urls)].filter((url) => url.endsWith(".png")
+  return [...new Set(urls)].filter((url) => (url.endsWith(".png") || url.endsWith(".svg"))
     && (COMMON_STAGE_SURFACE_IMAGES.has(url) || isCurrentStageDomImage(url)));
 }

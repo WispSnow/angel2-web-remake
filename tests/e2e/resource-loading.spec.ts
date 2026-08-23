@@ -580,6 +580,74 @@ test("continue gates the saved target stage rather than assuming stage 0", async
 });
 
 /**
+ * 資源門備妥之後，正式表面畫任何東西都該用同一次回應建立的物件 URL。所以整場關卡裡不該
+ * 有任何 `/assets/original/...` 的原始 URL 是由 Phaser（xhr）、`<img>`／CSS（image）或
+ * 音訊（media）發出的——那代表某個表面繞過了租約，慢速連線上它會在載入頁收起之後才開始
+ * 抓，而且每進一次關就重抓一次（持久快取只擋得住資源門自己的 fetch）。
+ *
+ * 第 0 關以外的關卡最容易漏：`BattleScene` 每一關都排入的共用敵方棋子，過去只掛在第 0 關
+ * 的模組上，因此只有第 0 關的租約有它們。
+ */
+const RAW_URL_SCENARIOS = [
+  "stage-01-player",       // 第一個戰役關卡
+  "stage-04-player",       // 逐關特效圖集
+  "stage-05-deployment",   // 部署名單的肖像與我方棋子
+  "stage-14-deployment",   // 名冊長大之後，候選職業已經不在棋盤上
+  "stage-20-player",       // 唯一的向量劇情背景
+  "stage-26-player",       // 逐關推柱圖集
+  "stage-30-player",       // 用樣板字串算出來的逐形態敵方棋子
+  "stage-32-player",       // 資源最多的一關
+  "stage-38-player",       // 最後一關
+] as const;
+for (const scenario of RAW_URL_SCENARIOS) {
+  test(`${scenario}: the surface never pulls a raw asset URL`, async ({ page }) => {
+    const rawPulls: string[] = [];
+    page.on("request", (request) => {
+      const type = request.resourceType();
+      if (type !== "xhr" && type !== "image" && type !== "media" && type !== "font") return;
+      const { pathname } = new URL(request.url());
+      if (!pathname.startsWith("/assets/original/")) return;
+      rawPulls.push(`${type} ${pathname}`);
+    });
+
+    await page.goto(`/?test=1&debugScenario=${scenario}`);
+    const surface = scenario.endsWith("-deployment") ? "deployment-screen" : "game-screen";
+    await expect(page.getByTestId(surface)).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByTestId("resource-loading-overlay")).toBeHidden();
+    // Let the scene finish mounting and pull whatever it still wants.
+    await page.waitForTimeout(3000);
+    expect(rawPulls).toEqual([]);
+  });
+}
+
+/**
+ * 關卡運行模組也是延後載入的一筆相依。它原本在資源門「之前」匯入，所以慢速連線上玩家
+ * 會先對著上一個畫面乾等一段沒有任何進度的時間，載入頁才姍姍出現。現在匯入本身就跑在
+ * 載入頁裡：模組還沒到，載入頁就該已經在了。
+ */
+test("the stage runtime module loads under the loading page, not before it", async ({ page }) => {
+  let releaseModule = () => undefined;
+  const moduleGate = new Promise<void>((resolve) => {
+    releaseModule = resolve;
+  });
+  await page.route("**/content/stage1.ts**", async (route) => {
+    await moduleGate;
+    await route.continue();
+  });
+
+  await page.goto("/?test=1&debugScenario=stage-00-player");
+  await expect(page.getByTestId("game-screen")).toBeVisible();
+  await page.locator("[data-debug-complete]").click();
+
+  const overlay = page.getByTestId("resource-loading-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toHaveAttribute("data-resource-pack", "stage:stage-01");
+  releaseModule();
+  await expect(overlay).toBeHidden({ timeout: 60_000 });
+  await expect(page.getByTestId("game-screen")).toHaveAttribute("aria-label", /騎士城堡前/);
+});
+
+/**
  * 部署介面是延後載入的，它的模組不在資源清單裡。原本要等「部署」階段真的開始才去抓，
  * 而那時載入頁早就收起來了：慢速連線上玩家看到的是一片沒有進度、也沒有東西可畫的
  * 部署表面，感覺就是卡死。載入頁收起之後、部署畫面出現之前，不該再有任何程式或樣式
