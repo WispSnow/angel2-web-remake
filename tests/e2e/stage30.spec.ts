@@ -260,8 +260,9 @@ test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves 
   await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("continue-game").click();
+  // 完成档的记录摘要显示刚打完的第 30 关；存档本身仍以第 31 关入口为身份。
   await expect(page.getByTestId("title-record-slot-1"))
-    .toHaveAttribute("aria-label", /前往斯德林海峽/u);
+    .toHaveAttribute("aria-label", /治癒維斯塔女帝/u);
   await page.getByTestId("title-record-slot-1").click();
   await waitForPhase(page, "prebattleStory");
   expect(await state(page)).toMatchObject({
