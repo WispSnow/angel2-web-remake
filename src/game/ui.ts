@@ -102,6 +102,7 @@ import {
 import {
   SAVE_SLOT_PAGE_COUNT,
   SAVE_SLOTS_PER_PAGE,
+  saveRecordStageLabel,
   saveSlotPageIndex,
   saveSlotPageStart,
 } from "./save";
@@ -2281,6 +2282,10 @@ interface RecordPanelConfig {
 // 弹出式资料面板而不是通用选单外框，列出逐槽元数据而不是单行摘要。原版五列
 // 「職業/等級/經驗值/儲存次數/難度」的前三列取自保存器的工作单位快照，对复刻版
 // 玩家没有辨识价值，因此按产品决定换成「關卡名／回合數」，保留后两列。
+//
+// 这两列取自原版存档头的 `1Ah`（DS:`2E77` 当前关卡）与 `1Ch`（DS:`2F83` 回合号，
+// 即时胜利 999 写文件时序列化为 1000），两者永远描述同一关，所以「完」必须配刚打完
+// 的那一关关卡名；关卡名的反查见 `saveRecordStageLabel`。
 function renderRecordPanel(controller: GameController, config: RecordPanelConfig): string {
   const page = saveSlotPageIndex(config.selectedIndex);
   const start = saveSlotPageStart(config.selectedIndex);
@@ -2291,7 +2296,7 @@ function renderRecordPanel(controller: GameController, config: RecordPanelConfig
     const selected = index === config.selectedIndex;
     const disabled = config.disableEmptySlots && !save;
     const cells = save
-      ? `<span class="record-cell-name">${save.stageLabel}</span><span
+      ? `<span class="record-cell-name">${saveRecordStageLabel(save)}</span><span
           class="record-cell-round">${save.kind === "battle" ? save.battle?.round ?? 1 : "完"}</span><span
           class="record-cell-count">${save.saveCount}</span><span
           class="record-cell-difficulty">${DIFFICULTY_OPTIONS[save.difficulty].label}</span>`

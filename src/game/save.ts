@@ -4,6 +4,7 @@ export {
   SAVE_VERSION,
 } from "./save/current-schema";
 export { parseSaveData } from "./save/migrations";
+export { saveRecordStageLabel } from "./save/record-labels";
 export {
   createSaveBackup,
   parseSaveBackup,

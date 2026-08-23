@@ -10,6 +10,7 @@ import {
   SAVE_SLOT_PAGE_COUNT,
   SAVE_SLOTS_PER_PAGE,
   SAVE_VERSION,
+  saveRecordStageLabel,
   saveSlotPageIndex,
   saveSlotPageStart,
   saveSlotKey,
@@ -5442,6 +5443,30 @@ describe("Web save validation", () => {
     expect(isSaveData({ ...completedSave(), stageId: "stage-00" })).toBe(false);
     expect(isSaveData({ ...completedSave(), battle: battleSave().battle })).toBe(false);
     expect(isSaveData({ ...battleSave(), stageLabel: "下一關" })).toBe(false);
+  });
+
+  // 原版存档头的关卡编号 `1Ah`（DS:`2E77`，模块 29 的当前关卡）与回合号 `1Ch`
+  // （DS:`2F83`，胜利保存时序列化成 1000）永远描述同一关，所以记录列表里的「完」必须
+  // 配刚打完的那一关。完成档本身仍以「下一关入口」为身份，反查只发生在显示层。
+  it("labels completed records with the cleared stage, not the next one", () => {
+    expect(saveRecordStageLabel(battleSave())).toBe("瓦爾克麗宮");
+
+    const cleared = completedSave();
+    expect(cleared.stageId).toBe("stage-01");
+    expect(cleared.stageLabel).toBe("騎士城堡前");
+    expect(saveRecordStageLabel(cleared)).toBe("瓦爾克麗宮");
+
+    // 主线最后两关的目的地不是可玩关卡，同样要反查回打完的那一关。
+    expect(saveRecordStageLabel({
+      ...cleared,
+      stageId: "stage-49",
+      stageLabel: "主線結局",
+    })).toBe("究極女神");
+    expect(saveRecordStageLabel({
+      ...cleared,
+      stageId: "stage-39",
+      stageLabel: "製作人員表",
+    })).toBe("異世界");
   });
 
   it("distinguishes empty, invalid and readable persistent slots", () => {

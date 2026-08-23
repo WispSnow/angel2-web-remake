@@ -40,6 +40,7 @@ import {
   moveSaveSlotIndex,
   moveSaveSlotPage,
   readSaveSlot,
+  saveRecordStageLabel,
   SAVE_SLOT_COUNT,
   SAVE_SLOT_PAGE_COUNT,
   SAVE_SLOTS_PER_PAGE,
@@ -335,7 +336,9 @@ export function mountStartup(
     const { save } = result;
     const progress = save.kind === "battle" ? `第 ${save.battle.round} 回合` : "戰役完成";
     const savedAt = `${save.savedAt.slice(0, 16).replace("T", " ")} UTC`;
-    return `記錄 ${slot}：${save.stageLabel}・${progress}・${RULESET_LABELS[save.ruleset]}・${savedAt}`;
+    // 关卡名与进度必须描述同一关：完成档的 `stageLabel` 存的是下一关入口，配上「戰役
+    // 完成」会说成还没开打的那一关已经打完，所以同样按 `saveRecordStageLabel` 反查。
+    return `記錄 ${slot}：${saveRecordStageLabel(save)}・${progress}・${RULESET_LABELS[save.ruleset]}・${savedAt}`;
   };
 
   const recordCells = (result: SaveSlotReadResult): readonly string[] => {

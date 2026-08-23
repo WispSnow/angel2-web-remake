@@ -3582,6 +3582,50 @@ test("S00-N: defeat and victory use native feedback text, portrait and two-step 
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-native-save-confirm.png" });
 });
 
+/**
+ * 原版存档头把关卡编号写在 `1Ah`（DS:`2E77`，模块 29 的当前关卡）、把回合号写在 `1Ch`
+ * （DS:`2F83`；即时胜利 999 在构造文件元数据时序列化成 1000），两者永远描述同一关：
+ * 刚打完的那一关。复刻版的完成档以「下一关入口」为身份，所以记录面板必须反查来源关卡，
+ * 否则会列出「还没开打的下一关名字 · 完」这种自相矛盾的行。
+ */
+test("S00-T: a post-victory record lists the stage it cleared next to 完", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-00-near-victory&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-attack").click();
+  await confirmPromotion(page);
+  await waitForPhase(page, "victoryStory");
+  await skipStoryDialogue(page);
+  await page.getByTestId("victory-continue").click();
+  await page.getByTestId("victory-continue").click();
+  await waitForPhase(page, "savePrompt");
+  await page.getByTestId("save-yes").click();
+  await page.getByTestId("save-slot-1").click();
+  await waitForPhase(page, "prebattleStory");
+
+  // 存档字段本身不变：完成档仍以下一关入口为身份，这条修正只发生在显示层。
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
+    kind: string;
+    stageId: string;
+    stageLabel: string;
+  });
+  expect(saved).toMatchObject({ kind: "completed", stageId: "stage-01", stageLabel: "騎士城堡前" });
+
+  // 回到有系统选单的玩家阶段读同一槽：关卡名必须是刚打完的第 0 关，才和「完」相符。
+  await page.goto("/?debugScenario=stage-01-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await openSystemMenu(page);
+  await page.getByTestId("system-command-load").click();
+  const record = page.getByTestId("record-slot-1");
+  await expect(record.locator(".record-cell-name")).toHaveText("瓦爾克麗宮");
+  await expect(record.locator(".record-cell-round")).toHaveText("完");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-completed-record-row.png",
+  });
+});
+
 test("S00-S: the 99-round cap warns on the final rounds and loses the stage at the boundary", async ({ page }) => {
   // REMAKE-110. 夹具停在第 99 回合，场上只剩一名够不到妮雅的敌人，所以结束本回合
   // 一定由逾时判负接管，而不是关卡目标先分出胜负。

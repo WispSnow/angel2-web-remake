@@ -570,7 +570,10 @@ test("BOOT-C: a normal reconnect migrates a stage-0 clear into stage-1 prebattle
   await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
   await page.getByTestId("continue-game").click();
-  await expect(page.getByTestId("title-record-detail")).toContainText("騎士城堡前");
+  // 摘要描述的是这一笔记录本身：完成档存的是下一关入口，但玩家打完的是第 0 关，所以
+  // 关卡名与「戰役完成」都必须落在瓦爾克麗宮上。读进去之后才是第 1 关关前剧情。
+  await expect(page.getByTestId("title-record-detail"))
+    .toContainText("記錄 1：瓦爾克麗宮・戰役完成");
   await page.getByTestId("title-record-slot-1").click();
 
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
