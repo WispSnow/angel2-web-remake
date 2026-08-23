@@ -368,3 +368,118 @@ test.describe("Tauri desktop window scaling", () => {
     expect(logical?.height).toBeLessThan(800);
   });
 });
+
+/**
+ * 桌面版的「介面縮放」。遊戲畫面在桌面版會放大填滿視窗，宿主工具列與三個參考面板卻是
+ * 固定 px 的 DOM，大螢幕上因此比原版自己的點陣字小上數倍。控制項走的是 WebView 真頁面
+ * 縮放（和 `Ctrl +/-` 同一條路徑），所以這裡驗的是「有沒有把倍率交給 WebView」與
+ * 「選擇有沒有留下來」，不是 CSS 有沒有變——真縮放不改任何一條 CSS。
+ */
+test.describe("Tauri host interface zoom", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+
+  const installTauri = async (page: Page): Promise<void> => {
+    await page.addInitScript(() => {
+      const zoomCalls: number[] = [];
+      Object.defineProperty(window, "__TAURI_TEST_ZOOM_CALLS__", { value: zoomCalls });
+      Object.defineProperty(window, "__TAURI_INTERNALS__", {
+        value: {
+          metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
+          invoke: async (command: string, args: Record<string, unknown>) => {
+            if (command === "plugin:webview|set_webview_zoom") zoomCalls.push(args.value as number);
+            if (command === "plugin:window|scale_factor") return 1;
+            if (command === "plugin:window|is_fullscreen" || command === "plugin:window|is_maximized") {
+              return false;
+            }
+            return null;
+          },
+        },
+      });
+    });
+  };
+
+  const zoomCalls = (page: Page): Promise<number[]> => page.evaluate(() =>
+    [...((window as Window & { __TAURI_TEST_ZOOM_CALLS__?: number[] }).__TAURI_TEST_ZOOM_CALLS__ ?? [])]);
+
+  test("the picker is desktop-only, hands the factor to the WebView and is remembered", async ({ page }) => {
+    await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    // 網頁版沒有這一組：瀏覽器自己的縮放已經做同一件事。
+    await expect(page.getByTestId("interface-zoom-150")).toHaveCount(0);
+    await expect(page.getByTestId("image-scaling-sharp")).toBeVisible();
+
+    await installTauri(page);
+    await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+    await expect(page.locator("html")).toHaveAttribute("data-desktop-runtime", "true");
+    const option = page.getByTestId("interface-zoom-150");
+    await expect(option).toBeVisible();
+    await expect(page.getByTestId("interface-zoom-100")).toHaveAttribute("aria-checked", "true");
+    // 預設 100% 不必為了「還原」多發一次呼叫：新開的 WebView 本來就是 100%。
+    expect(await zoomCalls(page)).toEqual([]);
+
+    await option.click();
+    await expect(option).toHaveAttribute("aria-checked", "true");
+    expect(await zoomCalls(page)).toEqual([1.5]);
+    // 說明行是兩個控制項共用的，玩家動過之後換成介面縮放這一條。
+    await expect(page.getByTestId("image-scaling-hint")).toContainText("遊戲畫面仍會填滿視窗");
+
+    // 兩個宿主顯示偏好共用同一筆記錄，互相不得覆寫。
+    await page.getByTestId("image-scaling-smooth").click();
+    expect(await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("angel2.preferences.display.v1") ?? "null")))
+      .toEqual({ imageScaling: "smooth", interfaceZoom: 150 });
+
+    await page.reload();
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+    await expect(page.getByTestId("interface-zoom-150")).toHaveAttribute("aria-checked", "true");
+    // 還原只發一次：表面切換會重建工具列，但頁面縮放屬於整個 WebView，
+    // 重複套用會把玩家用 `Ctrl +/-` 調過的倍率蓋回去。
+    expect(await zoomCalls(page)).toEqual([1.5]);
+  });
+
+  test("integer mode converts its CSS-pixel target into OS logical pixels", async ({ page }) => {
+    await installTauri(page);
+    await page.addInitScript(() => {
+      const calls: unknown[] = [];
+      Object.defineProperty(window, "__TAURI_TEST_RESIZE_CALLS__", { value: calls });
+      Object.defineProperties(window.screen, {
+        availWidth: { value: 1920 },
+        availHeight: { value: 1080 },
+      });
+      const internals = (window as unknown as {
+        __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> };
+      }).__TAURI_INTERNALS__;
+      const inner = internals.invoke;
+      internals.invoke = async (command, args) => {
+        if (command === "plugin:window|set_size") {
+          const value = args.value as { toJSON?: () => unknown } | undefined;
+          calls.push(value?.toJSON?.() ?? value);
+        }
+        // 頁面縮放 150%：`devicePixelRatio` 含縮放，視窗的 scaleFactor 不含。
+        if (command === "plugin:window|scale_factor") return 1;
+        return inner(command, args);
+      };
+      Object.defineProperty(window, "devicePixelRatio", { value: 1.5 });
+    });
+    await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
+    await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+    await page.getByTestId("image-scaling-integer").click();
+    await expect.poll(() => page.evaluate(() => {
+      const calls = (window as Window & { __TAURI_TEST_RESIZE_CALLS__?: unknown[] })
+        .__TAURI_TEST_RESIZE_CALLS__ ?? [];
+      return calls.length;
+    })).toBeGreaterThan(0);
+    const logical = await page.evaluate(() => {
+      const calls = (window as Window & { __TAURI_TEST_RESIZE_CALLS__: Array<{
+        Logical: { width: number; height: number };
+      }> }).__TAURI_TEST_RESIZE_CALLS__;
+      return calls.at(-1)?.Logical;
+    });
+    const cssWidth = await page.evaluate(() => Number(
+      getComputedStyle(document.querySelector(".logical-screen") as Element)
+        .getPropertyValue("--game-scale")) * 640);
+    // 少了換算，這裡會等於 CSS 寬度，視窗每次重算就再縮小 1/1.5。
+    expect(logical?.width).toBe(Math.round(cssWidth * 1.5));
+  });
+});

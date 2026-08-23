@@ -36,6 +36,9 @@ describe("desktop packaging contract", () => {
       title: "天使帝國 II Web 復刻版",
       width: 1280,
       height: 800,
+      // 桌面殼預設關掉頁面縮放熱鍵，網頁版玩家卻一直有 `Ctrl +/-`。宿主工具列與三個
+      // 參考面板是固定 px 的 DOM，少了這一條，桌面版玩家在大螢幕上沒有任何放大手段。
+      zoomHotkeysEnabled: true,
     });
   });
 
@@ -78,6 +81,8 @@ describe("desktop packaging contract", () => {
       "core:window:allow-set-size",
       "core:window:allow-set-fullscreen",
       "core:window:allow-unmaximize",
+      // 「介面縮放」用的命令不在 `core:default` 裡，漏掉這一條在桌面版是執行期才報錯。
+      "core:webview:allow-set-webview-zoom",
     ]));
   });
 });

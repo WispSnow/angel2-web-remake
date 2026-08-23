@@ -158,10 +158,31 @@ describe("display preferences", () => {
   test("round-trips every supported mode under its own key", () => {
     const storage = new MemoryStorage();
     for (const imageScaling of ["sharp", "smooth", "integer"] as const) {
-      saveDisplayPreferences(storage, { imageScaling });
-      expect(loadDisplayPreferences(storage)).toEqual({ imageScaling });
+      saveDisplayPreferences(storage, { imageScaling, interfaceZoom: 100 });
+      expect(loadDisplayPreferences(storage)).toEqual({ imageScaling, interfaceZoom: 100 });
     }
     // A host-display choice must not disturb the in-game presentation switches.
     expect(storage.getItem(PRESENTATION_PREFERENCES_KEY)).toBeNull();
+  });
+
+  test("keeps the desktop interface zoom beside the filter and rejects other factors", () => {
+    const storage = new MemoryStorage();
+    expect(DEFAULT_DISPLAY_PREFERENCES.interfaceZoom).toBe(100);
+    for (const interfaceZoom of [100, 125, 150, 200] as const) {
+      saveDisplayPreferences(storage, { imageScaling: "integer", interfaceZoom });
+      expect(loadDisplayPreferences(storage))
+        .toEqual({ imageScaling: "integer", interfaceZoom });
+    }
+    // 兩個偏好共用一筆記錄，任何一邊壞掉都只回退自己那一欄。
+    for (const rejected of [110, 1.5, "150", null]) {
+      storage.setItem(
+        DISPLAY_PREFERENCES_KEY,
+        JSON.stringify({ imageScaling: "smooth", interfaceZoom: rejected }),
+      );
+      expect(loadDisplayPreferences(storage)).toEqual({
+        imageScaling: "smooth",
+        interfaceZoom: DEFAULT_DISPLAY_PREFERENCES.interfaceZoom,
+      });
+    }
   });
 });

@@ -1,10 +1,12 @@
 import {
   hostChromeExtrasSlot,
+  hostChromeInterfaceSlot,
   imageScalingMode,
   mountImageScalingControls,
   onImageScalingChange,
 } from "./display-settings";
 import { mountHostOverlays } from "./host-overlays";
+import { mountInterfaceZoomControls, restoreInterfaceZoomOnce } from "./interface-zoom";
 import type { ImageScalingMode } from "./preferences";
 import {
   applyDesktopWindowTarget,
@@ -75,6 +77,11 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
     ?.querySelector<HTMLElement>(":scope > .display-settings");
   const extras = hostChromeExtrasSlot(viewport);
   const unmountOverlays = extras ? mountHostOverlays(extras) : () => undefined;
+  const interfaceSlot = hostChromeInterfaceSlot(viewport);
+  const unmountInterfaceZoom = interfaceSlot
+    ? mountInterfaceZoomControls(interfaceSlot)
+    : () => undefined;
+  restoreInterfaceZoomOnce();
   let integerResizeTimer: number | undefined;
 
   const availableDesktopHeight = (): number => Math.max(
@@ -150,6 +157,7 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
     window.removeEventListener("resize", resize);
     observer.disconnect();
     unsubscribe();
+    unmountInterfaceZoom();
     unmountOverlays();
     unmountControls();
   };

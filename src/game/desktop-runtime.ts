@@ -70,6 +70,18 @@ export function computeDesktopIntegerWindowTarget(
 }
 
 /**
+ * 頁面縮放倍率。`devicePixelRatio` 同時含作業系統縮放與 WebView 頁面縮放，而視窗自己的
+ * `scaleFactor()` 只有前者，兩者相除就得到後者——不論倍率是「介面縮放」設的還是玩家按
+ * `Ctrl +/-` 按出來的都算得到。
+ */
+export function computeDesktopPageZoom(devicePixelRatio: number, scaleFactor: number): number {
+  if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) return 1;
+  const ratio = devicePixelRatio > 0 ? devicePixelRatio : 1;
+  const zoom = ratio / scaleFactor;
+  return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+}
+
+/**
  * Integer mode owns the normal desktop window size. Maximized/fullscreen state
  * is left first, because an exact client size and an OS-owned maximized size are
  * mutually exclusive.
@@ -84,5 +96,22 @@ export async function applyDesktopWindowTarget(target: DesktopWindowTarget): Pro
     Math.abs(window.innerWidth - target.width) <= 1
     && Math.abs(window.innerHeight - target.height) <= 1
   ) return;
-  await appWindow.setSize(new LogicalSize(target.width, target.height));
+  // `LogicalSize` 用的是作業系統的邏輯像素，不受頁面縮放影響，而 target 量自 CSS 像素。
+  // 少了這一步，只要玩家縮放過頁面，整數倍模式每次重算都會再把視窗縮小 1/zoom 一次，
+  // 一路縮到 `minWidth` 為止。
+  const zoom = computeDesktopPageZoom(window.devicePixelRatio || 1, await appWindow.scaleFactor());
+  await appWindow.setSize(new LogicalSize(
+    Math.round(target.width * zoom),
+    Math.round(target.height * zoom),
+  ));
+}
+
+/**
+ * 真頁面縮放，和 `Ctrl +/-` 同一條路徑：CSS 視窗等比縮小，遊戲畫面按新的 `clientWidth`
+ * 重新填滿視窗，所以只有宿主 DOM 變大。需要 `core:webview:allow-set-webview-zoom`。
+ */
+export async function applyDesktopInterfaceZoom(percent: number): Promise<void> {
+  if (!isTauriDesktopRuntime()) return;
+  const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+  await getCurrentWebview().setZoom(percent / 100);
 }

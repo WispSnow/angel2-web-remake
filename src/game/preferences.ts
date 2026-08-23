@@ -31,8 +31,17 @@ export type SoundEffectVolume = VolumeLevel;
  */
 export type ImageScalingMode = "sharp" | "smooth" | "integer";
 
+/**
+ * 宿主介面的頁面縮放百分比。遊戲畫面本來就會按 CSS 視窗等比放大填滿視窗，但宿主
+ * 工具列與三個參考面板是固定 px 的 DOM，桌面版在大螢幕上因此比原版自己的 16×15
+ * 點陣字小上好幾倍。真頁面縮放才是對的解法：它等比縮小 CSS 視窗，遊戲會重新填滿，
+ * 只有宿主介面變大——所以媒體查詢、`vw/vh` 與覆蓋層斷點都不必改。
+ */
+export type InterfaceZoom = 100 | 125 | 150 | 200;
+
 export interface DisplayPreferences {
   imageScaling: ImageScalingMode;
+  interfaceZoom: InterfaceZoom;
 }
 
 export interface MusicPreferences {
@@ -71,10 +80,14 @@ export const DEFAULT_MUSIC_PREFERENCES: Readonly<MusicPreferences> = {
 
 export const DEFAULT_DISPLAY_PREFERENCES: Readonly<DisplayPreferences> = {
   imageScaling: "sharp",
+  interfaceZoom: 100,
 };
 
 export const isImageScalingMode = (value: unknown): value is ImageScalingMode =>
   value === "sharp" || value === "smooth" || value === "integer";
+
+export const isInterfaceZoom = (value: unknown): value is InterfaceZoom =>
+  value === 100 || value === 125 || value === 150 || value === 200;
 
 const isVolumeLevel = (value: unknown): value is VolumeLevel =>
   Number.isInteger(value) && typeof value === "number" && value >= 0 && value <= 4;
@@ -183,6 +196,9 @@ export function loadDisplayPreferences(storage: PreferenceStorage): DisplayPrefe
       imageScaling: isImageScalingMode(candidate.imageScaling)
         ? candidate.imageScaling
         : DEFAULT_DISPLAY_PREFERENCES.imageScaling,
+      interfaceZoom: isInterfaceZoom(candidate.interfaceZoom)
+        ? candidate.interfaceZoom
+        : DEFAULT_DISPLAY_PREFERENCES.interfaceZoom,
     };
   } catch {
     return { ...DEFAULT_DISPLAY_PREFERENCES };

@@ -2083,6 +2083,10 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   font: 700 11px/1.2 system-ui, sans-serif;
   letter-spacing: .18em;
 }
+/* 標籤與按鈕組現在包在各自的群組裡（畫面縮放、桌面版的介面縮放），群組自己補回
+   原本那 8px 的行內間距，整行看起來和單一控制項時一樣。 */
+.display-settings-group,
+.display-settings-interface { display: flex; align-items: center; gap: 8px; }
 .display-settings-options { display: flex; gap: 4px; }
 .display-settings-options > button {
   padding: 3px 12px;

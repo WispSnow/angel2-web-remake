@@ -1,3 +1,4 @@
+import { mountHostChromeRadioGroup } from "./host-chrome-radio";
 import {
   DEFAULT_DISPLAY_PREFERENCES,
   loadDisplayPreferences,
@@ -47,7 +48,8 @@ export function setImageScalingMode(mode: ImageScalingMode): void {
   if (imageScalingMode() === mode) return;
   current = mode;
   const store = storage();
-  if (store) saveDisplayPreferences(store, { imageScaling: mode });
+  // 兩個宿主顯示偏好共用同一筆記錄，整筆覆寫會把另一個選擇洗掉。
+  if (store) saveDisplayPreferences(store, { ...loadDisplayPreferences(store), imageScaling: mode });
   for (const listener of listeners) listener(mode);
 }
 
@@ -68,6 +70,16 @@ export function hostChromeExtrasSlot(viewport: HTMLElement): HTMLElement | undef
 }
 
 /**
+ * 同一行上「畫面縮放」右邊的槽，給桌面版的「介面縮放」用。網頁版不掛任何東西：
+ * 瀏覽器自己的縮放已經做同一件事，多一組按鈕只會多一份要維護的說明。
+ */
+export function hostChromeInterfaceSlot(viewport: HTMLElement): HTMLElement | undefined {
+  return viewport.parentElement
+    ?.querySelector<HTMLElement>(":scope > .display-settings .display-settings-interface")
+    ?? undefined;
+}
+
+/**
  * Mounts the scaling picker as a sibling of the viewport. Every surface rebuilds
  * `#app` on mount, so the controls are rebuilt with it rather than persisted.
  */
@@ -81,66 +93,38 @@ export function mountImageScalingControls(viewport: HTMLElement): () => void {
   panel.className = "display-settings";
   panel.dataset.testid = "display-settings";
   panel.innerHTML = `
-    <span class="display-settings-label" id="display-settings-label">畫面縮放</span>
-    <div class="display-settings-options" role="radiogroup" aria-labelledby="display-settings-label">
-      ${IMAGE_SCALING_OPTIONS.map(({ mode, label, hint }) => `
-        <button type="button" role="radio" data-image-scaling="${mode}"
-          data-testid="image-scaling-${mode}" title="${hint}">${label}</button>
-      `).join("")}
-    </div>
+    <div class="display-settings-group" data-image-scaling-slot></div>
+    <div class="display-settings-interface"></div>
     <div class="display-settings-extras"></div>
     <p class="display-settings-hint" data-testid="image-scaling-hint"></p>`;
   host.insertBefore(panel, viewport.nextSibling);
 
   const hint = panel.querySelector<HTMLParagraphElement>(".display-settings-hint");
-  const buttons = [...panel.querySelectorAll<HTMLButtonElement>("[data-image-scaling]")];
-  const render = (mode: ImageScalingMode) => {
-    for (const button of buttons) {
-      const selected = button.dataset.imageScaling === mode;
-      button.classList.toggle("is-selected", selected);
-      button.setAttribute("aria-checked", String(selected));
-      button.tabIndex = selected ? 0 : -1;
-    }
-    if (hint) {
+  const slot = panel.querySelector<HTMLElement>("[data-image-scaling-slot]");
+  if (!slot) return () => panel.remove();
+
+  const unmountGroup = mountHostChromeRadioGroup<ImageScalingMode>({
+    container: slot,
+    labelId: "display-settings-label",
+    labelText: "畫面縮放",
+    datasetKey: "imageScaling",
+    options: IMAGE_SCALING_OPTIONS.map(({ mode, label, hint: title }) => ({
+      value: mode,
+      label,
+      testid: `image-scaling-${mode}`,
+      title,
+    })),
+    read: imageScalingMode,
+    write: setImageScalingMode,
+    subscribe: onImageScalingChange,
+    onRender: (mode) => {
+      if (!hint) return;
       hint.textContent = IMAGE_SCALING_OPTIONS.find((option) => option.mode === mode)?.hint ?? "";
-    }
-  };
+    },
+  });
 
-  const events = new AbortController();
-  panel.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
-      "[data-image-scaling]",
-    );
-    const mode = button?.dataset.imageScaling;
-    if (mode === "sharp" || mode === "smooth" || mode === "integer") setImageScalingMode(mode);
-  }, { signal: events.signal });
-  panel.addEventListener("keydown", (event) => {
-    // The battle, startup and ending surfaces all bind `keydown` on `window`, so
-    // an unstopped press here would move the battle cursor or advance the ending
-    // while the player is only picking a filter. Focus inside host chrome must
-    // never reach the battlefield, so every key is stopped, not just the handled
-    // ones. `stopPropagation` alone still lets Tab move focus and Space/Enter
-    // activate the focused button.
-    event.stopPropagation();
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight"
-      && event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-    // Arrow keys are the expected radiogroup interaction and the only way to reach
-    // the unselected options once roving tabindex has parked focus on the current one.
-    const index = buttons.findIndex((button) => button === document.activeElement);
-    if (index < 0) return;
-    event.preventDefault();
-    const delta = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
-    const next = buttons[(index + delta + buttons.length) % buttons.length];
-    const mode = next.dataset.imageScaling;
-    if (mode === "sharp" || mode === "smooth" || mode === "integer") setImageScalingMode(mode);
-    next.focus();
-  }, { signal: events.signal });
-
-  const unsubscribe = onImageScalingChange(render);
-  render(imageScalingMode());
   return () => {
-    events.abort();
-    unsubscribe();
+    unmountGroup();
     panel.remove();
   };
 }

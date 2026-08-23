@@ -53,6 +53,12 @@ Windows 桌面版和 Web 版共享同一套 TypeScript、模拟、内容与 `pnp
 倍数，并把控制条高度计入窗口，因此不会在游戏画面外保留大块空区。网页构建不调用原生能力，
 仍保持最多 1 倍及整数倍留边的既有行为。
 
+桌面版的宿主介面（底部工具列与「復刻說明」「圖鑑」「RoadMap」三个覆盖层）不随游戏画面放大，
+因此窗口配置打开了 `zoomHotkeysEnabled`，工具列上也多一组「介面縮放」，通过
+`core:webview:allow-set-webview-zoom` 调用 WebView 的真页面缩放。整数倍模式的窗口尺寸是按 CSS
+像素量出来的，写回 `LogicalSize` 前必须先用窗口自己的 `scaleFactor()` 还原页面缩放倍率；漏掉这一步，
+玩家只要缩放过页面，整数倍每次重算都会再把窗口缩小一次，一路缩到 `minWidth`。
+
 私有 GitHub 仓库中的 `.github/workflows/desktop-windows.yml` 只在以下情况运行：
 
 - Actions 页面手动触发 `Windows desktop package`；
