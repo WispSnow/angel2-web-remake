@@ -20,6 +20,15 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # windows-latest 镜像的 git 全局配置是 core.autocrlf=true。本仓库自带
+      # `.gitattributes`（`* text=auto eol=lf`）不受影响，但素材仓库
+      # WispSnow/angel2-assets 没有 .gitattributes，检出时 107 个 JSON 和 1 个 SVG
+      # 会被逐个换成 CRLF，字节数比清单多出各自的换行数，check:assets 随即判定
+      # 「素材包不完整」。二进制素材没有这个问题，所以症状是「只有文本素材全错」。
+      - name: Force verbatim checkouts on the Windows runner
+        shell: bash
+        run: git config --global core.autocrlf false
+
       - name: Check out repository
         uses: actions/checkout@v4
 
