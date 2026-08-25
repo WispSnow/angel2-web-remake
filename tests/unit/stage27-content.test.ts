@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { EVIDENCE_AVAILABLE } from "./evidence";
 import { musicProgramFor } from "../../src/game/content/music";
 import { stageSimulationEffectFor } from "../../src/game/content/stage-effects";
 import {
@@ -147,7 +148,7 @@ describe("stage 27 generated content", () => {
       .toEqual({ type: "campaign-route", destination: "stage-28" });
   });
 
-  it("registers native phase music and keeps shipping assets present", async () => {
+  it("registers native phase music", () => {
     activateStage27Content();
     expect(STAGE27_MUSIC_PROGRAMS["stage-27-player-phase-music"])
       .toMatchObject({ entryTrack: "MUSIC/3", loopTrack: "MUSIC/2" });
@@ -155,7 +156,10 @@ describe("stage 27 generated content", () => {
       .toMatchObject({ entryTrack: "MUSIC/5", loopTrack: "MUSIC/4" });
     expect(musicProgramFor("stage-27-player-phase-music"))
       .toBe(STAGE27_MUSIC_PROGRAMS["stage-27-player-phase-music"]);
+  });
 
+  it.skipIf(!EVIDENCE_AVAILABLE)("keeps evidence and shipping assets byte-identical", async () => {
+    activateStage27Content();
     for (const source of STAGE27_SOURCES) {
       const value = await readFile(path.join(workspace, source.path));
       expect(value).toHaveLength(source.bytes);

@@ -22,6 +22,35 @@ const allowedStates = new Set([
 const activeImplementationStates = new Set(["authorized", "in-progress", "implemented"]);
 const errors = [];
 
+/**
+ * `reverse/` 的取证产物和 `ref/` 的原始资料都被 gitignore，干净检出（含 GitHub CI）上
+ * 一定不存在。指向它们的链接和依赖它们的重建检查因此不是「仓库坏了」，而是「本机没有
+ * 取证语料」——只在产物确实存在时才校验，否则记为跳过并在摘要里说明。
+ * 目录清单从 reverse/.gitignore 读出，避免与实际忽略规则脱节。
+ */
+const evidenceRoots = [
+  ...(await readFile(path.join(repositoryRoot, "reverse/.gitignore"), "utf8"))
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#") && line.endsWith("/"))
+    .map((directory) => path.join(repositoryRoot, "reverse", directory)),
+  // ref/ 只追踪 next-project/，其余原始资料同样不随仓库分发。
+  path.join(repositoryRoot, "ref"),
+];
+
+function isEvidencePath(absolute) {
+  return evidenceRoots.some((root) =>
+    absolute === root || absolute.startsWith(`${root}${path.sep}`));
+}
+
+const trackedEvidenceExceptions = [path.join(repositoryRoot, "ref/next-project")];
+
+function isDistributedPath(absolute) {
+  if (trackedEvidenceExceptions.some((root) =>
+    absolute === root || absolute.startsWith(`${root}${path.sep}`))) return true;
+  return !isEvidencePath(absolute);
+}
+
 function report(message) {
   errors.push(message);
 }
@@ -113,6 +142,7 @@ async function checkMarkdownLinks() {
     await Promise.all(roots.map((root) => collectMarkdownFiles(path.join(repositoryRoot, root))))
   ).flat();
   let checkedLinks = 0;
+  let skippedEvidenceLinks = 0;
 
   for (const file of files) {
     const markdown = await readFile(file, "utf8");
@@ -120,16 +150,22 @@ async function checkMarkdownLinks() {
       const resolved = target.startsWith("/")
         ? path.join(repositoryRoot, target)
         : path.resolve(path.dirname(file), target);
-      checkedLinks += 1;
-      if (!(await pathExists(resolved))) {
-        report(
-          `${path.relative(repositoryRoot, file)} links to missing document ${target}`,
-        );
+      if (await pathExists(resolved)) {
+        checkedLinks += 1;
+        continue;
       }
+      if (!isDistributedPath(resolved)) {
+        skippedEvidenceLinks += 1;
+        continue;
+      }
+      checkedLinks += 1;
+      report(
+        `${path.relative(repositoryRoot, file)} links to missing document ${target}`,
+      );
     }
   }
 
-  return { files: files.length, links: checkedLinks };
+  return { files: files.length, links: checkedLinks, skippedEvidenceLinks };
 }
 
 function parseFirstMilestoneStates(markdown) {
@@ -230,6 +266,17 @@ async function checkMilestoneStates() {
  * catalog, the map profiles or the runtime class catalog.
  */
 async function checkClassReference() {
+  // 重建需要 reverse/parsed/ 的取证语料。干净检出上它不存在，这时既无法重建也无从判断
+  // committed 副本是否过期——报错只会把「没有取证产物」误判成「仓库坏了」。
+  if (!(await pathExists(path.join(repositoryRoot, "reverse/parsed/native/unit-catalog.json")))) {
+    for (const target of [classReferenceMarkdownPath, classReferenceCsvPath]) {
+      if (!(await pathExists(target))) {
+        report(`${path.relative(repositoryRoot, target)} is missing; run pnpm docs:classes`);
+      }
+    }
+    return { rebuilt: false, skipped: true };
+  }
+
   let built;
   try {
     built = await buildClassReference();
@@ -267,10 +314,17 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   const active = milestoneResult.active.length > 0 ? milestoneResult.active.join(", ") : "none";
+  // 跳过项必须出现在摘要里：静默跳过会让「干净检出上少校验了什么」不可见。
+  const skippedLinks = markdownResult.skippedEvidenceLinks > 0
+    ? `, ${markdownResult.skippedEvidenceLinks} evidence link(s) skipped (corpus absent)`
+    : "";
+  const classSummary = classReferenceResult.skipped
+    ? "class stats reference not rebuilt (reverse/parsed/ absent)"
+    : `class stats reference up to date (${classReferenceResult.summary})`;
   console.log(
     `Project contracts verified: ${milestoneResult.milestones} milestones, ` +
-      `${markdownResult.files} Markdown files, ${markdownResult.links} document links, ` +
-      `class stats reference up to date (${classReferenceResult.summary}); ` +
+      `${markdownResult.files} Markdown files, ${markdownResult.links} document links` +
+      `${skippedLinks}; ${classSummary}; ` +
       `active implementation milestone: ${active}.`,
   );
 }

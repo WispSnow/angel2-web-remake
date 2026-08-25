@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -65,18 +64,20 @@ describe("versioned resource manifest", () => {
   // retired duplicate quietly rejoins it to a pack and shifts the identity hash
   // on the next regeneration. Requiring every packaged asset to come from the
   // checkout keeps "rerun the generators" a no-op instead of a silent drift.
-  test("packages only assets the checkout tracks", async () => {
+  // 素材已改由独立私有仓库分发，不再被本仓库追踪（见 docs/assets-split-migration.md），
+  // 因此原来的「git ls-files 里有没有」不再是有效判据。等价不变量是：清单不得引用素材包
+  // 里不存在的文件。pretest 钩子保证跑到这里时素材包必然已安装。
+  test("packages only assets the installed pack ships", async () => {
     const manifest = await readManifest();
-    const tracked = new Set(
-      execFileSync("git", ["ls-files", "-z", "public/assets/original"], { cwd: root, encoding: "utf8" })
-        .split("\0")
-        .filter((entry) => entry.length > 0),
-    );
-    expect(
-      manifest.assets
-        .map(({ url }) => `public${url}`)
-        .filter((repositoryPath) => !tracked.has(repositoryPath)),
-    ).toEqual([]);
+    const missing: string[] = [];
+    for (const { url } of manifest.assets) {
+      try {
+        await stat(path.join(root, "public", url));
+      } catch {
+        missing.push(`public${url}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
 
   test("uses atlas outputs and never advertises fragmented release-pruned frames", async () => {

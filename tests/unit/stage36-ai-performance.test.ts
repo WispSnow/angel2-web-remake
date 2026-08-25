@@ -29,6 +29,12 @@ const fullDeployment = {
   ],
 };
 
+// GitHub 的共享 runner 单核性能明显低于开发机（实测同一次规划本机约 1.1 s、CI 约 2.0 s），
+// 而 CPU 时间预算是机器相关的次要代理——这个用例真正的算法护栏是下面
+// `movementMapBuilds` / `movementMapHits` 两个计数器，它们与机器速度无关。
+// 因此在 CI 上放宽倍数，保留「数量级回归」的拦截能力，而不是删掉时间断言。
+const BUDGET_SCALE = process.env.CI ? 3 : 1;
+
 const planWithinBudget = (
   plan: () => unknown,
   budgetMs: number,
@@ -42,7 +48,7 @@ const planWithinBudget = (
   plan();
   const elapsed = process.threadCpuUsage(startedAt);
   const elapsedMs = (elapsed.user + elapsed.system) / 1_000;
-  expect(elapsedMs).toBeLessThan(budgetMs);
+  expect(elapsedMs).toBeLessThan(budgetMs * BUDGET_SCALE);
   return { elapsedMs };
 };
 

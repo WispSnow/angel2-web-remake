@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { EVIDENCE_AVAILABLE } from "./evidence";
 import {
   STAGE3_ASSETS,
   STAGE3_CAMERA_ORIGIN_BOUNDS,
@@ -118,7 +119,7 @@ describe("stage 3 generated content", () => {
       .toBe(STAGE3_MUSIC_PROGRAMS["stage-03-player-phase-music"]);
   });
 
-  it("keeps every evidence source and shipped asset byte-identical", async () => {
+  it.skipIf(!EVIDENCE_AVAILABLE)("keeps every evidence source and shipped asset byte-identical", async () => {
     for (const source of STAGE3_SOURCES) {
       const value = await readFile(path.join(workspace, source.path));
       expect(value).toHaveLength(source.bytes);

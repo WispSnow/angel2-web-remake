@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { EVIDENCE_AVAILABLE } from "./evidence";
 import { storyPagesForId } from "../../src/game/content/dialogue";
 import { musicProgramFor } from "../../src/game/content/music";
 import {
@@ -87,7 +88,7 @@ describe("stage 10 generated content", () => {
       .toBe(STAGE10_MUSIC_PROGRAMS["stage-10-story-music"]);
   });
 
-  it("keeps all evidence and shipping assets byte-identical", async () => {
+  it.skipIf(!EVIDENCE_AVAILABLE)("keeps all evidence and shipping assets byte-identical", async () => {
     for (const source of STAGE10_SOURCES) {
       const value = await readFile(path.join(workspace, source.path));
       expect(value).toHaveLength(source.bytes);

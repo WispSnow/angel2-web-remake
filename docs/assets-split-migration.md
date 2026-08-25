@@ -5,8 +5,9 @@
 
 **当前状态：第一、二阶段已完成，第三阶段部分完成。** 剩余未完成项：
 
-- [ ] 建立细粒度 PAT 并写入仓库 secret `ASSETS_REPO_TOKEN`（第 6 步，必须你本人操作）
-- [ ] 生成素材包并确定分发地址，回填 README 的「下载地址：待补充」占位符（第 5 步）
+- [ ] 建立细粒度 PAT 并写入仓库 secret `ASSETS_REPO_TOKEN`（第 6 步，必须你本人操作：
+      `gh secret set ASSETS_REPO_TOKEN --repo WispSnow/angel2-web-remake`）
+- [x] 生成素材包并确定分发地址，README 下载地址已回填（第 5 步）
 - [ ] 重写 Git 历史（第 8 步，**必须在仓库公开之前**）
 
 **在这三项完成之前，不要把仓库设为公开**：没有 secret 时 CI 会因为取不到素材而失败，
@@ -156,7 +157,7 @@ GitHub 不会把 secret 交给来自 fork 的 `pull_request` 触发的工作流�
 `battle-sprite-atlas`、`stage1-content`、`resource-manifest`、`construction-terrain-assets`
 共 7 个文件；依赖 `reverse/` 取证产物的还要多得多，见下节。
 
-### 7.1 干净检出上 CI 本来就跑不过（既有问题，与本次迁移无关）
+### 7.1 干净检出上 CI 本来就跑不过（既有问题，已修复）
 
 排查素材工作流时发现 `main` 上的 CI 已连续失败多次（最近一次为 run 32616278229），
 根因与素材同类：**多项检查假定维护者本地的 `reverse/`、`ref/` 取证产物存在**，而它们被
@@ -169,9 +170,24 @@ gitignore，干净检出上没有。
 | `tests/unit/stage36-ai-performance` | CI runner 较慢导致性能预算超标（实测 1996 ms > 1500 ms 上限），与取证产物无关 |
 | e2e | 前面失败触发 fail-fast，被取消 |
 
-**这是仓库公开前必须单独处理的一项**：README 顶部有 CI 徽章，公开后会直接显示 failing。
-处理方向与素材一致——把「需要本地取证产物」的检查同「干净检出可跑」的检查分开，前者只在
-维护者环境或带取证产物的 job 里跑。
+已按「把需要本地取证产物的检查同干净检出可跑的检查分开」修复：
+
+| 问题 | 处理 |
+| --- | --- |
+| `docs:check` 的 2 个错误 | `check-project-contracts.mjs` 现在识别未分发的取证路径：指向它们的链接记为跳过而非报错，职业数值参考在 `reverse/parsed/` 缺失时不重建。跳过项固定写进摘要 |
+| 34 个 `STAGE*_SOURCES` 回读用例 | `tests/unit/evidence.ts` 提供 `EVIDENCE_AVAILABLE`，对应用例改为 `it.skipIf(!EVIDENCE_AVAILABLE)`，干净检出上显示为 skipped |
+| 7 个顶层静态 import 取证 JSON 的文件 | `vitest.config.ts` 自动扫描 `from "../../reverse/` 并整文件排除，运行时打印排除清单；不维护硬编码名单 |
+| `stage36-ai-performance` 预算 | CI 上按 3 倍放宽（本机约 1.1 s、CI 约 2.0 s）；真正的算法护栏是 `movementMapBuilds`／`movementMapHits` 计数器，与机器速度无关 |
+| `angel2-phase1-verify.mjs` 这一步 | 它读 `ref/ANGEL2/` 的原版游戏文件，在任何干净检出上都必然失败，已从 `ci.yml` 移除，改为维护者本地门禁 |
+| `resource-manifest` 的「checkout tracks」断言 | 素材停止追踪后该前提失效，改为断言清单不引用素材包里不存在的文件 |
+
+验证结果（在一个未跑 `setup-worktree.sh` 的 worktree 上模拟干净检出）：
+
+| | 维护者本机 | 干净检出（等价 CI） |
+| --- | --- | --- |
+| `pnpm test` | 143 文件 / 1425 通过 / 0 跳过 | 136 文件 / 1210 通过 / 34 跳过 / 7 排除 |
+| `pnpm docs:check` | 848 链接，重建职业参考 | 847 链接 + 1 跳过，不重建 |
+| `pnpm build`、`test:coverage` | 通过 | 通过（覆盖率门槛仍达标） |
 
 ### 8. 重写历史（公开之前，不可逆）
 

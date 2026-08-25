@@ -24,6 +24,23 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 目标 DOM 或读档独有的状态组合；若读档前后阶段相同，不能只等 `phase`。资源请求断言应在导航前
 注册 Playwright `request` 监听，不依赖容量有限、可能淘汰早期条目的 Resource Timing 缓冲区。
 
+## 取证语料与素材依赖
+
+有两类外部依赖不随仓库分发，缺失时行为已经明确定义，不会伪装成回归：
+
+- **原版素材包**（`public/assets/original/`）：`predev`／`pretest`／`pretest:coverage`／
+  `pretest:e2e`／`prebuild:release` 会先跑 `pnpm check:assets`，缺失或版本不符时直接给出
+  安装路径并中止。安装方式见 README「获取原版素材」。
+- **`reverse/` 取证语料**：只存在于维护者本机。依赖它的用例分两种处理——
+  - 逐条回读 `STAGE*_SOURCES` 校验哈希的用例，用 `it.skipIf(!EVIDENCE_AVAILABLE)`
+    （`tests/unit/evidence.ts`）跳过，报告里显示为 skipped；
+  - 在文件顶层静态 `import "../../reverse/parsed/**.json"` 的用例，模块加载期就会失败，
+    `skipIf` 来不及生效，由 `vitest.config.ts` 自动扫描并整文件排除，运行时打印排除清单。
+
+因此同一份代码有两种合法结果：本机全量运行、零跳过；干净检出（含 CI）少跑 7 个文件与
+34 个用例，其余全绿。新增依赖取证语料的用例时，按上面两种形态之一登记，不要让它在干净
+检出上以 `ENOENT` 失败。
+
 ## 责任映射
 
 | 改动区域 | 首选单元测试 | 首选浏览器测试 |

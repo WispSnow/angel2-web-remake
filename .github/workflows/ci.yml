@@ -57,8 +57,9 @@ jobs:
       - name: Verify project documentation contracts
         run: pnpm docs:check
 
-      - name: Verify reverse-engineering evidence baseline
-        run: node reverse/tools/angel2-phase1-verify.mjs
+      # 取证基线校验器读取 ref/ANGEL2/ 的原版游戏文件，那些文件被 gitignore 且永远不会
+      # 进入仓库，因此这一步在任何干净检出上都必然失败。它是维护者本地门禁，触及证据时
+      # 按 AGENTS.md 手动运行：node reverse/tools/angel2-phase1-verify.mjs
 
       - name: Run unit tests
         if: github.event_name == 'pull_request'
