@@ -130,9 +130,14 @@ design contracts all are.
 想在 Windows 上离线游玩，用这个安装包。**原版素材已经打包在内**，不需要做下面
 [获取原版素材](#获取原版素材)那一步——那是从源码运行时才需要的。
 
-> 📦 **下载地址**：[百度网盘](https://pan.baidu.com/s/16vMJsOtSs7tFE8JYP6jA_A) 提取码: zsuf
+> 📦 **下载地址**：[百度网盘](https://pan.baidu.com/s/1BuCWcNoO8mfTSi-RUqvsIA?pwd=u8bz) 提取码: u8bz
 >
-> 文件：`Angel2 Web Remake_<版本>_x64-setup.exe`（约 56 MB），以及同名的 `.sha256` 校验文件。
+> 分享里有两样东西，直接玩只需要第一样：
+>
+> * `Angel2 Web Remake_<版本>_x64-setup.exe`（约 56 MB）和同名的 `.sha256` 校验文件
+>   —— Windows 安装包，原版素材已经打包在内。
+> * `angel2-assets-<version>.zip` —— 原版素材包，只有[从源码运行](#获取原版素材)时才需要，
+>   玩安装包的话不用下载。
 
 ### 安装前先核对 SHA-256
 
@@ -186,8 +191,10 @@ certutil -hashfile "Angel2 Web Remake_0.1.0_x64-setup.exe" SHA256
 
 下载 `angel2-assets-<version>.zip`，解压到 `public/assets/`：
 
-> 📦 **下载地址**：[百度网盘](https://pan.baidu.com/s/16vMJsOtSs7tFE8JYP6jA_A) 提取码: zsuf 
-
+> 📦 **下载地址**：[百度网盘](https://pan.baidu.com/s/1BuCWcNoO8mfTSi-RUqvsIA?pwd=u8bz) 提取码: u8bz
+>
+> 同一个分享里还有 Windows 安装包；只想直接玩、不打算跑源码的话用那个就够了，
+> 见 [Windows 安装包](#windows-安装包)。
 
 ```bash
 unzip -d public/assets angel2-assets-<version>.zip

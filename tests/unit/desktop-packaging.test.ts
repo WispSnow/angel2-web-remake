@@ -117,6 +117,10 @@ describe("desktop packaging contract", () => {
     expect(readme).toContain("## Windows 安装包");
     expect(readme).toContain("Get-FileHash -Algorithm SHA256");
     expect(readme).toContain("SmartScreen");
+    // 安裝包與素材包放在同一個網盤分享，README 兩處引用必須指向同一條連結——
+    // 上一版換連結時就漏改了其中一處。
+    const shareLinks = new Set(readme.match(/https:\/\/pan\.baidu\.com\/s\/[^)\s]+/gu) ?? []);
+    expect(shareLinks.size).toBe(1);
     expect(workflow).not.toMatch(/cloudflare|wrangler/i);
     expect(gitAttributes).toContain("* text=auto eol=lf");
     expect(appTypeScriptConfig.include).toEqual(["src"]);
