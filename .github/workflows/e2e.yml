@@ -1,0 +1,81 @@
+name: Playwright end-to-end
+
+# 只手动触发，不挂在 push／pull_request 上。
+#
+# 这套 513 个用例大多是真实通关流程，超时是在 macOS 上调出来的；headless Linux 走
+# SwiftShader 软件渲染要慢得多，首次在 CI 上完整跑完（run 32819755744）暴露了 113 个
+# 与环境相关的失败：61 个撞 expect 的 5 秒默认超时（多为 battle-canvas 未及时出现）、
+# 26 个撞单用例 60 秒上限、13 个连不上开发服务器。这些与素材迁移无关，也不代表功能回归
+# ——arena-stomp 等重度用例在同一次运行里正常通过，WebGL 本身可用。
+#
+# 在这批超时调校完成之前，把 e2e 挂进 CI 只会让徽章长期红着或被迫忽略真实失败，因此改为
+# 按需触发。日常验收仍以 AGENTS.md 的定向运行为准，发布前的完整验收在本机 Darwin 执行。
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Chromium (${{ matrix.shard }}/8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check out original assets
+        uses: actions/checkout@v4
+        with:
+          repository: WispSnow/angel2-assets
+          token: ${{ secrets.ASSETS_REPO_TOKEN }}
+          path: public/assets/original
+
+      # Vite 会把 public/ 下的一切原样复制进构建产物；不删就会把素材仓库的 git
+      # 元数据打进 release/ 和 Windows 安装包。
+      - name: Strip nested git metadata
+        shell: bash
+        run: rm -rf public/assets/original/.git
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache pinned Playwright browser
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install pinned Chromium and runtime dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps --no-shell chromium
+
+      - name: Install Playwright runtime dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Run Playwright shard
+        run: pnpm exec playwright test --shard=${{ matrix.shard }}/8

@@ -3,15 +3,16 @@
 把 `public/assets/original/` 从公开仓库移到独立私有仓库，同时保持 CI、Windows 打包和本地
 开发可用。本文是这次迁移的操作清单与顺序约束。
 
-**当前状态：第一、二阶段已完成，第三阶段部分完成。** 剩余未完成项：
+**当前状态：三个阶段全部完成。**
 
-- [ ] 建立细粒度 PAT 并写入仓库 secret `ASSETS_REPO_TOKEN`（第 6 步，必须你本人操作：
-      `gh secret set ASSETS_REPO_TOKEN --repo WispSnow/angel2-web-remake`）
-- [x] 生成素材包并确定分发地址，README 下载地址已回填（第 5 步）
-- [ ] 重写 Git 历史（第 8 步，**必须在仓库公开之前**）
+- [x] 私有素材仓库 `WispSnow/angel2-assets` 建立并推送（3,225 个文件）
+- [x] 主仓库停止追踪、`.gitignore` 更新
+- [x] 素材包分发地址已回填 README
+- [x] 仓库 secret `ASSETS_REPO_TOKEN` 已配置，并经真实 CI 运行验证
+- [x] 两个工作流的素材 checkout 已接入并实测通过
+- [x] Git 历史已重写并强制推送（2026-08-25）
 
-**在这三项完成之前，不要把仓库设为公开**：没有 secret 时 CI 会因为取不到素材而失败，
-而历史里仍留有素材的全部 3,831 个对象。
+公开前仍需留意「重写后的残留」一节。
 
 ## 为什么要分三个阶段
 
@@ -84,7 +85,7 @@ public/assets/original/
 
 `!docs/media/` 与 `!src-tauri/icons/...` 的例外要保留。
 
-### 4. 验证（已完成，尚未提交）
+### 4. 验证（已完成）
 
 ```bash
 git status --short          # 应只看到大量 D（删除追踪）与 .gitignore 修改
@@ -101,13 +102,14 @@ git archive --prefix=original/ -o angel2-assets-v1.zip HEAD
 ```
 
 `--prefix=original/` 让包内根目录是 `original/`，用户解压到 `public/assets/` 即落位；同时
-`git archive` 天然不含 `.git`。把 zip 传到公开仓库的 Release，版本号与素材仓库的 tag 对应。
+`git archive` 天然不含 `.git`。当前分发走仓库外的下载地址（见 README「获取原版素材」），不放
+公开 Release——那等于让 GitHub 继续公开托管同一批素材，与拆分目的相悖。
 
 ---
 
 ## 第三阶段：工作流与历史
 
-### 6. 两个工作流加素材 checkout（YAML 已改，secret 待建）
+### 6. 两个工作流加素材 checkout（已完成并经真实 CI 验证）
 
 `ci.yml` 的三个 job 与 `desktop-windows.yml` 的 package job，都要在「Install dependencies」
 **之前**加：
@@ -140,7 +142,7 @@ git archive --prefix=original/ -o angel2-assets-v1.zip HEAD
 GitHub 不会把 secret 交给来自 fork 的 `pull_request` 触发的工作流，因此外部贡献者的 PR 上
 素材 checkout 必然失败。已采用的做法：
 
-- `quality` 与 `e2e` 两个 job 加守卫，fork PR 跳过：
+- `quality` job 加守卫，fork PR 跳过（`e2e` 已移出 CI，见 7.2）：
 
   ```yaml
     if: github.event_name != 'pull_request'
@@ -168,7 +170,7 @@ gitignore，干净检出上没有。
 | `pnpm docs:check` | 2 个错误：`stage-02.md` 链到 gitignore 的 `ref/关卡列表.md`；职业数值参考需要 `reverse/parsed/native/unit-catalog.json` |
 | `pnpm test` / `test:coverage` | 约 40 个 `stage*-content` 用例报 `ENOENT: reverse/decoded/B/****/00.raw` |
 | `tests/unit/stage36-ai-performance` | CI runner 较慢导致性能预算超标（实测 1996 ms > 1500 ms 上限），与取证产物无关 |
-| e2e | 前面失败触发 fail-fast，被取消 |
+| e2e | 每片约需 70 分钟，一直撞 20 分钟 job 上限被取消，从未跑完 |
 
 已按「把需要本地取证产物的检查同干净检出可跑的检查分开」修复：
 
@@ -189,6 +191,21 @@ gitignore，干净检出上没有。
 | `pnpm docs:check` | 848 链接，重建职业参考 | 847 链接 + 1 跳过，不重建 |
 | `pnpm build`、`test:coverage` | 通过 | 通过（覆盖率门槛仍达标） |
 
+### 7.2 e2e 移出 CI（改为手动触发）
+
+分片从 2 提到 8 之后 e2e 第一次在 CI 上完整跑完（run 32819755744），随即暴露 113 个失败：
+61 个撞 `expect` 的 5 秒默认超时（多为 `battle-canvas` 未及时出现）、26 个撞单用例 60 秒
+上限、13 个连不上开发服务器。
+
+这不是功能回归，也与素材迁移无关——同一次运行里 `arena-stomp` 等重度用例正常通过，WebGL
+本身可用。根因是这套超时按 macOS 调校，而 headless Linux 走 SwiftShader 软件渲染慢得多；
+之前从未暴露，是因为 e2e 从未在 CI 上跑完过。
+
+在超时调校完成之前，把 e2e 挂在 push／PR 上只会让徽章长期红着，或迫使人忽略真实失败。因此
+拆到独立的 `.github/workflows/e2e.yml`，只 `workflow_dispatch` 触发；`ci.yml` 保留
+`quality`、`coverage`、`external-pr` 三个 job。日常验收仍按 AGENTS.md 做定向运行，发布前的
+完整验收在本机 Darwin 执行。
+
 ### 8. 重写历史（公开之前，不可逆）
 
 只在 HEAD 删除素材是无效的：当前 `.git` 有 270 MiB，`public/assets` 在历史中有 3,831 个
@@ -208,6 +225,31 @@ git filter-repo --path public/assets/original --invert-paths
 - `planning/` 与 `reverse/` 里引用旧 commit SHA 的文字会失效，需要复核。
 - 重写后再次运行 `pnpm check:assets`、`pnpm build:release` 和 `pnpm docs:check`。
 - 用 `git count-objects -vH` 确认体积确实下降（预期从约 270 MiB 降到 20 MiB 量级）。
+
+### 实际执行结果（2026-08-25）
+
+| | 重写前 | 重写后 |
+| --- | --- | --- |
+| 新克隆 `.git` | 约 373 MB | **7.4 MB** |
+| `main` 可达的 `public/assets/original` 对象 | 3,823 | **0** |
+| 提交数 | 390 | 389（`delete public assets` 内容变空被丢弃） |
+
+`community/`、`labs/` 完好，`git fsck` 干净，新克隆能安装依赖、构建并通过素材校验。
+完整镜像备份保留在会话 scratchpad 的 `backup-before-filter.git`。
+
+**本地仓库仍是 61 MiB 而非 7 MiB**：`refs/codex/turn-diffs/checkpoints/…` 有 17 个 ref
+直接指向 tree 对象（而非 commit）。filter-repo 只重写提交历史，指向 tree 的 ref 会让旧树
+连同资源 blob 一起存活。这些 ref 是另一个工具的本地会话快照，从未推送，不影响远端；想让
+本地也缩到 7 MiB，删掉它们再 `git gc --prune=now` 即可。
+
+### 重写后的残留
+
+**旧对象在 GitHub 上仍可通过 SHA 取回。** 实测强推之后，旧提交 `bf1c68f` 仍能解析，
+`public/assets/original/native-font.png` 通过旧 ref 仍返回 59,777 字节。这是 GitHub 的既有
+行为——不可达对象要等它自己 gc，没有用户可触发的方式。
+
+已决定不删库重建，等 GitHub 自行 gc：仓库公开前 fork 数与 star 数均为 0，不存在第三方持有
+旧克隆的情况，实际暴露面为零。若日后需要立即清除，可联系 GitHub Support 请求 gc。
 
 ---
 

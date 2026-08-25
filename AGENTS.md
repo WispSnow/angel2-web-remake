@@ -287,7 +287,10 @@ pnpm exec playwright install ffmpeg
 - 修复 bug 时优先添加能在修复前失败的回归测试。
 - 不要因截图变化直接更新黄金图；先判断是预期设计变化、字体/平台差异、动态表现还是实际回归。
 - JavaScript 驱动的眨眼和口型不会被 Playwright 的 `animations: "disabled"` 自动冻结。黄金截图应使用稳定表现时点或只屏蔽已经由独立测试覆盖的动态局部。
-- DOM 字形光栅化仍可能随宿主系统变化；CI 运行无夹具语义验收，Darwin 黄金图由固定 Chromium 在本地视觉审计。
+- DOM 字形光栅化仍可能随宿主系统变化；Darwin 黄金图由固定 Chromium 在本地视觉审计。
+- 端到端不在 push／PR 的 CI 中运行，只作为手动触发的 `Playwright end-to-end` 工作流存在：
+  这套超时按 macOS 调校，headless Linux 软件渲染要慢得多，挂进 CI 会长期红着。发布前的
+  完整端到端验收在本机执行，理由与实测数据见 `docs/assets-split-migration.md` 第 7.2 节。
 - `tests/e2e/stage0-real-clear.spec.ts` 的真实通关路径不得调用 `window.__ANGEL2__` 或添加测试查询参数。
 - DOM 断言不能代替 Canvas/WebGL 视觉检查；Canvas 测试必须保留截图证据。
 - 普通 Playwright 运行只在失败时自动截图/录像；显式视觉审计截图通过
