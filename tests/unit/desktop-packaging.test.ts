@@ -106,6 +106,17 @@ describe("desktop packaging contract", () => {
     expect(workflow).toContain("runs-on: windows-latest");
     expect(workflow).toContain("pnpm desktop:build:windows");
     expect(workflow).toContain("actions/upload-artifact@v4");
+    // 安裝包沒有代碼簽名，校驗和是玩家唯一能自證下載無誤的手段。sidecar 必須跟著
+    // artifact 一起上傳，摘要裡也要留一份，否則轉發到網盤的人得先下載 artifact 才
+    // 拿得到要公布的哈希。
+    expect(workflow).toContain("Get-FileHash -Algorithm SHA256");
+    expect(workflow).toContain("src-tauri/target/release/bundle/nsis/*-setup.exe.sha256");
+    expect(workflow).toContain("GITHUB_STEP_SUMMARY");
+    // README 是玩家側的校驗與 SmartScreen 說明落點，工作流換掉校驗方式時要一起改。
+    const readme = readText("README.md");
+    expect(readme).toContain("## Windows 安装包");
+    expect(readme).toContain("Get-FileHash -Algorithm SHA256");
+    expect(readme).toContain("SmartScreen");
     expect(workflow).not.toMatch(/cloudflare|wrangler/i);
     expect(gitAttributes).toContain("* text=auto eol=lf");
     expect(appTypeScriptConfig.include).toEqual(["src"]);

@@ -71,21 +71,45 @@ jobs:
       - name: Build audited Windows installer
         run: pnpm desktop:build:windows
 
-      - name: Verify installer artifact
+      - name: Verify installer artifact and record its checksum
         shell: pwsh
         run: |
           $installers = @(Get-ChildItem "src-tauri/target/release/bundle/nsis/*-setup.exe")
           if ($installers.Count -ne 1) {
             throw "Expected exactly one NSIS installer, found $($installers.Count)."
           }
-          $sizeMiB = [math]::Round($installers[0].Length / 1MB, 1)
-          Write-Output "Installer: $($installers[0].Name) ($sizeMiB MiB)"
+          $installer = $installers[0]
+          $sizeMiB = [math]::Round($installer.Length / 1MB, 1)
+          Write-Output "Installer: $($installer.Name) ($sizeMiB MiB)"
+
+          # 安装包未经代码签名，玩家侧唯一能自证「下载的就是这里构建的东西」的手段就是
+          # 校验和。sidecar 随 artifact 一起上传，转发到网盘时要跟安装包放在一起。
+          # 格式与 sha256sum -c 一致（哈希 + 两个空格 + 文件名），换行强制 LF，
+          # 否则 CRLF 会让非 Windows 侧的 sha256sum -c 读出带 \r 的文件名而报找不到。
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName).Hash.ToLower()
+          $line = $hash + '  ' + $installer.Name
+          [System.IO.File]::WriteAllText($installer.FullName + '.sha256', $line + "`n")
+
+          # 同时写进运行摘要：转发到网盘的人不必先下载 artifact 才能拿到要公布的哈希。
+          @(
+            '### Windows 安装包（未签名）',
+            '',
+            '| 项 | 值 |',
+            '| --- | --- |',
+            ('| 文件 | ' + $installer.Name + ' |'),
+            ('| 大小 | ' + $sizeMiB + ' MiB |'),
+            ('| SHA-256 | ' + $hash + ' |'),
+            '',
+            '分发时请把 .sha256 与安装包一起提供，并附上 README「Windows 安装包」一节的校验方法。'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       - name: Upload unsigned Windows verification package
         uses: actions/upload-artifact@v4
         with:
           name: angel2-windows-x64-${{ github.sha }}
-          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/nsis/*-setup.exe.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

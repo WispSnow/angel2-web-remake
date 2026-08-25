@@ -25,9 +25,16 @@ GitHub 上的一切都按「任何人可见」对待：不要把凭据、私有�
 不要在 GitHub Actions 中添加 Cloudflare Token、Account ID、Wrangler 上传或推送即上线逻辑。
 
 仓库公开后，Actions artifact 的可下载范围由仓库可见性决定：公开仓库的 artifact 任何人都能
-从 Actions 页面下载。Windows 安装包目前既未代码签名、也未完成真实 Windows 验收，因此仍属
-内部验证包；在取得签名方案并通过验收之前，不要把 artifact 链接当作面向玩家的发布渠道，也
-不要为它创建 GitHub Release。
+从 Actions 页面下载。Windows 安装包目前既未代码签名、也未完成真实 Windows 验收；在取得签名
+方案并通过验收之前，不要把 artifact 链接当作面向玩家的发布渠道，也不要为它创建 GitHub
+Release。
+
+面向玩家的 Windows 分发当前走百度网盘，理由是安装包内含原版素材，而 GitHub Release 会把它
+变成仓库自身的一条公开再分发渠道（见 README「授权与版权」）；顺带一提，Cloudflare Pages 单
+文件上限 25 MiB，约 56 MiB 的安装包本来也放不进现有站点。未签名分发靠校验和自证完整性：
+`Windows desktop package` 工作流会生成 `*-setup.exe.sha256` 并把 SHA-256 写进运行摘要，上传
+网盘时必须把校验文件与安装包放在一起，玩家侧的核对与 SmartScreen 说明见 README「Windows
+安装包」一节。换用代码签名后再回头删掉这些说明，不要两套并存。
 
 线上实际部署版本以 Cloudflare 的部署列表为准，不能仅根据本地 `HEAD`、`release/` 的修改
 时间或本文档推断。`release/`、`dist/` 和 `artifacts/` 都是被忽略的本地产物，不进入 Git。

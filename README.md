@@ -11,6 +11,8 @@ Angel II）完整复刻到浏览器：原版规则、剧情节奏、像素素材
 
 **▶ 在线试玩：<https://angel2-web-remake.pages.dev/>**（无需安装，桌面浏览器直接打开）
 
+**⬇ Windows 安装包**：见 [Windows 安装包](#windows-安装包)（未签名，安装前请先核对 SHA-256）
+
 <table>
   <tr>
     <td><img src="docs/media/title.png" alt="標題畫面" width="420"></td>
@@ -43,6 +45,9 @@ contracts alongside the code, so any gameplay behaviour can be traced back to a 
 original-game offset rather than to someone's memory.
 
 * **Play it now:** <https://angel2-web-remake.pages.dev/> (desktop browsers, no install)
+* **Windows build:** an unsigned NSIS installer is distributed separately; see
+  [Windows 安装包](#windows-安装包) for the download, the SHA-256 check and why
+  SmartScreen warns about it.
 * **Stack:** TypeScript, Phaser 4, Vite, Vitest, Playwright. No backend — saves live in
   `localStorage`.
 * **Scope:** all 38 campaign stages (第 0–37 關), the interlude, the main ending and the
@@ -119,6 +124,60 @@ design contracts all are.
 | Node.js | `.node-version` 记录主版本 `26`；`engines` 只声明下限 `>=24.18.0` |
 
 游戏没有后端：存档写入当前网页来源的 `localStorage`，不上传任何数据。
+
+## Windows 安装包
+
+想在 Windows 上离线游玩，用这个安装包。**原版素材已经打包在内**，不需要做下面
+[获取原版素材](#获取原版素材)那一步——那是从源码运行时才需要的。
+
+> 📦 **下载地址**：[百度网盘](https://pan.baidu.com/s/16vMJsOtSs7tFE8JYP6jA_A) 提取码: zsuf
+>
+> 文件：`Angel2 Web Remake_<版本>_x64-setup.exe`（约 56 MB），以及同名的 `.sha256` 校验文件。
+
+### 安装前先核对 SHA-256
+
+安装包**没有代码签名**（原因见下），校验和是确认「下载到的就是构建产物、中途没被替换或
+损坏」的唯一手段。把安装包和 `.sha256` 放在同一个目录，在该目录打开 PowerShell：
+
+```powershell
+$expected = (Get-Content .\*-setup.exe.sha256).Split(' ')[0]
+$actual = (Get-FileHash -Algorithm SHA256 .\*-setup.exe).Hash.ToLower()
+if ($actual -eq $expected) { '校验通过' } else { '校验失败，请重新下载，不要安装' }
+```
+
+只想看一眼哈希值自己对照：
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\*-setup.exe
+```
+
+不用 PowerShell 的话，系统自带的 `certutil` 也可以（需要填完整文件名）：
+
+```cmd
+certutil -hashfile "Angel2 Web Remake_0.1.0_x64-setup.exe" SHA256
+```
+
+对不上就**不要安装**，重新下载一次。
+
+### SmartScreen 警告是预期内的
+
+双击安装包后，Windows 大概率会弹出蓝色的「Windows 已保护你的电脑」。本项目是个人非商业
+项目，**没有购买代码签名证书**，任何未签名的程序都会触发这个提示，它不代表系统检测到了
+恶意代码。
+
+核对过 SHA-256 之后，点窗口里的「更多信息」，再点「仍要运行」即可继续。
+
+不愿意绕过这个提示也完全没问题——[在线试玩](https://angel2-web-remake.pages.dev/)的内容与
+桌面版一致，不需要安装任何东西。
+
+### 安装与运行
+
+* 安装到当前用户目录，**不需要管理员权限**，不修改系统设置，也不注册开机启动。
+* 桌面版使用系统自带的 Evergreen WebView2；系统里没有时，安装程序会静默调用微软官方的
+  联网引导程序装上。这一步需要联网，装完之后游玩全程离线。
+* 存档写在桌面版自己的来源下，**不会自动与网页版共享**。两边迁移用游戏内已有的 20 槽
+  备份导出／导入。
+* 卸载走「设置 → 应用」或安装目录下的卸载程序，同样只影响当前用户。
 
 ## 获取原版素材
 
@@ -251,8 +310,9 @@ pnpm preview:release
 
 Windows 本地版复用同一个玩家 `release/`，再由 Tauri 2 封装为 NSIS 安装包。正式 Windows 包
 不在 Mac 本地交叉编译；`Windows desktop package` 工作流使用真正的 `windows-latest` runner
-构建，并把安装程序保存为 Actions artifact。该工作流只允许手动触发或 `desktop-v*` 标签触发，
-不会部署 Cloudflare：
+构建，并把安装程序连同一个 `*-setup.exe.sha256` 校验文件保存为 Actions artifact，同时把文件名、
+大小与 SHA-256 写进运行摘要，转发到网盘时不必先下载 artifact 才能取到哈希。该工作流只允许手动
+触发或 `desktop-v*` 标签触发，不会部署 Cloudflare：
 
 ```bash
 pnpm desktop:dev             # 本机 Tauri 调试，需要本机 Rust 工具链
