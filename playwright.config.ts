@@ -18,6 +18,14 @@ export default defineConfig({
   workers: 2,
   // 该用例单独跑约 14 s，默认 30 s 余量太窄；留一倍余量，避免机器偶发变慢就误报。
   timeout: 60_000,
+  expect: {
+    // GitHub 的 Linux runner 没有 GPU，Chromium 走 SwiftShader 软件渲染，Phaser 建立
+    // battle-canvas、播完转场到断言可见的耗时明显长于本机 macOS。默认 5 s 是照本机调的，
+    // 首次完整跑完 CI（run 32819755744）有 61 个用例卡在这个门槛上，而同一次运行里
+    // arena-stomp 等重度用例正常通过——是慢，不是坏。
+    // 只在 CI 放宽：本机保持 5 s，断言失败时仍能快速反馈。
+    timeout: process.env.CI ? 15_000 : 5_000,
+  },
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL,
