@@ -8,6 +8,12 @@
     "pnpm": "11.9.0"
   },
   "scripts": {
+    "check:assets": "node scripts/check-original-assets.mjs",
+    "predev": "pnpm run check:assets --quiet",
+    "pretest": "pnpm run check:assets --quiet",
+    "pretest:coverage": "pnpm run check:assets --quiet",
+    "pretest:e2e": "pnpm run check:assets --quiet",
+    "prebuild:release": "pnpm run check:assets --quiet",
     "dev": "vite --host 127.0.0.1",
     "dev:arena": "vite --host 127.0.0.1 --open /arena.html",
     "dev:classes": "vite --host 127.0.0.1 --open /class-showdown.html",

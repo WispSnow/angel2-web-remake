@@ -7,6 +7,9 @@ __MACOSX/
 Icon[
 ]
 
+# msc
+.env
+
 # Resource forks
 ._*
 
@@ -17,41 +20,16 @@ ref/*
 .agents/
 .claude/
 *.png
+!docs/media/
+!docs/media/*.png
 !src-tauri/icons/32x32.png
 !src-tauri/icons/128x128.png
 !src-tauri/icons/128x128@2x.png
 !public/
 !public/assets/
-!public/assets/original/
-!public/assets/original/*.png
-!public/assets/original/portrait-animation/
-!public/assets/original/portrait-animation/*.png
-!public/assets/original/portraits/
-!public/assets/original/portraits/**/*.png
-!public/assets/original/dialogue/
-!public/assets/original/dialogue/*.png
-!public/assets/original/credits/
-!public/assets/original/credits/**/*.png
-!public/assets/original/ending/
-!public/assets/original/ending/**/*.png
-!public/assets/original/full-combat/
-!public/assets/original/full-combat/**/*.png
-!public/assets/original/map-actions/
-!public/assets/original/map-actions/**/*.png
-!public/assets/original/map-action-atlases/
-!public/assets/original/map-action-atlases/*.png
-!public/assets/original/status-icons/
-!public/assets/original/status-icons/*.png
-!public/assets/original/startup/
-!public/assets/original/startup/**/*.png
-!public/assets/original/story/
-!public/assets/original/story/*.png
-!public/assets/original/stage4-force-field-pulse/
-!public/assets/original/stage4-force-field-pulse/*.png
-!public/assets/original/stage26-column-push/
-!public/assets/original/stage26-column-push/**/*.png
-!public/assets/original/technique-lab/
-!public/assets/original/technique-lab/**/*.png
+# 原版素材由独立私有仓库 WispSnow/angel2-assets 分发，不进入本仓库。
+# 安装方式见 README「获取原版素材」；缺失时 scripts/check-original-assets.mjs 会拦下。
+public/assets/original/
 artifacts/
 test-results/
 playwright-report/

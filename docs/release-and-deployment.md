@@ -19,9 +19,15 @@
 Pages 项目或第二个站点来替代它，除非用户明确要求迁移托管方案。Cloudflare 的 Direct Upload
 项目以后不能原地切换成 Git 集成；若将来要自动部署，需要另行设计迁移并取得用户确认。
 
-GitHub 只用于私有开发仓库、普通 CI 与 Windows Tauri 安装包构建。Cloudflare 继续严格按本文
-后续步骤从本地运行 Wrangler Direct Upload；不要在 GitHub Actions 中添加 Cloudflare Token、
-Account ID、Wrangler 上传或推送即上线逻辑。
+GitHub 只用于源码托管、普通 CI 与 Windows Tauri 安装包构建。仓库为公开开源仓库，因此
+GitHub 上的一切都按「任何人可见」对待：不要把凭据、私有地址或未公开的发布计划写进工作流、
+提交信息或工作流日志。Cloudflare 继续严格按本文后续步骤从本地运行 Wrangler Direct Upload；
+不要在 GitHub Actions 中添加 Cloudflare Token、Account ID、Wrangler 上传或推送即上线逻辑。
+
+仓库公开后，Actions artifact 的可下载范围由仓库可见性决定：公开仓库的 artifact 任何人都能
+从 Actions 页面下载。Windows 安装包目前既未代码签名、也未完成真实 Windows 验收，因此仍属
+内部验证包；在取得签名方案并通过验收之前，不要把 artifact 链接当作面向玩家的发布渠道，也
+不要为它创建 GitHub Release。
 
 线上实际部署版本以 Cloudflare 的部署列表为准，不能仅根据本地 `HEAD`、`release/` 的修改
 时间或本文档推断。`release/`、`dist/` 和 `artifacts/` 都是被忽略的本地产物，不进入 Git。
@@ -59,7 +65,7 @@ Windows 桌面版和 Web 版共享同一套 TypeScript、模拟、内容与 `pnp
 像素量出来的，写回 `LogicalSize` 前必须先用窗口自己的 `scaleFactor()` 还原页面缩放倍率；漏掉这一步，
 玩家只要缩放过页面，整数倍每次重算都会再把窗口缩小一次，一路缩到 `minWidth`。
 
-私有 GitHub 仓库中的 `.github/workflows/desktop-windows.yml` 只在以下情况运行：
+`.github/workflows/desktop-windows.yml` 只在以下情况运行：
 
 - Actions 页面手动触发 `Windows desktop package`；
 - 推送 `desktop-v*` 版本标签。
@@ -71,8 +77,10 @@ pnpm desktop:build:windows
 ```
 
 Tauri 随后先调用 `pnpm build:release`，再只生成当前用户安装模式的 NSIS `*-setup.exe`。工作流
-要求产物精确为一个安装程序，并以 `angel2-windows-x64-<commit>` 名称保留 14 天；私有仓库
-artifact 只有获授权的仓库成员可以下载。它不会创建 GitHub Release，也不会更新 Cloudflare。
+要求产物精确为一个安装程序，并以 `angel2-windows-x64-<commit>` 名称保留 14 天。仓库公开后
+该 artifact 对任何访客可见可下载，因此它虽然仍是未签名的内部验证包，却不再有「只有成员能拿
+到」的保护；下节的签名与验收边界必须当作对外承诺来执行。它不会创建 GitHub Release，也不会
+更新 Cloudflare。
 
 Windows 开发包采用 Tauri 默认的小体积 Evergreen WebView2 路径：Windows 10/11 已有运行时时
 直接复用，缺失时由安装程序静默调用联网 bootstrapper。当前没有附带 127 MiB 离线安装程序或

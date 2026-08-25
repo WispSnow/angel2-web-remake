@@ -23,6 +23,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check out original assets
+        uses: actions/checkout@v4
+        with:
+          repository: WispSnow/angel2-assets
+          token: ${{ secrets.ASSETS_REPO_TOKEN }}
+          path: public/assets/original
+
+      # Vite 会把 public/ 下的一切原样复制进构建产物；不删就会把素材仓库的 git
+      # 元数据打进 release/ 和 Windows 安装包。
+      - name: Strip nested git metadata
+        shell: bash
+        run: rm -rf public/assets/original/.git
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -59,7 +72,7 @@ jobs:
           $sizeMiB = [math]::Round($installers[0].Length / 1MB, 1)
           Write-Output "Installer: $($installers[0].Name) ($sizeMiB MiB)"
 
-      - name: Upload private Windows package
+      - name: Upload unsigned Windows verification package
         uses: actions/upload-artifact@v4
         with:
           name: angel2-windows-x64-${{ github.sha }}

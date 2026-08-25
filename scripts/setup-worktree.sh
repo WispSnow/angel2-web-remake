@@ -72,6 +72,10 @@ if [ -d "$main_root/ref" ]; then
   done < <(ls "$main_root/ref")   # 不用 -A：.DS_Store 之类的宿主垃圾不该跟进 worktree
 fi
 
+# 原版素材包不随仓库分发，worktree 里必须借用主检出那一份；漏了它，pnpm dev／test／
+# build:release 都会被 check-original-assets.mjs 拦下，而且每个 worktree 复制一份要多占 67 MB。
+link_from_main "public/assets/original"
+
 echo
 echo "已链接 $linked 项，$skipped 项此前已链接。"
 
