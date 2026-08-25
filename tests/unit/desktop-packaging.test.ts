@@ -7,6 +7,9 @@ const readText = (relativePath: string): string =>
 const readJson = (relativePath: string): Record<string, unknown> =>
   JSON.parse(readText(relativePath)) as Record<string, unknown>;
 
+const readBytes = (relativePath: string): Buffer =>
+  readFileSync(new URL(`../../${relativePath}`, import.meta.url));
+
 describe("desktop packaging contract", () => {
   it("wraps only the audited player release in a stable Tauri identity", () => {
     const config = readJson("src-tauri/tauri.conf.json");
@@ -53,7 +56,40 @@ describe("desktop packaging contract", () => {
       type: "downloadBootstrapper",
       silent: true,
     });
-    expect(windows.nsis).toEqual({ installMode: "currentUser" });
+    // NSIS 只在 `installerIcon`/`uninstallerIcon` 非空時才 `!define MUI_ICON`；
+    // 少了這兩條，安裝與卸載程式自己會退回 NSIS 預設圖示。桌面／開始功能表捷徑
+    // 不受影響：它們指向主程式，用的是 tauri-build 從同一個 .ico 嵌進執行檔的
+    // 圖示資源。
+    expect(windows.nsis).toEqual({
+      installMode: "currentUser",
+      installerIcon: "icons/icon.ico",
+      uninstallerIcon: "icons/icon.ico",
+    });
+    expect(existsSync(new URL("../../src-tauri/icons/icon.ico", import.meta.url))).toBe(true);
+  });
+
+  it("serves the browser tab icon from the same artwork as the desktop shell", () => {
+    // 圖示只有一份來源：src-tauri/icons/ 由 src-tauri/app-icon.svg 經 `tauri icon`
+    // 產生。public/ 裡的兩個副本是逐位元組複製，所以斷言位元組相等而不是「看起來
+    // 一樣」——否則換圖時很容易只更新桌面殼，網頁版繼續掛著舊圖。
+    const mirrors = [
+      { web: "public/favicon.ico", desktop: "src-tauri/icons/icon.ico" },
+      { web: "public/icon-256.png", desktop: "src-tauri/icons/128x128@2x.png" },
+    ];
+    for (const { web, desktop } of mirrors) {
+      expect(readBytes(web).equals(readBytes(desktop))).toBe(true);
+    }
+
+    // `/favicon.ico` 是瀏覽器的隱式回退，各實驗室頁面靠它拿到同一個圖示；index.html
+    // 另外顯式宣告，讓高解析度分頁可以直接取 256 的 PNG。佔位圖示曾經是內嵌的
+    // data URI，這裡順帶擋住它回來。
+    const indexHtml = readText("index.html");
+    expect(indexHtml).toContain('<link rel="icon" href="/favicon.ico" />');
+    expect(indexHtml).toContain(
+      '<link rel="icon" type="image/png" sizes="256x256" href="/icon-256.png" />',
+    );
+    expect(indexHtml).toContain('<link rel="apple-touch-icon" href="/icon-256.png" />');
+    expect(indexHtml).not.toMatch(/<link[^>]*rel="(?:apple-touch-)?icon"[^>]*href="data:/u);
   });
 
   it("keeps Windows packaging manual and separate from Cloudflare deployment", () => {

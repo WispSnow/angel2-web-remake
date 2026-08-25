@@ -52,6 +52,13 @@ Windows 桌面版和 Web 版共享同一套 TypeScript、模拟、内容与 `pnp
 `localStorage` 存档会落入另一个来源。网页和桌面来源的存档不会自动共享，迁移使用游戏内已有的
 20 槽 JSON 备份导出／导入。
 
+图标同样只有一份来源：`src-tauri/app-icon.svg` 经 `pnpm tauri icon` 生成 `src-tauri/icons/`。
+桌面与开始菜单快捷方式不带独立图标参数，用的是 `tauri-build` 从 `icons/icon.ico` 嵌进主程序的
+图标资源；NSIS 安装程序和卸载程序自己另需 `installerIcon`／`uninstallerIcon`，缺了会退回 NSIS
+默认图标。网页版的分页图标是同一套素材的逐字节副本 `public/favicon.ico`（`/favicon.ico` 也是
+各实验室页面的隐式回退）与 `public/icon-256.png`；`desktop-packaging.test.ts` 断言两侧字节相等，
+换图时不会只更新其中一边。
+
 桌面运行时不继承 Web 页面的 640px 最大宽度：「銳利」与「平滑」以客户区宽、高中较紧的一边
 为准等比放大完整 640×350 逻辑画面，拖动窗口、最大化和全屏都会重新计算；未被画面占用的窄条
 只用于保持原始宽高比，底部宿主控制条不参与缩放。「整數倍」还会调用受限的 Tauri 窗口尺寸

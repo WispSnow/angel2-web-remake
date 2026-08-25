@@ -26,6 +26,8 @@ ref/*
 !src-tauri/icons/128x128.png
 !src-tauri/icons/128x128@2x.png
 !public/
+# 浏览器分页图标是 src-tauri/icons/ 的逐字节副本，由 desktop-packaging.test.ts 锁定。
+!public/icon-256.png
 !public/assets/
 # 原版素材由独立私有仓库 WispSnow/angel2-assets 分发，不进入本仓库。
 # 安装方式见 README「获取原版素材」；缺失时 scripts/check-original-assets.mjs 会拦下。
