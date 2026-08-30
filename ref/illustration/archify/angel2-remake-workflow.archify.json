@@ -45,7 +45,7 @@
       "lane": "journey",
       "col": 0,
       "type": "database",
-      "width": 72,
+      "width": 96,
       "height": 32,
       "yOffset": -20,
       "label": "原版基线"
@@ -55,7 +55,7 @@
       "lane": "journey",
       "col": 2,
       "type": "frontend",
-      "width": 72,
+      "width": 96,
       "height": 32,
       "yOffset": -20,
       "label": "垂直切片"
@@ -65,7 +65,7 @@
       "lane": "journey",
       "col": 4,
       "type": "security",
-      "width": 72,
+      "width": 96,
       "height": 32,
       "yOffset": -20,
       "label": "架构收口"
@@ -75,7 +75,7 @@
       "lane": "journey",
       "col": 5,
       "type": "messagebus",
-      "width": 72,
+      "width": 96,
       "height": 32,
       "yOffset": -20,
       "label": "能力收口"
@@ -85,7 +85,7 @@
       "lane": "journey",
       "col": 5,
       "type": "backend",
-      "width": 72,
+      "width": 96,
       "height": 32,
       "yOffset": 20,
       "label": "战役扩展"
@@ -95,7 +95,7 @@
       "lane": "journey",
       "col": 2,
       "type": "cloud",
-      "width": 72,
+      "width": 96,
       "height": 32,
       "yOffset": 20,
       "label": "产品硬化"
@@ -105,7 +105,7 @@
       "lane": "journey",
       "col": 0,
       "type": "external",
-      "width": 72,
+      "width": 96,
       "height": 32,
       "yOffset": 20,
       "label": "发布归档"
