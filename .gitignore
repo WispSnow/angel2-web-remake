@@ -22,6 +22,8 @@ ref/*
 .claude/
 *.png
 !ref/illustration/**
+# 演示图保留可编辑源与报告，导出的 PNG 仅保存在本地。
+ref/illustration/**/*.png
 !docs/media/
 !docs/media/*.png
 !src-tauri/icons/32x32.png
