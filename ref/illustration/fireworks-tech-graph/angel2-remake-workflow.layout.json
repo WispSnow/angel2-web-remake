@@ -1,0 +1,468 @@
+{
+  "canvas": {
+    "height": 760.0,
+    "width": 1400.0
+  },
+  "composition": {
+    "limits": {
+      "max_bends_per_edge": 2,
+      "max_bridged_crossings": 0,
+      "max_route_stretch": 1.35,
+      "max_total_bends": 8,
+      "min_container_gutter": 20.0,
+      "min_label_clearance": 4.0,
+      "min_node_gap": 40.0,
+      "min_segment_length": 16.0,
+      "profile": "showcase"
+    },
+    "metrics": {
+      "bridged_crossings": 0,
+      "max_route_stretch": 1.057,
+      "minimum_container_gutter": 20.0,
+      "minimum_node_gap": 41.0,
+      "shortest_segment": 33.0,
+      "total_bends": 2
+    },
+    "ok": true,
+    "profile": "showcase",
+    "score": 100,
+    "violations": []
+  },
+  "edges": [
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "phase-1",
+      "length": 42.0,
+      "route": [
+        [
+          200.0,
+          201.0
+        ],
+        [
+          242.0,
+          201.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "baseline",
+      "source_port": [
+        200.0,
+        201.0
+      ],
+      "target": "vertical",
+      "target_port": [
+        242.0,
+        201.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "phase-2",
+      "length": 41.0,
+      "route": [
+        [
+          392.0,
+          201.0
+        ],
+        [
+          433.0,
+          201.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "vertical",
+      "source_port": [
+        392.0,
+        201.0
+      ],
+      "target": "architecture",
+      "target_port": [
+        433.0,
+        201.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "phase-3",
+      "length": 42.0,
+      "route": [
+        [
+          583.0,
+          201.0
+        ],
+        [
+          625.0,
+          201.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "architecture",
+      "source_port": [
+        583.0,
+        201.0
+      ],
+      "target": "capability",
+      "target_port": [
+        625.0,
+        201.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "phase-4",
+      "length": 42.0,
+      "route": [
+        [
+          775.0,
+          201.0
+        ],
+        [
+          817.0,
+          201.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "capability",
+      "source_port": [
+        775.0,
+        201.0
+      ],
+      "target": "campaign",
+      "target_port": [
+        817.0,
+        201.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "phase-5",
+      "length": 41.0,
+      "route": [
+        [
+          967.0,
+          201.0
+        ],
+        [
+          1008.0,
+          201.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "campaign",
+      "source_port": [
+        967.0,
+        201.0
+      ],
+      "target": "hardening",
+      "target_port": [
+        1008.0,
+        201.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "phase-6",
+      "length": 42.0,
+      "route": [
+        [
+          1158.0,
+          201.0
+        ],
+        [
+          1200.0,
+          201.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "hardening",
+      "source_port": [
+        1158.0,
+        201.0
+      ],
+      "target": "release",
+      "target_port": [
+        1200.0,
+        201.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "slice-1",
+      "length": 42.0,
+      "route": [
+        [
+          200.0,
+          451.0
+        ],
+        [
+          242.0,
+          451.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "evidence",
+      "source_port": [
+        200.0,
+        451.0
+      ],
+      "target": "decision",
+      "target_port": [
+        242.0,
+        451.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "slice-2",
+      "length": 41.0,
+      "route": [
+        [
+          392.0,
+          451.0
+        ],
+        [
+          433.0,
+          451.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "decision",
+      "source_port": [
+        392.0,
+        451.0
+      ],
+      "target": "contract",
+      "target_port": [
+        433.0,
+        451.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "slice-3",
+      "length": 42.0,
+      "route": [
+        [
+          583.0,
+          451.0
+        ],
+        [
+          625.0,
+          451.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "contract",
+      "source_port": [
+        583.0,
+        451.0
+      ],
+      "target": "generate",
+      "target_port": [
+        625.0,
+        451.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "slice-4",
+      "length": 42.0,
+      "route": [
+        [
+          775.0,
+          451.0
+        ],
+        [
+          817.0,
+          451.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "generate",
+      "source_port": [
+        775.0,
+        451.0
+      ],
+      "target": "implement",
+      "target_port": [
+        817.0,
+        451.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "slice-5",
+      "length": 41.0,
+      "route": [
+        [
+          967.0,
+          451.0
+        ],
+        [
+          1008.0,
+          451.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "implement",
+      "source_port": [
+        967.0,
+        451.0
+      ],
+      "target": "verify",
+      "target_port": [
+        1008.0,
+        451.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "slice-6",
+      "length": 42.0,
+      "route": [
+        [
+          1158.0,
+          451.0
+        ],
+        [
+          1200.0,
+          451.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "verify",
+      "source_port": [
+        1158.0,
+        451.0
+      ],
+      "target": "accept",
+      "target_port": [
+        1200.0,
+        451.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 2,
+      "bridges": [],
+      "crossings": [],
+      "id": "slice-loop",
+      "length": 1216.0,
+      "route": [
+        [
+          1275.0,
+          497.0
+        ],
+        [
+          1275.0,
+          530.0
+        ],
+        [
+          125.0,
+          530.0
+        ],
+        [
+          125.0,
+          497.0
+        ]
+      ],
+      "route_stretch": 1.057,
+      "source": "accept",
+      "source_port": [
+        1275.0,
+        497.0
+      ],
+      "target": "evidence",
+      "target_port": [
+        125.0,
+        497.0
+      ],
+      "waypoints": [
+        [
+          1275.0,
+          530.0
+        ],
+        [
+          125.0,
+          530.0
+        ]
+      ]
+    }
+  ],
+  "input_schema": "v1",
+  "issues": [],
+  "mode": "flowchart",
+  "ok": true,
+  "placements": {
+    "legend": {
+      "actual": [
+        48.0,
+        620.0
+      ],
+      "bounds": [
+        38.0,
+        606.0,
+        504.0,
+        652.0
+      ],
+      "moved": false,
+      "requested": [
+        48.0,
+        620.0
+      ]
+    }
+  },
+  "schema_version": 1,
+  "semantics": {
+    "details": {},
+    "ok": true,
+    "profile": "generic",
+    "style": 3,
+    "visual_theme": "Blueprint"
+  },
+  "style": {
+    "id": 3,
+    "name": "Blueprint"
+  },
+  "summary": {
+    "bridged_crossings": 0,
+    "edges": 13,
+    "nodes": 14
+  },
+  "text_metrics": "heuristic-v1"
+}

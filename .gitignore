@@ -16,10 +16,12 @@ Icon[
 ref/*
 !ref/next-project/
 !ref/next-project/**
+!ref/illustration/
 .obsidian/
 .agents/
 .claude/
 *.png
+!ref/illustration/**
 !docs/media/
 !docs/media/*.png
 !src-tauri/icons/32x32.png

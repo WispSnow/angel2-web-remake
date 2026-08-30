@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "《天使帝国 II》Web 复刻：从原物到发布",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "visual_preset": "editorial",
+    "quality_profile": "showcase",
+    "viewBox": [800, 404],
+    "views": [
+      {
+        "id": "project-journey",
+        "label": "完整项目旅程",
+        "focus": ["baseline", "vertical_slice", "architecture", "capability_closure", "campaign", "hardening", "release"],
+        "note": "从原版证据基线出发，经真实切片、架构收口和共性能力闭合，再扩展完整战役并完成交付。"
+      },
+      {
+        "id": "slice-loop",
+        "label": "单个切片闭环",
+        "focus": ["evidence", "decision", "contract", "build", "verify", "accept"],
+        "note": "每个系统或关卡都重复同一条证据驱动的实现与接受链。"
+      },
+      {
+        "id": "scale-up",
+        "label": "从切片到全战役",
+        "focus": ["vertical_slice", "architecture", "capability_closure", "campaign", "build", "verify", "accept"],
+        "note": "第二、三个真实变体暴露重复后再抽象；共性能力经实验室组合验收和空装配演练后，才批量推进。"
+      },
+      {
+        "id": "delivery",
+        "label": "交付与发布",
+        "focus": ["hardening", "release", "verify", "accept"],
+        "note": "内容完成后独立处理资源、存档、响应式、玩家包、部署与回滚。"
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "journey", "label": "项目主线 · Baseline → Release" },
+    { "id": "slice", "label": "单切片闭环 · Evidence → Accept → Next" }
+  ],
+  "nodes": [
+    {
+      "id": "baseline",
+      "lane": "journey",
+      "col": 0,
+      "type": "database",
+      "width": 72,
+      "height": 32,
+      "yOffset": -20,
+      "label": "原版基线"
+    },
+    {
+      "id": "vertical_slice",
+      "lane": "journey",
+      "col": 2,
+      "type": "frontend",
+      "width": 72,
+      "height": 32,
+      "yOffset": -20,
+      "label": "垂直切片"
+    },
+    {
+      "id": "architecture",
+      "lane": "journey",
+      "col": 4,
+      "type": "security",
+      "width": 72,
+      "height": 32,
+      "yOffset": -20,
+      "label": "架构收口"
+    },
+    {
+      "id": "capability_closure",
+      "lane": "journey",
+      "col": 5,
+      "type": "messagebus",
+      "width": 72,
+      "height": 32,
+      "yOffset": -20,
+      "label": "能力收口"
+    },
+    {
+      "id": "campaign",
+      "lane": "journey",
+      "col": 5,
+      "type": "backend",
+      "width": 72,
+      "height": 32,
+      "yOffset": 20,
+      "label": "战役扩展"
+    },
+    {
+      "id": "hardening",
+      "lane": "journey",
+      "col": 2,
+      "type": "cloud",
+      "width": 72,
+      "height": 32,
+      "yOffset": 20,
+      "label": "产品硬化"
+    },
+    {
+      "id": "release",
+      "lane": "journey",
+      "col": 0,
+      "type": "external",
+      "width": 72,
+      "height": 32,
+      "yOffset": 20,
+      "label": "发布归档"
+    },
+    {
+      "id": "evidence",
+      "lane": "slice",
+      "col": 0,
+      "type": "database",
+      "width": 82,
+      "height": 32,
+      "yOffset": -20,
+      "label": "取证"
+    },
+    {
+      "id": "decision",
+      "lane": "slice",
+      "col": 2,
+      "type": "security",
+      "width": 82,
+      "height": 32,
+      "yOffset": -20,
+      "label": "决策"
+    },
+    {
+      "id": "contract",
+      "lane": "slice",
+      "col": 4,
+      "type": "frontend",
+      "width": 82,
+      "height": 32,
+      "yOffset": -20,
+      "label": "合同"
+    },
+    {
+      "id": "build",
+      "lane": "slice",
+      "col": 4,
+      "type": "backend",
+      "width": 82,
+      "height": 32,
+      "yOffset": 20,
+      "label": "生成实现"
+    },
+    {
+      "id": "verify",
+      "lane": "slice",
+      "col": 2,
+      "type": "security",
+      "width": 82,
+      "height": 32,
+      "yOffset": 20,
+      "label": "验证"
+    },
+    {
+      "id": "accept",
+      "lane": "slice",
+      "col": 0,
+      "type": "external",
+      "width": 82,
+      "height": 32,
+      "yOffset": 20,
+      "label": "接受"
+    }
+  ],
+  "edges": [
+    { "id": "baseline-slice", "from": "baseline", "to": "vertical_slice", "role": "main" },
+    { "id": "slice-architecture", "from": "vertical_slice", "to": "architecture", "role": "main" },
+    {
+      "id": "architecture-capability",
+      "from": "architecture",
+      "to": "capability_closure",
+      "role": "main"
+    },
+    {
+      "id": "capability-campaign",
+      "from": "capability_closure",
+      "to": "campaign",
+      "role": "main",
+      "route": "outside-right",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    { "id": "campaign-hardening", "from": "campaign", "to": "hardening", "role": "main" },
+    {
+      "id": "hardening-release",
+      "from": "hardening",
+      "to": "release",
+      "role": "main",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    { "id": "evidence-decision", "from": "evidence", "to": "decision", "variant": "emphasis", "role": "branch" },
+    { "id": "decision-contract", "from": "decision", "to": "contract", "variant": "emphasis", "role": "branch" },
+    {
+      "id": "contract-build",
+      "from": "contract",
+      "to": "build",
+      "variant": "emphasis",
+      "role": "branch",
+      "route": "outside-right",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "id": "build-verify",
+      "from": "build",
+      "to": "verify",
+      "variant": "emphasis",
+      "role": "branch",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "verify-accept",
+      "from": "verify",
+      "to": "accept",
+      "variant": "emphasis",
+      "role": "branch",
+      "route": "straight",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "accept-next",
+      "from": "accept",
+      "to": "evidence",
+      "label": "下一切片",
+      "variant": "dashed",
+      "role": "return",
+      "route": "return-left",
+      "fromSide": "left",
+      "toSide": "left"
+    }
+  ]
+}
