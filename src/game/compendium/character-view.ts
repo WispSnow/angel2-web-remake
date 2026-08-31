@@ -10,7 +10,7 @@ import { escapeHtml } from "../overlay/markup";
 import type { CharacterId } from "../content/character-catalog.generated";
 import { stagedRenderAssetSource } from "../staged-render-asset-cache";
 
-const NO_NOTE = "原版沒有給這名角色台詞或專屬橋段，所以圖鑑只列出身分與出場關卡。";
+const NO_NOTE = "原版未為該角色設計專屬台詞或劇情橋段，圖鑑僅列出其身分歸屬與登場關卡。";
 
 function characterButton(entry: CharacterEntry, selected: CharacterId): string {
   const isSelected = entry.id === selected;
@@ -97,7 +97,7 @@ export function renderCharacterDetail(id: CharacterId): string {
       <ul class="rn-character-stages" data-testid="compendium-character-stages">
         ${entry.stages.map(stageCell).join("")}
       </ul>
-      <p class="rn-hint">「名單候選」表示這一關可以把這名角色編進出擊名單，不代表一定上場；
-        「對白登場」表示只出現在該關的劇情畫面裡。</p>
+      <p class="rn-hint">「名單候選」表示該關卡可將此角色編入出擊陣容，非必定登場；
+        「對白登場」表示僅於該關卡劇情對話中出現。</p>
     </section>`;
 }

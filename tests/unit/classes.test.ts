@@ -11,6 +11,7 @@ import {
   classTierFor,
   isClassImmuneToOrdinaryHitStatus,
   ordinaryHitStatusFor,
+  poisonRemainingLifeDivisorFor,
   suppressesOrdinaryCounterFor,
   type ClassId,
 } from "../../src/game/content/classes";
@@ -1022,18 +1023,15 @@ describe("native class implementation sequence", () => {
     expect(defender.statuses.attackDown).toBe(3);
   });
 
-  it.each([
-    ["evil-sword-warrior", "confusion"],
-    ["jungle-warrior", "poison"],
-  ] as const)("stable remake blocks %s ordinary-hit %s on 1P/2P/3P", (attackerClassId, statusKey) => {
+  it("keeps 1P/2P/3P immune to ordinary-hit confusion", () => {
     for (const defenderClassId of ["dragon", "head", "hand"] as const) {
-      expect(isClassImmuneToOrdinaryHitStatus(defenderClassId, statusKey)).toBe(true);
+      expect(isClassImmuneToOrdinaryHitStatus(defenderClassId, "confusion")).toBe(true);
       const battle = new Stage0Battle(0);
       const attacker = battle.unit("1:0")!;
       const defender = battle.units.find(({ side }) => side === 2)!;
       battle.units = [attacker, defender];
-      attacker.classId = attackerClassId;
-      attacker.className = classDefinition(attackerClassId).nativeName;
+      attacker.classId = "evil-sword-warrior";
+      attacker.className = classDefinition("evil-sword-warrior").nativeName;
       attacker.experience = 0;
       attacker.life = classStatsFor(attacker).maxLife;
       attacker.x = 20;
@@ -1047,8 +1045,36 @@ describe("native class implementation sequence", () => {
 
       battle.attack(attacker.id, defender.id);
 
-      expect(defender.statuses[statusKey], defenderClassId).toBe(0);
+      expect(defender.statuses.confusion, defenderClassId).toBe(0);
     }
+  });
+
+  it("lets jungle-warrior ordinary hits poison 1P/2P/3P with the boss divisor", () => {
+    for (const defenderClassId of ["dragon", "head", "hand"] as const) {
+      expect(isClassImmuneToOrdinaryHitStatus(defenderClassId, "poison")).toBe(false);
+      expect(poisonRemainingLifeDivisorFor(defenderClassId)).toBe(3);
+      const battle = new Stage0Battle(0);
+      const attacker = battle.unit("1:0")!;
+      const defender = battle.units.find(({ side }) => side === 2)!;
+      battle.units = [attacker, defender];
+      attacker.classId = "jungle-warrior";
+      attacker.className = classDefinition("jungle-warrior").nativeName;
+      attacker.experience = 0;
+      attacker.life = classStatsFor(attacker).maxLife;
+      attacker.x = 20;
+      attacker.y = 20;
+      defender.classId = defenderClassId;
+      defender.className = classDefinition(defenderClassId).nativeName;
+      defender.experience = 0;
+      defender.life = classStatsFor(defender).maxLife;
+      defender.x = 21;
+      defender.y = 20;
+
+      battle.attack(attacker.id, defender.id);
+
+      expect(defender.statuses.poison, defenderClassId).toBe(3);
+    }
+    expect(poisonRemainingLifeDivisorFor("soldier")).toBe(2);
   });
 
   it.each([

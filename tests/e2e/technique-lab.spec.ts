@@ -1120,7 +1120,7 @@ test("FM reuses all twenty AA pairs and stays below a persistent ice shell", asy
   expect(pageErrors).toEqual([]);
 });
 
-test("IP plays both poison phases, preserves boss immunity, and stays below a persistent ice shell", async ({ page }) => {
+test("IP plays both poison phases, applies the boss divisor, and stays below a persistent ice shell", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/technique-lab.html");
@@ -1145,7 +1145,7 @@ test("IP plays both poison phases, preserves boss immunity, and stays below a pe
     terminalHoldMs: 100,
   });
   await expect(page.locator('[data-readout="affected"]'))
-    .toContainText("中毒狀態 3 · 每輪折半但不致死");
+    .toContainText("中毒狀態 3 · 每輪生命減半且不致死");
 
   for (const [time, expectedPhase, frame] of [
     [0, "poison", "0"],
@@ -1191,16 +1191,20 @@ test("IP plays both poison phases, preserves boss immunity, and stays below a pe
   await page.getByRole("button", { name: "放置／替換" }).click();
   await clickCell(23, 18);
   await expect(page.locator('[data-readout="affected"]'))
-    .toContainText("龍／頭／手免疫寫入");
+    .toContainText("中毒狀態 3 · 每輪生命降至三分之一且不致死");
   await seek(page, 2900);
-  await expect(page.locator('[data-readout="result"]')).toContainText("免疫中毒寫入");
+  await expect(page.locator('[data-readout="result"]')).toContainText("每完整輪生命降至三分之一");
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/technique-lab-poison-boss.png",
+    fullPage: true,
+  });
   await page.getByTestId("technique-lab-class").selectOption("head");
   await page.getByRole("button", { name: "放置／替換" }).click();
   await clickCell(23, 18);
   await expect(page.locator('[data-readout="affected"]'))
-    .toContainText("龍／頭／手免疫寫入");
+    .toContainText("中毒狀態 3 · 每輪生命降至三分之一且不致死");
   await seek(page, 2900);
-  await expect(page.locator('[data-readout="result"]')).toContainText("免疫中毒寫入");
+  await expect(page.locator('[data-readout="result"]')).toContainText("每完整輪生命降至三分之一");
   expect(pageErrors).toEqual([]);
 });
 

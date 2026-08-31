@@ -275,7 +275,12 @@ const bossStatusAndControl = {
     effect: "no displacement or action disable",
   },
   confusion: { immuneClasses: ["head", "hand"], stateWrite: false },
-  poison: { immuneClasses: ["head", "hand"], stateWrite: false },
+  poison: {
+    nativeImmuneClasses: ["head", "hand"],
+    immuneClasses: [],
+    stateWrite: true,
+    persistentLifeDivisor: 3,
+  },
   attackDown: { immuneClasses: [], stateWrite: true, fixedDelta: -20 },
   defenseDown: { immuneClasses: [], stateWrite: true, fixedDelta: -20 },
   spellSeal: {
@@ -295,7 +300,7 @@ const sources = Object.entries(inputPaths).map(([id, file]) => ({
   bytes: inputBuffers[id].length,
 }));
 const identityHash = createHash("sha256");
-identityHash.update("stableRemake\0REMAKE-084\0REMAKE-085\0");
+identityHash.update("stableRemake\0REMAKE-084\0REMAKE-085\0REMAKE-124\0");
 for (const source of sources) identityHash.update(`${source.path}\0${source.sha256}\n`);
 const contentIdentity = `stage-37/evidence-${identityHash.digest("hex")}`;
 const eventProgram = {
@@ -332,7 +337,7 @@ const eventProgram = {
     statusAndControl: bossStatusAndControl,
   },
   completedRoute: { module: 25, stage: 49, replayPresentation: false },
-  stableRemakeDecisions: ["REMAKE-005", "REMAKE-013", "REMAKE-084", "REMAKE-085"],
+  stableRemakeDecisions: ["REMAKE-005", "REMAKE-013", "REMAKE-084", "REMAKE-085", "REMAKE-124"],
 };
 const deployment = {
   kind: "interactive",

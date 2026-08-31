@@ -29,12 +29,13 @@ export interface OrdinaryHitStatus {
 
 const STABLE_REMAKE_ORDINARY_HIT_STATUS_IMMUNITIES = {
   confusion: ["dragon", "head", "hand"],
-  poison: ["dragon", "head", "hand"],
 } as const satisfies Readonly<Partial<Record<OrdinaryHitStatusKey, readonly ClassId[]>>>;
 
 /**
- * REMAKE-053 closes the native split where LA/IP techniques honor 1P/2P/3P
- * immunity but ordinary-hit writes to the same status slots bypass it.
+ * REMAKE-053 closes the native split where LA honors 1P/2P/3P immunity but
+ * ordinary-hit writes to the same status slot bypass it. REMAKE-124 later
+ * opens poison for both technique and ordinary-hit sources, so only confusion
+ * remains in this immunity table.
  */
 export function isClassImmuneToOrdinaryHitStatus(
   classId: ClassId,
@@ -43,6 +44,15 @@ export function isClassImmuneToOrdinaryHitStatus(
   const immuneClasses = STABLE_REMAKE_ORDINARY_HIT_STATUS_IMMUNITIES[status as
     keyof typeof STABLE_REMAKE_ORDINARY_HIT_STATUS_IMMUNITIES];
   return immuneClasses?.some((immuneClass) => immuneClass === classId) ?? false;
+}
+
+const STABLE_REMAKE_POISON_BOSS_CLASSES = ["dragon", "head", "hand"] as const;
+
+/** REMAKE-124 leaves ordinary poison at one half and reduces boss life to one third. */
+export function poisonRemainingLifeDivisorFor(classId: ClassId): 2 | 3 {
+  return STABLE_REMAKE_POISON_BOSS_CLASSES.some((bossClass) => bossClass === classId)
+    ? 3
+    : 2;
 }
 
 export interface PromotionTarget {

@@ -1,4 +1,4 @@
-import type { ClassId } from "./content/classes";
+import { poisonRemainingLifeDivisorFor, type ClassId } from "./content/classes";
 import {
   TECHNIQUE_LAB_CATALOG,
   TECHNIQUE_LAB_ATTACK_UP,
@@ -366,12 +366,9 @@ export class TechniqueLabSession {
     }
     if (this.current.actionCode === "IP"
       && this.affectedUnits().some(({ id }) => id === unit.id)) {
-      const immune = TECHNIQUE_LAB_POISON.immuneClassIds.some(
-        (classId) => classId === unit.classId,
-      );
-      return immune
-        ? "完整演出 · 龍／頭／手免疫寫入"
-        : `中毒狀態 ${TECHNIQUE_LAB_POISON.statusCounter} · 每輪折半但不致死`;
+      return poisonRemainingLifeDivisorFor(unit.classId) === 3
+        ? `中毒狀態 ${TECHNIQUE_LAB_POISON.statusCounter} · 每輪生命降至三分之一且不致死`
+        : `中毒狀態 ${TECHNIQUE_LAB_POISON.statusCounter} · 每輪生命減半且不致死`;
     }
     if (this.current.actionCode === "LA"
       && this.affectedUnits().some(({ id }) => id === unit.id)) {

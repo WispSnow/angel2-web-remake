@@ -921,7 +921,7 @@ describe("map technique laboratory session", () => {
     expect(session.state.actionCode).toBe("IP");
     expect(session.affectedUnits().map(({ classId }) => classId)).toEqual(["soldier"]);
     expect(session.damagePreviewFor(session.affectedUnits()[0]!))
-      .toBe("中毒狀態 3 · 每輪折半但不致死");
+      .toBe("中毒狀態 3 · 每輪生命減半且不致死");
     expect(session.setActionCode("LA")).toBe(true);
     expect(session.state.actionCode).toBe("LA");
     expect(session.affectedUnits().map(({ classId }) => classId)).toEqual(["soldier"]);

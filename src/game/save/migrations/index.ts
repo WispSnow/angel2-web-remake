@@ -452,6 +452,24 @@ function migrateVersion92Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-124 changes only future poison application and round ticks. Existing
+ * statuses, life, counters, action state, and PRNG cursors keep their exact
+ * stored meaning, so every legal v93 save migrates without rewriting battle
+ * state; its next poison tick uses the new stableRemake rule.
+ */
+function migrateVersion93Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 93
+    || value.contentVersion !== "stage-27-eliola-display-name-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-119 restores the two character descriptors that the first stage-33
  * runtime generator dropped. Existing v91 battle saves already contain the
  * right unit slots, classes, positions, and combat state, so only their
@@ -2692,6 +2710,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
   const value = addStage27EliolaDisplayIdentity(normalizeStage3OpeningEvents(raw));
+  const migratedVersion93 = migrateVersion93Save(value);
+  if (migratedVersion93) return migratedVersion93;
   const migratedVersion92 = migrateVersion92Save(value);
   if (migratedVersion92) return migratedVersion92;
   const migratedVersion91 = migrateVersion91Save(value);

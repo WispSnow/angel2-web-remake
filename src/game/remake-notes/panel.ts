@@ -21,11 +21,11 @@ export type RemakeNotesTab = "fixes" | "features" | "balance" | "controls" | "di
 type ComparisonTab = Exclude<RemakeNotesTab, "controls" | "disclaimer">;
 
 export const REMAKE_NOTES_TABS: readonly OverlayTab<RemakeNotesTab>[] = [
-  { id: "fixes", label: "Bug 修復", title: "原版缺陷與複刻修復" },
-  { id: "features", label: "功能增強", title: "不改變戰果的資訊、表現與操作增強" },
-  { id: "balance", label: "平衡性調整", title: "與原版不同的戰術與平衡調整" },
-  { id: "controls", label: "操作說明", title: "鍵盤、滑鼠與標準手把操作" },
-  { id: "disclaimer", label: "免責聲明", title: "非官方同人復刻的權利、用途與聯絡說明" },
+  { id: "fixes", label: "Bug 修復", title: "原版已知問題與復刻修復對照" },
+  { id: "features", label: "功能增強", title: "不改變戰果的資訊、表現與操作體驗優化" },
+  { id: "balance", label: "平衡性調整", title: "戰術深度、職業機制與平衡性優化調整" },
+  { id: "controls", label: "操作說明", title: "鍵盤、滑鼠與標準遊戲手柄操作指南" },
+  { id: "disclaimer", label: "免責聲明", title: "非官方同人復刻之權益、用途與聲明" },
 ];
 
 const NOTE_SECTIONS: Readonly<Record<ComparisonTab, RemakeNoteSection>> = {
@@ -114,16 +114,16 @@ function renderControlRows(rows: ReadonlyArray<{
 function renderControls(): string {
   return `
     <section class="rn-controls" data-testid="remake-controls">
-      <p class="rn-controls-lead">核心鍵位採用現代電腦遊戲的常見配置；同一按鍵在戰場、選單與對話中的用法保持一致。</p>
+      <p class="rn-controls-lead">核心操作鍵位符合現代 PC 遊戲通用習慣，常用功能均支援鍵盤、滑鼠與標準遊戲手柄。</p>
       <div class="rn-controls-grid">
         <article class="rn-control-card is-keyboard">
           <header><span>KEYBOARD</span><h3>鍵盤</h3></header>
           <div class="rn-control-list">
             ${renderControlRows([
-              { keys: ["方向鍵", "WASD"], action: "移動焦點／選單選擇", detail: "戰場游標、選單與目標共用" },
+              { keys: ["方向鍵", "WASD"], action: "移動游標／選單選擇", detail: "戰場游標、選單與目標共用" },
               { keys: ["Enter", "Space"], action: "確認／主操作", detail: "選擇單位、動作、目標，或推進對話" },
-              { keys: ["Esc", "Backspace"], action: "取消／返回", detail: "中性戰場按 Esc 開啟系統選單" },
-              { keys: ["Tab"], action: "下一名待行動角色", detail: "部署畫面改為切換名單與地圖落點" },
+              { keys: ["Esc", "Backspace"], action: "取消／返回", detail: "戰場空白處按 Esc 開啟系統選單" },
+              { keys: ["Tab"], action: "下一名待行動角色", detail: "出擊介面切換名單與地圖落點" },
               { keys: ["G"], action: "集體命令", detail: "再按一次關閉" },
               { keys: ["O"], action: "勝利／失敗條件", detail: "再按一次關閉" },
             ])}
@@ -134,24 +134,24 @@ function renderControls(): string {
           <div class="rn-control-list">
             ${renderControlRows([
               { keys: ["左鍵"], action: "選擇／確認" },
-              { keys: ["右鍵"], action: "取消／返回", detail: "中性戰場改為對焦下一名待行動角色" },
-              { keys: ["滾輪"], action: "切換魔弓完整箭道", detail: "只在箭道預覽時生效" },
-              { keys: ["畫面邊緣"], action: "捲動地圖", detail: "停留可連續捲動" },
+              { keys: ["右鍵"], action: "取消／返回", detail: "戰場空白處改為切換下一名待行動角色" },
+              { keys: ["滾輪"], action: "切換魔弓穿透彈道", detail: "僅於魔弓彈道預覽時生效" },
+              { keys: ["畫面邊緣"], action: "捲動地圖", detail: "游標停留可連續平滑捲動" },
             ])}
           </div>
         </article>
         <article class="rn-control-card">
-          <header><span>GAMEPAD</span><h3>標準手把</h3></header>
-          <p class="rn-control-note">部署與戰場支援瀏覽器辨識為 Standard Gamepad 的手把；按鍵名稱以 Xbox 佈局為例。</p>
+          <header><span>GAMEPAD</span><h3>標準手柄</h3></header>
+          <p class="rn-control-note">出擊與戰場全面支援標準遊戲手柄；按鍵標註以 Xbox 佈局為例。</p>
           <div class="rn-control-list">
             ${renderControlRows([
-              { keys: ["左搖桿", "方向鍵"], action: "移動焦點／選單選擇" },
+              { keys: ["左搖桿", "方向鍵"], action: "移動游標／選單選擇" },
               { keys: ["A"], action: "確認／主操作" },
               { keys: ["B"], action: "取消／返回" },
               { keys: ["Menu", "Start"], action: "系統選單" },
               { keys: ["Y"], action: "集體命令" },
               { keys: ["View", "LB"], action: "勝利／失敗條件" },
-              { keys: ["RB"], action: "下一名待行動角色", detail: "部署畫面的 LB／RB 切換地圖與名單" },
+              { keys: ["RB"], action: "下一名待行動角色", detail: "出擊介面 LB／RB 切換地圖與名單" },
             ])}
           </div>
         </article>
@@ -159,11 +159,11 @@ function renderControls(): string {
           <header><span>SHORTCUTS</span><h3>快捷與相容鍵</h3></header>
           <div class="rn-control-list">
             ${renderControlRows([
-              { keys: ["Q", "E"], action: "切換魔弓箭道", detail: "箭道預覽時" },
-              { keys: ["E", "M"], action: "音效／音樂面板", detail: "中性戰場時" },
+              { keys: ["Q", "E"], action: "切換魔弓彈道", detail: "彈道預覽時" },
+              { keys: ["E", "M"], action: "音效／音樂選單", detail: "戰場空白時" },
               { keys: ["F1–F4"], action: "直接執行四項集體命令" },
-              { keys: ["Ctrl", "Insert"], action: "原版相容確認" },
-              { keys: ["Alt", "Delete"], action: "原版相容取消" },
+              { keys: ["Ctrl", "Insert"], action: "原版相容確認鍵" },
+              { keys: ["Alt", "Delete"], action: "原版相容取消鍵" },
             ])}
           </div>
         </article>
@@ -175,7 +175,7 @@ const panel = createOverlayPanel<RemakeNotesTab>({
   testid: "remake-notes",
   eyebrow: "復刻說明",
   heading: "《天使帝國 II》Web 復刻版",
-  footer: "打開此視窗不會暫停遊戲；敵方階段仍會繼續。視窗內的按鍵不會操作戰場。",
+  footer: "打開本說明不會暫停遊戲進程；視窗內的按鍵操作僅供查閱，不會誤觸戰場指令。",
   tabs: REMAKE_NOTES_TABS,
   render: (tab) => tab === "disclaimer"
     ? renderDisclaimer(DISCLAIMER_SECTION)

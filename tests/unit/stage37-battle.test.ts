@@ -156,7 +156,7 @@ describe("stage 37 battle simulation", () => {
     expect(restored.planEnemyAiAction("2:55")).toMatchObject({ actionId: "fire-4" });
   });
 
-  it("reproduces the native head/hand status matrix and keeps seal outside their dedicated dispatcher", () => {
+  it("keeps head/hand control boundaries while stableRemake poison applies at one third", () => {
     const battle = new Stage37Battle(campaign, fullDeployment);
     const head = battle.unit("2:56")!;
     const leftHand = battle.unit("2:54")!;
@@ -171,20 +171,29 @@ describe("stage 37 battle simulation", () => {
     ]));
 
     const curseCaster = configureCaster(battle, "curse-master", 3);
-    for (const [actionId, target] of [
-      ["confusion", head],
-      ["poison", leftHand],
-    ] as const) {
-      const prepared = battle.prepareSpecialAction({
-        actionId,
-        actorId: curseCaster.id,
-        targetId: target.id,
-      });
-      expect(prepared.result).toMatchObject({ blocked: true, blockReason: "classImmune" });
-      battle.commitPreparedAction(prepared);
-      expect(target.statuses[actionId]).toBe(0);
-      curseCaster.acted = false;
-    }
+    const confusion = battle.prepareSpecialAction({
+      actionId: "confusion",
+      actorId: curseCaster.id,
+      targetId: head.id,
+    });
+    expect(confusion.result).toMatchObject({ blocked: true, blockReason: "classImmune" });
+    battle.commitPreparedAction(confusion);
+    expect(head.statuses.confusion).toBe(0);
+    curseCaster.acted = false;
+
+    const poison = battle.prepareSpecialAction({
+      actionId: "poison",
+      actorId: curseCaster.id,
+      targetId: leftHand.id,
+    });
+    expect(poison.result).toMatchObject({ blocked: false });
+    battle.commitPreparedAction(poison);
+    expect(leftHand.statuses.poison).toBe(3);
+    leftHand.life = 1_000;
+    battle.startNextRound();
+    expect(leftHand.life).toBe(333);
+    expect(leftHand.statuses.poison).toBe(2);
+    curseCaster.acted = false;
 
     const attackDown = battle.prepareSpecialAction({
       actionId: "attack-down",

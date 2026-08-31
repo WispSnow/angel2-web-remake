@@ -28,8 +28,8 @@ import type { CharacterId } from "../content/character-catalog.generated";
 export type CompendiumTab = "classes" | "characters";
 
 export const COMPENDIUM_TABS: readonly OverlayTab<CompendiumTab>[] = [
-  { id: "classes", label: "職業圖鑑", title: "全 39 個職業的棋子、全景動畫、屬性、成長與特性" },
-  { id: "characters", label: "角色圖鑑", title: "全 51 名具名角色的簡介與出場關卡" },
+  { id: "classes", label: "職業圖鑑", title: "收錄全 39 種職業的棋子造型、全景動畫、屬性數值、成長曲線與專屬特性" },
+  { id: "characters", label: "角色圖鑑", title: "收錄全 51 名具名角色的生平簡介、登場陣營與出場關卡" },
 ];
 
 let selectedClassId: ClassId = COMPENDIUM_DEFAULT_CLASS_ID;
@@ -113,7 +113,7 @@ const panel = createOverlayPanel<CompendiumTab>({
   testid: "compendium",
   eyebrow: "圖鑑",
   heading: "《天使帝國 II》Web 復刻版",
-  footer: "遊戲仍在背後正常進行；本視窗只讀取內容資料，不會改變戰局、存檔或隨機序列。",
+  footer: "遊戲在後台正常運行；本視窗僅供查閱圖鑑資料，不會影響戰局進程、存檔或隨機序列。",
   tabs: COMPENDIUM_TABS,
   render: renderTab,
   onBodyRendered: (body, tab) => {

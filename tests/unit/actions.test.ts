@@ -1031,7 +1031,7 @@ describe("Stage-0 class actions", () => {
     expect(target.statuses.magicGuard).toBe(0);
   });
 
-  it("applies IP after one experience roll, preserves frozen targets, and lets native bosses resist only the mutation", () => {
+  it("applies IP after one experience roll, preserves frozen targets, and poisons bosses", () => {
     const battle = new Stage0Battle(0);
     const { actor, target } = arrangeTarget(battle, "poison", 2);
     target.actionDisabled = true;
@@ -1073,15 +1073,19 @@ describe("Stage-0 class actions", () => {
       targetId: immunePair.target.id,
     });
     expect(immunePrepared.result).toMatchObject({
-      blocked: true,
-      blockReason: "classImmune",
+      blocked: false,
       affectedUnits: [expect.objectContaining({
-        statusesAfter: expect.objectContaining({ poison: 2 }),
+        statusesAfter: expect.objectContaining({ poison: 3 }),
       })],
     });
     expect(immunePrepared.rngCallsAfter).toBe(immuneBattle.rng.calls + 1);
     expect(immunePrepared.result.experienceGained).toBeGreaterThanOrEqual(14);
     expect(immunePrepared.result.experienceGained).toBeLessThanOrEqual(17);
+    immuneBattle.commitPreparedAction(immunePrepared);
+    immunePair.target.life = 101;
+    immuneBattle.startNextRound();
+    expect(immunePair.target.life).toBe(33);
+    expect(immunePair.target.statuses.poison).toBe(2);
   });
 
   it("ticks poison before thawing, skips frozen persistent damage, and never reduces life below one", () => {

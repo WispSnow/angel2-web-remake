@@ -2397,9 +2397,7 @@ export class GameController {
         : actionId === "magic-guard" && targetPresentation
           ? `${targetPresentation.name}獲得防魔；可抵消下一次適用魔法，未使用則於完整回合邊界消失。`
         : actionId === "poison" && targetPresentation
-          ? result.blockReason === "classImmune"
-            ? `${targetPresentation.name}完整承受毒霧演出，但其職業免疫中毒。`
-            : `${targetPresentation.name}中毒，狀態重置為 3。`
+          ? `${targetPresentation.name}中毒，狀態重置為 3。`
         : actionId === "confusion" && targetPresentation
           ? result.blockReason === "classImmune"
             ? `${targetPresentation.name}完整承受混亂演出，但其職業免疫狀態寫入。`
@@ -3776,9 +3774,7 @@ export class GameController {
             : action.actionId === "magic-guard"
               ? `${unit.name}使${target.name}獲得防魔。`
             : action.actionId === "poison"
-              ? result.blockReason === "classImmune"
-                ? `${target.name}免疫中毒。`
-                : `${unit.name}使${target.name}中毒，狀態重置為 3。`
+              ? `${unit.name}使${target.name}中毒，狀態重置為 3。`
             : action.actionId === "confusion"
               ? result.blockReason === "classImmune"
                 ? `${target.name}免疫混亂。`

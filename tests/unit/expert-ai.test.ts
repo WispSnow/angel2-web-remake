@@ -676,6 +676,28 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     });
   });
 
+  it("treats poison as effective on a dragon while preserving confusion immunity", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-curse", side: 1 as const, slot: 0, classId: "curse-master" as const, level: 3 as const, x: 22, y: 30 },
+      { id: "enemy-dragon", side: 2 as const, slot: 0, classId: "dragon" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3124));
+    const actor = battle.unit("ally-curse")!;
+    const target = battle.unit("enemy-dragon")!;
+    const context = {
+      width: 50,
+      height: 60,
+      units: battle.units,
+      terrainSlotAt: () => 2,
+      statsFor: () => ({ attack: 100, defense: 80, maxLife: 2_400, movement: 4, level: 1 }),
+      effectiveStatsFor: () => ({ attack: 100, defense: 80, maxLife: 2_400, movement: 4, level: 1 }),
+    };
+
+    expect(expertSpecialUtility(context, actor, "poison", target, [actor]))
+      .toMatchObject({ control: 80 + Math.floor(target.life / 4), waste: 0 });
+    expect(expertSpecialUtility(context, actor, "confusion", target, [actor]))
+      .toMatchObject({ control: 0, targetThreat: 0, waste: 1 });
+  });
+
   it("ranks confusion above spell seal and rejects seal targets without a technique menu", () => {
     const battle = new ArenaBattle([
       { id: "ally-technique", side: 1 as const, slot: 0, classId: "magician" as const, level: 1 as const, x: 22, y: 30 },

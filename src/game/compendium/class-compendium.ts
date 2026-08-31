@@ -226,8 +226,8 @@ function growthSegmentsFor(id: ClassId): readonly CompendiumGrowthSegment[] {
 }
 
 const SHOOTING_NOTES: Readonly<Partial<Record<ClassId, string>>> = {
-  "magic-archer": "屬魔法傷害：命中線上的其他單位各承受半傷，防魔可擋。",
-  "water-warrior": "`REMAKE-093` 授予的複刻版射擊，只有我方擁有；敵方水戰士維持原版純近戰。",
+  "magic-archer": "屬於魔法傷害：穿透彈道上的其餘單位各承受半額傷害，防魔護盾可完全抵擋。",
+  "water-warrior": "依據 REMAKE-093 賦予我方專屬遠程射擊能力；敵方水戰士維持原版純近戰設定。",
 };
 
 function shootingFor(id: ClassId): CompendiumShooting | undefined {
@@ -241,8 +241,8 @@ function shootingFor(id: ClassId): CompendiumShooting | undefined {
     minimumDistance: range.minimumDistance,
     maximumDistance: range.maximumDistance,
     damage: halved
-      ? `選定目標 ${Math.floor(damage.minimum / 2) * 2}–${Math.floor(damage.maximum / 2) * 2}`
-        + `，線上其他單位 ${Math.floor(damage.minimum / 2)}–${Math.floor(damage.maximum / 2)}`
+      ? `選定主目標 ${Math.floor(damage.minimum / 2) * 2}–${Math.floor(damage.maximum / 2) * 2}`
+        + `，沿線其餘單位 ${Math.floor(damage.minimum / 2)}–${Math.floor(damage.maximum / 2)}`
       : `${damage.minimum}–${damage.maximum}`,
     experience: `擊殺獎勵 + ${experience.minimum}–${experience.maximum}`,
     ...(note ? { note } : {}),
@@ -268,10 +268,10 @@ function scriptedStatsFor(id: ClassId): readonly CompendiumScriptedStats[] {
  * `technique`／`shooting` 都是空的——不能據此說它們「只有普通攻擊」。
  */
 const RUNTIME_ACTIONS: Readonly<Partial<Record<ClassId, string>>> = {
-  empress: "`WD`（女帝／龍專用的運行時技術，沿合法路徑造成飽和傷害，防魔完全阻擋）",
-  dragon: "`WD`（女帝／龍專用的運行時技術，沿合法路徑造成飽和傷害，防魔完全阻擋）",
-  head: "第 37 關首領部位，由該關專用邏輯驅動。",
-  hand: "第 37 關首領部位，由該關專用邏輯驅動。",
+  empress: "「WD」（女帝與龍專用的運行時特殊法術，沿合法路徑造成飽和傷害，防魔護盾可完全抵擋）",
+  dragon: "「WD」（女帝與龍專用的運行時特殊法術，沿合法路徑造成飽和傷害，防魔護盾可完全抵擋）",
+  head: "第 37 關首領特定部位，由該關專屬事件邏輯驅動。",
+  hand: "第 37 關首領特定部位，由該關專屬事件邏輯驅動。",
 };
 
 const ACTION_LABELS: Readonly<Record<string, string>> = {
@@ -282,24 +282,24 @@ const ACTION_LABELS: Readonly<Record<string, string>> = {
 };
 
 const CLASS_NOTES: Readonly<Partial<Record<ClassId, readonly string[]>>> = {
-  crossbow: ["弓兵線在第 3 層終止：弩兵沒有轉職去向，這是原版的結構差異，不是資料缺失。"],
-  "magic-archer": ["弓兵線在第 3 層終止：魔弓兵沒有轉職去向，這是原版的結構差異，不是資料缺失。"],
+  crossbow: ["弓兵系轉職路線於三階終止：弩兵無後續上位轉職，此為原版既定架構，並非資料缺失。"],
+  "magic-archer": ["弓兵系轉職路線於三階終止：魔弓兵無後續上位轉職，此為原版既定架構，並非資料缺失。"],
   "half-dragon-warrior": [
-    "不在轉職圖中：第 22 關起以固定實例登場，沒有上位轉職。",
-    "`REMAKE-092` 把 3 級前的成長節奏續到職業內 6 級，之後才切到原版終局速率。",
+    "不屬於常規轉職樹：自第 22 關起作為固定成員登場，無上位轉職。",
+    "依據 REMAKE-092 將 3 級前的優質成長率延續至職業 6 級，此後回歸原版終局成長速率。",
   ],
   "water-warrior": [
-    "不在轉職圖中：由關卡固定編隊登場。",
-    "受到普通近戰攻擊且存活時會分裂，全體共享生命。",
+    "不屬於常規轉職樹：由特定關卡固定陣容登場。",
+    "遭受常規近戰攻擊且存活時將觸發分裂，同隊分裂體共享生命值。",
   ],
-  engineer: ["不在轉職圖中：由關卡職業覆寫登場，技術用於構築地形。"],
+  engineer: ["不屬於常規轉職樹：由特定關卡職業配置登場，其專屬技術可用於鋪設改變地形。"],
   empress: [
-    "特殊運行記錄，只以我方登場；面板攻擊不被 `WD` 讀取，該技術走固定傷害表。",
-    "原版三行屬性恆為 `10／10／10`，本表照錄不改。",
+    "特殊機制角色，僅作為我方登場；面板攻擊力不參與「WD」結算，該技能採用固定傷害標準。",
+    "原版三行屬性固定為 10／10／10，本表照實記錄未作修改。",
   ],
-  dragon: ["劇情首領：只以敵方登場，原版沒有 side 1 地圖圖形。", "免疫普通命中與技術施加的混亂、毒。"],
-  head: ["劇情首領：只以敵方登場，原版沒有 side 1 地圖圖形。", "免疫普通命中與技術施加的混亂、毒。"],
-  hand: ["劇情首領：只以敵方登場，原版沒有 side 1 地圖圖形。", "免疫普通命中與技術施加的混亂、毒。"],
+  dragon: ["劇情首領：僅作為敵方登場，原版未提供 side 1 我方地圖模型。", "必定免疫普攻與法術附加的混亂狀態；可被施毒，每回合生命值降至三分之一。"],
+  head: ["劇情首領：僅作為敵方登場，原版未提供 side 1 我方地圖模型。", "必定免疫普攻與法術附加的混亂狀態；可被施毒，每回合生命值降至三分之一。"],
+  hand: ["劇情首領：僅作為敵方登場，原版未提供 side 1 我方地圖模型。", "必定免疫普攻與法術附加的混亂狀態；可被施毒，每回合生命值降至三分之一。"],
 };
 
 function buildEntry(id: ClassId): CompendiumEntry {

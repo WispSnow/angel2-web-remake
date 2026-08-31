@@ -5154,6 +5154,22 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("carries version-93 saves through the boss poison rules identity", () => {
+    const battle = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...battle,
+      version: 93,
+      contentVersion: "stage-27-eliola-display-name-1",
+    }))).toEqual(battle);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 93,
+      contentVersion: "stage-27-eliola-display-name-1",
+    }))).toEqual(completed);
+  });
+
   it("carries version-89 saves forward when SA narrows its target set", () => {
     // REMAKE-116 only narrows which enemy the AI may pick for SA. Like
     // REMAKE-102 on the buff side it stores nothing, so every v89 save —

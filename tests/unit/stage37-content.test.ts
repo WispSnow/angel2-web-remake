@@ -61,7 +61,7 @@ describe("stage 37 generated content", () => {
       visibleObjectiveRecord: { record: 105 },
       enemyReinforcements: { kind: "none", initialSide2: 3 },
       completedRoute: { module: 25, stage: 49, replayPresentation: false },
-      stableRemakeDecisions: ["REMAKE-005", "REMAKE-013", "REMAKE-084", "REMAKE-085"],
+      stableRemakeDecisions: ["REMAKE-005", "REMAKE-013", "REMAKE-084", "REMAKE-085", "REMAKE-124"],
     });
     expect(STAGE37_EVENT_PROGRAM.visibleObjectiveRecord.conflict).toContain("all side-2 parts");
     expect(STAGE37_EVENT_PROGRAM.enemyReinforcements.auditedSources).toEqual([
@@ -74,7 +74,12 @@ describe("stage 37 generated content", () => {
         effect: "no displacement or action disable",
       },
       confusion: { immuneClasses: ["head", "hand"], stateWrite: false },
-      poison: { immuneClasses: ["head", "hand"], stateWrite: false },
+      poison: {
+        nativeImmuneClasses: ["head", "hand"],
+        immuneClasses: [],
+        stateWrite: true,
+        persistentLifeDivisor: 3,
+      },
       attackDown: { immuneClasses: [], stateWrite: true, fixedDelta: -20 },
       defenseDown: { immuneClasses: [], stateWrite: true, fixedDelta: -20 },
       spellSeal: {

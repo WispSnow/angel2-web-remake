@@ -241,7 +241,21 @@ let presentationAssetCatalog:
   ExtendedActionContent["STAGE1_ACTION_PRESENTATION_ASSETS"] | undefined;
 
 export function registerActionContent(content: ExtendedActionContent): void {
-  Object.assign(BATTLE_ACTION_DEFINITIONS, content.STAGE1_ACTION_DEFINITIONS);
+  // The generated IP definition preserves the native 1P/2P/3P immunity
+  // evidence. REMAKE-124 overrides only the registered stableRemake catalog so
+  // resolution and expert AI both treat poison as effective on boss classes.
+  const poison = {
+    ...content.STAGE1_ACTION_DEFINITIONS.poison,
+    status: {
+      ...content.STAGE1_ACTION_DEFINITIONS.poison.status,
+      immuneClasses: [] as readonly ClassId[],
+    },
+  };
+  Object.assign(
+    BATTLE_ACTION_DEFINITIONS,
+    content.STAGE1_ACTION_DEFINITIONS,
+    { poison },
+  );
   Object.assign(BATTLE_ACTION_AUDIO_ASSETS, content.STAGE1_ACTION_AUDIO_ASSETS);
   presentationCatalog = content.STAGE1_ACTION_PRESENTATION;
   presentationAssetCatalog = content.STAGE1_ACTION_PRESENTATION_ASSETS;

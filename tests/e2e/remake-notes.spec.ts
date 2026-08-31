@@ -57,18 +57,18 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
     .toHaveText(["Bug 修復", "功能增強", "平衡性調整", "操作說明", "免責聲明"]);
   await expect(body.locator(".rn-intro")).toHaveText(
-    "這裡列出複刻版修正的原版問題。每一項都會說明原版的狀況與複刻版的改法；"
-      + "戰鬥動畫、聲音與加速設定只影響演出，不會改變遊戲規則。",
+    "本頁整理了復刻版針對原版已知問題與缺陷所做的修復。每項均對照說明原版行為與復刻調整；"
+      + "戰鬥動畫、音效與加速等設置僅影響視聽演出，不改變實際數值與結算規則。",
   );
   await expect(page.locator(".rn-foot")).toHaveText(
-    "打開此視窗不會暫停遊戲；敵方階段仍會繼續。視窗內的按鍵不會操作戰場。",
+    "打開本說明不會暫停遊戲進程；視窗內的按鍵操作僅供查閱，不會誤觸戰場指令。",
   );
   for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
   const poisonFix = page.getByTestId("remake-note-REMAKE-004");
-  await expect(poisonFix).toContainText("毒不再留下 0 生命的存活單位");
-  await expect(poisonFix).toContainText("但這一步不會觸發死亡");
+  await expect(poisonFix).toContainText("中毒狀態不再殘留 0 生命存活單位");
+  await expect(poisonFix).toContainText("但歸零時不會觸發死亡結算");
   const swiftGuardFix = page.getByTestId("remake-note-swift-dragon-guard-ground");
-  await expect(swiftGuardFix).toContainText("迅龍騎士格擋不再懸空");
+  await expect(swiftGuardFix).toContainText("迅龍騎士格擋動畫回歸地面");
   await expect(swiftGuardFix.locator(".rn-note-id")).toHaveCount(0);
   await captureVisualAudit(page.locator(".rn-dialog"), {
     path: "artifacts/playwright/remake-notes-fixes-desktop.png",
@@ -76,7 +76,7 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
 
   await page.getByTestId("remake-notes-tab-features").click();
   for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
-  await expect(page.getByTestId("remake-note-REMAKE-015")).toContainText("地形特性");
+  await expect(page.getByTestId("remake-note-REMAKE-015")).toContainText("地形屬性");
   // 發行版不附決定記錄：沒有決定編號的顯示增強不得畫出玩家查不到的徽章。
   const tooltipNote = page.getByTestId("remake-note-status-icon-tooltip");
   await expect(tooltipNote).toBeVisible();
@@ -89,8 +89,8 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   for (const term of playerFacingDevTerms) await expect(body).not.toContainText(term);
   await expect(page.getByTestId("remake-note-REMAKE-100")).toContainText("魔鎧戰士");
   const leaderCaution = page.getByTestId("remake-note-REMAKE-012-118");
-  await expect(leaderCaution).toContainText("敵方主將會守住護衛陣線");
-  await expect(leaderCaution).toContainText("原版沒有一套專門辨識具名敵將");
+  await expect(leaderCaution).toContainText("敵方主將保持陣線協同");
+  await expect(leaderCaution).toContainText("原版缺乏對具名主將的協同保護邏輯");
   await expect(leaderCaution).not.toContainText("遠追只移動");
   await captureVisualAudit(leaderCaution, {
     path: "artifacts/playwright/remake-notes-leader-caution.png",
@@ -109,7 +109,7 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
     await expect(keyboard.getByText(key, { exact: true })).toBeVisible();
   }
   await expect(controls).toContainText("下一名待行動角色");
-  await expect(controls).toContainText("標準手把");
+  await expect(controls).toContainText("標準手柄");
   await expect(controls).toContainText("Menu");
   await captureVisualAudit(page.locator(".rn-dialog"), {
     path: "artifacts/playwright/remake-controls-desktop.png",
@@ -120,11 +120,11 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   await expect(page.getByTestId("remake-disclaimer-rights"))
     .toContainText("大宇資訊股份有限公司");
   await expect(page.getByTestId("remake-disclaimer-noncommercial"))
-    .toContainText("僅供學習、研究、保存與交流使用");
+    .toContainText("僅供技術研究、經典保存與同好交流之用");
   await expect(page.getByTestId("remake-disclaimer-unofficial"))
-    .toContainText("不存在隸屬、合作、贊助或授權關係");
+    .toContainText("不存在任何隸屬、合作、贊助或官方授權關係");
   await expect(page.getByTestId("remake-disclaimer-redistribution"))
-    .toContainText("本聲明不授予任何人");
+    .toContainText("本聲明未向任何第三方");
   await expect(page.getByTestId("remake-disclaimer-contact"))
     .toContainText("RoadMap");
   await expect(page.getByTestId("remake-note-REMAKE-100")).toHaveCount(0);
@@ -143,6 +143,18 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   // 入口固定開在第一個分頁，不記住上次停在哪一頁。
   await page.getByTestId("remake-notes-open").click();
   await expect(page.getByTestId("remake-notes-tab-fixes")).toHaveAttribute("aria-selected", "true");
+});
+
+test("REMAKE-124 說明龍類首領可中毒並使用三分之一規則", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "fixes");
+  const bossPoison = page.getByTestId("remake-note-REMAKE-124");
+  await expect(bossPoison).toContainText("中毒效果調整為可對龍類首領生效");
+  await expect(bossPoison).toContainText("當前生命值降至三分之一");
+  await expect(bossPoison).toContainText("普通單位仍為減半");
+  await captureVisualAudit(bossPoison, {
+    path: "artifacts/playwright/remake-notes-boss-poison.png",
+  });
 });
 
 test("免責聲明在窄螢幕使用單欄並可完整捲動", async ({ page }) => {

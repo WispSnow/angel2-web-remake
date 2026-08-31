@@ -67,7 +67,7 @@ export const UNIT_STATUS_PRESENTATIONS = [
   {
     key: "poison",
     label: "施毒",
-    description: "回合開始時生命減半，最低保留 1。",
+    description: "回合開始時普通單位生命減半；龍／頭／手降至三分之一，最低保留 1。",
     nativeFrame: 6,
     source: "/assets/original/status-icons/06.png",
   },

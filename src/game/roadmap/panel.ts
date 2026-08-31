@@ -10,9 +10,9 @@ import { ROADMAP_CONTENT, type RoadmapItem, type RoadmapTab } from "./content";
  */
 
 export const ROADMAP_TABS: readonly OverlayTab<RoadmapTab>[] = [
-  { id: "presentation", label: "畫面與聲音", title: "讓經典素材擁有更多可選的現代表現" },
-  { id: "story", label: "劇情與玩法", title: "在不改寫原版主線的前提下拓展旅程" },
-  { id: "community", label: "Mod 與共創", title: "把規則變體與社群創作放進可追溯的邊界" },
+  { id: "presentation", label: "畫面與聲音", title: "為經典像素與音效賦予更多現代可選視聽表現" },
+  { id: "story", label: "劇情與玩法", title: "在尊重原版主線的基礎上拓展戰役體驗與豐富度" },
+  { id: "community", label: "Mod 與共創", title: "構建開放規範的模組生態與同好共創支援" },
 ];
 
 function renderItem(item: RoadmapItem): string {
@@ -29,8 +29,8 @@ function renderTab(tab: RoadmapTab): string {
     <div class="rn-roadmap">
       <main class="rn-roadmap-main">
         <div class="rn-roadmap-notice" data-testid="roadmap-notice">
-          <strong>這是一份開放願景，不是承諾時程。</strong>
-          <span>條目會隨證據、可行性與社群意見調整；任何玩法變更都要先有獨立規則與存檔邊界。</span>
+          <strong>本頁展示開放性未來規劃願景，並非已承諾的開發時程。</strong>
+          <span>所有規劃將結合社群反饋、原版考據與技術可行性持續迭代；任何玩法調整均有獨立規則與存檔邊界。</span>
         </div>
         <div class="rn-roadmap-grid">
           ${ROADMAP_CONTENT[tab].map(renderItem).join("")}
@@ -38,8 +38,8 @@ function renderTab(tab: RoadmapTab): string {
       </main>
       <aside class="rn-roadmap-community" aria-labelledby="roadmap-community-title">
         <p class="rn-roadmap-community-kicker">COMMUNITY</p>
-        <h3 id="roadmap-community-title">一起參與復刻版的下一步</h3>
-        <p>歡迎分享你最期待的改進、玩法構想、考據線索與測試回饋。</p>
+        <h3 id="roadmap-community-title">共同參與復刻版的下一步</h3>
+        <p>歡迎分享您最期待的改進、玩法腦洞、原版考據線索與實機測試反饋！</p>
         <div class="rn-roadmap-group-number" data-testid="roadmap-qq-group">
           <span>QQ 交流群</span>
           <strong>1107513111</strong>
@@ -57,7 +57,7 @@ const panel = createOverlayPanel<RoadmapTab>({
   testid: "roadmap",
   eyebrow: "RoadMap",
   heading: "《天使帝國 II》Web 復刻版",
-  footer: "RoadMap 只描述可討論的候選方向，不代表完成承諾或發布日期。",
+  footer: "RoadMap 僅展示未來規劃探討方向，不代表確定排期或發行日期承諾。",
   tabs: ROADMAP_TABS,
   render: renderTab,
 });

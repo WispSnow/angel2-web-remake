@@ -78,8 +78,8 @@ function statTable(entry: CompendiumEntry): string {
       <td>${row.maxLife}</td>
     </tr>`).join("");
   const caption = entry.scriptedStats.length > 0
-    ? "原版資料表（劇情首領不套用這三行，僅供對照）"
-    : `固定三行（原版資料，移動在職業內恆為 ${entry.movement}）`;
+    ? "原版基礎屬性（劇情首領不套用此表，數值僅供對照）"
+    : `前三級基礎屬性（原版數值，移動力在職業內固定為 ${entry.movement}）`;
   return `
     <table class="rn-stats">
       <caption>${escapeHtml(caption)}</caption>
@@ -111,7 +111,7 @@ function growthTable(entry: CompendiumEntry): string {
   const overridden = entry.growth.length > 1 || entry.growth.some((segment) => segment.defense > 0);
   return `
     <table class="rn-stats">
-      <caption>3 級後成長${overridden ? "（含複刻平衡覆寫）" : "（原版：防禦與移動在 3 級後永久固定）"}</caption>
+      <caption>3 級後每級成長${overridden ? "（含復刻平衡優化）" : "（原版設定：防禦與移動力在 3 級後不再成長）"}</caption>
       <thead>
         <tr><th scope="col">區間</th><th scope="col">經驗</th>
           <th scope="col">攻擊</th><th scope="col">防禦</th><th scope="col">最大生命</th></tr>
@@ -131,7 +131,7 @@ function scriptedTable(entry: CompendiumEntry): string {
     </tr>`).join("");
   return `
     <table class="rn-stats">
-      <caption>劇情首領逐難度屬性（不套用成長曲線，見「復刻說明 › 平衡性調整」<code>REMAKE-103</code>）</caption>
+      <caption>劇情首領各難度屬性（不套用常規成長曲線，詳見「復刻說明 › 平衡性調整」<code>REMAKE-103</code>）</caption>
       <thead>
         <tr><th scope="col">難度</th><th scope="col">攻擊</th>
           <th scope="col">防禦</th><th scope="col">最大生命</th></tr>
@@ -154,11 +154,11 @@ function promotionSection(entry: CompendiumEntry): string {
   if (entry.promotionTargets.length > 0) {
     parts.push(`<p><span class="rn-field">轉職去向</span>${linkList(entry.promotionTargets)}</p>`);
     if (entry.promotionExperience !== null) {
-      parts.push(`<p class="rn-hint">累計經驗達 ${entry.promotionExperience} 時觸發授職，`
-        + "提交後經驗歸零、當前生命不變，其餘屬性立即按新職業重算。</p>");
+      parts.push(`<p class="rn-hint">累計經驗達 ${entry.promotionExperience} 時可進行轉職，`
+        + "轉職後經驗歸零並繼承當前生命值，其餘屬性依照新職業重新計算。</p>");
     }
   } else if (entry.promotedFrom.length > 0) {
-    parts.push('<p class="rn-hint">終端職業，沒有轉職去向。</p>');
+    parts.push('<p class="rn-hint">此為終極職業，無後續轉職分支。</p>');
   }
   if (parts.length === 0) return "";
   return `<section class="rn-block"><h4>轉職</h4>${parts.join("")}</section>`;
@@ -170,7 +170,7 @@ function actionSection(entry: CompendiumEntry): string {
     const { minimumDistance, maximumDistance, damage, experience, note } = entry.shooting;
     parts.push(`<p><span class="rn-field">射擊</span>射程 ${minimumDistance}–${maximumDistance}`
       + `　傷害 ${escapeHtml(damage)}　經驗 ${escapeHtml(experience)}</p>`);
-    parts.push('<p class="rn-hint">射擊走固定動作表，與面板攻擊、目標防禦、地形防禦都無關，也不觸發反擊。</p>');
+    parts.push('<p class="rn-hint">遠程射擊傷害採用固定動作標準，無視面板攻擊與敵方地形防禦，且不會遭受反擊。</p>');
     if (note) parts.push(`<p class="rn-hint">${inlineMarkup(note)}</p>`);
   }
   for (const tier of entry.techniqueTiers) {
@@ -185,7 +185,7 @@ function actionSection(entry: CompendiumEntry): string {
     parts.push(`<p><span class="rn-field">運行時動作</span>${inlineMarkup(entry.runtimeAction)}</p>`);
   }
   if (parts.length === 0) {
-    parts.push('<p class="rn-hint">只有普通攻擊，沒有射擊或技術。</p>');
+    parts.push('<p class="rn-hint">僅具備常規近戰普通攻擊，無遠程射擊或法術技能。</p>');
   }
   return `<section class="rn-block"><h4>行動</h4>${parts.join("")}</section>`;
 }
@@ -236,8 +236,8 @@ function previewSection(
         <p>原版沒有這個職業的我方左側普通全景圖形；切換「敵軍」可查看唯一可重放版本。</p>
       </div>`;
   const hint = selection.animation === "stand"
-    ? "靜態展示正式全景戰鬥腳本中，角色受擊前的 direct frame 0 常態姿勢。"
-    : "使用正式全景戰鬥腳本；再次點擊目前動作可從頭重播。";
+    ? "靜態展示全景戰鬥中角色在受擊判定前的標準 Direct Frame 0 站姿。"
+    : "採用正式全景戰鬥腳本；再次點擊當前動作可重新播放。";
   return `<section class="rn-block rn-class-preview" aria-labelledby="compendium-combat-title">
     <div class="rn-class-preview-toolbar">
       <h4 id="compendium-combat-title">全景動畫</h4>
@@ -303,9 +303,9 @@ export function renderClassDetail(
       ${scriptedTable(entry)}
       ${statTable(entry)}
       ${growthTable(entry)}
-      ${entry.scriptedStats.length > 0 ? "" : '<p class="rn-hint">本表是我方口徑。敵方單位另有難度縮放：'
-        + "難度 0／3 逐字保持原版，難度 1／2 改用線性成長曲線並提高出場等級"
-        + "（見「復刻說明 › 平衡性調整」<code>REMAKE-103</code>）。</p>"}
+      ${entry.scriptedStats.length > 0 ? "" : '<p class="rn-hint">本表為我方玩家標準成長數據。敵方單位另外享有難度數值調整：'
+        + "難度 0／3 完全還原原版，難度 1／2 採用平滑線性成長並提升登場等級"
+        + "（詳見「復刻說明 › 平衡性調整」<code>REMAKE-103</code>）。</p>"}
     </section>
     ${actionSection(entry)}
     ${promotionSection(entry)}

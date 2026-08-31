@@ -10,6 +10,7 @@ import {
   killRewardFor,
   mitigateOrdinaryDamage,
   ordinaryHitStatusFor,
+  poisonRemainingLifeDivisorFor,
   STRIPPABLE_BUFF_KEYS,
   stripsTargetBuffsOnActiveHit,
   suppressesOrdinaryCounterFor,
@@ -3921,10 +3922,14 @@ export class Stage0Battle {
     for (const unit of this.units) {
       unit.acted = false;
       if (unit.statuses.poison > 0) {
-        // REMAKE-004 keeps poisoned units alive. REMAKE-013 skips persistent
-        // damage while the unit is still frozen, but the status duration is
-        // consumed normally. This must precede side-2 thawing below.
-        if (!unit.actionDisabled) this.setSharedLife(unit, Math.max(1, Math.floor(unit.life / 2)));
+        // REMAKE-004 keeps poisoned units alive. REMAKE-124 reduces 龍／頭／手
+        // to one third while ordinary units retain the native one-half rule.
+        // REMAKE-013 skips persistent damage while frozen but still consumes
+        // the duration. This must precede side-2 thawing below.
+        if (!unit.actionDisabled) {
+          const divisor = poisonRemainingLifeDivisorFor(unit.classId);
+          this.setSharedLife(unit, Math.max(1, Math.floor(unit.life / divisor)));
+        }
         this.recordCampaignUnit(unit);
       }
     }
