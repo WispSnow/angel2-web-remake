@@ -475,6 +475,30 @@ describe("stage 0 battle simulation", () => {
     }
   });
 
+  it("routes follow-leader movement around walls even when the detour increases Manhattan distance", () => {
+    const battle = battleAtPlayableOpening();
+    const leader = battle.unit("1:0")!;
+    const follower = battle.unit("1:43")!;
+    leader.x = 18;
+    leader.y = 20;
+    leader.acted = true;
+    follower.x = 12;
+    follower.y = 20;
+    battle.units = [leader, follower];
+    const distanceBefore = manhattan(follower, leader);
+
+    const action = battle.planAlliedAiAction(follower.id, leader.id);
+
+    expect(action).toMatchObject({ unitId: follower.id, kind: "move" });
+    expect(action?.path).toEqual([
+      { x: 12, y: 20 },
+      { x: 12, y: 21 },
+      { x: 12, y: 22 },
+      { x: 13, y: 22 },
+    ]);
+    expect(manhattan(action!.path.at(-1)!, leader)).toBeGreaterThan(distanceBefore);
+  });
+
   it("runs behavior 12 toward the hidden palace exit without attacking", () => {
     const battle = battleAtPlayableOpening();
     const enemy = battle.unit("2:41")!;

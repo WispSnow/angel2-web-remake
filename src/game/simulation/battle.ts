@@ -1925,6 +1925,63 @@ export class Stage0Battle {
     });
   }
 
+  /**
+   * Native follow-leader behavior builds an FY/FA route field with seed 55
+   * around DS:0D36 before rebuilding the actor's ordinary movement map with
+   * her real movement value (`1000:1CA3..1D07`). The route field, not screen
+   * geometry, decides progress: walking around a wall may temporarily increase
+   * Manhattan distance and must still be preferred over waiting in place.
+   */
+  private planFollowLeaderMove(
+    unit: BattleUnit,
+    leader: BattleUnit,
+  ): AlliedAiAction | undefined {
+    const movementBudget = this.statsFor(unit).movement;
+    const currentMovement = this.movementMapFor(unit, movementBudget);
+    // Once the anchor is already inside the normal movement field, cohesion no
+    // longer pre-empts the shared expert combat action for this unit.
+    if (currentMovement.reaches(leader)) return undefined;
+
+    const routeCosts = movementCostsToNearestTarget(
+      unit,
+      [leader],
+      this.units,
+      this.dynamicBattlefield,
+      { allowFriendlyOccupiedTargets: true },
+    );
+    const routeCostBefore = routeCosts.get(positionKey(unit));
+    // The native probe seed is 55 and propagation requires a strictly positive
+    // remainder, so an anchor at route cost 55 or more is outside this branch.
+    if (routeCostBefore === undefined || routeCostBefore >= 55) return undefined;
+
+    const candidates = currentMovement.cells
+      .filter((position) => positionKey(position) !== positionKey(unit))
+      .map((position) => {
+        const path = currentMovement.pathTo(position);
+        const traveledCost = path.slice(1).reduce(
+          (total, step) => total + movementCost(unit.classId, step, this.dynamicBattlefield),
+          0,
+        );
+        return {
+          position,
+          path,
+          traveledCost,
+          remainingCost: routeCosts.get(positionKey(position)),
+        };
+      })
+      .filter((candidate): candidate is typeof candidate & { remainingCost: number } =>
+        candidate.remainingCost !== undefined
+        && candidate.path.length > 1
+        && candidate.traveledCost + candidate.remainingCost === routeCostBefore)
+      .sort((left, right) => left.remainingCost - right.remainingCost
+        || left.position.y * this.stage.width + left.position.x
+          - (right.position.y * this.stage.width + right.position.x));
+    const selected = candidates[0];
+    return selected
+      ? { unitId: unit.id, kind: "move", path: selected.path }
+      : undefined;
+  }
+
   private planAlliedAiActionUncached(
     unit: BattleUnit,
     leaderId?: string,
@@ -1955,24 +2012,8 @@ export class Stage0Battle {
       ? this.unit(leaderId)
       : undefined;
     if (leader && leader.id !== unit.id && leader.side === unit.side) {
-      const leaderPath = shortestPath(
-        unit,
-        leader,
-        unit.classId,
-        this.statsFor(unit).movement,
-        this.units.filter((candidate) => candidate.id !== unit.id),
-        this.dynamicBattlefield,
-      );
-      if (leaderPath.length === 0) {
-        const path = routePath(
-          unit,
-          neighbors(leader, this.dynamicBattlefield),
-          this.units,
-          this.statsFor(unit).movement,
-          this.dynamicBattlefield,
-        );
-        if (path.length > 1) return { unitId: id, kind: "move", path };
-      }
+      const follow = this.planFollowLeaderMove(unit, leader);
+      if (follow) return follow;
     }
 
     const targetFilter = this.forces.targetFilterFor(id, this.units);

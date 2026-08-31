@@ -83,6 +83,10 @@ const CODE_SIGNATURES = [
   { address: "1000:16AD", offset: 0x116ad, hex: "e8c601c706161f0000582ea3" },
   { address: "1000:1876", offset: 0x11876, hex: "a1772e3d00007401c38b1e161f81fbdf087701c3a122008ec0b80000268807a124008ec0b80000268807c3" },
   { address: "1000:1BD9", offset: 0x11bd9, hex: "e8810983fa597503e9bf00a13f0d3d040074223d0600741d3d080074183d0a0074133d0000750a833e340d597503e99900ba4e00c32ea17f" },
+  // Group-command cohesion: behavior 0 plus DS:0D34='Y' reaches this branch.
+  // It probes the DS:0D36 target through FY/FA with seed 55, then rebuilds the
+  // ordinary movement map with the actor's raw movement value before moving.
+  { address: "1000:1CA3", offset: 0x11ca3, hex: "8b36161f2ea18101a30f1fb83700a3181f9a04009d138b3e360da1a9018ec0268a053c007503e93eff83ff007503e936ff8b36161f9a2900de172ea17f01a30f1fa1470da3181f9a04009d139aaf04de178b1e161fb80300e851089a6a01de17891e161f" },
   // Paired follower near test: base mode from [cs:017F], seed straight from
   // DS:0D47 with no floor, then the same-side behavior lookup at 1000:0D83.
   { address: "1000:1C0E", offset: 0x11c0e, hex: "2ea17f01a30f1fa1470da3181f9a04009d1333c02ea083018b1ef63b4b9a83067010893e7a0483ff" },
@@ -731,6 +735,14 @@ function nativeRules(
         gate: "build mode A (hard-coded even for side 2) with seed max(movement, 8), then run the ordinary adjacent-attack-position selector",
         action: "only when the gate finds a candidate, build the phase pursuit mode FY/FA with seed 100, use the same +50-only pursuit selector and move; never attack in the same action",
         nativeQuirk: "side-2 behavior 2 therefore probes with side-1 occupancy semantics because mode A is written literally",
+      },
+      groupCommandCohesion: {
+        dispatcher: "1000:1BD9; behavior 0 enters 1000:1CA3 when DS:0D34 is 'Y'",
+        target: "DS:0D36, written from the current cursor cell by the follow-leader command at 0000:6D59",
+        probe: "build the phase FY/FA pursuit map with literal seed 55 and require the target cell's resulting range byte to be nonzero",
+        execution: "rebuild the phase base A/Y movement map with the actor's raw DS:0D47 movement value, select an endpoint on the target route, move there, and consume the action",
+        consequence: "cohesion progress follows the weighted traversable range-map gradient; a necessary detour may increase Manhattan distance and still remains the correct route",
+        evidence: ["0000:6D42", "0000:6D59", "1000:1BD9", "1000:1CA3"],
       },
       pairedLeaderFollowerBehaviors: {
         dispatcher: "1000:1BD9; follower branch 1000:1C0E; exact same-side behavior lookup 1000:0D83/0D9C",

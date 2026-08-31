@@ -266,8 +266,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 100;
-  contentVersion: "follow-leader-spent-anchor-1";
+  version: 101;
+  contentVersion: "follow-leader-path-route-cost-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -606,6 +606,23 @@ function migrateVersion99Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-132 changes only how an unsubmitted follow-leader move is planned.
+ * The temporary anchor and automatic-action queue are not persisted, so a v100
+ * battle/completed save carries forward unchanged apart from its rule identity.
+ */
+function migrateVersion100Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 100
+    || value.contentVersion !== "follow-leader-spent-anchor-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-128 restores the tier roll made by every future lightning cast, while
  * REMAKE-129 also repairs the stage-3 baseline inherited from v96.
  */
@@ -2889,6 +2906,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion100 = migrateVersion100Save(value);
+    if (migratedVersion100) return migratedVersion100;
     const migratedVersion99 = migrateVersion99Save(value);
     if (migratedVersion99) return migratedVersion99;
     const migratedVersion98 = migrateVersion98Save(value);
