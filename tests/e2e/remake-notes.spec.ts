@@ -234,6 +234,19 @@ test("REMAKE-125 說明龍踏保留固定經驗並累加擊殺經驗", async ({ 
   });
 });
 
+test("REMAKE-133 將所有擊殺經驗提示列入 Bug 修復", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "fixes");
+  const killExperience = page.getByTestId("remake-note-REMAKE-133");
+  await expect(killExperience).toContainText("所有擊殺行動都會顯示實際取得經驗");
+  await expect(killExperience).toContainText("射擊、魔法、龍踏等所有特殊行動");
+  await expect(killExperience).toContainText("玩家操作、我方自動與敵方行動採用相同規則");
+  await expect(killExperience).toContainText("只補齊回饋，不改變經驗公式");
+  await captureVisualAudit(killExperience, {
+    path: "artifacts/playwright/remake-notes-kill-experience.png",
+  });
+});
+
 test("REMAKE-128 說明落雷無擊殺也有分層施法經驗", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "fixes");

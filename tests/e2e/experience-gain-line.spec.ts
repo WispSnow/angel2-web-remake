@@ -16,6 +16,10 @@ import { captureVisualAudit } from "./visual-audit";
  * selector `18h` past the PIT gate every other contextual line has to pass, so
  * it is never a coin flip, and none of the three sites sits behind the ＡＩ對話
  * switch.
+ *
+ * `REMAKE-133` keeps those original facts in the evidence layer but repairs
+ * the remake feedback: any special-action kill that actually increases its
+ * actor's experience reports the complete committed delta.
  */
 
 interface CombatDebugState extends ArenaBattleDebugState {
@@ -163,7 +167,7 @@ test("the full-screen route reports the same kill after MAGIC/12", async ({ page
   expect(pageErrors).toEqual([]);
 });
 
-test("a shot kill stays silent — the window belongs to melee and 技術", async ({ page }) => {
+test("a shot kill reports the shooter's complete awarded experience", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -182,9 +186,13 @@ test("a shot kill stays silent — the window belongs to melee and 技術", asyn
     arena.setClass("soldier");
     arena.setLevel(1);
     arena.setSide(2);
-    return [...shooters, arena.interact(23, 30)];
+    const target = arena.interact(23, 30);
+    // Keep one distant enemy alive so the experience page is not immediately
+    // followed by the arena-complete feedback during visual capture.
+    const survivor = arena.interact(27, 30);
+    return [...shooters, target, survivor];
   });
-  expect(placed).toEqual([true, true, true, true]);
+  expect(placed).toEqual([true, true, true, true, true]);
   await page.getByTestId("arena-start").click();
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
@@ -201,21 +209,77 @@ test("a shot kill stays silent — the window belongs to melee and 技術", asyn
     await expect(shoot).toBeVisible();
     await shoot.click();
     await clickArenaWorldCell(page, 23, 30);
-    await waitForActionSettled(page, shooter.id);
+    await page.waitForFunction((actorId) => {
+      const current = (window.__ANGEL2_ARENA__?.getState() as {
+        battle?: ArenaBattleDebugState;
+      }).battle;
+      return current?.lastSpecialAction?.actorId === actorId
+        && current.specialActionPresentation === undefined;
+    }, shooter.id);
     const state = await combatState(page);
     if (!state.units.some(({ id }) => id === "arena-2-0")) {
       killed = true;
+      await expect(dialogue).toHaveAttribute("data-source-record", "experience-gain");
+      await expect(dialogue).toHaveAttribute("data-active-slot", "upper");
+      const awarded = state.lastSpecialAction?.experienceGained ?? 0;
+      expect(awarded).toBeGreaterThan(0);
+      await expect(dialogue).toContainText(nativeExperienceLineText(awarded));
+      await waitForActionSettled(page, shooter.id);
       break;
     }
+    await expect(dialogue).toBeHidden();
+    await waitForActionSettled(page, shooter.id);
   }
   // 70..89 a volley against a 160-life soldier: two or three shots finish it.
   expect(killed).toBe(true);
-  // `0000:719B` — the shot commit — never reaches `0000:7678`.
-  await expect(dialogue).toBeHidden();
   expect(pageErrors).toEqual([]);
 });
 
-test("a 技術 kill reports the death scan's own kill sum, not the award", async ({ page }) => {
+test("an automatic shot kill reports the acting side's actual experience", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const target = arena.interact(23, 30);
+    arena.setSide(2);
+    arena.setClass("crossbow");
+    arena.setLevel(3);
+    return [
+      target,
+      arena.interact(20, 29),
+      arena.interact(20, 30),
+      arena.interact(20, 31),
+    ];
+  });
+  expect(placed).toEqual([true, true, true, true]);
+  await page.getByTestId("arena-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  await clickArenaWorldCell(page, 23, 30);
+  await page.getByTestId("unit-command-rest").click();
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "experience-gain", {
+    timeout: 60_000,
+  });
+  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
+  const killed = await combatState(page);
+  expect(killed.lastSpecialAction?.actionId).toBe("crossbow-shot");
+  expect(killed.lastSpecialAction?.actorId).toMatch(/^arena-2-/);
+  expect(killed.units.some(({ id }) => id === "arena-1-0")).toBe(false);
+  const awarded = killed.lastSpecialAction?.experienceGained ?? 0;
+  expect(awarded).toBeGreaterThan(0);
+  await expect(dialogue).toContainText(nativeExperienceLineText(awarded));
+  expect(pageErrors).toEqual([]);
+});
+
+test("a 技術 kill reports the complete awarded experience", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -257,12 +321,10 @@ test("a 技術 kill reports the death scan's own kill sum, not the award", async
   });
   await expect(dialogue).toHaveAttribute("data-active-slot", "upper");
   const killed = await combatState(page);
-  // `0000:7678` prints DS:7993 — the raw `0000:95DB` kill value of every unit
-  // the scan removed. `0000:72FF` separately pays the action's own base and
-  // random experience, which the window never shows.
-  await expect(dialogue).toContainText(nativeExperienceLineText(10));
   expect(killed.lastSpecialAction?.actionId).toBe("fire-4");
-  expect(killed.lastSpecialAction?.experienceGained ?? 0).toBeGreaterThan(10);
+  const awarded = killed.lastSpecialAction?.experienceGained ?? 0;
+  expect(awarded).toBeGreaterThan(10);
+  await expect(dialogue).toContainText(nativeExperienceLineText(awarded));
   // The window opens after the removals, not before them.
   expect(killed.units.some(({ id }) => id === "arena-2-0")).toBe(false);
   await captureVisualAudit(page.getByTestId("game-screen"), {
@@ -270,5 +332,77 @@ test("a 技術 kill reports the death scan's own kill sum, not the award", async
   });
 
   await waitForActionSettled(page, "arena-1-1");
+  expect(pageErrors).toEqual([]);
+});
+
+test("a 龍踏 area kill reports its fixed experience plus the kill reward", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("evil-mage");
+    arena.setLevel(3);
+    const ultimate = arena.interact(20, 29);
+    arena.setLevel(2);
+    const advanced = arena.interact(20, 31);
+    arena.setClass("magician");
+    arena.setLevel(1);
+    const initial = arena.interact(21, 28);
+    arena.setClass("great-dragon-knight");
+    const dragon = arena.interact(20, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    const target = arena.interact(23, 30);
+    return [ultimate, advanced, initial, dragon, target];
+  });
+  expect(placed).toEqual([true, true, true, true, true]);
+  await page.getByTestId("arena-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  const cast = async (
+    actorId: string,
+    origin: { x: number; y: number },
+    actionId: "fire-4" | "fire-3" | "fire-1",
+  ): Promise<void> => {
+    await clickArenaWorldCell(page, origin.x, origin.y);
+    await page.getByTestId("unit-command-technique").click();
+    await page.getByTestId(`technique-${actionId}`).click();
+    await clickArenaWorldCell(page, 23, 30);
+    await waitForActionSettled(page, actorId);
+  };
+
+  // 160 - floor(44%) - floor(32%) - floor(18%) = 11. The arena's fixed
+  // fourth PRNG draw makes 龍踏 deal 17, so the final area action is lethal.
+  await cast("arena-1-0", { x: 20, y: 29 }, "fire-4");
+  await cast("arena-1-1", { x: 20, y: 31 }, "fire-3");
+  await cast("arena-1-2", { x: 21, y: 28 }, "fire-1");
+  expect((await combatState(page)).units.find(({ id }) => id === "arena-2-0")?.life).toBe(11);
+
+  await clickArenaWorldCell(page, 20, 30);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-stomp-1").click();
+  await clickArenaWorldCell(page, 23, 30);
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-record", "experience-gain", {
+    timeout: 40_000,
+  });
+  const killed = await combatState(page);
+  expect(killed.lastSpecialAction).toMatchObject({
+    actionId: "stomp-1",
+    actorId: "arena-1-3",
+    experienceGained: 15,
+  });
+  expect(killed.units.some(({ id }) => id === "arena-2-0")).toBe(false);
+  await expect(dialogue).toContainText(nativeExperienceLineText(15));
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-experience-gain-stomp.png`,
+  });
+
+  await waitForActionSettled(page, "arena-1-3");
   expect(pageErrors).toEqual([]);
 });

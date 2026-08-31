@@ -32,7 +32,6 @@ import {
   immuneToPhysicalShootingFor,
   isClassId,
   className,
-  killRewardFor,
   promotionTargetsFor,
   unitDisplayName,
   type PromotionTarget,
@@ -2370,12 +2369,7 @@ export class GameController {
         const presentation = affectedPresentations.find(({ id }) => id === affected.unitId);
         if (presentation) await this.presentSpecialDeath(actorPresentation, presentation, result);
       }
-      await this.presentTechniqueExperienceLine(
-        actorPresentation,
-        actionId,
-        result,
-        affectedPresentations,
-      );
+      await this.presentSpecialActionExperienceLine(actorPresentation, result);
       await this.presentPendingUnitTransformations();
       const moved = result.affectedUnits.filter(({ moved }) => moved).length;
       const frozen = result.affectedUnits.filter(({ actionDisabledBefore, actionDisabledAfter }) =>
@@ -3604,35 +3598,25 @@ export class GameController {
   }
 
   /**
-   * `0000:75E4` — the player's 技術 commit — is the only action path that ever
-   * reports experience. Once the handler and its death scan return it tests the
-   * scan's flag DS:7990 and, when the scan removed at least one unit, writes the
-   * scan's own accumulator DS:7993 into the record and calls `0000:C97E` from
-   * `0000:7678`, after the MAGIC/12 removals rather than before them.
+   * `REMAKE-133` repairs the native presentation gap at `0000:719B` and the AI
+   * special-action entry: every committed special action that actually removes
+   * at least one unit now reports the earner's real experience delta. Reading
+   * the post-commit unit is intentional — stage 37 boss parts discard the
+   * resolver's experience return, so displaying `result.experienceGained`
+   * directly would claim an award that never entered simulation state.
    *
-   * Three native boundaries ride on that call site: the shot commit
-   * `0000:719B` and the `1N` direct technique `0000:7475` never reach it, the
-   * AI's technique entry `1000:1E51` never reaches it either, and the number is
-   * the death scan's raw sum of `0000:95DB` kill values — not the action's own
-   * base and random experience, which `0000:72FF` awards without showing it.
+   * Nonlethal action experience remains silent, matching the ordinary-combat
+   * feedback rule and avoiding a window for every heal, buff or cast.
    */
-  private async presentTechniqueExperienceLine(
-    actor: BattleUnit,
-    actionId: BattleActionId,
+  private async presentSpecialActionExperienceLine(
+    actorBefore: BattleUnit,
     result: SpecialActionResult,
-    affectedPresentations: readonly BattleUnit[],
   ): Promise<void> {
-    if (BATTLE_ACTION_DEFINITIONS[actionId].kind !== "technique") return;
-    if (actionId === HALF_DRAGON_TELEPORT_ACTION_ID) return;
-    const victims = result.affectedUnits.filter(({ died }) => died);
-    if (victims.length === 0) return;
-    // `0000:96C2` accumulates one kill value per *removed board cell*, so a
-    // shared water-warrior body pays once per cell exactly as it does here.
-    const killReward = victims.reduce((total, { unitId }) => {
-      const victim = affectedPresentations.find(({ id }) => id === unitId);
-      return total + (victim ? killRewardFor(victim.classId, victim.side) : 0);
-    }, 0);
-    await this.presentExperienceGainLine(actor, killReward);
+    if (!result.affectedUnits.some(({ died }) => died)) return;
+    const actorAfter = this.battle.unit(actorBefore.id);
+    const amount = actorAfter ? actorAfter.experience - actorBefore.experience : 0;
+    if (amount <= 0) return;
+    await this.presentExperienceGainLine(actorBefore, amount);
   }
 
   private async presentContextualLine(
@@ -3757,6 +3741,7 @@ export class GameController {
             const presentation = affectedPresentations.find(({ id }) => id === affected.unitId);
             if (presentation) await this.presentSpecialDeath(actorPresentation, presentation, result);
           }
+          await this.presentSpecialActionExperienceLine(actorPresentation, result);
           await this.presentPendingUnitTransformations();
           const moved = result.affectedUnits.filter(({ moved }) => moved).length;
           const frozen = result.affectedUnits.filter(({ actionDisabledBefore, actionDisabledAfter }) =>
