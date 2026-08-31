@@ -1061,22 +1061,16 @@ export class GameController {
 
   get groupLeader(): BattleUnit | undefined {
     const fixedCommander = this.battle.groupCommander;
-    if (fixedCommander) {
-      return !fixedCommander.acted && !fixedCommander.actionDisabled
-        ? fixedCommander
-        : undefined;
-    }
+    if (fixedCommander) return fixedCommander;
 
     const cursorUnit = this.battle.unitAt(this.cursor);
-    if (cursorUnit && this.battle.isPlayerControllableAlly(cursorUnit.id)
-      && !cursorUnit.acted && !cursorUnit.actionDisabled) return cursorUnit;
+    if (cursorUnit && this.battle.isPlayerControllableAlly(cursorUnit.id)) return cursorUnit;
 
     // The tactical desk is only visible while the pointer cursor is over an
     // empty cell. Keep that presentation hover separate from the battle's
     // retained unit focus, as the native side-panel path does.
     const retainedUnit = this.battle.focus;
     return retainedUnit && this.battle.isPlayerControllableAlly(retainedUnit.id)
-      && !retainedUnit.acted && !retainedUnit.actionDisabled
       ? retainedUnit
       : undefined;
   }
@@ -3238,7 +3232,7 @@ export class GameController {
       || this.groupCommandDialogueActive
     ) return;
     if (!this.groupLeader) {
-      this.statusMessage = "請先把焦點移到一名尚未行動的我方單位，再選擇跟隨主將。";
+      this.statusMessage = "請先把焦點移到一名在場的我方單位，再選擇跟隨主將。";
       this.emit();
       return;
     }
@@ -3255,8 +3249,7 @@ export class GameController {
   private async executeFollowLeader(leaderId: string): Promise<void> {
     if (this.phase !== "player" || this.busy) return;
     const leader = this.battle.unit(leaderId);
-    if (!leader || leader.side !== 1 || leader.acted || leader.actionDisabled) return;
-    this.battle.wait(leader.id);
+    if (!leader || !this.battle.commitFollowLeader(leader.id)) return;
     this.statusMessage = `${leader.name}成為臨時主將；其餘單位交由我方 AI 行動。`;
     this.emit();
     const promotionPause = this.pauseForPromotions();

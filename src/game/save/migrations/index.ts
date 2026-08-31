@@ -589,6 +589,23 @@ function migrateVersion98Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-131 changes only how a future group command chooses its cohesion
+ * anchor. No transient leader selection or automatic-action plan is persisted,
+ * so v99 battle/completed saves carry forward byte-for-byte apart from identity.
+ */
+function migrateVersion99Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 99
+    || value.contentVersion !== "stage-04-native-reinforcements-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-128 restores the tier roll made by every future lightning cast, while
  * REMAKE-129 also repairs the stage-3 baseline inherited from v96.
  */
@@ -2872,6 +2889,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion99 = migrateVersion99Save(value);
+    if (migratedVersion99) return migratedVersion99;
     const migratedVersion98 = migrateVersion98Save(value);
     if (migratedVersion98) return migratedVersion98;
     const migratedVersion97 = migrateVersion97Save(value);

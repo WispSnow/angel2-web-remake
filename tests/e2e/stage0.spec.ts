@@ -1115,6 +1115,8 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       { id: "retreat", label: "全面徹退" },
     ],
   });
+  // This path last focused a non-player cell, which remains outside the Web
+  // semantic target guard. REMAKE-131's spent ally path is covered below.
   await expect(page.getByTestId("group-command-followLeader")).toBeDisabled();
   await expect(page.getByTestId("group-command-menu")).toHaveClass(/native-command-menu/);
   await expect(page.getByTestId("group-command-menu")).toHaveCSS("width", "144px");
@@ -1661,6 +1663,39 @@ test("S00-G: group commands provide allied AI handoff and confirmed retreat", as
       + Math.abs(alliedMovement.path[index - 1].y - alliedMovement.path[index].y)).toBe(1);
   }
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-follow-leader.png" });
+});
+
+test("REMAKE-131: Nia can move before anchoring Follow Leader", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+
+  await clickCanvas(page, 220, 177);
+  await page.getByTestId("unit-command-move").click();
+  await clickCanvas(page, 180, 177);
+  await page.getByTestId("unit-command-end").click();
+  expect((await debugState(page)).units.find(({ id }) => id === "1:0"))
+    .toMatchObject({ x: 28, y: 26, acted: true });
+
+  // Reproduce the shipping pointer route: hovering empty ground restores the
+  // tactical desk while retaining the just-committed Nia focus.
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  await page.getByTestId("group-command-hotspot").click();
+  await expect(page.getByTestId("group-command-followLeader")).toBeEnabled();
+  expect((await debugState(page)).groupLeaderId).toBe("1:0");
+  await page.getByTestId("group-command-followLeader").click();
+  await expect(page.getByTestId("dialogue-window-upper")).toContainText(
+    "所有還未行動的人跟著我來．",
+  );
+  await finishGroupCommandDialogue(page);
+  await waitForPhase(page, "allyAuto");
+
+  expect((await debugState(page)).units.find(({ id }) => id === "1:0"))
+    .toMatchObject({ x: 28, y: 26, acted: true });
+  await page.waitForFunction(() =>
+    window.__ANGEL2__?.getState().movementPresentation?.kind === "allyAuto");
 });
 
 /**

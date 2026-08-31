@@ -1870,6 +1870,20 @@ export class Stage0Battle {
     return true;
   }
 
+  /**
+   * Native `跟隨主將` stores the current cell and ORs its map byte with 80h
+   * without first testing the action-spent bit or the per-unit disable field
+   * (`0000:6D55..6D68`). The write is therefore deliberately idempotent: a
+   * leader may move and finish an action before anchoring the remaining army.
+   */
+  commitFollowLeader(id: string): boolean {
+    const unit = this.unit(id);
+    if (!unit || !this.isPlayerControllableAlly(id)) return false;
+    unit.acted = true;
+    this.focusId = id;
+    return true;
+  }
+
   rest(id: string): number {
     const unit = this.unit(id);
     if (!unit || unit.acted || unit.actionDisabled) return 0;

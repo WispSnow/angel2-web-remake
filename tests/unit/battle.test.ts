@@ -439,6 +439,23 @@ describe("stage 0 battle simulation", () => {
     expect(battle.units.filter((unit) => unit.side === 1).every((unit) => unit.acted)).toBe(true);
   });
 
+  it("accepts an already-spent or action-disabled ally as the follow-leader anchor", () => {
+    const battle = battleAtPlayableOpening();
+    const nia = battle.unit("1:0")!;
+    const ximi = battle.unit("1:1")!;
+    nia.acted = true;
+    ximi.actionDisabled = true;
+    battle.focusId = "1:43";
+
+    expect(battle.commitFollowLeader(nia.id)).toBe(true);
+    expect(nia).toMatchObject({ acted: true, actionDisabled: false });
+    expect(battle.focusId).toBe(nia.id);
+    expect(battle.commitFollowLeader(ximi.id)).toBe(true);
+    expect(ximi).toMatchObject({ acted: true, actionDisabled: true });
+    expect(battle.focusId).toBe(ximi.id);
+    expect(battle.commitFollowLeader("2:40")).toBe(false);
+  });
+
   it("plans expert allied AI attacks and explicit leader-cohesion movement", () => {
     const battle = battleAtPlayableOpening();
     const adjacentAlly = battle.unit("1:43")!;

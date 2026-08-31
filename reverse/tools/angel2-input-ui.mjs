@@ -46,7 +46,7 @@ const CODE_SIGNATURES = [
   { module: 29, address: "0000:69BC", offset: 0x069bc, role: "class-0F extra move or abandon flow", hex: "813e430d30467401c3a124008ec08b1e5052268a073c0075" },
   { module: 29, address: "0000:6A55", offset: 0x06a55, role: "ranged move then attack/shoot/end/undo flow", hex: "a1161f2ea32674833e4a3d4d7403e9d700e8a708813e4a3d" },
   { module: 29, address: "0000:6CF1", offset: 0x06cf1, role: "show selector-1Fh all-rest command line before applying all-rest settlement", hex: "c706f41e434dc606f61e012ec70627844e00a180f8e8f18ae8b9008b1e8857b81f00e8685ce8d1002ec70627845900" },
-  { module: 29, address: "0000:6D2A", offset: 0x06d2a, role: "show selector-21h follow-leader command line before committing the leader and running allied AI", hex: "c706f41e434dc606f61e012ec70627844e00a180f8e8b88ac706340d5900e87a008b1e8857b82100e8295c8b1e8857891e360da122008ec0268a070c802688079ae3004711" },
+  { module: 29, address: "0000:6D21", offset: 0x06d21, role: "accept action 1T, show selector-21h, then store the cursor cell, idempotently mark it spent, and run allied AI without an unspent/disable eligibility check", hex: "813e4a3d31547401c3c706f41e434dc606f61e012ec70627844e00a180f8e8b88ac706340d5900e87a008b1e8857b82100e8295c8b1e8857891e360da122008ec0268a070c802688079ae3004711" },
   { module: 29, address: "0000:6D86", offset: 0x06d86, role: "show selector-20h free-action command line before running allied AI", hex: "c706f41e434dc606f61e012ec70627844e00a180f8e85c8ae824008b1e8857b82000e8d35b9ae30047112ec706278459" },
   { module: 29, address: "0000:7C27", offset: 0x07c27, role: "battle viewport, unit HUD, and minimap refresh", hex: "e8c700e89301e87601bae801bb0800b81503e81609803eec" },
   { module: 29, address: "0000:8492", offset: 0x08492, role: "delayed hovered-unit detail-panel controller", hex: "803e485d597401c3833e046059756d803e1afb4e7408a121" },
@@ -406,6 +406,33 @@ function parseGroupCommandDialogues(buffer) {
   }));
 }
 
+function parseFollowLeaderRule(buffer) {
+  const handlerOffset = 0x6d21;
+  const effectOffset = 0x6d55;
+  const actionGate = Buffer.from("813e4a3d31547401c3", "hex");
+  const effect = Buffer.from("8b1e8857891e360da122008ec0268a070c80268807", "hex");
+  if (!buffer.subarray(handlerOffset, handlerOffset + actionGate.length).equals(actionGate)) {
+    throw new Error("follow-leader action-code gate changed");
+  }
+  if (!buffer.subarray(effectOffset, effectOffset + effect.length).equals(effect)) {
+    throw new Error("follow-leader leader-cell/action-bit sequence changed");
+  }
+  return {
+    handler: "0000:6D21",
+    actionCodeGate: "DS:3D4A == '1T'",
+    dialogueCall: "0000:6D4B -> 0000:C97E selector 21h",
+    leaderCell: {
+      source: "DS:5788 current linear cursor cell",
+      destination: "DS:0D36 temporary cohesion cell",
+    },
+    actionCommit: "read unit-map byte at DS:5788, OR 80h, and write it back",
+    requiresUnspentLeader: false,
+    requiresActionEnabledLeader: false,
+    alreadySpentLeader: "accepted; OR 80h is idempotent, so a unit may move/finish first and then anchor the remaining side-1 AI",
+    scheduling: "far-call 1147:00E3 immediately runs the remaining side-1 AI in leader-cohesion mode",
+  };
+}
+
 function verifyCodeSignatures(module27, module29) {
   return CODE_SIGNATURES.map((signature) => {
     const source = signature.module === 27 ? module27 : module29;
@@ -643,6 +670,7 @@ async function extract(module27Path, module29Path, outputPath) {
     expected: [["全部休息", "0T"], ["跟隨主將", "1T"], ["自由行動", "2T"], ["全面徹退", "3T"]],
   });
   const groupCommandDialogues = parseGroupCommandDialogues(module29);
+  const followLeaderRule = parseFollowLeaderRule(module29);
   const confirmationMenu = parseMenu(module29, {
     id: "confirmCancel",
     offset: 0x3f2c,
@@ -676,7 +704,7 @@ async function extract(module27Path, module29Path, outputPath) {
 
   const output = {
     format: "ANGEL2 native input and battle UI",
-    semanticVersion: 6,
+    semanticVersion: 7,
     sources: [
       { module: 27, path: module27Path, bytes: module27.length, sha256: sha256(module27) },
       { module: 29, path: module29Path, bytes: module29.length, sha256: sha256(module29) },
@@ -823,7 +851,8 @@ async function extract(module27Path, module29Path, outputPath) {
         },
         followLeader: {
           dialogue: groupCommandDialogues.followLeader,
-          effect: "hand remaining side-1 units to AI with the selected cell as a temporary cohesion leader",
+          rule: followLeaderRule,
+          effect: "idempotently mark the selected cell spent, then hand only the remaining unspent side-1 units to AI with that cell as a temporary cohesion leader",
         },
         freeAction: {
           dialogue: groupCommandDialogues.freeAction,
