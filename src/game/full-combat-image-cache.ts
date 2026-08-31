@@ -62,20 +62,43 @@ async function decodeImage(
     ? urlApi.createObjectURL(new blobConstructor([blobBytes], { type: "image/png" }))
     : undefined;
   const source = objectUrl ?? url;
-  const image = ownerDocument.createElement("img");
-  image.decoding = "sync";
-  try {
+  const createImage = () => {
+    const image = ownerDocument.createElement("img");
+    image.decoding = "sync";
+    return image;
+  };
+  const decode = async (image: HTMLImageElement): Promise<void> => {
     if (typeof image.decode === "function") {
       image.src = source;
       await image.decode();
-    } else {
-      await new Promise<void>((resolve, reject) => {
-        image.addEventListener("load", () => resolve(), { once: true });
-        image.addEventListener("error", () => reject(new Error(`圖片解碼失敗：${url}`)), {
-          once: true,
-        });
-        image.src = source;
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      image.addEventListener("load", () => resolve(), { once: true });
+      image.addEventListener("error", () => reject(new Error(`圖片解碼失敗：${url}`)), {
+        once: true,
       });
+      image.src = source;
+    });
+  };
+  let image = createImage();
+  try {
+    try {
+      await decode(image);
+    } catch (firstError) {
+      // Chromium can reject one detached decoder while another route is
+      // releasing many blob-backed atlases. The bytes and object URL remain
+      // owned here, so a fresh element distinguishes that transient race from
+      // a genuinely invalid PNG without refetching or hiding persistent damage.
+      image = createImage();
+      try {
+        await decode(image);
+      } catch (secondError) {
+        throw new Error(
+          secondError instanceof Error ? secondError.message : String(secondError),
+          { cause: firstError },
+        );
+      }
     }
   } catch (error) {
     if (objectUrl) urlApi.revokeObjectURL(objectUrl);

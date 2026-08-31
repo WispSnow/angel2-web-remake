@@ -5,8 +5,9 @@ import {
   isFullCombatImageUrl,
 } from "../../src/game/full-combat-image-cache";
 
-function fakeDocument(failingObjectUrl?: string) {
+function fakeDocument(failingObjectUrl?: string, failFirstDecode = false) {
   let objectUrlSequence = 0;
+  let imageSequence = 0;
   const revokeObjectURL = vi.fn();
   const ownerDocument = {
     defaultView: {
@@ -17,10 +18,12 @@ function fakeDocument(failingObjectUrl?: string) {
       },
     },
     createElement: vi.fn(() => {
+      const imageNumber = ++imageSequence;
       const image = {
         decoding: "auto",
         src: "",
         decode: vi.fn(async () => {
+          if (failFirstDecode && imageNumber === 1) throw new Error("decoder busy");
           if (image.src === failingObjectUrl) throw new Error("broken PNG");
         }),
       };
@@ -64,6 +67,21 @@ describe("decoded full-combat image cache", () => {
 
     second.release();
     expect(fullCombatImageSource(atlas)).toBe(atlas);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:test-1");
+  });
+
+  test("retries a transient detached-image decode with the retained bytes", async () => {
+    const atlas = "/assets/original/full-combat-atlases/right-magic-priest.png";
+    const { ownerDocument, revokeObjectURL } = fakeDocument(undefined, true);
+    const lease = await acquireFullCombatImages([atlas], {
+      encodedBytes: new Map([[atlas, new Uint8Array([1, 2, 3])]]),
+      ownerDocument,
+    });
+
+    expect(ownerDocument.createElement).toHaveBeenCalledTimes(2);
+    expect(fullCombatImageSource(atlas)).toBe("blob:test-1");
+    lease.release();
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:test-1");
   });
 

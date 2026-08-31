@@ -4,7 +4,6 @@ import {
   setProgramPaused,
   toggleProgramPaused,
 } from "./program-clock";
-import "../program-pause.css";
 
 const OVERLAY_TEST_ID = "program-pause-overlay";
 
