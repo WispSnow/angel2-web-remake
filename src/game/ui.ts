@@ -433,7 +433,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     screen,
     sprite: commandMenuPointer,
     frameMs: () => controller.isTestMode
-      ? 1
+      // 1 ms 會讓一個 60 Hz requestAnimationFrame 同步吞掉十多個原生步進，瀏覽器只合成
+      // 最後一格，等同看不見「滑行」。測試模式沿用快轉節奏，但仍保留多個可見位置。
+      ? NATIVE_GLIDE_FRAME_MS / 3.2
       : controller.presentationFast
         ? NATIVE_GLIDE_FRAME_MS / 3.2
         : NATIVE_GLIDE_FRAME_MS,

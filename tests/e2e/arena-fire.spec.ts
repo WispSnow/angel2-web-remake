@@ -107,14 +107,33 @@ test("enemy tier-one evil mage uses stable radius-six 2F and group-10 dialogue",
   const before = await arenaBattleState(page);
   const targetBefore = before?.units.find(({ id }) => id === "arena-1-0");
   await clickArenaWorldCell(page, 19, 30);
+  const dialogue = page.getByTestId("dialogue-layer");
+  await dialogue.evaluate((layer, expectedLine) => {
+    const observed = layer as HTMLElement & { __expectedLineWasVisible?: boolean };
+    const record = () => {
+      if (!observed.hidden && observed.textContent?.includes(expectedLine)) {
+        observed.__expectedLineWasVisible = true;
+      }
+    };
+    record();
+    new MutationObserver(record).observe(observed, {
+      attributes: true,
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+  }, "看我的火球魔法.");
   await page.getByTestId("unit-command-rest").click();
 
-  const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
   await expect(dialogue).toHaveAttribute("data-action-id", "fire-2");
   await expect(dialogue).toHaveAttribute("data-effect-center", "19,30");
   await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
-  await expect(page.getByText("看我的火球魔法.", { exact: true })).toBeVisible();
+  // 快转模式下对白可能在 Playwright 连续读取四个属性时已经收起；先挂观察器，才能证明
+  // 玩家确实看见过这句，而不是把「隐藏节点仍留着文字」误当成通过。
+  await expect.poll(() => dialogue.evaluate((layer) =>
+    Boolean((layer as HTMLElement & { __expectedLineWasVisible?: boolean })
+      .__expectedLineWasVisible))).toBe(true);
   await page.waitForFunction(() => {
     const dataset = document.querySelector<HTMLCanvasElement>(
       "[data-testid='battle-canvas']",
