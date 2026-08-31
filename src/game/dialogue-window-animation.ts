@@ -24,6 +24,12 @@
  * 回呼呼叫端重跑描繪，才能把祖先節點一起收起。
  */
 
+import {
+  clearProgramTimeout,
+  setProgramTimeout,
+  type ProgramTimeout,
+} from "./program-clock";
+
 /** 收合中的面板類名；同時掛上收合動畫。 */
 const CLOSING_CLASS = "is-dialogue-window-closing";
 
@@ -45,7 +51,7 @@ const OPEN_FALLBACK_MS = 400;
 interface ClosingWindow {
   /** 世代序號：重複開闔時，只有最後一次的收尾算數，中途作廢的舊回呼要自行退出。 */
   generation: number;
-  fallback: ReturnType<typeof globalThis.setTimeout>;
+  fallback: ProgramTimeout;
   onClosed: () => void;
 }
 
@@ -62,7 +68,7 @@ function closeAnimations(panel: HTMLElement): Animation[] {
 function finishClose(panel: HTMLElement): ClosingWindow | undefined {
   const closing = closingWindows.get(panel);
   if (closing) {
-    globalThis.clearTimeout(closing.fallback);
+    clearProgramTimeout(closing.fallback);
     closingWindows.delete(panel);
   }
   panel.classList.remove(CLOSING_CLASS);
@@ -106,10 +112,10 @@ export function whenDialogueWindowOpened(panel: HTMLElement): Promise<void> {
   const animation = dialogueWindowOpenAnimation(panel);
   if (!animation) return Promise.resolve();
   return new Promise((resolve) => {
-    const fallback = globalThis.setTimeout(resolve, OPEN_FALLBACK_MS);
+    const fallback = setProgramTimeout(resolve, OPEN_FALLBACK_MS);
     // 中途被取消（面板又被收起）也算等到了：呼叫端自己會用世代鍵判斷該不該繼續。
     void animation.finished.catch(() => undefined).then(() => {
-      globalThis.clearTimeout(fallback);
+      clearProgramTimeout(fallback);
       resolve();
     });
   });
@@ -153,7 +159,7 @@ export function setDialogueWindowOpen(
   };
   closingWindows.set(panel, {
     generation,
-    fallback: globalThis.setTimeout(settle, CLOSE_FALLBACK_MS),
+    fallback: setProgramTimeout(settle, CLOSE_FALLBACK_MS),
     onClosed,
   });
   void Promise.allSettled(animations.map((animation) => animation.finished)).then(settle);

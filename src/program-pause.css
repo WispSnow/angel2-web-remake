@@ -1,0 +1,76 @@
+.program-pause-overlay {
+  position: fixed;
+  z-index: 12000;
+  inset: 0;
+  font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif;
+}
+
+.program-pause-overlay[hidden] { display: none; }
+
+.program-pause-scrim {
+  position: absolute;
+  inset: 0;
+  background: #030205d9;
+  backdrop-filter: blur(2px) grayscale(.35);
+}
+
+.program-pause-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(360px, calc(100vw - 32px));
+  padding: 24px 26px 22px;
+  border: 1px solid #79562a;
+  border-radius: 4px;
+  background:
+    linear-gradient(145deg, #24171d, #100b0e 65%),
+    repeating-linear-gradient(135deg, #b88a2b0d 0 1px, transparent 1px 9px);
+  box-shadow: 0 28px 90px #000d, 0 0 0 1px #2f2023 inset;
+  color: #ead9b8;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.program-pause-kicker {
+  margin: 0 0 7px;
+  color: #d9a93e;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .2em;
+}
+
+.program-pause-dialog h1 { margin: 0; color: #f1d48e; font-size: 24px; }
+.program-pause-dialog > p:not(.program-pause-kicker) { margin: 10px 0 18px; color: #b9a789; font-size: 13px; }
+.program-pause-dialog button {
+  min-width: 144px;
+  padding: 9px 18px;
+  border: 1px solid #8a632b;
+  border-radius: 3px;
+  background: #2b1d1c;
+  color: #f4dfac;
+  cursor: pointer;
+  font: 700 13px/1.4 inherit;
+}
+.program-pause-dialog button:hover { border-color: #d0a24a; background: #36231f; }
+.program-pause-dialog button:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 3px; }
+.program-pause-dialog small { display: block; margin-top: 12px; color: #81735f; font-size: 10px; }
+
+.program-pause-trigger { display: flex; margin-right: 4px; }
+.program-pause-trigger > button {
+  padding: 3px 10px;
+  border: 1px solid #3e3225;
+  border-radius: 2px;
+  color: #b9a98e;
+  background: #11100f;
+  cursor: pointer;
+  font: 11px/1.5 ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+.program-pause-trigger > button:hover { border-color: var(--gold-dark); color: var(--gold); }
+.program-pause-trigger > button:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 2px; }
+
+/* CSS timelines belong to the frozen program. The pause dialog itself is a
+   browser control surface and intentionally remains outside #app. */
+html[data-program-paused="true"] #app *,
+html[data-program-paused="true"] .rn-overlay * {
+  animation-play-state: paused !important;
+}

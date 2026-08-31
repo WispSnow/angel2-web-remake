@@ -26,6 +26,7 @@ import {
 } from "./content/stage49-ending";
 import { CREDITS_MUSIC_PROGRAM } from "./content/credits";
 import { deploymentMusicProgramFor } from "./content/deployment-music";
+import { isProgramPaused, onProgramPauseChange } from "./program-clock";
 
 type BattleMusicSide = "player" | "enemy";
 
@@ -52,6 +53,7 @@ const isWalkCue = (cue: { group: string; record: number; reason: string }): bool
 export class AudioManager {
   private readonly events = new AbortController();
   private readonly unsubscribe: () => void;
+  private readonly unsubscribeProgramPause: () => void;
   private unlocked = false;
   private previousBattleMusicSide?: BattleMusicSide;
   private previousCueSequence = 0;
@@ -88,6 +90,8 @@ export class AudioManager {
       SOUND_EFFECT_GAIN_BY_VOLUME[controller.soundEffectVolume],
       (state) => this.updateEffectTransportDebugState(state),
     );
+    this.unsubscribeProgramPause = onProgramPauseChange((paused) => this.setProgramPaused(paused));
+    this.setProgramPaused(isProgramPaused());
     this.updateEffectDebugState();
     root.addEventListener("pointerdown", () => this.unlock(), {
       capture: true,
@@ -109,11 +113,17 @@ export class AudioManager {
   destroy(): void {
     this.events.abort();
     this.unsubscribe();
+    this.unsubscribeProgramPause();
     this.effects.destroy();
     this.walkEffect = undefined;
     this.releasingWalkEffects.clear();
     this.activeEffects.clear();
     this.music.select(undefined);
+  }
+
+  private setProgramPaused(paused: boolean): void {
+    this.music.setSuspended(paused);
+    this.effects.setSuspended(paused);
   }
 
   playSpeechCharacter(character: string): void {

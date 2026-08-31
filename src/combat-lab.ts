@@ -31,6 +31,11 @@ import {
   type SoundEffectPlayback,
   type SoundEffectTransportState,
 } from "./game/sound-effect-transport";
+import {
+  isProgramPaused,
+  onProgramPauseChange,
+  programNow,
+} from "./game/program-clock";
 
 const LAB_CLASSES = [
   "soldier",
@@ -424,7 +429,7 @@ let phase: FullCombatPhaseName = "fullOpen";
 let currentTime = 0;
 // 見 `styles.css`：本作不跟隨系統「減少動態效果」，時間軸一律自動播放。
 let playing = true;
-let previousFrameTime = performance.now();
+let previousFrameTime = programNow();
 const activeAudio = new Set<SoundEffectPlayback>();
 const updateSoundEffectDebugState = (state: SoundEffectTransportState): void => {
   root.dataset.soundEffectEngine = "web-audio";
@@ -436,6 +441,8 @@ const updateSoundEffectDebugState = (state: SoundEffectTransportState): void => 
   else delete root.dataset.soundEffectError;
 };
 const soundEffects = new SoundEffectTransport(1, updateSoundEffectDebugState);
+const unsubscribeProgramPause = onProgramPauseChange((paused) => soundEffects.setSuspended(paused));
+soundEffects.setSuspended(isProgramPaused());
 const soundInput = field<HTMLInputElement>("sound");
 const soundEffectUrls = [...new Set([
   ...Object.values(STAGE0_ACTION_AUDIO_ASSETS),
@@ -644,7 +651,7 @@ function updateToggleLabel(): void {
 
 function setPlaying(next: boolean): void {
   playing = next;
-  previousFrameTime = performance.now();
+  previousFrameTime = programNow();
   updateToggleLabel();
 }
 
@@ -770,7 +777,8 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) setPlaying(false);
 });
 
-function tick(now: number): void {
+function tick(): void {
+  const now = programNow();
   const elapsed = Math.min(100, now - previousFrameTime);
   previousFrameTime = now;
   if (playing) {
@@ -826,5 +834,6 @@ updateToggleLabel();
 requestAnimationFrame(tick);
 window.addEventListener("pagehide", () => {
   stopAudio();
+  unsubscribeProgramPause();
   soundEffects.destroy();
 }, { once: true });

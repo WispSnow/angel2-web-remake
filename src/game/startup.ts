@@ -50,6 +50,7 @@ import {
 } from "./save";
 import type { Difficulty, SaveData } from "./types";
 import type { PreparedStartupMusic } from "./startup-music";
+import { isProgramPaused, onProgramPauseChange, programNow } from "./program-clock";
 
 /**
  * 規則集在存檔裡是代號（`stableRemake`），而發行版只有遊戲本體、不附任何決定記錄或設計
@@ -438,7 +439,7 @@ export function mountStartup(
   const showTitleMenu = () => {
     phase = "title";
     titleAssembled = true;
-    idleSince = performance.now();
+    idleSince = programNow();
     screen.dataset.startupPhase = phase;
     titleMenuFrame.hidden = false;
     difficultyMenuFrame.hidden = true;
@@ -452,7 +453,7 @@ export function mountStartup(
   const enterIntro = () => {
     if (phase !== "pretitle") return;
     phase = "intro";
-    phaseStartedAt = performance.now();
+    phaseStartedAt = programNow();
     screen.dataset.startupPhase = "intro";
     startupMusic.playIntro();
     updateStartupMusicDebugState();
@@ -465,7 +466,7 @@ export function mountStartup(
     phase = "title";
     titleAssembled = false;
     musicStarted = false;
-    phaseStartedAt = performance.now();
+    phaseStartedAt = programNow();
     screen.dataset.startupPhase = "title-assemble";
     intro.hidden = true;
     title.hidden = false;
@@ -489,7 +490,7 @@ export function mountStartup(
       phase = "pretitle";
       screen.dataset.startupPhase = phase;
       updateStartupMusicDebugState();
-      phaseStartedAt = performance.now();
+      phaseStartedAt = programNow();
       animationFrame = requestAnimationFrame(animate);
     }).catch((error: unknown) => {
       if (disposed) return;
@@ -513,7 +514,7 @@ export function mountStartup(
     titleVariant = titleVariant === 0 ? 1 : 0;
     phase = "intro";
     titleAssembled = false;
-    phaseStartedAt = performance.now();
+    phaseStartedAt = programNow();
     screen.dataset.startupPhase = "intro";
     screen.dataset.titleVariant = String(titleVariant);
     title.hidden = true;
@@ -616,7 +617,7 @@ export function mountStartup(
 
   const showDifficultyMenu = () => {
     phase = "difficulty";
-    idleSince = performance.now();
+    idleSince = programNow();
     difficultyIndex = 0;
     difficultyHintByKeyboard = false;
     screen.dataset.startupPhase = phase;
@@ -701,7 +702,7 @@ export function mountStartup(
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (disposed || event.repeat) return;
-    idleSince = performance.now();
+    idleSince = programNow();
     if (phase === "ready") {
       event.preventDefault();
       activateStartup();
@@ -765,7 +766,7 @@ export function mountStartup(
 
   const onPointerOver = (event: PointerEvent) => {
     // 0000:0480 resets the 201-cycle idle counter whenever the pointer moves.
-    idleSince = performance.now();
+    idleSince = programNow();
     const button = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action]");
     if (!button) return;
     if (saveBackupUi.handlePointerOver(button)) return;
@@ -814,7 +815,7 @@ export function mountStartup(
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    idleSince = performance.now();
+    idleSince = programNow();
     // `contextmenu` is the single home for the right button, so the skip below
     // stays a left/primary-press path and one physical right press keeps meaning
     // exactly one cancel wherever the phase lands by the time it fires.
@@ -832,7 +833,7 @@ export function mountStartup(
   const onContextMenu = (event: MouseEvent) => {
     if (disposed || !(event.target as Element).closest("#startup-screen")) return;
     event.preventDefault();
-    idleSince = performance.now();
+    idleSince = programNow();
     cancelInput();
   };
 
@@ -884,9 +885,9 @@ export function mountStartup(
   /** The native hold may end early; the fade-out that follows never does. */
   const skipPretitleHold = () => {
     const fadeIn = STARTUP_PRETITLE.fadeInSteps * dacStepMs;
-    const elapsed = performance.now() - phaseStartedAt;
+    const elapsed = programNow() - phaseStartedAt;
     if (elapsed >= fadeIn + pretitleHoldMs) return;
-    phaseStartedAt = performance.now() - Math.max(fadeIn, elapsed) - pretitleHoldMs;
+    phaseStartedAt = programNow() - Math.max(fadeIn, elapsed) - pretitleHoldMs;
   };
 
   const paintIntro = (scrollUpdate: number) => {
@@ -939,8 +940,9 @@ export function mountStartup(
     if (elapsed >= fadeIn + hold + fadeOut) enterIntro();
   };
 
-  const animate = (now: number) => {
+  const animate = () => {
     if (disposed) return;
+    const now = programNow();
     const elapsed = now - phaseStartedAt;
     if (phase === "pretitle") paintPretitle(elapsed);
     else if (phase === "intro") {
@@ -971,6 +973,7 @@ export function mountStartup(
     root.removeEventListener("pointerdown", onPointerDown);
     root.removeEventListener("contextmenu", onContextMenu);
     saveBackupUi.dispose();
+    unsubscribeProgramPause();
   };
 
   window.addEventListener("keydown", onKeyDown);
@@ -981,6 +984,8 @@ export function mountStartup(
   updateMenuSelection();
   screen.dataset.startupAssetsReady = "false";
   updateStartupMusicDebugState();
+  const unsubscribeProgramPause = onProgramPauseChange((paused) => startupMusic.setPaused(paused));
+  startupMusic.setPaused(isProgramPaused());
   void Promise.all([
     ...STARTUP_IMAGE_URLS.map(async (src) => {
       loadedImages.set(src, await loadStartupImage(src));

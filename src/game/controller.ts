@@ -136,6 +136,12 @@ import {
   type LoadedStageRuntime,
 } from "./stage-runtime";
 import type { ActionMode, AttackResult, BattleUnit, CampaignState, DialoguePage, Difficulty, GamePhase, PortraitRecord, Position, SaveData, StageId, UnitClassId, UnitStats } from "./types";
+import {
+  clearProgramTimeout,
+  programDelay,
+  programNow,
+  setProgramTimeout,
+} from "./program-clock";
 
 type Listener = () => void;
 type MovementKind = "scripted" | "player" | "allyAuto" | "enemy" | "rollback";
@@ -412,7 +418,7 @@ const STORY_PHASES = new Set<GamePhase>([
   "scriptedStory",
 ]);
 const isStoryPhase = (phase: GamePhase): phase is StageStoryPhase => STORY_PHASES.has(phase);
-const pause = (milliseconds: number) => new Promise<void>((resolve) => globalThis.setTimeout(resolve, milliseconds));
+const pause = programDelay;
 const atomicObjectiveConditions = (
   condition: StageObjectiveCondition,
 ): readonly Exclude<StageObjectiveCondition, { type: "any-of" }>[] => condition.type === "any-of"
@@ -2896,9 +2902,9 @@ export class GameController {
       this.emit();
 
       await new Promise<void>((resolve) => {
-        const timeout = globalThis.setTimeout(resolve, this.mapCombatDelay(maximumHoldNativeTicks));
+        const timeout = setProgramTimeout(resolve, this.mapCombatDelay(maximumHoldNativeTicks));
         this.prayerHoldSkip = () => {
-          globalThis.clearTimeout(timeout);
+          clearProgramTimeout(timeout);
           resolve();
         };
       });
@@ -4117,13 +4123,13 @@ export class GameController {
     const fastTest = this.testMode && !this.fullCombatRealTime;
     const timeScale = fastTest ? 24 : this.presentationFast ? 3.2 : 1;
     const frameInterval = fastTest ? 2 : 15;
-    const start = Date.now();
+    const start = programNow();
     let cueIndex = 0;
     let markIndex = 0;
     let phase: CombatPresentationPhase = "fullOpen";
     let elapsed = 0;
     while (elapsed <= script.duration) {
-      elapsed = (Date.now() - start) * timeScale;
+      elapsed = (programNow() - start) * timeScale;
       const t = Math.min(elapsed, script.duration);
       while (cueIndex < script.cues.length && script.cues[cueIndex].t <= t) {
         const cue = script.cues[cueIndex];

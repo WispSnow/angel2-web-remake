@@ -11,6 +11,7 @@ import {
 import { emptyUnitStatuses } from "../simulation/status";
 import type { AttackResult, BattleUnit, Side, UnitClassId } from "../types";
 import { renderCombat, type CombatPresentationRenderSource } from "../ui";
+import { programNow } from "../program-clock";
 import type { ClassPreviewSelection } from "./class-view";
 
 export interface ClassPreviewController {
@@ -126,7 +127,7 @@ export function mountClassPreview(
     unitStats: classStatsFor,
   };
   let currentTime = startAt;
-  let previousFrameTime = performance.now();
+  let previousFrameTime = programNow();
   let replayAt: number | undefined;
   let animationFrame = 0;
   let destroyed = false;
@@ -179,8 +180,9 @@ export function mountClassPreview(
     stage.dataset.static = String(staticFrame);
   };
 
-  const tick = (now: number): void => {
+  const tick = (): void => {
     if (destroyed) return;
+    const now = programNow();
     const elapsed = Math.min(100, now - previousFrameTime);
     previousFrameTime = now;
     if (replayAt !== undefined) {

@@ -26,6 +26,7 @@ export class SoundEffectTransport {
   private masterGain?: GainNode;
   private gain: number;
   private unlocked = false;
+  private suspended = false;
   private scheduledCount = 0;
   private readonly active = new Set<ActiveSoundEffect>();
   private error?: string;
@@ -43,6 +44,7 @@ export class SoundEffectTransport {
     this.unlocked = true;
     const context = this.ensureContext();
     void context.resume().then(() => {
+      if (this.suspended) return context.suspend();
       this.error = undefined;
       this.emitState();
     }).catch((error: unknown) => {
@@ -50,6 +52,20 @@ export class SoundEffectTransport {
       this.emitState();
     });
     this.emitState();
+  }
+
+  setSuspended(suspended: boolean): void {
+    this.suspended = suspended;
+    const context = this.context;
+    if (!context || !this.unlocked) return;
+    const change = suspended ? context.suspend() : context.resume();
+    void change.then(() => {
+      this.error = undefined;
+      this.emitState();
+    }).catch((error: unknown) => {
+      this.error = this.errorMessage(error);
+      this.emitState();
+    });
   }
 
   setGain(gain: number): void {
@@ -70,7 +86,7 @@ export class SoundEffectTransport {
     cueGain: number,
     onEnded?: () => void,
   ): SoundEffectPlayback | undefined {
-    if (!this.unlocked) return undefined;
+    if (!this.unlocked || this.suspended) return undefined;
     const buffer = this.buffers.get(url);
     if (!buffer) {
       this.error = `sound effect was not prepared before playback: ${url}`;

@@ -170,7 +170,7 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   const controls = page.getByTestId("remake-controls");
   await expect(controls).toBeVisible();
   const keyboard = controls.locator(".rn-control-card.is-keyboard");
-  for (const key of ["方向鍵", "WASD", "Enter", "Space", "Esc", "Backspace"]) {
+  for (const key of ["方向鍵", "WASD", "Enter", "Space", "Esc", "Backspace", "P", "Pause"]) {
     await expect(keyboard.getByText(key, { exact: true })).toBeVisible();
   }
   await expect(controls).toContainText("下一名待行動角色");

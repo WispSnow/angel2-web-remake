@@ -61,6 +61,11 @@ import {
   type SoundEffectPlayback,
   type SoundEffectTransportState,
 } from "./game/sound-effect-transport";
+import {
+  isProgramPaused,
+  onProgramPauseChange,
+  programNow,
+} from "./game/program-clock";
 
 interface LabPlaybackState {
   readonly actionCode: TechniqueLabNativeCode;
@@ -203,7 +208,7 @@ let playing = true;
 let speed = 1;
 let sound = false;
 let timeMs = 0;
-let lastAnimationTime = performance.now();
+let lastAnimationTime = programNow();
 let lightningTimeline: readonly TimedLightningFrame[] = [];
 let stompTimeline: readonly StompPresentationStep[] = [];
 let durationMs = 0;
@@ -225,6 +230,8 @@ const updateSoundEffectDebugState = (state: SoundEffectTransportState): void => 
   else delete root.dataset.soundEffectError;
 };
 const soundEffects = new SoundEffectTransport(1, updateSoundEffectDebugState);
+const unsubscribeProgramPause = onProgramPauseChange((paused) => soundEffects.setSuspended(paused));
+soundEffects.setSuspended(isProgramPaused());
 root.dataset.soundEffectReady = "false";
 soundInput.disabled = true;
 root.addEventListener("pointerdown", () => soundEffects.unlock(), { capture: true });
@@ -898,7 +905,7 @@ function restart(autoplay = true): void {
   }
   playedAudioCues = new Set();
   playing = autoplay;
-  lastAnimationTime = performance.now();
+  lastAnimationTime = programNow();
   playAudioBetween(-1, 0);
   render();
 }
@@ -999,7 +1006,7 @@ root.addEventListener("click", (event) => {
   else if (command === "play") {
     if (timeMs >= durationMs) timeMs = 0;
     playing = true;
-    lastAnimationTime = performance.now();
+    lastAnimationTime = programNow();
     playAudioBetween(-1, timeMs);
   } else if (command === "pause") playing = false;
   else if (command === "step") step();
@@ -1043,7 +1050,8 @@ soundInput.addEventListener("change", () => {
 });
 timelineInput.addEventListener("input", () => seek(Number(timelineInput.value)));
 
-function animate(now: number): void {
+function animate(): void {
+  const now = programNow();
   if (playing) {
     const previous = timeMs;
     // A control event can call restart() after the browser has captured this
@@ -1064,6 +1072,7 @@ requestAnimationFrame(animate);
 
 window.addEventListener("pagehide", () => {
   stopAudio();
+  unsubscribeProgramPause();
   soundEffects.destroy();
   renderer.game.destroy(true);
 }, { once: true });
@@ -1085,7 +1094,7 @@ window.__ANGEL2_TECHNIQUE_LAB__ = {
   seek,
   play: () => {
     playing = true;
-    lastAnimationTime = performance.now();
+    lastAnimationTime = programNow();
   },
   pause: () => {
     playing = false;

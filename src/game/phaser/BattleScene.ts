@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { bindPhaserProgramPause } from "./program-pause";
 import { ASSETS } from "../content/stage0";
 import {
   STAGE0_ACTION_PRESENTATION_ASSETS,
@@ -2112,7 +2113,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 }
 
 export function startPhaser(controller: GameController): Phaser.Game {
-  return new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.WEBGL,
     width: 640,
     height: 350,
@@ -2125,4 +2126,6 @@ export function startPhaser(controller: GameController): Phaser.Game {
     input: { gamepad: true },
     scene: [createBattleScene(controller)],
   });
+  bindPhaserProgramPause(game);
+  return game;
 }

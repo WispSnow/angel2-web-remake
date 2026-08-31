@@ -10,6 +10,7 @@ export interface PreparedStartupMusic {
   stopIntro(): void;
   playTitle(onEnded: () => void): void;
   stopTitle(): void;
+  setPaused(paused: boolean): void;
   dispose(): void;
 }
 
@@ -49,6 +50,8 @@ export async function prepareStartupMusic(): Promise<PreparedStartupMusic> {
     let introSource: AudioBufferSourceNode | undefined;
     let titleSource: AudioBufferSourceNode | undefined;
     let disposed = false;
+    let paused = false;
+    let unlocked = false;
 
     const stop = (source: AudioBufferSourceNode | undefined) => {
       if (!source) return;
@@ -74,7 +77,10 @@ export async function prepareStartupMusic(): Promise<PreparedStartupMusic> {
       get titlePlaying() { return titleSource !== undefined; },
       unlock: async () => {
         if (disposed) throw new Error("開場音樂已經關閉。");
+        unlocked = true;
         await context.resume();
+        if (paused) await context.suspend();
+        if (paused) return;
         if (context.state !== "running") throw new Error("瀏覽器未允許播放開場音樂。");
       },
       playIntro: () => {
@@ -106,6 +112,12 @@ export async function prepareStartupMusic(): Promise<PreparedStartupMusic> {
       stopTitle: () => {
         stop(titleSource);
         titleSource = undefined;
+      },
+      setPaused: (nextPaused) => {
+        paused = nextPaused;
+        if (disposed) return;
+        if (paused) void context.suspend();
+        else if (unlocked) void context.resume();
       },
       dispose: () => {
         if (disposed) return;

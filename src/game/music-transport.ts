@@ -55,6 +55,7 @@ export class MusicTransport {
   private masterGain?: GainNode;
   private gain: number;
   private unlocked = false;
+  private suspended = false;
   private desired?: MusicProgram;
   private active?: ScheduledProgram;
   private requestSequence = 0;
@@ -116,11 +117,28 @@ export class MusicTransport {
     // resume() is invoked synchronously from the user gesture. Loading and
     // decoding may finish later without losing the browser activation grant.
     void context.resume().then(() => {
+      if (this.suspended) return context.suspend();
       const desired = this.desired;
       if (desired) void this.schedule(desired, this.requestSequence);
     }).catch((error: unknown) => {
       this.updateState({ playing: false, error: this.errorMessage(error) });
     });
+  }
+
+  setSuspended(suspended: boolean): void {
+    this.suspended = suspended;
+    const context = this.context;
+    if (!context || !this.unlocked) return;
+    if (suspended) {
+      void context.suspend().then(() => this.updateState({ playing: this.active !== undefined }))
+        .catch((error: unknown) => this.updateState({ error: this.errorMessage(error) }));
+    } else {
+      void context.resume().then(() => {
+        const desired = this.desired;
+        if (desired && !this.active) void this.schedule(desired, this.requestSequence);
+        this.updateState({ playing: this.active !== undefined });
+      }).catch((error: unknown) => this.updateState({ error: this.errorMessage(error) }));
+    }
   }
 
   setGain(gain: number): void {
@@ -177,7 +195,7 @@ export class MusicTransport {
   }
 
   private async schedule(program: MusicProgram, request: number): Promise<void> {
-    if (!this.unlocked || this.context?.state !== "running") return;
+    if (!this.unlocked || this.suspended || this.context?.state !== "running") return;
     if (this.active?.id === program.id && this.active.request === request) return;
     if (this.schedulingRequest === request) return;
     this.schedulingRequest = request;

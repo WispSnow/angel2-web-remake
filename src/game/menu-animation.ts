@@ -12,6 +12,12 @@
  * 淡出的舊畫面。
  */
 
+import {
+  clearProgramTimeout,
+  setProgramTimeout,
+  type ProgramTimeout,
+} from "./program-clock";
+
 /** 收合中的方框類名；同時掛上收合動畫與 `pointer-events: none`。 */
 const CLOSING_CLASS = "is-menu-closing";
 
@@ -27,7 +33,7 @@ const CLOSE_FALLBACK_MS = 400;
 interface ClosingMenu {
   /** 世代序號：重複開闔時，只有最後一次的收尾算數，中途作廢的舊回呼要自行退出。 */
   generation: number;
-  fallback: ReturnType<typeof globalThis.setTimeout>;
+  fallback: ProgramTimeout;
 }
 
 const closingMenus = new WeakMap<HTMLElement, ClosingMenu>();
@@ -43,7 +49,7 @@ function closeAnimations(element: HTMLElement): Animation[] {
 function finishClose(element: HTMLElement): void {
   const closing = closingMenus.get(element);
   if (closing) {
-    globalThis.clearTimeout(closing.fallback);
+    clearProgramTimeout(closing.fallback);
     closingMenus.delete(element);
   }
   element.classList.remove(CLOSING_CLASS);
@@ -88,7 +94,7 @@ export function setMenuOpen(element: HTMLElement, open: boolean): boolean {
   };
   closingMenus.set(element, {
     generation,
-    fallback: globalThis.setTimeout(settle, CLOSE_FALLBACK_MS),
+    fallback: setProgramTimeout(settle, CLOSE_FALLBACK_MS),
   });
   void Promise.allSettled(animations.map((animation) => animation.finished)).then(settle);
   return false;

@@ -14,6 +14,7 @@ import {
   initializeDesktopRuntime,
 } from "./desktop-runtime";
 import { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
+import { mountProgramPauseButton } from "./program-pause";
 
 export { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
 
@@ -76,6 +77,7 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
   const panel = viewport.parentElement
     ?.querySelector<HTMLElement>(":scope > .display-settings");
   const extras = hostChromeExtrasSlot(viewport);
+  const unmountProgramPause = extras ? mountProgramPauseButton(extras) : () => undefined;
   const unmountOverlays = extras ? mountHostOverlays(extras) : () => undefined;
   const interfaceSlot = hostChromeInterfaceSlot(viewport);
   const unmountInterfaceZoom = interfaceSlot
@@ -159,6 +161,7 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
     unsubscribe();
     unmountInterfaceZoom();
     unmountOverlays();
+    unmountProgramPause();
     unmountControls();
   };
 }

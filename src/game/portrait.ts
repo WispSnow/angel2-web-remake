@@ -5,6 +5,7 @@ import {
 } from "./content/portrait-catalog.generated";
 import type { PortraitRecord } from "./types";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
+import { isProgramPaused } from "./program-clock";
 
 type BlinkStage = "idle" | "closing" | "closed" | "opening";
 
@@ -171,7 +172,7 @@ export function prepareAnimatedPortrait(element: HTMLElement): Promise<void> {
 export function startPortraitAnimations(
   root: HTMLElement,
   testMode: boolean,
-  shouldPause: () => boolean = () => false,
+  shouldPause: () => boolean = isProgramPaused,
 ): () => void {
   const blinkStates = new Map<string, BlinkState>();
   let animationFrame = 0;

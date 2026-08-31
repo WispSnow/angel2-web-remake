@@ -28,6 +28,7 @@ describe("modern keyboard bindings", () => {
     }
     expect(MODERN_KEYBOARD_HELP.confirm).toBe("Enter／Space");
     expect(MODERN_KEYBOARD_HELP.cancel).toBe("Esc／Backspace");
+    expect(MODERN_KEYBOARD_HELP.pause).toBe("P／Pause");
   });
 
   it("keeps the native diagonal navigation keys as optional non-conflicting aliases", () => {

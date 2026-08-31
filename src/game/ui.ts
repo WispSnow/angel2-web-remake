@@ -114,6 +114,12 @@ import {
 import { onStagedRenderAssetsChanged, stagedRenderAssetSource } from "./staged-render-asset-cache";
 import { applyStagedNativeUiAssets } from "./native-ui-assets";
 import { DIFFICULTY_OPTIONS } from "./content/startup";
+import {
+  clearProgramTimeout,
+  isProgramPaused,
+  setProgramTimeout,
+  type ProgramTimeout,
+} from "./program-clock";
 
 const promotionImageByClass: Readonly<Partial<Record<UnitClassId, string>>> =
   ASSETS.allyPromotionTargets;
@@ -472,8 +478,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     retreatConfirm,
     dialogueSkipConfirm,
   ];
-  let dialogueTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-  let dialogueAdvanceTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  let dialogueTimer: ProgramTimeout | undefined;
+  let dialogueAdvanceTimer: ProgramTimeout | undefined;
   let activeDialogueKey = "";
   let dialogueFullText = "";
   let revealedCharacters = 0;
@@ -488,19 +494,19 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   // 肖像分層還沒解碼完時主操作只能被吃掉：那一段連字都還沒有，補完等於把整頁跳過去。
   // 窗體展開不走這條——展開中的主操作照樣是「補完本頁」，只是要先讓窗體到位。
   let activeDialoguePortraitReady = true;
-  let feedbackTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  let feedbackTimer: ProgramTimeout | undefined;
   let activeFeedbackKey = "";
   let feedbackFullText = "";
   let feedbackRevealedCharacters = 0;
   let activeFeedbackText: HTMLElement | undefined;
   let activeFeedbackPortrait: HTMLElement | undefined;
   let activeFeedbackPortraitReady = true;
-  let sidePanelHintTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  let sidePanelHintTimer: ProgramTimeout | undefined;
   let sidePanelHintTarget: HTMLElement | undefined;
   const stopPortraitAnimations = startPortraitAnimations(
     root,
     controller.isTestMode,
-    () => controller.phase === "nextStage" || controller.phase === "quit",
+    () => isProgramPaused() || controller.phase === "nextStage" || controller.phase === "quit",
   );
 
   const stopSpeaking = (portrait: HTMLElement | undefined) => {
@@ -519,15 +525,15 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     portrait.dataset.talkCount = String(Number(portrait.dataset.talkCount ?? "0") + 1);
   };
   const stopDialogueTimer = () => {
-    if (dialogueTimer !== undefined) globalThis.clearTimeout(dialogueTimer);
-    if (dialogueAdvanceTimer !== undefined) globalThis.clearTimeout(dialogueAdvanceTimer);
+    if (dialogueTimer !== undefined) clearProgramTimeout(dialogueTimer);
+    if (dialogueAdvanceTimer !== undefined) clearProgramTimeout(dialogueAdvanceTimer);
     dialogueTimer = undefined;
     dialogueAdvanceTimer = undefined;
   };
   const scheduleAutomaticDialogueAdvance = (key: string) => {
     if (!controller.promotionDialogueActive && !controller.groupCommandDialogueActive) return;
     // 玩家補完逐字與逐字自然跑完都會走到這裡，重複排程會讓同一頁被推進兩次。
-    if (dialogueAdvanceTimer !== undefined) globalThis.clearTimeout(dialogueAdvanceTimer);
+    if (dialogueAdvanceTimer !== undefined) clearProgramTimeout(dialogueAdvanceTimer);
     const delay = controller.groupCommandDialogueActive && controller.isTestMode
       ? 1_200
       : controller.isTestMode
@@ -535,7 +541,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         : controller.presentationFast
           ? 80
           : 160;
-    dialogueAdvanceTimer = globalThis.setTimeout(() => {
+    dialogueAdvanceTimer = setProgramTimeout(() => {
       dialogueAdvanceTimer = undefined;
       if (
         activeDialogueKey === key
@@ -577,7 +583,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
       drawSpeechGlyph(activeDialoguePortrait, character);
       const delay = controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80;
-      dialogueTimer = globalThis.setTimeout(tick, delay);
+      dialogueTimer = setProgramTimeout(tick, delay);
     };
     const begin = () => {
       if (activeDialogueKey !== key || activeDialogueText !== target) return;
@@ -642,7 +648,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     return true;
   };
   const stopFeedbackTimer = () => {
-    if (feedbackTimer !== undefined) globalThis.clearTimeout(feedbackTimer);
+    if (feedbackTimer !== undefined) clearProgramTimeout(feedbackTimer);
     feedbackTimer = undefined;
   };
   const revealFeedback = (fullText: string, key: string, target: HTMLElement, portrait?: HTMLElement) => {
@@ -665,7 +671,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       renderNativeDialogueText(target, fullText.slice(0, feedbackRevealedCharacters), fullText);
       if (/[^\x00-\x7f]/u.test(character)) audio.playSpeechCharacter(character);
       drawSpeechGlyph(activeFeedbackPortrait, character);
-      feedbackTimer = globalThis.setTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
+      feedbackTimer = setProgramTimeout(tick, controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80);
     };
     const begin = () => {
       if (activeFeedbackKey !== key || activeFeedbackText !== target) return;
@@ -694,7 +700,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   };
 
   const hideSidePanelHint = () => {
-    if (sidePanelHintTimer !== undefined) globalThis.clearTimeout(sidePanelHintTimer);
+    if (sidePanelHintTimer !== undefined) clearProgramTimeout(sidePanelHintTimer);
     sidePanelHintTimer = undefined;
     sidePanelHintTarget = undefined;
     sidePanelTooltip.hidden = true;
@@ -711,7 +717,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   const scheduleSidePanelHint = (button: HTMLElement) => {
     hideSidePanelHint();
     sidePanelHintTarget = button;
-    sidePanelHintTimer = globalThis.setTimeout(() => {
+    sidePanelHintTimer = setProgramTimeout(() => {
       sidePanelHintTimer = undefined;
       if (sidePanelHintTarget === button) showSidePanelHint(button);
     }, 450);
@@ -2505,6 +2511,11 @@ function bindGamepad(controller: GameController, onInput: () => void): () => voi
     const pad = navigator.getGamepads?.()[0];
     if (pad) {
       const pressed = pad.buttons.map((button) => button.pressed);
+      if (isProgramPaused()) {
+        priorButtons = pressed;
+        animationFrame = requestAnimationFrame(poll);
+        return;
+      }
       const newlyPressed = (button: number) => pressed[button] && !priorButtons[button];
       if (newlyPressed(0)) { onInput(); controller.primaryAtCursor(); }
       if (newlyPressed(1)) { onInput(); controller.secondaryAction(); }

@@ -29,6 +29,7 @@ import {
 } from "./input-bindings";
 import type { Position } from "./types";
 import type { StageDeploymentPresentation } from "./stage-runtime";
+import { isProgramPaused } from "./program-clock";
 
 const ROSTER_COLUMN_X = [8, 152, 296] as const;
 const ROSTER_ROW_Y = [35, 95, 155, 215, 275] as const;
@@ -446,6 +447,11 @@ export function mountDeploymentUi(
       if (pressed(gamepad, 1)) current.add("secondary");
       if (pressed(gamepad, 4)) current.add("map");
       if (pressed(gamepad, 5)) current.add("roster");
+      if (isProgramPaused()) {
+        previousGamepad = current;
+        animationFrame = requestAnimationFrame(pollGamepad);
+        return;
+      }
       for (const action of current) {
         if (previousGamepad.has(action)) continue;
         root.dataset.inputMode = "keyboard";

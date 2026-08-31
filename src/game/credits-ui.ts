@@ -9,6 +9,12 @@ import {
 import type { GameController } from "./controller";
 import { prepareDomImageElements } from "./dom-image-readiness";
 import { configureGameScaling } from "./scaling";
+import {
+  bindProgramAnimation,
+  clearProgramTimeout,
+  setProgramTimeout,
+  type ProgramTimeout,
+} from "./program-clock";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
 
 const escapeHtml = (value: string): string => value
@@ -70,13 +76,14 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
   if (!viewport || !screen) throw new Error("credits surface not found");
   const destroyScaling = configureGameScaling(viewport, screen);
   let scrollAnimation: Animation | undefined;
-  let finalTimer: number | undefined;
+  let finalTimer: ProgramTimeout | undefined;
+  let unbindScrollPause: (() => void) | undefined;
   let finalStepIndex = 0;
   let renderGeneration = 0;
   let segmentFailed = false;
 
   const stopFinalAnimation = () => {
-    if (finalTimer !== undefined) window.clearTimeout(finalTimer);
+    if (finalTimer !== undefined) clearProgramTimeout(finalTimer);
     finalTimer = undefined;
   };
 
@@ -98,7 +105,7 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
         : controller.presentationFast
           ? Math.max(20, step.waitNativeTicks * 3)
           : step.waitNativeTicks * 10;
-      finalTimer = window.setTimeout(() => {
+      finalTimer = setProgramTimeout(() => {
         finalStepIndex = (finalStepIndex + 1) % CREDITS_FINAL_TIMELINE.length;
         runStep();
       }, delay);
@@ -108,6 +115,8 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
 
   const stopScrollAnimation = () => {
     if (!scrollAnimation) return;
+    unbindScrollPause?.();
+    unbindScrollPause = undefined;
     scrollAnimation.cancel();
     scrollAnimation = undefined;
   };
@@ -125,7 +134,10 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
       [{ transform: "translateY(0)" }, { transform: "translateY(-400px)" }],
       { duration, easing: "linear", fill: "forwards" },
     );
+    unbindScrollPause = bindProgramAnimation(scrollAnimation);
     void scrollAnimation.finished.then(() => {
+      unbindScrollPause?.();
+      unbindScrollPause = undefined;
       scrollAnimation = undefined;
       controller.advanceCredits();
     }).catch(() => undefined);

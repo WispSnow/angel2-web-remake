@@ -25,9 +25,11 @@ import {
   prepareStartupMusic,
   type PreparedStartupMusic,
 } from "./game/startup-music";
+import { installProgramPause } from "./game/program-pause";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (!root) throw new Error("#app not found");
+installProgramPause();
 const releaseBuild = import.meta.env.MODE === "release";
 const resourceLoader = new ResourcePackLoader();
 /**

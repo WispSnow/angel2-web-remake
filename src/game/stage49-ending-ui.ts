@@ -23,6 +23,13 @@ import {
 import { configureGameScaling } from "./scaling";
 import { decodeStagedRenderImages, stagedRenderAssetSource } from "./staged-render-asset-cache";
 import type { DialoguePage } from "./types";
+import {
+  clearProgramTimeout,
+  isProgramPaused,
+  programNow,
+  setProgramTimeout,
+  type ProgramTimeout,
+} from "./program-clock";
 
 const escapeHtml = (value: string): string => value
   .replaceAll("&", "&amp;")
@@ -167,14 +174,14 @@ export function mountStage49EndingUi(
   const screen = root.querySelector<HTMLButtonElement>("#stage49-screen");
   if (!viewport || !screen) throw new Error("stage 49 ending surface not found");
   const destroyScaling = configureGameScaling(viewport, screen);
-  const destroyPortraitAnimations = startPortraitAnimations(root, controller.isTestMode);
-  let timer: number | undefined;
-  let storyTimer: number | undefined;
+  const destroyPortraitAnimations = startPortraitAnimations(root, controller.isTestMode, isProgramPaused);
+  let timer: ProgramTimeout | undefined;
+  let storyTimer: ProgramTimeout | undefined;
   let storyText: HTMLElement | undefined;
   let storyPortrait: HTMLElement | undefined;
   let storyFullText = "";
   let storyRevealedCharacters = 0;
-  let epilogueTimer: number | undefined;
+  let epilogueTimer: ProgramTimeout | undefined;
   let epilogueGeneration = 0;
   let finishEpilogueTyping: (() => boolean) | undefined;
   let renderGeneration = 0;
@@ -182,7 +189,7 @@ export function mountStage49EndingUi(
   let segmentFailed = false;
 
   const stopEpilogueTyping = () => {
-    if (epilogueTimer !== undefined) window.clearTimeout(epilogueTimer);
+    if (epilogueTimer !== undefined) clearProgramTimeout(epilogueTimer);
     epilogueTimer = undefined;
     finishEpilogueTyping = undefined;
     epilogueGeneration += 1;
@@ -194,7 +201,7 @@ export function mountStage49EndingUi(
     portrait.dataset.mouthFrame = "1";
   };
   const stopStoryTimer = () => {
-    if (storyTimer !== undefined) window.clearTimeout(storyTimer);
+    if (storyTimer !== undefined) clearProgramTimeout(storyTimer);
     storyTimer = undefined;
   };
   const finishStoryTyping = (): boolean => {
@@ -248,7 +255,7 @@ export function mountStage49EndingUi(
           );
           storyPortrait.dataset.talkCount = String(Number(storyPortrait.dataset.talkCount ?? "0") + 1);
         }
-        storyTimer = window.setTimeout(
+        storyTimer = setProgramTimeout(
           tick,
           controller.isTestMode ? 12 : controller.presentationFast ? 20 : 80,
         );
@@ -285,8 +292,8 @@ export function mountStage49EndingUi(
     const scheduleHold = () => {
       screen.dataset.epilogueTyping = "false";
       const limit = Math.max(segment.waitNativeTicks, variant.typingNativeTicks) * 10;
-      const remaining = Math.max(0, limit - (performance.now() - startedAt));
-      timer = window.setTimeout(
+      const remaining = Math.max(0, limit - (programNow() - startedAt));
+      timer = setProgramTimeout(
         () => controller.advanceStage49Ending(),
         controller.presentationFast ? Math.min(30, remaining) : remaining,
       );
@@ -308,7 +315,7 @@ export function mountStage49EndingUi(
       screen.dataset.epilogueTyping = "true";
       finishEpilogueTyping = () => {
         if (revealed >= total) return false;
-        if (epilogueTimer !== undefined) window.clearTimeout(epilogueTimer);
+        if (epilogueTimer !== undefined) clearProgramTimeout(epilogueTimer);
         epilogueTimer = undefined;
         revealed = total;
         drawEpilogueGlyphs(canvas, font, glyphs, revealed, colors);
@@ -323,9 +330,9 @@ export function mountStage49EndingUi(
       // than its whole 240 ms trailing pause, so glyphs are scheduled against
       // the segment's own start instead of against the previous glyph.
       const scheduleGlyph = () => {
-        epilogueTimer = window.setTimeout(
+        epilogueTimer = setProgramTimeout(
           tick,
-          Math.max(0, startedAt + revealed * glyphDelay - performance.now()),
+          Math.max(0, startedAt + revealed * glyphDelay - programNow()),
         );
       };
       const tick = () => {
@@ -345,7 +352,7 @@ export function mountStage49EndingUi(
   };
   const render = () => {
     const generation = ++renderGeneration;
-    if (timer !== undefined) window.clearTimeout(timer);
+    if (timer !== undefined) clearProgramTimeout(timer);
     stopStoryTimer();
     stopEpilogueTyping();
     stopSpeaking(storyPortrait);
@@ -396,12 +403,12 @@ export function mountStage49EndingUi(
       // The epilogue owns its own advance timer: the hold only starts once the
       // images and font are ready, and typing may be cut short by a key press.
       if (session.section === "epilogue") {
-        startEpilogueTyping(performance.now());
+        startEpilogueTyping(programNow());
         return;
       }
       const delay = session.autoAdvanceMilliseconds;
       if (delay !== undefined && session.section !== "stage38-boundary") {
-        timer = window.setTimeout(
+        timer = setProgramTimeout(
           () => controller.advanceStage49Ending(),
           controller.presentationFast ? Math.min(30, delay) : delay,
         );
@@ -452,7 +459,7 @@ export function mountStage49EndingUi(
   render();
   screen.focus({ preventScroll: true });
   return () => {
-    if (timer !== undefined) window.clearTimeout(timer);
+    if (timer !== undefined) clearProgramTimeout(timer);
     stopStoryTimer();
     stopEpilogueTyping();
     stopSpeaking(storyPortrait);

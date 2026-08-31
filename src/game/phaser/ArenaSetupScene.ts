@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { bindPhaserProgramPause } from "./program-pause";
 import {
   ARENA_CLASS_IDS,
   ARENA_MAP,
@@ -183,5 +184,6 @@ export function startArenaSetupPhaser(
     scene: ArenaSetupScene,
     scale: { mode: Phaser.Scale.NONE },
   });
+  bindPhaserProgramPause(game);
   return { game };
 }

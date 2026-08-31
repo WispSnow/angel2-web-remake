@@ -25,6 +25,7 @@
  * 為避免暗示真實鼠標也被移動，這段演出只由鍵盤／手把開選單時使用；指標開選單直接顯示，
  * 詳見 `ui.ts` 的接線與 `design/remake-gdd/07-ui-ux-and-presentation.md`。
  */
+import { programNow } from "./program-clock";
 
 export interface PointerPosition {
   x: number;
@@ -130,7 +131,8 @@ export function createMenuPointerGlide(options: {
     onSettled();
   };
 
-  const tick = (time: number) => {
+  const tick = () => {
+    const time = programNow();
     frame = 0;
     const step = frameMs();
     elapsed += Math.max(0, time - previousTime);
@@ -160,7 +162,7 @@ export function createMenuPointerGlide(options: {
       path = next;
       index = 0;
       elapsed = 0;
-      previousTime = globalThis.performance.now();
+      previousTime = programNow();
       place(from);
       sprite.hidden = false;
       screen.dataset.pointerGlide = "true";

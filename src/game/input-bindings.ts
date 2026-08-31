@@ -43,4 +43,5 @@ export const MODERN_KEYBOARD_HELP = {
   nextUnit: "Tab",
   groupCommand: "G",
   objectives: "O",
+  pause: "P／Pause",
 } as const;

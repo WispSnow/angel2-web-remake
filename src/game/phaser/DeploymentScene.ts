@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import type { DeploymentSession } from "../deployment-session";
+import { bindPhaserProgramPause } from "./program-pause";
 
 const positionKey = ({ x, y }: { x: number; y: number }): string => `${x},${y}`;
 
@@ -51,7 +52,7 @@ export function startDeploymentPhaser(
   parent: string | HTMLElement = "deployment-phaser-root",
   sceneKey = "deployment",
 ): Phaser.Game {
-  return new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.WEBGL,
     width: 640,
     height: 350,
@@ -64,4 +65,6 @@ export function startDeploymentPhaser(
     input: { gamepad: true },
     scene: [createDeploymentScene(session, sceneKey)],
   });
+  bindPhaserProgramPause(game);
+  return game;
 }

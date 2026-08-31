@@ -126,6 +126,7 @@ function renderControls(): string {
               { keys: ["Tab"], action: "下一名待行動角色", detail: "出擊介面切換名單與地圖落點" },
               { keys: ["G"], action: "集體命令", detail: "再按一次關閉" },
               { keys: ["O"], action: "勝利／失敗條件", detail: "再按一次關閉" },
+              { keys: ["P", "Pause"], action: "暫停整個遊戲", detail: "暫停層內亦可按 Esc 繼續" },
             ])}
           </div>
         </article>

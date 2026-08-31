@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { bindPhaserProgramPause } from "./program-pause";
 import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../content/stage0-actions.generated";
 import {
   STAGE1_ACTION_PRESENTATION,
@@ -660,6 +661,7 @@ export function startTechniqueLabPhaser(
     scene: TechniqueLabScene,
     scale: { mode: Phaser.Scale.NONE },
   });
+  bindPhaserProgramPause(game);
 
   return {
     game,
