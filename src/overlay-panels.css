@@ -33,6 +33,9 @@
   font: 14px/1.7 "Noto Serif TC", "Songti TC", "PMingLiU", serif;
   transform: translate(-50%, -50%);
 }
+.rn-overlay[lang="zh-Hans"] .rn-dialog {
+  font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
+}
 .rn-dialog:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 3px; }
 
 .rn-head {
@@ -43,6 +46,7 @@
   border-bottom: 1px solid #3b2820;
   gap: 16px;
 }
+.rn-head > div:first-child { min-width: 0; }
 .rn-eyebrow {
   margin: 0;
   color: #dba638;
@@ -51,6 +55,31 @@
 }
 .rn-head h2 { margin: 6px 0 2px; color: var(--gold); font-size: 20px; font-weight: 700; }
 .rn-subtitle { margin: 0; color: #a9967a; font-size: 12px; }
+.rn-head-actions { display: flex; align-items: flex-start; flex: none; gap: 8px; }
+.rn-language-switch {
+  display: flex;
+  padding: 2px;
+  border: 1px solid #4b3527;
+  border-radius: 3px;
+  background: #100b0d;
+}
+.rn-language-switch > button {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 2px;
+  color: #8d7c65;
+  background: transparent;
+  cursor: pointer;
+  font: 11px/1.4 system-ui, sans-serif;
+}
+.rn-language-switch > button:hover { color: #f3dcae; }
+.rn-language-switch > button[aria-pressed="true"] {
+  color: #f0d18a;
+  background: #30201d;
+  box-shadow: 0 0 0 1px #6a4a24 inset;
+}
+.rn-language-switch > button:focus-visible,
+.rn-close:focus-visible { outline: 2px solid #9fd9ff; outline-offset: 2px; }
 .rn-close {
   padding: 4px 10px;
   border: 1px solid #4b3527;
@@ -694,6 +723,9 @@
 @media (max-width: 560px) {
   .rn-dialog { width: 100vw; max-height: 100vh; border: none; border-radius: 0; }
   .rn-head, .rn-tabs, .rn-body, .rn-foot { padding-inline: 14px; }
+  .rn-head { gap: 8px; }
+  .rn-head-actions { gap: 5px; }
+  .rn-language-switch > button { padding-inline: 7px; }
   .rn-roadmap { grid-template-columns: minmax(0, 1fr); }
   .rn-roadmap-community { position: static; }
   /* 疊起來之後索引不能再吃固定高度：矮視窗整格只剩一百多 px，固定 200px 會把詳情欄

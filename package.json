@@ -101,6 +101,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",
+    "opencc-js": "1.4.2",
     "phaser": "4.2.1"
   },
   "devDependencies": {

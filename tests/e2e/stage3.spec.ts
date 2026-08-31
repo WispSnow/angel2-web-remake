@@ -486,3 +486,21 @@ test("stage 3 promotions use Himi as the on-field grantor while Nia is absent", 
   await expect(page.getByTestId("dialogue-portrait-composite"))
     .toHaveAttribute("data-portrait-record", "45");
 });
+
+test("S03-S: rescue allies retain the magician map figure after a deeper promotion", async ({ page }) => {
+  await openStage3(page, "stage-03-player&difficulty=0&test=1");
+  const actorId = await page.evaluate(() => {
+    window.__ANGEL2__?.forceClassActionSetup("magician");
+    return (window.__ANGEL2__?.getState() as Stage3State | undefined)?.focusId;
+  });
+  if (!actorId) throw new Error("stage 3 magician fixture did not select an actor");
+  await expect.poll(async () =>
+    (await state(page)).units.find(({ id }) => id === actorId)?.classId).toBe("magician");
+  await expect.poll(async () => page.getByTestId("battle-canvas").evaluate((canvas, unitId) => {
+    const textures = JSON.parse(canvas.dataset.unitTextureById ?? "{}") as Record<string, string>;
+    return textures[unitId];
+  }, actorId)).toBe("ally-magician");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage3-rescue-ally-magician-map-figure.png`,
+  });
+});

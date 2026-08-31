@@ -1,4 +1,11 @@
 import "../../overlay-panels.css";
+import {
+  documentationLanguage,
+  localizeDocumentationElement,
+  setDocumentationLanguage,
+  subscribeDocumentationLanguage,
+  type DocumentationLanguage,
+} from "./documentation-language";
 import { escapeHtml } from "./markup";
 
 /**
@@ -47,6 +54,7 @@ interface PanelHandles {
   readonly body: HTMLElement;
   readonly subtitle: HTMLElement;
   readonly events: AbortController;
+  readonly unsubscribeLanguage: () => void;
 }
 
 export function createOverlayPanel<Id extends string>(
@@ -74,6 +82,33 @@ export function createOverlayPanel<Id extends string>(
       button.tabIndex = selected ? 0 : -1;
     }
     config.onBodyRendered?.(panel.body, activeTab);
+    localizeDocumentationElement(panel.root, documentationLanguage());
+  }
+
+  function renderChrome(language: DocumentationLanguage): void {
+    if (!panel) return;
+    const eyebrow = panel.root.querySelector<HTMLElement>(".rn-eyebrow");
+    const heading = panel.root.querySelector<HTMLElement>(".rn-head h2");
+    const close = panel.root.querySelector<HTMLButtonElement>(".rn-close");
+    const tablist = panel.root.querySelector<HTMLElement>(".rn-tabs");
+    const footer = panel.root.querySelector<HTMLElement>(".rn-foot");
+    if (!eyebrow || !heading || !close || !tablist || !footer) {
+      throw new Error(`${testid} panel chrome failed to render`);
+    }
+    eyebrow.textContent = config.eyebrow;
+    heading.textContent = config.heading;
+    close.setAttribute("aria-label", `關閉${config.eyebrow}`);
+    tablist.setAttribute("aria-label", `${config.eyebrow}分頁`);
+    footer.textContent = config.footer;
+    for (const button of panel.root.querySelectorAll<HTMLButtonElement>("[data-overlay-tab]")) {
+      const tab = tabs.find((definition) => definition.id === button.dataset.overlayTab);
+      button.textContent = tab?.label ?? "";
+    }
+    for (const button of panel.root.querySelectorAll<HTMLButtonElement>("[data-documentation-language]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.documentationLanguage === language));
+    }
+    if (panel.root.classList.contains("is-open")) renderBody();
+    else localizeDocumentationElement(panel.root, language);
   }
 
   function build(): PanelHandles {
@@ -90,9 +125,18 @@ export function createOverlayPanel<Id extends string>(
             <h2 id="${testid}-title">${escapeHtml(config.heading)}</h2>
             <p class="rn-subtitle" data-testid="${testid}-subtitle"></p>
           </div>
-          <button type="button" class="rn-close" data-overlay-dismiss
-            data-testid="${testid}-close"
-            aria-label="關閉${escapeHtml(config.eyebrow)}">✕</button>
+          <div class="rn-head-actions">
+            <div class="rn-language-switch" role="group" aria-label="文件語言"
+              data-documentation-language-switch data-testid="${testid}-language-switch">
+              <button type="button" data-documentation-language="zh-Hant"
+                data-testid="${testid}-language-traditional">繁體</button>
+              <button type="button" data-documentation-language="zh-Hans"
+                data-testid="${testid}-language-simplified">简体</button>
+            </div>
+            <button type="button" class="rn-close" data-overlay-dismiss
+              data-testid="${testid}-close"
+              aria-label="關閉${escapeHtml(config.eyebrow)}">✕</button>
+          </div>
         </header>
         <div class="rn-tabs" role="tablist" aria-label="${escapeHtml(config.eyebrow)}分頁"
           data-testid="${testid}-tabs">
@@ -113,9 +157,25 @@ export function createOverlayPanel<Id extends string>(
     const events = new AbortController();
     const { signal } = events;
 
+    const handles: PanelHandles = {
+      root,
+      body,
+      subtitle,
+      events,
+      unsubscribeLanguage: subscribeDocumentationLanguage(renderChrome),
+    };
+    panel = handles;
+    renderChrome(documentationLanguage());
+
     root.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
+      const language = target.closest<HTMLElement>("[data-documentation-language]")
+        ?.dataset.documentationLanguage;
+      if (language === "zh-Hant" || language === "zh-Hans") {
+        setDocumentationLanguage(language);
+        return;
+      }
       if (target.closest("[data-overlay-dismiss]")) {
         close();
         return;
@@ -127,6 +187,7 @@ export function createOverlayPanel<Id extends string>(
         return;
       }
       config.onBodyClick?.(target, body);
+      localizeDocumentationElement(root, documentationLanguage());
     }, { signal });
 
     // 覆蓋層在 `document.body` 上，按鍵會一路冒泡到綁在 `window` 的戰場、開場與結局
@@ -140,7 +201,7 @@ export function createOverlayPanel<Id extends string>(
       }
     }, { signal });
 
-    return { root, body, subtitle, events };
+    return handles;
   }
 
   /**
@@ -151,7 +212,7 @@ export function createOverlayPanel<Id extends string>(
     activeTab = tab;
     panel ??= build();
     panel.root.classList.add("is-open");
-    renderBody();
+    renderChrome(documentationLanguage());
     const active = document.activeElement;
     previouslyFocused = returnFocusTo
       ?? (active instanceof HTMLElement ? active : undefined);
@@ -175,6 +236,7 @@ export function createOverlayPanel<Id extends string>(
       if (!panel) return;
       config.onDestroy?.();
       panel.events.abort();
+      panel.unsubscribeLanguage();
       panel.root.remove();
       panel = undefined;
       previouslyFocused = undefined;

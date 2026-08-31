@@ -163,6 +163,25 @@ test("S08-D/REMAKE-038: all eight allies are manual and all-rest skips NPC actio
   expect(trace.some(({ statusMessage }) => statusMessage.includes("友軍 NPC"))).toBe(false);
 });
 
+test("S08-L: a late soldier-to-sister-to-magician path keeps its map figure", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-08-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const actorId = await page.evaluate(() => {
+    window.__ANGEL2__?.forceClassActionSetup("magician");
+    return (window.__ANGEL2__?.getState() as Stage8State | undefined)?.focusId;
+  });
+  if (!actorId) throw new Error("stage 8 magician fixture did not select an actor");
+  await expect.poll(async () =>
+    (await state(page)).units.find(({ id }) => id === actorId)?.classId).toBe("magician");
+  await expect.poll(async () => page.getByTestId("battle-canvas").evaluate((canvas, unitId) => {
+    const textures = JSON.parse(canvas.dataset.unitTextureById ?? "{}") as Record<string, string>;
+    return textures[unitId];
+  }, actorId)).toBe("ally-magician");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage8-late-promotion-magician-map-figure.png`,
+  });
+});
+
 test("S08-E/F: the last raider triggers the REMAKE-032 SAY/157 victory story", async ({ page }) => {
   await page.goto("/?debugScenario=stage-08-near-victory&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();

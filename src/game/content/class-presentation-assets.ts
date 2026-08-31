@@ -1,6 +1,6 @@
 import type { PortraitRecord, UnitClassId } from "../types";
 import { presentationActionIdsForClass, type BattleActionId } from "./actions";
-import { promotionTargetsFor } from "./classes";
+import { promotionReachableClassIds } from "./classes";
 import { FULL_COMBAT_ATLASES } from "./full-combat-atlases.generated";
 import { allyMapUnitAssetsForClasses } from "./map-unit-assets";
 import { mapActionAtlasAssetsForActions } from "./map-action-assets";
@@ -8,7 +8,7 @@ import { fullCombatBackgroundAssetsForStage } from "./full-combat-backgrounds";
 import { portraitAssetUrlsForRecords } from "./portrait-assets";
 
 export interface StageClassPresentationRequirements {
-  /** Player roster classes; immediate promotion choices are included. */
+  /** Player roster classes; every legal in-stage promotion descendant is included. */
   allyClassIds: readonly UnitClassId[];
   /** Every class known to the stage, including fixed and enemy figures. */
   encounterClassIds: readonly UnitClassId[];
@@ -33,10 +33,9 @@ const fullCombatAtlasById = new Map<string, (typeof FULL_COMBAT_ATLASES)[number]
 export function classPresentationAssetUrls(
   requirements: StageClassPresentationRequirements,
 ): readonly string[] {
-  const allyClasses = new Set<UnitClassId>(requirements.allyClassIds);
-  for (const classId of requirements.allyClassIds) {
-    for (const promotion of promotionTargetsFor(classId)) allyClasses.add(promotion.id);
-  }
+  const allyClasses = new Set<UnitClassId>(
+    promotionReachableClassIds(requirements.allyClassIds),
+  );
   const encounterClasses = new Set<UnitClassId>([
     ...requirements.encounterClassIds,
     ...allyClasses,

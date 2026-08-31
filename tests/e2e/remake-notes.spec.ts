@@ -41,6 +41,71 @@ test("三個覆蓋層入口並排在宿主工具列上，靠在縮放選項右�
   if (row) expect(row.x + row.width - (notes.x + notes.width)).toBeLessThan(4);
 });
 
+test("說明文件可在繁簡中文間切換，三個覆蓋層共用並記住選擇", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "fixes");
+
+  const notes = page.getByTestId("remake-notes");
+  const traditional = page.getByTestId("remake-notes-language-traditional");
+  const simplified = page.getByTestId("remake-notes-language-simplified");
+  await expect(notes).toHaveAttribute("lang", "zh-Hant");
+  await expect(traditional).toHaveAttribute("aria-pressed", "true");
+  await expect(simplified).toHaveAttribute("aria-pressed", "false");
+
+  await simplified.click();
+  await expect(notes).toHaveAttribute("lang", "zh-Hans");
+  await expect(traditional).toHaveAttribute("aria-pressed", "false");
+  await expect(simplified).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
+    .toHaveText(["Bug 修复", "功能增强", "平衡性调整", "操作说明", "免责声明"]);
+  await expect(page.getByTestId("remake-note-REMAKE-004"))
+    .toContainText("中毒状态不再残留 0 生命存活单位");
+  await expect(notes.locator(".rn-foot")).toContainText("不会误触战场指令");
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("compendium-open").click();
+  const compendium = page.getByTestId("compendium");
+  await expect(compendium).toHaveAttribute("lang", "zh-Hans");
+  await expect(page.getByTestId("compendium-tabs").getByRole("tab"))
+    .toHaveText(["职业图鉴", "角色图鉴"]);
+  await expect(page.getByTestId("compendium-detail")).toContainText("属性与成长");
+  await page.getByTestId("compendium-tab-characters").click();
+  await page.getByTestId("compendium-character-longwang").click();
+  await expect(page.getByTestId("compendium-detail").getByRole("heading", { name: "龙王" }))
+    .toBeVisible();
+  await expect(page.getByTestId("compendium-detail")).toContainText("对白登场");
+  await page.getByTestId("compendium-language-traditional").click();
+  await expect(page.getByTestId("compendium-tab-characters"))
+    .toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("compendium-detail").getByRole("heading", { name: "龍王" }))
+    .toBeVisible();
+  await page.getByTestId("compendium-language-simplified").click();
+  await expect(page.getByTestId("compendium-detail").getByRole("heading", { name: "龙王" }))
+    .toBeVisible();
+
+  await page.getByTestId("compendium-close").click();
+  await page.getByTestId("roadmap-open").click();
+  const roadmap = page.getByTestId("roadmap");
+  await expect(roadmap).toHaveAttribute("lang", "zh-Hans");
+  await expect(page.getByTestId("roadmap-tabs").getByRole("tab"))
+    .toHaveText(["画面与声音", "剧情与玩法", "Mod 与共创"]);
+  await expect(page.getByTestId("roadmap-item-hd-portraits")).toContainText("立绘高清化重制");
+  await expect(page.getByRole("img", { name: "QQ 交流群 1107513111 二维码" })).toBeVisible();
+  await captureVisualAudit(roadmap.locator(".rn-dialog"), {
+    path: "artifacts/playwright/roadmap-simplified-desktop.png",
+  });
+
+  // 刷新後仍沿用本机偏好；切回繁體則立即還原同一頁，不重設目前分頁。
+  await page.reload();
+  await page.getByTestId("roadmap-open").click();
+  await expect(page.getByTestId("roadmap-tab-presentation")).toHaveText("画面与声音");
+  await page.getByTestId("roadmap-language-traditional").click();
+  await expect(page.getByTestId("roadmap-tab-presentation")).toHaveText("畫面與聲音");
+  await expect(page.getByTestId("roadmap-item-hd-portraits")).toContainText("立繪高清化重製");
+  await expect(page.getByTestId("roadmap-language-traditional"))
+    .toHaveAttribute("aria-pressed", "true");
+});
+
 test("五個分頁各載入自己的內容，操作與免責說明都可獨立查閱", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "fixes");

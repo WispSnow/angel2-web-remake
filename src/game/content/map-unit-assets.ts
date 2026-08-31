@@ -1,5 +1,5 @@
 import type { UnitClassId } from "../types";
-import { promotionTargetsFor } from "./classes";
+import { promotionReachableClassIds } from "./classes";
 
 /**
  * Shared player-side map figures currently reachable in the released campaign
@@ -50,21 +50,16 @@ export function allyMapUnitAsset(classId: UnitClassId): string | undefined {
 }
 
 /**
- * Phaser only needs figures already present on the board plus the immediate
- * promotion choices that can replace one of them during this stage. Later
- * promotion tiers and unrelated campaign classes stay out of the texture
- * manager until a stage actually needs them.
+ * Phaser needs every figure reachable from a class already present on the
+ * board. A long stage can cross multiple promotion thresholds, so stopping at
+ * the immediate choices leaves a second promotion on Phaser's missing texture;
+ * unrelated promotion trees still stay out of the current scene.
  */
 export function allyMapUnitAssetsForClasses(
   classIds: Iterable<UnitClassId>,
 ): ReadonlyMap<UnitClassId, string> {
-  const required = new Set<UnitClassId>();
-  for (const classId of classIds) {
-    required.add(classId);
-    for (const target of promotionTargetsFor(classId)) required.add(target.id);
-  }
   const assets = new Map<UnitClassId, string>();
-  for (const classId of required) {
+  for (const classId of promotionReachableClassIds(classIds)) {
     const source = allyMapUnitAsset(classId);
     if (source) assets.set(classId, source);
   }

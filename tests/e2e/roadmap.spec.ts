@@ -16,7 +16,7 @@ test("RoadMap 展示候選方向、QQ 群與原始二維碼", async ({ page }) =
     .toHaveText(["畫面與聲音", "劇情與玩法", "Mod 與共創"]);
   await expect(page.getByTestId("roadmap-tab-presentation"))
     .toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("roadmap-notice")).toContainText("不是承諾時程");
+  await expect(page.getByTestId("roadmap-notice")).toContainText("並非已承諾的開發時程");
   await expect(page.getByTestId("roadmap-item-hd-portraits")).toContainText("立繪高清化重製");
   await expect(page.getByTestId("roadmap-item-ai-voices")).toContainText("AI 角色配音");
 

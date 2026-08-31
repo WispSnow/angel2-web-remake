@@ -558,6 +558,28 @@ export function promotionTargetsFor(classId: ClassId): readonly PromotionTarget[
   return classDefinition(classId).promotion.targets;
 }
 
+/**
+ * Every class a unit can reach without leaving the current battle. Promotion
+ * can happen more than once in a long stage, so presentation assets cannot stop
+ * at the immediate menu candidates. The visited set also keeps malformed or
+ * modded cyclic promotion data from looping forever.
+ */
+export function promotionReachableClassIds(
+  classIds: Iterable<ClassId>,
+): readonly ClassId[] {
+  const reachable: ClassId[] = [];
+  const pending = [...classIds];
+  const visited = new Set<ClassId>();
+  for (let index = 0; index < pending.length; index += 1) {
+    const classId = pending[index];
+    if (visited.has(classId)) continue;
+    visited.add(classId);
+    reachable.push(classId);
+    for (const target of promotionTargetsFor(classId)) pending.push(target.id);
+  }
+  return reachable;
+}
+
 export function isPromotionEligible(
   unit: Pick<BattleUnit, "side" | "classId" | "experience">,
 ): boolean {
