@@ -104,8 +104,8 @@ export interface StageSaveSchema {
   requiredResumeEventIds?: readonly string[];
   alliedUnits: StageSaveAlliedUnitRule;
   enemyClassById: readonly (readonly [string, UnitClassId])[];
-  /** Minimum saved enemy experience; stage 3 bypasses native difficulty seeding. */
-  enemyExperienceFloor?: "difficulty" | "none";
+  /** Minimum saved enemy experience under this stage's entry-seeding rule. */
+  enemyExperienceFloor?: "difficulty" | "none" | "difficulty-unless-lawless";
   enemyFormSequences?: readonly {
     unitId: string;
     classIdsByDifficulty: readonly (readonly UnitClassId[])[];
@@ -2226,7 +2226,7 @@ export const STAGE_RUNTIME_MANIFEST = {
         ["2:48", "soldier"],
         ["2:49", "soldier"],
       ],
-      enemyExperienceFloor: "none",
+      enemyExperienceFloor: "difficulty-unless-lawless",
       enemyAi: "none",
     },
     load: loadStage3Module,

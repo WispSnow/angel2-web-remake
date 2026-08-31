@@ -250,9 +250,22 @@ test("REMAKE-127 將第 8、11 關敵軍難度成長列為平衡調整", async (
   await expect(stageDifficulty).toContainText("第 8、11 關保留完整敵軍難度成長");
   await expect(stageDifficulty).toContainText("四檔敵軍登場等級依次為 2、4、6、5");
   await expect(stageDifficulty).toContainText("第 11 關的初始追兵與每輪增援使用相同規則");
-  await expect(stageDifficulty).toContainText("第 3 關「救援友軍」不套用此調整");
+  await expect(stageDifficulty).toContainText("第 3 關「救援友軍」另有專項規則");
   await captureVisualAudit(stageDifficulty, {
     path: "artifacts/playwright/remake-notes-stage8-stage11-difficulty.png",
+  });
+});
+
+test("REMAKE-129 說明救援友軍僅在無法無天採用 1 級敵軍", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "balance");
+  const stageDifficulty = page.getByTestId("remake-note-REMAKE-129");
+  await expect(stageDifficulty).toContainText("僅在無法無天採用 1 級敵軍");
+  await expect(stageDifficulty).toContainText("登場等級依次為 2、4、6");
+  await expect(stageDifficulty).toContainText("只有無法無天保留 1 級敵軍");
+  await expect(stageDifficulty).toContainText("不影響第 8、11 關");
+  await captureVisualAudit(stageDifficulty, {
+    path: "artifacts/playwright/remake-notes-stage3-lawless-level-one.png",
   });
 });
 

@@ -362,6 +362,24 @@ const legacySeededStage3BattleSave = (difficulty: Difficulty = 0): BattleSaveDat
   };
 };
 
+/** Reconstructs the all-difficulty zero baseline written by v96/v97 stage 3. */
+const previouslyUnseededStage3BattleSave = (difficulty: Difficulty = 0): BattleSaveData => {
+  const save = stage3BattleSave();
+  return {
+    ...save,
+    difficulty,
+    stageEntrySnapshot: { ...save.stageEntrySnapshot, difficulty },
+    battle: {
+      ...save.battle,
+      units: save.battle.units.map((unit) => {
+        if (unit.side === 1) return { ...unit };
+        const unseeded = { ...unit, experience: 0 };
+        return { ...unseeded, life: statsFor(unseeded, difficulty).maxLife };
+      }),
+    },
+  };
+};
+
 const stage4BattleSave = (): BattleSaveData => {
   const source = {
     stageId: "stage-04" as const,
@@ -5206,13 +5224,13 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
-  it("carries version-96 saves through the lightning tier-experience identity", () => {
-    const stage3 = stage3BattleSave();
+  it("migrates version-96 saves through lightning and selective stage-3 seeding", () => {
+    const stage3 = previouslyUnseededStage3BattleSave();
     expect(parseSaveData(JSON.stringify({
       ...stage3,
       version: 96,
       contentVersion: "stage-03-native-enemy-level-1",
-    }))).toEqual(stage3);
+    }))).toEqual(stage3BattleSave());
 
     const otherBattle = battleSave();
     expect(parseSaveData(JSON.stringify({
@@ -5226,6 +5244,58 @@ describe("Web save validation", () => {
       ...completed,
       version: 96,
       contentVersion: "stage-03-native-enemy-level-1",
+    }))).toEqual(completed);
+  });
+
+  it("restores the stage-3 seed in non-lawless version-97 battles", () => {
+    const difficulty = 2 as const;
+    const previous = previouslyUnseededStage3BattleSave(difficulty);
+    const previousUnits = previous.battle.units.map((unit) => {
+      if (unit.side === 1 || unit.id !== "2:42") return { ...unit };
+      const earned = { ...unit, experience: 23 };
+      return { ...earned, life: statsFor(earned, difficulty).maxLife - 17 };
+    });
+    const migrated = parseSaveData(JSON.stringify({
+      ...previous,
+      version: 97,
+      contentVersion: "lightning-tier-experience-1",
+      battle: { ...previous.battle, units: previousUnits },
+    }));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-03",
+      difficulty,
+    });
+    if (!migrated || migrated.kind !== "battle") throw new Error("stage 3 v97 migration failed");
+    for (const enemy of migrated.battle.units.filter(({ side }) => side === 2)) {
+      const earnedExperience = enemy.id === "2:42" ? 23 : 0;
+      const damage = enemy.id === "2:42" ? 17 : 0;
+      expect(enemy.experience, enemy.id)
+        .toBe(initialEnemyExperience(enemy.classId, difficulty) + earnedExperience);
+      expect(enemy.life, enemy.id).toBe(statsFor(enemy, difficulty).maxLife - damage);
+    }
+
+    const otherBattle = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...otherBattle,
+      version: 97,
+      contentVersion: "lightning-tier-experience-1",
+    }))).toEqual(otherBattle);
+
+    const lawless = previouslyUnseededStage3BattleSave(3);
+    expect(parseSaveData(JSON.stringify({
+      ...lawless,
+      version: 97,
+      contentVersion: "lightning-tier-experience-1",
+    }))).toEqual(lawless);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 97,
+      contentVersion: "lightning-tier-experience-1",
     }))).toEqual(completed);
   });
 
@@ -5290,6 +5360,17 @@ describe("Web save validation", () => {
       version: 95,
       contentVersion: "stomp-kill-experience-1",
     }))).toEqual(completed);
+
+    const nonLawless = legacySeededStage3BattleSave(1);
+    const migratedNonLawless = parseSaveData(JSON.stringify({
+      ...nonLawless,
+      version: 95,
+      contentVersion: "stomp-kill-experience-1",
+    }));
+    expect(migratedNonLawless?.kind === "battle"
+      ? migratedNonLawless.battle.units.filter(({ side }) => side === 2)
+        .every((enemy) => enemy.experience === initialEnemyExperience(enemy.classId, 1))
+      : false).toBe(true);
   });
 
   it("carries version-89 saves forward when SA narrows its target set", () => {
@@ -5353,7 +5434,7 @@ describe("Web save validation", () => {
       ],
     }))).toEqual(completed);
 
-    // 事件补录不碰名冊与 PRNG；REMAKE-126 另行修正敌军经验／生命上限。
+    // 事件补录不碰名冊与 PRNG；REMAKE-129 另行修正分档经验／生命上限。
     const legacyRoster = stage3BattleSave().roster;
     expect(parseSaveData(JSON.stringify(legacyBattle))?.roster).toEqual(legacyRoster);
 

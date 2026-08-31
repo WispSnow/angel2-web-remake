@@ -119,9 +119,9 @@ const STAGE3_FORCE_DEFINITIONS = [
 const STAGE3_UNIT_CONFIG = {
   alliedUnits: STAGE3_SEMANTIC_ALLIED_UNITS,
   enemyUnits: STAGE3_SEMANTIC_ENEMY_UNITS,
-  // Native module 29 jumps over the LV_HARD+1 experience loop for stage 3.
-  // Difficulty 3 still applies its later side-2 attack/defense/life multiplier.
-  enemyExperienceSeeding: "none",
+  // REMAKE-129 keeps normal Web levels on the first three settings; only
+  // lawless uses the native level-one exception before its later 150% stats.
+  enemyExperienceSeeding: "difficulty-unless-lawless",
   inheritance: {
     genericPortrait: 47,
     defaultClassId: "soldier",

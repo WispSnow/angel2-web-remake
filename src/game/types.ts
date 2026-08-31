@@ -266,8 +266,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 97;
-  contentVersion: "lightning-tier-experience-1";
+  version: 98;
+  contentVersion: "stage-03-lawless-enemy-level-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

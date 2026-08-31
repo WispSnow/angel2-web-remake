@@ -486,8 +486,8 @@ function migrateVersion94Save(value: unknown): SaveData | undefined {
   return isSaveData(migrated) ? migrated : undefined;
 }
 
-/** REMAKE-126 gives v95 the new identity; the shared post-migration repair below
- * also corrects every older stage-3 battle that survives its own version gate. */
+/** REMAKE-126 gives v95 the historical identity; REMAKE-129's shared repair
+ * below now removes the old seed only from lawless stage-3 battles. */
 function migrateVersion95Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 95
@@ -501,16 +501,68 @@ function migrateVersion95Save(value: unknown): SaveData | undefined {
 }
 
 /**
- * REMAKE-128 restores the tier roll made by every future lightning cast. No
- * pending action is persisted, so a legal v96 save carries over byte-for-byte;
- * only the next committed lightning result and its PRNG cursor differ.
+ * v96/v97 stage-3 battles were created while every difficulty used the native
+ * zero-experience exception. REMAKE-129 restores the shared seed on the first
+ * three settings, preserving earned experience and absolute damage.
  */
-function migrateVersion96Save(value: unknown): SaveData | undefined {
-  if (!isRecord(value)
-    || value.version !== 96
-    || value.contentVersion !== "stage-03-native-enemy-level-1") return undefined;
-  const migrated = {
+function restoreStage3DifficultySeedOutsideLawless(
+  value: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (value.kind !== "battle" || value.stageId !== "stage-03") return value;
+  const difficulty = value.difficulty;
+  if (!isDifficulty(difficulty)) return undefined;
+  if (difficulty === 3) return value;
+  if (!isRecord(value.battle) || !Array.isArray(value.battle.units)) return undefined;
+
+  let validPreviousEnemies = true;
+  const units = value.battle.units.map((unit) => {
+    if (!isRecord(unit) || unit.side !== 2) return unit;
+    if (!isClassId(unit.classId)
+      || !isIntegerBetween(unit.experience, 0, MAX_EXPERIENCE)
+      || !isIntegerBetween(unit.life, 0, MAX_LIFE)) {
+      validPreviousEnemies = false;
+      return unit;
+    }
+    const previousMaximumLife = statsFor({
+      side: 2,
+      classId: unit.classId,
+      experience: unit.experience,
+    }, difficulty).maxLife;
+    const seededExperience = initialEnemyExperience(unit.classId, difficulty);
+    if (unit.life > previousMaximumLife
+      || unit.experience > MAX_EXPERIENCE - seededExperience) {
+      validPreviousEnemies = false;
+      return unit;
+    }
+    const experience = unit.experience + seededExperience;
+    const maximumLife = statsFor({
+      side: 2,
+      classId: unit.classId,
+      experience,
+    }, difficulty).maxLife;
+    const damage = previousMaximumLife - unit.life;
+    return {
+      ...unit,
+      experience,
+      life: unit.life === 0 ? 0 : Math.max(1, maximumLife - damage),
+    };
+  });
+  if (!validPreviousEnemies) return undefined;
+  return {
     ...value,
+    battle: { ...value.battle, units },
+  };
+}
+
+/** REMAKE-129 restores normal stage-3 seeding outside lawless difficulty. */
+function migrateVersion97Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 97
+    || value.contentVersion !== "lightning-tier-experience-1") return undefined;
+  const restored = restoreStage3DifficultySeedOutsideLawless(value);
+  if (!restored) return undefined;
+  const migrated = {
+    ...restored,
     version: SAVE_VERSION,
     contentVersion: SAVE_CONTENT_VERSION,
   };
@@ -518,13 +570,30 @@ function migrateVersion96Save(value: unknown): SaveData | undefined {
 }
 
 /**
- * Every Web save version that could contain a stage-3 battle used the shared
- * difficulty seed. Run this after its own migration has validated the full
- * record, then subtract that synthetic baseline exactly once. This preserves
- * experience earned after entry and carries absolute damage to the lower cap.
+ * REMAKE-128 restores the tier roll made by every future lightning cast, while
+ * REMAKE-129 also repairs the stage-3 baseline inherited from v96.
+ */
+function migrateVersion96Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 96
+    || value.contentVersion !== "stage-03-native-enemy-level-1") return undefined;
+  const restored = restoreStage3DifficultySeedOutsideLawless(value);
+  if (!restored) return undefined;
+  const migrated = {
+    ...restored,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * Every pre-v96 stage-3 battle used the shared difficulty seed. Only lawless
+ * now removes that synthetic baseline; the first three settings keep it. This
+ * preserves earned experience and carries absolute damage to the lower cap.
  */
 function removeLegacyStage3DifficultySeed(save: SaveData): SaveData | undefined {
-  if (save.kind !== "battle" || save.stageId !== "stage-03") return save;
+  if (save.kind !== "battle" || save.stageId !== "stage-03" || save.difficulty !== 3) return save;
 
   let validLegacyEnemies = true;
   const units = save.battle.units.map((unit) => {
@@ -2784,8 +2853,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
-    // v96 already contains REMAKE-126's corrected stage-3 enemy baseline. It
-    // must bypass the pre-v96 seed-removal repair below.
+    const migratedVersion97 = migrateVersion97Save(value);
+    if (migratedVersion97) return migratedVersion97;
+    // v96/v97 used the all-difficulty level-one baseline; both bypass the
+    // pre-v96 lawless seed-removal repair after their own inverse migration.
     const migratedVersion96 = migrateVersion96Save(value);
     if (migratedVersion96) return migratedVersion96;
     const migrated = migrateLegacySaveData(value);

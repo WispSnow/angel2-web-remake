@@ -247,6 +247,23 @@ test("S03-T: lawless keeps stage-3 enemies at native level one with boosted stat
   });
 });
 
+test("S03-U: non-lawless stage-3 enemies retain normal Web difficulty levels", async ({ page }) => {
+  for (const [difficulty, level] of [[0, 2], [1, 4], [2, 6]] as const) {
+    await openStage3(page, `stage-03-player&difficulty=${difficulty}&test=1`);
+    const enemies = (await state(page)).units.filter(({ side }) => side === 2);
+    expect(enemies).toHaveLength(12);
+    expect(enemies.every(({ experience }) => experience > 0)).toBe(true);
+
+    await clickUnit(page, "2:42");
+    await expect(page.getByTestId("unit-level-stat")).toHaveText(new RegExp(`等級\\s*${level}`, "u"));
+    if (difficulty === 2) {
+      await captureVisualAudit(page.getByTestId("game-screen"), {
+        path: `${ARTIFACT_DIR}/stage3-hard-normal-level-six.png`,
+      });
+    }
+  }
+});
+
 test("S03-F/G: monk recovery exposes the native menu and marks only allies inside its effect diamond", async ({ page }) => {
   await openStage3(page, "stage-03-player&difficulty=0&test=1");
   await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("monk"));

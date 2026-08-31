@@ -178,8 +178,9 @@
 - [SR] `REMAKE-120` 曾将保存身份升级为 v93／`stage-27-eliola-display-name-1`，
   `REMAKE-124` 随后升级为 v94／`boss-poison-one-third-1`，`REMAKE-125` 为
   v95／`stomp-kill-experience-1`，`REMAKE-126` 为 v96／
-  `stage-03-native-enemy-level-1`；当前 `REMAKE-128` 为 v97／
-  `lightning-tier-experience-1`。合法 v96／v95／v94／v93 无损迁移；合法 v92 stage 27
+  `stage-03-native-enemy-level-1`；`REMAKE-128` 为 v97／`lightning-tier-experience-1`；当前
+  `REMAKE-129` 为 v98／`stage-03-lawless-enemy-level-1`。合法 v97／v96／v95／v94／v93
+  无损迁移；合法 v92 stage 27
   战中档只为槽 22 恢复姓名与 `named-class-portrait` 标志，职业、通用肖像、生命、经验、
   位置、行动位、PRNG 与军团归属不变；
 - [SR] 失败直接回 stage 27 部署，本次尝试取得的成长依 `REMAKE-016` 保留；

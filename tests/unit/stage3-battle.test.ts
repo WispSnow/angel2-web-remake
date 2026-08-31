@@ -4,7 +4,7 @@ import {
   STAGE3_FOURTH_CORPS_NAMED_ACTORS,
   stage3TerrainSlotAt,
 } from "../../src/game/content/stage3";
-import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { completeCampaignRoster, initialEnemyExperience } from "../../src/game/content/stage0";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
 import type { CampaignState, UnitClassId } from "../../src/game/types";
 
@@ -51,7 +51,19 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     expect(battle.focusId).toBe("1:1");
   });
 
-  it("keeps native stage-3 enemies at level one while applying the lawless stat bonus", () => {
+  it("keeps normal Web enemy levels on the first three difficulties", () => {
+    const levels = [2, 4, 6] as const;
+    for (const difficulty of [0, 1, 2] as const) {
+      const battle = new Stage3Battle({ ...campaign, difficulty });
+      for (const enemy of battle.units.filter(({ side }) => side === 2)) {
+        expect(enemy.experience, `${difficulty}:${enemy.id}`)
+          .toBe(initialEnemyExperience(enemy.classId, difficulty));
+        expect(battle.statsFor(enemy).level, `${difficulty}:${enemy.id}`).toBe(levels[difficulty]);
+      }
+    }
+  });
+
+  it("keeps only lawless stage-3 enemies at level one with the stat bonus", () => {
     const battle = new Stage3Battle({ ...campaign, difficulty: 3 });
     const expectedByClass: Partial<Record<UnitClassId, {
       level: number;

@@ -50,7 +50,7 @@ export interface FixedStageUnitConfig {
   alliedUnits: readonly FixedStageAlliedUnitDefinition[];
   enemyUnits: readonly FixedStageEnemyUnitDefinition[];
   /** Whether this ruleset applies the shared enemy difficulty experience loop. */
-  enemyExperienceSeeding?: "difficulty" | "none";
+  enemyExperienceSeeding?: "difficulty" | "none" | "difficulty-unless-lawless";
   inheritance: {
     genericPortrait: PortraitRecord;
     defaultClassId: UnitClassId;
@@ -120,6 +120,7 @@ export function createFixedStageEnemy(
   experienceSeeding: FixedStageUnitConfig["enemyExperienceSeeding"] = "difficulty",
 ): BattleUnit {
   const experience = experienceSeeding === "none"
+    || (experienceSeeding === "difficulty-unless-lawless" && difficulty === 3)
     ? 0
     : initialEnemyExperience(definition.classId, difficulty);
   const unit: BattleUnit = {
