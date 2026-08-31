@@ -486,6 +486,55 @@ function migrateVersion94Save(value: unknown): SaveData | undefined {
   return isSaveData(migrated) ? migrated : undefined;
 }
 
+/** REMAKE-126 gives v95 the new identity; the shared post-migration repair below
+ * also corrects every older stage-3 battle that survives its own version gate. */
+function migrateVersion95Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 95
+    || value.contentVersion !== "stomp-kill-experience-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * Every Web save version that could contain a stage-3 battle used the shared
+ * difficulty seed. Run this after its own migration has validated the full
+ * record, then subtract that synthetic baseline exactly once. This preserves
+ * experience earned after entry and carries absolute damage to the lower cap.
+ */
+function removeLegacyStage3DifficultySeed(save: SaveData): SaveData | undefined {
+  if (save.kind !== "battle" || save.stageId !== "stage-03") return save;
+
+  let validLegacyEnemies = true;
+  const units = save.battle.units.map((unit) => {
+    if (unit.side !== 2) return unit;
+    const seededExperience = initialEnemyExperience(unit.classId, save.difficulty);
+    if (unit.experience < seededExperience) {
+      validLegacyEnemies = false;
+      return unit;
+    }
+    const previousMaximumLife = statsFor(unit, save.difficulty).maxLife;
+    const experience = unit.experience - seededExperience;
+    const maximumLife = statsFor({ ...unit, experience }, save.difficulty).maxLife;
+    const damage = previousMaximumLife - unit.life;
+    return {
+      ...unit,
+      experience,
+      life: unit.life === 0 ? 0 : Math.max(1, maximumLife - damage),
+    };
+  });
+  if (!validLegacyEnemies) return undefined;
+  const corrected: SaveData = {
+    ...save,
+    battle: { ...save.battle, units },
+  };
+  return isSaveData(corrected) ? corrected : undefined;
+}
+
 /**
  * REMAKE-119 restores the two character descriptors that the first stage-33
  * runtime generator dropped. Existing v91 battle saves already contain the
@@ -2719,7 +2768,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
     const migrated = migrateLegacySaveData(value);
-    return migrated ? raiseHalfDragonSisterEntryExperience(migrated) : undefined;
+    const corrected = migrated ? removeLegacyStage3DifficultySeed(migrated) : undefined;
+    return corrected ? raiseHalfDragonSisterEntryExperience(corrected) : undefined;
   } catch {
     return undefined;
   }
@@ -2727,6 +2777,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
   const value = addStage27EliolaDisplayIdentity(normalizeStage3OpeningEvents(raw));
+  const migratedVersion95 = migrateVersion95Save(value);
+  if (migratedVersion95) return migratedVersion95;
   const migratedVersion94 = migrateVersion94Save(value);
   if (migratedVersion94) return migratedVersion94;
   const migratedVersion93 = migrateVersion93Save(value);

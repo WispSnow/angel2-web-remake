@@ -49,6 +49,8 @@ export interface FixedStageEnemyUnitDefinition {
 export interface FixedStageUnitConfig {
   alliedUnits: readonly FixedStageAlliedUnitDefinition[];
   enemyUnits: readonly FixedStageEnemyUnitDefinition[];
+  /** Native stages 3, 8, and 11 bypass module 29's difficulty experience loop. */
+  enemyExperienceSeeding?: "difficulty" | "none";
   inheritance: {
     genericPortrait: PortraitRecord;
     defaultClassId: UnitClassId;
@@ -115,8 +117,11 @@ function createInheritedAlly(
 export function createFixedStageEnemy(
   definition: FixedStageEnemyUnitDefinition,
   difficulty: Difficulty,
+  experienceSeeding: FixedStageUnitConfig["enemyExperienceSeeding"] = "difficulty",
 ): BattleUnit {
-  const experience = initialEnemyExperience(definition.classId, difficulty);
+  const experience = experienceSeeding === "none"
+    ? 0
+    : initialEnemyExperience(definition.classId, difficulty);
   const unit: BattleUnit = {
     id: `2:${definition.slot}`,
     side: 2,
@@ -147,7 +152,8 @@ export function createFixedStageUnits(
   return [
     ...config.alliedUnits.map((definition) =>
       createInheritedAlly(definition, campaignRoster, config.inheritance)),
-    ...config.enemyUnits.map((definition) => createFixedStageEnemy(definition, difficulty)),
+    ...config.enemyUnits.map((definition) =>
+      createFixedStageEnemy(definition, difficulty, config.enemyExperienceSeeding)),
   ];
 }
 

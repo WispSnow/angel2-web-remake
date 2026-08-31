@@ -229,6 +229,24 @@ test("S03-A/B/C/J: stage 3 boots from evidence content with the corrected object
   });
 });
 
+test("S03-T: lawless keeps stage-3 enemies at native level one with boosted stats", async ({ page }) => {
+  await openStage3(page, "stage-03-player&difficulty=3&test=1");
+  const enemies = (await state(page)).units.filter(({ side }) => side === 2);
+  expect(enemies).toHaveLength(12);
+  expect(enemies.every(({ experience }) => experience === 0)).toBe(true);
+
+  await clickUnit(page, "2:42");
+  await expect(page.getByText("士兵／士兵", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("unit-level-stat")).toHaveText(/等級\s*1/u);
+  await expect(page.getByTestId("unit-attack-stat")).toHaveText(/攻擊\s*58／58/u);
+  await expect(page.getByTestId("unit-defense-stat")).toHaveText(/防禦\s*31／31/u);
+  await expect(page.getByTestId("hp-bar")).toHaveAttribute("aria-label", "生命 240／240");
+  await expect(page.getByTestId("exp-bar")).toHaveAttribute("aria-label", /^經驗 0／/u);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage3-lawless-native-level-one.png`,
+  });
+});
+
 test("S03-F/G: monk recovery exposes the native menu and marks only allies inside its effect diamond", async ({ page }) => {
   await openStage3(page, "stage-03-player&difficulty=0&test=1");
   await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("monk"));

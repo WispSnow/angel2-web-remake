@@ -6,7 +6,7 @@ import {
 } from "../../src/game/content/stage3";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
-import type { CampaignState } from "../../src/game/types";
+import type { CampaignState, UnitClassId } from "../../src/game/types";
 
 const campaign: CampaignState = {
   stageId: "stage-03",
@@ -49,6 +49,29 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     expect(battle.unit("1:4")).toMatchObject({ classId: "archer", name: "拉朵那", x: 18, y: 36 });
     expect(battle.unit("2:17")).toMatchObject({ classId: "monk", name: "梅蒂", x: 18, y: 15 });
     expect(battle.focusId).toBe("1:1");
+  });
+
+  it("keeps native stage-3 enemies at level one while applying the lawless stat bonus", () => {
+    const battle = new Stage3Battle({ ...campaign, difficulty: 3 });
+    const expectedByClass: Partial<Record<UnitClassId, {
+      level: number;
+      attack: number;
+      defense: number;
+      maxLife: number;
+    }>> = {
+      soldier: { level: 1, attack: 58, defense: 31, maxLife: 240 },
+      sister: { level: 1, attack: 70, defense: 45, maxLife: 300 },
+      monk: { level: 1, attack: 75, defense: 51, maxLife: 375 },
+      cavalry: { level: 1, attack: 82, defense: 45, maxLife: 300 },
+    };
+
+    for (const enemy of battle.units.filter(({ side }) => side === 2)) {
+      const expected = expectedByClass[enemy.classId];
+      if (!expected) throw new Error(`missing stage-3 expectation for ${enemy.classId}`);
+      expect(enemy.experience, enemy.id).toBe(0);
+      expect(battle.statsFor(enemy), enemy.id).toMatchObject(expected);
+      expect(enemy.life, enemy.id).toBe(expected.maxLife);
+    }
   });
 
   /**

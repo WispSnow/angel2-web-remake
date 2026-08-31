@@ -32,6 +32,8 @@
   的 `normalStageObjectives[stage=3]`；
 - 逐关事件：[`stage-events.json`](../../../reverse/parsed/native/stage-events.json)
   的 `1000:4497`；
+- 难度经验播种：[`battle-lifecycle.json`](../../../reverse/parsed/native/battle-lifecycle.json)
+  的 `freshBattleInitialization.enemyExperienceSeeding`；
 - 剧情记录：[`0012.json`](../../../reverse/parsed/dialogue/0012.json)、
   [`0013.json`](../../../reverse/parsed/dialogue/0013.json)；
 - 技术规则与表现：[`technique-rules.json`](../../../reverse/parsed/native/technique-rules.json)、
@@ -92,6 +94,10 @@
 | 48 | 士兵 | `(23,28)` | [OF] 行为 0 |
 | 49 | 士兵 | `(31,30)` | [OF] 行为 0 |
 
+[OF] 模块 29 在 stage 3 直接跳过敌方 `LV_HARD+1` 次经验播种，因此上述十二名敌军在四种
+难度都以经验 `0`、职业等级 `1` 入场。无法无天仍执行随后独立的 side 2 属性加半：士兵
+`58/31/240`、修女 `70/45/300`、僧侶 `75/51/375`、騎兵 `82/45/300`（攻／防／生命）。
+
 ## 7. 胜负条件
 
 - 胜利：[OF] side 2 槽 17「梅蒂」不在棋盘。
@@ -149,6 +155,7 @@ victoryFeedback → savePrompt/saveSlots → nextStage(stage-04)`。自动友军
 | 自动友军生存策略 | 槽 `3/5` 防御区内行动；区外先入森林、且进入落点按离黛西的剩余路程排序；修女优先治疗自动友军；`REMAKE-111` 近战交出主动进攻权、不满血即休息、满血向黛西收拢，远程与治疗职业保持 `50%` 休息门槛并在无收益动作时收拢 | 原版行为 `2/3/4` 与低生命门槛，近战照常进攻 | 改防御区、集结点、交权范围或阈值须改变规则身份 |
 | 敌军目标 | 第一军团优先自动友军，第二军团优先玩家救援部队；目标组全灭后切换 | 原版行为 `0` | 改编组或切换条件须改变规则身份 |
 | 集团命令 | 固定由希蜜下令且只作用于玩家角色；自动友军随后按独立军团 AI 行动 | 按当前焦点选择临时主将并统一调度 | 改主将或队列须改变规则身份 |
+| 敌军难度成长 | `REMAKE-126`：四档均跳过经验播种、职业等级 1；无法无天仍加 50% 属性 | 同左 | 改经验基线或倍率须改变规则身份 |
 
 ## 12. 验收场景
 
@@ -184,6 +191,8 @@ victoryFeedback → savePrompt/saveSlots → nextStage(stage-04)`。自动友军
     自动阶段抵达黛西邻格，不再因为直线上有一格防区外地形而原地卡死。
 19. `S03-S`：被救援友军在本关内沿合法职业树继续成长到魔術士时，战场立即换用
     `ally-magician` 原版棋子，不显示 Phaser 的 `__MISSING` 占位。
+20. `S03-T`：无法无天下十二名敌军经验均为 `0`、职业等级均为 `1`；士兵 HUD 显示
+    攻击 `58`、防御 `31`、生命 `240`，证明只保留原版 50% 属性倍率。
 
 ## 13. 待决问题
 

@@ -30,8 +30,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 95 as const;
-export const SAVE_CONTENT_VERSION = "stomp-kill-experience-1" as const;
+export const SAVE_VERSION = 96 as const;
+export const SAVE_CONTENT_VERSION = "stage-03-native-enemy-level-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
@@ -336,11 +336,14 @@ export function isSavedBattleState(
       );
       const maximumLife = namedUnitRuleFor(unit, saveSchema)?.maximumLifeByDifficulty?.[difficulty]
         ?? statsFor(unit, difficulty).maxLife;
+      const minimumExperience = saveSchema.enemyExperienceFloor === "none"
+        ? 0
+        : initialEnemyExperience(unit.classId, difficulty);
       return unit.life > maximumLife
         || (formSequence
           ? unit.experience !== formSequence.experience
             || !formSequence.classIdsByDifficulty[difficulty]?.includes(unit.classId)
-          : unit.experience < initialEnemyExperience(unit.classId, difficulty));
+          : unit.experience < minimumExperience);
     })
   ) return false;
 

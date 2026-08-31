@@ -266,8 +266,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 95;
-  contentVersion: "stomp-kill-experience-1";
+  version: 96;
+  contentVersion: "stage-03-native-enemy-level-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

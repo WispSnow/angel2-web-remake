@@ -343,6 +343,25 @@ const stage3BattleSave = (): BattleSaveData => {
   };
 };
 
+/** Reconstructs the generic enemy seed written by every pre-v96 stage-3 build. */
+const legacySeededStage3BattleSave = (difficulty: Difficulty = 0): BattleSaveData => {
+  const save = stage3BattleSave();
+  return {
+    ...save,
+    difficulty,
+    stageEntrySnapshot: { ...save.stageEntrySnapshot, difficulty },
+    battle: {
+      ...save.battle,
+      units: save.battle.units.map((unit) => {
+        if (unit.side === 1) return { ...unit };
+        const experience = initialEnemyExperience(unit.classId, difficulty);
+        const seeded = { ...unit, experience };
+        return { ...seeded, life: statsFor(seeded, difficulty).maxLife };
+      }),
+    },
+  };
+};
+
 const stage4BattleSave = (): BattleSaveData => {
   const source = {
     stageId: "stage-04" as const,
@@ -5051,11 +5070,12 @@ describe("Web save validation", () => {
 
   it("carries version-88 saves forward when the fourth corps changes its doctrine", () => {
     // REMAKE-111 only changes how stage 3's automatic corps plans its phase.
-    // Nothing about that plan is saved, so every v88 save — the stage-3 battle
-    // the rule actually governs included — migrates untouched.
+    // Nothing about that plan is saved. The later REMAKE-126 migration still
+    // removes stage 3's obsolete difficulty seed; all other state is retained.
     const stage3 = stage3BattleSave();
+    const legacyStage3 = legacySeededStage3BattleSave();
     expect(parseSaveData(JSON.stringify({
-      ...stage3,
+      ...legacyStage3,
       version: 88,
       contentVersion: "stage-3-fourth-corps-joined-1",
     }))).toEqual(stage3);
@@ -5186,6 +5206,69 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("removes the old stage-3 difficulty seed while migrating legacy saves", () => {
+    const current = stage3BattleSave();
+    const difficulty = 3 as const;
+    const legacyUnits = current.battle.units.map((unit) => {
+      if (unit.side === 1) return { ...unit };
+      const earnedExperience = unit.id === "2:42" ? 23 : 0;
+      const experience = initialEnemyExperience(unit.classId, difficulty) + earnedExperience;
+      const seeded = { ...unit, experience };
+      const damage = unit.id === "2:42" ? 17 : 0;
+      return {
+        ...seeded,
+        life: statsFor(seeded, difficulty).maxLife - damage,
+      };
+    });
+    const legacy = {
+      ...current,
+      version: 95,
+      contentVersion: "stomp-kill-experience-1",
+      difficulty,
+      stageEntrySnapshot: { ...current.stageEntrySnapshot, difficulty },
+      battle: { ...current.battle, units: legacyUnits },
+    };
+
+    const migrated = parseSaveData(JSON.stringify(legacy));
+    expect(migrated).toMatchObject({
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      stageId: "stage-03",
+      difficulty,
+    });
+    if (!migrated || migrated.kind !== "battle") throw new Error("stage 3 v95 migration failed");
+    for (const enemy of migrated.battle.units.filter(({ side }) => side === 2)) {
+      const earnedExperience = enemy.id === "2:42" ? 23 : 0;
+      const damage = enemy.id === "2:42" ? 17 : 0;
+      expect(enemy.experience, enemy.id).toBe(earnedExperience);
+      expect(enemy.life, enemy.id).toBe(statsFor(enemy, difficulty).maxLife - damage);
+    }
+
+    const migratedVersion94 = parseSaveData(JSON.stringify({
+      ...legacy,
+      version: 94,
+      contentVersion: "boss-poison-one-third-1",
+    }));
+    expect(migratedVersion94?.kind === "battle"
+      ? migratedVersion94.battle.units.find(({ id }) => id === "2:42")?.experience
+      : undefined).toBe(23);
+
+    const otherBattle = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...otherBattle,
+      version: 95,
+      contentVersion: "stomp-kill-experience-1",
+    }))).toEqual(otherBattle);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 95,
+      contentVersion: "stomp-kill-experience-1",
+    }))).toEqual(completed);
+  });
+
   it("carries version-89 saves forward when SA narrows its target set", () => {
     // REMAKE-116 only narrows which enemy the AI may pick for SA. Like
     // REMAKE-102 on the buff side it stores nothing, so every v89 save —
@@ -5212,8 +5295,9 @@ describe("Web save validation", () => {
     // trio never received the point, and firing the grant on load would hand out
     // a promotion the run never reached.
     const battle = stage3BattleSave();
+    const seededBattle = legacySeededStage3BattleSave();
     const legacyBattle = {
-      ...battle,
+      ...seededBattle,
       version: 87,
       contentVersion: "stage-round-limit-99-1",
       consumedEventIds: ["stage-03-opening-story"],
@@ -5246,7 +5330,7 @@ describe("Web save validation", () => {
       ],
     }))).toEqual(completed);
 
-    // 名冊、單位與 PRNG 一個位元都不動：只补事件 id。
+    // 事件补录不碰名冊与 PRNG；REMAKE-126 另行修正敌军经验／生命上限。
     const legacyRoster = stage3BattleSave().roster;
     expect(parseSaveData(JSON.stringify(legacyBattle))?.roster).toEqual(legacyRoster);
 
