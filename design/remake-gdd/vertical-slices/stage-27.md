@@ -175,8 +175,9 @@
   `class-role-ranged-tactics-ai-1`，v52／v51 原样迁移；本关内容身份和 stage 28 路由不变；
 - [SR] `REMAKE-067` 将当前保存身份升级为 v54／`stage-27-first-round-sentry-1`，v53
   原样迁移；战中档已有 round，因此读档后无需保存额外 AI 状态；
-- [SR] `REMAKE-120` 曾将保存身份升级为 v93／`stage-27-eliola-display-name-1`；当前
-  `REMAKE-124` 为 v94／`boss-poison-one-third-1`。合法 v93 无损迁移；合法 v92 stage 27
+- [SR] `REMAKE-120` 曾将保存身份升级为 v93／`stage-27-eliola-display-name-1`，
+  `REMAKE-124` 随后升级为 v94／`boss-poison-one-third-1`；当前 `REMAKE-125` 为
+  v95／`stomp-kill-experience-1`。合法 v94／v93 无损迁移；合法 v92 stage 27
   战中档只为槽 22 恢复姓名与 `named-class-portrait` 标志，职业、通用肖像、生命、经验、
   位置、行动位、PRNG 与军团归属不变；
 - [SR] 失败直接回 stage 27 部署，本次尝试取得的成长依 `REMAKE-016` 保留；
@@ -219,7 +220,7 @@
 7.1 七名城防军与三名工兵继续使用通用职业肖像；`stableRemake` 的槽 22 在右栏、全景
     战斗状态和地形参照行显示“愛莉歐拉”，当前职业下身份行为“巨斧戰士／愛莉歐拉”加
     肖像记录 `57`；`legacyStrict` 保留原版“巨斧戰士／巨斧戰士”；
-8. SAY/0052 十检查点后保存当前 v94 完成档并路由 stage 28；v93／v92 战中／完成档迁移通过；
+8. SAY/0052 十检查点后保存当前 v95 完成档并路由 stage 28；v94／v93／v92 战中／完成档迁移通过；
 9. 八类调试场景、严格战中／完成档、动画速度、声音开关和代表性截图通过定向验收。
 9.1 三名工兵都显示“鐵板、障礙”；`1K` 目标选择提示“……並鋪設鐵板……”、`2K` 提示
     “……並設置障礙……”；`(35,33)` 提交后四邻成为逻辑槽 `21` 且落点保持逻辑槽 `7`，

@@ -470,6 +470,23 @@ function migrateVersion93Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-125 changes only experience earned by future lethal stomp actions.
+ * No pending technique resolution is persisted, so legal v94 saves migrate
+ * losslessly and use the repaired reward on their next committed stomp.
+ */
+function migrateVersion94Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 94
+    || value.contentVersion !== "boss-poison-one-third-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-119 restores the two character descriptors that the first stage-33
  * runtime generator dropped. Existing v91 battle saves already contain the
  * right unit slots, classes, positions, and combat state, so only their
@@ -2710,6 +2727,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {
   const value = addStage27EliolaDisplayIdentity(normalizeStage3OpeningEvents(raw));
+  const migratedVersion94 = migrateVersion94Save(value);
+  if (migratedVersion94) return migratedVersion94;
   const migratedVersion93 = migrateVersion93Save(value);
   if (migratedVersion93) return migratedVersion93;
   const migratedVersion92 = migrateVersion92Save(value);

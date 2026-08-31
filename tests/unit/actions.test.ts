@@ -1787,6 +1787,30 @@ describe("Stage-0 class actions", () => {
     expect(prepared.rngAfter).toBe(prepared.rngBefore);
   });
 
+  it("commits the class kill reward for a lethal initial lightning cast", () => {
+    const battle = new Stage0Battle(0);
+    const { actor, target } = arrangeTarget(battle, "lightning-1", 2);
+    actor.experience = 0;
+    target.life = 1;
+    const prepared = battle.prepareSpecialAction({
+      actionId: "lightning-1",
+      actorId: actor.id,
+      targetId: target.id,
+    });
+    const expectedExperience = killRewardFor(target.classId, target.side);
+
+    expect(prepared.result.affectedUnits).toContainEqual(expect.objectContaining({
+      unitId: target.id,
+      lifeAfter: 0,
+      died: true,
+    }));
+    expect(prepared.result.experienceGained).toBe(expectedExperience);
+
+    battle.commitPreparedAction(prepared);
+    expect(actor.experience).toBe(expectedExperience);
+    expect(battle.unit(target.id)).toBeUndefined();
+  });
+
   it("resolves 2L with four distinct range values, kill-only experience, and the frozen exception", () => {
     const battle = new Stage0Battle(0);
     const template = battle.units.find((unit) => unit.side === 2)!;
@@ -2109,7 +2133,60 @@ describe("Stage-0 class actions", () => {
     expect(target.life).toBe(prepared.targetLifeBefore);
   });
 
-  it("uses 15..29 independent damage and fixed five experience for male stomp", () => {
+  it("adds every stomp kill reward to the native fixed five experience", () => {
+    const battle = new Stage0Battle(0);
+    const { actor, target } = arrangeTarget(battle, "stomp-1", 2);
+    actor.experience = 0;
+    target.life = 1;
+    const preview = battle.prepareSpecialAction({
+      actionId: "stomp-1",
+      actorId: actor.id,
+      targetId: target.id,
+      viewportOrigin: { x: 0, y: 0 },
+    });
+    const secondPosition = preview.result.effectCells.find(({ position, value }) =>
+      value > 0
+      && (position.x !== actor.x || position.y !== actor.y)
+      && (position.x !== target.x || position.y !== target.y));
+    if (!secondPosition) throw new Error("missing second stomp kill cell");
+    const secondTarget = {
+      ...target,
+      id: "stomp-second-kill",
+      x: secondPosition.position.x,
+      y: secondPosition.position.y,
+      life: 1,
+      statuses: { ...target.statuses },
+    };
+    battle.units.push(secondTarget);
+    const prepared = battle.prepareSpecialAction({
+      actionId: "stomp-1",
+      actorId: actor.id,
+      targetId: target.id,
+      viewportOrigin: { x: 0, y: 0 },
+    });
+    const expectedExperience = 5
+      + killRewardFor(target.classId, target.side)
+      + killRewardFor(secondTarget.classId, secondTarget.side);
+
+    expect(prepared.result.affectedUnits).toContainEqual(expect.objectContaining({
+      unitId: target.id,
+      lifeAfter: 0,
+      died: true,
+    }));
+    expect(prepared.result.affectedUnits).toContainEqual(expect.objectContaining({
+      unitId: secondTarget.id,
+      lifeAfter: 0,
+      died: true,
+    }));
+    expect(prepared.result.experienceGained).toBe(expectedExperience);
+
+    battle.commitPreparedAction(prepared);
+    expect(actor.experience).toBe(expectedExperience);
+    expect(battle.unit(target.id)).toBeUndefined();
+    expect(battle.unit(secondTarget.id)).toBeUndefined();
+  });
+
+  it("uses 15..29 independent damage and fixed five experience for a nonlethal male stomp", () => {
     const battle = new Stage0Battle(0);
     const { actor, target } = arrangeTarget(battle, "stomp-2", 2);
     target.life = 100;
@@ -2135,7 +2212,7 @@ describe("Stage-0 class actions", () => {
     expect(actor.experience).toBe(prepared.actorExperienceBefore + 5);
   });
 
-  it("uses 20..39 independent damage, preserves magic guard, and fixes female-stomp experience at five", () => {
+  it("uses 20..39 independent damage, preserves magic guard, and keeps nonlethal female-stomp experience at five", () => {
     const battle = new Stage0Battle(0);
     const { actor, target } = arrangeTarget(battle, "stomp-3", 2);
     target.life = 100;

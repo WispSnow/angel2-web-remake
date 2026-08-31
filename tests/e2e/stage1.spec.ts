@@ -36,6 +36,7 @@ interface Stage1DebugState {
     x: number;
     y: number;
     life: number;
+    experience: number;
     acted: boolean;
     actionDisabled: boolean;
   }>;
@@ -44,6 +45,7 @@ interface Stage1DebugState {
     actorId: string;
     target: { x: number; y: number };
     damage: number;
+    experienceGained: number;
     affectedUnits: Array<{
       unitId: string;
       moved: boolean;
@@ -446,6 +448,7 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
 
   await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("magician"));
   const lightningBefore = await state(page);
+  const magicianBeforeLightning = lightningBefore.units.find(({ id }) => id === "1:0")!;
   const bossBeforeLightning = lightningBefore.units.find(({ id }) => id === "2:16")!;
   await clickMapCell(page, 220, 177);
   await page.getByTestId("unit-command-technique").click();
@@ -507,6 +510,11 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   const lightningAfter = await state(page);
   expect(lightningAfter.units.find(({ id }) => id === "2:16")?.life)
     .toBeLessThan(bossBeforeLightning.life);
+  // Native lightning grants kill rewards only. This fixture survives, so a
+  // committed nonlethal cast must leave the magician's experience unchanged.
+  expect(lightningAfter.lastSpecialAction?.experienceGained).toBe(0);
+  expect(lightningAfter.units.find(({ id }) => id === "1:0")?.experience)
+    .toBe(magicianBeforeLightning.experience);
   expect(cleanupTileCount).toBe(lightningAfter.lastSpecialAction!.affectedUnits.length);
   expect(lightningAfter.specialActionPresentationTrace.filter(({ phase }) => phase === "lightningMain"))
     .toHaveLength(32);
@@ -528,6 +536,8 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   }));
 
   await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("magician"));
+  const iceBefore = await state(page);
+  const magicianBeforeIce = iceBefore.units.find(({ id }) => id === "1:0")!;
   await clickMapCell(page, 220, 177);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-ice-1").click();
@@ -571,6 +581,10 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     moved: true,
     actionDisabledAfter: true,
   }));
+  expect(iceAfter.lastSpecialAction?.experienceGained).toBeGreaterThanOrEqual(8);
+  expect(iceAfter.lastSpecialAction?.experienceGained).toBeLessThanOrEqual(9);
+  expect(iceAfter.units.find(({ id }) => id === "1:0")?.experience)
+    .toBe(magicianBeforeIce.experience + iceAfter.lastSpecialAction!.experienceGained);
   expect(iceAfter.units.find(({ id }) => id === "2:16")?.actionDisabled).toBe(true);
   await expect(battleCanvas).toHaveAttribute("data-ice-disabled-unit-ids", /2:16/u);
   await captureVisualAudit(page.getByTestId("game-screen"), {

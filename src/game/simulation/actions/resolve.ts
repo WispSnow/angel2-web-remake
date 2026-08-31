@@ -672,9 +672,18 @@ function prepareStomp(
         blockReason: frozen ? "frozen" : undefined,
       });
     });
+  // REMAKE-125: the native stomp handler returned its fixed five points after
+  // the shared finalizer had already accumulated kill rewards, silently
+  // replacing them. Keep the native per-cast reward and add every defeated
+  // unit's normal class reward, in the same row-major order as resolution.
+  const killExperience = affectedUnits.reduce((total, affected) => {
+    if (!affected.died) return total;
+    const defeated = context.units.find(({ id }) => id === affected.unitId);
+    return total + (defeated ? killRewardFor(defeated.classId, defeated.side) : 0);
+  }, 0);
   return {
     affectedUnits,
-    experienceGained: definition.experience.fixed,
+    experienceGained: definition.experience.fixed + killExperience,
     effectCells: effect.cells().map((position) => ({ position, value: effect.valueAt(position) })),
   };
 }

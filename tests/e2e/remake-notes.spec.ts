@@ -222,6 +222,18 @@ test("REMAKE-124 說明龍類首領可中毒並使用三分之一規則", async 
   });
 });
 
+test("REMAKE-125 說明龍踏保留固定經驗並累加擊殺經驗", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "fixes");
+  const stompExperience = page.getByTestId("remake-note-REMAKE-125");
+  await expect(stompExperience).toContainText("龍踏擊殺不再遺失擊殺經驗");
+  await expect(stompExperience).toContainText("固定 5 點經驗");
+  await expect(stompExperience).toContainText("多名敵人會完整累加");
+  await captureVisualAudit(stompExperience, {
+    path: "artifacts/playwright/remake-notes-stomp-experience.png",
+  });
+});
+
 test("免責聲明在窄螢幕使用單欄並可完整捲動", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

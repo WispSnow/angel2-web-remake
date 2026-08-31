@@ -266,8 +266,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 94;
-  contentVersion: "boss-poison-one-third-1";
+  version: 95;
+  contentVersion: "stomp-kill-experience-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
