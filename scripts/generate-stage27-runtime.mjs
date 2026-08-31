@@ -228,9 +228,29 @@ assertEqual(
 if (eventsDocument.module29BattleRuntime.handlerBehaviorCatalog.dynamicBoardStages.includes(27)) {
   throw new Error("stage 27 entered the dynamic-board catalog");
 }
-if (eventsDocument.module29BattleRuntime.fullRoundSpecials.stages.some(({ stage }) => stage === 27)) {
-  throw new Error("stage 27 entered the full-round reinforcement chain");
-}
+const reinforcementSpecial = requireEntry(
+  eventsDocument.module29BattleRuntime.fullRoundSpecials.stages,
+  ({ stage }) => stage === 27,
+  "stage 27 full-round reinforcement branch",
+);
+assertEqual(reinforcementSpecial, {
+  stage: 27,
+  handler: "1000:525F",
+  behavior: "spawn one side-2 reinforcement per full round after round 4",
+  eligibleRounds: { minimum: 5, maximum: null },
+  spawnCells: [{ cell: 2083, hex: "0x0823", x: 33, y: 41 }],
+  occupiedCellRule: "skip the round when the exact cell is occupied",
+  candidateSlots: {
+    minimum: 30,
+    maximum: 39,
+    selection: "first slot not currently present as side 2 anywhere on the 2500-cell board",
+    reuseAfterRemoval: true,
+    simultaneousLimit: 10,
+    lifetimeLimit: null,
+  },
+  immediateSide2Activation: true,
+  prngCalls: 0,
+}, "stage 27 full-round reinforcement branch");
 if (eventsDocument.module29BattleRuntime.stage30MultiClassSequence.stage !== 30) {
   throw new Error("defeat replacement is no longer stage-30 only");
 }
@@ -245,9 +265,42 @@ const enemyUnits = template.activeUnitInstances
   }));
 if (enemyUnits.length !== 5) throw new Error(`stage 27 enemy count changed: ${enemyUnits.length}`);
 assertEqual(enemyUnits.map(({ aiBehavior }) => aiBehavior), [0, 0, 0, 0, 0], "stage 27 enemy behaviors");
+const reinforcementCandidates = Array.from(
+  {
+    length: reinforcementSpecial.candidateSlots.maximum
+      - reinforcementSpecial.candidateSlots.minimum + 1,
+  },
+  (_, index) => {
+    const slot = reinforcementSpecial.candidateSlots.minimum + index;
+    return {
+      slot,
+      nativeClassRecord: template.classArrays.side2[slot],
+      aiBehavior: template.perSlotBehaviorArrays.side2[slot],
+    };
+  },
+);
+assertEqual(
+  reinforcementCandidates,
+  [23, 8, 14, 15, 23, 23, 7, 14, 23, 15].map((nativeClassRecord, index) => ({
+    slot: 30 + index,
+    nativeClassRecord,
+    aiBehavior: 0,
+  })),
+  "stage 27 reinforcement candidate records",
+);
 const enemyReinforcements = {
-  kind: "none",
+  kind: "native-full-round-pending-implementation",
   initialSide2: enemyUnits.length,
+  timing: "before-side-2-ai",
+  firstRound: reinforcementSpecial.eligibleRounds.minimum,
+  spawnCells: reinforcementSpecial.spawnCells,
+  skipOccupiedRound: true,
+  slotReuseAfterRemoval: reinforcementSpecial.candidateSlots.reuseAfterRemoval,
+  simultaneousLimit: reinforcementSpecial.candidateSlots.simultaneousLimit,
+  lifetimeLimit: reinforcementSpecial.candidateSlots.lifetimeLimit,
+  immediateActivation: reinforcementSpecial.immediateSide2Activation,
+  prngCalls: reinforcementSpecial.prngCalls,
+  candidates: reinforcementCandidates,
   auditedSources: [
     "initial-template",
     "round-event-handler",

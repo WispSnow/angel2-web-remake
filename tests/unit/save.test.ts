@@ -380,7 +380,7 @@ const previouslyUnseededStage3BattleSave = (difficulty: Difficulty = 0): BattleS
   };
 };
 
-const stage4BattleSave = (): BattleSaveData => {
+const stage4BattleSave = (completedRounds = 0): BattleSaveData => {
   const source = {
     stageId: "stage-04" as const,
     ruleset: "stableRemake" as const,
@@ -407,6 +407,10 @@ const stage4BattleSave = (): BattleSaveData => {
     ],
   };
   const battle = new Stage4Battle(source, deployment);
+  for (let round = 0; round < completedRounds; round += 1) {
+    battle.beginEnemyPhase();
+    battle.startNextRound();
+  }
   const campaign = battle.campaignSnapshot();
   const nia = battle.unit("1:0")!;
   return {
@@ -5296,6 +5300,28 @@ describe("Web save validation", () => {
       ...completed,
       version: 97,
       contentVersion: "lightning-tier-experience-1",
+    }))).toEqual(completed);
+  });
+
+  it("migrates version-98 saves into the native stage-4 reinforcement identity", () => {
+    const current = stage4BattleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 98,
+      contentVersion: "stage-03-lawless-enemy-level-1",
+    }))).toEqual(current);
+
+    const withReinforcements = stage4BattleSave(4);
+    expect(withReinforcements.battle.round).toBe(5);
+    expect(withReinforcements.battle.units.filter(({ side }) => side === 2)
+      .map(({ id }) => id)).toEqual(["2:40", "2:41", "2:30", "2:31"]);
+    expect(isSaveData(withReinforcements)).toBe(true);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 98,
+      contentVersion: "stage-03-lawless-enemy-level-1",
     }))).toEqual(completed);
   });
 

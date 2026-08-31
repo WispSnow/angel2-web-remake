@@ -18,6 +18,7 @@ import {
   STAGE4_MUSIC_RECORDS,
   STAGE4_OBJECTIVE,
   STAGE4_PLAYER_CLASS_OVERRIDES,
+  STAGE4_REINFORCEMENT_PROGRAM,
   STAGE4_ROUTE_PULSE,
   STAGE4_SOURCES,
   STAGE4_STORY_PAGES,
@@ -157,6 +158,15 @@ export const STAGE4_SEMANTIC_ENEMY_UNITS = STAGE4_ENEMY_UNITS.map((unit) => ({
   portrait: 48 as PortraitRecord,
 }));
 
+export const STAGE4_SEMANTIC_REINFORCEMENTS = {
+  ...STAGE4_REINFORCEMENT_PROGRAM,
+  candidates: STAGE4_REINFORCEMENT_PROGRAM.candidates.map((candidate) => ({
+    ...candidate,
+    classId: semanticClassId(candidate.nativeClassRecord),
+    name: "騎士團士兵",
+  })),
+};
+
 export const STAGE4_ROUTE_PULSE_DEFINITION = STAGE4_ROUTE_PULSE satisfies RoutePulseDefinition;
 
 export const STAGE4_ASSETS = {
@@ -221,6 +231,7 @@ export {
   STAGE4_INITIAL_DANGER_CELLS,
   STAGE4_INITIAL_SAFE_CELLS,
   STAGE4_MUSIC_RECORDS,
+  STAGE4_REINFORCEMENT_PROGRAM,
   STAGE4_SOURCES,
   STAGE4_STORY_PAGES,
   STAGE4_STORY_PRESENTATION,

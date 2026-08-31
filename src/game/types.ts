@@ -266,8 +266,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 98;
-  contentVersion: "stage-03-lawless-enemy-level-1";
+  version: 99;
+  contentVersion: "stage-04-native-reinforcements-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

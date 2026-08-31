@@ -26,7 +26,10 @@ const VERIFIED_RANGES = [
   { module: 29, address: "1000:5197", start: 0x15197, end: 0x151e5, role: "stage-38 rematch opening, live-victory dialogue, and module-46 redirect", sha256: "ef488a6451dc9ea34d06a0b3fc1cc961db1225f880a0ddc23e7f3ef36d805b3a" },
   { module: 29, address: "1000:51E5", start: 0x151e5, end: 0x151f4, role: "write CH to the side map and CL to the unit-slot map at cell BX", sha256: "b615cb66304ec56f3d2b02b0a5deb121f5428a9b154fc23188bbac0c01a4c091" },
   { module: 29, address: "1000:5207", start: 0x15207, end: 0x15211, role: "dispatch stage 4, stage 11, and stage 27 full-round special spawns", sha256: "f93872bbe0029d3627e6cae31d13df6fcc6a1c47364e38d96e7350b5e0317530" },
+  { module: 29, address: "1000:5211", start: 0x15211, end: 0x15240, role: "on stage 4, count eligible rounds below 20 and spawn two sentries after every fourth count", sha256: "c121af9d5c2ecc3a03373111de9e52cd3eb413e09236ca93db3ba5c9e2b8af79" },
   { module: 29, address: "1000:5240", start: 0x15240, end: 0x1525f, role: "on stage 11, scan backward from cell 0980h and request one reinforcement at the first empty cell", sha256: "42e9175ae81988e6c7cd4438dd6115fbfba1576627a6948279be18636c042950" },
+  { module: 29, address: "1000:525F", start: 0x1525f, end: 0x15277, role: "on stage 27 after round 4, request one reinforcement at cell 0823h", sha256: "cadaeded16bc922cd38454d5f9a1b3763d563df2ba5859a0bb097cab1fff47ba" },
+  { module: 29, address: "1000:5277", start: 0x15277, end: 0x152b8, role: "place the first absent side-2 slot in 30..39 at an exact empty cell and rebuild its unit state", sha256: "fbf5adc377b558a41ac9c2e96bf6be47d26ff9ddd18446e99ef3f1b170462dcd" },
   { module: 29, address: "1000:52B8", start: 0x152b8, end: 0x152f9, role: "select the first absent side-2 slot in 40..79, place it, and rebuild its unit state", sha256: "a3c3b05721f211c63c47445a0f19b74001eec9c22559014ace582bdf659854c6" },
   { module: 29, address: "1000:52F9", start: 0x152f9, end: 0x15319, role: "scan all 2500 cells and report whether side-2 already occupies candidate slot DL", sha256: "15d4e4df34a623aa269390353b88b180c789c38fbc8d47a86f6547cc8ef11a13" },
   { module: 29, address: "1000:5319", start: 0x15319, end: 0x1533e, role: "remove every side-2 cell from both battle maps", sha256: "1ddd61af9885b893de39f9f1773d50ada5948b38070bcc7c639f946b73b2362d" },
@@ -180,12 +183,29 @@ function parseFullRoundSpecials(module29) {
     "module 29 full-round-special invocation changed",
   );
   assert(
+    module29.subarray(0x15211, 0x15240).equals(Buffer.from(
+      "a1772e3d04007401c3833e832f147201c3ff06582e833e582e037612c706582e0000bb4900e83e00bb4d00e83800c3",
+      "hex",
+    )),
+    "module 29 stage-4 reinforcement handler changed",
+  );
+  assert(
     module29.subarray(0x15240, 0x1525f).equals(Buffer.from(
       "a1772e3d0b007401c3a124008ec0bb8009268a073c0074034bebf6e85a00c3",
       "hex",
     )),
     "module 29 stage-11 reinforcement handler changed",
   );
+  assert(
+    module29.subarray(0x1525f, 0x15277).equals(Buffer.from(
+      "a1772e3d1b007401c3833e832f047701c3bb2308e80100c3",
+      "hex",
+    )),
+    "module 29 stage-27 reinforcement handler changed",
+  );
+  assert(module29.readUInt16LE(0x219f8) === 0, "stage-4 reinforcement counter no longer starts at zero");
+  assert(module29[0x15284] === 0xb2 && module29[0x15285] === 0x1e, "stage-4/27 first reinforcement slot changed");
+  assert(module29[0x15286] === 0xb9 && module29.readUInt16LE(0x15287) === 0x0a, "stage-4/27 reinforcement slot count changed");
   assert(module29[0x152c5] === 0xb2 && module29[0x152c6] === 0x28, "stage-11 first reinforcement slot changed");
   assert(module29[0x152c7] === 0xb9 && module29.readUInt16LE(0x152c8) === 0x28, "stage-11 reinforcement slot count changed");
   assert(module29.readUInt16LE(0x152fa) === 0x09c4, "stage-11 active-slot scan no longer covers 2500 cells");
@@ -197,6 +217,32 @@ function parseFullRoundSpecials(module29) {
       frequency: "once per full round, including round 1",
     },
     stages: [
+      {
+        stage: 4,
+        handler: "1000:5211",
+        behavior: "spawn up to two side-2 reinforcements every fourth full round before round 20",
+        eligibleRounds: { minimum: 1, maximum: 19 },
+        counter: {
+          address: "DS:2E58",
+          initial: 0,
+          increment: "once per eligible full round",
+          trigger: "value greater than 3",
+          resetAfterTrigger: 0,
+          resultingSpawnRounds: [4, 8, 12, 16],
+        },
+        spawnCells: [cell(0x0049), cell(0x004d)],
+        occupiedCellRule: "skip that cell without consuming a candidate slot",
+        candidateSlots: {
+          minimum: 30,
+          maximum: 39,
+          selection: "first slot not currently present as side 2 anywhere on the 2500-cell board",
+          reuseAfterRemoval: true,
+          simultaneousLimit: 10,
+          maximumSuccessfulSpawns: 8,
+        },
+        immediateSide2Activation: true,
+        prngCalls: 0,
+      },
       {
         stage: 11,
         handler: "1000:5240",
@@ -212,6 +258,24 @@ function parseFullRoundSpecials(module29) {
           selection: "first slot not currently present as side 2 anywhere on the 2500-cell board",
           reuseAfterRemoval: true,
           simultaneousLimit: 40,
+          lifetimeLimit: null,
+        },
+        immediateSide2Activation: true,
+        prngCalls: 0,
+      },
+      {
+        stage: 27,
+        handler: "1000:525F",
+        behavior: "spawn one side-2 reinforcement per full round after round 4",
+        eligibleRounds: { minimum: 5, maximum: null },
+        spawnCells: [cell(0x0823)],
+        occupiedCellRule: "skip the round when the exact cell is occupied",
+        candidateSlots: {
+          minimum: 30,
+          maximum: 39,
+          selection: "first slot not currently present as side 2 anywhere on the 2500-cell board",
+          reuseAfterRemoval: true,
+          simultaneousLimit: 10,
           lifetimeLimit: null,
         },
         immediateSide2Activation: true,

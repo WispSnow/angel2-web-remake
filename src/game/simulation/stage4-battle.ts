@@ -6,17 +6,20 @@ import {
   STAGE4_ROUTE_PULSE_DEFINITION,
   STAGE4_SEMANTIC_ALLIED_UNITS,
   STAGE4_SEMANTIC_ENEMY_UNITS,
+  STAGE4_SEMANTIC_REINFORCEMENTS,
   stage4TerrainSlotAt,
 } from "../content/stage4";
 import type { DeploymentRosterUnit } from "../deployment-session";
-import type { CampaignState } from "../types";
+import type { BattleUnit, CampaignState } from "../types";
 import { Stage0Battle } from "./battle";
+import type { EnemyPhaseUpdate } from "./ai-contracts";
 import {
   createDeployedStageRoster,
   createDeployedStageScenario,
   type DeployedStageUnitConfig,
 } from "./deployed-stage-battle";
 import { validateDeploymentResult, type DeploymentResult } from "./deployment";
+import { createFixedStageEnemy } from "./fixed-stage-battle";
 import type { ForceDefinition } from "./forces";
 import { DeterministicRng } from "./rng";
 
@@ -80,6 +83,8 @@ function stage4Forces(deployment: DeploymentResult): readonly ForceDefinition[] 
 }
 
 export class Stage4Battle extends Stage0Battle {
+  private lastReinforcementRound = 0;
+
   constructor(
     campaign: Pick<CampaignState, "difficulty" | "roster" | "rngState" | "rngCalls">,
     deployment: DeploymentResult,
@@ -99,5 +104,62 @@ export class Stage4Battle extends Stage0Battle {
       forces: stage4Forces(deployment),
       routePulses: [STAGE4_ROUTE_PULSE_DEFINITION],
     }, campaign.roster, deployment));
+  }
+
+  private spawnReinforcements(): BattleUnit[] {
+    if (!STAGE4_SEMANTIC_REINFORCEMENTS.spawnRounds
+      .some((round) => round === this.round)) return [];
+
+    const spawned: BattleUnit[] = [];
+    const occupiedCells = new Set(
+      this.units.map(({ x, y }) => y * this.stage.width + x),
+    );
+    for (const spawnCell of STAGE4_SEMANTIC_REINFORCEMENTS.spawnCells) {
+      if (occupiedCells.has(spawnCell.cell)) continue;
+      const candidate = STAGE4_SEMANTIC_REINFORCEMENTS.candidates.find(({ slot }) =>
+        !this.units.some((unit) => unit.side === 2 && unit.slot === slot));
+      if (!candidate) break;
+
+      const unit = createFixedStageEnemy({
+        slot: candidate.slot,
+        position: { x: spawnCell.x, y: spawnCell.y },
+        classId: candidate.classId,
+        name: candidate.name,
+        aiBehavior: candidate.aiBehavior,
+      }, this.difficulty);
+      this.forces.inheritUnit("2:40", unit.id);
+      this.units.push(unit);
+      spawned.push(unit);
+      occupiedCells.add(spawnCell.cell);
+    }
+    return spawned;
+  }
+
+  override beginEnemyPhase(): EnemyPhaseUpdate {
+    if (this.lastReinforcementRound !== this.round) {
+      this.lastReinforcementRound = this.round;
+      this.spawnReinforcements();
+    }
+    return super.beginEnemyPhase();
+  }
+
+  override enemyBehaviorFor(id: string): number {
+    const unit = this.unit(id);
+    if (unit?.side === 2) {
+      const candidate = STAGE4_SEMANTIC_REINFORCEMENTS.candidates
+        .find(({ slot }) => slot === unit.slot);
+      if (candidate) return candidate.aiBehavior;
+    }
+    return super.enemyBehaviorFor(id);
+  }
+
+  protected override restoreDerivedForceMemberships(): void {
+    this.lastReinforcementRound = 0;
+    for (const unit of this.units) {
+      if (unit.side === 2 && STAGE4_SEMANTIC_REINFORCEMENTS.candidates
+        .some(({ slot }) => slot === unit.slot)) {
+        this.forces.inheritUnit("2:40", unit.id);
+      }
+    }
   }
 }

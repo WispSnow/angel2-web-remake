@@ -759,7 +759,10 @@ async function createStage4Deployment(context: DebugScenarioContext): Promise<Ga
   return controller;
 }
 
-async function createStage4Player(context: DebugScenarioContext): Promise<GameController> {
+async function createStage4Player(
+  context: DebugScenarioContext,
+  targetRound = 1,
+): Promise<GameController> {
   const campaign = debugCampaign(context, "stage-04");
   const [{ STAGE4_DEFINITION }, { Stage4Battle }] = await Promise.all([
     import("./content/stage4"),
@@ -780,6 +783,7 @@ async function createStage4Player(context: DebugScenarioContext): Promise<GameCo
     ],
   };
   const battle = new Stage4Battle(campaign, deployment);
+  while (battle.round < targetRound) battle.startNextRound();
   const nia = battle.unit("1:0");
   if (!nia) throw new Error("stage 4 debug scenario is missing Nia");
   battle.focusId = nia.id;
@@ -3638,6 +3642,11 @@ const DEBUG_SCENARIO_FACTORIES = {
   "stage-04-first-pulse": withSetup(createStage4Player, (controller) => {
     controller.statusMessage = "調試場景：結束玩家回合以觀察首輪力場脈衝。";
   }),
+  "stage-04-first-reinforcement": async (context) => {
+    const controller = await createStage4Player(context, 4);
+    controller.statusMessage = "調試場景：結束第 4 回合玩家階段以觀察首波敵方增援。";
+    return controller;
+  },
   "stage-04-near-victory": withSetup(createStage4Player, (controller) => {
     controller.forceVictorySetupForTest();
   }),

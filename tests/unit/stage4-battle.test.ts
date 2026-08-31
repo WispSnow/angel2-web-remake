@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { completeCampaignRoster } from "../../src/game/content/stage0";
+import {
+  completeCampaignRoster,
+  initialEnemyExperience,
+} from "../../src/game/content/stage0";
 import { STAGE4_DEFINITION } from "../../src/game/content/stage4";
 import { Stage4Battle, createStage4DeploymentRoster } from "../../src/game/simulation/stage4-battle";
 import type { DeploymentResult } from "../../src/game/simulation/deployment";
@@ -180,5 +183,76 @@ describe("stage 4 deployment, forces, and route pulse", () => {
       defeated.units = defeated.units.filter(({ id }) => id !== protectedId);
       expect(defeated.outcome()).toBe("defeat");
     }
+  });
+
+  it("spawns two immediately active soldiers before enemy phases 4, 8, 12, and 16", () => {
+    const battle = new Stage4Battle(campaign, fullDeployment());
+    const callsBefore = battle.rng.calls;
+
+    for (let round = 1; round <= 4; round += 1) {
+      battle.beginEnemyPhase();
+      if (round < 4) battle.startNextRound();
+    }
+    expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(4);
+    expect(battle.unit("2:30")).toMatchObject({
+      classId: "soldier",
+      experience: initialEnemyExperience("soldier", campaign.difficulty),
+      x: 23,
+      y: 1,
+      acted: false,
+      actionDisabled: false,
+    });
+    expect(battle.unit("2:31")).toMatchObject({ x: 27, y: 1 });
+    expect(battle.enemyActionOrder()).toEqual(expect.arrayContaining(["2:30", "2:31"]));
+    expect(battle.forceForUnit("2:30")).toMatchObject({
+      id: "castle-sentries",
+      label: "城堡守軍",
+    });
+    expect(battle.rng.calls).toBe(callsBefore);
+
+    // Re-entering the same phase does not create another wave.
+    battle.beginEnemyPhase();
+    expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(4);
+    for (const unit of battle.units.filter(({ side, slot }) => side === 2 && slot < 40)) {
+      Object.assign(unit, { x: unit.slot - 20, y: 10 });
+    }
+
+    for (let round = 5; round <= 20; round += 1) {
+      battle.startNextRound();
+      battle.beginEnemyPhase();
+      for (const unit of battle.units.filter(({ side, slot, y }) =>
+        side === 2 && slot < 40 && y === 1)) {
+        Object.assign(unit, { x: unit.slot - 20, y: 10 });
+      }
+    }
+    expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(10);
+    expect(battle.unit("2:37")).toMatchObject({ classId: "soldier" });
+    expect(battle.unit("2:38")).toBeUndefined();
+    expect(battle.rng.calls).toBe(callsBefore);
+  });
+
+  it("skips occupied spawn cells, reuses defeated slots, and restores force membership", () => {
+    const battle = new Stage4Battle(campaign, fullDeployment());
+    Object.assign(battle.unit("1:1")!, { x: 23, y: 1 });
+    for (let round = 1; round <= 4; round += 1) {
+      battle.beginEnemyPhase();
+      if (round < 4) battle.startNextRound();
+    }
+    expect(battle.unit("2:30")).toMatchObject({ x: 27, y: 1 });
+    expect(battle.unit("2:31")).toBeUndefined();
+
+    battle.removeStoryUnits([{ side: 2, slot: 30 }]);
+    Object.assign(battle.unit("1:1")!, { x: 0, y: 0 });
+    for (let round = 5; round <= 8; round += 1) {
+      battle.startNextRound();
+      battle.beginEnemyPhase();
+    }
+    expect(battle.unit("2:30")).toMatchObject({ x: 23, y: 1 });
+    expect(battle.unit("2:31")).toMatchObject({ x: 27, y: 1 });
+
+    const restored = new Stage4Battle(campaign, fullDeployment());
+    restored.restore(battle.serializableSnapshot(), battle.campaignSnapshot().roster);
+    expect(restored.forceForUnit("2:30")?.id).toBe("castle-sentries");
+    expect(restored.forceForUnit("2:31")?.id).toBe("castle-sentries");
   });
 });

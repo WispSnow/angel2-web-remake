@@ -570,6 +570,25 @@ function migrateVersion97Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-130 restores the native stage-4 waves for future round transitions.
+ * A v98 player-phase save has no pending presentation or persisted wave
+ * counter, so its exact board, round, action state, statuses and PRNG cursor
+ * carry forward. Already missed historical waves are not invented on load;
+ * the next native scheduled round creates reinforcements normally.
+ */
+function migrateVersion98Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 98
+    || value.contentVersion !== "stage-03-lawless-enemy-level-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-128 restores the tier roll made by every future lightning cast, while
  * REMAKE-129 also repairs the stage-3 baseline inherited from v96.
  */
@@ -2853,6 +2872,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion98 = migrateVersion98Save(value);
+    if (migratedVersion98) return migratedVersion98;
     const migratedVersion97 = migrateVersion97Save(value);
     if (migratedVersion97) return migratedVersion97;
     // v96/v97 used the all-difficulty level-one baseline; both bypass the

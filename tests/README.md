@@ -104,7 +104,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 存档 schema 与迁移 | `save.test.ts` | `startup.spec.ts` 或对应关卡的存读档用例 |
 | `src/game/save/record-labels.ts` 的 `saveRecordStageLabel`：记录列表的「關卡名」必须与同一行的回合列描述同一关，所以完成档要按 `stageId`（下一关入口）反查刚打完的来源关卡，对应原版存档头 `1Ah`（DS:`2E77`）与 `1Ch`（DS:`2F83`，胜利保存写 1000）的成对语义 | `save.test.ts` 的「labels completed records with the cleared stage」 | `stage0.spec.ts` 的 `S00-T`；标题记录列表的无障碍摘要同样走这条反查 |
 | `src/game/save/backup.ts`、`src/game/save-backup-ui.ts` 的版本化 20 槽备份、逐槽严格迁移校验、完整还原、失败回滚，以及标题与战中记录确认表面 | `save-backup.test.ts` | `startup.spec.ts` 的 `BOOT-B backup/restore`；`stage0.spec.ts` 的 `RHP-03b` |
-| 第 4 关内容、行为 12 结界路线与 `route-pulse.ts`／`route-pulse-presentation.ts` 的两层力场电波 | `stage4-content.test.ts`、`stage4-battle.test.ts`、`route-pulse-presentation.test.ts`、`stage-runtime.test.ts` | `stage4.spec.ts` |
+| 第 4 关内容、行为 12 结界路线、`route-pulse.ts`／`route-pulse-presentation.ts` 的两层力场电波，以及第 `4/8/12/16` 回合原版双格士兵增援 | `stage4-content.test.ts`、`stage4-battle.test.ts`、`route-pulse-presentation.test.ts`、`stage-runtime.test.ts`、`save.test.ts` | `stage4.spec.ts` |
 | 第 7 关内容、部署与战斗合同 | `stage7-content.test.ts`、`stage7-battle.test.ts`、`stage-runtime.test.ts` | `stage7.spec.ts` |
 | 第 8 关内容、固定军团与战斗合同 | `stage8-content.test.ts`、`stage8-battle.test.ts`、`stage-runtime.test.ts` | `stage8.spec.ts` |
 | 第 9 关内容、部署、护送路线与复合目标 | `stage9-content.test.ts`、`stage9-battle.test.ts`、`objectives.test.ts`、`stage-runtime.test.ts` | `stage9.spec.ts` |

@@ -245,6 +245,14 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-04-first-reinforcement",
+    stageId: "stage-04",
+    title: "首波敵方增援",
+    phase: "Round 4 / before side 2",
+    description: "直接進入第 4 回合，結束玩家階段後驗證北端兩名原版士兵增援與同輪行動。",
+    fixture: true,
+  },
+  {
     id: "stage-04-near-victory",
     stageId: "stage-04",
     title: "一步抵達出口",

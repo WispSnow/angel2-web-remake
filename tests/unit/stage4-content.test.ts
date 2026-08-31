@@ -14,9 +14,11 @@ import {
   STAGE4_INITIAL_DANGER_CELLS,
   STAGE4_INITIAL_SAFE_CELLS,
   STAGE4_MUSIC_PROGRAMS,
+  STAGE4_REINFORCEMENT_PROGRAM,
   STAGE4_ROUTE_PULSE_DEFINITION,
   STAGE4_SEMANTIC_ALLIED_UNITS,
   STAGE4_SEMANTIC_ENEMY_UNITS,
+  STAGE4_SEMANTIC_REINFORCEMENTS,
   STAGE4_SOURCES,
   STAGE4_STORY_PAGES,
   STAGE4_TERRAIN_TOKENS,
@@ -105,6 +107,25 @@ describe("stage 4 generated content", () => {
       { slot: 40, classId: "soldier", position: { x: 23, y: 15 } },
       { slot: 41, classId: "soldier", position: { x: 27, y: 15 } },
     ]);
+    expect(STAGE4_REINFORCEMENT_PROGRAM).toMatchObject({
+      timing: "before-side-2-ai",
+      spawnRounds: [4, 8, 12, 16],
+      spawnCells: [
+        { cell: 73, x: 23, y: 1 },
+        { cell: 77, x: 27, y: 1 },
+      ],
+      skipOccupiedCell: true,
+      slotReuseAfterRemoval: true,
+      simultaneousLimit: 10,
+      maximumSuccessfulSpawns: 8,
+      immediateActivation: true,
+      prngCalls: 0,
+    });
+    expect(STAGE4_SEMANTIC_REINFORCEMENTS.candidates).toHaveLength(10);
+    expect(STAGE4_SEMANTIC_REINFORCEMENTS.candidates.every((candidate) =>
+      candidate.classId === "soldier" && candidate.aiBehavior === 0)).toBe(true);
+    expect(STAGE4_SEMANTIC_REINFORCEMENTS.candidates.map(({ slot }) => slot))
+      .toEqual([30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
   });
 
   it("preserves the behavior-12 safe area and MAGIC/26 presentation contract", () => {

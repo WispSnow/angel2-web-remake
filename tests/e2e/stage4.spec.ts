@@ -295,6 +295,33 @@ test("S04-K: reduced motion keeps every native draw of the force-field pulse", a
   }
 });
 
+test("S04-M: round 4 projects both native soldiers before their immediate enemy turn", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-04-first-reinforcement&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const before = await state(page);
+  expect(before).toMatchObject({ stageId: "stage-04", phase: "player", round: 4 });
+  expect(before.units.filter(({ side }) => side === 2).map(({ id }) => id))
+    .toEqual(["2:40", "2:41"]);
+
+  await endManualPhase(page);
+  await page.waitForFunction(() => {
+    const units = (window.__ANGEL2__?.getState() as Stage4State | undefined)?.units ?? [];
+    return units.some(({ id }) => id === "2:30") && units.some(({ id }) => id === "2:31");
+  });
+  const reinforced = await state(page);
+  expect(reinforced.round).toBe(4);
+  expect(reinforced.units.find(({ id }) => id === "2:30")).toMatchObject({
+    side: 2,
+    slot: 30,
+    classId: "soldier",
+  });
+  expect(reinforced.units.find(({ id }) => id === "2:31")).toMatchObject({
+    side: 2,
+    slot: 31,
+    classId: "soldier",
+  });
+});
+
 test("S04-G: the active deployment round-trips through the current save format", async ({ page }) => {
   await page.goto("/?debugScenario=stage-04-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();

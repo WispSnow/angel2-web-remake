@@ -112,7 +112,7 @@ describe("stage 27 generated content", () => {
     });
   });
 
-  it("registers SAY 51/52, no reinforcements, and the stage 28 route", () => {
+  it("registers SAY 51/52, the native reinforcement evidence, and the stage 28 route", () => {
     activateStage27Content();
     expect(Object.fromEntries(Object.entries(STAGE27_STORY_PAGES)
       .map(([id, pages]) => [id, pages.length]))).toEqual({
@@ -132,7 +132,24 @@ describe("stage 27 generated content", () => {
         firstRoundAutomaticPosture: "sentry",
         normalPostureFromRound: 2,
       },
-      enemyReinforcements: { kind: "none", initialSide2: 5 },
+      enemyReinforcements: {
+        kind: "native-full-round-pending-implementation",
+        initialSide2: 5,
+        timing: "before-side-2-ai",
+        firstRound: 5,
+        spawnCells: [{ cell: 2083, hex: "0x0823", x: 33, y: 41 }],
+        skipOccupiedRound: true,
+        slotReuseAfterRemoval: true,
+        simultaneousLimit: 10,
+        lifetimeLimit: null,
+        immediateActivation: true,
+        prngCalls: 0,
+        candidates: [23, 8, 14, 15, 23, 23, 7, 14, 23, 15].map((nativeClassRecord, index) => ({
+          slot: 30 + index,
+          nativeClassRecord,
+          aiBehavior: 0,
+        })),
+      },
       completedRoute: { module: 25, stage: 28, replayPresentation: false },
       stableRemakeDecisions: ["REMAKE-064", "REMAKE-067", "REMAKE-120"],
     });
