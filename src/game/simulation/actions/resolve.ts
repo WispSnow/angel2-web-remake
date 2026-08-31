@@ -494,6 +494,7 @@ function prepareLightning(
   actor: BattleUnit,
   center: Position,
   context: SpecialActionResolutionContext,
+  trial: DeterministicRng,
 ): { affectedUnits: SpecialActionAffectedUnit[]; experienceGained: number; effectCells: PreparedBattleAction["result"]["effectCells"] } {
   const definition = BATTLE_ACTION_DEFINITIONS[actionId];
   const damageByRangeValue: Readonly<Record<number, number>> = definition.damage.byRangeValue;
@@ -503,7 +504,7 @@ function prepareLightning(
     context.battlefield.height,
     definition.range.effectRadius,
   );
-  let experienceGained = 0;
+  let killExperience = 0;
   const affectedUnits = context.units
     .filter((unit) => unit.side !== actor.side && effect.valueAt(unit) > 0)
     .sort((left, right) => left.y * context.battlefield.width + left.x
@@ -524,7 +525,7 @@ function prepareLightning(
         ? 0
         : Math.min(unit.life, damageByRangeValue[rangeValue] ?? 0);
       const lifeAfter = unit.life - damage;
-      if (lifeAfter === 0) experienceGained += killRewardFor(unit.classId, unit.side);
+      if (lifeAfter === 0) killExperience += killRewardFor(unit.classId, unit.side);
       return affectedUnit(unit, {
         statusesAfter,
         blocked,
@@ -535,7 +536,13 @@ function prepareLightning(
     });
   return {
     affectedUnits,
-    experienceGained,
+    // The native inner effect returns kill rewards first. CB0B/CB28/CB45/CB62
+    // then unconditionally make one tier roll and add its base, even if every
+    // target was guarded/frozen or nobody died (REMAKE-128).
+    experienceGained: killExperience + definition.experience.base + trial.between(
+      definition.experience.randomMinimum,
+      definition.experience.randomMaximum,
+    ),
     effectCells: effect.cells().map((position) => ({ position, value: effect.valueAt(position) })),
   };
 }
@@ -734,6 +741,7 @@ export function prepareSpecialAction(
       actor,
       center,
       context,
+      trial,
     ));
   } else if (intent.actionId === "ice-1"
     || intent.actionId === "ice-2"

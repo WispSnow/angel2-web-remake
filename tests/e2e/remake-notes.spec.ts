@@ -234,6 +234,28 @@ test("REMAKE-125 說明龍踏保留固定經驗並累加擊殺經驗", async ({ 
   });
 });
 
+test("REMAKE-128 說明落雷無擊殺也有分層施法經驗", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "fixes");
+  const lightningExperience = page.getByTestId("remake-note-REMAKE-128");
+  await expect(lightningExperience).toContainText("落雷恢復原版分層施法經驗");
+  await expect(lightningExperience).toContainText("8–9、10–11、12–14、15–17");
+  await expect(lightningExperience).toContainText("沒有擊殺");
+});
+
+test("REMAKE-127 將第 8、11 關敵軍難度成長列為平衡調整", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "balance");
+  const stageDifficulty = page.getByTestId("remake-note-REMAKE-127");
+  await expect(stageDifficulty).toContainText("第 8、11 關保留完整敵軍難度成長");
+  await expect(stageDifficulty).toContainText("四檔敵軍登場等級依次為 2、4、6、5");
+  await expect(stageDifficulty).toContainText("第 11 關的初始追兵與每輪增援使用相同規則");
+  await expect(stageDifficulty).toContainText("第 3 關「救援友軍」不套用此調整");
+  await captureVisualAudit(stageDifficulty, {
+    path: "artifacts/playwright/remake-notes-stage8-stage11-difficulty.png",
+  });
+});
+
 test("免責聲明在窄螢幕使用單欄並可完整捲動", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

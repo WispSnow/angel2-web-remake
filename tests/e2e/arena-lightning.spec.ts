@@ -30,6 +30,7 @@ test("tier-one magic master performs native 2L with its two-stage lightning colu
   expect(placed).toEqual([true, true, true, true]);
   await page.getByTestId("arena-start").click();
   const before = await arenaBattleState(page);
+  const actorBefore = before?.units.find(({ id }) => id === "arena-1-0")?.experience;
   const centerBefore = before?.units.find(({ id }) => id === "arena-2-0")?.life;
   const innerBefore = before?.units.find(({ id }) => id === "arena-2-1")?.life;
   const outsideBefore = before?.units.find(({ id }) => id === "arena-2-2")?.life;
@@ -75,13 +76,15 @@ test("tier-one magic master performs native 2L with its two-stage lightning colu
     actorId: "arena-1-0",
     target: { x: 22, y: 30 },
     damage: 105,
-    experienceGained: 0,
   });
+  expect(after?.lastSpecialAction?.experienceGained).toBeGreaterThanOrEqual(10);
+  expect(after?.lastSpecialAction?.experienceGained).toBeLessThanOrEqual(11);
+  expect(after?.units.find(({ id }) => id === "arena-1-0")?.experience)
+    .toBe(actorBefore! + after!.lastSpecialAction!.experienceGained);
   expect(after?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(centerBefore! - 60);
   expect(after?.units.find(({ id }) => id === "arena-2-1")?.life).toBe(innerBefore! - 45);
   expect(after?.units.find(({ id }) => id === "arena-2-2")?.life).toBe(outsideBefore);
-  expect({ state: after?.rngState, calls: after?.rngCalls })
-    .toEqual({ state: before?.rngState, calls: before?.rngCalls });
+  expect(after?.rngCalls).toBe(before!.rngCalls + 1);
   expect(pageErrors).toEqual([]);
 });
 
@@ -105,6 +108,8 @@ test("enemy tier-one magic master uses 2L and the native group-11 dialogue", asy
   });
   expect(placed).toEqual([true, true]);
   await page.getByTestId("arena-start").click();
+  const before = await arenaBattleState(page);
+  const actorBefore = before?.units.find(({ id }) => id === "arena-2-0")?.experience;
   await clickArenaWorldCell(page, 25, 30);
   await page.getByTestId("unit-command-rest").click();
 
@@ -130,6 +135,11 @@ test("enemy tier-one magic master uses 2L and the native group-11 dialogue", asy
     target: { x: 25, y: 30 },
     damage: 60,
   });
+  expect(after?.lastSpecialAction?.experienceGained).toBeGreaterThanOrEqual(10);
+  expect(after?.lastSpecialAction?.experienceGained).toBeLessThanOrEqual(11);
+  expect(after?.units.find(({ id }) => id === "arena-2-0")?.experience)
+    .toBe(actorBefore! + after!.lastSpecialAction!.experienceGained);
+  expect(after?.rngCalls).toBe(before!.rngCalls + 1);
   expect(pageErrors).toEqual([]);
 });
 
@@ -161,6 +171,7 @@ test("tier-two magic master raises the native 3L cloud before landing its inheri
   expect(placed).toEqual([true, true, true, true]);
   await page.getByTestId("arena-start").click();
   const before = await arenaBattleState(page);
+  const actorBefore = before?.units.find(({ id }) => id === "arena-1-0")?.experience;
   const centerBefore = before?.units.find(({ id }) => id === "arena-2-0")?.life;
   const innerBefore = before?.units.find(({ id }) => id === "arena-2-1")?.life;
   const outsideBefore = before?.units.find(({ id }) => id === "arena-2-2")?.life;
@@ -222,15 +233,17 @@ test("tier-two magic master raises the native 3L cloud before landing its inheri
     actorId: "arena-1-0",
     target: { x: 24, y: 30 },
     damage: 165,
-    experienceGained: 0,
   });
+  expect(after?.lastSpecialAction?.experienceGained).toBeGreaterThanOrEqual(12);
+  expect(after?.lastSpecialAction?.experienceGained).toBeLessThanOrEqual(14);
+  expect(after?.units.find(({ id }) => id === "arena-1-0")?.experience)
+    .toBe(actorBefore! + after!.lastSpecialAction!.experienceGained);
   expect(audioRequests).toContain("/assets/original/audio/e/41.wav");
   expect(audioRequests).toContain("/assets/original/audio/e/9.wav");
   expect(after?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(centerBefore! - 90);
   expect(after?.units.find(({ id }) => id === "arena-2-1")?.life).toBe(innerBefore! - 75);
   expect(after?.units.find(({ id }) => id === "arena-2-2")?.life).toBe(outsideBefore);
-  expect({ state: after?.rngState, calls: after?.rngCalls })
-    .toEqual({ state: before?.rngState, calls: before?.rngCalls });
+  expect(after?.rngCalls).toBe(before!.rngCalls + 1);
   expect(pageErrors).toEqual([]);
 });
 
@@ -258,6 +271,7 @@ test("tier-three magic master descends native 4L before planting its inherited-a
   expect(placed).toEqual([true, true, true, true, true]);
   await page.getByTestId("arena-start").click();
   const before = await arenaBattleState(page);
+  const actorBefore = before?.units.find(({ id }) => id === "arena-1-0")?.experience;
   const centerBefore = before?.units.find(({ id }) => id === "arena-2-0")?.life;
   const innerBefore = before?.units.find(({ id }) => id === "arena-2-1")?.life;
   const outerBefore = before?.units.find(({ id }) => id === "arena-2-2")?.life;
@@ -309,8 +323,11 @@ test("tier-three magic master descends native 4L before planting its inherited-a
     actorId: "arena-1-0",
     target: { x: 23, y: 33 },
     damage: 230,
-    experienceGained: 0,
   });
+  expect(after?.lastSpecialAction?.experienceGained).toBeGreaterThanOrEqual(15);
+  expect(after?.lastSpecialAction?.experienceGained).toBeLessThanOrEqual(17);
+  expect(after?.units.find(({ id }) => id === "arena-1-0")?.experience)
+    .toBe(actorBefore! + after!.lastSpecialAction!.experienceGained);
   expect(after?.specialActionPresentationTrace).toEqual(expect.arrayContaining([
     expect.objectContaining({ phase: "lightningMain", frame: 16 }),
     expect.objectContaining({
@@ -323,8 +340,7 @@ test("tier-three magic master descends native 4L before planting its inherited-a
   expect(after?.units.find(({ id }) => id === "arena-2-1")?.life).toBe(innerBefore! - 90);
   expect(after?.units.find(({ id }) => id === "arena-2-2")?.life).toBe(outerBefore! - 30);
   expect(after?.units.find(({ id }) => id === "arena-2-3")?.life).toBe(outsideBefore);
-  expect({ state: after?.rngState, calls: after?.rngCalls })
-    .toEqual({ state: before?.rngState, calls: before?.rngCalls });
+  expect(after?.rngCalls).toBe(before!.rngCalls + 1);
   expect(pageErrors).toEqual([]);
 });
 

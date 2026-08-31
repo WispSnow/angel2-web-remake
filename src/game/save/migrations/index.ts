@@ -501,6 +501,23 @@ function migrateVersion95Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-128 restores the tier roll made by every future lightning cast. No
+ * pending action is persisted, so a legal v96 save carries over byte-for-byte;
+ * only the next committed lightning result and its PRNG cursor differ.
+ */
+function migrateVersion96Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 96
+    || value.contentVersion !== "stage-03-native-enemy-level-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * Every Web save version that could contain a stage-3 battle used the shared
  * difficulty seed. Run this after its own migration has validated the full
  * record, then subtract that synthetic baseline exactly once. This preserves
@@ -2767,6 +2784,10 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    // v96 already contains REMAKE-126's corrected stage-3 enemy baseline. It
+    // must bypass the pre-v96 seed-removal repair below.
+    const migratedVersion96 = migrateVersion96Save(value);
+    if (migratedVersion96) return migratedVersion96;
     const migrated = migrateLegacySaveData(value);
     const corrected = migrated ? removeLegacyStage3DifficultySeed(migrated) : undefined;
     return corrected ? raiseHalfDragonSisterEntryExperience(corrected) : undefined;

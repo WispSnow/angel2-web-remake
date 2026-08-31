@@ -5206,6 +5206,29 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("carries version-96 saves through the lightning tier-experience identity", () => {
+    const stage3 = stage3BattleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...stage3,
+      version: 96,
+      contentVersion: "stage-03-native-enemy-level-1",
+    }))).toEqual(stage3);
+
+    const otherBattle = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...otherBattle,
+      version: 96,
+      contentVersion: "stage-03-native-enemy-level-1",
+    }))).toEqual(otherBattle);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 96,
+      contentVersion: "stage-03-native-enemy-level-1",
+    }))).toEqual(completed);
+  });
+
   it("removes the old stage-3 difficulty seed while migrating legacy saves", () => {
     const current = stage3BattleSave();
     const difficulty = 3 as const;

@@ -49,6 +49,8 @@ const STAGE8_FORCE_DEFINITIONS = [
 const STAGE8_UNIT_CONFIG = {
   alliedUnits: STAGE8_SEMANTIC_ALLIED_UNITS,
   enemyUnits: STAGE8_SEMANTIC_ENEMY_UNITS,
+  // REMAKE-127 deliberately keeps Web difficulty scaling for this native exception.
+  enemyExperienceSeeding: "difficulty",
   inheritance: {
     genericPortrait: 47,
     defaultClassId: "soldier",

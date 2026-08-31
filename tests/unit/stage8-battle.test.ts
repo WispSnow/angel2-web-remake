@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { completeCampaignRoster, initialEnemyExperience } from "../../src/game/content/stage0";
 import { Stage8Battle, createStage8Units } from "../../src/game/simulation/stage8-battle";
 import type { CampaignState } from "../../src/game/types";
 
@@ -50,6 +50,18 @@ describe("stage 8 battle simulation", () => {
     expect(battle.forceForUnit("2:30")).toMatchObject({
       id: "dragon-tower-camp-raiders", control: "independent-ai",
     });
+  });
+
+  it("retains Web difficulty levels for stage 8's native no-seed exception", () => {
+    const levels = [2, 4, 6, 5] as const;
+    for (const difficulty of [0, 1, 2, 3] as const) {
+      const battle = new Stage8Battle({ ...campaign, difficulty });
+      for (const enemy of battle.units.filter(({ side }) => side === 2)) {
+        expect(enemy.experience, `${difficulty}:${enemy.id}`)
+          .toBe(initialEnemyExperience(enemy.classId, difficulty));
+        expect(battle.statsFor(enemy).level, `${difficulty}:${enemy.id}`).toBe(levels[difficulty]);
+      }
+    }
   });
 
   it("keeps campaign experience when the template overrides the class", () => {

@@ -52,6 +52,8 @@ const STAGE11_FORCE_DEFINITIONS = [
 const STAGE11_UNIT_CONFIG = {
   alliedUnits: STAGE11_SEMANTIC_ALLIED_UNITS,
   enemyUnits: STAGE11_SEMANTIC_ENEMY_UNITS,
+  // REMAKE-127 applies to the opening pursuer and every later reinforcement.
+  enemyExperienceSeeding: "difficulty",
   inheritance: {
     genericPortrait: 47,
     defaultClassId: "soldier",
@@ -117,7 +119,7 @@ export class Stage11Battle extends Stage0Battle {
       classId: candidate.classId,
       name: candidate.name,
       aiBehavior: candidate.aiBehavior,
-    }, this.difficulty);
+    }, this.difficulty, "difficulty");
     this.forces.inheritUnit("2:21", unit.id);
     this.units.push(unit);
     return unit;

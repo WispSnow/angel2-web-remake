@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { completeCampaignRoster, initialEnemyExperience } from "../../src/game/content/stage0";
 import { Stage11Battle, createStage11Units } from "../../src/game/simulation/stage11-battle";
 import type { CampaignState } from "../../src/game/types";
 
@@ -48,6 +48,20 @@ describe("stage 11 battle simulation", () => {
     expect(battle.forceForUnit("2:21")).toMatchObject({
       id: "pegasus-pursuer", control: "independent-ai", doctrine: { strategy: "expert" },
     });
+  });
+
+  it("retains Web difficulty levels for the opening pursuer and reinforcements", () => {
+    const levels = [2, 4, 6, 5] as const;
+    for (const difficulty of [0, 1, 2, 3] as const) {
+      const battle = new Stage11Battle({ ...campaign, difficulty });
+      battle.beginEnemyPhase();
+      for (const id of ["2:21", "2:40"]) {
+        const enemy = battle.unit(id)!;
+        expect(enemy.experience, `${difficulty}:${id}`)
+          .toBe(initialEnemyExperience(enemy.classId, difficulty));
+        expect(battle.statsFor(enemy).level, `${difficulty}:${id}`).toBe(levels[difficulty]);
+      }
+    }
   });
 
   it("wins only when Sulanda reaches cells 0..279 and loses if she leaves", () => {

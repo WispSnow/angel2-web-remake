@@ -139,14 +139,21 @@ describe("stage 37 battle simulation", () => {
     battle.unit("2:56")!.acted = true;
     const before = { state: battle.rng.state, calls: battle.rng.calls };
     const left = battle.planEnemyAiAction("2:54")!;
+    const leftExperience = battle.unit("2:54")!.experience;
     expect(left).toMatchObject({ kind: "special", actionId: "lightning-4" });
     expect({ state: battle.rng.state, calls: battle.rng.calls }).toEqual(before);
-    battle.commitPreparedAction(battle.prepareSpecialAction({
+    const prepared = battle.prepareSpecialAction({
       actorId: left.unitId,
       actionId: left.actionId!,
       targetId: left.targetId,
-    }));
-    expect(battle.rng.calls).toBeGreaterThan(before.calls);
+    });
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(15);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(17);
+    // At least one call selects the target, followed by the native 4L tier roll.
+    expect(prepared.rngCallsAfter).toBeGreaterThanOrEqual(before.calls + 2);
+    battle.commitPreparedAction(prepared);
+    expect(battle.rng.calls).toBe(prepared.rngCallsAfter);
+    expect(battle.unit("2:54")!.experience).toBe(leftExperience);
     expect(battle.planEnemyAiAction("2:55")).toMatchObject({ actionId: "fire-4" });
 
     const snapshot = battle.serializableSnapshot();

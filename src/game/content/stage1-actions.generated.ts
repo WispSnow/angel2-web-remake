@@ -148,6 +148,9 @@ export const STAGE1_ACTION_DEFINITIONS = {
       }
     },
     "experience": {
+      "base": 8,
+      "randomMinimum": 0,
+      "randomMaximum": 1,
       "addKillReward": true
     },
     "presentationId": "lightning-1"
@@ -173,6 +176,9 @@ export const STAGE1_ACTION_DEFINITIONS = {
       }
     },
     "experience": {
+      "base": 10,
+      "randomMinimum": 0,
+      "randomMaximum": 1,
       "addKillReward": true
     },
     "presentationId": "lightning-2"
@@ -198,6 +204,9 @@ export const STAGE1_ACTION_DEFINITIONS = {
       }
     },
     "experience": {
+      "base": 12,
+      "randomMinimum": 0,
+      "randomMaximum": 2,
       "addKillReward": true
     },
     "presentationId": "lightning-3"
@@ -224,6 +233,9 @@ export const STAGE1_ACTION_DEFINITIONS = {
       }
     },
     "experience": {
+      "base": 15,
+      "randomMinimum": 0,
+      "randomMaximum": 2,
       "addKillReward": true
     },
     "presentationId": "lightning-4"

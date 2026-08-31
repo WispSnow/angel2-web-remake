@@ -1945,7 +1945,12 @@ const definitions = {
       type: "magic-area",
       byRangeValue: lightningTier.damageByRangeValue,
     },
-    experience: { addKillReward: true },
+    experience: {
+      base: lightningTier.experienceBase,
+      randomMinimum: lightningTier.experienceRandom[0],
+      randomMaximum: lightningTier.experienceRandom[1],
+      addKillReward: true,
+    },
     presentationId: "lightning-1",
   },
   "lightning-2": {
@@ -1963,7 +1968,12 @@ const definitions = {
       type: "magic-area",
       byRangeValue: lightning2Tier.damageByRangeValue,
     },
-    experience: { addKillReward: true },
+    experience: {
+      base: lightning2Tier.experienceBase,
+      randomMinimum: lightning2Tier.experienceRandom[0],
+      randomMaximum: lightning2Tier.experienceRandom[1],
+      addKillReward: true,
+    },
     presentationId: "lightning-2",
   },
   "lightning-3": {
@@ -1981,7 +1991,12 @@ const definitions = {
       type: "magic-area",
       byRangeValue: lightning3Tier.damageByRangeValue,
     },
-    experience: { addKillReward: true },
+    experience: {
+      base: lightning3Tier.experienceBase,
+      randomMinimum: lightning3Tier.experienceRandom[0],
+      randomMaximum: lightning3Tier.experienceRandom[1],
+      addKillReward: true,
+    },
     presentationId: "lightning-3",
   },
   "lightning-4": {
@@ -1999,7 +2014,12 @@ const definitions = {
       type: "magic-area",
       byRangeValue: lightning4Tier.damageByRangeValue,
     },
-    experience: { addKillReward: true },
+    experience: {
+      base: lightning4Tier.experienceBase,
+      randomMinimum: lightning4Tier.experienceRandom[0],
+      randomMaximum: lightning4Tier.experienceRandom[1],
+      addKillReward: true,
+    },
     presentationId: "lightning-4",
   },
   "ice-1": {

@@ -381,7 +381,7 @@
 | `reverse/parsed/native/map-rules.json` | 110857 | `4602deafbc3cb0d3974c079973c92cd5721e2afcdeb2821090f5f8b00945e9a4` |
 | `reverse/parsed/native/promotion-table.json` | 46077 | `f2516f911518c6e2c8cb7ef88b9964fa580d6b6983b0294a382e029eb90e9cf8` |
 | `reverse/parsed/native/terrain-token-map.json` | 3757676 | `bdebd087d056ce2ebfccb9bacbe5d17210b2bc2256e143f15d86e5eb7f6f1f64` |
-| `reverse/parsed/native/technique-rules.json` | 91919 | `ffa9229f65e8b8b92f6cac3f9855c0ba0d11672ca5b791ae87d4d02a691f4f02` |
+| `reverse/parsed/native/technique-rules.json` | 93520 | `4cb4eca5a77fa630d4469a57465b8a1e80069023c4f4074509afbcb8955c4012` |
 
 生成器另外导入 `src/game/content/class-catalog.generated.ts` 与 `src/game/content/class-traits.ts`，
 并断言运行时成长行、地形百分比与原生目录一致；任一来源漂移都会中止生成而不是写出旧表。

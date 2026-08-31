@@ -254,6 +254,17 @@ describe("Stage-0 class actions", () => {
     expect("damagePresentation" in BATTLE_ACTION_DEFINITIONS["lightning-4"]).toBe(false);
   });
 
+  it("generates the four native lightning tier-experience contracts", () => {
+    expect(BATTLE_ACTION_DEFINITIONS["lightning-1"].experience)
+      .toEqual({ base: 8, randomMinimum: 0, randomMaximum: 1, addKillReward: true });
+    expect(BATTLE_ACTION_DEFINITIONS["lightning-2"].experience)
+      .toEqual({ base: 10, randomMinimum: 0, randomMaximum: 1, addKillReward: true });
+    expect(BATTLE_ACTION_DEFINITIONS["lightning-3"].experience)
+      .toEqual({ base: 12, randomMinimum: 0, randomMaximum: 2, addKillReward: true });
+    expect(BATTLE_ACTION_DEFINITIONS["lightning-4"].experience)
+      .toEqual({ base: 15, randomMinimum: 0, randomMaximum: 2, addKillReward: true });
+  });
+
   it("uses geometric construction edges and skips logical terrain slot zero", () => {
     const battle = new Stage0Battle(0);
     const source = battle.unit("1:0")!;
@@ -1784,10 +1795,12 @@ describe("Stage-0 class actions", () => {
       }),
     ]));
     expect(prepared.result.affectedUnits.some(({ unitId }) => unitId === outsideTarget.id)).toBe(false);
-    expect(prepared.rngAfter).toBe(prepared.rngBefore);
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(8);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(9);
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
   });
 
-  it("commits the class kill reward for a lethal initial lightning cast", () => {
+  it("commits tier experience plus the class kill reward for a lethal initial lightning cast", () => {
     const battle = new Stage0Battle(0);
     const { actor, target } = arrangeTarget(battle, "lightning-1", 2);
     actor.experience = 0;
@@ -1797,21 +1810,60 @@ describe("Stage-0 class actions", () => {
       actorId: actor.id,
       targetId: target.id,
     });
-    const expectedExperience = killRewardFor(target.classId, target.side);
+    const killExperience = killRewardFor(target.classId, target.side);
 
     expect(prepared.result.affectedUnits).toContainEqual(expect.objectContaining({
       unitId: target.id,
       lifeAfter: 0,
       died: true,
     }));
-    expect(prepared.result.experienceGained).toBe(expectedExperience);
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(8 + killExperience);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(9 + killExperience);
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
 
     battle.commitPreparedAction(prepared);
-    expect(actor.experience).toBe(expectedExperience);
+    expect(actor.experience).toBe(prepared.result.experienceGained);
     expect(battle.unit(target.id)).toBeUndefined();
   });
 
-  it("resolves 2L with four distinct range values, kill-only experience, and the frozen exception", () => {
+  it("still rolls lightning tier experience when every affected target is blocked", () => {
+    const battle = new Stage0Battle(0);
+    const actor = { ...battle.unit("1:0")!, x: 5, y: 5, classId: "magician" as const };
+    const guarded = {
+      ...battle.units.find((unit) => unit.side === 2)!,
+      id: "lightning-all-blocked",
+      x: 5,
+      y: 2,
+      life: 200,
+      statuses: {
+        ...battle.units.find((unit) => unit.side === 2)!.statuses,
+        magicGuard: 1,
+      },
+    };
+    const prepared = prepareSpecialAction(
+      { actionId: "lightning-1", actorId: actor.id, targetId: guarded.id },
+      actor,
+      guarded,
+      new DeterministicRng(0x5151),
+      {
+        units: [actor, guarded],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      guarded,
+    );
+
+    expect(prepared.result).toMatchObject({
+      damage: 0,
+      blocked: true,
+      experienceGained: expect.any(Number),
+    });
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(8);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(9);
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
+  });
+
+  it("resolves 2L with four distinct range values, tier plus kill experience, and the frozen exception", () => {
     const battle = new Stage0Battle(0);
     const template = battle.units.find((unit) => unit.side === 2)!;
     const actor = {
@@ -1877,9 +1929,10 @@ describe("Stage-0 class actions", () => {
       expect.objectContaining({ unitId: outer.id, damage: 15, lifeAfter: 85 }),
     ]));
     expect(prepared.result.affectedUnits.some(({ unitId }) => unitId === outside.id)).toBe(false);
-    expect(prepared.result.experienceGained).toBe(killRewardFor(center.classId, center.side));
-    expect(prepared.rngAfter).toBe(prepared.rngBefore);
-    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore);
+    const killExperience = killRewardFor(center.classId, center.side);
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(10 + killExperience);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(11 + killExperience);
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
   });
 
   it("resolves 3L with its independent 45/60/75/90 rings and preserves frozen magic guard", () => {
@@ -1948,12 +2001,13 @@ describe("Stage-0 class actions", () => {
       expect.objectContaining({ unitId: outer.id, damage: 45, lifeAfter: 55 }),
     ]));
     expect(prepared.result.affectedUnits.some(({ unitId }) => unitId === outside.id)).toBe(false);
-    expect(prepared.result.experienceGained).toBe(killRewardFor(center.classId, center.side));
-    expect(prepared.rngAfter).toBe(prepared.rngBefore);
-    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore);
+    const killExperience = killRewardFor(center.classId, center.side);
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(12 + killExperience);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(14 + killExperience);
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
   });
 
-  it("resolves 4L across five 30/50/70/90/110 rings with kill-only experience", () => {
+  it("resolves 4L across five 30/50/70/90/110 rings with tier plus kill experience", () => {
     const battle = new Stage0Battle(0);
     const template = battle.units.find((unit) => unit.side === 2)!;
     const actor = {
@@ -2019,9 +2073,10 @@ describe("Stage-0 class actions", () => {
       expect.objectContaining({ unitId: outer.id, damage: 30, lifeAfter: 90 }),
     ]));
     expect(prepared.result.affectedUnits.some(({ unitId }) => unitId === outside.id)).toBe(false);
-    expect(prepared.result.experienceGained).toBe(killRewardFor(center.classId, center.side));
-    expect(prepared.rngAfter).toBe(prepared.rngBefore);
-    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore);
+    const killExperience = killRewardFor(center.classId, center.side);
+    expect(prepared.result.experienceGained).toBeGreaterThanOrEqual(15 + killExperience);
+    expect(prepared.result.experienceGained).toBeLessThanOrEqual(17 + killExperience);
+    expect(prepared.rngCallsAfter).toBe(prepared.rngCallsBefore + 1);
   });
 
   it("unions the stomp target diamond with the frozen 10x7 viewport and rolls each receiver in row-major order", () => {

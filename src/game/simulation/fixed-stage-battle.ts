@@ -49,7 +49,7 @@ export interface FixedStageEnemyUnitDefinition {
 export interface FixedStageUnitConfig {
   alliedUnits: readonly FixedStageAlliedUnitDefinition[];
   enemyUnits: readonly FixedStageEnemyUnitDefinition[];
-  /** Native stages 3, 8, and 11 bypass module 29's difficulty experience loop. */
+  /** Whether this ruleset applies the shared enemy difficulty experience loop. */
   enemyExperienceSeeding?: "difficulty" | "none";
   inheritance: {
     genericPortrait: PortraitRecord;

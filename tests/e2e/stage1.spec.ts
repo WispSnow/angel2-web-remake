@@ -510,11 +510,14 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
   const lightningAfter = await state(page);
   expect(lightningAfter.units.find(({ id }) => id === "2:16")?.life)
     .toBeLessThan(bossBeforeLightning.life);
-  // Native lightning grants kill rewards only. This fixture survives, so a
-  // committed nonlethal cast must leave the magician's experience unchanged.
-  expect(lightningAfter.lastSpecialAction?.experienceGained).toBe(0);
+  // The outer 1L wrapper adds 8 + randomBelow(2) after damage/death cleanup,
+  // even though this fixture survives and no kill reward is present.
+  expect(lightningAfter.lastSpecialAction?.experienceGained).toBeGreaterThanOrEqual(8);
+  expect(lightningAfter.lastSpecialAction?.experienceGained).toBeLessThanOrEqual(9);
   expect(lightningAfter.units.find(({ id }) => id === "1:0")?.experience)
-    .toBe(magicianBeforeLightning.experience);
+    .toBe(magicianBeforeLightning.experience
+      + lightningAfter.lastSpecialAction!.experienceGained);
+  expect(lightningAfter.rngCalls).toBe(lightningBefore.rngCalls + 1);
   expect(cleanupTileCount).toBe(lightningAfter.lastSpecialAction!.affectedUnits.length);
   expect(lightningAfter.specialActionPresentationTrace.filter(({ phase }) => phase === "lightningMain"))
     .toHaveLength(32);
