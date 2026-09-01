@@ -1935,12 +1935,9 @@ export class Stage0Battle {
   private planFollowLeaderMove(
     unit: BattleUnit,
     leader: BattleUnit,
-  ): AlliedAiAction | undefined {
+  ): AlliedAiAction {
     const movementBudget = this.statsFor(unit).movement;
     const currentMovement = this.movementMapFor(unit, movementBudget);
-    // Once the anchor is already inside the normal movement field, cohesion no
-    // longer pre-empts the shared expert combat action for this unit.
-    if (currentMovement.reaches(leader)) return undefined;
 
     const routeCosts = movementCostsToNearestTarget(
       unit,
@@ -1952,7 +1949,11 @@ export class Stage0Battle {
     const routeCostBefore = routeCosts.get(positionKey(unit));
     // The native probe seed is 55 and propagation requires a strictly positive
     // remainder, so an anchor at route cost 55 or more is outside this branch.
-    if (routeCostBefore === undefined || routeCostBefore >= 55) return undefined;
+    // A commanded unit still spends the action here instead of falling through
+    // to pursuit: `跟隨主將` is a cohesion order, not conditional free action.
+    if (routeCostBefore === undefined || routeCostBefore >= 55) {
+      return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    }
 
     const candidates = currentMovement.cells
       .filter((position) => positionKey(position) !== positionKey(unit))
@@ -1979,7 +1980,7 @@ export class Stage0Battle {
     const selected = candidates[0];
     return selected
       ? { unitId: unit.id, kind: "move", path: selected.path }
-      : undefined;
+      : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
   }
 
   private planAlliedAiActionUncached(
@@ -2012,8 +2013,7 @@ export class Stage0Battle {
       ? this.unit(leaderId)
       : undefined;
     if (leader && leader.id !== unit.id && leader.side === unit.side) {
-      const follow = this.planFollowLeaderMove(unit, leader);
-      if (follow) return follow;
+      return this.planFollowLeaderMove(unit, leader);
     }
 
     const targetFilter = this.forces.targetFilterFor(id, this.units);

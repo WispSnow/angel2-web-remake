@@ -499,6 +499,74 @@ describe("stage 0 battle simulation", () => {
     expect(manhattan(action!.path.at(-1)!, leader)).toBeGreaterThan(distanceBefore);
   });
 
+  it("keeps nearby commanded allies moving toward the leader instead of engaging an adjacent enemy", () => {
+    const battle = battleAtPlayableOpening();
+    const leader = battle.unit("1:0")!;
+    const follower = battle.unit("1:43")!;
+    const enemy = battle.unit("2:48")!;
+    leader.x = 18;
+    leader.y = 20;
+    leader.acted = true;
+    follower.x = 18;
+    follower.y = 22;
+    enemy.x = 19;
+    enemy.y = 22;
+    battle.units = [leader, follower, enemy];
+
+    const action = battle.planAlliedAiAction(follower.id, leader.id);
+
+    expect(action).toEqual({
+      unitId: follower.id,
+      kind: "move",
+      path: [
+        { x: 18, y: 22 },
+        { x: 18, y: 21 },
+      ],
+    });
+  });
+
+  it("makes a commanded ally wait beside the leader instead of pursuing an adjacent enemy", () => {
+    const battle = battleAtPlayableOpening();
+    const leader = battle.unit("1:0")!;
+    const follower = battle.unit("1:43")!;
+    const enemy = battle.unit("2:48")!;
+    leader.x = 18;
+    leader.y = 20;
+    leader.acted = true;
+    follower.x = 18;
+    follower.y = 21;
+    enemy.x = 19;
+    enemy.y = 21;
+    battle.units = [leader, follower, enemy];
+
+    expect(battle.planAlliedAiAction(follower.id, leader.id)).toEqual({
+      unitId: follower.id,
+      kind: "wait",
+      path: [{ x: 18, y: 21 }],
+    });
+  });
+
+  it("does not turn an unreachable follow-leader order into enemy pursuit", () => {
+    const battle = battleAtPlayableOpening();
+    const leader = battle.unit("1:0")!;
+    const follower = battle.unit("1:43")!;
+    const enemy = battle.unit("2:48")!;
+    leader.x = 45;
+    leader.y = 45;
+    leader.acted = true;
+    follower.x = 5;
+    follower.y = 5;
+    enemy.x = 6;
+    enemy.y = 5;
+    battle.units = [leader, follower, enemy];
+
+    expect(battle.planAlliedAiAction(follower.id, leader.id)).toEqual({
+      unitId: follower.id,
+      kind: "wait",
+      path: [{ x: 5, y: 5 }],
+    });
+  });
+
   it("runs behavior 12 toward the hidden palace exit without attacking", () => {
     const battle = battleAtPlayableOpening();
     const enemy = battle.unit("2:41")!;

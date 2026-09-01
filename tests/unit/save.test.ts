@@ -5358,6 +5358,22 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-101 saves without changing battle state for strict player cohesion", () => {
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 101,
+      contentVersion: "follow-leader-path-route-cost-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 101,
+      contentVersion: "follow-leader-path-route-cost-1",
+    }))).toEqual(completed);
+  });
+
   it("removes the old stage-3 difficulty seed while migrating legacy saves", () => {
     const current = stage3BattleSave();
     const difficulty = 3 as const;
