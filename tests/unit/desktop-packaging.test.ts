@@ -1,4 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const readText = (relativePath: string): string =>
@@ -11,6 +13,37 @@ const readBytes = (relativePath: string): Buffer =>
   readFileSync(new URL(`../../${relativePath}`, import.meta.url));
 
 describe("desktop packaging contract", () => {
+  it("keeps every installer version source synchronized and defaults to the next minor", () => {
+    const packageJson = readJson("package.json");
+    const tauriConfig = readJson("src-tauri/tauri.conf.json");
+    const cargoManifest = readText("src-tauri/Cargo.toml");
+    const cargoLock = readText("src-tauri/Cargo.lock");
+    const version = String(packageJson.version);
+    const cargoManifestVersion = cargoManifest.match(
+      /^\[package\]\n[\s\S]*?^version = "([^"]+)"$/mu,
+    )?.[1];
+    const cargoLockVersion = cargoLock.match(
+      /^\[\[package\]\]\nname = "angel2-desktop"\nversion = "([^"]+)"$/mu,
+    )?.[1];
+
+    expect(tauriConfig.version).toBe(version);
+    expect(cargoManifestVersion).toBe(version);
+    expect(cargoLockVersion).toBe(version);
+    expect((packageJson.scripts as Record<string, unknown>)["release:version"])
+      .toBe("node scripts/bump-release-version.mjs");
+
+    const [major, minor] = version.split(".").map(Number);
+    const output = execFileSync(
+      process.execPath,
+      ["scripts/bump-release-version.mjs", "--dry-run"],
+      {
+        cwd: fileURLToPath(new URL("../..", import.meta.url)),
+        encoding: "utf8",
+      },
+    );
+    expect(output.trim()).toBe(`release version: ${version} -> ${major}.${minor + 1}.0 (dry run)`);
+  });
+
   it("wraps only the audited player release in a stable Tauri identity", () => {
     const config = readJson("src-tauri/tauri.conf.json");
     const build = config.build as Record<string, unknown>;

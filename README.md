@@ -159,7 +159,7 @@ Get-FileHash -Algorithm SHA256 .\*-setup.exe
 不用 PowerShell 的话，系统自带的 `certutil` 也可以（需要填完整文件名）：
 
 ```cmd
-certutil -hashfile "Angel2 Web Remake_0.1.0_x64-setup.exe" SHA256
+for %f in (*-setup.exe) do certutil -hashfile "%f" SHA256
 ```
 
 对不上就**不要安装**，重新下载一次。

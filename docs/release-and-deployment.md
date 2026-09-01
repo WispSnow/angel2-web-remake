@@ -50,6 +50,25 @@ Release。
 
 ## Windows Tauri 开发包
 
+### 发布版本号
+
+当前发布版本记录在 `package.json`，并与 `src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`
+及 `src-tauri/Cargo.lock` 保持一致。不要只重命名已经生成的安装包：NSIS 文件名、Windows
+文件元数据和安装升级判断都必须来自构建时的真实版本。
+
+每次准备新的 Windows 安装包时，先且只执行一次版本更新：
+
+```bash
+pnpm release:version          # 默认递增次版本，例如 0.2.0 -> 0.3.0
+pnpm release:version 0.2.1    # 用户明确指定版本时使用该版本
+pnpm release:version --dry-run
+```
+
+未明确指定版本号时，默认把次版本加一并把修订号归零，即 `x.y.z -> x.(y+1).0`。构建或上传失败后
+重试同一发行版时不得再次运行版本更新命令，否则会无故跳过版本。脚本会在修改前校验四处版本完全
+一致，并拒绝同版本或降级版本。版本变更与对应内容摘要登记在
+[`release-history.md`](release-history.md)。
+
 Windows 桌面版和 Web 版共享同一套 TypeScript、模拟、内容与 `pnpm build:release` 玩家包。
 发布构建只类型检查 `src/`；依赖本机逆向证据的单元测试另由 `pnpm typecheck:tests` 检查，
 避免不含 `reverse/parsed/` 工作产物的干净 GitHub 检出阻断玩家包构建。

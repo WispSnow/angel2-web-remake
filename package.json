@@ -1,6 +1,6 @@
 {
   "name": "angel2-web-remake",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,6 +9,7 @@
   },
   "scripts": {
     "check:assets": "node scripts/check-original-assets.mjs",
+    "release:version": "node scripts/bump-release-version.mjs",
     "predev": "pnpm run check:assets --quiet",
     "pretest": "pnpm run check:assets --quiet",
     "pretest:coverage": "pnpm run check:assets --quiet",
