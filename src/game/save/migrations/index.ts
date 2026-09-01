@@ -640,6 +640,23 @@ function migrateVersion101Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-135 restores the native shooting-class continuation after a future
+ * follow-leader move. The temporary anchor and automatic-action queue are not
+ * persisted, so v102 battle/completed saves retain every stored field.
+ */
+function migrateVersion102Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 102
+    || value.contentVersion !== "follow-leader-player-cohesion-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-128 restores the tier roll made by every future lightning cast, while
  * REMAKE-129 also repairs the stage-3 baseline inherited from v96.
  */
@@ -2923,6 +2940,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion102 = migrateVersion102Save(value);
+    if (migratedVersion102) return migratedVersion102;
     const migratedVersion101 = migrateVersion101Save(value);
     if (migratedVersion101) return migratedVersion101;
     const migratedVersion100 = migrateVersion100Save(value);

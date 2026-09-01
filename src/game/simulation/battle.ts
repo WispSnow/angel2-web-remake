@@ -1935,7 +1935,7 @@ export class Stage0Battle {
   private planFollowLeaderMove(
     unit: BattleUnit,
     leader: BattleUnit,
-  ): AlliedAiAction {
+  ): { action: AlliedAiAction; handled: boolean } {
     const movementBudget = this.statsFor(unit).movement;
     const currentMovement = this.movementMapFor(unit, movementBudget);
 
@@ -1952,7 +1952,10 @@ export class Stage0Battle {
     // A commanded unit still spends the action here instead of falling through
     // to pursuit: `跟隨主將` is a cohesion order, not conditional free action.
     if (routeCostBefore === undefined || routeCostBefore >= 55) {
-      return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+      return {
+        action: { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] },
+        handled: false,
+      };
     }
 
     const candidates = currentMovement.cells
@@ -1978,9 +1981,39 @@ export class Stage0Battle {
         || left.position.y * this.stage.width + left.position.x
           - (right.position.y * this.stage.width + right.position.x));
     const selected = candidates[0];
-    return selected
-      ? { unitId: unit.id, kind: "move", path: selected.path }
-      : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    return {
+      action: selected
+        ? { unitId: unit.id, kind: "move", path: selected.path }
+        : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] },
+      handled: true,
+    };
+  }
+
+  /**
+   * The native shooting dispatcher is the one exception to group-command
+   * cohesion consuming the whole class action. After `1000:1BD9` reports a
+   * successful cohesion result from `1000:1CA3..1D07`, `1000:197B..1989`
+   * immediately calls the shooting attempt at `1000:1F3F`. Ordinary melee, technique and
+   * empress/dragon callers instead finalize the move and return.
+   */
+  private planFollowLeaderAction(
+    unit: BattleUnit,
+    leader: BattleUnit,
+  ): AlliedAiAction {
+    const follow = this.planFollowLeaderMove(unit, leader);
+    const shootingActionId = shootingActionIdFor(unit.classId, unit.side);
+    if (!follow.handled || !shootingActionId) return follow.action;
+
+    const destination = follow.action.path.at(-1) ?? unit;
+    const shot = this.planClassAction(unit, [shootingActionId], {
+      positionFilter: (position) => positionKey(position) === positionKey(destination),
+      pathFilter: (path) => path.length === follow.action.path.length
+        && path.every((position, index) => {
+          const expected = follow.action.path[index];
+          return expected !== undefined && positionKey(position) === positionKey(expected);
+        }),
+    });
+    return shot ?? follow.action;
   }
 
   private planAlliedAiActionUncached(
@@ -2013,7 +2046,7 @@ export class Stage0Battle {
       ? this.unit(leaderId)
       : undefined;
     if (leader && leader.id !== unit.id && leader.side === unit.side) {
-      return this.planFollowLeaderMove(unit, leader);
+      return this.planFollowLeaderAction(unit, leader);
     }
 
     const targetFilter = this.forces.targetFilterFor(id, this.units);

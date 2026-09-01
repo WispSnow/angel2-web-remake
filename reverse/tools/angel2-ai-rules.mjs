@@ -83,6 +83,14 @@ const CODE_SIGNATURES = [
   { address: "1000:16AD", offset: 0x116ad, hex: "e8c601c706161f0000582ea3" },
   { address: "1000:1876", offset: 0x11876, hex: "a1772e3d00007401c38b1e161f81fbdf087701c3a122008ec0b80000268807a124008ec0b80000268807c3" },
   { address: "1000:1BD9", offset: 0x11bd9, hex: "e8810983fa597503e9bf00a13f0d3d040074223d0600741d3d080074183d0a0074133d0000750a833e340d597503e99900ba4e00c32ea17f" },
+  // Ordinary/technique group-command callers finalize a successful cohesion
+  // move immediately; neither one invokes its class attack executor afterward.
+  { address: "1000:18C2", offset: 0x118c2, hex: "e8140383fa4e7404e86507c3" },
+  { address: "1000:1A14", offset: 0x11a14, hex: "e8c20183fa4e7404e81306c3" },
+  { address: "1000:1AA4", offset: 0x11aa4, hex: "e8320183fa4e7404e88305c3" },
+  // Shooting is the exception: a successful 1BD9 result falls straight through
+  // to 1F3F before the common action finalizer at 2032.
+  { address: "1000:197B", offset: 0x1197b, hex: "e85b0283fa4e7407e8b905e8a906c3" },
   // Group-command cohesion: behavior 0 plus DS:0D34='Y' reaches this branch.
   // It probes the DS:0D36 target through FY/FA with seed 55, then rebuilds the
   // ordinary movement map with the actor's raw movement value before moving.
@@ -740,9 +748,15 @@ function nativeRules(
         dispatcher: "1000:1BD9; behavior 0 enters 1000:1CA3 when DS:0D34 is 'Y'",
         target: "DS:0D36, written from the current cursor cell by the follow-leader command at 0000:6D59",
         probe: "build the phase FY/FA pursuit map with literal seed 55 and require the target cell's resulting range byte to be nonzero",
-        execution: "rebuild the phase base A/Y movement map with the actor's raw DS:0D47 movement value, select an endpoint on the target route, move there, and consume the action",
+        execution: "rebuild the phase base A/Y movement map with the actor's raw DS:0D47 movement value, select an endpoint on the target route, move there, and return Y to the class dispatcher",
+        classContinuation: {
+          ordinary: "1000:18C2 sees Y, calls the common finalizer at 1000:2032 and returns; no ordinary attack follows",
+          shooting: "1000:197B sees Y, calls 1000:1F3F from the actor's post-move cell, then calls 1000:2032; a 3A/0I/1I unit therefore shoots when that cell has an eligible target",
+          technique: "1000:1A14 sees Y, calls 1000:2032 and returns; no technique follows",
+          empressOrDragon: "1000:1AA4 has the same finalize-and-return shape; no WD action follows",
+        },
         consequence: "cohesion progress follows the weighted traversable range-map gradient; a necessary detour may increase Manhattan distance and still remains the correct route",
-        evidence: ["0000:6D42", "0000:6D59", "1000:1BD9", "1000:1CA3"],
+        evidence: ["0000:6D42", "0000:6D59", "1000:18C2", "1000:197B", "1000:1A14", "1000:1BD9", "1000:1CA3", "1000:1F3F"],
       },
       pairedLeaderFollowerBehaviors: {
         dispatcher: "1000:1BD9; follower branch 1000:1C0E; exact same-side behavior lookup 1000:0D83/0D9C",
@@ -836,7 +850,7 @@ function nativeRules(
       },
       classFlowQuirks: {
         ordinary: "behavior 1 can attack only from the current globally preferred attack position; ordinary reposition through 1000:2081 may move and attack in the same action; long pursuit and behavior-2 pursuit only move",
-        shooting: "behavior 1 stands and fires when it has a target; other ordinary shooting uses 1000:1D0B and fires only after a successful move to a different distance-2 position, while an origin-winning selector result is treated as failure; a follower cohesion move can still continue into the shooting attempt when the leader was already near",
+        shooting: "behavior 1 stands and fires when it has a target; other ordinary shooting uses 1000:1D0B and fires only after a successful move to a different distance-2 position, while an origin-winning selector result is treated as failure; independently, every successful 1000:1BD9 cohesion move (including the temporary group command at 1000:1CA3) is followed by the shooting attempt at 1000:1F3F",
         technique: "uses the same behavior 12/FF, low-life, paired-follower and full-life fallback vocabulary, but keeps its own technique-selection ordering rather than sharing the shooting wrapper",
         empressOrDragon: "uses the same behavior 12/FF, low-life and movement fallbacks around the WD action pool",
       },

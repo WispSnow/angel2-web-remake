@@ -5374,6 +5374,22 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-102 saves without changing battle state for follow-leader shooting", () => {
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 102,
+      contentVersion: "follow-leader-player-cohesion-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 102,
+      contentVersion: "follow-leader-player-cohesion-1",
+    }))).toEqual(completed);
+  });
+
   it("removes the old stage-3 difficulty seed while migrating legacy saves", () => {
     const current = stage3BattleSave();
     const difficulty = 3 as const;

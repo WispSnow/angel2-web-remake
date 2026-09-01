@@ -546,6 +546,64 @@ describe("stage 0 battle simulation", () => {
     });
   });
 
+  it("lets a commanded archer shoot only after completing its leader-cohesion move", () => {
+    const battle = battleAtPlayableOpening();
+    const leader = battle.unit("1:0")!;
+    const archer = battle.unit("1:43")!;
+    const enemy = battle.unit("2:48")!;
+    leader.x = 18;
+    leader.y = 20;
+    leader.acted = true;
+    archer.classId = "archer";
+    archer.x = 18;
+    archer.y = 26;
+    enemy.x = 20;
+    enemy.y = 23;
+    battle.units = [leader, archer, enemy];
+
+    // The enemy is outside the archer's native 2..4 range at the origin. The
+    // follow route moves beside the leader first, then 1000:197B calls the
+    // shooting wrapper against the post-move cell.
+    expect(manhattan(archer, enemy)).toBeGreaterThan(4);
+    expect(battle.planAlliedAiAction(archer.id, leader.id)).toEqual({
+      unitId: archer.id,
+      kind: "special",
+      path: [
+        { x: 18, y: 26 },
+        { x: 17, y: 26 },
+        { x: 17, y: 25 },
+        { x: 17, y: 24 },
+        { x: 17, y: 23 },
+      ],
+      targetId: enemy.id,
+      actionId: "archer-shot",
+    });
+  });
+
+  it("lets a commanded archer already beside the leader fire without chasing", () => {
+    const battle = battleAtPlayableOpening();
+    const leader = battle.unit("1:0")!;
+    const archer = battle.unit("1:43")!;
+    const enemy = battle.unit("2:48")!;
+    leader.x = 18;
+    leader.y = 20;
+    leader.acted = true;
+    archer.classId = "archer";
+    archer.x = 18;
+    archer.y = 21;
+    enemy.x = 18;
+    enemy.y = 23;
+    battle.units = [leader, archer, enemy];
+
+    expect(battle.planAlliedAiAction(archer.id, leader.id)).toEqual({
+      unitId: archer.id,
+      kind: "special",
+      path: [{ x: 18, y: 21 }],
+      targetId: enemy.id,
+      actionId: "archer-shot",
+    });
+  });
+
   it("does not turn an unreachable follow-leader order into enemy pursuit", () => {
     const battle = battleAtPlayableOpening();
     const leader = battle.unit("1:0")!;
