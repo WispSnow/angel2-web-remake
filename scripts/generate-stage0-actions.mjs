@@ -290,7 +290,10 @@ const actions = {
       mode: "post-graphics-point-drain",
       waitPerPointNativeTicks: 1,
     },
-    experience: { minimum: 8, maximum: 11, addKillReward: true },
+    // REMAKE-138: 0000:7290 is `add cx,8` with no `add cx,ax`, so the DX=4
+    // 0000:72E3 roll never reaches CX and the cast reward is flat. CX still
+    // holds the death-scan total returned by 1747:000C+7A.
+    experience: { fixed: 8, addKillReward: true },
     presentationId: "shoot-common",
   },
   "crossbow-shot": {
@@ -310,7 +313,8 @@ const actions = {
       mode: "post-graphics-point-drain",
       waitPerPointNativeTicks: 1,
     },
-    experience: { minimum: 13, maximum: 17, addKillReward: true },
+    // REMAKE-138: same shape as the archer at 0000:72B0, discarding DX=5.
+    experience: { fixed: 13, addKillReward: true },
     presentationId: "shoot-common",
   },
   "magic-archer-shot": {
@@ -336,7 +340,10 @@ const actions = {
       waitPerPointNativeTicks: 1,
       fixedWaitNativeTicks: 20,
     },
-    experience: { minimum: 13, maximum: 17, addKillReward: true },
+    // REMAKE-138: the borrowed 3V handler 0000:CCA4 already returns
+    // kill + randomBelow(5) + 13, then 0000:72DC adds a second 13. Only the
+    // 3V roll is live; the branch's own DX=5 roll is discarded.
+    experience: { base: 26, randomMinimum: 0, randomMaximum: 4, addKillReward: true },
     presentationId: "shoot-line",
   },
   "fire-1": {

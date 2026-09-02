@@ -5422,6 +5422,22 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-105 saves without changing battle state for shooting cast experience", () => {
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 105,
+      contentVersion: "shared-body-kill-reward-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 105,
+      contentVersion: "shared-body-kill-reward-1",
+    }))).toEqual(completed);
+  });
+
   it("removes the old stage-3 difficulty seed while migrating legacy saves", () => {
     const current = stage3BattleSave();
     const difficulty = 3 as const;

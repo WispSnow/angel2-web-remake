@@ -397,10 +397,12 @@ function prepareSingleTarget(
   let experienceGained = 0;
   if (isSingleTargetShootingAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
-    experienceGained = trial.between(
-      definition.experience.minimum,
-      definition.experience.maximum,
-    );
+    // REMAKE-138: the native archer and crossbow tails roll `0000:72E3` and
+    // then `add cx,<flat>` without the `add cx,ax` that every lightning wrapper
+    // has, so the roll cannot reach CX. The cast reward is flat and, because
+    // the discarded native value came from a PIT read rather than a
+    // reproducible sequence, no simulation PRNG draw is consumed for it.
+    experienceGained = definition.experience.fixed;
     if (targetDied) experienceGained += killRewardTotalFor(context.units, [target]);
   } else if (isFireAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
@@ -470,9 +472,13 @@ function prepareMagicArcher(
       statusesAfter,
     });
   });
-  const experienceGained = trial.between(
-    definition.experience.minimum,
-    definition.experience.maximum,
+  // REMAKE-138: the magic archer borrows the `3V` handler `0000:CCA4`, which
+  // already returns kill + randomBelow(5) + 13; the shooting branch then adds a
+  // second 13 at `0000:72DC`. Only the `3V` roll is live, so exactly one draw is
+  // consumed here on top of the flat 26.
+  const experienceGained = definition.experience.base + trial.between(
+    definition.experience.randomMinimum,
+    definition.experience.randomMaximum,
   ) + killRewardTotalFor(context.units, defeatedUnitsIn(context.units, affectedUnits));
   return {
     affectedUnits,

@@ -244,7 +244,10 @@ function shootingFor(id: ClassId): CompendiumShooting | undefined {
       ? `選定主目標 ${Math.floor(damage.minimum / 2) * 2}–${Math.floor(damage.maximum / 2) * 2}`
         + `，沿線其餘單位 ${Math.floor(damage.minimum / 2)}–${Math.floor(damage.maximum / 2)}`
       : `${damage.minimum}–${damage.maximum}`,
-    experience: `擊殺獎勵 + ${experience.minimum}–${experience.maximum}`,
+    // REMAKE-138: 弓／弩的施法經驗是固定值，只有魔弓借用 `3V` 的那一次擲骰是活的。
+    experience: "fixed" in experience
+      ? `擊殺獎勵 + ${experience.fixed}`
+      : `擊殺獎勵 + ${experience.base + experience.randomMinimum}–${experience.base + experience.randomMaximum}`,
     ...(note ? { note } : {}),
   };
 }

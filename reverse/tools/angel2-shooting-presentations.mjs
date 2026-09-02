@@ -255,9 +255,9 @@ async function extract(
     },
     classes: {
       player: [
-        { classCode: "3A", className: "弓兵", baseRoll: "30..49", selectedTargetDamage: "30..49", presentation: "commonImpact", experience: "kill reward + 8..11" },
-        { classCode: "0I", className: "弩兵", baseRoll: "70..89", selectedTargetDamage: "70..89", presentation: "commonImpact", experience: "kill reward + 13..17" },
-        { classCode: "1I", className: "魔弓兵", baseRoll: "50..69", selectedTargetDamage: "2*floor(baseRoll/2) = 50..68", otherEligibleLineCellDamage: "floor(baseRoll/2) = 25..34", presentation: "lineEffect3", experience: "kill reward + 13..17" },
+        { classCode: "3A", className: "弓兵", baseRoll: "30..49", selectedTargetDamage: "30..49", presentation: "commonImpact", experience: "kill reward + 8 flat (0000:7290 add cx,8 with no add cx,ax)" },
+        { classCode: "0I", className: "弩兵", baseRoll: "70..89", selectedTargetDamage: "70..89", presentation: "commonImpact", experience: "kill reward + 13 flat (0000:72B0 add cx,0dh with no add cx,ax)" },
+        { classCode: "1I", className: "魔弓兵", baseRoll: "50..69", selectedTargetDamage: "2*floor(baseRoll/2) = 50..68", otherEligibleLineCellDamage: "floor(baseRoll/2) = 25..34", presentation: "lineEffect3", experience: "kill reward + 26..30 (3V handler 0000:CCA4 returns kill + randomBelow(5) + 13; 0000:72DC adds a second 13)" },
       ],
       ai: [
         { classCode: "3A", className: "弓兵", baseRoll: "30..49", selectedTargetDamage: "30..49", presentation: "commonImpact" },

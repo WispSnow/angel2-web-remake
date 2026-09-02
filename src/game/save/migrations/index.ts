@@ -659,6 +659,25 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-138 makes the archer and crossbow cast reward flat and raises the
+ * magic archer's to 26..30, and the archer/crossbow paths stop consuming an
+ * experience roll. The board, experience already earned and the PRNG are
+ * untouched and the new formula only applies from the next shot, so v105
+ * battle/completed saves retain every stored field.
+ */
+function migrateVersion105Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 105
+    || value.contentVersion !== "shared-body-kill-reward-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-136 only changes how stage 9's escort plans her own move: legs now
  * complete inside valley rectangles and the landing follows an ideal route to
  * the current goal. The plan is recomputed from public state on every action,
@@ -2977,6 +2996,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion105 = migrateVersion105Save(value);
+    if (migratedVersion105) return migratedVersion105;
     const migratedVersion104 = migrateVersion104Save(value);
     if (migratedVersion104) return migratedVersion104;
     const migratedVersion103 = migrateVersion103Save(value);

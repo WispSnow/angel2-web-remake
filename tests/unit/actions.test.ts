@@ -27,6 +27,7 @@ import type {
   BattleActionId,
   PrayerOutcomeKind,
 } from "../../src/game/simulation/actions/types";
+import { compendiumEntry } from "../../src/game/compendium/class-compendium";
 import { DeterministicRng } from "../../src/game/simulation/rng";
 import type { BattleUnit, Position } from "../../src/game/types";
 
@@ -3767,5 +3768,127 @@ describe("shared-body kill rewards", () => {
     );
     expect(prepared.result.experienceGained - groupReward(1)).toBeGreaterThanOrEqual(10);
     expect(prepared.result.experienceGained - groupReward(1)).toBeLessThanOrEqual(11);
+  });
+});
+
+describe("REMAKE-138 shooting cast experience", () => {
+  /**
+   * The native archer and crossbow tails are
+   * `mov dx,n / call 0000:72E3 / add cx,<flat> / call 0000:72FF`. Every
+   * lightning wrapper (`0000:CB0B` and friends) puts an `add cx,ax` between the
+   * roll and the flat add; the shooting tails do not, so the rolled value never
+   * reaches CX. CX there still holds the death-scan total handed back by
+   * `1747:000C+7A`, which makes the reward "kill + flat" rather than a range.
+   *
+   * These pin both halves of the correction: the exact flat value, and that no
+   * simulation PRNG draw is spent on the discarded native roll. The former
+   * `trial.between(8, 11)` / `between(13, 17)` implementation fails both.
+   */
+  function shoot(
+    actionId: "archer-shot" | "crossbow-shot" | "magic-archer-shot",
+    classId: "archer" | "crossbow" | "magic-archer",
+    seed: number,
+    targetLife: number,
+  ): { experienceGained: number; rngAfter: number; targetLifeAfter: number } {
+    const battle = new Stage0Battle(0, new DeterministicRng(seed));
+    const actor = battle.units.find((unit) => unit.side === 1)!;
+    const target = battle.units.find((unit) => unit.side === 2)!;
+    battle.units = [actor, target];
+    actor.classId = classId;
+    actor.className = className(classId);
+    actor.x = 20;
+    actor.y = 20;
+    actor.acted = false;
+    // Manhattan distance 3 clears the mode-2 minimum of 2 and stays inside the
+    // shortest of the three maxima.
+    target.x = 23;
+    target.y = 20;
+    target.life = targetLife;
+    const prepared = battle.prepareSpecialAction({
+      actionId,
+      actorId: actor.id,
+      targetId: target.id,
+      target: { x: target.x, y: target.y },
+    });
+    return {
+      experienceGained: prepared.result.experienceGained,
+      rngAfter: prepared.rngAfter,
+      targetLifeAfter: prepared.targetLifeAfter,
+    };
+  }
+
+  const seeds = [1, 2, 3, 7, 11, 12345, 0x0a11ce02];
+
+  /** State the shared stream reaches after exactly `draws` advances. */
+  function stateAfter(seed: number, draws: number): number {
+    const rng = new DeterministicRng(seed);
+    for (let index = 0; index < draws; index += 1) rng.nextUint();
+    return rng.state;
+  }
+
+  it.each([
+    ["archer-shot", "archer", 8],
+    ["crossbow-shot", "crossbow", 13],
+  ] as const)("%s pays a flat cast reward and spends no experience roll", (actionId, classId, flat) => {
+    for (const seed of seeds) {
+      // A surviving target isolates the cast reward from the kill half.
+      const { experienceGained, rngAfter } = shoot(actionId, classId, seed, 999);
+      expect(experienceGained).toBe(flat);
+      // Exactly one draw: the damage roll. A modelled experience roll would
+      // leave the stream one advance further along.
+      expect(rngAfter).toBe(stateAfter(seed, 1));
+    }
+  });
+
+  it("magic archer pays 26..30 because it adds a second 13 on top of 3V", () => {
+    // `0000:72B7` calls the `3V` handler `0000:CCA4`, which already returns
+    // kill + randomBelow(5) + 13, then adds another 13 at `0000:72DC`.
+    for (const seed of seeds) {
+      const expected = new DeterministicRng(seed);
+      expected.between(50, 69);
+      const expectedReward = 26 + expected.between(0, 4);
+
+      const { experienceGained, rngAfter } = shoot("magic-archer-shot", "magic-archer", seed, 999);
+
+      expect(experienceGained).toBe(expectedReward);
+      // Two draws: line damage, then the live `3V` roll.
+      expect(rngAfter).toBe(stateAfter(seed, 2));
+      expect(experienceGained).toBeGreaterThanOrEqual(26);
+      expect(experienceGained).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it("adds the death-scan kill total on top of the flat cast reward", () => {
+    const survived = shoot("archer-shot", "archer", 7, 999);
+    const killed = shoot("archer-shot", "archer", 7, 1);
+
+    expect(survived.targetLifeAfter).toBeGreaterThan(0);
+    expect(killed.targetLifeAfter).toBe(0);
+    expect(survived.experienceGained).toBe(8);
+    // REMAKE-137 still supplies the kill half, so it stacks on the flat reward
+    // instead of replacing it, and costs no extra draw.
+    expect(killed.experienceGained).toBeGreaterThan(8);
+    expect(killed.rngAfter).toBe(survived.rngAfter);
+  });
+
+  it("shows the corrected reward on the player-visible compendium card", () => {
+    expect(compendiumEntry("archer").shooting?.experience).toBe("擊殺獎勵 + 8");
+    expect(compendiumEntry("crossbow").shooting?.experience).toBe("擊殺獎勵 + 13");
+    expect(compendiumEntry("magic-archer").shooting?.experience).toBe("擊殺獎勵 + 26–30");
+    // REMAKE-093's water warrior shot inherits the archer table, card included.
+    expect(compendiumEntry("water-warrior").shooting?.experience).toBe("擊殺獎勵 + 8");
+  });
+
+  it("records the corrected shapes in the generated action content", () => {
+    expect(BATTLE_ACTION_DEFINITIONS["archer-shot"].experience)
+      .toEqual({ fixed: 8, addKillReward: true });
+    expect(BATTLE_ACTION_DEFINITIONS["crossbow-shot"].experience)
+      .toEqual({ fixed: 13, addKillReward: true });
+    expect(BATTLE_ACTION_DEFINITIONS["magic-archer-shot"].experience)
+      .toEqual({ base: 26, randomMinimum: 0, randomMaximum: 4, addKillReward: true });
+    // REMAKE-093's water warrior shot borrows the archer table wholesale, so it
+    // has to follow the correction instead of keeping a stale range.
+    expect(BATTLE_ACTION_DEFINITIONS["water-warrior-shot"].experience)
+      .toEqual({ fixed: 8, addKillReward: true });
   });
 });

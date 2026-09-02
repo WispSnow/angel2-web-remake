@@ -23,8 +23,7 @@ export const STAGE0_ACTION_DEFINITIONS = {
       "waitPerPointNativeTicks": 1
     },
     "experience": {
-      "minimum": 8,
-      "maximum": 11,
+      "fixed": 8,
       "addKillReward": true
     },
     "presentationId": "shoot-common"
@@ -51,8 +50,7 @@ export const STAGE0_ACTION_DEFINITIONS = {
       "waitPerPointNativeTicks": 1
     },
     "experience": {
-      "minimum": 13,
-      "maximum": 17,
+      "fixed": 13,
       "addKillReward": true
     },
     "presentationId": "shoot-common"
@@ -81,8 +79,9 @@ export const STAGE0_ACTION_DEFINITIONS = {
       "fixedWaitNativeTicks": 20
     },
     "experience": {
-      "minimum": 13,
-      "maximum": 17,
+      "base": 26,
+      "randomMinimum": 0,
+      "randomMaximum": 4,
       "addKillReward": true
     },
     "presentationId": "shoot-line"

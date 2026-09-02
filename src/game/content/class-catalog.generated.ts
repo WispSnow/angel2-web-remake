@@ -2396,7 +2396,7 @@ export const CLASS_CATALOG = {
       "minimumRange": 2,
       "maximumRange": 6,
       "damage": "roll 50..69; selected target receives 2*floor(roll/2)=50..68, while other eligible occupied line cells receive floor(roll/2)=25..34",
-      "experience": "kill reward + 13..17"
+      "experience": "kill reward + 26..30 (3V handler 0000:CCA4 returns kill + randomBelow(5) + 13; 0000:72DC adds a second 13)"
     },
     "technique": null,
     "directTechnique": null,
@@ -3668,7 +3668,7 @@ export const CLASS_CATALOG = {
       "minimumRange": 2,
       "maximumRange": 5,
       "damage": "30..49 to selected target",
-      "experience": "kill reward + 8..11"
+      "experience": "kill reward + 8 flat (0000:7290 has no add cx,ax, so the DX=4 roll is discarded; CX still holds the death-scan total from 1747:000C+7A)"
     },
     "technique": null,
     "directTechnique": null,
@@ -3837,7 +3837,7 @@ export const CLASS_CATALOG = {
       "minimumRange": 2,
       "maximumRange": 8,
       "damage": "70..89 to selected target",
-      "experience": "kill reward + 13..17"
+      "experience": "kill reward + 13 flat (0000:72B0, same shape as 3A, discarding the DX=5 roll)"
     },
     "technique": null,
     "directTechnique": null,

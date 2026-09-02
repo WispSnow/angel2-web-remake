@@ -260,9 +260,9 @@
 
 | 记录 | 职业 | 射程 | 伤害 | 经验 |
 | ---: | --- | --- | --- | --- |
-| 12 | 魔弓兵 | 2–6 | roll 50..69; selected target receives 2*floor(roll/2)=50..68, while other eligible occupied line cells receive floor(roll/2)=25..34 | kill reward + 13..17 |
-| 20 | 弓兵 | 2–5 | 30..49 to selected target | kill reward + 8..11 |
-| 21 | 弩兵 | 2–8 | 70..89 to selected target | kill reward + 13..17 |
+| 12 | 魔弓兵 | 2–6 | roll 50..69; selected target receives 2*floor(roll/2)=50..68, while other eligible occupied line cells receive floor(roll/2)=25..34 | kill reward + 26..30 (3V handler 0000:CCA4 returns kill + randomBelow(5) + 13; 0000:72DC adds a second 13) |
+| 20 | 弓兵 | 2–5 | 30..49 to selected target | kill reward + 8 flat (0000:7290 has no add cx,ax, so the DX=4 roll is discarded; CX still holds the death-scan total from 1747:000C+7A) |
+| 21 | 弩兵 | 2–8 | 70..89 to selected target | kill reward + 13 flat (0000:72B0, same shape as 3A, discarding the DX=5 roll) |
 
 ### 技術菜单（按技術階級）
 
@@ -377,11 +377,11 @@
 
 | 文件 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `reverse/parsed/native/unit-catalog.json` | 196879 | `a6fd8249bbc3e23eff88b6d33aa45c93bf8a00834ad78a210c19d6d938e22f95` |
+| `reverse/parsed/native/unit-catalog.json` | 202578 | `a7212a4470e57f69ac800f6507991a279241a1e15dc571dca79ad5128cff2e45` |
 | `reverse/parsed/native/map-rules.json` | 110857 | `4602deafbc3cb0d3974c079973c92cd5721e2afcdeb2821090f5f8b00945e9a4` |
 | `reverse/parsed/native/promotion-table.json` | 46077 | `f2516f911518c6e2c8cb7ef88b9964fa580d6b6983b0294a382e029eb90e9cf8` |
 | `reverse/parsed/native/terrain-token-map.json` | 3757676 | `bdebd087d056ce2ebfccb9bacbe5d17210b2bc2256e143f15d86e5eb7f6f1f64` |
-| `reverse/parsed/native/technique-rules.json` | 93520 | `4cb4eca5a77fa630d4469a57465b8a1e80069023c4f4074509afbcb8955c4012` |
+| `reverse/parsed/native/technique-rules.json` | 94981 | `01a628099dce7787f2f62204154415eece3c22a23fd964a0424099616c64db35` |
 
 生成器另外导入 `src/game/content/class-catalog.generated.ts` 与 `src/game/content/class-traits.ts`，
 并断言运行时成长行、地形百分比与原生目录一致；任一来源漂移都会中止生成而不是写出旧表。
