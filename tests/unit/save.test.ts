@@ -5422,6 +5422,24 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-107 saves without changing battle state for the enemy magic guard lifecycle", () => {
+    // REMAKE-140 只把 side 2 施放的防魔计数改为 2。战中档只在玩家阶段写出，旧规则下
+    // side 2 的防魔那一刻恒为 0，没有需要改写的字段，因此 v107 战中档与完成档无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 107,
+      contentVersion: "named-leader-line-holders-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 107,
+      contentVersion: "named-leader-line-holders-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-106 saves without changing battle state for the named leader line", () => {
     // REMAKE-139 只改具名主将护卫半径的「阵线」成员判据，规划从公开状态重算，
     // 棋盘、状态与 PRNG 都不动，因此 v106 战中档与完成档无损迁移。

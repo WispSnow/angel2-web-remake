@@ -1,4 +1,4 @@
-import type { UnitStatuses } from "../types";
+import type { Side, UnitStatuses } from "../types";
 
 export const UNIT_STATUS_KEYS = [
   "attackUp",
@@ -42,4 +42,15 @@ export function effectiveDefense(baseDefense: number, statuses: UnitStatuses): n
 
 export function tickTimedStatus(counter: number): number {
   return counter >= 1 && counter <= 3 ? counter - 1 : counter;
+}
+
+/**
+ * REMAKE-140: a guard has to outlive the first round boundary that follows an
+ * opposing phase, or it never meets any magic at all. The native `1` already
+ * does that for side 1, whose cast precedes the enemy phase of the same round;
+ * side 2 acts last in the round, so its guard needs one more boundary before
+ * the player phase it is meant to cover even begins.
+ */
+export function magicGuardCounterFor(side: Side, baseCounter: number): number {
+  return side === 2 ? baseCounter + 1 : baseCounter;
 }

@@ -822,14 +822,14 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     for (const targetId of ["enemy-guide", "enemy-archer"]) {
       expect(utilityFor("attack-up", targetId))
         .toMatchObject({ support: 0, targetThreat: 0, waste: 1 });
-      // FM keeps the full ally set for a side-1 caster: it answers magic damage,
-      // not the attack chain, and the enemy phase still follows its cast.
-      expect(expertSpecialUtility(context, { ...actor, side: 1 }, "magic-guard", battle.unit(targetId)!, [actor]))
-        .toMatchObject({ support: 120, waste: 0 });
-      // REMAKE-139: cast by side 2 it clears at the boundary that follows at
-      // once, before any player magic can meet it, so it is pure waste.
-      expect(utilityFor("magic-guard", targetId)).toMatchObject({ support: 0, targetThreat: 0, waste: 1 });
     }
+    // FM keeps every squadmate whatever its role: it answers magic damage, not
+    // the attack chain. REMAKE-140 only drops 魔導師 recipients, the caster itself first.
+    for (const targetId of ["enemy-front", "enemy-archer"]) {
+      expect(utilityFor("magic-guard", targetId)).toMatchObject({ support: 120, waste: 0 });
+    }
+    expect(utilityFor("magic-guard", "enemy-guide"))
+      .toMatchObject({ support: 0, targetThreat: 0, waste: 1 });
   });
 
   it("rejects every non-melee SA target while the other debuffs keep theirs", () => {
@@ -1765,6 +1765,39 @@ describe("REMAKE-139 pure-support squadmates do not form a named leader's line",
     // healer-as-line reading used to refuse.
     expect(manhattan(destination, sword)).toBeGreaterThan(NAMED_LEADER_ESCORT_RADIUS);
     expect(manhattan(destination, guide)).toBeGreaterThan(NAMED_LEADER_ESCORT_RADIUS);
+  });
+
+  it("never shields a 魔導師: with only casters in range it closes on 芳, with 芳 in range it shields 芳", () => {
+    // REMAKE-140. Self-FM on a flat 120 used to be the caster's default every
+    // time its own guard lapsed, and two 魔導師 side by side would trade guards
+    // every round; either way the caster stood still instead of following.
+    const { battle, fang, guide } = reportedPair(["2:8", "2:41", "2:47"]);
+    const otherGuide = battle.unit("2:47");
+    if (!otherGuide) throw new Error("second guide missing");
+    expect(otherGuide.classId).toBe("magic-guide");
+    otherGuide.x = guide.x + 1;
+    otherGuide.y = guide.y;
+    otherGuide.acted = true;
+    fang.statuses.attackUp = 3;
+    fang.x = guide.x + 1;
+    fang.y = guide.y + 6;
+    expect(manhattan(fang, guide)).toBeGreaterThan(
+      BATTLE_ACTION_DEFINITIONS["magic-guard"].range.selectionRadius - 1,
+    );
+    const outOfRange = battle.planEnemyAiAction("2:41");
+    expect(outOfRange?.kind).toBe("move");
+    expect(outOfRange).not.toHaveProperty("actionId");
+
+    fang.y = guide.y + 3;
+    expect(battle.planEnemyAiAction("2:41")).toMatchObject({
+      kind: "special",
+      actionId: "magic-guard",
+      targetId: "2:8",
+    });
+    expect(battle.expertAiDecisionTrace("2:41")?.candidates
+      .filter(({ action }) => action.actionId === "magic-guard")
+      .map(({ action }) => action.targetId))
+      .toEqual(["2:8"]);
   });
 
   it("marches the pair south over several phases instead of holding the same cells", () => {

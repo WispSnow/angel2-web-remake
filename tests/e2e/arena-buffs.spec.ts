@@ -688,11 +688,13 @@ test("tier-three magic guide commits FM through the formal technique flow", asyn
   expect(pageErrors).toEqual([]);
 });
 
-// REMAKE-139: an enemy-cast FM clears at the round boundary that follows the
-// enemy phase, before any player magic can meet it, so the expert planner
-// records it as waste. With every ally at full life the tier-three 魔導師 now
-// spends the phase on AA for its melee escort instead of shielding itself.
-test("enemy tier-three magic guide no longer spends its phase on an FM that expires unused", async ({ page }) => {
+// FM's support value is the flat 120 the expert planner gives every recipient;
+// REMAKE-140 drops every 魔導師 recipient (the caster first), so the 士兵 escort
+// receives the guard. AA
+// cannot outrank it here because the escort's attack is below the FM constant.
+// The enemy's guard is written as `2`, so it is still `1` — still up — when
+// control returns to the player.
+test("enemy tier-three magic guide shields its escort with an FM that is still up in the next player phase", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/arena.html?test=1");
@@ -716,24 +718,47 @@ test("enemy tier-three magic guide no longer spends its phase on an FM that expi
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-rest").click();
 
+  const dialogue = page.getByTestId("dialogue-layer");
+  await page.waitForFunction(() => {
+    const dataset = document.querySelector<HTMLCanvasElement>(
+      "[data-testid='battle-canvas']",
+    )?.dataset;
+    return dataset?.mapCombatPhase === "statusEffect"
+      && dataset.mapCombatFrame === "10"
+      && dataset.mapCombatEffectTileCount === "2";
+  }, undefined, { polling: "raf" });
+  await expect(dialogue).toBeHidden();
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-magic-guard-ai.png`,
+  });
+
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
       battle?: ArenaBattleDebugState;
     }).battle;
-    return current?.lastSpecialAction?.actorId === "arena-2-0"
+    return current?.lastSpecialAction?.actionId === "magic-guard"
+      && current.lastSpecialAction.actorId === "arena-2-0"
       && current.specialActionPresentation === undefined;
   });
-  const after = await arenaBattleState(page);
-  expect(after?.lastSpecialAction).toMatchObject({
-    actionId: "attack-up",
+  const cast = await arenaBattleState(page);
+  expect(cast?.lastSpecialAction).toMatchObject({
+    actionId: "magic-guard",
     actorId: "arena-2-0",
     affectedUnits: [expect.objectContaining({
       unitId: "arena-2-1",
-      statusesAfter: expect.objectContaining({ attackUp: 3 }),
+      statusesAfter: expect.objectContaining({ magicGuard: 2 }),
     })],
   });
-  for (const id of ["arena-2-0", "arena-2-1"]) {
-    expect(after?.units.find((unit) => unit.id === id)?.statuses.magicGuard).toBe(0);
-  }
+
+  // Back in the player phase the guard has survived the round boundary.
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as {
+      battle?: ArenaBattleDebugState;
+    }).battle;
+    return current?.phase === "player" && current.round === 2;
+  });
+  const after = await arenaBattleState(page);
+  expect(after?.units.find(({ id }) => id === "arena-2-1")?.statuses.magicGuard).toBe(1);
+  expect(after?.units.find(({ id }) => id === "arena-2-0")?.statuses.magicGuard).toBe(0);
   expect(pageErrors).toEqual([]);
 });

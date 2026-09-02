@@ -6,7 +6,7 @@ import {
 import { immuneToPhysicalShootingFor, killRewardFor } from "../../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../../types";
 import type { DeterministicRng } from "../rng";
-import { cloneUnitStatuses } from "../status";
+import { cloneUnitStatuses, magicGuardCounterFor } from "../status";
 import { waterWarriorGroupIn, waterWarriorRootId } from "../water-warrior-split";
 import { planIceDisplacement } from "./ice-displacement";
 import {
@@ -286,7 +286,9 @@ function prepareSingleTarget(
     };
   } else if (intent.actionId === "magic-guard") {
     const definition = BATTLE_ACTION_DEFINITIONS["magic-guard"];
-    targetStatusesAfter.magicGuard = definition.status.counter;
+    // The recipient shares the caster's side, so its side names the phase the
+    // cast happens in — REMAKE-140 lets a side-2 guard reach the player phase.
+    targetStatusesAfter.magicGuard = magicGuardCounterFor(target.side, definition.status.counter);
     return {
       affected: affectedUnit(target, { statusesAfter: targetStatusesAfter }),
       experienceGained: definition.experience.base + trial.between(

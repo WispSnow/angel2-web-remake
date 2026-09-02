@@ -30,8 +30,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 107 as const;
-export const SAVE_CONTENT_VERSION = "named-leader-line-holders-1" as const;
+export const SAVE_VERSION = 108 as const;
+export const SAVE_CONTENT_VERSION = "enemy-magic-guard-lifecycle-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

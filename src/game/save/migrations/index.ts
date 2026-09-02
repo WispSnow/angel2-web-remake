@@ -659,6 +659,25 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-140 lets a side-2 magic guard outlive the round boundary that follows
+ * the enemy phase, so it is written as `2` instead of `1`. Battle saves are
+ * only written during the player phase, where a side-2 guard was always `0`
+ * under the old rule, so v107 battle/completed saves retain every stored
+ * field and no counter needs rewriting.
+ */
+function migrateVersion107Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 107
+    || value.contentVersion !== "named-leader-line-holders-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-139 only changes which squadmates count as a named side-2 leader's
  * line for the REMAKE-118 escort radius: pure-support casters no longer do.
  * The plan is recomputed from public state on every action and nothing about
@@ -3015,6 +3034,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion107 = migrateVersion107Save(value);
+    if (migratedVersion107) return migratedVersion107;
     const migratedVersion106 = migrateVersion106Save(value);
     if (migratedVersion106) return migratedVersion106;
     const migratedVersion105 = migrateVersion105Save(value);

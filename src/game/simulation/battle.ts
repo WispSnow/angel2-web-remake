@@ -3594,6 +3594,9 @@ export class Stage0Battle {
           // 魔導師 itself included — is never a candidate. The expert path also
           // drops it via `waste`; this guard covers the native-style ranking.
           if (actionId === "attack-up" && classCombatRole(target.classId) !== "melee") continue;
+          // REMAKE-140: automatic FM covers squadmates, never a 魔導師 — itself
+          // or another caster it would otherwise trade guards with every round.
+          if (actionId === "magic-guard" && target.classId === "magic-guide") continue;
           const targetStats = this.statsFor(target);
           const missingLife = targetStats.maxLife - target.life;
           if (definition.target === "ally"

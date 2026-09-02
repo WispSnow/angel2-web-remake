@@ -977,6 +977,47 @@ describe("Stage-0 class actions", () => {
     expect(cancelled.defender.statuses.defenseUp).toBe(0);
   });
 
+  it("REMAKE-140: a side-2 magic guard outlives the boundary that follows its own phase", () => {
+    // Side 2 acts last in the round, so the native `1` would clear at the
+    // boundary that follows at once — before any player magic could meet it.
+    const battle = new Stage0Battle(0);
+    const caster = battle.units.find((unit) => unit.side === 2)!;
+    const ally = battle.units.find((unit) => unit.side === 2 && unit.id !== caster.id)!;
+    promoteForAction(caster, "magic-guard");
+    caster.experience = classDefinition("magic-guide").dataRows[2].experienceThreshold;
+    ally.x = caster.x + 1;
+    ally.y = caster.y;
+    battle.units = [battle.unit("1:0")!, caster, ally];
+
+    const prepared = battle.prepareSpecialAction({
+      actionId: "magic-guard",
+      actorId: caster.id,
+      targetId: ally.id,
+    });
+    expect(prepared.result.affectedUnits).toEqual([expect.objectContaining({
+      unitId: ally.id,
+      statusesAfter: expect.objectContaining({ magicGuard: 2 }),
+    })]);
+    battle.commitPreparedAction(prepared);
+    expect(ally.statuses.magicGuard).toBe(2);
+    // The boundary after the enemy phase: the guard is still up for the player phase.
+    battle.startNextRound();
+    expect(ally.statuses.magicGuard).toBe(1);
+    // Unused through that player phase, it clears at the next boundary.
+    battle.startNextRound();
+    expect(ally.statuses.magicGuard).toBe(0);
+
+    // Refreshing writes the same side-2 value on the caster itself, never a stack.
+    caster.acted = false;
+    caster.statuses.magicGuard = 1;
+    const refreshed = battle.prepareSpecialAction({
+      actionId: "magic-guard",
+      actorId: caster.id,
+      targetId: caster.id,
+    });
+    expect(refreshed.result.affectedUnits[0]?.statusesAfter.magicGuard).toBe(2);
+  });
+
   it("applies FM atomically to full-life, refreshed, self, or frozen allies and expires next round", () => {
     const battle = new Stage0Battle(0);
     const { actor, target } = arrangeTarget(battle, "magic-guard", 1);

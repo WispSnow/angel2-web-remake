@@ -617,15 +617,15 @@ export function expertSpecialUtility(
     // one — the 魔導師 itself included. Their attack value cashes out solely on
     // counters they are meant to avoid, yet a tier-one 巫師 and 魔導師 both show
     // 53 attack against the 戰士's 50, so `攻擊 + 40` used to outbid the escort.
-    // REMAKE-139: side 2 acts last in the round and an unconsumed 防魔 clears
-    // at the boundary that follows at once — before any player magic can meet
-    // it. An enemy-cast FM therefore never protects anyone, yet its flat
-    // support used to outbid moving, so an idle 魔導師 re-cast it on itself
-    // every round instead of following its line.
-    const guardExpiresUnused = actionId === "magic-guard" && actor.side === 2;
+    // REMAKE-140: automatic FM never lands on a 魔導師 — itself included. A
+    // flat 120 with the caster usually the highest-threat recipient made
+    // self-FM the default every time the guard lapsed, and two casters side by
+    // side would simply trade guards every round; either way the caster stood
+    // still instead of closing on the allies it exists to cover.
+    const guardOnCaster = actionId === "magic-guard" && target.classId === "magic-guide";
     if (statusValue > 0
       || (actionId === "attack-up" && classCombatRole(target.classId) !== "melee")
-      || guardExpiresUnused) {
+      || guardOnCaster) {
       utility.waste = 1;
     } else {
       const stats = context.effectiveStatsFor(target);
