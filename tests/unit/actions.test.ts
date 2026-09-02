@@ -3631,3 +3631,141 @@ describe("Stage-0 class actions", () => {
     expect(battle.enemyActionOrder()).not.toContain(enemy.id);
   });
 });
+
+describe("shared-body kill rewards", () => {
+  /**
+   * REMAKE-137: the death scan `0000:96C2` pays `0000:95DB`'s class reward once
+   * per cleared board cell, so a water warrior group hands its whole cell count
+   * to whichever shot or technique zeroes the shared life.
+   */
+  function waterWarriorGroup(bodies: number, life: number): BattleUnit[] {
+    const battle = new Stage0Battle(0);
+    const template = battle.units.find((unit) => unit.side === 2)!;
+    const root: BattleUnit = {
+      ...template,
+      id: "2:40",
+      slot: 40,
+      classId: "water-warrior",
+      x: 6,
+      y: 5,
+      life,
+      statuses: { ...template.statuses },
+    };
+    // The three split cells sit one step from the root, so a `1L` ring centred
+    // on the root covers the whole group until a body is moved out of it.
+    const offsets = [{ x: 1, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 }];
+    return [root, ...offsets.slice(0, bodies - 1).map((offset, index) => ({
+      ...root,
+      id: `2:40:split-${index + 1}`,
+      x: root.x + offset.x,
+      y: root.y + offset.y,
+      statuses: { ...root.statuses },
+    }))];
+  }
+
+  const groupReward = (bodies: number) => killRewardFor("water-warrior", 2) * bodies;
+
+  it("pays every split body when a single-target technique zeroes the shared life", () => {
+    const battle = new Stage0Battle(0);
+    const [root, ...splits] = waterWarriorGroup(4, 10);
+    const actor = { ...battle.unit("1:0")!, id: "fire-actor", x: 4, y: 5, classId: "evil-mage" as const };
+    const prepared = prepareSpecialAction(
+      { actionId: "fire-2", actorId: actor.id, targetId: root!.id },
+      actor,
+      root!,
+      new DeterministicRng(0x137),
+      {
+        units: [actor, root!, ...splits],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      root!,
+    );
+
+    // 炎暴 only ever touches the selected body, but the scan still clears four cells.
+    expect(prepared.result.affectedUnits).toHaveLength(1);
+    expect(prepared.result.affectedUnits[0]).toMatchObject({ unitId: root!.id, died: true });
+    expect(prepared.result.experienceGained - groupReward(4)).toBeGreaterThanOrEqual(10);
+    expect(prepared.result.experienceGained - groupReward(4)).toBeLessThanOrEqual(11);
+  });
+
+  it("pays the same group once whether the ring covers one body or all four", () => {
+    const battle = new Stage0Battle(0);
+    const actor = {
+      ...battle.unit("1:0")!,
+      id: "lightning-actor",
+      x: 0,
+      y: 5,
+      classId: "magician" as const,
+    };
+    const cast = (units: BattleUnit[], center: BattleUnit) => prepareSpecialAction(
+      { actionId: "lightning-1", actorId: actor.id, targetId: center.id },
+      actor,
+      center,
+      new DeterministicRng(0x1137),
+      {
+        units: [actor, ...units],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      center,
+    );
+
+    // `1L` pays damage out to two cells, so the body parked at (10,5) is outside.
+    const partial = waterWarriorGroup(4, 10);
+    partial[3]!.x = 10;
+    partial[3]!.y = 5;
+    const partialCast = cast(partial, partial[0]!);
+    expect(partialCast.result.affectedUnits.filter(({ died }) => died)).toHaveLength(3);
+
+    const full = waterWarriorGroup(4, 10);
+    const fullCast = cast(full, full[0]!);
+    expect(fullCast.result.affectedUnits.filter(({ died }) => died)).toHaveLength(4);
+
+    expect(partialCast.result.experienceGained).toBe(fullCast.result.experienceGained);
+    expect(fullCast.result.experienceGained - groupReward(4)).toBeGreaterThanOrEqual(8);
+    expect(fullCast.result.experienceGained - groupReward(4)).toBeLessThanOrEqual(9);
+  });
+
+  it("pays every split body for a lethal shot as well", () => {
+    const battle = new Stage0Battle(0);
+    const [root, ...splits] = waterWarriorGroup(4, 10);
+    const actor = { ...battle.unit("1:0")!, id: "archer-actor", x: 3, y: 5, classId: "archer" as const };
+    const prepared = prepareSpecialAction(
+      { actionId: "archer-shot", actorId: actor.id, targetId: root!.id },
+      actor,
+      root!,
+      new DeterministicRng(0x337),
+      {
+        units: [actor, root!, ...splits],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      root!,
+    );
+
+    expect(prepared.result.affectedUnits[0]).toMatchObject({ unitId: root!.id, died: true });
+    expect(prepared.result.experienceGained - groupReward(4)).toBeGreaterThanOrEqual(8);
+    expect(prepared.result.experienceGained - groupReward(4)).toBeLessThanOrEqual(11);
+  });
+
+  it("keeps a lone water warrior and other classes on the single class reward", () => {
+    const battle = new Stage0Battle(0);
+    const [root] = waterWarriorGroup(1, 10);
+    const actor = { ...battle.unit("1:0")!, id: "solo-actor", x: 4, y: 5, classId: "evil-mage" as const };
+    const prepared = prepareSpecialAction(
+      { actionId: "fire-2", actorId: actor.id, targetId: root!.id },
+      actor,
+      root!,
+      new DeterministicRng(0x137),
+      {
+        units: [actor, root!],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      root!,
+    );
+    expect(prepared.result.experienceGained - groupReward(1)).toBeGreaterThanOrEqual(10);
+    expect(prepared.result.experienceGained - groupReward(1)).toBeLessThanOrEqual(11);
+  });
+});

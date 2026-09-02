@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { classStatsFor, killRewardFor } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE12_DEFINITION } from "../../src/game/content/stage12";
 import { Stage12Battle, createStage12DeploymentRoster } from "../../src/game/simulation/stage12-battle";
@@ -15,6 +16,20 @@ const campaign: CampaignState = {
   ]),
   rngState: 0x1234_5678,
   rngCalls: 11,
+};
+
+/** Slot 1 carries 初級落雷／初級炎暴 so the technique kill reward can be observed. */
+const magicianCampaign: CampaignState = {
+  ...campaign,
+  roster: completeCampaignRoster([
+    { slot: 0, classId: "land-knight", experience: 720, life: 240 },
+    {
+      slot: 1,
+      classId: "magician",
+      experience: 299,
+      life: classStatsFor({ classId: "magician", experience: 299 }).maxLife,
+    },
+  ]),
 };
 
 const fullDeployment = {
@@ -90,6 +105,74 @@ describe("stage 12 battle simulation", () => {
     const simultaneous = new Stage12Battle(campaign, fullDeployment);
     simultaneous.units = simultaneous.units.filter(({ side, slot }) => side !== 2 && slot !== 0);
     expect(simultaneous.outcome()).toBe("defeat");
+  });
+
+  /**
+   * REMAKE-137: native `0000:96C2` pays the class reward per cleared board cell
+   * and hands the total to the shot or technique through `0000:63CF`, so a
+   * four-body group is worth `4 x 40` however the shared life reached zero.
+   */
+  function splitGroupBattle(): Stage12Battle {
+    const battle = new Stage12Battle(magicianCampaign, fullDeployment);
+    const melee = battle.unit("1:0")!;
+    for (let hit = 0; hit < 3; hit += 1) {
+      melee.x = 38;
+      melee.y = 17;
+      battle.attack(melee.id, "2:40");
+      battle.startNextRound();
+    }
+    const group = battle.units.filter(({ side, slot }) => side === 2 && slot === 40);
+    expect(group).toHaveLength(4);
+    for (const body of group) body.life = 10;
+    return battle;
+  }
+
+  const groupKillReward = killRewardFor("water-warrior", 2) * 4;
+
+  it("pays the whole split group for a 落雷 kill that only covers part of it", () => {
+    const battle = splitGroupBattle();
+    const mage = battle.unit("1:1")!;
+    // One body walks out of the ring; the shared life still ends at zero.
+    battle.unit("2:40:split-3")!.x = 43;
+    mage.x = 38;
+    mage.y = 14;
+    const before = mage.experience;
+
+    const prepared = battle.prepareSpecialAction({
+      actionId: "lightning-1",
+      actorId: mage.id,
+      targetId: "2:40:split-1",
+      target: { x: 39, y: 16 },
+    });
+    expect(prepared.result.affectedUnits.filter(({ died }) => died)).toHaveLength(3);
+    battle.commitPreparedAction(prepared);
+
+    expect(battle.units.filter(({ side, slot }) => side === 2 && slot === 40)).toHaveLength(0);
+    const gained = battle.unit(mage.id)!.experience - before;
+    expect(gained - groupKillReward).toBeGreaterThanOrEqual(8);
+    expect(gained - groupKillReward).toBeLessThanOrEqual(9);
+  });
+
+  it("pays the whole split group for a single-target 炎暴 kill", () => {
+    const battle = splitGroupBattle();
+    const mage = battle.unit("1:1")!;
+    mage.x = 38;
+    mage.y = 16;
+    const before = mage.experience;
+
+    const prepared = battle.prepareSpecialAction({
+      actionId: "fire-1",
+      actorId: mage.id,
+      targetId: "2:40",
+      target: { x: 39, y: 17 },
+    });
+    expect(prepared.result.affectedUnits).toHaveLength(1);
+    battle.commitPreparedAction(prepared);
+
+    expect(battle.units.filter(({ side, slot }) => side === 2 && slot === 40)).toHaveLength(0);
+    const gained = battle.unit(mage.id)!.experience - before;
+    expect(gained - groupKillReward).toBeGreaterThanOrEqual(8);
+    expect(gained - groupKillReward).toBeLessThanOrEqual(9);
   });
 
   it("gives every water-warrior root a legal shared-expert action", () => {

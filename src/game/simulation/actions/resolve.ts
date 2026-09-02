@@ -7,6 +7,7 @@ import { immuneToPhysicalShootingFor, killRewardFor } from "../../content/classe
 import type { BattleUnit, Position, UnitStats } from "../../types";
 import type { DeterministicRng } from "../rng";
 import { cloneUnitStatuses } from "../status";
+import { waterWarriorGroupIn, waterWarriorRootId } from "../water-warrior-split";
 import { planIceDisplacement } from "./ice-displacement";
 import {
   stompEffectRange,
@@ -59,6 +60,44 @@ const isSingleTargetShootingAction = (
  */
 function shootingEvaded(target: BattleUnit): boolean {
   return immuneToPhysicalShootingFor(target.classId);
+}
+
+/**
+ * `REMAKE-137`: the kill component of shooting and technique experience comes
+ * from the shared death scan, not from the effect's own target list. Native
+ * `0000:96C2` walks all 2,500 board cells and, for every cell whose slot is at
+ * zero life, adds `0000:95DB`'s class reward into `DS:7993` before clearing
+ * that single cell. `0000:63CF` returns the total, which each effector hands
+ * back as `CX` — shooting `1747:000C+7A`, lightning `1000:7166+0F`. A split
+ * water warrior shares one unit slot across up to four cells, so the scan pays
+ * its reward once per body, no matter which body took the lethal hit or how
+ * many bodies stood inside the effect. Victims are therefore grouped by shared
+ * slot: each group pays `bodies x reward` exactly once.
+ */
+function killRewardTotalFor(
+  units: readonly BattleUnit[],
+  victims: readonly BattleUnit[],
+): number {
+  const counted = new Set<string>();
+  let total = 0;
+  for (const victim of victims) {
+    const groupKey = waterWarriorRootId(victim) ?? victim.id;
+    if (counted.has(groupKey)) continue;
+    counted.add(groupKey);
+    total += killRewardFor(victim.classId, victim.side)
+      * waterWarriorGroupIn(units, victim).length;
+  }
+  return total;
+}
+
+function defeatedUnitsIn(
+  units: readonly BattleUnit[],
+  affectedUnits: readonly SpecialActionAffectedUnit[],
+): BattleUnit[] {
+  return affectedUnits
+    .filter(({ died }) => died)
+    .map(({ unitId }) => units.find(({ id }) => id === unitId))
+    .filter((unit): unit is BattleUnit => Boolean(unit));
 }
 
 function affectedUnit(
@@ -171,8 +210,9 @@ function prepareSingleTarget(
   intent: BattleActionIntent,
   target: BattleUnit,
   trial: DeterministicRng,
-  targetMaximumLife: number,
+  context: SpecialActionResolutionContext,
 ): { affected: SpecialActionAffectedUnit; experienceGained: number } {
+  const targetMaximumLife = context.statsFor(target).maxLife;
   let damage = 0;
   let healing = 0;
   let blocked = false;
@@ -361,14 +401,14 @@ function prepareSingleTarget(
       definition.experience.minimum,
       definition.experience.maximum,
     );
-    if (targetDied) experienceGained += killRewardFor(target.classId, target.side);
+    if (targetDied) experienceGained += killRewardTotalFor(context.units, [target]);
   } else if (isFireAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     experienceGained = definition.experience.base + trial.between(
       definition.experience.randomMinimum,
       definition.experience.randomMaximum,
     );
-    if (targetDied) experienceGained += killRewardFor(target.classId, target.side);
+    if (targetDied) experienceGained += killRewardTotalFor(context.units, [target]);
   } else if (isHealAction(intent.actionId)) {
     const definition = BATTLE_ACTION_DEFINITIONS[intent.actionId];
     const q = Math.floor(healing * 10 / targetMaximumLife);
@@ -433,12 +473,7 @@ function prepareMagicArcher(
   const experienceGained = trial.between(
     definition.experience.minimum,
     definition.experience.maximum,
-  ) + affectedUnits
-    .filter(({ died }) => died)
-    .reduce((total, affected) => {
-      const victim = context.units.find(({ id }) => id === affected.unitId);
-      return total + (victim ? killRewardFor(victim.classId, victim.side) : 0);
-    }, 0);
+  ) + killRewardTotalFor(context.units, defeatedUnitsIn(context.units, affectedUnits));
   return {
     affectedUnits,
     experienceGained,
@@ -504,7 +539,6 @@ function prepareLightning(
     context.battlefield.height,
     definition.range.effectRadius,
   );
-  let killExperience = 0;
   const affectedUnits = context.units
     .filter((unit) => unit.side !== actor.side && effect.valueAt(unit) > 0)
     .sort((left, right) => left.y * context.battlefield.width + left.x
@@ -525,7 +559,6 @@ function prepareLightning(
         ? 0
         : Math.min(unit.life, damageByRangeValue[rangeValue] ?? 0);
       const lifeAfter = unit.life - damage;
-      if (lifeAfter === 0) killExperience += killRewardFor(unit.classId, unit.side);
       return affectedUnit(unit, {
         statusesAfter,
         blocked,
@@ -539,7 +572,10 @@ function prepareLightning(
     // The native inner effect returns kill rewards first. CB0B/CB28/CB45/CB62
     // then unconditionally make one tier roll and add its base, even if every
     // target was guarded/frozen or nobody died (REMAKE-128).
-    experienceGained: killExperience + definition.experience.base + trial.between(
+    experienceGained: killRewardTotalFor(
+      context.units,
+      defeatedUnitsIn(context.units, affectedUnits),
+    ) + definition.experience.base + trial.between(
       definition.experience.randomMinimum,
       definition.experience.randomMaximum,
     ),
@@ -682,12 +718,12 @@ function prepareStomp(
   // REMAKE-125: the native stomp handler returned its fixed five points after
   // the shared finalizer had already accumulated kill rewards, silently
   // replacing them. Keep the native per-cast reward and add every defeated
-  // unit's normal class reward, in the same row-major order as resolution.
-  const killExperience = affectedUnits.reduce((total, affected) => {
-    if (!affected.died) return total;
-    const defeated = context.units.find(({ id }) => id === affected.unitId);
-    return total + (defeated ? killRewardFor(defeated.classId, defeated.side) : 0);
-  }, 0);
+  // unit's normal class reward, counted per board entity like every other
+  // death-scan path.
+  const killExperience = killRewardTotalFor(
+    context.units,
+    defeatedUnitsIn(context.units, affectedUnits),
+  );
   return {
     affectedUnits,
     experienceGained: definition.experience.fixed + killExperience,
@@ -781,7 +817,7 @@ export function prepareSpecialAction(
     experienceGained = 0;
   } else {
     if (!target) throw new Error("single-target action requires a target unit");
-    const single = prepareSingleTarget(intent, target, trial, context.statsFor(target).maxLife);
+    const single = prepareSingleTarget(intent, target, trial, context);
     affectedUnits = [single.affected];
     experienceGained = single.experienceGained;
   }

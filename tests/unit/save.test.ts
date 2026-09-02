@@ -5406,6 +5406,22 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-104 saves without changing battle state for shared-body kill rewards", () => {
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 104,
+      contentVersion: "stage-09-escort-valley-route-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 104,
+      contentVersion: "stage-09-escort-valley-route-1",
+    }))).toEqual(completed);
+  });
+
   it("removes the old stage-3 difficulty seed while migrating legacy saves", () => {
     const current = stage3BattleSave();
     const difficulty = 3 as const;

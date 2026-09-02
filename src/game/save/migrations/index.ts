@@ -640,6 +640,25 @@ function migrateVersion101Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-137 pays shooting and technique kill rewards per cleared board cell,
+ * so a water warrior group is worth one reward per body. The board, experience
+ * already earned and the PRNG are untouched and the new total only applies from
+ * the next lethal action, so v104 battle/completed saves retain every stored
+ * field.
+ */
+function migrateVersion104Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 104
+    || value.contentVersion !== "stage-09-escort-valley-route-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-136 only changes how stage 9's escort plans her own move: legs now
  * complete inside valley rectangles and the landing follows an ideal route to
  * the current goal. The plan is recomputed from public state on every action,
@@ -2958,6 +2977,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion104 = migrateVersion104Save(value);
+    if (migratedVersion104) return migratedVersion104;
     const migratedVersion103 = migrateVersion103Save(value);
     if (migratedVersion103) return migratedVersion103;
     const migratedVersion102 = migrateVersion102Save(value);

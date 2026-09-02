@@ -66,6 +66,7 @@ import type {
   SpecialActionResult,
 } from "./actions/types";
 import { emptyUnitStatuses, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
+import { waterWarriorGroupIn, waterWarriorRootId } from "./water-warrior-split";
 import {
   battleOutcomeForObjective,
   slotsNamedByCondition,
@@ -323,14 +324,6 @@ const canTargetFrozenUnit = (actionId: BattleActionId): boolean =>
 
 function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
   return UNIT_STATUS_KEYS.every((key) => left[key] === right[key]);
-}
-
-const WATER_WARRIOR_SPLIT_ID = /:split-[1-3]$/u;
-
-function waterWarriorRootId(unit: Pick<BattleUnit, "id" | "classId">): string | undefined {
-  return unit.classId === "water-warrior"
-    ? unit.id.replace(WATER_WARRIOR_SPLIT_ID, "")
-    : undefined;
 }
 
 function applyActiveOrdinaryHitStatus(attacker: BattleUnit, defender: BattleUnit): void {
@@ -796,12 +789,7 @@ export class Stage0Battle {
   }
 
   private waterWarriorGroup(unit: BattleUnit): BattleUnit[] {
-    const rootId = waterWarriorRootId(unit);
-    if (!rootId) return [unit];
-    return this.units.filter((candidate) =>
-      candidate.side === unit.side
-      && candidate.slot === unit.slot
-      && waterWarriorRootId(candidate) === rootId);
+    return waterWarriorGroupIn(this.units, unit);
   }
 
   private orderedSharedUnitGroup(unit: BattleUnit): BattleUnit[] {

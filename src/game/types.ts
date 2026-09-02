@@ -266,8 +266,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 104;
-  contentVersion: "stage-09-escort-valley-route-1";
+  version: 105;
+  contentVersion: "shared-body-kill-reward-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
