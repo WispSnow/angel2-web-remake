@@ -1337,6 +1337,37 @@ describe("Stage-0 class actions", () => {
     expect(target.statuses.defenseDown).toBe(0);
   });
 
+  it("scales SA and SD with the native difficulty-3 enemy multiplier", () => {
+    // 原版装载链先把 ±20 写进有效攻／防（`1000:8C2D`），之后才对 side 2 施加
+    // 難度 3 的 ×1.5（`1000:8BD1`），所以「無法無天」下的敌方攻／防下降是 30 点。
+    const battle = new Stage0Battle(3);
+    const { actor, target } = arrangeTarget(battle, "attack-down", 2);
+    const baseAttack = battle.statsFor(target).attack;
+    const baseDefense = battle.statsFor(target).defense;
+
+    battle.commitPreparedAction(battle.prepareSpecialAction({
+      actionId: "attack-down",
+      actorId: actor.id,
+      targetId: target.id,
+    }));
+    expect(target.statuses.attackDown).toBe(3);
+    expect(battle.effectiveStatsFor(target).attack).toBe(baseAttack - 30);
+
+    actor.acted = false;
+    const priest = arrangeTarget(battle, "defense-down", 2).actor;
+    battle.commitPreparedAction(battle.prepareSpecialAction({
+      actionId: "defense-down",
+      actorId: priest.id,
+      targetId: target.id,
+    }));
+    expect(target.statuses.defenseDown).toBe(3);
+    expect(battle.effectiveStatsFor(target).defense).toBe(baseDefense - 30);
+
+    // 攻升／攻降在任何难度下仍然逐点相消。
+    target.statuses.attackUp = 3;
+    expect(battle.effectiveStatsFor(target).attack).toBe(baseAttack);
+  });
+
   it("applies SN to frozen enemies, preserves guard, and keeps the dragon-only immunity after one roll", () => {
     const battle = new Stage0Battle(0);
     const { actor, target } = arrangeTarget(battle, "spell-seal", 2);

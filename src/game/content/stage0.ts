@@ -1,5 +1,5 @@
 import { STAGE0_SPEECH_RECORD_BY_CHARACTER, STAGE0_TERRAIN_TOKENS_BASE64, STAGE0_TOKEN_TO_SLOT_BASE64 } from "./stage0-runtime.generated";
-import type { BattleUnit, Difficulty, Position, SaveRosterEntry, UnitClassId, UnitStats } from "../types";
+import type { BattleUnit, Difficulty, Position, SaveRosterEntry, UnitClassId, UnitStats, UnitStatuses } from "../types";
 import {
   className,
   classStatsFor,
@@ -8,7 +8,7 @@ import {
   usesClassIdentity,
 } from "./classes";
 import { enemyScalingFor, scriptedBossStatsFor } from "./enemy-scaling";
-import { emptyUnitStatuses } from "../simulation/status";
+import { effectiveAttack, effectiveDefense, emptyUnitStatuses } from "../simulation/status";
 import { musicAsset, STAGE0_SEAMLESS_MUSIC_ASSETS } from "./music-assets";
 import { STAGE0_FULL_COMBAT_ASSETS } from "./stage0-actions.generated";
 
@@ -101,29 +101,58 @@ const UNIT_DEFINITIONS: Array<Pick<BattleUnit, "side" | "slot" | "classId" | "cl
 /**
  * 唯一的难度感知属性口。`Battle.statsFor` 把模拟、AI、HUD 与存档校验全部路由到这里，
  * 所以 `REMAKE-103` 的成长模式、剧情 boss 数值和原版难度 3 倍率都只需在此收口。
+ *
+ * 传入 `statuses` 时返回有效属性，顺序逐字复刻模块 29 的单位装载链
+ * `0000:502A → 0000:51EC → 1000:8C2D`（状态 ±20 写入有效攻／防）
+ * `→ 1000:8B60`（场景 37 统一覆盖）`→ 1000:8BD1`（难度 3 的 side 2 ×1.5）：
+ * 难度 3 的敌方状态修正会被一起放大，`(base ± 20) × 1.5` 相对 `base × 1.5`
+ * 恰好差 30 点，而不是 20 点。
  */
-export function statsFor(
+function difficultyAwareStats(
   unit: Pick<BattleUnit, "classId" | "experience" | "side">,
   difficulty: Difficulty,
+  statuses: UnitStatuses | undefined,
 ): UnitStats {
-  if (unit.side !== 2) return classStatsFor(unit);
+  const withStatuses = (stats: UnitStats): UnitStats => statuses === undefined ? stats : {
+    ...stats,
+    attack: effectiveAttack(stats.attack, statuses),
+    defense: effectiveDefense(stats.defense, statuses),
+  };
+
+  if (unit.side !== 2) return withStatuses(classStatsFor(unit));
 
   const rule = enemyScalingFor(difficulty);
   const base = classStatsFor(unit, rule.growth);
 
   // 剧情 boss 逐难度直接给值，不参与成长曲线，也不再叠加难度 3 倍率。
   const scripted = scriptedBossStatsFor(unit.classId, difficulty);
-  if (scripted) return { ...base, ...scripted };
+  if (scripted) return withStatuses({ ...base, ...scripted });
 
   const percent = rule.statMultiplierPercent;
-  if (percent === undefined) return base;
+  if (percent === undefined) return withStatuses(base);
   const scale = (value: number): number => Math.floor(value * percent / 100);
+  const modified = withStatuses(base);
   return {
-    ...base,
-    attack: scale(base.attack),
-    defense: scale(base.defense),
+    ...modified,
+    attack: scale(modified.attack),
+    defense: scale(modified.defense),
     maxLife: scale(base.maxLife),
   };
+}
+
+export function statsFor(
+  unit: Pick<BattleUnit, "classId" | "experience" | "side">,
+  difficulty: Difficulty,
+): UnitStats {
+  return difficultyAwareStats(unit, difficulty, undefined);
+}
+
+/** 基础属性叠加八个状态字后的有效攻／防；顺序见 `difficultyAwareStats`。 */
+export function effectiveStatsFor(
+  unit: Pick<BattleUnit, "classId" | "experience" | "side" | "statuses">,
+  difficulty: Difficulty,
+): UnitStats {
+  return difficultyAwareStats(unit, difficulty, unit.statuses);
 }
 
 /**

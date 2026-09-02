@@ -29,7 +29,7 @@ import {
   shootingActionIdFor,
   techniqueActionIdsFor,
 } from "../content/actions";
-import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
+import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, effectiveStatsFor, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, PortraitRecord, Position, SaveRosterEntry, SavedBattleState, Side, UnitClassId, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
@@ -65,7 +65,7 @@ import type {
   PreparedBattleAction,
   SpecialActionResult,
 } from "./actions/types";
-import { effectiveAttack, effectiveDefense, emptyUnitStatuses, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
+import { emptyUnitStatuses, tickTimedStatus, UNIT_STATUS_KEYS } from "./status";
 import {
   battleOutcomeForObjective,
   slotsNamedByCondition,
@@ -1079,12 +1079,7 @@ export class Stage0Battle {
   }
 
   effectiveStatsFor(unit: BattleUnit): UnitStats {
-    const base = this.statsFor(unit);
-    return {
-      ...base,
-      attack: effectiveAttack(base.attack, unit.statuses),
-      defense: effectiveDefense(base.defense, unit.statuses),
-    };
+    return effectiveStatsFor(unit, this.difficulty);
   }
 
   moveUnit(id: string, destination: Position): boolean {
@@ -2273,7 +2268,7 @@ export class Stage0Battle {
       battlefield: this.dynamicBattlefield,
       units: this.units,
       unit: (id) => this.unit(id),
-      statsFor: (unit) => this.statsFor(unit),
+      effectiveStatsFor: (unit) => this.effectiveStatsFor(unit),
       movementPath: (id, destination) => this.movementPath(id, destination),
       planSisterAction: (unit, actionId) => this.planClassAction(
         unit,

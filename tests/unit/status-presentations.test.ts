@@ -11,6 +11,7 @@ import {
   effectiveDefense,
   emptyUnitStatuses,
 } from "../../src/game/simulation/status";
+import { effectiveStatsFor, statsFor } from "../../src/game/content/stage0";
 
 const EXPECTED_PNG_HASHES = [
   "716a8d77e873b8f2045c5d74ea536a0d463ace1cc1cb07ebc2a13fe9ec7ad867",
@@ -52,15 +53,15 @@ describe("unit status presentations", () => {
 
   it("gives every native slot a hover description of the rule it already applies", () => {
     expect(UNIT_STATUS_PRESENTATIONS.map(({ key, description }) => [key, description])).toEqual([
-      ["attackUp", "攻擊力提高 20。"],
-      ["defenseUp", "防禦力提高 20。"],
+      ["attackUp", "攻擊力提高 20；「無法無天」的敵方為 30。"],
+      ["defenseUp", "防禦力提高 20；「無法無天」的敵方為 30。"],
       ["magicGuard", "抵擋一次魔法效果，抵擋後即消失。"],
       [
         "confusion",
         "點選後只會自行移動或停留，不攻擊、不射擊、不施術，並直接耗盡本回合行動。",
       ],
-      ["attackDown", "攻擊力降低 20。"],
-      ["defenseDown", "防禦力降低 20。"],
+      ["attackDown", "攻擊力降低 20；「無法無天」的敵方為 30。"],
+      ["defenseDown", "防禦力降低 20；「無法無天」的敵方為 30。"],
       ["poison", "回合開始時普通單位生命減半；龍／頭／手降至三分之一，最低保留 1。"],
       ["techniqueSeal", "無法使用技術，普通攻擊與射擊不受限。"],
     ]);
@@ -72,6 +73,15 @@ describe("unit status presentations", () => {
     statuses.defenseDown = 1;
     expect(effectiveAttack(100, statuses)).toBe(120);
     expect(effectiveDefense(100, statuses)).toBe(80);
+
+    // Native 1000:8C2D writes the same 20 before 1000:8BD1 multiplies side-2
+    // stats at difficulty 3, so the highest difficulty really does read 30.
+    const enemy = { classId: "soldier" as const, experience: 0, side: 2 as const };
+    const scaled = statsFor(enemy, 3);
+    expect(effectiveStatsFor({ ...enemy, statuses: { ...emptyUnitStatuses(), attackDown: 1 } }, 3).attack)
+      .toBe(scaled.attack - 30);
+    expect(effectiveStatsFor({ ...enemy, statuses: { ...emptyUnitStatuses(), defenseUp: 1 } }, 3).defense)
+      .toBe(scaled.defense + 30);
   });
 
   it("carries the description onto every active entry", () => {

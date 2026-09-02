@@ -25,14 +25,14 @@ export const UNIT_STATUS_PRESENTATIONS = [
   {
     key: "attackUp",
     label: "攻擊上升",
-    description: "攻擊力提高 20。",
+    description: "攻擊力提高 20；「無法無天」的敵方為 30。",
     nativeFrame: 0,
     source: "/assets/original/status-icons/00.png",
   },
   {
     key: "defenseUp",
     label: "防禦上升",
-    description: "防禦力提高 20。",
+    description: "防禦力提高 20；「無法無天」的敵方為 30。",
     nativeFrame: 1,
     source: "/assets/original/status-icons/01.png",
   },
@@ -53,14 +53,14 @@ export const UNIT_STATUS_PRESENTATIONS = [
   {
     key: "attackDown",
     label: "攻擊下降",
-    description: "攻擊力降低 20。",
+    description: "攻擊力降低 20；「無法無天」的敵方為 30。",
     nativeFrame: 4,
     source: "/assets/original/status-icons/04.png",
   },
   {
     key: "defenseDown",
     label: "防禦下降",
-    description: "防禦力降低 20。",
+    description: "防禦力降低 20；「無法無天」的敵方為 30。",
     nativeFrame: 5,
     source: "/assets/original/status-icons/05.png",
   },

@@ -13,8 +13,9 @@ import {
   scriptedBossStatsFor,
   stage37BossMaximumLifeByDifficulty,
 } from "../../src/game/content/enemy-scaling";
-import { initialEnemyExperience, statsFor } from "../../src/game/content/stage0";
-import type { Difficulty, UnitStats } from "../../src/game/types";
+import { effectiveStatsFor, initialEnemyExperience, statsFor } from "../../src/game/content/stage0";
+import { emptyUnitStatuses } from "../../src/game/simulation/status";
+import type { Difficulty, UnitStats, UnitStatuses } from "../../src/game/types";
 
 const DIFFICULTIES: readonly Difficulty[] = [0, 1, 2, 3];
 
@@ -219,5 +220,95 @@ describe("REMAKE-103 敌方难度缩放", () => {
     expect(stage37BossMaximumLifeByDifficulty)
       .toEqual(DIFFICULTIES.map((difficulty) => SCRIPTED_BOSS_STATS.head[difficulty].maxLife));
     expect(SCRIPTED_BOSS_STATS.hand).toEqual(SCRIPTED_BOSS_STATS.head);
+  });
+});
+
+describe("状态 ±20 与难度倍率的原版顺序", () => {
+  // 模块 29 的单位装载链是 `0000:502A → 0000:51EC → 1000:8C2D`（把 ±20 写进有效攻／防）
+  // `→ 1000:8B60 → 1000:8BD1`（难度 3 的 side 2 才 ×1.5，且同时放大有效值与基础值）。
+  // 倍率作用在已经加减过 20 的有效值上，所以「無法無天」的敌方状态修正是 30 点。
+  const statusesWith = (overrides: Partial<UnitStatuses>): UnitStatuses =>
+    ({ ...emptyUnitStatuses(), ...overrides });
+
+  const effectiveAt = (
+    classId: ClassId,
+    difficulty: Difficulty,
+    overrides: Partial<UnitStatuses>,
+    side: 1 | 2 = 2,
+  ): UnitStats => effectiveStatsFor(
+    {
+      classId,
+      experience: side === 2 ? initialEnemyExperience(classId, difficulty) : 0,
+      side,
+      statuses: statusesWith(overrides),
+    },
+    difficulty,
+  );
+
+  it("難度 3 的敵方攻擊下降／防禦下降各降 30 点，攻防提升各升 30 点", () => {
+    for (const classId of GROWTH_SCALED_CLASS_IDS) {
+      const experience = initialEnemyExperience(classId, 3);
+      // 倍率前的原版值：难度 3 沿用 legacy 曲线，所以就是 `classStatsFor` 默认值。
+      const unscaled = classStatsFor({ classId, experience, side: 2 });
+      const scaled = statsFor({ classId, experience, side: 2 }, 3);
+      const scale = (value: number): number => Math.floor(Math.max(0, value) * 3 / 2);
+
+      const down = effectiveAt(classId, 3, { attackDown: 3, defenseDown: 3 });
+      expect(down.attack, `${classId} attack down`).toBe(scale(unscaled.attack - 20));
+      expect(down.defense, `${classId} defense down`).toBe(scale(unscaled.defense - 20));
+
+      const up = effectiveAt(classId, 3, { attackUp: 3, defenseUp: 3 });
+      expect(up.attack, `${classId} attack up`).toBe(scale(unscaled.attack + 20));
+      expect(up.defense, `${classId} defense up`).toBe(scale(unscaled.defense + 20));
+
+      // 未被 `max(0, …)` 夹到的职业必须正好差 30，而不是 20。
+      if (unscaled.attack >= 20) {
+        expect(scaled.attack - down.attack, `${classId} attack down delta`).toBe(30);
+      }
+      expect(up.attack - scaled.attack, `${classId} attack up delta`).toBe(30);
+      if (unscaled.defense >= 20) {
+        expect(scaled.defense - down.defense, `${classId} defense down delta`).toBe(30);
+      }
+      expect(up.defense - scaled.defense, `${classId} defense up delta`).toBe(30);
+
+      // 生命不受状态影响，攻升与攻降仍然相消。
+      expect(down.maxLife, `${classId} maxLife`).toBe(scaled.maxLife);
+      expect(effectiveAt(classId, 3, { attackUp: 3, attackDown: 3 }).attack, `${classId} cancel`)
+        .toBe(scaled.attack);
+    }
+  });
+
+  it("其余难度与我方单位仍是固定 20 点", () => {
+    for (const classId of GROWTH_SCALED_CLASS_IDS) {
+      for (const difficulty of [0, 1, 2] as const) {
+        const base = enemyStatsAt(classId, difficulty);
+        const down = effectiveAt(classId, difficulty, { attackDown: 3, defenseDown: 3 });
+        expect(down.attack, `${classId} d${difficulty} attack`)
+          .toBe(Math.max(0, base.attack - 20));
+        expect(down.defense, `${classId} d${difficulty} defense`)
+          .toBe(Math.max(0, base.defense - 20));
+      }
+
+      for (const difficulty of DIFFICULTIES) {
+        const base = statsFor({ classId, experience: 0, side: 1 }, difficulty);
+        const down = effectiveAt(classId, difficulty, { attackDown: 3, defenseDown: 3 }, 1);
+        expect(down.attack, `${classId} side 1 d${difficulty} attack`)
+          .toBe(Math.max(0, base.attack - 20));
+        expect(down.defense, `${classId} side 1 d${difficulty} defense`)
+          .toBe(Math.max(0, base.defense - 20));
+      }
+    }
+  });
+
+  it("剧情 boss 的脚本值不参与倍率，状态仍是固定 20 点", () => {
+    for (const classId of SCRIPTED_BOSS_CLASS_IDS) {
+      for (const difficulty of DIFFICULTIES) {
+        const base = enemyStatsAt(classId, difficulty);
+        const down = effectiveAt(classId, difficulty, { attackDown: 3, defenseDown: 3 });
+        expect(down.attack, `${classId} d${difficulty} attack`).toBe(base.attack - 20);
+        expect(down.defense, `${classId} d${difficulty} defense`)
+          .toBe(Math.max(0, base.defense - 20));
+      }
+    }
   });
 });

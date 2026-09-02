@@ -1,7 +1,6 @@
 import { classCombatRole, terrainDefensePercentFor } from "../content/classes";
 import type { BattleUnit, Position, UnitStats } from "../types";
 import type { AlliedAiAction } from "./ai-contracts";
-import { effectiveAttack, effectiveDefense } from "./status";
 import { positionKey, reachableCells, type GridBattlefield } from "./grid";
 
 type SisterActionId = "fire-1" | "heal-1";
@@ -11,7 +10,8 @@ export interface EnemyThreatContext {
   battlefield: GridBattlefield;
   units: readonly BattleUnit[];
   unit: (id: string) => BattleUnit | undefined;
-  statsFor: (unit: Pick<BattleUnit, "classId" | "experience" | "side">) => UnitStats;
+  /** 状态 ±20 与难度倍率的原版顺序都由这里收口，见 `content/stage0.ts`。 */
+  effectiveStatsFor: (unit: BattleUnit) => UnitStats;
   movementPath: (id: string, destination: Position) => Position[];
   planSisterAction: (
     unit: BattleUnit,
@@ -25,9 +25,9 @@ function minimumOrdinaryDamage(
   defender: BattleUnit,
 ): number {
   if (defender.actionDisabled) return 0;
-  const attackerStats = context.statsFor(attacker);
-  const defenderStats = context.statsFor(defender);
-  const defenderDefense = effectiveDefense(defenderStats.defense, defender.statuses);
+  const attackerStats = context.effectiveStatsFor(attacker);
+  const defenderStats = context.effectiveStatsFor(defender);
+  const defenderDefense = defenderStats.defense;
   const terrainDefense = Math.floor(
     defenderDefense
     * terrainDefensePercentFor(
@@ -38,9 +38,7 @@ function minimumOrdinaryDamage(
   );
   return Math.max(
     0,
-    effectiveAttack(attackerStats.attack, attacker.statuses)
-      - defenderDefense
-      - terrainDefense,
+    attackerStats.attack - defenderDefense - terrainDefense,
   ) + 8;
 }
 
