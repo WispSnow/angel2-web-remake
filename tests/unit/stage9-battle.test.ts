@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE9_DEFINITION } from "../../src/game/content/stage9";
 import { Stage9Battle, createStage9DeploymentRoster } from "../../src/game/simulation/stage9-battle";
-import type { CampaignState } from "../../src/game/types";
+import type { CampaignState, Position } from "../../src/game/types";
 
 const campaign: CampaignState = {
   stageId: "stage-09",
@@ -52,6 +52,78 @@ describe("stage 9 battle simulation", () => {
     expect(action?.path[0]).toEqual({ x: 16, y: 38 });
     expect(action?.path.at(-1)?.y).toBeLessThan(38);
     expect(action?.path.length).toBeLessThanOrEqual(7);
+  });
+
+  /** Ship-side blockade only: the western cluster would otherwise stall her beside a blocker. */
+  function shipSideBattle(): Stage9Battle {
+    const battle = new Stage9Battle(campaign, deployment);
+    battle.units = battle.units.filter((unit) => unit.side !== 2 || [48, 49, 50].includes(unit.slot));
+    return battle;
+  }
+
+  function requireDori(battle: Stage9Battle) {
+    const dori = battle.unit("1:9");
+    if (!dori) throw new Error("Dori is missing");
+    return dori;
+  }
+
+  /** Replays only Dori's own actions; every other unit stays where it is. */
+  function traceDori(battle: Stage9Battle, limit: number): Position[] {
+    const landings: Position[] = [];
+    for (let turn = 0; turn < limit && battle.outcome() === "ongoing"; turn += 1) {
+      const dori = requireDori(battle);
+      const end = battle.planAlliedAiAction("1:9")?.path.at(-1);
+      if (!end || (end.x === dori.x && end.y === dori.y)) break;
+      Object.assign(dori, { x: end.x, y: end.y });
+      landings.push({ x: end.x, y: end.y });
+    }
+    return landings;
+  }
+
+  it("walks Dori through the valley and boards beside the bow instead of the nearest arrival row", () => {
+    const battle = shipSideBattle();
+    const landings = traceDori(battle, 40);
+    expect(battle.outcome()).toBe("victory");
+    const final = landings.at(-1) ?? { x: -1, y: -1 };
+    expect(final.x).toBeGreaterThanOrEqual(32);
+    expect(final.y).toBeGreaterThanOrEqual(17);
+    for (const cell of landings.slice(0, -1)) expect(cell.y * 50 + cell.x).toBeGreaterThan(933);
+    expect(landings.some(({ x, y }) => x >= 31 && y >= 22 && y <= 23)).toBe(true);
+    expect(landings.length).toBeLessThanOrEqual(18);
+  });
+
+  it("stays on the valley legs at the cells where Manhattan scoring used to turn north", () => {
+    for (const start of [{ x: 21, y: 23 }, { x: 19, y: 22 }, { x: 22, y: 22 }]) {
+      const battle = shipSideBattle();
+      Object.assign(requireDori(battle), start);
+      const end = battle.planAlliedAiAction("1:9")?.path.at(-1) ?? start;
+      expect(end.x).toBeGreaterThan(start.x);
+      expect(end.y).toBeGreaterThanOrEqual(22);
+    }
+  });
+
+  it("slips past the monk holding cell 934 onto the arrival cell beside the bow", () => {
+    const battle = shipSideBattle();
+    const monk = battle.units.find(({ side, slot }) => side === 2 && slot === 50);
+    expect(monk).toMatchObject({ x: 34, y: 18 });
+    Object.assign(requireDori(battle), { x: 34, y: 19 });
+    expect(battle.planAlliedAiAction("1:9")?.path.at(-1)).toEqual({ x: 33, y: 18 });
+    // The debug fixture parks her on cell 983; one independent action must still finish the stage,
+    // and from there the cheaper approach around the monk reaches 883 next to the bow.
+    Object.assign(requireDori(battle), { x: 33, y: 19 });
+    expect(battle.planAlliedAiAction("1:9")?.path.at(-1)).toEqual({ x: 33, y: 17 });
+  });
+
+  it("waits instead of wandering when nothing reachable shortens the route", () => {
+    const battle = shipSideBattle();
+    Object.assign(requireDori(battle), { x: 34, y: 20 });
+    const wall = [{ x: 34, y: 19 }, { x: 33, y: 19 }, { x: 35, y: 19 }];
+    for (const [index, slot] of [48, 49, 50].entries()) {
+      const blocker = battle.units.find((unit) => unit.side === 2 && unit.slot === slot);
+      if (!blocker) throw new Error(`missing blocker ${slot}`);
+      Object.assign(blocker, wall[index]);
+    }
+    expect(battle.planAlliedAiAction("1:9")).toMatchObject({ kind: "wait", path: [{ x: 34, y: 20 }] });
   });
 
   it("wins by Dori reaching cell 933 or by elimination, with defeat precedence", () => {

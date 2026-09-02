@@ -640,6 +640,24 @@ function migrateVersion101Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-136 only changes how stage 9's escort plans her own move: legs now
+ * complete inside valley rectangles and the landing follows an ideal route to
+ * the current goal. The plan is recomputed from public state on every action,
+ * so v103 battle/completed saves retain every stored field.
+ */
+function migrateVersion103Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 103
+    || value.contentVersion !== "follow-leader-post-move-shooting-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-135 restores the native shooting-class continuation after a future
  * follow-leader move. The temporary anchor and automatic-action queue are not
  * persisted, so v102 battle/completed saves retain every stored field.
@@ -2940,6 +2958,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion103 = migrateVersion103Save(value);
+    if (migratedVersion103) return migratedVersion103;
     const migratedVersion102 = migrateVersion102Save(value);
     if (migratedVersion102) return migratedVersion102;
     const migratedVersion101 = migrateVersion101Save(value);

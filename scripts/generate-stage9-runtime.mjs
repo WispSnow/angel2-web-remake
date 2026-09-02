@@ -228,29 +228,45 @@ const storyEntry = requireEntry(
 );
 if (storyEntry.record !== null) throw new Error(`stage 9 unexpectedly gained module 25 story ${storyEntry.record}`);
 
+// REMAKE-136：三段目标沿用原版行为 12 的目标格，但每段的“已完成”判定改为矩形。
+// 原版按线性格号切段（cell < 1316 / 1184 / 934）是给沿谷水平逼近设计的；复刻的多莉
+// 一进第 22／23 行就会提前切到终点段，然后被最近的到达行吸到远离飞船处通关。矩形只
+// 接受沿山谷抵达路点附近的位置，判定只看当前格，不需要新的存档字段。
+const ESCORT_LEG_COMPLETION = [
+  { min: { x: 0, y: 0 }, max: { x: 49, y: 25 } },
+  { min: { x: 31, y: 0 }, max: { x: 49, y: 23 } },
+  { min: { x: 0, y: 0 }, max: { x: 49, y: 17 } },
+];
 const escortRoute = {
   actorId: "1:9",
   movement: behavior12Document.stage9.movementOverride,
   width: 50,
-  waypoints: behavior12Document.stage9.waypointThresholds.slice(0, 3).map((entry) => ({
-    actorCellAtLeast: entry.actorCellAtLeast,
+  waypoints: behavior12Document.stage9.waypointThresholds.slice(0, 3).map((entry, index) => ({
     goal: { x: entry.goalCell % 50, y: Math.floor(entry.goalCell / 50) },
+    completeWithin: ESCORT_LEG_COMPLETION[index],
+    nativeCellAtLeast: entry.actorCellAtLeast,
   })),
   victoryMaximumCell: 933,
-  stableRemakeDecision: "REMAKE-040",
+  stableRemakeDecision: "REMAKE-136",
 };
 assertEqual(escortRoute, {
   actorId: "1:9",
   movement: 7,
   width: 50,
   waypoints: [
-    { actorCellAtLeast: 1316, goal: { x: 16, y: 25 } },
-    { actorCellAtLeast: 1184, goal: { x: 34, y: 22 } },
-    { actorCellAtLeast: 934, goal: { x: 34, y: 17 } },
+    { goal: { x: 16, y: 25 }, completeWithin: { min: { x: 0, y: 0 }, max: { x: 49, y: 25 } }, nativeCellAtLeast: 1316 },
+    { goal: { x: 34, y: 22 }, completeWithin: { min: { x: 31, y: 0 }, max: { x: 49, y: 23 } }, nativeCellAtLeast: 1184 },
+    { goal: { x: 34, y: 17 }, completeWithin: { min: { x: 0, y: 0 }, max: { x: 49, y: 17 } }, nativeCellAtLeast: 934 },
   ],
   victoryMaximumCell: 933,
-  stableRemakeDecision: "REMAKE-040",
+  stableRemakeDecision: "REMAKE-136",
 }, "stage 9 escort route");
+for (const { goal, completeWithin } of escortRoute.waypoints) {
+  if (goal.x < completeWithin.min.x || goal.x > completeWithin.max.x
+    || goal.y < completeWithin.min.y || goal.y > completeWithin.max.y) {
+    throw new Error(`stage 9 escort goal ${goal.x},${goal.y} lies outside its leg rectangle`);
+  }
+}
 
 const musicEntry = (table, stage) => requireEntry(
   musicDocument.stageTables[table].entries,
@@ -283,7 +299,7 @@ const sources = Object.entries(inputPaths).map(([id, file]) => ({
   bytes: inputBuffers[id].length,
 }));
 const identityHash = createHash("sha256");
-identityHash.update("stableRemake\0REMAKE-039\0REMAKE-040\0");
+identityHash.update("stableRemake\0REMAKE-039\0REMAKE-040\0REMAKE-136\0");
 for (const source of sources) identityHash.update(`${source.path}\0${source.sha256}\n`);
 const contentIdentity = `stage-09/evidence-${identityHash.digest("hex")}`;
 

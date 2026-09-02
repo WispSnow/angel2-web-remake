@@ -5390,6 +5390,22 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-103 saves without changing battle state for the stage 9 escort route", () => {
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 103,
+      contentVersion: "follow-leader-post-move-shooting-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 103,
+      contentVersion: "follow-leader-post-move-shooting-1",
+    }))).toEqual(completed);
+  });
+
   it("removes the old stage-3 difficulty seed while migrating legacy saves", () => {
     const current = stage3BattleSave();
     const difficulty = 3 as const;

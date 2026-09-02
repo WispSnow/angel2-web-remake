@@ -72,12 +72,24 @@ describe("stage 9 generated content", () => {
       movement: 7,
       width: 50,
       waypoints: [
-        { actorCellAtLeast: 1316, goal: { x: 16, y: 25 } },
-        { actorCellAtLeast: 1184, goal: { x: 34, y: 22 } },
-        { actorCellAtLeast: 934, goal: { x: 34, y: 17 } },
+        {
+          goal: { x: 16, y: 25 },
+          completeWithin: { min: { x: 0, y: 0 }, max: { x: 49, y: 25 } },
+          nativeCellAtLeast: 1316,
+        },
+        {
+          goal: { x: 34, y: 22 },
+          completeWithin: { min: { x: 31, y: 0 }, max: { x: 49, y: 23 } },
+          nativeCellAtLeast: 1184,
+        },
+        {
+          goal: { x: 34, y: 17 },
+          completeWithin: { min: { x: 0, y: 0 }, max: { x: 49, y: 17 } },
+          nativeCellAtLeast: 934,
+        },
       ],
       victoryMaximumCell: 933,
-      stableRemakeDecision: "REMAKE-040",
+      stableRemakeDecision: "REMAKE-136",
     });
   });
 
