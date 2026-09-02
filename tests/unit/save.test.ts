@@ -5422,6 +5422,24 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-106 saves without changing battle state for the named leader line", () => {
+    // REMAKE-139 只改具名主将护卫半径的「阵线」成员判据，规划从公开状态重算，
+    // 棋盘、状态与 PRNG 都不动，因此 v106 战中档与完成档无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 106,
+      contentVersion: "shooting-cast-experience-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 106,
+      contentVersion: "shooting-cast-experience-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-105 saves without changing battle state for shooting cast experience", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({

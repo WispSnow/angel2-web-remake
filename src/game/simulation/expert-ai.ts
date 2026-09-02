@@ -617,8 +617,15 @@ export function expertSpecialUtility(
     // one — the 魔導師 itself included. Their attack value cashes out solely on
     // counters they are meant to avoid, yet a tier-one 巫師 and 魔導師 both show
     // 53 attack against the 戰士's 50, so `攻擊 + 40` used to outbid the escort.
+    // REMAKE-139: side 2 acts last in the round and an unconsumed 防魔 clears
+    // at the boundary that follows at once — before any player magic can meet
+    // it. An enemy-cast FM therefore never protects anyone, yet its flat
+    // support used to outbid moving, so an idle 魔導師 re-cast it on itself
+    // every round instead of following its line.
+    const guardExpiresUnused = actionId === "magic-guard" && actor.side === 2;
     if (statusValue > 0
-      || (actionId === "attack-up" && classCombatRole(target.classId) !== "melee")) {
+      || (actionId === "attack-up" && classCombatRole(target.classId) !== "melee")
+      || guardExpiresUnused) {
       utility.waste = 1;
     } else {
       const stats = context.effectiveStatsFor(target);

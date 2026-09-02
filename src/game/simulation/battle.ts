@@ -2500,7 +2500,9 @@ export class Stage0Battle {
       : techniqueActionIdsFor(unit);
     const hostileActionIds = actionIds.filter((actionId) =>
       BATTLE_ACTION_DEFINITIONS[actionId].target === "enemy" || isIceActionId(actionId));
-    const pureSupport = hostileActionIds.length === 0;
+    // Same definition the REMAKE-118 escort radius reads, so a caster that
+    // anchors to the friendly front is never itself the front a leader waits on.
+    const pureSupport = !this.canOpenHostilities(unit);
     const opponents = this.units.filter((candidate) => candidate.side !== unit.side
       && !candidate.actionDisabled
       && (options.targetFilter?.(candidate) ?? true));
@@ -2701,6 +2703,21 @@ export class Stage0Battle {
   }
 
   /**
+   * Whether a unit can open hostilities by itself: an ordinary melee attack,
+   * a shot, or a hostile technique in its current pool. Pure-support casters
+   * (魔導師, 祈導師, 僧侶…) cannot, and REMAKE-066 anchors them to the friendly
+   * front line instead — they follow a line rather than form one. The named
+   * leader's escort radius and the support caster's own approach both read
+   * this single definition so the two anchors can never point at each other.
+   */
+  private canOpenHostilities(unit: BattleUnit): boolean {
+    if (classCombatRole(unit.classId) === "melee") return true;
+    if (shootingActionIdFor(unit.classId, unit.side)) return true;
+    return techniqueActionIdsFor(unit).some((actionId) =>
+      BATTLE_ACTION_DEFINITIONS[actionId].target === "enemy" || isIceActionId(actionId));
+  }
+
+  /**
    * REMAKE-118: a named leader may only land where its own line still stands
    * beside it — some surviving squadmate within `NAMED_LEADER_ESCORT_RADIUS`.
    * Escorts are measured where they stand *now*, before they take their own
@@ -2715,10 +2732,22 @@ export class Stage0Battle {
    * surviving squadmate at all has no line left to hold and is unconstrained.
    * Frozen squadmates still anchor, because losing an escort to ice should
    * pull the leader back, not turn it loose.
+   *
+   * REMAKE-139: only squadmates that can open hostilities form that line. A
+   * pure-support caster never advances on its own — REMAKE-066 parks it at
+   * support range from the friendly front, which in a two-unit squad is the
+   * leader itself. Measuring the leader against it closed a loop on stage 14:
+   * 芳 could not land more than three cells from her 魔導師, the 魔導師 had no
+   * reason to move while 芳 stood still, and both held the same cells for the
+   * rest of the battle while the player shot them for free. Once the line is
+   * gone the leader is unconstrained exactly as if it stood alone, and the
+   * caster catches up under its own rule.
    */
   private namedLeaderLineFilter(unit: BattleUnit): (position: Position) => boolean {
     const escorts = this.units.filter((candidate) =>
-      candidate.side === unit.side && candidate.id !== unit.id);
+      candidate.side === unit.side
+      && candidate.id !== unit.id
+      && this.canOpenHostilities(candidate));
     if (escorts.length === 0) return () => true;
     const lineDistance = (position: Position): number =>
       Math.min(...escorts.map((escort) => manhattan(position, escort)));

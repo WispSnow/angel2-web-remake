@@ -7,6 +7,8 @@ import {
 import { shootingLineVisitProbabilities } from "../../src/game/simulation/actions/range-map";
 import { classCombatRole, classDefinition } from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { BATTLE_ACTION_DEFINITIONS } from "../../src/game/content/actions";
+import { STAGE14_DEFINITION } from "../../src/game/content/stage14";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
 import { STAGE34_DEFINITION } from "../../src/game/content/stage34";
 import { NAMED_LEADER_ESCORT_RADIUS } from "../../src/game/simulation/battle";
@@ -14,6 +16,7 @@ import { loadStageRuntime } from "../../src/game/stage-runtime";
 import { manhattan } from "../../src/game/simulation/grid";
 import { expertSpecialUtility } from "../../src/game/simulation/expert-ai";
 import { DeterministicRng } from "../../src/game/simulation/rng";
+import { Stage14Battle } from "../../src/game/simulation/stage14-battle";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
 import { Stage34Battle } from "../../src/game/simulation/stage34-battle";
 import { Stage3Battle } from "../../src/game/simulation/stage3-battle";
@@ -819,8 +822,13 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     for (const targetId of ["enemy-guide", "enemy-archer"]) {
       expect(utilityFor("attack-up", targetId))
         .toMatchObject({ support: 0, targetThreat: 0, waste: 1 });
-      // FM keeps the full ally set: it answers magic damage, not the attack chain.
-      expect(utilityFor("magic-guard", targetId)).toMatchObject({ support: 120, waste: 0 });
+      // FM keeps the full ally set for a side-1 caster: it answers magic damage,
+      // not the attack chain, and the enemy phase still follows its cast.
+      expect(expertSpecialUtility(context, { ...actor, side: 1 }, "magic-guard", battle.unit(targetId)!, [actor]))
+        .toMatchObject({ support: 120, waste: 0 });
+      // REMAKE-139: cast by side 2 it clears at the boundary that follows at
+      // once, before any player magic can meet it, so it is pure waste.
+      expect(utilityFor("magic-guard", targetId)).toMatchObject({ support: 0, targetThreat: 0, waste: 1 });
     }
   });
 
@@ -1607,5 +1615,175 @@ describe("native contextual lines emitted from the AI planner", () => {
     const alone = clear.unit("empress")!;
     alone.life = Math.floor(clear.statsFor(alone).maxLife * 30 / 100);
     expect(clear.planAlliedAiAction("empress")?.nativeLine).toBe("restingLowLife");
+  });
+});
+
+/**
+ * REMAKE-139. Stage 14's report: once 芳's other guards were gone her only
+ * squadmate was the 魔導師, a pure-support caster that REMAKE-066 parks at
+ * support range from the friendly front — which in a two-unit squad is 芳
+ * herself. The REMAKE-118 escort radius then pinned 芳 to the caster while the
+ * caster waited on 芳, and both held the same cells for the rest of the battle.
+ */
+describe("REMAKE-139 pure-support squadmates do not form a named leader's line", () => {
+  const stage14Campaign: CampaignState = {
+    stageId: "stage-14",
+    ruleset: "stableRemake",
+    difficulty: 3,
+    roster: completeCampaignRoster([
+      { slot: 0, classId: "land-knight", experience: 720, life: 240 },
+    ]),
+    rngState: 0x1414_1414,
+    rngCalls: 0,
+  };
+  const stage14Deployment = {
+    placements: [
+      ...STAGE14_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+      ...STAGE14_DEFINITION.deployment.optionalSlots.slice(0, 9).map((slot, index) => ({
+        slot, position: { ...STAGE14_DEFINITION.deployment.openCells[index] }, fixed: false,
+      })),
+    ],
+  };
+
+  /** Round 7, 芳 off sentry, the north guard reduced to the reported pair. */
+  const reportedPair = (survivorIds: readonly string[] = ["2:8", "2:41"]) => {
+    const battle = new Stage14Battle(stage14Campaign, stage14Deployment);
+    while (battle.round < 7) battle.startNextRound();
+    battle.units = battle.units.filter(({ side, id }) => side === 1 || survivorIds.includes(id));
+    const fang = battle.unit("2:8");
+    const guide = battle.unit("2:41");
+    if (!fang || !guide) throw new Error("units missing");
+    expect(fang.name).toBe("芳");
+    expect(guide.classId).toBe("magic-guide");
+    fang.x = 25;
+    fang.y = 13;
+    guide.x = 23;
+    guide.y = 12;
+    const players = battle.units.filter(({ side }) => side === 1);
+    players.forEach((unit, index) => {
+      unit.x = 21 + index;
+      unit.y = 24;
+    });
+    // Two player units six rows south of 芳: in her reach over a few phases,
+    // and exactly the free-shot distance the report showed.
+    players[0].x = 25;
+    players[0].y = 19;
+    players[1].x = 24;
+    players[1].y = 19;
+    return { battle, fang, guide };
+  };
+
+  const nearestPlayerDistance = (battle: { units: readonly BattleUnit[] }, at: Position) =>
+    Math.min(...battle.units.filter(({ side }) => side === 1).map((unit) => manhattan(at, unit)));
+
+  /** The controller's enemy phase without presentation: select, apply, repeat. */
+  const runEnemyPhase = (battle: Stage14Battle) => {
+    const pending = new Set(battle.units
+      .filter((unit) => unit.side === 2 && !unit.acted && !unit.actionDisabled)
+      .map(({ id }) => id));
+    while (pending.size > 0) {
+      const selection = battle.selectNextEnemyAiAction([...pending]);
+      if (!selection) break;
+      pending.delete(selection.unitId);
+      const action = selection.action ?? battle.planEnemyAiAction(selection.unitId);
+      if (!action) {
+        battle.spendAction(selection.unitId);
+        continue;
+      }
+      const steps = action.path.slice(1);
+      for (const [index, step] of steps.entries()) {
+        battle.moveUnitStep(action.unitId, step, index < steps.length - 1);
+      }
+      if (action.kind === "attack" && action.targetId) {
+        battle.attack(action.unitId, action.targetId);
+      } else if (action.kind === "special" && action.actionId && action.targetId) {
+        battle.commitPreparedAction(battle.prepareSpecialAction({
+          actionId: action.actionId,
+          actorId: action.unitId,
+          targetId: action.targetId,
+        }));
+      } else {
+        battle.spendAction(action.unitId);
+      }
+    }
+  };
+
+  it("lets 芳 advance on the player when the 魔導師 is her only squadmate", () => {
+    const { battle, fang, guide } = reportedPair();
+    expect(battle.enemyAiIntentFor("2:8")).toBe("pursuit");
+
+    // Six cells is inside her movement budget, so the advance is the
+    // REMAKE-012 move-then-attack rather than a bare move.
+    const action = battle.planEnemyAiAction("2:8");
+    expect(["move", "attack"]).toContain(action?.kind);
+    expect(action?.path.length).toBeGreaterThan(1);
+    const destination = action!.path.at(-1)!;
+    expect(nearestPlayerDistance(battle, destination)).toBeLessThan(nearestPlayerDistance(battle, fang));
+    // The caster is not a line to hold: the landing may leave it behind.
+    expect(manhattan(destination, guide)).toBeGreaterThan(NAMED_LEADER_ESCORT_RADIUS);
+  });
+
+  it("keeps the 魔導師 buffing 芳 rather than itself, exactly as REMAKE-102 promised", () => {
+    const { battle } = reportedPair();
+
+    expect(battle.planEnemyAiAction("2:41")).toMatchObject({
+      kind: "special",
+      actionId: "attack-up",
+      targetId: "2:8",
+      path: [{ x: 23, y: 12 }],
+    });
+    expect(battle.expertAiDecisionTrace("2:41")?.candidates
+      .filter(({ action }) => action.actionId === "attack-up")
+      .map(({ action }) => action.targetId))
+      .toEqual(["2:8"]);
+  });
+
+  it("measures the line to a melee squadmate only, not to the healer standing beside her", () => {
+    const { battle, fang, guide } = reportedPair(["2:8", "2:41", "2:49"]);
+    const sword = battle.unit("2:49");
+    if (!sword) throw new Error("sword missing");
+    expect(classCombatRole(sword.classId)).toBe("melee");
+    // Healer adjacent, sword warrior posted nine cells to the south-east: the
+    // old rule read the adjacent healer as a one-cell line and clamped every
+    // landing to three cells of *somebody*; the line is now the sword alone,
+    // so the bound is the gap she already holds to him.
+    guide.x = fang.x;
+    guide.y = fang.y - 1;
+    sword.x = fang.x + 5;
+    sword.y = fang.y + 4;
+    const postedGap = manhattan(fang, sword);
+    expect(postedGap).toBeGreaterThan(NAMED_LEADER_ESCORT_RADIUS);
+
+    const action = battle.planEnemyAiAction("2:8");
+    expect(["move", "attack"]).toContain(action?.kind);
+    const destination = action!.path.at(-1)!;
+    expect(nearestPlayerDistance(battle, destination)).toBeLessThan(nearestPlayerDistance(battle, fang));
+    expect(manhattan(destination, sword)).toBeLessThanOrEqual(postedGap);
+    // Farther than three cells from every squadmate: exactly the landing the
+    // healer-as-line reading used to refuse.
+    expect(manhattan(destination, sword)).toBeGreaterThan(NAMED_LEADER_ESCORT_RADIUS);
+    expect(manhattan(destination, guide)).toBeGreaterThan(NAMED_LEADER_ESCORT_RADIUS);
+  });
+
+  it("marches the pair south over several phases instead of holding the same cells", () => {
+    const { battle, fang, guide } = reportedPair();
+    const start = { fang: { x: fang.x, y: fang.y }, guide: { x: guide.x, y: guide.y } };
+    const initialDistance = nearestPlayerDistance(battle, fang);
+
+    for (let phase = 0; phase < 4; phase += 1) {
+      runEnemyPhase(battle);
+      battle.startNextRound();
+    }
+    const fangAfter = battle.unit("2:8");
+    const guideAfter = battle.unit("2:41");
+    if (!fangAfter || !guideAfter) throw new Error("pair missing");
+    expect({ x: fangAfter.x, y: fangAfter.y }).not.toEqual(start.fang);
+    expect(nearestPlayerDistance(battle, fangAfter)).toBeLessThan(initialDistance);
+    // The caster follows under its own REMAKE-066 rule once 芳 leaves buff range.
+    expect({ x: guideAfter.x, y: guideAfter.y }).not.toEqual(start.guide);
+    expect(manhattan(guideAfter, fangAfter))
+      .toBeLessThanOrEqual(BATTLE_ACTION_DEFINITIONS["magic-guard"].range.selectionRadius);
   });
 });

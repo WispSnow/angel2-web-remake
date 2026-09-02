@@ -659,6 +659,25 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-139 only changes which squadmates count as a named side-2 leader's
+ * line for the REMAKE-118 escort radius: pure-support casters no longer do.
+ * The plan is recomputed from public state on every action and nothing about
+ * the board, statuses or PRNG moves, so v106 battle/completed saves retain
+ * every stored field.
+ */
+function migrateVersion106Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 106
+    || value.contentVersion !== "shooting-cast-experience-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-138 makes the archer and crossbow cast reward flat, so those paths
  * stop consuming an experience roll, and drops the magic archer's duplicated
  * `3V` bonus from 26..30 to 13..17. The board, experience already earned and
@@ -2996,6 +3015,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion106 = migrateVersion106Save(value);
+    if (migratedVersion106) return migratedVersion106;
     const migratedVersion105 = migrateVersion105Save(value);
     if (migratedVersion105) return migratedVersion105;
     const migratedVersion104 = migrateVersion104Save(value);
