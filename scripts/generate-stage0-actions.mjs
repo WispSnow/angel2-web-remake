@@ -340,10 +340,12 @@ const actions = {
       waitPerPointNativeTicks: 1,
       fixedWaitNativeTicks: 20,
     },
-    // REMAKE-138: the borrowed 3V handler 0000:CCA4 already returns
-    // kill + randomBelow(5) + 13, then 0000:72DC adds a second 13. Only the
-    // 3V roll is live; the branch's own DX=5 roll is discarded.
-    experience: { base: 26, randomMinimum: 0, randomMaximum: 4, addKillReward: true },
+    // REMAKE-138: native `0000:72B7` pays 26..30 because the borrowed `3V`
+    // handler `0000:CCA4` already returns kill + randomBelow(5) + 13 and the
+    // branch then adds a second 13 at `0000:72DC`. That duplicate is treated as
+    // an original defect, so only `3V`'s own contribution is kept here; the
+    // branch's own DX=5 roll was discarded natively and is not modelled.
+    experience: { base: 13, randomMinimum: 0, randomMaximum: 4, addKillReward: true },
     presentationId: "shoot-line",
   },
   "fire-1": {

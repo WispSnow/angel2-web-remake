@@ -234,6 +234,19 @@ test("REMAKE-125 說明龍踏保留固定經驗並累加擊殺經驗", async ({ 
   });
 });
 
+test("REMAKE-138 說明魔弓兵射擊不再取得雙份施法經驗", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "fixes");
+  const magicArcherExperience = page.getByTestId("remake-note-REMAKE-138");
+  await expect(magicArcherExperience).toContainText("魔弓兵射擊不再取得雙份施法經驗");
+  await expect(magicArcherExperience).toContainText("重複加上同一份 13 點基礎值");
+  await expect(magicArcherExperience).toContainText("取得 13–17 點施法經驗");
+  await expect(magicArcherExperience).toContainText("弓兵固定 8 點、弩兵固定 13 點");
+  await captureVisualAudit(magicArcherExperience, {
+    path: "artifacts/playwright/remake-notes-magic-archer-experience.png",
+  });
+});
+
 test("REMAKE-133 將所有擊殺經驗提示列入 Bug 修復", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "fixes");

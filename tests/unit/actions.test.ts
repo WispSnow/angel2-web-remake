@@ -3840,21 +3840,23 @@ describe("REMAKE-138 shooting cast experience", () => {
     }
   });
 
-  it("magic archer pays 26..30 because it adds a second 13 on top of 3V", () => {
-    // `0000:72B7` calls the `3V` handler `0000:CCA4`, which already returns
-    // kill + randomBelow(5) + 13, then adds another 13 at `0000:72DC`.
+  it("magic archer pays 13..17 once the duplicated 3V bonus is removed", () => {
+    // Native `0000:72B7` pays 26..30: the borrowed `3V` handler `0000:CCA4`
+    // already returns kill + randomBelow(5) + 13 and the branch adds a second 13
+    // at `0000:72DC`. REMAKE-138 treats that duplicate as an original defect and
+    // keeps only `3V`'s own contribution.
     for (const seed of seeds) {
       const expected = new DeterministicRng(seed);
       expected.between(50, 69);
-      const expectedReward = 26 + expected.between(0, 4);
+      const expectedReward = 13 + expected.between(0, 4);
 
       const { experienceGained, rngAfter } = shoot("magic-archer-shot", "magic-archer", seed, 999);
 
       expect(experienceGained).toBe(expectedReward);
       // Two draws: line damage, then the live `3V` roll.
       expect(rngAfter).toBe(stateAfter(seed, 2));
-      expect(experienceGained).toBeGreaterThanOrEqual(26);
-      expect(experienceGained).toBeLessThanOrEqual(30);
+      expect(experienceGained).toBeGreaterThanOrEqual(13);
+      expect(experienceGained).toBeLessThanOrEqual(17);
     }
   });
 
@@ -3874,7 +3876,7 @@ describe("REMAKE-138 shooting cast experience", () => {
   it("shows the corrected reward on the player-visible compendium card", () => {
     expect(compendiumEntry("archer").shooting?.experience).toBe("擊殺獎勵 + 8");
     expect(compendiumEntry("crossbow").shooting?.experience).toBe("擊殺獎勵 + 13");
-    expect(compendiumEntry("magic-archer").shooting?.experience).toBe("擊殺獎勵 + 26–30");
+    expect(compendiumEntry("magic-archer").shooting?.experience).toBe("擊殺獎勵 + 13–17");
     // REMAKE-093's water warrior shot inherits the archer table, card included.
     expect(compendiumEntry("water-warrior").shooting?.experience).toBe("擊殺獎勵 + 8");
   });
@@ -3885,7 +3887,7 @@ describe("REMAKE-138 shooting cast experience", () => {
     expect(BATTLE_ACTION_DEFINITIONS["crossbow-shot"].experience)
       .toEqual({ fixed: 13, addKillReward: true });
     expect(BATTLE_ACTION_DEFINITIONS["magic-archer-shot"].experience)
-      .toEqual({ base: 26, randomMinimum: 0, randomMaximum: 4, addKillReward: true });
+      .toEqual({ base: 13, randomMinimum: 0, randomMaximum: 4, addKillReward: true });
     // REMAKE-093's water warrior shot borrows the archer table wholesale, so it
     // has to follow the correction instead of keeping a stale range.
     expect(BATTLE_ACTION_DEFINITIONS["water-warrior-shot"].experience)

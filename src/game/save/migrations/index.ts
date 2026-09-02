@@ -659,11 +659,11 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
- * REMAKE-138 makes the archer and crossbow cast reward flat and raises the
- * magic archer's to 26..30, and the archer/crossbow paths stop consuming an
- * experience roll. The board, experience already earned and the PRNG are
- * untouched and the new formula only applies from the next shot, so v105
- * battle/completed saves retain every stored field.
+ * REMAKE-138 makes the archer and crossbow cast reward flat, so those paths
+ * stop consuming an experience roll, and drops the magic archer's duplicated
+ * `3V` bonus from 26..30 to 13..17. The board, experience already earned and
+ * the PRNG are untouched and the new formula only applies from the next shot,
+ * so v105 battle/completed saves retain every stored field.
  */
 function migrateVersion105Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)

@@ -473,9 +473,10 @@ function prepareMagicArcher(
     });
   });
   // REMAKE-138: the magic archer borrows the `3V` handler `0000:CCA4`, which
-  // already returns kill + randomBelow(5) + 13; the shooting branch then adds a
-  // second 13 at `0000:72DC`. Only the `3V` roll is live, so exactly one draw is
-  // consumed here on top of the flat 26.
+  // already returns kill + randomBelow(5) + 13; the native branch then adds a
+  // second 13 at `0000:72DC`. That duplicate is fixed as an original defect, so
+  // only `3V`'s own base and roll survive here — one draw, same shape as every
+  // tiered technique.
   const experienceGained = definition.experience.base + trial.between(
     definition.experience.randomMinimum,
     definition.experience.randomMaximum,

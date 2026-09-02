@@ -79,7 +79,7 @@ export const STAGE0_ACTION_DEFINITIONS = {
       "fixedWaitNativeTicks": 20
     },
     "experience": {
-      "base": 26,
+      "base": 13,
       "randomMinimum": 0,
       "randomMaximum": 4,
       "addKillReward": true
