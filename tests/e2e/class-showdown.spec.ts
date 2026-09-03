@@ -381,7 +381,7 @@ test("water warrior splits after defensive melee and all copies show shared life
     .toEqual({ x: 29, y: 23 });
   await page.keyboard.press("Space");
   await expect(page.locator(".hud-identity-name")).toHaveText("水戰士／水戰士");
-  await expect(page.getByTestId("unit-traits")).toHaveText("特性近戰受擊分裂");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性無視地形與阻擋／近戰受擊分裂");
   await expect(page.getByTestId("unit-traits")).toHaveAttribute(
     "aria-label",
     /相鄰合法空格新增一個分裂體.*共享生命.*最多 4 個/u,
@@ -413,7 +413,7 @@ test("water warrior splits after defensive melee and all copies show shared life
     .toEqual({ x: 31, y: 23 });
   await page.keyboard.press("Space");
   await expect(page.locator(".hud-identity-name")).toHaveText("水戰士／水戰士");
-  await expect(page.getByTestId("unit-traits")).toHaveText("特性近戰受擊分裂");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性無視地形與阻擋／近戰受擊分裂");
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-unit-life-label-count", "71");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/class-showdown-water-warrior-split.png`,
@@ -453,7 +453,7 @@ test("REMAKE-093 adds 射擊 to the water warrior's own command menu", async ({ 
   await expect(page.getByTestId("unit-command-attack")).toBeVisible();
   await expect(page.getByTestId("unit-command-shoot")).toBeVisible();
   // The melee identity is untouched: the split trait and 攻擊 both survive.
-  await expect(page.getByTestId("unit-traits")).toHaveText("特性近戰受擊分裂");
+  await expect(page.getByTestId("unit-traits")).toHaveText("特性無視地形與阻擋／近戰受擊分裂");
   await expect(page.getByTestId("unit-command-move")).toBeVisible();
   await expect(page.getByTestId("unit-command-rest")).toBeVisible();
   await captureVisualAudit(page.getByTestId("game-screen"), {

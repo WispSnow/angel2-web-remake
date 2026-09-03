@@ -12,7 +12,8 @@ export type ClassTraitId =
   | "evil-sword-confusion"
   | "jungle-poison"
   | "magic-armor-mitigation"
-  | "water-warrior-split";
+  | "water-warrior-split"
+  | "water-warrior-uniform-movement";
 
 export interface ClassTrait {
   readonly id: ClassTraitId;
@@ -77,6 +78,10 @@ const TRAITS_BY_CLASS: Readonly<Partial<Record<ClassId, readonly ClassTrait[]>>>
     description: "受到的普通攻擊與反擊傷害，依已失去的生命比例減免，生命見底時最多減免 50%。",
   }],
   "water-warrior": [{
+    id: "water-warrior-uniform-movement",
+    shortDescription: "無視地形與阻擋",
+    description: "移動時每一格一律只花 1 點，並可直接穿過敵我單位、不受敵方鄰格阻擋；只有本職業完全走不進的地形除外，落點仍必須是空格。",
+  }, {
     id: "water-warrior-split",
     shortDescription: "近戰受擊分裂",
     description: "受到普通近戰攻擊且存活時，會在相鄰合法空格新增一個分裂體；全體共享生命，場上最多 4 個。",

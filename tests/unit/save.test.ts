@@ -5422,6 +5422,24 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-108 saves without changing battle state for the water warrior movement mode", () => {
+    // REMAKE-141 只改水戰士的移动传播模式；存档字段含义不变，续战时移动图由棋盘重算，
+    // 因此 v108 战中档与完成档无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 108,
+      contentVersion: "enemy-magic-guard-lifecycle-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 108,
+      contentVersion: "enemy-magic-guard-lifecycle-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-107 saves without changing battle state for the enemy magic guard lifecycle", () => {
     // REMAKE-140 只把 side 2 施放的防魔计数改为 2。战中档只在玩家阶段写出，旧规则下
     // side 2 的防魔那一刻恒为 0，没有需要改写的字段，因此 v107 战中档与完成档无损迁移。

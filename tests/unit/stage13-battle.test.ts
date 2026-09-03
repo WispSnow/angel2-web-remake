@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { classStatsFor } from "../../src/game/content/classes";
+import { manhattan, movementCost } from "../../src/game/simulation/grid";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { STAGE13_DEFINITION } from "../../src/game/content/stage13";
 import { Stage13Battle, createStage13DeploymentRoster } from "../../src/game/simulation/stage13-battle";
-import type { CampaignState } from "../../src/game/types";
+import type { CampaignState, Position } from "../../src/game/types";
 
 const campaign: CampaignState = {
   stageId: "stage-13",
@@ -30,6 +31,41 @@ const fullDeployment = {
 };
 
 describe("stage 13 battle simulation", () => {
+  it("gives the newly recruited water warriors the native uniform movement mode", () => {
+    // MOVE-005：短码 `0N` 的「移動」走传播模式 `0`，每格统一扣 1、不读阵营图也不建立
+    // `FFh` 控制区，所以移动力 8 的摩莉娜的可达范围正好是曼哈顿 7 的菱形，只去掉本职业
+    // 规则 99 的地形与已占格。她的士兵同伴仍按地形加权，范围形状完全不同。
+    const battle = new Stage13Battle(campaign, fullDeployment);
+    const molina = battle.unit("1:11")!;
+    expect(molina).toMatchObject({ classId: "water-warrior", name: "摩莉娜", x: 34, y: 37 });
+    expect(battle.statsFor(molina).movement).toBe(8);
+
+    const battlefield = {
+      width: STAGE13_DEFINITION.width,
+      height: STAGE13_DEFINITION.height,
+      terrainSlotAt: (position: Position) => battle.terrainSlotAt(position),
+    };
+    const occupied = new Set(battle.units
+      .filter(({ id }) => id !== molina.id)
+      .map(({ x, y }) => `${x},${y}`));
+    const expected: string[] = [];
+    for (let y = 0; y < STAGE13_DEFINITION.height; y += 1) {
+      for (let x = 0; x < STAGE13_DEFINITION.width; x += 1) {
+        const key = `${x},${y}`;
+        if (manhattan({ x, y }, molina) > 7 || occupied.has(key)) continue;
+        if (movementCost("water-warrior", { x, y }, battlefield) >= 99) continue;
+        expected.push(key);
+      }
+    }
+
+    const reachable = battle.reachableCells(molina.id).map(({ x, y }) => `${x},${y}`);
+    expect([...reachable].sort()).toEqual([...expected].sort());
+    // 同一个菱形里有代价 3 的地形；加权模式下她走不到那么远。
+    expect(movementCost("water-warrior", { x: 30, y: 37 }, battlefield)).toBe(3);
+    expect(reachable).toContain("30,37");
+  });
+
+
   it("builds a twelve-unit player strike team and Marsiel's nine-unit expert guard", () => {
     const roster = createStage13DeploymentRoster(campaign);
     expect(roster).toHaveLength(22);

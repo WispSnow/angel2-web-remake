@@ -239,7 +239,7 @@
 | 21 | 弩兵 | 射擊 | shooting／shooting | 2–8 | — | — |
 | 24 | 修女 | 技術 | technique／technique | — | — | — |
 | 25 | 僧侶 | 技術 | technique／technique | — | — | — |
-| 26 | 水戰士 | 普通 | ordinary／ordinary | — | — | 近戰受擊分裂 |
+| 26 | 水戰士 | 普通 | ordinary／ordinary | — | — | 無視地形與阻擋、近戰受擊分裂 |
 | 30 | 祭司 | 技術 | technique／technique | — | — | — |
 | 31 | 巫師 | 技術 | technique／technique | — | — | — |
 | 32 | 魔法師 | 技術 | technique／technique | — | — | — |

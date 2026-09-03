@@ -1,7 +1,7 @@
 import type { CellBounds } from "../content/terrain";
 import type { BattleUnit, Position } from "../types";
 import {
-  movementCost,
+  movementStepCost,
   movementCostsToNearestTarget,
   movementMap,
   positionKey,
@@ -128,7 +128,7 @@ export function planEscortRoutePath(
       path,
       remaining: left,
       arrival,
-      cost: path.slice(1).reduce((sum, step) => sum + movementCost(actor.classId, step, battlefield), 0),
+      cost: path.slice(1).reduce((sum, step) => sum + movementStepCost(actor.classId, step, battlefield), 0),
     };
     if (!best || landsBetter(candidate, best)) best = candidate;
   }

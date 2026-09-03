@@ -47,6 +47,85 @@ export function movementCost(
   return movementRulesFor(classId)[battlefield.terrainSlotAt(position)] ?? 99;
 }
 
+/**
+ * The native range propagation mode word DS:`1F0F` (MOVE-005).
+ *
+ * `0000:7336` compares the acting unit's short code against `"0N"` and writes
+ * `'0'` for the water warrior, `'M'` for everyone else; `1000:167C` performs
+ * the same substitution on the AI phase base mode CS:`017F` and restores the
+ * saved value afterwards. The two handlers differ in three ways:
+ *
+ * - `1000:3C46` (`M`) subtracts the destination's own terrain rule and rejects
+ *   `98/99`; `1000:3BB0` (`0`) executes `dec cl`, so every terrain costs 1, and
+ *   compares only against `99`.
+ * - `1000:3C46` reads the side map and refuses any cell held by another side;
+ *   `1000:3BB0` never touches it, so mode `0` propagates straight through both
+ *   allies and enemies.
+ * - the `FFh` control-zone reservation at `1000:3D6D` dispatches on
+ *   `FY/FM/CY/CM/FA/Y/M/A` and falls through to `ret` for mode `0`, so the
+ *   water warrior is never stopped by an enemy's adjacency.
+ *
+ * Landing is unchanged: `1000:690B` still requires a positive propagated value,
+ * a rule other than `99`, and an empty side map cell.
+ */
+export type MovementPropagationMode = "M" | "0";
+
+const UNIFORM_MOVEMENT_CLASSES: ReadonlySet<UnitClassId> = new Set<UnitClassId>(["water-warrior"]);
+
+export function movementPropagationModeFor(classId: UnitClassId): MovementPropagationMode {
+  return UNIFORM_MOVEMENT_CLASSES.has(classId) ? "0" : "M";
+}
+
+/**
+ * The movement points charged for entering `position`. Mode `0` charges 1 on
+ * every terrain it can enter at all; mode `M` charges the class's terrain rule.
+ */
+export function movementStepCost(
+  classId: UnitClassId,
+  position: Position,
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+): number {
+  return movementPropagationModeFor(classId) === "0"
+    ? 1
+    : movementCost(classId, position, battlefield);
+}
+
+/** Whether the class's own movement profile forbids entering `position` at all. */
+export function movementBlocked(
+  classId: UnitClassId,
+  position: Position,
+  battlefield: GridBattlefield = STAGE0_BATTLEFIELD,
+): boolean {
+  const rule = movementCost(classId, position, battlefield);
+  return movementPropagationModeFor(classId) === "0" ? rule >= 99 : rule >= 98;
+}
+
+const NO_CELLS: ReadonlySet<string> = new Set<string>();
+
+/** Cells the propagation refuses to enter. Mode `0` never reads the side map. */
+function opposingOccupants(
+  unit: BattleUnit,
+  units: readonly BattleUnit[],
+): ReadonlySet<string> {
+  if (movementPropagationModeFor(unit.classId) === "0") return NO_CELLS;
+  return new Set(
+    units
+      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
+      .map(positionKey),
+  );
+}
+
+/** The `FFh` reservation, which `1000:3D6D` never builds for mode `0`. */
+function controlZoneFor(
+  unit: BattleUnit,
+  units: readonly BattleUnit[],
+  battlefield: GridBattlefield,
+): ReadonlySet<string> {
+  return movementPropagationModeFor(unit.classId) === "0"
+    ? NO_CELLS
+    : zoneOfControl(unit, units, battlefield);
+}
+
 interface SearchResult {
   costs: Map<string, number>;
   previous: Map<string, string>;
@@ -128,9 +207,9 @@ function search(
 
     for (const next of directedNeighbors(current.position, battlefield, directions)) {
       const key = positionKey(next);
-      const step = movementCost(classId, next, battlefield);
-      if (step >= 98 || (blocked.has(key) && key !== positionKey(start))) continue;
-      const cost = current.cost + step;
+      if (movementBlocked(classId, next, battlefield)
+        || (blocked.has(key) && key !== positionKey(start))) continue;
+      const cost = current.cost + movementStepCost(classId, next, battlefield);
       // The native range map stores the movement value at the origin and only
       // propagates a strictly positive remainder. A path is therefore legal
       // only when its accumulated entry cost is strictly below the stat.
@@ -161,17 +240,15 @@ export function movementMap(
   movementBudget = unitStatsMovement(unit),
 ): MovementMap {
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
-  const blocked = new Set(
-    units
-      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
-      .map(positionKey),
-  );
+  // Mode `0` reads neither the side map nor the `FFh` reservation, so the water
+  // warrior walks through enemies and out of an enemy's control zone. `occupied`
+  // below still keeps every held cell an illegal landing.
   const result = search(
     unit,
     unit.classId,
     movementBudget,
-    blocked,
-    zoneOfControl(unit, units, battlefield),
+    opposingOccupants(unit, units),
+    controlZoneFor(unit, units, battlefield),
     undefined,
     battlefield,
   );
@@ -312,17 +389,12 @@ export function routePath(
 ): Position[] {
   if (targets.length === 0) return [{ x: unit.x, y: unit.y }];
   const occupied = new Set(units.filter((candidate) => candidate.id !== unit.id).map(positionKey));
-  const blocked = new Set(
-    units
-      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
-      .map(positionKey),
-  );
   const routeResult = search(
     unit,
     unit.classId,
     movementBudget,
-    blocked,
-    zoneOfControl(unit, units, battlefield),
+    opposingOccupants(unit, units),
+    controlZoneFor(unit, units, battlefield),
     STABLE_NATIVE_ROUTE_DIRECTIONS,
     battlefield,
   );
@@ -362,11 +434,7 @@ export function movementCostsToNearestTarget(
   const occupants = new Map(units
     .filter((candidate) => candidate.id !== unit.id)
     .map((candidate) => [positionKey(candidate), candidate]));
-  const blocked = new Set(
-    units
-      .filter((candidate) => candidate.id !== unit.id && candidate.side !== unit.side)
-      .map(positionKey),
-  );
+  const blocked = opposingOccupants(unit, units);
   const targetKeys = new Set(targets
     .filter((target) => target.x >= 0
       && target.y >= 0
@@ -375,12 +443,12 @@ export function movementCostsToNearestTarget(
       && (!occupants.has(positionKey(target))
         || (options.allowFriendlyOccupiedTargets
           && occupants.get(positionKey(target))?.side === unit.side))
-      && movementCost(unit.classId, target, battlefield) < 98
+      && !movementBlocked(unit.classId, target, battlefield)
       && (options.positionFilter?.(target) ?? true))
     .map(positionKey));
   const costs = new Map<string, number>([...targetKeys].map((key) => [key, 0]));
   const pending = [...targetKeys].map((key) => ({ position: parsePositionKey(key), cost: 0 }));
-  const controlZone = zoneOfControl(unit, units, battlefield);
+  const controlZone = controlZoneFor(unit, units, battlefield);
   const startKey = positionKey(unit);
 
   while (pending.length > 0) {
@@ -391,12 +459,12 @@ export function movementCostsToNearestTarget(
     if (!current) continue;
     const currentKey = positionKey(current.position);
     if (current.cost !== costs.get(currentKey)) continue;
-    const reverseStepCost = movementCost(unit.classId, current.position, battlefield);
+    const reverseStepCost = movementStepCost(unit.classId, current.position, battlefield);
 
     for (const predecessor of neighbors(current.position, battlefield)) {
       const key = positionKey(predecessor);
       if (blocked.has(key)
-        || movementCost(unit.classId, predecessor, battlefield) >= 98
+        || movementBlocked(unit.classId, predecessor, battlefield)
         || !(options.positionFilter?.(predecessor) ?? true)
         || (controlZone.has(key) && !targetKeys.has(key) && key !== startKey)) continue;
       const cost = current.cost + reverseStepCost;

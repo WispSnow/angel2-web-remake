@@ -33,7 +33,7 @@ import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, PortraitRecord, Position, SaveRosterEntry, SavedBattleState, Side, UnitClassId, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
-import { constructionPath, constructionReachableCells, manhattan, movementCost, movementCostsToNearestTarget, movementMap, movementPath as findMovementPath, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield, type MovementMap } from "./grid";
+import { constructionPath, constructionReachableCells, manhattan, movementBlocked, movementCost, movementCostsToNearestTarget, movementMap, movementPath as findMovementPath, movementPropagationModeFor, movementStepCost, neighbors, positionKey, reachableCells, routePath, shortestPath, type GridBattlefield, type MovementMap } from "./grid";
 import {
   promoteUnit,
   promotionQueue,
@@ -1131,14 +1131,22 @@ export class Stage0Battle {
     return this.reachableCells(id, Math.floor(this.statsFor(unit).movement / 2));
   }
 
-  moveUnitStep(id: string, destination: Position, allowFriendlyTransit = false): boolean {
+  /**
+   * `transit` marks every step of a walk except the last one. Mode `M` may only
+   * cross a same-side occupant, because `1000:3C46` accepts the selected side
+   * and nothing else; mode `0` never reads the side map at all (MOVE-005), so
+   * the water warrior also crosses enemies. Neither may finish there: the last
+   * step is always submitted with `transit` false.
+   */
+  moveUnitStep(id: string, destination: Position, transit = false): boolean {
     const unit = this.unit(id);
     const occupant = this.unitAt(destination);
+    const crossesAnySide = movementPropagationModeFor(unit?.classId ?? "soldier") === "0";
     if (
       !unit
       || manhattan(unit, destination) !== 1
-      || (occupant && (!allowFriendlyTransit || occupant.side !== unit.side))
-      || movementCost(unit.classId, destination, this.dynamicBattlefield) >= 98
+      || (occupant && (!transit || (occupant.side !== unit.side && !crossesAnySide)))
+      || movementBlocked(unit.classId, destination, this.dynamicBattlefield)
     ) return false;
     unit.x = destination.x;
     unit.y = destination.y;
@@ -1946,7 +1954,7 @@ export class Stage0Battle {
       .map((position) => {
         const path = currentMovement.pathTo(position);
         const traveledCost = path.slice(1).reduce(
-          (total, step) => total + movementCost(unit.classId, step, this.dynamicBattlefield),
+          (total, step) => total + movementStepCost(unit.classId, step, this.dynamicBattlefield),
           0,
         );
         return {
@@ -2547,7 +2555,7 @@ export class Stage0Battle {
       for (let x = 0; x < this.stage.width; x += 1) {
         const position = { x, y };
         if (occupied.has(positionKey(position))
-          || movementCost(unit.classId, position, this.dynamicBattlefield) >= 98
+          || movementBlocked(unit.classId, position, this.dynamicBattlefield)
           || !strategicTargets.some((target) => manhattan(position, target) === preferredRange)) continue;
         ringCells.push(position);
       }
@@ -3353,7 +3361,7 @@ export class Stage0Battle {
         .map((position) => {
           const path = this.movementPath(unit.id, position);
           const traveledCost = path.slice(1).reduce(
-            (total, step) => total + movementCost(unit.classId, step, this.dynamicBattlefield),
+            (total, step) => total + movementStepCost(unit.classId, step, this.dynamicBattlefield),
             0,
           );
           return {

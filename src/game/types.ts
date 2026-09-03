@@ -266,8 +266,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 108;
-  contentVersion: "enemy-magic-guard-lifecycle-1";
+  version: 109;
+  contentVersion: "water-warrior-uniform-movement-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

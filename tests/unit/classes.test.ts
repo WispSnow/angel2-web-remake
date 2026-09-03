@@ -310,6 +310,10 @@ describe("native class implementation sequence", () => {
     expect(traitClasses.flatMap((classId) => classTraitsFor(classId))
       .every(({ description }) => description.length > 0)).toBe(true);
     expect(classTraitsFor("water-warrior")).toEqual([{
+      id: "water-warrior-uniform-movement",
+      shortDescription: "無視地形與阻擋",
+      description: "移動時每一格一律只花 1 點，並可直接穿過敵我單位、不受敵方鄰格阻擋；只有本職業完全走不進的地形除外，落點仍必須是空格。",
+    }, {
       id: "water-warrior-split",
       shortDescription: "近戰受擊分裂",
       description: "受到普通近戰攻擊且存活時，會在相鄰合法空格新增一個分裂體；全體共享生命，場上最多 4 個。",

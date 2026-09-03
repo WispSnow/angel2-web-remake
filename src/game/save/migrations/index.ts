@@ -659,6 +659,24 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-141 restores the native uniform movement mode `0` for the water
+ * warrior. Only movement legality changes; every stored field keeps its meaning
+ * and a resumed battle recomputes its range map from the board, so v108
+ * battle/completed saves migrate by identity alone.
+ */
+function migrateVersion108Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 108
+    || value.contentVersion !== "enemy-magic-guard-lifecycle-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-140 lets a side-2 magic guard outlive the round boundary that follows
  * the enemy phase, so it is written as `2` instead of `1`. Battle saves are
  * only written during the player phase, where a side-2 guard was always `0`
@@ -3034,6 +3052,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion108 = migrateVersion108Save(value);
+    if (migratedVersion108) return migratedVersion108;
     const migratedVersion107 = migrateVersion107Save(value);
     if (migratedVersion107) return migratedVersion107;
     const migratedVersion106 = migrateVersion106Save(value);

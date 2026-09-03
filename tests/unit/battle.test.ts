@@ -272,6 +272,96 @@ describe("stage 0 battle simulation", () => {
     ]);
   });
 
+  it("charges the water warrior 1 per cell regardless of terrain", () => {
+    // MOVE-005：`0000:7336` 对短码 `0N` 写传播模式 `0`，`1000:3BB0` 用 `dec cl` 代替
+    // 「减去目标地形规则」，所以除了本职业规则 99 的地形以外，每格一律扣 1。
+    // (20,24) 属代价 2 的槽 14，(20,25) 是代价 1 的槽 13：预算 3 时加权模式累计
+    // 2+1=3 不小于预算，统一模式只累计 2。
+    const battle = battleAtPlayableOpening();
+    const soldier = battle.unit("1:0")!;
+    soldier.x = 20;
+    soldier.y = 23;
+    battle.units = [soldier];
+    expect(movementCost("soldier", { x: 20, y: 24 })).toBe(2);
+    expect(movementCost("water-warrior", { x: 20, y: 24 })).toBe(2);
+
+    const weighted = reachableCells(soldier, battle.units, 3);
+    expect(weighted).toContainEqual({ x: 20, y: 24 });
+    expect(weighted).not.toContainEqual({ x: 20, y: 25 });
+
+    const water = battleAtPlayableOpening();
+    const marlin = water.unit("1:0")!;
+    marlin.classId = "water-warrior";
+    marlin.x = 20;
+    marlin.y = 23;
+    water.units = [marlin];
+
+    const uniform = reachableCells(marlin, water.units, 3);
+    expect(uniform).toContainEqual({ x: 20, y: 25 });
+    // 统一代价仍受预算约束：预算 3 最多走 2 步。
+    expect(uniform).not.toContainEqual({ x: 20, y: 26 });
+  });
+
+  it("walks the water warrior through an enemy and out of its control zone", () => {
+    // 模式 `0` 的传播回调从不读阵营图，`1000:3D6D` 的 `FFh` 保留分发也没有 `0` 分支，
+    // 所以水戰士既不被敌方棋子挡住，也不被敌方鄰格终止；落点仍必须是空格。
+    const battle = battleAtPlayableOpening();
+    const marlin = battle.unit("1:0")!;
+    const enemy = battle.unit("2:45")!;
+    marlin.classId = "water-warrior";
+    marlin.x = 20;
+    marlin.y = 27;
+    enemy.x = 22;
+    enemy.y = 27;
+    battle.units = [marlin, enemy];
+
+    const cells = reachableCells(marlin, battle.units, 4);
+    expect(cells).toContainEqual({ x: 23, y: 27 });
+    expect(cells).not.toContainEqual({ x: 22, y: 27 });
+    const path = battle.movementPath(marlin.id, { x: 23, y: 27 });
+    expect(path).toEqual([
+      { x: 20, y: 27 },
+      { x: 21, y: 27 },
+      { x: 22, y: 27 },
+      { x: 23, y: 27 },
+    ]);
+    expect(battle.movementPath(marlin.id, { x: 22, y: 27 })).toEqual([]);
+    // 中途格允许穿过敌方棋子，最后一步仍以空格提交。
+    expect(battle.moveUnitStep(marlin.id, path[1], true)).toBe(true);
+    expect(battle.moveUnitStep(marlin.id, path[2], true)).toBe(true);
+    expect(battle.moveUnitStep(marlin.id, path[3])).toBe(true);
+    expect(marlin).toMatchObject({ x: 23, y: 27 });
+    expect(enemy).toMatchObject({ x: 22, y: 27 });
+
+    const blocked = battleAtPlayableOpening();
+    const nia = blocked.unit("1:0")!;
+    const guard = blocked.unit("2:45")!;
+    nia.x = 20;
+    nia.y = 27;
+    guard.x = 22;
+    guard.y = 27;
+    blocked.units = [nia, guard];
+    expect(reachableCells(nia, blocked.units, 4)).not.toContainEqual({ x: 23, y: 27 });
+    expect(blocked.moveUnitStep(nia.id, { x: 21, y: 27 }, true)).toBe(true);
+    expect(blocked.moveUnitStep(nia.id, { x: 22, y: 27 }, true)).toBe(false);
+  });
+
+  it("still refuses terrain the water warrior profile rules out", () => {
+    // 模式 `0` 只放宽代价，`1000:3BB0` 仍比较规则 99，落点校验 `1000:690B` 也不变。
+    expect(movementCost("water-warrior", { x: 18, y: 19 })).toBe(99);
+    const battle = battleAtPlayableOpening();
+    const marlin = battle.unit("1:0")!;
+    marlin.classId = "water-warrior";
+    marlin.x = 21;
+    marlin.y = 20;
+    battle.units = [marlin];
+
+    const cells = reachableCells(marlin, battle.units, 8);
+    expect(cells).not.toContainEqual({ x: 19, y: 20 });
+    expect(cells).not.toContainEqual({ x: 20, y: 19 });
+    expect(battle.movementPath(marlin.id, { x: 19, y: 20 })).toEqual([]);
+  });
+
   it("does not let an ally beside an enemy truncate another ally's range", () => {
     // 保留规则不分阵营，模式 `M` 同样执行，所以我方棋子也会在控制区上开出可通行缺口。
     const battle = battleAtPlayableOpening();
