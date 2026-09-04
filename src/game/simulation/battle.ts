@@ -1601,7 +1601,10 @@ export class Stage0Battle {
     for (const affected of result.affectedUnits) {
       const unit = this.unit(affected.unitId);
       if (!unit) throw new Error("stale scripted special action");
-      this.setSharedLife(unit, affected.lifeAfter);
+      // Every outcome is a delta against the life the check above just pinned,
+      // which is the same absolute value for a lone unit but lets the cells of
+      // one shared water-warrior slot each remove their own share.
+      this.setSharedLife(unit, unit.life + affected.lifeAfter - affected.lifeBefore);
       unit.actionDisabled = affected.actionDisabledAfter;
       unit.statuses = { ...affected.statusesAfter };
       this.recordCampaignUnit(unit);

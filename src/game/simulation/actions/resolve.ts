@@ -90,6 +90,37 @@ function killRewardTotalFor(
   return total;
 }
 
+/**
+ * The life a multi-cell effect may still remove, per unit slot.
+ *
+ * Native `1000:736D` resolves each effect cell to its unit record (`0000:5058`),
+ * reads that record's **current** life from `DS:319F`, does
+ * `sub ax,[0x6CB7] / jnc / mov ax,0` and writes the clamped result back through
+ * `DS:31B9`. A split water warrior's cells all point at one record (`BAT-054`),
+ * so one effect drains a single pool: later cells only remove what is left, no
+ * effect can take more life than the slot had, and the cell that empties the
+ * pool is the one the death scan `0000:96C2` later finds at zero. Every other
+ * class owns its cell alone, so its pool is simply its own life.
+ *
+ * Cells must be drained in the scan's own order — ascending board index, which
+ * every caller already sorts by — because that is what decides how much is left
+ * for each of them.
+ */
+function sharedLifePool(): {
+  drain: (unit: BattleUnit, requested: number) => { damage: number; died: boolean };
+} {
+  const remaining = new Map<string, number>();
+  return {
+    drain(unit, requested) {
+      const key = waterWarriorRootId(unit) ?? unit.id;
+      const before = remaining.get(key) ?? unit.life;
+      const damage = Math.min(before, requested);
+      remaining.set(key, before - damage);
+      return { damage, died: damage > 0 && damage === before };
+    },
+  };
+}
+
 function defeatedUnitsIn(
   units: readonly BattleUnit[],
   affectedUnits: readonly SpecialActionAffectedUnit[],
@@ -104,7 +135,8 @@ function affectedUnit(
   unit: BattleUnit,
   patch: Partial<Pick<SpecialActionAffectedUnit,
     "positionAfter" | "lifeAfter" | "experienceAfter" | "actionDisabledAfter" | "statusesAfter"
-    | "damage" | "healing" | "blocked" | "blockReason" | "prayerOutcome" | "prayerRolledAmount">>,
+    | "damage" | "healing" | "blocked" | "blockReason" | "prayerOutcome" | "prayerRolledAmount"
+    | "died">>,
 ): SpecialActionAffectedUnit {
   const positionBefore = copyPosition(unit);
   const positionAfter = patch.positionAfter ? copyPosition(patch.positionAfter) : copyPosition(unit);
@@ -127,7 +159,9 @@ function affectedUnit(
     healing: patch.healing ?? 0,
     blocked: patch.blocked ?? false,
     blockReason: patch.blockReason,
-    died: lifeAfter === 0,
+    // Shared-slot victims override this: `lifeAfter` stays a per-cell delta
+    // against the group's common life, so only the pool knows who fell.
+    died: patch.died ?? lifeAfter === 0,
     moved: positionKey(positionBefore) !== positionKey(positionAfter),
     prayerOutcome: patch.prayerOutcome,
     prayerRolledAmount: patch.prayerRolledAmount,
@@ -456,21 +490,23 @@ function prepareMagicArcher(
     .map((position) => context.units.find((unit) => unit.x === position.x && unit.y === position.y
       && unit.side !== actor.side && !unit.actionDisabled))
     .filter((unit): unit is BattleUnit => Boolean(unit));
+  const pool = sharedLifePool();
   const affectedUnits = lineUnits.map((unit) => {
     const statusesAfter = cloneUnitStatuses(unit.statuses);
     const guarded = unit.statuses.magicGuard > 0;
     // REMAKE-099 removes the swift dragon knight's evasion from this path: the
     // magic archer deals magic damage, so `magicGuard` is its only counter.
     statusesAfter.magicGuard = 0;
-    const damage = unit.id === target.id
+    const requested = unit.id === target.id
       ? (guarded ? halfDamage : halfDamage * 2)
       : (guarded ? 0 : halfDamage);
-    const lifeAfter = Math.max(0, unit.life - damage);
+    const { damage, died } = pool.drain(unit, requested);
     return affectedUnit(unit, {
-      lifeAfter,
+      lifeAfter: unit.life - damage,
       damage,
-      blocked: guarded && damage === 0,
-      blockReason: guarded && damage === 0 ? "magicGuard" : undefined,
+      died,
+      blocked: guarded && requested === 0,
+      blockReason: guarded && requested === 0 ? "magicGuard" : undefined,
       statusesAfter,
     });
   });
@@ -510,6 +546,7 @@ function prepareWd(
   );
   if (path.length === 0) throw new Error("WD target has no valid predecessor path");
   const pathKeys = new Set(path.map(positionKey));
+  const pool = sharedLifePool();
   const affectedUnits = context.units
     .filter((unit) => unit.side === target.side
       && !unit.actionDisabled
@@ -518,10 +555,14 @@ function prepareWd(
       - path.findIndex((cell) => positionKey(cell) === positionKey(right)))
     .map((unit) => {
       const guarded = unit.statuses.magicGuard > 0;
-      const damage = guarded ? 0 : Math.min(unit.life, definition.damage.perEligibleLineCell);
+      const { damage, died } = pool.drain(
+        unit,
+        guarded ? 0 : definition.damage.perEligibleLineCell,
+      );
       return affectedUnit(unit, {
         lifeAfter: unit.life - damage,
         damage,
+        died,
         blocked: guarded,
         blockReason: guarded ? "magicGuard" : undefined,
       });
@@ -548,6 +589,7 @@ function prepareLightning(
     context.battlefield.height,
     definition.range.effectRadius,
   );
+  const pool = sharedLifePool();
   const affectedUnits = context.units
     .filter((unit) => unit.side !== actor.side && effect.valueAt(unit) > 0)
     .sort((left, right) => left.y * context.battlefield.width + left.x
@@ -564,16 +606,17 @@ function prepareLightning(
           : undefined;
       if (!frozen) statusesAfter.magicGuard = 0;
       const rangeValue = effect.valueAt(unit);
-      const damage = blocked
-        ? 0
-        : Math.min(unit.life, damageByRangeValue[rangeValue] ?? 0);
-      const lifeAfter = unit.life - damage;
+      const { damage, died } = pool.drain(
+        unit,
+        blocked ? 0 : damageByRangeValue[rangeValue] ?? 0,
+      );
       return affectedUnit(unit, {
         statusesAfter,
         blocked,
         blockReason,
         damage,
-        lifeAfter,
+        died,
+        lifeAfter: unit.life - damage,
       });
     });
   return {
@@ -704,22 +747,26 @@ function prepareStomp(
     height: definition.range.viewportHeight,
   };
   const effect = stompEffectRange(actor, center, context.battlefield, viewport);
+  const pool = sharedLifePool();
   const affectedUnits = context.units
     .filter((unit) => unit.side === target.side && effect.valueAt(unit) > 0)
     .sort((left, right) => left.y * context.battlefield.width + left.x
       - (right.y * context.battlefield.width + right.x))
     .map((unit) => {
       const frozen = unit.actionDisabled;
+      // The roll happens per cell whatever the pool has left, so an already
+      // drained group still costs the same PRNG draws.
       const rolledDamage = frozen
         ? 0
         : trial.between(
           definition.damage.base,
           definition.damage.base + definition.damage.randomBelow - 1,
         );
-      const damage = Math.min(unit.life, rolledDamage);
+      const { damage, died } = pool.drain(unit, rolledDamage);
       return affectedUnit(unit, {
         lifeAfter: unit.life - damage,
         damage,
+        died,
         blocked: frozen,
         blockReason: frozen ? "frozen" : undefined,
       });

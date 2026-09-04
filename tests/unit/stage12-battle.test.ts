@@ -144,7 +144,46 @@ describe("stage 12 battle simulation", () => {
       targetId: "2:40:split-1",
       target: { x: 39, y: 16 },
     });
-    expect(prepared.result.affectedUnits.filter(({ died }) => died)).toHaveLength(3);
+    // One shared pool behind the covered cells: the first one the scan reaches
+    // empties it, so it alone carries the death the scan then pays four cells for.
+    expect(prepared.result.affectedUnits.filter(({ died }) => died)).toHaveLength(1);
+    battle.commitPreparedAction(prepared);
+
+    expect(battle.units.filter(({ side, slot }) => side === 2 && slot === 40)).toHaveLength(0);
+    const gained = battle.unit(mage.id)!.experience - before;
+    expect(gained - groupKillReward).toBeGreaterThanOrEqual(8);
+    expect(gained - groupKillReward).toBeLessThanOrEqual(9);
+  });
+
+  /**
+   * The splash case behind the 2026-09-04 report: every ring tier on its own
+   * leaves the shared life standing, so the group only falls once the later
+   * cells have drained what the first one left. Native `1000:736D` re-reads the
+   * slot's live life per cell, so the total taken is the shared life itself and
+   * the cell that empties it is what the death scan pays for.
+   */
+  it("pays the whole split group when only the splash total reaches the shared life", () => {
+    const battle = splitGroupBattle();
+    // 60 clears 初級落雷's 50-point centre and every 35-point neighbour tier.
+    for (const body of battle.units.filter(({ side, slot }) => side === 2 && slot === 40)) {
+      body.life = 60;
+    }
+    const mage = battle.unit("1:1")!;
+    mage.x = 38;
+    mage.y = 14;
+    const before = mage.experience;
+
+    const prepared = battle.prepareSpecialAction({
+      actionId: "lightning-1",
+      actorId: mage.id,
+      targetId: "2:40:split-1",
+      target: { x: 39, y: 16 },
+    });
+    // No single cell is lethal on its own, and the ring can never remove more
+    // life than the one slot behind its four cells had.
+    expect(prepared.result.affectedUnits.every(({ damage }) => damage < 60)).toBe(true);
+    expect(prepared.result.affectedUnits.filter(({ died }) => died)).toHaveLength(1);
+    expect(prepared.result.damage).toBe(60);
     battle.commitPreparedAction(prepared);
 
     expect(battle.units.filter(({ side, slot }) => side === 2 && slot === 40)).toHaveLength(0);

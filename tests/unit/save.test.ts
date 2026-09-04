@@ -5422,6 +5422,24 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-109 saves without changing battle state for the shared splash pool", () => {
+    // REMAKE-142 只改多格效果对共享单位槽的伤害累计与击杀归属；棋盘、状态、已获得经验
+    // 与 PRNG 原样保留，读档后的下一次多格效果才按新口径结算，因此 v109 无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 109,
+      contentVersion: "water-warrior-uniform-movement-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 109,
+      contentVersion: "water-warrior-uniform-movement-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-108 saves without changing battle state for the water warrior movement mode", () => {
     // REMAKE-141 只改水戰士的移动传播模式；存档字段含义不变，续战时移动图由棋盘重算，
     // 因此 v108 战中档与完成档无损迁移。

@@ -3758,11 +3758,15 @@ describe("shared-body kill rewards", () => {
     partial[3]!.x = 10;
     partial[3]!.y = 5;
     const partialCast = cast(partial, partial[0]!);
-    expect(partialCast.result.affectedUnits.filter(({ died }) => died)).toHaveLength(3);
+    // One shared pool: the first cell the scan reaches empties it, and the cells
+    // behind it find a slot that is already at zero.
+    expect(partialCast.result.affectedUnits.filter(({ died }) => died)).toHaveLength(1);
+    expect(partialCast.result.damage).toBe(10);
 
     const full = waterWarriorGroup(4, 10);
     const fullCast = cast(full, full[0]!);
-    expect(fullCast.result.affectedUnits.filter(({ died }) => died)).toHaveLength(4);
+    expect(fullCast.result.affectedUnits.filter(({ died }) => died)).toHaveLength(1);
+    expect(fullCast.result.damage).toBe(10);
 
     expect(partialCast.result.experienceGained).toBe(fullCast.result.experienceGained);
     expect(fullCast.result.experienceGained - groupReward(4)).toBeGreaterThanOrEqual(8);
@@ -3788,6 +3792,47 @@ describe("shared-body kill rewards", () => {
 
     expect(prepared.result.affectedUnits[0]).toMatchObject({ unitId: root!.id, died: true });
     expect(prepared.result.experienceGained - groupReward(4)).toBeGreaterThanOrEqual(8);
+    expect(prepared.result.experienceGained - groupReward(4)).toBeLessThanOrEqual(11);
+  });
+
+  /**
+   * Native `1000:736D` re-reads the slot's live life word for every effect cell
+   * (`0000:5058` resolves the cell, `DS:319F` is the current life, `DS:31B9` the
+   * write-back pointer) and clamps `sub ax,[0x6CB7]` at zero, so a split group
+   * drains one pool as the scan walks its cells. A ring whose individual tiers
+   * all fall short of the shared life still empties it, and the death scan then
+   * clears every cell of the group.
+   */
+  it("drains one shared pool when no single splash tier reaches the shared life", () => {
+    const battle = new Stage0Battle(0);
+    const actor = {
+      ...battle.unit("1:0")!,
+      id: "splash-actor",
+      x: 1,
+      y: 5,
+      classId: "magician" as const,
+    };
+    // 60 at the centre and 45 on each adjacent body: every tier alone leaves the
+    // 100-point pool standing, their sum does not.
+    const [root, ...splits] = waterWarriorGroup(4, 100);
+    const prepared = prepareSpecialAction(
+      { actionId: "lightning-2", actorId: actor.id, targetId: root!.id },
+      actor,
+      root!,
+      new DeterministicRng(0x2137),
+      {
+        units: [actor, root!, ...splits],
+        battlefield: openBattlefield,
+        statsFor: (unit) => battle.statsFor(unit),
+      },
+      root!,
+    );
+
+    // The pool empties on the second cell the scan reaches, and the cells after
+    // it can no longer remove life the slot does not have.
+    expect(prepared.result.affectedUnits.filter(({ died }) => died)).toHaveLength(1);
+    expect(prepared.result.damage).toBe(100);
+    expect(prepared.result.experienceGained - groupReward(4)).toBeGreaterThanOrEqual(10);
     expect(prepared.result.experienceGained - groupReward(4)).toBeLessThanOrEqual(11);
   });
 

@@ -659,6 +659,26 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-142 drains one life pool per shared unit slot when a multi-cell effect
+ * covers several bodies of the same water warrior, so the splash total is
+ * capped at that slot's life and the cell that empties it is the one the death
+ * scan pays for. Nothing about the board, statuses, earned experience or the
+ * PRNG moves and the new accounting only applies from the next such effect, so
+ * v109 battle/completed saves retain every stored field.
+ */
+function migrateVersion109Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 109
+    || value.contentVersion !== "water-warrior-uniform-movement-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-141 restores the native uniform movement mode `0` for the water
  * warrior. Only movement legality changes; every stored field keeps its meaning
  * and a resumed battle recomputes its range map from the board, so v108
@@ -3052,6 +3072,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion109 = migrateVersion109Save(value);
+    if (migratedVersion109) return migratedVersion109;
     const migratedVersion108 = migrateVersion108Save(value);
     if (migratedVersion108) return migratedVersion108;
     const migratedVersion107 = migrateVersion107Save(value);

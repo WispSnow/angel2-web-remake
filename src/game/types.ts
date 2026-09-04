@@ -266,8 +266,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 109;
-  contentVersion: "water-warrior-uniform-movement-1";
+  version: 110;
+  contentVersion: "shared-body-splash-pool-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
