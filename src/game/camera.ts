@@ -38,6 +38,19 @@ export function cameraOriginForFocus(stage: StageDefinition, focus: Position): P
   });
 }
 
+/** Whether a battlefield cell is inside the viewport drawn from `origin`. */
+export function cameraContains(
+  stage: StageDefinition,
+  origin: Position,
+  position: Position,
+): boolean {
+  const { width, height } = stage.viewport;
+  return position.x >= origin.x
+    && position.x < origin.x + width
+    && position.y >= origin.y
+    && position.y < origin.y + height;
+}
+
 export function cameraFocusForOrigin(stage: StageDefinition, origin: Position): Position {
   const center = cameraCenterOffset(stage);
   const clamped = clampCameraOrigin(stage, origin);

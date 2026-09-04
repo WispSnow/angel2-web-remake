@@ -5,7 +5,11 @@ import {
   type ArenaBattleEnvironment,
 } from "../../src/game/simulation/arena-battle";
 import { shootingLineVisitProbabilities } from "../../src/game/simulation/actions/range-map";
-import { classCombatRole, classDefinition } from "../../src/game/content/classes";
+import {
+  classCombatRole,
+  classDefinition,
+  terrainDefensePercentFor,
+} from "../../src/game/content/classes";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { BATTLE_ACTION_DEFINITIONS } from "../../src/game/content/actions";
 import { STAGE14_DEFINITION } from "../../src/game/content/stage14";
@@ -1135,8 +1139,15 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
       ...ALL_TERRAIN_ARENA_ENVIRONMENT,
       terrainSlotAt: () => 2,
     });
-    battle.unit("enemy-prayer-guide")!.experience = 10_000;
-    battle.unit("enemy-prayer-guide")!.statuses.techniqueSeal = 3;
+    const guide = battle.unit("enemy-prayer-guide")!;
+    guide.experience = 10_000;
+    guide.life = battle.statsFor(guide).maxLife;
+    // Nothing in the third-tier pool pays off: everyone is whole and both
+    // possible AD targets already carry it, so the guide has to decide where
+    // to stand. (REMAKE-143 makes a sealed caster hold, so the seal can no
+    // longer stand in for "no technique to cast".)
+    battle.unit("ally-front")!.statuses.defenseUp = 3;
+    guide.statuses.defenseUp = 3;
 
     const action = battle.planEnemyAiAction("enemy-prayer-guide", 2);
     expect(action).toMatchObject({ kind: "move" });
@@ -1818,5 +1829,216 @@ describe("REMAKE-139 pure-support squadmates do not form a named leader's line",
     expect({ x: guideAfter.x, y: guideAfter.y }).not.toEqual(start.guide);
     expect(manhattan(guideAfter, fangAfter))
       .toBeLessThanOrEqual(BATTLE_ACTION_DEFINITIONS["magic-guard"].range.selectionRadius);
+  });
+});
+
+/**
+ * REMAKE-143. Native `1000:2291` rests a unit whose class action found nothing
+ * to do as soon as it is below full life; only a whole unit walks on to the
+ * movement fallbacks. The remake answered every such dead end with `wait`.
+ */
+describe("REMAKE-143 rest is the fallback of every idle dead end", () => {
+  const plain: ArenaBattleEnvironment = {
+    ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+    terrainSlotAt: () => 2,
+  };
+  const woundTo = (battle: ArenaBattle, id: string, percent: number): BattleUnit => {
+    const unit = battle.unit(id);
+    if (!unit) throw new Error(`missing ${id}`);
+    unit.life = Math.floor(battle.statsFor(unit).maxLife * percent / 100);
+    return unit;
+  };
+
+  it("lets a wounded ranged sentry with nobody in range rest instead of waiting", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-far", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 40, y: 30 },
+      { id: "enemy-archer", side: 2 as const, slot: 0, classId: "archer" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3330), plain);
+    expect(battle.planEnemyAiAction("enemy-archer", 1)).toEqual({
+      unitId: "enemy-archer",
+      kind: "wait",
+      path: [{ x: 25, y: 30 }],
+    });
+
+    woundTo(battle, "enemy-archer", 60);
+    expect(battle.planEnemyAiAction("enemy-archer", 1)).toEqual({
+      unitId: "enemy-archer",
+      kind: "rest",
+      path: [{ x: 25, y: 30 }],
+      nativeLine: "restingToRecover",
+    });
+  });
+
+  it("lets a wounded melee guard with nobody adjacent rest instead of waiting", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-near", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 27, y: 30 },
+      { id: "enemy-guard", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3331), plain);
+    expect(battle.planEnemyAiAction("enemy-guard", 1)).toMatchObject({ kind: "wait" });
+
+    woundTo(battle, "enemy-guard", 60);
+    expect(battle.planEnemyAiAction("enemy-guard", 1)).toMatchObject({
+      kind: "rest",
+      path: [{ x: 25, y: 30 }],
+      nativeLine: "restingToRecover",
+    });
+    // The 20% line still belongs to the native low-life rest.
+    woundTo(battle, "enemy-guard", 10);
+    expect(battle.planEnemyAiAction("enemy-guard", 1)).toMatchObject({
+      kind: "rest",
+      nativeLine: "restingLowLife",
+    });
+  });
+
+  it("holds a sealed caster where it stands: it waits when whole and rests while wounded", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-distant", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 40, y: 30 },
+      { id: "enemy-sister", side: 2 as const, slot: 0, classId: "sister" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3332), plain);
+    battle.unit("enemy-sister")!.statuses.techniqueSeal = 3;
+    // Unsealed, the same sister walks four cells toward the player (see the
+    // pursuit test above); sealed she has nothing to position for.
+    expect(battle.planEnemyAiAction("enemy-sister", 2)).toEqual({
+      unitId: "enemy-sister",
+      kind: "wait",
+      path: [{ x: 20, y: 30 }],
+    });
+
+    woundTo(battle, "enemy-sister", 60);
+    expect(battle.planEnemyAiAction("enemy-sister", 2)).toEqual({
+      unitId: "enemy-sister",
+      kind: "rest",
+      path: [{ x: 20, y: 30 }],
+      nativeLine: "restingToRecover",
+    });
+  });
+
+  it("keeps a sealed shooter shooting, because the seal only closes the technique menu", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 33 },
+      { id: "enemy-archer", side: 2 as const, slot: 0, classId: "archer" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3333), plain);
+    battle.unit("enemy-archer")!.statuses.techniqueSeal = 3;
+    woundTo(battle, "enemy-archer", 60);
+
+    expect(battle.planEnemyAiAction("enemy-archer", 2)).toMatchObject({
+      kind: "special",
+      actionId: "archer-shot",
+      targetId: "ally-target",
+    });
+  });
+
+  it("rests a wounded pursuer that is boxed in with no route left", () => {
+    // A one-cell corridor: the front two squadmates hold the only cells that
+    // lead to the target, so the rear unit has a queue but no progress.
+    const corridor: ArenaBattleEnvironment = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x, y }) => y === 30 && x >= 21 && x <= 25 ? 2 : 0,
+    };
+    const battle = new ArenaBattle([
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+      { id: "enemy-front", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "enemy-mid", side: 2 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "enemy-rear", side: 2 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 22, y: 30 },
+    ], 0, new DeterministicRng(0x3334), corridor);
+    expect(battle.planEnemyAiAction("enemy-rear")).toMatchObject({ kind: "wait" });
+
+    woundTo(battle, "enemy-rear", 60);
+    expect(battle.planEnemyAiAction("enemy-rear")).toMatchObject({
+      kind: "rest",
+      path: [{ x: 22, y: 30 }],
+      nativeLine: "restingToRecover",
+    });
+  });
+
+  it("rests a wounded confused unit that cannot relocate", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-west", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 24, y: 30 },
+      { id: "ally-east", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 26, y: 30 },
+      { id: "ally-north", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 25, y: 29 },
+      { id: "ally-south", side: 1 as const, slot: 3, classId: "soldier" as const, level: 1 as const, x: 25, y: 31 },
+      { id: "enemy-confused", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3335), plain);
+    battle.unit("enemy-confused")!.statuses.confusion = 3;
+    expect(battle.planEnemyAiAction("enemy-confused")).toMatchObject({ kind: "wait" });
+
+    woundTo(battle, "enemy-confused", 60);
+    expect(battle.planEnemyAiAction("enemy-confused")).toMatchObject({
+      kind: "rest",
+      path: [{ x: 25, y: 30 }],
+      nativeLine: "restingToRecover",
+    });
+  });
+
+  it("never leaves a confused ordinary unit on its own cell, exactly like native 1000:1D67", () => {
+    // The actor stands on the best terrain in reach. The native retreat needs
+    // an empty side-map byte, so its own cell is never a candidate and it
+    // relocates to worse ground; the old remake branch let it stay put.
+    const battle = new ArenaBattle([
+      { id: "ally-far", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 34 },
+      { id: "enemy-confused", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 25, y: 30 },
+    ], 0, new DeterministicRng(0x3336), {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x, y }) => x === 25 && y === 30 ? 3 : 2,
+    });
+    expect(terrainDefensePercentFor("soldier", 3))
+      .toBeGreaterThan(terrainDefensePercentFor("soldier", 2));
+    battle.unit("enemy-confused")!.statuses.confusion = 3;
+
+    const action = battle.planEnemyAiAction("enemy-confused");
+    expect(action).toMatchObject({ kind: "move" });
+    expect(action!.path.length).toBeGreaterThan(1);
+    expect(action!.path.at(-1)).not.toEqual({ x: 25, y: 30 });
+    expect(manhattan(action!.path.at(-1)!, { x: 25, y: 34 })).toBeGreaterThan(1);
+  });
+
+  it("lets a guard keep an effective shot below 40% life while a pursuer still rests", () => {
+    const placements = [
+      { id: "ally-target", side: 1 as const, slot: 0, classId: "soldier" as const, level: 3 as const, x: 25, y: 34 },
+      { id: "enemy-crossbow", side: 2 as const, slot: 0, classId: "crossbow" as const, level: 1 as const, x: 25, y: 30 },
+    ];
+    const sentry = new ArenaBattle(placements, 0, new DeterministicRng(0x3337), plain);
+    woundTo(sentry, "enemy-crossbow", 30);
+    expect(sentry.planEnemyAiAction("enemy-crossbow", 1)).toMatchObject({
+      kind: "special",
+      actionId: "crossbow-shot",
+      targetId: "ally-target",
+    });
+    const reasons = sentry.expertAiDecisionTrace("enemy-crossbow")?.chosen?.reasons ?? [];
+    expect(reasons.some((reason) => reason.startsWith("確定擊殺"))).toBe(false);
+    expect(reasons.some((reason) => reason.startsWith("有效傷害"))).toBe(true);
+
+    // REMAKE-012 is untouched for a unit that can still choose where to stand.
+    const pursuer = new ArenaBattle(placements, 0, new DeterministicRng(0x3337), plain);
+    woundTo(pursuer, "enemy-crossbow", 30);
+    expect(pursuer.planEnemyAiAction("enemy-crossbow", 2)).toMatchObject({ kind: "rest" });
+
+    // With nobody in range the guard recovers like everyone else.
+    const idle = new ArenaBattle([
+      { ...placements[0], x: 45 },
+      placements[1],
+    ], 0, new DeterministicRng(0x3337), plain);
+    woundTo(idle, "enemy-crossbow", 30);
+    expect(idle.planEnemyAiAction("enemy-crossbow", 1)).toMatchObject({ kind: "rest" });
+  });
+
+  it("rests a wounded follower that has no route to its leader", () => {
+    const walled: ArenaBattleEnvironment = {
+      ...ALL_TERRAIN_ARENA_ENVIRONMENT,
+      terrainSlotAt: ({ x }) => x === 25 ? 0 : 2,
+    };
+    const battle = new ArenaBattle([
+      { id: "ally-leader", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 30, y: 30 },
+      { id: "ally-follower", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "enemy-far", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 35, y: 30 },
+    ], 0, new DeterministicRng(0x3338), walled);
+    expect(battle.planAlliedAiAction("ally-follower", "ally-leader")).toMatchObject({ kind: "wait" });
+
+    woundTo(battle, "ally-follower", 60);
+    expect(battle.planAlliedAiAction("ally-follower", "ally-leader")).toMatchObject({
+      kind: "rest",
+      path: [{ x: 20, y: 30 }],
+      nativeLine: "restingToRecover",
+    });
   });
 });

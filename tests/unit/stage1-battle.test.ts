@@ -396,7 +396,18 @@ describe("stage 1 battle construction", () => {
       unitId: alertGuard.id,
       kind: "rest",
       path: [{ x: alertGuard.x, y: alertGuard.y }],
+      nativeLine: "restingToRecover",
     });
+
+    // REMAKE-143: a dormant guard has nothing to do, so any wound is worth
+    // resting off; only a whole one keeps waiting.
+    alertGuard.life = Math.floor(battle.statsFor(alertGuard).maxLife * 60 / 100);
+    expect(battle.planEnemyAiAction(alertGuard.id)).toMatchObject({
+      kind: "rest",
+      nativeLine: "restingToRecover",
+    });
+    alertGuard.life = battle.statsFor(alertGuard).maxLife;
+    expect(battle.planEnemyAiAction(alertGuard.id)).toMatchObject({ kind: "wait" });
   });
 
   it("records an attacked guard immediately and preserves its pending alert through restore", () => {

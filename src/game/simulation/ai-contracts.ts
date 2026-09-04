@@ -32,8 +32,16 @@ export interface AlliedAiAction {
 /**
  * The planner-emitted subset of the contextual battle lines. Each one is spoken
  * from inside the native AI decision, before the chosen action runs.
+ * `restingToRecover` is native `1000:2291`'s line 05h: the rest a unit takes
+ * because its class action found nothing to do (REMAKE-143 extends that rest
+ * to every idle dead end). The presentation layer also reads it to keep such
+ * idle rests from dragging the camera around.
  */
-export type AiPlannerLineKey = "restingLowLife" | "breakingContact" | "surrounded";
+export type AiPlannerLineKey =
+  | "restingLowLife"
+  | "restingToRecover"
+  | "breakingContact"
+  | "surrounded";
 
 /**
  * The phase scheduler ranks complete plans, not just actor ids. Returning the

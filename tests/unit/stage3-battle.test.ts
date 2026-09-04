@@ -330,6 +330,36 @@ describe("stage 3 battle construction and stable-remake automation", () => {
     });
   });
 
+  it("rests a wounded ranged member that has neither a shot nor rally progress left", () => {
+    // REMAKE-143: the fourth corps' hold position is a rest while wounded.
+    const battle = new Stage3Battle(campaign);
+    battle.units = battle.units.filter((unit) => unit.side === 1);
+    const daisy = battle.unit("1:3")!;
+    const archer = battle.unit("1:45")!;
+    archer.classId = "archer";
+    archer.className = "弓兵";
+    const occupied = new Set(battle.units.map(({ x, y }) => `${x},${y}`));
+    const beside = [
+      { x: daisy.x + 1, y: daisy.y },
+      { x: daisy.x - 1, y: daisy.y },
+      { x: daisy.x, y: daisy.y + 1 },
+      { x: daisy.x, y: daisy.y - 1 },
+    ].find((cell) => [3, 5].includes(stage3TerrainSlotAt(cell)) && !occupied.has(`${cell.x},${cell.y}`));
+    if (!beside) throw new Error("no in-doctrine cell beside Daisy");
+    archer.x = beside.x;
+    archer.y = beside.y;
+
+    archer.life = battle.statsFor(archer).maxLife;
+    expect(battle.planAlliedAiAction("1:45")).toMatchObject({ kind: "wait" });
+
+    archer.life = Math.floor(battle.statsFor(archer).maxLife * 75 / 100);
+    expect(battle.planAlliedAiAction("1:45")).toMatchObject({
+      kind: "rest",
+      path: [{ x: beside.x, y: beside.y }],
+      nativeLine: "restingToRecover",
+    });
+  });
+
   it("rallies a leaderless ranged automatic ally on Daisy once no shot is left", () => {
     const battle = new Stage3Battle(campaign);
     battle.units = battle.units.filter((unit) => unit.side === 1);

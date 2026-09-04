@@ -118,6 +118,7 @@ import {
   expertSpecialUtility,
   expertTacticalScore,
   expertUtilityForAction,
+  isEffectiveExpertUtility,
   type ExpertAiDecisionTrace,
   type ExpertAiEvaluationCache,
   type ExpertAiEvaluationContext,
@@ -1946,10 +1947,7 @@ export class Stage0Battle {
     // A commanded unit still spends the action here instead of falling through
     // to pursuit: `跟隨主將` is a cohesion order, not conditional free action.
     if (routeCostBefore === undefined || routeCostBefore >= 55) {
-      return {
-        action: { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] },
-        handled: false,
-      };
+      return { action: this.restOrWait(unit), handled: false };
     }
 
     const candidates = currentMovement.cells
@@ -1978,7 +1976,7 @@ export class Stage0Battle {
     return {
       action: selected
         ? { unitId: unit.id, kind: "move", path: selected.path }
-        : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] },
+        : this.restOrWait(unit),
       handled: true,
     };
   }
@@ -2215,43 +2213,35 @@ export class Stage0Battle {
     });
   }
 
+  /**
+   * Native behavior `FFh`. Ordinary classes call the same `1000:1D67` retreat
+   * the 20..39% band uses — an empty cell with no orthogonal opponent, highest
+   * terrain defense, later scan cell on a tie, never the actor's own cell — and
+   * end the action whether or not a cell was found. Shooting, technique and
+   * empress/dragon classes take the first ascending range cell whose PIT bit
+   * is clear. A unit that ends the action where it stands rests off any wound
+   * (REMAKE-143): the player's answer to that is to leave it room to wander.
+   */
   protected planConfusedAiAction(unit: BattleUnit): AlliedAiAction {
+    if (classDefinition(unit.classId).actionCategory === "ordinary") {
+      const retreat = this.defensiveRetreatPath(unit);
+      return retreat
+        ? { unitId: unit.id, kind: "move", path: retreat }
+        : this.restOrWait(unit);
+    }
+
     const reachable = this.reachableCells(unit.id)
       .sort((left, right) => left.y * this.stage.width + left.x
         - (right.y * this.stage.width + right.x));
-    if (classDefinition(unit.classId).actionCategory === "ordinary") {
-      let destination: Position | undefined;
-      let bestDefense = -1;
-      for (const candidate of reachable) {
-        if (neighbors(candidate, this.dynamicBattlefield).some((adjacent) =>
-          this.units.some((other) => other.side !== unit.side
-            && other.x === adjacent.x && other.y === adjacent.y))) continue;
-        const defense = terrainDefensePercentFor(unit.classId, this.terrainSlotAt(candidate));
-        if (defense >= bestDefense) {
-          destination = candidate;
-          bestDefense = defense;
-        }
-      }
-      if (!destination || positionKey(destination) === positionKey(unit)) {
-        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
-      }
-      const path = this.movementPath(unit.id, destination);
-      return path.length > 1
-        ? { unitId: unit.id, kind: "move", path }
-        : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
-    }
-
     for (const candidate of reachable) {
       // Native behavior FFh samples PIT bit 0 for each ascending cell. Gameplay
       // randomness is mapped one-for-one to the serializable simulation PRNG.
       if (this.rng.between(0, 1) !== 0) continue;
-      if (positionKey(candidate) === positionKey(unit)) {
-        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
-      }
+      if (positionKey(candidate) === positionKey(unit)) return this.restOrWait(unit);
       const path = this.movementPath(unit.id, candidate);
       if (path.length > 1) return { unitId: unit.id, kind: "move", path };
     }
-    return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    return this.restOrWait(unit);
   }
 
   protected hasDamageActionThisTurn(id: string): boolean {
@@ -2297,10 +2287,18 @@ export class Stage0Battle {
         || (options.targetFilter?.(target) ?? true),
     });
     const opponentSide: BattleUnit["side"] = unit.side === 1 ? 2 : 1;
+    // REMAKE-143: a sealed caster has no action to position for. The native
+    // dispatcher sent it down the ordinary melee flow, which REMAKE-066 rules
+    // out for casters, and walking to the front while unable to cast for up to
+    // three round boundaries only delivers it to the player. It holds and
+    // recovers instead; shooters never read the seal.
+    const sealedCaster = classCombatRole(unit.classId) === "ranged"
+      && !shootingActionIdFor(unit.classId, unit.side)
+      && unit.statuses.techniqueSeal > 0;
     let fallbackAction: AlliedAiAction | undefined;
     if (classCombatRole(unit.classId) === "ranged") {
       if (!classAction) {
-        fallbackAction = intent === "pursuit"
+        fallbackAction = intent === "pursuit" && !sealedCaster
           ? (usesTechniqueAi(unit.classId, unit.side)
               ? this.planExpertTechniquePositioningAction(unit, {
                   iceIsForbidden,
@@ -2310,7 +2308,7 @@ export class Stage0Battle {
             ?? this.planExpertRangedApproachAction(unit, {
               targetFilter: options.targetFilter,
             })
-          : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+          : this.restOrWait(unit);
       }
     } else {
       fallbackAction = this.planOrdinaryAiAction(unit, opponentSide, options.behavior, {
@@ -2340,8 +2338,7 @@ export class Stage0Battle {
           this.focusFireLifeForAction(unit, right),
         );
       });
-    const selected = candidates[0]
-      ?? { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+    const selected = candidates[0] ?? this.restOrWait(unit);
     const selectedUtility = this.expertUtilityForAction(unit, selected);
     const maximumLife = this.statsFor(unit).maxLife;
     // A named victory target is the AI's own loss condition, so below 20% it
@@ -2360,7 +2357,15 @@ export class Stage0Battle {
         return banded;
       }
     }
+    // REMAKE-143: a guard cannot break contact, so resting only postpones the
+    // exchange while the player keeps hitting it. It takes an effective attack,
+    // shot or technique at any life; the rest gate below stays for the units
+    // that can still choose where to stand.
+    const sentryKeepsActing = intent === "sentry"
+      && (selected.kind === "attack" || selected.kind === "special")
+      && isEffectiveExpertUtility(selectedUtility);
     if (unit.life * 100 < maximumLife * 40
+      && !sentryKeepsActing
       && selectedUtility.guaranteedKills === 0
       && selectedUtility.wizardHits === 0
       && selectedUtility.criticalSaves === 0) {
@@ -2660,6 +2665,26 @@ export class Stage0Battle {
     if (action.kind !== "rest") return action;
     const lifePercent = Math.floor(unit.life * 100 / this.statsFor(unit).maxLife);
     return lifePercent < 20 ? { ...action, nativeLine: "restingLowLife" } : action;
+  }
+
+  /**
+   * REMAKE-143: rest is what a unit does when it has nothing better to do,
+   * never a competitor to an effective action. Native `1000:2291` sits at this
+   * exact point of every class flow — after a failed attack, shot or technique
+   * it rests whenever current life is below maximum and speaks line 05h, and
+   * only a full-life unit walks on to the movement fallbacks. The remake used
+   * to answer the same dead end with `wait`, which the player saw as wounded
+   * guards standing idle. Below 20% the native low-life line 00h takes over.
+   */
+  protected restOrWait(unit: BattleUnit): AlliedAiAction {
+    const path = [{ x: unit.x, y: unit.y }];
+    if (unit.life >= this.statsFor(unit).maxLife) return { unitId: unit.id, kind: "wait", path };
+    return this.tagLowLifeRest(unit, {
+      unitId: unit.id,
+      kind: "rest",
+      path,
+      nativeLine: "restingToRecover",
+    });
   }
 
   /**
@@ -3284,9 +3309,8 @@ export class Stage0Battle {
       if (lifePercent < (options.restThresholdPercent ?? 40)) {
         return this.tagLowLifeRest(unit, { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] });
       }
-      if (behavior === 1) {
-        return { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
-      }
+      // A guard with nobody in reach spends the round recovering (REMAKE-143).
+      if (behavior === 1) return this.restOrWait(unit);
       const targets = enemies.flatMap((enemy) => neighbors(enemy, this.dynamicBattlefield));
       // REMAKE-090/118: a named leader ranks its pursuit landing by the exact
       // next-phase melee threat first, so it advances behind its escort
@@ -3357,7 +3381,7 @@ export class Stage0Battle {
         const geometric = geometricCandidates[0];
         return geometric
           ? { unitId: unit.id, kind: "move", path: geometric.path }
-          : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+          : this.restOrWait(unit);
       }
       const movementCandidates = reachable
         .filter((position) => positionKey(position) !== positionKey(unit))
@@ -3399,7 +3423,8 @@ export class Stage0Battle {
             pursuitProgress: originCost - selected.remainingCost,
             ...(queueAdvance ? { queueAdvance: true } : {}),
           }
-        : { unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
+        // Boxed in with no route left: recover instead of standing (REMAKE-143).
+        : this.restOrWait(unit);
     }
 
     if (unit.life < stats.maxLife) return { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };

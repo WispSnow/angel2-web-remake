@@ -1062,3 +1062,137 @@ test("a poisoned enemy rests below 20% life and says the native planner line", a
   });
   expect(pageErrors).toEqual([]);
 });
+
+/**
+ * REMAKE-143. A sealed caster has nothing to position for, so once wounded it
+ * rests where it stands — and that idle rest must neither drag the camera to
+ * it nor play the map effect while it is off screen. Poison walks the lone
+ * monk down to half life without any player unit ever standing in its sight;
+ * the 10×7 arena viewport makes "off screen" a matter of a few cells.
+ */
+test("REMAKE-143: an idle rest off camera keeps the camera, skips the effect and speaks 05h", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("curse-master");
+    arena.setLevel(3);
+    const caster = arena.interact(20, 30);
+    arena.setClass("soldier");
+    arena.setLevel(1);
+    const escort = arena.interact(15, 35);
+    arena.setSide(2);
+    arena.setClass("monk");
+    arena.setLevel(1);
+    const monk = arena.interact(25, 30);
+    return [caster, escort, monk];
+  });
+  expect(placed).toEqual([true, true, true]);
+  await page.getByTestId("arena-start").click();
+  const casterId = "arena-1-0";
+  const escortId = "arena-1-1";
+  const monkId = "arena-2-0";
+  type RestTraceState = ArenaBattleDebugState & {
+    restPresentation?: { unit: { id: string } };
+    restPresentationTrace: Array<{ unit: { id: string } }>;
+  };
+  const state = async (): Promise<RestTraceState> => {
+    const current = await arenaBattleState(page);
+    if (!current) throw new Error("arena battle state missing");
+    return current as RestTraceState;
+  };
+  const fullLife = (await state()).units.find(({ id }) => id === monkId)!.life;
+
+  // The arena viewport is 10×7 cells. Right-click in the neutral field is the
+  // player's way to focus the next unacted ally and centre the camera on it,
+  // which is how a unit outside the current view gets reached at all.
+  const onCamera = (origin: { x: number; y: number }, cell: { x: number; y: number }) =>
+    cell.x >= origin.x && cell.x < origin.x + 10 && cell.y >= origin.y && cell.y < origin.y + 7;
+  const focusAlly = async (unitId: string) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const current = await state();
+      const unit = current.units.find(({ id }) => id === unitId)!;
+      if (onCamera(current.cameraOrigin, unit)) return { unit, cameraOrigin: current.cameraOrigin };
+      const occupied = new Set(current.units.map(({ x, y }) => `${x},${y}`));
+      const empty = [1, 2, 3]
+        .map((offset) => ({ x: current.cameraOrigin.x + offset, y: current.cameraOrigin.y + 1 }))
+        .find(({ x, y }) => !occupied.has(`${x},${y}`))!;
+      await clickArenaWorldCell(page, empty.x, empty.y, { button: "right" });
+      await page.waitForFunction((target) => {
+        const battle = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+        const focused = battle?.units.find(({ id }) => id === target);
+        return !!battle && !!focused
+          && focused.x >= battle.cameraOrigin.x && focused.x < battle.cameraOrigin.x + 10
+          && focused.y >= battle.cameraOrigin.y && focused.y < battle.cameraOrigin.y + 7;
+      }, unitId, { timeout: 5_000 }).catch(() => undefined);
+    }
+    throw new Error(`could not bring ${unitId} on camera`);
+  };
+  const castOnMonk = async (techniqueTestId: string, applied: (statuses: Record<string, number>) => boolean) => {
+    const { unit } = await focusAlly(casterId);
+    await clickArenaWorldCell(page, unit.x, unit.y);
+    await page.getByTestId("unit-command-technique").click();
+    await page.getByTestId(techniqueTestId).click();
+    await clickArenaWorldCell(page, 25, 30);
+    await page.waitForFunction(({ id, check }) => {
+      const battle = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+      const monk = battle?.units.find((unit) => unit.id === id);
+      // eslint-disable-next-line no-new-func
+      return battle?.phase === "player" && !!monk && (new Function("s", `return ${check}`)(monk.statuses) as boolean);
+    }, { id: monkId, check: applied.toString().replace(/^\(?statuses\)?\s*=>\s*/, "").replace(/statuses/g, "s") }, { timeout: 30_000 });
+  };
+  // Resting the escort ends the player phase with the camera parked on it, far
+  // from the monk. Returns the camera origin the enemy phase then starts with.
+  const restEscort = async () => {
+    const { unit, cameraOrigin } = await focusAlly(escortId);
+    const round = (await state()).round;
+    await clickArenaWorldCell(page, unit.x, unit.y);
+    await page.getByTestId("unit-command-rest").click();
+    return { cameraOrigin, round };
+  };
+  const waitForRound = (round: number) => page.waitForFunction((target) => {
+    const battle = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return battle?.phase === "player" && (battle.round ?? 0) >= target;
+  }, round, { timeout: 30_000 });
+
+  // Round 1: poison from five cells away, then let the whole monk wait at full
+  // life. A lone support caster has nobody to anchor to and nothing to cast.
+  await castOnMonk("technique-poison", (statuses) => statuses.poison > 0);
+  const first = await restEscort();
+  await waitForRound(first.round + 1);
+  const halfLife = (await state()).units.find(({ id }) => id === monkId)!.life;
+  expect(halfLife).toBe(Math.floor(fullLife / 2));
+
+  // Round 2: seal it, park the camera on the escort again and let the enemy
+  // phase run with the wounded, sealed monk out of sight.
+  await castOnMonk("technique-spell-seal", (statuses) => statuses.techniqueSeal > 0);
+  const second = await restEscort();
+  const monkCell = (await state()).units.find(({ id }) => id === monkId)!;
+  expect(onCamera(second.cameraOrigin, monkCell)).toBe(false);
+
+  const dialogue = page.getByTestId("dialogue-layer");
+  await expect(dialogue).toHaveAttribute("data-source-address", "DS:8562");
+  await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
+  await expect(dialogue).toContainText("等我補足體力就去教訓妳.");
+  // While the monk speaks its line the camera is still parked on the escort:
+  // the idle rest did not centre on the speaker the way every other automatic
+  // action does. (The next player phase re-centres on the first ally, so this
+  // has to be observed during the enemy phase.)
+  const during = await state();
+  expect(during.cameraOrigin).toEqual(second.cameraOrigin);
+  expect(during.restPresentation).toBeUndefined();
+  await waitForRound(second.round + 1);
+
+  const after = await state();
+  // No MAGIC/0 finish ever played for the off-screen monk…
+  expect(after.restPresentationTrace.some(({ unit }) => unit.id === monkId)).toBe(false);
+  // …but the rest itself happened: 15% back before the next poison halving.
+  const recovered = Math.min(Math.floor(fullLife * 15 / 100), fullLife - halfLife);
+  expect(after.units.find(({ id }) => id === monkId)!.life)
+    .toBe(Math.floor((halfLife + recovered) / 2));
+  expect(pageErrors).toEqual([]);
+});

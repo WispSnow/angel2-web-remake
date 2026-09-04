@@ -117,8 +117,20 @@ export function planTerrainHoldForceAiAction(
   const allowedTerrainSlots = new Set(doctrine.allowedTerrainSlots);
   const isAllowedPosition = (position: Position): boolean =>
     allowedTerrainSlots.has(context.battlefield.terrainSlotAt(position));
-  const holdPosition = (): AlliedAiAction =>
-    ({ unitId: unit.id, kind: "wait", path: [{ x: unit.x, y: unit.y }] });
+  // REMAKE-143: a member with nothing left to do rests off any wound instead of
+  // standing idle. The doctrine's own rest threshold still runs first for the
+  // careers that act, so this only answers the dead ends below.
+  const holdPosition = (): AlliedAiAction => {
+    const path = [{ x: unit.x, y: unit.y }];
+    const maximumLife = context.statsFor(unit).maxLife;
+    if (unit.life >= maximumLife) return { unitId: unit.id, kind: "wait", path };
+    return {
+      unitId: unit.id,
+      kind: "rest",
+      path,
+      nativeLine: unit.life * 100 < maximumLife * 20 ? "restingLowLife" : "restingToRecover",
+    };
+  };
   // A fallen rally unit is already a lost stage, but the planner still has to
   // answer for the units that outlive it, so the rally simply drops out.
   const rally = doctrine.rally;

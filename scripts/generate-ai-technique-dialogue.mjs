@@ -49,6 +49,9 @@ const CONTEXTUAL_LINES = [
   { key: "restingLowLife", selector: "00h", record: "resting-low-life", gate: "aiDialogue", text: "快不行了!...我必需休息一下." },
   { key: "breakingContact", selector: "01h", record: "breaking-contact", gate: "aiDialogue", text: "我體力太低了!|先閃一邊...." },
   { key: "surrounded", selector: "02h", record: "surrounded", gate: "aiDialogue", text: "這....被包圍了." },
+  // `1000:2291`: the rest a class flow takes after its attack, shot or
+  // technique found nothing to do while the unit is below full life.
+  { key: "restingToRecover", selector: "05h", record: "resting-to-recover", gate: "aiDialogue", text: "等我補足體力就去教訓妳." },
   { key: "shootingAnnounce", selector: "08h", record: "shooting-announce", gate: "aiDialogue", text: "看我的飛箭." },
   { key: "spellSealed", selector: "1Ah", record: "spell-sealed", gate: "direct", text: "我中了禁咒，無法使用法術．" },
   { key: "noTargetInRange", selector: "1Bh", record: "no-target-in-range", gate: "direct", text: "沒有人在我的攻擊範圍內．" },

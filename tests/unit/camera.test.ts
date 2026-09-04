@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cameraContains,
   cameraFocusForOrigin,
   cameraOriginForFocus,
   clampCameraFocus,
@@ -35,6 +36,20 @@ describe("battle camera boundaries", () => {
       .toEqual({ x: 35, y: 37 });
     expect(cameraFocusForOrigin(STAGE1_DEFINITION, { x: 40, y: 43 }))
       .toEqual({ x: 30, y: 34 });
+  });
+
+  it("reports whether a cell is inside the viewport drawn from an origin", () => {
+    // REMAKE-143 reads this to keep an idle rest from dragging the camera or
+    // playing its map effect off screen, so the edges have to be exact.
+    const { width, height } = STAGE1_DEFINITION.viewport;
+    const origin = { x: 14, y: 13 };
+    expect(cameraContains(STAGE1_DEFINITION, origin, origin)).toBe(true);
+    expect(cameraContains(STAGE1_DEFINITION, origin, { x: 14 + width - 1, y: 13 + height - 1 }))
+      .toBe(true);
+    expect(cameraContains(STAGE1_DEFINITION, origin, { x: 14 + width, y: 13 })).toBe(false);
+    expect(cameraContains(STAGE1_DEFINITION, origin, { x: 14, y: 13 + height })).toBe(false);
+    expect(cameraContains(STAGE1_DEFINITION, origin, { x: 13, y: 20 })).toBe(false);
+    expect(cameraContains(STAGE1_DEFINITION, origin, { x: 20, y: 12 })).toBe(false);
   });
 
   it("keeps the already accepted stage-0 native address-space range", () => {

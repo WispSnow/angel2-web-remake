@@ -30,8 +30,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 110 as const;
-export const SAVE_CONTENT_VERSION = "shared-body-splash-pool-1" as const;
+export const SAVE_VERSION = 111 as const;
+export const SAVE_CONTENT_VERSION = "idle-rest-fallback-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

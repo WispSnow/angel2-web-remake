@@ -171,12 +171,9 @@ export class Stage1Battle extends Stage0Battle {
     if (!unit || unit.side !== 2 || unit.acted || unit.actionDisabled) return undefined;
     if (unit.statuses.confusion > 0) return this.planConfusedAiAction(unit);
     const intent = this.enemyAiIntentFor(id);
-    if (intent === "alert") {
-      if (unit.life * 100 < this.statsFor(unit).maxLife * 40) {
-        return { unitId: id, kind: "rest", path: [{ x: unit.x, y: unit.y }] };
-      }
-      return { unitId: id, kind: "wait", path: [{ x: unit.x, y: unit.y }] };
-    }
+    // A dormant guard has nothing to do by definition; REMAKE-143 lets it rest
+    // off any wound rather than only below 40%.
+    if (intent === "alert") return this.restOrWait(unit);
     return this.planModernEnemyAiAction(id, intent === "sentry" ? "sentry" : "pursuit");
   }
 

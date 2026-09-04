@@ -193,6 +193,7 @@ describe("native contextual battle lines", () => {
       ["restingLowLife", 0x00, "DS:8501", "aiDialogue", "快不行了!...我必需休息一下.", ["1000:2287"]],
       ["breakingContact", 0x01, "DS:851D", "aiDialogue", "我體力太低了!\n先閃一邊....", ["1000:2265"]],
       ["surrounded", 0x02, "DS:8538", "aiDialogue", "這....被包圍了.", ["1000:227B"]],
+      ["restingToRecover", 0x05, "DS:8562", "aiDialogue", "等我補足體力就去教訓妳.", ["1000:22B7"]],
       ["shootingAnnounce", 0x08, "DS:85A5", "aiDialogue", "看我的飛箭.", ["1000:1F6D"]],
       // Player responses: direct `0000:C97E` sites the switch never silences.
       ["spellSealed", 0x1a, "DS:8677", "direct", "我中了禁咒，無法使用法術．", ["0000:701F"]],
@@ -254,7 +255,13 @@ describe("native contextual battle-line gates", () => {
     // `1000:254F` carries the ＡＩ對話 switch, so everything behind it is
     // silenceable and everything reaching `0000:C97E` directly is not.
     expect(byGate("aiDialogue"))
-      .toEqual(["restingLowLife", "breakingContact", "surrounded", "shootingAnnounce"]);
+      .toEqual([
+        "restingLowLife",
+        "breakingContact",
+        "surrounded",
+        "restingToRecover",
+        "shootingAnnounce",
+      ]);
     expect(byGate("direct"))
       .toEqual([
         "spellSealed",

@@ -1,5 +1,6 @@
 import { STAGE0, initialEnemyExperience } from "./content/stage0";
 import {
+  cameraContains,
   cameraFocusForOrigin,
   cameraOriginForFocus,
   clampCameraFocus,
@@ -3653,7 +3654,14 @@ export class GameController {
     if (!unit) return deferOutcome ? false : this.resolveOutcome();
     this.battle.focusId = unit.id;
     this.cursor = { x: unit.x, y: unit.y };
-    this.centerCamera(unit);
+    // REMAKE-143: an idle rest — a unit that found nothing to do and recovers
+    // where it stands — changes nothing on the board, so it neither drags the
+    // camera to itself nor plays the map effect off screen. Low-life rests and
+    // every other action keep the existing focus; the line still follows the
+    // ＡＩ對話 switch like the native one does.
+    const idleRest = action.kind === "rest" && action.nativeLine === "restingToRecover";
+    const restVisible = !idleRest || cameraContains(this.battle.stage, this.cameraOrigin, unit);
+    if (!idleRest) this.centerCamera(unit);
     this.statusMessage = actingStatusText
       ?? (movementKind === "enemy"
         ? `${unit.name}正在自動行動。`
@@ -3812,8 +3820,10 @@ export class GameController {
         this.battle.spendAction(unit.id);
       }
     } else if (action.kind === "rest") {
-      const presentationUnit = { ...unit, statuses: { ...unit.statuses } };
-      await this.presentRest(presentationUnit);
+      if (restVisible) {
+        const presentationUnit = { ...unit, statuses: { ...unit.statuses } };
+        await this.presentRest(presentationUnit);
+      }
       const recovered = this.battle.rest(unit.id);
       this.statusMessage = `${unit.name}休息，恢復 ${recovered} 點生命。`;
     } else {

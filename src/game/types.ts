@@ -216,6 +216,7 @@ export interface DialoguePage {
       | "resting-low-life"
       | "breaking-contact"
       | "surrounded"
+      | "resting-to-recover"
       | "shooting-announce"
       | "spell-sealed"
       | "no-target-in-range"
@@ -266,8 +267,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 110;
-  contentVersion: "shared-body-splash-pool-1";
+  version: 111;
+  contentVersion: "idle-rest-fallback-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

@@ -395,6 +395,17 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
       "1000:227B"
     ]
   },
+  "restingToRecover": {
+    "record": "resting-to-recover",
+    "selector": 5,
+    "pointerEntry": "DS:84C5",
+    "address": "DS:8562",
+    "gate": "aiDialogue",
+    "text": "等我補足體力就去教訓妳.",
+    "emitters": [
+      "1000:22B7"
+    ]
+  },
   "shootingAnnounce": {
     "record": "shooting-announce",
     "selector": 8,

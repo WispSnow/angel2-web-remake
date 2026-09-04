@@ -648,8 +648,14 @@ function nativeRules(
       below20: "rest and recover 15% max life",
       from20To39: "behavior 1 rests immediately; otherwise, when an adjacent enemy exists, try a defensive retreat and rest if it fails",
       from40: "continue the class action flow",
-      fallback: "after failed attack/shot/technique attempts, 1000:2291 rests when currentLife < maxLife; a full-life unit continues to later fallbacks",
-      evidence: ["1000:2233", "1000:2291", "1000:2468"],
+      fallback: "after failed attack/shot/technique attempts, 1000:2291 rests when currentLife < maxLife and speaks contextual line 05h; a full-life unit continues to later fallbacks",
+      fallbackEntryPoints: {
+        ordinary: "1000:18E2, after the 1000:2081 attack attempt fails; a full-life unit then waits (behavior 1), runs 1000:2193 (behavior 2) or speaks 04h and runs 1000:20DB",
+        shooting: "1000:19A1, reached by behavior 1 straight from 1000:198A and by other behaviors after a failed 1000:1D0B reposition; the stand-and-fire branch 1000:19C1 comes only after it returns full life, so a wounded shooting sentry rests instead of firing",
+        technique: "1000:1A2C (technique) and 1000:1ABC (empress/dragon), after the 1000:1DA2 attempt fails; a full-life unit then retries the technique (behavior 1), runs 1000:2193 (behavior 2) or 1000:20DB",
+      },
+      confusionOrdering: "1000:18A1 and 1000:192C branch to FFh before calling 1000:2233, so a confused ordinary or shooting unit never rests; 1000:19DD and 1000:1A68 call 1000:2233 first and then apply the FFh random move on top",
+      evidence: ["1000:2233", "1000:2291", "1000:2468", "1000:18E2", "1000:19A1", "1000:19C1", "1000:1A2C", "1000:1ABC"],
     },
     targetSelection: {
       enemy: {
@@ -840,7 +846,7 @@ function nativeRules(
       },
       behaviorSummary: {
         zero: "ordinary default branch; can also follow DS:0D34/0D36 scripted goal when that runtime flag is Y",
-        one: "stand-ground policy: low-life rest; ordinary melee attacks only if the globally selected best attack position is the current cell; shooting/technique may act from the current position; never performs pursuit movement",
+        one: "stand-ground policy: low-life rest; ordinary melee attacks only if the globally selected best attack position is the current cell; technique may act from the current position; shooting fires from the current position only at full life because 1000:2291 precedes the stand-and-fire branch; never performs pursuit movement",
         two: "short-gated pursuit described above after class action failure at full life",
         leadersThreeFiveSevenNine: "ordinary default combat/pursuit plus serving as the target of the following even behavior",
         followersFourSixEightTen: "leader-cohesion pre-step described above, then ordinary class flow if no movement was needed",
@@ -850,7 +856,7 @@ function nativeRules(
       },
       classFlowQuirks: {
         ordinary: "behavior 1 can attack only from the current globally preferred attack position; ordinary reposition through 1000:2081 may move and attack in the same action; long pursuit and behavior-2 pursuit only move",
-        shooting: "behavior 1 stands and fires when it has a target; other ordinary shooting uses 1000:1D0B and fires only after a successful move to a different distance-2 position, while an origin-winning selector result is treated as failure; independently, every successful 1000:1BD9 cohesion move (including the temporary group command at 1000:1CA3) is followed by the shooting attempt at 1000:1F3F",
+        shooting: "behavior 1 stands and fires when it has a target and is at full life (1000:198A -> 19A1 -> 2291 -> 19C1; any wound rests first); other ordinary shooting uses 1000:1D0B and fires only after a successful move to a different distance-2 position, while an origin-winning selector result is treated as failure; independently, every successful 1000:1BD9 cohesion move (including the temporary group command at 1000:1CA3) is followed by the shooting attempt at 1000:1F3F",
         technique: "uses the same behavior 12/FF, low-life, paired-follower and full-life fallback vocabulary, but keeps its own technique-selection ordering rather than sharing the shooting wrapper",
         empressOrDragon: "uses the same behavior 12/FF, low-life and movement fallbacks around the WD action pool",
       },

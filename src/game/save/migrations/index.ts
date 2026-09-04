@@ -659,6 +659,27 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-143 makes rest the fallback of every idle dead end in the shared
+ * automatic planner: a wounded guard, blocked pursuer, sealed caster, confused
+ * unit that cannot relocate or dormant alert guard rests instead of waiting,
+ * a guard keeps an effective action below 40%, and a confused ordinary unit
+ * never picks its own cell. Every plan is recomputed from the public board on
+ * the next automatic action and no stored field changes meaning, so v110
+ * battle/completed saves retain every stored field.
+ */
+function migrateVersion110Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 110
+    || value.contentVersion !== "shared-body-splash-pool-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-142 drains one life pool per shared unit slot when a multi-cell effect
  * covers several bodies of the same water warrior, so the splash total is
  * capped at that slot's life and the cell that empties it is the one the death
@@ -3072,6 +3093,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion110 = migrateVersion110Save(value);
+    if (migratedVersion110) return migratedVersion110;
     const migratedVersion109 = migrateVersion109Save(value);
     if (migratedVersion109) return migratedVersion109;
     const migratedVersion108 = migrateVersion108Save(value);

@@ -5422,6 +5422,24 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-110 saves without changing battle state for the idle rest fallback", () => {
+    // REMAKE-143 只改自动规划在无事可做时的兜底（休息代替待命）、禁咒法系原地、守卫低血
+    // 仍出手与混乱普通职业不留原格；计划每次都从公开棋盘重算，因此 v110 无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 110,
+      contentVersion: "shared-body-splash-pool-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 110,
+      contentVersion: "shared-body-splash-pool-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-109 saves without changing battle state for the shared splash pool", () => {
     // REMAKE-142 只改多格效果对共享单位槽的伤害累计与击杀归属；棋盘、状态、已获得经验
     // 与 PRNG 原样保留，读档后的下一次多格效果才按新口径结算，因此 v109 无损迁移。

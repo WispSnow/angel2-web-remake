@@ -116,6 +116,23 @@ export function compareExpertAiPriorityBand(
   return expertAiPriorityBand(right) - expertAiPriorityBand(left);
 }
 
+/**
+ * REMAKE-143: whether an action changes the board in the actor's favour —
+ * a kill, a Wizard hit, a save, real damage or healing, a control effect or a
+ * non-redundant buff. Positioning value alone (terrain, exposure, progress)
+ * does not count; callers that only want attacks and techniques must also
+ * check the action kind, because a rest carries its own healing here.
+ */
+export function isEffectiveExpertUtility(utility: ExpertAiUtility): boolean {
+  return utility.guaranteedKills > 0
+    || utility.wizardHits > 0
+    || utility.criticalSaves > 0
+    || utility.effectiveDamage > 0
+    || utility.effectiveHealing > 0
+    || utility.control > 0
+    || utility.support > 0;
+}
+
 function countEffectiveWizardHit(
   utility: ExpertAiUtility,
   target: BattleUnit,
