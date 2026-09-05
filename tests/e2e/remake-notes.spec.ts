@@ -215,11 +215,24 @@ test("REMAKE-124 說明龍類首領可中毒並使用三分之一規則", async 
   await openNotes(page, "fixes");
   const bossPoison = page.getByTestId("remake-note-REMAKE-124");
   await expect(bossPoison).toContainText("中毒效果調整為可對龍類首領生效");
-  await expect(bossPoison).toContainText("當前生命值降至三分之一");
+  await expect(bossPoison).toContainText("扣除其當前生命值的三分之一");
   await expect(bossPoison).toContainText("普通單位仍為減半");
+  await expect(bossPoison).toContainText("三分之一為「扣除量」而非「剩餘量」");
   await captureVisualAudit(bossPoison, {
     path: "artifacts/playwright/remake-notes-boss-poison.png",
   });
+});
+
+test("REMAKE-145 說明劇情首領在四成以下繼續行動", async ({ page }) => {
+  await page.goto("/");
+  // 原版沒壞，是複刻主動改了首領的手感，所以歸「平衡性調整」而不是「Bug 修復」。
+  await openNotes(page, "balance");
+  const bossBand = page.getByTestId("remake-note-REMAKE-145");
+  await expect(bossBand).toContainText("劇情首領不再半血就罷手");
+  await expect(bossBand).toContainText("只有低於兩成才休息");
+  await expect(bossBand).toContainText("女帝與所有一般職業");
+  await expect(page.getByTestId("remake-note-REMAKE-145").locator(".rn-note-id"))
+    .toHaveText("REMAKE-145");
 });
 
 test("REMAKE-125 說明龍踏保留固定經驗並累加擊殺經驗", async ({ page }) => {

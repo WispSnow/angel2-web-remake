@@ -267,8 +267,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 111;
-  contentVersion: "idle-rest-fallback-1";
+  version: 112;
+  contentVersion: "boss-poison-and-life-band-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

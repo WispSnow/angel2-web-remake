@@ -659,6 +659,29 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-144 reads the 龍／頭／手 poison share as the damage instead of the
+ * remainder and repairs the difficulty-3 boss stat gate so a status word moves
+ * their effective attack/defense by 30 like every other side-2 unit; REMAKE-145
+ * then lifts those careers out of the 20..39% band and drops their automatic
+ * rest threshold to 20%. All three are derived at read time from the class,
+ * difficulty, stored status words and the public board; no stored life, status
+ * counter, action bit or PRNG cursor changes meaning, so v111 battle/completed
+ * saves migrate by identity and pick the repaired numbers up on their next
+ * poison tick, stat read and automatic action.
+ */
+function migrateVersion111Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 111
+    || value.contentVersion !== "idle-rest-fallback-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-143 makes rest the fallback of every idle dead end in the shared
  * automatic planner: a wounded guard, blocked pursuer, sealed caster, confused
  * unit that cannot relocate or dormant alert guard rests instead of waiting,
@@ -3093,6 +3116,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion111 = migrateVersion111Save(value);
+    if (migratedVersion111) return migratedVersion111;
     const migratedVersion110 = migrateVersion110Save(value);
     if (migratedVersion110) return migratedVersion110;
     const migratedVersion109 = migrateVersion109Save(value);

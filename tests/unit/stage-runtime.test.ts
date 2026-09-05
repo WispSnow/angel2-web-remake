@@ -732,4 +732,24 @@ describe("stage runtime manifest", () => {
       expect(deployed.campaignSnapshot().recordCounters?.[0]).toBe(41);
     }
   });
+
+  /**
+   * Regression: `restartBattle` answers `skip-entry-story` by calling
+   * `createBattle(snapshot)` with no deployment result, which every deployment
+   * stage rejects outright. Stage 20 shipped with that mode, so 全面撤退 and the
+   * defeat retry both threw before they could reach the deployment surface —
+   * the confirm looked dead and only 取消 responded. A stage that owns a
+   * preparation surface must retry through `entry` or `preparation`.
+   */
+  it("never gives a deployment stage the fixed-roster retry mode", async () => {
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const runtime = await loadStageRuntime(stageId);
+      if (!runtime.preparation) continue;
+      expect(STAGE_RUNTIME_MANIFEST[stageId].retry.mode, stageId).not.toBe("skip-entry-story");
+    }
+    expect(STAGE_RUNTIME_MANIFEST["stage-20"].retry).toMatchObject({
+      mode: "preparation",
+      retreatStatusText: "全面撤退：返回龍塔頂部部署並重新編隊。",
+    });
+  });
 });

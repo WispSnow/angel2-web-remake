@@ -1,7 +1,7 @@
 # `IP / 施毒` 系统规格
 
 状态：`implemented`；原版玩家／AI 规则、持续状态、地图表现、`REMAKE-004`、
-`REMAKE-013` 冰封例外与 `REMAKE-124` 首领毒伤已闭合
+`REMAKE-013` 冰封例外与 `REMAKE-124`／`REMAKE-144` 首领毒伤已闭合
 
 负责人：Web 复刻实现
 
@@ -17,13 +17,14 @@
 [`web-remake-rule-decisions.md#remake-013冰封不可被攻治外圈不外推破邪可解除`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-013冰封不可被攻治外圈不外推破邪可解除)、
 [`web-remake-rule-decisions.md#remake-014敌方技术提示保留原文并对焦效果中心`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-014敌方技术提示保留原文并对焦效果中心)
 、[`web-remake-rule-decisions.md#remake-124中毒对龍系-boss-生效并把当前生命降至三分之一`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-124中毒对龍系-boss-生效并把当前生命降至三分之一)
+、[`web-remake-rule-decisions.md#remake-144龍系-boss-的毒伤是当前生命的三分之一剧情-boss-的状态修正同样吃难度-3-倍率`](../../../reverse/gdd/web-remake-rule-decisions.md#remake-144龍系-boss-的毒伤是当前生命的三分之一剧情-boss-的状态修正同样吃难度-3-倍率)
 
 ## 玩家目的
 
 第二、第三层咒術師可在六步内指定一名敌军，播放原版上升毒液与毒云两段表现后，把目标
 中毒计数重置为 3。每个完整玩家＋我方自动＋敌方回合边界，中毒单位先结算一次毒伤，
 再把中毒计数减 1；`stableRemake` 保证毒不会把生命降到 0。`REMAKE-124` 使龍、頭、手也
-写入中毒，并把其每次 tick 改为当前生命的三分之一。一次成功施放固定取得
+写入中毒，`REMAKE-144` 把它们每次 tick 的扣除量定为当前生命的三分之一。一次成功施放固定取得
 `14+random(0..3)` 经验，并在完整 290 native tick 后提交。
 
 ## 证据与决策
@@ -40,8 +41,11 @@
 - `[SR]` `REMAKE-004` 把扣血修正为 `max(1, floor(currentLife/2))`，因此毒不能致死；
   `legacyStrict` 保留原版毒 tick 后 0 点暂时留场、后续全局死亡扫描才移除的行为。
 - `[DD]` `REMAKE-124` 取代 `stableRemake` 的龍／頭／手毒免疫：`IP` 与叢林戰士普通命中
-  都可写入同一 3 回合状态，普通单位仍写 `max(1,floor(life/2))`，龍／頭／手改写
-  `max(1,floor(life/3))`。混乱与冰雪等其他免疫不变。
+  都可写入同一 3 回合状态。混乱与冰雪等其他免疫不变。
+- `[DD]` `REMAKE-144` 修正该条的除数方向：三分之一是**扣除量**而不是剩余量。普通单位仍写
+  `max(1,floor(life/2))`，龍／頭／手写 `max(1, life − floor(life/3))`，即每轮扣掉
+  `floor(life/3)`。难度 3 妖龍因此是 `4230 → 2820 → 1880 → 1254`，而不是
+  `4230 → 1410 → 470`。
 - `[SR]` `REMAKE-013` 的禁选范围只覆盖普通攻击、射击、单体伤害和治疗；施毒没有即时
   伤害，故冻结敌军仍可成为目标并获得中毒。完整轮边界若单位此刻仍冻结，则该次持续伤害
   完整跳过，不改变生命、死亡、击杀、经验或 PRNG，但中毒计数仍减 1。冰壳始终绘制在
@@ -113,7 +117,7 @@ tick、状态写入、生命除数、PRNG 次数或提交时点。
 6. 敌方 AI 层级池保持原始长度／顺序；目标已被同池 LA 混乱后，专家规划确定性选择 IP，
    显示“中毒.”，龍／頭／手可作为有效候选；
 7. 正式玩家与 AI 在 130 tick 请求 `E/58`，290 tick 前状态、经验和行动位不提交；
-8. technique-lab 与正式竞技场的两段帧序、锚点、声音、目标侧、Boss 三分之一规则和结果
+8. technique-lab 与正式竞技场的两段帧序、锚点、声音、目标侧、Boss 扣除三分之一规则和结果
    读数一致。
 
 ## 验证记录
@@ -145,3 +149,13 @@ tick、状态写入、生命除数、PRNG 次数或提交时点。
 - 已人工查看 `technique-lab-poison-boss.png`、`class-showdown-jungle-poison-status-icon.png`
   与 `remake-notes-boss-poison.png`，Boss 三分之一读数、中毒图标和规则说明均正确；
 - `pnpm build` 与 `pnpm docs:check` 通过。
+
+## 2026-09-04 `REMAKE-144` 定向验证
+
+- `actions.test.ts`：普通单位仍 `101 → 50`；妖龍 `101 → 68`、`2400 → 1600 → 1067 → 712`，
+  1 点生命的 Boss 仍留 1 点；冰封轮跳伤与计数递减不变；
+- `classes.test.ts`：`poisonRemainingLifeFor` 对三类 Boss 与普通职业的逐值断言，叢林戰士
+  普攻写入路径不变；
+- `stage37-battle.test.ts`：手部 `1000 → 667`；
+- `technique-lab.spec.ts`、`class-showdown.spec.ts`、`remake-notes.spec.ts`：玩家可见文案改为
+  “減少三分之一”，`REMAKE-124` 说明补记“扣除量而非剩余量”。

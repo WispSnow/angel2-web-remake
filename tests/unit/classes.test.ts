@@ -11,10 +11,13 @@ import {
   classTierFor,
   isClassImmuneToOrdinaryHitStatus,
   ordinaryHitStatusFor,
-  poisonRemainingLifeDivisorFor,
+  isBossClass,
+  poisonRemainingLifeFor,
   suppressesOrdinaryCounterFor,
+  usesEmpressOrDragonAi,
   type ClassId,
 } from "../../src/game/content/classes";
+import { SCRIPTED_BOSS_STATS } from "../../src/game/content/enemy-scaling";
 import { Stage0Battle } from "../../src/game/simulation/battle";
 import { CLASS_GROWTH_OVERRIDES } from "../../src/game/content/class-balance-overrides";
 import { techniqueActionIdsFor } from "../../src/game/content/actions";
@@ -1053,10 +1056,30 @@ describe("native class implementation sequence", () => {
     }
   });
 
-  it("lets jungle-warrior ordinary hits poison 1P/2P/3P with the boss divisor", () => {
+  /**
+   * One boss boundary, two rule families: `REMAKE-124`/`REMAKE-144` read it for
+   * the poison share and `REMAKE-145` for the automatic life bands. The scripted
+   * stat table covers exactly the same three records, so a future boss cannot
+   * pick up one rule without the other.
+   */
+  it("keeps the boss career set in step with the scripted boss stat table", () => {
+    const scripted = Object.keys(SCRIPTED_BOSS_STATS) as ClassId[];
+    expect(scripted.every((classId) => isBossClass(classId))).toBe(true);
+    expect(CLASS_IDS.filter((classId) => isBossClass(classId))).toEqual(scripted);
+    // The empress shares the 0P/1P AI dispatcher without being a boss career.
+    expect(usesEmpressOrDragonAi("empress")).toBe(true);
+    expect(isBossClass("empress")).toBe(false);
+  });
+
+  it("lets jungle-warrior ordinary hits poison 1P/2P/3P with the boss share", () => {
     for (const defenderClassId of ["dragon", "head", "hand"] as const) {
       expect(isClassImmuneToOrdinaryHitStatus(defenderClassId, "poison")).toBe(false);
-      expect(poisonRemainingLifeDivisorFor(defenderClassId)).toBe(3);
+      expect(isBossClass(defenderClassId)).toBe(true);
+      // REMAKE-144: the boss loses a third and keeps the rest; REMAKE-124 had
+      // written the third as what was left.
+      expect(poisonRemainingLifeFor(defenderClassId, 4230)).toBe(2820);
+      expect(poisonRemainingLifeFor(defenderClassId, 101)).toBe(68);
+      expect(poisonRemainingLifeFor(defenderClassId, 1)).toBe(1);
       const battle = new Stage0Battle(0);
       const attacker = battle.unit("1:0")!;
       const defender = battle.units.find(({ side }) => side === 2)!;
@@ -1078,7 +1101,9 @@ describe("native class implementation sequence", () => {
 
       expect(defender.statuses.poison, defenderClassId).toBe(3);
     }
-    expect(poisonRemainingLifeDivisorFor("soldier")).toBe(2);
+    expect(isBossClass("soldier")).toBe(false);
+    expect(poisonRemainingLifeFor("soldier", 101)).toBe(50);
+    expect(poisonRemainingLifeFor("soldier", 1)).toBe(1);
   });
 
   it.each([

@@ -85,6 +85,16 @@ describe("stage 37 battle simulation", () => {
     for (const unit of battle.units.filter(({ side }) => side === 2)) {
       expect(unit.life).toBe(15_000);
       expect(battle.statsFor(unit)).toMatchObject({ attack: 150, defense: 15, maxLife: 15_000 });
+      // 状态 ±20 写在 `1000:8BD1` 的 ×1.5 之前，所以「無法無天」的三部位与其余敌方
+      // 一样实得 ±30；此前 boss 分支只在最终值上加减 20。
+      unit.statuses.attackDown = 3;
+      unit.statuses.defenseDown = 3;
+      expect(battle.effectiveStatsFor(unit)).toMatchObject({ attack: 120, defense: 0 });
+      unit.statuses.attackDown = 0;
+      unit.statuses.defenseDown = 0;
+      unit.statuses.attackUp = 3;
+      unit.statuses.defenseUp = 3;
+      expect(battle.effectiveStatsFor(unit)).toMatchObject({ attack: 180, defense: 45 });
     }
   });
 
@@ -163,7 +173,7 @@ describe("stage 37 battle simulation", () => {
     expect(restored.planEnemyAiAction("2:55")).toMatchObject({ actionId: "fire-4" });
   });
 
-  it("keeps head/hand control boundaries while stableRemake poison applies at one third", () => {
+  it("keeps head/hand control boundaries while stableRemake poison takes one third", () => {
     const battle = new Stage37Battle(campaign, fullDeployment);
     const head = battle.unit("2:56")!;
     const leftHand = battle.unit("2:54")!;
@@ -196,9 +206,10 @@ describe("stage 37 battle simulation", () => {
     expect(poison.result).toMatchObject({ blocked: false });
     battle.commitPreparedAction(poison);
     expect(leftHand.statuses.poison).toBe(3);
+    // REMAKE-144: the tick removes `floor(1000 / 3)` instead of leaving it.
     leftHand.life = 1_000;
     battle.startNextRound();
-    expect(leftHand.life).toBe(333);
+    expect(leftHand.life).toBe(667);
     expect(leftHand.statuses.poison).toBe(2);
     curseCaster.acted = false;
 

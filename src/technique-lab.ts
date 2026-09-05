@@ -4,7 +4,7 @@ import {
   CLASS_IDS,
   className,
   isClassId,
-  poisonRemainingLifeDivisorFor,
+  isBossClass,
 } from "./game/content/classes";
 import { STAGE0_ACTION_PRESENTATION_ASSETS } from "./game/content/stage0-actions.generated";
 import {
@@ -792,9 +792,8 @@ function render(): void {
         : "300 tick 完整演出後才寫入防魔與 10..13 經驗"
     : session.state.actionCode === "IP"
       ? completed
-        ? session.affectedUnits().some(({ classId }) =>
-          poisonRemainingLifeDivisorFor(classId) === 3)
-          ? "中毒狀態重置為 3 · 龍／頭／手每完整輪生命降至三分之一 · 最低保留 1"
+        ? session.affectedUnits().some(({ classId }) => isBossClass(classId))
+          ? "中毒狀態重置為 3 · 龍／頭／手每完整輪生命減少三分之一 · 最低保留 1"
           : "中毒狀態重置為 3 · 每完整輪生命減半但不致死 · 冰封時跳過毒傷並消耗計數"
         : "MAGIC/17 130 tick 後請求 E/58，再播放 MAGIC/18；290 tick 後才提交"
     : session.state.actionCode === "LA"
@@ -869,7 +868,7 @@ function render(): void {
     : session.state.actionCode === "FM"
       ? "防魔可指定自己、滿生命、已有狀態或冰封友軍；與 AA 完全共用 20 對 MAGIC/16 和 UN/51，冰殼保持在效果上方。"
     : session.state.actionCode === "IP"
-      ? "施毒可指定冰封敵軍與龍、頭、手；冰封只跳過後續輪末毒傷且照常消耗計數。普通單位生命減半，龍、頭、手降至三分之一，冰殼保持在效果上方。"
+      ? "施毒可指定冰封敵軍與龍、頭、手；冰封只跳過後續輪末毒傷且照常消耗計數。普通單位生命減半，龍、頭、手減少三分之一，冰殼保持在效果上方。"
     : session.state.actionCode === "LA"
       ? "混亂可指定冰封敵軍；冰封期間不進入行動隊列但計數照常遞減。手動玩家不受 AI 覆寫，龍、頭、手完整演出但免疫寫入，冰殼保持在效果上方。"
     : session.state.actionCode === "SA"

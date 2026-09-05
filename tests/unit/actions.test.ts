@@ -1135,9 +1135,11 @@ describe("Stage-0 class actions", () => {
     expect(immunePrepared.result.experienceGained).toBeGreaterThanOrEqual(14);
     expect(immunePrepared.result.experienceGained).toBeLessThanOrEqual(17);
     immuneBattle.commitPreparedAction(immunePrepared);
+    // REMAKE-144: the boss share is the damage, not the remainder — 101 loses
+    // `floor(101 / 3) = 33` and keeps 68, where REMAKE-124 had left it at 33.
     immunePair.target.life = 101;
     immuneBattle.startNextRound();
-    expect(immunePair.target.life).toBe(33);
+    expect(immunePair.target.life).toBe(68);
     expect(immunePair.target.statuses.poison).toBe(2);
   });
 
@@ -1166,6 +1168,26 @@ describe("Stage-0 class actions", () => {
     battle.startNextRound();
     expect(target.life).toBe(1);
     expect(target.statuses.poison).toBe(2);
+
+    // REMAKE-144 keeps `REMAKE-004`'s floor for the boss share too: one point
+    // of life loses `floor(1 / 3) = 0` and the clamp never has to fire.
+    target.classId = "dragon";
+    target.className = className("dragon");
+    target.life = 1;
+    target.statuses.poison = 3;
+    battle.startNextRound();
+    expect(target.life).toBe(1);
+
+    // 三轮连续毒伤：每轮扣掉当前生命的三分之一，而不是只留下三分之一。
+    target.life = 2400;
+    target.statuses.poison = 3;
+    battle.startNextRound();
+    expect(target.life).toBe(1600);
+    battle.startNextRound();
+    expect(target.life).toBe(1067);
+    battle.startNextRound();
+    expect(target.life).toBe(712);
+    expect(target.statuses.poison).toBe(0);
   });
 
   it("applies LA after one experience roll, accepts frozen targets, and preserves native boss immunity", () => {

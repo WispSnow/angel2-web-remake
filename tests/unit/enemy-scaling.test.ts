@@ -300,15 +300,48 @@ describe("状态 ±20 与难度倍率的原版顺序", () => {
     }
   });
 
-  it("剧情 boss 的脚本值不参与倍率，状态仍是固定 20 点", () => {
+  /**
+   * 剧情 boss 的表值已经是难度倍率之后的最终属性，但状态 `±20` 在原版里写在倍率之前
+   * （`1000:8C2D → 8B60 → 8BD1`），所以它必须和其余 side 2 单位一样被放大。此前
+   * boss 分支直接在最终值上加减 20，无法無天的妖龍被攻击下降只掉 20 点而不是 30。
+   */
+  it("剧情 boss 的状态修正与其余敌方同样被难度 3 放大到 30 点", () => {
     for (const classId of SCRIPTED_BOSS_CLASS_IDS) {
       for (const difficulty of DIFFICULTIES) {
         const base = enemyStatsAt(classId, difficulty);
+        const delta = difficulty === 3 ? 30 : 20;
         const down = effectiveAt(classId, difficulty, { attackDown: 3, defenseDown: 3 });
-        expect(down.attack, `${classId} d${difficulty} attack`).toBe(base.attack - 20);
+        expect(down.attack, `${classId} d${difficulty} attack`).toBe(base.attack - delta);
         expect(down.defense, `${classId} d${difficulty} defense`)
-          .toBe(Math.max(0, base.defense - 20));
+          .toBe(Math.max(0, base.defense - delta));
+
+        const up = effectiveAt(classId, difficulty, { attackUp: 3, defenseUp: 3 });
+        expect(up.attack, `${classId} d${difficulty} attack up`).toBe(base.attack + delta);
+        expect(up.defense, `${classId} d${difficulty} defense up`).toBe(base.defense + delta);
+
+        // 生命不受状态影响；攻升与攻降仍然相消。
+        expect(down.maxLife, `${classId} d${difficulty} maxLife`).toBe(base.maxLife);
+        expect(
+          effectiveAt(classId, difficulty, { attackUp: 3, attackDown: 3 }).attack,
+          `${classId} d${difficulty} cancel`,
+        ).toBe(base.attack);
       }
     }
+  });
+
+  /**
+   * 表值仍是倍率之后的最终属性，所以 `(倍率前 ± 20) × 1.5` 必须与
+   * `最终值 ± 30` 逐值相等——`20 × 1.5` 是整数，这条恒等式让实现不必回推
+   * 不可逆的 `x + floor(x / 2)`。
+   */
+  it("妖龍难度 3 的实得值等于倍率前 252/85 各 ±20 再 ×1.5", () => {
+    const scale = (value: number): number => Math.floor(value * 3 / 2);
+    expect(enemyStatsAt("dragon", 3)).toMatchObject({ attack: 378, defense: 127, maxLife: 4230 });
+    const down = effectiveAt("dragon", 3, { attackDown: 3, defenseDown: 3 });
+    expect(down.attack).toBe(scale(252 - 20));
+    expect(down.defense).toBe(scale(85 - 20));
+    const up = effectiveAt("dragon", 3, { attackUp: 3, defenseUp: 3 });
+    expect(up.attack).toBe(scale(252 + 20));
+    expect(up.defense).toBe(scale(85 + 20));
   });
 });

@@ -116,7 +116,7 @@ v72/v71/v70 与 stage 49 主线结局入口；冰雪轮頭最后与碧娜維姬 
 | [`systems/technique-aa-attack-up.md`](systems/technique-aa-attack-up.md) | 攻击提升、完整轮计数、双方 AI、原版双格光柱与冰封例外 | 已实现并通过完整门禁 |
 | [`systems/technique-ad-defense-up.md`](systems/technique-ad-defense-up.md) | 防御提升、完整轮计数、双方 AI、原版四格盾牌与冰封例外 | 已实现并通过完整门禁 |
 | [`systems/technique-fm-magic-guard.md`](systems/technique-fm-magic-guard.md) | 防魔、一次性魔法保护、原版 AI 孤项安全修复、AA 共用光焰与冰封例外 | 已实现并通过完整门禁 |
-| [`systems/technique-ip-poison.md`](systems/technique-ip-poison.md) | 施毒、普通单位折半、龍／頭／手降至三分之一、双方 AI、两段毒雾与冰封跳伤例外 | 已实现；`REMAKE-124` 定向门禁通过 |
+| [`systems/technique-ip-poison.md`](systems/technique-ip-poison.md) | 施毒、普通单位折半、龍／頭／手每轮扣掉三分之一、双方 AI、两段毒雾与冰封跳伤例外 | 已实现；`REMAKE-124`／`REMAKE-144` 定向门禁通过 |
 | [`systems/technique-la-confusion.md`](systems/technique-la-confusion.md) | 混亂、原版 FFh 自动调度、玩家手动例外、首领免疫、无声鬼脸／星光与冰封例外 | 已实现并通过完整门禁 |
 | [`systems/technique-oj-prayer.md`](systems/technique-oj-prayer.md) | 祈禱、全图逐单位随机、渐进提交、程序图元、原版 SM 空槽与冰封生命例外 | 已实现并通过完整门禁 |
 | [`systems/technique-sa-attack-down.md`](systems/technique-sa-attack-down.md) | 攻击下降、攻升相消、双方 AI、原版下坠光束与冰封例外 | 已实现并通过完整门禁 |

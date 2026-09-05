@@ -305,7 +305,7 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
   await poisonIcon.hover();
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toHaveText(
-    "施毒剩餘 3 回合回合開始時普通單位生命減半；龍／頭／手降至三分之一，最低保留 1。",
+    "施毒剩餘 3 回合回合開始時普通單位生命減半；龍／頭／手減少三分之一，最低保留 1。",
   );
   // The panel is flush against the right edge, so the plate has to open inside
   // the logical screen instead of spilling off it.

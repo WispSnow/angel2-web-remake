@@ -70,7 +70,7 @@ const TRAITS_BY_CLASS: Readonly<Partial<Record<ClassId, readonly ClassTrait[]>>>
   "jungle-warrior": [{
     id: "jungle-poison",
     shortDescription: "命中施毒",
-    description: "普通攻擊命中後施加與技術「施毒」相同的 3 回合狀態；普通單位每輪生命減半，龍／頭／手降至三分之一。",
+    description: "普通攻擊命中後施加與技術「施毒」相同的 3 回合狀態；普通單位每輪生命減半，龍／頭／手減少三分之一。",
   }],
   "magic-armor-warrior": [{
     id: "magic-armor-mitigation",

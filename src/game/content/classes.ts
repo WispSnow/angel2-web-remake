@@ -46,13 +46,32 @@ export function isClassImmuneToOrdinaryHitStatus(
   return immuneClasses?.some((immuneClass) => immuneClass === classId) ?? false;
 }
 
-const STABLE_REMAKE_POISON_BOSS_CLASSES = ["dragon", "head", "hand"] as const;
+/**
+ * The one 剧情 Boss boundary the stableRemake rules share: `1P/龍`, `2P/頭` and
+ * `3P/手`. `REMAKE-124`/`REMAKE-144` read it for the poison share and
+ * `REMAKE-145` for the automatic life bands, so the two can never disagree
+ * about who counts as a boss. A named leader in an ordinary career never joins
+ * it just because a victory condition points at that slot; `SCRIPTED_BOSS_STATS`
+ * covers exactly these three records and `classes.test.ts` locks the pair.
+ */
+const STABLE_REMAKE_BOSS_CLASSES = ["dragon", "head", "hand"] as const;
 
-/** REMAKE-124 leaves ordinary poison at one half and reduces boss life to one third. */
-export function poisonRemainingLifeDivisorFor(classId: ClassId): 2 | 3 {
-  return STABLE_REMAKE_POISON_BOSS_CLASSES.some((bossClass) => bossClass === classId)
-    ? 3
-    : 2;
+export function isBossClass(classId: ClassId): boolean {
+  return STABLE_REMAKE_BOSS_CLASSES.some((bossClass) => bossClass === classId);
+}
+
+/**
+ * Life left after one poison tick. Ordinary careers keep the native halving —
+ * the tick writes `floor(life / 2)`. `REMAKE-144` reads the boss share as the
+ * damage rather than the remainder: a boss loses `floor(life / 3)` and keeps
+ * the rest, where `REMAKE-124` had written `floor(life / 3)` as what was left.
+ * Neither source can reduce a unit below 1 (`REMAKE-004`).
+ */
+export function poisonRemainingLifeFor(classId: ClassId, life: number): number {
+  const remaining = isBossClass(classId)
+    ? life - Math.floor(life / 3)
+    : Math.floor(life / 2);
+  return Math.max(1, remaining);
 }
 
 export interface PromotionTarget {

@@ -1,4 +1,4 @@
-import { poisonRemainingLifeDivisorFor, type ClassId } from "./content/classes";
+import { isBossClass, type ClassId } from "./content/classes";
 import {
   TECHNIQUE_LAB_CATALOG,
   TECHNIQUE_LAB_ATTACK_UP,
@@ -366,8 +366,8 @@ export class TechniqueLabSession {
     }
     if (this.current.actionCode === "IP"
       && this.affectedUnits().some(({ id }) => id === unit.id)) {
-      return poisonRemainingLifeDivisorFor(unit.classId) === 3
-        ? `中毒狀態 ${TECHNIQUE_LAB_POISON.statusCounter} · 每輪生命降至三分之一且不致死`
+      return isBossClass(unit.classId)
+        ? `中毒狀態 ${TECHNIQUE_LAB_POISON.statusCounter} · 每輪生命減少三分之一且不致死`
         : `中毒狀態 ${TECHNIQUE_LAB_POISON.statusCounter} · 每輪生命減半且不致死`;
     }
     if (this.current.actionCode === "LA"

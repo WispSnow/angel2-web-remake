@@ -1191,9 +1191,9 @@ test("IP plays both poison phases, applies the boss divisor, and stays below a p
   await page.getByRole("button", { name: "放置／替換" }).click();
   await clickCell(23, 18);
   await expect(page.locator('[data-readout="affected"]'))
-    .toContainText("中毒狀態 3 · 每輪生命降至三分之一且不致死");
+    .toContainText("中毒狀態 3 · 每輪生命減少三分之一且不致死");
   await seek(page, 2900);
-  await expect(page.locator('[data-readout="result"]')).toContainText("每完整輪生命降至三分之一");
+  await expect(page.locator('[data-readout="result"]')).toContainText("每完整輪生命減少三分之一");
   await captureVisualAudit(page, {
     path: "artifacts/playwright/technique-lab-poison-boss.png",
     fullPage: true,
@@ -1202,9 +1202,9 @@ test("IP plays both poison phases, applies the boss divisor, and stays below a p
   await page.getByRole("button", { name: "放置／替換" }).click();
   await clickCell(23, 18);
   await expect(page.locator('[data-readout="affected"]'))
-    .toContainText("中毒狀態 3 · 每輪生命降至三分之一且不致死");
+    .toContainText("中毒狀態 3 · 每輪生命減少三分之一且不致死");
   await seek(page, 2900);
-  await expect(page.locator('[data-readout="result"]')).toContainText("每完整輪生命降至三分之一");
+  await expect(page.locator('[data-readout="result"]')).toContainText("每完整輪生命減少三分之一");
   expect(pageErrors).toEqual([]);
 });
 

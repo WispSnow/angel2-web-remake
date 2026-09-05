@@ -8,7 +8,12 @@ import {
   usesClassIdentity,
 } from "./classes";
 import { enemyScalingFor, scriptedBossStatsFor } from "./enemy-scaling";
-import { effectiveAttack, effectiveDefense, emptyUnitStatuses } from "../simulation/status";
+import {
+  effectiveAttack,
+  effectiveDefense,
+  emptyUnitStatuses,
+  STATUS_STAT_DELTA,
+} from "../simulation/status";
 import { musicAsset, STAGE0_SEAMLESS_MUSIC_ASSETS } from "./music-assets";
 import { STAGE0_FULL_COMBAT_ASSETS } from "./stage0-actions.generated";
 
@@ -113,24 +118,33 @@ function difficultyAwareStats(
   difficulty: Difficulty,
   statuses: UnitStatuses | undefined,
 ): UnitStats {
-  const withStatuses = (stats: UnitStats): UnitStats => statuses === undefined ? stats : {
+  const withStatuses = (
+    stats: UnitStats,
+    delta = STATUS_STAT_DELTA,
+  ): UnitStats => statuses === undefined ? stats : {
     ...stats,
-    attack: effectiveAttack(stats.attack, statuses),
-    defense: effectiveDefense(stats.defense, statuses),
+    attack: effectiveAttack(stats.attack, statuses, delta),
+    defense: effectiveDefense(stats.defense, statuses, delta),
   };
 
   if (unit.side !== 2) return withStatuses(classStatsFor(unit));
 
   const rule = enemyScalingFor(difficulty);
   const base = classStatsFor(unit, rule.growth);
-
-  // 剧情 boss 逐难度直接给值，不参与成长曲线，也不再叠加难度 3 倍率。
-  const scripted = scriptedBossStatsFor(unit.classId, difficulty);
-  if (scripted) return withStatuses({ ...base, ...scripted });
-
   const percent = rule.statMultiplierPercent;
+  const scale = (value: number): number => percent === undefined
+    ? value
+    : Math.floor(value * percent / 100);
+
+  // 剧情 boss 逐难度直接给值，不参与成长曲线；表内已经是套用倍率之后的最终属性。
+  // 但状态 ±20 写在倍率之前（`1000:8C2D → 8B60 → 8BD1`），所以 boss 的状态修正与其他
+  // side 2 单位一样被放大：难度 3 是 ±30。放大写在这一步而不是回推倍率之前的基础值，
+  // 因为 `x + floor(x / 2)` 不可逆，而 `floor((x ± 20) × 1.5)` 与 `floor(x × 1.5) ± 30`
+  // 逐值相等（`20 × 1.5` 是整数）。
+  const scripted = scriptedBossStatsFor(unit.classId, difficulty);
+  if (scripted) return withStatuses({ ...base, ...scripted }, scale(STATUS_STAT_DELTA));
+
   if (percent === undefined) return withStatuses(base);
-  const scale = (value: number): number => Math.floor(value * percent / 100);
   const modified = withStatuses(base);
   return {
     ...modified,

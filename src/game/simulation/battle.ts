@@ -6,11 +6,12 @@ import {
   className,
   genericUnitName,
   immuneToPhysicalShootingFor,
+  isBossClass,
   isClassImmuneToOrdinaryHitStatus,
   killRewardFor,
   mitigateOrdinaryDamage,
   ordinaryHitStatusFor,
-  poisonRemainingLifeDivisorFor,
+  poisonRemainingLifeFor,
   STRIPPABLE_BUFF_KEYS,
   stripsTargetBuffsOnActiveHit,
   suppressesOrdinaryCounterFor,
@@ -322,6 +323,19 @@ const canTargetFrozenUnit = (actionId: BattleActionId): boolean =>
   || actionId === "defense-down"
   || actionId === "spell-seal"
   || actionId === "dispel";
+
+/**
+ * The life below which the shared expert planner spends the round recovering
+ * instead of positioning. `REMAKE-012`'s 40% still governs every ordinary
+ * career; `REMAKE-145` gives the 剧情 Boss careers 20% instead, because their
+ * pool is large enough that 40% of it is most of a fight — the stage-20 demon
+ * dragon spent every round after its first poison tick standing still. Both
+ * thresholds sit behind the guaranteed-kill, wizard-hit and critical-save
+ * exemptions, so recovery never displaces an action that pays off.
+ */
+function expertRestThresholdPercentFor(unit: Pick<BattleUnit, "classId">): number {
+  return isBossClass(unit.classId) ? 20 : 40;
+}
 
 function statusesEqual(left: UnitStatuses, right: UnitStatuses): boolean {
   return UNIT_STATUS_KEYS.every((key) => left[key] === right[key]);
@@ -2364,7 +2378,7 @@ export class Stage0Battle {
     const sentryKeepsActing = intent === "sentry"
       && (selected.kind === "attack" || selected.kind === "special")
       && isEffectiveExpertUtility(selectedUtility);
-    if (unit.life * 100 < maximumLife * 40
+    if (unit.life * 100 < maximumLife * expertRestThresholdPercentFor(unit)
       && !sentryKeepsActing
       && selectedUtility.guaranteedKills === 0
       && selectedUtility.wizardHits === 0
@@ -2806,6 +2820,11 @@ export class Stage0Battle {
       targetFilter?: (target: BattleUnit) => boolean;
     },
   ): AlliedAiAction | undefined {
+    // REMAKE-145 takes the 剧情 Boss careers out of this band entirely: their
+    // life pool is an order of magnitude above a regular career, so the native
+    // 20..39% retreat covers most of a stage-long fight and reads as a boss
+    // that stopped playing. The band still owns the empress.
+    if (isBossClass(unit.classId)) return undefined;
     const lifePercent = Math.floor(unit.life * 100 / this.statsFor(unit).maxLife);
     if (lifePercent >= 40 || lifePercent < 20) return undefined;
     // Native `1000:2233` splits this band three ways and says something
@@ -3306,7 +3325,7 @@ export class Stage0Battle {
     }
 
     if (options.expertRanking) {
-      if (lifePercent < (options.restThresholdPercent ?? 40)) {
+      if (lifePercent < (options.restThresholdPercent ?? expertRestThresholdPercentFor(unit))) {
         return this.tagLowLifeRest(unit, { unitId: unit.id, kind: "rest", path: [{ x: unit.x, y: unit.y }] });
       }
       // A guard with nobody in reach spends the round recovering (REMAKE-143).
@@ -4061,13 +4080,13 @@ export class Stage0Battle {
     for (const unit of this.units) {
       unit.acted = false;
       if (unit.statuses.poison > 0) {
-        // REMAKE-004 keeps poisoned units alive. REMAKE-124 reduces 龍／頭／手
-        // to one third while ordinary units retain the native one-half rule.
+        // REMAKE-004 keeps poisoned units alive. REMAKE-124 opened poison for
+        // 龍／頭／手 and REMAKE-144 makes their share the damage rather than the
+        // remainder; ordinary units retain the native one-half rule.
         // REMAKE-013 skips persistent damage while frozen but still consumes
         // the duration. This must precede side-2 thawing below.
         if (!unit.actionDisabled) {
-          const divisor = poisonRemainingLifeDivisorFor(unit.classId);
-          this.setSharedLife(unit, Math.max(1, Math.floor(unit.life / divisor)));
+          this.setSharedLife(unit, poisonRemainingLifeFor(unit.classId, unit.life));
         }
         this.recordCampaignUnit(unit);
       }

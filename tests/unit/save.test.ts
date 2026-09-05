@@ -5422,6 +5422,25 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-111 saves without changing battle state for the boss poison share", () => {
+    // REMAKE-144 只改龍／頭／手的毒伤口径与难度 3 剧情 boss 的状态 ±30，REMAKE-145 只改
+    // 它们的自动休息阈值；三者都在读取时按职业、难度、已存状态字与公开棋盘重算，没有需要
+    // 改写的字段，因此 v111 无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 111,
+      contentVersion: "idle-rest-fallback-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 111,
+      contentVersion: "idle-rest-fallback-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-110 saves without changing battle state for the idle rest fallback", () => {
     // REMAKE-143 只改自动规划在无事可做时的兜底（休息代替待命）、禁咒法系原地、守卫低血
     // 仍出手与混乱普通职业不留原格；计划每次都从公开棋盘重算，因此 v110 无损迁移。

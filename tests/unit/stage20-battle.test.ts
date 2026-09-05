@@ -156,11 +156,14 @@ describe("stage 20 battle", () => {
   });
 
   /**
-   * `1000:2233` answers a successful `1000:1D67` retreat with `M`, and only
-   * the `0P/1P` dispatcher reacts to that code by running the technique chain
-   * again — from the cell it just retreated to.
+   * `REMAKE-145`: the native `1000:2233` band — behavior-1 or unadjacent rest,
+   * otherwise a `1000:1D67` retreat that the `0P/1P` dispatcher answers by
+   * casting again from the new cell — no longer owns the 剧情 Boss careers.
+   * With 2,400–4,230 life, 40% of the pool is most of a stage, and the demon
+   * dragon spent every round after its first poison tick standing still. It
+   * now keeps casting down to 20%, from where it stands.
    */
-  it("retreats out of contact and still casts WD between 20% and 39% life", () => {
+  it("keeps fighting between 20% and 39% life instead of breaking contact", () => {
     const battle = new Stage20Battle(campaign(), fullDeployment());
     replaceTableauWithDragon(battle);
     keepAllies(battle, [0, 1]);
@@ -168,7 +171,8 @@ describe("stage 20 battle", () => {
     const shield = battle.unit("1:1");
     const dragon = battle.unit("2:28");
     if (!nia || !shield || !dragon) throw new Error("units missing");
-    // Two adjacent allies out of melee-kill reach, so the band decides.
+    // Two adjacent allies out of melee-kill reach, so only the band could
+    // have pulled the dragon off them.
     nia.x = 29;
     nia.y = 17;
     nia.life = 900;
@@ -177,23 +181,63 @@ describe("stage 20 battle", () => {
     shield.life = 900;
     dragon.life = 720; // 30% of 2,400
 
+    // The band used to answer this board with a retreat plus a WD recast from
+    // the new cell. Without it the dragon simply keeps hitting what is next to
+    // it, from where it stands and without a break-contact line.
     const action = battle.planEnemyAiAction("2:28");
-    expect(action).toMatchObject({ kind: "special", actionId: "wd" });
-    const destination = action?.path.at(-1);
-    expect(destination).not.toEqual({ x: 29, y: 16 });
-    expect(battle.units.some((unit) => unit.side === 1
-      && Math.abs(unit.x - (destination?.x ?? 0)) + Math.abs(unit.y - (destination?.y ?? 0)) === 1))
-      .toBe(false);
+    expect(action).toMatchObject({ kind: "attack", targetId: "1:0" });
+    expect(action?.path.at(-1)).toEqual({ x: 29, y: 16 });
+    expect(action?.nativeLine).toBeUndefined();
   });
 
-  it("rests between 20% and 39% life when no opponent is adjacent", () => {
+  it("keeps acting between 20% and 39% life when no opponent is adjacent", () => {
     const battle = new Stage20Battle(campaign(), fullDeployment());
     replaceTableauWithDragon(battle);
     const dragon = battle.unit("2:28");
     if (!dragon) throw new Error("dragon missing");
     dragon.life = 720;
 
-    expect(battle.planEnemyAiAction("2:28")).toMatchObject({ kind: "rest" });
+    expect(battle.planEnemyAiAction("2:28")).toMatchObject({
+      kind: "special",
+      actionId: "wd",
+    });
+
+    // 21% still acts; one point below the boundary is the first resting band.
+    dragon.acted = false;
+    dragon.life = 504; // 21% of 2,400
+    expect(battle.planEnemyAiAction("2:28")).toMatchObject({ actionId: "wd" });
+
+    dragon.acted = false;
+    dragon.life = 456; // 19% of 2,400
+    expect(battle.planEnemyAiAction("2:28")).toMatchObject({
+      kind: "rest",
+      nativeLine: "restingLowLife",
+      path: [{ x: 29, y: 16 }],
+    });
+  });
+
+  /**
+   * `REMAKE-145` narrows the band to the 剧情 Boss careers, and the empress is
+   * not one of them: she shares the `0P/1P` dispatcher but carries an ordinary
+   * ten-point record, so the native 20..39% rest still owns her. Swapping the
+   * class on the stage-20 spawn is the only place this branch can be reached,
+   * because no stage fields her as an automatic unit.
+   */
+  it("leaves the native 20..39% band on the empress, who is not a boss career", () => {
+    const battle = new Stage20Battle(campaign(), fullDeployment());
+    replaceTableauWithDragon(battle);
+    const empress = battle.unit("2:28");
+    if (!empress) throw new Error("spawn missing");
+    empress.classId = "empress";
+    empress.className = "女帝";
+    const maximumLife = battle.statsFor(empress).maxLife;
+    empress.life = Math.floor(maximumLife * 30 / 100);
+
+    expect(battle.planEnemyAiAction("2:28")).toMatchObject({
+      kind: "rest",
+      nativeLine: "restingLowLife",
+      path: [{ x: 29, y: 16 }],
+    });
   });
 
   it("rebuilds the dragon force membership before validating a restored player save", () => {

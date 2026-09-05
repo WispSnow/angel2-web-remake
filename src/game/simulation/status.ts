@@ -28,15 +28,32 @@ export function cloneUnitStatuses(statuses: UnitStatuses): UnitStatuses {
   return { ...statuses };
 }
 
-export function effectiveAttack(baseAttack: number, statuses: UnitStatuses): number {
-  const attackUp = statuses.attackUp > 0 ? 20 : 0;
-  const attackDown = statuses.attackDown > 0 ? 20 : 0;
+/** The points `1000:8C2D` writes into effective attack/defense per status word. */
+export const STATUS_STAT_DELTA = 20;
+
+/**
+ * `delta` exists because `1000:8BD1` scales side-2 stats *after* the status
+ * write, so a difficulty that multiplies the base multiplies this step with it
+ * (see `difficultyAwareStats`). Callers that scale the finished value already
+ * carry the multiplier and keep the native `20`.
+ */
+export function effectiveAttack(
+  baseAttack: number,
+  statuses: UnitStatuses,
+  delta = STATUS_STAT_DELTA,
+): number {
+  const attackUp = statuses.attackUp > 0 ? delta : 0;
+  const attackDown = statuses.attackDown > 0 ? delta : 0;
   return Math.max(0, baseAttack + attackUp - attackDown);
 }
 
-export function effectiveDefense(baseDefense: number, statuses: UnitStatuses): number {
-  const defenseUp = statuses.defenseUp > 0 ? 20 : 0;
-  const defenseDown = statuses.defenseDown > 0 ? 20 : 0;
+export function effectiveDefense(
+  baseDefense: number,
+  statuses: UnitStatuses,
+  delta = STATUS_STAT_DELTA,
+): number {
+  const defenseUp = statuses.defenseUp > 0 ? delta : 0;
+  const defenseDown = statuses.defenseDown > 0 ? delta : 0;
   return Math.max(0, baseDefense + defenseUp - defenseDown);
 }
 

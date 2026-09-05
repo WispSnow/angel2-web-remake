@@ -257,3 +257,36 @@ test("S20-F/G: boss victory plays Kins and Dragon King, then enters stage 21", a
   });
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "42");
 });
+
+/**
+ * Regression: stage 20 shipped the fixed-roster `skip-entry-story` retry mode,
+ * which rebuilds the battle with no deployment result. Both 全面撤退 and the
+ * defeat retry threw `stage 20 requires a deployment result` before they could
+ * change phase, so the confirm looked frozen and only 取消 answered.
+ */
+test("S20-H: 全面撤退 and the defeat retry both reopen the 龍塔頂部 deployment", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(String(error)));
+
+  await page.goto("/?debugScenario=stage-20-player&difficulty=3&test=1");
+  await waitForPhase(page, "player");
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-retreat").click();
+  await expect(page.getByTestId("retreat-confirm")).toBeVisible();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await waitForPhase(page, "deployment");
+  await expect(page.getByRole("heading", { name: "龍塔頂部 · 出擊準備" })).toBeVisible();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 3／17");
+  expect(errors).toEqual([]);
+
+  await page.goto("/?debugScenario=stage-20-player&difficulty=3&test=1");
+  await waitForPhase(page, "player");
+  await page.evaluate(() => window.__ANGEL2__?.forceDefeat());
+  await waitForPhase(page, "defeat");
+  await page.getByTestId("retry-button").click();
+  if ((await state(page)).phase === "defeat") await page.getByTestId("retry-button").click();
+  await waitForPhase(page, "deployment");
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 3／17");
+  expect(errors).toEqual([]);
+});

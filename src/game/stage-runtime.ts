@@ -3211,7 +3211,11 @@ export const STAGE_RUNTIME_MANIFEST = {
     },
     enemyPhaseStatusText: "敵方階段：妖龍開始行動。",
     retry: {
-      mode: "skip-entry-story",
+      // `skip-entry-story` rebuilds the battle without a deployment result, which
+      // only works for the fixed-roster stages. Stage 20 owns a deployment
+      // surface, so both retry texts already promise the re-formation that only
+      // `preparation` performs; the old mode threw before either could run.
+      mode: "preparation",
       statusText: "重新開始龍塔頂部部署。",
       retreatStatusText: "全面撤退：返回龍塔頂部部署並重新編隊。",
     },

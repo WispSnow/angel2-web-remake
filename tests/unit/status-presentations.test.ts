@@ -62,7 +62,7 @@ describe("unit status presentations", () => {
       ],
       ["attackDown", "攻擊力降低 20；「無法無天」的敵方為 30。"],
       ["defenseDown", "防禦力降低 20；「無法無天」的敵方為 30。"],
-      ["poison", "回合開始時普通單位生命減半；龍／頭／手降至三分之一，最低保留 1。"],
+      ["poison", "回合開始時普通單位生命減半；龍／頭／手減少三分之一，最低保留 1。"],
       ["techniqueSeal", "無法使用技術，普通攻擊與射擊不受限。"],
     ]);
 
@@ -90,7 +90,7 @@ describe("unit status presentations", () => {
     expect(activeUnitStatusPresentations(statuses)).toEqual([{
       key: "poison",
       label: "施毒",
-      description: "回合開始時普通單位生命減半；龍／頭／手降至三分之一，最低保留 1。",
+      description: "回合開始時普通單位生命減半；龍／頭／手減少三分之一，最低保留 1。",
       nativeFrame: 6,
       source: "/assets/original/status-icons/06.png",
       remainingRounds: 2,

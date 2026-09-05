@@ -645,9 +645,9 @@ function nativeRules(
     },
     lowLifePolicy: {
       percentage: "floor(currentLife * 100 / maxLife)",
-      below20: "rest and recover 15% max life",
-      from20To39: "behavior 1 rests immediately; otherwise, when an adjacent enemy exists, try a defensive retreat and rest if it fails",
-      from40: "continue the class action flow",
+      below20: "1000:2280 speaks line 00h and rests, recovering 15% max life; returns N",
+      from20To39: "behavior 1 rests at 1000:228A without a line; every other behavior calls 1070:0583 for an orthogonally adjacent opponent and, when CX is zero, falls to the same 1000:2280 rest that the sub-20% band uses. Only an adjacent opponent reaches the retreat: speak 01h, run 1000:1D67, return M when it relocates, or speak 02h and rest when it fails",
+      from40: "continue the class action flow (returns Y)",
       fallback: "after failed attack/shot/technique attempts, 1000:2291 rests when currentLife < maxLife and speaks contextual line 05h; a full-life unit continues to later fallbacks",
       fallbackEntryPoints: {
         ordinary: "1000:18E2, after the 1000:2081 attack attempt fails; a full-life unit then waits (behavior 1), runs 1000:2193 (behavior 2) or speaks 04h and runs 1000:20DB",
