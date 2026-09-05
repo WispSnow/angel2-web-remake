@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Angel2 Web Remake",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "com.wispsnow.angel2-web-remake",
   "build": {
     "frontendDist": "../release",
