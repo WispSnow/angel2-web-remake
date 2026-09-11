@@ -751,6 +751,30 @@ describe("stage 0 battle simulation", () => {
     expect(battle.enemyActionOrder()).not.toContain("2:15");
   });
 
+  /**
+   * Native `1000:14A6` clears the side-2 action bits before it runs the enemy
+   * AI (`turn-action-system.md` 標準階段順序 6). Round advance clears both
+   * sides anyway, so this only shows up for a unit that received the `80h`
+   * bit during the player phase: stage 20's dragon arrives that way and used
+   * to sit out its entire first enemy phase.
+   */
+  it("clears the side-2 action bits when the enemy phase opens", () => {
+    const battle = battleAtPlayableOpening();
+    const arrival = battle.unit("2:15");
+    const ally = battle.unit("1:0");
+    if (!arrival || !ally) throw new Error("units missing");
+    arrival.acted = true;
+    ally.acted = true;
+
+    battle.beginEnemyPhase();
+
+    expect(arrival.acted).toBe(false);
+    expect(battle.enemyActionOrder()).toContain("2:15");
+    // Side 1 keeps its own boundary: `1000:147E` already cleared it before
+    // this point, and the enemy phase must not hand the player a second turn.
+    expect(ally.acted).toBe(true);
+  });
+
   it("plans every enemy route with the current allied zone of control", () => {
     const battle = battleAtPlayableOpening();
     const enemyIds = battle.units.filter((unit) => unit.side === 2).map((unit) => unit.id);

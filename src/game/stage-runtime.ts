@@ -1899,7 +1899,13 @@ const RELEASED_MAP_ACTION_IDS = [
   "stomp-1", "stomp-2", "stomp-3", "iron-plate", "obstacle",
 ] as const satisfies readonly BattleActionId[];
 
-const STAGE20_MAP_ACTION_IDS = [
+/**
+ * `WD` is the `0P/1P` dispatcher's whole skill pool and lives outside the
+ * tiered technique table, so a stage only preloads its atlas when a demon
+ * dragon or empress can actually reach the board — including one written in
+ * by a story reinforcement after the scene has already preloaded.
+ */
+const WD_MAP_ACTION_IDS = [
   ...RELEASED_MAP_ACTION_IDS,
   "wd",
 ] as const satisfies readonly BattleActionId[];
@@ -3202,7 +3208,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     ...STAGE_INDEX["stage-20"],
     nextStageId: "stage-21",
     focusUnitId: "1:0",
-    mapPresentationActionIds: STAGE20_MAP_ACTION_IDS,
+    mapPresentationActionIds: WD_MAP_ACTION_IDS,
     entry: {
       trigger: "campaign-entered",
       phase: "prebattleStory",
@@ -3310,7 +3316,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     ...STAGE_INDEX["stage-22"],
     nextStageId: "stage-23",
     focusUnitId: "1:0",
-    mapPresentationActionIds: RELEASED_MAP_ACTION_IDS,
+    mapPresentationActionIds: WD_MAP_ACTION_IDS,
     entry: {
       trigger: "campaign-entered",
       phase: "player",

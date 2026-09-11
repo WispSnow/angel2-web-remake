@@ -319,11 +319,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           `/assets/original/map-actions/obstacle/${controller.battle.stage.id}.png`,
         ),
       );
-      const allyMapAssets = allyMapUnitAssetsForClasses(
-        controller.battle.units
-          .filter(({ side }) => side === 1)
-          .map(({ classId }) => classId),
-      );
+      const allyMapAssets = allyMapUnitAssetsForClasses(controller.currentAllyMapClassIds);
       const scheduledAllyKeys = new Set<string>();
       for (const [classId, source] of allyMapAssets) {
         const key = `ally-${classId}`;

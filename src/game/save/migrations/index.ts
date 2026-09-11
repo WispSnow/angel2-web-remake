@@ -659,6 +659,26 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-146 clears the side-2 action bits as the enemy phase opens, the way
+ * native `1000:14A6` does. Only a unit that received the `80h` bit during the
+ * player phase behaved differently, and the bit is re-read from the stored
+ * board on the next enemy phase, so v112 battle/completed saves migrate by
+ * identity: a stage-20 save whose dragon arrived already spent keeps that
+ * stored bit and simply gets its turn back on the next enemy phase.
+ */
+function migrateVersion112Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 112
+    || value.contentVersion !== "boss-poison-and-life-band-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-144 reads the 龍／頭／手 poison share as the damage instead of the
  * remainder and repairs the difficulty-3 boss stat gate so a status word moves
  * their effective attack/defense by 30 like every other side-2 unit; REMAKE-145
@@ -3116,6 +3136,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion112 = migrateVersion112Save(value);
+    if (migratedVersion112) return migratedVersion112;
     const migratedVersion111 = migrateVersion111Save(value);
     if (migratedVersion111) return migratedVersion111;
     const migratedVersion110 = migrateVersion110Save(value);

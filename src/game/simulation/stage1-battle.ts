@@ -134,6 +134,7 @@ export class Stage1Battle extends Stage0Battle {
   }
 
   override beginEnemyPhase(): EnemyPhaseUpdate {
+    super.beginEnemyPhase();
     if (!this.activeGroupIds.has(STAGE1_CASTLE_GUARD_GROUP_ID)) {
       const threatened = [...STAGE1_CASTLE_GUARD_IDS]
         .some((id) => this.hasDamageActionThisTurn(id));

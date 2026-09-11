@@ -5422,6 +5422,24 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-112 saves without changing battle state for the enemy-phase action bits", () => {
+    // REMAKE-146 只改敌方阶段入口是否清 side 2 行动位；行动位本身仍从棋盘读出，
+    // 读档后的下一个敌方阶段才按新口径调度，因此 v112 无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 112,
+      contentVersion: "boss-poison-and-life-band-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 112,
+      contentVersion: "boss-poison-and-life-band-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-111 saves without changing battle state for the boss poison share", () => {
     // REMAKE-144 只改龍／頭／手的毒伤口径与难度 3 剧情 boss 的状态 ±30，REMAKE-145 只改
     // 它们的自动休息阈值；三者都在读取时按职业、难度、已存状态字与公开棋盘重算，没有需要

@@ -1062,7 +1062,16 @@ export class Stage0Battle {
     return this.scenario.routeEnemy ? "route" : undefined;
   }
 
+  /**
+   * Native `1000:14A6` selects side 2 and clears its action bits *before*
+   * running the enemy AI (`turn-action-system.md` 標準階段順序 6). Round
+   * advance clears both sides anyway, so this only matters for a unit that
+   * received the `80h` bit during the player phase — a `story-reinforcements`
+   * write with the default `actionSpent`. Without it, stage 20's dragon
+   * arrived already spent and sat out the whole first enemy phase.
+   */
   beginEnemyPhase(): EnemyPhaseUpdate {
+    this.clearActionState(2);
     return { activatedGroupIds: [] };
   }
 

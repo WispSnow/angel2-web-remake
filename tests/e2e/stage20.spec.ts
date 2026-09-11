@@ -9,6 +9,7 @@ interface Stage20State {
   stageId: string;
   stageProgress: number;
   phase: string;
+  statusMessage?: string;
   activeStoryId?: string;
   focusId: string;
   campaignRoute?: string;
@@ -134,6 +135,30 @@ test("S20-C/D: round one replaces the 16-unit tableau with the WD dragon", async
     "stage-20-opening-story",
   ]);
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("aria-label", /龍塔頂部戰術地圖/u);
+
+  // The arrival writes the dragon's cell with the native `80h` action bit, and
+  // `1000:14A6` clears the side-2 bits again as the enemy phase opens. Without
+  // that clear the boss sat out the whole first enemy phase — surrounded and
+  // motionless — because round advance was the only thing resetting them.
+  const alliedLifeBefore = (await state(page)).units
+    .filter(({ side }) => side === 1)
+    .reduce((total, { life }) => total + life, 0);
+  await page.keyboard.press("g");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.getByTestId("group-command-allRest").click();
+  for (let input = 0; input < 8; input += 1) {
+    if (await activeDialogueRecord(page) !== "battle-command") break;
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(20);
+  }
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage20State | undefined;
+    return current?.phase === "player" && current.statusMessage?.includes("第 2 回合開始");
+  });
+  expect((await state(page)).lastSpecialAction).toMatchObject({ actionId: "wd" });
+  expect((await state(page)).units
+    .filter(({ side }) => side === 1)
+    .reduce((total, { life }) => total + life, 0)).toBeLessThan(alliedLifeBefore);
 });
 
 test("S20-E: demon dragon casts the native-timed WD path and defeats Nia", async ({ page }) => {

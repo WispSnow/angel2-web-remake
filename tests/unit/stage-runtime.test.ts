@@ -7,7 +7,17 @@ import {
   STAGE_RUNTIME_MANIFEST,
 } from "../../src/game/stage-runtime";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
-import type { CampaignState, StageId } from "../../src/game/types";
+import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../../src/game/content/stage0-actions.generated";
+import { presentationActionIdsForClass } from "../../src/game/content/actions";
+import { mapActionAtlasIdForAction } from "../../src/game/content/map-action-assets";
+import { MAP_ACTION_ATLAS_IDS } from "../../src/game/content/map-action-atlases.generated";
+import { collectMapActionSources } from "../../src/game/phaser/map-action-atlas";
+import { allyMapUnitAssetsForClasses } from "../../src/game/content/map-unit-assets";
+import {
+  deferredAllyClassIds,
+  stageSimulationEffectFor,
+} from "../../src/game/content/stage-effects";
+import type { CampaignState, Side, StageId, UnitClassId } from "../../src/game/types";
 
 const campaign: CampaignState = {
   stageId: "stage-02",
@@ -751,5 +761,116 @@ describe("stage runtime manifest", () => {
       mode: "preparation",
       retreatStatusText: "全面撤退：返回龍塔頂部部署並重新編隊。",
     });
+  });
+
+  /**
+   * The battle scene schedules one ally figure per class it expects on the
+   * board, and the stage resource gate stages exactly the roster closure plus
+   * the stage's own `unitSprites`. Anything outside that pair reaches Phaser
+   * as a raw `/assets/original` URL after the loading page is gone — or, when
+   * nothing schedules it at all, as Phaser's missing-texture placeholder,
+   * which is how stage 21's four scouts shipped.
+   */
+  it("stages an ally figure for every class its scene can put on the board", async () => {
+    const roster = completeCampaignRoster([]);
+    const missing: string[] = [];
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const runtime = await loadStageRuntime(stageId);
+      const battle = runtime.createBattle(
+        { ...campaign, stageId, roster },
+        runtime.preparation?.createInitialResult(),
+      );
+      const staged = new Set<string>([
+        ...allyMapUnitAssetsForClasses(roster.map(({ classId }) => classId)).values(),
+        ...Object.values(runtime.assets?.unitSprites ?? {}),
+      ]);
+      const sceneClassIds = [...new Set<UnitClassId>([
+        ...battle.units.filter(({ side }) => side === 1).map(({ classId }) => classId),
+        ...deferredAllyClassIds(runtime.definition.events, {
+          unit: (id) => battle.unit(id),
+          rosterClassId: (slot) => roster.find((entry) => entry.slot === slot)?.classId,
+        }),
+      ])];
+      for (const [classId, source] of allyMapUnitAssetsForClasses(sceneClassIds)) {
+        if (!staged.has(source)) missing.push(`${stageId}: ${classId} → ${source}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  /**
+   * `BattleScene` preloads map-action atlases once, from the stage manifest.
+   * A unit that reaches the board later cannot add one, so an action whose
+   * atlas was never listed throws inside the render — the controller's
+   * fallback then leaves the presentation frozen and the enemy phase never
+   * finishes. Stage 22 shipped exactly that way: its demon dragon arrives by
+   * story reinforcement and `WD` was missing from the list.
+   *
+   * The reachable set is deliberately the units the stage really writes —
+   * board entries, story reinforcements and form transitions — not the whole
+   * promotion closure, which no released stage can traverse inside one battle.
+   */
+  it("preloads a map-action atlas for every action its reachable units can present", async () => {
+    /**
+     * Two stages carry a caster that never reaches an interactive phase, so
+     * none of its actions can be presented: `stage-42-portal` is a scripted
+     * interlude that routes out without ever handing the board to a side
+     * phase, and stage 30's empress is rewritten into a soldier by the
+     * opening form transition before the player takes control. Naming them
+     * keeps the rule strict everywhere the board is actually played.
+     */
+    const CUTSCENE_ONLY_CASTERS: Readonly<Partial<Record<StageId, readonly UnitClassId[]>>> = {
+      "stage-42-portal": ["empress", "magic-priest"],
+      "stage-30": ["empress"],
+    };
+    const atlasIds = new Set<string>(MAP_ACTION_ATLAS_IDS);
+    const alwaysLoaded = new Set(collectMapActionSources(STAGE0_ACTION_PRESENTATION_ASSETS)
+      .map((source) => source.slice("/assets/original/map-actions/".length))
+      .map((relative) => relative.slice(0, relative.indexOf("/"))));
+    const missing: string[] = [];
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const runtime = await loadStageRuntime(stageId);
+      const battle = runtime.createBattle(
+        { ...campaign, stageId, roster: completeCampaignRoster([]) },
+        runtime.preparation?.createInitialResult(),
+      );
+      const reachable = new Map<string, { classId: UnitClassId; side: Side }>();
+      const add = (classId: UnitClassId, side: Side) =>
+        reachable.set(`${classId}:${side}`, { classId, side });
+      for (const unit of battle.units) add(unit.classId, unit.side);
+      for (const event of runtime.definition.events) {
+        if (event.simulationEffect === "none") continue;
+        const effect = stageSimulationEffectFor(event.simulationEffect);
+        if (effect?.type === "unit-form-transition") {
+          const side = battle.unit(effect.actorId)?.side;
+          if (side) add(effect.targetClassId, side);
+        }
+        if (effect?.type !== "story-reinforcements") continue;
+        for (const actor of effect.actors) {
+          if (actor.forcedClassId) add(actor.forcedClassId, actor.source.side);
+        }
+      }
+      const preloaded = new Set([
+        ...alwaysLoaded,
+        ...runtime.mapPresentationActionIds.map(mapActionAtlasIdForAction),
+      ]);
+      const inert = CUTSCENE_ONLY_CASTERS[stageId] ?? [];
+      for (const classId of inert) {
+        expect([...reachable.values()].some((entry) => entry.classId === classId), stageId)
+          .toBe(true);
+      }
+      for (const { classId, side } of reachable.values()) {
+        if (inert.includes(classId)) continue;
+        for (const actionId of presentationActionIdsForClass(classId, side)) {
+          const atlasId = mapActionAtlasIdForAction(actionId);
+          // Actions without their own atlas (the `1N` teleport) draw nothing.
+          if (!atlasIds.has(atlasId) || preloaded.has(atlasId)) continue;
+          missing.push(`${stageId}: ${classId} side ${side} needs ${atlasId} for ${actionId}`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+    expect(STAGE_RUNTIME_MANIFEST["stage-20"].mapPresentationActionIds).toContain("wd");
+    expect(STAGE_RUNTIME_MANIFEST["stage-22"].mapPresentationActionIds).toContain("wd");
   });
 });

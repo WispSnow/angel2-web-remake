@@ -87,6 +87,16 @@ test("S21-A–D: four scouts enter, cross the forest, discover the dolls, and ro
     expect.objectContaining({ id: "1:8", name: "蘇蘭達", portrait: 10, x: 40, y: 26 }),
   ]);
   for (const unit of (await state(page)).units) expect(unit.classId).not.toBe("soldier");
+  // Every scout is written in after the scene finished preloading, and its
+  // profession comes from the campaign roster rather than from stage data, so
+  // the scene cannot read it off the board. Before that was handled the whole
+  // party arrived as Phaser's `__MISSING` placeholder.
+  const scoutTextures = JSON.parse(
+    await page.getByTestId("battle-canvas").getAttribute("data-unit-texture-by-id") ?? "{}",
+  ) as Record<string, string>;
+  for (const unit of (await state(page)).units) {
+    expect(scoutTextures[unit.id], `${unit.name}/${unit.classId}`).toBe(`ally-${unit.classId}`);
+  }
   // The interlude never reaches a side phase, so nobody wears the 已行動 badge.
   await expect(page.getByTestId("battle-canvas")).toHaveAttribute("data-acted-badge-count", "0");
   await expect(page.getByTestId("unit-hud")).toContainText("妮雅");

@@ -44,6 +44,7 @@ import {
 } from "./content/dialogue";
 import { stageDialoguePortraitRecords } from "./content/portrait-assets";
 import {
+  deferredAllyClassIds,
   stageSimulationEffectFor,
   type CampaignRouteId,
 } from "./content/stage-effects";
@@ -666,6 +667,21 @@ export class GameController {
 
   get currentMapPresentationActionIds() {
     return this.stageRuntime.mapPresentationActionIds;
+  }
+
+  /**
+   * 場景預載我方地圖圖形時必須涵蓋的職業：目前在場的，加上劇情增援與形態轉換
+   * 還會帶進來的（見 `deferredAllyClassIds`）。
+   */
+  get currentAllyMapClassIds(): readonly UnitClassId[] {
+    const roster = this.battle.campaignSnapshot().roster;
+    return [...new Set<UnitClassId>([
+      ...this.battle.units.filter(({ side }) => side === 1).map(({ classId }) => classId),
+      ...deferredAllyClassIds(this.stageRuntime.definition.events, {
+        unit: (id) => this.battle.unit(id),
+        rosterClassId: (slot) => roster.find((entry) => entry.slot === slot)?.classId,
+      }),
+    ])];
   }
 
   get currentRoutePulseSafeArea(): Position[] {
@@ -3378,9 +3394,11 @@ export class GameController {
     }
 
     await this.presentTurnTransition("enemy");
+    // `1000:147E` clears the side-1 action bits here, for the next player
+    // phase. The side-1 disable array (ice) shares that boundary; side 2's
+    // disable array waits for the next-round entry instead. Side 2's own
+    // action bits are cleared inside `beginEnemyPhase` (`1000:14A6`).
     this.battle.clearActionState(1);
-    // The native side-1 disable array is cleared after the player/ally phase,
-    // immediately before enemy scheduling. Side 2 is cleared at next-round start.
     this.battle.clearActionDisableState(1);
     this.phase = "enemy";
     const enemyPhaseUpdate = this.battle.beginEnemyPhase();
@@ -3790,8 +3808,17 @@ export class GameController {
                 || action.actionId === "stomp-3"
                 ? `${unit.name}以${BATTLE_ACTION_DEFINITIONS[action.actionId].label}造成共 ${result.damage} 點傷害。`
                 : `${unit.name}造成 ${result.damage} 點傷害。`;
-        } catch {
+        } catch (error) {
+          // A planned action can legitimately turn illegal before it commits,
+          // and spending the turn is the right answer for that. What must not
+          // happen is the presentation surviving the throw: every later
+          // `emit` would replay the same broken frame and take the enemy
+          // phase down with it — stage 22's missing WD atlas froze the board
+          // exactly that way. Report the cause too; this branch is a
+          // fallback, not a place to lose an asset or rule defect.
+          console.error(`${unit.name}的${action.actionId}無法完成`, error);
           this.aiTechniqueDialogue = undefined;
+          this.specialActionPresentation = undefined;
           this.battle.spendAction(unit.id);
           this.statusMessage = `${unit.name}的特殊行動已失效，改為待命。`;
         }

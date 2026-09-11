@@ -273,7 +273,13 @@ export const STAGE5_ASSETS = {
 export const STAGE42_ASSETS = {
   map: "/assets/original/stage42-portal-map.png",
   minimap: "/assets/original/stage42-portal-minimap.png",
-  unitSprites: {},
+  // 維絲塔 stands on this board as an empress, a profession no campaign roster
+  // can hold, so the shared ally catalog is the only place her figure exists.
+  // The manifest generator reads literal URLs out of this block, so name the
+  // file here rather than referencing the catalog constant.
+  unitSprites: {
+    "ally-empress": "/assets/original/technique-lab/units/ally-empress.png",
+  },
   audio: {
     playerEntry: musicAsset("MUSIC", 35),
     playerLoop: musicAsset("MUSIC", 34),

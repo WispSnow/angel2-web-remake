@@ -5,7 +5,7 @@ import type {
   Side,
   UnitClassId,
 } from "../types";
-import type { StageSimulationEffectId } from "./stages";
+import type { StageEventDefinition, StageSimulationEffectId } from "./stages";
 import { STAGE0 } from "./stage0";
 
 export type { CampaignRouteId } from "../types";
@@ -171,4 +171,43 @@ export function stageSimulationEffectFor(
   id: Exclude<StageSimulationEffectId, "none">,
 ): StageSimulationEffectDefinition | undefined {
   return STAGE_SIMULATION_EFFECT_REGISTRY[id];
+}
+
+/**
+ * The side-1 professions a stage can still put on the board after the battle
+ * scene has finished preloading.
+ *
+ * `story-reinforcements` writes its units long after `create`, and an actor
+ * without a `forcedClassId` takes its profession from the campaign roster
+ * rather than from stage data, so the scene cannot read it off the board.
+ * Stage 21 is written entirely that way and its four scouts arrived as
+ * Phaser's missing-texture placeholder. The resolution order matches
+ * `runStoryReinforcements`; a form transition can likewise rewrite a side-1
+ * unit into a profession nothing preloaded.
+ */
+export function deferredAllyClassIds(
+  events: readonly StageEventDefinition[],
+  resolve: {
+    unit: (id: string) => { side: Side; classId: UnitClassId } | undefined;
+    rosterClassId: (slot: number) => UnitClassId | undefined;
+  },
+): readonly UnitClassId[] {
+  const classIds = new Set<UnitClassId>();
+  for (const event of events) {
+    if (event.simulationEffect === "none") continue;
+    const effect = stageSimulationEffectFor(event.simulationEffect);
+    if (effect?.type === "unit-form-transition") {
+      if (resolve.unit(effect.actorId)?.side === 1) classIds.add(effect.targetClassId);
+      continue;
+    }
+    if (effect?.type !== "story-reinforcements") continue;
+    for (const actor of effect.actors) {
+      if (actor.source.side !== 1) continue;
+      const classId = actor.forcedClassId
+        ?? resolve.unit(`1:${actor.source.slot}`)?.classId
+        ?? resolve.rosterClassId(actor.source.slot);
+      if (classId) classIds.add(classId);
+    }
+  }
+  return [...classIds];
 }
