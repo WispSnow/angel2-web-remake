@@ -178,6 +178,18 @@ pnpm content:resource-manifest
 任何被登记的图片、音频、JSON 或字体变化后都必须重跑。`prepare-release.mjs` 会先清掉已迁移的
 零碎来源，再逐项检查清单 URL 存在且字节／哈希与生成时一致；旧清单会让发布构建明确失败。
 
+清单身份一变，**必须同步把 `public/assets/original/` 的改动推到私有素材仓库
+`WispSnow/angel2-assets`**，否则任何 GitHub 工作流都会失败。本机 `public/assets/original/` 是
+gitignore 的普通目录，不是该仓库的工作区，所以本地重跑生成器不会自动传播出去；而 `ci.yml`、
+`e2e.yml` 与 `desktop-windows.yml` 都从素材仓库检出素材，`check:assets` 会比对代码期望的身份与
+素材包提供的身份，不符即中止（这是期望行为，不是 CI 坏了）。网页版 Direct Upload 用的是本机
+`release/`，**不经过素材仓库，因此网页版能上线并不证明素材仓库已同步**——0.5.0 就是这样：网页版
+部署成功，同一个提交的 CI 与 Windows 构建却双双失败。
+
+同步方法是克隆素材仓库、覆盖变化的文件、提交推送；推送后重跑工作流即可。面向玩家的
+`angel2-assets-<version>.zip`（供从源码运行者使用）走百度网盘，需要另行手工上传，不随
+素材仓库推送自动更新。
+
 当前加载策略使用页面直接管理的 Cache Storage 持久保留已完成资源包。缓存名包含清单版本与
 身份；同一清单刷新后复用本地字节，新清单则切换到新命名空间并清理旧资源缓存，不会把稳定语义 URL
 下的旧内容当成新版。`index.html` 与资源清单仍按普通 HTTP 策略重验证；Vite 生成的带内容哈希
@@ -319,6 +331,7 @@ pnpm dlx wrangler pages deployment list \
 | --- | --- |
 | `release/` 不存在 | 运行 `pnpm build:release`，不要改传 `dist/` |
 | release 审计报告实验室或调试模块 | 修复源码引用／打包边界并重建，不手删构建产物蒙混过关 |
+| CI／Windows 构建报「素材包版本与代码不匹配」 | 把 `public/assets/original/` 的改动推到 `WispSnow/angel2-assets` 再重跑；不要改 `check:assets` 绕过 |
 | Wrangler 未登录 | 运行 `pnpm dlx wrangler login`，让用户完成浏览器授权 |
 | 找不到 `angel2-web-remake` | 用 `whoami` 与 `pages project list` 核对账号；停止，不新建项目 |
 | 文件数或单文件超过 Pages 限制 | 评估资源压缩、合并或 R2；取得方案确认后再改架构 |

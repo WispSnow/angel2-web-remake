@@ -35,6 +35,17 @@ const fullDeployment = {
 // 因此在 CI 上放宽倍数，保留「数量级回归」的拦截能力，而不是删掉时间断言。
 const BUDGET_SCALE = process.env.CI ? 3 : 1;
 
+// 每次规划的 CPU 预算，两处调用共用，避免与下面的墙钟上限各自漂移。
+const PLANNING_BUDGET_MS = 1_500;
+const PLANNING_PASSES = 2;
+
+// Vitest 的默认用例超时是 5 s 墙钟，而本用例跑两次规划、在 CI 上允许合计 9 s CPU——
+// 两个数字互相矛盾，且墙钟还额外包含本 worker 被调度出去的时间（覆盖率门禁并发 137 个
+// 测试文件）。结果是 CPU 断言尚未触发，用例先被判超时：run 34559871825 实测 5,752 ms，
+// 而同一提交本机隔离跑只要约 1.7 s。这里按同一组常数推出墙钟上限，让它永远宽于用例
+// 自己允许的 CPU 时间；真正的算法护栏仍是下面的 movementMap* 计数器，未放宽。
+const TEST_TIMEOUT_MS = PLANNING_PASSES * PLANNING_BUDGET_MS * BUDGET_SCALE + 5_000;
+
 const planWithinBudget = (
   plan: () => unknown,
   budgetMs: number,
@@ -58,7 +69,7 @@ describe("stage 36 shared expert AI performance budget", () => {
     let enemySelection: AiActionSelection | undefined;
     planWithinBudget(() => {
       enemySelection = enemyBattle.selectNextEnemyAiAction(enemyBattle.enemyActionOrder());
-    }, 1_500);
+    }, PLANNING_BUDGET_MS);
     expect(enemySelection).toMatchObject({ unitId: "2:31", action: { unitId: "2:31" } });
     if (!enemySelection?.action) throw new Error("enemy selection is missing its planned action");
     const enemyDiagnostics = enemyBattle.aiPlanningDiagnostics();
@@ -77,11 +88,11 @@ describe("stage 36 shared expert AI performance budget", () => {
       alliedSelection = alliedBattle.selectNextAlliedAiAction(
         alliedBattle.alliedActionOrder(true),
       );
-    }, 1_500);
+    }, PLANNING_BUDGET_MS);
     expect(alliedSelection).toMatchObject({ unitId: "1:2", action: { unitId: "1:2" } });
     const alliedDiagnostics = alliedBattle.aiPlanningDiagnostics();
     expect(alliedDiagnostics.movementMapBuilds).toBeLessThanOrEqual(28);
     expect(alliedDiagnostics.movementMapHits).toBeGreaterThan(1_000);
     expect(alliedDiagnostics.actionRangeHits).toBeGreaterThan(alliedDiagnostics.actionRangeBuilds);
-  });
+  }, TEST_TIMEOUT_MS);
 });
