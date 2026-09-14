@@ -66,3 +66,17 @@ export const CLASS_GROWTH_OVERRIDES: Readonly<
  * 只授予 side 1。side 2 维持原版纯近战行为，第 13 关沼澤戰的敌方阵容与打法完全不变。
  */
 export const SIDE1_ONLY_SHOOTING_CLASSES: readonly ClassId[] = ["water-warrior"];
+
+/**
+ * REMAKE-149：REMAKE-093 的射击借了射程 seed、伤害、经验与表现，却没有借射击传播读的地形表，
+ * 于是模式 2 读了水戰士自己的近战移动 profile。原版射击与法系职业都在近战职业填 `99` 的槽 12
+ * 填 `98`（走不进、射得过）——`stage-23` 的崖壁、`stage-27` 的海中深水、`stage-10` 船外的天空
+ * 都是这一槽——水戰士那里是 `99`，射击因此被整片截断。
+ *
+ * 射击传播改读弓兵的 profile（与弩兵逐字相同）：它的阻断槽 `{0,17}` 是水戰士 `{0,12,17}` 的
+ * 子集，只增加可射格；魔弓兵的表会把水戰士能走进的浅海槽 7 封死，所以不借。这里的值只给
+ * 射击传播用，水戰士的移动仍读自己的 profile。
+ */
+export const SHOOTING_TERRAIN_PROFILE_OVERRIDES: Readonly<Partial<Record<ClassId, ClassId>>> = {
+  "water-warrior": "archer",
+};

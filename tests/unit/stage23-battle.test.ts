@@ -115,4 +115,46 @@ describe("stage 23 battle simulation", () => {
       expect(battle.planEnemyAiAction(enemy.id), enemy.id).toMatchObject({ unitId: enemy.id });
     }
   });
+
+  it("lets the water warrior's shot cross the valley cliffs the way an archer's does", () => {
+    // REMAKE-149：死亡之谷的崖壁是原版规则槽 12。弓／弩／魔弓与法系都在这一槽填 `98`
+    // （走不进、射得过），水戰士的近战移动表却是 `99`，所以此前谷底射不到崖顶的弩兵，
+    // 也射不到停在崖壁格上的飛龍騎士。
+    const battle = new Stage23Battle(campaign, {
+      placements: STAGE23_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+    });
+    const shooter = battle.unit("1:0");
+    const crossbow = battle.units.find(({ x, y }) => x === 32 && y === 25);
+    const flyer = battle.units.find(({ x, y }) => x === 24 && y === 10);
+    if (!shooter || !crossbow || !flyer) throw new Error("stage 23 cliff fixture moved");
+    expect(crossbow).toMatchObject({ side: 2, classId: "crossbow" });
+    expect(flyer).toMatchObject({ side: 2, classId: "flying-dragon-knight" });
+    shooter.classId = "water-warrior";
+    battle.units = [shooter, crossbow, flyer];
+
+    // 谷底 (30,24) 与崖顶弩兵 (32,25) 之间隔着整列崖壁 x=31。
+    shooter.x = 30;
+    shooter.y = 24;
+    expect(battle.terrainSlotAt({ x: 31, y: 24 })).toBe(12);
+    expect(battle.terrainSlotAt({ x: 31, y: 25 })).toBe(12);
+    expect(battle.actionTargetCells(shooter.id, "water-warrior-shot"))
+      .toContainEqual({ x: 32, y: 25 });
+
+    // 飛龍騎士本身停在崖壁格 (24,10) 上，与 (24,12) 之间只隔一格平地。
+    shooter.x = 24;
+    shooter.y = 12;
+    expect(battle.terrainSlotAt({ x: 24, y: 10 })).toBe(12);
+    expect(battle.actionTargetCells(shooter.id, "water-warrior-shot"))
+      .toContainEqual({ x: 24, y: 10 });
+    const prepared = battle.prepareSpecialAction({
+      actionId: "water-warrior-shot",
+      actorId: shooter.id,
+      targetId: flyer.id,
+      target: { x: flyer.x, y: flyer.y },
+    });
+    expect(prepared.result.damage).toBeGreaterThanOrEqual(30);
+    expect(prepared.result.damage).toBeLessThanOrEqual(49);
+  });
 });

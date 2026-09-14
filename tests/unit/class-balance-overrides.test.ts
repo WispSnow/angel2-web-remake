@@ -4,6 +4,7 @@ import {
   CLASS_IDS,
   classDefinition,
   classStatsFor,
+  movementRulesFor,
   nextExperienceThresholdFor,
   type ClassId,
 } from "../../src/game/content/classes";
@@ -17,6 +18,7 @@ import {
   shootingActionIdFor,
 } from "../../src/game/content/actions";
 import { Stage0Battle } from "../../src/game/simulation/battle";
+import { shootingRange } from "../../src/game/simulation/actions/range-map";
 import { initialEnemyExperience, statsFor } from "../../src/game/content/stage0";
 
 function nativeRecord(record: number) {
@@ -234,6 +236,44 @@ describe("REMAKE-093 water warrior shooting grant", () => {
     target.x = 24;
     target.y = 20;
     expect(battle.actionTargetCells(attacker.id, WATER_WARRIOR_SHOT_ACTION_ID)).toEqual([]);
+  });
+});
+
+describe("REMAKE-149 water warrior shot terrain", () => {
+  // A 5×1 strip: shooter at x=0, the slot under test on x=1..2, plain ground
+  // (slot 1) elsewhere. With the shot's seed 6 the far cell x=3 keeps value 3
+  // when both tested cells let the arrow through, and 0 when either stops it.
+  const reachAcross = (classId: ClassId, slot: number): number => shootingRange(
+    { x: 0, y: 0, classId },
+    {
+      width: 5,
+      height: 1,
+      terrainSlotAt: ({ x }) => (x === 1 || x === 2 ? slot : 1),
+    },
+    BATTLE_ACTION_DEFINITIONS[WATER_WARRIOR_SHOT_ACTION_ID].range.nativeSeed,
+  ).valueAt({ x: 3, y: 0 });
+
+  it("stops the shot on exactly the terrain that stops an archer's", () => {
+    const slots = movementRulesFor("archer").length;
+    expect(slots).toBe(23);
+    for (let slot = 0; slot < slots; slot += 1) {
+      expect(reachAcross("water-warrior", slot), `slot ${slot}`).toBe(reachAcross("archer", slot));
+    }
+  });
+
+  it("clears cliffs, deep water and sky without changing the water warrior's own movement", () => {
+    // Slot 12 is 99 on the water warrior's melee table and 98 on every native
+    // shooter's, which is why the shot used to die at stage 23's cliff faces.
+    expect(movementRulesFor("water-warrior")[12]).toBe(99);
+    expect(movementRulesFor("archer")[12]).toBe(98);
+    expect(reachAcross("water-warrior", 12)).toBe(3);
+    // Shallow sea (slot 7) stays open; borrowing the magic archer's table
+    // along with its seed would have closed it.
+    expect(reachAcross("water-warrior", 7)).toBe(3);
+    expect(reachAcross("magic-archer", 7)).toBe(0);
+    // Slots the archer cannot shoot through still stop the water warrior.
+    expect(reachAcross("water-warrior", 0)).toBe(0);
+    expect(reachAcross("water-warrior", 17)).toBe(0);
   });
 });
 

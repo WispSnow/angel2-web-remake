@@ -334,3 +334,79 @@ test("arena setup remains usable at a narrow viewport", async ({ page }) => {
   expect(horizontalOverflow).toBeLessThanOrEqual(1);
   await captureVisualAudit(page, { path: `${ARTIFACT_DIR}/arena-setup-narrow.png`, fullPage: true });
 });
+
+test("REMAKE-149 lets the water warrior's shot cross terrain it cannot walk", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  // Stage 1's row 17 is a wall of rule slot 12 whose only gap is x=25. From
+  // (20,18) the crossbowman at (20,16) is two cells straight across it and a
+  // dozen around through the gap — far past the shot's seed-6 reach.
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("water-warrior");
+    const shooter = arena.interact(20, 18);
+    arena.setSide(2);
+    arena.setClass("crossbow");
+    const target = arena.interact(20, 16);
+    return [shooter, target];
+  });
+  expect(placed).toEqual([true, true]);
+  await page.getByTestId("arena-start").click();
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  // Right-click in the neutral field focuses the next unacted ally, which is
+  // how the player brings this far-north pair onto the 10×7 view.
+  const onCamera = (origin: { x: number; y: number }, cell: { x: number; y: number }) =>
+    cell.x >= origin.x && cell.x < origin.x + 10 && cell.y >= origin.y && cell.y < origin.y + 7;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const current = await arenaBattleState(page);
+    if (!current) throw new Error("arena battle state missing");
+    if (onCamera(current.cameraOrigin, { x: 20, y: 18 })) break;
+    const occupied = new Set(current.units.map(({ x, y }) => `${x},${y}`));
+    const empty = [1, 2, 3]
+      .map((offset) => ({ x: current.cameraOrigin.x + offset, y: current.cameraOrigin.y + 1 }))
+      .find(({ x, y }) => !occupied.has(`${x},${y}`))!;
+    await clickArenaWorldCell(page, empty.x, empty.y, { button: "right" });
+    await page.waitForFunction(() => {
+      const battle = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+      return !!battle
+        && battle.cameraOrigin.x <= 20 && battle.cameraOrigin.x + 10 > 20
+        && battle.cameraOrigin.y <= 18 && battle.cameraOrigin.y + 7 > 18;
+    }, undefined, { timeout: 5_000 }).catch(() => undefined);
+  }
+  const ready = await arenaBattleState(page);
+  if (!ready) throw new Error("arena battle state missing");
+  expect(onCamera(ready.cameraOrigin, { x: 20, y: 18 })).toBe(true);
+  expect(onCamera(ready.cameraOrigin, { x: 20, y: 16 })).toBe(true);
+  const target = ready.units.find(({ x, y }) => x === 20 && y === 16);
+  if (!target) throw new Error("arena crossbowman missing");
+
+  // Before REMAKE-149 the water warrior's own slot-12 rule (99) kept the
+  // crossbowman out of the range map, so 射擊 found no enemy in range and never
+  // opened target selection.
+  await clickArenaWorldCell(page, 20, 18);
+  await page.getByTestId("unit-command-shoot").click();
+  await expect(page.getByTestId("game-screen")).toHaveAttribute("data-action-mode", "specialTarget");
+  await expect(page.getByTestId("unit-command-shoot")).toBeHidden();
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-water-warrior-shot-over-slot-12.png`,
+  });
+
+  await clickArenaWorldCell(page, 20, 16);
+  await page.waitForFunction(() => {
+    const battle = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+    return battle?.lastSpecialAction?.actionId === "water-warrior-shot"
+      && battle.specialActionPresentation === undefined;
+  }, undefined, { timeout: 30_000 });
+  const after = await arenaBattleState(page);
+  expect(after?.lastSpecialAction?.target).toEqual({ x: 20, y: 16 });
+  const damaged = after?.units.find(({ id }) => id === target.id);
+  expect(damaged).toBeDefined();
+  expect(target.life - damaged!.life).toBeGreaterThanOrEqual(30);
+  expect(target.life - damaged!.life).toBeLessThanOrEqual(49);
+  expect(pageErrors).toEqual([]);
+});

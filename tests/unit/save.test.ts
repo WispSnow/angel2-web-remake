@@ -5422,6 +5422,24 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-113 saves without changing battle state for the water warrior shot terrain", () => {
+    // REMAKE-149 只改水戰士射击传播时读取的地形表；射击范围图每次都从棋盘重算、从不入档，
+    // 因此 v113 战中档与完成档无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 113,
+      contentVersion: "enemy-phase-action-bits-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 113,
+      contentVersion: "enemy-phase-action-bits-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-112 saves without changing battle state for the enemy-phase action bits", () => {
     // REMAKE-146 只改敌方阶段入口是否清 side 2 行动位；行动位本身仍从棋盘读出，
     // 读档后的下一个敌方阶段才按新口径调度，因此 v112 无损迁移。

@@ -659,6 +659,25 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-149 lets the water warrior's shot read the archer's terrain profile,
+ * so cliff faces, deep water and open sky no longer stop it. Shooting ranges
+ * are rebuilt from the stored board on every read and never saved, so v113
+ * battle/completed saves migrate by identity and simply see the wider target
+ * set on their next shot.
+ */
+function migrateVersion113Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 113
+    || value.contentVersion !== "enemy-phase-action-bits-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-146 clears the side-2 action bits as the enemy phase opens, the way
  * native `1000:14A6` does. Only a unit that received the `80h` bit during the
  * player phase behaved differently, and the bit is re-read from the stored
@@ -3136,6 +3155,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
     // A save already at the current version is returned untouched: its sisters
     // entered at the threshold, and experience never decreases.
     if (isSaveData(value)) return value;
+    const migratedVersion113 = migrateVersion113Save(value);
+    if (migratedVersion113) return migratedVersion113;
     const migratedVersion112 = migrateVersion112Save(value);
     if (migratedVersion112) return migratedVersion112;
     const migratedVersion111 = migrateVersion111Save(value);

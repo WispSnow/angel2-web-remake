@@ -1,3 +1,4 @@
+import { SHOOTING_TERRAIN_PROFILE_OVERRIDES } from "../../content/class-balance-overrides";
 import { movementRulesFor } from "../../content/classes";
 import type { BattleUnit, Position } from "../../types";
 
@@ -64,11 +65,11 @@ function buildUniformRange(
   battlefield: ActionBattlefield,
   seed: number,
   blocks: (movementRule: number) => boolean,
+  movementRules: readonly number[] = movementRulesFor(actor.classId),
 ): NumericRangeMap {
   const result = new NumericRangeMap(battlefield.width, battlefield.height);
   const pending: Position[] = [{ x: actor.x, y: actor.y }];
   result.set(actor, seed);
-  const movementRules = movementRulesFor(actor.classId);
 
   while (pending.length > 0) {
     const current = pending.shift();
@@ -87,17 +88,33 @@ function buildUniformRange(
   return result;
 }
 
+/**
+ * Mode `2` at `1000:3FA8` stops only on rules `0/99`, so the `98` that native
+ * shooters and casters carry where melee careers carry `99` is terrain their
+ * arrows cross but their feet cannot. REMAKE-149 points the water warrior's
+ * remake shot at the archer's profile; see SHOOTING_TERRAIN_PROFILE_OVERRIDES.
+ */
+function shootingGradient(
+  actor: Pick<BattleUnit, "x" | "y" | "classId">,
+  battlefield: ActionBattlefield,
+  nativeSeed: number,
+): NumericRangeMap {
+  const terrainProfile = SHOOTING_TERRAIN_PROFILE_OVERRIDES[actor.classId] ?? actor.classId;
+  return buildUniformRange(
+    actor,
+    battlefield,
+    nativeSeed,
+    (movementRule) => movementRule === 0 || movementRule === 99,
+    movementRulesFor(terrainProfile),
+  );
+}
+
 export function shootingRange(
   actor: Pick<BattleUnit, "x" | "y" | "classId">,
   battlefield: ActionBattlefield,
   nativeSeed: number,
 ): NumericRangeMap {
-  const result = buildUniformRange(
-    actor,
-    battlefield,
-    nativeSeed,
-    (movementRule) => movementRule === 0 || movementRule === 99,
-  );
+  const result = shootingGradient(actor, battlefield, nativeSeed);
   result.set(actor, 0);
   for (const offset of OFFSETS) {
     result.set({ x: actor.x + offset.x, y: actor.y + offset.y }, 0);
@@ -119,12 +136,7 @@ export function shootingLinePath(
   nativeSeed: number,
   choosePredecessor: (candidateCount: number) => number = () => 0,
 ): Position[] {
-  const gradient = buildUniformRange(
-    actor,
-    battlefield,
-    nativeSeed,
-    (movementRule) => movementRule === 0 || movementRule === 99,
-  );
+  const gradient = shootingGradient(actor, battlefield, nativeSeed);
   if (gradient.valueAt(target) === 0) return [];
 
   const reversed = [copyPosition(target)];
@@ -157,12 +169,7 @@ export function shootingLinePaths(
   battlefield: ActionBattlefield,
   nativeSeed: number,
 ): Position[][] {
-  const gradient = buildUniformRange(
-    actor,
-    battlefield,
-    nativeSeed,
-    (movementRule) => movementRule === 0 || movementRule === 99,
-  );
+  const gradient = shootingGradient(actor, battlefield, nativeSeed);
   if (gradient.valueAt(target) === 0) return [];
 
   const paths: Position[][] = [];
@@ -197,12 +204,7 @@ export function shootingLineVisitProbabilities(
   battlefield: ActionBattlefield,
   nativeSeed: number,
 ): ReadonlyMap<string, number> {
-  const gradient = buildUniformRange(
-    actor,
-    battlefield,
-    nativeSeed,
-    (movementRule) => movementRule === 0 || movementRule === 99,
-  );
+  const gradient = shootingGradient(actor, battlefield, nativeSeed);
   if (gradient.valueAt(target) === 0) return new Map();
 
   const probabilities = new Map<string, number>();
