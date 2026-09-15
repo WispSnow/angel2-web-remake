@@ -5449,6 +5449,23 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-117 saves without changing battle state for the nearest free pursuer cell", () => {
+    // REMAKE-154 只改出兵格被占时的落点；落点每次都从棋盘重算、从不入档，因此 v117 无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 117,
+      contentVersion: "stage-27-native-reinforcements-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 117,
+      contentVersion: "stage-27-native-reinforcements-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-116 saves without changing battle state for the stage 27 pursuers", () => {
     // REMAKE-153 只让第 27 关第 5 回合起的敌方阶段按原版生成增援；回合与槽位都从棋盘重算、
     // 不另存计数，因此 v116 战中档与完成档无损迁移。

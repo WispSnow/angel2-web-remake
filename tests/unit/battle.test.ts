@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { killRewardFor, terrainDefensePercentFor } from "../../src/game/content/classes";
 import { STAGE0 } from "../../src/game/content/stage0";
 import { Stage0Battle } from "../../src/game/simulation/battle";
-import { manhattan, movementCost, positionKey, reachableCells, zoneOfControl } from "../../src/game/simulation/grid";
+import {
+  manhattan,
+  movementCost,
+  nearestStandableFreeCell,
+  positionKey,
+  reachableCells,
+  zoneOfControl,
+} from "../../src/game/simulation/grid";
 import {
   STAGE_ROUND_LIMIT,
   STAGE_ROUND_LIMIT_WARNING_ROUNDS,
@@ -1036,5 +1043,42 @@ describe("stage 0 battle simulation", () => {
     expect(result.counterExperienceGained).toBe(0);
     expect(battle.unit("2:45")).toBeUndefined();
     expect(battle.unit("1:0")!.life).toBe(niaLife);
+  });
+});
+
+describe("nearest standable free cell (REMAKE-154)", () => {
+  // 5×5: row y=4 is map boundary (slot 0), (2,1) and (1,2) are shallow water (slot 7),
+  // every other cell is grass (slot 2). Fliers enter water; the great axe warrior cannot.
+  const battlefield = {
+    width: 5,
+    height: 5,
+    terrainSlotAt: ({ x, y }: { x: number; y: number }) => {
+      if (y === 4) return 0;
+      if ((x === 2 && y === 1) || (x === 1 && y === 2)) return 7;
+      return 2;
+    },
+  };
+  const origin = { x: 2, y: 2 };
+
+  it("prefers distance, then the lower row-major cell the class may enter", () => {
+    expect(nearestStandableFreeCell("pegasus-warrior", origin, new Set(), battlefield))
+      .toEqual({ x: 2, y: 2 });
+    const occupied = new Set([positionKey(origin)]);
+    // Distance-1 cells in row-major order: (2,1) water, (1,2) water, (3,2), (2,3).
+    expect(nearestStandableFreeCell("pegasus-warrior", origin, occupied, battlefield))
+      .toEqual({ x: 2, y: 1 });
+    expect(nearestStandableFreeCell("great-axe-warrior", origin, occupied, battlefield))
+      .toEqual({ x: 3, y: 2 });
+  });
+
+  it("skips occupied and boundary cells and gives up only on a full board", () => {
+    const occupied = new Set([origin, { x: 3, y: 2 }, { x: 2, y: 3 }].map(positionKey));
+    // Every distance-1 cell is water or taken; (2,0) is the first distance-2 cell.
+    expect(nearestStandableFreeCell("great-axe-warrior", origin, occupied, battlefield))
+      .toEqual({ x: 2, y: 0 });
+    const everyCell = new Set(Array.from({ length: 25 }, (_, index) =>
+      positionKey({ x: index % 5, y: Math.floor(index / 5) })));
+    expect(nearestStandableFreeCell("pegasus-warrior", origin, everyCell, battlefield))
+      .toBeUndefined();
   });
 });

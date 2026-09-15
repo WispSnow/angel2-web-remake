@@ -4309,6 +4309,18 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.statusMessage = "調試場景：結束第 5 回合玩家階段後，第一名原版追兵會在 (33,41) 出現並當輪行動。";
     return controller;
   },
+  "stage-27-blocked-reinforcement": async (context) => {
+    const controller = await createStage27Player(context, 5);
+    const engineer = controller.battle.unit("1:58");
+    if (engineer) {
+      engineer.x = 33;
+      engineer.y = 41;
+      controller.battle.focusId = engineer.id;
+      controller.cursor = { x: engineer.x, y: engineer.y };
+    }
+    controller.statusMessage = "調試場景：工兵占住 (33,41)；結束第 5 回合玩家階段後，追兵改從最近的空格出現。";
+    return controller;
+  },
   "stage-27-near-victory": withSetup(createStage27Player, (controller) => {
     const nia = controller.battle.unit("1:0");
     if (!nia) return;

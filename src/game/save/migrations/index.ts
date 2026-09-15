@@ -661,6 +661,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-154 moves a stage 27 pursuer whose spawn cell is occupied onto the
+ * nearest free cell instead of skipping the round. The landing cell is derived
+ * from the board on every spawn and never saved, so v117 saves migrate by identity.
+ */
+function migrateVersion117Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 117
+    || value.contentVersion !== "stage-27-native-reinforcements-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-153 lets stage 27's native full-round chain spawn pursuers from round 5.
  * The round, spawn cell and free slot are all read off the board, so a v116 save
  * has no counter to rebuild; a loaded stage 27 battle past round 4 simply gets
@@ -3256,6 +3273,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migratePreviousSaveData(value: unknown): SaveData | undefined {
+  const migratedVersion117 = migrateVersion117Save(value);
+  if (migratedVersion117) return migratedVersion117;
   const migratedVersion116 = migrateVersion116Save(value);
   if (migratedVersion116) return migratedVersion116;
   const migratedVersion115 = migrateVersion115Save(value);

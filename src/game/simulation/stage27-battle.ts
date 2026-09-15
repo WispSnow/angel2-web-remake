@@ -22,6 +22,7 @@ import {
 import { validateDeploymentResult, type DeploymentResult } from "./deployment";
 import { createFixedStageEnemy } from "./fixed-stage-battle";
 import type { ForceDefinition } from "./forces";
+import { nearestStandableFreeCell, positionKey, type GridBattlefield } from "./grid";
 import { DeterministicRng } from "./rng";
 
 const STAGE27_UNIT_CONFIG: DeployedStageUnitConfig = {
@@ -128,23 +129,36 @@ export class Stage27Battle extends Stage0Battle {
 
   /**
    * REMAKE-153: native `1000:525F` runs once per full round, after every side-1
-   * manual and automatic action and before side-2 AI. From round 5 it tries the
-   * single cell (33,41): any unit there skips the whole round; otherwise the
-   * lowest side-2 slot 30..39 not on the board spawns and acts this same enemy
-   * phase. Removed slots come back into the pool, and no PRNG is read.
+   * manual and automatic action and before side-2 AI. From round 5 the lowest
+   * side-2 slot 30..39 not on the board spawns at (33,41) and acts this same
+   * enemy phase. Removed slots come back into the pool, and no PRNG is read.
+   *
+   * REMAKE-154: the native chain skips the whole round while any unit stands on
+   * (33,41), so a parked unit shuts the reinforcements off. stableRemake lands the
+   * pursuer on the nearest free cell its own class may enter instead.
    */
   private spawnReinforcement(): BattleUnit | undefined {
     const program = STAGE27_SEMANTIC_REINFORCEMENTS;
     if (this.round < program.firstRound) return undefined;
-    const [spawnCell] = program.spawnCells;
-    if (this.units.some(({ x, y }) => x === spawnCell.x && y === spawnCell.y)) return undefined;
     const candidate = program.candidates.find(({ slot }) =>
       !this.units.some((unit) => unit.side === 2 && unit.slot === slot));
     if (!candidate) return undefined;
 
+    const [spawnCell] = program.spawnCells;
+    const occupiedKeys = new Set(this.units.map(positionKey));
+    const battlefield: GridBattlefield = {
+      width: this.stage.width,
+      height: this.stage.height,
+      terrainSlotAt: (cell) => this.terrainSlotAt(cell),
+    };
+    const position = occupiedKeys.has(positionKey(spawnCell))
+      ? nearestStandableFreeCell(candidate.classId, spawnCell, occupiedKeys, battlefield)
+      : { x: spawnCell.x, y: spawnCell.y };
+    if (!position) return undefined;
+
     const unit = createFixedStageEnemy({
       slot: candidate.slot,
-      position: { x: spawnCell.x, y: spawnCell.y },
+      position,
       classId: candidate.classId,
       name: candidate.name,
       aiBehavior: candidate.aiBehavior,

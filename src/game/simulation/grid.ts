@@ -100,6 +100,31 @@ export function movementBlocked(
   return movementPropagationModeFor(classId) === "0" ? rule >= 99 : rule >= 98;
 }
 
+/**
+ * Nearest cell to `origin` with no unit on it that `classId` may enter: Manhattan
+ * distance first, then the lower row-major cell number. No path back to `origin`
+ * is required (the REMAKE-154 spawn fallback). `undefined` when no cell qualifies.
+ */
+export function nearestStandableFreeCell(
+  classId: UnitClassId,
+  origin: Position,
+  occupiedKeys: ReadonlySet<string>,
+  battlefield: GridBattlefield,
+): Position | undefined {
+  let nearest: { position: Position; distance: number } | undefined;
+  // Row-major order visits lower cell numbers first, so a strict `<` keeps that tie-break.
+  for (let y = 0; y < battlefield.height; y += 1) {
+    for (let x = 0; x < battlefield.width; x += 1) {
+      const position = { x, y };
+      if (occupiedKeys.has(positionKey(position))
+        || movementBlocked(classId, position, battlefield)) continue;
+      const distance = manhattan(origin, position);
+      if (!nearest || distance < nearest.distance) nearest = { position, distance };
+    }
+  }
+  return nearest?.position;
+}
+
 const NO_CELLS: ReadonlySet<string> = new Set<string>();
 
 /** Cells the propagation refuses to enter. Mode `0` never reads the side map. */

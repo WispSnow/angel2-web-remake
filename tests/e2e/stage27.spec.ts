@@ -279,6 +279,31 @@ test("S27-L/REMAKE-153: round 5 lands the first native pursuer before the rebels
   });
 });
 
+test("S27-M/REMAKE-154: a unit on (33,41) no longer blocks the round-5 pursuer", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-27-blocked-reinforcement&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  const before = await state(page);
+  expect(before).toMatchObject({ stageId: "stage-27", round: 5 });
+  expect(before.units.find(({ id }) => id === "1:58")).toMatchObject({ x: 33, y: 41 });
+
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-allRest").click();
+  await page.getByTestId("dialogue-layer").click();
+  await page.waitForFunction(
+    () => ((window.__ANGEL2__?.getState() as Stage27State | undefined)?.units ?? [])
+      .some(({ id }) => id === "2:30"),
+    undefined,
+    { timeout: 60_000 },
+  );
+  const reinforced = await state(page);
+  expect(reinforced.round).toBe(5);
+  expect(reinforced.units.find(({ id }) => id === "2:30")).toMatchObject({
+    side: 2,
+    slot: 30,
+    classId: "pegasus-warrior",
+  });
+});
+
 test("S27-H: Nia defeat returns directly to the same deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-27-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");

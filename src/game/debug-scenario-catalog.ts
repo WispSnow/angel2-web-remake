@@ -1437,6 +1437,14 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-27-blocked-reinforcement",
+    stageId: "stage-27",
+    title: "出兵格被占",
+    phase: "Round 5 / blocked spawn",
+    description: "工兵站在 (33,41)；玩家與城防友軍行動結束後，驗證追兵改從最近空格 (33,40) 出現並於同輪行動。",
+    fixture: true,
+  },
+  {
     id: "stage-27-near-victory",
     stageId: "stage-27",
     title: "一步回到瓦爾克麗城",

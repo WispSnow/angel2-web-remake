@@ -298,31 +298,44 @@ describe("stage 27 battle simulation", () => {
     expect(battle.rng.calls).toBe(callsBefore);
   });
 
-  it("skips an occupied spawn round, reuses a removed slot, and restores rebel membership", () => {
+  it("lands a blocked pursuer on the nearest free cell and reuses a removed slot (REMAKE-154)", () => {
     const battle = new Stage27Battle(campaign, fullDeployment);
     while (battle.round < 5) battle.startNextRound();
-    const engineer = battle.unit("1:57");
-    if (!engineer) throw new Error("stage 27 test is missing engineer 57");
-    Object.assign(engineer, { x: 33, y: 41 });
-    battle.beginEnemyPhase();
-    expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(5);
+    const unitById = (id: string) => {
+      const unit = battle.unit(id);
+      if (!unit) throw new Error(`stage 27 test is missing ${id}`);
+      return unit;
+    };
+    const callsBefore = battle.rng.calls;
 
-    Object.assign(engineer, { x: 35, y: 35 });
+    // A unit parked on (33,41) no longer shuts the round off: the first free
+    // distance-1 cell in row-major order is (33,40).
+    Object.assign(unitById("1:57"), { x: 33, y: 41 });
+    battle.beginEnemyPhase();
+    expect(battle.unit("2:30")).toMatchObject({
+      classId: "pegasus-warrior",
+      x: 33,
+      y: 40,
+      acted: false,
+    });
+    expect(battle.enemyActionOrder()).toContain("2:30");
+
+    // With the other distance-1 cells taken and (33,42) on the map boundary, the
+    // next pursuer takes the first distance-2 cell in row-major order, (33,39).
+    Object.assign(unitById("1:56"), { x: 32, y: 41 });
+    Object.assign(unitById("1:58"), { x: 34, y: 41 });
     battle.startNextRound();
     battle.beginEnemyPhase();
-    expect(battle.unit("2:30")).toMatchObject({ classId: "pegasus-warrior", x: 33, y: 41 });
+    expect(battle.unit("2:31")).toMatchObject({ classId: "half-dragon-warrior", x: 33, y: 39 });
 
-    Object.assign(battle.unit("2:30")!, { x: 30, y: 45 });
-    battle.startNextRound();
-    battle.beginEnemyPhase();
-    expect(battle.unit("2:31")).toMatchObject({ classId: "half-dragon-warrior", x: 33, y: 41 });
-
+    // A clear native cell is used again, and a removed slot comes back first.
     battle.removeStoryUnits([{ side: 2, slot: 30 }]);
-    Object.assign(battle.unit("2:31")!, { x: 31, y: 45 });
+    Object.assign(unitById("1:57"), { x: 35, y: 35 });
     battle.startNextRound();
     battle.beginEnemyPhase();
     expect(battle.unit("2:30")).toMatchObject({ classId: "pegasus-warrior", x: 33, y: 41 });
     expect(battle.unit("2:32")).toBeUndefined();
+    expect(battle.rng.calls).toBe(callsBefore);
 
     battle.startNextRound();
     const restored = new Stage27Battle(campaign, fullDeployment);
