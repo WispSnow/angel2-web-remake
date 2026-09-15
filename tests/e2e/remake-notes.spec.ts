@@ -118,6 +118,8 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
     "處理器",
     "渲染器",
     "戰鬥動畫實驗室",
+    "stableRemake",
+    "legacyStrict",
   ];
   await expect(page.getByTestId("remake-notes-tabs").getByRole("tab"))
     .toHaveText(["Bug 修復", "功能增強", "平衡性調整", "操作說明", "免責聲明"]);
@@ -280,6 +282,28 @@ test("REMAKE-128 說明落雷無擊殺也有分層施法經驗", async ({ page }
   await expect(lightningExperience).toContainText("落雷恢復原版分層施法經驗");
   await expect(lightningExperience).toContainText("8–9、10–11、12–14、15–17");
   await expect(lightningExperience).toContainText("沒有擊殺");
+});
+
+test("REMAKE-152 與 REMAKE-154 將兩關的敵軍配置漏洞列入 Bug 修復", async ({ page }) => {
+  await page.goto("/");
+  // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。
+  await openNotes(page, "fixes");
+  const priestLine = page.getByTestId("remake-note-REMAKE-152");
+  await expect(priestLine).toContainText("「遭遇碧娜維姬」的魔祭師不再單獨離隊");
+  await expect(priestLine).toContainText("唯獨橫列左起第二名魔祭師被設成追擊");
+  await expect(priestLine.locator(".rn-note-id")).toHaveText("REMAKE-152");
+  const blockedSpawn = page.getByTestId("remake-note-REMAKE-154");
+  await expect(blockedSpawn).toContainText("「趕回瓦爾克麗城」的追兵無法再被占位封鎖");
+  await expect(blockedSpawn).toContainText("離該格最近、且該職業能夠進入的空格");
+  await expect(blockedSpawn).toContainText("出兵格空著時仍照原版從原處出現");
+  await expect(blockedSpawn.locator(".rn-note-id")).toHaveText("REMAKE-154");
+  await captureVisualAudit(blockedSpawn, {
+    path: "artifacts/playwright/remake-notes-stage27-blocked-spawn.png",
+  });
+
+  await page.getByTestId("remake-notes-tab-balance").click();
+  await expect(page.getByTestId("remake-note-REMAKE-152")).toHaveCount(0);
+  await expect(page.getByTestId("remake-note-REMAKE-154")).toHaveCount(0);
 });
 
 test("REMAKE-127 將第 8、11 關敵軍難度成長列為平衡調整", async ({ page }) => {

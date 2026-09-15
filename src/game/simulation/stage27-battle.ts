@@ -134,8 +134,8 @@ export class Stage27Battle extends Stage0Battle {
    * enemy phase. Removed slots come back into the pool, and no PRNG is read.
    *
    * REMAKE-154: the native chain skips the whole round while any unit stands on
-   * (33,41), so a parked unit shuts the reinforcements off. stableRemake lands the
-   * pursuer on the nearest free cell its own class may enter instead.
+   * (33,41), so a parked unit shuts the reinforcements off. Fixed as an original bug
+   * in every ruleset: the pursuer lands on the nearest free cell its class may enter.
    */
   private spawnReinforcement(): BattleUnit | undefined {
     const program = STAGE27_SEMANTIC_REINFORCEMENTS;

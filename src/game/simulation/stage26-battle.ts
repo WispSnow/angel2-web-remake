@@ -23,8 +23,9 @@ import type { ForceDefinition } from "./forces";
 import { DeterministicRng } from "./rng";
 
 // REMAKE-152: B/0053 leaves the slot-40 priest at native behavior 0 inside a line
-// where Binaweiji and the other six priests are behavior-1 guards. stableRemake
-// holds the whole line; content keeps the native value as evidence.
+// where Binaweiji and the other six priests are behavior-1 guards. The user ruled
+// that an original bug, so every ruleset holds the whole line; content keeps the
+// native value as evidence.
 const STAGE26_LINE_GUARD_SLOTS: ReadonlySet<number> = new Set([40]);
 const STAGE26_GUARD_BEHAVIOR = 1;
 
