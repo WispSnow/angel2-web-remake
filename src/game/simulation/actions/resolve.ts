@@ -219,6 +219,10 @@ function preparePrayer(
         blockReason = "frozen";
       } else {
         const maximumLife = context.statsFor(unit).maxLife;
+        // REMAKE-156, in both rulesets: heal the roll the result text shows. The native
+        // write-back (`1000:5B50`) adds DS:522C instead — the lightning wave's leftover
+        // threshold, 10 until a wave runs and −11..−26 after — so the original heals a
+        // fixed 10, or drains, zeroes or fully heals once anyone has cast lightning.
         healing = Math.min(maximumLife - unit.life, prayerRolledAmount);
         lifeAfter += healing;
       }

@@ -169,7 +169,7 @@ node reverse/tools/angel2-remaining-technique-presentations.mjs --extract \
 
 结果文字始终显示抽取的 `5..14`。分裂水戰士同组多个格通过门时，每格都在共享记录上按上表再结算一次。
 
-**保留未知。** 静态扫描无法绝对排除运行时算址写入。需要实机闭合时，可在 DOSBox-X 对 DS:`522Ch` 设写断点，或比较开战后首个祈祷生命结果（应为 `+10`）与施放 `1L` 之后的结果（扣 20 或回满）。PIT 采样只决定走哪一分支，不影响加数。`remaining-technique-presentations.json` 与 `technique-rules.json` 仍把生命结果写作 `5..14`，这段文案也已进入生成内容；本次只登记证据，没有修改它们，待复刻决策后与生成器一起修订。决策需求见 [`technique-oj-prayer.md`](../../design/remake-gdd/systems/technique-oj-prayer.md)，证据行为 [`evidence-register.md`](../gdd/evidence-register.md) 的 `BAT-023`。
+**保留未知。** 静态扫描无法绝对排除运行时算址写入。需要实机闭合时，可在 DOSBox-X 对 DS:`522Ch` 设写断点，或比较开战后首个祈祷生命结果（应为 `+10`）与施放 `1L` 之后的结果（扣 20 或回满）。PIT 采样只决定走哪一分支，不影响加数。`remaining-technique-presentations.json` 与 `technique-rules.json` 仍把生命结果写作 `5..14`，这段文案也已进入生成内容。复刻决策 `REMAKE-156` 已定为两套规则集都恢复显示的抽取量，所以这两处文案描述的正是复刻规则，保持不变；原版的实际写回以本节为准。决策见 [`web-remake-rule-decisions.md`](../gdd/web-remake-rule-decisions.md) 的 `REMAKE-156` 与 [`technique-oj-prayer.md`](../../design/remake-gdd/systems/technique-oj-prayer.md)，证据行为 [`evidence-register.md`](../gdd/evidence-register.md) 的 `BAT-023`。
 
 ## 工兵 `1K/2K`
 

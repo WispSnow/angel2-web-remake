@@ -3577,6 +3577,63 @@ describe("Stage-0 class actions", () => {
     }
   });
 
+  it("heals OJ recipients by the displayed roll, capped only by their missing life (REMAKE-156)", () => {
+    // Native `1000:5B50` adds the lightning wave's leftover threshold (DS:522C) instead of
+    // the roll it just displayed; both rulesets heal the displayed roll instead.
+    const seed = findPrayerSeed(3, ([first, second]) => first?.candidateIndex === 0
+      && first.outcome === "healing"
+      && second?.candidateIndex === 1
+      && second.outcome === "healing"
+      && second.rolledAmount! > 3);
+    const [first, second] = expectedPrayerSequence(seed, 3).outcomes;
+    const battle = new Stage0Battle(0, new DeterministicRng(seed));
+    const actor = battle.unit("1:0")!;
+    const template = battle.units.find((unit) => unit.side === 1 && unit.id !== actor.id)!;
+    promoteForAction(actor, "prayer");
+    actor.experience = classDefinition("prayer-guide").dataRows[2].experienceThreshold;
+    actor.x = 4;
+    actor.y = 3;
+    const maxLife = battle.statsFor(template).maxLife;
+    const wounded: BattleUnit = {
+      ...template,
+      id: "oj-wounded",
+      x: 1,
+      y: 1,
+      life: maxLife - 30,
+      statuses: { ...template.statuses },
+    };
+    const nearlyFull: BattleUnit = {
+      ...template,
+      id: "oj-nearly-full",
+      x: 2,
+      y: 1,
+      life: maxLife - 3,
+      statuses: { ...template.statuses },
+    };
+    battle.units = [actor, wounded, nearlyFull];
+
+    const prepared = battle.prepareSpecialAction({ actionId: "prayer", actorId: actor.id });
+    expect(prepared.affectedUnits.slice(0, 2).map((affected) => ({
+      unitId: affected.unitId,
+      prayerRolledAmount: affected.prayerRolledAmount,
+      healing: affected.healing,
+      lifeAfter: affected.lifeAfter,
+    }))).toEqual([
+      {
+        unitId: wounded.id,
+        prayerRolledAmount: first!.rolledAmount,
+        healing: first!.rolledAmount,
+        lifeAfter: maxLife - 30 + first!.rolledAmount!,
+      },
+      {
+        unitId: nearlyFull.id,
+        prayerRolledAmount: second!.rolledAmount,
+        healing: 3,
+        lifeAfter: maxLife,
+      },
+    ]);
+  });
+
   it("settles OJ recipients only after each presentation and spends the action at the end", () => {
     const seed = findPrayerSeed(3, (outcomes) => outcomes.length >= 2);
     const battle = new Stage0Battle(0, new DeterministicRng(seed));

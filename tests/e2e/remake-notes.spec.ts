@@ -284,6 +284,24 @@ test("REMAKE-128 說明落雷無擊殺也有分層施法經驗", async ({ page }
   await expect(lightningExperience).toContainText("沒有擊殺");
 });
 
+test("REMAKE-156 說明祈禱生命恢復量改為畫面顯示的數字", async ({ page }) => {
+  await page.goto("/");
+  // 使用者決定保留顯示的抽取量：與原版不同的改動一律算原版缺陷修復，不歸「平衡性調整」。
+  await openNotes(page, "fixes");
+  const prayerHeal = page.getByTestId("remake-note-REMAKE-156");
+  await expect(prayerHeal).toContainText("祈禱的生命恢復量與畫面數字一致");
+  await expect(prayerHeal).toContainText("固定恢復 10 點");
+  await expect(prayerHeal).toContainText("扣除 11–26 點生命");
+  await expect(prayerHeal).toContainText("一律恢復畫面上顯示的 5–14 點");
+  await expect(prayerHeal.locator(".rn-note-id")).toHaveText("REMAKE-156");
+  await captureVisualAudit(prayerHeal, {
+    path: "artifacts/playwright/remake-notes-prayer-heal.png",
+  });
+
+  await page.getByTestId("remake-notes-tab-balance").click();
+  await expect(page.getByTestId("remake-note-REMAKE-156")).toHaveCount(0);
+});
+
 test("REMAKE-152 與 REMAKE-154 將兩關的敵軍配置漏洞列入 Bug 修復", async ({ page }) => {
   await page.goto("/");
   // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。
