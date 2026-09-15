@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -164,8 +165,7 @@ test("S33-F: removing the final guard uses ordinary victory feedback without a v
     life: 1,
   });
   await clickCell(page, 27, 38);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCell(page, 28, 38);
+  await attackOnlyAdjacentEnemy(page);
   const promotion = page.getByTestId("promotion-layer");
   await expect.poll(async () =>
     (await state(page)).phase === "victoryFeedback" || await promotion.isVisible()).toBe(true);

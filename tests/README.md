@@ -20,6 +20,14 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 的用例会自动等这段动画，不需要手动 sleep；但量测几何或「关掉再开同一个选单」的用例要用
 `menu-controls.ts` 的 `settleMenuAnimation` 与 `expectMenuOpen`，见责任映射对应行。
 
+用鼠标按职业选单命令优先走 `command-controls.ts` 的 `chooseUnitCommand`：指针一移进某行，控制器就同步
+改高亮并以 `innerHTML` 重建整份选单，直接 `click()` 的第一次按下对准的是被换掉的旧按钮，由 Playwright
+自己拦下再重试——游戏只收到重试那一下，但追踪记录像按了两次。普通攻击必须按
+`design/remake-gdd/03-battle-rules.md` 的目标分支二选一：只有一个相邻合法目标时用
+`attackOnlyAdjacentEnemy`，按下「攻擊」即自动锁定并提交，之后不得再点目标格（那一下会与战斗演出赛跑，
+一旦对白层、转职层或胜利剧情先盖住画布就会一直等到超时）；两个以上目标时用 `enterAttackTargeting`，
+确认已进入手动选格再点目标。
+
 分段资源门会在 `goto`、`reload` 与战中读档后异步替换游戏表面。E2E 必须等待目标控制器阶段、
 目标 DOM 或读档独有的状态组合；若读档前后阶段相同，不能只等 `phase`。资源请求断言应在导航前
 注册 Playwright `request` 监听，不依赖容量有限、可能淘汰早期条目的 Resource Timing 缓冲区。

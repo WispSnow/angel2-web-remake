@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -123,8 +124,7 @@ test("S35-G/H: final elimination plays SAY/0068 and Nia defeat retries the openi
   await page.goto("/?debugScenario=stage-35-near-victory&difficulty=0&test=1");
   await waitForPhase(page, "player");
   await clickCell(page, 22, 11);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCell(page, 22, 10);
+  await attackOnlyAdjacentEnemy(page);
   const promotion = page.getByTestId("promotion-layer");
   await expect.poll(async () =>
     (await state(page)).phase === "victoryStory" || await promotion.isVisible()).toBe(true);

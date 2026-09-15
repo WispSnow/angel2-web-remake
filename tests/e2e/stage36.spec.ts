@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { enterAttackTargeting } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -147,7 +148,8 @@ test("S36-F: defeating Bina Vige wins while the other 29 enemies remain", async 
     life: 1,
   });
   await clickCell(page, 22, 13);
-  await page.getByTestId("unit-command-attack").click();
+  // 2:32 at (22,14) is adjacent too, so 攻擊 opens manual target selection.
+  await enterAttackTargeting(page);
   await clickCell(page, 23, 13);
   const promotion = page.getByTestId("promotion-layer");
   await expect.poll(async () =>

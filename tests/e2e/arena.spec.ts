@@ -5,6 +5,7 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { activeDialogueRecord } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -240,8 +241,7 @@ test("ordinary melee status applies directly and appears in the unit HUD without
   await clickArenaWorldCell(page, 20, 30);
   await expect(page.getByTestId("unit-control-summary")).toHaveText("玩家・可行動");
   await expect(page.getByTestId("status-strip")).toContainText("玩家・可行動");
-  await page.getByTestId("unit-command-attack").click();
-  await clickArenaWorldCell(page, 21, 30);
+  await attackOnlyAdjacentEnemy(page);
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -296,8 +296,7 @@ test("great dragon knight counter guard keeps its wide shield centered", async (
 
   await page.getByTestId("arena-start").click();
   await clickArenaWorldCell(page, 20, 30);
-  await page.getByTestId("unit-command-attack").click();
-  await clickArenaWorldCell(page, 21, 30);
+  await attackOnlyAdjacentEnemy(page);
   await page.waitForFunction(() =>
     window.__ANGEL2_ARENA__?.getState().battle?.combatPresentation?.phase === "fullCounterImpact");
 

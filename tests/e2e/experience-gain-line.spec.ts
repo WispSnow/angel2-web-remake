@@ -6,6 +6,7 @@ import {
   type ArenaBattleDebugState,
 } from "./arena-test-support";
 import { nativeExperienceLineText } from "../../src/game/content/ai-technique-dialogue";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 /**
@@ -93,10 +94,7 @@ async function waitForActionSettled(page: Page, actorId: string): Promise<void> 
 
 async function attackFrom(page: Page, origin: { x: number; y: number }): Promise<void> {
   await clickArenaWorldCell(page, origin.x, origin.y);
-  const attack = page.getByTestId("unit-command-attack");
-  await expect(attack).toBeVisible();
-  await attack.click();
-  await clickArenaWorldCell(page, TARGET.x, TARGET.y);
+  await attackOnlyAdjacentEnemy(page);
 }
 
 test("an ordinary kill opens the native experience window on the map route", async ({ page }) => {

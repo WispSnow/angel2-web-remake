@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { activeDialogueRecord } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -115,8 +116,7 @@ test("promotion lab exposes all twelve threshold pairs and the formal choice UI"
     .toMatchObject({ classId: "soldier", experience: 299, x: 17, y: 14 });
 
   await clickWorldCell(page, 17, 14);
-  await page.getByTestId("unit-command-attack").click();
-  await clickWorldCell(page, 18, 14);
+  await attackOnlyAdjacentEnemy(page);
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute(
     "data-source-record",
     "promotion",
@@ -218,8 +218,7 @@ test("generic land knight promotes with its beast figure and canonical professio
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
   await clickWorldCell(page, 17, 16);
-  await page.getByTestId("unit-command-attack").click();
-  await clickWorldCell(page, 18, 16);
+  await attackOnlyAdjacentEnemy(page);
 
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute(
     "data-source-record",
@@ -296,8 +295,7 @@ test("advanced source options use published class figures", async ({ page }) => 
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
   await clickWorldCell(page, 17, 15);
-  await page.getByTestId("unit-command-attack").click();
-  await clickWorldCell(page, 18, 15);
+  await attackOnlyAdjacentEnemy(page);
   await finishPromotionDialogue(page);
 
   const state = await promotionLabState(page);
@@ -319,13 +317,9 @@ test("variable-size profession figures remain undistorted and centered in the na
   await page.getByTestId("promotion-lab-start").click();
   await expect(page.getByTestId("battle-canvas")).toBeVisible();
 
-  const openChoices = async (
-    source: { x: number; y: number },
-    target: { x: number; y: number },
-  ) => {
+  const openChoices = async (source: { x: number; y: number }) => {
     await clickWorldCell(page, source.x, source.y);
-    await page.getByTestId("unit-command-attack").click();
-    await clickWorldCell(page, target.x, target.y);
+    await attackOnlyAdjacentEnemy(page);
     await finishPromotionDialogue(page);
   };
   const expectNativeFigure = async (
@@ -362,7 +356,7 @@ test("variable-size profession figures remain undistorted and centered in the na
     expect(Math.abs(metrics.centerOffsetY)).toBeLessThanOrEqual(0.5);
   };
 
-  await openChoices({ x: 17, y: 17 }, { x: 18, y: 17 });
+  await openChoices({ x: 17, y: 17 });
   expect((await promotionLabState(page)).battle?.promotionTargets.map(({ id }) => id))
     .toEqual(["crossbow", "magic-archer"]);
   await expectNativeFigure("crossbow", 32, 43, -3);
@@ -382,7 +376,7 @@ test("variable-size profession figures remain undistorted and centered in the na
   await page.mouse.move(canvasBounds.x + canvasBounds.width + 8, canvasBounds.y + 180);
   await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");
 
-  await openChoices({ x: 29, y: 19 }, { x: 30, y: 19 });
+  await openChoices({ x: 29, y: 19 });
   expect((await promotionLabState(page)).battle?.promotionTargets.map(({ id }) => id))
     .toEqual(["magic-priest", "curse-master"]);
   await expectNativeFigure("curse-master", 32, 43, 3);

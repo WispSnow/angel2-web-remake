@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { skipOpeningToTitle } from "./startup-controls";
 import { expectStoryBackground } from "./story-background";
@@ -162,8 +163,7 @@ test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves 
     experience: 0,
   });
   await clickCell(page, 27, 23);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCell(page, 28, 23);
+  await attackOnlyAdjacentEnemy(page);
 
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "battle-context");

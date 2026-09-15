@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { CREDITS_NAME_FRAMES, CREDITS_ROLE_FRAMES } from "../../src/game/content/credits";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -135,8 +136,7 @@ test("S38-E: near-victory fixture leaves one adjacent 1-HP enemy", async ({ page
     path: `${ARTIFACT_DIR}/stage38-near-victory-fixture.png`,
   });
   await clickCell(page, 29, 28);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCell(page, 30, 28);
+  await attackOnlyAdjacentEnemy(page);
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "165");
   expect((await state(page)).units.filter(({ side }) => side === 2)).toHaveLength(0);

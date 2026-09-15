@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
@@ -166,8 +167,7 @@ test("S28-F: the final enemy's removal starts SAY/0055", async ({ page }) => {
     life: 1,
   });
   await clickCell(page, 28, 24);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCell(page, 29, 24);
+  await attackOnlyAdjacentEnemy(page);
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "55");
   expect((await state(page)).units.filter(({ side }) => side === 2)).toHaveLength(0);

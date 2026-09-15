@@ -6,6 +6,7 @@ import {
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
 } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy, enterAttackTargeting } from "./command-controls";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
 import { skipOpeningToTitle } from "./startup-controls";
@@ -2526,7 +2527,7 @@ test("RHP-05: sound desk object exposes independent volume and four persistent r
 
   await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
   await page.keyboard.press(" ");
-  await page.getByTestId("unit-command-attack").click();
+  await enterAttackTargeting(page);
   const targeting = await debugState(page);
   const target = targeting.targets[0];
   await clickCanvas(
@@ -3127,7 +3128,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   const attackFirstForcedTarget = async () => {
     await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
     await page.keyboard.press(" ");
-    await page.getByTestId("unit-command-attack").click();
+    await enterAttackTargeting(page);
     const targeting = await debugState(page);
     const target = targeting.targets[0];
     const targetUnit = targeting.units.find(({ x, y }) => x === target.x && y === target.y);
@@ -3291,8 +3292,7 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await page.evaluate(() => window.__ANGEL2__?.forceCavalryCounterSetup());
   await setBattlePresentation(page, "full");
   await clickCanvas(page, 220, 177);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCanvas(page, 260, 177);
+  await attackOnlyAdjacentEnemy(page);
   // The cavalry counter throws its lance as a separate travelling channel:
   // the rider launches it, then leaves while the lance crosses the window.
   const lanceX = () => page.evaluate(() =>
@@ -3560,7 +3560,7 @@ test("S00-M: native system records restore battle state and combat cues follow p
   await setBattlePresentation(page, "map");
   await page.evaluate(() => window.__ANGEL2__?.forceMultipleTargets());
   await page.keyboard.press(" ");
-  await page.getByTestId("unit-command-attack").click();
+  await enterAttackTargeting(page);
   const targeting = await debugState(page);
   const target = targeting.targets[0];
   await clickCanvas(

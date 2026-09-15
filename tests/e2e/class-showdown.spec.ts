@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -257,8 +258,7 @@ test("jungle warrior melee poison is direct and leaves the persistent native sta
 
   await clickClassShowdownWorldCell(page, 17, 17);
   await expect(page.locator(".hud-identity-name")).toHaveText("叢林戰士／叢林戰士");
-  await page.getByTestId("unit-command-attack").click();
-  await clickClassShowdownWorldCell(page, 18, 17);
+  await attackOnlyAdjacentEnemy(page);
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
@@ -614,8 +614,7 @@ test("counterattacks grant experience without applying ordinary-hit class status
 
   await clickClassShowdownWorldCell(page, 17, 16);
   await expect(page.locator(".hud-identity-name")).toHaveText("魔劍戰士／魔劍戰士");
-  await page.getByTestId("unit-command-attack").click();
-  await clickClassShowdownWorldCell(page, 18, 16);
+  await attackOnlyAdjacentEnemy(page);
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {

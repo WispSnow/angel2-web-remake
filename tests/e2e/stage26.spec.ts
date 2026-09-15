@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -178,8 +179,7 @@ test("S26-G: Binaweiji's removal starts SAY/0050 while seven priests remain", as
   await page.goto("/?debugScenario=stage-26-near-victory&difficulty=0&test=1");
   await waitForPhase(page, "player");
   await clickCell(page, 22, 17);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCell(page, 22, 16);
+  await attackOnlyAdjacentEnemy(page);
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "50");
   const victory = await state(page);

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -139,8 +140,7 @@ test("S32-F: defeating the final alliance unit starts SAY/0064", async ({ page }
     life: 1,
   });
   await clickCell(page, 25, 24);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCell(page, 26, 24);
+  await attackOnlyAdjacentEnemy(page);
   const promotion = page.getByTestId("promotion-layer");
   await expect.poll(async () =>
     (await state(page)).phase === "victoryStory" || await promotion.isVisible()).toBe(true);

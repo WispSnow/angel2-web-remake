@@ -5,6 +5,7 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 test("tier-two curse-master commits IP after its poison presentation", async ({ page }) => {
@@ -848,8 +849,7 @@ test("only the bone knight's full reflect speaks between the hit and its counter
   await expect.poll(async () => (await arenaBattleState(page))?.battlePresentation).toBe("map");
 
   await clickArenaWorldCell(page, 20, 30);
-  await page.getByTestId("unit-command-attack").click();
-  await clickArenaWorldCell(page, 21, 30);
+  await attackOnlyAdjacentEnemy(page);
 
   const dialogue = page.getByTestId("dialogue-layer");
   await expect(dialogue).toHaveAttribute("data-source-record", "counterattack");
@@ -872,8 +872,7 @@ test("only the bone knight's full reflect speaks between the hit and its counter
   // Same exchange against an ordinary defender: the counter still lands, and
   // the native gate keeps it silent.
   await clickArenaWorldCell(page, 20, 32);
-  await page.getByTestId("unit-command-attack").click();
-  await clickArenaWorldCell(page, 21, 32);
+  await attackOnlyAdjacentEnemy(page);
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
     return current?.lastCombat?.attackerId === "arena-1-1" && current.combatPresentation === undefined;

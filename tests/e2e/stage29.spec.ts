@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { expectStoryBackground } from "./story-background";
 import { captureVisualAudit } from "./visual-audit";
@@ -189,8 +190,7 @@ test("S29-F: removing the final guard uses ordinary victory feedback without a v
     life: 1,
   });
   await clickCell(page, 44, 26);
-  await page.getByTestId("unit-command-attack").click();
-  await clickCell(page, 45, 26);
+  await attackOnlyAdjacentEnemy(page);
   await waitForPhase(page, "victoryFeedback");
   expect((await state(page)).units.filter(({ side }) => side === 2)).toHaveLength(0);
   await expect(page.getByTestId("dialogue-layer")).toBeHidden();

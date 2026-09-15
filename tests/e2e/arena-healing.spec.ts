@@ -5,6 +5,7 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 test("tier-three prayer guide performs native 2H as two heart cycles plus the shared tail", async ({ page }) => {
@@ -207,8 +208,7 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
     [26, 31, "arena-1-1"],
   ] as const) {
     await clickArenaWorldCell(page, x, y);
-    await page.getByTestId("unit-command-attack").click();
-    await clickArenaWorldCell(page, 26, 30);
+    await attackOnlyAdjacentEnemy(page);
     await page.waitForFunction((expectedActorId) => {
       const current = (window.__ANGEL2_ARENA__?.getState() as {
         battle?: ArenaBattleDebugState;
@@ -421,14 +421,13 @@ test("enemy tier-three prayer guide selects 3I and uses group-14 dialogue", asyn
   // Two hits on the 祈導師 and one on its 士兵 escort give the ring two real
   // recipients, which is what makes 3I outscore the single-target 2H that
   // shares the tier-three pool.
-  for (const [x, y, targetX, targetY, actorId, defenderId] of [
-    [24, 30, 25, 30, "arena-1-0", "arena-2-0"],
-    [25, 31, 25, 30, "arena-1-1", "arena-2-0"],
-    [26, 29, 26, 30, "arena-1-2", "arena-2-1"],
+  for (const [x, y, actorId, defenderId] of [
+    [24, 30, "arena-1-0", "arena-2-0"],
+    [25, 31, "arena-1-1", "arena-2-0"],
+    [26, 29, "arena-1-2", "arena-2-1"],
   ] as const) {
     await clickArenaWorldCell(page, x, y);
-    await page.getByTestId("unit-command-attack").click();
-    await clickArenaWorldCell(page, targetX, targetY);
+    await attackOnlyAdjacentEnemy(page);
     await page.waitForFunction(([expectedActorId, expectedDefenderId]) => {
       const current = (window.__ANGEL2_ARENA__?.getState() as {
         battle?: ArenaBattleDebugState;
@@ -530,8 +529,7 @@ test("formal 3I keeps an ice-frozen ally blocked and leaves its shell above the 
   const frozenLife = before?.units.find(({ id }) => id === "arena-2-0")?.life;
 
   await clickArenaWorldCell(page, 24, 31);
-  await page.getByTestId("unit-command-attack").click();
-  await clickArenaWorldCell(page, 25, 31);
+  await attackOnlyAdjacentEnemy(page);
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
       battle?: ArenaBattleDebugState;
