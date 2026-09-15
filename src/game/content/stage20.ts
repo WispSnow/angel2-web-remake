@@ -310,7 +310,9 @@ export function activateStage20Content(): void {
         // stableRemake keeps Kins's explicit stage-42/22 profession instead of
         // exposing the otherwise stale campaign-slot fallback as a soldier.
         forcedClassId: semanticClassId(STAGE20_KINS.nativeClassRecord),
-        forcedExperience: 0,
+        // REMAKE-151: the slot this event writes has already been floored to
+        // 299 by module 27 `0000:0493`, as every still class-0 named slot is.
+        forcedExperience: 299,
         forceSourceId: "1:0",
       }],
       statusText: "琴斯突然現身",

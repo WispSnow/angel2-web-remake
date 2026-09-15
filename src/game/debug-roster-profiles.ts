@@ -44,7 +44,7 @@ const SULANDA_CAVALRY_BASELINE = { slot: 8, classId: "cavalry", experience: 299 
 const DORI_CURSE_MASTER_BASELINE = { slot: 9, classId: "curse-master", experience: 299 } as const;
 const MARLIN_WATER_WARRIOR_BASELINE = { slot: 10, classId: "water-warrior", experience: 299 } as const;
 const MOLINA_WATER_WARRIOR_BASELINE = { slot: 11, classId: "water-warrior", experience: 299 } as const;
-const KINS_MAGIC_PRIEST_BASELINE = { slot: 7, classId: "magic-priest", experience: 0 } as const;
+const KINS_MAGIC_PRIEST_BASELINE = { slot: 7, classId: "magic-priest", experience: 299 } as const;
 const STAGE27_GREAT_AXE_DEFENDER_BASELINE = {
   slot: 22,
   classId: "great-axe-warrior",

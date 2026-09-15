@@ -1452,7 +1452,7 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     });
   });
 
-  it("does not let a magic archer act adjacent to any enemy, even one currently disabled", () => {
+  it("keeps a pursuing magic archer out of contact with any enemy, even one currently disabled", () => {
     const battle = new ArenaBattle([
       { id: "ally-adjacent", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
       { id: "ally-ranged-target", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
@@ -1460,9 +1460,50 @@ describe("REMAKE-033/037 stable-remake shared automatic expert AI", () => {
     ], 0, new DeterministicRng(0x3325));
     battle.unit("ally-adjacent")!.actionDisabled = true;
 
-    expect(battle.planEnemyAiAction("enemy-magic-archer", 1)).toEqual({
+    const action = battle.planEnemyAiAction("enemy-magic-archer", 2);
+    expect(action).toMatchObject({ kind: "special", actionId: "magic-archer-shot" });
+    expect(manhattan(action!.path.at(-1)!, battle.unit("ally-adjacent")!)).toBeGreaterThan(1);
+  });
+
+  it("lets a guard magic archer that cannot leave contact fire in place (REMAKE-150)", () => {
+    // Behavior 1 may only act from its own cell. Banning every cell beside an
+    // enemy used to leave it nothing but waiting — or resting once wounded —
+    // while the frozen soldier stood next to it; native behavior 1 fires in
+    // place at `19C1`.
+    const battle = new ArenaBattle([
+      { id: "ally-adjacent", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "ally-ranged-target", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "enemy-magic-archer", side: 2 as const, slot: 0, classId: "magic-archer" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3325));
+    battle.unit("ally-adjacent")!.actionDisabled = true;
+    const guardShot = {
       unitId: "enemy-magic-archer",
-      kind: "wait",
+      kind: "special",
+      actionId: "magic-archer-shot",
+      targetId: "ally-ranged-target",
+      path: [{ x: 20, y: 30 }],
+    };
+
+    expect(battle.planEnemyAiAction("enemy-magic-archer", 1)).toMatchObject(guardShot);
+    const archer = battle.unit("enemy-magic-archer")!;
+    archer.life = Math.max(1, Math.floor(archer.life * 3 / 10));
+    expect(battle.planEnemyAiAction("enemy-magic-archer", 1)).toMatchObject(guardShot);
+  });
+
+  it("lets a boxed-in pursuing magic archer fire from contact instead of idling (REMAKE-150)", () => {
+    const battle = new ArenaBattle([
+      { id: "ally-north", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 29 },
+      { id: "ally-west", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 19, y: 30 },
+      { id: "ally-east", side: 1 as const, slot: 2, classId: "soldier" as const, level: 1 as const, x: 21, y: 30 },
+      { id: "ally-south", side: 1 as const, slot: 3, classId: "soldier" as const, level: 1 as const, x: 20, y: 31 },
+      { id: "ally-ranged-target", side: 1 as const, slot: 4, classId: "soldier" as const, level: 1 as const, x: 23, y: 30 },
+      { id: "enemy-magic-archer", side: 2 as const, slot: 0, classId: "magic-archer" as const, level: 1 as const, x: 20, y: 30 },
+    ], 0, new DeterministicRng(0x3327));
+
+    expect(battle.planEnemyAiAction("enemy-magic-archer", 2)).toMatchObject({
+      kind: "special",
+      actionId: "magic-archer-shot",
+      targetId: "ally-ranged-target",
       path: [{ x: 20, y: 30 }],
     });
   });

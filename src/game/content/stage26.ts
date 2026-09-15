@@ -133,7 +133,7 @@ export const STAGE26_SEMANTIC_ALLIED_UNITS = STAGE26_DEPLOYMENT_ACTORS.map((acto
   aiBehavior: 0,
   // Kins entered the campaign at stage 22 as a record-3 magic priest without
   // the 299-experience baseline used by native class-0 named actors.
-  untouchedExperience: untouchedEntryExperience(actor.slot, actor.slot === 7 ? 0 : 299),
+  untouchedExperience: untouchedEntryExperience(actor.slot, 299),
 }));
 
 export const STAGE26_SEMANTIC_ENEMY_UNITS = STAGE26_ENEMY_UNITS.map((unit) => {

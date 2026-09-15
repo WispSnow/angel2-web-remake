@@ -125,7 +125,7 @@ const campaignActors = STAGE27_DEPLOYMENT_ACTORS.map((actor) => ({
   name: actor.normalizedName,
   portrait: actor.portraitRecord as PortraitRecord,
   aiBehavior: 0,
-  untouchedExperience: untouchedEntryExperience(actor.slot, actor.slot === 7 ? 0 : 299),
+  untouchedExperience: untouchedEntryExperience(actor.slot, 299),
 }));
 
 export const STAGE27_SEMANTIC_DEPLOYMENT_ROSTER_UNITS = campaignActors;

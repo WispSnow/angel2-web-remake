@@ -511,8 +511,8 @@ describe("debug roster profiles", () => {
         expect(roster[7], `${stageId}/${profileId}/${perStageGrowth ?? "configured"}`).toEqual({
           slot: 7,
           classId: "magic-priest",
-          experience: 0,
-          life: classStatsFor({ classId: "magic-priest", experience: 0 }).maxLife,
+          experience: 299,
+          life: classStatsFor({ classId: "magic-priest", experience: 299 }).maxLife,
         });
         for (const slot of [25, 26, 27, 28, 29, 30, 31]) {
           expect(roster[slot]?.classId).toBe("half-dragon-warrior");

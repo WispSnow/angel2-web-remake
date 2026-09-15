@@ -119,9 +119,10 @@ export const STAGE23_SEMANTIC_ALLIED_UNITS = STAGE23_DEPLOYMENT_ACTORS.map((acto
   name: actor.normalizedName,
   portrait: actor.portraitRecord as PortraitRecord,
   aiBehavior: 0,
-  // Kins enters the deployable roster as the stage-22 record-3 magic priest;
-  // unlike native class-0 named baselines, that override does not grant 299 experience.
-  untouchedExperience: untouchedEntryExperience(actor.slot, actor.slot === 7 ? 0 : 299),
+  // REMAKE-151: Kins's record-3 profession is the template's sparse class
+  // override, which module 27 applies only after `0000:0493` has floored the
+  // still class-0 named slot to 299, so he enters on the same baseline.
+  untouchedExperience: untouchedEntryExperience(actor.slot, 299),
 }));
 
 export const STAGE23_SEMANTIC_ENEMY_UNITS = STAGE23_ENEMY_UNITS.map((unit) => {

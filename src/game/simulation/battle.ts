@@ -3612,14 +3612,26 @@ export class Stage0Battle {
         utility: ExpertAiUtility;
         rangedRisk: RangedPositionRisk;
       }> = [];
+      const pathTo = (position: Position): Position[] => positionKey(position) === positionKey(unit)
+        ? [{ x: unit.x, y: unit.y }]
+        : this.movementPath(unit.id, position);
+      const usablePath = (path: readonly Position[]): boolean =>
+        path.length > 0 && (options.pathFilter?.(path) ?? true);
+      // REMAKE-066 keeps a magic archer out of contact, but only while its
+      // strategy still offers a cell out of contact. A guard held to its own
+      // cell, or a pursuer boxed in on every side, fires from where it stands
+      // — native behavior 1 shoots in place at `19C1` — instead of idling next
+      // to the enemy it cannot leave (REMAKE-150).
+      const avoidsContact = (options.expertRanking || options.modernRanking)
+        && actionId === "magic-archer-shot"
+        && positions.some((position) => rangedRiskAt(position).adjacentEnemyCount === 0
+          && usablePath(pathTo(position)));
 
       for (const position of positions) {
         const rangedRisk = shootingAction
           ? rangedRiskAt(position)
           : { adjacentEnemyCount: 0, meleeContactCount: 0, meleeExpectedDamage: 0 };
-        if ((options.expertRanking || options.modernRanking)
-          && actionId === "magic-archer-shot"
-          && rangedRisk.adjacentEnemyCount > 0) continue;
+        if (avoidsContact && rangedRisk.adjacentEnemyCount > 0) continue;
         const rangeActor = { ...unit, x: position.x, y: position.y };
         const shootingActionId = isShootingActionId(actionId) ? actionId : undefined;
         const rangeSeed = shootingActionId
@@ -3634,10 +3646,8 @@ export class Stage0Battle {
           rangeSeed,
           shootingActionId !== undefined,
         );
-        const path = positionKey(position) === positionKey(unit)
-          ? [{ x: unit.x, y: unit.y }]
-          : this.movementPath(unit.id, position);
-        if (path.length === 0 || !(options.pathFilter?.(path) ?? true)) continue;
+        const path = pathTo(position);
+        if (!usablePath(path)) continue;
 
         for (const target of this.units) {
           const correctSide = definition.target === "ally"

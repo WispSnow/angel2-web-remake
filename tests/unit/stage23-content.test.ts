@@ -52,7 +52,7 @@ describe("stage 23 generated content", () => {
       name: "琴斯",
       portrait: 14,
       initialClassId: "magic-priest",
-      untouchedExperience: 0,
+      untouchedExperience: 299,
     });
     expect(STAGE23_SEMANTIC_ENEMY_UNITS).toHaveLength(21);
     expect(STAGE23_SEMANTIC_ENEMY_UNITS).toEqual(expect.arrayContaining([

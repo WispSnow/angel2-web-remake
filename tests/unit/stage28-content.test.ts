@@ -51,7 +51,7 @@ describe("stage 28 generated content", () => {
     expect(STAGE28_SEMANTIC_ALLIED_UNITS.find(({ slot }) => slot === 7)).toMatchObject({
       name: "琴斯",
       portrait: 14,
-      untouchedExperience: 0,
+      untouchedExperience: 299,
     });
 
     expect(STAGE28_SEMANTIC_ENEMY_UNITS).toHaveLength(17);

@@ -15,6 +15,8 @@ import {
   HALF_DRAGON_SISTER_CLASS_ID,
   HALF_DRAGON_SISTER_ENTRY_EXPERIENCE,
   HALF_DRAGON_SISTER_SLOTS,
+  KINS_ENTRY_CLASS_ID,
+  KINS_ENTRY_EXPERIENCE,
 } from "../../content/campaign-entry-experience";
 import { STAGE0_DEFINITION } from "../../content/stages";
 import { consumedEventIdsForBattleResume } from "../../simulation/stage-events";
@@ -650,6 +652,24 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 104
     || value.contentVersion !== "stage-09-escort-valley-route-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * REMAKE-150 lets a guard or boxed-in magic archer fire from contact, and
+ * REMAKE-151 restores Kins's 299 entry floor. Plans are rebuilt from the board
+ * on every read and parseSaveData raises any Kins an older save parked below
+ * the floor, so v114 battle/completed saves otherwise migrate by identity.
+ */
+function migrateVersion114Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 114
+    || value.contentVersion !== "water-warrior-shot-terrain-1") return undefined;
   const migrated = {
     ...value,
     version: SAVE_VERSION,
@@ -3109,23 +3129,29 @@ function migrateLegacySave(save: LegacySaveData): SaveData {
 }
 
 /**
- * REMAKE-092 replaces the sisters' entry baseline, so a save written before it
- * can still hold a sister parked on the old class-0 soldier number. Raising her
- * to the entry threshold on migration keeps an in-flight campaign consistent
- * with a fresh one; a sister who already earned more than the threshold keeps
- * every point of it, and the pass never lowers anyone.
+ * Raises one entrant parked below its entry floor in every copy a save keeps:
+ * the roster, the stage-entry snapshot and the live board. Anyone who already
+ * earned past the floor keeps every point of it, and the pass never lowers
+ * anyone.
  */
-function raiseHalfDragonSisterEntryExperience(save: SaveData): SaveData {
+function raiseEntryExperienceFloor(
+  save: SaveData,
+  entrant: {
+    slots: readonly number[];
+    classId: SaveRosterEntry["classId"];
+    experience: number;
+  },
+): SaveData {
   const belowEntry = (entry: Pick<SaveRosterEntry, "slot" | "classId" | "experience">): boolean =>
-    HALF_DRAGON_SISTER_SLOTS.includes(entry.slot)
-    && entry.classId === HALF_DRAGON_SISTER_CLASS_ID
-    && entry.experience < HALF_DRAGON_SISTER_ENTRY_EXPERIENCE;
+    entrant.slots.includes(entry.slot)
+    && entry.classId === entrant.classId
+    && entry.experience < entrant.experience;
   const raiseEntry = (entry: SaveRosterEntry): SaveRosterEntry => {
     if (!belowEntry(entry)) return entry;
     // Carry the accumulated damage across rather than the raw life value, so a
-    // wounded sister stays wounded by the same amount at her new ceiling.
+    // wounded entrant stays wounded by the same amount at the new ceiling.
     const damage = Math.max(0, classStatsFor(entry).maxLife - Math.min(entry.life, classStatsFor(entry).maxLife));
-    const experience = HALF_DRAGON_SISTER_ENTRY_EXPERIENCE;
+    const experience = entrant.experience;
     const maximumLife = classStatsFor({ classId: entry.classId, experience }).maxLife;
     return { ...entry, experience, life: Math.max(1, maximumLife - damage) };
   };
@@ -3149,56 +3175,94 @@ function raiseHalfDragonSisterEntryExperience(save: SaveData): SaveData {
   };
 }
 
+/**
+ * REMAKE-092 replaces the sisters' entry baseline, so a save written before it
+ * can still hold a sister parked on the old class-0 soldier number. Raising her
+ * to the entry threshold on migration keeps an in-flight campaign consistent
+ * with a fresh one.
+ */
+function raiseHalfDragonSisterEntryExperience(save: SaveData): SaveData {
+  return raiseEntryExperienceFloor(save, {
+    slots: HALF_DRAGON_SISTER_SLOTS,
+    classId: HALF_DRAGON_SISTER_CLASS_ID,
+    experience: HALF_DRAGON_SISTER_ENTRY_EXPERIENCE,
+  });
+}
+
+/**
+ * REMAKE-151 restores Kins's native 299 entry floor. Every earlier version
+ * seated him as a 0-experience 魔祭師, so any older save may still hold him
+ * below it. A 魔祭師 stays on his first growth row until 580, so only the
+ * number moves; an untouched default-soldier slot 7 is left alone so the next
+ * stage still seats him from its own baseline.
+ */
+function raiseKinsEntryExperience(save: SaveData): SaveData {
+  return raiseEntryExperienceFloor(save, {
+    slots: [KINS_SLOT],
+    classId: KINS_ENTRY_CLASS_ID,
+    experience: KINS_ENTRY_EXPERIENCE,
+  });
+}
+
 export function parseSaveData(raw: string): SaveData | undefined {
   try {
     const value: unknown = JSON.parse(raw);
     // A save already at the current version is returned untouched: its sisters
-    // entered at the threshold, and experience never decreases.
+    // and Kins entered at their floors, and experience never decreases.
     if (isSaveData(value)) return value;
-    const migratedVersion113 = migrateVersion113Save(value);
-    if (migratedVersion113) return migratedVersion113;
-    const migratedVersion112 = migrateVersion112Save(value);
-    if (migratedVersion112) return migratedVersion112;
-    const migratedVersion111 = migrateVersion111Save(value);
-    if (migratedVersion111) return migratedVersion111;
-    const migratedVersion110 = migrateVersion110Save(value);
-    if (migratedVersion110) return migratedVersion110;
-    const migratedVersion109 = migrateVersion109Save(value);
-    if (migratedVersion109) return migratedVersion109;
-    const migratedVersion108 = migrateVersion108Save(value);
-    if (migratedVersion108) return migratedVersion108;
-    const migratedVersion107 = migrateVersion107Save(value);
-    if (migratedVersion107) return migratedVersion107;
-    const migratedVersion106 = migrateVersion106Save(value);
-    if (migratedVersion106) return migratedVersion106;
-    const migratedVersion105 = migrateVersion105Save(value);
-    if (migratedVersion105) return migratedVersion105;
-    const migratedVersion104 = migrateVersion104Save(value);
-    if (migratedVersion104) return migratedVersion104;
-    const migratedVersion103 = migrateVersion103Save(value);
-    if (migratedVersion103) return migratedVersion103;
-    const migratedVersion102 = migrateVersion102Save(value);
-    if (migratedVersion102) return migratedVersion102;
-    const migratedVersion101 = migrateVersion101Save(value);
-    if (migratedVersion101) return migratedVersion101;
-    const migratedVersion100 = migrateVersion100Save(value);
-    if (migratedVersion100) return migratedVersion100;
-    const migratedVersion99 = migrateVersion99Save(value);
-    if (migratedVersion99) return migratedVersion99;
-    const migratedVersion98 = migrateVersion98Save(value);
-    if (migratedVersion98) return migratedVersion98;
-    const migratedVersion97 = migrateVersion97Save(value);
-    if (migratedVersion97) return migratedVersion97;
-    // v96/v97 used the all-difficulty level-one baseline; both bypass the
-    // pre-v96 lawless seed-removal repair after their own inverse migration.
-    const migratedVersion96 = migrateVersion96Save(value);
-    if (migratedVersion96) return migratedVersion96;
-    const migrated = migrateLegacySaveData(value);
-    const corrected = migrated ? removeLegacyStage3DifficultySeed(migrated) : undefined;
-    return corrected ? raiseHalfDragonSisterEntryExperience(corrected) : undefined;
+    // Every older branch below returns on its own, so REMAKE-151's floor wraps
+    // the whole chain instead of any single version step.
+    const migrated = migratePreviousSaveData(value);
+    return migrated ? raiseKinsEntryExperience(migrated) : undefined;
   } catch {
     return undefined;
   }
+}
+
+function migratePreviousSaveData(value: unknown): SaveData | undefined {
+  const migratedVersion114 = migrateVersion114Save(value);
+  if (migratedVersion114) return migratedVersion114;
+  const migratedVersion113 = migrateVersion113Save(value);
+  if (migratedVersion113) return migratedVersion113;
+  const migratedVersion112 = migrateVersion112Save(value);
+  if (migratedVersion112) return migratedVersion112;
+  const migratedVersion111 = migrateVersion111Save(value);
+  if (migratedVersion111) return migratedVersion111;
+  const migratedVersion110 = migrateVersion110Save(value);
+  if (migratedVersion110) return migratedVersion110;
+  const migratedVersion109 = migrateVersion109Save(value);
+  if (migratedVersion109) return migratedVersion109;
+  const migratedVersion108 = migrateVersion108Save(value);
+  if (migratedVersion108) return migratedVersion108;
+  const migratedVersion107 = migrateVersion107Save(value);
+  if (migratedVersion107) return migratedVersion107;
+  const migratedVersion106 = migrateVersion106Save(value);
+  if (migratedVersion106) return migratedVersion106;
+  const migratedVersion105 = migrateVersion105Save(value);
+  if (migratedVersion105) return migratedVersion105;
+  const migratedVersion104 = migrateVersion104Save(value);
+  if (migratedVersion104) return migratedVersion104;
+  const migratedVersion103 = migrateVersion103Save(value);
+  if (migratedVersion103) return migratedVersion103;
+  const migratedVersion102 = migrateVersion102Save(value);
+  if (migratedVersion102) return migratedVersion102;
+  const migratedVersion101 = migrateVersion101Save(value);
+  if (migratedVersion101) return migratedVersion101;
+  const migratedVersion100 = migrateVersion100Save(value);
+  if (migratedVersion100) return migratedVersion100;
+  const migratedVersion99 = migrateVersion99Save(value);
+  if (migratedVersion99) return migratedVersion99;
+  const migratedVersion98 = migrateVersion98Save(value);
+  if (migratedVersion98) return migratedVersion98;
+  const migratedVersion97 = migrateVersion97Save(value);
+  if (migratedVersion97) return migratedVersion97;
+  // v96/v97 used the all-difficulty level-one baseline; both bypass the
+  // pre-v96 lawless seed-removal repair after their own inverse migration.
+  const migratedVersion96 = migrateVersion96Save(value);
+  if (migratedVersion96) return migratedVersion96;
+  const migrated = migrateLegacySaveData(value);
+  const corrected = migrated ? removeLegacyStage3DifficultySeed(migrated) : undefined;
+  return corrected ? raiseHalfDragonSisterEntryExperience(corrected) : undefined;
 }
 
 function migrateLegacySaveData(raw: unknown): SaveData | undefined {

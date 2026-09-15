@@ -123,7 +123,7 @@ export const STAGE29_SEMANTIC_ALLIED_UNITS = STAGE29_DEPLOYMENT_ACTORS.map((acto
     aiBehavior: 0,
     untouchedExperience: untouchedEntryExperience(
       actor.slot,
-      usesClassFallback || actor.slot === 7 ? 0 : 299,
+      usesClassFallback ? 0 : 299,
     ),
     // REMAKE-070 keeps Eliola's reachable deployment name on the battlefield,
     // while the missing native portrait still follows her inherited profession.

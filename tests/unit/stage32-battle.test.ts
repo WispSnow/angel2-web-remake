@@ -17,7 +17,7 @@ const campaign: CampaignState = {
   difficulty: 2,
   roster: completeCampaignRoster([
     { slot: 0, classId: "land-knight", experience: 900, life: 270 },
-    { slot: 7, classId: "magic-priest", experience: 0, life: 140 },
+    { slot: 7, classId: "magic-priest", experience: 299, life: 140 },
     { slot: 23, classId: "empress", experience: 0, life: 380 },
     { slot: 25, classId: "half-dragon-warrior", experience: 359, life: 280 },
   ]),
@@ -42,7 +42,7 @@ describe("stage 32 battle simulation", () => {
     expect(roster).toHaveLength(29);
     expect(roster.map(({ slot }) => slot)).not.toContain(23);
     expect(roster.find(({ slot }) => slot === 7)).toMatchObject({
-      name: "琴斯", classId: "magic-priest", experience: 0,
+      name: "琴斯", classId: "magic-priest", experience: 299,
     });
 
     const battle = new Stage32Battle(campaign, fullDeployment);

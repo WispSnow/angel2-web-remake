@@ -1,9 +1,9 @@
 /**
  * 名单槽首次上场时带的经验，只在该槽还没有被战役写过时使用。
  *
- * 各关自己的默认值保留在关卡文件里，因为它们描述的是那一关的出场证据（例如琴斯
- * 带着强制剧情职业入队，所以不适用士兵基线）。本模块只承载跨关一致、且必须逐关
- * 同步的入队基线，避免同一个角色因为玩家先在哪一关部署她而拿到不同起点。
+ * 各关自己的默认值保留在关卡文件里，因为它们描述的是那一关的出场证据（例如只有职业
+ * 回退肖像的通用槽不适用具名基线）。本模块只承载跨关一致、且必须逐关同步的入队基线，
+ * 避免同一个角色因为玩家先在哪一关部署她而拿到不同起点。
  */
 import type { ClassId } from "./class-catalog.generated";
 
@@ -34,3 +34,13 @@ export function untouchedEntryExperience(slot: number, stageDefault: number): nu
 
 /** 姊妹的入队基线只对半龍戰士曲线成立，所以覆写必须跟着那个职业走。 */
 export const HALF_DRAGON_SISTER_CLASS_ID: ClassId = "half-dragon-warrior";
+
+/**
+ * REMAKE-151：琴斯（槽 7）。模块 27 `0000:0493` 在套用模板的稀疏职业覆写之前，就把职业记录
+ * 仍为 0、描述符肖像不是 `FFh`、经验不高于 299 的具名 side-1 槽抬到 299；琴斯的魔祭師职业是
+ * 之后才由覆写写入的，所以他和其他具名角色一样带着 299 入队。复刻曾以为覆写会绕过这条下限
+ * 而把他写成 0，存档迁移据下面三个值把旧档里的他补到下限。
+ */
+export const KINS_SLOT = 7;
+export const KINS_ENTRY_CLASS_ID: ClassId = "magic-priest";
+export const KINS_ENTRY_EXPERIENCE = 299;

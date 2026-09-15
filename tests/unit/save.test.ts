@@ -1917,7 +1917,7 @@ const stage36BattleSave = (): BattleSaveData => {
     rngCalls: 114,
     roster: completeCampaignRoster([
       { slot: 0, classId: "land-knight", experience: 1_120, life: 330 },
-      { slot: 7, classId: "magic-priest", experience: 0, life: 190 },
+      { slot: 7, classId: "magic-priest", experience: 299, life: 190 },
       { slot: 22, classId: "great-axe-warrior", experience: 0, life: 220 },
       { slot: 23, classId: "empress", experience: 0, life: 380 },
       { slot: 40, classId: "magic-sword-warrior", experience: 0, life: 150 },
@@ -4469,14 +4469,16 @@ describe("Web save validation", () => {
       stageId: "stage-24",
     });
     if (migrated?.kind !== "battle") throw new Error("expected migrated stage 24 battle");
+    // REMAKE-151 then lifts the restored 魔祭師 to his 299 entry floor; the
+    // first growth row runs to 580, so every life value stays where it was.
     expect(migrated.stageEntrySnapshot.roster[7]).toMatchObject({
-      classId: "magic-priest", experience: 0, life: 305,
+      classId: "magic-priest", experience: 299, life: 305,
     });
     expect(migrated.roster[7]).toMatchObject({
-      classId: "magic-priest", experience: 0, life: 282,
+      classId: "magic-priest", experience: 299, life: 282,
     });
     expect(migrated.battle.units.find(({ side, slot }) => side === 1 && slot === 7))
-      .toMatchObject({ classId: "magic-priest", experience: 0, life: 282 });
+      .toMatchObject({ classId: "magic-priest", experience: 299, life: 282 });
   });
 
   it("migrates v44 saves to the stage 23 content identity", () => {
@@ -5420,6 +5422,81 @@ describe("Web save validation", () => {
       version: 104,
       contentVersion: "stage-09-escort-valley-route-1",
     }))).toEqual(completed);
+  });
+
+  it("migrates version-114 saves without changing battle state when no Kins sits below his floor", () => {
+    // REMAKE-150 只改魔弓兵在脱不开接触时是否原地射击，规划每次都从棋盘重算；REMAKE-151 的琴斯
+    // 下限只补仍停在 299 以下的魔祭師琴斯，这两份夹具的槽 7 仍是默认士兵，因此 v114 无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 114,
+      contentVersion: "water-warrior-shot-terrain-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 114,
+      contentVersion: "water-warrior-shot-terrain-1",
+    }))).toEqual(completed);
+  });
+
+  it("raises a Kins an older save seated at 0 experience to his native 299 floor", () => {
+    // REMAKE-151：此前每个版本都让琴斯以魔祭師、经验 0 入队。魔祭師第一行用到 580，所以补到
+    // 299 后攻防和生命上限都不变，已损失的生命原样保留。
+    for (const [version, contentVersion] of [
+      [114, "water-warrior-shot-terrain-1"],
+      [112, "boss-poison-and-life-band-1"],
+    ] as const) {
+      const current = completedSave();
+      const legacy = {
+        ...current,
+        version,
+        contentVersion,
+        roster: current.roster.map((entry) => entry.slot === 7
+          ? { ...entry, classId: "magic-priest", experience: 0, life: 280 }
+          : entry),
+      };
+      expect(parseSaveData(JSON.stringify(legacy))?.roster.find(({ slot }) => slot === 7), `v${version}`)
+        .toMatchObject({ classId: "magic-priest", experience: 299, life: 280 });
+    }
+
+    const battle = stage28BattleSave();
+    const savedKins = battle.roster.find(({ slot }) => slot === 7);
+    expect(savedKins).toMatchObject({ classId: "magic-priest", experience: 0 });
+    const migrated = parseSaveData(JSON.stringify({
+      ...battle,
+      version: 114,
+      contentVersion: "water-warrior-shot-terrain-1",
+    }));
+    if (migrated?.kind !== "battle") throw new Error("stage 28 battle save did not migrate");
+    expect(migrated.roster.find(({ slot }) => slot === 7))
+      .toMatchObject({ experience: 299, life: savedKins!.life });
+    expect(migrated.stageEntrySnapshot.roster.find(({ slot }) => slot === 7))
+      .toMatchObject({ experience: 299, life: 140 });
+  });
+
+  it("leaves an untouched slot 7 and a Kins past the floor as saved", () => {
+    const current = completedSave();
+    const untouched = current.roster.find(({ slot }) => slot === 7);
+    expect(untouched).toMatchObject({ classId: "soldier", experience: 0 });
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 114,
+      contentVersion: "water-warrior-shot-terrain-1",
+    }))?.roster.find(({ slot }) => slot === 7)).toEqual(untouched);
+
+    const grown = {
+      ...current,
+      version: 114,
+      contentVersion: "water-warrior-shot-terrain-1",
+      roster: current.roster.map((entry) => entry.slot === 7
+        ? { ...entry, classId: "magic-priest", experience: 700, life: 325 }
+        : entry),
+    };
+    expect(parseSaveData(JSON.stringify(grown))?.roster.find(({ slot }) => slot === 7))
+      .toMatchObject({ experience: 700, life: 325 });
   });
 
   it("migrates version-113 saves without changing battle state for the water warrior shot terrain", () => {

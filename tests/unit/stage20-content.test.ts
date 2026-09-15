@@ -94,7 +94,7 @@ describe("stage 20 content", () => {
         id: "1:7",
         name: "琴斯",
         forcedClassId: "magic-priest",
-        forcedExperience: 0,
+        forcedExperience: 299,
         forceSourceId: "1:0",
       }],
     });

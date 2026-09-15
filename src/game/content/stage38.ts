@@ -119,7 +119,7 @@ export const STAGE38_SEMANTIC_ALLIED_UNITS = STAGE38_DEPLOYMENT_ACTORS.map((acto
   name: actor.normalizedName,
   portrait: actor.portraitRecord as PortraitRecord,
   aiBehavior: 0,
-  untouchedExperience: untouchedEntryExperience(actor.slot, actor.slot === 7 ? 0 : 299),
+  untouchedExperience: untouchedEntryExperience(actor.slot, 299),
 }));
 
 export const STAGE38_SEMANTIC_ENEMY_UNITS = STAGE38_ENEMY_UNITS.map((unit) => {

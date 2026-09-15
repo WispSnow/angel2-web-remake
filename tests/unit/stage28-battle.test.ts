@@ -17,7 +17,7 @@ const campaign: CampaignState = {
   difficulty: 2,
   roster: completeCampaignRoster([
     { slot: 0, classId: "land-knight", experience: 840, life: 250 },
-    { slot: 7, classId: "magic-priest", experience: 0, life: 140 },
+    { slot: 7, classId: "magic-priest", experience: 299, life: 140 },
     { slot: 10, classId: "water-warrior", experience: 359, life: 260 },
     { slot: 25, classId: "half-dragon-warrior", experience: 319, life: 260 },
   ]),
@@ -41,7 +41,7 @@ describe("stage 28 battle simulation", () => {
     const roster = createStage28DeploymentRoster(campaign);
     expect(roster).toHaveLength(29);
     expect(roster.find(({ slot }) => slot === 7)).toMatchObject({
-      name: "琴斯", classId: "magic-priest", experience: 0,
+      name: "琴斯", classId: "magic-priest", experience: 299,
     });
     expect(roster.find(({ slot }) => slot === 25)).toMatchObject({
       classId: "half-dragon-warrior", experience: 319,

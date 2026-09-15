@@ -267,8 +267,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 114;
-  contentVersion: "water-warrior-shot-terrain-1";
+  version: 115;
+  contentVersion: "guard-magic-archer-kins-entry-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

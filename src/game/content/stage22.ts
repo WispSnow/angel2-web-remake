@@ -324,7 +324,9 @@ export function activateStage22Content(): void {
         name: kins.name,
         portrait: kins.portraitRecord as PortraitRecord,
         forcedClassId: semanticClassId(kins.nativeClassRecord),
-        forcedExperience: 0,
+        // REMAKE-151: module 27 `0000:0493` floors the still class-0 named slot
+        // to 299 before any template override or event writes it.
+        forcedExperience: 299,
       }],
       statusText: "琴斯緊接著從村屋中現身",
       revealTiming: "native-before-write-deferred-refresh",

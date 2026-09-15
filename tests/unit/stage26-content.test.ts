@@ -49,7 +49,7 @@ describe("stage 26 generated content", () => {
     expect(STAGE26_TERRAIN_TOKENS).toHaveLength(2500);
     expect(STAGE26_SEMANTIC_ALLIED_UNITS).toHaveLength(29);
     expect(STAGE26_SEMANTIC_ALLIED_UNITS.find(({ slot }) => slot === 7)).toMatchObject({
-      name: "琴斯", portrait: 14, untouchedExperience: 0,
+      name: "琴斯", portrait: 14, untouchedExperience: 299,
     });
     expect(STAGE26_SEMANTIC_ENEMY_UNITS).toHaveLength(8);
     expect(STAGE26_SEMANTIC_ENEMY_UNITS.find(({ slot }) => slot === 1)).toMatchObject({

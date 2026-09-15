@@ -33,7 +33,7 @@ const fullDeployment = {
 };
 
 describe("stage 23 battle simulation", () => {
-  it("commits Kins's magic-priest entry class for an untouched roster slot", () => {
+  it("commits Kins's magic-priest entry class at the native 299 floor for an untouched roster slot", () => {
     const untouchedCampaign: CampaignState = {
       ...campaign,
       roster: completeCampaignRoster([
@@ -44,7 +44,7 @@ describe("stage 23 battle simulation", () => {
     expect(roster.find(({ slot }) => slot === 7)).toMatchObject({
       name: "琴斯",
       classId: "magic-priest",
-      experience: 0,
+      experience: 299,
       life: 305,
     });
     const battle = new Stage23Battle(untouchedCampaign, {
@@ -55,7 +55,7 @@ describe("stage 23 battle simulation", () => {
     expect(battle.campaignSnapshot().roster[7]).toMatchObject({
       slot: 7,
       classId: "magic-priest",
-      experience: 0,
+      experience: 299,
       life: 305,
     });
   });
@@ -156,5 +156,37 @@ describe("stage 23 battle simulation", () => {
     });
     expect(prepared.result.damage).toBeGreaterThanOrEqual(30);
     expect(prepared.result.damage).toBeLessThanOrEqual(49);
+  });
+
+  it("has both sentry magic archers fire in place while a climber stands between them", () => {
+    // REMAKE-150：用户在死亡之谷反馈这两名守卫魔弓兵从不出手，掉血休息、满血待命，用冰雪
+    // 推开后才恢复射击。守卫只能在原格行动，而魔弓兵的禁贴身规则把贴着敌人的原格也剔掉了；
+    // 原版行为 1 射手是在 `19C1` 原地射击。
+    const battle = new Stage23Battle(campaign, fullDeployment);
+    const [climber, target] = battle.units.filter(({ side, id }) => side === 1 && id !== "1:0");
+    if (!climber || !target) throw new Error("stage 23 test needs two deployed allies");
+    // 爬上梯顶 (23,19) 的我方同时贴着左右两名魔弓兵，另一名停在崖壁下方的 (24,22)。
+    climber.x = 23;
+    climber.y = 19;
+    target.x = 24;
+    target.y = 22;
+
+    for (const position of [{ x: 22, y: 19 }, { x: 24, y: 19 }]) {
+      const archer = battle.units.find(({ side, x, y }) =>
+        side === 2 && x === position.x && y === position.y);
+      if (!archer) throw new Error(`stage 23 magic archer missing at ${position.x},${position.y}`);
+      expect(archer.classId).toBe("magic-archer");
+      expect(battle.enemyAiIntentFor(archer.id)).toBe("sentry");
+      const shot = {
+        unitId: archer.id,
+        kind: "special",
+        actionId: "magic-archer-shot",
+        targetId: target.id,
+        path: [position],
+      };
+      expect(battle.planEnemyAiAction(archer.id)).toMatchObject(shot);
+      archer.life = Math.max(1, Math.floor(archer.life * 3 / 10));
+      expect(battle.planEnemyAiAction(archer.id)).toMatchObject(shot);
+    }
   });
 });
