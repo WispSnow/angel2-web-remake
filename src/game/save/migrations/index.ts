@@ -661,6 +661,24 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-153 lets stage 27's native full-round chain spawn pursuers from round 5.
+ * The round, spawn cell and free slot are all read off the board, so a v116 save
+ * has no counter to rebuild; a loaded stage 27 battle past round 4 simply gets
+ * its next pursuer on the coming enemy phase, without inventing missed ones.
+ */
+function migrateVersion116Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 116
+    || value.contentVersion !== "stage-26-priest-line-guard-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-152 holds stage 26's slot-40 priest with the rest of the guard line.
  * Per-slot behaviors come from stage content and are never saved, so v115
  * battle/completed saves migrate by identity; a loaded stage 26 battle simply
@@ -3238,6 +3256,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migratePreviousSaveData(value: unknown): SaveData | undefined {
+  const migratedVersion116 = migrateVersion116Save(value);
+  if (migratedVersion116) return migratedVersion116;
   const migratedVersion115 = migrateVersion115Save(value);
   if (migratedVersion115) return migratedVersion115;
   const migratedVersion114 = migrateVersion114Save(value);

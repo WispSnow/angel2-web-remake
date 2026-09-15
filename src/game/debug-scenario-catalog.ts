@@ -1429,6 +1429,14 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-27-first-reinforcement",
+    stageId: "stage-27",
+    title: "第一名原版追兵",
+    phase: "Round 5 / before side 2",
+    description: "直接進入第 5 回合；玩家與城防友軍行動結束後，驗證 (33,41) 生成槽 30 飛馬戰士並於同輪行動。",
+    fixture: true,
+  },
+  {
     id: "stage-27-near-victory",
     stageId: "stage-27",
     title: "一步回到瓦爾克麗城",

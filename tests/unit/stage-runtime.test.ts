@@ -518,8 +518,11 @@ describe("stage runtime manifest", () => {
     });
     expect(stage27.preparation?.presentation.enemies).toHaveLength(5);
     expect(stage27.entry).toMatchObject({ phase: "deployment", trigger: "campaign-entered" });
-    expect(stage27.save.enemyClassById).toHaveLength(5);
+    // Five static rebels plus the ten REMAKE-153 pursuer slots 30..39.
+    expect(stage27.save.enemyClassById).toHaveLength(15);
     expect(stage27.save.enemyClassById).toContainEqual(["2:40", "magic-sword-warrior"]);
+    expect(stage27.save.enemyClassById).toContainEqual(["2:30", "pegasus-warrior"]);
+    expect(stage27.save.enemyClassById).toContainEqual(["2:36", "great-axe-warrior"]);
     expect(stage27.save.namedUnits).toEqual([{
       match: { kind: "unit", unitId: "1:22", side: 1, slot: 22 },
       displayIdentity: "named-class-portrait",

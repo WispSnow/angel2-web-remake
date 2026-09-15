@@ -3629,6 +3629,17 @@ export const STAGE_RUNTIME_MANIFEST = {
         openCellCount: 20,
       },
       enemyClassById: [
+        // REMAKE-153 native pursuers from round 5; slot order follows B/0055.
+        ["2:30", "pegasus-warrior"],
+        ["2:31", "half-dragon-warrior"],
+        ["2:32", "demon-dragon-knight"],
+        ["2:33", "flying-dragon-knight"],
+        ["2:34", "pegasus-warrior"],
+        ["2:35", "pegasus-warrior"],
+        ["2:36", "great-axe-warrior"],
+        ["2:37", "demon-dragon-knight"],
+        ["2:38", "pegasus-warrior"],
+        ["2:39", "flying-dragon-knight"],
         ["2:40", "magic-sword-warrior"],
         ["2:41", "magic-priest"],
         ["2:44", "magic-archer"],

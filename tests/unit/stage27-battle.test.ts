@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { techniqueActionIdsFor } from "../../src/game/content/actions";
 import { movementRulesFor, usesClassIdentity } from "../../src/game/content/classes";
-import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { completeCampaignRoster, initialEnemyExperience } from "../../src/game/content/stage0";
 import {
   STAGE27_DEFINITION,
   STAGE27_IRON_PLATE_TERRAIN_SLOT,
@@ -240,5 +240,95 @@ describe("stage 27 battle simulation", () => {
     for (const enemy of battle.units.filter(({ side }) => side === 2)) {
       expect(battle.enemyAiIntentFor(enemy.id)).toBe("pursuit");
     }
+  });
+
+  it("spawns one immediately active pursuer at (33,41) before every enemy phase from round 5", () => {
+    const battle = new Stage27Battle(campaign, fullDeployment);
+    const callsBefore = battle.rng.calls;
+    const clearSpawnCell = () => {
+      const pursuer = battle.units.find(({ side, x, y }) => side === 2 && x === 33 && y === 41);
+      if (pursuer) Object.assign(pursuer, { x: pursuer.slot - 10, y: 45 });
+    };
+
+    for (let round = 1; round <= 4; round += 1) {
+      battle.beginEnemyPhase();
+      expect(battle.units.filter(({ side }) => side === 2), `round ${round}`).toHaveLength(5);
+      battle.startNextRound();
+    }
+    battle.beginEnemyPhase();
+    expect(battle.round).toBe(5);
+    expect(battle.unit("2:30")).toMatchObject({
+      classId: "pegasus-warrior",
+      experience: initialEnemyExperience("pegasus-warrior", campaign.difficulty),
+      x: 33,
+      y: 41,
+      acted: false,
+      actionDisabled: false,
+    });
+    expect(battle.enemyActionOrder()).toContain("2:30");
+    expect(battle.forceForUnit("2:30")?.id).toBe("valkyrie-rebels");
+    expect(battle.enemyAiIntentFor("2:30")).toBe("pursuit");
+
+    // Re-entering the same enemy phase does not add a second pursuer.
+    clearSpawnCell();
+    battle.beginEnemyPhase();
+    expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(6);
+
+    for (let round = 6; round <= 15; round += 1) {
+      clearSpawnCell();
+      battle.startNextRound();
+      battle.beginEnemyPhase();
+    }
+    // Round 15 finds all ten candidate slots on the board and adds nobody.
+    expect(battle.units.filter(({ side, slot }) => side === 2 && slot < 40)
+      .sort((left, right) => left.slot - right.slot)
+      .map(({ slot, classId }) => [slot, classId])).toEqual([
+      [30, "pegasus-warrior"],
+      [31, "half-dragon-warrior"],
+      [32, "demon-dragon-knight"],
+      [33, "flying-dragon-knight"],
+      [34, "pegasus-warrior"],
+      [35, "pegasus-warrior"],
+      [36, "great-axe-warrior"],
+      [37, "demon-dragon-knight"],
+      [38, "pegasus-warrior"],
+      [39, "flying-dragon-knight"],
+    ]);
+    expect(battle.units.some(({ x, y }) => x === 33 && y === 41)).toBe(false);
+    expect(battle.rng.calls).toBe(callsBefore);
+  });
+
+  it("skips an occupied spawn round, reuses a removed slot, and restores rebel membership", () => {
+    const battle = new Stage27Battle(campaign, fullDeployment);
+    while (battle.round < 5) battle.startNextRound();
+    const engineer = battle.unit("1:57");
+    if (!engineer) throw new Error("stage 27 test is missing engineer 57");
+    Object.assign(engineer, { x: 33, y: 41 });
+    battle.beginEnemyPhase();
+    expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(5);
+
+    Object.assign(engineer, { x: 35, y: 35 });
+    battle.startNextRound();
+    battle.beginEnemyPhase();
+    expect(battle.unit("2:30")).toMatchObject({ classId: "pegasus-warrior", x: 33, y: 41 });
+
+    Object.assign(battle.unit("2:30")!, { x: 30, y: 45 });
+    battle.startNextRound();
+    battle.beginEnemyPhase();
+    expect(battle.unit("2:31")).toMatchObject({ classId: "half-dragon-warrior", x: 33, y: 41 });
+
+    battle.removeStoryUnits([{ side: 2, slot: 30 }]);
+    Object.assign(battle.unit("2:31")!, { x: 31, y: 45 });
+    battle.startNextRound();
+    battle.beginEnemyPhase();
+    expect(battle.unit("2:30")).toMatchObject({ classId: "pegasus-warrior", x: 33, y: 41 });
+    expect(battle.unit("2:32")).toBeUndefined();
+
+    battle.startNextRound();
+    const restored = new Stage27Battle(campaign, fullDeployment);
+    restored.restore(battle.serializableSnapshot(), battle.campaignSnapshot().roster);
+    expect(restored.forceForUnit("2:30")?.id).toBe("valkyrie-rebels");
+    expect(restored.forceForUnit("2:31")?.id).toBe("valkyrie-rebels");
+    expect(restored.enemyAiIntentFor("2:31")).toBe("pursuit");
   });
 });

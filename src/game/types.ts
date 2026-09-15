@@ -267,8 +267,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 116;
-  contentVersion: "stage-26-priest-line-guard-1";
+  version: 117;
+  contentVersion: "stage-27-native-reinforcements-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

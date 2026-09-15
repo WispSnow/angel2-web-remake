@@ -17,6 +17,7 @@ import {
   STAGE27_SEMANTIC_ALLIED_UNITS,
   STAGE27_SEMANTIC_DEPLOYMENT_ROSTER_UNITS,
   STAGE27_SEMANTIC_ENEMY_UNITS,
+  STAGE27_SEMANTIC_REINFORCEMENTS,
   STAGE27_SOURCES,
   STAGE27_STORY_PAGES,
 } from "../../src/game/content/stage27";
@@ -133,7 +134,7 @@ describe("stage 27 generated content", () => {
         normalPostureFromRound: 2,
       },
       enemyReinforcements: {
-        kind: "native-full-round-pending-implementation",
+        kind: "native-full-round",
         initialSide2: 5,
         timing: "before-side-2-ai",
         firstRound: 5,
@@ -153,6 +154,25 @@ describe("stage 27 generated content", () => {
       completedRoute: { module: 25, stage: 28, replayPresentation: false },
       stableRemakeDecisions: ["REMAKE-064", "REMAKE-067", "REMAKE-120"],
     });
+    // REMAKE-153 consumes the program; every candidate needs its enemy figure preloaded,
+    // because the scene only prepares stage sprites before the first spawn.
+    expect(STAGE27_SEMANTIC_REINFORCEMENTS.candidates
+      .map(({ slot, classId, name }) => [slot, classId, name])).toEqual([
+      [30, "pegasus-warrior", "飛馬戰士"],
+      [31, "half-dragon-warrior", "半龍戰士"],
+      [32, "demon-dragon-knight", "妖龍騎士"],
+      [33, "flying-dragon-knight", "飛龍騎士"],
+      [34, "pegasus-warrior", "飛馬戰士"],
+      [35, "pegasus-warrior", "飛馬戰士"],
+      [36, "great-axe-warrior", "巨斧戰士"],
+      [37, "demon-dragon-knight", "妖龍騎士"],
+      [38, "pegasus-warrior", "飛馬戰士"],
+      [39, "flying-dragon-knight", "飛龍騎士"],
+    ]);
+    const unitSprites = new Map<string, string>(Object.entries(STAGE27_ASSETS.unitSprites));
+    for (const { classId } of STAGE27_SEMANTIC_REINFORCEMENTS.candidates) {
+      expect(unitSprites.get(`enemy-${classId}`), classId).toContain(`/enemy-${classId}.png`);
+    }
     expect(STAGE27_EVENT_PROGRAM.enemyReinforcements.auditedSources).toEqual([
       "initial-template", "round-event-handler", "dynamic-board-catalog",
       "full-round-special-chain", "defeat-replacement-and-form-chain",

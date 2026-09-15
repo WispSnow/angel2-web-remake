@@ -245,6 +245,40 @@ test("S27-G: one move into the exact city range starts SAY/0052 with all rebels 
   expect(victory.units.filter(({ side }) => side === 2)).toHaveLength(5);
 });
 
+test("S27-L/REMAKE-153: round 5 lands the first native pursuer before the rebels act", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-27-first-reinforcement&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  const before = await state(page);
+  expect(before).toMatchObject({ stageId: "stage-27", round: 5 });
+  expect(before.units.filter(({ side }) => side === 2).map(({ id }) => id).sort())
+    .toEqual(["2:40", "2:41", "2:42", "2:43", "2:44"]);
+
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-allRest").click();
+  await page.getByTestId("dialogue-layer").click();
+  await page.waitForFunction(
+    () => ((window.__ANGEL2__?.getState() as Stage27State | undefined)?.units ?? [])
+      .some(({ id }) => id === "2:30"),
+    undefined,
+    { timeout: 60_000 },
+  );
+  const reinforced = await state(page);
+  expect(reinforced.round).toBe(5);
+  expect(reinforced.units.find(({ id }) => id === "2:30")).toMatchObject({
+    side: 2,
+    slot: 30,
+    classId: "pegasus-warrior",
+  });
+  // The pursuer arrives after the scene preloaded its textures; a missing stage sprite
+  // would render it as Phaser's `__MISSING` placeholder.
+  await expect.poll(async () => (JSON.parse(
+    await page.getByTestId("battle-canvas").getAttribute("data-unit-texture-by-id") ?? "{}",
+  ) as Record<string, string>)["2:30"]).toBe("enemy-pegasus-warrior");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage27-first-pursuer.png`,
+  });
+});
+
 test("S27-H: Nia defeat returns directly to the same deployment", async ({ page }) => {
   await page.goto("/?debugScenario=stage-27-near-defeat&difficulty=0&test=1");
   await waitForPhase(page, "player");

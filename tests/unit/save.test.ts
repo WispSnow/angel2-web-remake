@@ -5424,6 +5424,49 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("round-trips stage 27 native pursuers and rejects a wrong reinforcement class", () => {
+    // REMAKE-153：第 27 关第 5 回合起在 (33,41) 生成槽 30..39；战中档必须保存这些槽并逐槽核对职业。
+    const saved = stage27BattleSave();
+    const battle = new Stage27Battle(saved, {
+      placements: STAGE27_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+    });
+    while (battle.round < 5) battle.startNextRound();
+    battle.beginEnemyPhase();
+    battle.startNextRound();
+    expect(battle.unit("2:30")).toMatchObject({ classId: "pegasus-warrior", x: 33, y: 41 });
+    const reinforced: BattleSaveData = {
+      ...saved,
+      battle: { ...saved.battle, ...battle.serializableSnapshot() },
+    };
+    expect(parseSaveData(JSON.stringify(reinforced))).toEqual(reinforced);
+
+    const wrongClass = structuredClone(reinforced);
+    const pursuer = wrongClass.battle.units.find(({ id }) => id === "2:30");
+    if (!pursuer) throw new Error("stage 27 pursuer is missing from the save");
+    pursuer.classId = "soldier";
+    expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
+  });
+
+  it("migrates version-116 saves without changing battle state for the stage 27 pursuers", () => {
+    // REMAKE-153 只让第 27 关第 5 回合起的敌方阶段按原版生成增援；回合与槽位都从棋盘重算、
+    // 不另存计数，因此 v116 战中档与完成档无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 116,
+      contentVersion: "stage-26-priest-line-guard-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 116,
+      contentVersion: "stage-26-priest-line-guard-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-115 saves without changing battle state for the stage 26 guard line", () => {
     // REMAKE-152 只把第 26 关槽 40 的魔祭師改为守卫；逐槽行为从关卡内容读取、从不入档，
     // 因此 v115 战中档与完成档无损迁移。

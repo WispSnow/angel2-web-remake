@@ -170,6 +170,16 @@ export const STAGE27_SEMANTIC_ENEMY_UNITS = STAGE27_ENEMY_UNITS.map((unit) => {
   };
 });
 
+// REMAKE-153 consumes the native full-round spawn program (`1000:525F`). Candidates keep
+// B/0055's slot order and resolve to semantic classes here, like the static rebels above.
+export const STAGE27_SEMANTIC_REINFORCEMENTS = {
+  ...STAGE27_EVENT_PROGRAM.enemyReinforcements,
+  candidates: STAGE27_EVENT_PROGRAM.enemyReinforcements.candidates.map((candidate) => {
+    const classId = semanticClassId(candidate.nativeClassRecord);
+    return { ...candidate, classId, name: className(classId) };
+  }),
+};
+
 export const STAGE27_ASSETS = {
   map: "/assets/original/stage27-map.png",
   minimap: "/assets/original/stage27-minimap.png",
@@ -186,6 +196,11 @@ export const STAGE27_ASSETS = {
     "enemy-magic-archer": "/assets/original/technique-lab/units/enemy-magic-archer.png",
     "enemy-magic-armor-warrior": "/assets/original/technique-lab/units/enemy-magic-armor-warrior.png",
     "enemy-curse-master": "/assets/original/technique-lab/units/enemy-curse-master.png",
+    "enemy-pegasus-warrior": "/assets/original/technique-lab/units/enemy-pegasus-warrior.png",
+    "enemy-half-dragon-warrior": "/assets/original/technique-lab/units/enemy-half-dragon-warrior.png",
+    "enemy-demon-dragon-knight": "/assets/original/technique-lab/units/enemy-demon-dragon-knight.png",
+    "enemy-flying-dragon-knight": "/assets/original/technique-lab/units/enemy-flying-dragon-knight.png",
+    "enemy-great-axe-warrior": "/assets/original/technique-lab/units/enemy-great-axe-warrior.png",
   },
   audio: {
     playerEntry: musicAsset("MUSIC", 3),

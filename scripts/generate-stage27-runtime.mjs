@@ -289,7 +289,7 @@ assertEqual(
   "stage 27 reinforcement candidate records",
 );
 const enemyReinforcements = {
-  kind: "native-full-round-pending-implementation",
+  kind: "native-full-round",
   initialSide2: enemyUnits.length,
   timing: "before-side-2-ai",
   firstRound: reinforcementSpecial.eligibleRounds.minimum,

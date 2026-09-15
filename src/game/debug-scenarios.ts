@@ -2579,10 +2579,14 @@ async function createStage27Opening(context: DebugScenarioContext): Promise<Game
   return controller;
 }
 
-async function createStage27Player(context: DebugScenarioContext): Promise<GameController> {
+async function createStage27Player(
+  context: DebugScenarioContext,
+  targetRound = 1,
+): Promise<GameController> {
   const campaign = debugCampaign(context, "stage-27");
   const { Stage27Battle } = await import("./simulation/stage27-battle");
   const battle = new Stage27Battle(campaign, await stage27FullDeployment());
+  while (battle.round < targetRound) battle.startNextRound();
   const nia = battle.unit("1:0");
   if (!nia) throw new Error("stage 27 debug scenario is missing Nia");
   battle.focusId = nia.id;
@@ -4300,6 +4304,11 @@ const DEBUG_SCENARIO_FACTORIES = {
     }
     controller.statusMessage = "調試場景：玩家隊已全部行動，接著由七名瓦爾克麗城防友軍自動行動。";
   }),
+  "stage-27-first-reinforcement": async (context) => {
+    const controller = await createStage27Player(context, 5);
+    controller.statusMessage = "調試場景：結束第 5 回合玩家階段後，第一名原版追兵會在 (33,41) 出現並當輪行動。";
+    return controller;
+  },
   "stage-27-near-victory": withSetup(createStage27Player, (controller) => {
     const nia = controller.battle.unit("1:0");
     if (!nia) return;

@@ -7,18 +7,20 @@ import {
   STAGE27_SEMANTIC_ALLIED_UNITS,
   STAGE27_SEMANTIC_DEPLOYMENT_ROSTER_UNITS,
   STAGE27_SEMANTIC_ENEMY_UNITS,
+  STAGE27_SEMANTIC_REINFORCEMENTS,
   stage27TerrainSlotAt,
 } from "../content/stage27";
 import type { DeploymentRosterUnit } from "../deployment-session";
-import type { CampaignState } from "../types";
+import type { BattleUnit, CampaignState } from "../types";
 import { Stage0Battle } from "./battle";
-import type { EnemyAiIntent } from "./ai-contracts";
+import type { EnemyAiIntent, EnemyPhaseUpdate } from "./ai-contracts";
 import {
   createDeployedStageRoster,
   createDeployedStageScenario,
   type DeployedStageUnitConfig,
 } from "./deployed-stage-battle";
 import { validateDeploymentResult, type DeploymentResult } from "./deployment";
+import { createFixedStageEnemy } from "./fixed-stage-battle";
 import type { ForceDefinition } from "./forces";
 import { DeterministicRng } from "./rng";
 
@@ -36,6 +38,9 @@ const STAGE27_DEPLOYMENT_ROSTER_CONFIG: DeployedStageUnitConfig = {
   ...STAGE27_UNIT_CONFIG,
   alliedUnits: STAGE27_SEMANTIC_DEPLOYMENT_ROSTER_UNITS,
 };
+
+/** Static rebel whose force every spawned pursuer joins; force membership outlives removal. */
+const STAGE27_REBEL_FORCE_SOURCE_ID = "2:40";
 
 export function createStage27DeploymentRoster(
   campaign: Pick<CampaignState, "difficulty" | "roster">,
@@ -87,6 +92,8 @@ function stage27Forces(deployment: DeploymentResult): readonly ForceDefinition[]
 }
 
 export class Stage27Battle extends Stage0Battle {
+  private lastReinforcementRound = 0;
+
   constructor(
     campaign: Pick<CampaignState, "difficulty" | "roster" | "rngState" | "rngCalls">,
     deployment: DeploymentResult,
@@ -106,12 +113,53 @@ export class Stage27Battle extends Stage0Battle {
         "magic-sword-warrior": 1,
         "magic-priest": 3,
         "curse-master": 5,
+        "great-axe-warrior": 7,
+        "half-dragon-warrior": 8,
         "magic-armor-warrior": 9,
         "magic-archer": 12,
+        "demon-dragon-knight": 14,
+        "flying-dragon-knight": 15,
+        "pegasus-warrior": 23,
       },
       forces: stage27Forces(deployment),
     }, campaign.roster, deployment));
     this.focusId = "1:0";
+  }
+
+  /**
+   * REMAKE-153: native `1000:525F` runs once per full round, after every side-1
+   * manual and automatic action and before side-2 AI. From round 5 it tries the
+   * single cell (33,41): any unit there skips the whole round; otherwise the
+   * lowest side-2 slot 30..39 not on the board spawns and acts this same enemy
+   * phase. Removed slots come back into the pool, and no PRNG is read.
+   */
+  private spawnReinforcement(): BattleUnit | undefined {
+    const program = STAGE27_SEMANTIC_REINFORCEMENTS;
+    if (this.round < program.firstRound) return undefined;
+    const [spawnCell] = program.spawnCells;
+    if (this.units.some(({ x, y }) => x === spawnCell.x && y === spawnCell.y)) return undefined;
+    const candidate = program.candidates.find(({ slot }) =>
+      !this.units.some((unit) => unit.side === 2 && unit.slot === slot));
+    if (!candidate) return undefined;
+
+    const unit = createFixedStageEnemy({
+      slot: candidate.slot,
+      position: { x: spawnCell.x, y: spawnCell.y },
+      classId: candidate.classId,
+      name: candidate.name,
+      aiBehavior: candidate.aiBehavior,
+    }, this.difficulty);
+    this.forces.inheritUnit(STAGE27_REBEL_FORCE_SOURCE_ID, unit.id);
+    this.units.push(unit);
+    return unit;
+  }
+
+  override beginEnemyPhase(): EnemyPhaseUpdate {
+    if (this.lastReinforcementRound !== this.round) {
+      this.lastReinforcementRound = this.round;
+      this.spawnReinforcement();
+    }
+    return super.beginEnemyPhase();
   }
 
   /** REMAKE-067 keeps the city defenders stationary only during round 1. */
@@ -129,8 +177,27 @@ export class Stage27Battle extends Stage0Battle {
     return behavior;
   }
 
+  override enemyBehaviorFor(id: string): number {
+    const unit = this.unit(id);
+    const candidate = unit?.side === 2
+      ? STAGE27_SEMANTIC_REINFORCEMENTS.candidates.find(({ slot }) => slot === unit.slot)
+      : undefined;
+    return candidate?.aiBehavior ?? super.enemyBehaviorFor(id);
+  }
+
   override enemyAiIntentFor(id: string): EnemyAiIntent | undefined {
     const unit = this.unit(id);
     return unit?.side === 2 ? "pursuit" : undefined;
+  }
+
+  /** Saves happen in the player phase, so the next enemy phase may spawn again after a load. */
+  protected override restoreDerivedForceMemberships(): void {
+    this.lastReinforcementRound = 0;
+    for (const unit of this.units) {
+      if (unit.side === 2 && STAGE27_SEMANTIC_REINFORCEMENTS.candidates
+        .some(({ slot }) => slot === unit.slot)) {
+        this.forces.inheritUnit(STAGE27_REBEL_FORCE_SOURCE_ID, unit.id);
+      }
+    }
   }
 }
