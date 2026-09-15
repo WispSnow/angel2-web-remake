@@ -178,9 +178,21 @@ function preparePrayer(
     .sort((left, right) => left.y * context.battlefield.width + left.x
       - (right.y * context.battlefield.width + right.x));
   const affectedUnits: SpecialActionAffectedUnit[] = [];
+  // Split water-warrior bodies all point at one unit slot (BAT-054), and the scan
+  // resolves that record again at every cell it visits (`1000:5963 → 0000:5058`).
+  // Each body that passes the gate therefore lands its own outcome on the shared
+  // record: the healing branch re-reads the record's current life before capping
+  // (`1000:5B4D`), and experience and the status words go through the same record
+  // writers. A later body starts from whatever the earlier bodies left.
+  const sharedRecords = new Map<string, Pick<BattleUnit, "life" | "experience" | "statuses">>();
 
-  for (const unit of eligible) {
+  for (const candidate of eligible) {
     if ((trial.nextUint() & (1 << definition.scan.gateBit)) === 0) continue;
+    const recordKey = waterWarriorRootId(candidate) ?? candidate.id;
+    const record = sharedRecords.get(recordKey);
+    const unit: BattleUnit = record
+      ? { ...candidate, ...record, statuses: cloneUnitStatuses(record.statuses) }
+      : candidate;
     const outcomeRoll = trial.between(0, 3);
     const outcome: PrayerOutcomeKind = outcomeRoll === definition.outcomes.healing.roll
       ? "healing"
@@ -222,7 +234,7 @@ function preparePrayer(
       statusesAfter.defenseUp = definition.outcomes.defenseUp.counter;
     }
 
-    affectedUnits.push(affectedUnit(unit, {
+    const affected = affectedUnit(unit, {
       lifeAfter,
       experienceAfter,
       statusesAfter,
@@ -231,7 +243,13 @@ function preparePrayer(
       blockReason,
       prayerOutcome: outcome,
       prayerRolledAmount,
-    }));
+    });
+    sharedRecords.set(recordKey, {
+      life: affected.lifeAfter,
+      experience: affected.experienceAfter,
+      statuses: affected.statusesAfter,
+    });
+    affectedUnits.push(affected);
   }
 
   return {

@@ -2871,9 +2871,6 @@ export class GameController {
     prepared: PreparedBattleAction,
   ): Promise<void> {
     this.specialActionPresentationTrace = [];
-    const displayedLifeByUnitId: Record<string, number> = Object.fromEntries(
-      prepared.affectedUnits.map((affected) => [affected.unitId, affected.lifeBefore]),
-    );
     const maximumHoldNativeTicks = actionPresentationCatalog()
       .prayer.presentation.resultHold.maximumNativeTicksPerTriggeredUnit;
 
@@ -2882,6 +2879,15 @@ export class GameController {
       if (!target) throw new Error("stale prepared prayer action");
       await this.focusCameraOnAction(affected.positionBefore);
       const targetPresentation = { ...target, statuses: { ...target.statuses } };
+      // Every earlier recipient is already committed, so the board holds the life to
+      // show. A later body of a split water warrior starts its prepared entry where the
+      // earlier body leaves the shared life, so its own `lifeBefore` would show that
+      // heal before it lands.
+      const displayedLifeByUnitId: Record<string, number> = {};
+      for (const { unitId } of prepared.affectedUnits) {
+        const unit = this.battle.unit(unitId);
+        if (unit) displayedLifeByUnitId[unitId] = unit.life;
+      }
       this.specialActionPresentation = {
         actor,
         target: targetPresentation,
@@ -2903,7 +2909,6 @@ export class GameController {
       this.emit();
 
       this.battle.commitPreparedPrayerOutcome(prepared, index);
-      displayedLifeByUnitId[affected.unitId] = affected.lifeAfter;
       this.emit();
 
       await new Promise<void>((resolve) => {

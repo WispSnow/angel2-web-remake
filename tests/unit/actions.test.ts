@@ -3665,6 +3665,129 @@ describe("Stage-0 class actions", () => {
       .toEqual({ state: prepared.rngAfter, calls: prepared.rngCallsAfter });
   });
 
+  /**
+   * BAT-054: split bodies keep the root's side and slot and so share its life,
+   * experience and status words. Board order is root (1,1), split-1 (2,1),
+   * split-2 (1,2) and then the caster at (4,3).
+   */
+  function arrangePrayerOverSplitWaterWarrior(seed: number, bodies: 2 | 3, lifeLoss: number) {
+    const battle = new Stage0Battle(0, new DeterministicRng(seed));
+    const actor = battle.unit("1:0")!;
+    const template = battle.units.find((unit) => unit.side === 1 && unit.id !== actor.id)!;
+    promoteForAction(actor, "prayer");
+    actor.experience = classDefinition("prayer-guide").dataRows[2].experienceThreshold;
+    actor.x = 4;
+    actor.y = 3;
+    const root: BattleUnit = {
+      ...template,
+      id: "1:10",
+      slot: 10,
+      classId: "water-warrior",
+      className: className("water-warrior"),
+      x: 1,
+      y: 1,
+      statuses: { ...template.statuses },
+    };
+    const maxLife = battle.statsFor(root).maxLife;
+    root.life = maxLife - lifeLoss;
+    const splits = [{ x: 2, y: 1 }, { x: 1, y: 2 }].slice(0, bodies - 1)
+      .map((position, index): BattleUnit => ({
+        ...root,
+        ...position,
+        id: `1:10:split-${index + 1}`,
+        statuses: { ...root.statuses },
+      }));
+    const group = [root, ...splits];
+    battle.units = [actor, ...group];
+    return { battle, actor, group, maxLife };
+  }
+
+  it("caps each split water-warrior body's heal against the life the body before it left", () => {
+    const seed = findPrayerSeed(3, ([first, second]) => first?.candidateIndex === 0
+      && first.outcome === "healing"
+      && second?.candidateIndex === 1
+      && second.outcome === "healing"
+      && first.rolledAmount! + second.rolledAmount! > 15);
+    const expected = expectedPrayerSequence(seed, 3);
+    const firstHeal = expected.outcomes[0]!.rolledAmount!;
+    const secondHeal = expected.outcomes[1]!.rolledAmount!;
+    const { battle, actor, group, maxLife } = arrangePrayerOverSplitWaterWarrior(seed, 2, 15);
+
+    const prepared = battle.prepareSpecialAction({ actionId: "prayer", actorId: actor.id });
+    expect(prepared.affectedUnits.slice(0, 2).map((affected) => ({
+      unitId: affected.unitId,
+      lifeBefore: affected.lifeBefore,
+      lifeAfter: affected.lifeAfter,
+      healing: affected.healing,
+      prayerRolledAmount: affected.prayerRolledAmount,
+    }))).toEqual([
+      {
+        unitId: "1:10",
+        lifeBefore: maxLife - 15,
+        lifeAfter: maxLife - 15 + firstHeal,
+        healing: firstHeal,
+        prayerRolledAmount: firstHeal,
+      },
+      {
+        unitId: "1:10:split-1",
+        lifeBefore: maxLife - 15 + firstHeal,
+        lifeAfter: maxLife,
+        healing: 15 - firstHeal,
+        prayerRolledAmount: secondHeal,
+      },
+    ]);
+    // Stacking reads the shared record but draws nothing extra.
+    expect(prepared.rngCallsAfter).toBe(expected.callsAfter);
+
+    battle.commitPreparedPrayerOutcome(prepared, 0);
+    expect(group.map(({ life }) => life))
+      .toEqual([maxLife - 15 + firstHeal, maxLife - 15 + firstHeal]);
+    // This body used to be checked against its own untouched snapshot, so the
+    // commit threw and left the caster free to pray again in the same round.
+    battle.commitPreparedPrayerOutcome(prepared, 1);
+    expect(group.map(({ life }) => life)).toEqual([maxLife, maxLife]);
+    for (let index = 2; index < prepared.affectedUnits.length; index += 1) {
+      battle.commitPreparedPrayerOutcome(prepared, index);
+    }
+    expect(battle.completePreparedPrayer(prepared)).toBe(prepared.result);
+    expect(actor.acted).toBe(true);
+    expect(() => battle.prepareSpecialAction({ actionId: "prayer", actorId: actor.id }))
+      .toThrow("illegal special action");
+  });
+
+  it("stacks experience and status words from every split body before spending the action", () => {
+    const seed = findPrayerSeed(4, (outcomes) => outcomes.slice(0, 3)
+      .map(({ candidateIndex, outcome }) => `${candidateIndex}:${outcome}`)
+      .join() === "0:experience,1:attackUp,2:experience");
+    const [first, , third] = expectedPrayerSequence(seed, 4).outcomes;
+    const { battle, actor, group } = arrangePrayerOverSplitWaterWarrior(seed, 3, 0);
+    const base = group[0]!.experience;
+    const firstGain = first!.rolledAmount!;
+    const thirdGain = third!.rolledAmount!;
+
+    const prepared = battle.prepareSpecialAction({ actionId: "prayer", actorId: actor.id });
+    expect(prepared.affectedUnits.slice(0, 3).map((affected) => [
+      affected.experienceBefore,
+      affected.experienceAfter,
+      affected.statusesBefore.attackUp,
+      affected.statusesAfter.attackUp,
+    ])).toEqual([
+      [base, base + firstGain, 0, 0],
+      [base + firstGain, base + firstGain, 0, 3],
+      [base + firstGain, base + firstGain + thirdGain, 3, 3],
+    ]);
+
+    for (let index = 0; index < prepared.affectedUnits.length; index += 1) {
+      battle.commitPreparedPrayerOutcome(prepared, index);
+    }
+    // The root settled first but now also carries the third body's experience;
+    // completion holds every body to its group's last outcome, not its own entry.
+    expect(battle.completePreparedPrayer(prepared)).toBe(prepared.result);
+    expect(actor.acted).toBe(true);
+    expect(group.map(({ experience, statuses }) => [experience, statuses.attackUp]))
+      .toEqual(group.map(() => [base + firstGain + thirdGain, 3]));
+  });
+
   it("locks ice to the actor cell and rejects any caller-supplied target center", () => {
     const battle = new Stage0Battle(0);
     const actor = battle.unit("1:0")!;

@@ -1718,22 +1718,9 @@ export class Stage0Battle {
       || actor.classId !== "prayer-guide" || actor.statuses.techniqueSeal > 0) {
       throw new Error("stale prepared prayer action");
     }
-    const sequenceIsCurrent = prepared.affectedUnits.every((candidate, candidateIndex) => {
-      const unit = this.unit(candidate.unitId);
-      if (!unit) return false;
-      const committed = candidateIndex < index;
-      return unit.life === (committed ? candidate.lifeAfter : candidate.lifeBefore)
-        && unit.experience === (committed ? candidate.experienceAfter : candidate.experienceBefore)
-        && unit.x === (committed ? candidate.positionAfter.x : candidate.positionBefore.x)
-        && unit.y === (committed ? candidate.positionAfter.y : candidate.positionBefore.y)
-        && unit.actionDisabled === (committed
-          ? candidate.actionDisabledAfter
-          : candidate.actionDisabledBefore)
-        && statusesEqual(unit.statuses, committed ? candidate.statusesAfter : candidate.statusesBefore);
-    });
     const expectedRngState = index === 0 ? prepared.rngBefore : prepared.rngAfter;
     const expectedRngCalls = index === 0 ? prepared.rngCallsBefore : prepared.rngCallsAfter;
-    if (!sequenceIsCurrent
+    if (!this.preparedPrayerMatchesBoard(prepared, index)
       || this.rng.state !== expectedRngState
       || this.rng.calls !== expectedRngCalls) {
       throw new Error("stale prepared prayer action");
@@ -1757,16 +1744,10 @@ export class Stage0Battle {
   completePreparedPrayer(prepared: PreparedBattleAction): SpecialActionResult {
     if (prepared.intent.actionId !== "prayer") throw new Error("prepared action is not prayer");
     const actor = this.unit(prepared.intent.actorId);
-    const allOutcomesCommitted = prepared.affectedUnits.every((affected) => {
-      const unit = this.unit(affected.unitId);
-      return unit
-        && unit.life === affected.lifeAfter
-        && unit.experience === affected.experienceAfter
-        && unit.x === affected.positionAfter.x
-        && unit.y === affected.positionAfter.y
-        && unit.actionDisabled === affected.actionDisabledAfter
-        && statusesEqual(unit.statuses, affected.statusesAfter);
-    });
+    const allOutcomesCommitted = this.preparedPrayerMatchesBoard(
+      prepared,
+      prepared.affectedUnits.length,
+    );
     const rngStillUncommitted = prepared.affectedUnits.length === 0
       && this.rng.state === prepared.rngBefore
       && this.rng.calls === prepared.rngCallsBefore;
@@ -1787,6 +1768,55 @@ export class Stage0Battle {
     this.recordCampaignUnit(actor);
     this.focusId = prepared.affectedUnits.at(-1)?.unitId ?? actor.id;
     return prepared.result;
+  }
+
+  /**
+   * Whether the board holds exactly the first `committedCount` outcomes of a
+   * prepared prayer. The bodies of a split water warrior share one record, and each
+   * body's prepared outcome starts from the one before it in the group, so a body is
+   * held to its group's latest committed outcome — or, before any has landed, to the
+   * group's first starting values — rather than to its own entry.
+   */
+  private preparedPrayerMatchesBoard(
+    prepared: PreparedBattleAction,
+    committedCount: number,
+  ): boolean {
+    const expectedRecords = new Map<string, Pick<BattleUnit, "life" | "experience" | "statuses">>();
+    const bodies: { unit: BattleUnit; recordKey: string }[] = [];
+    for (const [index, affected] of prepared.affectedUnits.entries()) {
+      const unit = this.unit(affected.unitId);
+      if (!unit) return false;
+      const committed = index < committedCount;
+      const position = committed ? affected.positionAfter : affected.positionBefore;
+      const actionDisabled = committed
+        ? affected.actionDisabledAfter
+        : affected.actionDisabledBefore;
+      if (unit.x !== position.x || unit.y !== position.y || unit.actionDisabled !== actionDisabled) {
+        return false;
+      }
+      const recordKey = waterWarriorRootId(unit) ?? unit.id;
+      if (committed) {
+        expectedRecords.set(recordKey, {
+          life: affected.lifeAfter,
+          experience: affected.experienceAfter,
+          statuses: affected.statusesAfter,
+        });
+      } else if (!expectedRecords.has(recordKey)) {
+        expectedRecords.set(recordKey, {
+          life: affected.lifeBefore,
+          experience: affected.experienceBefore,
+          statuses: affected.statusesBefore,
+        });
+      }
+      bodies.push({ unit, recordKey });
+    }
+    return bodies.every(({ unit, recordKey }) => {
+      const expected = expectedRecords.get(recordKey);
+      return expected !== undefined
+        && unit.life === expected.life
+        && unit.experience === expected.experience
+        && statusesEqual(unit.statuses, expected.statuses);
+    });
   }
 
   prepareIronPlateConstruction(

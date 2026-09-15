@@ -611,6 +611,175 @@ test("tier-three prayer guide performs OJ as progressive per-recipient procedura
   expect(pageErrors).toEqual([]);
 });
 
+test("OJ over a split water warrior stacks every body on the shared record and spends the caster once", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/arena.html?test=1");
+  await page.getByTestId("arena-clear").click();
+  const placed = await page.evaluate(() => {
+    const arena = window.__ANGEL2_ARENA__;
+    if (!arena) return [];
+    arena.setSide(1);
+    arena.setClass("prayer-guide");
+    arena.setLevel(3);
+    const caster = arena.interact(18, 30);
+    arena.setClass("water-warrior");
+    arena.setLevel(1);
+    const waterWarrior = arena.interact(24, 30);
+    arena.setSide(2);
+    arena.setClass("soldier");
+    const attacker = arena.interact(25, 30);
+    return [caster, waterWarrior, attacker];
+  });
+  expect(placed).toEqual([true, true, true]);
+  await page.getByTestId("arena-start").click();
+
+  // The arena shows 10×7 cells, so a unit off camera has to be brought in by
+  // right-clicking, which focuses the next ally that has not acted yet.
+  const focusAlly = async (unitId: string) => {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const current = await arenaBattleState(page);
+      const unit = current?.units.find(({ id }) => id === unitId);
+      if (!current || !unit) throw new Error(`missing ${unitId}`);
+      if (unit.x >= current.cameraOrigin.x && unit.x < current.cameraOrigin.x + 10
+        && unit.y >= current.cameraOrigin.y && unit.y < current.cameraOrigin.y + 7) {
+        return unit;
+      }
+      const occupied = new Set(current.units.map(({ x, y }) => `${x},${y}`));
+      const empty = [1, 2, 3]
+        .map((offset) => ({ x: current.cameraOrigin.x + offset, y: current.cameraOrigin.y + 1 }))
+        .find(({ x, y }) => !occupied.has(`${x},${y}`))!;
+      await clickArenaWorldCell(page, empty.x, empty.y, { button: "right" });
+      await page.waitForFunction((target) => {
+        const battle = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
+        const focused = battle?.units.find(({ id }) => id === target);
+        return !!battle && !!focused
+          && focused.x >= battle.cameraOrigin.x && focused.x < battle.cameraOrigin.x + 10
+          && focused.y >= battle.cameraOrigin.y && focused.y < battle.cameraOrigin.y + 7;
+      }, unitId, { timeout: 5_000 }).catch(() => undefined);
+    }
+    throw new Error(`could not bring ${unitId} on camera`);
+  };
+  const waitForIdlePlayer = (round: number, unitIds: readonly string[] = []) => page.waitForFunction(
+    ([expectedRound, requiredIds]) => {
+      const current = (window.__ANGEL2_ARENA__?.getState() as {
+        battle?: ArenaBattleDebugState & { restPresentation?: unknown };
+      }).battle;
+      return current?.phase === "player"
+        && current.round === expectedRound
+        && current.actionMode === "idle"
+        && current.restPresentation === undefined
+        && requiredIds.every((id) => current.units.some((unit) => unit.id === id));
+    },
+    [round, unitIds] as const,
+  );
+
+  // Both allies rest so the adjacent 士兵 strikes the water warrior in the enemy
+  // phase, and BAT-054 splits a second body off it.
+  for (const unitId of ["arena-1-0", "arena-1-1"]) {
+    const ally = await focusAlly(unitId);
+    await clickArenaWorldCell(page, ally.x, ally.y);
+    await page.getByTestId("unit-command-rest").click();
+    if (unitId === "arena-1-0") {
+      await page.waitForFunction(() => {
+        const current = (window.__ANGEL2_ARENA__?.getState() as {
+          battle?: ArenaBattleDebugState & { restPresentation?: unknown };
+        }).battle;
+        return current?.units.find(({ id }) => id === "arena-1-0")?.acted === true
+          && current.actionMode === "idle"
+          && current.restPresentation === undefined;
+      });
+    }
+  }
+  await waitForIdlePlayer(2, ["arena-1-1:split-1"]);
+  const before = await arenaBattleState(page);
+  const rootBefore = before?.units.find(({ id }) => id === "arena-1-1")!;
+  // The split body sits in the free cell above and points at the same slot, so it
+  // carries the root's life, experience and status words.
+  expect(before?.units.find(({ id }) => id === "arena-1-1:split-1")).toMatchObject({
+    x: 24,
+    y: 29,
+    life: rootBefore.life,
+    experience: rootBefore.experience,
+    statuses: rootBefore.statuses,
+  });
+
+  const caster = await focusAlly("arena-1-0");
+  await clickArenaWorldCell(page, caster.x, caster.y);
+  await page.getByTestId("unit-command-technique").click();
+  await page.getByTestId("technique-prayer").click();
+
+  // Board order is split (24,29), caster (18,30), root (24,30), and all three pass
+  // the gate. The root is the body whose own snapshot used to go stale — the split
+  // body had already raised the shared attack word — so the prayer threw here and
+  // the caster kept its action.
+  await page.waitForFunction(() => {
+    const dataset = document.querySelector<HTMLCanvasElement>(
+      "[data-testid='battle-canvas']",
+    )?.dataset;
+    return dataset?.mapCombatPhase === "prayerEffect"
+      && dataset.mapCombatLifeChangeUnit === "arena-1-1"
+      && dataset.mapCombatPrayerOutcome === "experience"
+      && dataset.mapCombatPrayerRolledAmount === "13";
+  }, undefined, { polling: "raf" });
+  const during = await arenaBattleState(page);
+  for (const bodyId of ["arena-1-1", "arena-1-1:split-1"]) {
+    expect(during?.units.find(({ id }) => id === bodyId)).toMatchObject({
+      experience: rootBefore.experience + 13,
+      statuses: expect.objectContaining({ attackUp: 3 }),
+    });
+  }
+  expect(during?.units.find(({ id }) => id === "arena-1-0")?.acted).toBe(false);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/arena-prayer-split-water-warrior.png`,
+  });
+
+  await page.waitForFunction(() => {
+    const current = (window.__ANGEL2_ARENA__?.getState() as {
+      battle?: ArenaBattleDebugState;
+    }).battle;
+    return current?.lastSpecialAction?.actionId === "prayer"
+      && current.specialActionPresentation === undefined;
+  });
+  const after = await arenaBattleState(page);
+  expect(after?.lastSpecialAction?.affectedUnits).toEqual([
+    expect.objectContaining({ unitId: "arena-1-1:split-1", prayerOutcome: "attackUp" }),
+    expect.objectContaining({ unitId: "arena-1-0", prayerOutcome: "attackUp" }),
+    expect.objectContaining({
+      unitId: "arena-1-1",
+      prayerOutcome: "experience",
+      prayerRolledAmount: 13,
+      statusesBefore: expect.objectContaining({ attackUp: 3 }),
+      experienceAfter: rootBefore.experience + 13,
+    }),
+  ]);
+  expect(after?.units.find(({ id }) => id === "arena-1-0")?.acted).toBe(true);
+  for (const bodyId of ["arena-1-1", "arena-1-1:split-1"]) {
+    expect(after?.units.find(({ id }) => id === bodyId)).toMatchObject({
+      life: rootBefore.life,
+      experience: rootBefore.experience + 13,
+      statuses: expect.objectContaining({ attackUp: 3 }),
+    });
+  }
+  expect(after?.rngCalls).toBe(before!.rngCalls + 7);
+  for (const step of after?.specialActionPresentationTrace ?? []) {
+    expect(step.displayedLifeByUnitId["arena-1-1:split-1"])
+      .toBe(step.displayedLifeByUnitId["arena-1-1"]);
+  }
+  await expect(page.getByTestId("status-strip"))
+    .toContainText("祈禱回應 3 名我方：生命 0、經驗 1、攻擊 2、防禦 0。");
+
+  // What the player saw: picking the caster again must not reopen its commands.
+  for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowLeft");
+  await expect.poll(async () => ((await arenaBattleState(page)) as
+    (ArenaBattleDebugState & { cursor?: { x: number; y: number } }) | undefined)?.cursor)
+    .toEqual({ x: 18, y: 30 });
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("status-strip")).toContainText("此單位本回合已行動。");
+  await expect(page.getByTestId("unit-command-technique")).toBeHidden();
+  expect(pageErrors).toEqual([]);
+});
+
 test("tier-three magic guide commits FM through the formal technique flow", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
