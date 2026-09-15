@@ -5,7 +5,7 @@ import {
   statsFor,
 } from "../content/stage0";
 import { isPortraitRecord } from "../content/portrait-catalog.generated";
-import { STAGE_ROUND_LIMIT } from "../simulation/objectives";
+import { objectiveConditionSatisfied, STAGE_ROUND_LIMIT } from "../simulation/objectives";
 import { UNIT_STATUS_KEYS } from "../simulation/status";
 import {
   isPlayableStageId,
@@ -355,28 +355,27 @@ export function isSavedBattleState(
       || matching.some(({ side }) => side !== 2)) return false;
   }
 
+  // 战中档只在玩家阶段写出，它记录的战斗必然胜负未分。我方在此之前可以阵亡：模拟把
+  // 阵亡者移出棋盘、名册条目照留，所以存档可以缺少本关派出的任何我方——唯独缺了就
+  // 等于判负的单位不可能缺。旧规则要求固定／部署固定槽全员在场，第一名友军阵亡后写出
+  // 的每一份战中档都会在读取时被当成损坏。
+  if (objectiveConditionSatisfied(units, saveSchema.defeat)) return false;
+
   const allies = units.filter((unit) => unit.side === 1);
   const alliedRoots = allies.filter((unit) => unit.id === `${unit.side}:${unit.slot}`);
   const alliedRule = saveSchema.alliedUnits;
   if (alliedRule.kind === "deployment") {
     const eligibleSlots = new Set<number>(alliedRule.eligibleSlots);
-    const fixedSlots = new Set<number>(alliedRule.fixedSlots);
     const optionalSlots = new Set<number>(alliedRule.optionalSlots);
-    const alliedSlots = new Set(alliedRoots.map(({ slot }) => slot));
-    if (alliedRoots.length < fixedSlots.size
-      || alliedRoots.length > alliedRule.maximumUnits
+    if (alliedRoots.length > alliedRule.maximumUnits
       || alliedRoots.some(({ slot }) => !eligibleSlots.has(slot))
-      || [...fixedSlots].some((slot) => !alliedSlots.has(slot))
       || alliedRoots.filter(({ slot }) => optionalSlots.has(slot)).length
         > alliedRule.openCellCount) {
       return false;
     }
-  } else if (alliedRule.kind === "exact-slots") {
-    const alliedSlots = alliedRoots.map(({ slot }) => slot).sort((left, right) => left - right);
-    if (alliedSlots.length !== alliedRule.slots.length
-      || !alliedSlots.every((slot, index) => slot === alliedRule.slots[index])) {
-      return false;
-    }
+  } else if (alliedRule.kind === "fixed-roster") {
+    const rosterSlots = new Set<number>(alliedRule.slots);
+    if (alliedRoots.some(({ slot }) => !rosterSlots.has(slot))) return false;
   }
 
   const rosterBySlot = new Map(roster.map((entry) => [entry.slot, entry]));

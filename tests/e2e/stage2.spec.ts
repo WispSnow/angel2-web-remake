@@ -342,6 +342,40 @@ test("REMAKE-016: retreat and defeat restore the immutable stage-entry campaign"
   await expectEntryCampaign();
 });
 
+test("keeps a battle record readable after an automatic ally has fallen", async ({ page }) => {
+  // Regression: a record missing any fixed-roster ally used to list as 此處沒有記錄 and
+  // refuse to load. A fallen ally leaves the board while its roster entry stays, which
+  // is the shape written into the stored record below.
+  await page.goto("/?debugScenario=stage-02-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+  await page.evaluate(() => {
+    const save = JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
+      battle: { focusId: string; units: Array<{ id: string }> };
+    };
+    save.battle.units = save.battle.units.filter(({ id }) => id !== "1:44");
+    if (save.battle.focusId === "1:44") save.battle.focusId = "1:0";
+    localStorage.setItem("angel2.save.1", JSON.stringify(save));
+  });
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-load").click();
+  const record = page.getByTestId("record-slot-1");
+  await expect(record).toContainText("攻打騎士堡");
+  await expect(record).not.toContainText("此處沒有記錄");
+  await record.click();
+  await page.waitForFunction(() => {
+    const loaded = window.__ANGEL2__?.getState() as Stage2State | undefined;
+    return loaded?.phase === "player"
+      && loaded.units.some(({ id }) => id === "1:0")
+      && !loaded.units.some(({ id }) => id === "1:44");
+  });
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+});
+
 test("S02-J: fixed battle remains readable in a narrow reduced-motion viewport", async ({ page }) => {
   await page.setViewportSize({ width: 720, height: 620 });
   await page.emulateMedia({ reducedMotion: "reduce" });

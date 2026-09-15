@@ -345,7 +345,7 @@ describe("stage runtime manifest", () => {
       8: "/assets/original/story-stage8-background-8.png",
     });
     expect(stage8.save.alliedUnits).toEqual({
-      kind: "exact-slots",
+      kind: "fixed-roster",
       slots: [8, 17, 18, 40, 41, 42, 43, 44],
     });
     expect(stage8.save.validEventIds).toEqual([
@@ -366,7 +366,7 @@ describe("stage runtime manifest", () => {
     expect(stage11.createBattle({ ...campaign, stageId: "stage-11" }).stage.id).toBe("stage-11");
     expect(stage11.nextStageId).toBe("stage-10");
     expect(stage11.save.alliedUnits).toEqual({
-      kind: "exact-slots",
+      kind: "fixed-roster",
       slots: [8, 16, 17, 18, 19, 40, 41, 42],
     });
     expect(stage12.preparation?.definition).toMatchObject({
@@ -450,7 +450,7 @@ describe("stage runtime manifest", () => {
       16: "/assets/original/story-stage21-background-16.png",
     });
     expect(stage21.save.alliedUnits).toEqual({
-      kind: "exact-slots",
+      kind: "fixed-roster",
       slots: [0, 1, 24, 8],
     });
     expect(stage21.nextStageId).toBe("stage-22");
@@ -586,7 +586,7 @@ describe("stage runtime manifest", () => {
       phase: "prebattleStory",
       trigger: "campaign-entered",
     });
-    expect(stage30.save.alliedUnits).toEqual({ kind: "exact-slots", slots: [0, 7, 40] });
+    expect(stage30.save.alliedUnits).toEqual({ kind: "fixed-roster", slots: [0, 7, 40] });
     expect(stage30.save.enemyClassById).toEqual([]);
     expect(stage30.save.enemyFormSequences?.[0]).toMatchObject({
       unitId: "2:27",
@@ -669,7 +669,7 @@ describe("stage runtime manifest", () => {
     expect(stage35.preparation).toBeUndefined();
     expect(stage35.createBattle({ ...campaign, stageId: "stage-35" }).units).toHaveLength(19);
     expect(stage35.save.alliedUnits).toEqual({
-      kind: "exact-slots",
+      kind: "fixed-roster",
       slots: [0, 1, 2, 3, 4, 5, 7, 8, 18],
     });
     expect(stage35.save.enemyClassById).toHaveLength(10);
@@ -743,6 +743,17 @@ describe("stage runtime manifest", () => {
       // The deployment-confirm rebuild takes the same path with a real result.
       const deployed = runtime.createBattle(entry, runtime.preparation.createInitialResult());
       expect(deployed.campaignSnapshot().recordCounters?.[0]).toBe(41);
+    }
+  });
+
+  it("mirrors every stage's defeat condition into its save schema", async () => {
+    // Save validation never loads a stage chunk, so each manifest keeps its own copy of
+    // the objective's defeat condition. A stale copy would either turn genuine saves
+    // into unreadable slots or accept a board that has already lost.
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const runtime = await loadStageRuntime(stageId);
+      expect({ stageId, defeat: runtime.save.defeat })
+        .toEqual({ stageId, defeat: runtime.definition.objective.defeat });
     }
   });
 

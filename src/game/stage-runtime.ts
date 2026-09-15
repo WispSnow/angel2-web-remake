@@ -1,4 +1,9 @@
-import { STAGE0_DEFINITION, type InteractiveDeploymentDefinition, type StageDefinition } from "./content/stages";
+import {
+  STAGE0_DEFINITION,
+  type InteractiveDeploymentDefinition,
+  type StageDefinition,
+  type StageObjectiveCondition,
+} from "./content/stages";
 import { STAGE_INDEX } from "./content/stage-index";
 import type { CampaignRouteId } from "./content/stage-effects";
 import type { EnemyPhaseTailPresentationDefinition } from "./enemy-phase-tail-presentation";
@@ -66,17 +71,22 @@ export interface StageDeploymentPresentation {
   guidanceText?: string;
 }
 
+/**
+ * Which allied slots a saved board may hold. Every rule bounds the allies still
+ * standing, never demands them: allies fall before a save is written, and only the
+ * schema's `defeat` condition names the ones whose absence would already be a loss.
+ */
 export type StageSaveAlliedUnitRule =
   | { kind: "allowed-classes"; classIds: readonly UnitClassId[] }
   | {
     kind: "deployment";
     eligibleSlots: readonly number[];
-    fixedSlots: readonly number[];
     optionalSlots: readonly number[];
     maximumUnits: number;
     openCellCount: number;
   }
-  | { kind: "exact-slots"; slots: readonly number[] };
+  /** A stage without a deployment surface fields these slots, and only these. */
+  | { kind: "fixed-roster"; slots: readonly number[] };
 
 export type StageSaveNamedUnitMatch =
   | { kind: "unit"; unitId: string; side: Side; slot: number }
@@ -102,6 +112,13 @@ export interface StageSaveNamedUnitRule {
 export interface StageSaveSchema {
   validEventIds: readonly string[];
   requiredResumeEventIds?: readonly string[];
+  /**
+   * The stage objective's defeat condition. A battle save is only written while the
+   * fight is undecided, so a saved board that already meets it cannot be genuine.
+   * Mirrored here so validation never loads the stage chunk; `stage-runtime.test.ts`
+   * keeps every copy equal to the loaded definition.
+   */
+  defeat: StageObjectiveCondition;
   alliedUnits: StageSaveAlliedUnitRule;
   enemyClassById: readonly (readonly [string, UnitClassId])[];
   /** Minimum saved enemy experience under this stage's entry-seeding rule. */
@@ -1934,6 +1951,9 @@ function createStage11SaveEnemyClasses(): readonly (readonly [string, UnitClassI
   ];
 }
 
+/** The defeat condition most stages share: 妮雅 leaving the board. */
+const NIA_DEFEAT = { type: "unit-removed", side: 1, slot: 0 } as const satisfies StageObjectiveCondition;
+
 export const STAGE_RUNTIME_MANIFEST = {
   "stage-00": {
     ...STAGE_INDEX["stage-00"],
@@ -1958,6 +1978,7 @@ export const STAGE_RUNTIME_MANIFEST = {
     },
     save: {
       validEventIds: STAGE0_DEFINITION.events.map(({ id }) => id),
+      defeat: STAGE0_DEFINITION.objective.defeat,
       alliedUnits: {
         kind: "allowed-classes",
         classIds: ["soldier", "cavalry", "warrior", "archer", "sister"],
@@ -2038,10 +2059,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-01-enter-deployment",
         "stage-01-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 4, 24, 40, 41, 42, 43],
-        fixedSlots: [42, 40, 43, 41, 0],
         optionalSlots: [1, 2, 4, 24],
         maximumUnits: 8,
         openCellCount: 3,
@@ -2124,9 +2145,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-02-completed-route",
       ],
       requiredResumeEventIds: ["stage-02-opening-story"],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         // REMAKE-108 swaps the four grown campaign slots out to stage 3.
-        kind: "exact-slots",
+        kind: "fixed-roster",
         slots: [0, 2, 24, 44, 45, 51, 52, 53, 54],
       },
       enemyClassById: [
@@ -2213,9 +2235,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-03-player-ready",
         "stage-03-fourth-corps-joined",
       ],
+      defeat: { type: "any-unit-removed", side: 1, slots: [1, 3] },
       alliedUnits: {
         // REMAKE-108 hands Himi the four campaign slots the player grew in stages 0–1.
-        kind: "exact-slots",
+        kind: "fixed-roster",
         slots: [1, 3, 4, 20, 21, 40, 41, 42, 43, 45, 46, 47, 50],
       },
       enemyClassById: [
@@ -2308,10 +2331,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-04-enter-deployment",
         "stage-04-opening-story",
       ],
+      defeat: { type: "any-unit-removed", side: 1, slots: [0, 24] },
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 20, 21, 24],
-        fixedSlots: [0, 24],
         optionalSlots: [1, 2, 3, 4, 20, 21],
         maximumUnits: 8,
         openCellCount: 6,
@@ -2365,10 +2388,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-05-completed-route",
       ],
       requiredResumeEventIds: ["stage-05-enter-deployment", "stage-05-opening-story"],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 20, 21, 24],
         maximumUnits: 6,
         openCellCount: 5,
@@ -2420,8 +2443,9 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-42-departure-story",
         "stage-42-completed-route",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
-        kind: "exact-slots",
+        kind: "fixed-roster",
         slots: [0, 1, 2, 3, 4, 5, 6, 7, 23, 24],
       },
       enemyClassById: [],
@@ -2468,10 +2492,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-06-prebattle-story",
         "stage-06-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
         maximumUnits: 9,
         openCellCount: 8,
@@ -2518,10 +2542,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-07-prebattle-story",
         "stage-07-enter-deployment",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
-        fixedSlots: [0, 1],
         optionalSlots: [2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
         maximumUnits: 7,
         openCellCount: 5,
@@ -2570,8 +2594,9 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-08-prebattle-story",
         "stage-08-opening-story",
       ],
+      defeat: { type: "unit-removed", side: 1, slot: 8 },
       alliedUnits: {
-        kind: "exact-slots",
+        kind: "fixed-roster",
         slots: [8, 17, 18, 40, 41, 42, 43, 44],
       },
       enemyClassById: [
@@ -2618,10 +2643,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-09-enter-deployment",
         "stage-09-opening-story",
       ],
+      defeat: { type: "any-unit-removed", side: 1, slots: [0, 9] },
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 9, 12, 13, 14, 20, 21, 24],
-        fixedSlots: [9, 0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 12, 13, 14, 20, 21, 24],
         maximumUnits: 9,
         openCellCount: 7,
@@ -2671,8 +2696,9 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-11-opening-story",
         "stage-11-dori-departure",
       ],
+      defeat: { type: "unit-removed", side: 1, slot: 8 },
       alliedUnits: {
-        kind: "exact-slots",
+        kind: "fixed-roster",
         slots: [8, 16, 17, 18, 19, 40, 41, 42],
       },
       enemyClassById: createStage11SaveEnemyClasses(),
@@ -2713,10 +2739,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-10-prebattle-story",
         "stage-10-enter-deployment",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 13,
         openCellCount: 12,
@@ -2768,10 +2794,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-12-enter-deployment",
         "stage-12-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 9,
         openCellCount: 8,
@@ -2820,10 +2846,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-13-prebattle-story",
         "stage-13-enter-deployment",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 12,
         openCellCount: 11,
@@ -2876,10 +2902,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-14-enter-deployment",
         "stage-14-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 10,
         openCellCount: 9,
@@ -2930,10 +2956,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-15-enter-deployment",
         "stage-15-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 10,
         openCellCount: 9,
@@ -2987,10 +3013,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-16-enter-deployment",
         "stage-16-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 10,
         openCellCount: 9,
@@ -3047,10 +3073,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-17-enter-deployment",
         "stage-17-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 10,
         openCellCount: 9,
@@ -3106,10 +3132,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-18-enter-deployment",
         "stage-18-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 8,
         openCellCount: 7,
@@ -3169,10 +3195,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-19-enter-deployment",
         "stage-19-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24],
         maximumUnits: 10,
         openCellCount: 9,
@@ -3259,10 +3285,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-20-dragon-arrival",
         "stage-20-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 24, 32],
-        fixedSlots: [32, 0, 24],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
         maximumUnits: 17,
         openCellCount: 14,
@@ -3306,7 +3332,8 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-21-discovery-story",
         "stage-21-completed-route",
       ],
-      alliedUnits: { kind: "exact-slots", slots: [0, 1, 24, 8] },
+      defeat: NIA_DEFEAT,
+      alliedUnits: { kind: "fixed-roster", slots: [0, 1, 24, 8] },
       enemyClassById: [],
       enemyAi: "none",
     },
@@ -3372,10 +3399,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-22-ambush-arrivals",
         "stage-22-player-ready",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 19,
         openCellCount: 18,
@@ -3425,10 +3452,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-23-enter-deployment",
         "stage-23-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 15,
         openCellCount: 14,
@@ -3494,10 +3521,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-24-enter-deployment",
         "stage-24-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 15,
         openCellCount: 14,
@@ -3564,10 +3591,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-26-enter-deployment",
         "stage-26-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0, 1, 7, 8],
         optionalSlots: [2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 22,
         openCellCount: 18,
@@ -3620,10 +3647,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-27-enter-deployment",
         "stage-27-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [22, 41, 44, 43, 45, 42, 40, 57, 56, 58, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [22, 41, 44, 43, 45, 42, 40, 57, 56, 58, 0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 31,
         openCellCount: 20,
@@ -3693,10 +3720,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-28-enter-deployment",
         "stage-28-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 29,
         openCellCount: 34,
@@ -3757,10 +3784,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-29-prebattle-story",
         "stage-29-enter-deployment",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 15,
         openCellCount: 14,
@@ -3828,7 +3855,8 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-30-opening-story",
         "stage-30-opening-form-transition",
       ],
-      alliedUnits: { kind: "exact-slots", slots: [0, 7, 40] },
+      defeat: NIA_DEFEAT,
+      alliedUnits: { kind: "fixed-roster", slots: [0, 7, 40] },
       enemyClassById: [],
       enemyFormSequences: [{
         unitId: "2:27",
@@ -3886,10 +3914,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-31-enter-deployment",
         "stage-31-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0, 1, 2, 3, 4],
         optionalSlots: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 17,
         openCellCount: 12,
@@ -3949,10 +3977,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-32-enter-deployment",
         "stage-32-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 16,
         openCellCount: 15,
@@ -4014,10 +4042,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-33-enter-deployment",
         "stage-33-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 10,
         openCellCount: 9,
@@ -4102,10 +4130,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-34-enter-deployment",
         "stage-34-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 11,
         openCellCount: 10,
@@ -4165,8 +4193,9 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-35-completed-route",
       ],
       requiredResumeEventIds: ["stage-35-opening-story"],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
-        kind: "exact-slots",
+        kind: "fixed-roster",
         slots: [0, 1, 2, 3, 4, 5, 7, 8, 18],
       },
       enemyClassById: [
@@ -4218,10 +4247,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-36-enter-deployment",
         "stage-36-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 28,
         openCellCount: 27,
@@ -4295,10 +4324,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-37-enter-deployment",
         "stage-37-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0],
         optionalSlots: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 27,
         openCellCount: 26,
@@ -4354,10 +4383,10 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-38-enter-deployment",
         "stage-38-opening-story",
       ],
+      defeat: NIA_DEFEAT,
       alliedUnits: {
         kind: "deployment",
         eligibleSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
-        fixedSlots: [0, 1],
         optionalSlots: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 31],
         maximumUnits: 20,
         openCellCount: 18,

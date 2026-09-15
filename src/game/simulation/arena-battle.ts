@@ -286,8 +286,9 @@ export function createArenaRuntime(
     },
     save: {
       validEventIds: [],
+      defeat: environment.definition.objective.defeat,
       alliedUnits: {
-        kind: "exact-slots",
+        kind: "fixed-roster",
         slots: frozenPlacements.filter(({ side }) => side === 1).map(({ slot }) => slot),
       },
       enemyClassById: frozenPlacements

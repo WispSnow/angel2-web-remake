@@ -84,7 +84,9 @@ import { Stage34Battle } from "../../src/game/simulation/stage34-battle";
 import { Stage35Battle } from "../../src/game/simulation/stage35-battle";
 import { Stage36Battle } from "../../src/game/simulation/stage36-battle";
 import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-battle";
-import type { BattleSaveData, CompletedSaveData, Difficulty } from "../../src/game/types";
+import type { Stage0Battle } from "../../src/game/simulation/battle";
+import { loadStageRuntime } from "../../src/game/stage-runtime";
+import type { BattleSaveData, CampaignState, CompletedSaveData, Difficulty } from "../../src/game/types";
 
 const completedSave = (): CompletedSaveData => ({
   format: "ANGEL2-web-save",
@@ -2559,21 +2561,31 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(save))).toEqual(save);
   });
 
-  it("round-trips stage-3 fixed battles and rejects missing protected allies", () => {
+  it("round-trips stage-3 fixed battles and rejects a board that already lost a protected ally", () => {
     const save = stage3BattleSave();
     expect(parseSaveData(JSON.stringify(save))).toEqual(save);
 
+    // 希蜜 and 黛西 are this stage's defeat condition; the rest of the roster may fall.
+    const fallenAlly = stage3BattleSave();
+    const unprotected = fallenAlly.battle.units.find(({ side, slot }) =>
+      side === 1 && slot !== 1 && slot !== 3)!;
+    fallenAlly.battle.units = fallenAlly.battle.units.filter(({ id }) => id !== unprotected.id);
+    fallenAlly.battle.focusId = "1:1";
+    expect(parseSaveData(JSON.stringify(fallenAlly))).toEqual(fallenAlly);
+
     const missingHimi = stage3BattleSave();
     missingHimi.battle.units = missingHimi.battle.units.filter(({ id }) => id !== "1:1");
+    missingHimi.battle.focusId = missingHimi.battle.units.find(({ side }) => side === 2)!.id;
     expect(isSaveData(missingHimi)).toBe(false);
   });
 
-  it("round-trips stage-4 deployments and rejects a missing or roster-mismatched guide", () => {
+  it("round-trips stage-4 deployments and rejects a lost or roster-mismatched guide", () => {
     const save = stage4BattleSave();
     expect(parseSaveData(JSON.stringify(save))).toEqual(save);
 
     const missingGuide = stage4BattleSave();
     missingGuide.battle.units = missingGuide.battle.units.filter(({ id }) => id !== "1:24");
+    missingGuide.battle.focusId = "1:0";
     expect(isSaveData(missingGuide)).toBe(false);
 
     const wrongGuide = stage4BattleSave();
@@ -2598,13 +2610,20 @@ describe("Web save validation", () => {
     expect(isSaveData(wrongEnemy)).toBe(false);
   });
 
-  it("round-trips stage-7 deployments and rejects a missing fixed ally or wrong Laili class", () => {
+  it("round-trips stage-7 deployments, keeps a fallen fixed ally and rejects a lost Nia or wrong Laili class", () => {
     const save = stage7BattleSave();
     expect(parseSaveData(JSON.stringify(save))).toEqual(save);
 
-    const missingHimi = stage7BattleSave();
-    missingHimi.battle.units = missingHimi.battle.units.filter(({ id }) => id !== "1:1");
-    expect(isSaveData(missingHimi)).toBe(false);
+    // 希蜜 is a fixed deployment placement, but only 妮雅 falling loses this stage.
+    const fallenHimi = stage7BattleSave();
+    fallenHimi.battle.units = fallenHimi.battle.units.filter(({ id }) => id !== "1:1");
+    fallenHimi.battle.focusId = "1:0";
+    expect(parseSaveData(JSON.stringify(fallenHimi))).toEqual(fallenHimi);
+
+    const missingNia = stage7BattleSave();
+    missingNia.battle.units = missingNia.battle.units.filter(({ id }) => id !== "1:0");
+    missingNia.battle.focusId = "1:1";
+    expect(isSaveData(missingNia)).toBe(false);
 
     const wrongLaili = stage7BattleSave();
     const laili = wrongLaili.battle.units.find(({ id }) => id === "2:18")!;
@@ -2613,13 +2632,20 @@ describe("Web save validation", () => {
     expect(isSaveData(wrongLaili)).toBe(false);
   });
 
-  it("round-trips stage-8 fixed forces and rejects a missing ranger or wrong enemy class", () => {
+  it("round-trips stage-8 fixed forces, keeps a fallen ranger and rejects a lost Sulanda or wrong enemy class", () => {
     const save = stage8BattleSave();
     expect(parseSaveData(JSON.stringify(save))).toEqual(save);
 
-    const missingRanger = stage8BattleSave();
-    missingRanger.battle.units = missingRanger.battle.units.filter(({ id }) => id !== "1:40");
-    expect(isSaveData(missingRanger)).toBe(false);
+    // Stage 8 is lost only when 蘇蘭達 (slot 8) falls; the rangers around her may go first.
+    const fallenRanger = stage8BattleSave();
+    fallenRanger.battle.units = fallenRanger.battle.units.filter(({ id }) => id !== "1:40");
+    fallenRanger.battle.focusId = "1:8";
+    expect(parseSaveData(JSON.stringify(fallenRanger))).toEqual(fallenRanger);
+
+    const missingSulanda = stage8BattleSave();
+    missingSulanda.battle.units = missingSulanda.battle.units.filter(({ id }) => id !== "1:8");
+    missingSulanda.battle.focusId = "1:40";
+    expect(isSaveData(missingSulanda)).toBe(false);
 
     const wrongEnemy = stage8BattleSave();
     const magician = wrongEnemy.battle.units.find(({ id }) => id === "2:30")!;
@@ -3522,11 +3548,21 @@ describe("Web save validation", () => {
       ...save,
       consumedEventIds: save.consumedEventIds.slice(0, -1),
     })).toBe(false);
+    // A fixed ally may fall before the save; only 妮雅 falling loses stage 31.
     expect(isSaveData({
       ...save,
       battle: {
         ...save.battle,
+        focusId: "1:0",
         units: save.battle.units.filter(({ id }) => id !== "1:4"),
+      },
+    })).toBe(true);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        focusId: "1:4",
+        units: save.battle.units.filter(({ id }) => id !== "1:0"),
       },
     })).toBe(false);
     expect(isSaveData({
@@ -3767,11 +3803,21 @@ describe("Web save validation", () => {
       classId: "demon-dragon-knight",
     });
     expect(isSaveData({ ...save, consumedEventIds: [] })).toBe(false);
+    // The fixed nine may lose anyone but 妮雅 before a save is written.
     expect(isSaveData({
       ...save,
       battle: {
         ...save.battle,
+        focusId: "1:0",
         units: save.battle.units.filter(({ id }) => id !== "1:18"),
+      },
+    })).toBe(true);
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        focusId: "1:18",
+        units: save.battle.units.filter(({ id }) => id !== "1:0"),
       },
     })).toBe(false);
     expect(isSaveData({
@@ -4994,9 +5040,16 @@ describe("Web save validation", () => {
   });
 
   it("strictly correlates stage-1 deployment, events and completed route state", () => {
-    const missingFixedUnit = stage1BattleSave();
-    missingFixedUnit.battle.units = missingFixedUnit.battle.units.filter(({ id }) => id !== "1:42");
-    expect(isSaveData(missingFixedUnit)).toBe(false);
+    // Slot 42 is a fixed placement that can fall; only 妮雅 falling loses stage 1.
+    const fallenFixedAlly = stage1BattleSave();
+    fallenFixedAlly.battle.units = fallenFixedAlly.battle.units.filter(({ id }) => id !== "1:42");
+    fallenFixedAlly.battle.focusId = "1:0";
+    expect(isSaveData(fallenFixedAlly)).toBe(true);
+
+    const lostNia = stage1BattleSave();
+    lostNia.battle.units = lostNia.battle.units.filter(({ id }) => id !== "1:0");
+    lostNia.battle.focusId = "1:42";
+    expect(isSaveData(lostNia)).toBe(false);
 
     const promotedGadirath = stage1BattleSave();
     const magician = promotedGadirath.battle.units.find(({ id }) => id === "1:24")!;
@@ -5042,19 +5095,162 @@ describe("Web save validation", () => {
     })).toBe(false);
   });
 
-  it("round-trips stage-2 fixed battles and rejects missing automatic allies", () => {
+  it("round-trips stage-2 fixed battles, keeps fallen automatic allies and rejects a lost Nia", () => {
     const save = stage2BattleSave();
     save.battle.units.find(({ id }) => id === "1:44")!.acted = true;
     expect(parseSaveData(JSON.stringify(save))).toEqual(save);
 
-    const missingAutomatic = stage2BattleSave();
-    missingAutomatic.battle.units = missingAutomatic.battle.units
+    const fallenAutomatic = stage2BattleSave();
+    fallenAutomatic.battle.units = fallenAutomatic.battle.units
       .filter(({ id }) => id !== "1:44");
-    expect(isSaveData(missingAutomatic)).toBe(false);
+    expect(parseSaveData(JSON.stringify(fallenAutomatic))).toEqual(fallenAutomatic);
+
+    const missingNia = stage2BattleSave();
+    missingNia.battle.units = missingNia.battle.units.filter(({ id }) => id !== "1:0");
+    missingNia.battle.focusId = "1:44";
+    expect(isSaveData(missingNia)).toBe(false);
 
     const wrongOpening = stage2BattleSave();
     wrongOpening.consumedEventIds = [];
     expect(isSaveData(wrongOpening)).toBe(false);
+  });
+
+  /**
+   * Regression: fixed-roster and deployment rules used to demand that every allied slot
+   * the stage fielded still stood, while the simulation removes a fallen ally from the
+   * board. Every manual save written after the first allied death then read back as an
+   * empty or 損壞 slot although 儲存次數 kept counting — reported from 攻打騎士堡 and
+   * from the long rounds of 趕回瓦爾克麗城, whose pursuers wear the city's NPCs down.
+   */
+  describe("battle saves written after allies fell in combat", () => {
+    const defeatInCombat = (battle: Stage0Battle, allyId: string): void => {
+      const ally = battle.unit(allyId)!;
+      const attacker = battle.units.find(({ side, acted, actionDisabled }) =>
+        side === 2 && !acted && !actionDisabled)!;
+      const cell = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]
+        .map(({ x, y }) => ({ x: ally.x + x, y: ally.y + y }))
+        .find((position) => position.x >= 0 && position.y >= 0
+          && position.x < battle.stage.width && position.y < battle.stage.height
+          && !battle.unitAt(position))!;
+      attacker.x = cell.x;
+      attacker.y = cell.y;
+      // Ordinary damage never drops below half of 8, so one hit finishes a 1-life ally.
+      ally.life = 1;
+      battle.attack(attacker.id, ally.id);
+      expect(battle.unit(allyId)).toBeUndefined();
+    };
+
+    // Mirrors `GameController.writeBattleSave`.
+    const battleSaveOf = (
+      battle: Stage0Battle,
+      entry: CampaignState,
+      stageLabel: string,
+      consumedEventIds: string[],
+    ): BattleSaveData => {
+      const campaign = battle.campaignSnapshot();
+      const focus = battle.focus!;
+      return {
+        format: "ANGEL2-web-save",
+        version: SAVE_VERSION,
+        contentVersion: SAVE_CONTENT_VERSION,
+        kind: "battle",
+        savedAt: "2026-09-15T12:00:00.000Z",
+        saveCount: 31,
+        stageId: battle.stage.id,
+        stageLabel,
+        ruleset: "stableRemake",
+        difficulty: campaign.difficulty,
+        rngState: campaign.rngState,
+        rngCalls: campaign.rngCalls,
+        roster: campaign.roster,
+        recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
+        stageEntrySnapshot: {
+          ...entry,
+          recordCounters: Array<number>(75).fill(0),
+          roster: entry.roster.map((rosterEntry) => ({ ...rosterEntry })),
+        },
+        stageProgress: 0,
+        consumedEventIds,
+        battle: {
+          phase: "player",
+          ...battle.serializableSnapshot(),
+          cursor: { x: focus.x, y: focus.y },
+          cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+        },
+      };
+    };
+
+    const expectReadableAndRestorable = async (save: BattleSaveData, battle: Stage0Battle) => {
+      const parsed = parseSaveData(JSON.stringify(save));
+      expect(parsed).toEqual(save);
+      if (parsed?.kind !== "battle") return;
+      const runtime = await loadStageRuntime(parsed.stageId);
+      const restored = runtime.restoreBattle({
+        stageId: parsed.stageId,
+        ruleset: parsed.ruleset,
+        difficulty: parsed.difficulty,
+        roster: parsed.roster,
+        recordCounters: parsed.recordCounters,
+        rngState: parsed.rngState,
+        rngCalls: parsed.rngCalls,
+      }, parsed.battle);
+      expect(restored.round).toBe(battle.round);
+      expect(restored.units.map(({ id }) => id).sort())
+        .toEqual(battle.units.map(({ id }) => id).sort());
+    };
+
+    it("keeps a stage-2 record readable after automatic allies fall", async () => {
+      const entry: CampaignState = {
+        stageId: "stage-02",
+        ruleset: "stableRemake",
+        difficulty: 3,
+        rngState: 0x1020_3040,
+        rngCalls: 3,
+        roster: completeCampaignRoster([
+          { slot: 0, classId: "cavalry", experience: 450, life: 100 },
+          { slot: 2, classId: "archer", experience: 360, life: 90 },
+        ]),
+      };
+      const battle = new Stage2Battle(entry);
+      defeatInCombat(battle, "1:51");
+      defeatInCombat(battle, "1:54");
+
+      const save = battleSaveOf(battle, entry, "攻打騎士堡", ["stage-02-opening-story"]);
+      await expectReadableAndRestorable(save, battle);
+
+      const lostNia = structuredClone(save);
+      lostNia.battle.units = lostNia.battle.units.filter(({ id }) => id !== "1:0");
+      lostNia.battle.focusId = "1:2";
+      expect(isSaveData(lostNia)).toBe(false);
+    });
+
+    it("keeps a stage-27 record readable after fixed NPC defenders fall", async () => {
+      const entry: CampaignState = {
+        stageId: "stage-27",
+        ruleset: "stableRemake",
+        difficulty: 3,
+        rngState: 0x27a0_b0c0,
+        rngCalls: 96,
+        roster: completeCampaignRoster([
+          { slot: 0, classId: "land-knight", experience: 800, life: 240 },
+          { slot: 7, classId: "magic-priest", experience: 700, life: 180 },
+        ]),
+      };
+      const deployment = {
+        placements: STAGE27_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+          slot, position: { ...position }, fixed: true,
+        })),
+      };
+      const battle = new Stage27Battle(entry, deployment);
+      defeatInCombat(battle, "1:41");
+      defeatInCombat(battle, "1:45");
+
+      const save = battleSaveOf(battle, entry, "趕回瓦爾克麗城", [
+        "stage-27-enter-deployment",
+        "stage-27-opening-story",
+      ]);
+      await expectReadableAndRestorable(save, battle);
+    });
   });
 
   it("bounds a saved round by the stage cap and refuses version-86 battles past it", () => {
