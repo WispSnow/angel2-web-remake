@@ -61,6 +61,10 @@ describe("stage 26 generated content", () => {
     });
     expect(STAGE26_SEMANTIC_ENEMY_UNITS.filter(({ classId }) => classId === "magic-priest"))
       .toHaveLength(7);
+    // Content keeps B/0053's native values; REMAKE-152 holds slot 40 in the simulation only.
+    expect(STAGE26_SEMANTIC_ENEMY_UNITS.filter(({ aiBehavior }) => aiBehavior !== 1)
+      .map(({ slot, position, aiBehavior }) => ({ slot, position, aiBehavior })))
+      .toEqual([{ slot: 40, position: { x: 18, y: 15 }, aiBehavior: 0 }]);
   });
 
   it("registers the 24 opening and 34 victory checkpoints", () => {

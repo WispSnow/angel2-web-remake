@@ -22,9 +22,17 @@ import { prepareColumnPush, type EnemyPhaseTailDefinition } from "./enemy-phase-
 import type { ForceDefinition } from "./forces";
 import { DeterministicRng } from "./rng";
 
+// REMAKE-152: B/0053 leaves the slot-40 priest at native behavior 0 inside a line
+// where Binaweiji and the other six priests are behavior-1 guards. stableRemake
+// holds the whole line; content keeps the native value as evidence.
+const STAGE26_LINE_GUARD_SLOTS: ReadonlySet<number> = new Set([40]);
+const STAGE26_GUARD_BEHAVIOR = 1;
+
 const STAGE26_UNIT_CONFIG: DeployedStageUnitConfig = {
   alliedUnits: STAGE26_SEMANTIC_ALLIED_UNITS,
-  enemyUnits: STAGE26_SEMANTIC_ENEMY_UNITS,
+  enemyUnits: STAGE26_SEMANTIC_ENEMY_UNITS.map((unit) => STAGE26_LINE_GUARD_SLOTS.has(unit.slot)
+    ? { ...unit, aiBehavior: STAGE26_GUARD_BEHAVIOR }
+    : unit),
   inheritance: {
     genericPortrait: 47,
     defaultClassId: "soldier",

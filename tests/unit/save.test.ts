@@ -5424,6 +5424,24 @@ describe("Web save validation", () => {
     }))).toEqual(completed);
   });
 
+  it("migrates version-115 saves without changing battle state for the stage 26 guard line", () => {
+    // REMAKE-152 只把第 26 关槽 40 的魔祭師改为守卫；逐槽行为从关卡内容读取、从不入档，
+    // 因此 v115 战中档与完成档无损迁移。
+    const current = battleSave();
+    expect(parseSaveData(JSON.stringify({
+      ...current,
+      version: 115,
+      contentVersion: "guard-magic-archer-kins-entry-1",
+    }))).toEqual(current);
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 115,
+      contentVersion: "guard-magic-archer-kins-entry-1",
+    }))).toEqual(completed);
+  });
+
   it("migrates version-114 saves without changing battle state when no Kins sits below his floor", () => {
     // REMAKE-150 只改魔弓兵在脱不开接触时是否原地射击，规划每次都从棋盘重算；REMAKE-151 的琴斯
     // 下限只补仍停在 299 以下的魔祭師琴斯，这两份夹具的槽 7 仍是默认士兵，因此 v114 无损迁移。

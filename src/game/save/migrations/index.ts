@@ -661,6 +661,24 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-152 holds stage 26's slot-40 priest with the rest of the guard line.
+ * Per-slot behaviors come from stage content and are never saved, so v115
+ * battle/completed saves migrate by identity; a loaded stage 26 battle simply
+ * holds that priest from whatever cell it already reached.
+ */
+function migrateVersion115Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 115
+    || value.contentVersion !== "guard-magic-archer-kins-entry-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-150 lets a guard or boxed-in magic archer fire from contact, and
  * REMAKE-151 restores Kins's 299 entry floor. Plans are rebuilt from the board
  * on every read and parseSaveData raises any Kins an older save parked below
@@ -3220,6 +3238,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migratePreviousSaveData(value: unknown): SaveData | undefined {
+  const migratedVersion115 = migrateVersion115Save(value);
+  if (migratedVersion115) return migratedVersion115;
   const migratedVersion114 = migrateVersion114Save(value);
   if (migratedVersion114) return migratedVersion114;
   const migratedVersion113 = migrateVersion113Save(value);

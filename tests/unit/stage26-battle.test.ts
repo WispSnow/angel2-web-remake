@@ -71,15 +71,21 @@ describe("stage 26 battle simulation", () => {
     expect(battle.outcome()).toBe("defeat");
   });
 
-  it("maps seven guards to sentry and one priest to pursuit", () => {
+  it("holds Binaweiji and all seven priests as guards (REMAKE-152)", () => {
     const battle = new Stage26Battle(campaign, fullDeployment);
     const enemies = battle.units.filter(({ side }) => side === 2);
-    const sentries = enemies.filter(({ id }) => battle.enemyBehaviorFor(id) === 1);
-    const pursuers = enemies.filter(({ id }) => battle.enemyBehaviorFor(id) !== 1);
-    expect(sentries).toHaveLength(7);
-    expect(pursuers.map(({ id }) => id)).toEqual(["2:40"]);
-    for (const enemy of sentries) expect(battle.enemyAiIntentFor(enemy.id)).toBe("sentry");
-    for (const enemy of pursuers) expect(battle.enemyAiIntentFor(enemy.id)).toBe("pursuit");
+    expect(enemies).toHaveLength(8);
+    for (const enemy of enemies) {
+      expect(battle.enemyBehaviorFor(enemy.id), enemy.id).toBe(1);
+      expect(battle.enemyAiIntentFor(enemy.id), enemy.id).toBe("sentry");
+    }
+  });
+
+  it("keeps the slot-40 priest in the line on the first enemy phase", () => {
+    // REMAKE-152: under its native behavior 0 the shared pursuit planner walked
+    // this priest out of the line from (18,15) to (18,22).
+    const battle = new Stage26Battle(campaign, fullDeployment);
+    expect(battle.planEnemyAiAction("2:40")?.path.at(-1)).toEqual({ x: 18, y: 15 });
   });
 
   it("prepares then commits each of the two bottom-to-top column pushes", () => {

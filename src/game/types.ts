@@ -267,8 +267,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 115;
-  contentVersion: "guard-magic-archer-kins-entry-1";
+  version: 116;
+  contentVersion: "stage-26-priest-line-guard-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";
