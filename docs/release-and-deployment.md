@@ -45,7 +45,8 @@ Release。
 - 只有用户明确确认当前内容并要求发布／上线后，才能创建生产部署。
 - 发布前再次运行 `git status --short --branch`，保留用户已有改动，确认这次要发布的源码范围。
 - 若 Cloudflare 登录失效、账号不对、找不到既有项目或需要创建新项目，停止并请用户处理；
-  不要自行创建同名或近似项目。
+  不要自行创建同名或近似项目。判断之前先按第 4 步排除 `pnpm dlx` 报 `ERR_PNPM_IGNORED_BUILDS`
+  造成的「未登录／找不到项目」假象。
 - 不把 Cloudflare API Token、账号 ID、OAuth 配置或其他凭据写入仓库、命令输出摘要或发布文档。
 
 ## Windows Tauri 开发包
@@ -270,22 +271,33 @@ pnpm preview:release
 
 ### 4. 检查 Cloudflare 登录与既有项目
 
-Wrangler 不作为项目依赖提交，发布时通过 `pnpm dlx` 调用：
+Wrangler 不作为项目依赖提交，发布时通过 `pnpm dlx` 调用。每条 wrangler 命令都必须带上
+`--allow-build=esbuild --allow-build=workerd`：
 
 ```bash
-pnpm dlx wrangler whoami
-pnpm dlx wrangler pages project list
+pnpm dlx --allow-build=esbuild --allow-build=workerd wrangler whoami
+pnpm dlx --allow-build=esbuild --allow-build=workerd wrangler pages project list
 ```
 
-首次使用或 OAuth 已过期时运行 `pnpm dlx wrangler login`，由用户在浏览器完成登录。项目列表中
-必须能看到既有的 `angel2-web-remake`。不要执行 `pages project create`。
+现在的 pnpm 遇到未获准的依赖构建脚本不再只是警告：不带这两个参数时，`dlx` 安装 wrangler 会因
+`esbuild`／`workerd` 的构建脚本被拦下而以 `ERR_PNPM_IGNORED_BUILDS`（`Ignored build scripts`）中止，
+wrangler 本身根本没有运行。这时 `whoami` 看起来像「未登录」，项目列表看起来像「找不到项目」，两者都是
+假象——0.6.0 发布时就遇到过，而 0.5.0 时不带参数还能运行。所以先确认输出里没有
+`ERR_PNPM_IGNORED_BUILDS`，再按上文权限边界判断登录或项目问题。只放行这两个包，不要为此全局放开依赖
+构建脚本；若 wrangler 日后新增需要构建脚本的依赖，报错会在 `Ignored build scripts` 后列出包名，确认是
+wrangler 的正常依赖后再补进 `--allow-build`。
+
+首次使用或 OAuth 已过期时运行 `pnpm dlx --allow-build=esbuild --allow-build=workerd wrangler login`，
+由用户在浏览器完成登录。项目列表中必须能看到既有的 `angel2-web-remake`。不要执行
+`pages project create`。
 
 ### 5. 上传生产版本
 
 只有在用户已明确授权上线后，才执行：
 
 ```bash
-pnpm dlx wrangler pages deploy release --project-name=angel2-web-remake
+pnpm dlx --allow-build=esbuild --allow-build=workerd \
+  wrangler pages deploy release --project-name=angel2-web-remake
 ```
 
 不要把 `dist/`、仓库根目录或 zip 包作为上传目标。生产部署不传 `--branch`；只有用户明确要求
@@ -299,7 +311,8 @@ Wrangler；Direct Upload 的 Wrangler 与 Dashboard 上传虽然可以在同一�
 ### 6. 验证线上结果
 
 ```bash
-pnpm dlx wrangler pages deployment list \
+pnpm dlx --allow-build=esbuild --allow-build=workerd \
+  wrangler pages deployment list \
   --project-name=angel2-web-remake \
   --environment=production
 ```
@@ -332,8 +345,9 @@ pnpm dlx wrangler pages deployment list \
 | `release/` 不存在 | 运行 `pnpm build:release`，不要改传 `dist/` |
 | release 审计报告实验室或调试模块 | 修复源码引用／打包边界并重建，不手删构建产物蒙混过关 |
 | CI／Windows 构建报「素材包版本与代码不匹配」 | 把 `public/assets/original/` 的改动推到 `WispSnow/angel2-assets` 再重跑；不要改 `check:assets` 绕过 |
-| Wrangler 未登录 | 运行 `pnpm dlx wrangler login`，让用户完成浏览器授权 |
-| 找不到 `angel2-web-remake` | 用 `whoami` 与 `pages project list` 核对账号；停止，不新建项目 |
+| `pnpm dlx` 报 `ERR_PNPM_IGNORED_BUILDS`，或 wrangler 看似未登录／找不到项目 | pnpm 拦下了 `esbuild`／`workerd` 的构建脚本，wrangler 并没有运行；按第 4 步补上 `--allow-build=esbuild --allow-build=workerd` 重跑。这不是登录或项目问题，不要据此重新登录或新建项目 |
+| Wrangler 未登录 | 先排除上一行的假象，再运行 `pnpm dlx --allow-build=esbuild --allow-build=workerd wrangler login`，让用户完成浏览器授权 |
+| 找不到 `angel2-web-remake` | 先排除 `ERR_PNPM_IGNORED_BUILDS` 假象，再用 `whoami` 与 `pages project list` 核对账号；停止，不新建项目 |
 | 文件数或单文件超过 Pages 限制 | 评估资源压缩、合并或 R2；取得方案确认后再改架构 |
 | 部署成功但稳定网址仍像旧版 | 先查生产部署列表和本次专属 URL，再强制刷新与检查缓存 |
 | 新版存在阻断性问题 | 立即按上一节回滚，再修复本地源码和重新发布 |
