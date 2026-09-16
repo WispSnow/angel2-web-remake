@@ -200,11 +200,12 @@ JS／CSS 由 `public/_headers` 设为一年 `immutable`。这不是离线应用�
 关卡资源门必须覆盖该关卡表面真正会画的每一个文件。判断标准是可机检的：正式运行时里
 `/assets/original/...` 的原始 URL 不该由 Phaser（`xhr`）、`<img>`／CSS（`image`）或音频（`media`）发出——
 这些通道都不经过 Cache Storage，所以一旦漏了，慢速连线会在载入页收起之后才开始抓，而且每进一次关就
-重抓一次。已知的三种漏法都已修掉，新增关卡时要一并检查：`BattleScene` 每关都排入的共用棋子必须进
+重抓一次。已知的四种漏法都已修掉，新增关卡时要一并检查：`BattleScene` 每关都排入的共用棋子必须进
 `battle:core`（不能只挂在第 0 关模块上）；关卡模块用样板字串算出来的 `unitSprites` 清单生成器看不到，
 因此由 `StageAssetRequirements.unitSpriteUrls` 在运行时原样带过资源门；`.svg` 与 `.png`／`.json` 一样要能
-进 staged 租约。结局与制作人员表的租约还要覆盖 `native-ui-assets.ts` 里 CSS 自定义属性引用的图，否则
-换包之后那些属性会退回原始 URL。
+进 staged 租约；关卡以外的表面也算数——`mountStartup` 一建立标题就替读取游戏进度面板画点阵字，`boot`
+是那一刻唯一的租约，所以 `native-font.png` 必须同时属于 `boot` 与 `battle:core`。结局与制作人员表的租约
+还要覆盖 `native-ui-assets.ts` 里 CSS 自定义属性引用的图，否则换包之后那些属性会退回原始 URL。
 
 部署介面是正式流程里唯一延后加载的表面，它的模块与样式是打包产物，不在资源清单里。有部署阶段的
 关卡必须在关卡资源门内把这些模块一并备妥（`ensureStage` 的 `afterLoad`），载入页收起之后、玩家走到
@@ -215,7 +216,8 @@ JS／CSS 由 `public/_headers` 设为一年 `immutable`。这不是离线应用�
 Cache Storage 不会自动拦截 `<img>`、CSS `url()`、Phaser 或 `new Image()`；正式运行时必须先把
 当前资源包的 PNG／JSON 响应交给 staged render lease，再由 DOM、CSS 与 Phaser 使用同一次响应
 建立的对象 URL。战场边框、HUD、战术面板、对话框、点阵字体、命令菜单／指针和状态图标属于
-`battle:core`，不得重新塞回第 0 关包；当前小地图、剧情插画、部署／转职我方棋子随当前关进入
+`battle:core`，不得重新塞回第 0 关包；其中点阵字体与命令菜单指针另行同时列入 `boot`，因为标题在任何
+战场包存在之前就要用它们——这两笔在生成器里显式登记，不能只靠落包规则推导；当前小地图、剧情插画、部署／转职我方棋子随当前关进入
 有限预解码集合。图鉴中不属于当前包的职业／肖像仍按需读取，全景、地图技能、敌方纹理、结局
 与制作人员表继续使用各自既有租约，禁止为了消除原始 URL 而把全战役 PNG 同时解码常驻。
 

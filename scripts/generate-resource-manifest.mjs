@@ -180,6 +180,16 @@ for (const [stageId, urls] of stageAssetUrls) {
 // with `battle:core` prevents the first stage prefetch from fetching it again.
 addToPack("boot", assetUrl("command-menu-pointer.png"));
 addToPack("battle:core", assetUrl("command-menu-pointer.png"));
+// `mountStartup` paints the title's `[data-native-text]` hosts — the 讀取遊戲進度
+// panel's heading and every record cell — the moment it builds the screen, long
+// before any battle pack exists. Leaving the atlas to `battle:core` meant
+// `loadNativeFont` found no lease covering it and fell back to `new Image()` on
+// the raw URL, the one path that skips Cache Storage and repeats on every load.
+// Both packs list it explicitly: an implicit `battle:core` assignment below only
+// runs for files no pack has claimed yet, so naming it for `boot` alone would
+// take it away from the stage surfaces instead.
+addToPack("boot", assetUrl("native-font.png"));
+addToPack("battle:core", assetUrl("native-font.png"));
 // `BattleScene` schedules the two generic side-2 figures for *every* stage, not
 // just stage 0 whose module happens to name them. Leaving them to that one module
 // kept them out of every later stage's lease, so Phaser pulled the raw URL right

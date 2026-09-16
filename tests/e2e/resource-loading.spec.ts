@@ -621,6 +621,49 @@ for (const scenario of RAW_URL_SCENARIOS) {
 }
 
 /**
+ * 上面那一組場景都從 `?test=1&debugScenario=...` 進場，跳過開場直接落在關卡表面，所以
+ * 開場與標題自己拉了什麼從來沒有人看。實際上啟動門一備妥，`mountStartup` 就會替標題的
+ * `[data-native-text]` 宿主（讀取遊戲進度面板的標題與每一格記錄）叫一次 `loadNativeFont`，
+ * 而 `native-font.png` 當時只屬於 `battle:core`，租約裡沒有它 —— `new Image()` 於是去抓
+ * 原始 URL，一次落在 Cache Storage 之外、每次載入都重來的請求。
+ *
+ * 這一條走玩家真正的入口：普通 `/`、啟動門、開場、標題，再開一次記錄面板與難度選單，
+ * 因為那兩個才是標題上真的會新建點陣字畫布的表面。
+ */
+test("the plain entry never pulls a raw asset URL through the title", async ({ page }) => {
+  const rawPulls: string[] = [];
+  page.on("request", (request) => {
+    const type = request.resourceType();
+    if (type !== "xhr" && type !== "image" && type !== "media" && type !== "font") return;
+    const { pathname } = new URL(request.url());
+    if (!pathname.startsWith("/assets/original/")) return;
+    rawPulls.push(`${type} ${pathname}`);
+  });
+
+  await page.goto("/");
+  const enter = page.getByTestId("startup-enter");
+  await expect(enter).toBeVisible({ timeout: 30_000 });
+  await expect(enter).toBeEnabled({ timeout: 30_000 });
+  expect(rawPulls).toEqual([]);
+
+  await skipOpeningToTitle(page);
+  await expect(page.getByTestId("title-menu")).toBeVisible({ timeout: 30_000 });
+
+  await page.getByTestId("continue-game").click();
+  await expect(page.getByTestId("title-record-menu")).toBeVisible();
+  await page.getByTestId("title-record-next-page").click();
+  await page.keyboard.press("Escape");
+
+  await expect(page.getByTestId("title-menu")).toBeVisible();
+  await page.getByTestId("new-game").click();
+  await expect(page.getByTestId("difficulty-menu")).toBeVisible();
+
+  // 讓標題把還想要的東西抓完再判定。
+  await page.waitForTimeout(3000);
+  expect(rawPulls).toEqual([]);
+});
+
+/**
  * 關卡運行模組也是延後載入的一筆相依。它原本在資源門「之前」匯入，所以慢速連線上玩家
  * 會先對著上一個畫面乾等一段沒有任何進度的時間，載入頁才姍姍出現。現在匯入本身就跑在
  * 載入頁裡：模組還沒到，載入頁就該已經在了。

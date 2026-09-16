@@ -107,6 +107,9 @@ describe("versioned resource manifest", () => {
     const boot = resolvedPackUrls(manifest, "boot");
     expect(boot).toContain("/assets/original/startup/title/background.png");
     expect(boot).toContain("/assets/original/command-menu-pointer.png");
+    // 標題一建立就替讀取遊戲進度面板畫點陣字，那時只有 `boot` 有租約。少了這一筆，
+    // `loadNativeFont` 會退回 `new Image()` 去抓原始 URL，繞過 Cache Storage。
+    expect(boot).toContain("/assets/original/native-font.png");
     expect(boot).not.toContain("/assets/original/stage0-map.png");
 
     const stage0 = resolvedPackUrls(manifest, "stage:stage-00");
