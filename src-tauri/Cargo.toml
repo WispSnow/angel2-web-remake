@@ -1,6 +1,6 @@
 [package]
 name = "angel2-desktop"
-version = "0.7.0"
+version = "0.8.0"
 description = "Desktop shell for the Angel2 Web Remake"
 authors = ["WispSnow"]
 license = ""
