@@ -71,8 +71,8 @@ import { waterWarriorGroupIn, waterWarriorRootId } from "./water-warrior-split";
 import {
   battleOutcomeForObjective,
   slotsNamedByCondition,
-  STAGE_ROUND_LIMIT,
   STAGE_ROUND_LIMIT_WARNING_ROUNDS,
+  stageRoundLimit,
 } from "./objectives";
 import {
   hasEnemyDamageActionThisTurn,
@@ -4159,26 +4159,29 @@ export class Stage0Battle {
     if (this.unit("1:0")) this.focusId = "1:0";
   }
 
-  /** `REMAKE-110` 的每关回合上限。目前是全局常量，逐关差异化需要新的规则身份。 */
+  /**
+   * `REMAKE-110` 的每关回合上限，默认全局 99；`REMAKE-157` 起关卡可在定义里声明
+   * 自己的上限（第 29 关为 199）。
+   */
   get roundLimit(): number {
-    return STAGE_ROUND_LIMIT;
+    return stageRoundLimit(this.stage);
   }
 
   /** 含本回合在内还能打几个完整回合；越过上限后为 0。 */
   get roundsRemaining(): number {
-    return Math.max(0, STAGE_ROUND_LIMIT - this.round + 1);
+    return Math.max(0, this.roundLimit - this.round + 1);
   }
 
   /**
-   * 给玩家看的回合号。越过上限的那一档只是回合边界上的判负标记，玩家并没有打第
-   * 100 个回合，所以回合框停在最后一个真的打过的回合。
+   * 给玩家看的回合号。越过上限的那一档只是回合边界上的判负标记，玩家并没有打那个
+   * 回合，所以回合框停在最后一个真的打过的回合。
    */
   get displayRound(): number {
-    return Math.min(this.round, STAGE_ROUND_LIMIT);
+    return Math.min(this.round, this.roundLimit);
   }
 
   get roundLimitExceeded(): boolean {
-    return this.round > STAGE_ROUND_LIMIT;
+    return this.round > this.roundLimit;
   }
 
   /** 进入倒数警告区间；越过上限后战斗已结束，不再报警告。 */
@@ -4190,7 +4193,7 @@ export class Stage0Battle {
   outcome(): BattleOutcome {
     if (this.pendingTransformations.length > 0) return "ongoing";
     const objectiveOutcome = battleOutcomeForObjective(this.units, this.stage.objective);
-    // REMAKE-110 的逾时判负只接管「目标还没分出结果」的局面：第 99 回合内打出的胜利
+    // REMAKE-110 的逾时判负只接管「目标还没分出结果」的局面：上限回合内打出的胜利
     // 照常成立。回合号越过上限时目标必定仍未达成——每次行动和敌方阶段结束都会结算一次
     // 胜负，真打赢了根本走不到这个回合边界——所以这里不需要再定义两者的优先级。
     if (objectiveOutcome !== "ongoing") return objectiveOutcome;

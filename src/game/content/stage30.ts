@@ -66,6 +66,8 @@ export const STAGE30_DEFINITION = {
   ...STAGE30,
   contentIdentity: STAGE30_CONTENT_IDENTITY,
   objective: STAGE30_OBJECTIVE,
+  // REMAKE-157: on 無法無天 the trio has to break 32 forms, which may not fit in 99 rounds.
+  roundLimit: 199,
   deployment: { kind: "fixed" },
   stories: {
     prebattle: "stage-30-prebattle-story",
@@ -154,11 +156,20 @@ const enemyUnitSprites = Object.fromEntries([
   `/assets/original/technique-lab/units/enemy-${classId}.png`,
 ]));
 
+// The last form rejoins as side 1 through the defeat-replacement chain. The scene's
+// derived ally preload reads only the board and the stage events, so the figure it
+// becomes is staged here or it renders as Phaser's `__MISSING` placeholder.
+const finalConversionClassId = semanticClassId(STAGE30_EVENT_PROGRAM.finalConversion.to.classRecord);
+
 export const STAGE30_ASSETS = {
   map: "/assets/original/stage30-map.png",
   minimap: "/assets/original/stage30-minimap.png",
   storyBackground: "/assets/original/story-stage29-background-23.png",
-  unitSprites: enemyUnitSprites,
+  unitSprites: {
+    ...enemyUnitSprites,
+    [`ally-${finalConversionClassId}`]:
+      `/assets/original/technique-lab/units/ally-${finalConversionClassId}.png`,
+  },
   audio: {
     story: musicAsset("MAGIC", 78),
     playerEntry: musicAsset("MUSIC", 29),

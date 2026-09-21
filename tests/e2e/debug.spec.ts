@@ -234,6 +234,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
     "stage-30-player",
     "stage-30-near-victory",
     "stage-30-near-defeat",
+    "stage-30-round-limit",
     "stage-30-victory-ready",
     "stage-30-cleared",
     "stage-31-prebattle",
@@ -305,7 +306,7 @@ test("debug hub selects a difficulty and opens the formal stage-one deployment",
   await expect(page.locator('[data-debug-stage-id="stage-29"] [data-debug-scenario-id]'))
     .toHaveCount(7);
   await expect(page.locator('[data-debug-stage-id="stage-30"] [data-debug-scenario-id]'))
-    .toHaveCount(6);
+    .toHaveCount(7);
   await expect(page.locator('[data-debug-stage-id="stage-31"] [data-debug-scenario-id]'))
     .toHaveCount(7);
   await expect(page.locator('[data-debug-stage-id="stage-32"] [data-debug-scenario-id]'))

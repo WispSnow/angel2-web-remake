@@ -640,6 +640,11 @@ export interface StageDefinition<Id extends StageId = StageId> {
   };
   contentIdentity: string;
   objective: StageObjectiveDefinition;
+  /**
+   * `REMAKE-157`：本关自己的完整回合上限。省略时沿用 `REMAKE-110` 的全局
+   * `STAGE_ROUND_LIMIT`；存档 schema 在 `stage-runtime.ts` 另存一份同值。
+   */
+  roundLimit?: number;
   deployment: StageDeploymentDefinition;
   stories: StageStoryDefinition;
   music: StageMusicDefinition;

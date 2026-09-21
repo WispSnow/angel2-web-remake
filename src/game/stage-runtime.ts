@@ -119,6 +119,12 @@ export interface StageSaveSchema {
    * keeps every copy equal to the loaded definition.
    */
   defeat: StageObjectiveCondition;
+  /**
+   * The stage definition's own round limit (`REMAKE-157`); omitted where the stage keeps
+   * `REMAKE-110`'s global 99. A save is only written on a player phase that exists, so
+   * its round never passes this. Mirrored like `defeat`.
+   */
+  roundLimit?: number;
   alliedUnits: StageSaveAlliedUnitRule;
   /**
    * Allied slots the stage fields as one-battle guests. Their battle leaves them out
@@ -3872,6 +3878,7 @@ export const STAGE_RUNTIME_MANIFEST = {
         "stage-30-opening-form-transition",
       ],
       defeat: NIA_DEFEAT,
+      roundLimit: 199,
       alliedUnits: { kind: "fixed-roster", slots: [0, 7, 40] },
       enemyClassById: [],
       enemyFormSequences: [{

@@ -30,13 +30,14 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 118 as const;
-export const SAVE_CONTENT_VERSION = "stage-27-nearest-free-spawn-1" as const;
+export const SAVE_VERSION = 119 as const;
+export const SAVE_CONTENT_VERSION = "stage-30-round-limit-199-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;
 // REMAKE-110: 战中档只能在玩家阶段写出，而越过上限就没有下一个玩家阶段，所以
-// 合法的存档回合号正好是 1..99。这里直接引用规则常量，避免 schema 与规则各说各话。
+// 合法的存档回合号正好是 1..上限。这里直接引用规则常量，避免 schema 与规则各说各话；
+// REMAKE-157 起关卡可在存档 schema 的 `roundLimit` 声明自己的上限。
 export const MAX_ROUND = STAGE_ROUND_LIMIT;
 export const MAX_EXPERIENCE = 0x7fff_ffff;
 export const MAX_LIFE = 0x7fff_ffff;
@@ -277,10 +278,11 @@ export function isSavedBattleState(
   requireActionDisabled = true,
   requireTerrainOverrides = true,
 ): value is SavedBattleState {
+  const saveSchema: StageSaveSchema = STAGE_RUNTIME_MANIFEST[stageId].save;
   if (
     !isRecord(value)
     || value.phase !== "player"
-    || !isIntegerBetween(value.round, 1, MAX_ROUND)
+    || !isIntegerBetween(value.round, 1, saveSchema.roundLimit ?? MAX_ROUND)
     || typeof value.focusId !== "string"
     || !Array.isArray(value.units)
     || value.units.length === 0
@@ -298,7 +300,6 @@ export function isSavedBattleState(
     || !isPosition(value.cameraOrigin, CAMERA_MAX_X, CAMERA_MAX_Y)
   ) return false;
 
-  const saveSchema: StageSaveSchema = STAGE_RUNTIME_MANIFEST[stageId].save;
   if (saveSchema.enemyAi === "stage-01-castle-guard") {
     if (requireStage1Ai) {
       if (!isSavedEnemyAiState(value.enemyAi, value.round)) return false;

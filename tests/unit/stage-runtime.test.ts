@@ -7,6 +7,7 @@ import {
   STAGE_RUNTIME_MANIFEST,
 } from "../../src/game/stage-runtime";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { STAGE_ROUND_LIMIT } from "../../src/game/simulation/objectives";
 import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../../src/game/content/stage0-actions.generated";
 import { presentationActionIdsForClass } from "../../src/game/content/actions";
 import { mapActionAtlasIdForAction } from "../../src/game/content/map-action-assets";
@@ -755,6 +756,22 @@ describe("stage runtime manifest", () => {
       expect({ stageId, defeat: runtime.save.defeat })
         .toEqual({ stageId, defeat: runtime.definition.objective.defeat });
     }
+  });
+
+  it("mirrors every stage's round limit into its save schema", async () => {
+    // REMAKE-157 lets a stage declare its own limit; save validation reads the copy in the
+    // schema, so a stale one would either reject its late records or accept rounds the
+    // stage never reaches.
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const runtime = await loadStageRuntime(stageId);
+      const battle = runtime.createBattle(
+        { ...campaign, stageId, roster: completeCampaignRoster([]) },
+        runtime.preparation?.createInitialResult(),
+      );
+      expect({ stageId, roundLimit: runtime.save.roundLimit ?? STAGE_ROUND_LIMIT })
+        .toEqual({ stageId, roundLimit: battle.roundLimit });
+    }
+    expect(STAGE_RUNTIME_MANIFEST["stage-30"].save.roundLimit).toBe(199);
   });
 
   it("mirrors every stage's guest allies into its save schema", async () => {

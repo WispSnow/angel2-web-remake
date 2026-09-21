@@ -5460,6 +5460,21 @@ describe("Web save validation", () => {
     }))).toBeUndefined();
   });
 
+  it("bounds a stage-30 saved round by that stage's own 199-round limit (REMAKE-157)", () => {
+    const atRound = (round: number): BattleSaveData => {
+      const save = stage30BattleSave(3);
+      return { ...save, battle: { ...save.battle, round } };
+    };
+    expect(isSaveData(atRound(STAGE_ROUND_LIMIT + 1))).toBe(true);
+    expect(isSaveData(atRound(199))).toBe(true);
+    expect(isSaveData(atRound(200))).toBe(false);
+
+    // Every other stage keeps REMAKE-110's 99.
+    const stageZero = battleSave();
+    stageZero.battle.round = STAGE_ROUND_LIMIT + 1;
+    expect(isSaveData(stageZero)).toBe(false);
+  });
+
   it("carries version-88 saves forward when the fourth corps changes its doctrine", () => {
     // REMAKE-111 only changes how stage 3's automatic corps plans its phase.
     // Nothing about that plan is saved. The later REMAKE-126 migration still
@@ -5815,6 +5830,25 @@ describe("Web save validation", () => {
     if (!pursuer) throw new Error("stage 27 pursuer is missing from the save");
     pursuer.classId = "soldier";
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
+  });
+
+  it("migrates version-118 saves without changing battle state for stage 30's longer round limit", () => {
+    // REMAKE-157 只把第 30 关的回合上限读自关卡定义；上限不入档，v118 的战中档都停在第 99
+    // 回合以内，因此 v118 无损迁移。
+    for (const current of [battleSave(), stage30BattleSave(3)]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 118,
+        contentVersion: "stage-27-nearest-free-spawn-1",
+      }))).toEqual(current);
+    }
+
+    const completed: CompletedSaveData = { ...completedSave() };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 118,
+      contentVersion: "stage-27-nearest-free-spawn-1",
+    }))).toEqual(completed);
   });
 
   it("migrates version-117 saves without changing battle state for the nearest free pursuer cell", () => {

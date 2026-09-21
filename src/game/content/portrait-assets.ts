@@ -1,12 +1,18 @@
 import type { DialoguePage, PortraitRecord } from "../types";
 import type { StageDefinition, StageStoryId } from "./stages";
 import { storyPagesForId } from "./dialogue";
-import { PORTRAIT_CATALOG } from "./portrait-catalog.generated";
+import { PORTRAIT_CATALOG, type PortraitAnimationAssets } from "./portrait-catalog.generated";
 
 export function portraitAssetUrls(record: PortraitRecord): readonly string[] {
   const entry = PORTRAIT_CATALOG[record];
-  if (!entry.animation) return [entry.source];
-  return [entry.source, ...entry.animation.eyes, ...entry.animation.mouths];
+  const animation: PortraitAnimationAssets | null = entry.animation;
+  if (!animation) return [entry.source];
+  return [
+    entry.source,
+    ...animation.eyes,
+    ...animation.mouths,
+    ...(animation.redEyes ? [animation.redEyes] : []),
+  ];
 }
 
 export function portraitAssetUrlsForRecords(

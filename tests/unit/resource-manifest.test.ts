@@ -163,7 +163,8 @@ describe("versioned resource manifest", () => {
     );
 
     expect(resolvedPackUrls(manifest, "stream:full-combat").size).toBe(172);
-    expect(resolvedPackUrls(manifest, "stream:portraits").size).toBe(500);
+    // Includes the four module-29 red-eye overlays (frame 7 of D/0, D/2, D/3 and D/41).
+    expect(resolvedPackUrls(manifest, "stream:portraits").size).toBe(504);
   });
 
   test("gives every debug campaign scenario its formal campaign stage pack", async () => {

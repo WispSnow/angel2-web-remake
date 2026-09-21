@@ -302,6 +302,20 @@ test("REMAKE-156 說明祈禱生命恢復量改為畫面顯示的數字", async 
   await expect(page.getByTestId("remake-note-REMAKE-156")).toHaveCount(0);
 });
 
+test("REMAKE-157 把「治癒維斯塔女帝」的回合上限放寬列在 REMAKE-110 之後", async ({ page }) => {
+  await page.goto("/");
+  // 使用者把這條列在「平衡調整」之下，它修改的是 REMAKE-110 這條同樣在平衡分頁的復刻規則。
+  await openNotes(page, "balance");
+  const roundCap = page.getByTestId("remake-note-REMAKE-157");
+  await expect(roundCap).toContainText("「治癒維斯塔女帝」的回合上限放寬為 199 回合");
+  await expect(roundCap).toContainText("第 199 回合結束仍未喚醒女帝才逾時判負");
+  await expect(roundCap.locator(".rn-note-id")).toHaveText("REMAKE-157");
+  await expect(page.getByTestId("remake-note-REMAKE-110")).toContainText("見 REMAKE-157");
+
+  await page.getByTestId("remake-notes-tab-fixes").click();
+  await expect(page.getByTestId("remake-note-REMAKE-157")).toHaveCount(0);
+});
+
 test("REMAKE-152 與 REMAKE-154 將兩關的敵軍配置漏洞列入 Bug 修復", async ({ page }) => {
   await page.goto("/");
   // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。

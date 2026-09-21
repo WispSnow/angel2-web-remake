@@ -1,7 +1,9 @@
 import {
   isPortraitRecord,
+  MODULE29_RED_EYE_RULE,
   PORTRAIT_CATALOG,
   portraitSourceFor,
+  type PortraitAnimationAssets,
 } from "./content/portrait-catalog.generated";
 import type { PortraitRecord } from "./types";
 import { stagedRenderAssetSource } from "./staged-render-asset-cache";
@@ -23,6 +25,8 @@ interface PortraitMarkupOptions {
   className: string;
   wrapperTestId?: string;
   baseTestId?: string;
+  /** Draw the record's frame-7 red eyes in place of every blink frame. */
+  redEyes?: boolean;
 }
 
 const HALF_FRAME_MS = 85;
@@ -40,6 +44,22 @@ const portraitPreparations = new WeakMap<HTMLElement, {
 const percentage = (value: number) => `${(value / PORTRAIT_SIZE * 100).toFixed(6)}%`;
 const randomInteger = (minimum: number, maximum: number) =>
   minimum + Math.floor(Math.random() * (maximum - minimum + 1));
+
+/**
+ * Module 29 runs `0000:85EC/860E/862B` before both of its blink draws — the unit detail
+ * at `0000:8578` and the battle-dialogue portraits at `1864:00B0` — and draws frame 7 in
+ * place of the blink frame while a possessed character's stage is still undecided.
+ * Module 25's prebattle story blink has no such check.
+ */
+export function module29ShowsRedEyes(
+  portrait: PortraitRecord,
+  nativeStage: number,
+  stageProgress: number,
+): boolean {
+  return stageProgress !== MODULE29_RED_EYE_RULE.clearedProgress
+    && MODULE29_RED_EYE_RULE.stages.some((rule) => rule.nativeStage === nativeStage
+      && (rule.portraits as readonly number[]).includes(portrait));
+}
 
 export type NativeMouthFrame = "1" | "2";
 
@@ -71,7 +91,7 @@ const PORTRAIT_UNDERLAY = '<i class="dialogue-portrait-underlay" aria-hidden="tr
 
 function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: string): string {
   const portraitSource = portraitSourceFor(portrait);
-  const animation = PORTRAIT_CATALOG[portrait].animation;
+  const animation: PortraitAnimationAssets | null = PORTRAIT_CATALOG[portrait].animation;
   const base = `${PORTRAIT_UNDERLAY}<img class="portrait-base" ${baseTestId ? `data-testid="${baseTestId}"` : ""} src="${stagedRenderAssetSource(portraitSource)}" data-source-url="${portraitSource}" alt="${alt}" />`;
   if (!animation) return base;
   const eyeStyle = [
@@ -91,6 +111,9 @@ function portraitLayers(portrait: PortraitRecord, alt: string, baseTestId?: stri
     ${animation.eyes.map((source, index) =>
       `<img class="portrait-eye portrait-eye-${index + 1}" style="${eyeStyle}" src="${stagedRenderAssetSource(source)}" data-source-url="${source}" alt="" aria-hidden="true" />`,
     ).join("")}
+    ${animation.redEyes
+      ? `<img class="portrait-red-eyes" style="${eyeStyle}" src="${stagedRenderAssetSource(animation.redEyes)}" data-source-url="${animation.redEyes}" alt="" aria-hidden="true" />`
+      : ""}
     ${animation.mouths.map((source, index) =>
       `<img class="portrait-mouth portrait-mouth-${index + 1}" style="${mouthStyle}" src="${stagedRenderAssetSource(source)}" data-source-url="${source}" alt="" aria-hidden="true" />`,
     ).join("")}`;
@@ -107,6 +130,7 @@ export function animatedPortraitMarkup(portrait: PortraitRecord, options: Portra
       data-mouth-frame="1"
       data-talk-count="0"
       data-speaking="false"
+      data-red-eyes="${options.redEyes ? "true" : "false"}"
       data-portrait-ready="false">
       ${portraitLayers(portrait, options.alt, options.baseTestId)}
     </span>`;
@@ -118,7 +142,9 @@ export function configureAnimatedPortrait(
   alt: string,
   channel: string,
   baseTestId?: string,
+  redEyes = false,
 ): void {
+  element.dataset.redEyes = String(redEyes);
   if (element.dataset.portraitRecord !== String(portrait)) {
     element.dataset.portraitRecord = String(portrait);
     element.dataset.portraitChannel = channel;

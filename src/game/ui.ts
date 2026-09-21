@@ -37,7 +37,7 @@ import {
 } from "./full-combat";
 import { applyFullCombatAtlasFrame } from "./full-combat-atlas";
 import { fullCombatImageSource } from "./full-combat-image-cache";
-import type { BattleUnit, DialoguePage, UnitClassId, UnitStats } from "./types";
+import type { BattleUnit, DialoguePage, PortraitRecord, UnitClassId, UnitStats } from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
@@ -84,6 +84,7 @@ import {
 import {
   animatedPortraitMarkup,
   configureAnimatedPortrait,
+  module29ShowsRedEyes,
   nativeMouthFrameAfterGlyph,
   nativeStoryGlyphMovesMouth,
   prepareAnimatedPortrait,
@@ -1523,6 +1524,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             `${state.speaker ?? "角色"}肖像`,
             `dialogue-${slot}`,
             `dialogue-portrait-${slot}`,
+            battlePortraitShowsRedEyes(controller, state.portrait),
           );
           void prepareAnimatedPortrait(elements.portrait).catch(() => undefined);
           elements.portrait.hidden = false;
@@ -2158,6 +2160,17 @@ function nativeUnitDetailText(
   };
 }
 
+/**
+ * The native red-eye check lives in module 29, which owns the battle HUD and every
+ * battle-time dialogue. The prebattle story (module 25) and the deployment surface
+ * (module 27) never reach it.
+ */
+function battlePortraitShowsRedEyes(controller: GameController, portrait: PortraitRecord): boolean {
+  return controller.phase !== "prebattleStory"
+    && controller.phase !== "deployment"
+    && module29ShowsRedEyes(portrait, controller.battle.stage.nativeStage, controller.stageProgress);
+}
+
 function renderHud(
   controller: GameController,
   unit: NonNullable<GameController["focusedUnit"]>,
@@ -2210,6 +2223,7 @@ function renderHud(
         className: "hud-portrait",
         wrapperTestId: "unit-portrait-composite",
         baseTestId: "unit-portrait",
+        redEyes: battlePortraitShowsRedEyes(controller, unit.portrait),
       })}
       <div class="hud-identity" data-testid="hud-identity">
         <b class="${identityClass}" title="${identity}">${identity}</b>

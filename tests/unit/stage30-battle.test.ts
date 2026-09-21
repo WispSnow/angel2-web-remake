@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  STAGE30_ASSETS,
   STAGE30_EVENT_PROGRAM,
   STAGE30_FORM_CLASS_IDS_BY_DIFFICULTY,
 } from "../../src/game/content/stage30";
+import { allyMapUnitAsset } from "../../src/game/content/map-unit-assets";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { Stage30Battle } from "../../src/game/simulation/stage30-battle";
 import type { CampaignState, Difficulty, UnitClassId } from "../../src/game/types";
@@ -111,6 +113,12 @@ describe("stage 30 battle simulation", () => {
           expect(committed.after).toMatchObject({
             id: "1:23", side: 1, slot: 23, classId: "empress", name: "維絲塔", portrait: 41,
           });
+          // Nothing on the board or in the stage events names this ally, so the stage
+          // has to stage its figure itself.
+          expect(STAGE30_ASSETS.unitSprites).toHaveProperty(
+            `ally-${committed.after.classId}`,
+            allyMapUnitAsset(committed.after.classId),
+          );
           expect(battle.unit("2:27")).toBeUndefined();
           expect(battle.outcome()).toBe("victory");
           expect(battle.campaignSnapshot().roster.find(({ slot }) => slot === 23))
@@ -118,6 +126,25 @@ describe("stage 30 battle simulation", () => {
         }
       }
     }
+  });
+
+  it("keeps the board past round 99 and loses on time only after round 199 (REMAKE-157)", () => {
+    const battle = new Stage30Battle(campaignFor(3));
+    commitOpeningForm(battle);
+    expect(battle.roundLimit).toBe(199);
+
+    battle.round = 99;
+    battle.startNextRound();
+    expect(battle).toMatchObject({ round: 100, displayRound: 100, roundLimitWarningActive: false });
+    expect(battle.outcome()).toBe("ongoing");
+
+    battle.round = 190;
+    expect(battle).toMatchObject({ roundsRemaining: 10, roundLimitWarningActive: true });
+
+    battle.round = 199;
+    battle.startNextRound();
+    expect(battle).toMatchObject({ round: 200, displayRound: 199, roundLimitExceeded: true });
+    expect(battle.outcome()).toBe("defeat");
   });
 
   it("preserves the defeated form action bit and supports special-action defeats", () => {

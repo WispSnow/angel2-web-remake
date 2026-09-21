@@ -19,11 +19,13 @@ const outputPath = path.join(root, "src/game/content/portrait-catalog.generated.
 const publicRoot = path.join(root, "public/assets/original/portraits");
 const dialoguePublicRoot = path.join(root, "public/assets/original/dialogue");
 const storyPublicRoot = path.join(root, "public/assets/original/story");
+const module29Path = path.join(root, "reverse/unpacked/lzexe-modules/raw/0029-unpacked.bin");
 
-const [storySource, storyRenderManifestSource, renderManifestSource] = await Promise.all([
+const [storySource, storyRenderManifestSource, renderManifestSource, module29Image] = await Promise.all([
   readFile(storyPresentationPath),
   readFile(storyRenderManifestPath),
   readFile(renderManifestPath),
+  readFile(module29Path),
 ]);
 const storyPresentations = JSON.parse(storySource.toString("utf8"));
 const storyRenderManifest = JSON.parse(storyRenderManifestSource.toString("utf8"));
@@ -43,6 +45,62 @@ const originCorrections = new Map([
     appliedOrigin: { x: 56, y: 24 },
   }],
 ]);
+
+/*
+ * 模組 29 的兩個眨眼繪製點畫眼部覆蓋片之前都先過同一組判定：右欄單位詳情
+ * `0000:8578` 以近呼叫 `0000:85CB..85D3`，對白肖像 `1864:00B0` 以遠呼叫
+ * `1864:00CB → 0000:85D8`。三段判定 `0000:85EC/860E/862B` 各比對一個關卡號
+ * DS:`2E77` 與畫像號 DS:`5DED`，只要 DS:`2F83` 還不是現場勝利 999，就把 CX 改成
+ * frame 7——D.SWF 裡恰好只有這幾筆記錄帶的紅眼覆蓋片。模組 25 的關前劇情眨眼
+ * `0000:1562` 沒有這一步。規則直接從映像解碼，不在內容裡手抄關卡與畫像號。
+ */
+const module29Slice = (start, end) => module29Image.subarray(start, end);
+const module29Signatures = [
+  ["unit-detail eye draw 0000:8578..85D8", 0x8578, 0x85d8, "5655192eeb77809af9892d85d6ad30c000c8c10515393ab31530908bb724e794"],
+  ["far check entry 0000:85D8..85EC", 0x85d8, 0x85ec, "671984731ca19ab348d341df84646cd00b370fb935ae71038a53be4211a2c961"],
+  ["dialogue eye draw 1864:00B0..00D5", 0x186f0, 0x18715, "af212e62fe4753a8042f4b92c104130d2a9d506affa89eb215695f22e38114d5"],
+  ["red-eye checks 0000:85EC..8648", 0x85ec, 0x8648, "22326813d07d1622702ae17eaeffd52f42e68bf755e37c1bf8bc94df633a6aec"],
+];
+for (const [label, start, end, expected] of module29Signatures) {
+  assert.equal(sha256(module29Slice(start, end)), expected, `module 29 ${label} changed; re-audit the red-eye override`);
+}
+
+function decodeRedEyeChecks(bytes) {
+  const expectBytes = (offset, expected, label) => {
+    assert.deepEqual([...bytes.subarray(offset, offset + expected.length)], expected, `red-eye check ${label} at +${offset}`);
+    return offset + expected.length;
+  };
+  const stages = [];
+  let offset = 0;
+  while (offset < bytes.length) {
+    offset = expectBytes(offset, [0x83, 0x3e, 0x77, 0x2e], "cmp word [2E77h]");
+    const nativeStage = bytes[offset];
+    offset = expectBytes(offset + 1, [0x74, 0x01, 0xc3, 0xa1, 0xed, 0x5d], "stage gate / mov ax,[5DEDh]");
+    const portraits = [];
+    while (bytes[offset] === 0x3d) {
+      portraits.push(bytes.readUInt16LE(offset + 1));
+      offset = expectBytes(offset + 3, [0x74], "jz after cmp ax") + 1;
+    }
+    assert(portraits.length > 0, "red-eye check names no portrait");
+    offset = expectBytes(offset, [0xc3, 0x81, 0x3e, 0x83, 0x2f], "ret / cmp word [2F83h]");
+    const clearedProgress = bytes.readUInt16LE(offset);
+    offset = expectBytes(offset + 2, [0x74, 0x03, 0xb9], "jz / mov cx");
+    const frame = bytes.readUInt16LE(offset);
+    offset = expectBytes(offset + 2, [0xc3], "ret");
+    stages.push({ nativeStage, portraits, clearedProgress, frame });
+  }
+  const [{ clearedProgress, frame }] = stages;
+  assert(stages.every((stage) => stage.clearedProgress === clearedProgress && stage.frame === frame));
+  return {
+    frame,
+    clearedProgress,
+    stages: stages.map(({ nativeStage, portraits }) => ({ nativeStage, portraits })),
+  };
+}
+const module29RedEyeRule = decodeRedEyeChecks(module29Slice(0x85ec, 0x8648));
+assert.equal(module29RedEyeRule.frame, 7);
+assert.equal(module29RedEyeRule.clearedProgress, 999);
+const redEyePortraits = new Set(module29RedEyeRule.stages.flatMap(({ portraits }) => portraits));
 
 const metadataEntries = [...storyPresentations.portraitMetadata.entries]
   .sort((left, right) => left.searchOrder - right.searchOrder || left.tableIndex - right.tableIndex);
@@ -194,6 +252,17 @@ for (const record of records) {
       throw new Error(`D/${directory} has portrait metadata but is missing eye or mouth frames`);
     }
     const [eyeOpen, eyeHalf, eyeClosed, mouthClosed, mouthHalf, mouthOpen] = required;
+    // Frame 7 exists exactly where a module-29 check can select it, and it is drawn at
+    // the eye origin in place of the blink frame, so it must share the eye frame's size.
+    const redEyes = imagesByIndex.get(module29RedEyeRule.frame);
+    assert.equal(Boolean(redEyes), redEyePortraits.has(record), `D/${directory} red-eye frame disagrees with module 29`);
+    if (redEyes) {
+      assert.deepEqual([redEyes.width, redEyes.height], [eyeOpen.width, eyeOpen.height]);
+      copyOperations.push(copyFile(
+        path.join(renderRoot, directory, redEyes.output.split("/").at(-1)),
+        path.join(outputDirectory, "eye-red.png"),
+      ));
+    }
     const frameOutputs = [
       [eyeOpen, "eye-open.png"],
       [eyeHalf, "eye-half.png"],
@@ -218,6 +287,7 @@ for (const record of records) {
       mouthOrigin: { x: metadata.nativeLayoutBytes[2], y: metadata.nativeLayoutBytes[3] },
       mouthSize: { width: mouthClosed.width, height: mouthClosed.height },
       mouths: ["mouth-closed.png", "mouth-half.png", "mouth-open.png"].map((file) => `${publicPrefix}/${file}`),
+      ...(redEyes ? { redEyes: `${publicPrefix}/eye-red.png` } : {}),
       originCorrection: originCorrection
         ? {
           ruleId: originCorrection.ruleId,
@@ -239,6 +309,12 @@ for (const record of records) {
   };
 }
 
+assert.deepEqual(
+  records.filter((record) => catalog[record].animation?.redEyes),
+  [...redEyePortraits].sort((left, right) => left - right),
+  "every module-29 red-eye portrait needs its frame 7",
+);
+
 await Promise.all(copyOperations);
 
 const generatedSource = `// Generated by scripts/generate-portrait-catalog.mjs from native D/A renders and story metadata.\n`
@@ -255,6 +331,11 @@ const generatedSource = `// Generated by scripts/generate-portrait-catalog.mjs f
     storyRenderManifest: {
       path: "reverse/renders/story-presentations/manifest.json",
       sha256: sha256(storyRenderManifestSource),
+    },
+    module29RedEyeChecks: {
+      path: "reverse/unpacked/lzexe-modules/raw/0029-unpacked.bin",
+      range: "0000:85EC..8648",
+      sha256: module29Signatures.at(-1)[3],
     },
   })} as const;\n`
   + `export const DIALOGUE_PORTRAIT_FRAME_ASSETS = ${JSON.stringify(dialogueFrameOutputs)} as const;\n`
@@ -273,6 +354,8 @@ const generatedSource = `// Generated by scripts/generate-portrait-catalog.mjs f
   + `  mouthOrigin: { x: number; y: number };\n`
   + `  mouthSize: { width: number; height: number };\n`
   + `  mouths: readonly [string, string, string];\n`
+  + `  /** Native frame 7, drawn at the eye origin in place of the blink frame; see MODULE29_RED_EYE_RULE. */\n`
+  + `  redEyes?: string;\n`
   + `  originCorrection?: {\n`
   + `    ruleId: "REMAKE-010";\n`
   + `    target: "eye";\n`
@@ -286,6 +369,11 @@ const generatedSource = `// Generated by scripts/generate-portrait-catalog.mjs f
   + `  animation: PortraitAnimationAssets | null;\n`
   + `}\n`
   + `export const PORTRAIT_CATALOG = ${JSON.stringify(catalog)} as const satisfies Readonly<Record<PortraitRecord, PortraitCatalogEntry>>;\n`
+  + `/**\n`
+  + ` * Module 29 \`0000:85EC/860E/862B\`: while DS:2F83 is not the live victory 999, the\n`
+  + ` * unit-detail and battle-dialogue blinks draw \`frame\` for these (stage, portrait) pairs.\n`
+  + ` */\n`
+  + `export const MODULE29_RED_EYE_RULE = ${JSON.stringify(module29RedEyeRule)} as const;\n`
   + `export function isPortraitRecord(value: unknown): value is PortraitRecord {\n`
   + `  return Number.isInteger(value) && Number(value) >= 0 && Number(value) < PORTRAIT_RECORDS.length;\n`
   + `}\n`

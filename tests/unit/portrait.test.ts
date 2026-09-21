@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  module29ShowsRedEyes,
   nativeMouthFrameAfterGlyph,
   nativeStoryGlyphMovesMouth,
 } from "../../src/game/portrait";
 import {
   isPortraitRecord,
+  MODULE29_RED_EYE_RULE,
   PORTRAIT_CATALOG,
   PORTRAIT_RECORDS,
   portraitSourceFor,
+  type PortraitAnimationAssets,
 } from "../../src/game/content/portrait-catalog.generated";
 
 describe("native portrait mouth animation", () => {
@@ -61,6 +64,39 @@ describe("generated campaign portrait catalog", () => {
         appliedOrigin: { x: 56, y: 24 },
       },
     });
+  });
+
+  it("ships frame 7 red eyes exactly for the portraits module 29 can select them for", () => {
+    // Decoded from `0000:85EC/860E/862B`: stage 5 萊茵／汀塔琪, stage 30 維絲塔, stage 22 葛蒂拉斯.
+    expect(MODULE29_RED_EYE_RULE).toEqual({
+      frame: 7,
+      clearedProgress: 999,
+      stages: [
+        { nativeStage: 5, portraits: [2, 3] },
+        { nativeStage: 30, portraits: [41] },
+        { nativeStage: 22, portraits: [0] },
+      ],
+    });
+    const withRedEyes = PORTRAIT_RECORDS.filter((record) => {
+      const animation: PortraitAnimationAssets | null = PORTRAIT_CATALOG[record].animation;
+      return animation?.redEyes !== undefined;
+    });
+    expect(withRedEyes).toEqual([0, 2, 3, 41]);
+    const empress: PortraitAnimationAssets | null = PORTRAIT_CATALOG[41].animation;
+    expect(empress?.redEyes).toBe("/assets/original/portraits/0041/eye-red.png");
+  });
+
+  it("shows red eyes only on the possessed character's own stage until its live victory", () => {
+    expect(module29ShowsRedEyes(41, 30, 0)).toBe(true);
+    expect(module29ShowsRedEyes(41, 30, 999)).toBe(false);
+    expect(module29ShowsRedEyes(41, 22, 0)).toBe(false);
+    expect(module29ShowsRedEyes(46, 30, 0)).toBe(false);
+    expect(module29ShowsRedEyes(2, 5, 0)).toBe(true);
+    expect(module29ShowsRedEyes(3, 5, 0)).toBe(true);
+    // Scene 42 fields the same 萊茵 and 汀塔琪 as allies; the check is keyed on the scene.
+    expect(module29ShowsRedEyes(2, 42, 0)).toBe(false);
+    expect(module29ShowsRedEyes(0, 22, 0)).toBe(true);
+    expect(module29ShowsRedEyes(0, 20, 0)).toBe(false);
   });
 
   it("uses the native 0..67 record boundary", () => {

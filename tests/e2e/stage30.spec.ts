@@ -115,6 +115,9 @@ test("S30-A–E: SAY/0057 and SAY/0058 lead through the Empress mutation into th
   await expect(dialogue).toContainText("頭好痛啊");
   await expect(page.getByTestId("dialogue-portrait-composite"))
     .toHaveAttribute("data-portrait-record", "41");
+  // Module 29's dialogue blink draws D/41 frame 7 while the stage is undecided.
+  await expect(page.getByTestId("dialogue-portrait-composite"))
+    .toHaveAttribute("data-red-eyes", "true");
   expect((await state(page)).units.find(({ id }) => id === "2:27")).toMatchObject({
     classId: "empress",
     portrait: 41,
@@ -170,6 +173,9 @@ test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves 
   await expect(dialogue).toContainText("頭好痛啊");
   await expect(page.getByTestId("dialogue-portrait-composite"))
     .toHaveAttribute("data-portrait-record", "41");
+  // The last line comes before the conversion writes the live victory 999.
+  await expect(page.getByTestId("dialogue-portrait-composite"))
+    .toHaveAttribute("data-red-eyes", "true");
   expect((await state(page)).units.find(({ id }) => id === "2:27")).toBeUndefined();
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage30-final-form-context.png`,
@@ -189,6 +195,11 @@ test("S30-F–I: the difficulty-final form changes sides before SAY/0059, saves 
     portrait: 41,
     experience: 0,
   });
+  // The rejoined Empress is written long after the scene preloaded its figures; her ally
+  // sprite used to be missing, so she rendered as Phaser's `__MISSING` placeholder.
+  await expect.poll(async () => (JSON.parse(
+    await page.getByTestId("battle-canvas").getAttribute("data-unit-texture-by-id") ?? "{}",
+  ) as Record<string, string>)["1:23"]).toBe("ally-empress");
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage30-victory-story.png`,
   });
@@ -340,4 +351,56 @@ test("S30-J: a record saved after 維絲塔 has fought lists and reloads", async
   const loaded = await state(page);
   expect(loaded).toMatchObject({ phase: "player", round: 2 });
   expect(loaded.units.find(({ id }) => id === "2:27")).toEqual(vesta);
+});
+
+
+/**
+ * REMAKE-157: stage 30 keeps REMAKE-110's time-out boundary but moves it to round 199,
+ * since on 無法無天 the trio has to break 32 forms. The fixture parks the board there.
+ */
+test("S30-K/REMAKE-157: the stage 30 cap sits at round 199 and still loses on time", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-30-round-limit&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  expect((await state(page)).round).toBe(199);
+  // The native round box keeps the last three digits, so 199 fits it unchanged.
+  await expect(page.locator("#bottom-round-text")).toHaveText("第 199 回合");
+  await expect(page.locator("#bottom-round")).toHaveAttribute("data-round-limit-warning", "true");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage30-round-limit-final-round.png`,
+  });
+
+  await page.keyboard.press("g");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.getByTestId("group-command-allRest").click();
+  await expect.poll(async () => {
+    if ((await state(page)).phase === "defeat") return true;
+    const dialogue = page.getByTestId("dialogue-layer");
+    if (await dialogue.isVisible()) await dialogue.click();
+    return false;
+  }, { timeout: 30_000 }).toBe(true);
+  await expect(page.locator("#status-strip")).toHaveText("未能在 199 回合內達成目標");
+  await expect(page.locator("#bottom-round-text")).toHaveText("第 199 回合");
+});
+
+/**
+ * Module 29 checks `0000:85EC/860E/862B` before it draws an eye frame: while stage 30 is
+ * undecided, 維絲塔's unit detail shows D/41 frame 7 in place of every blink frame.
+ */
+test("S30-L: the possessed 維絲塔 shows the native red eyes in the unit detail", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-30-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  const composite = page.getByTestId("unit-portrait-composite");
+  // The cursor opens on Nia at (28,25); 維絲塔's soldier form stands at (28,17).
+  await expect(composite).toHaveAttribute("data-portrait-record", "46");
+  await expect(composite).toHaveAttribute("data-red-eyes", "false");
+  for (let step = 0; step < 8; step += 1) await page.keyboard.press("ArrowUp");
+  await expect(composite).toHaveAttribute("data-portrait-record", "41");
+  await expect(composite).toHaveAttribute("data-red-eyes", "true");
+  await expect(composite.locator(".portrait-red-eyes")).toHaveCSS("opacity", "1");
+  for (const index of [1, 2, 3]) {
+    await expect(composite.locator(`.portrait-eye-${index}`)).toHaveCSS("opacity", "0");
+  }
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage30-red-eyes-unit-detail.png`,
+  });
 });

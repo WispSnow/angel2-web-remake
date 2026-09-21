@@ -4456,6 +4456,11 @@ const DEBUG_SCENARIO_FACTORIES = {
     controller.cameraOrigin = { x: 24, y: 20 };
     controller.statusMessage = "調試場景：妮雅只剩 1 點生命，維絲塔士兵形態位於相鄰格。";
   }),
+  "stage-30-round-limit": withSetup(createStage30Player, (controller) => {
+    controller.battle.round = controller.battle.roundLimit;
+    controller.statusMessage =
+      `調試場景：第 ${controller.battle.round} 回合，結束本回合即逾時判負。`;
+  }),
   "stage-30-victory-ready": withSetup(createStage30Player, (controller) => {
     controller.battle.queueUnitFormTransition("2:27", {
       classId: "empress",

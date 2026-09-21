@@ -1621,6 +1621,14 @@ export const DEBUG_SCENARIOS = [
     fixture: true,
   },
   {
+    id: "stage-30-round-limit",
+    stageId: "stage-30",
+    title: "回合上限逾時",
+    phase: "Round 199",
+    description: "REMAKE-157：停在本關最後一個合法回合第 199 回合；結束本回合即驗證逾時判負。",
+    fixture: true,
+  },
+  {
     id: "stage-30-victory-ready",
     stageId: "stage-30",
     title: "女帝恢復對白",

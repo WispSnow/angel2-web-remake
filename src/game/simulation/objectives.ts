@@ -114,6 +114,14 @@ export function slotsNamedByCondition(
 export const STAGE_ROUND_LIMIT = 99;
 
 /**
+ * `REMAKE-157`：上限仍是安全阀，但个别关卡的正常打法本身就要更久——第 29 关
+ * 「治癒維斯塔女帝」在无法无天要连打 32 个形态——这类关卡在定义里声明自己的上限。
+ */
+export function stageRoundLimit(stage: { readonly roundLimit?: number }): number {
+  return stage.roundLimit ?? STAGE_ROUND_LIMIT;
+}
+
+/**
  * 上限本身是个安全阀，触发时必须已经预告过——突然判负等于没收玩家的一局。最后这些
  * 回合里，回合框进入警告态，回合开始信息栏也逐条报剩余回合数。
  */

@@ -267,8 +267,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 118;
-  contentVersion: "stage-27-nearest-free-spawn-1";
+  version: 119;
+  contentVersion: "stage-30-round-limit-199-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

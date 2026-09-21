@@ -28,6 +28,11 @@ describe("stage-scoped portrait assets", () => {
     ]);
   });
 
+  test("stages a portrait's red-eye layer with the rest of its layers", () => {
+    expect(portraitAssetUrls(41)).toContain("/assets/original/portraits/0041/eye-red.png");
+    expect(portraitAssetUrls(46).some((url) => url.endsWith("eye-red.png"))).toBe(false);
+  });
+
   test("derives the complete current-stage story portrait set without loading all records", () => {
     const records = stageDialoguePortraitRecords(STAGE0_DEFINITION);
     expect(records).toEqual(expect.arrayContaining([45, 46, 47, 48]));

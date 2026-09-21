@@ -661,6 +661,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-157 gives stage 30 its own 199-round limit in place of REMAKE-110's
+ * global 99. The limit is read off the stage, never saved, and every v118
+ * battle is still at or below round 99, so v118 saves migrate by identity.
+ */
+function migrateVersion118Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 118
+    || value.contentVersion !== "stage-27-nearest-free-spawn-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-154 moves a stage 27 pursuer whose spawn cell is occupied onto the
  * nearest free cell instead of skipping the round. The landing cell is derived
  * from the board on every spawn and never saved, so v117 saves migrate by identity.
@@ -3273,6 +3290,8 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migratePreviousSaveData(value: unknown): SaveData | undefined {
+  const migratedVersion118 = migrateVersion118Save(value);
+  if (migratedVersion118) return migratedVersion118;
   const migratedVersion117 = migrateVersion117Save(value);
   if (migratedVersion117) return migratedVersion117;
   const migratedVersion116 = migrateVersion116Save(value);

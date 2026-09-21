@@ -22,7 +22,8 @@ test("portrait lab loads every native character and previews reusable blink and 
   await page.waitForFunction(() => Array.from(document.images).every(
     (image) => image.complete && image.naturalWidth > 0,
   ));
-  expect(await page.locator("[data-portrait-card] img").count()).toBe(470);
+  // 68 bases, 67 × (3 eyes + 3 mouths), and the four module-29 red-eye overlays.
+  expect(await page.locator("[data-portrait-card] img").count()).toBe(474);
 
   for (const record of [0, 15, 42, 43, 44, 45, 46, 47, 48]) {
     const card = page.getByTestId(`portrait-record-${record}`);

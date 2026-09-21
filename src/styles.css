@@ -581,6 +581,11 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .animated-portrait[data-force-blink-frame="1"] .portrait-eye-1,
 .animated-portrait[data-force-blink-frame="2"] .portrait-eye-2,
 .animated-portrait[data-force-blink-frame="3"] .portrait-eye-3 { opacity: 1; }
+/* 模組 29 的眨眼在被操控的角色所在關分出勝負前，每一格都改畫 frame 7 紅眼覆蓋片，
+   所以紅眼常駐、看不到眨眼；口型照常。這組規則必須排在上面的眨眼規則之後。 */
+.animated-portrait .portrait-red-eyes { z-index: 1; opacity: 0; }
+.animated-portrait[data-red-eyes="true"] .portrait-eye { opacity: 0; }
+.animated-portrait[data-red-eyes="true"] .portrait-red-eyes { opacity: 1; }
 .animated-portrait[data-mouth-frame="1"] .portrait-mouth-1,
 .animated-portrait[data-mouth-frame="2"] .portrait-mouth-2,
 .animated-portrait[data-mouth-frame="3"] .portrait-mouth-3 { opacity: 1; }
