@@ -315,3 +315,32 @@ test("S20-H: 全面撤退 and the defeat retry both reopen the 龍塔頂部 depl
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 3／17");
   expect(errors).toEqual([]);
 });
+
+/**
+ * Regression: 守護者 is this stage's guest and never writes back to the campaign roster,
+ * but the save contract held every fielded ally to its roster entry. 已儲存至記錄 showed,
+ * yet from the first player phase every 龍塔頂部 record listed as 此處沒有記錄.
+ */
+test("S20-I: a 龍塔頂部 battle record lists and reloads with the guest 守護者", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-20-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  const saved = await state(page);
+  expect(saved.units.find(({ id }) => id === "1:32"))
+    .toMatchObject({ classId: "prayer-guide", name: "守護者" });
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+  await expect.poll(async () => (await state(page)).statusMessage).toBe("已儲存至記錄 1。");
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-load").click();
+  const record = page.getByTestId("record-slot-1");
+  await expect(record).toContainText("龍塔頂部");
+  await expect(record).not.toContainText("此處沒有記錄");
+  await record.click();
+  await expect.poll(async () => (await state(page)).statusMessage).toBe("已讀取記錄 1。");
+  const loaded = await state(page);
+  expect(loaded.phase).toBe("player");
+  expect(loaded.units).toEqual(saved.units);
+});

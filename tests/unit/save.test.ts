@@ -48,6 +48,11 @@ import { STAGE16_DEFINITION } from "../../src/game/content/stage16";
 import { STAGE17_DEFINITION } from "../../src/game/content/stage17";
 import { STAGE18_DEFINITION } from "../../src/game/content/stage18";
 import { STAGE19_DEFINITION } from "../../src/game/content/stage19";
+import {
+  STAGE20_DEFINITION,
+  STAGE20_EVENT_PROGRAM,
+  STAGE20_SEMANTIC_DRAGON,
+} from "../../src/game/content/stage20";
 import { STAGE22_DEFINITION, STAGE22_SEMANTIC_ENEMIES } from "../../src/game/content/stage22";
 import { STAGE23_DEFINITION } from "../../src/game/content/stage23";
 import { STAGE24_DEFINITION } from "../../src/game/content/stage24";
@@ -69,6 +74,7 @@ import { Stage16Battle } from "../../src/game/simulation/stage16-battle";
 import { Stage17Battle } from "../../src/game/simulation/stage17-battle";
 import { Stage18Battle } from "../../src/game/simulation/stage18-battle";
 import { Stage19Battle } from "../../src/game/simulation/stage19-battle";
+import { Stage20Battle } from "../../src/game/simulation/stage20-battle";
 import { Stage22Battle } from "../../src/game/simulation/stage22-battle";
 import { Stage23Battle } from "../../src/game/simulation/stage23-battle";
 import { Stage24Battle } from "../../src/game/simulation/stage24-battle";
@@ -3461,8 +3467,18 @@ describe("Web save validation", () => {
       ...save,
       consumedEventIds: save.consumedEventIds.slice(0, -1),
     })).toBe(false);
+    // Each form is rebuilt at 0 experience and then earns more in combat, so 0 is a
+    // floor: a form that has already fought is still a legal Vesta.
+    expect(isSaveData({
+      ...save,
+      battle: {
+        ...save.battle,
+        units: save.battle.units.map((unit) => unit.id === "2:27"
+          ? { ...unit, experience: 1 }
+          : unit),
+      },
+    })).toBe(true);
     for (const patch of [
-      { experience: 1 },
       { name: "士兵" },
       { displayIdentity: "named-class-portrait" as const },
       { portrait: classFallbackPortraitFor("soldier", 2) },
@@ -5115,6 +5131,69 @@ describe("Web save validation", () => {
     expect(isSaveData(wrongOpening)).toBe(false);
   });
 
+  // Mirrors `GameController.writeBattleSave`.
+  const battleSaveOf = (
+    battle: Stage0Battle,
+    entry: CampaignState,
+    stageLabel: string,
+    consumedEventIds: string[],
+  ): BattleSaveData => {
+    const campaign = battle.campaignSnapshot();
+    const focus = battle.focus!;
+    return {
+      format: "ANGEL2-web-save",
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+      kind: "battle",
+      savedAt: "2026-09-15T12:00:00.000Z",
+      saveCount: 31,
+      stageId: battle.stage.id,
+      stageLabel,
+      ruleset: "stableRemake",
+      difficulty: campaign.difficulty,
+      rngState: campaign.rngState,
+      rngCalls: campaign.rngCalls,
+      roster: campaign.roster,
+      recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
+      stageEntrySnapshot: {
+        ...entry,
+        recordCounters: Array<number>(75).fill(0),
+        roster: entry.roster.map((rosterEntry) => ({ ...rosterEntry })),
+      },
+      stageProgress: 0,
+      consumedEventIds,
+      battle: {
+        phase: "player",
+        ...battle.serializableSnapshot(),
+        cursor: { x: focus.x, y: focus.y },
+        cameraOrigin: { ...battle.stage.viewport.initialOrigin },
+      },
+    };
+  };
+
+  const expectReadableAndRestorable = async (
+    save: BattleSaveData,
+    battle: Stage0Battle,
+  ): Promise<Stage0Battle> => {
+    const parsed = parseSaveData(JSON.stringify(save));
+    expect(parsed).toEqual(save);
+    if (parsed?.kind !== "battle") throw new Error("expected the battle record to read back");
+    const runtime = await loadStageRuntime(parsed.stageId);
+    const restored = runtime.restoreBattle({
+      stageId: parsed.stageId,
+      ruleset: parsed.ruleset,
+      difficulty: parsed.difficulty,
+      roster: parsed.roster,
+      recordCounters: parsed.recordCounters,
+      rngState: parsed.rngState,
+      rngCalls: parsed.rngCalls,
+    }, parsed.battle);
+    expect(restored.round).toBe(battle.round);
+    expect(restored.units.map(({ id }) => id).sort())
+      .toEqual(battle.units.map(({ id }) => id).sort());
+    return restored;
+  };
+
   /**
    * Regression: fixed-roster and deployment rules used to demand that every allied slot
    * the stage fielded still stood, while the simulation removes a fallen ally from the
@@ -5138,65 +5217,6 @@ describe("Web save validation", () => {
       ally.life = 1;
       battle.attack(attacker.id, ally.id);
       expect(battle.unit(allyId)).toBeUndefined();
-    };
-
-    // Mirrors `GameController.writeBattleSave`.
-    const battleSaveOf = (
-      battle: Stage0Battle,
-      entry: CampaignState,
-      stageLabel: string,
-      consumedEventIds: string[],
-    ): BattleSaveData => {
-      const campaign = battle.campaignSnapshot();
-      const focus = battle.focus!;
-      return {
-        format: "ANGEL2-web-save",
-        version: SAVE_VERSION,
-        contentVersion: SAVE_CONTENT_VERSION,
-        kind: "battle",
-        savedAt: "2026-09-15T12:00:00.000Z",
-        saveCount: 31,
-        stageId: battle.stage.id,
-        stageLabel,
-        ruleset: "stableRemake",
-        difficulty: campaign.difficulty,
-        rngState: campaign.rngState,
-        rngCalls: campaign.rngCalls,
-        roster: campaign.roster,
-        recordCounters: [...(campaign.recordCounters ?? Array<number>(75).fill(0))],
-        stageEntrySnapshot: {
-          ...entry,
-          recordCounters: Array<number>(75).fill(0),
-          roster: entry.roster.map((rosterEntry) => ({ ...rosterEntry })),
-        },
-        stageProgress: 0,
-        consumedEventIds,
-        battle: {
-          phase: "player",
-          ...battle.serializableSnapshot(),
-          cursor: { x: focus.x, y: focus.y },
-          cameraOrigin: { ...battle.stage.viewport.initialOrigin },
-        },
-      };
-    };
-
-    const expectReadableAndRestorable = async (save: BattleSaveData, battle: Stage0Battle) => {
-      const parsed = parseSaveData(JSON.stringify(save));
-      expect(parsed).toEqual(save);
-      if (parsed?.kind !== "battle") return;
-      const runtime = await loadStageRuntime(parsed.stageId);
-      const restored = runtime.restoreBattle({
-        stageId: parsed.stageId,
-        ruleset: parsed.ruleset,
-        difficulty: parsed.difficulty,
-        roster: parsed.roster,
-        recordCounters: parsed.recordCounters,
-        rngState: parsed.rngState,
-        rngCalls: parsed.rngCalls,
-      }, parsed.battle);
-      expect(restored.round).toBe(battle.round);
-      expect(restored.units.map(({ id }) => id).sort())
-        .toEqual(battle.units.map(({ id }) => id).sort());
     };
 
     it("keeps a stage-2 record readable after automatic allies fall", async () => {
@@ -5251,6 +5271,135 @@ describe("Web save validation", () => {
       ]);
       await expectReadableAndRestorable(save, battle);
     });
+  });
+
+  /**
+   * Regression: stage 30 held 維絲塔 to exactly the experience her form is rebuilt with,
+   * but she earns experience like any other enemy — by countering the ally who struck
+   * her, or by her own hit on a survivor. From the first exchange she survived, every
+   * manual save read back as 此處沒有記錄 and the export skipped it as 損壞, whatever the round.
+   */
+  it("keeps a stage-30 record readable after 維絲塔 earns combat experience", async () => {
+    const entry: CampaignState = {
+      stageId: "stage-30",
+      ruleset: "stableRemake",
+      difficulty: 3,
+      rngState: 0x30a0_b0c0,
+      rngCalls: 108,
+      roster: completeCampaignRoster([
+        { slot: 0, classId: "land-knight", experience: 920, life: 280 },
+        { slot: 7, classId: "magic-priest", experience: 700, life: 190 },
+        { slot: 40, classId: "magic-sword-warrior", experience: 0, life: 150 },
+      ]),
+    };
+    const battle = new Stage30Battle(entry);
+    battle.queueUnitFormTransition("2:27", {
+      classId: "soldier",
+      name: "維絲塔",
+      portrait: 41,
+      experience: 0,
+    }, STAGE30_EVENT_PROGRAM.contextualLine);
+    battle.commitNextUnitTransformation();
+    const consumedEventIds = [
+      "stage-30-prebattle-story",
+      "stage-30-opening-story",
+      "stage-30-opening-form-transition",
+    ];
+    const vesta = battle.unit("2:27")!;
+    const swordsman = battle.unit("1:40")!;
+    swordsman.x = vesta.x;
+    swordsman.y = vesta.y + 1;
+
+    // The ally's hit leaves her standing, so her counter pays her experience.
+    const countered = battle.attack(swordsman.id, vesta.id);
+    expect(countered).toMatchObject({ defenderDied: false, counterOccurred: true });
+    expect(countered.counterExperienceGained).toBeGreaterThan(0);
+    const afterCounter = await expectReadableAndRestorable(
+      battleSaveOf(battle, entry, "治癒維斯塔女帝", consumedEventIds),
+      battle,
+    );
+    expect(afterCounter.unit("2:27")).toEqual(battle.unit("2:27"));
+
+    // Her own hit on a survivor pays again; the record still reads back.
+    const nia = battle.unit("1:0")!;
+    nia.x = vesta.x - 1;
+    nia.y = vesta.y;
+    const experienceBeforeHit = battle.unit("2:27")!.experience;
+    expect(battle.attack(vesta.id, nia.id).defenderDied).toBe(false);
+    expect(battle.unit("2:27")!.experience).toBeGreaterThan(experienceBeforeHit);
+    const afterHit = await expectReadableAndRestorable(
+      battleSaveOf(battle, entry, "治癒維斯塔女帝", consumedEventIds),
+      battle,
+    );
+    expect(afterHit.unit("2:27")).toEqual(battle.unit("2:27"));
+  });
+
+  /**
+   * Regression: stage 20 fields 守護者 in slot 32 as a guest that never writes back to the
+   * campaign roster, yet every fielded ally was held to its roster entry. The saved roster
+   * keeps slot 32 at its entry value while the board carries the prayer guide, so no
+   * 龍塔頂部 battle record read back, from the first player phase on.
+   */
+  it("keeps a stage-20 record readable while its guest 守護者 fights", async () => {
+    const entry: CampaignState = {
+      stageId: "stage-20",
+      ruleset: "stableRemake",
+      difficulty: 0,
+      rngState: 0x2020_4040,
+      rngCalls: 57,
+      roster: completeCampaignRoster([
+        { slot: 0, classId: "land-knight", experience: 640, life: 250 },
+      ]),
+    };
+    const battle = new Stage20Battle(entry, {
+      placements: STAGE20_DEFINITION.deployment.fixedPlacements.map(({ slot, position }) => ({
+        slot, position: { ...position }, fixed: true,
+      })),
+    });
+    // The resume contract starts after the scripted opening: 守護者 steps down, the
+    // rooftop tableau leaves and the dragon lands.
+    const guardian = battle.unit("1:32")!;
+    guardian.x = STAGE20_EVENT_PROGRAM.guardianMove.to.x;
+    guardian.y = STAGE20_EVENT_PROGRAM.guardianMove.to.y;
+    battle.removeStoryUnits(battle.units.filter(({ side }) => side === 2));
+    battle.appendStoryUnits([createFixedStageEnemy({
+      slot: STAGE20_SEMANTIC_DRAGON.slot,
+      position: STAGE20_SEMANTIC_DRAGON.position,
+      classId: STAGE20_SEMANTIC_DRAGON.classId,
+      name: STAGE20_SEMANTIC_DRAGON.name,
+      portrait: STAGE20_SEMANTIC_DRAGON.portrait,
+      aiBehavior: STAGE20_SEMANTIC_DRAGON.aiBehavior,
+    }, entry.difficulty)], [{ sourceUnitId: "2:55", derivedUnitId: "2:28" }]);
+    const consumedEventIds = [
+      "stage-20-prebattle-story",
+      "stage-20-enter-deployment",
+      "stage-20-contact-story",
+      "stage-20-guardian-move",
+      "stage-20-guardian-story",
+      "stage-20-tableau-departure",
+      "stage-20-dragon-arrival",
+      "stage-20-opening-story",
+    ];
+    const rosterGuardian = battle.campaignSnapshot().roster.find(({ slot }) => slot === 32);
+    expect(rosterGuardian?.classId).not.toBe(guardian.classId);
+    await expectReadableAndRestorable(
+      battleSaveOf(battle, entry, "龍塔頂部", consumedEventIds),
+      battle,
+    );
+
+    // Trading blows with the dragon moves the guest's experience and life on the board only.
+    const dragon = battle.unit("2:28")!;
+    dragon.x = guardian.x;
+    dragon.y = guardian.y - 1;
+    expect(battle.attack(guardian.id, dragon.id).attackerDied).toBe(false);
+    expect(battle.unit("1:32")!.experience).toBeGreaterThan(0);
+    expect(battle.campaignSnapshot().roster.find(({ slot }) => slot === 32))
+      .toEqual(rosterGuardian);
+    const restored = await expectReadableAndRestorable(
+      battleSaveOf(battle, entry, "龍塔頂部", consumedEventIds),
+      battle,
+    );
+    expect(restored.unit("1:32")).toEqual(battle.unit("1:32"));
   });
 
   it("bounds a saved round by the stage cap and refuses version-86 battles past it", () => {

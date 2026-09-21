@@ -342,7 +342,7 @@ export function isSavedBattleState(
         : initialEnemyExperience(unit.classId, difficulty);
       return unit.life > maximumLife
         || (formSequence
-          ? unit.experience !== formSequence.experience
+          ? unit.experience < formSequence.experienceFloor
             || !formSequence.classIdsByDifficulty[difficulty]?.includes(unit.classId)
           : unit.experience < minimumExperience);
     })
@@ -378,14 +378,19 @@ export function isSavedBattleState(
     if (alliedRoots.some(({ slot }) => !rosterSlots.has(slot))) return false;
   }
 
+  // 关卡来宾不写回战役名册：名册里是入关时的条目，棋盘上才是它们的现值，所以这些槽
+  // 不拿名册比对。否则来宾一上场，这一关的每份战中档都读不回来。
+  const stageOnlySlots = new Set<number>(saveSchema.stageOnlyAllySlots ?? []);
   const rosterBySlot = new Map(roster.map((entry) => [entry.slot, entry]));
-  return allies.every((unit) => {
-    const entry = rosterBySlot.get(unit.slot);
-    return entry !== undefined
-      && unit.classId === entry.classId
-      && unit.experience === entry.experience
-      && unit.life === entry.life;
-  });
+  return allies
+    .filter(({ slot }) => !stageOnlySlots.has(slot))
+    .every((unit) => {
+      const entry = rosterBySlot.get(unit.slot);
+      return entry !== undefined
+        && unit.classId === entry.classId
+        && unit.experience === entry.experience
+        && unit.life === entry.life;
+    });
 }
 
 function isSavedEnemyAiState(value: unknown, round: number): value is SavedEnemyAiState {

@@ -297,3 +297,47 @@ test("S30-G: Nia defeat retries from SAY/0057", async ({ page }) => {
     activeStoryId: "stage-30-prebattle-story",
   });
 });
+
+/**
+ * Regression: the save contract held 維絲塔 to exactly the experience her form is rebuilt
+ * with, but she earns experience whenever she trades blows and survives. 已儲存至記錄
+ * showed, yet from her first such exchange every record listed as 此處沒有記錄 and the
+ * export skipped it as 損壞, whatever the round.
+ */
+test("S30-J: a record saved after 維絲塔 has fought lists and reloads", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-30-player&difficulty=3&test=1");
+  await waitForPhase(page, "player");
+  await page.keyboard.press("g");
+  await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  await page.getByTestId("group-command-allRest").click();
+  // The trio rests and 維絲塔 closes in to strike; acknowledge whatever lines she speaks.
+  await expect.poll(async () => {
+    const current = await state(page);
+    if (current.phase === "player" && current.round === 2) return true;
+    const dialogue = page.getByTestId("dialogue-layer");
+    if (await dialogue.isVisible()) await dialogue.click();
+    return false;
+  }, { timeout: 30_000 }).toBe(true);
+  const fought = await state(page);
+  const vesta = fought.units.find(({ id }) => id === "2:27");
+  expect(vesta?.experience).toBeGreaterThan(0);
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+  await expect.poll(async () => (await state(page)).statusMessage).toBe("已儲存至記錄 1。");
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-load").click();
+  const record = page.getByTestId("record-slot-1");
+  await expect(record).toContainText("治癒維斯塔女帝");
+  await expect(record).not.toContainText("此處沒有記錄");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage30-record-after-combat.png`,
+  });
+  await record.click();
+  await expect.poll(async () => (await state(page)).statusMessage).toBe("已讀取記錄 1。");
+  const loaded = await state(page);
+  expect(loaded).toMatchObject({ phase: "player", round: 2 });
+  expect(loaded.units.find(({ id }) => id === "2:27")).toEqual(vesta);
+});

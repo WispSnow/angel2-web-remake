@@ -590,7 +590,7 @@ describe("stage runtime manifest", () => {
     expect(stage30.save.enemyClassById).toEqual([]);
     expect(stage30.save.enemyFormSequences?.[0]).toMatchObject({
       unitId: "2:27",
-      experience: 0,
+      experienceFloor: 0,
     });
     expect(stage30.save.enemyFormSequences?.[0]?.classIdsByDifficulty.map(({ length }) => length))
       .toEqual([8, 16, 24, 32]);
@@ -754,6 +754,34 @@ describe("stage runtime manifest", () => {
       const runtime = await loadStageRuntime(stageId);
       expect({ stageId, defeat: runtime.save.defeat })
         .toEqual({ stageId, defeat: runtime.definition.objective.defeat });
+    }
+  });
+
+  it("mirrors every stage's guest allies into its save schema", async () => {
+    // A guest's board state never reaches the campaign roster, so save validation must
+    // not hold it to its roster entry; a stale list either leaves every record of that
+    // stage unreadable (stage 20's 守護者 did) or stops checking an ally the roster tracks.
+    // Probe each fielded ally: a guest is one whose board change never reaches the roster.
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const runtime = await loadStageRuntime(stageId);
+      const battle = runtime.createBattle(
+        { ...campaign, stageId, roster: completeCampaignRoster([]) },
+        runtime.preparation?.createInitialResult(),
+      );
+      const guests = battle.units
+        .filter(({ side }) => side === 1)
+        .filter((unit) => {
+          unit.experience += 1;
+          const recorded = battle.campaignSnapshot().roster
+            .find(({ slot }) => slot === unit.slot)?.experience;
+          unit.experience -= 1;
+          return recorded !== unit.experience + 1;
+        })
+        .map(({ slot }) => slot)
+        .sort((left, right) => left - right);
+      const declared = [...(runtime.save.stageOnlyAllySlots ?? [])]
+        .sort((left, right) => left - right);
+      expect({ stageId, guests }).toEqual({ stageId, guests: declared });
     }
   });
 

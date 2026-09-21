@@ -120,13 +120,25 @@ export interface StageSaveSchema {
    */
   defeat: StageObjectiveCondition;
   alliedUnits: StageSaveAlliedUnitRule;
+  /**
+   * Allied slots the stage fields as one-battle guests. Their battle leaves them out
+   * of its campaign slots, so the saved roster keeps its entry-time value while the
+   * board carries the guest's live class, experience and life. Mirrored from the
+   * stage battle; `stage-runtime.test.ts` keeps the two equal.
+   */
+  stageOnlyAllySlots?: readonly number[];
   enemyClassById: readonly (readonly [string, UnitClassId])[];
   /** Minimum saved enemy experience under this stage's entry-seeding rule. */
   enemyExperienceFloor?: "difficulty" | "none" | "difficulty-unless-lawless";
   enemyFormSequences?: readonly {
     unitId: string;
     classIdsByDifficulty: readonly (readonly UnitClassId[])[];
-    experience: number;
+    /**
+     * The experience every form is rebuilt with. A form then earns experience like
+     * any other enemy — its counter, or its own hit on a survivor — so a saved form
+     * holds at least this much, not exactly this much.
+     */
+    experienceFloor: number;
   }[];
   namedUnits?: readonly StageSaveNamedUnitRule[];
   /**
@@ -2448,6 +2460,8 @@ export const STAGE_RUNTIME_MANIFEST = {
         kind: "fixed-roster",
         slots: [0, 1, 2, 3, 4, 5, 6, 7, 23, 24],
       },
+      // The portal scene's 琴斯 and 維絲塔 appear for this scene only.
+      stageOnlyAllySlots: [7, 23],
       enemyClassById: [],
       enemyAi: "none",
     },
@@ -3293,6 +3307,8 @@ export const STAGE_RUNTIME_MANIFEST = {
         maximumUnits: 17,
         openCellCount: 14,
       },
+      // 守護者 is this stage's guest and never writes back to the campaign roster.
+      stageOnlyAllySlots: [32],
       enemyClassById: [["2:28", "dragon"]],
       enemyAi: "none",
     },
@@ -3866,7 +3882,7 @@ export const STAGE_RUNTIME_MANIFEST = {
           ["soldier", "magic-sword-warrior", "jungle-warrior", "magic-priest", "prayer-guide", "curse-master", "magician", "great-axe-warrior", "half-dragon-warrior", "magic-armor-warrior", "magic-guide", "evil-mage", "magic-archer", "land-knight", "demon-dragon-knight", "flying-dragon-knight", "beast-knight", "bone-knight", "swift-dragon-knight", "great-dragon-knight", "archer", "crossbow", "cavalry", "pegasus-warrior"],
           ["soldier", "magic-sword-warrior", "jungle-warrior", "magic-priest", "prayer-guide", "curse-master", "magician", "great-axe-warrior", "half-dragon-warrior", "magic-armor-warrior", "magic-guide", "evil-mage", "magic-archer", "land-knight", "demon-dragon-knight", "flying-dragon-knight", "beast-knight", "bone-knight", "swift-dragon-knight", "great-dragon-knight", "archer", "crossbow", "cavalry", "pegasus-warrior", "sister", "monk", "water-warrior", "divine-sword-warrior", "warrior", "steel-armor-warrior", "priest", "wizard"],
         ],
-        experience: 0,
+        experienceFloor: 0,
       }],
       namedUnits: [{
         // The possessed 維絲塔 keeps her own name and portrait through every form.
