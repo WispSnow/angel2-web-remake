@@ -42,6 +42,11 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
+      // `battle-record-roundtrip.test.ts` 经玩家自己的记录选单驱动每一关的调试夹具，因此把
+      // 控制器与仅供开发的调试场景载入了单元测试。这两个文件的编排由 Playwright 验收；把约
+      // 5000 行以表现为主的代码计入分母，会淹没这组门槛真正守的规则层（它们此前从未被单元
+      // 测试载入，排除后的统计口径与之前一致）。
+      exclude: ["src/game/controller.ts", "src/game/debug-scenarios.ts"],
       thresholds: {
         statements: 75,
         branches: 70,
