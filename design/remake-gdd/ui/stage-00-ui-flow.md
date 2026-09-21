@@ -71,6 +71,7 @@ stateDiagram-v2
     SystemMenu --> RecordSlots: 讀取記錄 / 儲存記錄
     RecordSlots --> RecordSlots: 匯出 20 槽備份 / 校驗匯入檔
     RecordSlots --> RecordSlots: 確認完整還原 / 取消匯入
+    RecordSlots --> RecordSlots: 存档未通过读取校验（不写入）
     RecordSlots --> PlayerPhase: 读档成功 / 存档成功
     RecordSlots --> SystemMenu: 取消
     SystemMenu --> QuitConfirm: 離開遊戲
@@ -173,6 +174,9 @@ stateDiagram-v2
   外壳、20 槽数量及逐槽普通存档校验后才显示确认层。确认层阻断所在记录面板和战场输入、
   默认落在“取 消”，并明确说明备份空槽会清空当前同号槽；取消或坏文件都不得改变
   `localStorage`。战中确认还原后只刷新槽位显示，当前内存战局保持不变。
+- `[DD]` 面板标题列右侧是一栏现代字体状态，备份结果与存档被拒的提示共用、后到者显示；
+  战后面板平时没有这一栏，只在提示出现时显示。存档被读取校验拒绝时两处面板都不收起、
+  槽位列表照旧，规则见 [`02-game-flow.md`](../02-game-flow.md) 的“失败、胜利与保存”。
 - `[OF]` 原版通用选单会移动位置以避开当前指针与右侧资讯栏矩形，该资讯栏精确占用
   `x=480..639`（`reverse/notes/input-and-battle-ui.md` 的“通用行动菜单”一节，
   `reverse/parsed/native/input-ui.json` 的 `unitHud.positioning`）。
@@ -344,4 +348,4 @@ stateDiagram-v2
     回滚结果。战中还原后面板留在原处并立即显示新槽位，当前单位、回合、焦点、视口和 PRNG
     不变。
 
-以上状态已映射到 [`startup.spec.ts`](../../../tests/e2e/startup.spec.ts) 的 `BOOT-A/BOOT-B/BOOT-C` 与 `BOOT-B backup/restore`、[`tests/e2e/stage0.spec.ts`](../../../tests/e2e/stage0.spec.ts) 的 `S00-A` 至 `S00-N`、`RHP-03b`，并由 [`stage0-real-clear.spec.ts`](../../../tests/e2e/stage0-real-clear.spec.ts) 的 `S00-O` 在无 `?test=1`、无调试 API 条件下完成真实通关。浏览器测试同时保存标题记录第 1/4 页、标题第 4 页、标题备份导入确认、读档后战场、战中记录第 4 页、战中备份入口与导入确认、战后保存第 4 页、空地战术右栏、单位详情覆盖、EXP 非零、系统菜单、退出/撤退反馈、全景战斗、结算完成和窄屏等代表性截图，并对最终 stage 1 路由做黄金截图比较；第 0 关已由用户完成手动视觉与手感验收。
+以上状态已映射到 [`startup.spec.ts`](../../../tests/e2e/startup.spec.ts) 的 `BOOT-A/BOOT-B/BOOT-C` 与 `BOOT-B backup/restore`、[`tests/e2e/stage0.spec.ts`](../../../tests/e2e/stage0.spec.ts) 的 `S00-A` 至 `S00-N`、`RHP-03b`、`RHP-03c`，并由 [`stage0-real-clear.spec.ts`](../../../tests/e2e/stage0-real-clear.spec.ts) 的 `S00-O` 在无 `?test=1`、无调试 API 条件下完成真实通关。浏览器测试同时保存标题记录第 1/4 页、标题第 4 页、标题备份导入确认、读档后战场、战中记录第 4 页、战中备份入口与导入确认、战后保存第 4 页、空地战术右栏、单位详情覆盖、EXP 非零、系统菜单、退出/撤退反馈、全景战斗、结算完成和窄屏等代表性截图，并对最终 stage 1 路由做黄金截图比较；第 0 关已由用户完成手动视觉与手感验收。

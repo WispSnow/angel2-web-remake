@@ -2161,7 +2161,7 @@ test("RHP-03b: in-game record pages export and safely replace all manual slots",
   });
   expect(exported.slots).toHaveLength(SAVE_SLOT_COUNT);
   expect(exported.slots[0]?.version).toBe(SAVE_VERSION);
-  await expect(page.getByTestId("record-backup-status")).toHaveText("已匯出 1 筆記錄。");
+  await expect(page.getByTestId("record-panel-status")).toHaveText("已匯出 1 筆記錄。");
 
   const fileInput = page.getByTestId("record-backup-file");
   await fileInput.setInputFiles({
@@ -2169,7 +2169,7 @@ test("RHP-03b: in-game record pages export and safely replace all manual slots",
     mimeType: "application/json",
     buffer: Buffer.from('{"format":"wrong"}'),
   });
-  await expect(page.getByTestId("record-backup-status"))
+  await expect(page.getByTestId("record-panel-status"))
     .toHaveText("匯入失敗：檔案格式、版本或記錄內容不相容。");
   expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).not.toBeNull();
 
@@ -2213,7 +2213,7 @@ test("RHP-03b: in-game record pages export and safely replace all manual slots",
   await page.getByTestId("record-backup-confirm-import").click();
   await expect(confirm).toBeHidden();
   await expect(page.getByTestId("record-menu")).toBeVisible();
-  await expect(page.getByTestId("record-backup-status")).toHaveText("已從備份還原 1 筆記錄。");
+  await expect(page.getByTestId("record-panel-status")).toHaveText("已從備份還原 1 筆記錄。");
   await expect(page.getByTestId("record-slot-1")).toContainText("此處沒有記錄");
   await expect(page.getByTestId("record-slot-1")).toBeDisabled();
   await expect(page.getByTestId("record-slot-3")).not.toBeDisabled();
@@ -2226,6 +2226,65 @@ test("RHP-03b: in-game record pages export and safely replace all manual slots",
   expect(battleAfterBackup.round).toBe(battleBeforeBackup.round);
   expect(battleAfterBackup.cursor).toEqual(battleBeforeBackup.cursor);
   expect(battleAfterBackup.cameraOrigin).toEqual(battleBeforeBackup.cameraOrigin);
+});
+
+/**
+ * 存檔先按讀取路徑校驗，讀不回來的記錄不寫入。職業行動夾具把妮雅變成魔術士，而第 0 關的
+ * 存檔 schema 只收士兵／騎兵／戰士／弓兵／修女，這個棋盤寫出的正是讀取時會被拒絕的記錄。
+ * 面板不收起、標題列說明原因、該槽仍列著原有記錄；之後的備份回報照常接手同一欄。
+ */
+test("RHP-03c: a record the load path would reject leaves the slot and keeps the panel open", async ({ page }) => {
+  const refusals: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && message.text().includes("未儲存")) refusals.push(message.text());
+  });
+  await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+  await waitForPhase(page, "player");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+  await expect.poll(async () => (await debugState(page)).statusMessage).toBe("已儲存至記錄 1。");
+  const kept = await page.evaluate(() => localStorage.getItem("angel2.save.1"));
+  const keptCount = (JSON.parse(kept ?? "null") as { saveCount: number }).saveCount;
+
+  await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("magician"));
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+
+  const notice = "記錄 1 未儲存：資料校驗失敗，原有記錄保持不變。";
+  const status = page.getByTestId("record-panel-status");
+  await expect(status).toHaveText(notice);
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await expect(page.getByTestId("record-slot-1").locator(".record-cell-count"))
+    .toHaveText(String(keptCount));
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBe(kept);
+  expect(refusals).toEqual([
+    expect.stringContaining("記錄 1 未儲存：stage-00 第 1 回合的戰中記錄未通過讀取校驗。"),
+  ]);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-record-save-refused.png",
+  });
+
+  // 換槽會重繪面板，提示仍在；匯出的回報後到，接手同一欄，重繪也不會把舊提示蓋回來。
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("record-slot-2")).toHaveAttribute("aria-current", "true");
+  await expect(status).toHaveText(notice);
+  const download = page.waitForEvent("download");
+  await page.getByTestId("record-backup-export").click();
+  await download;
+  await expect(status).toHaveText("已匯出 1 筆記錄。");
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByTestId("record-slot-1")).toHaveAttribute("aria-current", "true");
+  await expect(status).toHaveText("已匯出 1 筆記錄。");
+
+  await page.locator("[data-action=close-record-menu]").click();
+  await expect(page.getByTestId("record-menu")).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("system-menu")).toBeHidden();
+  await expect(page.getByTestId("status-strip")).toHaveText(notice);
+  expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBe(kept);
 });
 
 test("RHP-04: grid, edge-scroll and portrait objects control persistent presentation only", async ({ page }) => {

@@ -1296,7 +1296,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         disableEmptySlots: mode === "load",
         cancelAction: "close-record-menu",
         showBackupTools: true,
-        backupStatus: recordBackupStatus,
+        status: controller.recordSaveNotice || recordBackupStatus,
       });
     }
     if (setMenuOpen(quitConfirm, controller.quitConfirmOpen)) {
@@ -1651,7 +1651,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     onRecordsRestored: () => render(),
     onStatus: (message) => {
       recordBackupStatus = message;
-      const status = recordMenu.querySelector<HTMLElement>("[data-testid=record-backup-status]");
+      controller.dismissRecordSaveNotice();
+      const status = recordMenu.querySelector<HTMLElement>("[data-testid=record-panel-status]");
       if (status) status.textContent = message;
     },
   });
@@ -2283,7 +2284,11 @@ interface RecordPanelConfig {
   readonly cancelAction?: string;
   /** 戰中記錄面板可直接備份全部二十槽；戰後單次存檔面板不顯示這組宿主工具。 */
   readonly showBackupTools?: boolean;
-  readonly backupStatus?: string;
+  /**
+   * 标题列右侧的现代字体状态：备份结果或写入失败提示。战中面板总有这一栏；战后面板
+   * 只在有提示时才出现，平时的构图不变。
+   */
+  readonly status?: string;
 }
 
 // 战中「儲存記錄／讀取記錄」与战后「儲存遊戲進度」共用同一张面板：原版这两处是
@@ -2318,9 +2323,9 @@ function renderRecordPanel(controller: GameController, config: RecordPanelConfig
   const cancel = config.cancelAction
     ? `<button type="button" class="record-panel-cancel" data-action="${config.cancelAction}">取 消</button>`
     : "";
-  const backupStatus = config.showBackupTools
-    ? `<span class="record-panel-backup-status" data-testid="record-backup-status"
-        aria-live="polite">${config.backupStatus ?? ""}</span>`
+  const status = config.showBackupTools || config.status
+    ? `<span class="record-panel-status" data-testid="record-panel-status"
+        aria-live="polite">${config.status ?? ""}</span>`
     : "";
   const backupTools = config.showBackupTools
     ? `<div class="record-panel-backup-tools" role="group" aria-label="記錄備份">
@@ -2330,7 +2335,7 @@ function renderRecordPanel(controller: GameController, config: RecordPanelConfig
           data-testid="record-backup-import">匯 入</button>
       </div>`
     : "";
-  return `<div class="record-panel-title"><strong>${config.title}</strong>${backupStatus}</div>
+  return `<div class="record-panel-title"><strong>${config.title}</strong>${status}</div>
     <div class="record-panel-header" aria-hidden="true"><span class="record-cell-index">槽</span><span
       class="record-slot-bar"><span class="record-cell-name">關卡名</span><span
         class="record-cell-round">回合數</span><span class="record-cell-count">儲存次數</span><span
@@ -2437,6 +2442,7 @@ function renderResult(layer: HTMLElement, controller: GameController): void {
         pageTestIdPrefix: "post-save",
         slotAttributes: (index, slot) => `data-slot="${slot}" data-post-save-index="${index}"`,
         disableEmptySlots: false,
+        status: controller.recordSaveNotice,
       })
     }</div>`;
   } else if (phase === "quit") {

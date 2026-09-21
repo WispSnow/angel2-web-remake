@@ -14,6 +14,7 @@ import {
   saveSlotPageIndex,
   saveSlotPageStart,
   saveSlotKey,
+  writeSaveSlot,
 } from "../../src/game/save";
 import { STAGE_ROUND_LIMIT } from "../../src/game/simulation/objectives";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
@@ -2552,6 +2553,28 @@ describe("Web save validation", () => {
     expect(moveSaveSlotIndex(19, 1)).toBe(0);
     expect(moveSaveSlotPage(2, -1)).toBe(17);
     expect(moveSaveSlotPage(17, 1)).toBe(2);
+  });
+
+  it("writes a slot only with a record the load path reads back", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value);
+      },
+    };
+
+    expect(writeSaveSlot(storage, 3, battleSave())).toEqual({ kind: "written" });
+    const stored = values.get(saveSlotKey(3));
+    expect(stored).toBe(JSON.stringify(battleSave()));
+    expect(readSaveSlot(storage, 3)).toEqual({ kind: "valid", save: battleSave() });
+
+    // Save counts start at 1, so a record carrying 0 is one the load path refuses.
+    const unreadable = { ...completedSave(), saveCount: 0 };
+    expect(writeSaveSlot(storage, 3, unreadable)).toEqual({ kind: "rejected" });
+    expect(values.get(saveSlotKey(3))).toBe(stored);
+    expect(writeSaveSlot(storage, 4, unreadable)).toEqual({ kind: "rejected" });
+    expect(values.has(saveSlotKey(4))).toBe(false);
   });
 
   it("accepts complete current-version battle and completed saves", () => {

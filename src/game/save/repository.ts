@@ -44,3 +44,24 @@ export function readSaveSlot(
   const save = parseSaveData(raw);
   return save ? { kind: "valid", save } : { kind: "invalid" };
 }
+
+export type SaveSlotWriteResult =
+  | { kind: "written" }
+  | { kind: "rejected" };
+
+/**
+ * Stores `save` only if `readSaveSlot` would read it back. The exact string about
+ * to be stored goes through `parseSaveData`, so a record the save schema rejects
+ * never replaces what the slot already holds. Written anyway, it would list as an
+ * empty slot, drop out of every backup, and the record it replaced would be gone.
+ */
+export function writeSaveSlot(
+  storage: Pick<Storage, "setItem">,
+  slot: number,
+  save: SaveData,
+): SaveSlotWriteResult {
+  const raw = JSON.stringify(save);
+  if (!parseSaveData(raw)) return { kind: "rejected" };
+  storage.setItem(saveSlotKey(slot), raw);
+  return { kind: "written" };
+}

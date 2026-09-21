@@ -27,5 +27,7 @@ export {
   saveSlotKey,
   saveSlotPageIndex,
   saveSlotPageStart,
+  writeSaveSlot,
   type SaveSlotReadResult,
+  type SaveSlotWriteResult,
 } from "./save/repository";

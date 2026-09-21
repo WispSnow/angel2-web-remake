@@ -128,6 +128,7 @@ import {
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
   saveSlotKey,
+  writeSaveSlot,
 } from "./save";
 import {
   INITIAL_STAGE_RUNTIME,
@@ -470,6 +471,11 @@ export class GameController {
   recordMenuMode?: RecordMenuMode;
   recordMenuReturn?: "battle" | "system";
   recordMenuIndex = 0;
+  /**
+   * 记录面板标题列的写入失败提示。只在战中记录与战后存档面板开着时显示，两个面板
+   * 打开时清空；备份工具回报新状态时由 UI 调 `dismissRecordSaveNotice` 让位。
+   */
+  recordSaveNotice = "";
   dialogueSkipConfirmOpen = false;
   dialogueSkipConfirmIndex = 1;
   quitConfirmOpen = false;
@@ -4728,6 +4734,7 @@ export class GameController {
     if (this.phase !== "savePrompt") return;
     this.phase = "saveSlots";
     this.postSaveSlotIndex = 0;
+    this.recordSaveNotice = "";
     this.emit();
   }
 
@@ -4786,17 +4793,38 @@ export class GameController {
     return result.kind === "valid" ? result.save : undefined;
   }
 
+  /**
+   * 两条存档路径共用的写入口。记录先经 `writeSaveSlot` 按读取路径校验：存档 schema
+   * 拒绝的记录不写入——槽位保留原有记录、儲存次數不累计，记录面板由调用方保持开启并
+   * 显示提示，控制台留下关卡、回合与被拒的整份记录供回报。否则玩家会看到「已儲存」，
+   * 读取时却只剩「此處沒有記錄」，原本那份记录也已被覆盖。
+   */
+  private commitSaveRecord(slot: number, save: SaveData): boolean {
+    if (writeSaveSlot(localStorage, slot, save).kind === "written") {
+      this.campaignSaveCount = save.saveCount;
+      this.recordSaveNotice = "";
+      return true;
+    }
+    console.error(
+      `記錄 ${slot} 未儲存：${this.battle.stage.id} 第 ${this.battle.round} 回合的${
+        save.kind === "battle" ? "戰中" : "戰後"}記錄未通過讀取校驗。`,
+      save,
+    );
+    this.recordSaveNotice = `記錄 ${slot} 未儲存：資料校驗失敗，原有記錄保持不變。`;
+    this.statusMessage = this.recordSaveNotice;
+    return false;
+  }
+
   private writeCompletedSave(slot: number): void {
     const campaign = this.battle.campaignSnapshot();
     const runtime = this.stageRuntime;
-    this.campaignSaveCount += 1;
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
       kind: "completed",
       savedAt: new Date().toISOString(),
-      saveCount: this.campaignSaveCount,
+      saveCount: this.campaignSaveCount + 1,
       stageId: runtime.nextStageId,
       stageLabel: runtime.completion.destinationLabel,
       ruleset: campaign.ruleset,
@@ -4810,9 +4838,11 @@ export class GameController {
         ? this.battle.stage.events.map(({ id }) => id)
         : [],
     };
-    localStorage.setItem(saveSlotKey(slot), JSON.stringify(save));
     this.pendingSaveSlot = undefined;
-    this.completeVictoryFlow();
+    // 写不进去就留在存档面板上：离开面板会直接进入下一关的关前剧情，提示也就没人看见。
+    // 玩家照常以取消键离开，等同在「是否要記錄下來」选了取消。
+    if (this.commitSaveRecord(slot, save)) this.completeVictoryFlow();
+    else this.emit();
   }
 
   openRecordMenu(mode: RecordMenuMode): void {
@@ -4834,6 +4864,7 @@ export class GameController {
     this.recordMenuMode = mode;
     this.recordMenuReturn = fromSystem ? "system" : "battle";
     this.recordMenuIndex = 0;
+    this.recordSaveNotice = "";
     this.statusMessage = mode === "save" ? "選擇儲存記錄位置。" : "選擇要讀取的戰役記錄。";
     this.emit();
   }
@@ -4844,8 +4875,17 @@ export class GameController {
     this.recordMenuMode = undefined;
     this.recordMenuReturn = undefined;
     this.recordMenuIndex = 0;
+    this.recordSaveNotice = "";
     this.systemMenuOpen = returnToSystem;
     this.emit();
+  }
+
+  /**
+   * 备份工具的回报与写入失败提示共用面板标题列，谁后到显示谁。UI 已经直接改写了
+   * 那一栏，这里只撤下旧提示，免得下一次重绘又把它盖回去，所以不发出变更。
+   */
+  dismissRecordSaveNotice(): void {
+    this.recordSaveNotice = "";
   }
 
   moveRecordMenuSelection(delta: number): void {
@@ -4881,14 +4921,13 @@ export class GameController {
   private writeBattleSave(slot: number): void {
     const campaign = this.battle.campaignSnapshot();
     const snapshot = this.battle.serializableSnapshot();
-    this.campaignSaveCount += 1;
     const save: SaveData = {
       format: "ANGEL2-web-save",
       version: SAVE_VERSION,
       contentVersion: SAVE_CONTENT_VERSION,
       kind: "battle",
       savedAt: new Date().toISOString(),
-      saveCount: this.campaignSaveCount,
+      saveCount: this.campaignSaveCount + 1,
       stageId: this.battle.stage.id,
       stageLabel: this.stageRuntime.label,
       ruleset: campaign.ruleset,
@@ -4907,11 +4946,14 @@ export class GameController {
         cameraOrigin: { ...this.cameraOrigin },
       },
     };
-    localStorage.setItem(saveSlotKey(slot), JSON.stringify(save));
-    this.recordMenuMode = undefined;
-    this.recordMenuReturn = undefined;
-    this.recordMenuIndex = 0;
-    this.statusMessage = `已儲存至記錄 ${slot}。`;
+    // 成功时面板收起；失败时面板不收，操作结果本身就和成功不同，玩家也能当场看到
+    // 该槽仍是原有记录。
+    if (this.commitSaveRecord(slot, save)) {
+      this.recordMenuMode = undefined;
+      this.recordMenuReturn = undefined;
+      this.recordMenuIndex = 0;
+      this.statusMessage = `已儲存至記錄 ${slot}。`;
+    }
     this.emit();
   }
 

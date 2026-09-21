@@ -1121,7 +1121,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   letter-spacing: .1em;
 }
 .record-panel-title > strong { flex: none; font: inherit; }
-.record-panel-backup-status {
+/* 備份結果與寫入失敗提示共用這一欄，誰後到顯示誰。 */
+.record-panel-status {
   min-width: 0;
   overflow: hidden;
   color: #fff4c9;
