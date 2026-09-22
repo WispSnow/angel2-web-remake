@@ -37,7 +37,7 @@ import {
 } from "./full-combat";
 import { applyFullCombatAtlasFrame } from "./full-combat-atlas";
 import { fullCombatImageSource } from "./full-combat-image-cache";
-import type { BattleUnit, DialoguePage, PortraitRecord, UnitClassId, UnitStats } from "./types";
+import type { BattleUnit, DialoguePage, PortraitRecord, Position, UnitClassId, UnitStats } from "./types";
 import type { TerrainInspection } from "./terrain-inspection";
 import type { AudioManager } from "./audio";
 import { renderNativeDialogueText } from "./dialogue-text";
@@ -746,12 +746,73 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     if (button && sidePanelHintTarget === button) hideSidePanelHint();
   }, { signal: eventController.signal });
 
-  root.addEventListener("click", (event) => {
-    const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
-    if (minimap) {
-      controller.commitMinimapPreview();
+  /**
+   * 小地圖指標工作階段。原版 `0000:263B` 只在主鍵按下時檢查指標是否落在小地圖上、
+   * `0000:279F` 再把像素換成棋盤格；複刻沿用這條換算，另外加上「按住拖曳」[DD]：
+   * 按下就把視口定到指針格，拖動期間視口連續跟隨，放開時才依原版語義把焦點放到
+   * 視口中心（`commitMinimapPreview`）。
+   *
+   * 指標捕獲掛在 `#logical-screen` 而不是小地圖節點：每次 `emit()` 都用 `innerHTML`
+   * 重建右欄，捕獲若掛在被換掉的節點上會跟著失效；掛在畫布的祖先上也讓 Phaser 在拖曳
+   * 期間收不到指標事件，戰場邊緣捲動與格子懸停都不會被誤觸。
+   */
+  const MINIMAP_SELECTOR = "[data-testid=tactical-minimap]";
+  const findMinimap = () => root.querySelector<HTMLElement>(MINIMAP_SELECTOR);
+  const minimapCellAt = (minimap: HTMLElement, event: PointerEvent): Position => {
+    const bounds = minimap.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(stage.width - 1, Math.floor((event.clientX - bounds.left) * stage.width / bounds.width))),
+      y: Math.max(0, Math.min(stage.height - 1, Math.floor((event.clientY - bounds.top) * stage.height / bounds.height))),
+    };
+  };
+  const syncMinimapPreview = (origin: Position | undefined) => {
+    const preview = findMinimap()?.querySelector<HTMLElement>("[data-testid=minimap-preview]");
+    if (!preview) return;
+    if (!origin) {
+      preview.hidden = true;
       return;
     }
+    preview.hidden = false;
+    preview.style.left = `${origin.x * 3}px`;
+    preview.style.top = `${origin.y * 3}px`;
+  };
+  let minimapDragPointerId: number | undefined;
+  const continueMinimapDrag = (event: PointerEvent) => {
+    const minimap = findMinimap();
+    if (!minimap) return;
+    syncMinimapPreview(controller.dragMinimapViewport(minimapCellAt(minimap, event)));
+  };
+  const endMinimapDrag = (event: PointerEvent, commit: boolean) => {
+    if (event.pointerId !== minimapDragPointerId) return;
+    minimapDragPointerId = undefined;
+    if (screen.hasPointerCapture(event.pointerId)) screen.releasePointerCapture(event.pointerId);
+    if (commit) controller.commitMinimapPreview();
+    else controller.clearMinimapPreview();
+    syncMinimapPreview(undefined);
+  };
+  root.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || minimapDragPointerId !== undefined) return;
+    const minimap = (event.target as Element).closest<HTMLElement>(MINIMAP_SELECTOR);
+    if (!minimap) return;
+    const origin = controller.dragMinimapViewport(minimapCellAt(minimap, event));
+    if (!origin) return;
+    minimapDragPointerId = event.pointerId;
+    try {
+      screen.setPointerCapture(event.pointerId);
+    } catch {
+      // 合成事件沒有活躍指標可捕獲；工作階段仍由 pointerId 追蹤到放開為止。
+    }
+    syncMinimapPreview(origin);
+    // 沒有這一行，按住小地圖的 `<img>` 拖動會啟動瀏覽器自己的圖片拖放並取消指標事件。
+    event.preventDefault();
+  }, { signal: eventController.signal });
+  window.addEventListener("pointerup", (event) => endMinimapDrag(event, true), { signal: eventController.signal });
+  window.addEventListener("pointercancel", (event) => endMinimapDrag(event, false), { signal: eventController.signal });
+  screen.addEventListener("lostpointercapture", (event) => endMinimapDrag(event, false), { signal: eventController.signal });
+
+  root.addEventListener("click", (event) => {
+    // 小地圖在指標放開時就已提交（見上方的工作階段）；隨後的 click 不得落到動作按鈕上。
+    if ((event.target as Element).closest(MINIMAP_SELECTOR)) return;
     const button = (event.target as Element).closest<HTMLElement>("[data-action]");
     if (!button) {
       if ((event.target as Element).closest("#dialogue-layer")) {
@@ -859,6 +920,10 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
 
   root.addEventListener("pointermove", (event) => {
     trackScreenPointer(event);
+    if (minimapDragPointerId !== undefined) {
+      if (event.pointerId === minimapDragPointerId) continueMinimapDrag(event);
+      return;
+    }
     const recordBackupButton = (event.target as Element).closest<HTMLElement>(
       "[data-action^=record-backup]",
     );
@@ -894,30 +959,22 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       controller.selectPromotionTarget(Number(promotionTarget.dataset.promotionIndex));
       promotionLayer.dataset.pointerDetails = "true";
     }
-    const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
+    const minimap = (event.target as Element).closest<HTMLElement>(MINIMAP_SELECTOR);
     if (!minimap) {
       if (controller.minimapPreviewOrigin) controller.clearMinimapPreview();
       return;
     }
-    const bounds = minimap.getBoundingClientRect();
-    const cell = {
-      x: Math.max(0, Math.min(stage.width - 1, Math.floor((event.clientX - bounds.left) * stage.width / bounds.width))),
-      y: Math.max(0, Math.min(stage.height - 1, Math.floor((event.clientY - bounds.top) * stage.height / bounds.height))),
-    };
-    const origin = controller.previewMinimapCell(cell);
-    const preview = minimap.querySelector<HTMLElement>("[data-testid=minimap-preview]");
-    if (!preview || !origin) return;
-    preview.hidden = false;
-    preview.style.left = `${origin.x * 3}px`;
-    preview.style.top = `${origin.y * 3}px`;
+    const origin = controller.previewMinimapCell(minimapCellAt(minimap, event));
+    if (origin) syncMinimapPreview(origin);
   }, { signal: eventController.signal });
 
   root.addEventListener("pointerout", (event) => {
-    const minimap = (event.target as Element).closest<HTMLElement>("[data-testid=tactical-minimap]");
+    // 捕獲切換會對舊目標補一個 pointerout；拖曳中的白框由工作階段自己收尾。
+    if (minimapDragPointerId !== undefined) return;
+    const minimap = (event.target as Element).closest<HTMLElement>(MINIMAP_SELECTOR);
     if (!minimap || (event.relatedTarget instanceof Node && minimap.contains(event.relatedTarget))) return;
     controller.clearMinimapPreview();
-    const preview = minimap.querySelector<HTMLElement>("[data-testid=minimap-preview]");
-    if (preview) preview.hidden = true;
+    syncMinimapPreview(undefined);
   }, { signal: eventController.signal });
 
   /**
@@ -2399,7 +2456,7 @@ function renderTactical(controller: GameController, underUnit = false): string {
     <div class="hud-tactical${underUnit ? " under-unit" : ""}" data-testid="tactical-hud" aria-label="戰術輔助與即時小地圖">
       ${statePatches}
       <div class="tactical-minimap" data-testid="tactical-minimap" aria-label="${controller.battle.stage.name}即時小地圖">
-        <img src="${stagedRenderAssetSource(minimap)}" alt="" />
+        <img src="${stagedRenderAssetSource(minimap)}" alt="" draggable="false" />
         ${underUnit ? "" : `<span class="minimap-viewport" style="left:${viewport.x * 3}px;top:${viewport.y * 3}px" aria-hidden="true"></span>`}
         ${underUnit ? "" : `<span class="minimap-preview" data-testid="minimap-preview" aria-hidden="true" hidden></span>`}
         ${markers}

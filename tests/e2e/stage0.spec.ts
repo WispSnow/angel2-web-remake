@@ -6,7 +6,7 @@ import {
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
 } from "../../src/game/save";
-import { attackOnlyAdjacentEnemy, enterAttackTargeting } from "./command-controls";
+import { attackOnlyAdjacentEnemy, chooseUnitCommand, enterAttackTargeting } from "./command-controls";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
 import { skipOpeningToTitle } from "./startup-controls";
@@ -1837,6 +1837,112 @@ test("S00-H: minimap hover previews and primary click relocates the native viewp
     units: baseline.units,
     rngState: baseline.rngState,
   });
+});
+
+test("S00-H2: the minimap stays live while a move is picked and drags the viewport", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+  const screen = page.getByTestId("game-screen");
+  const canvas = page.getByTestId("battle-canvas");
+  const minimap = page.getByTestId("tactical-minimap");
+
+  // The opening walk leaves the camera centred on 妮雅 at (29,26). Address cells
+  // through the 40×44 tiles behind the (40,23) camera viewport, not fixed pixels.
+  const opening = await debugState(page);
+  const nia = opening.units.find(({ id }) => id === "1:0")!;
+  const cellPoint = (cell: { x: number; y: number }) => ({
+    x: 40 + (cell.x - opening.cameraOrigin.x) * 40 + 20,
+    y: 23 + (cell.y - opening.cameraOrigin.y) * 44 + 22,
+  });
+  await canvas.click({ position: cellPoint(nia) });
+  await chooseUnitCommand(page, "move");
+  await expect(screen).toHaveAttribute("data-action-mode", "move");
+  // With the cursor still on the actor the panel shows her detail (`0000:8492`);
+  // the minimap under it is dimmed and inert.
+  await expect(screen).toHaveAttribute("data-hud-mode", "unit");
+  // An empty candidate cell hands the panel back to the live minimap, exactly the
+  // state in which the original lets the player relocate mid-移動.
+  await canvas.hover({ position: cellPoint({ x: nia.x - 1, y: nia.y }) });
+  await expect(screen).toHaveAttribute("data-hud-mode", "tactical");
+  await expect(minimap).toBeVisible();
+  const before = await debugState(page);
+  expect(before.actionMode).toBe("move");
+  expect(before.reachable.length).toBeGreaterThan(1);
+
+  await minimap.hover({ position: { x: 121, y: 121 } });
+  await expect(page.getByTestId("minimap-preview")).toBeVisible();
+  expect((await debugState(page)).minimapPreviewOrigin).toEqual({ x: 36, y: 37 });
+  await minimap.click({ position: { x: 121, y: 121 } });
+  const relocated = await debugState(page);
+  expect(relocated).toMatchObject({
+    actionMode: "move",
+    selectedId: before.selectedId,
+    focusId: before.focusId,
+    cameraOrigin: { x: 36, y: 37 },
+    cursor: { x: 40, y: 40 },
+    reachable: before.reachable,
+    units: before.units,
+    rngState: before.rngState,
+  });
+  expect(relocated.minimapPreviewOrigin).toBeUndefined();
+  await captureVisualAudit(screen, { path: "artifacts/playwright/stage0-minimap-move-relocated.png" });
+
+  // Press-and-drag [DD]: the viewport follows the held pointer at once, while the
+  // cursor waits for the release. Coordinates are page pixels over the 150×150 map.
+  const box = (await minimap.boundingBox())!;
+  const scale = box.width / 150;
+  const onMinimap = (x: number, y: number) => ({ x: box.x + x * scale, y: box.y + y * scale });
+  await page.mouse.move(onMinimap(2, 2).x, onMinimap(2, 2).y);
+  await page.mouse.down();
+  expect(await debugState(page)).toMatchObject({
+    actionMode: "move",
+    cameraOrigin: { x: 0, y: 0 },
+    cursor: { x: 40, y: 40 },
+  });
+  await page.mouse.move(onMinimap(76, 76).x, onMinimap(76, 76).y, { steps: 6 });
+  expect(await debugState(page)).toMatchObject({
+    cameraOrigin: { x: 21, y: 22 },
+    cursor: { x: 40, y: 40 },
+    minimapPreviewOrigin: { x: 21, y: 22 },
+  });
+  await expect(page.getByTestId("minimap-preview")).toBeVisible();
+  await captureVisualAudit(screen, { path: "artifacts/playwright/stage0-minimap-drag-held.png" });
+  // Leaving the map while held keeps following, clamped to the pan range, and the
+  // captured pointer never reaches Phaser: no edge pan, no held flag on the board.
+  const screenBox = (await screen.boundingBox())!;
+  const logical = (x: number, y: number) => ({ x: screenBox.x + x * screenBox.width / 640, y: screenBox.y + y * screenBox.height / 350 });
+  await page.mouse.move(logical(470, 300).x, logical(470, 300).y, { steps: 4 });
+  const bounds = (await canvas.getAttribute("data-camera-origin-bounds"))!.split(",").map(Number);
+  expect(await debugState(page)).toMatchObject({
+    cameraOrigin: { x: bounds[0], y: Math.min(bounds[3]!, 46 - 3) },
+    cursor: { x: 40, y: 40 },
+  });
+  await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");
+  await expect(canvas).toHaveAttribute("data-primary-pointer-held", "false");
+  await page.mouse.up();
+  const dragged = await debugState(page);
+  expect(dragged).toMatchObject({
+    actionMode: "move",
+    selectedId: before.selectedId,
+    focusId: before.focusId,
+    cursor: { x: dragged.cameraOrigin.x + 4, y: dragged.cameraOrigin.y + 3 },
+    reachable: before.reachable,
+    units: before.units,
+    rngState: before.rngState,
+  });
+  expect(dragged.minimapPreviewOrigin).toBeUndefined();
+
+  // Backing out still returns to the command menu with nothing moved or spent.
+  await canvas.click({ button: "right", position: { x: 220, y: 177 } });
+  expect(await debugState(page)).toMatchObject({
+    actionMode: "actionMenu",
+    commandMenuKind: "initial",
+    selectedId: before.selectedId,
+  });
+  expect((await debugState(page)).units.find(({ id }) => id === "1:0")).toMatchObject({ x: nia.x, y: nia.y, acted: false });
 });
 
 test("RHP-01: native side-panel hitboxes share one gated coordinate layer", async ({ page }) => {

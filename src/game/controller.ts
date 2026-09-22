@@ -421,6 +421,24 @@ const STORY_PHASES = new Set<GamePhase>([
   "scriptedStory",
 ]);
 const isStoryPhase = (phase: GamePhase): phase is StageStoryPhase => STORY_PHASES.has(phase);
+/**
+ * Modes in which the battlefield cursor roams freely: the pointer drags it across
+ * the board (`focusCell`) and the minimap may relocate it. Menus, the shot-route
+ * picker and self-centred casts pin the cursor to the actor instead, and the
+ * minimap stays inert there so a stray press cannot move the actor's frame.
+ */
+const ROAMING_CURSOR_MODES: ReadonlySet<ActionMode> = new Set<ActionMode>([
+  "idle",
+  "move",
+  "target",
+  "specialTarget",
+]);
+/** The roaming modes that still hold a selected unit: a range is being picked. */
+const RANGE_SELECTION_MODES: ReadonlySet<ActionMode> = new Set<ActionMode>([
+  "move",
+  "target",
+  "specialTarget",
+]);
 const pause = programDelay;
 const atomicObjectiveConditions = (
   condition: StageObjectiveCondition,
@@ -975,8 +993,16 @@ export class GameController {
   }
 
   get focusedUnit(): BattleUnit | undefined {
-    if (this.phase === "player") return this.selectedUnit ?? this.battle.unitAt(this.cursor);
-    return this.battle.focus;
+    if (this.phase !== "player") return this.battle.focus;
+    // `0000:8492` opens the unit detail only for the unit under the focus cell and
+    // closes it as soon as the focus leaves that unit, whatever the player is in
+    // the middle of. While a range is being picked the cursor roams, so the panel
+    // follows it: an empty cell brings the live minimap back (which is how the
+    // original lets the player relocate the viewport mid-移動), a unit cell shows
+    // that unit. Menus, route picking and self-centred casts keep the cursor on
+    // the actor, so the selected unit stays up there.
+    if (RANGE_SELECTION_MODES.has(this.actionMode)) return this.battle.unitAt(this.cursor);
+    return this.selectedUnit ?? this.battle.unitAt(this.cursor);
   }
 
   get terrainInspection(): TerrainInspection | undefined {
@@ -1912,7 +1938,7 @@ export class GameController {
   focusCell(position: Position): void {
     if (
       this.phase !== "player"
-      || !["idle", "move", "target", "specialTarget"].includes(this.actionMode)
+      || !ROAMING_CURSOR_MODES.has(this.actionMode)
       || this.hasBlockingOverlay
       || this.busy
     ) return;
@@ -5287,15 +5313,42 @@ export class GameController {
     this.emit();
   }
 
+  /**
+   * Whether the tactical minimap answers the pointer right now: the cursor must be
+   * free to roam and nothing may be blocking or animating. The hover preview, the
+   * press-and-drag pan and the release commit all share this gate so the three
+   * cannot disagree halfway through a gesture.
+   */
+  get minimapAvailable(): boolean {
+    return this.phase === "player"
+      && ROAMING_CURSOR_MODES.has(this.actionMode)
+      && !this.busy
+      && !this.hasBlockingOverlay;
+  }
+
   previewMinimapCell(position: Position): Position | undefined {
-    if (
-      this.phase !== "player"
-      || this.actionMode !== "idle"
-      || this.busy
-      || this.hasBlockingOverlay
-    ) return undefined;
+    if (!this.minimapAvailable) return undefined;
     this.minimapPreviewOrigin = cameraOriginForFocus(this.battle.stage, position);
     return { ...this.minimapPreviewOrigin };
+  }
+
+  /**
+   * Press-and-drag on the minimap [DD]: the viewport follows the pointer cell for
+   * as long as the primary button is held. Only the camera moves — the cursor, the
+   * selection, the candidate cells and the story focus stay put — so the HUD cannot
+   * flip to a unit detail (which would hide the minimap) halfway through the
+   * gesture. The release goes through `commitMinimapPreview`, i.e. the native
+   * click semantics.
+   */
+  dragMinimapViewport(position: Position): Position | undefined {
+    if (!this.minimapAvailable) return undefined;
+    const origin = cameraOriginForFocus(this.battle.stage, position);
+    this.minimapPreviewOrigin = origin;
+    if (positionKey(origin) !== positionKey(this.cameraOrigin)) {
+      this.cameraOrigin = origin;
+      this.emit();
+    }
+    return { ...origin };
   }
 
   clearMinimapPreview(): void {
@@ -5304,10 +5357,19 @@ export class GameController {
 
   commitMinimapPreview(): void {
     if (!this.minimapPreviewOrigin) return;
+    if (!this.minimapAvailable) {
+      this.minimapPreviewOrigin = undefined;
+      return;
+    }
     const origin = clampCameraOrigin(this.battle.stage, this.minimapPreviewOrigin);
     this.cameraOrigin = origin;
     this.cursor = cameraFocusForOrigin(this.battle.stage, origin);
-    this.battle.focusId = this.battle.unitAt(this.cursor)?.id ?? this.battle.focusId;
+    // The native click parks the focus cell at the viewport centre. The remake's
+    // story/HUD focus follows it only on the neutral battlefield: during a range
+    // selection the actor keeps that focus and the roaming cursor alone relocates.
+    if (this.actionMode === "idle") {
+      this.battle.focusId = this.battle.unitAt(this.cursor)?.id ?? this.battle.focusId;
+    }
     this.minimapPreviewOrigin = undefined;
     this.emit();
   }

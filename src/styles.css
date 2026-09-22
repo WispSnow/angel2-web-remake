@@ -713,7 +713,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 /* 戰術桌底圖與小地圖框合成在同一张画布上，理由同 `.hud-unit-frame`。这两块原本
    隔着开关状态图与小地图，所以小地圖降到 0、合成层占 1、开关升到 2——叠放次序
    （小地圖 → 邊框 → 開關）与併层前完全相同。 */
-.tactical-minimap { position: absolute; z-index: 0; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: var(--image-rendering, pixelated); }
+/* `touch-action: none` 讓觸控拖曳小地圖時視口跟著走，而不是捲動整頁；`user-select`
+   則擋掉按住拖曳時瀏覽器對底下 `<img>` 的選取反白。 */
+.tactical-minimap { position: absolute; z-index: 0; left: 5px; top: 161px; width: 150px; height: 150px; overflow: hidden; background: #000; image-rendering: var(--image-rendering, pixelated); touch-action: none; user-select: none; -webkit-user-select: none; }
 .tactical-panel-frame { position: absolute; z-index: 1; left: 0; top: 0; display: block; width: 160px; height: 321px; pointer-events: none; }
 .tactical-panel-state { position: absolute; z-index: 2; display: block; image-rendering: var(--image-rendering, pixelated); pointer-events: none; }
 .hud-tactical:not(.under-unit) .tactical-minimap { pointer-events: auto; cursor: var(--native-cursor-hand); }
