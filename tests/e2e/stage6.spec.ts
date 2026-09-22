@@ -42,7 +42,7 @@ const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
 test("S06-A/B/C: portal completion enters nine-unit deployment and switches SAY/14 backgrounds", async ({ page }) => {
   await page.goto("/?debugScenario=stage-42-completed-route&difficulty=0&test=1");
   await expect(page.getByTestId("deployment-screen")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "過異世界之門 · 出擊準備" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "來到異世界 · 出擊準備" })).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／9");
   await expect(page.locator(".deployment-entry:not(.is-empty)")).toHaveCount(13);
   await expect(page.locator(".deployment-open-cell")).toHaveCount(8);
@@ -189,7 +189,7 @@ test("S06-F/G/H/I/J: live victory builds the ranger tableau, saves the current s
     contentVersion: SAVE_CONTENT_VERSION,
     kind: "completed",
     stageId: "stage-07",
-    stageLabel: "來到異世界",
+    stageLabel: "營地遭到偷襲",
     stageProgress: 1000,
   });
   expect(completedSave.consumedEventIds).toContain("stage-06-ranger-leader-move");

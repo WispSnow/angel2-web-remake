@@ -81,6 +81,32 @@ const correctedStageLabel = (stageId: unknown): string | undefined => {
   return undefined;
 };
 
+/**
+ * REMAKE-158: before v120 stages 6..8 were named by counting SAY records from
+ * stage 5 and stage 38 by the remake's own "異世界", while module 29 draws the
+ * `DS:30BA` entry of each stage. A save's `stageLabel` is only the name of its
+ * `stageId` (for a completed save, of the destination), so the exact names older
+ * versions wrote for these four ids are renamed before any version step
+ * validates them; nothing else in the record depends on the name.
+ */
+const ORIGINAL_STAGE_TITLE_CORRECTIONS: ReadonlyArray<{
+  stageId: StageId;
+  previous: string;
+  original: string;
+}> = [
+  { stageId: "stage-06", previous: "過異世界之門", original: "來到異世界" },
+  { stageId: "stage-07", previous: "來到異世界", original: "營地遭到偷襲" },
+  { stageId: "stage-08", previous: "營地遭到偷襲", original: "營地遭到偷襲 ２" },
+  { stageId: "stage-38", previous: "異世界", original: "瑪姬的墓園" },
+];
+
+function restoreOriginalStageTitle(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  const correction = ORIGINAL_STAGE_TITLE_CORRECTIONS.find(({ stageId, previous }) =>
+    value.stageId === stageId && value.stageLabel === previous);
+  return correction ? { ...value, stageLabel: correction.original } : value;
+}
+
 const GADIRATH_SLOT = 24;
 const GADIRATH_TEMPLATE_CLASS = "magician" as const;
 const GADIRATH_TEMPLATE_STAGES = new Set<StageId>(["stage-01", "stage-02", "stage-04"]);
@@ -652,6 +678,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 104
     || value.contentVersion !== "stage-09-escort-valley-route-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * REMAKE-158 renames stages 6, 7, 8 and 38 to their `DS:30BA` titles. The
+ * rename already happened in `restoreOriginalStageTitle`; battle state, roster,
+ * events and PRNG are untouched, so v119 saves otherwise migrate by identity.
+ */
+function migrateVersion119Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 119
+    || value.contentVersion !== "stage-30-round-limit-199-1") return undefined;
   const migrated = {
     ...value,
     version: SAVE_VERSION,
@@ -2045,7 +2088,7 @@ function migrateVersion19Save(value: unknown): SaveData | undefined {
   const stageLabel = value.kind === "completed"
     && value.stageId === "stage-06"
     && value.stageLabel === "第 6 關"
-    ? "過異世界之門"
+    ? "來到異世界"
     : value.stageLabel;
   return finalizeDirectMigration({
     ...value,
@@ -3289,7 +3332,11 @@ export function parseSaveData(raw: string): SaveData | undefined {
   }
 }
 
-function migratePreviousSaveData(value: unknown): SaveData | undefined {
+function migratePreviousSaveData(raw: unknown): SaveData | undefined {
+  // Every version step below validates against the current names.
+  const value = restoreOriginalStageTitle(raw);
+  const migratedVersion119 = migrateVersion119Save(value);
+  if (migratedVersion119) return migratedVersion119;
   const migratedVersion118 = migrateVersion118Save(value);
   if (migratedVersion118) return migratedVersion118;
   const migratedVersion117 = migrateVersion117Save(value);

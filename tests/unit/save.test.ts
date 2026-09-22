@@ -490,7 +490,7 @@ const stage6BattleSave = (): BattleSaveData => {
     savedAt: "2026-08-08T12:00:00.000Z",
     saveCount: 1,
     stageId: "stage-06",
-    stageLabel: "過異世界之門",
+    stageLabel: "來到異世界",
     ruleset: "stableRemake",
     difficulty: 0,
     rngState: campaign.rngState,
@@ -550,7 +550,7 @@ const stage7BattleSave = (): BattleSaveData => {
     savedAt: "2026-08-09T12:00:00.000Z",
     saveCount: 1,
     stageId: "stage-07",
-    stageLabel: "來到異世界",
+    stageLabel: "營地遭到偷襲",
     ruleset: "stableRemake",
     difficulty: 0,
     rngState: campaign.rngState,
@@ -599,7 +599,7 @@ const stage8BattleSave = (): BattleSaveData => {
     savedAt: "2026-08-09T14:00:00.000Z",
     saveCount: 1,
     stageId: "stage-08",
-    stageLabel: "營地遭到偷襲",
+    stageLabel: "營地遭到偷襲 ２",
     ruleset: "stableRemake",
     difficulty: 0,
     rngState: campaign.rngState,
@@ -2726,7 +2726,7 @@ describe("Web save validation", () => {
     const portalCompleted: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-06",
-      stageLabel: "過異世界之門",
+      stageLabel: "來到異世界",
       stageProgress: 1000,
       consumedEventIds: [
         "stage-42-nia-move",
@@ -2749,7 +2749,7 @@ describe("Web save validation", () => {
     const stage6Completed: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-07",
-      stageLabel: "來到異世界",
+      stageLabel: "營地遭到偷襲",
       stageProgress: 1000,
       consumedEventIds: [
         "stage-06-enter-deployment",
@@ -2769,7 +2769,7 @@ describe("Web save validation", () => {
     const stage7Completed: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-08",
-      stageLabel: "營地遭到偷襲",
+      stageLabel: "營地遭到偷襲 ２",
       stageProgress: 1000,
       consumedEventIds: [
         "stage-07-prebattle-story",
@@ -4819,7 +4819,7 @@ describe("Web save validation", () => {
     const current: CompletedSaveData = {
       ...completedSave(),
       stageId: "stage-06",
-      stageLabel: "過異世界之門",
+      stageLabel: "來到異世界",
       stageProgress: 1000,
       consumedEventIds: [
         "stage-42-nia-move",
@@ -5832,6 +5832,99 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("renames stages 6, 7 and 8 to their DS:30BA titles when migrating older saves (REMAKE-158)", () => {
+    // v119 之前第 6～8 关按记录号从第 5 关顺推，拿到了相邻一关的名字。存档里的关卡名只是
+    // stageId（完成档是目的地）的派生名，所以迁移只改这一个字段，其余字段逐字保留。
+    const completedAt = (
+      stageId: "stage-06" | "stage-07" | "stage-08",
+      stageLabel: string,
+      consumedEventIds: string[],
+    ): CompletedSaveData => ({
+      ...completedSave(),
+      stageId,
+      stageLabel,
+      stageProgress: 1000,
+      consumedEventIds,
+    });
+    const cases: Array<{ current: BattleSaveData | CompletedSaveData; previous: string; original: string }> = [
+      { current: stage6BattleSave(), previous: "過異世界之門", original: "來到異世界" },
+      { current: stage7BattleSave(), previous: "來到異世界", original: "營地遭到偷襲" },
+      { current: stage8BattleSave(), previous: "營地遭到偷襲", original: "營地遭到偷襲 ２" },
+      {
+        current: completedAt("stage-06", "來到異世界", [
+          "stage-42-nia-move",
+          "stage-42-arrival-story",
+          "stage-42-confrontation-story",
+          "stage-42-gadirath-move",
+          "stage-42-intervention-story",
+          "stage-42-lightning",
+          "stage-42-departures",
+          "stage-42-departure-story",
+          "stage-42-completed-route",
+        ]),
+        previous: "過異世界之門",
+        original: "來到異世界",
+      },
+      {
+        current: completedAt("stage-07", "營地遭到偷襲", [
+          "stage-06-enter-deployment",
+          "stage-06-prebattle-story",
+          "stage-06-opening-story",
+          "stage-06-objective-reached",
+          "stage-06-retreat-story",
+          "stage-06-reinforcements",
+          "stage-06-ranger-leader-move",
+          "stage-06-alliance-story",
+          "stage-06-completed-route",
+        ]),
+        previous: "來到異世界",
+        original: "營地遭到偷襲",
+      },
+      {
+        current: completedAt("stage-08", "營地遭到偷襲 ２", [
+          "stage-07-prebattle-story",
+          "stage-07-enter-deployment",
+          "stage-07-objective-reached",
+          "stage-07-completed-route",
+        ]),
+        previous: "營地遭到偷襲",
+        original: "營地遭到偷襲 ２",
+      },
+    ];
+    for (const { current, previous, original } of cases) {
+      expect(current.stageLabel).toBe(original);
+      // The current schema only accepts the original title.
+      expect(isSaveData({ ...current, stageLabel: previous })).toBe(false);
+      for (const [version, contentVersion] of [
+        [119, "stage-30-round-limit-199-1"],
+        [118, "stage-27-nearest-free-spawn-1"],
+      ] as const) {
+        expect(parseSaveData(JSON.stringify({
+          ...current,
+          version,
+          contentVersion,
+          stageLabel: previous,
+        })), `${current.kind} ${current.stageId} v${version}`).toEqual(current);
+      }
+    }
+
+    // Only the exact name an older version wrote for that id is renamed.
+    expect(parseSaveData(JSON.stringify({
+      ...stage6BattleSave(),
+      version: 119,
+      contentVersion: "stage-30-round-limit-199-1",
+      stageLabel: "營地遭到偷襲",
+    }))).toBeUndefined();
+    // Stages whose title never changed migrate by identity.
+    for (const current of [battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 119,
+        contentVersion: "stage-30-round-limit-199-1",
+      }))).toEqual(current);
+    }
+  });
+
   it("migrates version-118 saves without changing battle state for stage 30's longer round limit", () => {
     // REMAKE-157 只把第 30 关的回合上限读自关卡定义；上限不入档，v118 的战中档都停在第 99
     // 回合以内，因此 v118 无损迁移。
@@ -6527,7 +6620,7 @@ describe("Web save validation", () => {
       ...cleared,
       stageId: "stage-39",
       stageLabel: "製作人員表",
-    })).toBe("異世界");
+    })).toBe("瑪姬的墓園");
   });
 
   it("distinguishes empty, invalid and readable persistent slots", () => {

@@ -21,7 +21,7 @@ import {
   nativeStatRow,
 } from "../../src/game/native-text";
 import { nativeMenuLabelText } from "../../src/game/native-dom-text";
-import { nativeStageLabelText } from "../../src/game/native-hud-text";
+import { nativeStageLabel, nativeStageLabelText } from "../../src/game/native-hud-text";
 
 const glyphCell = (character: string) => NATIVE_FONT_CHARACTERS.indexOf(character);
 const asciiCell = (character: string) =>
@@ -229,7 +229,18 @@ describe("0000:4F41 stage label", () => {
   });
 
   test("falls back to the single leading tab most label records use", () => {
-    expect(nativeStageLabelText("異世界之門")).toBe("\t異世界之門");
+    expect(nativeStageLabelText("全地形競技場")).toBe("\t全地形競技場");
+  });
+
+  test("draws the DS:30BA record for stage 38 and nothing for the portal scene 42", () => {
+    // Stage 38 is listed twice; 0000:4F41 stops at the first entry, SAY/0161.
+    expect(nativeStageLabel({ nativeStage: 38, name: "瑪姬的墓園" })).toBe("瑪姬的墓園");
+    expect(nativeStageLabelText("瑪姬的墓園")).toBe("      瑪姬的墓園    ");
+    expect(nativeStageLabelText("營地遭到偷襲 ２")).toBe("\t營地遭到偷襲 ２ ");
+    // Scene 42's only entry has record 0, so the original bar stays empty.
+    expect(nativeStageLabel({ nativeStage: 42, name: "異世界之門" })).toBeUndefined();
+    // The labs borrow stage 1's number under their own names.
+    expect(nativeStageLabel({ nativeStage: 1, name: "全地形競技場" })).toBe("全地形競技場");
   });
 
   test("keeps every recorded label inside the colour-1 plate", () => {

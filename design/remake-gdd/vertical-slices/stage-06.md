@@ -1,4 +1,4 @@
-# 第 6 关纸面垂直切片：`stage-06 / 過異世界之門`
+# 第 6 关纸面垂直切片：`stage-06 / 來到異世界`
 
 版本：Draft 0.1
 
@@ -22,7 +22,8 @@
 
 ## 3. 证据入口
 
-- 标题／原文目标：[`0124.json`](../../../reverse/parsed/dialogue/0124.json)、
+- 标题／原文目标：[`0125.json`](../../../reverse/parsed/dialogue/0125.json)（`DS:30BA` 键 6；
+  `REMAKE-158` 前误取无引用的 SAY/0124“過異世界之門”）、
   [`0088.json`](../../../reverse/parsed/dialogue/0088.json)；
 - 地图／模板：[`battle-templates.json`](../../../reverse/parsed/native/battle-templates.json)
   的 native stage `6` / `B/0013`；
@@ -170,7 +171,7 @@ ID；这些投影不可选择、不可行动、不参与胜负、经验、转职
   生命、成长、阵容、事件或 PRNG 进度；重新部署后仍播放 SAY 14／15；
 - 存档版本：[DD] 实现使用 v20 接纳 stage 6 战中／完成语义并确定迁移 v2–v19；不得原地
   扩大 v19；
-- 下一关：[OF] `campaign-route/stage-07`，显示标题“來到異世界”。本切片只建立冻结路由，
+- 下一关：[OF] `campaign-route/stage-07`，显示标题“營地遭到偷襲”（`REMAKE-158` 前误作“來到異世界”）。本切片只建立冻结路由，
   不生成或实现第 7 关地图、部署、剧情或战斗。
 
 ## 11. UI 状态

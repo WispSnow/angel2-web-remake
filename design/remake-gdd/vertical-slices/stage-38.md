@@ -1,4 +1,4 @@
-# 隱藏關「異世界」
+# 隱藏關「瑪姬的墓園」
 
 版本：Draft 0.1
 
@@ -12,6 +12,8 @@
 
 ## 2. 玩法合同
 
+- `[OF]` 关卡名为 SAY/0161“瑪姬的墓園”：`DS:30BA` 表首第一条就是 `38→161`，`0000:4F41`
+  在此停下，表尾另一条 `38→0` 永远扫不到。`REMAKE-158` 前复刻误用自拟的“異世界”。
 - `[OF]` 地图模板为 B/0077，固定两名我方单位：妮雅槽 0 `(29,21)`、希蜜槽 1
   `(30,21)`；18 个可部署格，名单标志槽为 `2..21,25..31`，最多 20 人。
 - `[OF]` 初始敌方为 44 名静态单位，槽位、职业记录、地图坐标和 side 2 角色描述符均由
@@ -35,7 +37,7 @@
 
 ## 3. 生成与验收
 
-- 内容来源：`reverse/decoded/B/0077/00.raw`、`battle-templates.json`、`battle-objectives.json`、
+- 内容来源：SAY/0161 与 `story-presentations.json` 的 `DS:30BA` 表、`reverse/decoded/B/0077/00.raw`、`battle-templates.json`、`battle-objectives.json`、
   `battle-lifecycle.json`、`stage-events.json`、`music-catalog.json`、SAY/0164/0165、
   `B/0088`、`C/0033`、`UN/0054`、`UN/0055`、`ending-presentations.json`。
 - 必须验证名单槽与固定棋盘槽分离、44 名敌军在 SAY/0164 前已建立、16 名历代角色的姓名／

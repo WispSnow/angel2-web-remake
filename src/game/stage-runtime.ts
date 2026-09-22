@@ -2445,7 +2445,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "傳送門過場不可撤退。",
     },
     completion: {
-      destinationLabel: "過異世界之門",
+      destinationLabel: "來到異世界",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -2491,7 +2491,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "全面撤退：返回第 6 關部署並重新編隊。",
     },
     completion: {
-      destinationLabel: "來到異世界",
+      destinationLabel: "營地遭到偷襲",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -2547,7 +2547,7 @@ export const STAGE_RUNTIME_MANIFEST = {
       retreatStatusText: "全面撤退：返回第 7 關關前流程並重新編隊。",
     },
     completion: {
-      destinationLabel: "營地遭到偷襲",
+      destinationLabel: "營地遭到偷襲 ２",
       destinationProgress: 1000,
       consumedEvents: "all",
     },
@@ -4386,8 +4386,8 @@ export const STAGE_RUNTIME_MANIFEST = {
     enemyPhaseStatusText: "敵方階段：異世界殘軍依序追擊。",
     retry: {
       mode: "preparation",
-      statusText: "重新開始異世界決戰部署。",
-      retreatStatusText: "全面撤退：返回異世界決戰部署並重新編隊。",
+      statusText: "重新開始瑪姬的墓園決戰部署。",
+      retreatStatusText: "全面撤退：返回瑪姬的墓園決戰部署並重新編隊。",
     },
     completion: {
       destinationLabel: "製作人員表",

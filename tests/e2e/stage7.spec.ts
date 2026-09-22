@@ -104,7 +104,7 @@ test("S07-A/B/C: accepted stage-6 completion plays SAY/17 and enters two-plus-fi
 
   await skipStoryDialogue(page);
   await waitForPhase(page, "deployment");
-  await expect(page.getByRole("heading", { name: "來到異世界 · 出擊準備" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "營地遭到偷襲 · 出擊準備" })).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 2／7");
   await expect(page.locator(".deployment-entry:not(.is-empty)")).toHaveCount(13);
   await expect(page.locator(".deployment-open-cell")).toHaveCount(5);
@@ -225,7 +225,7 @@ test("S07-F/G/H: defeat and retreat replay SAY/17, victory saves v25, and enters
     contentVersion: SAVE_CONTENT_VERSION,
     kind: "completed",
     stageId: "stage-08",
-    stageLabel: "營地遭到偷襲",
+    stageLabel: "營地遭到偷襲 ２",
     stageProgress: 1000,
     consumedEventIds: [
       "stage-07-prebattle-story",

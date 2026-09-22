@@ -5,7 +5,7 @@ import {
   createStage38DeploymentRoster,
   Stage38Battle,
 } from "../../src/game/simulation/stage38-battle";
-import { isSaveData, SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { isSaveData, parseSaveData, SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { BattleSaveData, CampaignState } from "../../src/game/types";
 
 const campaign: CampaignState = {
@@ -69,7 +69,7 @@ describe("stage 38 battle simulation", () => {
       savedAt: "2000-01-01T00:00:00.000Z",
       saveCount: 1,
       stageId: "stage-38",
-      stageLabel: "異世界",
+      stageLabel: "瑪姬的墓園",
       ruleset: "stableRemake",
       difficulty: campaign.difficulty,
       rngState: campaign.rngState,
@@ -90,6 +90,15 @@ describe("stage 38 battle simulation", () => {
       },
     };
     expect(isSaveData(save)).toBe(true);
+    // REMAKE-158: the original bar reads SAY/0161 瑪姬的墓園 for this stage. Saves
+    // written while the Web version called it 異世界 carry only that name over.
+    expect(isSaveData({ ...save, stageLabel: "異世界" })).toBe(false);
+    expect(parseSaveData(JSON.stringify({
+      ...save,
+      version: 119,
+      contentVersion: "stage-30-round-limit-199-1",
+      stageLabel: "異世界",
+    }))).toEqual(save);
     const enemy = save.battle.units.find(({ id }) => id === "2:52");
     if (!enemy) throw new Error("stage 38 save is missing enemy 2:52");
     enemy.classId = "soldier";

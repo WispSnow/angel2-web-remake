@@ -3,6 +3,7 @@ import {
   NATIVE_ROUND_DIGIT_INDICES,
   NATIVE_ROUND_TEMPLATE,
   NATIVE_STAGE_LABEL_PADDING,
+  NATIVE_STAGE_LABELS,
   NATIVE_STAT_ROWS,
   NATIVE_STATUS_COUNTERS,
   NATIVE_TEXT_ORIGINS,
@@ -61,6 +62,19 @@ export interface NativeTextLayer {
  */
 export function nativeStageLabelText(label: string): string {
   return NATIVE_STAGE_LABEL_PADDING[label] ?? `\t${label}`;
+}
+
+/**
+ * The bottom label a battle surface shows. 0000:4F41 looks the stage up in
+ * DS:30BA by its native number and draws nothing when that entry's record is 0,
+ * so the portal scene 42 runs with an empty bar and the remake's own name for it
+ * never reaches the native surface. The arena and the labs borrow stage 1's
+ * number under names of their own and keep showing those.
+ */
+export function nativeStageLabel(
+  stage: { readonly nativeStage: number; readonly name: string },
+): string | undefined {
+  return NATIVE_STAGE_LABELS[stage.nativeStage] === null ? undefined : stage.name;
 }
 
 export function createNativeTextLayer(): NativeTextLayer {

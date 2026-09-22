@@ -386,7 +386,7 @@ test("S49-A–D: main ending plays story, roster, conditional epilogue, then ent
     stage49Ending: { section: "stage38-boundary" },
   });
   await expect(page.getByTestId("stage38-boundary")).toContainText("墓碑上的異世界之門再次開啟");
-  await expect(page.getByTestId("start-stage38")).toHaveText("進入異世界");
+  await expect(page.getByTestId("start-stage38")).toHaveText("進入瑪姬的墓園");
   await expect(page.locator("#app")).toHaveAttribute("data-music-track", "none");
   await captureVisualAudit(page.getByTestId("ending-advance"), {
     path: `${ARTIFACT_DIR}/stage49-stage38-boundary.png`,

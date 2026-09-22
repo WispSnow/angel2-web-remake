@@ -31,7 +31,7 @@ describe("stage 6 generated content", () => {
     expect(STAGE6_DEFINITION).toMatchObject({
       id: "stage-06",
       nativeStage: 6,
-      name: "過異世界之門",
+      name: "來到異世界",
       viewport: { initialOrigin: { x: 17, y: 21 } },
       objective: {
         victory: { type: "unit-removed", side: 2, slot: 19 },

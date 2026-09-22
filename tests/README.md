@@ -45,7 +45,7 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
   - 在文件顶层静态 `import "../../reverse/parsed/**.json"` 的用例，模块加载期就会失败，
     `skipIf` 来不及生效，由 `vitest.config.ts` 自动扫描并整文件排除，运行时打印排除清单。
 
-因此同一份代码有两种合法结果：本机全量运行、零跳过；干净检出（含 CI）少跑 7 个文件与
+因此同一份代码有两种合法结果：本机全量运行、零跳过；干净检出（含 CI）少跑 8 个文件与
 34 个用例，其余全绿。新增依赖取证语料的用例时，按上面两种形态之一登记，不要让它在干净
 检出上以 `ENOENT` 失败。
 
@@ -83,7 +83,8 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | `content/ai-technique-dialogue.ts` 的 DS:`84BB` 上下文短句与 `controller.ts` 的触发点：混亂点选 `1Ch`、禁咒拒绝 `1Ah`（技術项保留且不消耗行动）、无目标 `1Bh`、射击免疫 `1Dh`（玩家侧不受开关控制）、反击 `1Eh`（仅地图战斗分支且仅骨龍騎士完整反伤）、AI 射击宣告 `08h` 与规划器标注的 `00h/01h/02h/05h`（均受“ＡＩ對話”开关控制） | `ai-technique-dialogue.test.ts` 的短句表与门禁；规划器标注见 `expert-ai.test.ts` 的「native contextual lines emitted from the AI planner」 | `arena-ailments.spec.ts` 的上下文短句用例；无目标短句在真实关卡的口径见 `stage0.spec.ts` 的 `S00-I` |
 | `content/ai-technique-dialogue.ts` 的取得经验短句 `18h` 与 `controller.ts` 的触发点：普通攻击击杀保留地图／全景原版时序；`REMAKE-133` 让射击、单体／范围魔法、龍踏及自动特殊行动在确有阵亡且行动者实际取得正经验时，于死亡表现后显示完整入账值。数字按 `0000:EF56` 右对齐定宽五格；无击杀施法经验、零经验击杀与 stage 37 Boss 丢弃经验返回保持静默 | `ai-technique-dialogue.test.ts` 的「the experience window's numeric field」；精确动作经验与击杀累计由 `actions.test.ts` 覆盖 | `experience-gain-line.spec.ts` |
 | `src/game/content/status-presentations.ts` 与 `ui.ts` 的单位详情状态图标行：原生 `A/17` 槽顺序、剩余回合、逐状态悬停说明文字与只读提示几何 | `status-presentations.test.ts` | `class-showdown.spec.ts` 的施毒图标与悬停提示用例；其他状态图标断言见 `arena.spec.ts`、`arena-ailments.spec.ts`、`stage37.spec.ts` |
-| `src/game/native-text.ts`、`native-hud-text.ts` 与 `content/native-font.generated.ts` 的原版点阵字文字层：`UN/58`+`UN/59` 与 BIOS `8×8` ROM 字模合成的图集、`0000:EA04` 的光标前进量与两遍外框、五字元数值栏、身分栏左右对齐、回合样板与关卡名内边距 | `native-text.test.ts` | `stage0.spec.ts` 的 `RHP-08`；身分列与数值文字仍由 `class-showdown.spec.ts`、`arena-buffs.spec.ts` 读 DOM 断言 |
+| `src/game/native-text.ts`、`native-hud-text.ts` 与 `content/native-font.generated.ts` 的原版点阵字文字层：`UN/58`+`UN/59` 与 BIOS `8×8` ROM 字模合成的图集、`0000:EA04` 的光标前进量与两遍外框、五字元数值栏、身分栏左右对齐、回合样板与关卡名内边距，以及 `nativeStageLabel` 对 `DS:30BA` 记录为 0 的传送门过场不画底条 | `native-text.test.ts` | `stage0.spec.ts` 的 `RHP-08`；`stage38.spec.ts` 的 `S38-C/D` 与 `stage5.spec.ts` 的 `S05-I/J` 用 `native-text-ink.ts` 读底条像素；身分列与数值文字仍由 `class-showdown.spec.ts`、`arena-buffs.spec.ts` 读 DOM 断言 |
+| `content/stage-index.ts` 的关卡名、`stage-runtime.ts` 的完成档目的地名与各关生成器的标题记录：`REMAKE-158` 要求逐字等于 `DS:30BA` 按原版关卡号首条命中的记录（`NATIVE_STAGE_LABELS`），不得按记录号顺推；存档 v120 迁移只替换第 6／7／8／38 关的旧名 | `stage-titles.test.ts`（干净检出可跑）、`stage-title-records.test.ts`（取证语料，校验生成物与各生成器 `title`／`nextTitle` 来源）、`save.test.ts` 与 `stage38-battle.test.ts` 的旧名迁移 | `stage6.spec.ts`、`stage7.spec.ts`、`stage38.spec.ts` 的部署标题与完成档名，`debug.spec.ts` 的关卡分组标题，`stage49-ending.spec.ts` 的隐藏关入口 |
 | `src/game/native-dom-text.ts` 把点阵字接到留在 DOM 的表面上：逐段独立画布、被裁切的无障碍副本（保留不含原版空格的原文）、`story` 游标（半形前进 8，模组 25 `0000:0736`／模组 29 `0000:BE14` 交给同一个 `0000:EA04`）、`NATIVE_MENU_LABEL_PADDING` 的逐列原版字距，以及命令／系统／集体／確定取消选单、`遊戲功能` 设定框、`A/18` 对白正文与姓名牌、全景状态框与伤害数字、標題读取进度面板、離開遊戲画面、勝利條件面板的实际落点 | `native-text.test.ts` 的 `story` 模式、行盒与选单字距用例 | `stage0.spec.ts` 的选单外框用例（逐列落点 `選單左緣 + 0x38 - 8`、四字列因此以中线右侧 9 px 为中心、画布宽度即字宽）、`game-functions-menu.spec.ts`、`stage7.spec.ts` 的对白逐字排版、`dialogue-portrait-frame.spec.ts`、`startup.spec.ts` 的记录面板 |
 | `src/game/prayer-presentation.ts`、`phaser/PrayerRenderer.ts` 的 `OJ` 结果文字：来源是 `TECHNIQUE_LAB_PRAYER.presentation.resultStrings` 的原版样板，`|` 是游标换行、数量走 `0000:EF56` 的五字元数值栏，画布纹理以最近邻取样贴进 Phaser | `technique-lab.test.ts` 的 OJ 结果用例 | `technique-lab.spec.ts` 的 `OJ scans side 1`（含视觉审计截图） |
 | `class-showdown-session.ts` 的对阵场编成与镜像 | `class-showdown.test.ts` | `class-showdown.spec.ts` |

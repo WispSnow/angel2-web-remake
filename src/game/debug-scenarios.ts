@@ -909,7 +909,7 @@ async function createStage42Completed(context: DebugScenarioContext): Promise<Ga
     savedAt: "2000-01-01T00:00:00.000Z",
     saveCount: 1,
     stageId: "stage-06",
-    stageLabel: "過異世界之門",
+    stageLabel: "來到異世界",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
     rngState: campaign.rngState,
@@ -962,7 +962,7 @@ async function createStage6Player(context: DebugScenarioContext): Promise<GameCo
   const battleCampaign = battle.campaignSnapshot();
   const save: BattleSaveData = {
     ...battleSaveBase(battleCampaign, "stage-06"),
-    stageLabel: "過異世界之門",
+    stageLabel: "來到異世界",
     roster: battleCampaign.roster,
     consumedEventIds: [...STAGE6_BATTLE_EVENT_IDS],
     battle: {
@@ -987,7 +987,7 @@ async function createStage6Completed(context: DebugScenarioContext): Promise<Gam
     savedAt: "2000-01-01T00:00:00.000Z",
     saveCount: 1,
     stageId: "stage-07",
-    stageLabel: "來到異世界",
+    stageLabel: "營地遭到偷襲",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
     rngState: campaign.rngState,
@@ -1040,7 +1040,7 @@ async function createStage7Player(context: DebugScenarioContext): Promise<GameCo
   const battleCampaign = battle.campaignSnapshot();
   const save: BattleSaveData = {
     ...battleSaveBase(battleCampaign, "stage-07"),
-    stageLabel: "來到異世界",
+    stageLabel: "營地遭到偷襲",
     roster: battleCampaign.roster,
     consumedEventIds: [...STAGE7_BATTLE_EVENT_IDS],
     battle: {
@@ -1065,7 +1065,7 @@ async function createStage7Completed(context: DebugScenarioContext): Promise<Gam
     savedAt: "2000-01-01T00:00:00.000Z",
     saveCount: 1,
     stageId: "stage-08",
-    stageLabel: "營地遭到偷襲",
+    stageLabel: "營地遭到偷襲 ２",
     ruleset: campaign.ruleset,
     difficulty: campaign.difficulty,
     rngState: campaign.rngState,
@@ -1101,7 +1101,7 @@ async function createStage8Player(context: DebugScenarioContext): Promise<GameCo
   const battleCampaign = battle.campaignSnapshot();
   const save: BattleSaveData = {
     ...battleSaveBase(battleCampaign, "stage-08"),
-    stageLabel: "營地遭到偷襲",
+    stageLabel: "營地遭到偷襲 ２",
     roster: battleCampaign.roster,
     consumedEventIds: [...STAGE8_BATTLE_EVENT_IDS],
     battle: {
@@ -3440,7 +3440,7 @@ async function createStage38Player(context: DebugScenarioContext): Promise<GameC
   const battleCampaign = battle.campaignSnapshot();
   const save: BattleSaveData = {
     ...battleSaveBase(battleCampaign, "stage-38"),
-    stageLabel: "異世界",
+    stageLabel: "瑪姬的墓園",
     roster: battleCampaign.roster,
     consumedEventIds: [...STAGE38_BATTLE_EVENT_IDS],
     battle: {

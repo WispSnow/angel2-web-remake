@@ -132,6 +132,34 @@ for (const label of spec.stageLabel.table.labels) {
   stageLabelPadding[visible] = label.text;
 }
 
+/**
+ * 0000:4F41 does not derive the label from the stage number: it scans DS:30BA
+ * with DS:2E77 and stops at the first entry for that stage, returning before
+ * anything is drawn when the entry's record is 0. Stage 38 is listed twice and
+ * its first entry (SAY/161) wins; the portal scene 42, stage 43, the ending 49
+ * and the skipped stage 25 only have zero entries, so their bar stays empty.
+ * SAY/124 is never referenced, which is why counting records from stage 5 gives
+ * stages 6..8 the wrong names.
+ */
+const labelTextByRecord = new Map(
+  spec.stageLabel.table.labels.map(({ sayRecord, text }) => [sayRecord, text]),
+);
+const stageLabels = {};
+for (const { stage, sayRecord } of spec.stageLabel.table.entries) {
+  if (Object.hasOwn(stageLabels, stage)) continue;
+  if (sayRecord === 0) {
+    stageLabels[stage] = null;
+    continue;
+  }
+  const text = labelTextByRecord.get(sayRecord);
+  assert(text !== undefined, `stage ${stage}: SAY/${sayRecord} is not a decoded label record`);
+  const visible = text.replaceAll("\t", "").trim();
+  assert(Object.hasOwn(stageLabelPadding, visible), `stage ${stage}: ${visible} has no padding entry`);
+  stageLabels[stage] = visible;
+}
+assert.equal(stageLabels[38], "瑪姬的墓園", "stage 38 no longer resolves to its first DS:30BA entry");
+assert.equal(stageLabels[42], null, "the portal scene 42 gained a stage label");
+
 const palette = hud.resourceValidation.paletteColors.map(
   ([red, green, blue]) => `#${[red, green, blue].map((value) => value.toString(16).padStart(2, "0")).join("")}`,
 );
@@ -298,6 +326,15 @@ export const NATIVE_STAGE_LABEL_BAR = ${JSON.stringify(spec.stageLabel.barRectan
 /** Visible label text to the padded SAY record the original ran the cursor on. */
 export const NATIVE_STAGE_LABEL_PADDING: Readonly<Record<string, string>> = ${
   JSON.stringify(stageLabelPadding, null, 2).split("\n").join("\n")
+};
+
+/**
+ * DS:30BA resolved the way 0000:4F41 reads it: native stage number to the
+ * visible label of its first entry, or \`null\` when that entry's record is 0 and
+ * the original leaves the bar empty (the portal scene 42, 43, 49 and 25).
+ */
+export const NATIVE_STAGE_LABELS: Readonly<Record<number, string | null>> = ${
+  JSON.stringify(stageLabels, null, 2)
 };
 `;
 

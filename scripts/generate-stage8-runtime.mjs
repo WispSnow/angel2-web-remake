@@ -20,7 +20,7 @@ const inputPaths = {
   campaignRoster: reversePath("parsed/native/campaign-roster.json"),
   events: reversePath("parsed/native/stage-events.json"),
   music: reversePath("parsed/native/music-catalog.json"),
-  title: reversePath("parsed/dialogue/0126.json"),
+  title: reversePath("parsed/dialogue/0158.json"),
   objectiveText: reversePath("parsed/dialogue/0162.json"),
   storyPresentations: reversePath("parsed/native/story-presentations.json"),
   prebattleStory: reversePath("parsed/dialogue/0021.json"),
@@ -158,9 +158,18 @@ const objectiveRecordEntries = parseInput("storyPresentations")
 if (objectiveRecordEntries.length !== 1 || objectiveRecordEntries[0].dialogueRecord !== 162) {
   throw new Error(`stage 8 objective record changed: ${JSON.stringify(objectiveRecordEntries)}`);
 }
+// The bottom stage label is not a stage-number formula either: module 29
+// `0000:4F41` scans `DS:30BA` for the current stage and draws the first entry's
+// record. Counting records from stage 5 gave stages 6..8 their neighbours' names
+// (SAY/0124 is never referenced), so lock this stage to its own entry.
+const titleRecordEntry = parseInput("storyPresentations")
+  .globalReachabilityAudit.tables.postBattle.entries.find(({ key }) => key === 8);
+if (titleRecordEntry?.dialogueRecord !== 158 || path.basename(inputPaths.title) !== "0158.json") {
+  throw new Error(`stage 8 title record changed: ${JSON.stringify(titleRecordEntry)}`);
+}
 const titleText = parseInput("title").actions.filter(({ op }) => op === "text")
   .map(({ text }) => text).join("").replace(/[\t$]/gu, "").trim();
-if (titleText !== "營地遭到偷襲") throw new Error(`stage 8 title changed: ${titleText}`);
+if (titleText !== "營地遭到偷襲 ２") throw new Error(`stage 8 title changed: ${titleText}`);
 
 const stageHandler = requireEntry(
   eventsDocument.module29BattleRuntime.handlerBehaviorCatalog.handlers,

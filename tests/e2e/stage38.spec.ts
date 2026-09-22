@@ -4,6 +4,7 @@ import { CREDITS_NAME_FRAMES, CREDITS_ROLE_FRAMES } from "../../src/game/content
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { nativeTextInkColumns, ROUND_LINE_BOX, STAGE_LABEL_BOX } from "./native-text-ink";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -42,7 +43,7 @@ async function clickCell(page: Page, x: number, y: number): Promise<void> {
 test("S38-A/B: hidden stage deployment preserves two fixed actors and 18 open cells", async ({ page }) => {
   await page.goto("/?debugScenario=stage-38-deployment&difficulty=0&test=1");
   await waitForPhase(page, "deployment");
-  await expect(page.getByRole("heading", { name: "異世界 · 出擊準備" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "瑪姬的墓園 · 出擊準備" })).toBeVisible();
   await expect(page.getByTestId("deployment-summary")).toContainText("已出場 2／20");
   await expect(page.locator(".deployment-open-cell")).toHaveCount(18);
   await expect(page.getByTestId("deployment-guidance")).toContainText("妮雅與希蜜固定出場");
@@ -61,6 +62,11 @@ test("S38-A/B: hidden stage deployment preserves two fixed actors and 18 open ce
 test("S38-C/D: the battle uses 20 allies, 44 enemies, and the all-enemy objective", async ({ page }) => {
   await page.goto("/?debugScenario=stage-38-player&difficulty=0&test=1");
   await waitForPhase(page, "player");
+  // REMAKE-158: `DS:30BA` lists stage 38 twice and `0000:4F41` stops at the first
+  // entry, SAY/0161. Its six recorded spaces put 瑪 at x=120+6×8.
+  await expect(page.locator(".bottom-location")).toHaveText("瑪姬的墓園");
+  await expect.poll(() => nativeTextInkColumns(page, ROUND_LINE_BOX)).not.toEqual({});
+  expect(await nativeTextInkColumns(page, STAGE_LABEL_BOX)).toEqual({ first: 168, last: 248 });
   const battle = await state(page);
   expect(battle.units.filter(({ side }) => side === 1)).toHaveLength(20);
   expect(battle.units.filter(({ side }) => side === 2)).toHaveLength(44);
@@ -176,7 +182,7 @@ test("S38-E: Nia defeat retries the hidden-stage deployment", async ({ page }) =
   await page.getByTestId("retry-button").click();
   if ((await state(page)).phase === "defeat") await page.getByTestId("retry-button").click();
   await waitForPhase(page, "deployment");
-  await expect(page.getByRole("heading", { name: "異世界 · 出擊準備" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "瑪姬的墓園 · 出擊準備" })).toBeVisible();
 });
 
 test("S38-F/G: victory saves stage 39, shows seven credit pages, then loops on The End", async ({ page }) => {

@@ -170,7 +170,7 @@ const DEBUG_CAMPAIGN_MEMBER_SPECS = [
   { slot: 12, name: "亞莉沙", joinStageId: "stage-06", campaignEntryClassId: "soldier" },
   { slot: 13, name: "克莉絲", joinStageId: "stage-06", campaignEntryClassId: "soldier" },
   { slot: 14, name: "舒菲亞", joinStageId: "stage-06", campaignEntryClassId: "soldier" },
-  // 第 8 關營地遭到偷襲的固定編隊：蘇蘭達被強制為騎兵，兩名游騎兵沿用士兵。
+  // 第 8 關「營地遭到偷襲 ２」的固定編隊：蘇蘭達被強制為騎兵，兩名游騎兵沿用士兵。
   { slot: 8, name: "蘇蘭達", joinStageId: "stage-08", campaignEntryClassId: "cavalry" },
   { slot: 17, name: "阿曼妮", joinStageId: "stage-08", campaignEntryClassId: "soldier" },
   { slot: 18, name: "雷伊拉", joinStageId: "stage-08", campaignEntryClassId: "soldier" },

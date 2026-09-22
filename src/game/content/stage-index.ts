@@ -9,6 +9,11 @@ import type { StageId } from "../types";
  *
  * 序数不等于原版关卡编号：原版第 10、11 关在战役路线上互换，第 25 关被跳过，
  * 异世界之门插曲与第 5 关共用序数 5。
+ *
+ * 标题逐字等于原版底栏关卡名表 `DS:30BA` 按关卡号取到的记录（`NATIVE_STAGE_LABELS`，
+ * `stage-titles.test.ts` 逐关断言），不能按记录号顺推：SAY/0124 从未被引用，第 8 关是
+ * 追加的 SAY/0158，第 38 关取表中先出现的 SAY/0161。异世界之门插曲在原版表中是 0、
+ * 底栏不画字，这里的名称只供复刻自己的表面（图鉴、调试中心与完成档路由）使用。
  */
 export interface StageIndexEntry {
   id: StageId;
@@ -24,9 +29,9 @@ export const STAGE_INDEX = {
   "stage-04": { id: "stage-04", ordinal: 4, label: "通過力場" },
   "stage-05": { id: "stage-05", ordinal: 5, label: "遭遇丁塔琪" },
   "stage-42-portal": { id: "stage-42-portal", ordinal: 5, label: "異世界之門" },
-  "stage-06": { id: "stage-06", ordinal: 6, label: "過異世界之門" },
-  "stage-07": { id: "stage-07", ordinal: 7, label: "來到異世界" },
-  "stage-08": { id: "stage-08", ordinal: 8, label: "營地遭到偷襲" },
+  "stage-06": { id: "stage-06", ordinal: 6, label: "來到異世界" },
+  "stage-07": { id: "stage-07", ordinal: 7, label: "營地遭到偷襲" },
+  "stage-08": { id: "stage-08", ordinal: 8, label: "營地遭到偷襲 ２" },
   "stage-09": { id: "stage-09", ordinal: 9, label: "找尋傳說中的飛船" },
   "stage-11": { id: "stage-11", ordinal: 10, label: "拯救蘇蘭達" },
   "stage-10": { id: "stage-10", ordinal: 11, label: "飛船上遭遇敵人" },
@@ -55,5 +60,5 @@ export const STAGE_INDEX = {
   "stage-35": { id: "stage-35", ordinal: 34, label: "時空異變" },
   "stage-36": { id: "stage-36", ordinal: 35, label: "異世界的碧娜維姬" },
   "stage-37": { id: "stage-37", ordinal: 36, label: "究極女神" },
-  "stage-38": { id: "stage-38", ordinal: 37, label: "異世界" },
+  "stage-38": { id: "stage-38", ordinal: 37, label: "瑪姬的墓園" },
 } as const satisfies Readonly<Record<StageId, StageIndexEntry>>;

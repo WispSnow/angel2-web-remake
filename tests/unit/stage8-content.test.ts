@@ -29,7 +29,7 @@ describe("stage 8 generated content", () => {
     expect(STAGE8_DEFINITION).toMatchObject({
       id: "stage-08",
       nativeStage: 8,
-      name: "營地遭到偷襲",
+      name: "營地遭到偷襲 ２",
       viewport: { initialOrigin: { x: 18, y: 27 } },
       objective: {
         victory: { type: "eliminate-side", side: 2 },

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { nativeTextInkColumns, ROUND_LINE_BOX, STAGE_LABEL_BOX } from "./native-text-ink";
 import { captureVisualAudit } from "./visual-audit";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 
@@ -262,6 +263,11 @@ async function enterPortalLightning(page: Page): Promise<Stage5State> {
 async function advancePortalToLightning(page: Page): Promise<Stage5State> {
   await waitForPhase(page, "scriptedStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "11");
+  // REMAKE-158: scene 42's only `DS:30BA` entry is record 0, so the original bar
+  // stays empty while the round line is drawn; the remake's own 異世界之門 stays off it.
+  await expect(page.locator(".bottom-location")).toHaveText("");
+  await expect.poll(() => nativeTextInkColumns(page, ROUND_LINE_BOX)).not.toEqual({});
+  expect(await nativeTextInkColumns(page, STAGE_LABEL_BOX)).toEqual({});
   const initial = await state(page);
   expect(initial.units.find(({ id }) => id === "1:0")).toMatchObject({ x: 24, y: 24 });
   expect(initial.units).toContainEqual(expect.objectContaining({ id: "1:23", classId: "empress" }));

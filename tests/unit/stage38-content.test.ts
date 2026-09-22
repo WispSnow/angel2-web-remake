@@ -29,7 +29,7 @@ describe("stage 38 generated content", () => {
     expect(STAGE38).toMatchObject({
       id: "stage-38",
       nativeStage: 38,
-      name: "異世界",
+      name: "瑪姬的墓園",
       viewport: { initialOrigin: { x: 24, y: 24 } },
     });
     expect(STAGE38_DEFINITION).toMatchObject({

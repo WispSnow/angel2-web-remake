@@ -1,4 +1,4 @@
-# 第 7 关纸面垂直切片：`stage-07 / 來到異世界`
+# 第 7 关纸面垂直切片：`stage-07 / 營地遭到偷襲`
 
 版本：Draft 0.1
 
@@ -24,7 +24,8 @@
 
 ## 3. 证据入口
 
-- 标题／原文目标：[`0125.json`](../../../reverse/parsed/dialogue/0125.json)、
+- 标题／原文目标：[`0126.json`](../../../reverse/parsed/dialogue/0126.json)（`DS:30BA` 键 7；
+  `REMAKE-158` 前误取 SAY/0125“來到異世界”）、
   [`0089.json`](../../../reverse/parsed/dialogue/0089.json)；
 - 地图／模板：[`battle-templates.json`](../../../reverse/parsed/native/battle-templates.json)
   的 native stage `7` / `B/0015`；
@@ -126,7 +127,7 @@
 - 失败／撤退重试：[SR] 依 `REMAKE-016` 从不可变入关快照回到 SAY 17，再进入全新部署，
   不保留本次生命、成长、阵容、事件或 PRNG 进度；
 - 存档版本：[DD] 实现使用 v21 接纳 stage 7 战中／完成语义并确定迁移 v2–v20；
-- 下一关：[OF] `campaign-route/stage-08`，标题“營地遭到偷襲”。本切片只建立冻结路由。
+- 下一关：[OF] `campaign-route/stage-08`，标题“營地遭到偷襲 ２”（`REMAKE-158` 前误作“營地遭到偷襲”）。本切片只建立冻结路由。
 
 ## 10. UI 状态
 

@@ -134,6 +134,7 @@ import {
   INITIAL_STAGE_RUNTIME,
   isPlayableStageId,
   loadStageRuntime,
+  STAGE_RUNTIME_MANIFEST,
   stageRuntimeSourceForDestination,
   type LoadedStageRuntime,
 } from "./stage-runtime";
@@ -5132,7 +5133,7 @@ export class GameController {
     }
     if (ending.advance() === "stage38-boundary") {
       this.campaignRoute = "stage-38";
-      this.statusMessage = "主線結局完成；可進入隱藏關異世界。";
+      this.statusMessage = `主線結局完成；可進入隱藏關「${STAGE_RUNTIME_MANIFEST["stage-38"].label}」。`;
     }
     this.emit();
   }

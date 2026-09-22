@@ -9,6 +9,7 @@ import {
   STAGE49_EPILOGUE_LAYOUT,
   STAGE49_STORY_PAGES,
 } from "./content/stage49-ending";
+import { STAGE_INDEX } from "./content/stage-index";
 import type { GameController } from "./controller";
 import { drawEpilogueGlyphs, loadEpilogueFont } from "./epilogue-text";
 import { prepareDomImageElements } from "./dom-image-readiness";
@@ -152,7 +153,7 @@ function boundaryMarkup(): string {
     <h2>主線結局完成</h2>
     <p>墓碑上的異世界之門再次開啟。妮雅與夥伴即將迎戰最後的敵人。</p>
     <strong>隱藏關 · STAGE 38</strong>
-    <span class="stage49-boundary-action" data-testid="start-stage38">進入異世界</span>
+    <span class="stage49-boundary-action" data-testid="start-stage38">進入${STAGE_INDEX["stage-38"].label}</span>
   </div>`;
 }
 

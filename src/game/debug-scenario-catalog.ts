@@ -441,7 +441,7 @@ export const DEBUG_SCENARIOS = [
     stageId: "stage-07",
     title: "完成路由",
     phase: "Route to stage 8",
-    description: "視為第 7 關已完成，直接進入「營地遭到偷襲」第 8 關關前劇情。",
+    description: "視為第 7 關已完成，直接進入「營地遭到偷襲 ２」第 8 關關前劇情。",
     fixture: true,
   },
   {

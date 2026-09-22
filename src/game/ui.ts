@@ -62,6 +62,7 @@ import {
 } from "./native-dom-text";
 import {
   createNativeTextLayer,
+  nativeStageLabel,
   type NativeUnitDetailText,
 } from "./native-hud-text";
 import {
@@ -165,7 +166,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             <div id="phaser-root"></div>
             <div class="story-background" id="story-background"></div>
             <section class="unit-hud" id="unit-hud" data-testid="unit-hud" aria-live="polite"></section>
-            <div class="bottom-location">${stage.name}</div>
+            <div class="bottom-location">${nativeStageLabel(stage) ?? ""}</div>
             <div class="bottom-round" id="bottom-round">
               <img src="${stagedRenderAssetSource(ASSETS.sidePanelChrome.round)}" alt="" aria-hidden="true" />
               <span id="bottom-round-text"></span>
@@ -1415,7 +1416,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
         : undefined,
       round: battleChromeVisible ? controller.battle.displayRound : undefined,
       roundLimitWarning: controller.battle.roundLimitWarningActive,
-      stageLabel: battleChromeVisible ? stage.name : undefined,
+      stageLabel: battleChromeVisible ? nativeStageLabel(stage) : undefined,
     });
 
     const page = controller.currentDialogue;

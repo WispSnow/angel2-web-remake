@@ -1,4 +1,4 @@
-# 第 8 关纸面垂直切片：`stage-08 / 營地遭到偷襲`
+# 第 8 关纸面垂直切片：`stage-08 / 營地遭到偷襲 ２`
 
 版本：Draft 0.3
 
@@ -26,7 +26,8 @@
 
 ## 3. 证据入口
 
-- 标题／原文目标：[`0126.json`](../../../reverse/parsed/dialogue/0126.json)、
+- 标题／原文目标：[`0158.json`](../../../reverse/parsed/dialogue/0158.json)（`DS:30BA` 键 8；
+  `REMAKE-158` 前误取 SAY/0126“營地遭到偷襲”）、
   [`0090.json`](../../../reverse/parsed/dialogue/0090.json)；
 - 地图／模板：[`battle-templates.json`](../../../reverse/parsed/native/battle-templates.json)
   的 native stage `8` / `B/0017`；
