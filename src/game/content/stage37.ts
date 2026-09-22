@@ -141,8 +141,7 @@ export const STAGE37_ASSETS = {
   audio: {
     playerEntry: musicAsset("MUSIC", 33),
     playerLoop: musicAsset("MUSIC", 32),
-    enemyEntry: musicAsset("MUSIC", 5),
-    enemyLoop: musicAsset("MUSIC", 4),
+    enemy: musicAsset("UN", 48),
   },
 } as const;
 
@@ -156,14 +155,15 @@ export const STAGE37_MUSIC_PROGRAMS = {
     seamlessLoop: STAGE37_ASSETS.audio.playerLoop,
     crossfadeSeconds: 1024 / 44_100,
   },
+  // Module 29 `1000:36E6` skips the per-stage enemy table for scene 37 and
+  // loops this stage-exclusive record on its own: no odd entry part, and the
+  // next full round goes back to the player table's 33→32 pair.
   "stage-37-enemy-phase-music": {
     id: "stage37-enemy-battle",
-    kind: "intro-loop",
-    entryTrack: `MUSIC/${STAGE37_MUSIC_RECORDS.enemy.entry}`,
-    loopTrack: `MUSIC/${STAGE37_MUSIC_RECORDS.enemy.loop}`,
-    entry: STAGE37_ASSETS.audio.enemyEntry,
-    seamlessLoop: STAGE37_ASSETS.audio.enemyLoop,
-    crossfadeSeconds: 1024 / 44_100,
+    kind: "loop",
+    track: `${STAGE37_MUSIC_RECORDS.enemy.container}/${STAGE37_MUSIC_RECORDS.enemy.record}`,
+    source: STAGE37_ASSETS.audio.enemy,
+    seamlessLoop: STAGE37_ASSETS.audio.enemy,
   },
 } as const satisfies Partial<Record<StageMusicId, MusicProgram>>;
 

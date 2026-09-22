@@ -28,8 +28,7 @@ const inputPaths = {
   minimap: reversePath("renders/battle-maps/minimap/37.png"),
   playerEntryMusic: reversePath("converted/audio/rix-wav/MUSIC/0033.wav"),
   playerLoopMusic: reversePath("converted/audio/rix-wav/MUSIC/0032.wav"),
-  enemyEntryMusic: reversePath("converted/audio/rix-wav/MUSIC/0005.wav"),
-  enemyLoopMusic: reversePath("converted/audio/rix-wav/MUSIC/0004.wav"),
+  enemyMusic: reversePath("converted/audio/rix-wav/UN/0048.wav"),
 };
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
@@ -223,18 +222,31 @@ const enemyReinforcements = {
   ],
 };
 
-const musicEntry = (table) => requireEntry(
-  musicDocument.stageTables[table].entries,
-  ({ stage }) => stage === 37,
-  `${table} stage 37 music`,
+const playerMusic = requireEntry(
+  musicDocument.stageTables.playerPhase.entries,
+  ({ stage, reachable }) => stage === 37 && reachable,
+  "player-phase stage 37 music",
 );
+// 模块 29 `1000:36E6` 在场景 37 整段绕过敌方逐关表 DS:1E46，改以单曲无限循环播放本关
+// 专属的 UN/48；表里仍留着的 stage 37 项（MUSIC/5→4）在发布版读不到。
+const enemyMusic = requireEntry(
+  musicDocument.stageTables.enemyPhase.sceneOverrides,
+  ({ scene }) => scene === 37,
+  "stage 37 enemy-phase scene override",
+);
+if (musicDocument.stageTables.enemyPhase.entries.some(({ stage, reachable }) => stage === 37 && reachable)) {
+  throw new Error("stage 37 enemy-phase table entry is reachable again");
+}
+if (reversePath("converted/audio", enemyMusic.decodedOutput) !== inputPaths.enemyMusic) {
+  throw new Error(`stage 37 enemy music source changed: ${enemyMusic.decodedOutput}`);
+}
 const musicRecords = {
-  player: { entry: musicEntry("playerPhase").entryRecord, loop: musicEntry("playerPhase").loopRecord },
-  enemy: { entry: musicEntry("enemyPhase").entryRecord, loop: musicEntry("enemyPhase").loopRecord },
+  player: { entry: playerMusic.entryRecord, loop: playerMusic.loopRecord },
+  enemy: { container: enemyMusic.container, record: enemyMusic.record, playback: enemyMusic.playback },
 };
 assertEqual(musicRecords, {
   player: { entry: 33, loop: 32 },
-  enemy: { entry: 5, loop: 4 },
+  enemy: { container: "UN", record: 48, playback: "single-loop" },
 }, "stage 37 music");
 const storyPages = {
   "stage-37-opening-story": compileNativeStory(

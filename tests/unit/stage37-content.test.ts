@@ -19,6 +19,7 @@ import {
   STAGE37_STORY_PAGES,
   STAGE37_TERRAIN_TOKENS,
 } from "../../src/game/content/stage37";
+import { STAGE37_MUSIC_RECORDS } from "../../src/game/content/stage37-runtime.generated";
 
 const workspace = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const sha256 = (value: Uint8Array): string => createHash("sha256").update(value).digest("hex");
@@ -111,10 +112,28 @@ describe("stage 37 generated content", () => {
       .toEqual({ type: "campaign-route", destination: "stage-49" });
     expect(STAGE37_MUSIC_PROGRAMS["stage-37-player-phase-music"])
       .toMatchObject({ entryTrack: "MUSIC/33", loopTrack: "MUSIC/32" });
-    expect(STAGE37_MUSIC_PROGRAMS["stage-37-enemy-phase-music"])
-      .toMatchObject({ entryTrack: "MUSIC/5", loopTrack: "MUSIC/4" });
     expect(musicProgramFor("stage-37-player-phase-music"))
       .toBe(STAGE37_MUSIC_PROGRAMS["stage-37-player-phase-music"]);
+  });
+
+  // Module 29 `1000:36E6` compares the scene with 37 before touching the
+  // DS:1E46 enemy table; this stage alone skips the table and loops UN/48 with
+  // RIX command 1 / mode 1, so the table's MUSIC/5→4 entry never plays here.
+  it("loops the stage-exclusive UN/48 in the enemy phase instead of the table pair", () => {
+    activateStage37Content();
+    expect(STAGE37_MUSIC_RECORDS.enemy)
+      .toEqual({ container: "UN", record: 48, playback: "single-loop" });
+    expect(musicProgramFor("stage-37-enemy-phase-music")).toEqual({
+      id: "stage37-enemy-battle",
+      kind: "loop",
+      track: "UN/48",
+      source: "/assets/original/music/UN/0048.ogg",
+      seamlessLoop: "/assets/original/music/UN/0048.ogg",
+    });
+    expect(STAGE37_SOURCES.map(({ path: source }) => source))
+      .toContain("reverse/converted/audio/rix-wav/UN/0048.wav");
+    expect(STAGE37_SOURCES.map(({ path: source }) => source).filter((source) =>
+      /rix-wav\/MUSIC\/000[45]\.wav$/u.test(source))).toEqual([]);
   });
 
   it.skipIf(!EVIDENCE_AVAILABLE)("keeps evidence and shipping assets byte-identical", async () => {

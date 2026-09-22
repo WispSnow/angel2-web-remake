@@ -12,10 +12,12 @@ import {
   debugRosterStageId,
 } from "../../src/game/debug-scenario-catalog";
 import { STAGE_INDEX } from "../../src/game/content/stage-index";
+import { musicProgramFor } from "../../src/game/content/music";
 import {
   parseResourceManifest,
   type ResourceManifest,
 } from "../../src/game/resource-loader";
+import { loadStageRuntime, STAGE_RUNTIME_MANIFEST } from "../../src/game/stage-runtime";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const manifestPath = path.join(root, "public/assets/original/resource-manifest.v1.json");
@@ -93,6 +95,28 @@ describe("versioned resource manifest", () => {
     expect(urls.some((url) => /\/map-actions\/(?:shoot|fire-1|heal-1)\//u.test(url))).toBe(false);
   });
 
+  // Battle programs are not uniformly entry+loop pairs: scene 37's enemy phase
+  // loops UN/48 on its own (module 29 `1000:36E6`). Derive the expected tracks
+  // from each stage's registered programs instead of counting files.
+  test("gates every story and battle track a stage can select in its own pack", async () => {
+    const manifest = await readManifest();
+    for (const { id: stageId } of Object.values(STAGE_RUNTIME_MANIFEST)) {
+      const { music } = (await loadStageRuntime(stageId)).definition;
+      const stageUrls = resolvedPackUrls(manifest, `stage:${stageId}`);
+      for (const musicId of [music.story, music.playerPhase, music.enemyPhase]) {
+        if (!musicId) continue;
+        const program = musicProgramFor(musicId);
+        if (!program) throw new Error(`${stageId} does not register ${musicId}`);
+        const urls = program.kind === "loop"
+          ? [program.source, program.seamlessLoop]
+          : [program.entry, program.seamlessLoop];
+        for (const url of urls) expect(stageUrls, `${stageId} ${musicId}`).toContain(url);
+      }
+    }
+    expect(resolvedPackUrls(manifest, "stage:stage-37"))
+      .toContain("/assets/original/music/UN/0048.ogg");
+  });
+
   test("keeps boot, current-stage, following-stage, and streaming packages separate", async () => {
     const manifest = await readManifest();
     const stageIds = Object.keys(STAGE_INDEX);
@@ -147,7 +171,6 @@ describe("versioned resource manifest", () => {
       expect(stageUrls).toContain(
         `/assets/original/music/MUSIC/${deploymentTrack}.ogg`,
       );
-      expect([...stageUrls].filter((url) => url.includes("/music/")).length).toBeGreaterThanOrEqual(5);
       for (const sound of soundEffects) expect(stageUrls).toContain(sound);
     }
 

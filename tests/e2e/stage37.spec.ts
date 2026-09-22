@@ -125,9 +125,29 @@ test("S37-F: boss HUD conceals all numeric fields while preserving the gauges", 
   });
 });
 
+type MusicTrackLog = Window & { __stage37MusicTracks?: string[] };
+
+// Records every change of the published music track, so a phase that goes by
+// quickly under fast presentation still leaves its track behind.
+const recordMusicTracks = (page: Page) => page.evaluate(() => {
+  const app = document.querySelector("#app");
+  if (!app) throw new Error("missing #app");
+  const tracks: string[] = [];
+  (window as MusicTrackLog).__stage37MusicTracks = tracks;
+  new MutationObserver(() => {
+    const track = app.getAttribute("data-music-track");
+    if (track && tracks.at(-1) !== track) tracks.push(track);
+  }).observe(app, { attributes: true, attributeFilter: ["data-music-track"] });
+});
+
+const recordedMusicTracks = (page: Page) => page.evaluate(
+  () => (window as MusicTrackLog).__stage37MusicTracks ?? [],
+);
+
 test("S37-G: the ice round lets both immobile hands act before the head", async ({ page }) => {
   await page.goto("/?debugScenario=stage-37-player&difficulty=0&test=1");
   await waitForPhase(page, "player");
+  await recordMusicTracks(page);
   const bossPositions = (await state(page)).units.filter(({ side }) => side === 2)
     .map(({ id, x, y }) => ({ id, x, y }));
   await page.evaluate(() => window.__ANGEL2__?.setPresentationFast(true));
@@ -155,6 +175,16 @@ test("S37-G: the ice round lets both immobile hands act before the head", async 
     .toMatchObject({ actionId: "ice-3", actorId: "2:56" });
   expect((await state(page)).units.filter(({ side }) => side === 2)
     .map(({ id, x, y }) => ({ id, x, y }))).toEqual(bossPositions);
+
+  // Module 29 `1000:36E6` skips the DS:1E46 table for scene 37: every enemy
+  // phase loops the stage-exclusive UN/48, and each new round restarts the
+  // player table's 33→32 pair. MUSIC/32 only shows up once the 33 entry has
+  // finished playing, so it is left out of the phase-boundary sequence.
+  const tracks = (await recordedMusicTracks(page)).filter((track) => track !== "MUSIC/32");
+  expect(tracks).not.toContain("MUSIC/5");
+  expect(tracks).not.toContain("MUSIC/4");
+  expect(tracks.slice(tracks.indexOf("UN/48")))
+    .toEqual(["UN/48", "MUSIC/33", "UN/48", "MUSIC/33"]);
 });
 
 test("S37-H: Nia defeat retries deployment", async ({ page }) => {
