@@ -6,9 +6,14 @@ import {
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
 } from "../../src/game/save";
+import {
+  DIAGONAL_EDGE_SCROLL_CURSOR_ART,
+  type DiagonalEdgeScrollCursor,
+} from "../../src/game/edge-scroll-cursors";
 import { attackOnlyAdjacentEnemy, chooseUnitCommand, enterAttackTargeting } from "./command-controls";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
+import { decodeScreenshot } from "./screenshot-pixels";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -2500,6 +2505,30 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
     expect(presentation.rendered).toContain("blob:");
     expect(presentation.source).toContain(asset);
   };
+  // The corners pan along both axes, so they show the remake's diagonal arrows:
+  // no A/0001 frame, and an image drawn from the pixel table with its hotspot
+  // on the tip.
+  const expectDiagonalPointer = async (
+    position: { x: number; y: number },
+    cursor: DiagonalEdgeScrollCursor,
+  ) => {
+    await canvas.hover({ position });
+    await expect(canvas).toHaveAttribute("data-native-pointer-cursor", cursor);
+    await expect(canvas).not.toHaveAttribute("data-native-pointer-frame");
+    const rendered = await canvas.evaluate((element) => getComputedStyle(element).cursor);
+    const art = DIAGONAL_EDGE_SCROLL_CURSOR_ART[cursor];
+    const parsed = /^url\("data:image\/png;base64,([^"]+)"\) (\d+) (\d+), ([a-z-]+)$/u.exec(rendered);
+    expect(parsed?.slice(2)).toEqual([String(art.hotspot.x), String(art.hotspot.y), art.fallback]);
+    const image = decodeScreenshot(Buffer.from(parsed?.[1] ?? "", "base64"));
+    expect([image.width, image.height]).toEqual([art.rows[0].length, art.rows.length]);
+    const drawn = art.rows.map((row, y) => [...row].map((_, x) => {
+      const offset = (y * image.width + x) * image.channels;
+      const [red, green, blue, alpha] = image.pixels.subarray(offset, offset + 4);
+      if (alpha === 0) return ".";
+      return red === 255 && green === 255 && blue === 255 && alpha === 255 ? "#" : "?";
+    }).join(""));
+    expect(drawn).toEqual(art.rows);
+  };
   await expectNativePointer({ x: 420, y: 45 }, "hand", 0, "command-menu-pointer.png");
 
   const grid = page.getByTestId("grid-hotspot");
@@ -2531,7 +2560,10 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expect(edgeScrollArt).toHaveAttribute("data-native-frame", "26");
   const cameraBeforeDisabledEdge = (await debugState(page)).cameraOrigin;
   await expectNativePointer({ x: 220, y: 5 }, "up", 1, "native-cursor-up.png");
-  await expectNativePointer({ x: 5, y: 5 }, "up", 1, "native-cursor-up.png");
+  await expectDiagonalPointer({ x: 5, y: 5 }, "up-left");
+  await expectDiagonalPointer({ x: 450, y: 5 }, "up-right");
+  await expectDiagonalPointer({ x: 5, y: 340 }, "down-left");
+  await expectDiagonalPointer({ x: 450, y: 340 }, "down-right");
   await expectNativePointer({ x: 220, y: 340 }, "down", 2, "native-cursor-down.png");
   await expectNativePointer({ x: 5, y: 177 }, "left", 3, "native-cursor-left.png");
   await expect(canvas).toHaveAttribute("data-edge-pan-direction", "0,0");

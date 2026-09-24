@@ -148,6 +148,9 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   const tooltipNote = page.getByTestId("remake-note-status-icon-tooltip");
   await expect(tooltipNote).toBeVisible();
   await expect(tooltipNote.locator(".rn-note-id")).toHaveCount(0);
+  const diagonalEdgeNote = page.getByTestId("remake-note-edge-scroll-diagonal");
+  await expect(diagonalEdgeNote).toContainText("↖、↗、↙、↘ 斜向箭頭");
+  await expect(diagonalEdgeNote.locator(".rn-note-id")).toHaveCount(0);
   await expect(page.getByTestId("remake-note-REMAKE-015").locator(".rn-note-id"))
     .toHaveText("REMAKE-015");
   await expect(page.getByTestId("remake-note-REMAKE-004")).toHaveCount(0);

@@ -31,6 +31,12 @@ import {
   preloadBattleSpriteAtlases,
 } from "./battle-sprite-atlas";
 import { stagedRenderAssetSource } from "../staged-render-asset-cache";
+import {
+  NATIVE_POINTER_FRAMES,
+  applyDiagonalEdgeScrollCursors,
+  battlePointerCursorFor,
+  type BattlePointerCursor,
+} from "../edge-scroll-cursors";
 
 const TILE_WIDTH = 40;
 const TILE_HEIGHT = 44;
@@ -117,16 +123,6 @@ const enemyPhaseTailTextureKey = (
   resource: "phase1" | "phase2",
   frame: number,
 ): string => `enemy-phase-tail-${presentationId}-${resource}-${frame}`;
-
-type NativePointerCursor = "hand" | "up" | "down" | "left" | "right";
-
-const NATIVE_POINTER_FRAME: Readonly<Record<NativePointerCursor, number>> = {
-  hand: 0,
-  up: 1,
-  down: 2,
-  left: 3,
-  right: 4,
-};
 
 interface DeathDescriptor {
   xOffset: number;
@@ -407,7 +403,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         this.setPrimaryPointerHeld(true);
         const edgeDirection = this.edgeDirectionFor(pointer);
         if (edgeDirection) {
-          this.setNativePointerCursor(this.nativeCursorFor(edgeDirection));
+          this.setNativePointerCursor(battlePointerCursorFor(edgeDirection));
           this.startEdgePan(edgeDirection);
           return;
         }
@@ -463,6 +459,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         originBounds.max.x,
         originBounds.max.y,
       ].join(",");
+      applyDiagonalEdgeScrollCursors(canvas);
       this.setNativePointerCursor("hand");
       // Phaser still reports the scene as inactive during part of create(), so
       // the eager sync above can be ignored by the stale-scene guard. Static
@@ -483,7 +480,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
 
     private handlePointerMove(pointer: Phaser.Input.Pointer): void {
       const edgeDirection = this.edgeDirectionFor(pointer);
-      this.setNativePointerCursor(edgeDirection ? this.nativeCursorFor(edgeDirection) : "hand");
+      this.setNativePointerCursor(battlePointerCursorFor(edgeDirection));
       const edgePan = controller.edgeScrollEnabled || this.primaryPointerHeld ? edgeDirection : undefined;
       if (edgePan) {
         this.startEdgePan(edgePan);
@@ -502,6 +499,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       controller.focusCell({ x: Math.floor(world.x / TILE_WIDTH), y: Math.floor(world.y / TILE_HEIGHT) });
     }
 
+    // Corners report both axes. The release's single direction slot let the
+    // vertical edge win and scrolled corners vertically only; the remake pans
+    // diagonally there and shows a matching diagonal arrow (see
+    // `edge-scroll-cursors.ts`).
     private edgeDirectionFor(pointer: Phaser.Input.Pointer): { x: number; y: number } | undefined {
       if (
         pointer.x < 0
@@ -514,18 +515,13 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       return x === 0 && y === 0 ? undefined : { x, y };
     }
 
-    private nativeCursorFor(edgeDirection: { x: number; y: number }): NativePointerCursor {
-      // The release evaluates horizontal edges first and vertical edges second.
-      // Its 1/2/3/4 direction slot therefore resolves corners to up/down.
-      if (edgeDirection.y < 0) return "up";
-      if (edgeDirection.y > 0) return "down";
-      return edgeDirection.x < 0 ? "left" : "right";
-    }
-
-    private setNativePointerCursor(cursor: NativePointerCursor): void {
+    private setNativePointerCursor(cursor: BattlePointerCursor): void {
       const canvas = this.game.canvas;
       canvas.dataset.nativePointerCursor = cursor;
-      canvas.dataset.nativePointerFrame = String(NATIVE_POINTER_FRAME[cursor]);
+      // The diagonal arrows are remake art and have no `A/0001` frame to report.
+      const frame = NATIVE_POINTER_FRAMES[cursor];
+      if (frame === undefined) delete canvas.dataset.nativePointerFrame;
+      else canvas.dataset.nativePointerFrame = String(frame);
     }
 
     private setPrimaryPointerHeld(held: boolean): void {

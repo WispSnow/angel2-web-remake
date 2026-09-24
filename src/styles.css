@@ -513,6 +513,21 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 #phaser-root canvas[data-native-pointer-cursor="right"] {
   cursor: var(--native-cursor-right-image, url("/assets/original/native-cursor-right.png")) 23 9, e-resize;
 }
+/* 四角是复刻的斜向滚屏：原版方向槽只有上下左右，四角由纵向箭头优先。斜向箭头是复刻
+   按原版箭头比例自绘的，图片与热点由 `edge-scroll-cursors.ts` 写进画布的
+   `--edge-scroll-cursor-*`；变量缺失时退回原版四角的纵向箭头。 */
+#phaser-root canvas[data-native-pointer-cursor="up-left"] {
+  cursor: var(--edge-scroll-cursor-up-left, var(--native-cursor-up-image, url("/assets/original/native-cursor-up.png")) 12 0, n-resize);
+}
+#phaser-root canvas[data-native-pointer-cursor="up-right"] {
+  cursor: var(--edge-scroll-cursor-up-right, var(--native-cursor-up-image, url("/assets/original/native-cursor-up.png")) 12 0, n-resize);
+}
+#phaser-root canvas[data-native-pointer-cursor="down-left"] {
+  cursor: var(--edge-scroll-cursor-down-left, var(--native-cursor-down-image, url("/assets/original/native-cursor-down.png")) 12 18, s-resize);
+}
+#phaser-root canvas[data-native-pointer-cursor="down-right"] {
+  cursor: var(--edge-scroll-cursor-down-right, var(--native-cursor-down-image, url("/assets/original/native-cursor-down.png")) 12 18, s-resize);
+}
 /* `BK/<id>` 的落點是原生寫死的 `(160,80)`（模組 25 `0000:098C`、模組 29 同值），不是把
    `320×200` 在 `640×350` 裡置中——置中會落在 `(160,75)`，上下留白剛好差 5 px。 */
 .story-background {

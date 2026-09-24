@@ -676,6 +676,7 @@ test("S01-J: every stage-1 camera entry stays inside the drawn map", async ({ pa
   // Edge scrolling shares the same clamp and cannot advance beyond the corner.
   await battleCanvas.hover({ position: { x: 475, y: 340 } });
   await expect(battleCanvas).toHaveAttribute("data-edge-pan-direction", "1,1");
+  await expect(battleCanvas).toHaveAttribute("data-native-pointer-cursor", "down-right");
   await page.waitForTimeout(350);
   expect((await state(page)).cameraOrigin).toEqual({ x: 26, y: 31 });
   await captureVisualAudit(page.getByTestId("game-screen"), {
