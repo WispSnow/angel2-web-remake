@@ -5,6 +5,7 @@ import {
   CLASS_IDS,
   classCombatRole,
   classDefinition,
+  classEntryLevelFor,
   classIdFromNativeRecord,
   classStatsFor,
   classTargetPriorityProfile,
@@ -263,6 +264,17 @@ describe("native class implementation sequence", () => {
     expect(classStatsFor({ classId: "cavalry", experience: 360 }).level).toBe(3);
     expect(classStatsFor({ classId: "cavalry", experience: 540 }).level).toBe(4);
     expect(classStatsFor({ classId: "jungle-warrior", experience: 1140 }).level).toBe(3);
+  });
+
+  it("exposes the native cumulative marker as the entry level every promotion lands on", () => {
+    for (const classId of CLASS_IDS) {
+      for (const target of classDefinition(classId).promotion.targets) {
+        expect(classEntryLevelFor(target.id), `${classId} → ${target.id}`)
+          .toBe(target.targetStartLevel);
+      }
+    }
+    expect((["soldier", "cavalry", "land-knight", "crossbow", "magic-master"] as const)
+      .map((classId) => classEntryLevelFor(classId))).toEqual([1, 4, 7, 8, 10]);
   });
 
   it("catalogs every confirmed terminal knight and warrior trait without inventing missing branches", () => {

@@ -1,3 +1,4 @@
+import { classEntryLevelFor, classStatsFor, type ClassId } from "../../content/classes";
 import type { InteractiveDeploymentDefinition } from "../../content/stages";
 import type { Position } from "../../types";
 
@@ -19,6 +20,7 @@ export type DeploymentFocus =
   | { kind: "roster"; index: number }
   | { kind: "page"; page: 0 | 1 | 2 }
   | { kind: "finish" }
+  | { kind: "auto-fill" }
   | { kind: "map" };
 
 export interface DeploymentState {
@@ -37,8 +39,10 @@ export type DeploymentAction =
   | { type: "move-focus"; direction: "up" | "down" | "left" | "right" }
   | { type: "focus-roster"; index: number }
   | { type: "focus-finish" }
+  | { type: "focus-auto-fill" }
   | { type: "focus-map" }
   | { type: "toggle-roster-slot"; slot?: number }
+  | { type: "auto-fill"; ranking: readonly number[] }
   | { type: "select-page"; page: 0 | 1 | 2 }
   | { type: "cycle-open-cell"; direction: "previous" | "next" }
   | { type: "select-open-cell"; position: Position }
@@ -197,10 +201,17 @@ function moveFocus(state: DeploymentState, direction: "up" | "down" | "left" | "
     const page = ((focus.page + delta) % 3) as 0 | 1 | 2;
     return { ...state, rosterPage: page, focus: { kind: "page", page } };
   }
-  if (focus.kind === "finish") {
-    return direction === "left"
-      ? { ...state, focus: { kind: "page", page: state.rosterPage } }
-      : state;
+  if (focus.kind === "finish" || focus.kind === "auto-fill") {
+    if (direction === "left") return { ...state, focus: { kind: "page", page: state.rosterPage } };
+    // The remake's 自動配置 sits under the native 結束, turning module 27's one-control
+    // column into a two-control column that wraps like the roster and page columns.
+    if (direction === "up" || direction === "down") {
+      return {
+        ...state,
+        focus: focus.kind === "finish" ? { kind: "auto-fill" } : { kind: "finish" },
+      };
+    }
+    return state;
   }
   return direction === "left" || direction === "right"
     ? { ...state, focus: { kind: "roster", index: state.lastRosterIndex } }
@@ -265,6 +276,61 @@ function toggleRosterSlot(state: DeploymentState, slot?: number): DeploymentStat
   };
 }
 
+const hasOpenCapacity = (state: DeploymentState): boolean =>
+  state.placements.length < state.definition.maximumUnits
+  && remainingOpenCells(state).length > 0;
+
+/**
+ * 自動配置 is a macro over the native add rule, not a second placement rule: it
+ * replays `toggle-roster-slot` for undeployed optional roster slots in `ranking`
+ * order until the cap or the open cells run out, so its result is always one the
+ * player could have clicked by hand. Deployed units, fixed or chosen, are never
+ * candidates and keep their cells; a full screen answers with the native
+ * capacity text, exactly like adding one more unit by hand.
+ */
+function autoFill(state: DeploymentState, ranking: readonly number[]): DeploymentState {
+  if (!hasOpenCapacity(state)) return { ...state, feedback: "full" };
+  const roster = new Set(state.rosterSlots);
+  const optional = new Set(state.definition.optionalSlots);
+  let next = state;
+  for (const slot of new Set(ranking)) {
+    if (!hasOpenCapacity(next)) break;
+    if (!roster.has(slot) || !optional.has(slot)
+      || next.placements.some((placement) => placement.slot === slot)) continue;
+    const placed = toggleRosterSlot(next, slot);
+    if (placed.feedback) break;
+    next = placed;
+  }
+  return next;
+}
+
+export interface AutoFillCandidate {
+  slot: number;
+  classId: ClassId;
+  experience: number;
+}
+
+/**
+ * The 自動配置 order, highest first: career entry level (so a freshly promoted
+ * career outranks a veteran of the career it came from), then the HUD profession
+ * level, then experience; equal units keep their roster order.
+ */
+export function rankAutoFillSlots(roster: readonly AutoFillCandidate[]): number[] {
+  return roster
+    .map((unit, order) => ({
+      slot: unit.slot,
+      order,
+      entryLevel: classEntryLevelFor(unit.classId),
+      level: classStatsFor(unit).level,
+      experience: unit.experience,
+    }))
+    .sort((left, right) => right.entryLevel - left.entryLevel
+      || right.level - left.level
+      || right.experience - left.experience
+      || left.order - right.order)
+    .map(({ slot }) => slot);
+}
+
 export function reduceDeployment(
   state: DeploymentState,
   action: DeploymentAction,
@@ -286,8 +352,10 @@ export function reduceDeployment(
     };
   }
   if (action.type === "focus-finish") return { ...state, focus: { kind: "finish" } };
+  if (action.type === "focus-auto-fill") return { ...state, focus: { kind: "auto-fill" } };
   if (action.type === "focus-map") return { ...state, focus: { kind: "map" } };
   if (action.type === "toggle-roster-slot") return toggleRosterSlot(state, action.slot);
+  if (action.type === "auto-fill") return autoFill(state, action.ranking);
   if (action.type === "select-page") {
     return {
       ...state,

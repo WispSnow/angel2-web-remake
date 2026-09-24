@@ -444,6 +444,17 @@ export function classTierFor(
   return (selectedIndex + 1) as 1 | 2 | 3;
 }
 
+/**
+ * DATA field6 on row 0: where this career starts on the native continuous level
+ * scale (soldier 1, first promotions 4, second promotions 7–8, third promotions
+ * 10), which is also every promotion target's `targetStartLevel`. The HUD never
+ * shows it — `classStatsFor().level` restarts at 1 after a promotion — so it is
+ * the only evidence-backed way to order careers across the promotion tree.
+ */
+export function classEntryLevelFor(classId: ClassId): number {
+  return classDefinition(classId).dataRows[0].level;
+}
+
 export function nextExperienceThresholdFor(
   unit: ClassProgressionState,
   mode: EnemyGrowthMode = "legacy",

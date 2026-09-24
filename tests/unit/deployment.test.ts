@@ -4,6 +4,7 @@ import {
   DEPLOYMENT_FEEDBACK_TEXT,
   createDeploymentState,
   finishDeployment,
+  rankAutoFillSlots,
   reduceDeployment,
   validateDeploymentResult,
 } from "../../src/game/simulation/deployment";
@@ -101,6 +102,7 @@ describe("stage 1 deployment simulation", () => {
     expect(reduceDeployment(fixed, { type: "move-focus", direction: "right" })).toBe(fixed);
     expect(reduceDeployment(fixed, { type: "cycle-open-cell", direction: "next" })).toBe(fixed);
     expect(reduceDeployment(fixed, { type: "finish" })).toBe(fixed);
+    expect(reduceDeployment(fixed, { type: "auto-fill", ranking: [1, 2, 4, 24] })).toBe(fixed);
     const dismissed = reduceDeployment(fixed, { type: "dismiss-feedback" });
     expect(dismissed.feedback).toBeUndefined();
     expect(dismissed.placements).toEqual(initial.placements);
@@ -136,6 +138,24 @@ describe("stage 1 deployment simulation", () => {
     });
   });
 
+  it("puts 自動配置 under 結束 in a wrapping two-control column", () => {
+    let state = reduceDeployment(createDeploymentState(definition, roster), { type: "select-page", page: 1 });
+    state = reduceDeployment(state, { type: "focus-finish" });
+    expect(reduceDeployment(state, { type: "move-focus", direction: "up" }).focus)
+      .toEqual({ kind: "auto-fill" });
+    state = reduceDeployment(state, { type: "move-focus", direction: "down" });
+    expect(state.focus).toEqual({ kind: "auto-fill" });
+    expect(reduceDeployment(state, { type: "move-focus", direction: "right" })).toBe(state);
+    expect(reduceDeployment(state, { type: "move-focus", direction: "down" }).focus)
+      .toEqual({ kind: "finish" });
+    expect(reduceDeployment(state, { type: "move-focus", direction: "up" }).focus)
+      .toEqual({ kind: "finish" });
+    expect(reduceDeployment(state, { type: "move-focus", direction: "left" }).focus)
+      .toEqual({ kind: "page", page: 1 });
+    expect(reduceDeployment(createDeploymentState(definition, roster), { type: "focus-auto-fill" }).focus)
+      .toEqual({ kind: "auto-fill" });
+  });
+
   it("does not consume PRNG and validates normalized deployment results", () => {
     const rng = new DeterministicRng(0x1234);
     const before = rng.state;
@@ -153,5 +173,65 @@ describe("stage 1 deployment simulation", () => {
     expect(() => validateDeploymentResult(definition, {
       placements: result.placements.filter(({ slot }) => slot !== 0),
     })).toThrow("fixed slot 0 is missing or moved");
+  });
+});
+
+describe("deployment auto-fill (自動配置)", () => {
+  it("ranks career entry level, then profession level, then experience, then roster order", () => {
+    expect(rankAutoFillSlots([
+      { slot: 1, classId: "soldier", experience: 299 },
+      { slot: 2, classId: "magician", experience: 0 },
+      { slot: 3, classId: "crossbow", experience: 900 },
+      { slot: 4, classId: "magic-master", experience: 0 },
+      { slot: 5, classId: "magic-master", experience: 599 },
+      { slot: 6, classId: "evil-mage", experience: 600 },
+      { slot: 7, classId: "soldier", experience: 299 },
+    ])).toEqual([6, 5, 4, 3, 2, 1, 7]);
+    // Experience scales differ between careers, so the profession level decides first:
+    // a level-3 water warrior outranks a level-2 crossbow holding more raw experience.
+    expect(rankAutoFillSlots([
+      { slot: 12, classId: "crossbow", experience: 899 },
+      { slot: 10, classId: "water-warrior", experience: 720 },
+    ])).toEqual([10, 12]);
+  });
+
+  it("fills from the current cell in ranking order and skips slots it may not place", () => {
+    let state = createDeploymentState(definition, roster);
+    state = reduceDeployment(state, { type: "select-open-cell", position: { x: 25, y: 33 } });
+    state = reduceDeployment(state, { type: "auto-fill", ranking: [0, 99, 24, 24, 1, 2, 4] });
+    expect(state.feedback).toBeUndefined();
+    expect(state.placements.filter(({ fixed }) => !fixed)).toEqual([
+      { slot: 24, position: { x: 25, y: 33 }, fixed: false },
+      { slot: 1, position: { x: 21, y: 33 }, fixed: false },
+      { slot: 2, position: { x: 23, y: 33 }, fixed: false },
+    ]);
+    expect(state.currentOpenCell).toBeUndefined();
+    expect(() => finishDeployment(state)).not.toThrow();
+  });
+
+  it("keeps a manual pick in its cell even when it ranks last", () => {
+    let state = createDeploymentState(definition, roster);
+    state = reduceDeployment(state, { type: "toggle-roster-slot", slot: 4 });
+    const manual = state.placements.find(({ slot }) => slot === 4);
+    state = reduceDeployment(state, { type: "auto-fill", ranking: [24, 1, 2, 4] });
+    expect(state.placements.find(({ slot }) => slot === 4)).toEqual(manual);
+    expect(state.placements.filter(({ fixed }) => !fixed)
+      .map(({ slot, position }) => `${slot}@${position.x},${position.y}`))
+      .toEqual(["4@21,33", "24@23,33", "1@25,33"]);
+  });
+
+  it("answers a full screen with the native capacity text and changes nothing", () => {
+    let state = createDeploymentState(definition, roster);
+    state = reduceDeployment(state, { type: "auto-fill", ranking: [24, 1, 2, 4] });
+    expect(state.placements).toHaveLength(definition.maximumUnits);
+    const full = reduceDeployment(state, { type: "auto-fill", ranking: [24, 1, 2, 4] });
+    expect(full.feedback).toBe("full");
+    expect(full.placements).toBe(state.placements);
+    expect(DEPLOYMENT_FEEDBACK_TEXT[full.feedback ?? "empty-slot"]).toBe("出場人數已滿.");
+  });
+
+  it("ignores a ranking that names no undeployed optional roster slot", () => {
+    const state = createDeploymentState(definition, roster);
+    expect(reduceDeployment(state, { type: "auto-fill", ranking: [0, 42, 99] })).toBe(state);
   });
 });

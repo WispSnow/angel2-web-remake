@@ -36,7 +36,7 @@ Phaser 负责：
 
 DOM 负责：
 
-- 三列五行名单、页签、`結束`；
+- 三列五行名单、页签、`結束` 与复刻增补的「自動配置」；
 - 人物名、职业、等级、生命、固定/可选/已出场状态；
 - `已出場 5–8／8`、剩余空位和当前落点说明；
 - 底部三条原文错误及屏幕阅读器反馈。
@@ -55,6 +55,7 @@ stateDiagram-v2
   RosterFocus --> MapFocus: 焦点进入可见部署格
   MapFocus --> MapFocus: primary/secondary 循环前后空位
   MapFocus --> RosterFocus: 焦点回名单
+  RosterFocus --> RosterFocus: 自動配置按排序补满剩余名额
   RosterFocus --> Feedback: 空名单/满员/固定单位主操作
   Feedback --> RosterFocus: 新的 primary 仅关闭错误
   RosterFocus --> Submitted: finish；5–8 人均合法
@@ -70,6 +71,7 @@ stateDiagram-v2
 - 三个名单列各自上下循环五行；左右移动进入相邻名单列。
 - 第三名单列向右进入页签列；页签列上下循环三项。
 - 页签列向右进入 `結束`；`結束` 向左回到当前页签。
+- `結束` 下方是复刻增补的「自動配置」：两者组成上下循环的两项列，「自動配置」向左同样回到当前页签。
 - 地图 open cell 是同一语义焦点图中的 contextual 节点：鼠标点击直接进入；键盘/手柄
   从名单下方或明确的地图导航动作进入，离开时恢复先前名单焦点。
 - 输入设备切换只改变焦点来源，不能提交部署动作。

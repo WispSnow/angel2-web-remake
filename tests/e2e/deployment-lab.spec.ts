@@ -388,6 +388,71 @@ test("pointer pages, native feedback gate and capacity rules remain unchanged", 
   expect(await rootRelativeBox(page, ".deployment-error-frame")).toEqual({ left: 2, top: 328, width: 636, height: 20 });
 });
 
+test("自動配置 ranks the remaining candidates and keeps the player's own picks", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/deployment-lab.html");
+  const autoFill = page.getByTestId("deployment-auto-fill");
+  const placements = page.getByTestId("deployment-canvas");
+
+  // The remake's control takes the free native slot under 結束 on the page-Ⅱ row and
+  // keeps a modern DOM label instead of painting on the native bitmap-font canvas.
+  expect(await rootRelativeBox(page, '[data-testid="deployment-auto-fill"]'))
+    .toEqual({ left: 540, top: 65, width: 80, height: 24 });
+  await expect(autoFill).toHaveText("自動配置");
+  await expect(autoFill).toHaveAccessibleName(/^自動配置：依職業位階、等級與經驗值/u);
+  await expect.poll(() => nativeTextBounds(page, { left: 540, top: 35, width: 80, height: 24 }))
+    .not.toBeNull();
+  expect(await nativeTextBounds(page, { left: 540, top: 65, width: 80, height: 24 })).toBeNull();
+
+  // 拉朵那 ties the other two level-3 soldiers but comes last in roster order; the
+  // player's own pick is outside the pool, so she keeps the first cell anyway.
+  await page.getByTestId("deployment-roster-3").click();
+  await expect(placements).toHaveAttribute("data-deployment-placements", /;4@21,33$/u);
+  await autoFill.click();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 8／8");
+  // 葛蒂拉斯 is a level-1 magician, yet her career enters the native scale at 7, so she
+  // outranks the level-3 soldiers; 希蜜 then wins the last cell on roster order.
+  await expect(placements)
+    .toHaveAttribute("data-deployment-placements", /;4@21,33;24@23,33;1@25,33$/u);
+  await expect(page.getByTestId("deployment-roster-2")).toHaveAttribute("aria-pressed", "false");
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
+    path: "artifacts/playwright/deployment-lab-auto-fill.png",
+  });
+
+  await autoFill.click();
+  await expect(page.getByTestId("deployment-status")).toHaveText("出場人數已滿.");
+  await autoFill.click();
+  await expect(page.getByTestId("deployment-status"))
+    .toHaveText("選擇出場人物；5至8人均可完成。");
+  expect((await deploymentState(page))?.placements).toHaveLength(8);
+  expect(pageErrors).toEqual([]);
+});
+
+test("自動配置 sits under 結束 in the keyboard focus column", async ({ page }) => {
+  await page.goto("/deployment-lab.html");
+  const ui = page.locator("#deployment-ui-root");
+  await ui.focus();
+  for (const key of ["ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight"]) await ui.press(key);
+  expect((await deploymentState(page))?.focus).toEqual({ kind: "finish" });
+  await ui.press("ArrowDown");
+  expect((await deploymentState(page))?.focus).toEqual({ kind: "auto-fill" });
+  expect(await rootRelativeBox(page, ".deployment-native-focus-pointer"))
+    .toEqual({ left: 597, top: 83, width: 24, height: 24 });
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
+    path: "artifacts/playwright/deployment-lab-auto-fill-focus.png",
+  });
+  await ui.press("ArrowUp");
+  expect((await deploymentState(page))?.focus).toEqual({ kind: "finish" });
+  await ui.press("ArrowUp");
+  await ui.press("Space");
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 8／8");
+  await expect(page.getByTestId("deployment-canvas"))
+    .toHaveAttribute("data-deployment-placements", /;24@21,33;1@23,33;2@25,33$/u);
+  await ui.press("ArrowLeft");
+  expect((await deploymentState(page))?.focus).toEqual({ kind: "page", page: 0 });
+});
+
 test("gamepad actions reach the same semantic reducer and contextual map cycle", async ({ page }) => {
   await page.addInitScript(() => {
     const buttons = Array.from({ length: 16 }, () => ({ pressed: false, touched: false, value: 0 }));

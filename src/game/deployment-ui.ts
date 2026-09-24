@@ -37,6 +37,13 @@ const PAGE_X = 440;
 const PAGE_Y = [35, 65, 95] as const;
 const FINISH_X = 540;
 const FINISH_Y = 35;
+// 自動配置 is the remake's own control, not module 27's: it takes the free slot
+// under 結束 on the page-Ⅱ row and keeps a modern label (07 字体分层), so players
+// can tell it apart from the native bitmap-font controls around it.
+const AUTO_FILL_X = FINISH_X;
+const AUTO_FILL_Y = 65;
+const AUTO_FILL_LABEL = "自動配置";
+const AUTO_FILL_DESCRIPTION = "依職業位階、等級與經驗值由高到低補滿剩餘出場名額，已出場的人物保持不變";
 const ROSTER_COPY_LEFT = 56;
 const ROSTER_COPY_WIDTH = 74;
 const ROSTER_COPY_HEIGHT = 24;
@@ -227,6 +234,9 @@ function focusPointerStyle(focus: DeploymentFocus): string | undefined {
   if (focus.kind === "finish") {
     return `left:${FINISH_X + 60 - 3}px;top:${FINISH_Y + 20 - 2}px`;
   }
+  if (focus.kind === "auto-fill") {
+    return `left:${AUTO_FILL_X + 60 - 3}px;top:${AUTO_FILL_Y + 20 - 2}px`;
+  }
   return undefined;
 }
 
@@ -335,6 +345,9 @@ export function mountDeploymentUi(
       <button type="button" tabindex="-1" data-finish data-testid="deployment-finish"
         class="deployment-finish" style="left:${FINISH_X}px;top:${FINISH_Y}px"
         aria-label="${escapeHtml(presentation.finishLabel)}"><span class="visually-hidden">${escapeHtml(presentation.finishLabel)}</span></button>
+      <button type="button" tabindex="-1" data-auto-fill data-testid="deployment-auto-fill"
+        class="deployment-auto-fill" style="left:${AUTO_FILL_X}px;top:${AUTO_FILL_Y}px"
+        aria-label="${AUTO_FILL_LABEL}：${AUTO_FILL_DESCRIPTION}"><span class="deployment-auto-fill-label" aria-hidden="true">${AUTO_FILL_LABEL}</span></button>
 
       <aside class="deployment-rail" aria-label="戰場預覽">
         <section class="deployment-map-panel">
@@ -396,6 +409,7 @@ export function mountDeploymentUi(
     else if (rosterIndex !== undefined) session.activateRoster(Number(rosterIndex));
     else if (page !== undefined) session.activatePage(Number(page) as 0 | 1 | 2);
     else if (target.hasAttribute("data-finish")) session.activateFinish();
+    else if (target.hasAttribute("data-auto-fill")) session.activateAutoFill();
     root.focus({ preventScroll: true });
   };
 

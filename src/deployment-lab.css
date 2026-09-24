@@ -116,6 +116,8 @@
 .deployment-page::after,
 .deployment-finish::before,
 .deployment-finish::after,
+.deployment-auto-fill::before,
+.deployment-auto-fill::after,
 .deployment-error-frame::before,
 .deployment-error-frame::after {
   content: "";
@@ -191,7 +193,8 @@
 
 .deployment-entry-hitbox,
 .deployment-page,
-.deployment-finish {
+.deployment-finish,
+.deployment-auto-fill {
   position: absolute;
   z-index: 3;
   box-sizing: border-box;
@@ -212,7 +215,8 @@
 
 .deployment-entry-hitbox::before,
 .deployment-page::before,
-.deployment-finish::before {
+.deployment-finish::before,
+.deployment-auto-fill::before {
   left: 1px;
   top: 1px;
   width: 79px;
@@ -222,7 +226,8 @@
 
 .deployment-entry-hitbox::after,
 .deployment-page::after,
-.deployment-finish::after {
+.deployment-finish::after,
+.deployment-auto-fill::after {
   left: 1px;
   top: 1px;
   width: 78px;
@@ -253,7 +258,27 @@
 
 .deployment-page:focus-visible,
 .deployment-entry-hitbox:focus-visible,
-.deployment-finish:focus-visible { outline: none; }
+.deployment-finish:focus-visible,
+.deployment-auto-fill:focus-visible { outline: none; }
+
+/* 自動配置 borrows the native 80x24 control frame but not its bitmap font: a
+   modern label marks it as the remake's own addition (07 字体分层). */
+.deployment-auto-fill-label {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--native-15);
+  font: 700 13px/1 system-ui, sans-serif;
+  text-shadow:
+    1px 0 var(--native-0),
+    -1px 0 var(--native-0),
+    0 1px var(--native-0),
+    0 -1px var(--native-0);
+  white-space: nowrap;
+  pointer-events: none;
+}
 
 .deployment-native-text {
   position: absolute;

@@ -2,6 +2,7 @@ import type { InteractiveDeploymentDefinition } from "./content/stages";
 import type { PortraitRecord, UnitClassId } from "./types";
 import {
   createDeploymentState,
+  rankAutoFillSlots,
   reduceDeployment,
   type DeploymentAction,
   type DeploymentState,
@@ -27,12 +28,15 @@ export class DeploymentSession {
   private currentState: DeploymentState;
   private readonly listeners = new Set<DeploymentListener>();
   readonly roster: readonly DeploymentRosterUnit[];
+  /** Nothing on this screen changes a unit's career or experience, so one ranking serves every press. */
+  private readonly autoFillRanking: readonly number[];
 
   constructor(
     definition: InteractiveDeploymentDefinition,
     roster: readonly DeploymentRosterUnit[],
   ) {
     this.roster = roster.map((unit) => ({ ...unit }));
+    this.autoFillRanking = rankAutoFillSlots(this.roster);
     this.currentState = createDeploymentState(definition, roster.map(({ slot }) => slot));
   }
 
@@ -80,6 +84,10 @@ export class DeploymentSession {
       this.commit({ type: "finish" });
       return;
     }
+    if (focus.kind === "auto-fill") {
+      this.commit({ type: "auto-fill", ranking: this.autoFillRanking });
+      return;
+    }
     this.commit({ type: "cycle-open-cell", direction: "previous" });
   }
 
@@ -105,6 +113,14 @@ export class DeploymentSession {
   activateFinish(): void {
     if (this.dismissFeedbackOnPrimary()) return;
     this.commit({ type: "focus-finish" }, { type: "finish" });
+  }
+
+  activateAutoFill(): void {
+    if (this.dismissFeedbackOnPrimary()) return;
+    this.commit(
+      { type: "focus-auto-fill" },
+      { type: "auto-fill", ranking: this.autoFillRanking },
+    );
   }
 
   activateOpenCell(position: { x: number; y: number }): void {

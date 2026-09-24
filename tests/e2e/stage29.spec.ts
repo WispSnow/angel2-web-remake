@@ -178,6 +178,47 @@ test("S29-A–E: SAY/0056 leads through the 30-entry roster into the dialogue-fr
   });
 });
 
+test("自動配置 fills the 1–15 deployment across both roster pages around a manual pick", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-29-deployment&difficulty=0&test=1");
+  await waitForPhase(page, "deployment");
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／15");
+  // 愛歐里雅 ties every other level-3 soldier and comes last in roster order, so she is
+  // the lowest-ranked candidate; picking her by hand still keeps her on the field.
+  await page.getByTestId("deployment-page-1").click();
+  await expect(page.getByTestId("deployment-roster-6")).toContainText("愛歐里雅");
+  await page.getByTestId("deployment-roster-6").click();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 2／15");
+
+  await page.getByTestId("deployment-auto-fill").click();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 15／15");
+  // Career entry level decides first: the three level-10 careers (愛莉歐拉 with no
+  // experience at all among them), then the seven half-dragons and two water warriors
+  // at 8, then the cavalry 蘇蘭達 at 4; every other level-3 soldier stays benched.
+  await expect(page.getByTestId("deployment-canvas")).toHaveAttribute(
+    "data-deployment-placements",
+    [
+      "0@41,26", "21@39,25", "7@40,25", "9@41,25", "22@42,25", "25@43,25", "26@39,26",
+      "27@40,26", "28@42,26", "29@43,26", "30@39,27", "31@40,27", "10@41,27", "11@42,27",
+      "8@43,27",
+    ].join(";"),
+  );
+  await expect(page.getByTestId("deployment-roster-0")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("deployment-roster-6")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("deployment-roster-7")).toHaveAttribute("aria-pressed", "true");
+  await captureVisualAudit(page.getByTestId("deployment-screen"), {
+    path: `${ARTIFACT_DIR}/stage29-deployment-auto-fill.png`,
+  });
+
+  await page.getByTestId("deployment-finish").click();
+  if ((await state(page)).phase === "deployment") await page.getByTestId("deployment-finish").click();
+  await waitForPhase(page, "player");
+  expect((await state(page)).units
+    .filter(({ side }) => side === 1)
+    .map(({ slot }) => slot)
+    .sort((left, right) => left - right))
+    .toEqual([0, 7, 8, 9, 10, 11, 21, 22, 25, 26, 27, 28, 29, 30, 31]);
+});
+
 test("S29-F: removing the final guard uses ordinary victory feedback without a victory SAY", async ({ page }) => {
   await page.goto("/?debugScenario=stage-29-near-victory&difficulty=0&test=1");
   await waitForPhase(page, "player");
