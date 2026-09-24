@@ -350,10 +350,32 @@ export interface NativeContextualBattleLine {
   readonly address: `DS:${string}`;
   /** `aiDialogue` lines are silenced by the ＡＩ對話 switch; `direct` ones are not. */
   readonly gate: "aiDialogue" | "direct" | "mixed";
+  /** Whether `0000:C981` sends this selector through the `0000:CAC3` coin. */
+  readonly randomGate: boolean;
   readonly text: string;
   /** Native call sites that play this line. */
   readonly emitters: readonly string[];
 }
+
+/**
+ * `0000:C981` opens the exempt selectors straight away; every other one first
+ * calls `0000:CAC3`, which adds a PIT channel-0 byte into DS:80B3 and reduces it
+ * modulo `modulus`, and the window only opens on `0..playsWhenAtMost`.
+ */
+export const NATIVE_CONTEXTUAL_LINE_RANDOM_GATE = {
+  "entry": "0000:C981",
+  "coin": "0000:CAC3",
+  "accumulator": "DS:80B3",
+  "modulus": 10,
+  "playsWhenAtMost": 5,
+  "exemptSelectors": [
+    24,
+    31,
+    32,
+    33,
+    34
+  ]
+} as const;
 
 /**
  * DS:84BB entries outside the AI technique groups. Each carries the gate its
@@ -368,6 +390,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84BB",
     "address": "DS:8501",
     "gate": "aiDialogue",
+    "randomGate": true,
     "text": "快不行了!...我必需休息一下.",
     "emitters": [
       "1000:2287"
@@ -379,6 +402,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84BD",
     "address": "DS:851D",
     "gate": "aiDialogue",
+    "randomGate": true,
     "text": "我體力太低了!\n先閃一邊....",
     "emitters": [
       "1000:2265"
@@ -390,9 +414,23 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84BF",
     "address": "DS:8538",
     "gate": "aiDialogue",
+    "randomGate": true,
     "text": "這....被包圍了.",
     "emitters": [
       "1000:227B"
+    ]
+  },
+  "rallyingToGeneral": {
+    "record": "rallying-to-general",
+    "selector": 3,
+    "pointerEntry": "DS:84C1",
+    "address": "DS:8548",
+    "gate": "aiDialogue",
+    "randomGate": true,
+    "text": "將軍我來了.",
+    "emitters": [
+      "1000:1C93",
+      "1000:1CFB"
     ]
   },
   "restingToRecover": {
@@ -401,6 +439,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84C5",
     "address": "DS:8562",
     "gate": "aiDialogue",
+    "randomGate": true,
     "text": "等我補足體力就去教訓妳.",
     "emitters": [
       "1000:22B7"
@@ -412,6 +451,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84CB",
     "address": "DS:85A5",
     "gate": "aiDialogue",
+    "randomGate": true,
     "text": "看我的飛箭.",
     "emitters": [
       "1000:1F6D"
@@ -423,6 +463,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84EF",
     "address": "DS:8677",
     "gate": "direct",
+    "randomGate": true,
     "text": "我中了禁咒，無法使用法術．",
     "emitters": [
       "0000:701F"
@@ -434,6 +475,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84F1",
     "address": "DS:8692",
     "gate": "direct",
+    "randomGate": true,
     "text": "沒有人在我的攻擊範圍內．",
     "emitters": [
       "0000:70ED"
@@ -445,6 +487,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84F3",
     "address": "DS:86AB",
     "gate": "direct",
+    "randomGate": true,
     "text": "我的頭好昏，無法思考．",
     "emitters": [
       "0000:671D"
@@ -456,6 +499,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84F5",
     "address": "DS:86C2",
     "gate": "mixed",
+    "randomGate": true,
     "text": "要打中我沒那麼容易．",
     "emitters": [
       "0000:7260",
@@ -468,6 +512,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84F7",
     "address": "DS:86D7",
     "gate": "direct",
+    "randomGate": true,
     "text": "妳竟敢打我．",
     "emitters": [
       "0000:92C1"
@@ -479,6 +524,7 @@ export const NATIVE_CONTEXTUAL_BATTLE_LINES = {
     "pointerEntry": "DS:84EB",
     "address": "DS:8654",
     "gate": "direct",
+    "randomGate": false,
     "text": "得經驗值00000 點",
     "emitters": [
       "0000:7678",

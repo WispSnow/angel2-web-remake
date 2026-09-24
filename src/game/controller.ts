@@ -24,6 +24,9 @@ import {
   aiTechniqueDialogueFor,
   contextualBattleDialogueFor,
   experienceGainDialogueFor,
+  nativeContextualLineCoinPasses,
+  nativeContextualSelectorRollsCoin,
+  NATIVE_CONTEXTUAL_BATTLE_LINES,
   type ContextualBattleLineKey,
 } from "./content/ai-technique-dialogue";
 import { fullCombatBackgroundRecord } from "./content/full-combat-backgrounds";
@@ -3613,8 +3616,8 @@ export class GameController {
    * off makes the target speak line `1Dh` after the shot presentation. This half
    * reaches `0000:C97E` directly, so the ＡＩ對話 switch does not silence it; the
    * AI half at `1000:1FB2` does and is played separately. `REMAKE-099` replaced
-   * the native PIT coin flip with a deterministic immunity, so the line now
-   * accompanies every such blocked shot instead of about half of them.
+   * the native PIT dodge roll with a deterministic immunity, so every such shot
+   * is blocked; the window itself still rolls the REMAKE-161 opening coin.
    */
   private async presentShotDodgeLine(
     actionId: BattleActionId,
@@ -3636,6 +3639,17 @@ export class GameController {
   ): Promise<void> {
     if (!this.aiDialogueEnabled) return;
     await this.presentContextualLine(actor, line, statusText);
+  }
+
+  /**
+   * Native `0000:C981`: every DS:84BB window except `18h`/`1Fh..22h` first
+   * passes the `0000:CAC3` coin, whichever route reached `0000:C97E`.
+   * REMAKE-161 rolls it from a presentation-only source, so a closed coin skips
+   * the window and nothing else — no simulation state, no battle PRNG draw.
+   */
+  private nativeLineWindowOpens(selector: number): boolean {
+    return !nativeContextualSelectorRollsCoin(selector)
+      || nativeContextualLineCoinPasses(Math.random());
   }
 
   /**
@@ -3683,9 +3697,15 @@ export class GameController {
     /** Only `18h` needs one: the record with its numeric field already written. */
     prepared?: DialoguePage,
   ): Promise<void> {
+    // The status line is the remake's own feedback, so it stays even when the
+    // native coin keeps the window shut.
+    if (statusText !== undefined) this.statusMessage = statusText;
+    if (!this.nativeLineWindowOpens(NATIVE_CONTEXTUAL_BATTLE_LINES[line].selector)) {
+      this.emit();
+      return;
+    }
     const page = prepared ?? contextualBattleDialogueFor(actor, line);
     this.contextualLineDialogue = { actor, line, page };
-    if (statusText !== undefined) this.statusMessage = statusText;
     this.emit();
     const text = page.activeSlot ? page[page.activeSlot]?.text ?? "" : "";
     // The native window closes on its own after the per-character wait; there is
@@ -3727,7 +3747,8 @@ export class GameController {
     this.emit();
 
     // Native `1000:2233`/`2265`/`227B` speak from inside the planner, before the
-    // retreat or rest they chose actually runs.
+    // retreat or rest they chose actually runs; `1000:1CFB` likewise speaks 03h
+    // before the follower walks its route.
     if (action.nativeLine) await this.presentAiContextualLine(unit, action.nativeLine);
 
     if (
@@ -6491,7 +6512,8 @@ export class GameController {
   ): Promise<void> {
     if (!this.aiDialogueEnabled) return;
     const page = aiTechniqueDialogueFor(actor, actionId);
-    if (!page) return;
+    // `aiTechniqueDialogueFor` carries the notice's DS:84BB selector as `wait`.
+    if (!page || !this.nativeLineWindowOpens(page.source.wait)) return;
     this.aiTechniqueDialogue = {
       actionId,
       actor,

@@ -2,8 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
+import { pinNativeLineCoin } from "./native-line-coin";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
+
+// These specs assert native line windows, which REMAKE-161 opens on a
+// six-in-ten coin; pin it open so each asserted window appears.
+test.beforeEach(async ({ page }) => pinNativeLineCoin(page));
 
 const ARTIFACT_DIR = "artifacts/playwright";
 

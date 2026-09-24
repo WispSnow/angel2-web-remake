@@ -4,12 +4,15 @@ import {
   confusedActorDialogueFor,
   contextualBattleDialogueFor,
   experienceGainDialogueFor,
+  nativeContextualLineCoinPasses,
+  nativeContextualSelectorRollsCoin,
   nativeExperienceLineText,
   nativeAiTechniqueDialogueForCode,
   NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE,
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
   NATIVE_CONFUSED_ACTOR_DIALOGUE,
   NATIVE_CONTEXTUAL_BATTLE_LINES,
+  NATIVE_CONTEXTUAL_LINE_RANDOM_GATE,
 } from "../../src/game/content/ai-technique-dialogue";
 import { HALF_DRAGON_TELEPORT_ACTION_ID } from "../../src/game/content/actions";
 import { activateStage1Content } from "../../src/game/content/stage1";
@@ -193,6 +196,8 @@ describe("native contextual battle lines", () => {
       ["restingLowLife", 0x00, "DS:8501", "aiDialogue", "快不行了!...我必需休息一下.", ["1000:2287"]],
       ["breakingContact", 0x01, "DS:851D", "aiDialogue", "我體力太低了!\n先閃一邊....", ["1000:2265"]],
       ["surrounded", 0x02, "DS:8538", "aiDialogue", "這....被包圍了.", ["1000:227B"]],
+      // The paired-follower far branch and the 跟隨主將 rally, nothing else.
+      ["rallyingToGeneral", 0x03, "DS:8548", "aiDialogue", "將軍我來了.", ["1000:1C93", "1000:1CFB"]],
       ["restingToRecover", 0x05, "DS:8562", "aiDialogue", "等我補足體力就去教訓妳.", ["1000:22B7"]],
       ["shootingAnnounce", 0x08, "DS:85A5", "aiDialogue", "看我的飛箭.", ["1000:1F6D"]],
       // Player responses: direct `0000:C97E` sites the switch never silences.
@@ -259,6 +264,7 @@ describe("native contextual battle-line gates", () => {
         "restingLowLife",
         "breakingContact",
         "surrounded",
+        "rallyingToGeneral",
         "restingToRecover",
         "shootingAnnounce",
       ]);
@@ -271,6 +277,55 @@ describe("native contextual battle-line gates", () => {
         "experienceGain",
       ]);
     expect(byGate("mixed")).toEqual(["dodgedShot"]);
+  });
+
+  test("records which selectors the native sends through the 0000:CAC3 coin", () => {
+    // `0000:C981` opens 18h and the four group-command/scenario-30 selectors
+    // straight away; everything else is folded through a PIT byte modulo 10
+    // and only opens on 0..5.
+    expect(NATIVE_CONTEXTUAL_LINE_RANDOM_GATE).toEqual({
+      entry: "0000:C981",
+      coin: "0000:CAC3",
+      accumulator: "DS:80B3",
+      modulus: 10,
+      playsWhenAtMost: 5,
+      exemptSelectors: [0x18, 0x1f, 0x20, 0x21, 0x22],
+    });
+    const uncoined = Object.entries(NATIVE_CONTEXTUAL_BATTLE_LINES)
+      .filter(([, line]) => !line.randomGate)
+      .map(([key]) => key);
+    expect(uncoined).toEqual(["experienceGain"]);
+  });
+
+  test("REMAKE-161 rolls the six-in-ten coin for every selector 0000:C981 does not exempt", () => {
+    for (const [key, line] of Object.entries(NATIVE_CONTEXTUAL_BATTLE_LINES)) {
+      expect(nativeContextualSelectorRollsCoin(line.selector), key).toBe(line.randomGate);
+    }
+    // The technique notices reach the same renderer through `1000:254F`.
+    for (const { selector } of NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS) {
+      expect(nativeContextualSelectorRollsCoin(selector)).toBe(true);
+    }
+    const selectors = Array.from({ length: 0x23 }, (_, selector) => selector);
+    expect(selectors.filter((selector) => !nativeContextualSelectorRollsCoin(selector)))
+      .toEqual([0x18, 0x1f, 0x20, 0x21, 0x22]);
+
+    const tenths = Array.from({ length: 10 }, (_, index) => index / 10);
+    expect(tenths.filter(nativeContextualLineCoinPasses)).toEqual([0, 0.1, 0.2, 0.3, 0.4, 0.5]);
+    expect(nativeContextualLineCoinPasses(0.5999)).toBe(true);
+    expect(nativeContextualLineCoinPasses(0.6)).toBe(false);
+    expect(nativeContextualLineCoinPasses(0.9999)).toBe(false);
+  });
+});
+
+describe("the follower's rally line", () => {
+  test("speaks from the follower's own window with its own portrait", () => {
+    expect(contextualBattleDialogueFor({ name: "士兵D", portrait: 60, side: 1 }, "rallyingToGeneral"))
+      .toEqual({
+        activeSlot: "upper",
+        upper: { portrait: 60, speaker: "士兵D", text: "將軍我來了." },
+        lower: undefined,
+        source: { record: "rallying-to-general", wait: 0x03, address: "DS:8548" },
+      });
   });
 });
 

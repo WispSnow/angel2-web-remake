@@ -98,6 +98,11 @@ const CODE_SIGNATURES = [
   // Paired follower near test: base mode from [cs:017F], seed straight from
   // DS:0D47 with no floor, then the same-side behavior lookup at 1000:0D83.
   { address: "1000:1C0E", offset: 0x11c0e, hex: "2ea17f01a30f1fa1470da3181f9a04009d1333c02ea083018b1ef63b4b9a83067010893e7a0483ff" },
+  // Paired follower far branch: FY/FA seed 55 finds the leader, then the same
+  // route/landing/line/move tail as the group-command branch at 1CA3 — 17DE:04AF
+  // picks the landing, 1C8C..1C93 speaks line 03h from DS:1F16 (the actor's own
+  // cell) and only then does 17DE:016A walk it.
+  { address: "1000:1C3D", offset: 0x11c3d, hex: "8b36161f2ea18101a30f1fb83700a3181f9a04009d1333c02ea083018b1ef63b4b9a83067010893e7a0483ff00749e8b36161f9a2900de172ea17f01a30f1fa1470da3181f9a04009d139aaf04de178b1e161fb80300e8b9089a6a01de17891e161fba5900c3" },
   // The only DS:0D47 writer: the AI input loader gated on base mode 'Y'/'A'.
   { address: "1000:2300", offset: 0x12300, hex: "2e833e7f015974092e833e7f01417401c38b1e161f9a58500000a1f63ba33f0da1c531a3470da1bd31a3" },
   // DS:0D45 is the DATA row: decremented and clamped to 0..2 for the skill pool.
@@ -117,9 +122,18 @@ const CODE_SIGNATURES = [
   { address: "1000:3DC5", offset: 0x13dc5, hex: "833e0f1f4d7437833e0f1f597430813e0f1f46597428813e0f1f464d7420813e0f1f43597418813e0f1f434d7410833e" },
   { address: "1000:40EE", offset: 0x140ee, hex: "813e0f1f46597417833e0f1f597410813e0f1f46417408833e0f1f417401c3a1a9018ec0c7061a1f5f07e8f7fca12400" },
   { address: "0000:7BFC", offset: 0x07bfc, hex: "e80100cb" },
+  // Contextual-line renderer entry: store the selector, let 18h/1Fh/20h/21h/22h
+  // jump straight to the window at C9A2, send every other selector through the
+  // CAC3 coin and skip the line (`ja C9B8`) when it comes back above 5.
+  { address: "0000:C97E", offset: 0x0c97e, hex: "a3b9843d1800741c3d1f0074173d200074123d2100740d3d22007408e826013d05007716" },
+  // The coin: one PIT channel-0 byte added into DS:80B3, reduced modulo 10.
+  { address: "0000:CAC3", offset: 0x0cac3, hex: "33c0e4400106b380833eb3800a7207832eb3800aebf2a1b380c3" },
 ];
 
 const CONTEXTUAL_BATTLE_LINE_COUNT = 35;
+const CONTEXTUAL_LINE_RENDERER = 0x0c97e;
+const CONTEXTUAL_LINE_WINDOW = 0x0c9a2;
+const CONTEXTUAL_LINE_COIN = 0x0cac3;
 const PLAYER_CONFUSION_DIALOGUE_SELECTOR = 0x1c;
 const EXPECTED_PLAYER_CONFUSION_LINE = "我的頭好昏，無法思考．";
 
@@ -397,6 +411,63 @@ function scanContextualLineCallSites(buffer) {
 }
 
 /**
+ * `0000:C97E` stores AX in DS:84B9, then `0000:C981` compares it with a short
+ * list of selectors that jump straight to the window at `0000:C9A2`. Every other
+ * selector first calls `0000:CAC3`, which adds one PIT channel-0 byte into
+ * DS:80B3 and reduces it modulo 10; `cmp ax,5 / ja` then drops the line on 6..9.
+ * The list and both constants are read from the code rather than restated.
+ */
+function parseContextualLineRandomGate(buffer) {
+  let at = CONTEXTUAL_LINE_RENDERER;
+  if (buffer[at] !== 0xa3 || buffer.readUInt16LE(at + 1) !== 0x84b9) {
+    throw new Error("0000:C97E no longer stores the contextual selector in DS:84B9");
+  }
+  at += 3;
+  const exemptSelectors = [];
+  // cmp ax,imm16 / jz rel8 — each exempt selector jumps straight to the window.
+  while (buffer[at] === 0x3d) {
+    if (buffer[at + 3] !== 0x74 || at + 5 + buffer.readInt8(at + 4) !== CONTEXTUAL_LINE_WINDOW) {
+      throw new Error(`0000:${hex(at)}: contextual selector exemption no longer opens 0000:C9A2`);
+    }
+    exemptSelectors.push(`${hex(buffer.readUInt16LE(at + 1), 2)}h`);
+    at += 5;
+  }
+  if (buffer[at] !== 0xe8 || at + 3 + buffer.readInt16LE(at + 1) !== CONTEXTUAL_LINE_COIN) {
+    throw new Error(`0000:${hex(at)}: gated contextual selectors no longer call 0000:CAC3`);
+  }
+  const compareAt = at + 3;
+  if (buffer[compareAt] !== 0x3d || buffer[compareAt + 3] !== 0x77) {
+    throw new Error(`0000:${hex(compareAt)}: the contextual coin is no longer tested with cmp/ja`);
+  }
+  const playsWhenAtMost = buffer.readUInt16LE(compareAt + 1);
+  const skipTarget = compareAt + 5 + buffer.readInt8(compareAt + 4);
+  // xor ax,ax / in al,port / add [acc],ax / cmp word [acc],modulus / jb / sub word [acc],modulus
+  const coin = CONTEXTUAL_LINE_COIN;
+  const port = buffer[coin + 3];
+  const accumulator = buffer.readUInt16LE(coin + 6);
+  const modulus = buffer[coin + 12];
+  if (buffer[coin + 2] !== 0xe4 || buffer.readUInt16LE(coin + 10) !== accumulator
+    || buffer[coin + 19] !== modulus) {
+    throw new Error("0000:CAC3 is no longer a single PIT byte accumulated modulo a constant");
+  }
+  if (exemptSelectors.join(",") !== "18h,1Fh,20h,21h,22h" || modulus !== 10 || playsWhenAtMost !== 5) {
+    throw new Error(`contextual line coin changed: ${exemptSelectors.join(",")} ${playsWhenAtMost}/${modulus}`);
+  }
+  return {
+    entry: "0000:C981",
+    exemptSelectors,
+    exemptBranch: `0000:${hex(CONTEXTUAL_LINE_WINDOW)} opens the window without the coin`,
+    coin: `0000:${hex(coin)}`,
+    coinSource: `PIT channel 0 (port ${hex(port, 2)}h), added into DS:${hex(accumulator)} and reduced modulo ${modulus}`,
+    accumulator: `DS:${hex(accumulator)}`,
+    modulus,
+    playsWhenAtMost,
+    skipBranch: `0000:${hex(compareAt + 3)} ja 0000:${hex(skipTarget)}`,
+    chance: `${playsWhenAtMost + 1}/${modulus}`,
+  };
+}
+
+/**
  * The complete DS:84BB contextual battle-line table. Entries 0Ah..17h are the AI
  * technique notices; everything else belongs to a separate trigger, and two
  * entries have no call site at all in the release build.
@@ -404,6 +475,7 @@ function scanContextualLineCallSites(buffer) {
 function parseContextualBattleLines(buffer) {
   const decoder = new TextDecoder("big5", { fatal: true });
   const callSites = scanContextualLineCallSites(buffer);
+  const randomGate = parseContextualLineRandomGate(buffer);
   const entries = [];
   for (let selector = 0; selector < CONTEXTUAL_BATTLE_LINE_COUNT; selector += 1) {
     const pointerEntry = AI_CONTEXT_DIALOGUE_POINTER_TABLE + selector * 2;
@@ -423,7 +495,14 @@ function parseContextualBattleLines(buffer) {
       text: decoder.decode(buffer.subarray(stringFileOffset, terminator)),
       emitters,
       reachable: emitters.length > 0,
+      randomGate: !randomGate.exemptSelectors.includes(`${hex(selector, 2)}h`),
     });
+  }
+  // Line 03h belongs to the two follower branches of 1000:1BD9 and nothing
+  // else; the rule notes below describe both, so pin them here.
+  const rallyEmitters = entries[3].emitters.map(({ address }) => address).join(",");
+  if (rallyEmitters !== "1000:1C93,1000:1CFB") {
+    throw new Error(`contextual line 03h moved: ${rallyEmitters}`);
   }
   const dynamicSites = callSites.filter(({ selector }) => selector === null);
   const unreachable = entries.filter(({ reachable }) => !reachable).map(({ selector }) => selector);
@@ -442,6 +521,7 @@ function parseContextualBattleLines(buffer) {
   return {
     pointerTable: `DS:${hex(AI_CONTEXT_DIALOGUE_POINTER_TABLE)}`,
     renderer: "0000:C97E, reached directly or through the 0000:C97A thunk and the ＡＩ對話-gated 1000:254F",
+    randomGate,
     count: entries.length,
     entries,
     dynamicSites: dynamicSites.map(({ address, target }) => ({ address, target })),
@@ -755,6 +835,7 @@ function nativeRules(
         target: "DS:0D36, written from the current cursor cell by the follow-leader command at 0000:6D59",
         probe: "build the phase FY/FA pursuit map with literal seed 55 and require the target cell's resulting range byte to be nonzero",
         execution: "rebuild the phase base A/Y movement map with the actor's raw DS:0D47 movement value, select an endpoint on the target route, move there, and return Y to the class dispatcher",
+        line: "1000:1CF4..1CFB loads BX = DS:1F16 (the actor's own cell) and AX = 3 and calls the ＡＩ對話 gate 1000:254F after 17DE:04AF (1000:828F) has picked the endpoint and before 17DE:016A walks it, so contextual line 03h 將軍我來了. is spoken by the mover whenever the probe succeeds, whether or not the chosen endpoint moves it; 0000:C981 still sends 03h through the 6-in-10 0000:CAC3 coin",
         classContinuation: {
           ordinary: "1000:18C2 sees Y, calls the common finalizer at 1000:2032 and returns; no ordinary attack follows",
           shooting: "1000:197B sees Y, calls 1000:1F3F from the actor's post-move cell, then calls 1000:2032; a 3A/0I/1I unit therefore shoots when that cell has an eligible target",
@@ -762,7 +843,7 @@ function nativeRules(
           empressOrDragon: "1000:1AA4 has the same finalize-and-return shape; no WD action follows",
         },
         consequence: "cohesion progress follows the weighted traversable range-map gradient; a necessary detour may increase Manhattan distance and still remains the correct route",
-        evidence: ["0000:6D42", "0000:6D59", "1000:18C2", "1000:197B", "1000:1A14", "1000:1BD9", "1000:1CA3", "1000:1F3F"],
+        evidence: ["0000:6D42", "0000:6D59", "1000:18C2", "1000:197B", "1000:1A14", "1000:1BD9", "1000:1CA3", "1000:1F3F", "1000:254F", "0000:C97E", "0000:CAC3"],
       },
       pairedLeaderFollowerBehaviors: {
         dispatcher: "1000:1BD9; follower branch 1000:1C0E; exact same-side behavior lookup 1000:0D83/0D9C",
@@ -785,6 +866,7 @@ function nativeRules(
           entry: "1000:1C3D",
           probe: "DS:1F0F receives [cs:0181] (the phase FY/FA pursuit mode) and DS:1F18 the literal 0x37 = 55 at 1000:1C48",
           execution: "1000:1C6C rebuilds the base mode with the raw DS:0D47 movement seed again, moves, and returns 'Y' so the action is consumed",
+          line: "1000:1C8C..1C93 speaks contextual line 03h 將軍我來了. from DS:1F16 through 1000:254F between the 17DE:04AF endpoint pick and the 17DE:016A move, exactly like the group-command branch at 1000:1CF4",
         },
         noLeader: "if the extended map finds no paired leader, continue to the class action flow",
       },

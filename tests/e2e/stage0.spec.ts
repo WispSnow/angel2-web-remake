@@ -15,9 +15,14 @@ import { NATIVE_POINTER_SPRITES } from "../../src/game/native-pointer";
 import { attackOnlyAdjacentEnemy, chooseUnitCommand, enterAttackTargeting } from "./command-controls";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
+import { pinNativeLineCoin, setNativeLineCoin } from "./native-line-coin";
 import { decodeScreenshot } from "./screenshot-pixels";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
+
+// These specs assert native line windows, which REMAKE-161 opens on a
+// six-in-ten coin; pin it open so each asserted window appears.
+test.beforeEach(async ({ page }) => pinNativeLineCoin(page));
 
 const EDGE_PAN_SETTLE_MS = 180;
 
@@ -1761,6 +1766,223 @@ test("REMAKE-122: army-wide group commands are spoken by the stage commander", a
     groupLeaderId: "1:43",
     statusMessage: "士兵D下令其餘部隊跟隨主將。",
   });
+});
+
+type NativeWindowEvent =
+  | { kind: "line"; line: string; actorId: string; side: number; x: number; y: number }
+  | { kind: "notice"; actionId: string; actorId: string }
+  | { kind: "move"; unitId: string; from: { x: number; y: number } };
+
+const enterOpeningPlayerPhase = async (page: Page) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+};
+
+/**
+ * Samples the debug state every 20 ms from now until the enemy phase takes
+ * over, keeping each new contextual line, each new AI technique notice and
+ * each new allied walk in the order they appeared.
+ */
+const recordUntilEnemyPhase = (page: Page) => page.evaluate(() => {
+  const events: unknown[] = [];
+  let lastLine = "";
+  let lastNotice = "";
+  let lastMove = "";
+  const timer = window.setInterval(() => {
+    const state = window.__ANGEL2__?.getState() as unknown as {
+      phase: string;
+      contextualLineDialogue?: {
+        line: string;
+        actor: { id: string; side: number; x: number; y: number };
+      };
+      aiTechniqueDialogue?: { actionId: string; actor: { id: string } };
+      movementPresentation?: { unitId: string; kind: string; path: Array<{ x: number; y: number }> };
+    } | undefined;
+    if (!state) return;
+    const line = state.contextualLineDialogue;
+    const lineKey = line ? `${line.line}:${line.actor.id}` : "";
+    if (line && lineKey !== lastLine) {
+      const { id, side, x, y } = line.actor;
+      events.push({ kind: "line", line: line.line, actorId: id, side, x, y });
+    }
+    lastLine = lineKey;
+    const notice = state.aiTechniqueDialogue;
+    const noticeKey = notice ? `${notice.actionId}:${notice.actor.id}` : "";
+    if (notice && noticeKey !== lastNotice) {
+      events.push({ kind: "notice", actionId: notice.actionId, actorId: notice.actor.id });
+    }
+    lastNotice = noticeKey;
+    const move = state.movementPresentation?.kind === "allyAuto" ? state.movementPresentation : undefined;
+    const moveKey = move ? `${move.unitId}:${JSON.stringify(move.path)}` : "";
+    if (move && moveKey !== lastMove) events.push({ kind: "move", unitId: move.unitId, from: { ...move.path[0] } });
+    lastMove = moveKey;
+    if (state.phase === "enemy") window.clearInterval(timer);
+  }, 20);
+  Object.assign(window, { __nativeWindowEvents: events });
+});
+
+const recordedSoFar = (page: Page): Promise<NativeWindowEvent[]> => page.evaluate(() =>
+  (window as unknown as { __nativeWindowEvents: NativeWindowEvent[] }).__nativeWindowEvents);
+
+const recordedUntilEnemyPhase = async (page: Page): Promise<NativeWindowEvent[]> => {
+  await waitForPhase(page, "enemy");
+  return recordedSoFar(page);
+};
+
+const rallyLinesIn = (events: readonly NativeWindowEvent[]) => events.filter(
+  (event): event is Extract<NativeWindowEvent, { kind: "line" }> =>
+    event.kind === "line" && event.line === "rallyingToGeneral",
+);
+
+/**
+ * `REMAKE-160`：原版跟隨主將時，每名找到通路的隊友在走之前先用自己的上窗說 `03h`
+ * 「將軍我來了.」（`1000:1CFB`，經「ＡＩ對話」閘 `1000:254F`）。複刻只在主將是妮雅、且隊友
+ * 真的移動時保留這句。本檔把 REMAKE-161 的六成硬幣釘成必過，跟隨士兵D或關掉ＡＩ對話時的
+ * 沉默因此只能歸因於主將判斷與開關，而不是運氣。
+ */
+test("REMAKE-160: followers answer 妮雅 with 將軍我來了 and stay silent otherwise", async ({ page }) => {
+  // 妮雅 anchors the order: the followers answer her before they walk.
+  await enterOpeningPlayerPhase(page);
+  await recordUntilEnemyPhase(page);
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-followLeader").click();
+  expect((await debugState(page)).groupLeaderId).toBe("1:0");
+  await finishGroupCommandDialogue(page);
+  // One follower's window after another: read the speaker and the rendered
+  // window in the same frame so the two can never belong to different lines.
+  const shown = await (await page.waitForFunction(() => {
+    const line = (window.__ANGEL2__?.getState() as unknown as {
+      contextualLineDialogue?: {
+        line: string;
+        actor: { id: string; name: string; side: number; portrait: number };
+      };
+    }).contextualLineDialogue;
+    const layer = document.querySelector<HTMLElement>("[data-testid=dialogue-layer]");
+    const upper = document.querySelector<HTMLElement>("[data-testid=dialogue-window-upper]");
+    const portrait = document.querySelector<HTMLElement>("[data-testid=dialogue-portrait-composite]");
+    if (line?.line !== "rallyingToGeneral" || !layer || layer.hidden
+      || layer.dataset.sourceAddress !== "DS:8548"
+      || !upper?.textContent?.includes("將軍我來了.")) return undefined;
+    return {
+      actor: line.actor,
+      record: layer.dataset.sourceRecord,
+      activeSlot: layer.dataset.activeSlot,
+      ariaLabel: upper.getAttribute("aria-label"),
+      portrait: portrait?.dataset.portraitRecord,
+    };
+  })).jsonValue();
+  expect(shown).toMatchObject({
+    record: "rallying-to-general",
+    activeSlot: "upper",
+    ariaLabel: `${shown?.actor.name}對話`,
+    portrait: String(shown?.actor.portrait),
+  });
+  expect(shown?.actor.side).toBe(1);
+  expect(shown?.actor.id).not.toBe("1:0");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-follow-leader-rally-line.png",
+  });
+  const niaPhase = await recordedUntilEnemyPhase(page);
+  const niaRally = rallyLinesIn(niaPhase);
+  expect(niaRally.length).toBeGreaterThan(0);
+  expect(niaRally.every(({ actorId, side }) => actorId !== "1:0" && side === 1)).toBe(true);
+  // The line comes first and only for a follower that then really walks, from
+  // the very cell it spoke on (`1CFB` speaks before `17DE:016A` moves).
+  for (const [index, event] of niaPhase.entries()) {
+    if (event.kind !== "line") continue;
+    const walk = niaPhase.slice(index + 1).find((candidate) =>
+      candidate.kind === "move" && candidate.unitId === event.actorId);
+    expect(walk, `${event.actorId} spoke without walking`).toMatchObject({
+      from: { x: event.x, y: event.y },
+    });
+  }
+
+  // 士兵D anchors the same order: the same rally, and nobody calls him general.
+  await enterOpeningPlayerPhase(page);
+  await page.keyboard.press("Tab");
+  await expect.poll(async () => (await debugState(page)).focusId).toBe("1:43");
+  await recordUntilEnemyPhase(page);
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-followLeader").click();
+  expect((await debugState(page)).groupLeaderId).toBe("1:43");
+  await finishGroupCommandDialogue(page);
+  const soldierPhase = await recordedUntilEnemyPhase(page);
+  expect(soldierPhase.some(({ kind }) => kind === "move")).toBe(true);
+  expect(rallyLinesIn(soldierPhase)).toEqual([]);
+
+  // ＡＩ對話 off: `1000:254F` returns before the coin is even rolled.
+  await enterOpeningPlayerPhase(page);
+  await openSettingsMenu(page);
+  await page.getByTestId("ai-dialogue-button").click();
+  await expect(page.getByTestId("ai-dialogue-button").locator(".native-settings-state")).toHaveText("OFF");
+  await closeSettingsMenu(page);
+  await recordUntilEnemyPhase(page);
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-followLeader").click();
+  expect((await debugState(page)).groupLeaderId).toBe("1:0");
+  await finishGroupCommandDialogue(page);
+  const silentPhase = await recordedUntilEnemyPhase(page);
+  expect(silentPhase.some(({ kind }) => kind === "move")).toBe(true);
+  expect(rallyLinesIn(silentPhase)).toEqual([]);
+});
+
+/**
+ * `REMAKE-161`：原版 `0000:C981` 只讓 `18h/1Fh..22h` 直接開窗，其餘上下文短句與 AI 技術
+ * 台詞都先過 `0000:CAC3` 的六成硬幣。把硬幣釘成關閉：玩家反饋 `1Bh`、跟隨妮雅的 `03h`
+ * 與我方自動治療的技術台詞都不開窗，狀態列與結算照常；集團命令 `20h/21h` 豁免硬幣，
+ * 照常開窗。
+ */
+test("REMAKE-161: a closed native coin shuts every gated window but never a group command", async ({ page }) => {
+  await enterOpeningPlayerPhase(page);
+  await setNativeLineCoin(page, "closed");
+  await recordUntilEnemyPhase(page);
+
+  // `1Bh`: nobody in 妮雅's reach at the untouched opening. The window stays
+  // shut and the remake's own status line still says why the menu came back.
+  await page.keyboard.press(" ");
+  await page.getByTestId("unit-command-attack").click();
+  await expect.poll(async () => (await debugState(page)).statusMessage)
+    .toBe("妮雅的攻擊範圍內沒有敵人。請選擇移動或休息。");
+  expect(await debugState(page)).toMatchObject({ actionMode: "actionMenu", targets: [] });
+  await expect(page.getByTestId("dialogue-layer")).toBeHidden();
+  await page.keyboard.press("Escape");
+
+  // `21h` never rolls the coin, so the order itself is still spoken…
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-followLeader").click();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:873C");
+  expect((await debugState(page)).groupLeaderId).toBe("1:0");
+  await finishGroupCommandDialogue(page);
+  // …while every follower walks toward 妮雅 without a word.
+  const followPhase = await recordedUntilEnemyPhase(page);
+  expect(followPhase.some(({ kind }) => kind === "move")).toBe(true);
+  expect(followPhase.filter(({ kind }) => kind !== "move")).toEqual([]);
+
+  // An AI technique notice rolls the same coin: `20h` opens, the heal lands,
+  // and `生命單.` never does. The notice would have opened before the effect,
+  // so the landed heal is enough — the free phase may stop at a promotion.
+  await enterOpeningPlayerPhase(page);
+  await setNativeLineCoin(page, "closed");
+  await page.evaluate(() => window.__ANGEL2__?.forceClassActionSetup("sister"));
+  const allyBefore = (await debugState(page)).units.find(({ id }) => id === "1:1")!;
+  await recordUntilEnemyPhase(page);
+  await page.keyboard.press("g");
+  await page.keyboard.press("F3");
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-address", "DS:8716");
+  await finishGroupCommandDialogue(page);
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState();
+    return current?.lastSpecialAction?.actorId === "1:0"
+      && current.lastSpecialAction.actionId === "heal-1";
+  });
+  expect((await debugState(page)).units.find(({ id }) => id === "1:1")!.life)
+    .toBeGreaterThan(allyBefore.life);
+  // `18h` is exempt as well, so an ally's kill may still report its experience.
+  expect((await recordedSoFar(page)).filter((event) => event.kind === "notice"
+    || (event.kind === "line" && event.line !== "experienceGain"))).toEqual([]);
 });
 
 test("REMAKE-014: side-1 autonomous techniques use the upper native dialogue window", async ({ page }) => {

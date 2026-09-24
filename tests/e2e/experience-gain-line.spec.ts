@@ -7,7 +7,12 @@ import {
 } from "./arena-test-support";
 import { nativeExperienceLineText } from "../../src/game/content/ai-technique-dialogue";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
+import { pinNativeLineCoin } from "./native-line-coin";
 import { captureVisualAudit } from "./visual-audit";
+
+// `18h` is one of the selectors `0000:C981` never sends through the
+// REMAKE-161 coin, so a closed coin must leave every asserted window open.
+test.beforeEach(async ({ page }) => pinNativeLineCoin(page, "closed"));
 
 /**
  * DS:84BB `18h` — `得經驗值00000 點`. Module 29 opens it from exactly three

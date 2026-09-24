@@ -5,6 +5,7 @@ import {
   NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS,
   NATIVE_CONFUSED_ACTOR_DIALOGUE,
   NATIVE_CONTEXTUAL_BATTLE_LINES,
+  NATIVE_CONTEXTUAL_LINE_RANDOM_GATE,
   type NativeAiTechniqueDialogueRecord,
 } from "./ai-technique-dialogue.generated";
 import type { BattleUnit, DialoguePage } from "../types";
@@ -15,8 +16,29 @@ import type { BattleUnit, DialoguePage } from "../types";
  */
 export { NATIVE_AI_TECHNIQUE_DIALOGUE_BY_CODE, NATIVE_AI_TECHNIQUE_DIALOGUE_GROUPS };
 export { NATIVE_CONFUSED_ACTOR_DIALOGUE, NATIVE_CONTEXTUAL_BATTLE_LINES };
+export { NATIVE_CONTEXTUAL_LINE_RANDOM_GATE };
 
 export type ContextualBattleLineKey = keyof typeof NATIVE_CONTEXTUAL_BATTLE_LINES;
+
+/**
+ * REMAKE-161: `0000:C981` opens `18h` and `1Fh..22h` straight away and sends
+ * every other DS:84BB selector — AI notices, planner lines and player
+ * responses alike — through the `0000:CAC3` coin first.
+ */
+export function nativeContextualSelectorRollsCoin(selector: number): boolean {
+  const exempt: readonly number[] = NATIVE_CONTEXTUAL_LINE_RANDOM_GATE.exemptSelectors;
+  return !exempt.includes(selector);
+}
+
+/**
+ * The native folds a PIT byte into a running total modulo 10 and opens the
+ * window on `0..5`. `sample` is one draw in `[0, 1)` from a presentation-only
+ * source — never the battle PRNG, which the window must not advance.
+ */
+export function nativeContextualLineCoinPasses(sample: number): boolean {
+  const { modulus, playsWhenAtMost } = NATIVE_CONTEXTUAL_LINE_RANDOM_GATE;
+  return Math.floor(sample * modulus) <= playsWhenAtMost;
+}
 
 export function nativeAiTechniqueDialogueForCode(
   nativeCode: string,

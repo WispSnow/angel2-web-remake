@@ -6,7 +6,12 @@ import {
   type ArenaBattleDebugState,
 } from "./arena-test-support";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
+import { pinNativeLineCoin } from "./native-line-coin";
 import { captureVisualAudit } from "./visual-audit";
+
+// These specs assert native line windows, which REMAKE-161 opens on a
+// six-in-ten coin; pin it open so each asserted window appears.
+test.beforeEach(async ({ page }) => pinNativeLineCoin(page));
 
 test("tier-two curse-master commits IP after its poison presentation", async ({ page }) => {
   const pageErrors: string[] = [];

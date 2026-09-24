@@ -35,13 +35,15 @@ export interface AlliedAiAction {
  * `restingToRecover` is native `1000:2291`'s line 05h: the rest a unit takes
  * because its class action found nothing to do (REMAKE-143 extends that rest
  * to every idle dead end). The presentation layer also reads it to keep such
- * idle rests from dragging the camera around.
+ * idle rests from dragging the camera around. `rallyingToGeneral` is line 03h,
+ * spoken by a commanded follower just before it walks toward 妮雅 (REMAKE-160).
  */
 export type AiPlannerLineKey =
   | "restingLowLife"
   | "restingToRecover"
   | "breakingContact"
-  | "surrounded";
+  | "surrounded"
+  | "rallyingToGeneral";
 
 /**
  * The phase scheduler ranks complete plans, not just actor ids. Returning the

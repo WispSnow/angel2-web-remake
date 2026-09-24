@@ -2082,4 +2082,18 @@ describe("REMAKE-143 rest is the fallback of every idle dead end", () => {
       nativeLine: "restingToRecover",
     });
   });
+
+  it("REMAKE-160 keeps a rally toward the arena's slot-0 commander silent", () => {
+    // The arena's default commander is a soldier in slot 0, not 妮雅; its ids
+    // are the arena's own, so 03h never names it the general.
+    const battle = new ArenaBattle([
+      { id: "arena-1-0", side: 1 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 20, y: 30 },
+      { id: "arena-1-1", side: 1 as const, slot: 1, classId: "soldier" as const, level: 1 as const, x: 12, y: 30 },
+      { id: "arena-2-0", side: 2 as const, slot: 0, classId: "soldier" as const, level: 1 as const, x: 40, y: 10 },
+    ], 0, new DeterministicRng(0x3339), plain);
+
+    const action = battle.planAlliedAiAction("arena-1-1", "arena-1-0");
+    expect(action).toMatchObject({ kind: "move" });
+    expect(action).not.toHaveProperty("nativeLine");
+  });
 });

@@ -216,6 +216,7 @@ export interface DialoguePage {
       | "resting-low-life"
       | "breaking-contact"
       | "surrounded"
+      | "rallying-to-general"
       | "resting-to-recover"
       | "shooting-announce"
       | "spell-sealed"

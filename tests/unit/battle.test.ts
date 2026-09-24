@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { CHARACTER_CATALOG } from "../../src/game/content/character-catalog.generated";
 import { killRewardFor, terrainDefensePercentFor } from "../../src/game/content/classes";
 import { STAGE0 } from "../../src/game/content/stage0";
-import { Stage0Battle } from "../../src/game/simulation/battle";
+import { CAMPAIGN_GENERAL_UNIT_ID, Stage0Battle } from "../../src/game/simulation/battle";
 import {
   manhattan,
   movementCost,
@@ -619,6 +620,7 @@ describe("stage 0 battle simulation", () => {
         { x: 18, y: 22 },
         { x: 18, y: 21 },
       ],
+      nativeLine: "rallyingToGeneral",
     });
   });
 
@@ -636,6 +638,8 @@ describe("stage 0 battle simulation", () => {
     enemy.y = 21;
     battle.units = [leader, follower, enemy];
 
+    // The native spoke 03h here before a zero-step walk; REMAKE-160 only lets a
+    // follower that really walks say it.
     expect(battle.planAlliedAiAction(follower.id, leader.id)).toEqual({
       unitId: follower.id,
       kind: "wait",
@@ -662,6 +666,7 @@ describe("stage 0 battle simulation", () => {
     // follow route moves beside the leader first, then 1000:197B calls the
     // shooting wrapper against the post-move cell.
     expect(manhattan(archer, enemy)).toBeGreaterThan(4);
+    // 03h is spoken before the walk, the shot's own 08h after it.
     expect(battle.planAlliedAiAction(archer.id, leader.id)).toEqual({
       unitId: archer.id,
       kind: "special",
@@ -674,6 +679,7 @@ describe("stage 0 battle simulation", () => {
       ],
       targetId: enemy.id,
       actionId: "archer-shot",
+      nativeLine: "rallyingToGeneral",
     });
   });
 
@@ -692,6 +698,7 @@ describe("stage 0 battle simulation", () => {
     enemy.y = 23;
     battle.units = [leader, archer, enemy];
 
+    // Shooting from the spot it already holds: no walk, so no 03h (REMAKE-160).
     expect(battle.planAlliedAiAction(archer.id, leader.id)).toEqual({
       unitId: archer.id,
       kind: "special",
@@ -715,10 +722,77 @@ describe("stage 0 battle simulation", () => {
     enemy.y = 5;
     battle.units = [leader, follower, enemy];
 
+    // The seed-55 probe failed, so the native never reaches 1000:1CFB: no 03h.
     expect(battle.planAlliedAiAction(follower.id, leader.id)).toEqual({
       unitId: follower.id,
       kind: "wait",
       path: [{ x: 5, y: 5 }],
+    });
+  });
+
+  describe("REMAKE-160 rally line", () => {
+    it("names 妮雅 as the general: her roster slot is the campaign unit it matches", () => {
+      const nia = CHARACTER_CATALOG.find(({ id }) => id === "nia");
+      expect(nia).toMatchObject({ name: "妮雅", allySlot: 0 });
+      expect(CAMPAIGN_GENERAL_UNIT_ID).toBe(`1:${nia?.allySlot}`);
+      expect(battleAtPlayableOpening().unit(CAMPAIGN_GENERAL_UNIT_ID)?.name).toBe("妮雅");
+    });
+
+    it("tags the rally toward 妮雅 on the plan the follow phase actually commits", () => {
+      const battle = battleAtPlayableOpening();
+      battle.commitFollowLeader("1:0");
+      const selection = battle.selectNextAlliedAiAction(["1:41"], "1:0");
+      expect(selection?.action).toMatchObject({
+        unitId: "1:41",
+        kind: "move",
+        nativeLine: "rallyingToGeneral",
+      });
+    });
+
+    it("stays silent when the anchor is anyone but 妮雅", () => {
+      const battle = battleAtPlayableOpening();
+      const soldier = battle.unit("1:41")!;
+      const nia = battle.unit("1:0")!;
+      const follower = battle.unit("1:43")!;
+      soldier.x = 18;
+      soldier.y = 20;
+      soldier.acted = true;
+      nia.x = 18;
+      nia.y = 26;
+      follower.x = 22;
+      follower.y = 20;
+      battle.units = [soldier, nia, follower];
+
+      // Same rally, same route rules — only the line depends on who leads.
+      for (const id of [nia.id, follower.id]) {
+        const action = battle.planAlliedAiAction(id, soldier.id);
+        expect(action).toMatchObject({ unitId: id, kind: "move" });
+        expect(action).not.toHaveProperty("nativeLine");
+      }
+    });
+
+    it("lets a wounded follower beside 妮雅 say its rest line instead", () => {
+      const battle = battleAtPlayableOpening();
+      const leader = battle.unit("1:0")!;
+      const follower = battle.unit("1:43")!;
+      leader.x = 18;
+      leader.y = 20;
+      leader.acted = true;
+      follower.x = 18;
+      follower.y = 21;
+      battle.units = [leader, follower];
+      const maxLife = follower.life;
+
+      follower.life = Math.floor(maxLife / 2);
+      expect(battle.planAlliedAiAction(follower.id, leader.id)).toMatchObject({
+        kind: "rest",
+        nativeLine: "restingToRecover",
+      });
+      follower.life = 1;
+      expect(battle.planAlliedAiAction(follower.id, leader.id)).toMatchObject({
+        kind: "rest",
+        nativeLine: "restingLowLife",
+      });
     });
   });
 

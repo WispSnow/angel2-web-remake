@@ -5,7 +5,12 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { pinNativeLineCoin } from "./native-line-coin";
 import { captureVisualAudit } from "./visual-audit";
+
+// These specs assert native line windows, which REMAKE-161 opens on a
+// six-in-ten coin; pin it open so each asserted window appears.
+test.beforeEach(async ({ page }) => pinNativeLineCoin(page));
 
 test("tier-one magic master performs native 2L with its two-stage lightning column", async ({ page }) => {
   const pageErrors: string[] = [];

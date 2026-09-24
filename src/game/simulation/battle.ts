@@ -200,6 +200,13 @@ const clonePendingUnitTransformation = (
  */
 export const NAMED_LEADER_ESCORT_RADIUS = 3;
 
+/**
+ * 妮雅, the general line 03h addresses. Campaign unit ids are `side:slot` and
+ * roster slot 0 is hers in every stage that fields her (the character catalog's
+ * `nia.allySlot`); arena units carry ids of their own and never match.
+ */
+export const CAMPAIGN_GENERAL_UNIT_ID = "1:0";
+
 interface RangedPositionRisk {
   adjacentEnemyCount: number;
   meleeContactCount: number;
@@ -2050,8 +2057,9 @@ export class Stage0Battle {
     leader: BattleUnit,
   ): AlliedAiAction {
     const follow = this.planFollowLeaderMove(unit, leader);
+    if (!follow.handled) return follow.action;
     const shootingActionId = shootingActionIdFor(unit.classId, unit.side);
-    if (!follow.handled || !shootingActionId) return follow.action;
+    if (!shootingActionId) return this.withGeneralRallyLine(follow.action, leader);
 
     const destination = follow.action.path.at(-1) ?? unit;
     const shot = this.planClassAction(unit, [shootingActionId], {
@@ -2062,7 +2070,21 @@ export class Stage0Battle {
           return expected !== undefined && positionKey(position) === positionKey(expected);
         }),
     });
-    return shot ?? follow.action;
+    return this.withGeneralRallyLine(shot ?? follow.action, leader);
+  }
+
+  /**
+   * Native `1000:1CF4..1CFB` speaks line 03h 「將軍我來了.」 as soon as the anchor
+   * probe has succeeded: after the landing is picked and before `17DE:016A`
+   * walks it, with the post-rally shot after it. The native says it even when
+   * the landing leaves the follower where it stands; REMAKE-160 keeps it only
+   * for a follower that really walks, and only while the anchor is 妮雅, the
+   * general it addresses. Waits, REMAKE-143 rests and shots from the spot the
+   * follower already holds stay silent or keep their own line.
+   */
+  private withGeneralRallyLine(action: AlliedAiAction, leader: BattleUnit): AlliedAiAction {
+    if (leader.id !== CAMPAIGN_GENERAL_UNIT_ID || action.path.length < 2) return action;
+    return { ...action, nativeLine: "rallyingToGeneral" };
   }
 
   private planAlliedAiActionUncached(

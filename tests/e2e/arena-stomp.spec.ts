@@ -5,7 +5,12 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { pinNativeLineCoin } from "./native-line-coin";
 import { captureVisualAudit } from "./visual-audit";
+
+// These specs assert native line windows, which REMAKE-161 opens on a
+// six-in-ten coin; pin it open so each asserted window appears.
+test.beforeEach(async ({ page }) => pinNativeLineCoin(page));
 
 /**
  * A 2x2 side-1 squad inside the stomp area. `arena-1-1` at (21,30) is the cell
