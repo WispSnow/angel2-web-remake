@@ -8,8 +8,10 @@ import {
 } from "../../src/game/save";
 import {
   DIAGONAL_EDGE_SCROLL_CURSOR_ART,
+  type BattlePointerCursor,
   type DiagonalEdgeScrollCursor,
 } from "../../src/game/edge-scroll-cursors";
+import { NATIVE_POINTER_SPRITES } from "../../src/game/native-pointer";
 import { attackOnlyAdjacentEnemy, chooseUnitCommand, enterAttackTargeting } from "./command-controls";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
@@ -281,7 +283,9 @@ const expectNativeMenuChrome = async (menu: Locator, expectedHeight: number) => 
       height: (element as HTMLElement).offsetHeight,
       chrome: getComputedStyle(element).backgroundImage,
       selection: selected ? getComputedStyle(selected, "::before").backgroundImage : "",
-      pointer: selected ? getComputedStyle(selected).cursor : "",
+      // The in-screen pointer hides the host cursor while the mouse is over the
+      // screen, so read the host rule it stands in for rather than `cursor`.
+      pointer: selected ? getComputedStyle(selected).getPropertyValue("--native-cursor-hand") : "",
       chromeSources: ["top", "side", "bottom"].map((part) =>
         getComputedStyle(element).getPropertyValue(`--native-command-menu-${part}-source`)),
       selectionSource: getComputedStyle(element)
@@ -786,7 +790,9 @@ test("S00-A through S00-D: complete playable, defeat/retry, victory and save loo
       darkTexture: getComputedStyle(menu).getPropertyValue("--native-menu-dark").trim(),
       lightTexture: getComputedStyle(menu).getPropertyValue("--native-menu-light").trim(),
       selection: selected ? getComputedStyle(selected, "::before").backgroundImage : "",
-      pointer: selected ? getComputedStyle(selected).cursor : "",
+      // The in-screen pointer hides the host cursor while the mouse is over the
+      // screen, so read the host rule it stands in for rather than `cursor`.
+      pointer: selected ? getComputedStyle(selected).getPropertyValue("--native-cursor-hand") : "",
       chromeSources: ["top", "side", "bottom"].map((part) =>
         getComputedStyle(menu).getPropertyValue(`--native-command-menu-${part}-source`)),
       selectionSource: getComputedStyle(menu)
@@ -2486,24 +2492,58 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
   await expect(canvas).toHaveAttribute("data-grid-enabled", "false");
   await expect(canvas).toHaveAttribute("data-grid-line-count", "0");
 
+  /**
+   * What the player sees at `position`: the in-screen pointer sprite (frame, image
+   * and placement against its hotspot, one logical pixel per CSS pixel here) with
+   * the host cursor hidden underneath, plus the host cursor rule that stands in
+   * whenever the sprite has no position yet, read by lifting the takeover for one
+   * synchronous style read.
+   */
+  const pointerPresentation = async (
+    position: { x: number; y: number },
+    cursor: BattlePointerCursor,
+  ) => {
+    await canvas.hover({ position });
+    await expect(canvas).toHaveAttribute("data-native-pointer-cursor", cursor);
+    const sprite = page.getByTestId("native-pointer");
+    await expect(sprite).toBeVisible();
+    await expect(sprite).toHaveAttribute("data-frame", cursor);
+    const read = await canvas.evaluate((element, cursorName) => {
+      const screen = element.closest<HTMLElement>(".logical-screen")!;
+      const pointer = screen.querySelector<HTMLElement>(".native-pointer")!;
+      const screenBox = screen.getBoundingClientRect();
+      const box = pointer.getBoundingClientRect();
+      const hostWhileSprite = getComputedStyle(element).cursor;
+      screen.removeAttribute("data-native-pointer");
+      const hostFallback = getComputedStyle(element).cursor;
+      screen.dataset.nativePointer = "sprite";
+      const source = cursorName === "hand" ? "--native-cursor-hand-source" : `--native-cursor-${cursorName}-source`;
+      return {
+        box: { x: box.left - screenBox.left, y: box.top - screenBox.top, width: box.width, height: box.height },
+        image: getComputedStyle(pointer).backgroundImage,
+        source: getComputedStyle(pointer).getPropertyValue(source),
+        hostWhileSprite,
+        hostFallback,
+      };
+    }, cursor);
+    const { width, height, hotspot } = NATIVE_POINTER_SPRITES[cursor];
+    expect(read.box).toEqual({ x: position.x - hotspot.x, y: position.y - hotspot.y, width, height });
+    expect(read.hostWhileSprite).toBe("none");
+    return read;
+  };
   const expectNativePointer = async (
     position: { x: number; y: number },
     cursor: "hand" | "up" | "down" | "left" | "right",
     frame: number,
     asset: string,
   ) => {
-    await canvas.hover({ position });
-    await expect(canvas).toHaveAttribute("data-native-pointer-cursor", cursor);
+    const read = await pointerPresentation(position, cursor);
     await expect(canvas).toHaveAttribute("data-native-pointer-frame", String(frame));
-    const presentation = await canvas.evaluate((element, cursorName) => {
-      const style = getComputedStyle(element);
-      const property = cursorName === "hand"
-        ? "--native-cursor-hand-source"
-        : `--native-cursor-${cursorName}-source`;
-      return { rendered: style.cursor, source: style.getPropertyValue(property) };
-    }, cursor);
-    expect(presentation.rendered).toContain("blob:");
-    expect(presentation.source).toContain(asset);
+    // The stage pack stages the pointer art as opaque object URLs; the companion
+    // `--*-source` variable names the A/0001 file behind them.
+    expect(read.image).toContain("blob:");
+    expect(read.source).toContain(asset);
+    expect(read.hostFallback).toContain("blob:");
   };
   // The corners pan along both axes, so they show the remake's diagonal arrows:
   // no A/0001 frame, and an image drawn from the pixel table with its hotspot
@@ -2512,18 +2552,18 @@ test("RHP-04: grid, edge-scroll and portrait objects control persistent presenta
     position: { x: number; y: number },
     cursor: DiagonalEdgeScrollCursor,
   ) => {
-    await canvas.hover({ position });
-    await expect(canvas).toHaveAttribute("data-native-pointer-cursor", cursor);
+    const read = await pointerPresentation(position, cursor);
     await expect(canvas).not.toHaveAttribute("data-native-pointer-frame");
-    const rendered = await canvas.evaluate((element) => getComputedStyle(element).cursor);
     const art = DIAGONAL_EDGE_SCROLL_CURSOR_ART[cursor];
-    const parsed = /^url\("data:image\/png;base64,([^"]+)"\) (\d+) (\d+), ([a-z-]+)$/u.exec(rendered);
-    expect(parsed?.slice(2)).toEqual([String(art.hotspot.x), String(art.hotspot.y), art.fallback]);
-    const image = decodeScreenshot(Buffer.from(parsed?.[1] ?? "", "base64"));
-    expect([image.width, image.height]).toEqual([art.rows[0].length, art.rows.length]);
+    const image = /^url\("data:image\/png;base64,([^"]+)"\)$/u.exec(read.image);
+    const fallback = /^url\("data:image\/png;base64,([^"]+)"\) (\d+) (\d+), ([a-z-]+)$/u.exec(read.hostFallback);
+    expect(fallback?.[1]).toBe(image?.[1]);
+    expect(fallback?.slice(2)).toEqual([String(art.hotspot.x), String(art.hotspot.y), art.fallback]);
+    const decoded = decodeScreenshot(Buffer.from(image?.[1] ?? "", "base64"));
+    expect([decoded.width, decoded.height]).toEqual([art.rows[0].length, art.rows.length]);
     const drawn = art.rows.map((row, y) => [...row].map((_, x) => {
-      const offset = (y * image.width + x) * image.channels;
-      const [red, green, blue, alpha] = image.pixels.subarray(offset, offset + 4);
+      const offset = (y * decoded.width + x) * decoded.channels;
+      const [red, green, blue, alpha] = decoded.pixels.subarray(offset, offset + 4);
       if (alpha === 0) return ".";
       return red === 255 && green === 255 && blue === 255 && alpha === 255 ? "#" : "?";
     }).join(""));

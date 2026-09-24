@@ -514,7 +514,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   cursor: var(--native-cursor-right-image, url("/assets/original/native-cursor-right.png")) 23 9, e-resize;
 }
 /* 四角是复刻的斜向滚屏：原版方向槽只有上下左右，四角由纵向箭头优先。斜向箭头是复刻
-   按原版箭头比例自绘的，图片与热点由 `edge-scroll-cursors.ts` 写进画布的
+   按原版箭头比例自绘的，图片与热点由 `edge-scroll-cursors.ts` 写进逻辑画面的
    `--edge-scroll-cursor-*`；变量缺失时退回原版四角的纵向箭头。 */
 #phaser-root canvas[data-native-pointer-cursor="up-left"] {
   cursor: var(--edge-scroll-cursor-up-left, var(--native-cursor-up-image, url("/assets/original/native-cursor-up.png")) 12 0, n-resize);
@@ -528,6 +528,45 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 #phaser-root canvas[data-native-pointer-cursor="down-right"] {
   cursor: var(--edge-scroll-cursor-down-right, var(--native-cursor-down-image, url("/assets/original/native-cursor-down.png")) 12 18, s-resize);
 }
+
+/* 画面内指针（`native-pointer.ts`）：原版鼠标是画进画面的软件光标，和游戏像素同倍率。
+   宿主游标不随逻辑画面的 transform 放大，所以指针一进画面就由这个精灵接手、藏起宿主
+   游标；上面各条宿主游标规则只在精灵还没有位置（刚换画面、指针在画面外）时生效。
+   精灵在逻辑画面里以逻辑像素定位，跟随「畫面縮放」的锐利／平滑设置。 */
+.native-pointer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* 逻辑画面里的层都在 40 以下；宿主覆盖层挂在 body 上，指针移过去时精灵本来就收起。 */
+  z-index: 100;
+  display: block;
+  pointer-events: none;
+  background: var(--native-pointer-image) left top / 100% 100% no-repeat;
+  image-rendering: var(--image-rendering, pixelated);
+}
+.native-pointer[data-frame="hand"] {
+  --native-pointer-image: var(--native-cursor-hand-image, url("/assets/original/command-menu-pointer.png"));
+}
+.native-pointer[data-frame="up"] {
+  --native-pointer-image: var(--native-cursor-up-image, url("/assets/original/native-cursor-up.png"));
+}
+.native-pointer[data-frame="down"] {
+  --native-pointer-image: var(--native-cursor-down-image, url("/assets/original/native-cursor-down.png"));
+}
+.native-pointer[data-frame="left"] {
+  --native-pointer-image: var(--native-cursor-left-image, url("/assets/original/native-cursor-left.png"));
+}
+.native-pointer[data-frame="right"] {
+  --native-pointer-image: var(--native-cursor-right-image, url("/assets/original/native-cursor-right.png"));
+}
+.native-pointer[data-frame="up-left"] { --native-pointer-image: var(--edge-scroll-cursor-up-left-image); }
+.native-pointer[data-frame="up-right"] { --native-pointer-image: var(--edge-scroll-cursor-up-right-image); }
+.native-pointer[data-frame="down-left"] { --native-pointer-image: var(--edge-scroll-cursor-down-left-image); }
+.native-pointer[data-frame="down-right"] { --native-pointer-image: var(--edge-scroll-cursor-down-right-image); }
+.logical-screen[data-native-pointer="sprite"],
+.logical-screen[data-native-pointer="sprite"] * { cursor: none !important; }
+/* 键盘开选单的指针滑行有自己的手形精灵，滑行期间让它独占画面。 */
+.logical-screen[data-pointer-glide="true"] .native-pointer { visibility: hidden; }
 /* `BK/<id>` 的落點是原生寫死的 `(160,80)`（模組 25 `0000:098C`、模組 29 同值），不是把
    `320×200` 在 `640×350` 裡置中——置中會落在 `(160,75)`，上下留白剛好差 5 px。 */
 .story-background {

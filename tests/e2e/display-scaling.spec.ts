@@ -367,6 +367,58 @@ test.describe("Tauri desktop window scaling", () => {
     expect(logical?.height).toBeGreaterThan(700);
     expect(logical?.height).toBeLessThan(800);
   });
+
+  // 原版鼠标是画进画面的软件光标，和游戏像素同倍率；宿主游标不随逻辑画面的 transform
+  // 放大，2 倍画面里只剩一半大。指针一进画面就由画面内精灵接手，离开再交还宿主游标。
+  test("the in-screen pointer is drawn at the game scale instead of the host cursor size", async ({ page }) => {
+    await page.goto("/?debugScenario=stage-00-player&difficulty=0&test=1");
+    const canvas = page.getByTestId("battle-canvas");
+    await expect(canvas).toBeVisible();
+    await page.getByTestId("image-scaling-sharp").click();
+    await expect.poll(async () => (await screenMetrics(page)).scale).toBe(2);
+    await page.addStyleTag({ content: ".debug-toolbar { display: none !important; }" });
+
+    const screen = page.getByTestId("game-screen");
+    const sprite = page.getByTestId("native-pointer");
+    const pointAt = async (logical: { x: number; y: number }) => {
+      const box = await screen.boundingBox();
+      if (!box) throw new Error("the logical screen has no layout box");
+      // 落在逻辑像素正中，免得取整时掉到相邻像素。
+      await page.mouse.move(box.x + logical.x * 2 + 1, box.y + logical.y * 2 + 1);
+      await expect(sprite).toBeVisible();
+      return sprite.evaluate((element) => {
+        const screenBox = (element.parentElement as HTMLElement).getBoundingClientRect();
+        const box = element.getBoundingClientRect();
+        return {
+          frame: (element as HTMLElement).dataset.frame,
+          box: { x: box.left - screenBox.left, y: box.top - screenBox.top, width: box.width, height: box.height },
+          rendering: getComputedStyle(element).imageRendering,
+          host: getComputedStyle(document.querySelector("#phaser-root canvas") as HTMLElement).cursor,
+        };
+      });
+    };
+
+    // 手指 24×24、热点 (3,2)：两倍画面里是 48×48，左上角落在 (x-3, y-2) 的两倍处。
+    expect(await pointAt({ x: 200, y: 150 })).toEqual({
+      frame: "hand",
+      box: { x: 394, y: 296, width: 48, height: 48 },
+      rendering: "pixelated",
+      host: "none",
+    });
+    await expect(canvas).toHaveAttribute("data-native-pointer-cursor", "hand");
+    // 原版上箭头 24×20、热点 (12,0)；复刻斜向箭头 18×18、热点在箭尖。
+    expect((await pointAt({ x: 220, y: 5 })).box).toEqual({ x: 416, y: 10, width: 48, height: 40 });
+    expect(await pointAt({ x: 5, y: 340 })).toMatchObject({
+      frame: "down-left",
+      box: { x: 8, y: 648, width: 36, height: 36 },
+    });
+
+    // 精灵跟随「畫面縮放」：平滑模式下和游戏画面一样双线性插值。
+    await page.getByTestId("image-scaling-smooth").click();
+    await expect(sprite).toBeHidden();
+    await expect(screen).not.toHaveAttribute("data-native-pointer", "sprite");
+    expect((await pointAt({ x: 200, y: 150 })).rendering).toBe("auto");
+  });
 });
 
 /**

@@ -158,11 +158,13 @@ test("title artwork dissolves in over its background before the menu appears", a
   // opaque object URL. The hotspot suffix is what identifies the hand chain in
   // `.logical-screen`; the file behind the blob is read from the companion
   // `--*-source` variable `applyStagedNativeUiAssets` writes for exactly this.
+  // Once the mouse is over the screen the in-screen pointer hides the host
+  // cursor, so read the host rule itself rather than the computed `cursor`.
   for (const testId of ["title-screen", "new-game"]) {
     const pointer = await page.getByTestId(testId).evaluate((element) => {
       const style = getComputedStyle(element);
       return {
-        rendered: style.cursor,
+        rendered: style.getPropertyValue("--native-cursor-hand"),
         source: style.getPropertyValue("--native-cursor-hand-source"),
       };
     });

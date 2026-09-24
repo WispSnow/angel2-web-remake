@@ -49,6 +49,7 @@ test("game functions reproduces the native five-switch submenu", async ({ page }
         width: bounds.width,
         height: bounds.height,
         cursor: getComputedStyle(button).cursor,
+        fallbackCursor: getComputedStyle(button).getPropertyValue("--native-cursor-hand"),
       };
     });
     return {
@@ -73,13 +74,17 @@ test("game functions reproduces the native five-switch submenu", async ({ page }
   expect(presentation.buttons).toHaveLength(5);
   for (const [index, button] of presentation.buttons.entries()) {
     expect(button).toMatchObject({ left: 8, top: 38 + index * 25, width: 112, height: 24 });
-    // The stage pack stages the pointer art, so the cursor image is an opaque
-    // object URL; only the hotspot suffix and the companion `--*-source`
-    // variable still name the native hand chain.
-    expect(button.cursor).toContain("blob:");
-    expect(button.cursor).toContain("3 2, pointer");
+    // The pointer is over the screen, so the in-screen pointer has taken over
+    // and hidden the host cursor. The host rule underneath still names the
+    // native hand chain: the stage pack stages the art as an opaque object URL,
+    // so only the hotspot suffix and the `--*-source` variable identify it.
+    expect(button.cursor).toBe("none");
+    expect(button.fallbackCursor).toContain("blob:");
+    expect(button.fallbackCursor).toContain("3 2, pointer");
   }
   expect(presentation.pointerSource).toContain("command-menu-pointer.png");
+  await expect(page.getByTestId("native-pointer")).toBeVisible();
+  await expect(page.getByTestId("native-pointer")).toHaveAttribute("data-frame", "hand");
 
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: "artifacts/playwright/game-functions-native-menu.png",

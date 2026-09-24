@@ -33,7 +33,6 @@ import {
 import { stagedRenderAssetSource } from "../staged-render-asset-cache";
 import {
   NATIVE_POINTER_FRAMES,
-  applyDiagonalEdgeScrollCursors,
   battlePointerCursorFor,
   type BattlePointerCursor,
 } from "../edge-scroll-cursors";
@@ -459,7 +458,6 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
         originBounds.max.x,
         originBounds.max.y,
       ].join(",");
-      applyDiagonalEdgeScrollCursors(canvas);
       this.setNativePointerCursor("hand");
       // Phaser still reports the scene as inactive during part of create(), so
       // the eager sync above can be ignored by the stale-scene guard. Static

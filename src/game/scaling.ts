@@ -15,6 +15,7 @@ import {
 } from "./desktop-runtime";
 import { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
 import { mountProgramPauseButton } from "./program-pause";
+import { mountNativePointer } from "./native-pointer";
 
 export { LOGICAL_SCREEN_HEIGHT, LOGICAL_SCREEN_WIDTH } from "./scaling-constants";
 
@@ -84,6 +85,7 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
     ? mountInterfaceZoomControls(interfaceSlot)
     : () => undefined;
   restoreInterfaceZoomOnce();
+  const pointer = mountNativePointer(screen);
   let integerResizeTimer: number | undefined;
 
   const availableDesktopHeight = (): number => Math.max(
@@ -126,6 +128,8 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
     screen.style.setProperty("--game-offset-x", `${offset}px`);
     document.documentElement.style.setProperty("--image-rendering", CSS_IMAGE_RENDERING[mode]);
     document.documentElement.dataset.imageScaling = mode;
+    // 指针不动时画面照样可能缩放或位移，画面内指针要按新的逻辑座标重摆。
+    pointer.refresh();
     if (mode === "integer") scheduleIntegerWindowResize();
   };
 
@@ -159,6 +163,7 @@ export function configureGameScaling(viewport: HTMLElement, screen: HTMLElement)
     window.removeEventListener("resize", resize);
     observer.disconnect();
     unsubscribe();
+    pointer.dispose();
     unmountInterfaceZoom();
     unmountOverlays();
     unmountProgramPause();

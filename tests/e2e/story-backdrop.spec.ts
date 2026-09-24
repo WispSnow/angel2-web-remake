@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { parkPointerOutsideScreen } from "./pointer-controls";
 import { decodeScreenshot, type ScreenshotPixels } from "./screenshot-pixels";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -34,6 +35,8 @@ const advanceToPortraitPage = async (page: Page) => {
     await page.locator("#logical-screen").click({ noWaitAfter: true }).catch(() => {});
     return false;
   }, { timeout: 30_000 }).toBe(true);
+  // 推进剧情的点击把画面内指针留在插画正中，截图前先移出画面。
+  await parkPointerOutsideScreen(page);
 };
 
 test("every interstitial story page tiles the native A/20 backdrop behind the illustration", async ({ page }) => {

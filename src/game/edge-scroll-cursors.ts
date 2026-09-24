@@ -111,13 +111,9 @@ export const DIAGONAL_EDGE_SCROLL_CURSOR_ART: Readonly<
   "down-right": diagonalArt("down-right"),
 };
 
-/** `styles.css` 读取的变量名；变量缺失时退回原版四角的纵向箭头。 */
-const diagonalEdgeScrollCursorProperty = (cursor: DiagonalEdgeScrollCursor): string =>
-  `--edge-scroll-cursor-${cursor}`;
+const renderedImages = new Map<DiagonalEdgeScrollCursor, string>();
 
-const renderedCursorValues = new Map<DiagonalEdgeScrollCursor, string>();
-
-function renderCursorValue(cursor: DiagonalEdgeScrollCursor): string | undefined {
+function renderImage(cursor: DiagonalEdgeScrollCursor): string | undefined {
   const art = DIAGONAL_EDGE_SCROLL_CURSOR_ART[cursor];
   const canvas = document.createElement("canvas");
   canvas.width = art.rows[0].length;
@@ -130,21 +126,28 @@ function renderCursorValue(cursor: DiagonalEdgeScrollCursor): string | undefined
       if (row[x] === "#") context.fillRect(x, y, 1, 1);
     }
   });
-  return `url("${canvas.toDataURL("image/png")}") ${art.hotspot.x} ${art.hotspot.y}, ${art.fallback}`;
+  return canvas.toDataURL("image/png");
 }
 
 /**
- * CSS `cursor` 只收图片网址，所以把像素表画成 PNG data URL 写进变量；每张只画一次，
- * 之后换关、换场景都重用同一字串。
+ * 把像素表画成 PNG data URL 写进 `styles.css` 读取的变量：画面内指针用
+ * `--edge-scroll-cursor-*-image`，宿主游标后备用含热点的完整值 `--edge-scroll-cursor-*`
+ * （缺失时退回原版四角的纵向箭头）。每张只画一次，之后换关、换场景都重用同一字串。
  */
 export function applyDiagonalEdgeScrollCursors(target: HTMLElement): void {
   for (const cursor of DIAGONAL_EDGE_SCROLL_CURSORS) {
-    let value = renderedCursorValues.get(cursor);
-    if (value === undefined) {
-      value = renderCursorValue(cursor);
-      if (value === undefined) continue;
-      renderedCursorValues.set(cursor, value);
+    let image = renderedImages.get(cursor);
+    if (image === undefined) {
+      image = renderImage(cursor);
+      if (image === undefined) continue;
+      renderedImages.set(cursor, image);
     }
-    target.style.setProperty(diagonalEdgeScrollCursorProperty(cursor), value);
+    const art = DIAGONAL_EDGE_SCROLL_CURSOR_ART[cursor];
+    const url = `url("${image}")`;
+    target.style.setProperty(`--edge-scroll-cursor-${cursor}-image`, url);
+    target.style.setProperty(
+      `--edge-scroll-cursor-${cursor}`,
+      `${url} ${art.hotspot.x} ${art.hotspot.y}, ${art.fallback}`,
+    );
   }
 }

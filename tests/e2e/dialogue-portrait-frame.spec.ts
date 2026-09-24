@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { parkPointerOutsideScreen } from "./pointer-controls";
 import { decodeScreenshot, type ScreenshotPixels } from "./screenshot-pixels";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -99,6 +100,8 @@ const expectNativePortraitComposite = async (
     layers: 2 + OUTLINE_COLUMNS.length,
   });
 
+  // 點擊推進或開選單會把畫面內指針留在畫面裡，逐像素比對前先移開。
+  await parkPointerOutsideScreen(page);
   const shot = decodeScreenshot(await page.getByTestId("game-screen").screenshot());
   // 夾具校驗：本用例只在 1:1 的邏輯螢幕上比對裝置像素。
   expect({ width: shot.width, height: shot.height }).toEqual({ width: 640, height: 350 });
