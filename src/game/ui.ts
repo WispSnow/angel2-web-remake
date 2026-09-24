@@ -1,4 +1,4 @@
-import { ASSETS, nextExperienceThresholdFor } from "./content/stage0";
+import { ASSETS } from "./content/stage0";
 import {
   DIALOGUE_PORTRAIT_FRAME_ASSETS,
   DIALOGUE_TEXT_WINDOW_ASSET,
@@ -2213,7 +2213,7 @@ function nativeUnitDetailText(
       attack: [field(stats.attack), field(baseStats.attack)],
       defense: [field(stats.defense), field(baseStats.defense)],
       levelGrowthRow: [field(stats.level)],
-      experience: [field(unit.experience), field(nextExperienceThresholdFor(unit))],
+      experience: [field(unit.experience), field(controller.battle.nextExperienceThresholdFor(unit))],
     },
     statusCounters: activeUnitStatusPresentations(unit.statuses)
       .map(({ remainingRounds }) => remainingRounds),
@@ -2239,7 +2239,7 @@ function renderHud(
   const baseStats = controller.battle.statsFor(unit);
   const concealedBossStats = controller.battle.stage.id === "stage-37" && unit.side === 2;
   const hpPercent = Math.max(0, Math.min(100, Math.floor(unit.life / stats.maxLife * 100)));
-  const nextExperience = nextExperienceThresholdFor(unit);
+  const nextExperience = controller.battle.nextExperienceThresholdFor(unit);
   const expPercent = Math.max(0, Math.min(100, Math.floor(unit.experience * 100 / Math.max(1, nextExperience))));
   const context = unitContextPresentation(controller, unit);
   const displayName = unitDisplayName(unit);

@@ -267,8 +267,8 @@ export interface SavedBattleState {
 
 interface SaveDataBase {
   format: "ANGEL2-web-save";
-  version: 120;
-  contentVersion: "original-stage-titles-1";
+  version: 121;
+  contentVersion: "enemy-linear-experience-step-1";
   savedAt: string;
   saveCount: number;
   ruleset: "stableRemake";

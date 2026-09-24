@@ -170,6 +170,20 @@ export function effectiveStatsFor(
 }
 
 /**
+ * 与 `statsFor` 同一条成长规则下的下一级门槛。`REMAKE-159` 起难度 1／2 的敌方 3 级之后
+ * 不再与我方共用门槛，所以经验栏必须从这里读，不能直接调用默认 `legacy` 的版本。
+ */
+export function nextExperienceThresholdAt(
+  unit: Pick<BattleUnit, "classId" | "experience" | "side">,
+  difficulty: Difficulty,
+): number {
+  return nextExperienceThresholdFor(
+    unit,
+    unit.side === 2 ? enemyScalingFor(difficulty).growth : "legacy",
+  );
+}
+
+/**
  * 敌方出场经验 = 走到 `ENEMY_SCALING[difficulty].level` 这一成长行所需的经验再 +1。
  * 门槛阶梯由成长模式决定，所以这里与 `statsFor` 必须读同一条规则。
  */

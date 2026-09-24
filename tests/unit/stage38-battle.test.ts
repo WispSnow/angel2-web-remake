@@ -7,6 +7,7 @@ import {
 } from "../../src/game/simulation/stage38-battle";
 import { isSaveData, parseSaveData, SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { BattleSaveData, CampaignState } from "../../src/game/types";
+import { onNativeLinearLadder } from "./native-linear-ladder";
 
 const campaign: CampaignState = {
   stageId: "stage-38",
@@ -94,7 +95,7 @@ describe("stage 38 battle simulation", () => {
     // written while the Web version called it 異世界 carry only that name over.
     expect(isSaveData({ ...save, stageLabel: "異世界" })).toBe(false);
     expect(parseSaveData(JSON.stringify({
-      ...save,
+      ...onNativeLinearLadder(save),
       version: 119,
       contentVersion: "stage-30-round-limit-199-1",
       stageLabel: "異世界",

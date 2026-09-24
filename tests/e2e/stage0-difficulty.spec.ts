@@ -3,7 +3,7 @@ import { skipStoryDialogue } from "./dialogue-controls";
 import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
-async function enterStage0FromOrdinaryStartup(page: Page, difficulty: 0 | 3): Promise<void> {
+async function enterStage0FromOrdinaryStartup(page: Page, difficulty: 0 | 1 | 2 | 3): Promise<void> {
   await page.goto("/");
   await skipOpeningToTitle(page);
   await expect(page.getByTestId("title-menu")).toBeVisible();
@@ -99,6 +99,42 @@ test("S00-Q: ordinary startup exposes the native lowest and highest difficulty s
       for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowLeft");
       for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
       await expectHudValues(page, "騎兵／哈釘", scenario.hading);
+    }
+  }
+});
+
+// REMAKE-159: on the two linear difficulties an enemy's rows after the third cost
+// its own early step, so the HUD's next-level field must read the enemy ladder —
+// 士兵 keeps 100 per row, 哈釘's 騎兵 needs 180. Seeded stats are unchanged.
+test("S00-U: ordinary startup shows the linear difficulties' enemy experience ladder", async ({ page }) => {
+  const cases = [
+    {
+      difficulty: 1 as const,
+      soldier: ["190／190", "48／48", "30／30", "4", "301／400"],
+      hading: ["290／290", "70／70", "39／39", "4", "541／720"],
+    },
+    {
+      difficulty: 2 as const,
+      soldier: ["210／210", "54／54", "36／36", "6", "501／600"],
+      hading: ["350／350", "80／80", "45／45", "6", "901／1080"],
+      screenshot: "artifacts/playwright/stage0-difficulty-2-hading.png",
+    },
+  ] as const;
+
+  for (const scenario of cases) {
+    await enterStage0FromOrdinaryStartup(page, scenario.difficulty);
+    // Allies stay on the native ladder on every difficulty.
+    await expectHudValues(page, "士兵／妮雅", ["180／180", "45／45", "27／27", "3", "299／300"]);
+
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowLeft");
+    await expectHudValues(page, "士兵／士兵", scenario.soldier);
+
+    for (let step = 0; step < 4; step += 1) await page.keyboard.press("ArrowLeft");
+    for (let step = 0; step < 6; step += 1) await page.keyboard.press("ArrowDown");
+    await expectHudValues(page, "騎兵／哈釘", scenario.hading);
+    if ("screenshot" in scenario) {
+      await captureVisualAudit(page.getByTestId("game-screen"), { path: scenario.screenshot });
     }
   }
 });

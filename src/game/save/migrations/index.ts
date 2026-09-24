@@ -1,9 +1,13 @@
 import {
+  classDefinition,
   classFallbackPortraitFor,
   classIdFromNativeRecord,
   className,
   classStatsFor,
   isClassId,
+  linearExperienceStepFor,
+  nativePostThirdRowExperienceStepFor,
+  type ClassId,
 } from "../../content/classes";
 import {
   STAGE0_ALLY_INITIAL_EXPERIENCE,
@@ -105,6 +109,59 @@ function restoreOriginalStageTitle(value: unknown): unknown {
   const correction = ORIGINAL_STAGE_TITLE_CORRECTIONS.find(({ stageId, previous }) =>
     value.stageId === stageId && value.stageLabel === previous);
   return correction ? { ...value, stageLabel: correction.original } : value;
+}
+
+/** REMAKE-103 introduced the `linear` enemy ladder in v83; v120 is the last version on it. */
+const NATIVE_LINEAR_LADDER_VERSIONS = { first: 83, last: 120 } as const;
+
+/**
+ * The same growth row and the same experience earned inside it, counted on the
+ * current `linear` ladder instead of the native post-third-row step it was stored on.
+ */
+function experienceOnCurrentLinearLadder(classId: ClassId, experience: number): number {
+  const previousStep = nativePostThirdRowExperienceStepFor(classId);
+  const currentStep = linearExperienceStepFor(classId);
+  if (previousStep === undefined || currentStep === undefined || previousStep === currentStep) {
+    return experience;
+  }
+  const thirdRowThreshold = classDefinition(classId).dataRows[2].experienceThreshold;
+  if (experience < thirdRowThreshold) return experience;
+  const rows = Math.floor((experience - thirdRowThreshold) / previousStep);
+  const earnedInRow = experience - thirdRowThreshold - rows * previousStep;
+  return thirdRowThreshold + rows * currentStep + Math.min(earnedInRow, currentStep - 1);
+}
+
+/**
+ * REMAKE-159 changes what a stored enemy experience value means on difficulties 1
+ * and 2: `linear` now counts the rows after the third on the class's own early step
+ * instead of the native `+100`. Every v83..v120 battle save wrote its side-2 values
+ * on the native ladder, so each one moves to the current ladder at the same growth
+ * row with the same experience earned inside it. Level, every derived stat and the
+ * life cap are unchanged on load and only the distance to the next row grows. An
+ * enemy still on its seed sits one point past its row, exactly where the new seed
+ * puts it, so the difficulty experience floor keeps holding. Difficulties 0 and 3
+ * never used `linear`, and completed saves carry no enemies.
+ */
+function rescaleLinearEnemyExperience(value: unknown): unknown {
+  if (!isRecord(value)
+    || !isIntegerBetween(
+      value.version,
+      NATIVE_LINEAR_LADDER_VERSIONS.first,
+      NATIVE_LINEAR_LADDER_VERSIONS.last,
+    )
+    || value.kind !== "battle"
+    || (value.difficulty !== 1 && value.difficulty !== 2)
+    || !isRecord(value.battle)
+    || !Array.isArray(value.battle.units)) return value;
+  const units = value.battle.units.map((unit: unknown) => {
+    if (!isRecord(unit)
+      || unit.side !== 2
+      || !isClassId(unit.classId)
+      || !isIntegerBetween(unit.experience, 0, MAX_EXPERIENCE)) return unit;
+    const experience = experienceOnCurrentLinearLadder(unit.classId, unit.experience);
+    return experience === unit.experience ? unit : { ...unit, experience };
+  });
+  return { ...value, battle: { ...value.battle, units } };
 }
 
 const GADIRATH_SLOT = 24;
@@ -678,6 +735,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 104
     || value.contentVersion !== "stage-09-escort-valley-route-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * REMAKE-159 moves difficulty 1/2 enemies onto the class's own early EXP step
+ * after the third row. The side-2 values were already rescaled by
+ * `rescaleLinearEnemyExperience`; nothing else in a v120 save changes meaning.
+ */
+function migrateVersion120Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 120
+    || value.contentVersion !== "original-stage-titles-1") return undefined;
   const migrated = {
     ...value,
     version: SAVE_VERSION,
@@ -3333,8 +3407,11 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migratePreviousSaveData(raw: unknown): SaveData | undefined {
-  // Every version step below validates against the current names.
-  const value = restoreOriginalStageTitle(raw);
+  // Every version step below validates against the current names and the
+  // current difficulty 1/2 enemy ladder.
+  const value = rescaleLinearEnemyExperience(restoreOriginalStageTitle(raw));
+  const migratedVersion120 = migrateVersion120Save(value);
+  if (migratedVersion120) return migratedVersion120;
   const migratedVersion119 = migrateVersion119Save(value);
   if (migratedVersion119) return migratedVersion119;
   const migratedVersion118 = migrateVersion118Save(value);

@@ -18,7 +18,12 @@ import {
 } from "../../src/game/save";
 import { STAGE_ROUND_LIMIT } from "../../src/game/simulation/objectives";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
-import { classFallbackPortraitFor, className, classStatsFor } from "../../src/game/content/classes";
+import {
+  classDefinition,
+  classFallbackPortraitFor,
+  className,
+  classStatsFor,
+} from "../../src/game/content/classes";
 import {
   completeCampaignRoster,
   initialEnemyExperience,
@@ -94,6 +99,7 @@ import { createFixedStageEnemy } from "../../src/game/simulation/fixed-stage-bat
 import type { Stage0Battle } from "../../src/game/simulation/battle";
 import { loadStageRuntime } from "../../src/game/stage-runtime";
 import type { BattleSaveData, CampaignState, CompletedSaveData, Difficulty } from "../../src/game/types";
+import { onNativeLinearLadder } from "./native-linear-ladder";
 
 const completedSave = (): CompletedSaveData => ({
   format: "ANGEL2-web-save",
@@ -2036,7 +2042,7 @@ describe("Web save validation", () => {
     // 没有字段新增或改义，可达范围本来就在读档后重算，所以 v83 存档无损迁移。
     for (const current of [battleSave(), completedSave()]) {
       const legacy = {
-        ...current,
+        ...onNativeLinearLadder(current),
         version: 83,
         contentVersion: "enemy-difficulty-scaling-1",
       };
@@ -5445,7 +5451,7 @@ describe("Web save validation", () => {
 
     const legacyAtCap = { ...battleSave(), battle: { ...battleSave().battle, round: STAGE_ROUND_LIMIT } };
     expect(parseSaveData(JSON.stringify({
-      ...legacyAtCap,
+      ...onNativeLinearLadder(legacyAtCap),
       version: 86,
       contentVersion: "stage-3-fourth-corps-promotion-ready-1",
     }))).toEqual(legacyAtCap);
@@ -5454,7 +5460,7 @@ describe("Web save validation", () => {
     // 判负前一回合复活，没有诚实的改写方式。
     const legacyPastCap = { ...battleSave(), battle: { ...battleSave().battle, round: STAGE_ROUND_LIMIT + 5 } };
     expect(parseSaveData(JSON.stringify({
-      ...legacyPastCap,
+      ...onNativeLinearLadder(legacyPastCap),
       version: 86,
       contentVersion: "stage-3-fourth-corps-promotion-ready-1",
     }))).toBeUndefined();
@@ -5482,7 +5488,7 @@ describe("Web save validation", () => {
     const stage3 = stage3BattleSave();
     const legacyStage3 = legacySeededStage3BattleSave();
     expect(parseSaveData(JSON.stringify({
-      ...legacyStage3,
+      ...onNativeLinearLadder(legacyStage3),
       version: 88,
       contentVersion: "stage-3-fourth-corps-joined-1",
     }))).toEqual(stage3);
@@ -5501,7 +5507,7 @@ describe("Web save validation", () => {
     // stored, so every v90 save migrates untouched.
     const battle = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...battle,
+      ...onNativeLinearLadder(battle),
       version: 90,
       contentVersion: "expert-attack-down-melee-targeting-1",
     }))).toEqual(battle);
@@ -5522,7 +5528,7 @@ describe("Web save validation", () => {
       ? { ...unit, name: "迅龍騎士", portrait: genericPortrait }
       : unit);
     const migrated = parseSaveData(JSON.stringify({
-      ...legacy,
+      ...onNativeLinearLadder(legacy),
       version: 91,
       contentVersion: "named-leader-line-hold-1",
     }));
@@ -5556,7 +5562,7 @@ describe("Web save validation", () => {
       return { ...generic, name: "巨斧戰士" };
     });
     const migrated = parseSaveData(JSON.stringify({
-      ...legacy,
+      ...onNativeLinearLadder(legacy),
       version: 92,
       contentVersion: "stage-33-named-enemies-1",
     }));
@@ -5584,7 +5590,7 @@ describe("Web save validation", () => {
   it("carries version-93 saves through the boss poison rules identity", () => {
     const battle = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...battle,
+      ...onNativeLinearLadder(battle),
       version: 93,
       contentVersion: "stage-27-eliola-display-name-1",
     }))).toEqual(battle);
@@ -5600,7 +5606,7 @@ describe("Web save validation", () => {
   it("carries version-94 saves through the stomp kill-experience identity", () => {
     const battle = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...battle,
+      ...onNativeLinearLadder(battle),
       version: 94,
       contentVersion: "boss-poison-one-third-1",
     }))).toEqual(battle);
@@ -5616,14 +5622,14 @@ describe("Web save validation", () => {
   it("migrates version-96 saves through lightning and selective stage-3 seeding", () => {
     const stage3 = previouslyUnseededStage3BattleSave();
     expect(parseSaveData(JSON.stringify({
-      ...stage3,
+      ...onNativeLinearLadder(stage3),
       version: 96,
       contentVersion: "stage-03-native-enemy-level-1",
     }))).toEqual(stage3BattleSave());
 
     const otherBattle = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...otherBattle,
+      ...onNativeLinearLadder(otherBattle),
       version: 96,
       contentVersion: "stage-03-native-enemy-level-1",
     }))).toEqual(otherBattle);
@@ -5645,7 +5651,7 @@ describe("Web save validation", () => {
       return { ...earned, life: statsFor(earned, difficulty).maxLife - 17 };
     });
     const migrated = parseSaveData(JSON.stringify({
-      ...previous,
+      ...onNativeLinearLadder(previous),
       version: 97,
       contentVersion: "lightning-tier-experience-1",
       battle: { ...previous.battle, units: previousUnits },
@@ -5668,7 +5674,7 @@ describe("Web save validation", () => {
 
     const otherBattle = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...otherBattle,
+      ...onNativeLinearLadder(otherBattle),
       version: 97,
       contentVersion: "lightning-tier-experience-1",
     }))).toEqual(otherBattle);
@@ -5691,7 +5697,7 @@ describe("Web save validation", () => {
   it("migrates version-98 saves into the native stage-4 reinforcement identity", () => {
     const current = stage4BattleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 98,
       contentVersion: "stage-03-lawless-enemy-level-1",
     }))).toEqual(current);
@@ -5713,7 +5719,7 @@ describe("Web save validation", () => {
   it("migrates version-99 saves without changing battle state for spent-leader eligibility", () => {
     const current = battleSave();
     const migrated = parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 99,
       contentVersion: "stage-04-native-reinforcements-1",
     }));
@@ -5730,7 +5736,7 @@ describe("Web save validation", () => {
   it("migrates version-100 saves without changing battle state for route-cost cohesion", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 100,
       contentVersion: "follow-leader-spent-anchor-1",
     }))).toEqual(current);
@@ -5746,7 +5752,7 @@ describe("Web save validation", () => {
   it("migrates version-101 saves without changing battle state for strict player cohesion", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 101,
       contentVersion: "follow-leader-path-route-cost-1",
     }))).toEqual(current);
@@ -5762,7 +5768,7 @@ describe("Web save validation", () => {
   it("migrates version-102 saves without changing battle state for follow-leader shooting", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 102,
       contentVersion: "follow-leader-player-cohesion-1",
     }))).toEqual(current);
@@ -5778,7 +5784,7 @@ describe("Web save validation", () => {
   it("migrates version-103 saves without changing battle state for the stage 9 escort route", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 103,
       contentVersion: "follow-leader-post-move-shooting-1",
     }))).toEqual(current);
@@ -5794,7 +5800,7 @@ describe("Web save validation", () => {
   it("migrates version-104 saves without changing battle state for shared-body kill rewards", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 104,
       contentVersion: "stage-09-escort-valley-route-1",
     }))).toEqual(current);
@@ -5830,6 +5836,69 @@ describe("Web save validation", () => {
     if (!pursuer) throw new Error("stage 27 pursuer is missing from the save");
     pursuer.classId = "soldier";
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
+  });
+
+  it("keeps difficulty 1/2 enemies on their growth row when moving them to their own early EXP step (REMAKE-159)", () => {
+    // v83..v120 的难度 1／2 敌方经验记在原版 3 级后 +100 门槛上。迁移保留成长行与行内已得
+    // 经验：等级、攻防、生命上限与现有生命读档前后逐值相同，只是离下一级更远。
+    const cavalryThird = classDefinition("cavalry").dataRows[2].experienceThreshold;
+    const seeded = battleSave();
+    expect(seeded.difficulty).toBe(2);
+    // 刚出场的敌人在第 6 行、行内 1 点，换算后正好是新阶梯的出场值。
+    expect(onNativeLinearLadder(seeded).battle.units[1].experience).toBe(cavalryThird + 3 * 100 + 1);
+    expect(seeded.battle.units[1].experience).toBe(initialEnemyExperience("cavalry", 2));
+
+    // 哈釘战中又拿到一行多：第 7 行、行内 51 点。
+    const leveled = battleSave();
+    const hading = { ...leveled.battle.units[1], experience: cavalryThird + 4 * 180 + 51 };
+    expect(statsFor(hading, 2).level).toBe(7);
+    leveled.battle.units[1] = hading;
+    const legacyLeveled = onNativeLinearLadder(leveled);
+    expect(legacyLeveled.battle.units[1].experience).toBe(cavalryThird + 4 * 100 + 51);
+    // 只改版本号不换算，旧值在新阶梯上只到第 5 行、也低于难度 2 的出场下限，读档必须拒绝。
+    expect(isSaveData({
+      ...legacyLeveled,
+      version: SAVE_VERSION,
+      contentVersion: SAVE_CONTENT_VERSION,
+    })).toBe(false);
+
+    for (const [version, contentVersion] of [
+      [120, "original-stage-titles-1"],
+      [83, "enemy-difficulty-scaling-1"],
+    ] as const) {
+      for (const current of [seeded, leveled]) {
+        expect(parseSaveData(JSON.stringify({
+          ...onNativeLinearLadder(current),
+          version,
+          contentVersion,
+        })), `v${version} ${current.battle.units[1].experience}`).toEqual(current);
+      }
+    }
+
+    // 难度 0／3 从没用过 linear 阶梯，旧值原样保留；完成档不带敌人。
+    for (const difficulty of [0, 3] as const) {
+      const native = { ...battleSave(), difficulty };
+      native.stageEntrySnapshot = { ...native.stageEntrySnapshot, difficulty };
+      const enemy = {
+        ...native.battle.units[1],
+        experience: initialEnemyExperience("cavalry", difficulty) + 150,
+      };
+      native.battle.units[1] = {
+        ...enemy,
+        life: Math.min(enemy.life, statsFor(enemy, difficulty).maxLife),
+      };
+      expect(parseSaveData(JSON.stringify({
+        ...native,
+        version: 120,
+        contentVersion: "original-stage-titles-1",
+      })), `d${difficulty}`).toEqual(native);
+    }
+    const completed: CompletedSaveData = { ...completedSave(), difficulty: 2 };
+    expect(parseSaveData(JSON.stringify({
+      ...completed,
+      version: 120,
+      contentVersion: "original-stage-titles-1",
+    }))).toEqual(completed);
   });
 
   it("renames stages 6, 7 and 8 to their DS:30BA titles when migrating older saves (REMAKE-158)", () => {
@@ -5910,7 +5979,7 @@ describe("Web save validation", () => {
 
     // Only the exact name an older version wrote for that id is renamed.
     expect(parseSaveData(JSON.stringify({
-      ...stage6BattleSave(),
+      ...onNativeLinearLadder(stage6BattleSave()),
       version: 119,
       contentVersion: "stage-30-round-limit-199-1",
       stageLabel: "營地遭到偷襲",
@@ -5918,7 +5987,7 @@ describe("Web save validation", () => {
     // Stages whose title never changed migrate by identity.
     for (const current of [battleSave(), completedSave()]) {
       expect(parseSaveData(JSON.stringify({
-        ...current,
+        ...onNativeLinearLadder(current),
         version: 119,
         contentVersion: "stage-30-round-limit-199-1",
       }))).toEqual(current);
@@ -5930,7 +5999,7 @@ describe("Web save validation", () => {
     // 回合以内，因此 v118 无损迁移。
     for (const current of [battleSave(), stage30BattleSave(3)]) {
       expect(parseSaveData(JSON.stringify({
-        ...current,
+        ...onNativeLinearLadder(current),
         version: 118,
         contentVersion: "stage-27-nearest-free-spawn-1",
       }))).toEqual(current);
@@ -5948,7 +6017,7 @@ describe("Web save validation", () => {
     // REMAKE-154 只改出兵格被占时的落点；落点每次都从棋盘重算、从不入档，因此 v117 无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 117,
       contentVersion: "stage-27-native-reinforcements-1",
     }))).toEqual(current);
@@ -5966,7 +6035,7 @@ describe("Web save validation", () => {
     // 不另存计数，因此 v116 战中档与完成档无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 116,
       contentVersion: "stage-26-priest-line-guard-1",
     }))).toEqual(current);
@@ -5984,7 +6053,7 @@ describe("Web save validation", () => {
     // 因此 v115 战中档与完成档无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 115,
       contentVersion: "guard-magic-archer-kins-entry-1",
     }))).toEqual(current);
@@ -6002,7 +6071,7 @@ describe("Web save validation", () => {
     // 下限只补仍停在 299 以下的魔祭師琴斯，这两份夹具的槽 7 仍是默认士兵，因此 v114 无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 114,
       contentVersion: "water-warrior-shot-terrain-1",
     }))).toEqual(current);
@@ -6039,7 +6108,7 @@ describe("Web save validation", () => {
     const savedKins = battle.roster.find(({ slot }) => slot === 7);
     expect(savedKins).toMatchObject({ classId: "magic-priest", experience: 0 });
     const migrated = parseSaveData(JSON.stringify({
-      ...battle,
+      ...onNativeLinearLadder(battle),
       version: 114,
       contentVersion: "water-warrior-shot-terrain-1",
     }));
@@ -6055,13 +6124,13 @@ describe("Web save validation", () => {
     const untouched = current.roster.find(({ slot }) => slot === 7);
     expect(untouched).toMatchObject({ classId: "soldier", experience: 0 });
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 114,
       contentVersion: "water-warrior-shot-terrain-1",
     }))?.roster.find(({ slot }) => slot === 7)).toEqual(untouched);
 
     const grown = {
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 114,
       contentVersion: "water-warrior-shot-terrain-1",
       roster: current.roster.map((entry) => entry.slot === 7
@@ -6077,7 +6146,7 @@ describe("Web save validation", () => {
     // 因此 v113 战中档与完成档无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 113,
       contentVersion: "enemy-phase-action-bits-1",
     }))).toEqual(current);
@@ -6095,7 +6164,7 @@ describe("Web save validation", () => {
     // 读档后的下一个敌方阶段才按新口径调度，因此 v112 无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 112,
       contentVersion: "boss-poison-and-life-band-1",
     }))).toEqual(current);
@@ -6114,7 +6183,7 @@ describe("Web save validation", () => {
     // 改写的字段，因此 v111 无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 111,
       contentVersion: "idle-rest-fallback-1",
     }))).toEqual(current);
@@ -6132,7 +6201,7 @@ describe("Web save validation", () => {
     // 仍出手与混乱普通职业不留原格；计划每次都从公开棋盘重算，因此 v110 无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 110,
       contentVersion: "shared-body-splash-pool-1",
     }))).toEqual(current);
@@ -6150,7 +6219,7 @@ describe("Web save validation", () => {
     // 与 PRNG 原样保留，读档后的下一次多格效果才按新口径结算，因此 v109 无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 109,
       contentVersion: "water-warrior-uniform-movement-1",
     }))).toEqual(current);
@@ -6168,7 +6237,7 @@ describe("Web save validation", () => {
     // 因此 v108 战中档与完成档无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 108,
       contentVersion: "enemy-magic-guard-lifecycle-1",
     }))).toEqual(current);
@@ -6186,7 +6255,7 @@ describe("Web save validation", () => {
     // side 2 的防魔那一刻恒为 0，没有需要改写的字段，因此 v107 战中档与完成档无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 107,
       contentVersion: "named-leader-line-holders-1",
     }))).toEqual(current);
@@ -6204,7 +6273,7 @@ describe("Web save validation", () => {
     // 棋盘、状态与 PRNG 都不动，因此 v106 战中档与完成档无损迁移。
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 106,
       contentVersion: "shooting-cast-experience-1",
     }))).toEqual(current);
@@ -6220,7 +6289,7 @@ describe("Web save validation", () => {
   it("migrates version-105 saves without changing battle state for shooting cast experience", () => {
     const current = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 105,
       contentVersion: "shared-body-kill-reward-1",
     }))).toEqual(current);
@@ -6248,7 +6317,7 @@ describe("Web save validation", () => {
       };
     });
     const legacy = {
-      ...current,
+      ...onNativeLinearLadder(current),
       version: 95,
       contentVersion: "stomp-kill-experience-1",
       difficulty,
@@ -6283,7 +6352,7 @@ describe("Web save validation", () => {
 
     const otherBattle = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...otherBattle,
+      ...onNativeLinearLadder(otherBattle),
       version: 95,
       contentVersion: "stomp-kill-experience-1",
     }))).toEqual(otherBattle);
@@ -6297,7 +6366,7 @@ describe("Web save validation", () => {
 
     const nonLawless = legacySeededStage3BattleSave(1);
     const migratedNonLawless = parseSaveData(JSON.stringify({
-      ...nonLawless,
+      ...onNativeLinearLadder(nonLawless),
       version: 95,
       contentVersion: "stomp-kill-experience-1",
     }));
@@ -6313,7 +6382,7 @@ describe("Web save validation", () => {
     // mid-battle and completed alike — migrates untouched.
     const battle = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...battle,
+      ...onNativeLinearLadder(battle),
       version: 89,
       contentVersion: "fourth-corps-rally-hold-1",
     }))).toEqual(battle);
@@ -6335,7 +6404,7 @@ describe("Web save validation", () => {
     const battle = stage3BattleSave();
     const seededBattle = legacySeededStage3BattleSave();
     const legacyBattle = {
-      ...seededBattle,
+      ...onNativeLinearLadder(seededBattle),
       version: 87,
       contentVersion: "stage-round-limit-99-1",
       consumedEventIds: ["stage-03-opening-story"],
@@ -6375,7 +6444,7 @@ describe("Web save validation", () => {
     // 其他关卡的存档不受影响。
     const stage0 = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...stage0,
+      ...onNativeLinearLadder(stage0),
       version: 87,
       contentVersion: "stage-round-limit-99-1",
     }))).toEqual(stage0);
@@ -6394,7 +6463,7 @@ describe("Web save validation", () => {
 
     const stage0 = battleSave();
     expect(parseSaveData(JSON.stringify({
-      ...stage0,
+      ...onNativeLinearLadder(stage0),
       version: 84,
       contentVersion: "control-zone-occupied-gap-1",
     }))).toEqual(stage0);
@@ -6406,7 +6475,7 @@ describe("Web save validation", () => {
       return moved === undefined ? unit : { ...unit, id: `1:${moved}`, slot: moved };
     });
     expect(parseSaveData(JSON.stringify({
-      ...legacyStage2,
+      ...onNativeLinearLadder(legacyStage2),
       version: 84,
       contentVersion: "control-zone-occupied-gap-1",
     }))).toBeUndefined();

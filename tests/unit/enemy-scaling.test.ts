@@ -3,6 +3,8 @@ import {
   CLASS_IDS,
   classDefinition,
   classStatsFor,
+  linearExperienceStepFor,
+  nativePostThirdRowExperienceStepFor,
   nextExperienceThresholdFor,
   type ClassId,
 } from "../../src/game/content/classes";
@@ -13,7 +15,12 @@ import {
   scriptedBossStatsFor,
   stage37BossMaximumLifeByDifficulty,
 } from "../../src/game/content/enemy-scaling";
-import { effectiveStatsFor, initialEnemyExperience, statsFor } from "../../src/game/content/stage0";
+import {
+  effectiveStatsFor,
+  initialEnemyExperience,
+  nextExperienceThresholdAt,
+  statsFor,
+} from "../../src/game/content/stage0";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
 import type { Difficulty, UnitStats, UnitStatuses } from "../../src/game/types";
 
@@ -100,21 +107,106 @@ describe("REMAKE-103 敌方难度缩放", () => {
     }
   });
 
-  it("linear 模式保持原版经验阶梯，敌方战中升级节奏不变", () => {
-    // 模式只改「每行给多少属性」。门槛沿用原版 3 级后增量，所以同一经验值在两种
-    // 模式下落在同一成长行——否则存档语义与升级演出都会跟着漂移。
+  it("REMAKE-159：linear 模式 3 级之后的门槛延续职业自己前 3 级的步长", () => {
+    // 属性步长取自前 3 级，门槛也取自前 3 级，3 级前后每点经验换到的属性因此相同。
+    // 改动前门槛沿用原版 3 级后的 +100，神劍戰士这类职业 3 级后成长快 4.5 倍。
     for (const classId of GROWTH_SCALED_CLASS_IDS) {
-      // 带成长覆写的职业是唯一例外，单独在下一条用例里说明。
-      if (CLASS_GROWTH_OVERRIDES[classId]) continue;
-      const third = classDefinition(classId).dataRows[2].experienceThreshold;
-      for (const offset of [0, 1, 500, 5_000, 50_000]) {
-        const unit = { classId, experience: third + offset, side: 2 as const };
-        expect(classStatsFor(unit, "linear").level, `${classId} +${offset}`)
-          .toBe(classStatsFor(unit, "legacy").level);
-        expect(nextExperienceThresholdFor(unit, "linear"), `${classId} +${offset} next`)
+      const rows = classDefinition(classId).dataRows;
+      const step = rows[1].experienceThreshold - rows[0].experienceThreshold;
+      // 除女帝外两段前期门槛逐值相同，「前 3 级的步长」没有歧义。
+      expect(rows[2].experienceThreshold - rows[1].experienceThreshold, `${classId} early rows`)
+        .toBe(step);
+      expect(linearExperienceStepFor(classId), classId).toBe(step);
+
+      const third = rows[2].experienceThreshold;
+      for (const rowsAbove of [0, 1, 3, 10]) {
+        for (const earned of [0, 1, step - 1]) {
+          const unit = { classId, experience: third + rowsAbove * step + earned, side: 2 as const };
+          expect(classStatsFor(unit, "linear").level, `${classId} +${rowsAbove}/${earned}`)
+            .toBe(3 + rowsAbove);
+          expect(nextExperienceThresholdFor(unit, "linear"), `${classId} +${rowsAbove}/${earned} next`)
+            .toBe(third + (rowsAbove + 1) * step);
+        }
+      }
+
+      // 出场后要再拿满一整个前期步长才升下一级，这就是敌方战中升级的节奏。
+      for (const difficulty of [1, 2] as const) {
+        const seeded = initialEnemyExperience(classId, difficulty);
+        const unit = { classId, experience: seeded, side: 2 as const };
+        expect(nextExperienceThresholdFor(unit, "linear") - (seeded - 1), `${classId} d${difficulty}`)
+          .toBe(step);
+      }
+    }
+  });
+
+  it("只有原版 +100 门槛的一转、二转职业与祈導師／魔導師换了阶梯", () => {
+    // 原版的 +100 只出现在可转职职业上，它是「3 级后再拿 100 经验就进入转职扫描」；
+    // 会一直升下去的终端职业，3 级后门槛本来就等于自己前 3 级的步长。
+    for (const classId of GROWTH_SCALED_CLASS_IDS) {
+      const promotable = classDefinition(classId).promotion.targets.length > 0;
+      expect(nativePostThirdRowExperienceStepFor(classId) === 100, classId).toBe(promotable);
+    }
+    // 士兵前 3 级同样是每行 100，所以实际换阶梯的是 11 个一转、二转职业，外加原版
+    // 3 级前后门槛为 590／570 的两名法系。
+    const changed = GROWTH_SCALED_CLASS_IDS.filter((classId) =>
+      linearExperienceStepFor(classId) !== nativePostThirdRowExperienceStepFor(classId));
+    expect([...changed].sort()).toEqual([
+      "archer",
+      "cavalry",
+      "divine-sword-warrior",
+      "land-knight",
+      "magic-guide",
+      "magician",
+      "monk",
+      "pegasus-warrior",
+      "prayer-guide",
+      "priest",
+      "sister",
+      "steel-armor-warrior",
+      "warrior",
+    ]);
+    // 新阶梯只会更长，同一成长行里已拿到的经验换算后仍留在这一行（存档迁移依赖这一点）。
+    for (const classId of changed) {
+      expect(linearExperienceStepFor(classId), classId)
+        .toBeGreaterThan(nativePostThirdRowExperienceStepFor(classId) ?? Infinity);
+    }
+  });
+
+  it("剧情 boss 保留原版门槛：属性逐难度取脚本值，经验只决定显示等级", () => {
+    for (const classId of SCRIPTED_BOSS_CLASS_IDS) {
+      expect(linearExperienceStepFor(classId), classId)
+        .toBe(nativePostThirdRowExperienceStepFor(classId));
+      for (const difficulty of [1, 2] as const) {
+        const unit = {
+          classId,
+          experience: initialEnemyExperience(classId, difficulty),
+          side: 2 as const,
+        };
+        expect(nextExperienceThresholdFor(unit, "linear"), `${classId} d${difficulty}`)
           .toBe(nextExperienceThresholdFor(unit, "legacy"));
       }
     }
+  });
+
+  it("经验栏按单位自己的成长规则取下一级门槛", () => {
+    // `REMAKE-159` 之后难度 1／2 的敌方 3 级后不再与我方共用门槛，HUD 与详情页读这个口。
+    for (const classId of GROWTH_SCALED_CLASS_IDS) {
+      const third = classDefinition(classId).dataRows[2].experienceThreshold;
+      const enemy = { classId, experience: third + 1, side: 2 as const };
+      const ally = { ...enemy, side: 1 as const };
+      for (const difficulty of DIFFICULTIES) {
+        const mode = ENEMY_SCALING[difficulty].growth;
+        expect(nextExperienceThresholdAt(enemy, difficulty), `${classId} enemy d${difficulty}`)
+          .toBe(nextExperienceThresholdFor(enemy, mode));
+        expect(nextExperienceThresholdAt(ally, difficulty), `${classId} ally d${difficulty}`)
+          .toBe(nextExperienceThresholdFor(ally));
+      }
+    }
+    const swordThird = classDefinition("divine-sword-warrior").dataRows[2].experienceThreshold;
+    const sword = { classId: "divine-sword-warrior" as const, experience: swordThird + 1 };
+    expect(nextExperienceThresholdAt({ ...sword, side: 2 }, 2)).toBe(swordThird + 450);
+    expect(nextExperienceThresholdAt({ ...sword, side: 2 }, 3)).toBe(swordThird + 100);
+    expect(nextExperienceThresholdAt({ ...sword, side: 1 }, 2)).toBe(swordThird + 100);
   });
 
   it("linear 模式接管 REMAKE-092 半龍戰士覆写，但敌方出场行完全一致", () => {

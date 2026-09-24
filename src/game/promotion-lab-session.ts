@@ -7,9 +7,11 @@ import {
   promotionExperienceThresholdFor,
   type ClassId,
 } from "./content/classes";
+import { nextExperienceThresholdAt } from "./content/stage0";
 import { STAGE1_DEFINITION } from "./content/stage1";
 import type { ArenaBattleEnvironment } from "./simulation/arena-battle";
 import { CLASS_SHOWDOWN_MAP, classShowdownTerrainSlotAt } from "./class-showdown-session";
+import type { Difficulty } from "./types";
 
 export const PROMOTION_LAB_CLASS_IDS = CLASS_IDS.filter(
   (classId) => classDefinition(classId).promotion.targets.length > 0,
@@ -27,7 +29,21 @@ export function promotionLabExperienceFor(classId: ClassId): number {
   return promotionExperienceThresholdFor(classId) - 1;
 }
 
-export function createPromotionLabPlacements(): readonly ArenaUnitPlacement[] {
+/**
+ * 敌方只升级、不转职，它的第 4 成长行按所选难度的成长规则计：难度 0／3 与我方同为
+ * 第三行阈值 + 100，`REMAKE-159` 起难度 1／2 的敌方按职业自己前 3 级的门槛步长。
+ */
+export function promotionLabEnemyExperienceFor(classId: ClassId, difficulty: Difficulty): number {
+  const thirdRowThreshold = classDefinition(classId).dataRows[2].experienceThreshold;
+  return nextExperienceThresholdAt(
+    { classId, experience: thirdRowThreshold, side: 2 },
+    difficulty,
+  ) - 1;
+}
+
+export function createPromotionLabPlacements(
+  difficulty: Difficulty = 0,
+): readonly ArenaUnitPlacement[] {
   return PROMOTION_LAB_CLASS_IDS.flatMap((classId, index) => {
     const column = Math.floor(index / PROMOTION_LAB_ROWS_PER_COLUMN);
     const row = index % PROMOTION_LAB_ROWS_PER_COLUMN;
@@ -54,7 +70,7 @@ export function createPromotionLabPlacements(): readonly ArenaUnitPlacement[] {
         slot: index,
         classId,
         level: 3 as const,
-        experience,
+        experience: promotionLabEnemyExperienceFor(classId, difficulty),
         portrait: classFallbackPortraitFor(classId, 2),
         x: x.enemy,
         y,

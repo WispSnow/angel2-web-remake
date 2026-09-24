@@ -11,7 +11,6 @@ import {
 import {
   classDefinition,
   className,
-  classStatsFor,
   promotionExperienceThresholdFor,
 } from "./game/content/classes";
 import { TECHNIQUE_LAB_UNIT_ASSETS } from "./game/content/technique-lab.generated";
@@ -77,7 +76,7 @@ function renderSetup(): void {
         <div>
           <span>TRIGGER CONTROL</span>
           <h2 id="promotion-lab-controls-heading">原版臨界經驗</h2>
-          <p>正式戰鬥成長只讀前三個 DATA 行；之後按職業短碼成長。這 12 種職業敵我均為 +100 經驗進入第 4 成長行，但只有我方會進入轉職掃描。</p>
+          <p>正式戰鬥成長只讀前三個 DATA 行；之後按職業短碼成長。難度 0／3 下這 12 種職業敵我均為 +100 經驗進入第 4 成長行；難度 1／2 的敵方改按該職業前 3 級的經驗步長。每一檔都讓雙方只差 1 經驗開戰，但只有我方會進入轉職掃描。</p>
         </div>
         <label>戰鬥難度
           <select data-testid="promotion-lab-difficulty">
@@ -122,13 +121,15 @@ function renderSetup(): void {
 
 function updateBattleProgress(): void {
   if (!controller) return;
+  const battle = controller.battle;
   const sourceById = new Map(PROMOTION_LAB_CLASS_IDS.map(
     (classId, index) => [`promotion-1-${index}`, classId],
   ));
-  const promotedAllies = controller.battle.units.filter((unit) =>
+  const promotedAllies = battle.units.filter((unit) =>
     unit.side === 1 && sourceById.get(unit.id) !== unit.classId).length;
-  const levelFourEnemies = controller.battle.units.filter((unit) =>
-    unit.side === 2 && classStatsFor(unit).level >= 4).length;
+  // Enemy levels follow the chosen difficulty's growth rule (REMAKE-159).
+  const levelFourEnemies = battle.units.filter((unit) =>
+    unit.side === 2 && battle.statsFor(unit).level >= 4).length;
   const progress = toolbar.querySelector<HTMLElement>("[data-testid=promotion-lab-progress]");
   if (progress) {
     progress.textContent = `我方已轉職 ${promotedAllies}/${PROMOTION_LAB_CLASS_IDS.length} · 敵方等級 4+ ${levelFourEnemies}/${PROMOTION_LAB_CLASS_IDS.length}`;
@@ -139,7 +140,7 @@ function startBattle(): void {
   destroySetup();
   destroySetup = () => undefined;
   mode = "battle";
-  const placements = createPromotionLabPlacements();
+  const placements = createPromotionLabPlacements(difficulty);
   const battle = new ArenaBattle(placements, difficulty, undefined, PROMOTION_LAB_ENVIRONMENT);
   controller = GameController.forStandaloneBattle(
     battle,
@@ -190,7 +191,7 @@ declare global {
 
 window.__ANGEL2_PROMOTION_LAB__ = {
   getState: () => mode === "setup"
-    ? { mode, difficulty, placements: createPromotionLabPlacements() }
+    ? { mode, difficulty, placements: createPromotionLabPlacements(difficulty) }
     : { mode, difficulty, battle: controller?.debugState() },
   startBattle,
   returnToSetup: renderSetup,

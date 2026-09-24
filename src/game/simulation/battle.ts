@@ -30,7 +30,7 @@ import {
   shootingActionIdFor,
   techniqueActionIdsFor,
 } from "../content/actions";
-import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, effectiveStatsFor, isStage0Exit, statsFor, terrainSlotAt } from "../content/stage0";
+import { STAGE0, STAGE0_AI_CLASS_PRIORITY, STAGE0_IRON_PLATE_TERRAIN_SLOT, STAGE0_OBSTACLE_TERRAIN_SLOT, completeCampaignRoster, createStage0Units, effectiveStatsFor, isStage0Exit, nextExperienceThresholdAt, statsFor, terrainSlotAt } from "../content/stage0";
 import { STAGE0_DEFINITION, type StageDefinition } from "../content/stages";
 import type { AttackResult, BattleOutcome, BattleUnit, CampaignState, Difficulty, DynamicTerrainKind, DynamicTerrainOverride, PortraitRecord, Position, SaveRosterEntry, SavedBattleState, Side, UnitClassId, UnitStats, UnitStatuses } from "../types";
 import { DeterministicRng } from "./rng";
@@ -1092,6 +1092,10 @@ export class Stage0Battle {
 
   effectiveStatsFor(unit: BattleUnit): UnitStats {
     return effectiveStatsFor(unit, this.difficulty);
+  }
+
+  nextExperienceThresholdFor(unit: Pick<BattleUnit, "classId" | "experience" | "side">): number {
+    return nextExperienceThresholdAt(unit, this.difficulty);
   }
 
   moveUnit(id: string, destination: Position): boolean {

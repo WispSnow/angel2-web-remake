@@ -10,6 +10,7 @@ import {
   PROMOTION_LAB_ENVIRONMENT,
   PROMOTION_LAB_ROWS_PER_COLUMN,
   createPromotionLabPlacements,
+  promotionLabEnemyExperienceFor,
   promotionLabExperienceFor,
   promotionLabPair,
 } from "../../src/game/promotion-lab-session";
@@ -44,6 +45,33 @@ describe("promotion trigger lab", () => {
       }).level)).toEqual([3, 3]);
       expect(promotionLabExperienceFor(classId)).toBe(threshold - 1);
     }
+  });
+
+  it("places enemies one point below their fourth growth row on every difficulty (REMAKE-159)", () => {
+    for (const difficulty of [0, 1, 2, 3] as const) {
+      const battle = new ArenaBattle(
+        createPromotionLabPlacements(difficulty),
+        difficulty,
+        undefined,
+        PROMOTION_LAB_ENVIRONMENT,
+      );
+      for (const [index, classId] of PROMOTION_LAB_CLASS_IDS.entries()) {
+        const enemy = battle.unit(`promotion-2-${index}`);
+        if (!enemy) throw new Error(`missing enemy ${classId}`);
+        expect(enemy.experience, `${classId} d${difficulty}`)
+          .toBe(promotionLabEnemyExperienceFor(classId, difficulty));
+        expect(battle.statsFor(enemy).level, `${classId} d${difficulty}`).toBe(3);
+        expect(battle.statsFor({ ...enemy, experience: enemy.experience + 1 }).level,
+          `${classId} d${difficulty} +1`).toBe(4);
+        expect(battle.unit(`promotion-1-${index}`)?.experience).toBe(promotionLabExperienceFor(classId));
+      }
+    }
+    // 难度 1／2 的敵方神劍戰士要在第三行之上拿满自己前 3 级的 450 才进第 4 成长行；
+    // 难度 0／3 与我方一样是原版的 +100。
+    const swordThird = classDefinition("divine-sword-warrior").dataRows[2].experienceThreshold;
+    expect(promotionLabEnemyExperienceFor("divine-sword-warrior", 1)).toBe(swordThird + 449);
+    expect(promotionLabEnemyExperienceFor("divine-sword-warrior", 3)).toBe(swordThird + 99);
+    expect(promotionLabExperienceFor("divine-sword-warrior")).toBe(swordThird + 99);
   });
 
   it("uses formal combat to promote allies while enemies only advance a growth level", () => {

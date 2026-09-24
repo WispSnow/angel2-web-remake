@@ -338,6 +338,20 @@ test("REMAKE-152 與 REMAKE-154 將兩關的敵軍配置漏洞列入 Bug 修復"
   await expect(page.getByTestId("remake-note-REMAKE-154")).toHaveCount(0);
 });
 
+test("REMAKE-103 說明線性成長的屬性與升級經驗都延續前 3 級", async ({ page }) => {
+  await page.goto("/");
+  await openNotes(page, "balance");
+  const linearGrowth = page.getByTestId("remake-note-REMAKE-103");
+  await expect(linearGrowth).toContainText("敵方難度細化為「成長曲線」與「登場等級」雙重維度");
+  // REMAKE-159: the post-level-3 EXP step follows the class's own levels 1–3 as well.
+  await expect(linearGrowth).toContainText("與升級所需經驗，都延續該職業 1 至 3 級的步調");
+  await expect(linearGrowth).toContainText("關卡內的升級不會一口氣跨過難度檔位");
+  await expect(linearGrowth).toContainText("分別提至 4 級與 6 級");
+  await captureVisualAudit(linearGrowth, {
+    path: "artifacts/playwright/remake-notes-linear-growth.png",
+  });
+});
+
 test("REMAKE-127 將第 8、11 關敵軍難度成長列為平衡調整", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "balance");

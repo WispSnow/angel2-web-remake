@@ -293,14 +293,48 @@ function growthFor(classId: ClassId, side: BattleUnit["side"] = 1) {
 }
 
 /**
+ * 原版第三行之后每一成长行的经验门槛。`legacy` 一直按它走；`REMAKE-159` 之前
+ * `linear` 也按它走，存档迁移据此把旧版敌方经验换算到现行阶梯。
+ */
+export function nativePostThirdRowExperienceStepFor(
+  classId: ClassId,
+  side: BattleUnit["side"] = 2,
+): number | undefined {
+  return growthFor(classId, side)?.thresholdIncrement;
+}
+
+/**
+ * REMAKE-159：`linear` 模式 3 级之后每一成长行的经验门槛，取职业自己前 3 级的门槛步长。
+ *
+ * 原版只有可转职职业用默认的 `+100` 门槛——转职触发就是「第三行阈值 + 100」，这个数
+ * 是离转职扫描还差多少，不是给持续成长设计的阶梯。会一直升下去的终端职业（第 4 层、
+ * 弩兵、魔弓兵、半龍、水戰士、工兵）原版 3 级后的门槛都等于自己前 3 级的步长，只有
+ * 祈導師／魔導師是 570 对 590。`REMAKE-103` 让敌方 3 级后继续拿前 3 级的属性步长，却仍
+ * 按 `+100` 计门槛，一转、二转共 11 个职业每点经验换到的属性因此是前 3 级的 1.8～4.5
+ * 倍；门槛也延续前 3 级的步长后，3 级前后每点经验的成长速度相同。
+ *
+ * 剧情 boss（龍／頭／手）的属性逐难度取脚本值、不走成长曲线，经验只决定显示等级和
+ * 普通攻击经验公式里的 `L`，所以保留原版门槛。
+ */
+export function linearExperienceStepFor(
+  classId: ClassId,
+  side: BattleUnit["side"] = 2,
+): number | undefined {
+  const nativeStep = nativePostThirdRowExperienceStepFor(classId, side);
+  if (nativeStep === undefined || isBossClass(classId)) return nativeStep;
+  const rows = classDefinition(classId).dataRows;
+  return rows[1].experienceThreshold - rows[0].experienceThreshold;
+}
+
+/**
  * REMAKE-103 `linear` 模式：把职业前 3 级的每行增量一直延续下去。
  *
  * 除女帝外，全部职业第 1→2 行与第 2→3 行的属性增量和经验门槛增量逐值相同，所以
  * 「前 3 级的成长数值」就是 `dataRows[1] − dataRows[0]`，无须在两段之间取舍。女帝
  * 是唯一例外（两段门槛 1200／100 不同），但她只以 side 1 出场，够不到本模式。
  *
- * 门槛沿用原版 3 级后的增量而不是前 3 级的增量：本模式只改「每行给多少属性」，
- * 经验↔等级的阶梯保持原版，敌方战中升级节奏因而完全不变。
+ * 门槛同样延续前 3 级的步长（`REMAKE-159`，见 `linearExperienceStepFor`）；出场等级
+ * 另由难度表决定。
  *
  * 本模式绕开 `CLASS_GROWTH_OVERRIDES`。那些覆写是为 `legacy` 曲线打的补丁，其中
  * `REMAKE-092` 半龍戰士本身就是「把前 3 级曲线续到 6 级」——在 `linear` 下由通用
@@ -311,10 +345,10 @@ function linearGrowthSegmentsFor(
   side: BattleUnit["side"],
 ): readonly ClassGrowthSegment[] {
   const rows = classDefinition(classId).dataRows;
-  const growth = growthFor(classId, side);
-  if (!growth) return [];
+  const thresholdIncrement = linearExperienceStepFor(classId, side);
+  if (thresholdIncrement === undefined) return [];
   return [{
-    thresholdIncrement: growth.thresholdIncrement,
+    thresholdIncrement,
     attackIncrement: rows[1].attack - rows[0].attack,
     defenseIncrement: rows[1].defense - rows[0].defense,
     maxLifeIncrement: rows[1].maxLife - rows[0].maxLife,

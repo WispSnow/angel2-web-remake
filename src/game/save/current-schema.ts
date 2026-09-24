@@ -30,8 +30,8 @@ import type {
   UnitClassId,
 } from "../types";
 
-export const SAVE_VERSION = 120 as const;
-export const SAVE_CONTENT_VERSION = "original-stage-titles-1" as const;
+export const SAVE_VERSION = 121 as const;
+export const SAVE_CONTENT_VERSION = "enemy-linear-experience-step-1" as const;
 
 export const MAX_UNIT_SLOT = 74;
 export const MAX_BATTLE_UNIT_SLOT = 79;

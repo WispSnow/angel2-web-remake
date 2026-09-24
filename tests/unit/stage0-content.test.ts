@@ -127,7 +127,8 @@ describe("stage 0 evidence-backed content", () => {
   it("reproduces the stage-0 enemy stats for all four difficulties", () => {
     // 难度 0（等级 2）与难度 3（等级 5 + ×1.5）逐字保持原版。难度 1／2 走
     // `REMAKE-103` 的 linear 曲线并分别坐在等级 4／6：士兵每行 +3/+3/+10，
-    // 騎兵每行 +5/+3/+30，经验阶梯仍是原版的每行 +100。
+    // 騎兵每行 +5/+3/+30。`REMAKE-159` 起 3 级之后的经验阶梯取各职业前 3 级的
+    // 步长：士兵仍是每行 100，騎兵是每行 180，出场属性不变。
     const expected = [
       {
         soldier: { experience: 101, attack: 42, defense: 24, maxLife: 170, level: 2 },
@@ -135,11 +136,11 @@ describe("stage 0 evidence-backed content", () => {
       },
       {
         soldier: { experience: 301, attack: 48, defense: 30, maxLife: 190, level: 4 },
-        hading: { experience: 461, attack: 70, defense: 39, maxLife: 290, level: 4 },
+        hading: { experience: 541, attack: 70, defense: 39, maxLife: 290, level: 4 },
       },
       {
         soldier: { experience: 501, attack: 54, defense: 36, maxLife: 210, level: 6 },
-        hading: { experience: 661, attack: 80, defense: 45, maxLife: 350, level: 6 },
+        hading: { experience: 901, attack: 80, defense: 45, maxLife: 350, level: 6 },
       },
       {
         soldier: { experience: 401, attack: 70, defense: 40, maxLife: 300, level: 5 },
