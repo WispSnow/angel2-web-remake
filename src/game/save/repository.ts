@@ -65,3 +65,30 @@ export function writeSaveSlot(
   storage.setItem(saveSlotKey(slot), raw);
   return { kind: "written" };
 }
+
+export type SaveSlotDeleteResult =
+  | { kind: "deleted" }
+  | { kind: "empty" }
+  | { kind: "failed" };
+
+/**
+ * Clears one manual slot, the in-game counterpart of deleting an original
+ * `WARn.TST`: the slot scanner then reads it as empty. A corrupt record is
+ * cleared like any other. Only this slot's key is touched — the other slots,
+ * a running battle and its entry snapshot never live under it. A browser that
+ * refuses the write (blocked site data, some private modes) reports `failed`
+ * instead of throwing into the menu that asked.
+ */
+export function deleteSaveSlot(
+  storage: Pick<Storage, "getItem" | "removeItem">,
+  slot: number,
+): SaveSlotDeleteResult {
+  const key = saveSlotKey(slot);
+  try {
+    if (storage.getItem(key) === null) return { kind: "empty" };
+    storage.removeItem(key);
+    return storage.getItem(key) === null ? { kind: "deleted" } : { kind: "failed" };
+  } catch {
+    return { kind: "failed" };
+  }
+}

@@ -925,7 +925,7 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
       return;
     }
     const recordBackupButton = (event.target as Element).closest<HTMLElement>(
-      "[data-action^=record-backup]",
+      "[data-action^=record-backup], [data-action^=record-delete]",
     );
     if (recordBackupButton && recordBackupUi.handlePointerOver(recordBackupButton)) return;
     const command = (event.target as Element).closest<HTMLElement>("[data-command-index]");
@@ -1708,7 +1708,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
   };
   recordBackupUi = mountRecordSaveBackupUi(root, {
     storage: localStorage,
+    selectedSlot: () => controller.recordMenuIndex + 1,
     onRecordsRestored: () => render(),
+    onRecordDeleted: () => render(),
     onStatus: (message) => {
       recordBackupStatus = message;
       controller.dismissRecordSaveNotice();
@@ -2354,7 +2356,10 @@ interface RecordPanelConfig {
   /** 读取模式下空槽不可确认；储存模式允许覆盖。 */
   readonly disableEmptySlots: boolean;
   readonly cancelAction?: string;
-  /** 戰中記錄面板可直接備份全部二十槽；戰後單次存檔面板不顯示這組宿主工具。 */
+  /**
+   * 戰中記錄面板可直接備份全部二十槽，也可刪除游標所在的單一記錄；戰後單次存檔面板
+   * 不顯示這組宿主工具。
+   */
   readonly showBackupTools?: boolean;
   /**
    * 标题列右侧的现代字体状态：备份结果或写入失败提示。战中面板总有这一栏；战后面板
@@ -2400,11 +2405,13 @@ function renderRecordPanel(controller: GameController, config: RecordPanelConfig
         aria-live="polite">${config.status ?? ""}</span>`
     : "";
   const backupTools = config.showBackupTools
-    ? `<div class="record-panel-backup-tools" role="group" aria-label="記錄備份">
+    ? `<div class="record-panel-tools" role="group" aria-label="記錄工具">
         <button type="button" data-action="record-backup-export"
           data-testid="record-backup-export">匯 出</button>
         <button type="button" data-action="record-backup-import"
           data-testid="record-backup-import">匯 入</button>
+        <button type="button" data-action="record-delete"
+          data-testid="record-backup-delete" aria-label="刪除目前選取的記錄">刪 除</button>
       </div>`
     : "";
   return `<div class="record-panel-title"><strong>${config.title}</strong>${status}</div>

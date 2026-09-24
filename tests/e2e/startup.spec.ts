@@ -560,6 +560,87 @@ test("BOOT-B restore: import validates, confirms safely, and replaces all twenty
   await expect(page.getByTestId("title-record-slot-3")).toHaveAttribute("data-slot-state", "valid");
 });
 
+test("BOOT-B delete: the title deletes only the selected record behind a cancel-first confirmation", async ({ page }) => {
+  await page.goto("/?test=1");
+  await writeLocalSave(page, 1, legacyBattleSave());
+  await writeLocalSave(page, 2, "{");
+  await writeLocalSave(page, 3, completedSave());
+  await page.reload();
+  await skipOpeningToTitle(page);
+  await page.getByTestId("continue-game").click();
+  await expect(page.getByTestId("title-record-menu")).toBeVisible();
+  const storedSlot = (slot: number) => page.evaluate(
+    (key) => localStorage.getItem(key),
+    `angel2.save.${slot}`,
+  );
+  const firstRecord = await storedSlot(1);
+
+  await expect(page.getByRole("group", { name: "記錄工具" }).getByRole("button"))
+    .toHaveText(["匯出全部記錄", "匯入記錄", "刪除此記錄"]);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("title-record-slot-3")).toHaveAttribute("aria-current", "true");
+  await page.getByTestId("delete-save-record").click();
+  const confirm = page.getByTestId("delete-save-confirm");
+  await expect(confirm).toBeVisible();
+  await expect(page.getByTestId("delete-save-title")).toHaveText("刪除記錄 3？");
+  await expect(page.getByTestId("delete-save-summary"))
+    .toHaveText("瓦爾克麗宮・戰役完成・困難重重・2026-07-25 12:00 UTC");
+  await expect(page.getByTestId("cancel-save-delete")).toHaveAttribute("aria-current", "true");
+  await captureVisualAudit(page.getByTestId("title-record-menu"), {
+    path: "artifacts/playwright/startup-save-delete-confirm.png",
+  });
+
+  // Like the batch restore, the confirmation opens on 取消 and nothing is written before it.
+  await page.keyboard.press("Enter");
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("delete-save-record")).toBeFocused();
+  expect(await storedSlot(3)).not.toBeNull();
+
+  await page.getByTestId("delete-save-record").click();
+  await expect(confirm).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("title-record-menu")).toBeVisible();
+  expect(await storedSlot(3)).not.toBeNull();
+
+  await page.getByTestId("delete-save-record").click();
+  await page.getByTestId("confirm-save-delete").click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("title-record-detail")).toHaveText("已刪除記錄 3。");
+  await expect(page.getByTestId("title-record-slot-3")).toHaveAttribute("data-slot-state", "empty");
+  await expect(page.getByTestId("title-record-slot-3")).toHaveAttribute("aria-current", "true");
+  expect(await storedSlot(3)).toBeNull();
+  expect(await storedSlot(1)).toBe(firstRecord);
+  // The closed dialog uncovered other rows under the still pointer; only real motion
+  // may move the cursor, so the result stays readable.
+  await expect(page.getByTestId("title-record-detail")).toHaveText("已刪除記錄 3。");
+  await expect(page.getByTestId("title-record-slot-3")).toHaveAttribute("aria-current", "true");
+
+  // A corrupt record can be cleared too; the confirmation says it is unreadable.
+  await page.keyboard.press("ArrowUp");
+  await page.getByTestId("delete-save-record").click();
+  await expect(page.getByTestId("delete-save-title")).toHaveText("刪除記錄 2？");
+  await expect(page.getByTestId("delete-save-summary")).toHaveText("資料損壞或版本不相容，無法讀取。");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("confirm-save-delete")).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("Enter");
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("title-record-slot-2")).toHaveAttribute("data-slot-state", "empty");
+  expect(await storedSlot(2)).toBeNull();
+
+  // An empty slot has nothing to confirm.
+  await page.getByTestId("delete-save-record").click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("title-record-detail")).toHaveText("記錄 2 是空槽，沒有可刪除的資料。");
+  await expect(page.getByTestId("title-record-slot-1")).toHaveAttribute("data-slot-state", "valid");
+  expect(await storedSlot(1)).toBe(firstRecord);
+
+  await page.getByTestId("title-record-slot-1").hover();
+  await expect(page.getByTestId("title-record-slot-1")).toHaveAttribute("aria-current", "true");
+  await expect(page.getByTestId("title-record-detail")).toContainText("記錄 1：瓦爾克麗宮");
+});
+
 test("BOOT-C: a normal reconnect migrates a stage-0 clear into stage-1 prebattle", async ({ page }) => {
   const save = completedSave();
   await page.goto("/");

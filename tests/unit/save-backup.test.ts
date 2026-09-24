@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import {
   createSaveBackup,
+  deleteSaveSlot,
   parseSaveBackup,
+  readSaveSlot,
   restoreSaveBackup,
   saveBackupFilename,
   SAVE_BACKUP_FORMAT,
@@ -38,6 +40,7 @@ const completedSave = (saveCount = 3): CompletedSaveData => ({
 class MemoryStorage {
   readonly values = new Map<string, string>();
   failNextSetKey: string | undefined;
+  failNextRemoveKey: string | undefined;
 
   getItem(key: string): string | null {
     return this.values.get(key) ?? null;
@@ -52,6 +55,10 @@ class MemoryStorage {
   }
 
   removeItem(key: string): void {
+    if (key === this.failNextRemoveKey) {
+      this.failNextRemoveKey = undefined;
+      throw new Error("storage blocked");
+    }
     this.values.delete(key);
   }
 }
@@ -136,5 +143,44 @@ describe("portable save backups", () => {
     expect(target.getItem(saveSlotKey(1))).toBeNull();
     expect(target.getItem(saveSlotKey(2))).toBeNull();
     expect(target.getItem(saveSlotKey(4))).toBe(previous);
+  });
+});
+
+describe("single manual slot deletion", () => {
+  it("clears only the chosen slot, corrupt or valid, and leaves the rest byte for byte", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(saveSlotKey(1), JSON.stringify(completedSave(1)));
+    storage.setItem(saveSlotKey(2), "{");
+    storage.setItem(saveSlotKey(3), JSON.stringify(completedSave(3)));
+    const untouched = storage.getItem(saveSlotKey(3));
+
+    expect(deleteSaveSlot(storage, 1)).toEqual({ kind: "deleted" });
+    expect(readSaveSlot(storage, 1)).toEqual({ kind: "empty" });
+    expect(deleteSaveSlot(storage, 2)).toEqual({ kind: "deleted" });
+    expect(readSaveSlot(storage, 2)).toEqual({ kind: "empty" });
+    expect(storage.getItem(saveSlotKey(3))).toBe(untouched);
+    expect([...storage.values.keys()]).toEqual([saveSlotKey(3)]);
+  });
+
+  it("reports an empty slot without touching storage", () => {
+    const storage = new MemoryStorage();
+    storage.failNextRemoveKey = saveSlotKey(4);
+    expect(deleteSaveSlot(storage, 4)).toEqual({ kind: "empty" });
+    expect(storage.failNextRemoveKey).toBe(saveSlotKey(4));
+  });
+
+  it("keeps the record and reports failure when the browser refuses the write", () => {
+    const storage = new MemoryStorage();
+    const raw = JSON.stringify(completedSave(2));
+    storage.setItem(saveSlotKey(5), raw);
+    storage.failNextRemoveKey = saveSlotKey(5);
+    expect(deleteSaveSlot(storage, 5)).toEqual({ kind: "failed" });
+    expect(storage.getItem(saveSlotKey(5))).toBe(raw);
+
+    const ignoresRemoval = {
+      getItem: (key: string) => (key === saveSlotKey(5) ? raw : null),
+      removeItem: () => undefined,
+    };
+    expect(deleteSaveSlot(ignoresRemoval, 5)).toEqual({ kind: "failed" });
   });
 });

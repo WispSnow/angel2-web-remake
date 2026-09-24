@@ -18,6 +18,7 @@ export {
   type SaveBackupData,
 } from "./save/backup";
 export {
+  deleteSaveSlot,
   readSaveSlot,
   SAVE_SLOT_COUNT,
   SAVE_SLOT_PAGE_COUNT,
@@ -28,6 +29,7 @@ export {
   saveSlotPageIndex,
   saveSlotPageStart,
   writeSaveSlot,
+  type SaveSlotDeleteResult,
   type SaveSlotReadResult,
   type SaveSlotWriteResult,
 } from "./save/repository";

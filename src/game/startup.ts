@@ -426,13 +426,17 @@ export function mountStartup(
     if (titleAssembled) paintTitleStatic();
   };
 
+  const reloadRecordSlots = () => {
+    refreshRecordSlots();
+    renderRecordSlots();
+    updateMenuSelection();
+  };
+
   saveBackupUi = mountSaveBackupUi(recordSelector, {
     storage: localStorage,
-    onRecordsRestored: () => {
-      refreshRecordSlots();
-      renderRecordSlots();
-      updateMenuSelection();
-    },
+    selectedSlot: () => recordIndex + 1,
+    onRecordsRestored: reloadRecordSlots,
+    onRecordDeleted: reloadRecordSlots,
     onStatus: (message) => { recordDetail.textContent = message; },
   });
 
@@ -778,12 +782,24 @@ export function mountStartup(
       difficultyIndex = index;
       difficultyHintByKeyboard = false;
     }
-    else {
-      setRecordIndex(index);
-      return;
-    }
+    // Record rows follow real pointer motion instead (`onPointerMove`).
+    else return;
     titleStatus.textContent = "";
     updateMenuSelection();
+  };
+
+  /**
+   * Record rows select on `pointermove`, like the in-battle record panel. Chrome
+   * also fires `pointerover` when a closing dialog uncovers the row under a still
+   * pointer, which moved the cursor off the record just deleted or restored and
+   * wrote that row's description over the result message.
+   */
+  const onPointerMove = (event: PointerEvent) => {
+    if (phase !== "records") return;
+    const row = (event.target as Element).closest<HTMLButtonElement>("[data-startup-action=record]");
+    if (!row) return;
+    const index = Number(row.dataset.menuIndex);
+    if (index !== recordIndex) setRecordIndex(index);
   };
 
   const onClick = (event: MouseEvent) => {
@@ -969,6 +985,7 @@ export function mountStartup(
     stopScaling();
     window.removeEventListener("keydown", onKeyDown);
     root.removeEventListener("pointerover", onPointerOver);
+    root.removeEventListener("pointermove", onPointerMove);
     root.removeEventListener("click", onClick);
     root.removeEventListener("pointerdown", onPointerDown);
     root.removeEventListener("contextmenu", onContextMenu);
@@ -978,6 +995,7 @@ export function mountStartup(
 
   window.addEventListener("keydown", onKeyDown);
   root.addEventListener("pointerover", onPointerOver);
+  root.addEventListener("pointermove", onPointerMove);
   root.addEventListener("click", onClick);
   root.addEventListener("pointerdown", onPointerDown);
   root.addEventListener("contextmenu", onContextMenu);

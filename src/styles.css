@@ -413,7 +413,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   height: 23px;
 }
 .startup-record-tools button,
-.startup-import-confirm-actions button {
+.startup-record-confirm-actions button {
   min-width: 112px;
   height: 21px;
   padding: 0 10px;
@@ -426,9 +426,9 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .startup-record-tools button:hover,
 .startup-record-tools button:focus-visible,
-.startup-import-confirm-actions button:hover,
-.startup-import-confirm-actions button:focus-visible,
-.startup-import-confirm-actions button.is-selected {
+.startup-record-confirm-actions button:hover,
+.startup-record-confirm-actions button:focus-visible,
+.startup-record-confirm-actions button.is-selected {
   border-color: #f1e9d3;
   color: #fff;
   background: var(--record-panel-button-active);
@@ -444,7 +444,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   font-size: 11px;
   text-align: center;
 }
-.startup-import-confirm {
+.startup-record-confirm {
   position: absolute;
   z-index: 2;
   left: 116px;
@@ -459,19 +459,19 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   box-shadow: 0 8px 24px #000d, inset 0 0 0 2px #2c2440;
   text-align: center;
 }
-.startup-import-confirm h3 {
+.startup-record-confirm h3 {
   margin: 0 0 13px;
   color: #f6e36b;
   font-size: 17px;
   letter-spacing: .12em;
 }
-.startup-import-confirm p {
+.startup-record-confirm p {
   margin: 6px 0;
   color: #eee9dc;
   font-size: 12px;
   line-height: 18px;
 }
-.startup-import-confirm-actions {
+.startup-record-confirm-actions {
   display: flex;
   justify-content: center;
   gap: 12px;
@@ -1241,14 +1241,14 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .record-panel-pagination > button:hover,
 .record-panel-pagination > button:focus-visible { color: #fff; background: #a8865c; outline: none; }
-.record-panel-backup-tools {
+.record-panel-tools {
   grid-column: 1;
   justify-self: start;
   display: flex;
   gap: 4px;
 }
-.record-panel-backup-tools > button,
-.record-backup-confirm-actions > button {
+.record-panel-tools > button,
+.record-tools-confirm-actions > button {
   height: 20px;
   padding: 0 7px;
   border: 1px solid #46331f;
@@ -1260,11 +1260,11 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   text-shadow: 1px 1px #000;
   cursor: var(--native-cursor-hand, pointer);
 }
-.record-panel-backup-tools > button:hover,
-.record-panel-backup-tools > button:focus-visible,
-.record-backup-confirm-actions > button:hover,
-.record-backup-confirm-actions > button:focus-visible,
-.record-backup-confirm-actions > button.is-selected {
+.record-panel-tools > button:hover,
+.record-panel-tools > button:focus-visible,
+.record-tools-confirm-actions > button:hover,
+.record-tools-confirm-actions > button:focus-visible,
+.record-tools-confirm-actions > button.is-selected {
   color: #fff;
   background: #a8865c;
   outline: none;
@@ -1286,7 +1286,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .record-panel-cancel:hover,
 .record-panel-cancel:focus-visible { color: #fff; background: #a8865c; outline: none; }
-.record-backup-confirm.record-panel {
+.record-tools-confirm.record-panel {
   z-index: 17;
   left: 82px;
   top: 82px;
@@ -1301,26 +1301,26 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
     inset 0 0 0 1px #46331f,
     6px 7px 0 #0009;
 }
-.record-backup-confirm h3 {
+.record-tools-confirm h3 {
   margin: 0 0 11px;
   color: #ffeab4;
   font-size: 17px;
   font-weight: 400;
   letter-spacing: .12em;
 }
-.record-backup-confirm p {
+.record-tools-confirm p {
   margin: 6px 0;
   color: #f0e2c1;
   font-size: 11px;
   line-height: 17px;
 }
-.record-backup-confirm-actions {
+.record-tools-confirm-actions {
   display: flex;
   justify-content: center;
   gap: 12px;
   margin-top: 13px;
 }
-.record-backup-confirm-actions > button { min-width: 72px; }
+.record-tools-confirm-actions > button { min-width: 72px; }
 /* Anchored inside the map viewport's top-right corner (right edge 440px, top
    edge 23px) instead of across its floor, where the strip used to sit on top of
    the pieces the player is about to command. The box shrinks to its text and

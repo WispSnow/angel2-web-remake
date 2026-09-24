@@ -2393,6 +2393,71 @@ test("RHP-03c: a record the load path would reject leaves the slot and keeps the
   expect(await page.evaluate(() => localStorage.getItem("angel2.save.1"))).toBe(kept);
 });
 
+test("RHP-03d: in-game record pages delete only the selected record and leave the battle alone", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await page.evaluate(() => window.__ANGEL2__?.clearSaves());
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+  await page.getByTestId("battle-canvas").hover({ position: { x: 420, y: 45 } });
+  for (const slot of [1, 2]) {
+    await page.getByTestId("save-hotspot").click();
+    await page.getByTestId(`record-slot-${slot}`).click();
+    await expect(page.getByTestId("record-menu")).toBeHidden();
+  }
+  const storedSlot = (slot: number) => page.evaluate(
+    (key) => localStorage.getItem(key),
+    `angel2.save.${slot}`,
+  );
+  const firstRecord = await storedSlot(1);
+  const battleBeforeDelete = await debugState(page);
+
+  await page.getByTestId("load-hotspot").click();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  await expect(page.getByRole("group", { name: "記錄工具" }).getByRole("button"))
+    .toHaveText(["匯 出", "匯 入", "刪 除"]);
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("record-slot-2")).toHaveAttribute("aria-current", "true");
+  await page.getByTestId("record-backup-delete").click();
+  const confirm = page.getByTestId("record-delete-confirm");
+  await expect(confirm).toBeVisible();
+  await expect(page.getByTestId("record-delete-title")).toHaveText("刪除記錄 2？");
+  await expect(page.getByTestId("record-delete-summary")).toContainText("瓦爾克麗宮・第 1 回合・過關斬將");
+  await expect(page.getByTestId("record-delete-cancel")).toHaveAttribute("aria-current", "true");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-record-delete-confirm.png",
+  });
+
+  // The confirmation opens on 取消, and a right click backs out of it like Esc.
+  await page.getByTestId("record-delete-confirm-delete").hover();
+  await page.getByTestId("game-screen").click({ button: "right", position: { x: 600, y: 300 } });
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("record-menu")).toBeVisible();
+  expect(await storedSlot(2)).not.toBeNull();
+
+  await page.getByTestId("record-backup-delete").click();
+  await page.getByTestId("record-delete-confirm-delete").click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("record-panel-status")).toHaveText("已刪除記錄 2。");
+  await expect(page.getByTestId("record-slot-2")).toContainText("此處沒有記錄");
+  await expect(page.getByTestId("record-slot-2")).toBeDisabled();
+  await expect(page.getByTestId("record-slot-1")).not.toBeDisabled();
+  expect(await storedSlot(2)).toBeNull();
+  expect(await storedSlot(1)).toBe(firstRecord);
+
+  await page.keyboard.press("ArrowDown");
+  await page.getByTestId("record-backup-delete").click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId("record-panel-status")).toHaveText("記錄 3 是空槽，沒有可刪除的資料。");
+
+  const battleAfterDelete = await debugState(page);
+  expect(battleAfterDelete.units).toEqual(battleBeforeDelete.units);
+  expect(battleAfterDelete.rngState).toBe(battleBeforeDelete.rngState);
+  expect(battleAfterDelete.round).toBe(battleBeforeDelete.round);
+  expect(battleAfterDelete.cursor).toEqual(battleBeforeDelete.cursor);
+});
+
 test("RHP-04: grid, edge-scroll and portrait objects control persistent presentation only", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await page.evaluate(() => localStorage.removeItem("angel2.preferences.presentation.v1"));
