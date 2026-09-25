@@ -27,6 +27,7 @@ interface Stage1DebugState {
   rngState: number;
   rngCalls: number;
   round: number;
+  statusMessage: string;
   enemyAi: {
     activeGroupIds: string[];
     pendingNoticeGroupIds: string[];
@@ -373,6 +374,12 @@ test("S01-A through S01-E: deployment, techniques, save restore and victory rout
     "battle-command",
   );
   await completeBattleCommandDialogue(page);
+  // The activation notice lasts until the first enemy acts. It names the trailing
+  // commander from her live unit (a hand-written name outlived REMAKE-051).
+  await page.waitForFunction(() => {
+    const current = window.__ANGEL2__?.getState() as Stage1DebugState | undefined;
+    return current?.statusMessage === "城堡守軍解除警戒，全軍進入追擊；娜米將於下一回合出擊。";
+  });
   const aiTechniqueDialogue = page.getByTestId("dialogue-layer");
   await expect(aiTechniqueDialogue).toHaveAttribute("data-source-record", "ai-technique");
   await expect(aiTechniqueDialogue).toHaveAttribute("data-source-wait", "10");

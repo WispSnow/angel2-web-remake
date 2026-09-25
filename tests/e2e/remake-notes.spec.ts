@@ -341,6 +341,24 @@ test("REMAKE-152 與 REMAKE-154 將兩關的敵軍配置漏洞列入 Bug 修復"
   await expect(page.getByTestId("remake-note-REMAKE-154")).toHaveCount(0);
 });
 
+test("REMAKE-162 把「騎士城堡前」隔河攻擊娜米的漏洞列入 Bug 修復", async ({ page }) => {
+  await page.goto("/");
+  // 使用者要求的、與原版不同的關卡改動一律算原版缺陷修復，不歸「平衡性調整」。
+  await openNotes(page, "fixes");
+  const guardedCommander = page.getByTestId("remake-note-REMAKE-162");
+  await expect(guardedCommander).toContainText("「騎士城堡前」攻擊娜米會驚動城堡守軍");
+  await expect(guardedCommander).toContainText("就能隔河反覆對她施法或射擊");
+  await expect(guardedCommander).toContainText("就與直接攻擊守軍一樣");
+  await expect(guardedCommander).toContainText("娜米本人仍從下一回合起才出擊");
+  await expect(guardedCommander.locator(".rn-note-id")).toHaveText("REMAKE-162");
+  await captureVisualAudit(guardedCommander, {
+    path: "artifacts/playwright/remake-notes-stage1-guarded-commander.png",
+  });
+
+  await page.getByTestId("remake-notes-tab-balance").click();
+  await expect(page.getByTestId("remake-note-REMAKE-162")).toHaveCount(0);
+});
+
 test("REMAKE-103 說明線性成長的屬性與升級經驗都延續前 3 級", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "balance");

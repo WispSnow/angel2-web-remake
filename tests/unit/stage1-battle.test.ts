@@ -278,7 +278,10 @@ describe("stage 1 battle construction", () => {
     player.y = candidate.y;
 
     expect(sisterRanges.every((range) => range.valueAt(player) === 0)).toBe(true);
-    expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: ["castle-guard"] });
+    expect(battle.beginEnemyPhase()).toEqual({
+      activatedGroupIds: ["castle-guard"],
+      delayedPursuitUnitIds: ["2:16"],
+    });
     const guardAction = battle.planEnemyAiAction("2:40");
     expect(guardAction).toMatchObject({ kind: "attack", targetId: player.id });
     expect(guardAction?.path.length).toBeGreaterThan(1);
@@ -341,7 +344,10 @@ describe("stage 1 battle construction", () => {
     player.x = sister.x;
     player.y = sister.y + 4;
 
-    expect(battle.beginEnemyPhase()).toEqual({ activatedGroupIds: ["castle-guard"] });
+    expect(battle.beginEnemyPhase()).toEqual({
+      activatedGroupIds: ["castle-guard"],
+      delayedPursuitUnitIds: ["2:16"],
+    });
     for (const id of ["2:40", "2:41", "2:42", "2:43"]) {
       expect(battle.enemyAiIntentFor(id)).toBe("pursuit");
     }
@@ -426,9 +432,92 @@ describe("stage 1 battle construction", () => {
 
     const restored = new Stage1Battle(campaign, deploymentWithMagician());
     restored.restore(battle.serializableSnapshot());
-    expect(restored.beginEnemyPhase()).toEqual({ activatedGroupIds: ["castle-guard"] });
+    expect(restored.beginEnemyPhase()).toEqual({
+      activatedGroupIds: ["castle-guard"],
+      delayedPursuitUnitIds: ["2:16"],
+    });
     expect(restored.beginEnemyPhase()).toEqual({ activatedGroupIds: [] });
     expect(restored.enemyAiIntentFor("2:16")).toBe("sentry");
+  });
+
+  it("wakes the castle guard when Nami is hit from outside every member's reach (REMAKE-162)", () => {
+    // The reported loophole: from (25,20) 初級炎暴 reaches Nami four cells away
+    // while both sisters stand six away, so no member can deal damage this turn
+    // and the guard used to sleep through her whole death.
+    const battle = new Stage1Battle(campaign, deploymentWithMagician());
+    const magician = battle.unit("1:24")!;
+    magician.x = 25;
+    magician.y = 20;
+    for (const sisterId of ["2:42", "2:43"]) {
+      expect(battle.actionRange(sisterId, "fire-1").valueAt(magician)).toBe(0);
+    }
+
+    battle.commitPreparedAction(battle.prepareSpecialAction({
+      actionId: "fire-1",
+      actorId: magician.id,
+      targetId: "2:16",
+    }));
+    expect(battle.serializableSnapshot().enemyAi).toEqual({
+      activeGroupIds: ["castle-guard"],
+      pendingNoticeGroupIds: ["castle-guard"],
+      fangPursuitRound: 2,
+    });
+
+    expect(battle.beginEnemyPhase()).toEqual({
+      activatedGroupIds: ["castle-guard"],
+      delayedPursuitUnitIds: ["2:16"],
+    });
+    for (const id of ["2:40", "2:41", "2:42", "2:43"]) {
+      expect(battle.enemyAiIntentFor(id)).toBe("pursuit");
+    }
+    // She still trails her guard by one round; the woken sisters tend her meanwhile.
+    expect(battle.enemyAiIntentFor("2:16")).toBe("sentry");
+    expect(battle.planEnemyAiAction("2:42")).toMatchObject({
+      kind: "special",
+      actionId: "heal-1",
+      targetId: "2:16",
+    });
+    battle.startNextRound();
+    expect(battle.enemyAiIntentFor("2:16")).toBe("pursuit");
+  });
+
+  it("counts a technique that only splashes Nami, but not one that reaches neither her nor a member", () => {
+    const splashCast = (patrolX: number) => {
+      const battle = new Stage1Battle(campaign, deploymentWithMagician());
+      const magician = battle.unit("1:24")!;
+      magician.x = 25;
+      magician.y = 20;
+      battle.unit("2:45")!.x = patrolX;
+      const prepared = battle.prepareSpecialAction({
+        actionId: "lightning-1",
+        actorId: magician.id,
+        targetId: "2:45",
+      });
+      battle.commitPreparedAction(prepared);
+      return {
+        affectedIds: prepared.affectedUnits.map(({ unitId }) => unitId).sort(),
+        enemyAi: battle.serializableSnapshot().enemyAi,
+      };
+    };
+
+    // 初級落雷 on the patrol soldier in front of the bridge: Nami two cells from
+    // the centre takes the outer ring, while the sisters four cells away take nothing.
+    const splash = splashCast(25);
+    expect(splash.affectedIds).toEqual(["2:16", "2:45", "2:46"]);
+    expect(splash.enemyAi).toEqual({
+      activeGroupIds: ["castle-guard"],
+      pendingNoticeGroupIds: ["castle-guard"],
+      fangPursuitRound: 2,
+    });
+
+    // One cell to the left the same strike misses her and every member.
+    const miss = splashCast(24);
+    expect(miss.affectedIds).toEqual(["2:45", "2:46"]);
+    expect(miss.enemyAi).toEqual({
+      activeGroupIds: [],
+      pendingNoticeGroupIds: [],
+      fangPursuitRound: null,
+    });
   });
 
   it("lets pursuit units move and attack in one action", () => {

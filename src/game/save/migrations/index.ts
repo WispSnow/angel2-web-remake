@@ -744,6 +744,24 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
 }
 
 /**
+ * REMAKE-162 lets a hostile player action that reaches 娜米 wake stage 1's
+ * castle guard. The protected slot comes from stage content and the activation
+ * state is already saved, so v121 saves migrate by identity: an earlier hit on
+ * her is not replayed, and the next one wakes the guard.
+ */
+function migrateVersion121Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 121
+    || value.contentVersion !== "enemy-linear-experience-step-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
  * REMAKE-159 moves difficulty 1/2 enemies onto the class's own early EXP step
  * after the third row. The side-2 values were already rescaled by
  * `rescaleLinearEnemyExperience`; nothing else in a v120 save changes meaning.
@@ -3410,6 +3428,8 @@ function migratePreviousSaveData(raw: unknown): SaveData | undefined {
   // Every version step below validates against the current names and the
   // current difficulty 1/2 enemy ladder.
   const value = rescaleLinearEnemyExperience(restoreOriginalStageTitle(raw));
+  const migratedVersion121 = migrateVersion121Save(value);
+  if (migratedVersion121) return migratedVersion121;
   const migratedVersion120 = migrateVersion120Save(value);
   if (migratedVersion120) return migratedVersion120;
   const migratedVersion119 = migrateVersion119Save(value);

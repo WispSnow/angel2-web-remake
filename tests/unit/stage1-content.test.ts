@@ -118,6 +118,7 @@ describe("stage 1 generated content", () => {
         id: "castle-guard",
         slots: [40, 41, 42, 43],
         trigger: "damage-this-turn",
+        protectedSlots: [16],
       },
       commander: { slot: 16, pursuitDelayRounds: 1 },
     });

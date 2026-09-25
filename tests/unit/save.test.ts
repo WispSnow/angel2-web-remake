@@ -5838,6 +5838,30 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("migrates version-121 saves by identity when the castle guard starts protecting Nami (REMAKE-162)", () => {
+    // REMAKE-162 只让我军波及娜米的敌对动作唤醒第 1 关城堡守军；受保护槽位来自关卡内容，
+    // 激活状态本就入档，因此 v121 无损迁移。读档前她受过的伤不追溯唤醒守军。
+    const wounded = stage1BattleSave();
+    wounded.battle.units.find(({ id }) => id === "2:16")!.life -= 1;
+    expect(wounded.battle.enemyAi).toEqual({
+      activeGroupIds: [],
+      pendingNoticeGroupIds: [],
+      fangPursuitRound: null,
+    });
+    for (const current of [battleSave(), wounded, completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...current,
+        version: 121,
+        contentVersion: "enemy-linear-experience-step-1",
+      })), `${current.kind} ${current.stageId}`).toEqual(current);
+    }
+    expect(parseSaveData(JSON.stringify({
+      ...wounded,
+      version: 121,
+      contentVersion: "stage-01-guard-protects-commander-1",
+    }))).toBeUndefined();
+  });
+
   it("keeps difficulty 1/2 enemies on their growth row when moving them to their own early EXP step (REMAKE-159)", () => {
     // v83..v120 的难度 1／2 敌方经验记在原版 3 级后 +100 门槛上。迁移保留成长行与行内已得
     // 经验：等级、攻防、生命上限与现有生命读档前后逐值相同，只是离下一级更远。

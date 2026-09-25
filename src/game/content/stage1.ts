@@ -87,6 +87,10 @@ export const STAGE1_STABLE_AI = {
     id: "castle-guard",
     slots: [40, 41, 42, 43],
     trigger: "damage-this-turn",
+    // REMAKE-162: the guard holds the bridge for 娜米, so a hostile player action
+    // that reaches her provokes it exactly like one against a member. Her own
+    // reach still does not: the phase-start damage check stays member-only.
+    protectedSlots: [16],
   },
   commander: {
     slot: 16,

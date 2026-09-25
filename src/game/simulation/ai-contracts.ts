@@ -95,4 +95,10 @@ export type EnemyAiIntent = "route" | "sentry" | "alert" | "pursuit";
 
 export interface EnemyPhaseUpdate {
   activatedGroupIds: readonly string[];
+  /**
+   * Units an activation this phase only turns into pursuers from a later round —
+   * stage 1's commander trails the castle guard by one. The notice names them
+   * from the live units, so a renamed boss can never go stale in the UI text.
+   */
+  delayedPursuitUnitIds?: readonly string[];
 }

@@ -3443,8 +3443,15 @@ export class GameController {
     this.battle.clearActionDisableState(1);
     this.phase = "enemy";
     const enemyPhaseUpdate = this.battle.beginEnemyPhase();
+    // The trailing commander is named from the live unit: a hand-written name
+    // here outlived REMAKE-051's rename of the stage 1 boss.
+    const trailingNames = (enemyPhaseUpdate.delayedPursuitUnitIds ?? [])
+      .flatMap((id) => this.battle.unit(id)?.name ?? []);
+    const trailingNotice = trailingNames.length > 0
+      ? `；${trailingNames.join("、")}將於下一回合出擊`
+      : "";
     this.statusMessage = enemyPhaseUpdate.activatedGroupIds.includes("castle-guard")
-      ? "城堡守軍解除警戒，全軍進入追擊；芳將於下一回合出擊。"
+      ? `城堡守軍解除警戒，全軍進入追擊${trailingNotice}。`
       : this.stageRuntime.enemyPhaseStatusText;
     this.emit();
     if (enemyPhaseUpdate.activatedGroupIds.length > 0) {

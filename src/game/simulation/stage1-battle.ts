@@ -41,6 +41,13 @@ import type {
 export const STAGE1_CASTLE_GUARD_GROUP_ID = STAGE1_STABLE_AI.alertGroup.id;
 const enemyId = (slot: number): string => `2:${slot}`;
 const STAGE1_CASTLE_GUARD_IDS = new Set(STAGE1_STABLE_AI.alertGroup.slots.map(enemyId));
+// REMAKE-162: a hostile player action that reaches a member or the commander the
+// guard protects provokes it. Only this hook reads the protected slots; the
+// phase-start damage check stays member-only, so Nami's own reach wakes nobody.
+const STAGE1_CASTLE_GUARD_PROVOCATION_IDS = new Set([
+  ...STAGE1_STABLE_AI.alertGroup.slots,
+  ...STAGE1_STABLE_AI.alertGroup.protectedSlots,
+].map(enemyId));
 const STAGE1_OPENING_PURSUIT_IDS = new Set(STAGE1_STABLE_AI.pursuitGroup.slots.map(enemyId));
 const STAGE1_FANG_ID = enemyId(STAGE1_STABLE_AI.commander.slot);
 
@@ -142,7 +149,11 @@ export class Stage1Battle extends Stage0Battle {
     }
     const activatedGroupIds = [...this.pendingNoticeGroupIds];
     this.pendingNoticeGroupIds.clear();
-    return { activatedGroupIds };
+    const commanderTrails = activatedGroupIds.includes(STAGE1_CASTLE_GUARD_GROUP_ID)
+      && this.enemyAiIntentFor(STAGE1_FANG_ID) === "sentry";
+    return commanderTrails
+      ? { activatedGroupIds, delayedPursuitUnitIds: [STAGE1_FANG_ID] }
+      : { activatedGroupIds };
   }
 
   override enemyAiIntentFor(id: string): EnemyAiIntent | undefined {
@@ -200,8 +211,12 @@ export class Stage1Battle extends Stage0Battle {
     };
   }
 
+  /**
+   * Called for the defender of an ordinary attack and for every opposing unit a
+   * shot or technique affects, splash included, before any damage lands.
+   */
   protected override onHostileTargeted(actor: BattleUnit, target: BattleUnit): void {
-    if (actor.side === 1 && STAGE1_CASTLE_GUARD_IDS.has(target.id)) {
+    if (actor.side === 1 && STAGE1_CASTLE_GUARD_PROVOCATION_IDS.has(target.id)) {
       this.activateCastleGuard();
     }
   }
