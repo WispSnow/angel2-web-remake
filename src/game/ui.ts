@@ -30,7 +30,7 @@ import {
   TACTICAL_PANEL_CHROME_COMPOSITE,
   UNIT_DETAIL_CHROME_COMPOSITE,
 } from "./chrome-composite";
-import type { CombatPresentation, GameController } from "./controller";
+import type { CombatPresentation, GameController, UnitCommandId } from "./controller";
 import {
   FULL_COMBAT_FRAME_META,
   type FullCombatSpriteState,
@@ -891,6 +891,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "rest") controller.chooseRest();
     else if (action === "end-unit") controller.chooseEnd();
     else if (action === "undo-move") controller.chooseUndo();
+    else if (action === "confirm-extra-move") controller.confirmExtraMove();
+    else if (action === "cancel-extra-move") controller.cancelExtraMove();
     else if (action === "promotion-target") {
       controller.selectPromotionTarget(Number(button.dataset.promotionIndex));
       controller.confirmPromotion();
@@ -1193,10 +1195,12 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
             ? "選擇單位行動"
             : controller.commandMenuKind === "extraMove"
               ? "選擇飛龍騎士攻擊後移動或放棄"
-              : "選擇移動後行動",
+              : controller.commandMenuKind === "extraMoveConfirm"
+                ? "確認飛龍騎士攻擊後移動"
+                : "選擇移動後行動",
         );
         actionMenu.innerHTML = controller.unitCommands.map((command, index) => {
-          const action = command.id === "end" ? "end-unit" : command.id === "undo" ? "undo-move" : command.id;
+          const action = UNIT_COMMAND_ACTIONS[command.id];
           const selected = index === controller.commandIndex;
           return `<button type="button" role="menuitem" data-action="${action}" data-command-index="${index}" data-testid="unit-command-${command.id}" class="${selected ? "is-selected" : ""}" aria-current="${selected ? "true" : "false"}"><span class="native-command-label">${command.label}</span></button>`;
         }).join("");
@@ -2562,6 +2566,19 @@ function nativeFeedbackMarkup(text: string, action?: string, testId?: string): s
     ${action ? `<button class="feedback-primary" data-action="${action}" ${testId ? `data-testid="${testId}"` : ""} aria-label="繼續"></button>` : ""}
   </div>`;
 }
+
+/** `data-action` of each unit command row, as the click dispatcher reads it. */
+const UNIT_COMMAND_ACTIONS: Readonly<Record<UnitCommandId, string>> = {
+  move: "move",
+  attack: "attack",
+  shoot: "shoot",
+  technique: "technique",
+  rest: "rest",
+  end: "end-unit",
+  undo: "undo-move",
+  confirm: "confirm-extra-move",
+  cancel: "cancel-extra-move",
+};
 
 /** `.group-command-menu button:disabled`, kept in one place so both agree. */
 const DISABLED_COMMAND_INK = "#81766d";

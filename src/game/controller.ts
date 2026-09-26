@@ -36,6 +36,7 @@ import {
   immuneToPhysicalShootingFor,
   isClassId,
   className,
+  promotionExperienceThresholdFor,
   promotionTargetsFor,
   unitDisplayName,
   type PromotionTarget,
@@ -317,7 +318,16 @@ export interface RestPresentation {
 
 export type AudioCueGroup = "e" | "magic" | "un";
 
-export type UnitCommandId = "move" | "attack" | "shoot" | "technique" | "rest" | "end" | "undo";
+export type UnitCommandId =
+  | "move"
+  | "attack"
+  | "shoot"
+  | "technique"
+  | "rest"
+  | "end"
+  | "undo"
+  | "confirm"
+  | "cancel";
 export type GroupCommandId = SpokenGroupCommandId | "retreat";
 export type SystemCommandId = "settings" | "objectives" | "load" | "save" | "quit";
 export type RecordMenuMode = "load" | "save";
@@ -363,6 +373,15 @@ const POST_MOVE_COMMANDS: readonly UnitCommand[] = [
   { id: "attack", label: "攻擊" },
   { id: "end", label: "結束" },
   { id: "undo", label: "返悔" },
+];
+
+/**
+ * `DS:3F2C`, which `0000:734C` opens once the class-0F extra move has landed:
+ * `SY` ends the action, `X` sends the dragon back to its post-attack cell.
+ */
+const EXTRA_MOVE_CONFIRM_COMMANDS: readonly UnitCommand[] = [
+  { id: "confirm", label: "確定" },
+  { id: "cancel", label: "取消" },
 ];
 
 /**
@@ -562,6 +581,8 @@ export class GameController {
   private pendingOrigin?: Position;
   private pendingPath?: Position[];
   private pendingExtraMove = false;
+  /** The class-0F dragon has landed and waits on the `DS:3F2C` 確定／取消 menu. */
+  private extraMoveLanded = false;
   private magicArcherRoutes: MagicArcherLineOption[] = [];
   private magicArcherRouteTargetId?: string;
   private selectedMagicArcherRouteIndex = 0;
@@ -1030,15 +1051,19 @@ export class GameController {
     return id ? this.battle.unit(id) : undefined;
   }
 
+  /**
+   * `REMAKE-018`: the on-field commander grants the class while Nia is absent —
+   * 希蜜 in stage 3, 蘇蘭達 in stages 8 and 11, the same commander that issues
+   * the group commands. `0000:04AD` hard-codes Nia's portrait `2Eh` instead, and
+   * `undefined` falls back to exactly that fixed grantor when a board has neither.
+   */
   get promotionGrantor(): BattleUnit | undefined {
     const nia = this.battle.units.find(
       ({ side, portrait }) => side === 1 && portrait === NIA_CHARACTER_RECORD,
     );
     if (nia) return nia;
-    const himi = this.battle.unit("1:1");
-    return himi?.side === 1
-      ? himi
-      : this.battle.units.find(({ side }) => side === 1);
+    const commander = this.battle.groupCommander;
+    return commander?.side === 1 ? commander : undefined;
   }
 
   get promotionDialogueActive(): boolean {
@@ -1152,8 +1177,8 @@ export class GameController {
     return this.groupLeader !== undefined;
   }
 
-  get commandMenuKind(): "initial" | "postMove" | "extraMove" {
-    if (this.pendingExtraMove) return "extraMove";
+  get commandMenuKind(): "initial" | "postMove" | "extraMove" | "extraMoveConfirm" {
+    if (this.pendingExtraMove) return this.extraMoveLanded ? "extraMoveConfirm" : "extraMove";
     return this.pendingPath ? "postMove" : "initial";
   }
 
@@ -1161,6 +1186,7 @@ export class GameController {
     if (this.commandMenuKind === "extraMove") {
       return [BASIC_COMMANDS[0], { id: "end", label: "放棄" }];
     }
+    if (this.commandMenuKind === "extraMoveConfirm") return EXTRA_MOVE_CONFIRM_COMMANDS;
     const selectedClassCommand = this.selectedUnit
       ? classCommandFor(this.selectedUnit.classId, this.selectedUnit.side)
       : undefined;
@@ -1973,7 +1999,7 @@ export class GameController {
     if (
       this.phase !== "player"
       || this.actionMode !== "actionMenu"
-      || this.commandMenuKind === "extraMove"
+      || this.pendingExtraMove
       || !unit
     ) return;
     this.targets = this.battle.units
@@ -2003,7 +2029,7 @@ export class GameController {
   }
 
   chooseShoot(): void {
-    if (this.commandMenuKind === "extraMove") return;
+    if (this.pendingExtraMove) return;
     const unit = this.selectedUnit;
     const actionId = unit && shootingActionIdFor(unit.classId, unit.side);
     if (actionId) this.chooseSpecialAction(actionId);
@@ -2174,6 +2200,24 @@ export class GameController {
     }
   }
 
+  /** 確定 on the landing menu: `734C` marks the action spent through `7BE5`. */
+  confirmExtraMove(): void {
+    if (
+      this.phase !== "player"
+      || this.actionMode !== "actionMenu"
+      || this.commandMenuKind !== "extraMoveConfirm"
+      || this.busy
+    ) return;
+    this.finishUnitAction("飛龍騎士完成攻擊後移動；單位行動結束。", true);
+  }
+
+  /** 取消 on the landing menu, also its `X` cancel code. */
+  cancelExtraMove(): void {
+    if (this.actionMode === "actionMenu" && this.commandMenuKind === "extraMoveConfirm") {
+      void this.rollbackSelectedMovement();
+    }
+  }
+
   moveCommandSelection(delta: number): void {
     if (this.actionMode !== "actionMenu" || this.unitCommands.length === 0) return;
     this.commandIndex = (this.commandIndex + delta + this.unitCommands.length) % this.unitCommands.length;
@@ -2198,6 +2242,8 @@ export class GameController {
     else if (command.id === "rest") this.chooseRest();
     else if (command.id === "end") this.chooseEnd();
     else if (command.id === "undo") this.chooseUndo();
+    else if (command.id === "confirm") this.confirmExtraMove();
+    else if (command.id === "cancel") this.cancelExtraMove();
   }
 
   movePromotionSelection(delta: number): void {
@@ -2334,6 +2380,10 @@ export class GameController {
       if (this.commandMenuKind === "extraMove") {
         this.statusMessage = "攻擊已經提交；請選擇額外移動或放棄。";
         this.emit();
+        return;
+      }
+      if (this.commandMenuKind === "extraMoveConfirm") {
+        this.cancelExtraMove();
         return;
       }
       if (this.commandMenuKind === "postMove") {
@@ -3192,6 +3242,7 @@ export class GameController {
     this.pendingOrigin = undefined;
     this.pendingPath = undefined;
     this.pendingExtraMove = false;
+    this.extraMoveLanded = false;
     this.reachable = [];
     this.targets = [];
     this.actionRange = [];
@@ -5674,6 +5725,28 @@ export class GameController {
     this.emit();
   }
 
+  /**
+   * Puts one player unit exactly on its promotion threshold, so the board scan
+   * after its next committed action queues it. Specs rest it and read which
+   * commander answers the request on boards Nia is absent from.
+   */
+  forcePromotionThresholdForTest(unitId: string): void {
+    if (!this.debugMode) return;
+    const unit = this.battle.unit(unitId);
+    if (!unit || !this.battle.isPlayerControllableAlly(unit.id)) return;
+    unit.experience = promotionExperienceThresholdFor(unit.classId);
+    unit.acted = false;
+    unit.actionDisabled = false;
+    this.battle.focusId = unit.id;
+    this.phase = "player";
+    this.centerCamera(unit);
+    this.cursor = { x: unit.x, y: unit.y };
+    this.resetAction();
+    this.statusMessage = `自動驗收：${unitDisplayName(unit)}已達轉職門檻。`;
+    this.busy = false;
+    this.emit();
+  }
+
   forceEvacuationSetupForTest(): void {
     if (!this.debugMode) return;
     const finalEnemy = this.battle.unit("2:15");
@@ -6407,7 +6480,14 @@ export class GameController {
     const completed = await this.animateUnitPath(unit.id, path, "player");
     this.busy = false;
     if (completed && extraMove) {
-      this.finishUnitAction("飛龍騎士完成攻擊後移動；單位行動結束。", true);
+      // `0000:6A2C` raises CS:`6A54`='Y' before calling `734C`, which then skips
+      // the target count an ordinary move makes and always asks 確定／取消.
+      this.extraMoveLanded = true;
+      this.actionMode = "actionMenu";
+      this.commandIndex = 0;
+      this.reachable = [];
+      this.statusMessage = "確定後飛龍騎士結束行動；取消則返回攻擊後的位置重選。";
+      this.emit();
       return;
     }
     this.actionMode = completed ? "actionMenu" : "move";
@@ -6430,6 +6510,19 @@ export class GameController {
     this.busy = false;
     this.pendingPath = undefined;
     this.commandIndex = 0;
+    if (this.pendingExtraMove) {
+      // `0000:73ED` rebuilds the halved range at the restored cell and jumps
+      // straight back into the destination loop at `734C`; only a cancel from
+      // that loop returns to 移動／放棄.
+      this.extraMoveLanded = false;
+      this.reachable = this.battle.extraMovementRange(unit.id);
+      this.actionMode = "move";
+      this.statusMessage = completed
+        ? "已返回攻擊後的位置；請重新選擇落點，或取消回到移動／放棄。"
+        : "無法返回原位置。";
+      this.emit();
+      return;
+    }
     this.actionMode = "actionMenu";
     this.reachable = [];
     this.statusMessage = completed ? "已沿原路返回；請重新選擇行動。" : "無法返回原位置。";
@@ -6586,6 +6679,7 @@ export interface Angel2DebugApi {
   forceDefeat: () => void;
   forceVictorySetup: () => void;
   forcePromotionSetup: () => void;
+  forcePromotionThreshold: (unitId: string) => void;
   forceEvacuationSetup: () => void;
   forceMultipleTargets: () => void;
   forceCavalryCounterSetup: () => void;
@@ -6619,6 +6713,7 @@ export function exposeDebugApi(controller: GameController): void {
     forceDefeat: () => controller.forceDefeatForTest(),
     forceVictorySetup: () => controller.forceVictorySetupForTest(),
     forcePromotionSetup: () => controller.forcePromotionSetupForTest(),
+    forcePromotionThreshold: (unitId) => controller.forcePromotionThresholdForTest(unitId),
     forceEvacuationSetup: () => controller.forceEvacuationSetupForTest(),
     forceMultipleTargets: () => controller.forceMultipleTargetsForTest(),
     forceCavalryCounterSetup: () => controller.forceCavalryCounterSetupForTest(),

@@ -130,6 +130,25 @@ test("S11-D/E: the corrected objective uses Sulanda's native boarding cells", as
   });
 });
 
+test("S11-I/REMAKE-018: Sulanda grants the ranger's class while Nia is absent", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-11-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  await page.evaluate(() => window.__ANGEL2__?.forcePromotionThreshold("1:40"));
+  await clickUnit(page, "1:40");
+  await page.getByTestId("unit-command-rest").click();
+  await expect(page.getByTestId("dialogue-layer"))
+    .toHaveAttribute("data-source-record", "promotion");
+  await expect(page.getByTestId("dialogue-window-lower")).toContainText("騎兵A");
+  await page.evaluate(() => window.__ANGEL2__?.advanceDialogue());
+  await expect(page.locator("#dialogue-speaker-upper")).toHaveText("蘇蘭達");
+  await expect(page.getByTestId("dialogue-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "10");
+  await page.waitForTimeout(120);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage11-promotion-sulanda-grantor.png`,
+  });
+});
+
 test("S11-H: every player-to-enemy transition adds one immediately active lower-edge reinforcement", async ({ page }) => {
   await page.goto("/?debugScenario=stage-11-player&difficulty=0&test=1");
   await expect(page.getByTestId("battle-canvas")).toBeVisible();

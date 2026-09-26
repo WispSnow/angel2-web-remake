@@ -588,6 +588,51 @@ test("flying dragon knight can move once at half range after attacking", async (
   await expect.poll(async () => (await classShowdownBattleState(page))?.cursor.y)
     .toBe(destination.y);
   await page.keyboard.press("Space");
+
+  // `734C` asks 確定／取消 once the dragon lands instead of ending the action there.
+  await expect.poll(async () => (await classShowdownBattleState(page))?.commandMenuKind)
+    .toBe("extraMoveConfirm");
+  const landed = await classShowdownBattleState(page);
+  expect(landed?.actionMode).toBe("actionMenu");
+  expect(landed?.commands).toEqual([
+    { id: "confirm", label: "確定" },
+    { id: "cancel", label: "取消" },
+  ]);
+  expect(landed?.units.find(({ id }) => id === "arena-1-15")).toMatchObject({
+    x: destination.x,
+    y: destination.y,
+    acted: true,
+  });
+  await expect(page.getByTestId("unit-command-confirm")).toBeVisible();
+  await expect(page.getByTestId("unit-command-cancel")).toBeVisible();
+  await expect(page.getByTestId("unit-command-attack")).toHaveCount(0);
+  await expect(page.locator("#logical-screen")).not.toHaveAttribute("data-pointer-glide", "true");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/class-showdown-flying-dragon-extra-move-confirm.png`,
+  });
+
+  // 取消 returns the dragon to its post-attack cell and reopens the halved destination
+  // loop there; only cancelling that loop brings 移動／放棄 back.
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.actionMode).toBe("move");
+  const reselecting = await classShowdownBattleState(page);
+  expect(reselecting?.units.find(({ id }) => id === "arena-1-15")).toMatchObject({
+    x: 17,
+    y: 30,
+    acted: true,
+  });
+  expect(reselecting?.reachable).toEqual(targeting?.reachable);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await classShowdownBattleState(page))?.commandMenuKind)
+    .toBe("extraMove");
+  expect((await classShowdownBattleState(page))?.actionMode).toBe("actionMenu");
+
+  await page.getByTestId("unit-command-move").click();
+  await expect.poll(async () => (await classShowdownBattleState(page))?.actionMode).toBe("move");
+  await clickClassShowdownWorldCell(page, destination.x, destination.y);
+  await expect.poll(async () => (await classShowdownBattleState(page))?.commandMenuKind)
+    .toBe("extraMoveConfirm");
+  await page.getByTestId("unit-command-confirm").click();
   await expect.poll(async () => (await classShowdownBattleState(page))?.actionMode).toBe("idle");
 
   const moved = await classShowdownBattleState(page);
