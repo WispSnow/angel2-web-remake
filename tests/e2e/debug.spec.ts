@@ -4,6 +4,7 @@ import { debugRosterForProfile } from "../../src/game/debug-roster-profiles";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import type { CompletedSaveData } from "../../src/game/types";
+import { drawnFrames, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { activeDialogueRecord } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -1078,18 +1079,12 @@ test("dispel uses its original map animation and releases a frozen ally", async 
   await page.getByTestId("unit-command-technique").click();
   await expect(page.getByTestId("technique-dispel")).toHaveText("破邪");
   await page.getByTestId("technique-dispel").click();
+  const frames = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "iceDisabledUnitIds"]);
   await canvas.click({ position: { x: 260, y: 177 } });
-
-  await page.waitForFunction(() => {
-    const element = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
-    return element?.dataset.mapCombatPhase === "dispelEffect"
-      && Number(element.dataset.mapCombatFrame) >= 20;
-  });
-  await expect(canvas).toHaveAttribute("data-ice-disabled-unit-ids", frozenTargetId);
-  await expect(canvas).not.toHaveAttribute("data-map-combat-effect-tile-count", "0");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/debug-stage1-dispel-animation.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "dispelEffect",
+    mapCombatFrame: "20",
+  }, { path: `${ARTIFACT_DIR}/debug-stage1-dispel-animation.png` });
 
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as {
@@ -1099,6 +1094,15 @@ test("dispel uses its original map animation and releases a frozen ally", async 
     return current?.lastSpecialAction?.actionId === "dispel"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  // The freeze holds through the late dispel frames and is released only once they commit.
+  const lateFrames = drawnFrames(drawn, { mapCombatPhase: "dispelEffect" })
+    .filter(({ mapCombatFrame }) => Number(mapCombatFrame) >= 20);
+  expect(lateFrames.length).toBeGreaterThan(0);
+  for (const frame of lateFrames) {
+    expect(frame.iceDisabledUnitIds).toBe(frozenTargetId);
+    expect(frame.mapCombatEffectTileCount).not.toBe("0");
+  }
   const state = await page.evaluate(() => window.__ANGEL2__?.getState() as {
     units: Array<{
       id: string;

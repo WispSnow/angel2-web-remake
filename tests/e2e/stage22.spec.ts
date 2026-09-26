@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { drawnFrame, recordCanvasFrames } from "./canvas-frame-recorder";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -381,21 +382,13 @@ test("S22-J: a deployed half-dragon warrior flies the native teleport across the
       Math.abs(cell.x - from.x) + Math.abs(cell.y - from.y) > 25)!;
   }, { x: actor!.x, y: actor!.y });
   await moveCursor(page, destination.x - actor!.x, destination.y - actor!.y);
+  const frames = await recordCanvasFrames(page, [], () => {
+    const flight = (window.__ANGEL2__?.getState() as {
+      movementPresentation?: { unitId: string; kind: string; path: Array<{ x: number; y: number }> };
+    } | undefined)?.movementPresentation;
+    return flight && { unitId: flight.unitId, kind: flight.kind, path: flight.path };
+  });
   await page.keyboard.press("Space");
-
-  // The native handler replays the ordinary movement walk, so a real multi-step
-  // flight runs before the actor commits to the far cell.
-  await page.waitForFunction(() =>
-    (window.__ANGEL2__?.getState() as {
-      movementPresentation?: { unitId: string };
-    }).movementPresentation?.unitId === "1:25", undefined, { polling: "raf" });
-  const flight = await page.evaluate(() => (window.__ANGEL2__?.getState() as {
-    movementPresentation?: { kind: string; path: Array<{ x: number; y: number }> };
-  }).movementPresentation);
-  expect(flight?.kind).toBe("player");
-  expect(flight?.path[0]).toEqual({ x: actor!.x, y: actor!.y });
-  expect(flight?.path.at(-1)).toEqual(destination);
-  expect(flight!.path.length).toBeGreaterThan(25);
 
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage22State & {
@@ -404,6 +397,14 @@ test("S22-J: a deployed half-dragon warrior flies the native teleport across the
     return current.movementPresentation === undefined
       && current.units.some(({ id, acted }) => id === "1:25" && acted);
   });
+  // The native handler replays the ordinary movement walk, so a real multi-step
+  // flight runs before the actor commits to the far cell.
+  const drawn = await frames.stop();
+  const flight = drawnFrame(drawn, { state: { unitId: "1:25" } }).state;
+  expect(flight?.kind).toBe("player");
+  expect(flight?.path[0]).toEqual({ x: actor!.x, y: actor!.y });
+  expect(flight?.path.at(-1)).toEqual(destination);
+  expect(flight?.path.length).toBeGreaterThan(25);
   const after = await state(page);
   expect(after.units.find(({ id }) => id === "1:25")).toMatchObject({
     x: destination.x,

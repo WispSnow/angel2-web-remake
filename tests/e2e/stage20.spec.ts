@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { drawnFrames, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -166,22 +167,26 @@ test("S20-E: demon dragon casts the native-timed WD path and defeats Nia", async
   await waitForPhase(page, "player");
   await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatEffectTextureKeys",
+  ]);
   await page.getByTestId("group-command-allRest").click();
   for (let input = 0; input < 8; input += 1) {
     if (await activeDialogueRecord(page) !== "battle-command") break;
     await page.keyboard.press("Enter");
     await page.waitForTimeout(20);
   }
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "wdGrowth" && Number(dataset.mapCombatFrame) >= 2;
-  });
-  const canvas = page.getByTestId("battle-canvas");
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-texture-keys", /map-wd-/u);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage20-wd-growth.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "wdGrowth",
+    mapCombatFrame: "2",
+  }, { path: `${ARTIFACT_DIR}/stage20-wd-growth.png` });
   await waitForPhase(page, "defeat");
+  const drawn = await frames.stop();
+  const growth = drawnFrames(drawn, { mapCombatPhase: "wdGrowth" })
+    .filter(({ mapCombatFrame }) => Number(mapCombatFrame) >= 2);
+  expect(growth.length).toBeGreaterThan(0);
+  expect(growth[0]?.mapCombatEffectTextureKeys).toMatch(/map-wd-/u);
   expect((await state(page)).lastSpecialAction).toMatchObject({ actionId: "wd" });
 });
 

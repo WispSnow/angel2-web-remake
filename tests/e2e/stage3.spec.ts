@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { stage3TerrainSlotAt } from "../../src/game/content/stage3";
+import { drawnFrames, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -279,22 +280,21 @@ test("S03-F/G: monk recovery exposes the native menu and marks only allies insid
   await expect(page.getByTestId("technique-heal-1")).toHaveText("初級治療");
   await expect(page.getByTestId("technique-recovery-1")).toHaveText("初級回復");
   await page.getByTestId("technique-recovery-1").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   await clickUnit(page, target.id);
-
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
-    return canvas?.dataset.mapCombatPhase === "recoveryEffect"
-      && Number(canvas.dataset.mapCombatFrame) >= 3
-      && Number(canvas.dataset.mapCombatEffectTileCount) === 2;
-  });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage3-recovery-effect.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "recoveryEffect",
+    mapCombatFrame: "3",
+  }, { path: `${ARTIFACT_DIR}/stage3-recovery-effect.png` });
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage3State | undefined;
     return current?.lastSpecialAction?.actionId === "recovery-1"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  expect(drawnFrames(drawn, { mapCombatPhase: "recoveryEffect" })
+    .filter(({ mapCombatFrame }) => Number(mapCombatFrame) >= 3))
+    .toContainEqual(expect.objectContaining({ mapCombatEffectTileCount: "2" }));
   const result = await state(page);
   expect(result.lastSpecialAction).toMatchObject({ actionId: "recovery-1" });
   expect(result.lastSpecialAction!.healing).toBeGreaterThan(0);

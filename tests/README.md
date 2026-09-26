@@ -43,8 +43,9 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 等某一帧可能整帧错过、空等 60 s，等到了之后的 `toHaveAttribute` 或状态读取也常常已是后面的帧。
 断言单帧画布属性时改用 `canvas-frame-recorder.ts`：在触发动作前 `recordCanvasFrames`，等到持久的
 结束状态（如 `specialActionPresentation === undefined`）后用 `stop()` 取回逐帧记录，再以
-`drawnFrame`／`drawnFrames` 断言；要核对「这一帧画出时模拟还没提交」，就传入在页面内执行的 probe
-（竞技场用 `arena-test-support.ts` 的 `arenaUnitsProbe`）。`BattleScene.sync()` 在每次控制器 emit 时
+`drawnFrame`／`drawnFrames` 断言；要核对「这一帧画出时模拟还没提交」或移动演出路径这类不在画布属性上的
+状态，就传入在页面内执行的 probe（竞技场用 `arena-test-support.ts` 的 `arenaUnitsProbe`），它记下的
+`state` 也能当匹配条件（如 `{ state: { unitId } }`）。`BattleScene.sync()` 在每次控制器 emit 时
 同步改写画布 `data-*`，每帧又各等自己的程序计时器，观察器回调因此必定落在两帧之间，与负载无关。
 这类帧的视觉审计截图用记录器的 `captureVisualAudit`，只在 `VISUAL_AUDIT=1` 时尽力截取，错过就记入
 测试注解，不当断言；全局程序暂停会连 Phaser 一起停，无法把某一帧冻住再截图。

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { drawnFrames, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { captureVisualAudit } from "./visual-audit";
 
 const trackedBattleSpriteRequests = (page: Page) => {
@@ -92,22 +93,34 @@ test("map hit and death render after every duplicate atlas request is rejected",
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("system-menu")).toBeHidden();
   await canvas.click({ position: { x: 220, y: 177 } });
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   await page.getByTestId("unit-command-attack").click();
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "primaryHit",
+  }, { path: "artifacts/playwright/resource-loading-map-hit.png" });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "defenderDeath",
+    mapCombatFrame: "6",
+  }, { path: "artifacts/playwright/resource-loading-map-death.png" });
 
-  await expect(canvas).toHaveAttribute("data-map-combat-phase", "primaryHit");
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "1");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: "artifacts/playwright/resource-loading-map-hit.png",
-  });
+  // The trace keeps the kill's last death frame once the presentation has ended.
   await page.waitForFunction(() => {
-    const element = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
-    return element?.dataset.mapCombatPhase === "defenderDeath"
-      && Number(element.dataset.mapCombatFrame) >= 6
-      && Number(element.dataset.mapCombatEffectTileCount) > 0;
+    const current = window.__ANGEL2__?.getState() as {
+      combatPresentation?: object;
+      combatPresentationTrace: Array<{ phase: string; frame: number }>;
+    } | undefined;
+    return current !== undefined
+      && current.combatPresentation === undefined
+      && current.combatPresentationTrace.some(({ phase, frame }) =>
+        phase === "defenderDeath" && frame === 14);
   });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: "artifacts/playwright/resource-loading-map-death.png",
-  });
+  const drawn = await frames.stop();
+  const hit = drawnFrames(drawn, { mapCombatPhase: "primaryHit" });
+  expect(hit.length).toBeGreaterThan(0);
+  for (const frame of hit) expect(frame.mapCombatEffectTileCount).toBe("1");
+  expect(drawnFrames(drawn, { mapCombatPhase: "defenderDeath" }).filter((frame) =>
+    Number(frame.mapCombatFrame) >= 6 && Number(frame.mapCombatEffectTileCount) > 0).length)
+    .toBeGreaterThan(0);
   expect(requestCounts(requests)).toEqual(expectedAtlasRequests(
     "map-combat",
     "turn-transition",

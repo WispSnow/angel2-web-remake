@@ -898,21 +898,18 @@ test("half-dragon warrior can teleport to any empty map cell in the showdown", a
   const actorBefore = before?.units.find(({ id }) => id === "arena-1-8");
   expect(actorBefore).toMatchObject({ x: 17, y: 23, acted: false });
 
+  const frames = await recordCanvasFrames(page, [], () => {
+    const flight = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState;
+    } | undefined)?.battle?.movementPresentation;
+    return flight && { unitId: flight.unitId, path: flight.path };
+  });
   await page.keyboard.press("Space");
   // The native handler replays the ordinary movement walk instead of a
   // dedicated effect, so the actor flies a real path to the chosen cell.
-  await page.waitForFunction(() => {
-    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
-      battle?: ClassShowdownBattleState;
-    }).battle;
-    return current?.movementPresentation?.unitId === "arena-1-8";
-  }, undefined, { polling: "raf" });
-  const flight = await classShowdownBattleState(page);
-  expect(flight?.movementPresentation?.path[0]).toEqual({ x: 17, y: 23 });
-  expect(flight?.movementPresentation?.path.at(-1)).toEqual({ x: 20, y: 24 });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/class-showdown-half-dragon-teleport-effect.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    state: { unitId: "arena-1-8" },
+  }, { path: `${ARTIFACT_DIR}/class-showdown-half-dragon-teleport-effect.png` });
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
       battle?: ClassShowdownBattleState;
@@ -920,6 +917,10 @@ test("half-dragon warrior can teleport to any empty map cell in the showdown", a
     const actor = current?.units.find(({ id }) => id === "arena-1-8");
     return current?.movementPresentation === undefined && actor?.x === 20 && actor?.y === 24;
   });
+  const drawn = await frames.stop();
+  const flight = drawnFrame(drawn, { state: { unitId: "arena-1-8" } }).state;
+  expect(flight?.path[0]).toEqual({ x: 17, y: 23 });
+  expect(flight?.path.at(-1)).toEqual({ x: 20, y: 24 });
   const after = await classShowdownBattleState(page);
   expect(after?.units.find(({ id }) => id === "arena-1-8")).toMatchObject({
     x: 20,

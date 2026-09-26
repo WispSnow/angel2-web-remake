@@ -5,6 +5,7 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { drawnFrames, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { pinNativeLineCoin } from "./native-line-coin";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -52,19 +53,16 @@ test("tier-one wizard pushes the outer ring beyond 2C through the formal techniq
     .toHaveAttribute("data-ice-cast-preview-freeze-cell-count", "13");
   await expect(page.getByTestId("battle-canvas"))
     .toHaveAttribute("data-ice-cast-preview-displacement-cell-count", "12");
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatIceDistance",
+    "mapCombatIceRangeValue",
+  ]);
   await page.keyboard.press(" ");
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatIceDistance === "3"
-      && dataset.mapCombatIceRangeValue === "1"
-      && dataset.mapCombatEffectTileCount === "12";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-ice-2-outer-ring.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatIceDistance: "3",
+    mapCombatIceRangeValue: "1",
+  }, { path: `${ARTIFACT_DIR}/arena-ice-2-outer-ring.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -73,6 +71,9 @@ test("tier-one wizard pushes the outer ring beyond 2C through the formal techniq
     return current?.lastSpecialAction?.actionId === "ice-2"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  expect(drawnFrames(drawn, { mapCombatIceDistance: "3", mapCombatIceRangeValue: "1" }))
+    .toContainEqual(expect.objectContaining({ mapCombatEffectTileCount: "12" }));
   const after = await arenaBattleState(page);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-ice-2-outer-pushed.png`,
@@ -326,19 +327,16 @@ test("tier-two wizard pushes the fourth ring beyond 3C", async ({ page }) => {
     .toHaveAttribute("data-ice-cast-preview-freeze-cell-count", "25");
   await expect(page.getByTestId("battle-canvas"))
     .toHaveAttribute("data-ice-cast-preview-displacement-cell-count", "16");
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatIceDistance",
+    "mapCombatIceRangeValue",
+  ]);
   await page.keyboard.press(" ");
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatIceDistance === "4"
-      && dataset.mapCombatIceRangeValue === "1"
-      && dataset.mapCombatEffectTileCount === "16";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-ice-3-outer-ring.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatIceDistance: "4",
+    mapCombatIceRangeValue: "1",
+  }, { path: `${ARTIFACT_DIR}/arena-ice-3-outer-ring.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -347,6 +345,9 @@ test("tier-two wizard pushes the fourth ring beyond 3C", async ({ page }) => {
     return current?.lastSpecialAction?.actionId === "ice-3"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  expect(drawnFrames(drawn, { mapCombatIceDistance: "4", mapCombatIceRangeValue: "1" }))
+    .toContainEqual(expect.objectContaining({ mapCombatEffectTileCount: "16" }));
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "ice-3",
@@ -420,19 +421,16 @@ test("tier-three wizard pushes the fifth ring beyond 4C", async ({ page }) => {
     .toHaveAttribute("data-ice-cast-preview-freeze-cell-count", "41");
   await expect(page.getByTestId("battle-canvas"))
     .toHaveAttribute("data-ice-cast-preview-displacement-cell-count", "20");
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatIceDistance",
+    "mapCombatIceRangeValue",
+  ]);
   await page.keyboard.press(" ");
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatIceDistance === "5"
-      && dataset.mapCombatIceRangeValue === "1"
-      && dataset.mapCombatEffectTileCount === "20";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-ice-4-outer-ring.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatIceDistance: "5",
+    mapCombatIceRangeValue: "1",
+  }, { path: `${ARTIFACT_DIR}/arena-ice-4-outer-ring.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -441,6 +439,9 @@ test("tier-three wizard pushes the fifth ring beyond 4C", async ({ page }) => {
     return current?.lastSpecialAction?.actionId === "ice-4"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  expect(drawnFrames(drawn, { mapCombatIceDistance: "5", mapCombatIceRangeValue: "1" }))
+    .toContainEqual(expect.objectContaining({ mapCombatEffectTileCount: "20" }));
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "ice-4",

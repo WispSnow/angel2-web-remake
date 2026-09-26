@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { drawnFrames, recordCanvasFrames } from "./canvas-frame-recorder";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
@@ -133,38 +134,50 @@ test("S26-F: enemy phase runs two complete presentations before committing each 
 
   await page.keyboard.press("g");
   await expect(page.getByTestId("group-command-menu")).toBeVisible();
+  // Each sample also records where the pushed column's lead unit stood at that draw.
+  const frames = await recordCanvasFrames(page, [
+    "mapCombatPhase",
+    "mapCombatEffectTextureKeys",
+    "enemyPhaseTailExecution",
+    "enemyPhaseTailMoveCount",
+  ], () => {
+    const lead = (window.__ANGEL2__?.getState() as Stage26State | undefined)
+      ?.units.find(({ id }) => id === "1:0");
+    return lead && { x: lead.x, y: lead.y };
+  });
   await page.getByTestId("group-command-allRest").click();
   await expect(page.getByTestId("dialogue-layer")).toBeVisible();
   await page.getByTestId("dialogue-layer").click();
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "enemy-phase-tail-sweep"
-      && dataset.enemyPhaseTailExecution === "1";
-  });
-  const canvas = page.getByTestId("battle-canvas");
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-texture-keys", /enemy-phase-tail-/u);
-  await expect(canvas).toHaveAttribute("data-enemy-phase-tail-move-count", "1");
-  expect((await state(page)).units.find(({ id }) => id === "1:0"))
-    .toMatchObject({ x: 22, y: 20 });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage26-column-push-first-sweep.png`,
-  });
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "enemy-phase-tail-sweep"
-      && dataset.enemyPhaseTailExecution === "2";
-  });
-  expect((await state(page)).units.find(({ id }) => id === "1:0"))
-    .toMatchObject({ x: 22, y: 23 });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage26-column-push-second-sweep.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "enemy-phase-tail-sweep",
+    enemyPhaseTailExecution: "1",
+  }, { path: `${ARTIFACT_DIR}/stage26-column-push-first-sweep.png` });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "enemy-phase-tail-sweep",
+    enemyPhaseTailExecution: "2",
+  }, { path: `${ARTIFACT_DIR}/stage26-column-push-second-sweep.png` });
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage26State | undefined;
     return current?.phase === "player" && current.round === 2;
   });
+  const drawn = await frames.stop();
+  const firstSweep = drawnFrames(drawn, {
+    mapCombatPhase: "enemy-phase-tail-sweep",
+    enemyPhaseTailExecution: "1",
+  });
+  expect(firstSweep.length).toBeGreaterThan(0);
+  expect(firstSweep).toContainEqual(expect.objectContaining({
+    mapCombatEffectTextureKeys: expect.stringMatching(/enemy-phase-tail-/u),
+  }));
+  for (const frame of firstSweep) {
+    expect(frame).toMatchObject({ enemyPhaseTailMoveCount: "1", state: { x: 22, y: 20 } });
+  }
+  const secondSweep = drawnFrames(drawn, {
+    mapCombatPhase: "enemy-phase-tail-sweep",
+    enemyPhaseTailExecution: "2",
+  });
+  expect(secondSweep.length).toBeGreaterThan(0);
+  for (const frame of secondSweep) expect(frame.state).toEqual({ x: 22, y: 23 });
 
   const finished = await state(page);
   expect(finished.units.find(({ id }) => id === "1:0")).toMatchObject({ x: 22, y: 26 });

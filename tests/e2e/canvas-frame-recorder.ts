@@ -23,18 +23,24 @@ import { captureVisualAudit } from "./visual-audit";
 export type CanvasFrame<Key extends string, State = never> =
   { readonly [K in Key]?: string } & { readonly state?: State };
 
-export type CanvasFrameMatch<Key extends string> = { readonly [K in Key]?: string };
+/** A partial probe result: nested objects match like `toMatchObject`, other values by `===`. */
+export type CanvasStateMatch<State> = State extends object
+  ? { readonly [K in keyof State]?: CanvasStateMatch<State[K]> }
+  : State;
+
+export type CanvasFrameMatch<Key extends string, State = never> =
+  { readonly [K in Key]?: string } & { readonly state?: CanvasStateMatch<State> };
 
 export interface CanvasFrameRecording<Key extends string, State = never> {
   /**
-   * `VISUAL_AUDIT=1` only: screenshots `target` while the canvas still shows `frame`. This is
-   * best effort and never an assertion. A frame the screenshot can no longer reach is noted in
-   * the test annotations and skipped. The global program pause cannot hold a frame for the
+   * `VISUAL_AUDIT=1` only: screenshots `target` while the live canvas, and the probe when
+   * `frame` names a `state`, still match `frame`. This is best effort and never an assertion.
+   * A frame the screenshot can no longer reach is noted in the test annotations and skipped. The global program pause cannot hold a frame for the
    * screenshot either, because it also pauses Phaser before the frame is drawn.
    */
   captureVisualAudit(
     target: Locator,
-    frame: CanvasFrameMatch<Key>,
+    frame: CanvasFrameMatch<Key, State>,
     options: { path: string },
   ): Promise<void>;
   /** Stops observing and returns every distinct sample, oldest first. */
@@ -108,13 +114,17 @@ export async function recordCanvasFrames<Key extends string, State = never>(
         `data-${key.replace(/[A-Z]/gu, (letter) => `-${letter.toLowerCase()}`)}`),
     });
     record();
-    const matches = (
-      sample: Readonly<Record<string, unknown>>,
-      frame: Readonly<Record<string, string | undefined>>,
-    ): boolean => Object.entries(frame).every(([key, value]) => sample[key] === value);
+    // Page code cannot import, so this repeats `matchesFrame` below.
+    const matches = (actual: unknown, expected: unknown): boolean => {
+      if (expected === null || typeof expected !== "object") return actual === expected;
+      if (actual === null || typeof actual !== "object") return false;
+      return Object.entries(expected).every(([key, value]) =>
+        matches(Reflect.get(actual, key), value));
+    };
     return {
-      locate: (frame: Readonly<Record<string, string | undefined>>) => {
-        if (matches({ ...canvas.dataset }, frame)) return "on-screen";
+      locate: (frame: Readonly<Record<string, unknown>>) => {
+        const live = probe ? { ...canvas.dataset, state: probe() } : { ...canvas.dataset };
+        if (matches(live, frame)) return "on-screen";
         return samples.some((sample) => matches(sample, frame)) ? "passed" : undefined;
       },
       stop: () => {
@@ -129,7 +139,7 @@ export async function recordCanvasFrames<Key extends string, State = never>(
   return {
     async captureVisualAudit(target, frame, options) {
       if (process.env.VISUAL_AUDIT !== "1") return;
-      const expected: Readonly<Record<string, string | undefined>> = frame;
+      const expected: Readonly<Record<string, unknown>> = frame;
       const located = await page.waitForFunction(
         ({ handle, match }) => handle.locate(match),
         { handle: recorder, match: expected },
@@ -154,16 +164,20 @@ export async function recordCanvasFrames<Key extends string, State = never>(
   };
 }
 
-/** Every recorded sample whose `dataset` entries equal `frame`'s, oldest first. */
+/** Whether `actual` carries every entry of `expected`, nested objects included. */
+function matchesFrame(actual: unknown, expected: unknown): boolean {
+  if (expected === null || typeof expected !== "object") return actual === expected;
+  if (actual === null || typeof actual !== "object") return false;
+  return Object.entries(expected).every(([key, value]) =>
+    matchesFrame(Reflect.get(actual, key), value));
+}
+
+/** Every recorded sample that matches `frame`, oldest first. */
 export function drawnFrames<Key extends string, State>(
   samples: ReadonlyArray<CanvasFrame<Key, State>>,
-  frame: CanvasFrameMatch<Key>,
+  frame: CanvasFrameMatch<Key, State>,
 ): Array<CanvasFrame<Key, State>> {
-  const expected: ReadonlyArray<[string, string | undefined]> = Object.entries(frame);
-  return samples.filter((sample) => {
-    const drawn: Readonly<Record<string, unknown>> = sample;
-    return expected.every(([key, value]) => drawn[key] === value);
-  });
+  return samples.filter((sample) => matchesFrame(sample, frame));
 }
 
 /**
@@ -188,11 +202,13 @@ export function quakeSteps<State>(
  */
 export function drawnFrame<Key extends string, State>(
   samples: ReadonlyArray<CanvasFrame<Key, State>>,
-  frame: CanvasFrameMatch<Key>,
+  frame: CanvasFrameMatch<Key, State>,
 ): CanvasFrame<Key, State> {
   const [only, ...rest] = drawnFrames(samples, frame);
   if (only && rest.length === 0) return only;
-  const recording = samples.map(({ state: _state, ...drawn }) => JSON.stringify(drawn)).join("\n");
+  // Probe results can be large, so they are listed only when the match was on them.
+  const recording = samples.map(({ state, ...drawn }) =>
+    JSON.stringify(frame.state === undefined ? drawn : { ...drawn, state })).join("\n");
   throw new Error(`expected exactly one drawn frame matching ${JSON.stringify(frame)}, `
     + `found ${rest.length + (only ? 1 : 0)} in ${samples.length} samples:\n${recording}`);
 }
