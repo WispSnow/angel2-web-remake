@@ -61,6 +61,14 @@ const waitForPhase = (page: Page, phase: string) => page.waitForFunction(
   phase,
 );
 
+/** The texture Phaser resolved for each side-1 unit; `__MISSING` is the placeholder box. */
+const allyTextureById = async (page: Page): Promise<Record<string, string | undefined>> => {
+  const allies = (await state(page)).units.filter(({ side }) => side === 1);
+  const textures = await page.getByTestId("battle-canvas").evaluate((canvas) =>
+    JSON.parse(canvas.dataset.unitTextureById ?? "{}") as Record<string, string>);
+  return Object.fromEntries(allies.map(({ id }) => [id, textures[id]]));
+};
+
 test("S05-A/B/C/D: stage 5 enters a one-to-six unit deployment and starts SAY/9", async ({ page }) => {
   // The host Mac used for manual acceptance has Reduce Motion enabled. The
   // current deployment cell remains essential focus feedback in that mode.
@@ -252,6 +260,46 @@ test("S05-G/H: battle saves use the current schema and victory saves enter the l
     stageId: "stage-42-portal",
     phase: "scriptedStory",
     activeStoryId: "stage-42-portal-arrival-story",
+  });
+});
+
+test("reading a record after a retreat redeploy draws every ally figure it brings back", async ({ page }) => {
+  // Regression: 全面撤退 remounts the battle surface for the new formation, and 讀取記錄
+  // then swaps the recorded board in on that same surface. The five allies the record
+  // brings back were never preloaded and drew as Phaser's missing-texture placeholder.
+  await page.goto("/?debugScenario=stage-05-player&difficulty=0&roster=promotion-coverage&test=1");
+  await waitForPhase(page, "player");
+  const recorded = (await state(page)).units.filter(({ side }) => side === 1);
+  expect(recorded).toHaveLength(6);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-retreat").click();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await expect(page.getByTestId("deployment-screen")).toBeVisible();
+  await expect(page.getByTestId("deployment-summary")).toContainText("已出場 1／6");
+  await page.getByTestId("deployment-finish").click();
+  await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "9");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+  expect(Object.keys(await allyTextureById(page))).toEqual(["1:0"]);
+
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-load").click();
+  await page.getByTestId("record-slot-1").click();
+  await page.waitForFunction(() => {
+    const loaded = window.__ANGEL2__?.getState() as Stage5State | undefined;
+    return loaded?.phase === "player"
+      && loaded.units.filter(({ side }) => side === 1).length === 6;
+  });
+  await expect.poll(() => allyTextureById(page)).toEqual(
+    Object.fromEntries(recorded.map(({ id, classId }) => [id, `ally-${classId}`])),
+  );
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage5-record-after-retreat-redeploy.png`,
   });
 });
 

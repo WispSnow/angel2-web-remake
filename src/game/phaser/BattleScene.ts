@@ -279,6 +279,10 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
     private turnTransitionMask?: Phaser.Display.Masks.GeometryMask;
     private turnTransitionMaskShape?: Phaser.GameObjects.Graphics;
     private unitViews = new Map<string, UnitView>();
+    /** 已按它排入我方棋子图的棋盘；见 `scheduleAllyFiguresForBoard`。 */
+    private allyFigureBattle?: GameController["battle"];
+    /** 换盘后补排、还没载完的我方棋子图键。 */
+    private readonly pendingAllyFigureKeys = new Set<string>();
     private unsubscribe?: () => void;
     private edgePan?: { x: number; y: number };
     private nextEdgePanAt = 0;
@@ -314,17 +318,15 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           `/assets/original/map-actions/obstacle/${controller.battle.stage.id}.png`,
         ),
       );
-      const allyMapAssets = allyMapUnitAssetsForClasses(controller.currentAllyMapClassIds);
-      const scheduledAllyKeys = new Set<string>();
-      for (const [classId, source] of allyMapAssets) {
-        const key = `ally-${classId}`;
-        scheduledAllyKeys.add(key);
+      this.allyFigureBattle = controller.battle;
+      const allyFigures = this.allyFigureSources();
+      for (const [key, source] of allyFigures) {
         this.load.image(key, stagedRenderAssetSource(source));
       }
       this.load.image("enemy-soldier", stagedRenderAssetSource(ASSETS.enemySoldier));
       this.load.image("enemy-cavalry", stagedRenderAssetSource(ASSETS.enemyCavalry));
       Object.entries(stageAssets?.unitSprites ?? {}).forEach(([key, source]) => {
-        if (scheduledAllyKeys.has(key)) return;
+        if (allyFigures.has(key)) return;
         this.load.image(key, stagedRenderAssetSource(source));
       });
       const battleSpriteSources = [
@@ -562,6 +564,7 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       // surface destroys this scene. Ignore that last stale callback after
       // Phaser has released the camera during a battle/deployment swap.
       if (!this.sys.isActive() || !this.cameras.main) return;
+      this.scheduleAllyFiguresForBoard();
       if (!controller.edgeScrollEnabled && !this.primaryPointerHeld && this.edgePan) this.clearEdgePan();
       this.syncCamera();
       this.drawTerrainOverrides();
@@ -572,6 +575,42 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
       this.drawCombatEffects();
       this.drawTurnTransition();
       this.drawCursor();
+    }
+
+    /** 我方棋子图键到来源：在场 ∪ 剧情增援 ∪ 形态转换的职业，连同各自的转职闭包。 */
+    private allyFigureSources(): ReadonlyMap<string, string> {
+      const sources = new Map<string, string>();
+      for (const [classId, source] of allyMapUnitAssetsForClasses(controller.currentAllyMapClassIds)) {
+        sources.set(`ally-${classId}`, source);
+      }
+      return sources;
+    }
+
+    /**
+     * `preload` 只替建立场景那一刻的棋盘排入我方棋子图，但全面撤退、重新开始与读取记录
+     * 都在同一个 `battle:<关卡>` 表面上直接换掉 `controller.battle`，表面不会重建。新棋盘
+     * 若带着原棋盘推不出的职业——读进来的记录里自动友军已经阵亡、撤退后重新部署选了
+     * 别人——棋子就落在 Phaser 的缺图方块上。每换一个棋盘就按同一条规则补排，载完之前
+     * 先不画还没有图的棋子。
+     */
+    private scheduleAllyFiguresForBoard(): void {
+      if (this.allyFigureBattle === controller.battle) return;
+      this.allyFigureBattle = controller.battle;
+      let queued = false;
+      for (const [key, source] of this.allyFigureSources()) {
+        if (this.textures.exists(key) || this.pendingAllyFigureKeys.has(key)) continue;
+        this.pendingAllyFigureKeys.add(key);
+        this.load.image(key, stagedRenderAssetSource(source));
+        queued = true;
+      }
+      if (!queued) return;
+      // A load that fails still completes the batch; the unit then shows the
+      // placeholder rather than staying hidden.
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        this.pendingAllyFigureKeys.clear();
+        this.sync();
+      });
+      this.load.start();
     }
 
     private drawTerrainOverrides(): void {
@@ -1066,7 +1105,9 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
           targetX,
           displayPosition.y * TILE_HEIGHT + TILE_HEIGHT / 2,
         );
-        view.sprite.setTexture(this.textureFor(unit));
+        const texture = this.textureFor(unit);
+        const figurePending = !this.textures.exists(texture) && this.pendingAllyFigureKeys.has(texture);
+        view.sprite.setTexture(texture);
         renderedTextureByUnitId[unit.id] = view.sprite.texture.key;
         view.sprite.setX(this.unitVisualOffset(unit));
         view.sprite.setAlpha(1);
@@ -1097,13 +1138,14 @@ export function createBattleScene(controller: GameController): typeof Phaser.Sce
             deathUnitIndex < currentDeathTargetIndex
             || (deathUnitIndex === currentDeathTargetIndex && mapPresentation!.frame >= 6)
           );
-        view.container.setVisible(!erasedByDeath);
-        if (!erasedByDeath) visibleCount += 1;
+        const shown = !erasedByDeath && !figurePending;
+        view.container.setVisible(shown);
+        if (shown) visibleCount += 1;
         renderedLifeByUnitId[unit.id] = displayedLife;
         this.drawLifeDigits(view, { ...unit, life: displayedLife });
         // Frozen units are state-driven and untargetable; keep the shell visible
         // while unrelated area techniques play until dispel or phase cleanup.
-        view.iceDisabledOverlay?.setVisible(unit.actionDisabled);
+        view.iceDisabledOverlay?.setVisible(unit.actionDisabled && !figurePending);
         // `0000:822B` 先测棋盘格的 `80h` 行动位，命中就画 `E` 并返回；
         // 只有未行动的自动友军才继续走到 `825B` 的 `N` 分支。
         const showActed = unit.acted && !mapPresentation;

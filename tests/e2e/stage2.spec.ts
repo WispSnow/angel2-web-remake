@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
 import { skipStoryDialogue } from "./dialogue-controls";
+import { skipOpeningToTitle } from "./startup-controls";
 import { captureVisualAudit } from "./visual-audit";
 
 const ARTIFACT_DIR = "artifacts/playwright";
@@ -55,6 +56,14 @@ async function clickUnit(page: Page, id: string): Promise<void> {
 const npcAllyBadgeIds = async (page: Page): Promise<string[]> => {
   const raw = await page.getByTestId("battle-canvas").getAttribute("data-npc-ally-badge-unit-ids");
   return (raw ?? "").split(",").filter((id) => id.length > 0).sort();
+};
+
+/** The texture Phaser resolved for each side-1 unit; `__MISSING` is the placeholder box. */
+const allyTextureById = async (page: Page): Promise<Record<string, string | undefined>> => {
+  const allies = (await state(page)).units.filter(({ side }) => side === 1);
+  const textures = await page.getByTestId("battle-canvas").evaluate((canvas) =>
+    JSON.parse(canvas.dataset.unitTextureById ?? "{}") as Record<string, string>);
+  return Object.fromEntries(allies.map(({ id }) => [id, textures[id]]));
 };
 
 test("S02-A/B/J: stage 2 opens from evidence content and marks six allies as automatic", async ({ page }) => {
@@ -374,6 +383,54 @@ test("keeps a battle record readable after an automatic ally has fallen", async 
       && !loaded.units.some(({ id }) => id === "1:44");
   });
   await expect(page.getByTestId("record-menu")).toBeHidden();
+});
+
+test("retreat draws the automatic allies a record read from the title had already lost", async ({ page }) => {
+  // Regression: a record read from the title builds the battle surface for its own
+  // board, and 全面撤退 then swaps the stage-entry board in on that same surface. With
+  // every automatic ally fallen and no manual ally still a soldier, nothing had
+  // preloaded `ally-soldier`, so all six came back as missing-texture boxes.
+  await page.goto("/?debugScenario=stage-02-player&difficulty=0&roster=promotion-coverage&test=1");
+  await waitForPhase(page, "player");
+  const automaticIds = await npcAllyBadgeIds(page);
+  expect(automaticIds).toHaveLength(6);
+  const entryAllies = (await state(page)).units.filter(({ side }) => side === 1);
+  expect(entryAllies.filter(({ id }) => !automaticIds.includes(id)).map(({ classId }) => classId))
+    .not.toContain("soldier");
+  await page.keyboard.press("Escape");
+  await page.getByTestId("system-command-save").click();
+  await page.getByTestId("record-slot-1").click();
+  await page.evaluate((fallen) => {
+    const save = JSON.parse(localStorage.getItem("angel2.save.1") ?? "null") as {
+      battle: { focusId: string; units: Array<{ id: string }> };
+    };
+    save.battle.units = save.battle.units.filter(({ id }) => !fallen.includes(id));
+    if (fallen.includes(save.battle.focusId)) save.battle.focusId = "1:0";
+    localStorage.setItem("angel2.save.1", JSON.stringify(save));
+  }, automaticIds);
+
+  await page.goto("/?test=1");
+  await skipOpeningToTitle(page);
+  await page.getByTestId("continue-game").click();
+  await page.getByTestId("title-record-slot-1").click();
+  await waitForPhase(page, "player");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  expect(Object.keys(await allyTextureById(page)).sort())
+    .toEqual(entryAllies.map(({ id }) => id).filter((id) => !automaticIds.includes(id)).sort());
+
+  await page.keyboard.press("g");
+  await page.getByTestId("group-command-retreat").click();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await page.locator("[data-action=retreat-confirm]").click();
+  await waitForPhase(page, "openingStory");
+  await skipStoryDialogue(page);
+  await waitForPhase(page, "player");
+  await expect.poll(() => allyTextureById(page)).toEqual(
+    Object.fromEntries(entryAllies.map(({ id, classId }) => [id, `ally-${classId}`])),
+  );
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage2-retreat-restores-automatic-allies.png`,
+  });
 });
 
 test("S02-J: fixed battle remains readable in a narrow reduced-motion viewport", async ({ page }) => {
