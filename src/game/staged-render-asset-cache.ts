@@ -12,6 +12,7 @@ export interface StagedRenderAssetLease {
 
 export interface StagedRenderAssetOptions {
   readonly ownerDocument?: Document;
+  /** Makes one attempt; `loadStagedRenderImage` owns retrying a refused decode. */
   readonly decodeImage?: (source: string, originalUrl: string) => Promise<HTMLImageElement>;
 }
 
@@ -20,11 +21,26 @@ interface ActiveStagedRenderAssets {
   readonly urlApi: Pick<typeof URL, "createObjectURL" | "revokeObjectURL">;
   readonly blobConstructor: typeof Blob;
   readonly decodeImage: (source: string, originalUrl: string) => Promise<HTMLImageElement>;
+  readonly createImageBitmap?: (image: Blob) => Promise<ImageBitmap>;
   released: boolean;
 }
 
 let activeAssets: ActiveStagedRenderAssets | undefined;
 const MAX_PARALLEL_IMAGE_DECODES = 6;
+/**
+ * Waits before each further attempt at a refused image decode.
+ *
+ * Chromium 149 rejects `decode()` with the same "The source image cannot be
+ * decoded." for a valid, fully loaded image as for a broken one: when cc's
+ * decode cache cannot budget the image — `GpuImageDecodeCache` caps its working
+ * set at 256 images and a byte budget — `ImageController::CompleteTaskForRequest`
+ * reports the unbudgeted request as a failure. Every successful decode keeps
+ * its image in that working set for three commits, or for 4 s when the page
+ * commits nothing (`DecodedImageTracker::kTimeoutDurationMs`), so under load a
+ * refusal can outlast an immediate retry by seconds. The schedule outlasts that
+ * 4 s fallback.
+ */
+const DECODE_RETRY_DELAYS_MS = [50, 150, 400, 1_000, 3_000] as const;
 const changeSubscribers = new Set<() => void>();
 
 /**
@@ -83,34 +99,16 @@ export function activateStagedRenderAssets(
   const ownerWindow = options.ownerDocument?.defaultView;
   const urlApi = ownerWindow?.URL ?? globalThis.URL;
   const blobConstructor = ownerWindow?.Blob ?? globalThis.Blob;
+  const bitmapScope = ownerWindow ?? globalThis;
   const decodeImage = options.decodeImage ?? (async (source: string, originalUrl: string) => {
     const ownerDocument = options.ownerDocument
       ?? (typeof document === "undefined" ? undefined : document);
     if (!ownerDocument) throw new Error(`cannot decode staged render asset ${source}`);
-    const createImage = () => {
-      const image = ownerDocument.createElement("img");
-      image.decoding = "sync";
-      image.dataset.stagedAssetUrl = originalUrl;
-      image.src = source;
-      return image;
-    };
-    let image = createImage();
-    try {
-      await image.decode();
-    } catch (firstError) {
-      // Chromium can reject a detached image's first decode while an old route
-      // is releasing many blob URLs. A fresh decoder for the same retained
-      // source distinguishes that transition race from genuinely invalid PNG.
-      image = createImage();
-      try {
-        await image.decode();
-      } catch (secondError) {
-        const reason = secondError instanceof Error ? secondError.message : String(secondError);
-        throw new Error(`staged render asset failed to decode: ${originalUrl}: ${reason}`, {
-          cause: firstError,
-        });
-      }
-    }
+    const image = ownerDocument.createElement("img");
+    image.decoding = "sync";
+    image.dataset.stagedAssetUrl = originalUrl;
+    image.src = source;
+    await image.decode();
     if (image.naturalWidth === 0 || image.naturalHeight === 0) {
       throw new Error(`staged render asset decoded empty: ${source}`);
     }
@@ -126,6 +124,9 @@ export function activateStagedRenderAssets(
     urlApi,
     blobConstructor,
     decodeImage,
+    createImageBitmap: typeof bitmapScope.createImageBitmap === "function"
+      ? (image) => bitmapScope.createImageBitmap(image)
+      : undefined,
     released: false,
   };
   const previous = activeAssets;
@@ -147,20 +148,80 @@ export function activateStagedRenderAssets(
   };
 }
 
+function encodedBlob(assets: ActiveStagedRenderAssets, entry: StagedRenderAssetEntry): Blob {
+  const bytes = new ArrayBuffer(entry.bytes.byteLength);
+  new Uint8Array(bytes).set(entry.bytes);
+  return new assets.blobConstructor([bytes], { type: entry.contentType });
+}
+
+function entrySource(assets: ActiveStagedRenderAssets, entry: StagedRenderAssetEntry): string {
+  entry.source ??= assets.urlApi.createObjectURL(encodedBlob(assets, entry));
+  return entry.source;
+}
+
 export function stagedRenderAssetSource(url: string): string {
   const assets = activeAssets;
   if (!assets || assets.released) return url;
   const entry = assets.entries.get(url);
-  if (!entry) return url;
-  if (!entry.source) {
-    const bytes = new ArrayBuffer(entry.bytes.byteLength);
-    new Uint8Array(bytes).set(entry.bytes);
-    entry.source = assets.urlApi.createObjectURL(new assets.blobConstructor(
-      [bytes],
-      { type: entry.contentType },
-    ));
+  return entry ? entrySource(assets, entry) : url;
+}
+
+/**
+ * Decodes the retained bytes outside `<img>` and the compositor, which tells a
+ * refused valid image apart from a genuinely broken one. `undefined` means this
+ * browser offers no second decoder to ask.
+ */
+async function encodedImageDecodes(
+  assets: ActiveStagedRenderAssets,
+  entry: StagedRenderAssetEntry,
+): Promise<boolean | undefined> {
+  if (!assets.createImageBitmap) return undefined;
+  try {
+    const bitmap = await assets.createImageBitmap(encodedBlob(assets, entry));
+    bitmap.close();
+    return true;
+  } catch {
+    return false;
   }
-  return entry.source;
+}
+
+async function decodeStagedImage(
+  assets: ActiveStagedRenderAssets,
+  entry: StagedRenderAssetEntry,
+  url: string,
+): Promise<HTMLImageElement> {
+  let bytesDecode: boolean | undefined;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await assets.decodeImage(entrySource(assets, entry), url);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      // A broken PNG fails both decoders and goes straight to the retry UI;
+      // only bytes that decode elsewhere wait out the compositor's budget.
+      if (attempt === 0) bytesDecode = await encodedImageDecodes(assets, entry);
+      if (bytesDecode === false) {
+        throw new Error(`staged render asset failed to decode: ${url}: ${reason}`, {
+          cause: error,
+        });
+      }
+      if (attempt >= DECODE_RETRY_DELAYS_MS.length) {
+        throw new Error(
+          `staged render asset failed to decode after ${attempt + 1} attempts: ${url}: ${reason}`,
+          { cause: error },
+        );
+      }
+      await new Promise((resolve) => {
+        globalThis.setTimeout(resolve, DECODE_RETRY_DELAYS_MS[attempt]);
+      });
+      // Releasing the lease revoked the object URL, so another attempt could
+      // only fail on the dead `blob:`.
+      if (assets.released) {
+        throw new Error(`staged render asset lease ended before ${url} decoded`, {
+          cause: error,
+        });
+      }
+    }
+  }
 }
 
 /** Returns the decoded image owned by the current surface, when it staged `url`. */
@@ -170,7 +231,7 @@ export function loadStagedRenderImage(url: string): Promise<HTMLImageElement> | 
   const entry = assets.entries.get(url);
   if (!entry) return undefined;
   if (!entry.imagePromise) {
-    const pending = assets.decodeImage(stagedRenderAssetSource(url), url);
+    const pending = decodeStagedImage(assets, entry, url);
     entry.imagePromise = pending;
     void pending.catch(() => {
       if (entry.imagePromise === pending) entry.imagePromise = undefined;
