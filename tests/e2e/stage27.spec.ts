@@ -236,8 +236,9 @@ test("S27-G: one move into the exact city range starts SAY/0052 with all rebels 
     path: `${ARTIFACT_DIR}/stage27-destination-highlight.png`,
   });
   await clickCell(page, 20, 14);
-  await expect(page.getByTestId("unit-command-end")).toBeVisible();
-  await page.getByTestId("unit-command-end").click();
+  // Nothing is in reach of the destination, so `734C` asks 確定／取消.
+  await expect(page.getByTestId("unit-command-confirm")).toBeVisible();
+  await page.getByTestId("unit-command-confirm").click();
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "52");
   const victory = await state(page);

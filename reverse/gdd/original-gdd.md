@@ -741,8 +741,9 @@ counterDamage = floor(max(0, counterAttack - attackDefense - attackTerrainDefens
 移动的目标统计、固定打开 DS:`3F2C`“確 定／取 消”。確定经 `7BE5` 置行动位并结束；取消
 （含取消码 `X`）由 `73ED` 以 `1000:815C` 放回攻击后的格子、按同一半移动力重建范围并回到
 选落点；在选落点时取消才回到“移動／放棄”。普通移动落点**没有**攻击／射击目标时同样改开这张
-“確 定／取 消”，有目标才显示“攻擊／結束／返悔”。完整分支见
-`../notes/input-and-battle-ui.md#移动落点循环-0000734c-与落点确认` 与 UI-009。
+“確 定／取 消”，有目标才进入移动后菜单；弓兵系还按攻击／射击目标类型分流（UI-010）。完整
+分支见 `../notes/input-and-battle-ui.md#移动落点循环-0000734c-与落点确认`、
+`../notes/input-and-battle-ui.md#射击职业移动后的分流-00006a55` 与 UI-009。
 
 ### 射击（C）
 

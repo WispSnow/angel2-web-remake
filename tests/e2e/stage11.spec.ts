@@ -119,8 +119,9 @@ test("S11-D/E: the corrected objective uses Sulanda's native boarding cells", as
     const current = window.__ANGEL2__?.getState() as Stage11State | undefined;
     return current?.phase === "victoryStory" || current?.actionMode === "actionMenu";
   });
+  // Nothing is in reach of the boarding cell, so `734C` asks 確定／取消.
   if ((await state(page)).phase === "player") {
-    await page.getByTestId("unit-command-end").click();
+    await page.getByTestId("unit-command-confirm").click();
   }
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "27");

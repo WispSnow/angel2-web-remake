@@ -10,7 +10,9 @@ interface ActionDebugState {
   actionMode: string;
   battlePresentation: "map" | "full";
   rngState: number;
+  commandMenuKind: string;
   commands: Array<{ id: string; label: string }>;
+  reachable: Array<{ x: number; y: number }>;
   actionRange: Array<{ x: number; y: number }>;
   lastSpecialAction?: {
     actionId: ClassActionId;
@@ -224,12 +226,32 @@ test("M00.6 archer shooting keeps simulation frozen through UN/60, then commits"
     .toBe(targetBefore.life - after.lastSpecialAction!.damage);
 });
 
+const MOVE_CONFIRM_COMMANDS = [
+  { id: "confirm", label: "確定" },
+  { id: "cancel", label: "取消" },
+];
+
+/**
+ * The menu kind follows the pending path, which is set as the walk starts, so wait
+ * for the menu itself before reading which commands a landing produced.
+ */
+const waitForMenu = (page: Page, kind: string) => expect.poll(async () => {
+  const current = await state(page);
+  return current.actionMode === "actionMenu" ? current.commandMenuKind : undefined;
+}).toBe(kind);
+
+/** The class-action fixtures centre the camera on (29,26), putting the view origin at (25,23). */
+const clickFixtureCell = (page: Page, x: number, y: number) =>
+  clickMapCell(page, 40 + (x - 25) * 40 + 20, 23 + (y - 23) * 44 + 22);
+
 test("M00.6 post-move menus keep shooting but never offer techniques", async ({ page }) => {
   await page.goto("/?test=1&skipStartup=1");
   await forceSetup(page, "sister");
   await openActorMenu(page);
   await page.getByTestId("unit-command-move").click();
-  await clickMapCell(page, 180, 177);
+  // (32,26) is next to the enemy at (33,26), so the landing has an attack target.
+  expect((await state(page)).reachable).toContainEqual({ x: 32, y: 26 });
+  await clickFixtureCell(page, 32, 26);
   await expect.poll(async () => (await state(page)).actionMode).toBe("actionMenu");
   expect((await state(page)).commands).toEqual([
     { id: "attack", label: "攻擊" },
@@ -244,9 +266,97 @@ test("M00.6 post-move menus keep shooting but never offer techniques", async ({ 
   await forceSetup(page, "archer");
   await openActorMenu(page);
   await page.getByTestId("unit-command-move").click();
-  await clickMapCell(page, 180, 177);
+  // Five cells from the enemy is past the bow's reach and nobody is adjacent, so
+  // `7428` counts no shot target either and `734C` asks 確定／取消.
+  await clickFixtureCell(page, 28, 26);
+  await waitForMenu(page, "moveConfirm");
+  expect((await state(page)).commands).toEqual(MOVE_CONFIRM_COMMANDS);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await state(page)).actionMode).toBe("move");
+  // Three cells away is inside the bow range without being adjacent: `6AF9` opens
+  // `DS:3E1E`, which has no 攻擊 at all.
+  expect((await state(page)).reachable).toContainEqual({ x: 30, y: 26 });
+  await clickFixtureCell(page, 30, 26);
+  await waitForMenu(page, "postMove");
+  expect((await state(page)).commands).toEqual([
+    { id: "shoot", label: "射擊" },
+    { id: "end", label: "結束" },
+    { id: "undo", label: "返悔" },
+  ]);
+  await expect(page.getByTestId("unit-command-attack")).toHaveCount(0);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-archer-post-move-shoot-only.png",
+  });
+  // REMAKE-163: cancelling the shot's target pick returns to this menu with the
+  // archer still on its landing cell, instead of undoing the move as `6B3F` does.
+  await page.getByTestId("unit-command-shoot").click();
+  await expect.poll(async () => (await state(page)).actionMode).toBe("specialTarget");
+  await page.keyboard.press("Escape");
   await expect.poll(async () => (await state(page)).actionMode).toBe("actionMenu");
-  expect((await state(page)).commands).toContainEqual({ id: "shoot", label: "射擊" });
+  const cancelledShot = await state(page);
+  expect(cancelledShot.commandMenuKind).toBe("postMove");
+  expect(cancelledShot.units.find(({ id }) => id === "1:0"))
+    .toMatchObject({ x: 30, y: 26, acted: false });
+
+  // REMAKE-163: an adjacent enemy with nothing in bow range keeps the four-item
+  // menu, instead of `6A55` striking the only neighbour at once.
+  await forceSetup(page, "archer", true);
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-move").click();
+  const reachable = (await state(page)).reachable;
+  const besideEnemy = [{ x: 30, y: 25 }, { x: 30, y: 27 }, { x: 31, y: 26 }]
+    .find((cell) => reachable.some(({ x, y }) => x === cell.x && y === cell.y));
+  if (!besideEnemy) throw new Error("the archer fixture has no reachable cell beside its enemy");
+  await clickFixtureCell(page, besideEnemy.x, besideEnemy.y);
+  await waitForMenu(page, "postMove");
+  const beside = await state(page);
+  expect(beside.commands).toEqual([
+    { id: "attack", label: "攻擊" },
+    { id: "shoot", label: "射擊" },
+    { id: "end", label: "結束" },
+    { id: "undo", label: "返悔" },
+  ]);
+  expect(beside.units.find(({ id }) => id === "1:0")).toMatchObject({ ...besideEnemy, acted: false });
+});
+
+test("a move with nothing to attack asks 確定／取消 and 取消 returns to picking a cell", async ({ page }) => {
+  await page.goto("/?test=1&skipStartup=1");
+  await forceSetup(page, "warrior");
+  await openActorMenu(page);
+  await page.getByTestId("unit-command-move").click();
+  const range = (await state(page)).reachable;
+  // The fixture enemy stands at (30,26); from (28,26) it is two cells away.
+  await clickFixtureCell(page, 28, 26);
+  await waitForMenu(page, "moveConfirm");
+  const landed = await state(page);
+  expect(landed.actionMode).toBe("actionMenu");
+  expect(landed.commands).toEqual(MOVE_CONFIRM_COMMANDS);
+  expect(landed.units.find(({ id }) => id === "1:0")).toMatchObject({ x: 28, y: 26, acted: false });
+  await expect(page.getByTestId("action-menu")).toHaveAttribute("data-kind", "moveConfirm");
+  await expect(page.getByTestId("unit-command-confirm")).toBeVisible();
+  await expect(page.getByTestId("unit-command-attack")).toHaveCount(0);
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: "artifacts/playwright/stage0-move-without-target-confirm.png",
+  });
+
+  // `73ED` puts the unit back and reopens the same destination loop with the full
+  // range; a cancel from there is what reaches the command menu again.
+  await page.getByTestId("unit-command-cancel").click();
+  await expect.poll(async () => (await state(page)).actionMode).toBe("move");
+  const reselecting = await state(page);
+  expect(reselecting.units.find(({ id }) => id === "1:0")).toMatchObject({ x: 29, y: 26, acted: false });
+  expect(reselecting.reachable).toEqual(range);
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await state(page)).commandMenuKind).toBe("initial");
+  expect((await state(page)).actionMode).toBe("actionMenu");
+
+  await page.getByTestId("unit-command-move").click();
+  await clickFixtureCell(page, 28, 26);
+  await waitForMenu(page, "moveConfirm");
+  await page.getByTestId("unit-command-confirm").click();
+  await expect.poll(async () => (await state(page)).actionMode).toBe("idle");
+  expect((await state(page)).units.find(({ id }) => id === "1:0"))
+    .toMatchObject({ x: 28, y: 26, acted: true });
 });
 
 test("M00.6 sister technique menu preserves nested cancel and both native timelines", async ({ page }) => {

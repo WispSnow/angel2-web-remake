@@ -163,8 +163,9 @@ test("S23-E: the marked destination and one-step fixture reach victory without a
     path: `${ARTIFACT_DIR}/stage23-destination-highlight.png`,
   });
   await clickCell(page, 25, 9);
-  await expect(page.getByTestId("unit-command-end")).toBeVisible();
-  await page.getByTestId("unit-command-end").click();
+  // Nothing is in reach of the destination, so `734C` asks 確定／取消.
+  await expect(page.getByTestId("unit-command-confirm")).toBeVisible();
+  await page.getByTestId("unit-command-confirm").click();
   await waitForPhase(page, "victoryFeedback");
 
   const victory = await state(page);
@@ -255,8 +256,9 @@ test("stage 24's deployment screen plays module 27's own roster track", async ({
   await clickCell(page, 25, 10);
   await page.getByTestId("unit-command-move").click();
   await clickCell(page, 25, 9);
-  await expect(page.getByTestId("unit-command-end")).toBeVisible();
-  await page.getByTestId("unit-command-end").click();
+  // Nothing is in reach of the destination, so `734C` asks 確定／取消.
+  await expect(page.getByTestId("unit-command-confirm")).toBeVisible();
+  await page.getByTestId("unit-command-confirm").click();
   await waitForPhase(page, "victoryFeedback");
   // Nothing stops the battle track at victory; it keeps playing through the
   // feedback and save-prompt screens, same as every other stage.

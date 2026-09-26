@@ -376,10 +376,11 @@ const POST_MOVE_COMMANDS: readonly UnitCommand[] = [
 ];
 
 /**
- * `DS:3F2C`, which `0000:734C` opens once the class-0F extra move has landed:
- * `SY` ends the action, `X` sends the dragon back to its post-attack cell.
+ * `DS:3F2C`, which the destination loop `0000:734C` opens once a unit lands with
+ * nothing to attack or shoot, and always after the class-0F extra move: `SY`
+ * ends the action, `X` walks the unit back to where this move began.
  */
-const EXTRA_MOVE_CONFIRM_COMMANDS: readonly UnitCommand[] = [
+const MOVE_CONFIRM_COMMANDS: readonly UnitCommand[] = [
   { id: "confirm", label: "確定" },
   { id: "cancel", label: "取消" },
 ];
@@ -581,8 +582,8 @@ export class GameController {
   private pendingOrigin?: Position;
   private pendingPath?: Position[];
   private pendingExtraMove = false;
-  /** The class-0F dragon has landed and waits on the `DS:3F2C` 確定／取消 menu. */
-  private extraMoveLanded = false;
+  /** The unit has landed and waits on the `DS:3F2C` 確定／取消 menu. */
+  private awaitingMoveConfirmation = false;
   private magicArcherRoutes: MagicArcherLineOption[] = [];
   private magicArcherRouteTargetId?: string;
   private selectedMagicArcherRouteIndex = 0;
@@ -1177,16 +1178,24 @@ export class GameController {
     return this.groupLeader !== undefined;
   }
 
-  get commandMenuKind(): "initial" | "postMove" | "extraMove" | "extraMoveConfirm" {
-    if (this.pendingExtraMove) return this.extraMoveLanded ? "extraMoveConfirm" : "extraMove";
-    return this.pendingPath ? "postMove" : "initial";
+  get commandMenuKind():
+    | "initial"
+    | "postMove"
+    | "moveConfirm"
+    | "extraMove"
+    | "extraMoveConfirm" {
+    if (this.pendingExtraMove) {
+      return this.awaitingMoveConfirmation ? "extraMoveConfirm" : "extraMove";
+    }
+    if (!this.pendingPath) return "initial";
+    return this.awaitingMoveConfirmation ? "moveConfirm" : "postMove";
   }
 
   get unitCommands(): readonly UnitCommand[] {
     if (this.commandMenuKind === "extraMove") {
       return [BASIC_COMMANDS[0], { id: "end", label: "放棄" }];
     }
-    if (this.commandMenuKind === "extraMoveConfirm") return EXTRA_MOVE_CONFIRM_COMMANDS;
+    if (this.awaitingMoveConfirmation) return MOVE_CONFIRM_COMMANDS;
     const selectedClassCommand = this.selectedUnit
       ? classCommandFor(this.selectedUnit.classId, this.selectedUnit.side)
       : undefined;
@@ -1195,9 +1204,15 @@ export class GameController {
     // here would hide a player-visible native response.
     const classCommand = selectedClassCommand;
     if (this.commandMenuKind === "postMove") {
-      return classCommand?.id === "shoot"
-        ? [POST_MOVE_COMMANDS[0], classCommand, ...POST_MOVE_COMMANDS.slice(1)]
-        : POST_MOVE_COMMANDS;
+      if (classCommand?.id !== "shoot") return POST_MOVE_COMMANDS;
+      const [attack, ...rest] = POST_MOVE_COMMANDS;
+      // A landing with shot targets but nobody adjacent opens `DS:3E1E`
+      // 射擊／結束／返悔 (`0000:6AF9`). With an adjacent enemy the four-item menu
+      // stays, rather than `6A55` jumping into its attack sub-flow (REMAKE-163).
+      const unit = this.selectedUnit;
+      return unit && this.attackTargetCells(unit).length === 0
+        ? [classCommand, ...rest]
+        : [attack, classCommand, ...rest];
     }
     return classCommand
       ? [BASIC_COMMANDS[0], BASIC_COMMANDS[1], classCommand, BASIC_COMMANDS[2]]
@@ -2000,13 +2015,10 @@ export class GameController {
       this.phase !== "player"
       || this.actionMode !== "actionMenu"
       || this.pendingExtraMove
+      || this.awaitingMoveConfirmation
       || !unit
     ) return;
-    this.targets = this.battle.units
-      .filter((candidate) => candidate.side !== unit.side
-        && !candidate.actionDisabled
-        && manhattan(unit, candidate) === 1)
-      .map(({ x, y }) => ({ x, y }));
+    this.targets = this.attackTargetCells(unit);
     if (this.targets.length === 0) {
       // `0000:70B6` answers an empty target list with contextual line 1Bh and
       // returns to the command menu, so the unit says it rather than the strip.
@@ -2029,10 +2041,29 @@ export class GameController {
   }
 
   chooseShoot(): void {
-    if (this.pendingExtraMove) return;
+    if (this.pendingExtraMove || this.awaitingMoveConfirmation) return;
     const unit = this.selectedUnit;
     const actionId = unit && shootingActionIdFor(unit.classId, unit.side);
     if (actionId) this.chooseSpecialAction(actionId);
+  }
+
+  private attackTargetCells(unit: BattleUnit): Position[] {
+    return this.battle.units
+      .filter((candidate) => candidate.side !== unit.side
+        && !candidate.actionDisabled
+        && manhattan(unit, candidate) === 1)
+      .map(({ x, y }) => ({ x, y }));
+  }
+
+  /**
+   * `0000:7428` counts what a unit can do where it landed: ordinary attack
+   * targets, and for a shooter with none of those, its shot targets. Zero sends
+   * `734C` to the 確定／取消 menu instead of the post-move command menu.
+   */
+  private hasPostMoveTarget(unit: BattleUnit): boolean {
+    if (this.attackTargetCells(unit).length > 0) return true;
+    const shot = shootingActionIdFor(unit.classId, unit.side);
+    return shot !== undefined && this.battle.actionTargetCells(unit.id, shot).length > 0;
   }
 
   chooseTechnique(): void {
@@ -2201,19 +2232,26 @@ export class GameController {
   }
 
   /** 確定 on the landing menu: `734C` marks the action spent through `7BE5`. */
-  confirmExtraMove(): void {
+  confirmMove(): void {
+    const unit = this.selectedUnit;
     if (
-      this.phase !== "player"
+      !unit
+      || this.phase !== "player"
       || this.actionMode !== "actionMenu"
-      || this.commandMenuKind !== "extraMoveConfirm"
+      || !this.awaitingMoveConfirmation
       || this.busy
     ) return;
-    this.finishUnitAction("飛龍騎士完成攻擊後移動；單位行動結束。", true);
+    if (this.pendingExtraMove) {
+      this.finishUnitAction("飛龍騎士完成攻擊後移動；單位行動結束。", true);
+      return;
+    }
+    this.battle.wait(unit.id);
+    this.finishUnitAction("單位行動結束。", true);
   }
 
   /** 取消 on the landing menu, also its `X` cancel code. */
-  cancelExtraMove(): void {
-    if (this.actionMode === "actionMenu" && this.commandMenuKind === "extraMoveConfirm") {
+  cancelMove(): void {
+    if (this.actionMode === "actionMenu" && this.awaitingMoveConfirmation) {
       void this.rollbackSelectedMovement();
     }
   }
@@ -2242,8 +2280,8 @@ export class GameController {
     else if (command.id === "rest") this.chooseRest();
     else if (command.id === "end") this.chooseEnd();
     else if (command.id === "undo") this.chooseUndo();
-    else if (command.id === "confirm") this.confirmExtraMove();
-    else if (command.id === "cancel") this.cancelExtraMove();
+    else if (command.id === "confirm") this.confirmMove();
+    else if (command.id === "cancel") this.cancelMove();
   }
 
   movePromotionSelection(delta: number): void {
@@ -2382,8 +2420,8 @@ export class GameController {
         this.emit();
         return;
       }
-      if (this.commandMenuKind === "extraMoveConfirm") {
-        this.cancelExtraMove();
+      if (this.awaitingMoveConfirmation) {
+        this.cancelMove();
         return;
       }
       if (this.commandMenuKind === "postMove") {
@@ -3242,7 +3280,7 @@ export class GameController {
     this.pendingOrigin = undefined;
     this.pendingPath = undefined;
     this.pendingExtraMove = false;
-    this.extraMoveLanded = false;
+    this.awaitingMoveConfirmation = false;
     this.reachable = [];
     this.targets = [];
     this.actionRange = [];
@@ -6479,14 +6517,17 @@ export class GameController {
     this.pendingPath = path.map((step) => ({ ...step }));
     const completed = await this.animateUnitPath(unit.id, path, "player");
     this.busy = false;
-    if (completed && extraMove) {
-      // `0000:6A2C` raises CS:`6A54`='Y' before calling `734C`, which then skips
-      // the target count an ordinary move makes and always asks 確定／取消.
-      this.extraMoveLanded = true;
+    // `0000:6A2C` raises CS:`6A54`='Y' before calling `734C`, which then skips
+    // the target count and always asks 確定／取消 after the class-0F move.
+    if (completed && (extraMove || !this.hasPostMoveTarget(unit))) {
+      this.awaitingMoveConfirmation = true;
       this.actionMode = "actionMenu";
       this.commandIndex = 0;
       this.reachable = [];
-      this.statusMessage = "確定後飛龍騎士結束行動；取消則返回攻擊後的位置重選。";
+      this.statusMessage = extraMove
+        ? "確定後飛龍騎士結束行動；取消則返回攻擊後的位置重選。"
+        : `此處沒有可${shootingActionIdFor(unit.classId, unit.side) ? "攻擊或射擊" : "攻擊"}的目標；`
+          + "確定後結束行動，取消則返回原位置重選。";
       this.emit();
       return;
     }
@@ -6510,16 +6551,21 @@ export class GameController {
     this.busy = false;
     this.pendingPath = undefined;
     this.commandIndex = 0;
-    if (this.pendingExtraMove) {
-      // `0000:73ED` rebuilds the halved range at the restored cell and jumps
-      // straight back into the destination loop at `734C`; only a cancel from
-      // that loop returns to 移動／放棄.
-      this.extraMoveLanded = false;
-      this.reachable = this.battle.extraMovementRange(unit.id);
+    if (this.awaitingMoveConfirmation) {
+      // 取消 rather than 返悔: `0000:73ED` rebuilds the range at the restored cell
+      // with the budget this move had (halved for class 0F) and jumps straight
+      // back into the destination loop at `734C`. Only a cancel from that loop
+      // reaches the command menu again, or 移動／放棄 after an attack.
+      this.awaitingMoveConfirmation = false;
+      this.reachable = this.pendingExtraMove
+        ? this.battle.extraMovementRange(unit.id)
+        : this.battle.reachableCells(unit.id);
       this.actionMode = "move";
-      this.statusMessage = completed
-        ? "已返回攻擊後的位置；請重新選擇落點，或取消回到移動／放棄。"
-        : "無法返回原位置。";
+      this.statusMessage = !completed
+        ? "無法返回原位置。"
+        : this.pendingExtraMove
+          ? "已返回攻擊後的位置；請重新選擇落點，或取消回到移動／放棄。"
+          : "已返回原位置；請重新選擇落點，或取消回到行動選單。";
       this.emit();
       return;
     }

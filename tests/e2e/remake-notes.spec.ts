@@ -359,6 +359,25 @@ test("REMAKE-162 把「騎士城堡前」隔河攻擊娜米的漏洞列入 Bug �
   await expect(page.getByTestId("remake-note-REMAKE-162")).toHaveCount(0);
 });
 
+test("REMAKE-163 把弓兵系移動後的自動出手與撤回移動列入 Bug 修復", async ({ page }) => {
+  await page.goto("/");
+  // 使用者要求保留的、與原版不同的操作流程一律算原版缺陷修復，不歸「平衡性調整」。
+  await openNotes(page, "fixes");
+  const rangedMenu = page.getByTestId("remake-note-REMAKE-163");
+  await expect(rangedMenu).toContainText("弓兵系移動後不再自動出手或撤回移動");
+  await expect(rangedMenu).toContainText("會不經選單直接攻擊");
+  await expect(rangedMenu).toContainText("則會撤銷整次移動、退回出發位置");
+  await expect(rangedMenu).toContainText("「結束」只結束本單位的行動");
+  await expect(rangedMenu).toContainText("移動後沒有任何目標時的「確定／取消」");
+  await expect(rangedMenu.locator(".rn-note-id")).toHaveText("REMAKE-163");
+  await captureVisualAudit(rangedMenu, {
+    path: "artifacts/playwright/remake-notes-ranged-post-move-menu.png",
+  });
+
+  await page.getByTestId("remake-notes-tab-balance").click();
+  await expect(page.getByTestId("remake-note-REMAKE-163")).toHaveCount(0);
+});
+
 test("REMAKE-103 說明線性成長的屬性與升級經驗都延續前 3 級", async ({ page }) => {
   await page.goto("/");
   await openNotes(page, "balance");

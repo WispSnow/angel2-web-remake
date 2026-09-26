@@ -148,8 +148,9 @@ test("S24-E: the marked destination and one-step fixture enter the victory story
     path: `${ARTIFACT_DIR}/stage24-destination-highlight.png`,
   });
   await clickCell(page, 30, 20);
-  await expect(page.getByTestId("unit-command-end")).toBeVisible();
-  await page.getByTestId("unit-command-end").click();
+  // Nothing is in reach of the destination, so `734C` asks 確定／取消.
+  await expect(page.getByTestId("unit-command-confirm")).toBeVisible();
+  await page.getByTestId("unit-command-confirm").click();
   await waitForPhase(page, "victoryStory");
   await expect(page.getByTestId("dialogue-layer")).toHaveAttribute("data-source-record", "48");
 

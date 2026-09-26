@@ -891,8 +891,8 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
     else if (action === "rest") controller.chooseRest();
     else if (action === "end-unit") controller.chooseEnd();
     else if (action === "undo-move") controller.chooseUndo();
-    else if (action === "confirm-extra-move") controller.confirmExtraMove();
-    else if (action === "cancel-extra-move") controller.cancelExtraMove();
+    else if (action === "confirm-move") controller.confirmMove();
+    else if (action === "cancel-move") controller.cancelMove();
     else if (action === "promotion-target") {
       controller.selectPromotionTarget(Number(button.dataset.promotionIndex));
       controller.confirmPromotion();
@@ -1197,7 +1197,9 @@ export function mountUi(root: HTMLElement, controller: GameController, audio: Au
               ? "選擇飛龍騎士攻擊後移動或放棄"
               : controller.commandMenuKind === "extraMoveConfirm"
                 ? "確認飛龍騎士攻擊後移動"
-                : "選擇移動後行動",
+                : controller.commandMenuKind === "moveConfirm"
+                  ? "確認移動"
+                  : "選擇移動後行動",
         );
         actionMenu.innerHTML = controller.unitCommands.map((command, index) => {
           const action = UNIT_COMMAND_ACTIONS[command.id];
@@ -2576,8 +2578,8 @@ const UNIT_COMMAND_ACTIONS: Readonly<Record<UnitCommandId, string>> = {
   rest: "rest",
   end: "end-unit",
   undo: "undo-move",
-  confirm: "confirm-extra-move",
-  cancel: "cancel-extra-move",
+  confirm: "confirm-move",
+  cancel: "cancel-move",
 };
 
 /** `.group-command-menu button:disabled`, kept in one place so both agree. */
