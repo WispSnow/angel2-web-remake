@@ -16,6 +16,7 @@ interface Stage11State {
   activeStoryId?: string;
   campaignRoute?: string;
   statusMessage: string;
+  cursor: { x: number; y: number };
   cameraOrigin: { x: number; y: number };
   consumedEventIds: string[];
   units: Array<{
@@ -24,6 +25,7 @@ interface Stage11State {
     slot: number;
     classId: string;
     name: string;
+    portrait: number;
     x: number;
     y: number;
     life: number;
@@ -147,6 +149,24 @@ test("S11-I/REMAKE-018: Sulanda grants the ranger's class while Nia is absent", 
   await page.waitForTimeout(120);
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/stage11-promotion-sulanda-grantor.png`,
+  });
+});
+
+test("S11-J/REMAKE-164: the opening pursuer shows 麗蘭特's descriptor name and portrait", async ({ page }) => {
+  await page.goto("/?debugScenario=stage-11-player&difficulty=0&test=1");
+  await expect(page.getByTestId("battle-canvas")).toBeVisible();
+  const opening = await state(page);
+  expect(opening.units.find(({ id }) => id === "2:21")).toMatchObject({
+    classId: "pegasus-warrior", name: "麗蘭特", portrait: 28, x: 36, y: 48,
+  });
+  for (let x = opening.cursor.x; x < 36; x += 1) await page.keyboard.press("ArrowRight");
+  for (let y = opening.cursor.y; y < 48; y += 1) await page.keyboard.press("ArrowDown");
+  expect((await state(page)).cursor).toEqual({ x: 36, y: 48 });
+  await expect(page.locator(".hud-identity-name")).toHaveText("飛馬戰士／麗蘭特");
+  await expect(page.getByTestId("unit-portrait-composite"))
+    .toHaveAttribute("data-portrait-record", "28");
+  await captureVisualAudit(page.getByTestId("game-screen"), {
+    path: `${ARTIFACT_DIR}/stage11-lilante-hud.png`,
   });
 });
 

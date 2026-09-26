@@ -133,13 +133,15 @@ export const STAGE11_SEMANTIC_ALLIED_UNITS = STAGE11_ALLIED_UNITS.map((unit) => 
   };
 });
 
+// REMAKE-164: the side-2 actor descriptor names the opening pursuer 麗蘭特 (D/28).
 export const STAGE11_SEMANTIC_ENEMY_UNITS = STAGE11_ENEMY_UNITS.map((unit) => {
   const classId = semanticClassId(unit.nativeClassRecord);
   return {
     slot: unit.slot,
     position: unit.position,
     classId,
-    name: className(classId),
+    name: "name" in unit ? unit.name : className(classId),
+    ...("portraitRecord" in unit ? { portrait: unit.portraitRecord as PortraitRecord } : {}),
     aiBehavior: unit.aiBehavior,
   };
 });

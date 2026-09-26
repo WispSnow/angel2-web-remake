@@ -111,6 +111,32 @@ function restoreOriginalStageTitle(value: unknown): unknown {
   return correction ? { ...value, stageLabel: correction.original } : value;
 }
 
+/**
+ * REMAKE-164: every stage-11 battle save before v123 stored the opening pursuer
+ * with its 飛馬戰士 class identity because the first generator skipped the side-2
+ * actor descriptor. Slot 21 is only ever that pursuer (reinforcements use 40..79),
+ * so the repair is its name and portrait; class, stats, position and PRNG stay.
+ */
+function restoreStage11PursuerIdentity(value: unknown): unknown {
+  if (!isRecord(value)
+    || value.kind !== "battle"
+    || value.stageId !== "stage-11"
+    || !isRecord(value.battle)
+    || !Array.isArray(value.battle.units)) return value;
+  return {
+    ...value,
+    battle: {
+      ...value.battle,
+      units: value.battle.units.map((unit) => isRecord(unit)
+        && unit.id === "2:21"
+        && unit.side === 2
+        && unit.slot === 21
+        ? { ...unit, name: "麗蘭特", portrait: 28 }
+        : unit),
+    },
+  };
+}
+
 /** REMAKE-103 introduced the `linear` enemy ladder in v83; v120 is the last version on it. */
 const NATIVE_LINEAR_LADDER_VERSIONS = { first: 83, last: 120 } as const;
 
@@ -735,6 +761,23 @@ function migrateVersion104Save(value: unknown): SaveData | undefined {
   if (!isRecord(value)
     || value.version !== 104
     || value.contentVersion !== "stage-09-escort-valley-route-1") return undefined;
+  const migrated = {
+    ...value,
+    version: SAVE_VERSION,
+    contentVersion: SAVE_CONTENT_VERSION,
+  };
+  return isSaveData(migrated) ? migrated : undefined;
+}
+
+/**
+ * REMAKE-164 names stage 11's opening pursuer 麗蘭特. The identity repair runs in
+ * `restoreStage11PursuerIdentity` before every version step, so a v122 save only
+ * moves to the current identity here.
+ */
+function migrateVersion122Save(value: unknown): SaveData | undefined {
+  if (!isRecord(value)
+    || value.version !== 122
+    || value.contentVersion !== "stage-01-guard-protects-commander-1") return undefined;
   const migrated = {
     ...value,
     version: SAVE_VERSION,
@@ -3425,9 +3468,13 @@ export function parseSaveData(raw: string): SaveData | undefined {
 }
 
 function migratePreviousSaveData(raw: unknown): SaveData | undefined {
-  // Every version step below validates against the current names and the
-  // current difficulty 1/2 enemy ladder.
-  const value = rescaleLinearEnemyExperience(restoreOriginalStageTitle(raw));
+  // Every version step below validates against the current names, the current
+  // difficulty 1/2 enemy ladder and stage 11's named pursuer.
+  const value = restoreStage11PursuerIdentity(
+    rescaleLinearEnemyExperience(restoreOriginalStageTitle(raw)),
+  );
+  const migratedVersion122 = migrateVersion122Save(value);
+  if (migratedVersion122) return migratedVersion122;
   const migratedVersion121 = migrateVersion121Save(value);
   if (migratedVersion121) return migratedVersion121;
   const migratedVersion120 = migrateVersion120Save(value);

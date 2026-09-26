@@ -97,8 +97,24 @@ const compactUnit = (unit) => ({
   position: { x: unit.x, y: unit.y },
   aiBehavior: unit.perSlotBehavior,
 });
+const enemyActorFor = (slot) => requireEntry(
+  campaignRoster.displayResolution.enemyActors,
+  (actor) => actor.slot === slot,
+  `stage 11 enemy actor ${slot}`,
+);
 const alliedUnits = template.activeUnitInstances.filter(({ side }) => side === 1).map(compactUnit);
-const enemyUnits = template.activeUnitInstances.filter(({ side }) => side === 2).map(compactUnit);
+// REMAKE-164: module 29 resolves every side-2 slot through the `DS:32AD`
+// descriptor table; only an FF portrait byte falls back to the class name and
+// portrait. The first generator skipped the lookup and demoted slot 21 麗蘭特.
+const enemyUnits = template.activeUnitInstances.filter(({ side }) => side === 2).map((unit) => {
+  const actor = enemyActorFor(unit.unitSlot);
+  return {
+    ...compactUnit(unit),
+    ...(actor.portraitRecord !== 0xff
+      ? { name: actor.normalizedName, portraitRecord: actor.portraitRecord }
+      : {}),
+  };
+});
 assertEqual(alliedUnits, [
   { slot: 9, nativeClassRecord: null, position: { x: 26, y: 2 }, aiBehavior: 0 },
   { slot: 18, nativeClassRecord: null, position: { x: 23, y: 32 }, aiBehavior: 0 },
@@ -111,7 +127,14 @@ assertEqual(alliedUnits, [
   { slot: 40, nativeClassRecord: 22, position: { x: 30, y: 38 }, aiBehavior: 0 },
 ], "stage 11 allied units");
 assertEqual(enemyUnits, [
-  { slot: 21, nativeClassRecord: 23, position: { x: 36, y: 48 }, aiBehavior: 0 },
+  {
+    slot: 21,
+    nativeClassRecord: 23,
+    position: { x: 36, y: 48 },
+    aiBehavior: 0,
+    name: "麗蘭特",
+    portraitRecord: 28,
+  },
 ], "stage 11 enemy units");
 
 const actorBySlot = new Map(campaignRoster.displayResolution.actors.map((actor) => [actor.slot, actor]));
@@ -285,7 +308,7 @@ const sources = Object.entries(inputPaths).map(([id, file]) => ({
   bytes: inputBuffers[id].length,
 }));
 const identityHash = createHash("sha256");
-identityHash.update("stableRemake\0REMAKE-041\0");
+identityHash.update("stableRemake\0REMAKE-041\0REMAKE-164\0");
 for (const source of sources) identityHash.update(`${source.path}\0${source.sha256}\n`);
 const contentIdentity = `stage-11/evidence-${identityHash.digest("hex")}`;
 const eventProgram = {

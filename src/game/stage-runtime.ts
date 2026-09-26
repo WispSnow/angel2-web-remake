@@ -2722,6 +2722,12 @@ export const STAGE_RUNTIME_MANIFEST = {
         slots: [8, 16, 17, 18, 19, 40, 41, 42],
       },
       enemyClassById: createStage11SaveEnemyClasses(),
+      namedUnits: [{
+        // REMAKE-164: the opening pursuer is the descriptor actor 麗蘭特.
+        match: { kind: "unit", unitId: "2:21", side: 2, slot: 21 },
+        name: "麗蘭特",
+        portrait: 28,
+      }],
       enemyAi: "none",
     },
     load: loadStage11Module,

@@ -59,14 +59,15 @@ describe("stage 11 generated content", () => {
   it("keeps the original nine allies, initial enemy, coordinates, classes, and behaviors", () => {
     expect(STAGE11_TERRAIN_TOKENS).toHaveLength(2500);
     expect(STAGE11_SEMANTIC_ALLIED_UNITS).toHaveLength(9);
-    expect(STAGE11_SEMANTIC_ENEMY_UNITS).toEqual([
-      expect.objectContaining({
-        slot: 21,
-        classId: "pegasus-warrior",
-        position: { x: 36, y: 48 },
-        aiBehavior: 0,
-      }),
-    ]);
+    // REMAKE-164: the side-2 actor descriptor names the opening pursuer.
+    expect(STAGE11_SEMANTIC_ENEMY_UNITS).toEqual([{
+      slot: 21,
+      classId: "pegasus-warrior",
+      name: "麗蘭特",
+      portrait: 28,
+      position: { x: 36, y: 48 },
+      aiBehavior: 0,
+    }]);
     expect(STAGE11_SEMANTIC_ALLIED_UNITS.find(({ slot }) => slot === 9)).toMatchObject({
       name: "多莉", portrait: 13, position: { x: 26, y: 2 }, aiBehavior: 0,
     });

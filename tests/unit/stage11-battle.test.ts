@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { usesClassIdentity } from "../../src/game/content/classes";
 import { completeCampaignRoster, initialEnemyExperience } from "../../src/game/content/stage0";
 import { Stage11Battle, createStage11Units } from "../../src/game/simulation/stage11-battle";
 import type { CampaignState } from "../../src/game/types";
@@ -36,9 +37,13 @@ describe("stage 11 battle simulation", () => {
     expect(battle.unit("1:42")).toMatchObject({
       classId: "cavalry", experience: 0, life: 200, x: 22, y: 35,
     });
-    expect(battle.unit("2:21")).toMatchObject({
-      classId: "pegasus-warrior", x: 36, y: 48,
+    const lilante = battle.unit("2:21");
+    expect(lilante).toMatchObject({
+      classId: "pegasus-warrior", className: "飛馬戰士", name: "麗蘭特", portrait: 28, x: 36, y: 48,
     });
+    if (!lilante) throw new Error("missing stage 11 opening pursuer");
+    // REMAKE-164 keeps her out of rank and file, so REMAKE-118 plans her landings.
+    expect(usesClassIdentity(lilante)).toBe(false);
     const alliedIds = battle.units.filter(({ side }) => side === 1).map(({ id }) => id);
     expect(alliedIds.every((id) => battle.isPlayerControllableAlly(id))).toBe(true);
     expect(battle.alliedActionOrder(false)).toEqual([]);
@@ -101,11 +106,14 @@ describe("stage 11 battle simulation", () => {
     battle.beginEnemyPhase();
     expect(battle.unit("2:40")).toMatchObject({
       classId: "cavalry",
+      name: "騎兵",
       x: 32,
       y: 48,
       acted: false,
       actionDisabled: false,
     });
+    // Descriptors 40..59 carry FF portraits: reinforcements stay rank and file.
+    expect(usesClassIdentity(battle.unit("2:40")!)).toBe(true);
     expect(battle.enemyActionOrder()).toContain("2:40");
     expect(battle.forceForUnit("2:40")).toMatchObject({
       id: "pegasus-pursuer",

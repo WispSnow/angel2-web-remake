@@ -7,6 +7,8 @@ import {
   STAGE_RUNTIME_MANIFEST,
 } from "../../src/game/stage-runtime";
 import { completeCampaignRoster } from "../../src/game/content/stage0";
+import { CHARACTER_CATALOG } from "../../src/game/content/character-catalog.generated";
+import { usesClassIdentity } from "../../src/game/content/classes";
 import { STAGE_ROUND_LIMIT } from "../../src/game/simulation/objectives";
 import { STAGE0_ACTION_PRESENTATION_ASSETS } from "../../src/game/content/stage0-actions.generated";
 import { presentationActionIdsForClass } from "../../src/game/content/actions";
@@ -370,6 +372,11 @@ describe("stage runtime manifest", () => {
       kind: "fixed-roster",
       slots: [8, 16, 17, 18, 19, 40, 41, 42],
     });
+    expect(stage11.save.namedUnits).toEqual([{
+      match: { kind: "unit", unitId: "2:21", side: 2, slot: 21 },
+      name: "麗蘭特",
+      portrait: 28,
+    }]);
     expect(stage12.preparation?.definition).toMatchObject({
       fixedPlacements: [{ slot: 0, position: { x: 23, y: 20 } }],
       maximumUnits: 9,
@@ -718,6 +725,34 @@ describe("stage runtime manifest", () => {
     expect(stage38.nextStageId).toBe("stage-39");
     expect(loadedStageRuntime("stage-02")).toBe(stage2);
     expect(await loadStageRuntime("stage-02")).toBe(stage2);
+  });
+
+  it("fields every named side-2 descriptor actor under its own name and portrait", async () => {
+    // Module 29 resolves each side-2 slot through the `DS:32AD` actor descriptor
+    // table and only falls back to the class name and portrait on an FF byte. The
+    // catalog is generated from that table, so no slot it names may reach an
+    // opening board as rank and file (REMAKE-119, REMAKE-164).
+    const actorByEnemySlot = new Map(CHARACTER_CATALOG
+      .filter(({ enemySlot }) => enemySlot !== null)
+      .map((entry) => [entry.enemySlot, entry]));
+    const checked: string[] = [];
+    for (const stageId of Object.keys(STAGE_RUNTIME_MANIFEST) as StageId[]) {
+      const runtime = await loadStageRuntime(stageId);
+      const battle = runtime.createBattle(
+        { ...campaign, stageId, roster: completeCampaignRoster([]) },
+        runtime.preparation?.createInitialResult(),
+      );
+      for (const unit of battle.units) {
+        const actor = unit.side === 2 ? actorByEnemySlot.get(unit.slot) : undefined;
+        if (!actor) continue;
+        const id = `${stageId}/${unit.id}`;
+        checked.push(id);
+        expect({ id, name: unit.name, portrait: unit.portrait })
+          .toEqual({ id, name: actor.name, portrait: actor.portraitRecord });
+        expect(usesClassIdentity(unit), id).toBe(false);
+      }
+    }
+    expect(checked).toEqual(expect.arrayContaining(["stage-11/2:21", "stage-38/2:21"]));
   });
 
   it("carries the campaign record counters into every rebuilt battle", async () => {

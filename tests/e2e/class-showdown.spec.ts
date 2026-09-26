@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   drawnFrame,
+  drawnFrames,
   MAP_COMBAT_FRAME_KEYS,
   quakeSteps,
   recordCanvasFrames,
@@ -491,27 +492,30 @@ test("water warrior copies die in sequence and multiply the killer's experience"
   expect(attacker).toBeDefined();
 
   await page.keyboard.press("Space");
+  const frames = await recordCanvasFrames(page, [
+    "mapCombatPhase",
+    "mapCombatTarget",
+    "mapCombatFrame",
+    "mapCombatDeathTargetIndex",
+    "mapCombatDeathTargetCount",
+    "unitLifeLabelCount",
+  ]);
   await page.getByTestId("unit-command-attack").click();
-  const canvas = page.getByTestId("battle-canvas");
-  await page.waitForFunction(() => {
-    const element = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
-    return element?.dataset.mapCombatPhase === "defenderDeath"
-      && element.dataset.mapCombatTarget === "arena-2-26:split-1"
-      && element.dataset.mapCombatFrame === "3";
-  });
-  await expect(canvas).toHaveAttribute("data-map-combat-death-target-index", "1");
-  await expect(canvas).toHaveAttribute("data-map-combat-death-target-count", "4");
-  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "72");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/class-showdown-water-warrior-sequential-death.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "defenderDeath",
+    mapCombatTarget: "arena-2-26:split-1",
+    mapCombatFrame: "3",
+  }, { path: `${ARTIFACT_DIR}/class-showdown-water-warrior-sequential-death.png` });
 
+  // The trace is reset as the presentation starts, so a non-empty one with no presentation
+  // left means the whole group clear has played.
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
       battle?: ClassShowdownBattleState;
     }).battle;
     return current?.lastCombat?.defenderDied === true
-      && current.combatPresentation === undefined;
+      && current.combatPresentation === undefined
+      && current.combatPresentationTrace.length > 0;
   });
   const resolved = await classShowdownBattleState(page);
   const deathTargets = resolved?.lastCombat?.defenderDeathTargets ?? [];
@@ -528,6 +532,21 @@ test("water warrior copies die in sequence and multiply the killer's experience"
   expect(deathTrace.map(({ deathTargetId }) => deathTargetId)).toEqual(
     deathTargets.flatMap(({ id }) => Array.from({ length: 15 }, () => id)),
   );
+  // The canvas drew the same order: 15 MAGIC/12 frames per copy, each copy erased from frame 6
+  // of its own clear and staying erased through the later copies' clears and afterwards.
+  const boardBodies = setup?.units.length ?? 0;
+  expect(drawnFrames(await frames.stop(), { mapCombatPhase: "defenderDeath" }))
+    .toEqual(deathTargets.flatMap(({ id }, index) =>
+      Array.from({ length: 15 }, (_, frame) => ({
+        mapCombatPhase: "defenderDeath",
+        mapCombatTarget: id,
+        mapCombatFrame: String(frame),
+        mapCombatDeathTargetIndex: String(index),
+        mapCombatDeathTargetCount: "4",
+        unitLifeLabelCount: String(boardBodies - index - (frame >= 6 ? 1 : 0)),
+      }))));
+  await expect(page.getByTestId("battle-canvas"))
+    .toHaveAttribute("data-unit-life-label-count", String(boardBodies - deathTargets.length));
   expect((resolved!.lastCombat!.experienceGained) / deathTargets.length)
     .toBeGreaterThanOrEqual(44);
   expect((resolved!.lastCombat!.experienceGained) / deathTargets.length)

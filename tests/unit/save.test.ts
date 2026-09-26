@@ -5838,6 +5838,42 @@ describe("Web save validation", () => {
     expect(parseSaveData(JSON.stringify(wrongClass))).toBeUndefined();
   });
 
+  it("names stage 11's opening pursuer 麗蘭特 while migrating older battle saves (REMAKE-164)", () => {
+    // 首版生成器跳过了敌方角色描述符，槽 21 一直以「飛馬戰士」职业身份入档。迁移只修
+    // 姓名与画像；职业、生命、经验、坐标、增援槽、事件与 PRNG 逐字段保留。
+    const current = stage11BattleSave(3);
+    expect(current.battle.units.find(({ id }) => id === "2:21")).toMatchObject({
+      classId: "pegasus-warrior", name: "麗蘭特", portrait: 28,
+    });
+    const genericPortrait = classFallbackPortraitFor("pegasus-warrior", 2);
+    if (genericPortrait === undefined) throw new Error("missing pegasus enemy portrait");
+    const legacy = structuredClone(current);
+    legacy.battle.units = legacy.battle.units.map((unit) => unit.id === "2:21"
+      ? { ...unit, name: "飛馬戰士", portrait: genericPortrait }
+      : unit);
+    expect(isSaveData(legacy)).toBe(false);
+    for (const [version, contentVersion] of [
+      [122, "stage-01-guard-protects-commander-1"],
+      [121, "enemy-linear-experience-step-1"],
+      [32, "stage-11-ranger-reinforcements-1"],
+    ] as const) {
+      expect(parseSaveData(JSON.stringify({ ...legacy, version, contentVersion })), `v${version}`)
+        .toEqual(current);
+    }
+
+    // Once she has fallen, only the save identity changes.
+    const fallen = structuredClone(current);
+    fallen.battle.units = fallen.battle.units.filter(({ id }) => id !== "2:21");
+    expect(isSaveData(fallen)).toBe(true);
+    for (const other of [fallen, battleSave(), completedSave()]) {
+      expect(parseSaveData(JSON.stringify({
+        ...other,
+        version: 122,
+        contentVersion: "stage-01-guard-protects-commander-1",
+      })), `${other.kind} ${other.stageId}`).toEqual(other);
+    }
+  });
+
   it("migrates version-121 saves by identity when the castle guard starts protecting Nami (REMAKE-162)", () => {
     // REMAKE-162 只让我军波及娜米的敌对动作唤醒第 1 关城堡守军；受保护槽位来自关卡内容，
     // 激活状态本就入档，因此 v121 无损迁移。读档前她受过的伤不追溯唤醒守军。

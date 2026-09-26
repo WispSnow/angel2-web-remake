@@ -49,6 +49,10 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 同步改写画布 `data-*`，每帧又各等自己的程序计时器，观察器回调因此必定落在两帧之间，与负载无关。
 这类帧的视觉审计截图用记录器的 `captureVisualAudit`，只在 `VISUAL_AUDIT=1` 时尽力截取，错过就记入
 测试注解，不当断言；全局程序暂停会连 Phaser 一起停，无法把某一帧冻住再截图。
+要在一段会自行结束的停留里读状态或按键（如祈禱每名对象 240 ms 的结果停留），记录器也无能为力：在
+`goto` 前 `page.clock.install()`，触发前 `pauseAt` 冻结时间，再以 `runFor` 小步推进（见
+`arena-buffs.spec.ts` 的 `advanceToPrayerResult`）；推进预算低于停留时长，才能证明是按键跳过了停留。
+假时钟管不到 CSS 动画：选单收合仍按真实时间播放，截图前要先等它收完。
 
 ## 取证语料与素材依赖
 
@@ -141,7 +145,8 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 | 第 7 关内容、部署与战斗合同 | `stage7-content.test.ts`、`stage7-battle.test.ts`、`stage-runtime.test.ts` | `stage7.spec.ts` |
 | 第 8 关内容、固定军团与战斗合同 | `stage8-content.test.ts`、`stage8-battle.test.ts`、`stage-runtime.test.ts` | `stage8.spec.ts` |
 | 第 9 关内容、部署、护送路线与复合目标 | `stage9-content.test.ts`、`stage9-battle.test.ts`、`objectives.test.ts`、`stage-runtime.test.ts` | `stage9.spec.ts` |
-| 内部第 11 关内容、剧情离场、每轮无限可复用增援、固定撤离战与到达区目标 | `stage11-content.test.ts`、`stage11-battle.test.ts`、`stage-runtime.test.ts` | `stage11.spec.ts` |
+| 内部第 11 关内容、开场追兵麗蘭特 D/28 的描述符身份（`REMAKE-164`）、剧情离场、每轮无限可复用增援、固定撤离战与到达区目标 | `stage11-content.test.ts`、`stage11-battle.test.ts`、`stage-runtime.test.ts`、`save.test.ts` | `stage11.spec.ts` |
+| 逐关开局棋盘的具名敌方身份：落在敌方角色描述符具名槽（`DS:32AD` 画像非 `FFh`，以角色图鉴目录为参照）上的 side 2 单位必须带该角色的姓名与画像，并处于具名将领边界 | `stage-runtime.test.ts` | — |
 | 内部第 10 关内容、BK/10 关前剧情、1–13 人部署、五名追兵与全灭目标 | `stage10-content.test.ts`、`stage10-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage10.spec.ts` |
 | 内部第 12 关内容、BK/10–14 三段剧情、1–9 人部署、五个水戰士根槽、职业分裂、共享生命显示时序、全景右侧详情快照与无关卡增援 | `stage12-content.test.ts`、`stage12-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage12.spec.ts` 的地图／全景分身扣血与右侧详情回归；`stage0.spec.ts` S00-K 的普通职业全景详情回归 |
 | 内部第 13 关内容、BK/15 关前剧情、1–12 人部署、两名水戰士新成员、九名守军、瑪西爾首领目标与无增援 | `stage13-content.test.ts`、`stage13-battle.test.ts`、`save.test.ts`、`stage-runtime.test.ts` | `stage13.spec.ts` |

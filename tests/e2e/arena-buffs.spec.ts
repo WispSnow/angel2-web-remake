@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   ARTIFACT_DIR,
   arenaBattleState,
@@ -13,6 +13,28 @@ import { captureVisualAudit } from "./visual-audit";
 // These specs assert native line windows, which REMAKE-161 opens on a
 // six-in-ten coin; pin it open so each asserted window appears.
 test.beforeEach(async ({ page }) => pinNativeLineCoin(page));
+
+/**
+ * Steps the paused Playwright clock 12 ms at a time until the canvas shows `unitId`'s OJ
+ * result, then one more frame so Phaser draws it. Fails once `withinMs` of program time pass
+ * without it. A result holds for `mapCombatDelay(60)` = 240 ms under `?test=1`, so a budget
+ * well below that proves the previous hold was skipped, not left to expire.
+ */
+async function advanceToPrayerResult(page: Page, unitId: string, withinMs: number): Promise<void> {
+  const canvas = page.getByTestId("battle-canvas");
+  for (let elapsed = 0; ; elapsed += 12) {
+    const shown = await canvas.evaluate((element, id) => {
+      const { dataset } = element as HTMLCanvasElement;
+      return dataset.mapCombatPhase === "prayerEffect" && dataset.mapCombatLifeChangeUnit === id;
+    }, unitId);
+    if (shown) break;
+    if (elapsed >= withinMs) {
+      throw new Error(`no OJ result for ${unitId} within ${withinMs} ms of program time`);
+    }
+    await page.clock.runFor(12);
+  }
+  await page.clock.runFor(16);
+}
 
 test("magic guide commits AA through the formal technique flow", async ({ page }) => {
   const pageErrors: string[] = [];
@@ -478,6 +500,10 @@ test("AD buffs an ice-frozen ally while the persistent shell stays above the shi
 test("tier-three prayer guide performs OJ as progressive per-recipient procedural results", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  // Each OJ result holds for only 240 ms of program time before the next recipient starts on
+  // its own: too short to read it and press Enter inside it once workers compete. A fake
+  // clock paused through the prayer keeps every hold open until Enter ends it.
+  await page.clock.install();
   await page.goto("/arena.html?test=1");
   await page.getByTestId("arena-clear").click();
   const placed = await page.evaluate(() => {
@@ -508,17 +534,13 @@ test("tier-three prayer guide performs OJ as progressive per-recipient procedura
   await expect(page.getByTestId("technique-recovery-3")).toContainText("高級回復");
   await expect(page.getByTestId("technique-defense-up")).toContainText("防禦提昇");
   await expect(page.getByTestId("technique-prayer")).toContainText("祈禱");
+  // The page idles in the technique menu, so jumping its clock half a second ahead is harmless.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
   await page.getByTestId("technique-prayer").click();
 
   const canvas = page.getByTestId("battle-canvas");
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "prayerEffect"
-      && dataset.mapCombatLifeChangeUnit === "arena-1-0"
-      && dataset.mapCombatPrayerOutcome === "defenseUp";
-  }, undefined, { polling: "raf" });
+  await advanceToPrayerResult(page, "arena-1-0", 2_000);
+  await expect(canvas).toHaveAttribute("data-map-combat-prayer-outcome", "defenseUp");
   let during = await arenaBattleState(page);
   expect(during?.lastSpecialAction).toBeUndefined();
   expect(during?.specialActionPresentation).toMatchObject({
@@ -535,6 +557,9 @@ test("tier-three prayer guide performs OJ as progressive per-recipient procedura
   expect(during?.units.find(({ id }) => id === "arena-1-3")?.statuses.attackUp).toBe(0);
   expect(during?.rngCalls).toBe(before!.rngCalls + 8);
   await expect(canvas).toHaveAttribute("data-map-combat-prayer-rolled-amount", "");
+  // The result landed the instant 祈禱 was clicked, but the menu's close animation runs on
+  // real time, not the paused clock: let it finish so the shot shows the result alone.
+  await expect(page.getByTestId("technique-prayer")).toBeHidden();
   await captureVisualAudit(page.getByTestId("game-screen"), {
     path: `${ARTIFACT_DIR}/arena-prayer.png`,
   });
@@ -542,14 +567,9 @@ test("tier-three prayer guide performs OJ as progressive per-recipient procedura
   // The native result hold is skippable. Advancing it must reveal and commit
   // the next recipient without spending the caster action early.
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatLifeChangeUnit === "arena-1-2"
-      && dataset.mapCombatPrayerOutcome === "experience"
-      && dataset.mapCombatPrayerRolledAmount === "9";
-  }, undefined, { polling: "raf" });
+  await advanceToPrayerResult(page, "arena-1-2", 180);
+  await expect(canvas).toHaveAttribute("data-map-combat-prayer-outcome", "experience");
+  await expect(canvas).toHaveAttribute("data-map-combat-prayer-rolled-amount", "9");
   during = await arenaBattleState(page);
   expect(during?.units.find(({ id }) => id === "arena-1-2")?.experience)
     .toBe(experienceBefore.experience + 9);
@@ -557,18 +577,14 @@ test("tier-three prayer guide performs OJ as progressive per-recipient procedura
   expect(during?.units.find(({ id }) => id === "arena-1-0")?.acted).toBe(false);
 
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatLifeChangeUnit === "arena-1-3"
-      && dataset.mapCombatPrayerOutcome === "attackUp";
-  }, undefined, { polling: "raf" });
+  await advanceToPrayerResult(page, "arena-1-3", 180);
+  await expect(canvas).toHaveAttribute("data-map-combat-prayer-outcome", "attackUp");
   during = await arenaBattleState(page);
   expect(during?.units.find(({ id }) => id === "arena-1-3")?.statuses.attackUp).toBe(3);
   expect(during?.units.find(({ id }) => id === "arena-1-0")?.acted).toBe(false);
 
   await page.keyboard.press("Enter");
+  await page.clock.resume();
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
       battle?: ArenaBattleDebugState;
@@ -698,32 +714,17 @@ test("OJ over a split water warrior stacks every body on the shared record and s
   const caster = await focusAlly("arena-1-0");
   await clickArenaWorldCell(page, caster.x, caster.y);
   await page.getByTestId("unit-command-technique").click();
+  const frames = await recordCanvasFrames(page, [
+    "mapCombatPhase",
+    "mapCombatLifeChangeUnit",
+    "mapCombatPrayerOutcome",
+    "mapCombatPrayerRolledAmount",
+  ], arenaUnitsProbe);
   await page.getByTestId("technique-prayer").click();
-
-  // Board order is split (24,29), caster (18,30), root (24,30), and all three pass
-  // the gate. The root is the body whose own snapshot used to go stale — the split
-  // body had already raised the shared attack word — so the prayer threw here and
-  // the caster kept its action.
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "prayerEffect"
-      && dataset.mapCombatLifeChangeUnit === "arena-1-1"
-      && dataset.mapCombatPrayerOutcome === "experience"
-      && dataset.mapCombatPrayerRolledAmount === "13";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  for (const bodyId of ["arena-1-1", "arena-1-1:split-1"]) {
-    expect(during?.units.find(({ id }) => id === bodyId)).toMatchObject({
-      experience: rootBefore.experience + 13,
-      statuses: expect.objectContaining({ attackUp: 3 }),
-    });
-  }
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.acted).toBe(false);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-prayer-split-water-warrior.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "prayerEffect",
+    mapCombatLifeChangeUnit: "arena-1-1",
+  }, { path: `${ARTIFACT_DIR}/arena-prayer-split-water-warrior.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -732,6 +733,25 @@ test("OJ over a split water warrior stacks every body on the shared record and s
     return current?.lastSpecialAction?.actionId === "prayer"
       && current.specialActionPresentation === undefined;
   });
+  // Board order is split (24,29), caster (18,30), root (24,30), and all three pass
+  // the gate. The root is the body whose own snapshot used to go stale — the split
+  // body had already raised the shared attack word — so the prayer threw here and
+  // the caster kept its action.
+  const rootResult = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "prayerEffect",
+    mapCombatLifeChangeUnit: "arena-1-1",
+  });
+  expect(rootResult).toMatchObject({
+    mapCombatPrayerOutcome: "experience",
+    mapCombatPrayerRolledAmount: "13",
+  });
+  for (const bodyId of ["arena-1-1", "arena-1-1:split-1"]) {
+    expect(rootResult.state?.[bodyId]).toMatchObject({
+      experience: rootBefore.experience + 13,
+      statuses: expect.objectContaining({ attackUp: 3 }),
+    });
+  }
+  expect(rootResult.state?.["arena-1-0"]?.acted).toBe(false);
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction?.affectedUnits).toEqual([
     expect.objectContaining({ unitId: "arena-1-1:split-1", prayerOutcome: "attackUp" }),
