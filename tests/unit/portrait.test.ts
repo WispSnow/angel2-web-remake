@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   module29ShowsRedEyes,
   nativeMouthFrameAfterGlyph,
   nativeStoryGlyphMovesMouth,
+  startPortraitAnimations,
 } from "../../src/game/portrait";
 import {
   isPortraitRecord,
@@ -105,5 +106,51 @@ describe("generated campaign portrait catalog", () => {
     expect(isPortraitRecord(68)).toBe(false);
     expect(isPortraitRecord(-1)).toBe(false);
     expect(isPortraitRecord(1.5)).toBe(false);
+  });
+});
+
+describe("animated portrait preparation", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("decodes the same layers again on the next frame after a refused decode", async () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    let refusals = 1;
+    const layers = ["base", "eye-1", "mouth-1"].map((layer) => ({
+      naturalHeight: 16,
+      naturalWidth: 24,
+      src: `blob:portrait-0046-${layer}`,
+      decode: vi.fn(async () => {
+        // Chromium 對「合成器預算不夠」與「圖本身壞掉」回的是同一個 EncodingError。
+        if (layer === "eye-1" && refusals > 0) {
+          refusals -= 1;
+          throw new DOMException("The source image cannot be decoded.", "EncodingError");
+        }
+      }),
+    }));
+    const portrait = {
+      dataset: { portraitChannel: "stage49-story-lower", portraitRecord: "46", portraitReady: "false" },
+      querySelectorAll: () => layers,
+    } as unknown as HTMLElement;
+    const root = { querySelectorAll: () => [portrait] } as unknown as HTMLElement;
+    const settle = () => new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+
+    const stop = startPortraitAnimations(root, true, () => false);
+    frames.shift()?.(16);
+    await settle();
+    expect(portrait.dataset.portraitReady).toBe("false");
+    expect(portrait.dataset.portraitError).toBe("The source image cannot be decoded.");
+    expect(layers.map(({ decode }) => decode.mock.calls.length)).toEqual([1, 1, 1]);
+
+    // 被拒的準備已從快取丟掉，下一幀的 tick 就對同一批圖層元素重新 decode()。
+    frames.shift()?.(33);
+    await settle();
+    expect(layers.map(({ decode }) => decode.mock.calls.length)).toEqual([2, 2, 2]);
+    expect(portrait.dataset.portraitReady).toBe("true");
+    expect(portrait.dataset.portraitError).toBeUndefined();
+    stop();
   });
 });

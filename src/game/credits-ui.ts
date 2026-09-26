@@ -159,7 +159,9 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
       screen.innerHTML = scrollMarkup(credits.transitionIndex);
       screen.setAttribute("aria-label", `製作人員表轉場 ${credits.transitionIndex + 1}／${CREDITS_TRANSITION.count}`);
     }
-    void prepareDomImageElements(screen.querySelectorAll<HTMLImageElement>("img")).then(() => {
+    void prepareDomImageElements(screen.querySelectorAll<HTMLImageElement>("img"), {
+      abandoned: () => generation !== renderGeneration,
+    }).then(() => {
       if (generation !== renderGeneration) return;
       screen.dataset.segmentReady = "true";
       if (credits.section === "the-end") startFinalAnimation();
@@ -184,6 +186,8 @@ export function mountCreditsUi(root: HTMLElement, controller: GameController): (
   screen.addEventListener("click", retryFailedSegment);
   render();
   return () => {
+    // Ends the segment too, so a decode still waiting out a refusal stops.
+    renderGeneration += 1;
     stopFinalAnimation();
     stopScrollAnimation();
     unsubscribe();

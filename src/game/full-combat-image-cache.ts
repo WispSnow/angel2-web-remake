@@ -1,3 +1,9 @@
+import {
+  decodesOutsideCompositor,
+  imageBitmapDecoder,
+  retryRefusedImageDecode,
+} from "./image-decode-retry";
+
 type FetchImage = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 interface DecodedFullCombatImage {
@@ -58,20 +64,16 @@ async function decodeImage(
   const canUseObjectUrl = typeof urlApi.createObjectURL === "function";
   const blobBytes = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(blobBytes).set(bytes);
-  const objectUrl = canUseObjectUrl
-    ? urlApi.createObjectURL(new blobConstructor([blobBytes], { type: "image/png" }))
-    : undefined;
+  const blob = new blobConstructor([blobBytes], { type: "image/png" });
+  const objectUrl = canUseObjectUrl ? urlApi.createObjectURL(blob) : undefined;
   const source = objectUrl ?? url;
-  const createImage = () => {
+  const decodeDetachedImage = async (): Promise<HTMLImageElement> => {
     const image = ownerDocument.createElement("img");
     image.decoding = "sync";
-    return image;
-  };
-  const decode = async (image: HTMLImageElement): Promise<void> => {
     if (typeof image.decode === "function") {
       image.src = source;
       await image.decode();
-      return;
+      return image;
     }
     await new Promise<void>((resolve, reject) => {
       image.addEventListener("load", () => resolve(), { once: true });
@@ -80,30 +82,28 @@ async function decodeImage(
       });
       image.src = source;
     });
+    return image;
   };
-  let image = createImage();
+  let image: HTMLImageElement;
   try {
-    try {
-      await decode(image);
-    } catch (firstError) {
-      // Chromium can reject one detached decoder while another route is
-      // releasing many blob-backed atlases. The bytes and object URL remain
-      // owned here, so a fresh element distinguishes that transient race from
-      // a genuinely invalid PNG without refetching or hiding persistent damage.
-      image = createImage();
-      try {
-        await decode(image);
-      } catch (secondError) {
-        throw new Error(
-          secondError instanceof Error ? secondError.message : String(secondError),
-          { cause: firstError },
-        );
-      }
-    }
+    // The stage resource gate awaits this, so a compositor refusal must not
+    // surface as 「資源讀取失敗」. Every attempt is a fresh detached element on
+    // the bytes and object URL owned here: no refetch, and a PNG that
+    // `createImageBitmap` rejects too still fails at once.
+    image = await retryRefusedImageDecode({
+      attempt: decodeDetachedImage,
+      decodesElsewhere: () => decodesOutsideCompositor(
+        imageBitmapDecoder(ownerWindow ?? globalThis),
+        () => blob,
+      ),
+      failure: ({ outcome, reason, attempts, cause }) => {
+        const detail = outcome === "exhausted" ? `嘗試 ${attempts} 次：${reason}` : reason;
+        return new Error(`圖片解碼失敗：${url}${detail ? `（${detail}）` : ""}`, { cause });
+      },
+    });
   } catch (error) {
     if (objectUrl) urlApi.revokeObjectURL(objectUrl);
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`圖片解碼失敗：${url}${detail ? `（${detail}）` : ""}`, { cause: error });
+    throw error;
   }
   return {
     source,

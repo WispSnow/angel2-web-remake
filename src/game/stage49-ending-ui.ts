@@ -388,7 +388,9 @@ export function mountStage49EndingUi(
     const ordinaryImages = [...screen.querySelectorAll<HTMLImageElement>("img")]
       .filter((image) => !image.closest(".animated-portrait"));
     const readiness = [
-      prepareDomImageElements(ordinaryImages),
+      prepareDomImageElements(ordinaryImages, {
+        abandoned: () => generation !== renderGeneration,
+      }),
       ...portraits.map((portrait) => prepareAnimatedPortrait(portrait)),
     ];
     if (session.section === "story") readiness.push(decodeStagedRenderImages(dialogueFrameAssetUrls));
@@ -460,6 +462,8 @@ export function mountStage49EndingUi(
   render();
   screen.focus({ preventScroll: true });
   return () => {
+    // Ends the segment too, so a decode still waiting out a refusal stops.
+    renderGeneration += 1;
     if (timer !== undefined) clearProgramTimeout(timer);
     stopStoryTimer();
     stopEpilogueTyping();
