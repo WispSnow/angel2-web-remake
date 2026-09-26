@@ -54,6 +54,17 @@ async function clickCell(page: Page, x: number, y: number): Promise<void> {
   });
 }
 
+/**
+ * Acknowledges whatever line is up during an enemy phase without letting the click
+ * outlive it. AI notices close on their own after a fixed hold, and since REMAKE-161
+ * they open only by chance, so the layer can hide between `isVisible()` and the
+ * click; an unbounded click would then wait out the whole poll.
+ */
+async function acknowledgeVisibleLine(page: Page): Promise<void> {
+  const dialogue = page.getByTestId("dialogue-layer");
+  if (await dialogue.isVisible()) await dialogue.click({ timeout: 1_000 }).catch(() => undefined);
+}
+
 async function acknowledgeBattleContext(page: Page): Promise<void> {
   const dialogue = page.getByTestId("dialogue-layer");
   await dialogue.click();
@@ -325,8 +336,7 @@ test("S30-J: a record saved after 維絲塔 has fought lists and reloads", async
   await expect.poll(async () => {
     const current = await state(page);
     if (current.phase === "player" && current.round === 2) return true;
-    const dialogue = page.getByTestId("dialogue-layer");
-    if (await dialogue.isVisible()) await dialogue.click();
+    await acknowledgeVisibleLine(page);
     return false;
   }, { timeout: 30_000 }).toBe(true);
   const fought = await state(page);
@@ -374,8 +384,7 @@ test("S30-K/REMAKE-157: the stage 30 cap sits at round 199 and still loses on ti
   await page.getByTestId("group-command-allRest").click();
   await expect.poll(async () => {
     if ((await state(page)).phase === "defeat") return true;
-    const dialogue = page.getByTestId("dialogue-layer");
-    if (await dialogue.isVisible()) await dialogue.click();
+    await acknowledgeVisibleLine(page);
     return false;
   }, { timeout: 30_000 }).toBe(true);
   await expect(page.locator("#status-strip")).toHaveText("未能在 199 回合內達成目標");
