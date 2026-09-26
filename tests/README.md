@@ -38,6 +38,17 @@ pnpm test:e2e:visual tests/e2e/<file>.spec.ts -g "<title>"
 目标 DOM 或读档独有的状态组合；若读档前后阶段相同，不能只等 `phase`。资源请求断言应在导航前
 注册 Playwright `request` 监听，不依赖容量有限、可能淘汰早期条目的 Resource Timing 缓冲区。
 
+地图战斗、技能与力场演出在 `?test=1` 下每帧只停留 `mapCombatDelay(ticks)` = ticks × 4 ms（一般
+40 ms，踩踏震动一步只有 4 ms），而多个 worker 并行时 rAF 被节流得远比这慢：`waitForFunction`
+等某一帧可能整帧错过、空等 60 s，等到了之后的 `toHaveAttribute` 或状态读取也常常已是后面的帧。
+断言单帧画布属性时改用 `canvas-frame-recorder.ts`：在触发动作前 `recordCanvasFrames`，等到持久的
+结束状态（如 `specialActionPresentation === undefined`）后用 `stop()` 取回逐帧记录，再以
+`drawnFrame`／`drawnFrames` 断言；要核对「这一帧画出时模拟还没提交」，就传入在页面内执行的 probe
+（竞技场用 `arena-test-support.ts` 的 `arenaUnitsProbe`）。`BattleScene.sync()` 在每次控制器 emit 时
+同步改写画布 `data-*`，每帧又各等自己的程序计时器，观察器回调因此必定落在两帧之间，与负载无关。
+这类帧的视觉审计截图用记录器的 `captureVisualAudit`，只在 `VISUAL_AUDIT=1` 时尽力截取，错过就记入
+测试注解，不当断言；全局程序暂停会连 Phaser 一起停，无法把某一帧冻住再截图。
+
 ## 取证语料与素材依赖
 
 有两类外部依赖不随仓库分发，缺失时行为已经明确定义，不会伪装成回归：

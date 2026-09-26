@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { NATIVE_OBJECTIVE_PANEL_TEXT } from "../../src/game/content/objective-panel.generated";
 import { SAVE_CONTENT_VERSION, SAVE_VERSION } from "../../src/game/save";
+import { drawnFrame, drawnFrames, recordCanvasFrames } from "./canvas-frame-recorder";
 import { skipStoryDialogue } from "./dialogue-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -107,12 +108,17 @@ async function clickUnit(page: Page, id: string): Promise<void> {
 // sweep draw instead of racing the 22-draw wave.
 const SLOW_PULSE_QUERY = "&slowMap=1";
 
-const waitForSweepFrame = (page: Page, frame: string) => page.waitForFunction(
-  (expected) => document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")
-    ?.dataset.routePulseSweepFrame === expected,
-  frame,
-  { polling: 16 },
-);
+/** The canvas `dataset` entries of one force-field pulse draw. */
+const ROUTE_PULSE_FRAME_KEYS = [
+  "mapCombatPhase",
+  "mapCombatFrame",
+  "mapCombatEffectTileCount",
+  "routePulseVisible",
+  "routePulseNativeTicks",
+  "routePulseVisibleUnitIds",
+  "routePulseSweepFrame",
+  "routePulseSweepCellCount",
+] as const;
 
 async function endManualPhase(page: Page): Promise<void> {
   await page.keyboard.press("g");
@@ -194,42 +200,42 @@ test("S04-D/E/F: Gadirath is independent, projects the safe area, and emits the 
   await expect(page.getByTestId("route-pulse-safety")).toHaveAttribute("data-safety", "danger");
   await expect(canvas).toHaveAttribute("data-route-pulse-safe-cell-count", "13");
   await page.keyboard.press("Escape");
+  // Each sample also counts the safe cells inside the camera window as it stood for that draw.
+  const frames = await recordCanvasFrames(page, ROUTE_PULSE_FRAME_KEYS, () => {
+    const current = window.__ANGEL2__?.getState() as Stage4State | undefined;
+    const safeCells = current?.routePulsePresentation?.result.safeCells;
+    if (!current || !safeCells) return undefined;
+    const { x: left, y: top } = current.cameraOrigin;
+    return safeCells.filter(({ x, y }) =>
+      x >= left && x < left + 10 && y >= top && y < top + 7).length;
+  });
   await endManualPhase(page);
-  await waitForSweepFrame(page, "4");
-  await expect(canvas).toHaveAttribute("data-map-combat-phase", "route-pulse");
-  await expect(canvas).toHaveAttribute("data-route-pulse-visible", "true");
-  await expect(canvas).toHaveAttribute("data-map-combat-frame", /^1[12]$/u);
-  await expect(canvas).toHaveAttribute("data-route-pulse-native-ticks", "2");
-  await expect(canvas).toHaveAttribute(
-    "data-route-pulse-visible-unit-ids",
-    "1:1,1:2,1:3,1:4,1:20,1:21",
-  );
-  // The sweep layer covers the whole camera window outside the barrier: `0000:97DC` walks
-  // the same 10x7 screen array the remake viewport renders, and only the safe area is skipped.
-  const sweepSample = await page.evaluate(() => {
-    const element = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
-    const current = window.__ANGEL2__?.getState() as Stage4State;
-    return {
-      sweepCells: Number(element?.dataset.routePulseSweepCellCount),
-      tileCount: Number(element?.dataset.mapCombatEffectTileCount),
-      cameraOrigin: current.cameraOrigin,
-      safeCells: current.routePulsePresentation?.result.safeCells ?? [],
-    };
-  });
-  const safeInWindow = sweepSample.safeCells.filter(({ x, y }) =>
-    x >= sweepSample.cameraOrigin.x && x < sweepSample.cameraOrigin.x + 10
-    && y >= sweepSample.cameraOrigin.y && y < sweepSample.cameraOrigin.y + 7).length;
-  expect(safeInWindow).toBeGreaterThan(0);
-  expect(sweepSample.sweepCells).toBe(70 - safeInWindow);
-  expect(sweepSample.tileCount).toBe(sweepSample.sweepCells + 6);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage4-force-field-pulse.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    routePulseSweepFrame: "4",
+  }, { path: `${ARTIFACT_DIR}/stage4-force-field-pulse.png` });
 
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage4State | undefined;
     return current?.lastRoutePulse !== undefined && current.routePulsePresentation === undefined;
   });
+  const sweep = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "route-pulse",
+    routePulseSweepFrame: "4",
+  });
+  expect(sweep).toMatchObject({
+    routePulseVisible: "true",
+    routePulseNativeTicks: "2",
+    routePulseVisibleUnitIds: "1:1,1:2,1:3,1:4,1:20,1:21",
+  });
+  expect(sweep.mapCombatFrame).toMatch(/^1[12]$/u);
+  // The sweep layer covers the whole camera window outside the barrier: `0000:97DC` walks
+  // the same 10x7 screen array the remake viewport renders, and only the safe area is skipped.
+  const safeInWindow = sweep.state ?? 0;
+  expect(safeInWindow).toBeGreaterThan(0);
+  expect(Number(sweep.routePulseSweepCellCount)).toBe(70 - safeInWindow);
+  expect(Number(sweep.mapCombatEffectTileCount))
+    .toBe(Number(sweep.routePulseSweepCellCount) + 6);
+
   const resolved = await state(page);
   expect(resolved.lastRoutePulse).toMatchObject({ actorId: "1:24" });
   expect(resolved.lastRoutePulse!.path.length).toBeGreaterThan(1);
@@ -261,23 +267,27 @@ test("S04-K: reduced motion keeps every native draw of the force-field pulse", a
   await expect(canvas).toBeVisible();
   const initial = await state(page);
 
+  const frames = await recordCanvasFrames(page, ROUTE_PULSE_FRAME_KEYS);
   await endManualPhase(page);
-  await expect(canvas).toHaveAttribute("data-map-combat-phase", "route-pulse");
-  await expect(canvas).toHaveAttribute("data-route-pulse-visible", "true");
-  await expect(canvas).toHaveAttribute("data-route-pulse-native-ticks", "2");
-  await expect(canvas).toHaveAttribute(
-    "data-route-pulse-visible-unit-ids",
-    "1:1,1:2,1:3,1:4,1:20,1:21",
-  );
-  await waitForSweepFrame(page, "4");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/stage4-force-field-pulse-reduced-motion.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    routePulseSweepFrame: "4",
+  }, { path: `${ARTIFACT_DIR}/stage4-force-field-pulse-reduced-motion.png` });
 
   await page.waitForFunction(() => {
     const current = window.__ANGEL2__?.getState() as Stage4State | undefined;
     return current?.lastRoutePulse !== undefined && current.routePulsePresentation === undefined;
   });
+  const drawn = await frames.stop();
+  expect(drawnFrame(drawn, { mapCombatPhase: "route-pulse", routePulseSweepFrame: "4" })
+    .routePulseVisible).toBe("true");
+  const visiblePulse = drawnFrames(drawn, { mapCombatPhase: "route-pulse", routePulseVisible: "true" });
+  expect(visiblePulse.length).toBeGreaterThan(0);
+  for (const frame of visiblePulse) {
+    expect(frame).toMatchObject({
+      routePulseNativeTicks: "2",
+      routePulseVisibleUnitIds: "1:1,1:2,1:3,1:4,1:20,1:21",
+    });
+  }
   const resolved = await state(page);
   // The shared lightning wave keeps its native draw count under every presentation option;
   // only the player-visible speed toggle may change the wall clock.

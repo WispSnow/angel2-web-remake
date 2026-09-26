@@ -1,4 +1,11 @@
 import { expect, test } from "@playwright/test";
+import {
+  drawnFrame,
+  MAP_COMBAT_FRAME_KEYS,
+  quakeSteps,
+  recordCanvasFrames,
+  STOMP_FRAME_KEYS,
+} from "./canvas-frame-recorder";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -228,24 +235,29 @@ test("advanced fire uses the formal campaign atlas mapping in the all-class show
   await expect(page.getByTestId("technique-fire-3")).toContainText("高級炎暴");
   await page.getByTestId("technique-fire-3").click();
   await page.keyboard.press("ArrowRight");
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatEffectAtlasFrames",
+  ]);
   await page.keyboard.press("Space");
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "fireEffect",
+    mapCombatFrame: "10",
+  }, { path: `${ARTIFACT_DIR}/class-showdown-fire-3-formal-atlas.png` });
 
-  const canvas = page.getByTestId("battle-canvas");
   await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "fireEffect"
-      && dataset.mapCombatFrame === "10"
-      && dataset.mapCombatEffectTileCount === "6";
-  }, undefined, { polling: "raf" });
-  await expect(canvas).toHaveAttribute(
-    "data-map-combat-effect-atlas-frames",
-    [39, 40, 41, 42, 43, 44].map((frame) => `fire-3__effect__${frame}`).join(","),
-  );
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/class-showdown-fire-3-formal-atlas.png`,
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState & { lastSpecialAction?: { actionId: string } };
+    }).battle;
+    return current?.lastSpecialAction?.actionId === "fire-3"
+      && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "fireEffect", mapCombatFrame: "10" }))
+    .toMatchObject({
+      mapCombatEffectTileCount: "6",
+      mapCombatEffectAtlasFrames: [39, 40, 41, 42, 43, 44]
+        .map((frame) => `fire-3__effect__${frame}`).join(","),
+    });
   expect(pageErrors).toEqual([]);
 });
 
@@ -826,25 +838,26 @@ test("great dragon knight stomp lands on its selected target in the all-class sh
   await expect(page.getByTestId("technique-stomp-3")).toContainText("女踏");
   await page.getByTestId("technique-stomp-3").click();
   await page.keyboard.press("ArrowRight");
+  const frames = await recordCanvasFrames(page, STOMP_FRAME_KEYS);
   await page.keyboard.press("Space");
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatStompPhase: "quake",
+  }, { path: `${ARTIFACT_DIR}/class-showdown-stomp-3-target-impact.png` });
 
   await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatStompPhase === "quake"
-      && dataset.mapCombatStompAction === "stomp-3"
-      && dataset.mapCombatStompX === "160"
-      && dataset.mapCombatStompShadowY === "368"
-      && dataset.mapCombatStompResource === "MAGIC/53"
-      && dataset.mapCombatStompTargetScreenX !== undefined
-      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
-      && dataset.mapCombatStompTargetScreenY !== undefined
-      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/class-showdown-stomp-3-target-impact.png`,
+    const current = (window.__ANGEL2_CLASS_SHOWDOWN__?.getState() as {
+      battle?: ClassShowdownBattleState & { lastSpecialAction?: { actionId: string } };
+    }).battle;
+    return current?.lastSpecialAction?.actionId === "stomp-3"
+      && current.specialActionPresentation === undefined;
   });
+  expect(quakeSteps(await frames.stop())).toContainEqual(expect.objectContaining({
+    mapCombatStompAction: "stomp-3",
+    mapCombatStompX: "160",
+    mapCombatStompShadowY: "368",
+    mapCombatStompResource: "MAGIC/53",
+    impactOnTarget: true,
+  }));
   expect(pageErrors).toEqual([]);
 });
 

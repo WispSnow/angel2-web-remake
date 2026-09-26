@@ -2,11 +2,12 @@ import { expect, test } from "@playwright/test";
 import {
   ARTIFACT_DIR,
   arenaBattleState,
+  arenaUnitsProbe,
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { drawnFrame, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { pinNativeLineCoin } from "./native-line-coin";
-import { captureVisualAudit } from "./visual-audit";
 
 // These specs assert native line windows, which REMAKE-161 opens on a
 // six-in-ten coin; pin it open so each asserted window appears.
@@ -47,19 +48,12 @@ test("tier-three magic priest commits native 2F through the formal technique flo
   await expect(page.getByTestId("technique-recovery-1")).toContainText("初級回復");
   await expect(page.getByTestId("technique-dispel")).toContainText("破邪");
   await page.getByTestId("technique-fire-2").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "fireEffect"
-      && dataset.mapCombatFrame === "8"
-      && dataset.mapCombatEffectTileCount === "2";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-fire-2-column.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "fireEffect",
+    mapCombatFrame: "8",
+  }, { path: `${ARTIFACT_DIR}/arena-fire-2-column.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -68,6 +62,8 @@ test("tier-three magic priest commits native 2F through the formal technique flo
     return current?.lastSpecialAction?.actionId === "fire-2"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "fireEffect", mapCombatFrame: "8" })
+    .mapCombatEffectTileCount).toBe("2");
   const after = await arenaBattleState(page);
   const damage = Math.min(156, Math.floor(targetBefore!.life * 26 / 100));
   expect(after?.lastSpecialAction).toMatchObject({
@@ -128,6 +124,7 @@ test("enemy tier-one evil mage uses stable radius-six 2F and group-10 dialogue",
       subtree: true,
     });
   }, "看我的火球魔法.");
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   await page.getByTestId("unit-command-rest").click();
 
   await expect(dialogue).toHaveAttribute("data-source-record", "ai-technique");
@@ -139,17 +136,10 @@ test("enemy tier-one evil mage uses stable radius-six 2F and group-10 dialogue",
   await expect.poll(() => dialogue.evaluate((layer) =>
     Boolean((layer as HTMLElement & { __expectedLineWasVisible?: boolean })
       .__expectedLineWasVisible))).toBe(true);
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "fireEffect"
-      && dataset.mapCombatFrame === "8"
-      && dataset.mapCombatEffectTileCount === "2";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-fire-2-ai-column.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "fireEffect",
+    mapCombatFrame: "8",
+  }, { path: `${ARTIFACT_DIR}/arena-fire-2-ai-column.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -159,6 +149,8 @@ test("enemy tier-one evil mage uses stable radius-six 2F and group-10 dialogue",
       && current.lastSpecialAction.actorId === "arena-2-0"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "fireEffect", mapCombatFrame: "8" })
+    .mapCombatEffectTileCount).toBe("2");
   const after = await arenaBattleState(page);
   const damage = Math.min(156, Math.floor(targetBefore!.life * 26 / 100));
   expect(after?.lastSpecialAction).toMatchObject({
@@ -203,23 +195,15 @@ test("tier-two evil mage commits native 3F through the formal technique flow", a
   await expect(page.getByTestId("technique-fire-3")).toContainText("高級炎暴");
   await expect(page.getByTestId("technique-fire-2")).toHaveCount(0);
   await page.getByTestId("technique-fire-3").click();
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatEffectAtlasFrames",
+  ]);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "fireEffect"
-      && dataset.mapCombatFrame === "10"
-      && dataset.mapCombatEffectTileCount === "6";
-  }, undefined, { polling: "raf" });
-  await expect(page.getByTestId("battle-canvas")).toHaveAttribute(
-    "data-map-combat-effect-atlas-frames",
-    [39, 40, 41, 42, 43, 44].map((frame) => `fire-3__effect__${frame}`).join(","),
-  );
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-fire-3-wave.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "fireEffect",
+    mapCombatFrame: "10",
+  }, { path: `${ARTIFACT_DIR}/arena-fire-3-wave.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -228,6 +212,12 @@ test("tier-two evil mage commits native 3F through the formal technique flow", a
     return current?.lastSpecialAction?.actionId === "fire-3"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "fireEffect", mapCombatFrame: "10" }))
+    .toMatchObject({
+      mapCombatEffectTileCount: "6",
+      mapCombatEffectAtlasFrames: [39, 40, 41, 42, 43, 44]
+        .map((frame) => `fire-3__effect__${frame}`).join(","),
+    });
   const after = await arenaBattleState(page);
   const damage = Math.min(192, Math.floor(targetBefore!.life * 32 / 100));
   expect(after?.lastSpecialAction).toMatchObject({
@@ -279,51 +269,20 @@ test("tier-three evil mage performs 4F through its ground, rising-column, and in
   await expect(page.getByTestId("technique-fire-2")).toHaveCount(0);
   await expect(page.getByTestId("technique-fire-3")).toHaveCount(0);
   await page.getByTestId("technique-fire-4").click();
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatAnchorOffset",
+    "mapCombatEffectTextureKeys",
+  ], arenaUnitsProbe);
   await clickArenaWorldCell(page, 23, 33);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "fireEffect"
-      && dataset.mapCombatFrame === "20"
-      && dataset.mapCombatAnchorOffset === "0,0"
-      && dataset.mapCombatEffectTileCount === "9"
-      && dataset.mapCombatEffectTextureKeys === Array.from(
-        { length: 9 },
-        (_, index) => `map-fire-4-finish-${index}`,
-      ).join(",");
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(targetBefore?.life);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-fire-4-rising-column.png`,
-  });
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "fireEffect"
-      && dataset.mapCombatFrame === "24"
-      && dataset.mapCombatAnchorOffset === "0,0"
-      && dataset.mapCombatEffectTileCount === "4"
-      && dataset.mapCombatEffectTextureKeys === [18, 19, 19, 20]
-        .map((frame) => `map-fire-4-finish-${frame}`).join(",");
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-fire-4-finish.png`,
-  });
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "fireEffect"
-      && dataset.mapCombatFrame === "28"
-      && dataset.mapCombatAnchorOffset === "0,-4"
-      && dataset.mapCombatEffectTileCount === "4";
-  }, undefined, { polling: "raf" });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "fireEffect",
+    mapCombatFrame: "20",
+  }, { path: `${ARTIFACT_DIR}/arena-fire-4-rising-column.png` });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "fireEffect",
+    mapCombatFrame: "24",
+  }, { path: `${ARTIFACT_DIR}/arena-fire-4-finish.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -331,6 +290,27 @@ test("tier-three evil mage performs 4F through its ground, rising-column, and in
     }).battle;
     return current?.lastSpecialAction?.actionId === "fire-4"
       && current.specialActionPresentation === undefined;
+  });
+  const drawn = await frames.stop();
+  const risingColumn = drawnFrame(drawn, { mapCombatPhase: "fireEffect", mapCombatFrame: "20" });
+  expect(risingColumn).toMatchObject({
+    mapCombatAnchorOffset: "0,0",
+    mapCombatEffectTileCount: "9",
+    mapCombatEffectTextureKeys: Array.from(
+      { length: 9 },
+      (_, index) => `map-fire-4-finish-${index}`,
+    ).join(","),
+  });
+  expect(risingColumn.state?.["arena-2-0"]?.life).toBe(targetBefore?.life);
+  expect(drawnFrame(drawn, { mapCombatPhase: "fireEffect", mapCombatFrame: "24" })).toMatchObject({
+    mapCombatAnchorOffset: "0,0",
+    mapCombatEffectTileCount: "4",
+    mapCombatEffectTextureKeys: [18, 19, 19, 20]
+      .map((frame) => `map-fire-4-finish-${frame}`).join(","),
+  });
+  expect(drawnFrame(drawn, { mapCombatPhase: "fireEffect", mapCombatFrame: "28" })).toMatchObject({
+    mapCombatAnchorOffset: "0,-4",
+    mapCombatEffectTileCount: "4",
   });
   const after = await arenaBattleState(page);
   const damage = Math.min(270, Math.floor(targetBefore!.life * 44 / 100));

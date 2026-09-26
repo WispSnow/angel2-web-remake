@@ -12,6 +12,12 @@ import {
   type DiagonalEdgeScrollCursor,
 } from "../../src/game/edge-scroll-cursors";
 import { NATIVE_POINTER_SPRITES } from "../../src/game/native-pointer";
+import {
+  drawnFrame,
+  drawnFrames,
+  MAP_COMBAT_FRAME_KEYS,
+  recordCanvasFrames,
+} from "./canvas-frame-recorder";
 import { attackOnlyAdjacentEnemy, chooseUnitCommand, enterAttackTargeting } from "./command-controls";
 import { activeDialogueRecord, skipStoryDialogue } from "./dialogue-controls";
 import { expectMenuOpen, settleMenuAnimation } from "./menu-controls";
@@ -3507,43 +3513,50 @@ test("S00-J: native map hit, point-drain and death descriptors preserve the boar
   expect(setup.battlePresentation).toBe("map");
 
   await clickCanvas(page, 220, 177);
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatTarget",
+    "combatShadowUnitCount",
+    "unitLifeLabelCount",
+  ]);
   await page.getByTestId("unit-command-attack").click();
-  const canvas = page.getByTestId("battle-canvas");
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "primaryHit",
+  }, { path: "artifacts/playwright/stage0-map-hit-native-frame.png" });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "defenderDeath",
+    mapCombatFrame: "3",
+  }, { path: "artifacts/playwright/stage0-map-death-before-erase.png" });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "defenderDeath",
+    mapCombatFrame: "6",
+  }, { path: "artifacts/playwright/stage0-map-death-after-erase.png" });
 
-  await expect(canvas).toHaveAttribute("data-map-combat-phase", "primaryHit");
-  await expect(canvas).toHaveAttribute("data-map-combat-target", finalEnemy.id);
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "1");
-  await expect(canvas).toHaveAttribute("data-combat-shadow-unit-count", "1");
-  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-map-hit-native-frame.png" });
-
+  // The kill hands straight to the promotion pause, which holds until the player answers.
   await page.waitForFunction(() => {
-    const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
-    return canvasElement?.dataset.mapCombatPhase === "defenderDeath"
-      && canvasElement.dataset.mapCombatFrame === "3";
+    const current = window.__ANGEL2__?.getState() as DebugState | undefined;
+    return current !== undefined
+      && current.combatPresentation === undefined
+      && current.promotionUnitIds.length > 0;
   });
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "6");
-  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "7");
-  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-map-death-before-erase.png" });
-
-  await page.waitForFunction(() => {
-    const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
-    return canvasElement?.dataset.mapCombatPhase === "defenderDeath"
-      && Number(canvasElement.dataset.mapCombatFrame) >= 6
-      && Number(canvasElement.dataset.mapCombatFrame) < 14
-      && Number(canvasElement.dataset.mapCombatEffectTileCount) > 0;
-  });
-  const afterErase = await canvas.evaluate((canvasElement) => ({
-    phase: canvasElement.dataset.mapCombatPhase,
-    frame: Number(canvasElement.dataset.mapCombatFrame),
-    effectTiles: Number(canvasElement.dataset.mapCombatEffectTileCount),
-    visibleUnits: Number(canvasElement.dataset.unitLifeLabelCount),
-  }));
-  expect(afterErase.phase).toBe("defenderDeath");
-  expect(afterErase.frame).toBeGreaterThanOrEqual(6);
-  expect(afterErase.frame).toBeLessThan(14);
-  expect(afterErase.effectTiles).toBeGreaterThan(0);
-  expect(afterErase.visibleUnits).toBe(6);
-  await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-map-death-after-erase.png" });
+  const drawn = await frames.stop();
+  const hit = drawnFrames(drawn, { mapCombatPhase: "primaryHit" });
+  expect(hit.length).toBeGreaterThan(0);
+  for (const frame of hit) {
+    expect(frame).toMatchObject({
+      mapCombatTarget: finalEnemy.id,
+      mapCombatEffectTileCount: "1",
+      combatShadowUnitCount: "1",
+    });
+  }
+  expect(drawnFrame(drawn, { mapCombatPhase: "defenderDeath", mapCombatFrame: "3" }))
+    .toMatchObject({ mapCombatEffectTileCount: "6", unitLifeLabelCount: "7" });
+  const afterErase = drawnFrames(drawn, { mapCombatPhase: "defenderDeath" }).filter((frame) =>
+    Number(frame.mapCombatFrame) >= 6
+    && Number(frame.mapCombatFrame) < 14
+    && Number(frame.mapCombatEffectTileCount) > 0);
+  expect(afterErase.length).toBeGreaterThan(0);
+  for (const frame of afterErase) expect(frame.unitLifeLabelCount).toBe("6");
 
   await finishPromotionDialogue(page);
   expect((await debugState(page)).phase).toBe("player");
@@ -3864,6 +3877,14 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await page.evaluate(() => window.__ANGEL2__?.forceVictorySetup());
   await setBattlePresentation(page, "full");
   await clickCanvas(page, 220, 177);
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "unitLifeLabelCount",
+    "combatShadowUnitCount",
+  ], () => ({
+    fullLayerHidden: document.querySelector<HTMLElement>("[data-testid='combat-presentation']")
+      ?.hidden,
+  }));
   await page.getByTestId("unit-command-attack").click();
   const canvas = page.getByTestId("battle-canvas");
   await page.waitForFunction(() => {
@@ -3888,26 +3909,31 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "2");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "0");
   await captureVisualAudit(page.getByTestId("game-screen"), { path: "artifacts/playwright/stage0-full-native-death.png" });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "defenderDeath",
+    mapCombatFrame: "3",
+  }, { path: "artifacts/playwright/stage0-full-map-death-before-erase.png" });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "defenderDeath",
+    mapCombatFrame: "6",
+  }, { path: "artifacts/playwright/stage0-full-map-death-after-erase.png" });
+  // The kill hands straight to the promotion pause, which holds until the player answers.
   await page.waitForFunction(() => {
-    const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
-    return canvasElement?.dataset.mapCombatPhase === "defenderDeath"
-      && canvasElement.dataset.mapCombatFrame === "3";
+    const current = window.__ANGEL2__?.getState() as DebugState | undefined;
+    return current !== undefined
+      && current.combatPresentation === undefined
+      && current.promotionUnitIds.length > 0;
   });
-  await expect(fullLayer).toBeHidden();
-  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "7");
-  await expect(canvas).toHaveAttribute("data-combat-shadow-unit-count", "1");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: "artifacts/playwright/stage0-full-map-death-before-erase.png",
+  const drawn = await frames.stop();
+  expect(drawnFrame(drawn, { mapCombatPhase: "defenderDeath", mapCombatFrame: "3" })).toMatchObject({
+    unitLifeLabelCount: "7",
+    combatShadowUnitCount: "1",
+    state: { fullLayerHidden: true },
   });
-  await page.waitForFunction(() => {
-    const canvasElement = document.querySelector<HTMLCanvasElement>("[data-testid=battle-canvas]");
-    return canvasElement?.dataset.mapCombatPhase === "defenderDeath"
-      && Number(canvasElement.dataset.mapCombatFrame) >= 6;
-  });
-  await expect(canvas).toHaveAttribute("data-unit-life-label-count", "6");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: "artifacts/playwright/stage0-full-map-death-after-erase.png",
-  });
+  const afterErase = drawnFrames(drawn, { mapCombatPhase: "defenderDeath" })
+    .filter(({ mapCombatFrame }) => Number(mapCombatFrame) >= 6);
+  expect(afterErase.length).toBeGreaterThan(0);
+  for (const frame of afterErase) expect(frame.unitLifeLabelCount).toBe("6");
   await confirmPromotion(page);
   await waitForPhase(page, "victoryStory");
   const deathResolved = await debugState(page);

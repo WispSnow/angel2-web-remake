@@ -2,9 +2,11 @@ import { expect, test } from "@playwright/test";
 import {
   ARTIFACT_DIR,
   arenaBattleState,
+  arenaUnitsProbe,
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { drawnFrame, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { pinNativeLineCoin } from "./native-line-coin";
 import { captureVisualAudit } from "./visual-audit";
 
@@ -42,23 +44,12 @@ test("magic guide commits AA through the formal technique flow", async ({ page }
   await expect(page.getByTestId("technique-recovery-1")).toContainText("初級回復");
   await expect(page.getByTestId("technique-attack-up")).toContainText("攻擊提昇");
   await page.getByTestId("technique-attack-up").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatFrame === "10"
-      && dataset.mapCombatEffectTileCount === "2";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-1-1")?.statuses.attackUp).toBe(0);
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.experience)
-    .toBe(casterBefore?.experience);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-attack-up-mid.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "10",
+  }, { path: `${ARTIFACT_DIR}/arena-attack-up-mid.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -67,6 +58,13 @@ test("magic guide commits AA through the formal technique flow", async ({ page }
     return current?.lastSpecialAction?.actionId === "attack-up"
       && current.specialActionPresentation === undefined;
   });
+  const during = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "10",
+  });
+  expect(during.mapCombatEffectTileCount).toBe("2");
+  expect(during.state?.["arena-1-1"]?.statuses.attackUp).toBe(0);
+  expect(during.state?.["arena-1-0"]?.experience).toBe(casterBefore?.experience);
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "attack-up",
@@ -217,18 +215,12 @@ test("AA buffs an ice-frozen ally while the persistent shell stays above the eff
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-attack-up").click();
+  const frames = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "iceDisabledUnitIds"]);
   await clickArenaWorldCell(page, 19, 30);
-  const canvas = page.getByTestId("battle-canvas");
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
-    return canvas?.dataset.mapCombatPhase === "statusEffect"
-      && canvas.dataset.mapCombatFrame === "10"
-      && canvas.dataset.iceDisabledUnitIds === "arena-1-1";
-  }, undefined, { polling: "raf" });
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "2");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-attack-up-frozen-exception.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "10",
+  }, { path: `${ARTIFACT_DIR}/arena-attack-up-frozen-exception.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -237,6 +229,8 @@ test("AA buffs an ice-frozen ally while the persistent shell stays above the eff
     return current?.lastSpecialAction?.actionId === "attack-up"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "statusEffect", mapCombatFrame: "10" }))
+    .toMatchObject({ iceDisabledUnitIds: "arena-1-1", mapCombatEffectTileCount: "2" });
   const after = await arenaBattleState(page);
   expect(after?.units.find(({ id }) => id === "arena-1-1")).toMatchObject({
     actionDisabled: true,
@@ -283,23 +277,12 @@ test("prayer guide commits AD through the formal technique flow", async ({ page 
   await expect(page.getByTestId("technique-recovery-1")).toContainText("初級回復");
   await expect(page.getByTestId("technique-defense-up")).toContainText("防禦提昇");
   await page.getByTestId("technique-defense-up").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatFrame === "5"
-      && dataset.mapCombatEffectTileCount === "4";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-1-1")?.statuses.defenseUp).toBe(0);
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.experience)
-    .toBe(casterBefore?.experience);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-defense-up-mid.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  }, { path: `${ARTIFACT_DIR}/arena-defense-up-mid.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -308,6 +291,13 @@ test("prayer guide commits AD through the formal technique flow", async ({ page 
     return current?.lastSpecialAction?.actionId === "defense-up"
       && current.specialActionPresentation === undefined;
   });
+  const during = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  });
+  expect(during.mapCombatEffectTileCount).toBe("4");
+  expect(during.state?.["arena-1-1"]?.statuses.defenseUp).toBe(0);
+  expect(during.state?.["arena-1-0"]?.experience).toBe(casterBefore?.experience);
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "defense-up",
@@ -453,18 +443,12 @@ test("AD buffs an ice-frozen ally while the persistent shell stays above the shi
   await clickArenaWorldCell(page, 18, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-defense-up").click();
+  const frames = await recordCanvasFrames(page, [...MAP_COMBAT_FRAME_KEYS, "iceDisabledUnitIds"]);
   await clickArenaWorldCell(page, 19, 30);
-  const canvas = page.getByTestId("battle-canvas");
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']");
-    return canvas?.dataset.mapCombatPhase === "statusEffect"
-      && canvas.dataset.mapCombatFrame === "5"
-      && canvas.dataset.iceDisabledUnitIds === "arena-1-1";
-  }, undefined, { polling: "raf" });
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "4");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-defense-up-frozen-exception.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  }, { path: `${ARTIFACT_DIR}/arena-defense-up-frozen-exception.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -473,6 +457,8 @@ test("AD buffs an ice-frozen ally while the persistent shell stays above the shi
     return current?.lastSpecialAction?.actionId === "defense-up"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "statusEffect", mapCombatFrame: "5" }))
+    .toMatchObject({ iceDisabledUnitIds: "arena-1-1", mapCombatEffectTileCount: "4" });
   const after = await arenaBattleState(page);
   expect(after?.units.find(({ id }) => id === "arena-1-1")).toMatchObject({
     actionDisabled: true,
@@ -816,23 +802,12 @@ test("tier-three magic guide commits FM through the formal technique flow", asyn
   await expect(page.getByTestId("technique-attack-up")).toContainText("攻擊提昇");
   await expect(page.getByTestId("technique-magic-guard")).toContainText("防魔");
   await page.getByTestId("technique-magic-guard").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 24, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatFrame === "10"
-      && dataset.mapCombatEffectTileCount === "2";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-1-1")?.statuses.magicGuard).toBe(0);
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.experience)
-    .toBe(casterBefore?.experience);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-magic-guard-mid.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "10",
+  }, { path: `${ARTIFACT_DIR}/arena-magic-guard-mid.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -841,6 +816,13 @@ test("tier-three magic guide commits FM through the formal technique flow", asyn
     return current?.lastSpecialAction?.actionId === "magic-guard"
       && current.specialActionPresentation === undefined;
   });
+  const during = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "10",
+  });
+  expect(during.mapCombatEffectTileCount).toBe("2");
+  expect(during.state?.["arena-1-1"]?.statuses.magicGuard).toBe(0);
+  expect(during.state?.["arena-1-0"]?.experience).toBe(casterBefore?.experience);
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "magic-guard",
@@ -890,21 +872,14 @@ test("enemy tier-three magic guide shields its escort with an FM that is still u
   expect(placed).toEqual([true, true, true]);
   await page.getByTestId("arena-start").click();
   await clickArenaWorldCell(page, 18, 30);
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, () => ({
+    dialogueHidden: document.querySelector<HTMLElement>("[data-testid='dialogue-layer']")?.hidden,
+  }));
   await page.getByTestId("unit-command-rest").click();
-
-  const dialogue = page.getByTestId("dialogue-layer");
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatFrame === "10"
-      && dataset.mapCombatEffectTileCount === "2";
-  }, undefined, { polling: "raf" });
-  await expect(dialogue).toBeHidden();
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-magic-guard-ai.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "10",
+  }, { path: `${ARTIFACT_DIR}/arena-magic-guard-ai.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -914,6 +889,8 @@ test("enemy tier-three magic guide shields its escort with an FM that is still u
       && current.lastSpecialAction.actorId === "arena-2-0"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "statusEffect", mapCombatFrame: "10" }))
+    .toMatchObject({ mapCombatEffectTileCount: "2", state: { dialogueHidden: true } });
   const cast = await arenaBattleState(page);
   expect(cast?.lastSpecialAction).toMatchObject({
     actionId: "magic-guard",

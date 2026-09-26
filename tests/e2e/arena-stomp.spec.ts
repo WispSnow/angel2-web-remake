@@ -5,8 +5,8 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { quakeSteps, recordCanvasFrames, STOMP_FRAME_KEYS } from "./canvas-frame-recorder";
 import { pinNativeLineCoin } from "./native-line-coin";
-import { captureVisualAudit } from "./visual-audit";
 
 // These specs assert native line windows, which REMAKE-161 opens on a
 // six-in-ten coin; pin it open so each asserted window appears.
@@ -99,25 +99,11 @@ test("tier-one great dragon knight performs native 1D stomp in the integrated ar
   await page.getByTestId("unit-command-technique").click();
   await expect(page.getByTestId("technique-stomp-1")).toContainText("龍踏");
   await page.getByTestId("technique-stomp-1").click();
+  const frames = await recordCanvasFrames(page, STOMP_FRAME_KEYS);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatStompPhase === "quake"
-      && dataset.mapCombatStompExplicitTicks === "0"
-      && dataset.mapCombatStompX === "160"
-      && dataset.mapCombatStompShadowY === "338"
-      && dataset.mapCombatStompTargetScreenX !== undefined
-      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
-      && dataset.mapCombatStompTargetScreenY !== undefined
-      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY
-      && dataset.mapCombatEffectTileCount === "2";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-stomp-1-quake.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatStompPhase: "quake",
+  }, { path: `${ARTIFACT_DIR}/arena-stomp-1-quake.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -126,6 +112,13 @@ test("tier-one great dragon knight performs native 1D stomp in the integrated ar
     return current?.lastSpecialAction?.actionId === "stomp-1"
       && current.specialActionPresentation === undefined;
   });
+  expect(quakeSteps(await frames.stop())).toContainEqual(expect.objectContaining({
+    mapCombatStompExplicitTicks: "0",
+    mapCombatStompX: "160",
+    mapCombatStompShadowY: "338",
+    mapCombatEffectTileCount: "2",
+    impactOnTarget: true,
+  }));
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "stomp-1",
@@ -172,25 +165,11 @@ test("tier-two great dragon knight lands native 2D male graphics on the selected
   await expect(page.getByTestId("technique-stomp-2")).toContainText("男踏");
   await expect(page.getByTestId("technique-stomp-1")).toHaveCount(0);
   await page.getByTestId("technique-stomp-2").click();
+  const frames = await recordCanvasFrames(page, STOMP_FRAME_KEYS);
   await clickArenaWorldCell(page, 23, 32);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatStompPhase === "quake"
-      && dataset.mapCombatStompAction === "stomp-2"
-      && dataset.mapCombatStompX === "160"
-      && dataset.mapCombatStompShadowY === "368"
-      && dataset.mapCombatStompResource === "MAGIC/51"
-      && dataset.mapCombatStompTargetScreenX !== undefined
-      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
-      && dataset.mapCombatStompTargetScreenY !== undefined
-      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-stomp-2-quake.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatStompPhase: "quake",
+  }, { path: `${ARTIFACT_DIR}/arena-stomp-2-quake.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -199,6 +178,13 @@ test("tier-two great dragon knight lands native 2D male graphics on the selected
     return current?.lastSpecialAction?.actionId === "stomp-2"
       && current.specialActionPresentation === undefined;
   });
+  expect(quakeSteps(await frames.stop())).toContainEqual(expect.objectContaining({
+    mapCombatStompAction: "stomp-2",
+    mapCombatStompX: "160",
+    mapCombatStompShadowY: "368",
+    mapCombatStompResource: "MAGIC/51",
+    impactOnTarget: true,
+  }));
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "stomp-2",
@@ -228,6 +214,7 @@ test("enemy tier-two great dragon knight uses mirrored 2D and group-13 dialogue"
   const placed = await placeStompScenario(page, 2);
   expect(placed).toEqual([true, true, true, true, true]);
   await page.getByTestId("arena-start").click();
+  const frames = await recordCanvasFrames(page, STOMP_FRAME_KEYS);
   await restStompSquad(page);
 
   const dialogue = page.getByTestId("dialogue-layer");
@@ -236,23 +223,9 @@ test("enemy tier-two great dragon knight uses mirrored 2D and group-13 dialogue"
   await expect(dialogue).toHaveAttribute("data-effect-center", "21,30");
   await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
   await expect(page.getByText("看我的巨龍.", { exact: true })).toBeVisible();
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatStompPhase === "quake"
-      && dataset.mapCombatStompAction === "stomp-2"
-      && dataset.mapCombatStompX === "160"
-      && dataset.mapCombatStompShadowY === "368"
-      && dataset.mapCombatStompResource === "MAGIC/52"
-      && dataset.mapCombatStompTargetScreenX !== undefined
-      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
-      && dataset.mapCombatStompTargetScreenY !== undefined
-      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-stomp-2-ai-quake.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatStompPhase: "quake",
+  }, { path: `${ARTIFACT_DIR}/arena-stomp-2-ai-quake.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -262,6 +235,13 @@ test("enemy tier-two great dragon knight uses mirrored 2D and group-13 dialogue"
       && current.lastSpecialAction.actorId === "arena-2-0"
       && current.specialActionPresentation === undefined;
   });
+  expect(quakeSteps(await frames.stop())).toContainEqual(expect.objectContaining({
+    mapCombatStompAction: "stomp-2",
+    mapCombatStompX: "160",
+    mapCombatStompShadowY: "368",
+    mapCombatStompResource: "MAGIC/52",
+    impactOnTarget: true,
+  }));
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "stomp-2",
@@ -303,25 +283,11 @@ test("tier-three great dragon knight performs 3D with female graphics and 20..39
   await expect(page.getByTestId("technique-stomp-1")).toHaveCount(0);
   await expect(page.getByTestId("technique-stomp-2")).toHaveCount(0);
   await page.getByTestId("technique-stomp-3").click();
+  const frames = await recordCanvasFrames(page, STOMP_FRAME_KEYS);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatStompPhase === "quake"
-      && dataset.mapCombatStompAction === "stomp-3"
-      && dataset.mapCombatStompX === "160"
-      && dataset.mapCombatStompShadowY === "368"
-      && dataset.mapCombatStompResource === "MAGIC/53"
-      && dataset.mapCombatStompTargetScreenX !== undefined
-      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
-      && dataset.mapCombatStompTargetScreenY !== undefined
-      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-stomp-3-quake.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatStompPhase: "quake",
+  }, { path: `${ARTIFACT_DIR}/arena-stomp-3-quake.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -330,6 +296,13 @@ test("tier-three great dragon knight performs 3D with female graphics and 20..39
     return current?.lastSpecialAction?.actionId === "stomp-3"
       && current.specialActionPresentation === undefined;
   });
+  expect(quakeSteps(await frames.stop())).toContainEqual(expect.objectContaining({
+    mapCombatStompAction: "stomp-3",
+    mapCombatStompX: "160",
+    mapCombatStompShadowY: "368",
+    mapCombatStompResource: "MAGIC/53",
+    impactOnTarget: true,
+  }));
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "stomp-3",
@@ -355,6 +328,7 @@ test("enemy tier-three great dragon knight uses mirrored 3D and group-13 dialogu
   const placed = await placeStompScenario(page, 3);
   expect(placed).toEqual([true, true, true, true, true]);
   await page.getByTestId("arena-start").click();
+  const frames = await recordCanvasFrames(page, STOMP_FRAME_KEYS);
   await restStompSquad(page);
 
   const dialogue = page.getByTestId("dialogue-layer");
@@ -362,23 +336,9 @@ test("enemy tier-three great dragon knight uses mirrored 3D and group-13 dialogu
   await expect(dialogue).toHaveAttribute("data-action-id", "stomp-3");
   await expect(dialogue).toHaveAttribute("data-effect-center", "21,30");
   await expect(page.getByText("看我的巨龍.", { exact: true })).toBeVisible();
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatStompPhase === "quake"
-      && dataset.mapCombatStompAction === "stomp-3"
-      && dataset.mapCombatStompX === "160"
-      && dataset.mapCombatStompShadowY === "368"
-      && dataset.mapCombatStompResource === "MAGIC/54"
-      && dataset.mapCombatStompTargetScreenX !== undefined
-      && dataset.mapCombatStompTargetScreenX === dataset.mapCombatStompImpactScreenX
-      && dataset.mapCombatStompTargetScreenY !== undefined
-      && dataset.mapCombatStompTargetScreenY === dataset.mapCombatStompImpactScreenY;
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-stomp-3-ai-quake.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatStompPhase: "quake",
+  }, { path: `${ARTIFACT_DIR}/arena-stomp-3-ai-quake.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -388,6 +348,13 @@ test("enemy tier-three great dragon knight uses mirrored 3D and group-13 dialogu
       && current.lastSpecialAction.actorId === "arena-2-0"
       && current.specialActionPresentation === undefined;
   });
+  expect(quakeSteps(await frames.stop())).toContainEqual(expect.objectContaining({
+    mapCombatStompAction: "stomp-3",
+    mapCombatStompX: "160",
+    mapCombatStompShadowY: "368",
+    mapCombatStompResource: "MAGIC/54",
+    impactOnTarget: true,
+  }));
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "stomp-3",

@@ -5,9 +5,9 @@ import {
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { drawnFrame, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { pinNativeLineCoin } from "./native-line-coin";
-import { captureVisualAudit } from "./visual-audit";
 
 // These specs assert native line windows, which REMAKE-161 opens on a
 // six-in-ten coin; pin it open so each asserted window appears.
@@ -44,19 +44,12 @@ test("tier-three prayer guide performs native 2H as two heart cycles plus the sh
   await expect(page.getByTestId("technique-heal-1")).toHaveCount(0);
   await expect(page.getByTestId("technique-recovery-1")).toHaveCount(0);
   await page.getByTestId("technique-heal-2").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "healPrimary"
-      && dataset.mapCombatFrame === "3"
-      && dataset.mapCombatEffectTileCount === "6";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-heal-2-heart.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "healPrimary",
+    mapCombatFrame: "3",
+  }, { path: `${ARTIFACT_DIR}/arena-heal-2-heart.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -65,6 +58,8 @@ test("tier-three prayer guide performs native 2H as two heart cycles plus the sh
     return current?.lastSpecialAction?.actionId === "heal-2"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "healPrimary", mapCombatFrame: "3" })
+    .mapCombatEffectTileCount).toBe("6");
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "heal-2",
@@ -116,25 +111,14 @@ test("tier-three magic guide performs native 3H with its delayed bloom sound", a
   await expect(page.getByTestId("technique-recovery-2")).toContainText("中級回復");
   await expect(page.getByTestId("technique-heal-2")).toHaveCount(0);
   await page.getByTestId("technique-heal-3").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, () =>
+    (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState } | undefined)
+      ?.battle?.audioCueLog.some(({ reason }) => reason === "heal-3-bloom"));
   await clickArenaWorldCell(page, 23, 30);
-
-  if (process.env.VISUAL_AUDIT === "1") {
-    await page.waitForFunction(() => {
-      const current = (window.__ANGEL2_ARENA__?.getState() as {
-        battle?: ArenaBattleDebugState;
-      }).battle;
-      const dataset = document.querySelector<HTMLCanvasElement>(
-        "[data-testid='battle-canvas']",
-      )?.dataset;
-      return dataset?.mapCombatPhase === "healPrimary"
-        && dataset.mapCombatFrame === "12"
-        && dataset.mapCombatEffectTileCount === "6"
-        && current?.audioCueLog.some(({ reason }) => reason === "heal-3-bloom");
-    }, undefined, { polling: "raf" });
-    await captureVisualAudit(page.getByTestId("game-screen"), {
-      path: `${ARTIFACT_DIR}/arena-heal-3-heart.png`,
-    });
-  }
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "healPrimary",
+    mapCombatFrame: "12",
+  }, { path: `${ARTIFACT_DIR}/arena-heal-3-heart.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -143,6 +127,9 @@ test("tier-three magic guide performs native 3H with its delayed bloom sound", a
     return current?.lastSpecialAction?.actionId === "heal-3"
       && current.specialActionPresentation === undefined;
   });
+  // The bloom sound is already queued when the heart reaches its frame-12 bloom.
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "healPrimary", mapCombatFrame: "12" }))
+    .toMatchObject({ mapCombatEffectTileCount: "6", state: true });
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "heal-3",
@@ -197,16 +184,7 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
   await page.getByTestId("arena-start").click();
   const before = await arenaBattleState(page);
   const guideMaxLife = before?.units.find(({ id }) => id === "arena-2-0")?.life;
-  const healHeartFrame = process.env.VISUAL_AUDIT === "1"
-    ? page.waitForFunction(() => {
-      const dataset = document.querySelector<HTMLCanvasElement>(
-        "[data-testid='battle-canvas']",
-      )?.dataset;
-      return dataset?.mapCombatPhase === "healPrimary"
-        && dataset.mapCombatFrame === "12"
-        && dataset.mapCombatEffectTileCount === "6";
-    }, undefined, { polling: "raf" })
-    : undefined;
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
 
   for (const [x, y, actorId] of [
     [25, 30, "arena-1-0"],
@@ -232,12 +210,10 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
   await expect(dialogue).toHaveAttribute("data-effect-center", "26,30");
   await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
   await expect(page.getByText("生命單.", { exact: true })).toBeVisible();
-  if (healHeartFrame) {
-    await healHeartFrame;
-    await captureVisualAudit(page.getByTestId("game-screen"), {
-      path: `${ARTIFACT_DIR}/arena-heal-3-ai-heart.png`,
-    });
-  }
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "healPrimary",
+    mapCombatFrame: "12",
+  }, { path: `${ARTIFACT_DIR}/arena-heal-3-ai-heart.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -247,6 +223,8 @@ test("enemy tier-three magic guide selects 3H on itself with group-15 dialogue",
       && current.lastSpecialAction.actorId === "arena-2-0"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "healPrimary", mapCombatFrame: "12" })
+    .mapCombatEffectTileCount).toBe("6");
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "heal-3",
@@ -297,19 +275,12 @@ test("tier-two prayer guide performs native 2I on the stable effect range", asyn
   await expect(page.getByTestId("technique-recovery-1")).toHaveCount(0);
   await expect(page.getByTestId("technique-heal-2")).toHaveCount(0);
   await page.getByTestId("technique-recovery-2").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   await clickArenaWorldCell(page, 22, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "recoveryEffect"
-      && dataset.mapCombatFrame === "8"
-      && dataset.mapCombatEffectTileCount === "3";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-recovery-2.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "recoveryEffect",
+    mapCombatFrame: "8",
+  }, { path: `${ARTIFACT_DIR}/arena-recovery-2.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -318,6 +289,8 @@ test("tier-two prayer guide performs native 2I on the stable effect range", asyn
     return current?.lastSpecialAction?.actionId === "recovery-2"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "recoveryEffect", mapCombatFrame: "8" })
+    .mapCombatEffectTileCount).toBe("3");
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "recovery-2",
@@ -363,19 +336,12 @@ test("tier-three prayer guide performs native 3I on its four recovery rings", as
   await expect(page.getByTestId("technique-recovery-3")).toContainText("高級回復");
   await expect(page.getByTestId("technique-recovery-2")).toHaveCount(0);
   await page.getByTestId("technique-recovery-3").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "recoveryEffect"
-      && dataset.mapCombatFrame === "8"
-      && dataset.mapCombatEffectTileCount === "4";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-recovery-3.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "recoveryEffect",
+    mapCombatFrame: "8",
+  }, { path: `${ARTIFACT_DIR}/arena-recovery-3.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -384,6 +350,8 @@ test("tier-three prayer guide performs native 3I on its four recovery rings", as
     return current?.lastSpecialAction?.actionId === "recovery-3"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "recoveryEffect", mapCombatFrame: "8" })
+    .mapCombatEffectTileCount).toBe("4");
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "recovery-3",
@@ -423,6 +391,7 @@ test("enemy tier-three prayer guide selects 3I and uses group-14 dialogue", asyn
   });
   expect(placed).toEqual([true, true, true, true, true]);
   await page.getByTestId("arena-start").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   // Two hits on the 祈導師 and one on its 士兵 escort give the ring two real
   // recipients, which is what makes 3I outscore the single-target 2H that
   // shares the tier-three pool.
@@ -455,19 +424,10 @@ test("enemy tier-three prayer guide selects 3I and uses group-14 dialogue", asyn
   await expect(dialogue).toHaveAttribute("data-effect-center", "25,30");
   await expect(dialogue).toHaveAttribute("data-active-slot", "lower");
   await expect(page.getByText("生命全.", { exact: true })).toBeVisible();
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "recoveryEffect"
-      && dataset.mapCombatFrame === "8";
-  }, undefined, { polling: "raf" });
-  // Both real recipients carry a life-change tile now that the ring heals.
-  await expect(page.getByTestId("battle-canvas"))
-    .toHaveAttribute("data-map-combat-effect-tile-count", "2");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-recovery-3-ai.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "recoveryEffect",
+    mapCombatFrame: "8",
+  }, { path: `${ARTIFACT_DIR}/arena-recovery-3-ai.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -477,6 +437,9 @@ test("enemy tier-three prayer guide selects 3I and uses group-14 dialogue", asyn
       && current.lastSpecialAction.actorId === "arena-2-0"
       && current.specialActionPresentation === undefined;
   });
+  // Both real recipients carry a life-change tile now that the ring heals.
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "recoveryEffect", mapCombatFrame: "8" })
+    .mapCombatEffectTileCount).toBe("2");
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "recovery-3",
@@ -547,6 +510,11 @@ test("formal 3I keeps an ice-frozen ally blocked and leaves its shell above the 
   await clickArenaWorldCell(page, 21, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-ice-1").click();
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "iceDisabledCount",
+    "iceDisabledUnitIds",
+  ]);
   // Self-centred ice previews its footprint first; the cast needs a confirmation.
   await page.keyboard.press(" ");
   await page.waitForFunction(() => {
@@ -571,18 +539,10 @@ test("formal 3I keeps an ice-frozen ally blocked and leaves its shell above the 
   await expect(dialogue).toHaveAttribute("data-action-id", "recovery-3");
   await expect(dialogue).toHaveAttribute("data-effect-center", "25,31");
   await expect(page.getByText("生命全.", { exact: true })).toBeVisible();
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "recoveryEffect"
-      && dataset.mapCombatFrame === "8"
-      && dataset.iceDisabledCount === "1"
-      && dataset.iceDisabledUnitIds === "arena-2-0";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-recovery-3-frozen-exception.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "recoveryEffect",
+    mapCombatFrame: "8",
+  }, { path: `${ARTIFACT_DIR}/arena-recovery-3-frozen-exception.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -591,6 +551,8 @@ test("formal 3I keeps an ice-frozen ally blocked and leaves its shell above the 
     return current?.lastSpecialAction?.actionId === "recovery-3"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "recoveryEffect", mapCombatFrame: "8" }))
+    .toMatchObject({ iceDisabledCount: "1", iceDisabledUnitIds: "arena-2-0" });
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "recovery-3",

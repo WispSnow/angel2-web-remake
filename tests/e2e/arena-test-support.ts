@@ -94,6 +94,25 @@ export const arenaBattleState = (page: Page) => page.evaluate(() =>
     battle?: ArenaBattleDebugState;
   }).battle);
 
+/** The committed simulation fields of one unit, as `arenaUnitsProbe` records them. */
+export interface ArenaUnitSnapshot {
+  life: number;
+  experience: number;
+  acted: boolean;
+  statuses: Record<string, number>;
+}
+
+/**
+ * A `recordCanvasFrames` probe: every unit's committed simulation fields, keyed by id. A
+ * recorded frame then shows whether the action had been committed when it was drawn.
+ */
+export const arenaUnitsProbe = (): Record<string, ArenaUnitSnapshot> => Object.fromEntries(
+  (((window as ArenaDebugWindow).__ANGEL2_ARENA__?.getState() as {
+    battle?: ArenaBattleDebugState;
+  } | undefined)?.battle?.units ?? []).map(({ id, life, experience, acted, statuses }) =>
+    [id, { life, experience, acted, statuses }]),
+);
+
 export async function clickArenaWorldCell(
   page: Page,
   x: number,

@@ -2,11 +2,17 @@ import { expect, test } from "@playwright/test";
 import {
   ARTIFACT_DIR,
   arenaBattleState,
+  arenaUnitsProbe,
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import {
+  drawnFrame,
+  drawnFrames,
+  MAP_COMBAT_FRAME_KEYS,
+  recordCanvasFrames,
+} from "./canvas-frame-recorder";
 import { pinNativeLineCoin } from "./native-line-coin";
-import { captureVisualAudit } from "./visual-audit";
 
 // These specs assert native line windows, which REMAKE-161 opens on a
 // six-in-ten coin; pin it open so each asserted window appears.
@@ -44,29 +50,15 @@ test("tier-one magic master performs native 2L with its two-stage lightning colu
   await page.getByTestId("unit-command-technique").click();
   await expect(page.getByTestId("technique-lightning-2")).toContainText("中級落雷");
   await page.getByTestId("technique-lightning-2").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 22, 30);
-
-  const canvas = page.getByTestId("battle-canvas");
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "15");
-  const during = await arenaBattleState(page);
-  expect(during?.specialActionPresentation?.phase).toBe("lightningMain");
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(centerBefore);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-2-column.png`,
-  });
-
-  await page.waitForFunction(() => {
-    const current = (window.__ANGEL2_ARENA__?.getState() as {
-      battle?: ArenaBattleDebugState;
-    }).battle;
-    return current?.specialActionPresentation?.phase === "lightningCleanup";
-  });
-  // Only the two enemies inside the effect diamond receive MAGIC/6; the one
-  // five cells out has range value 0 and is skipped by `1000:6DE8`.
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "2");
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-2-cleanup.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningMain",
+    mapCombatEffectTileCount: "15",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-2-column.png` });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningCleanup",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-2-cleanup.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -75,6 +67,19 @@ test("tier-one magic master performs native 2L with its two-stage lightning colu
     return current?.lastSpecialAction?.actionId === "lightning-2"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  const column = drawnFrames(drawn, {
+    mapCombatPhase: "lightningMain",
+    mapCombatEffectTileCount: "15",
+  });
+  expect(column.length).toBeGreaterThan(0);
+  for (const frame of column) expect(frame.state?.["arena-2-0"]?.life).toBe(centerBefore);
+  // Only the two enemies inside the effect diamond receive MAGIC/6; the one
+  // five cells out has range value 0 and is skipped by `1000:6DE8`.
+  const cleanup = drawnFrames(drawn, { mapCombatPhase: "lightningCleanup" });
+  expect(cleanup.length).toBeGreaterThan(0);
+  expect(cleanup.map(({ mapCombatEffectTileCount }) => mapCombatEffectTileCount))
+    .toEqual(cleanup.map(() => "2"));
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "lightning-2",
@@ -186,44 +191,19 @@ test("tier-two magic master raises the native 3L cloud before landing its inheri
   await expect(page.getByTestId("technique-lightning-3")).toContainText("高級落雷");
   await expect(page.getByTestId("technique-lightning-2")).toHaveCount(0);
   await page.getByTestId("technique-lightning-3").click();
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatAnchorOffset",
+  ], arenaUnitsProbe);
   await clickArenaWorldCell(page, 24, 30);
-
-  const canvas = page.getByTestId("battle-canvas");
-  await expect(canvas).toHaveAttribute("data-map-combat-phase", "lightningMain");
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "lightningMain"
-      && dataset.mapCombatFrame === "3"
-      && dataset.mapCombatAnchorOffset === "0,-1";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-3-cloud.png`,
-  });
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "lightningMain"
-      && dataset.mapCombatFrame === "9"
-      && dataset.mapCombatAnchorOffset === "0,-3";
-  }, undefined, { polling: "raf" });
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "lightningMain"
-      && dataset.mapCombatFrame === "12"
-      && dataset.mapCombatAnchorOffset === "0,-4";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(centerBefore);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-3-column.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningMain",
+    mapCombatFrame: "3",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-3-cloud.png` });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningMain",
+    mapCombatFrame: "12",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-3-column.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -232,6 +212,14 @@ test("tier-two magic master raises the native 3L cloud before landing its inheri
     return current?.lastSpecialAction?.actionId === "lightning-3"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  expect(drawnFrame(drawn, { mapCombatPhase: "lightningMain", mapCombatFrame: "3" })
+    .mapCombatAnchorOffset).toBe("0,-1");
+  expect(drawnFrame(drawn, { mapCombatPhase: "lightningMain", mapCombatFrame: "9" })
+    .mapCombatAnchorOffset).toBe("0,-3");
+  const column = drawnFrame(drawn, { mapCombatPhase: "lightningMain", mapCombatFrame: "12" });
+  expect(column.mapCombatAnchorOffset).toBe("0,-4");
+  expect(column.state?.["arena-2-0"]?.life).toBe(centerBefore);
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "lightning-3",
@@ -288,32 +276,19 @@ test("tier-three magic master descends native 4L before planting its inherited-a
   await expect(page.getByTestId("technique-lightning-2")).toHaveCount(0);
   await expect(page.getByTestId("technique-lightning-3")).toHaveCount(0);
   await page.getByTestId("technique-lightning-4").click();
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatAnchorOffset",
+  ]);
   await clickArenaWorldCell(page, 23, 33);
-  if (process.env.VISUAL_AUDIT === "1") {
-    await page.waitForFunction(() => {
-      const dataset = document.querySelector<HTMLCanvasElement>(
-        "[data-testid='battle-canvas']",
-      )?.dataset;
-      return dataset?.mapCombatPhase === "lightningMain"
-        && dataset.mapCombatFrame === "16"
-        && dataset.mapCombatAnchorOffset === "0,0";
-    }, undefined, { polling: "raf" });
-    await captureVisualAudit(page.getByTestId("game-screen"), {
-      path: `${ARTIFACT_DIR}/arena-lightning-4-descending.png`,
-    });
-
-    await page.waitForFunction(() => {
-      const dataset = document.querySelector<HTMLCanvasElement>(
-        "[data-testid='battle-canvas']",
-      )?.dataset;
-      return dataset?.mapCombatPhase === "lightningMain"
-        && dataset.mapCombatFrame === "21"
-        && dataset.mapCombatAnchorOffset === "0,1";
-    }, undefined, { polling: "raf" });
-    await captureVisualAudit(page.getByTestId("game-screen"), {
-      path: `${ARTIFACT_DIR}/arena-lightning-4-column.png`,
-    });
-  }
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningMain",
+    mapCombatFrame: "16",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-4-descending.png` });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningMain",
+    mapCombatFrame: "21",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-4-column.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -322,6 +297,11 @@ test("tier-three magic master descends native 4L before planting its inherited-a
     return current?.lastSpecialAction?.actionId === "lightning-4"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  expect(drawnFrame(drawn, { mapCombatPhase: "lightningMain", mapCombatFrame: "16" })
+    .mapCombatAnchorOffset).toBe("0,0");
+  expect(drawnFrame(drawn, { mapCombatPhase: "lightningMain", mapCombatFrame: "21" })
+    .mapCombatAnchorOffset).toBe("0,1");
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "lightning-4",
@@ -378,31 +358,15 @@ test("reduced motion keeps every native 1L draw and the in-range cleanup", async
   await clickArenaWorldCell(page, 20, 30);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-lightning-1").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS);
   await clickArenaWorldCell(page, 22, 30);
-
-  const canvas = page.getByTestId("battle-canvas");
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "lightningMain" && dataset.mapCombatFrame === "12";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-1-reduced-motion-main.png`,
-  });
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "lightningCleanup";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-1-reduced-motion-cleanup.png`,
-  });
-  // Native `1000:6DE8` requires a non-zero effect-range value, so the enemy
-  // seven cells away never receives the MAGIC/6 cleanup sprite.
-  await expect(canvas).toHaveAttribute("data-map-combat-effect-tile-count", "1");
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningMain",
+    mapCombatFrame: "12",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-1-reduced-motion-main.png` });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningCleanup",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-1-reduced-motion-cleanup.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -411,6 +375,15 @@ test("reduced motion keeps every native 1L draw and the in-range cleanup", async
     return current?.lastSpecialAction?.actionId === "lightning-1"
       && current.specialActionPresentation === undefined;
   });
+  const drawn = await frames.stop();
+  expect(drawnFrames(drawn, { mapCombatPhase: "lightningMain", mapCombatFrame: "12" }))
+    .toHaveLength(1);
+  // Native `1000:6DE8` requires a non-zero effect-range value, so the enemy
+  // seven cells away never receives the MAGIC/6 cleanup sprite.
+  const cleanup = drawnFrames(drawn, { mapCombatPhase: "lightningCleanup" });
+  expect(cleanup.length).toBeGreaterThan(0);
+  expect(cleanup.map(({ mapCombatEffectTileCount }) => mapCombatEffectTileCount))
+    .toEqual(cleanup.map(() => "1"));
   const after = await arenaBattleState(page);
   const drawsFor = (phase: string) =>
     after?.specialActionPresentationTrace.filter((entry) => entry.phase === phase).length;
@@ -473,20 +446,17 @@ test("formal 4L skips an ice-frozen covered enemy and keeps its shell above the 
   await clickArenaWorldCell(page, 20, 32);
   await page.getByTestId("unit-command-technique").click();
   await page.getByTestId("technique-lightning-4").click();
+  const frames = await recordCanvasFrames(page, [
+    ...MAP_COMBAT_FRAME_KEYS,
+    "mapCombatAnchorOffset",
+    "iceDisabledCount",
+    "iceDisabledUnitIds",
+  ]);
   await clickArenaWorldCell(page, 23, 32);
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>(
-      "[data-testid='battle-canvas']",
-    )?.dataset;
-    return dataset?.mapCombatPhase === "lightningMain"
-      && dataset.mapCombatFrame === "21"
-      && dataset.mapCombatAnchorOffset === "0,1"
-      && dataset.iceDisabledCount === "1"
-      && dataset.iceDisabledUnitIds === "arena-2-0";
-  }, undefined, { polling: "raf" });
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-lightning-4-frozen-exception.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "lightningMain",
+    mapCombatFrame: "21",
+  }, { path: `${ARTIFACT_DIR}/arena-lightning-4-frozen-exception.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as {
@@ -495,6 +465,12 @@ test("formal 4L skips an ice-frozen covered enemy and keeps its shell above the 
     return current?.lastSpecialAction?.actionId === "lightning-4"
       && current.specialActionPresentation === undefined;
   });
+  expect(drawnFrame(await frames.stop(), { mapCombatPhase: "lightningMain", mapCombatFrame: "21" }))
+    .toMatchObject({
+      mapCombatAnchorOffset: "0,1",
+      iceDisabledCount: "1",
+      iceDisabledUnitIds: "arena-2-0",
+    });
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "lightning-4",

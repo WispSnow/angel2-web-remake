@@ -2,9 +2,11 @@ import { expect, test } from "@playwright/test";
 import {
   ARTIFACT_DIR,
   arenaBattleState,
+  arenaUnitsProbe,
   clickArenaWorldCell,
   type ArenaBattleDebugState,
 } from "./arena-test-support";
+import { drawnFrame, MAP_COMBAT_FRAME_KEYS, recordCanvasFrames } from "./canvas-frame-recorder";
 import { attackOnlyAdjacentEnemy } from "./command-controls";
 import { pinNativeLineCoin } from "./native-line-coin";
 import { captureVisualAudit } from "./visual-audit";
@@ -44,22 +46,14 @@ test("tier-two curse-master commits IP after its poison presentation", async ({ 
   await expect(page.getByTestId("technique-heal-1")).toContainText("初級治療");
   await expect(page.getByTestId("technique-poison")).toContainText("施毒");
   await page.getByTestId("technique-poison").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 24, 30);
 
   const canvas = page.getByTestId("battle-canvas");
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "poisonEffect"
-      && dataset.mapCombatFrame === "18"
-      && dataset.mapCombatEffectTileCount === "4";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.statuses.poison).toBe(0);
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.experience)
-    .toBe(caster1Before?.experience);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-poison-cloud.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "poisonEffect",
+    mapCombatFrame: "18",
+  }, { path: `${ARTIFACT_DIR}/arena-poison-cloud.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
@@ -67,6 +61,13 @@ test("tier-two curse-master commits IP after its poison presentation", async ({ 
       && current.lastSpecialAction.actorId === "arena-1-0"
       && current.specialActionPresentation === undefined;
   });
+  const cloud = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "poisonEffect",
+    mapCombatFrame: "18",
+  });
+  expect(cloud.mapCombatEffectTileCount).toBe("4");
+  expect(cloud.state?.["arena-2-0"]?.statuses.poison).toBe(0);
+  expect(cloud.state?.["arena-1-0"]?.experience).toBe(caster1Before?.experience);
   const afterNormal = await arenaBattleState(page);
   expect(afterNormal?.lastSpecialAction).toMatchObject({
     actionId: "poison",
@@ -115,27 +116,25 @@ test("tier-one curse-master performs LA before the confused enemy spends a turn 
   await expect(page.getByTestId("technique-confusion")).toContainText("混亂");
   await expect(page.getByTestId("technique-poison")).toHaveCount(0);
   await page.getByTestId("technique-confusion").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 24, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatFrame === "5"
-      && dataset.mapCombatEffectTileCount === "6";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.statuses.confusion).toBe(0);
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.experience)
-    .toBe(casterBefore?.experience);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-confusion-faces.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  }, { path: `${ARTIFACT_DIR}/arena-confusion-faces.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
     return current?.lastSpecialAction?.actionId === "confusion"
       && current.specialActionPresentation === undefined;
   });
+  const faces = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  });
+  expect(faces.mapCombatEffectTileCount).toBe("6");
+  expect(faces.state?.["arena-2-0"]?.statuses.confusion).toBe(0);
+  expect(faces.state?.["arena-1-0"]?.experience).toBe(casterBefore?.experience);
   const afterCast = await arenaBattleState(page);
   expect(afterCast?.lastSpecialAction).toMatchObject({
     actionId: "confusion",
@@ -199,22 +198,12 @@ test("tier-one curse-master commits SA after its formal presentation", async ({ 
   await expect(page.getByTestId("technique-heal-1")).toContainText("初級治療");
   await expect(page.getByTestId("technique-attack-down")).toContainText("攻擊下降");
   await page.getByTestId("technique-attack-down").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatFrame === "5"
-      && dataset.mapCombatEffectTileCount === "2";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.statuses.attackDown).toBe(0);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(targetBefore?.life);
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.experience)
-    .toBe(casterBefore?.experience);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-attack-down.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  }, { path: `${ARTIFACT_DIR}/arena-attack-down.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
@@ -222,6 +211,14 @@ test("tier-one curse-master commits SA after its formal presentation", async ({ 
       && current.lastSpecialAction.actorId === "arena-1-0"
       && current.specialActionPresentation === undefined;
   });
+  const during = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  });
+  expect(during.mapCombatEffectTileCount).toBe("2");
+  expect(during.state?.["arena-2-0"]?.statuses.attackDown).toBe(0);
+  expect(during.state?.["arena-2-0"]?.life).toBe(targetBefore?.life);
+  expect(during.state?.["arena-1-0"]?.experience).toBe(casterBefore?.experience);
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "attack-down",
@@ -334,22 +331,12 @@ test("tier-one magic-priest commits SD after its formal presentation", async ({ 
   await expect(page.getByTestId("technique-recovery-1")).toContainText("初級回復");
   await expect(page.getByTestId("technique-defense-down")).toContainText("防禦下降");
   await page.getByTestId("technique-defense-down").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 23, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatFrame === "5"
-      && dataset.mapCombatEffectTileCount === "4";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.statuses.defenseDown).toBe(0);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(targetBefore?.life);
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.experience)
-    .toBe(casterBefore?.experience);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-defense-down.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  }, { path: `${ARTIFACT_DIR}/arena-defense-down.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
@@ -357,6 +344,14 @@ test("tier-one magic-priest commits SD after its formal presentation", async ({ 
       && current.lastSpecialAction.actorId === "arena-1-0"
       && current.specialActionPresentation === undefined;
   });
+  const during = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "5",
+  });
+  expect(during.mapCombatEffectTileCount).toBe("4");
+  expect(during.state?.["arena-2-0"]?.statuses.defenseDown).toBe(0);
+  expect(during.state?.["arena-2-0"]?.life).toBe(targetBefore?.life);
+  expect(during.state?.["arena-1-0"]?.experience).toBe(casterBefore?.experience);
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "defense-down",
@@ -459,22 +454,12 @@ test("tier-three curse-master commits SN after its formal presentation", async (
   await expect(page.getByTestId("technique-poison")).toContainText("施毒");
   await expect(page.getByTestId("technique-spell-seal")).toContainText("禁咒");
   await page.getByTestId("technique-spell-seal").click();
+  const frames = await recordCanvasFrames(page, MAP_COMBAT_FRAME_KEYS, arenaUnitsProbe);
   await clickArenaWorldCell(page, 24, 30);
-
-  await page.waitForFunction(() => {
-    const dataset = document.querySelector<HTMLCanvasElement>("[data-testid='battle-canvas']")?.dataset;
-    return dataset?.mapCombatPhase === "statusEffect"
-      && dataset.mapCombatFrame === "4"
-      && dataset.mapCombatEffectTileCount === "6";
-  }, undefined, { polling: "raf" });
-  const during = await arenaBattleState(page);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.statuses.techniqueSeal).toBe(0);
-  expect(during?.units.find(({ id }) => id === "arena-2-0")?.life).toBe(targetBefore?.life);
-  expect(during?.units.find(({ id }) => id === "arena-1-0")?.experience)
-    .toBe(casterBefore?.experience);
-  await captureVisualAudit(page.getByTestId("game-screen"), {
-    path: `${ARTIFACT_DIR}/arena-spell-seal.png`,
-  });
+  await frames.captureVisualAudit(page.getByTestId("game-screen"), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "4",
+  }, { path: `${ARTIFACT_DIR}/arena-spell-seal.png` });
 
   await page.waitForFunction(() => {
     const current = (window.__ANGEL2_ARENA__?.getState() as { battle?: ArenaBattleDebugState }).battle;
@@ -482,6 +467,14 @@ test("tier-three curse-master commits SN after its formal presentation", async (
       && current.lastSpecialAction.actorId === "arena-1-0"
       && current.specialActionPresentation === undefined;
   });
+  const during = drawnFrame(await frames.stop(), {
+    mapCombatPhase: "statusEffect",
+    mapCombatFrame: "4",
+  });
+  expect(during.mapCombatEffectTileCount).toBe("6");
+  expect(during.state?.["arena-2-0"]?.statuses.techniqueSeal).toBe(0);
+  expect(during.state?.["arena-2-0"]?.life).toBe(targetBefore?.life);
+  expect(during.state?.["arena-1-0"]?.experience).toBe(casterBefore?.experience);
   const after = await arenaBattleState(page);
   expect(after?.lastSpecialAction).toMatchObject({
     actionId: "spell-seal",
