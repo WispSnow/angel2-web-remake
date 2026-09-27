@@ -32341,7 +32341,63 @@ export const STAGE0_FULL_COMBAT_GEOMETRY = {
     "rightEntry": "0000:B29B",
     "xFormula": "channelX - frameXAnchor",
     "yFormula": "channelY - bitmapHeight + frameYOffset",
-    "conclusion": "both physical sides consume the same channel coordinate system; apparent per-frame registration differences come from their independent frame anchor tables"
+    "conclusion": "both physical sides consume the same channel coordinate system; each class side owns two frame placement tables, one for the current actor's +50 frames and one for the defender's four direct frames"
+  },
+  "framePlacementTables": {
+    "descriptorCopy": "0000:51EC copies the unit descriptor +04h word pair to runtime block +2/+4 (DS:31D5) and the +10h presentation block twice, to +6 (counter) and +20h (primary)",
+    "actor": "A49D/A413 (left actor) and A623/A599 (right actor) load the actor sub-block's x-anchor/y-offset pointers, so only +50 frames read framePlacement",
+    "defender": "the same setups load the defending side's runtime block +2/+4 (DS:7C9F/7CA1 or DS:7C65/7C67) into its compositor pointers DS:7AFE/7B00 or DS:7A78/7A7A, so stand, hurt, death and guard read defenderFramePlacement",
+    "defenderTableShape": "four signed x anchors follow the +04h pair, then four own y offsets or the shared zero table DS:87F6; the +10h presentation block starts right after them",
+    "defenderLinkedChannels": "no defender-side command stream issues G1..G5, so the defender tables only ever project direct frames 0..3"
+  },
+  "groundClip": {
+    "drawRows": "0000:DF86",
+    "maskRows": "0000:E1F9",
+    "bufferRowBytes": 56,
+    "lastDrawnBufferOffset": 7560,
+    "firstClippedRow": 135,
+    "effect": "both routines skip every byte past the last drawn buffer offset, so channel bitmap rows at or below the y=135 ground line are never drawn; frames whose y offset lowers them past that line lose their bottom rows",
+    "scope": "all five channels of both sides and the B3BD common trail; only the first byte of the first clipped row passes the unsigned comparison"
+  },
+  "mainChannelShadow": {
+    "entry": "0000:E336",
+    "callers": "B0FF/B29B call it only for channel offset 6 (the character main channel), after that channel's E090 mask and before its DD8E bitmap",
+    "passes": [
+      {
+        "firstRow": 132,
+        "rows": 2,
+        "sideExtension": 0
+      },
+      {
+        "firstRow": 134,
+        "rows": 2,
+        "sideExtension": 8
+      },
+      {
+        "firstRow": 136,
+        "rows": 2,
+        "sideExtension": 0
+      }
+    ],
+    "horizontalSpan": "each pass covers the bitmap's own pixels [left, left+width), widened by sideExtension on both sides",
+    "byteAlignedRowMasks": [
+      170,
+      170
+    ],
+    "shiftedRowMasks": [
+      85,
+      170
+    ],
+    "maskMeaning": "each pass ANDs its first mask into its first row and its second mask into its second row on all four planes; a clear bit (MSB = leftmost pixel) becomes palette colour 0",
+    "alignment": "a byte-aligned left edge (left % 8 == 0) takes E4AF; any other alignment takes E55A, which masks only the bitmap's shifted pixel span",
+    "lastDrawnBufferOffset": 10080,
+    "verticalClip": "the shadow's own limit is far below the window, so it is not cut at the ground line",
+    "edgeWrap": "the shifted loop clips by its first byte only: at the right window edge its second byte spills into the next row's first pixels, and at the left edge the first partial byte is skipped"
+  },
+  "drawOrder": {
+    "substep": "0000:AD70 draws the background (AEC3), the character channels (B04A), B4F1 and the common trail (B3BD) into the buffer, then presents it",
+    "channels": "B04A runs B224 when side 1 acts ([7A00]=1) and B088 when side 2 acts; both walk channel offsets 8,6,4,2,0 and draw the defending side before the acting side at each offset",
+    "tokenChannels": "G1..G5 re-point channel offsets 0,2,4,6,8; the released tables only use G1 (drawn last) and G5 (drawn before both main channels)"
   },
   "characterInitialization": {
     "primaryEntry": "0000:A2E4",
@@ -33597,25 +33653,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 64,
           "h": 78,
-          "anchor": 21,
+          "anchor": 44,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 79,
-          "anchor": 82,
+          "anchor": 42,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 58,
-          "anchor": 38,
+          "anchor": 40,
           "yOffset": 0
         },
         {
           "w": 72,
           "h": 80,
-          "anchor": 37,
+          "anchor": 35,
           "yOffset": 0
         }
       ],
@@ -33663,25 +33719,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 76,
-          "anchor": 55,
+          "anchor": 52,
           "yOffset": 0
         },
         {
           "w": 120,
           "h": 76,
-          "anchor": 100,
+          "anchor": 71,
           "yOffset": 0
         },
         {
           "w": 136,
           "h": 63,
-          "anchor": 43,
+          "anchor": 52,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 76,
-          "anchor": 46,
+          "anchor": 52,
           "yOffset": 0
         }
       ],
@@ -33747,25 +33803,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 56,
           "h": 81,
-          "anchor": 40,
+          "anchor": 39,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 64,
-          "anchor": 45,
+          "anchor": 39,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 47,
-          "anchor": 53,
-          "yOffset": 0
+          "anchor": 47,
+          "yOffset": 8
         },
         {
           "w": 56,
           "h": 80,
-          "anchor": 11,
+          "anchor": 38,
           "yOffset": 0
         }
       ],
@@ -33813,20 +33869,20 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 69,
-          "anchor": 55,
+          "anchor": 25,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 50,
-          "anchor": 108,
+          "anchor": 23,
           "yOffset": 0
         },
         {
           "w": 64,
           "h": 61,
-          "anchor": 89,
-          "yOffset": 11
+          "anchor": 42,
+          "yOffset": 0
         }
       ],
       "plus50": [
@@ -33861,25 +33917,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 76,
-          "anchor": 42,
-          "yOffset": -2
+          "anchor": 32,
+          "yOffset": 0
         },
         {
           "w": 96,
           "h": 73,
-          "anchor": 39,
+          "anchor": 33,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 60,
-          "anchor": 73,
+          "anchor": 52,
           "yOffset": 0
         },
         {
           "w": 136,
           "h": 90,
-          "anchor": 66,
+          "anchor": 77,
           "yOffset": 0
         }
       ],
@@ -33921,25 +33977,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 48,
           "h": 79,
-          "anchor": 63,
+          "anchor": 39,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 82,
-          "anchor": 51,
+          "anchor": 30,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 68,
-          "anchor": 162,
-          "yOffset": 0
+          "anchor": 44,
+          "yOffset": 20
         },
         {
           "w": 72,
           "h": 76,
-          "anchor": 161,
+          "anchor": 52,
           "yOffset": 0
         }
       ],
@@ -33999,20 +34055,20 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 104,
           "h": 81,
-          "anchor": 81,
+          "anchor": 69,
           "yOffset": 0
         },
         {
           "w": 120,
           "h": 74,
-          "anchor": 89,
-          "yOffset": 0
+          "anchor": 42,
+          "yOffset": 22
         },
         {
           "w": 120,
           "h": 95,
-          "anchor": 65,
-          "yOffset": 0
+          "anchor": 37,
+          "yOffset": 5
         }
       ],
       "plus50": [
@@ -34071,25 +34127,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 104,
           "h": 90,
-          "anchor": 88,
+          "anchor": 66,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 79,
-          "anchor": 90,
+          "anchor": 58,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 80,
-          "anchor": 78,
-          "yOffset": 0
+          "anchor": 90,
+          "yOffset": 15
         },
         {
           "w": 128,
           "h": 76,
-          "anchor": 80,
+          "anchor": 28,
           "yOffset": 0
         }
       ],
@@ -34143,25 +34199,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 88,
           "h": 70,
-          "anchor": 76,
+          "anchor": 70,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 81,
-          "anchor": 69,
+          "anchor": 57,
           "yOffset": 0
         },
         {
           "w": 128,
           "h": 49,
-          "anchor": 76,
-          "yOffset": 0
+          "anchor": 53,
+          "yOffset": 14
         },
         {
           "w": 96,
           "h": 74,
-          "anchor": 72,
+          "anchor": 65,
           "yOffset": 0
         }
       ],
@@ -34215,19 +34271,19 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 68,
-          "anchor": 39,
+          "anchor": 37,
           "yOffset": 0
         },
         {
           "w": 120,
           "h": 55,
-          "anchor": 74,
+          "anchor": 36,
           "yOffset": 0
         },
         {
           "w": 72,
           "h": 64,
-          "anchor": 73,
+          "anchor": 31,
           "yOffset": 0
         }
       ],
@@ -34281,25 +34337,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 104,
           "h": 79,
-          "anchor": 68,
+          "anchor": 66,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 85,
-          "anchor": 59,
+          "anchor": 70,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 72,
-          "anchor": 56,
-          "yOffset": 0
+          "anchor": 40,
+          "yOffset": 9
         },
         {
           "w": 112,
           "h": 79,
-          "anchor": 82,
+          "anchor": 55,
           "yOffset": 0
         }
       ],
@@ -34347,25 +34403,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 96,
           "h": 90,
-          "anchor": 15,
+          "anchor": 44,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 77,
-          "anchor": 11,
+          "anchor": 42,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 58,
-          "anchor": 31,
+          "anchor": 40,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 88,
-          "anchor": 11,
+          "anchor": 35,
           "yOffset": 0
         }
       ],
@@ -34413,25 +34469,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 90,
-          "anchor": 56,
+          "anchor": 42,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 86,
-          "anchor": 59,
+          "anchor": 38,
           "yOffset": 0
         },
         {
           "w": 136,
           "h": 80,
-          "anchor": 55,
-          "yOffset": 0
+          "anchor": 69,
+          "yOffset": 48
         },
         {
           "w": 80,
           "h": 81,
-          "anchor": 75,
+          "anchor": 57,
           "yOffset": 0
         }
       ],
@@ -34467,25 +34523,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 136,
           "h": 151,
-          "anchor": 52,
+          "anchor": 66,
           "yOffset": 0
         },
         {
           "w": 176,
           "h": 133,
-          "anchor": 65,
+          "anchor": 77,
           "yOffset": 0
         },
         {
           "w": 192,
           "h": 75,
-          "anchor": 52,
+          "anchor": 98,
           "yOffset": 0
         },
         {
           "w": 160,
           "h": 114,
-          "anchor": 14,
+          "anchor": 64,
           "yOffset": 0
         }
       ],
@@ -34545,26 +34601,26 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 120,
           "h": 105,
-          "anchor": 58,
+          "anchor": 57,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 98,
-          "anchor": 21,
+          "anchor": 64,
           "yOffset": 0
         },
         {
           "w": 224,
           "h": 87,
-          "anchor": 21,
-          "yOffset": -3
+          "anchor": 101,
+          "yOffset": 0
         },
         {
           "w": 120,
           "h": 91,
-          "anchor": 21,
-          "yOffset": -6
+          "anchor": 63,
+          "yOffset": 0
         }
       ],
       "plus50": [
@@ -34671,25 +34727,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 152,
           "h": 98,
-          "anchor": 115,
+          "anchor": 114,
           "yOffset": 0
         },
         {
           "w": 152,
           "h": 118,
-          "anchor": 118,
+          "anchor": 83,
           "yOffset": 0
         },
         {
           "w": 152,
           "h": 74,
-          "anchor": 115,
-          "yOffset": 13
+          "anchor": 67,
+          "yOffset": 11
         },
         {
           "w": 160,
           "h": 98,
-          "anchor": 117,
+          "anchor": 116,
           "yOffset": 0
         }
       ],
@@ -34725,25 +34781,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 144,
           "h": 95,
-          "anchor": 43,
+          "anchor": 76,
           "yOffset": 0
         },
         {
           "w": 200,
           "h": 99,
-          "anchor": 33,
+          "anchor": 128,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 77,
-          "anchor": 80,
-          "yOffset": 0
+          "anchor": 87,
+          "yOffset": 18
         },
         {
           "w": 128,
           "h": 87,
-          "anchor": 68,
+          "anchor": 65,
           "yOffset": 0
         }
       ],
@@ -34815,25 +34871,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 168,
           "h": 96,
-          "anchor": 46,
+          "anchor": 99,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 108,
-          "anchor": 45,
+          "anchor": 55,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 58,
-          "anchor": 80,
+          "anchor": 72,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 112,
-          "anchor": 116,
+          "anchor": 95,
           "yOffset": 0
         }
       ],
@@ -34875,26 +34931,26 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 136,
           "h": 106,
-          "anchor": 73,
+          "anchor": 75,
           "yOffset": 0
         },
         {
           "w": 128,
           "h": 111,
-          "anchor": 77,
+          "anchor": 67,
           "yOffset": 0
         },
         {
           "w": 152,
           "h": 75,
-          "anchor": 75,
-          "yOffset": 0
+          "anchor": 36,
+          "yOffset": 11
         },
         {
           "w": 120,
           "h": 103,
-          "anchor": 71,
-          "yOffset": -16
+          "anchor": 57,
+          "yOffset": 0
         }
       ],
       "plus50": [
@@ -34935,25 +34991,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 64,
           "h": 77,
-          "anchor": 44,
+          "anchor": 45,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 69,
-          "anchor": 0,
+          "anchor": 61,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 44,
-          "anchor": 0,
+          "anchor": 31,
           "yOffset": 0
         },
         {
           "w": 160,
           "h": 136,
-          "anchor": 0,
+          "anchor": 107,
           "yOffset": 0
         }
       ],
@@ -34995,25 +35051,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 83,
-          "anchor": 61,
+          "anchor": 53,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 80,
-          "anchor": 57,
+          "anchor": 55,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 65,
-          "anchor": 57,
+          "anchor": 41,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 83,
-          "anchor": 49,
+          "anchor": 52,
           "yOffset": 0
         }
       ],
@@ -35079,25 +35135,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 64,
           "h": 63,
-          "anchor": 28,
+          "anchor": 36,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 73,
-          "anchor": 35,
+          "anchor": 47,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 53,
-          "anchor": 35,
+          "anchor": 27,
           "yOffset": 0
         },
         {
           "w": 72,
           "h": 61,
-          "anchor": 41,
+          "anchor": 51,
           "yOffset": 0
         }
       ],
@@ -35145,25 +35201,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 96,
           "h": 78,
-          "anchor": 43,
+          "anchor": 45,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 73,
-          "anchor": 39,
+          "anchor": 37,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 60,
-          "anchor": 41,
+          "anchor": 37,
           "yOffset": 0
         },
         {
           "w": 120,
           "h": 76,
-          "anchor": 45,
+          "anchor": 48,
           "yOffset": 0
         }
       ],
@@ -35235,19 +35291,19 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 104,
           "h": 98,
-          "anchor": 66,
-          "yOffset": 4
+          "anchor": 57,
+          "yOffset": 0
         },
         {
           "w": 112,
           "h": 71,
-          "anchor": 63,
-          "yOffset": 0
+          "anchor": 46,
+          "yOffset": 21
         },
         {
           "w": 96,
           "h": 75,
-          "anchor": 58,
+          "anchor": 52,
           "yOffset": 0
         }
       ],
@@ -35283,25 +35339,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 67,
-          "anchor": 39,
+          "anchor": 34,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 69,
-          "anchor": 60,
+          "anchor": 30,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 48,
-          "anchor": 60,
-          "yOffset": 0
+          "anchor": 43,
+          "yOffset": 12
         },
         {
           "w": 96,
           "h": 69,
-          "anchor": 50,
+          "anchor": 34,
           "yOffset": 0
         }
       ],
@@ -35355,25 +35411,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 56,
           "h": 62,
-          "anchor": 34,
+          "anchor": 31,
           "yOffset": 0
         },
         {
           "w": 64,
           "h": 65,
-          "anchor": 37,
+          "anchor": 23,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 43,
-          "anchor": 50,
-          "yOffset": 0
+          "anchor": 26,
+          "yOffset": 15
         },
         {
           "w": 72,
           "h": 62,
-          "anchor": 31,
+          "anchor": 39,
           "yOffset": 0
         }
       ],
@@ -35457,19 +35513,19 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 88,
           "h": 69,
-          "anchor": 66,
+          "anchor": 38,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 64,
-          "anchor": 104,
-          "yOffset": 0
+          "anchor": 37,
+          "yOffset": 17
         },
         {
           "w": 104,
           "h": 68,
-          "anchor": 87,
+          "anchor": 50,
           "yOffset": 0
         }
       ],
@@ -35523,25 +35579,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 104,
           "h": 69,
-          "anchor": 44,
+          "anchor": 52,
           "yOffset": 0
         },
         {
           "w": 72,
           "h": 82,
-          "anchor": 43,
+          "anchor": 52,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 59,
-          "anchor": 42,
-          "yOffset": 0
+          "anchor": 52,
+          "yOffset": 21
         },
         {
           "w": 80,
           "h": 69,
-          "anchor": 54,
+          "anchor": 61,
           "yOffset": 0
         }
       ],
@@ -35589,25 +35645,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 88,
           "h": 71,
-          "anchor": 35,
+          "anchor": 43,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 70,
-          "anchor": 36,
+          "anchor": 34,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 56,
-          "anchor": 64,
-          "yOffset": 0
+          "anchor": 28,
+          "yOffset": 9
         },
         {
           "w": 88,
           "h": 71,
-          "anchor": 36,
+          "anchor": 43,
           "yOffset": 0
         }
       ],
@@ -35649,25 +35705,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 72,
-          "anchor": 44,
+          "anchor": 35,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 71,
-          "anchor": 56,
+          "anchor": 40,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 78,
-          "anchor": 36,
-          "yOffset": 0
+          "anchor": 49,
+          "yOffset": 17
         },
         {
           "w": 72,
           "h": 65,
-          "anchor": 39,
+          "anchor": 29,
           "yOffset": 0
         }
       ],
@@ -35703,25 +35759,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 81,
-          "anchor": 48,
+          "anchor": 41,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 81,
-          "anchor": 48,
+          "anchor": 50,
           "yOffset": 0
         },
         {
           "w": 120,
           "h": 41,
-          "anchor": 45,
-          "yOffset": 0
+          "anchor": 50,
+          "yOffset": 10
         },
         {
           "w": 88,
           "h": 79,
-          "anchor": 46,
+          "anchor": 39,
           "yOffset": 0
         }
       ],
@@ -35817,25 +35873,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 81,
-          "anchor": 26,
+          "anchor": 37,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 81,
-          "anchor": 19,
+          "anchor": 32,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 46,
-          "anchor": 20,
-          "yOffset": 0
+          "anchor": 54,
+          "yOffset": 14
         },
         {
           "w": 56,
           "h": 81,
-          "anchor": 2,
+          "anchor": 34,
           "yOffset": 0
         }
       ],
@@ -35865,25 +35921,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 80,
-          "anchor": 47,
+          "anchor": 40,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 82,
-          "anchor": 52,
+          "anchor": 27,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 63,
-          "anchor": 20,
-          "yOffset": 0
+          "anchor": 46,
+          "yOffset": 23
         },
         {
           "w": 88,
           "h": 75,
-          "anchor": 2,
+          "anchor": 40,
           "yOffset": 0
         }
       ],
@@ -35913,25 +35969,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 89,
-          "anchor": 31,
+          "anchor": 44,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 97,
-          "anchor": 25,
-          "yOffset": -3
+          "anchor": 41,
+          "yOffset": 0
         },
         {
           "w": 120,
           "h": 85,
-          "anchor": 61,
-          "yOffset": 0
+          "anchor": 56,
+          "yOffset": 33
         },
         {
           "w": 80,
           "h": 94,
-          "anchor": 34,
+          "anchor": 42,
           "yOffset": 0
         }
       ],
@@ -35973,25 +36029,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 66,
-          "anchor": 58,
+          "anchor": 33,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 65,
-          "anchor": 55,
+          "anchor": 30,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 39,
           "anchor": 27,
-          "yOffset": 0
+          "yOffset": 19
         },
         {
           "w": 64,
           "h": 59,
-          "anchor": 2,
+          "anchor": 29,
           "yOffset": 0
         }
       ],
@@ -36027,25 +36083,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 78,
-          "anchor": 58,
+          "anchor": 24,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 79,
-          "anchor": 22,
+          "anchor": 41,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 58,
-          "anchor": 27,
+          "anchor": 70,
           "yOffset": 0
         },
         {
           "w": 64,
           "h": 80,
-          "anchor": 40,
+          "anchor": 42,
           "yOffset": 0
         }
       ],
@@ -36093,25 +36149,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 64,
           "h": 76,
-          "anchor": 25,
+          "anchor": 15,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 76,
-          "anchor": 32,
+          "anchor": 45,
           "yOffset": 0
         },
         {
           "w": 136,
           "h": 63,
-          "anchor": 27,
+          "anchor": 87,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 76,
-          "anchor": 32,
+          "anchor": 47,
           "yOffset": 0
         }
       ],
@@ -36183,19 +36239,19 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 64,
-          "anchor": 12,
+          "anchor": 42,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 47,
-          "anchor": 111,
-          "yOffset": 0
+          "anchor": 54,
+          "yOffset": 8
         },
         {
           "w": 48,
           "h": 80,
-          "anchor": 161,
+          "anchor": 17,
           "yOffset": 0
         }
       ],
@@ -36237,26 +36293,26 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 65,
-          "anchor": 23,
+          "anchor": 24,
           "yOffset": 0
         },
         {
           "w": 72,
           "h": 69,
-          "anchor": 23,
+          "anchor": 42,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 50,
-          "anchor": 44,
+          "anchor": 69,
           "yOffset": 0
         },
         {
           "w": 64,
           "h": 61,
-          "anchor": 46,
-          "yOffset": 11
+          "anchor": 21,
+          "yOffset": 0
         }
       ],
       "plus50": [
@@ -36291,25 +36347,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 76,
-          "anchor": 40,
-          "yOffset": -2
+          "anchor": 38,
+          "yOffset": 0
         },
         {
           "w": 96,
           "h": 73,
-          "anchor": 48,
+          "anchor": 67,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 60,
-          "anchor": 12,
+          "anchor": 53,
           "yOffset": 0
         },
         {
           "w": 136,
           "h": 90,
-          "anchor": 16,
+          "anchor": 56,
           "yOffset": 0
         }
       ],
@@ -36351,25 +36407,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 56,
           "h": 79,
-          "anchor": 35,
+          "anchor": 11,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 82,
-          "anchor": 52,
+          "anchor": 45,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 68,
-          "anchor": 29,
-          "yOffset": 0
+          "anchor": 64,
+          "yOffset": 20
         },
         {
           "w": 64,
           "h": 76,
-          "anchor": 28,
+          "anchor": 16,
           "yOffset": 0
         }
       ],
@@ -36435,13 +36491,13 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 120,
           "h": 74,
-          "anchor": 38,
-          "yOffset": 0
+          "anchor": 81,
+          "yOffset": 22
         },
         {
           "w": 120,
           "h": 95,
-          "anchor": 74,
+          "anchor": 83,
           "yOffset": 0
         }
       ],
@@ -36507,19 +36563,19 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 112,
           "h": 79,
-          "anchor": 24,
+          "anchor": 54,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 80,
-          "anchor": 24,
-          "yOffset": 0
+          "anchor": 39,
+          "yOffset": 15
         },
         {
           "w": 128,
           "h": 76,
-          "anchor": 29,
+          "anchor": 86,
           "yOffset": 0
         }
       ],
@@ -36579,19 +36635,19 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 81,
-          "anchor": 17,
+          "anchor": 19,
           "yOffset": 0
         },
         {
           "w": 128,
           "h": 49,
-          "anchor": 19,
-          "yOffset": 0
+          "anchor": 77,
+          "yOffset": 14
         },
         {
           "w": 96,
           "h": 74,
-          "anchor": 17,
+          "anchor": 30,
           "yOffset": 0
         }
       ],
@@ -36639,25 +36695,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 104,
           "h": 67,
-          "anchor": 26,
+          "anchor": 27,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 68,
-          "anchor": 27,
+          "anchor": 48,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 55,
-          "anchor": 24,
+          "anchor": 78,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 64,
-          "anchor": 63,
+          "anchor": 47,
           "yOffset": 0
         }
       ],
@@ -36711,25 +36767,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 104,
           "h": 79,
-          "anchor": 35,
+          "anchor": 38,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 85,
-          "anchor": 41,
+          "anchor": 44,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 72,
-          "anchor": 43,
-          "yOffset": 0
+          "anchor": 61,
+          "yOffset": 9
         },
         {
           "w": 112,
           "h": 79,
-          "anchor": 50,
+          "anchor": 58,
           "yOffset": 0
         }
       ],
@@ -36777,25 +36833,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 96,
           "h": 90,
-          "anchor": 65,
+          "anchor": 50,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 77,
-          "anchor": 69,
+          "anchor": 59,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 58,
-          "anchor": 51,
+          "anchor": 46,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 88,
-          "anchor": 65,
+          "anchor": 68,
           "yOffset": 0
         }
       ],
@@ -36843,25 +36899,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 90,
-          "anchor": 18,
+          "anchor": 31,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 86,
-          "anchor": 19,
+          "anchor": 36,
           "yOffset": 0
         },
         {
           "w": 136,
           "h": 80,
-          "anchor": 20,
-          "yOffset": 0
+          "anchor": 60,
+          "yOffset": 48
         },
         {
           "w": 88,
           "h": 81,
-          "anchor": 65,
+          "anchor": 24,
           "yOffset": 0
         }
       ],
@@ -36897,25 +36953,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 136,
           "h": 151,
-          "anchor": 76,
+          "anchor": 66,
           "yOffset": 0
         },
         {
           "w": 176,
           "h": 133,
-          "anchor": 101,
+          "anchor": 108,
           "yOffset": 0
         },
         {
           "w": 192,
           "h": 75,
-          "anchor": 76,
+          "anchor": 93,
           "yOffset": 0
         },
         {
           "w": 160,
           "h": 114,
-          "anchor": 14,
+          "anchor": 99,
           "yOffset": 0
         }
       ],
@@ -36981,20 +37037,20 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 136,
           "h": 98,
-          "anchor": 25,
+          "anchor": 74,
           "yOffset": 0
         },
         {
           "w": 216,
           "h": 83,
-          "anchor": 21,
-          "yOffset": -3
+          "anchor": 120,
+          "yOffset": 0
         },
         {
           "w": 112,
           "h": 91,
-          "anchor": 14,
-          "yOffset": -6
+          "anchor": 53,
+          "yOffset": 0
         }
       ],
       "plus50": [
@@ -37101,25 +37157,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 152,
           "h": 98,
-          "anchor": 96,
+          "anchor": 40,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 118,
-          "anchor": 96,
+          "anchor": 65,
           "yOffset": 0
         },
         {
           "w": 152,
           "h": 74,
-          "anchor": 94,
-          "yOffset": 11
+          "anchor": 88,
+          "yOffset": 0
         },
         {
           "w": 160,
           "h": 98,
-          "anchor": 95,
+          "anchor": 44,
           "yOffset": 0
         }
       ],
@@ -37155,25 +37211,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 144,
           "h": 95,
-          "anchor": 27,
+          "anchor": 66,
           "yOffset": 0
         },
         {
           "w": 200,
           "h": 99,
-          "anchor": 28,
+          "anchor": 77,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 77,
-          "anchor": 60,
-          "yOffset": 0
+          "anchor": 59,
+          "yOffset": 18
         },
         {
           "w": 120,
           "h": 87,
-          "anchor": 64,
+          "anchor": 55,
           "yOffset": 0
         }
       ],
@@ -37245,25 +37301,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 168,
           "h": 96,
-          "anchor": 32,
+          "anchor": 70,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 108,
-          "anchor": 20,
+          "anchor": 88,
           "yOffset": 0
         },
         {
           "w": 152,
           "h": 58,
-          "anchor": 33,
+          "anchor": 78,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 112,
-          "anchor": 28,
+          "anchor": 38,
           "yOffset": 0
         }
       ],
@@ -37311,20 +37367,20 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 128,
           "h": 111,
-          "anchor": 62,
+          "anchor": 56,
           "yOffset": 0
         },
         {
           "w": 152,
           "h": 75,
-          "anchor": 63,
-          "yOffset": 0
+          "anchor": 117,
+          "yOffset": 11
         },
         {
           "w": 120,
           "h": 103,
-          "anchor": 61,
-          "yOffset": -16
+          "anchor": 65,
+          "yOffset": 0
         }
       ],
       "plus50": [
@@ -37365,25 +37421,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 64,
           "h": 77,
-          "anchor": 69,
+          "anchor": 15,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 69,
-          "anchor": 150,
+          "anchor": 25,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 44,
-          "anchor": 150,
+          "anchor": 63,
           "yOffset": 0
         },
         {
           "w": 160,
           "h": 136,
-          "anchor": 150,
+          "anchor": 48,
           "yOffset": 0
         }
       ],
@@ -37425,25 +37481,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 83,
-          "anchor": 18,
+          "anchor": 25,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 80,
-          "anchor": 39,
+          "anchor": 41,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 65,
-          "anchor": 31,
+          "anchor": 55,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 83,
-          "anchor": 18,
+          "anchor": 31,
           "yOffset": 0
         }
       ],
@@ -37509,25 +37565,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 64,
           "h": 63,
-          "anchor": 22,
+          "anchor": 28,
           "yOffset": 0
         },
         {
           "w": 120,
           "h": 73,
-          "anchor": 26,
+          "anchor": 68,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 53,
-          "anchor": 16,
+          "anchor": 66,
           "yOffset": 0
         },
         {
           "w": 72,
           "h": 61,
-          "anchor": 0,
+          "anchor": 20,
           "yOffset": 0
         }
       ],
@@ -37575,13 +37631,13 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 96,
           "h": 78,
-          "anchor": 49,
+          "anchor": 46,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 73,
-          "anchor": 62,
+          "anchor": 57,
           "yOffset": 0
         },
         {
@@ -37593,7 +37649,7 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 128,
           "h": 76,
-          "anchor": 53,
+          "anchor": 76,
           "yOffset": 0
         }
       ],
@@ -37659,25 +37715,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 96,
           "h": 75,
-          "anchor": 48,
+          "anchor": 47,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 98,
-          "anchor": 45,
-          "yOffset": 4
+          "anchor": 50,
+          "yOffset": 0
         },
         {
           "w": 112,
           "h": 71,
-          "anchor": 46,
-          "yOffset": 0
+          "anchor": 66,
+          "yOffset": 21
         },
         {
           "w": 96,
           "h": 75,
-          "anchor": 48,
+          "anchor": 42,
           "yOffset": 0
         }
       ],
@@ -37713,25 +37769,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 67,
-          "anchor": 26,
+          "anchor": 33,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 69,
-          "anchor": 24,
+          "anchor": 48,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 48,
-          "anchor": 24,
-          "yOffset": 0
+          "anchor": 53,
+          "yOffset": 12
         },
         {
           "w": 96,
           "h": 69,
-          "anchor": 33,
+          "anchor": 62,
           "yOffset": 0
         }
       ],
@@ -37785,20 +37841,20 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 56,
           "h": 62,
-          "anchor": 19,
+          "anchor": 21,
           "yOffset": 0
         },
         {
           "w": 64,
           "h": 65,
-          "anchor": 41,
+          "anchor": 42,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 43,
-          "anchor": 16,
-          "yOffset": 0
+          "anchor": 71,
+          "yOffset": 15
         },
         {
           "w": 64,
@@ -37881,25 +37937,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 88,
           "h": 68,
-          "anchor": 33,
+          "anchor": 32,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 69,
-          "anchor": 17,
+          "anchor": 46,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 64,
-          "anchor": 18,
-          "yOffset": 0
+          "anchor": 69,
+          "yOffset": 17
         },
         {
           "w": 104,
           "h": 68,
-          "anchor": 36,
+          "anchor": 47,
           "yOffset": 0
         }
       ],
@@ -37953,25 +38009,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 96,
           "h": 69,
-          "anchor": 33,
+          "anchor": 50,
           "yOffset": 0
         },
         {
           "w": 72,
           "h": 82,
-          "anchor": 55,
+          "anchor": 19,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 59,
-          "anchor": 23,
-          "yOffset": 0
+          "anchor": 58,
+          "yOffset": 21
         },
         {
           "w": 80,
           "h": 69,
-          "anchor": 23,
+          "anchor": 19,
           "yOffset": 0
         }
       ],
@@ -38019,7 +38075,7 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 88,
           "h": 71,
-          "anchor": 67,
+          "anchor": 48,
           "yOffset": 0
         },
         {
@@ -38031,13 +38087,13 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 112,
           "h": 56,
-          "anchor": 23,
-          "yOffset": 0
+          "anchor": 85,
+          "yOffset": 9
         },
         {
           "w": 88,
           "h": 71,
-          "anchor": 20,
+          "anchor": 47,
           "yOffset": 0
         }
       ],
@@ -38079,25 +38135,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 72,
-          "anchor": 33,
+          "anchor": 35,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 71,
-          "anchor": 32,
+          "anchor": 67,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 78,
-          "anchor": 75,
-          "yOffset": 0
+          "anchor": 58,
+          "yOffset": 17
         },
         {
           "w": 72,
           "h": 65,
-          "anchor": 76,
+          "anchor": 49,
           "yOffset": 0
         }
       ],
@@ -38133,25 +38189,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 81,
-          "anchor": 27,
+          "anchor": 34,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 81,
-          "anchor": 24,
+          "anchor": 32,
           "yOffset": 0
         },
         {
           "w": 120,
           "h": 41,
-          "anchor": 26,
-          "yOffset": 0
+          "anchor": 71,
+          "yOffset": 10
         },
         {
           "w": 88,
           "h": 79,
-          "anchor": 28,
+          "anchor": 46,
           "yOffset": 0
         }
       ],
@@ -38247,25 +38303,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 81,
-          "anchor": 58,
+          "anchor": 42,
           "yOffset": 0
         },
         {
           "w": 96,
           "h": 81,
-          "anchor": 56,
+          "anchor": 65,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 46,
-          "anchor": 107,
-          "yOffset": 0
+          "anchor": 52,
+          "yOffset": 14
         },
         {
           "w": 56,
           "h": 81,
-          "anchor": 2,
+          "anchor": 23,
           "yOffset": 0
         }
       ],
@@ -38295,25 +38351,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 80,
-          "anchor": 52,
+          "anchor": 31,
           "yOffset": 0
         },
         {
           "w": 104,
           "h": 82,
-          "anchor": 60,
+          "anchor": 74,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 63,
-          "anchor": 96,
-          "yOffset": 0
+          "anchor": 69,
+          "yOffset": 23
         },
         {
           "w": 88,
           "h": 75,
-          "anchor": 2,
+          "anchor": 48,
           "yOffset": 0
         }
       ],
@@ -38343,25 +38399,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 80,
           "h": 89,
-          "anchor": 42,
+          "anchor": 36,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 97,
-          "anchor": 46,
-          "yOffset": -3
+          "anchor": 48,
+          "yOffset": 0
         },
         {
           "w": 120,
           "h": 85,
-          "anchor": 28,
-          "yOffset": 0
+          "anchor": 65,
+          "yOffset": 33
         },
         {
           "w": 72,
           "h": 94,
-          "anchor": 41,
+          "anchor": 35,
           "yOffset": 0
         }
       ],
@@ -38403,25 +38459,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 64,
           "h": 66,
-          "anchor": 53,
+          "anchor": 35,
           "yOffset": 0
         },
         {
           "w": 80,
           "h": 65,
-          "anchor": 56,
+          "anchor": 45,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 39,
-          "anchor": 66,
-          "yOffset": 0
+          "anchor": 61,
+          "yOffset": 19
         },
         {
           "w": 64,
           "h": 59,
-          "anchor": 2,
+          "anchor": 35,
           "yOffset": 0
         }
       ],
@@ -38451,25 +38507,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 72,
           "h": 78,
-          "anchor": 58,
+          "anchor": 24,
           "yOffset": 0
         },
         {
           "w": 88,
           "h": 79,
-          "anchor": 22,
+          "anchor": 41,
           "yOffset": 0
         },
         {
           "w": 112,
           "h": 58,
-          "anchor": 27,
+          "anchor": 70,
           "yOffset": 0
         },
         {
           "w": 64,
           "h": 80,
-          "anchor": 40,
+          "anchor": 42,
           "yOffset": 0
         }
       ],
@@ -38529,13 +38585,13 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 200,
           "h": 130,
-          "anchor": 2,
+          "anchor": 88,
           "yOffset": 0
         },
         {
           "w": 208,
           "h": 142,
-          "anchor": 0,
+          "anchor": 88,
           "yOffset": 0
         }
       ],
@@ -38559,26 +38615,26 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 176,
           "h": 120,
-          "anchor": 79,
+          "anchor": 31,
           "yOffset": 0
         },
         {
           "w": 184,
           "h": 122,
-          "anchor": 85,
+          "anchor": 74,
           "yOffset": 0
         },
         {
           "w": 184,
           "h": 122,
-          "anchor": 87,
+          "anchor": 31,
           "yOffset": 0
         },
         {
           "w": 184,
           "h": 122,
-          "anchor": 60,
-          "yOffset": -15
+          "anchor": 53,
+          "yOffset": 0
         }
       ],
       "plus50": [
@@ -38631,25 +38687,25 @@ export const STAGE0_FULL_COMBAT_FRAME_META = {
         {
           "w": 152,
           "h": 65,
-          "anchor": 74,
+          "anchor": 31,
           "yOffset": 0
         },
         {
           "w": 192,
           "h": 97,
-          "anchor": 31,
+          "anchor": 74,
           "yOffset": 0
         },
         {
           "w": 144,
           "h": 65,
-          "anchor": 0,
-          "yOffset": 2
+          "anchor": 31,
+          "yOffset": 0
         },
         {
           "w": 168,
           "h": 135,
-          "anchor": 0,
+          "anchor": 53,
           "yOffset": 0
         }
       ],

@@ -68,12 +68,28 @@ export interface FullCombatSpriteState {
   x: number;
   /** Signed native-pixel lift above the ground anchor; negative sinks below it. */
   lift: number;
-  /** Explicit remake-only correction applied after the original frame y-offset. */
-  yOffsetCorrection?: number;
-  /** Explicit remake-only correction applied after the original frame x-anchor. */
-  xOffsetCorrection?: number;
   mirror: boolean;
   opacity: number;
+}
+
+/**
+ * One two-row pass of module 29's `E336` ground shadow. Every pixel of the
+ * band whose scene-x parity matches that row's entry turns palette colour 0.
+ */
+export interface FullCombatShadowBand {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Scene-x parity blackened on the band's first and second rows. */
+  darkParity: readonly [0 | 1, 0 | 1];
+}
+
+/** `B0FF/B29B` draw this under channel offset 6, the character main channel. */
+export interface FullCombatShadowState {
+  side: "left" | "right";
+  channel: "actor" | "victim";
+  bands: readonly FullCombatShadowBand[];
 }
 
 export interface FullCombatSceneState {
@@ -100,6 +116,8 @@ export interface FullCombatSceneState {
     right: FullCombatLifeGaugeState;
   };
   sprites: FullCombatSpriteState[];
+  /** Main-channel ground shadows in native draw order: defender, then actor. */
+  shadows: FullCombatShadowState[];
   lance?: { x: number; y: number; frame: number; side: "left" | "right" };
   projectile?: {
     x: number;
@@ -469,10 +487,18 @@ interface NativeStreamSample {
   anchored: boolean;
 }
 
+/** A ground-relative channel y as a lift: positive y sinks below the line. */
+function groundRelativeLift(y: number): number {
+  return y === 0 ? 0 : -y;
+}
+
 /**
- * Converts a character-channel sample to the renderer's lift. Ground-relative
- * poses only ever rise; an anchored pose carries an absolute bottom anchor and
- * must be measured against the scene's ground line instead.
+ * Converts an actor-channel sample to the renderer's lift. An anchored pose
+ * carries an absolute bottom anchor and is measured against the ground line.
+ * Ground-relative actor poses are still held at or above the line here, even
+ * though module 29 lets them sink under its ground clip (the jungle warrior's
+ * and the head's burrowing passes); only the defender channel follows the
+ * native accumulator so far.
  */
 function nativeActorLift(sample: NativeStreamSample): number {
   return sample.anchored
@@ -499,41 +525,77 @@ function nativeFrameIntersectsViewport(
   return left < FULL_SCENE.width && left + meta.w > 0;
 }
 
-type FullCombatVictimReaction = NonNullable<FullCombatSpriteState["reaction"]>;
+function visibleChannelSprite(
+  sprite: FullCombatSpriteState | undefined,
+): FullCombatSpriteState | undefined {
+  return sprite && nativeFrameIntersectsViewport(
+    sprite.side,
+    sprite.classId,
+    sprite.set,
+    sprite.frame,
+    sprite.x,
+  ) ? sprite : undefined;
+}
 
-// REMAKE-121 keeps the original placement tables as evidence, but neutralizes
-// the specific reaction-frame registration defects reported through the class
-// compendium. The correction aligns the affected bitmap canvas centre with its
-// own side's direct standing frame; logical channels, shared trails, damage
-// numbers, camera motion and simulation state continue to use the native x.
-const STABLE_REMAKE_REACTION_CENTERING = {
-  death: {
-    left: [0, 3, 5, 16, 19, 27, 29, 31, 32],
-    right: [2, 16, 19, 25, 29, 31, 32],
-  },
-  hurt: { left: [19], right: [19] },
-  guard: { left: [19], right: [19] },
-} as const satisfies Record<
-  FullCombatVictimReaction,
-  Record<"left" | "right", readonly number[]>
->;
+const NATIVE_SHADOW = STAGE0_FULL_COMBAT_GEOMETRY.mainChannelShadow;
 
-function victimReactionXOffsetCorrection(
-  classRecord: FullCombatClass,
-  side: "left" | "right",
-  reaction: FullCombatVictimReaction,
-  frame: number,
-): number | undefined {
-  const records = STABLE_REMAKE_REACTION_CENTERING[reaction][side] as readonly number[];
-  if (!records.includes(classRecord)) return undefined;
-  const frames = FULL_COMBAT_FRAME_META[side][classRecord]?.direct;
-  const standing = frames?.[0];
-  const current = frames?.[frame];
-  if (!standing || !current) return undefined;
-  const standingCenter = standing.w / 2 - standing.anchor;
-  const currentCenter = current.w / 2 - current.anchor;
-  const correction = standingCenter - currentCenter;
-  return correction === 0 ? undefined : correction;
+/**
+ * Scene-x parity that an `E336` AND mask turns into colour 0. A VGA byte's MSB
+ * is its leftmost pixel, so 0AAh clears odd columns and 55h clears even ones.
+ */
+function nativeShadowDarkParity(mask: number): 0 | 1 {
+  const cleared = Array.from({ length: 8 }, (_, pixel) => pixel)
+    .filter((pixel) => (mask & (0x80 >> pixel)) === 0)
+    .join(",");
+  if (cleared === "1,3,5,7") return 1;
+  if (cleared === "0,2,4,6") return 0;
+  throw new Error(`Unsupported native shadow mask ${mask}`);
+}
+
+/**
+ * `E336` bands under a main-channel bitmap whose left edge is `left`. They sit
+ * on fixed rows whatever the character's lift, widen the middle pass by one
+ * byte on each side, and switch from the byte-aligned column dither (`E4AF`)
+ * to the shifted checkerboard (`E55A`) with the bitmap's alignment.
+ */
+export function nativeMainChannelShadowBands(
+  left: number,
+  width: number,
+): FullCombatShadowBand[] {
+  const masks = ((left % 8) + 8) % 8 === 0
+    ? NATIVE_SHADOW.byteAlignedRowMasks
+    : NATIVE_SHADOW.shiftedRowMasks;
+  const darkParity = [
+    nativeShadowDarkParity(masks[0]),
+    nativeShadowDarkParity(masks[1]),
+  ] as const;
+  return NATIVE_SHADOW.passes.map((pass) => ({
+    x: left - pass.sideExtension,
+    y: pass.firstRow,
+    width: width + pass.sideExtension * 2,
+    height: pass.rows,
+    darkParity,
+  }));
+}
+
+/**
+ * The shadow follows the main channel, not its visibility: a bitmap just past
+ * the window edge still leaves the widened middle pass inside the window.
+ */
+function nativeMainChannelShadow(
+  sprite: FullCombatSpriteState | undefined,
+): FullCombatShadowState | undefined {
+  if (!sprite || (sprite.channel !== "actor" && sprite.channel !== "victim")) return undefined;
+  // Like the viewport test, a side without bitmaps (the empress's left block)
+  // has nothing to project; the renderer rejects such sprites on its own.
+  const meta = FULL_COMBAT_FRAME_META[sprite.side][sprite.classId]?.[sprite.set]?.[sprite.frame];
+  if (!meta) return undefined;
+  const anchor = sprite.mirror ? meta.w - meta.anchor : meta.anchor;
+  return {
+    side: sprite.side,
+    channel: sprite.channel,
+    bands: nativeMainChannelShadowBands(sprite.x - anchor, meta.w),
+  };
 }
 
 type NativeAnimationMode = "none" | "alternate" | "cycle4" | "cycle6";
@@ -795,13 +857,6 @@ function nativePostHitActorSprite(
     impact.y,
     impact.anchored,
   );
-  if (!nativeFrameIntersectsViewport(
-    base.side,
-    actorClass,
-    base.set,
-    pose.frame,
-    pose.x,
-  )) return undefined;
   return {
     ...base,
     frame: pose.frame,
@@ -837,13 +892,6 @@ function nativeClassActorSprite(
       spec.actorX,
       0,
     );
-    if (!nativeFrameIntersectsViewport(
-      base.side,
-      spec.actorClass,
-      base.set,
-      pose.frame,
-      pose.x,
-    )) return undefined;
     return {
       ...base,
       frame: pose.frame,
@@ -898,79 +946,63 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
     mirror: false,
     opacity: 1,
   };
+  // Defender streams never issue `:S`, so the channel y stays ground-relative
+  // and keeps accumulating from the approach through the reaction into the
+  // death stream. A positive y sinks the bitmap, and the compositor's ground
+  // clip then hides whatever falls past the line (the great axe warrior's
+  // guard stream drives its target 112 px down).
+  const approach = nativeMainStream(
+    spec.actorClass,
+    spec.actorSide,
+    "mainRightOrDefender",
+  );
   if (t < times.impact) {
-    const stream = nativeMainStream(
-      spec.actorClass,
-      spec.actorSide,
-      "mainRightOrDefender",
-    );
     const pose = sampleNativeStream(
-      stream,
+      approach,
       t - spec.start,
       NATIVE_STRIKE_SUBSTEP,
       spec.victimStartX,
       0,
     );
-    const x = pose.x;
-    if (!nativeFrameIntersectsViewport(
-      base.side,
-      spec.victimClass,
-      base.set,
-      pose.frame,
-      x,
-    )) return undefined;
     return {
       ...base,
       frame: pose.frame,
-      x,
-      lift: Math.max(0, -pose.y),
+      x: pose.x,
+      lift: groundRelativeLift(pose.y),
     };
   }
+  const approachEnd = sampleNativeStream(
+    approach,
+    nativeStreamDuration(approach, NATIVE_STRIKE_SUBSTEP),
+    NATIVE_STRIKE_SUBSTEP,
+    spec.victimStartX,
+    0,
+  );
   const thresholdReaction = spec.damage <= 10 ? "guard" : "hurt";
-  let reaction: NonNullable<FullCombatSpriteState["reaction"]> = thresholdReaction;
   const reactionStream = nativeReactionStream(
     spec.actorClass,
     spec.actorSide,
     thresholdReaction,
     "victim",
   );
+  // `B683/B6BD` only swap in the six `frame 2, dx 0, dy 0` death poses, so
+  // the body lies wherever the reaction accumulator left the channel.
+  const deathStarted = spec.victimDies && t >= times.holdStart;
   const pose = sampleNativeStream(
     reactionStream,
-    t - times.impact,
+    deathStarted
+      ? nativeStreamDuration(reactionStream, NATIVE_POST_HIT_SUBSTEP)
+      : t - times.impact,
     NATIVE_POST_HIT_SUBSTEP,
     spec.victimX,
-    0,
-  );
-  let frame = pose.frame;
-  let lift = Math.max(0, -pose.y);
-  if (spec.victimDies) {
-    const deathStart = times.holdStart;
-    if (t >= deathStart) {
-      reaction = "death";
-      frame = 2;
-      lift = 0;
-    }
-  }
-  // Record 18's original direct frame 3 table contains yOffset=-16 on both
-  // physical sides, and module 29 applies it literally. That makes the swift
-  // dragon knight hover only while guarding. Keep the evidence table intact
-  // and neutralize the inherited defect at the remake projection boundary.
-  const yOffsetCorrection = spec.victimClass === 18 && reaction === "guard" ? 16 : undefined;
-  const xOffsetCorrection = victimReactionXOffsetCorrection(
-    spec.victimClass,
-    victimSide,
-    reaction,
-    frame,
+    approachEnd.y,
   );
   return {
     ...base,
-    frame,
-    reaction,
+    frame: deathStarted ? 2 : pose.frame,
+    reaction: deathStarted ? "death" : thresholdReaction,
     x: spec.victimX,
-    lift,
-    yOffsetCorrection,
-    xOffsetCorrection,
-    opacity: 1,
+    lift: groundRelativeLift(pose.y),
   };
 }
 
@@ -1539,11 +1571,13 @@ function strikeMarks(spec: StrikeSpec, times: StrikeTimes): FullCombatMark[] {
 
 function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
   FullCombatSceneState,
-  "camera" | "viewportYOffset" | "sprites" | "lance" | "projectile" | "particles" | "damage"
+  "camera" | "viewportYOffset" | "sprites" | "shadows" | "lance" | "projectile" | "particles" | "damage"
 > {
   const sprites: FullCombatSpriteState[] = [];
-  const actor = nativeClassActorSprite(spec, times, t);
-  const victim = victimSprite(spec, times, t);
+  const actorChannel = nativeClassActorSprite(spec, times, t);
+  const victimChannel = victimSprite(spec, times, t);
+  const actor = visibleChannelSprite(actorChannel);
+  const victim = visibleChannelSprite(victimChannel);
   const nativeG1Effect = nativeG1EffectSprite(spec, times, t);
   const nativeLinkedEffects = genericNativeLinkedEffectSprites(spec, times, t);
   const nativePresentation = nativePresentationAt(spec, times, t);
@@ -1551,10 +1585,15 @@ function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
   if (actor) sprites.push(actor);
   if (nativeG1Effect) sprites.push(nativeG1Effect);
   sprites.push(...nativeLinkedEffects);
+  const shadows = [victimChannel, actorChannel].flatMap((channel) => {
+    const shadow = nativeMainChannelShadow(channel);
+    return shadow ? [shadow] : [];
+  });
   return {
     camera: cameraAt(spec, times, t),
     viewportYOffset: nativePresentation.viewportYOffset,
     sprites,
+    shadows,
     lance: lanceAt(spec, times, t),
     projectile: archerProjectileAt(spec, times, t),
     particles: nativePresentation.particles,
@@ -1677,6 +1716,7 @@ export function buildFullCombatScript(
         viewportYOffset: 0,
         lifeGauges: lifeGaugesAt(t),
         sprites: [],
+        shadows: [],
         particles: [],
       };
     }

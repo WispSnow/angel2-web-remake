@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ACCEPTED_FULL_COMBAT_RECORDS,
@@ -15,11 +17,26 @@ import {
   FULL_SCENE,
   FULL_COMBAT_FRAME_META,
   nativeFullCombatLifeGauge,
+  nativeMainChannelShadowBands,
   type FullCombatPhaseName,
   type FullCombatScript,
 } from "../../src/game/full-combat";
 import { emptyUnitStatuses } from "../../src/game/simulation/status";
 import type { AttackResult, BattleUnit, UnitClassId } from "../../src/game/types";
+import { EVIDENCE_AVAILABLE } from "./evidence";
+
+const workspace = path.resolve(import.meta.dirname, "../..");
+
+interface EvidencePlacement {
+  xAnchor: number[];
+  yOffset: number[];
+}
+
+interface EvidencePresentationBlock {
+  available: boolean;
+  framePlacement?: EvidencePlacement;
+  defenderFramePlacement?: EvidencePlacement;
+}
 
 const unit = (
   side: 1 | 2,
@@ -166,6 +183,14 @@ function referenceActorLift({ y, anchored }: Pick<ReferenceFrame, "y" | "anchore
   return anchored
     ? STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization.actor.y - y
     : Math.max(0, -y);
+}
+
+/**
+ * Defender streams never take `:S`, so the channel stays ground-relative and
+ * may sink below the line; the compositor's ground clip hides what falls past.
+ */
+function referenceDefenderLift(y: number): number {
+  return y === 0 ? 0 : -y;
 }
 
 function referenceNativeEnd(
@@ -587,7 +612,7 @@ describe("Full-screen ordinary combat choreography", () => {
             side: side === "left" ? "right" : "left",
             frame: expectedVictim.frame,
             x: victimX,
-            lift: Math.max(0, -expectedVictim.y),
+            lift: referenceDefenderLift(expectedVictim.y),
           });
         }
         expect(state.camera).toBe(mainCamera.camera[index]);
@@ -713,7 +738,7 @@ describe("Full-screen ordinary combat choreography", () => {
               reaction,
               frame: expectedVictim.frame,
               x: victimMark,
-              lift: Math.max(0, -expectedVictim.y),
+              lift: referenceDefenderLift(expectedVictim.y),
             });
           expect(state.camera).toBe(mainCamera.final + postCamera.camera[index]);
           expect(state.viewportYOffset).toBe(postPresentation.frames[index].viewportYOffset);
@@ -1317,7 +1342,9 @@ describe("Full-screen ordinary combat choreography", () => {
       .toBeUndefined();
   });
 
-  it("centers the great dragon knight guard without moving the shared counter-guard trail", () => {
+  it("registers the great dragon knight guard from its defender table without moving the counter-guard trail", () => {
+    expect(FULL_COMBAT_FRAME_META.left[19].direct[3]).toMatchObject({ w: 160, anchor: 107, yOffset: 0 });
+    expect(FULL_COMBAT_FRAME_META.right[19].direct[3]).toMatchObject({ w: 160, anchor: 48, yOffset: 0 });
     const left = buildFullCombatScript(
       unit(1, 0, "測試攻方", "great-dragon-knight"),
       unit(2, 48, "測試守方"),
@@ -1337,7 +1364,6 @@ describe("Full-screen ordinary combat choreography", () => {
         frame: 3,
         reaction: "guard",
         x: 210,
-        xOffsetCorrection: -92,
       });
     const leftTrail = left.sample(leftCounterImpact + 200).particles;
     expect(leftTrail).toHaveLength(3);
@@ -1370,32 +1396,35 @@ describe("Full-screen ordinary combat choreography", () => {
         frame: 3,
         reaction: "guard",
         x: 290,
-        xOffsetCorrection: 33,
       });
     const rightTrail = right.sample(rightCounterImpact + 200).particles;
     expect(rightTrail).toHaveLength(3);
     expect(rightTrail).toEqual(rightReference.sample(rightReferenceCounterImpact + 200).particles);
   });
 
-  it("grounds the swift dragon knight guard while retaining its original frame offsets", () => {
-    expect(FULL_COMBAT_FRAME_META.left[18].direct[3].yOffset).toBe(-16);
-    expect(FULL_COMBAT_FRAME_META.right[18].direct[3].yOffset).toBe(-16);
+  it("keeps the swift dragon knight guard on the ground through its defender table", () => {
+    // The -16 once read as an original hover belongs to the actor's +50 frame
+    // 3. The defender's direct guard frame reads the descriptor +04h table.
+    expect(FULL_COMBAT_FRAME_META.left[18].plus50[3].yOffset).toBe(-16);
+    expect(FULL_COMBAT_FRAME_META.right[18].plus50[3].yOffset).toBe(-16);
+    expect(FULL_COMBAT_FRAME_META.left[18].direct[3].yOffset).toBe(0);
+    expect(FULL_COMBAT_FRAME_META.right[18].direct[3].yOffset).toBe(0);
 
     const rightVictim = buildFullCombatScript(
       unit(1, 0, "測試攻方"),
       unit(2, 48, "測試守方", "swift-dragon-knight"),
       result({ damage: 8, counterOccurred: false, counterDamage: 0 }),
     );
-    expect(rightVictim.sample(markTime(rightVictim, "fullImpact") + 50).sprites
-      .find(({ channel }) => channel === "victim"))
-      .toMatchObject({
-        side: "right",
-        classId: 18,
-        frame: 3,
-        reaction: "guard",
-        lift: 0,
-        yOffsetCorrection: 16,
-      });
+    const rightGuard = rightVictim.sample(markTime(rightVictim, "fullImpact") + 50).sprites
+      .find(({ channel }) => channel === "victim");
+    expect(rightGuard).toMatchObject({
+      side: "right",
+      classId: 18,
+      frame: 3,
+      reaction: "guard",
+      lift: 0,
+    });
+    expect(rightGuard).not.toHaveProperty("yOffsetCorrection");
 
     const leftVictim = buildFullCombatScript(
       unit(2, 48, "測試攻方"),
@@ -1416,63 +1445,148 @@ describe("Full-screen ordinary combat choreography", () => {
         frame: 3,
         reaction: "guard",
         lift: 0,
-        yOffsetCorrection: 16,
       });
   });
 
-  it("applies REMAKE-121 only to the reported horizontal reaction registrations", () => {
+  it("registers defender frames with the native descriptor +04h tables", () => {
     expect(FULL_SCENE.groundY).toBe(135);
-    const deathCases = [
-      { classId: "soldier", record: 0, side: "left", correction: -7 },
-      { classId: "magic-priest", record: 3, side: "left", correction: 51 },
-      { classId: "curse-master", record: 5, side: "left", correction: 71 },
-      { classId: "beast-knight", record: 16, side: "left", correction: 37 },
-      { classId: "great-dragon-knight", record: 19, side: "left", correction: -60 },
-      { classId: "divine-sword-warrior", record: 27, side: "left", correction: -6 },
-      { classId: "steel-armor-warrior", record: 29, side: "left", correction: -24 },
-      { classId: "wizard", record: 31, side: "left", correction: -18 },
-      { classId: "magic-master", record: 32, side: "left", correction: -47 },
-      { classId: "jungle-warrior", record: 2, side: "right", correction: 75 },
-      { classId: "beast-knight", record: 16, side: "right", correction: 33 },
-      { classId: "great-dragon-knight", record: 19, side: "right", correction: 65 },
-      { classId: "monk", record: 25, side: "right", correction: -23 },
-      { classId: "steel-armor-warrior", record: 29, side: "right", correction: 26 },
-      { classId: "wizard", record: 31, side: "right", correction: 37 },
-      { classId: "magic-master", record: 32, side: "right", correction: 24 },
-    ] as const satisfies readonly {
-      classId: UnitClassId;
-      record: number;
-      side: "left" | "right";
-      correction: number;
-    }[];
-    for (const deathCase of deathCases) {
-      const victimSide = deathCase.side === "left" ? 1 : 2;
-      const attackerSide = victimSide === 1 ? 2 : 1;
-      const script = buildFullCombatScript(
-        unit(attackerSide, attackerSide === 1 ? 0 : 48, "校正攻方"),
-        unit(victimSide, victimSide === 1 ? 0 : 48, "校正守方", deathCase.classId),
-        result({
-          attackerId: `${attackerSide}:${attackerSide === 1 ? 0 : 48}`,
-          defenderId: `${victimSide}:${victimSide === 1 ? 0 : 48}`,
-          counterOccurred: false,
-          counterDamage: 0,
-          defenderDied: true,
-        }),
-      );
-      const death = script.sample(markTime(script, "fullDefenderDeath") + 1)
-        .sprites.find(({ channel }) => channel === "victim");
-      expect(death).toMatchObject({
-        side: deathCase.side,
-        classId: deathCase.record,
-        frame: 2,
-        reaction: "death",
-        xOffsetCorrection: deathCase.correction,
-      });
-      const standing = FULL_COMBAT_FRAME_META[deathCase.side][deathCase.record].direct[0];
-      const current = FULL_COMBAT_FRAME_META[deathCase.side][deathCase.record].direct[2];
-      expect(current.w / 2 - current.anchor + deathCase.correction)
-        .toBe(standing.w / 2 - standing.anchor);
+    // Stage-0 capture: the right soldier's entry bitmaps start at x=346/306
+    // for channel x=370/330 and its hurt bitmap at 249 for x=290; the
+    // counter-attacked left soldier starts at 6..126 for x=50..170 and its
+    // hurt bitmap at 168 for x=210.
+    const right = FULL_COMBAT_FRAME_META.right[0].direct;
+    const left = FULL_COMBAT_FRAME_META.left[0].direct;
+    expect(right.map(({ anchor }) => anchor)).toEqual([24, 41, 70, 42]);
+    expect(left.map(({ anchor }) => anchor)).toEqual([44, 42, 40, 35]);
+    expect([370, 330].map((x) => x - right[0].anchor)).toEqual([346, 306]);
+    expect(290 - right[1].anchor).toBe(249);
+    expect([50, 90, 130, 170].map((x) => x - left[0].anchor)).toEqual([6, 46, 86, 126]);
+    expect(210 - left[1].anchor).toBe(168);
+
+    // User capture of the original: the fallen right divine sword warrior's
+    // bitmap starts at (232, 97), and none of its rows at y >= 135 is drawn.
+    const script = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "demon-dragon-knight"),
+      unit(2, 48, "測試守方", "divine-sword-warrior"),
+      result({ damage: 80, counterOccurred: false, counterDamage: 0, defenderDied: true }),
+    );
+    expect(script.sample(markTime(script, "fullDefenderDeath") + 1).sprites
+      .find(({ channel }) => channel === "victim"))
+      .toMatchObject({ side: "right", classId: 27, frame: 2, reaction: "death", x: 290, lift: 0 });
+    const death = FULL_COMBAT_FRAME_META.right[27].direct[2];
+    expect(death).toMatchObject({ w: 104, h: 59, anchor: 58, yOffset: 21 });
+    expect(290 - death.anchor).toBe(232);
+    expect(FULL_SCENE.groundY - (death.h ?? 0) + (death.yOffset ?? 0)).toBe(97);
+  });
+
+  it.skipIf(!EVIDENCE_AVAILABLE)("keeps actor and defender placement tables apart for every frame", async () => {
+    const evidence = JSON.parse(await readFile(
+      path.join(workspace, "reverse/parsed/native/combat-presentations.json"),
+      "utf8",
+    )) as {
+      fullScreenPresentation: {
+        classRecords: Array<{
+          record: number;
+          side1: EvidencePresentationBlock;
+          side2: EvidencePresentationBlock;
+        }>;
+      };
+    };
+    let checkedSides = 0;
+    for (const record of evidence.fullScreenPresentation.classRecords) {
+      for (const [side, block] of [["left", record.side1], ["right", record.side2]] as const) {
+        const meta = FULL_COMBAT_FRAME_META[side][record.record];
+        if (!block.available || !meta) continue;
+        checkedSides += 1;
+        const { defenderFramePlacement, framePlacement } = block;
+        expect(meta.direct.map(({ anchor, yOffset }) => [anchor, yOffset])).toEqual(
+          meta.direct.map((_, index) => [
+            defenderFramePlacement?.xAnchor[index],
+            defenderFramePlacement?.yOffset[index],
+          ]),
+        );
+        expect(meta.plus50.map(({ anchor, yOffset }) => [anchor, yOffset])).toEqual(
+          meta.plus50.map((_, index) => [
+            framePlacement?.xAnchor[index],
+            framePlacement?.yOffset[index],
+          ]),
+        );
+      }
     }
+    expect(checkedSides).toBe(75);
+  });
+
+  it("starts a fatal body where the reaction stream left the defender channel", () => {
+    // The great dragon knight's hurt stream nets +8 px; `B683/B6BD` only swap
+    // in the six still death poses, so the body lies 8 px lower.
+    const dragonKill = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "great-dragon-knight"),
+      unit(2, 48, "測試守方"),
+      result({ damage: 24, counterOccurred: false, counterDamage: 0, defenderDied: true }),
+    );
+    expect(dragonKill.sample(markTime(dragonKill, "fullDefenderDeath") + 1).sprites
+      .find(({ channel }) => channel === "victim"))
+      .toMatchObject({ frame: 2, reaction: "death", lift: -8 });
+
+    // The great axe warrior's guard stream holds for 7 substeps, then drives
+    // its target down 16 px per substep; the ground clip hides the rest.
+    const axeGuard = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "great-axe-warrior"),
+      unit(2, 48, "測試守方"),
+      result({ damage: 8, counterOccurred: false, counterDamage: 0 }),
+    );
+    const guardAt = markTime(axeGuard, "fullImpact");
+    const victimLift = (t: number) => axeGuard.sample(t).sprites
+      .find(({ channel }) => channel === "victim")?.lift;
+    expect(victimLift(guardAt + 7 * 50 + 1)).toBe(0);
+    expect(victimLift(guardAt + 8 * 50 + 1)).toBe(-16);
+    expect(victimLift(markTime(axeGuard, "fullHold"))).toBe(-112);
+
+    const axeKill = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "great-axe-warrior"),
+      unit(2, 48, "測試守方"),
+      result({ damage: 8, counterOccurred: false, counterDamage: 0, defenderDied: true }),
+    );
+    expect(axeKill.sample(markTime(axeKill, "fullDefenderDeath") + 1).sprites
+      .find(({ channel }) => channel === "victim"))
+      .toMatchObject({ frame: 2, reaction: "death", lift: -112 });
+  });
+
+  it("lays the E336 ground shadow under each main channel in native draw order", () => {
+    // Byte-aligned bitmaps take E4AF: 0AAh on both rows of every pass.
+    expect(nativeMainChannelShadowBands(232, 104)).toEqual([
+      { x: 232, y: 132, width: 104, height: 2, darkParity: [1, 1] },
+      { x: 224, y: 134, width: 120, height: 2, darkParity: [1, 1] },
+      { x: 232, y: 136, width: 104, height: 2, darkParity: [1, 1] },
+    ]);
+    // Any other alignment takes E55A: 55h on the first row, 0AAh on the second.
+    expect(nativeMainChannelShadowBands(346, 72)).toEqual([
+      { x: 346, y: 132, width: 72, height: 2, darkParity: [0, 1] },
+      { x: 338, y: 134, width: 88, height: 2, darkParity: [0, 1] },
+      { x: 346, y: 136, width: 72, height: 2, darkParity: [0, 1] },
+    ]);
+    expect(nativeMainChannelShadowBands(-3, 64)[1]).toMatchObject({ x: -11, width: 80, darkParity: [0, 1] });
+    expect(nativeMainChannelShadowBands(-8, 64)[0]).toMatchObject({ x: -8, darkParity: [1, 1] });
+
+    const script = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "demon-dragon-knight"),
+      unit(2, 48, "測試守方", "divine-sword-warrior"),
+      result({ damage: 80, counterOccurred: false, counterDamage: 0, defenderDied: true }),
+    );
+    // Both main channels are active from the first substep, including the
+    // defender still waiting off-window at x=650.
+    const opening = script.sample(markTime(script, "fullWindup") + 1);
+    expect(opening.sprites.find(({ channel }) => channel === "victim")).toBeUndefined();
+    expect(opening.shadows.map(({ side, channel }) => ({ side, channel }))).toEqual([
+      { side: "right", channel: "victim" },
+      { side: "left", channel: "actor" },
+    ]);
+    const openingVictim = opening.shadows.find(({ channel }) => channel === "victim");
+    expect(openingVictim?.bands[0].x).toBe(650 - FULL_COMBAT_FRAME_META.right[27].direct[0].anchor);
+    // The shadow stays on its fixed rows whatever the body's pose.
+    expect(script.sample(markTime(script, "fullDefenderDeath") + 1).shadows).toEqual([
+      { side: "right", channel: "victim", bands: nativeMainChannelShadowBands(232, 104) },
+    ]);
   });
 
   it("reinitializes a counter strike to the same native character geometry as a primary strike", () => {
@@ -1579,13 +1693,13 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(leftContact.bolt).toMatchObject({ side: "left", classId: 21, frame: 5, x: 266 });
     expect(leftContact.victim).toMatchObject({ side: "right", frame: 1, x: 250 });
     expect(leftContact.boltSpan).toEqual([112, 296]);
-    expect(leftContact.victimSpan).toEqual([228, 316]);
+    expect(leftContact.victimSpan).toEqual([209, 297]);
 
     const rightContact = contact("right");
     expect(rightContact.bolt).toMatchObject({ side: "right", classId: 21, frame: 5, x: 216 });
     expect(rightContact.victim).toMatchObject({ side: "left", frame: 1, x: 250 });
     expect(rightContact.boltSpan).toEqual([188, 372]);
-    expect(rightContact.victimSpan).toEqual([168, 256]);
+    expect(rightContact.victimSpan).toEqual([208, 296]);
 
     // Both sides land the bolt just past the victim's ground anchor and keep
     // the two bitmaps overlapping, mirroring the archer's contact geometry.
@@ -1611,7 +1725,7 @@ describe("Full-screen ordinary combat choreography", () => {
     const leftVictimMeta = FULL_COMBAT_FRAME_META.right[0].direct[1];
     const leftOrbRight = (leftOrb?.x ?? 0) - leftOrbMeta.anchor + leftOrbMeta.w;
     const leftVictimLeft = (leftVictim?.x ?? 0) - leftVictimMeta.anchor;
-    expect(leftOrbRight - leftVictimLeft).toBe(15);
+    expect(leftOrbRight - leftVictimLeft).toBe(34);
 
     const right = buildFullCombatScript(
       unit(2, 48, "測試攻方", "sister"),
@@ -1632,7 +1746,7 @@ describe("Full-screen ordinary combat choreography", () => {
     const rightVictimMeta = FULL_COMBAT_FRAME_META.left[0].direct[1];
     const rightOrbLeft = (rightOrb?.x ?? 0) - rightOrbMeta.anchor;
     const rightVictimRight = (rightVictim?.x ?? 0) - rightVictimMeta.anchor + rightVictimMeta.w;
-    expect(rightVictimRight - rightOrbLeft).toBe(3);
+    expect(rightVictimRight - rightOrbLeft).toBe(43);
   });
 
   it("keeps engineer's baked arrow frame on the native bottom anchor", () => {

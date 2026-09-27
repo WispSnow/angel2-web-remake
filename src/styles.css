@@ -1448,6 +1448,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   height: 148px;
   overflow: hidden;
   background: #130a07;
+  /* Keeps the native channel layering below the damage number and gauges. */
+  isolation: isolate;
 }
 .full-combat-backdrop { position: absolute; inset: 0; --far-scroll: 0px; --near-scroll: 0px; }
 .full-combat-backdrop img {
@@ -1465,14 +1467,62 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 .full-combat-backdrop img.far.copy { transform: translateX(calc(var(--far-scroll) + 448px)); }
 .full-combat-backdrop img.near { left: 0; transform: translateX(var(--near-scroll)); clip-path: inset(110px 0 0 0); }
 .full-combat-backdrop img.near.copy { transform: translateX(calc(var(--near-scroll) + 448px)); clip-path: inset(110px 0 0 0); }
+/* Module 29 skips every channel byte past buffer offset 1D88h (135 rows of
+   56 bytes), so no character, weapon or spell bitmap is drawn at or below the
+   y=135 ground line; the 13 rows beneath it only show the backdrop, the
+   ground shadows and the damage number. */
+.full-combat-channels {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 448px;
+  height: 135px;
+  overflow: hidden;
+}
+/* Each substep draws channel offsets 8, 6, 4, 2, 0 (G5, main, G3, G2, G1),
+   the defending side before the acting side at every offset. The main
+   channel lays its `E336` shadow right before its own bitmap, so the actor's
+   shadow still darkens the defender underneath it. */
 .full-combat-sprite {
   position: absolute;
-  z-index: 3;
+  z-index: 23;
   left: 0;
-  bottom: 13px;
+  bottom: 0;
   width: 0;
   height: 0;
 }
+.full-combat-sprite.slot-effect-G5 { z-index: 10; }
+.full-combat-shadow[data-channel="victim"] { z-index: 20; }
+.full-combat-sprite.slot-victim { z-index: 21; }
+.full-combat-shadow[data-channel="actor"] { z-index: 22; }
+.full-combat-sprite.slot-effect-G3 { z-index: 30; }
+.full-combat-sprite.slot-effect-G2 { z-index: 40; }
+.full-combat-sprite.slot-effect-G1,
+.full-combat-lance,
+.full-combat-projectile { z-index: 50; }
+.full-combat-shadow {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+/* `E336` ANDs a byte mask into every plane; a cleared bit becomes palette
+   colour 0. `data-dither` lists the scene-x parity blackened on the band's
+   first and second row: byte-aligned bitmaps get 0AAh twice (columns), any
+   other alignment 55h then 0AAh (a checkerboard). Each 2x2 tile is a pixel
+   image rather than a gradient so the dither stays one black pixel wide. */
+.full-combat-shadow > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  background-repeat: repeat;
+  background-size: 2px 2px;
+  image-rendering: var(--image-rendering, pixelated);
+}
+.full-combat-shadow > i[data-dither="00"] { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNgYGD4z8DAwMDEAAUADhYBAr1eJKkAAAAASUVORK5CYII="); }
+.full-combat-shadow > i[data-dither="01"] { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR42mNgYGD4z4AE/gMADwMB/+56SD4AAAAASUVORK5CYII="); }
+.full-combat-shadow > i[data-dither="10"] { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAADklEQVR42mNggID/cAIADwMB/6M+/HkAAAAASUVORK5CYII="); }
+.full-combat-shadow > i[data-dither="11"] { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEElEQVR42mNggID/TFAGAwAKGgECCKZAggAAAABJRU5ErkJggg=="); }
 .full-combat-frame {
   display: block;
   max-width: none;
@@ -1485,7 +1535,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   bottom: 0;
 }
 .full-combat-lance,
-.full-combat-projectile { position: absolute; z-index: 4; left: 0; top: 0; }
+.full-combat-projectile { position: absolute; left: 0; top: 0; }
 .full-combat-particles { position: absolute; z-index: 2; inset: 0; }
 .full-combat-particles .full-combat-frame {
   position: absolute;

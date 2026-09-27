@@ -152,6 +152,10 @@ export function mountClassPreview(
             ({ channel, side }) => channel === "victim"
               && side === (currentSide === 1 ? "left" : "right"),
           ),
+          shadows: sampledScene.shadows.filter(
+            ({ channel, side }) => channel === "victim"
+              && side === (currentSide === 1 ? "left" : "right"),
+          ),
           lance: undefined,
           projectile: undefined,
           particles: [],

@@ -276,7 +276,7 @@ test("ordinary melee status applies directly and appears in the unit HUD without
   expect(pageErrors).toEqual([]);
 });
 
-test("great dragon knight counter guard keeps its wide shield centered", async ({ page }) => {
+test("great dragon knight counter guard uses its native defender registration", async ({ page }) => {
   await page.goto("/arena.html?test=1&slowFull");
   await page.getByTestId("arena-clear").click();
   const placed = await page.evaluate(() => {
@@ -306,7 +306,13 @@ test("great dragon knight counter guard keeps its wide shield centered", async (
   await expect(victim).toHaveAttribute("data-frame", "3");
   await expect(victim).toHaveAttribute("data-reaction", "guard");
   await expect(victim).toHaveAttribute("data-x", "210");
-  await expect(victim).toHaveAttribute("data-x-offset-correction", "-92");
+  // Left direct frame 3 reads x anchor 107 from the descriptor +04h table.
+  const bitmapLeft = await victim.evaluate((image) => {
+    const scene = image.closest(".full-combat-scene")?.getBoundingClientRect();
+    if (!scene) throw new Error("full-combat scene is missing");
+    return Math.round((image.getBoundingClientRect().left - scene.left) / (scene.width / 448));
+  });
+  expect(bitmapLeft).toBe(210 - 107);
   const particles = page.locator(".full-combat-particles .full-combat-frame:not([hidden])");
   await expect(particles).toHaveCount(3);
   const particleXs = await particles.evaluateAll((elements) => elements.map((element) => {

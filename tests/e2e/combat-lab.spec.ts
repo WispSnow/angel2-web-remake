@@ -427,11 +427,13 @@ test("record 5 curse master passes late G1, reaction and death visual gates", as
 });
 
 test("swift dragon knight guard stays grounded on both physical sides", async ({ page }) => {
+  // The guard is a direct frame, so it reads the descriptor +04h defender
+  // table (y offset 0); the -16 belongs to the +50 attack frame 3.
   const observed: Array<{
     side: "left" | "right";
     nativeYOffset: string | null;
-    correction: string | null;
     projectedYOffset: string | null;
+    groundClippedRows: string | null;
   }> = [];
 
   for (const side of ["left", "right"] as const) {
@@ -461,15 +463,72 @@ test("swift dragon knight guard stays grounded on both physical sides", async ({
     observed.push(await sprite.evaluate((image) => ({
       side: image.dataset.side as "left" | "right",
       nativeYOffset: image.getAttribute("data-y-offset"),
-      correction: image.getAttribute("data-y-offset-correction"),
       projectedYOffset: image.getAttribute("data-projected-y-offset"),
+      groundClippedRows: image.getAttribute("data-ground-clipped-rows"),
     })));
   }
 
   expect(observed).toEqual([
-    { side: "right", nativeYOffset: "-16", correction: "16", projectedYOffset: "0" },
-    { side: "left", nativeYOffset: "-16", correction: "16", projectedYOffset: "0" },
+    { side: "right", nativeYOffset: "0", projectedYOffset: "0", groundClippedRows: "0" },
+    { side: "left", nativeYOffset: "0", projectedYOffset: "0", groundClippedRows: "0" },
   ]);
+});
+
+test("a fallen divine sword warrior keeps the original registration, ground clip and shadow", async ({ page }) => {
+  await page.goto(
+    "/combat-lab.html?attacker=demon-dragon-knight&defender=divine-sword-warrior"
+      + "&reaction=hurt&death=1&side=left&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const deathAt = (await labState(page)).marks
+    .find(({ phase }) => phase === "fullDefenderDeath")?.t;
+  expect(deathAt).toBeDefined();
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), deathAt! + 1);
+
+  const victim = page.getByTestId("full-victim-sprite");
+  await expect(victim).toHaveAttribute("data-reaction", "death");
+  await expect(victim).toHaveAttribute("data-frame", "2");
+  await expect(victim).toHaveAttribute("data-x", "290");
+  await expect(victim).toHaveAttribute("data-y-offset", "21");
+  await expect(victim).toHaveAttribute("data-ground-clipped-rows", "21");
+  await expect(page.getByTestId("full-actor-shadow")).toBeHidden();
+  await waitForVisibleSpriteImages(page);
+
+  const geometry = await page.evaluate(() => {
+    const scene = document.querySelector<HTMLElement>(".full-combat-scene")?.getBoundingClientRect();
+    if (!scene) throw new Error("full-combat scene is missing");
+    const scale = scene.width / 448;
+    const toScene = (box: DOMRect) => ({
+      left: Math.round((box.left - scene.left) / scale),
+      top: Math.round((box.top - scene.top) / scale),
+      right: Math.round((box.right - scene.left) / scale),
+      bottom: Math.round((box.bottom - scene.top) / scale),
+    });
+    const element = (selector: string) => {
+      const found = document.querySelector<HTMLElement>(selector);
+      if (!found) throw new Error(`${selector} is missing`);
+      return found;
+    };
+    return {
+      image: toScene(element('[data-testid="full-victim-sprite"]').getBoundingClientRect()),
+      channels: toScene(element('[data-testid="full-combat-channels"]').getBoundingClientRect()),
+      bands: Array.from(document.querySelectorAll<HTMLElement>('[data-testid="full-victim-shadow"] > i'))
+        .map((band) => ({ ...toScene(band.getBoundingClientRect()), dither: band.dataset.dither })),
+    };
+  });
+  // The user's capture of the original shows the body from (232, 97) with no
+  // row at or below the y=135 ground line; the E336 shadow sits under it.
+  expect(geometry.image).toEqual({ left: 232, top: 97, right: 336, bottom: 156 });
+  expect(geometry.channels).toEqual({ left: 0, top: 0, right: 448, bottom: 135 });
+  expect(geometry.bands).toEqual([
+    { left: 232, top: 132, right: 336, bottom: 134, dither: "11" },
+    { left: 224, top: 134, right: 344, bottom: 136, dither: "11" },
+    { left: 232, top: 136, right: 336, bottom: 138, dither: "11" },
+  ]);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-divine-sword-death-registration.png",
+    fullPage: true,
+  });
 });
 
 test.describe.serial("native records sequential visual acceptance", () => {

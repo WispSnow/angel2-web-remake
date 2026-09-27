@@ -10,8 +10,13 @@ const RECORD_COUNT = 39;
 // 记录 36「龍」/37「頭」/38「手」只在 side 2 出现（场景 20/22 与 37），
 // 所以原版只填了 side 2 表现块，side 1 块整体指向零占位。
 const SIDE1_ONLY_UNAVAILABLE_RECORDS = [36, 37, 38];
+// 描述符 +04h 指向受击方 direct 四帧（站立／受击／倒地／格挡）的落点表；y 表可以
+// 指向这张全零共享表。+10h 的表现块只装当前出手方 +50 图形的落点表。
+const SHARED_ZERO_Y_OFFSET_TABLE = 0x87f6;
+const DEFENDER_FRAME_COUNT = 4;
 
 const CODE_SIGNATURES = [
+  ["0000:51EC", "copy-unit-descriptor-placement-and-presentation-blocks", "e841008b07a39d318b4702a3bb318b7704bfd5318cd88ec0b90200f3a58b7710bfd9318cd88ec0b90c00f3a58b7710bff3318cd88ec0b90c00f3a5e8"],
   ["0000:0220", "play-loaded-voc-far-entry", "e83100cbe80100cbf606ed10017403e82200c3f606ee10017403e81700c3f606"],
   ["0000:0254", "play-loaded-voc-near-worker", "a30b00803e0a0059741ec70693f501008cc88bd8b97d02e8e7d1a10b009a1307471ec70693f50000c3"],
   ["0000:9135", "map-counter-presentation", "a1c177a33252b80200a3df77a1bf778b0ed577c706181f01009a0800b516e80b00e869058b3ebf77e80201c38b1ebf77"],
@@ -30,8 +35,23 @@ const CODE_SIGNATURES = [
   ["0000:A23E", "select-full-screen-hit-reaction", "833ed77c0a7704e84600c3e80100c3"],
   ["0000:A2E4", "prepare-full-screen-primary", "8b3ebf77e81f013c0174053c027448c3bafa00bb8700e8640dba8a02bb8700e8f70ee89401e81914a180f8be41029a0a"],
   ["0000:A377", "prepare-full-screen-counter", "8b3ebf77e88c003c0274053c017448c3bafa00bb8700e8d10cba8a02bb8700e8640ee87700e88613a180f8be41029a0a"],
+  ["0000:A413", "setup-counter-left-actor-right-defender", "9ae100471ee8c503e8c805a1697ca37c7aa1717ca3187ca1737ca31a7ca1757ca3847aa1777ca30a7ba1797ca3527aa17d7ca3547aa17b7ca3dc7aa17f7ca3de7aa16b7ca3787aa16d7ca37a7aa19f7ca3fe7aa1a17ca3007b"],
+  ["0000:A49D", "setup-primary-left-actor-right-defender", "9ae100471ee83b03e83e05a1837ca37c7aa18b7ca3187ca18d7ca31a7ca18f7ca3847aa1917ca30a7ba1937ca3527aa1977ca3547aa1957ca3dc7aa1997ca3de7aa1857ca3787aa1877ca37a7aa19f7ca3fe7aa1a17ca3007b"],
+  ["0000:A599", "setup-counter-right-actor-left-defender", "9ae100471ee83f02e84204a1a37ca3027ba1ab7ca3187ca1ad7ca31a7ca1af7ca30a7ba1b17ca3847aa1b37ca3d87aa1b77ca3da7aa1b57ca3567aa1b97ca3587aa1657ca3787aa1677ca37a7aa1a57ca3fe7aa1a77ca3007b"],
+  ["0000:A623", "setup-primary-right-actor-left-defender", "9ae100471ee8b501e8b803a1bd7ca3027ba1c57ca3187ca1c77ca31a7ca1c97ca30a7ba1cb7ca3847aa1cd7ca3d87aa1d17ca3da7aa1cf7ca3567aa1d37ca3587aa1657ca3787aa1677ca37a7aa1bf7ca3fe7aa1c17ca3007b"],
   ["0000:A77F", "execute-full-screen-command-stream", "8b1e187c8b073dffff7419a3167c8306187c02e85f00e86202e85f04e8c104e82305ebdcc3"],
   ["0000:A7A4", "execute-full-screen-death-stream", "8b1e187c8b073dffff7413a3167c8306187c02e83a00e83d02e80405ebe2c3"],
+  ["0000:AD70", "render-one-full-screen-substep", "e85001c706687b3100c7068c7b3100e8c802c706687b3200c7068c7b3200e86007e82906e83700"],
+  ["0000:B04A", "select-channel-draw-order", "833e007a017408833e007a027405c3e8c801c3e82800c3"],
+  ["0000:B088", "draw-channels-left-before-right", "b90500514903c9890e767a890efc7a8b1e767a83bf7e7a007403e85a008b1efc7a83bf047b007403e8e80159e2d5c3"],
+  ["0000:B0FF", "composite-left-channel-with-main-shadow", "8b1e767a8b87887ae89e00a3747ac70684f84102a14102ba00008b0e747ae87640890e6e7a8b367a7a8b1e747a03db8b008b1e767a8b97b07a2b166e7a03d08916727a8b36787a8b1e747a03db8b008b1e767a8b97a67a2bd08916707a8b16707a8b1e727a8b0e747abe4102bfb902e81f2fa1747a8b1e767a83fb0675148b16707abb84008b0e747abe4102bfb902e8a5318b16707a8b1e727a8b0e747abe4102bfb902e8e82bc3"],
+  ["0000:B224", "draw-channels-right-before-left", "b90500514903c9890e767a890efc7a8b1efc7a83bf047b007403e85a008b1e767a83bf7e7a007403e8b0fe59e2d5c3"],
+  ["0000:B29B", "composite-right-channel-with-main-shadow", "8b1efc7a8b870e7be89e00a3fa7ac70684f86902a16902ba00008b0efa7ae8da3e890ef47a8b36007b8b1efa7a03db8b008b1efc7a8b97367b2b16f47a03d08916f87a8b36fe7a8b1efa7a03db8b008b1efc7a8b972c7b2bd08916f67a8b16f67a8b1ef87a8b0efa7abe6902bfb902e8832da1fa7a8b1efc7a83fb0675148b16f67abb84008b0efa7abe6902bfb902e809308b16f67a8b1ef87a8b0efa7abe6902bfb902e84c2ac3"],
+  ["0000:DF86", "draw-channel-bitmap-rows-with-ground-clip", "e8bd00a1e1f72ea3a6df8b1edff7a1bef78ec0e8d200a1d0f78ed8eb005157b9d2042e3b3e8ce072122e3b3e8ee0770b81ff881d77058a042608054647e2e35f83c7382e83068ce0382e83068ee03859e2cbb8ba1e8ed8c3"],
+  ["0000:E1F9", "mask-channel-bitmap-rows-with-ground-clip", "8cc38cc281c240055157b9d2042e3b3e33e372232e3b3e31e3771c81ff881d77168a048ec3262005262085002a8ec2262005262085002a4647e2d25f83c7382e830633e3382e830631e33859e2bab8ba1e8ed8c3"],
+  ["0000:E336", "draw-main-channel-ground-shadow", "1eb8ba1e8ed8890e33f8891635f8891e37f8893612f8893e14f88bc233d23d00007c14909090bb0800f7f3881632f8a335f8e81b001fc3f7d8bb0800f7f3881632f8bb00002bd8891e35f8e856001fc3"],
+  ["0000:E4AF", "ground-shadow-byte-aligned-column-dither", "e89401a139f82ea3f6e48b1e37f8a116f88ec0e8a901a128f88ed8b90300eb008cc38cc281c24005e81a004f2e8306f6e402e81000472e832ef6e402e80600b8ba1e8ed8c357b9d2042e3b3e8ee672469090902e3b3e8ce6773c90909081ff60277733909090b8aaaa8ec3262005262085002a8ec2262005262085002ab8aaaa8ec326204538262085382a8ec226204538262085382a4647e2af5f83c7702e83068ee6702e83068ce670c3"],
+  ["0000:E55A", "ground-shadow-shifted-checker-dither", "2e8816a8e552e8e300a139f82ea3abe58b1e37f8a116f88ec0e8f800a128f88ed85af7d5b90300eb008cc38cc281c24005e81b004f2e8306abe502e81100472e832eabe502e80700b8ba1e8ed8c30057b9d2042e3b3e8ee672789090902e3b3e8ce6776e90909081ff6027776590909051b855550bc58ec3262005262085002a8ec2262005262085002a8ec3262065012620a5012a8ec2262065012620a5012ab8aaaa0bc58ec326204538262085382a8ec226204538262085382a8ec3262065392620a5392a8ec2262065392620a5392a594746e202eb03e978ff5f83c7702e83068ee6702e83068ce670c3"],
   ["0000:B3BD", "draw-shared-full-screen-trail", "803e487f597416803e487f55742c803e"],
   ["0000:B683", "full-screen-left-death", "833e647a007401c3a105028ec0bf0000b90b00bb0300e8f646e841f1e844f3c706187c4c7dc706847a5a7dc7060a7bae"],
   ["0000:B6BD", "full-screen-right-death", "833eea7a007401c3a105028ec0bf0000b90b00bb0300e8bc46e807f1e80af3c706187c4c7dc7060a7b847dc706847aae"],
@@ -106,6 +126,18 @@ function readTerminatedWords(buffer, dsOffset, terminator = 0xffff, maxWords = 2
     values.push(value);
   }
   throw new Error(`DS:${hex(dsOffset)}: missing ${hex(terminator)} terminator`);
+}
+
+function readCodeWord(buffer, address) {
+  const { linear } = parseAddress(address);
+  return checkedSlice(buffer, linear, linear + 2, address).readUInt16LE(0);
+}
+
+function sameCodeWord(buffer, addresses, label) {
+  const values = addresses.map((address) => readCodeWord(buffer, address));
+  assert(values.every((value) => value === values[0]),
+    `${label}: ${addresses.join("/")} disagree (${values.map((value) => hex(value)).join("/")})`);
+  return values[0];
 }
 
 function verifiedWord(buffer, dsOffset, expected, label) {
@@ -320,6 +352,44 @@ function sideDescriptor(record, role) {
     ?? record.descriptors.find((entry) => entry.set === (role === "side1" ? "set1" : "set2"));
   assert(result !== undefined, `record ${record.record}: missing ${role} descriptor`);
   return result;
+}
+
+/**
+ * The defender's direct frames never read the presentation block's tables.
+ * `0000:51EC` copies the descriptor's +04h word pair into runtime block +2/+4,
+ * and every strike setup (`A49D/A413/A599/A623`) hands the defending side's
+ * +2/+4 to its compositor as the x-anchor/y-offset tables. The pair points at
+ * four x anchors stored right after it, then either four own y offsets or the
+ * shared zero table; the +10h presentation block begins immediately after, so
+ * each table covers exactly the four direct frames.
+ */
+function defenderFramePlacement(buffer, descriptor) {
+  const pairAddress = descriptor.unknownPointer04;
+  const [xPointer, yPointer] = readWords(buffer, pairAddress, 2);
+  const label = `${descriptor.set} descriptor ${descriptor.descriptorAddress}`;
+  assert(xPointer === pairAddress + 4,
+    `${label}: defender x-anchor table must follow its +04h pointer pair`);
+  const sharedYOffsets = yPointer === SHARED_ZERO_Y_OFFSET_TABLE;
+  assert(sharedYOffsets || yPointer === xPointer + DEFENDER_FRAME_COUNT * 2,
+    `${label}: defender y-offset table must follow the x anchors or use DS:87F6`);
+  const tableEnd = sharedYOffsets ? xPointer : yPointer;
+  assert(descriptor.unknownPointer10 === tableEnd + DEFENDER_FRAME_COUNT * 2,
+    `${label}: the presentation block must start right after the four-frame defender tables`);
+  const yOffset = Array.from({ length: DEFENDER_FRAME_COUNT }, (_, index) =>
+    readSignedWord(buffer, yPointer + index * 2));
+  if (sharedYOffsets) {
+    assert(yOffset.every((value) => value === 0), "DS:87F6 must stay the shared zero table");
+  }
+  return {
+    source: "unit descriptor +04h pointer pair",
+    tablePointerPair: `DS:${hex(pairAddress)}`,
+    tablePointers: [`DS:${hex(xPointer)}`, `DS:${hex(yPointer)}`],
+    sharedZeroYOffsets: sharedYOffsets,
+    frameCount: DEFENDER_FRAME_COUNT,
+    xAnchor: Array.from({ length: DEFENDER_FRAME_COUNT }, (_, index) =>
+      readSignedWord(buffer, xPointer + index * 2)),
+    yOffset,
+  };
 }
 
 function presentationBlock(buffer, descriptor, includeCommandStreams) {
@@ -677,13 +747,15 @@ async function extract(
       renderedFrameCount(record.fullScreenGraphicVariants.rightDirect),
       renderedFrameCount(record.fullScreenGraphicVariants.rightPlus50),
     );
-    for (const [side, frameCount] of [
-      [record.side1, leftFrameCount],
-      [record.side2, rightFrameCount],
+    const descriptorRecord = descriptors.records.find((entry) => entry.record === record.record);
+    for (const [side, frameCount, role] of [
+      [record.side1, leftFrameCount, "side1"],
+      [record.side2, rightFrameCount, "side2"],
     ]) {
       if (!side.available) continue;
       const [xPointer, yPointer] = side.anchorOrOffsetTablePointers.map((address) =>
         Number.parseInt(address.slice(3), 16));
+      // Presentation block +2/+4: only the current actor's +50 frames use these.
       side.framePlacement = {
         frameCount,
         xAnchor: Array.from({ length: frameCount }, (_, index) =>
@@ -691,13 +763,34 @@ async function extract(
         yOffset: Array.from({ length: frameCount }, (_, index) =>
           readSignedWord(moduleBuffer, yPointer + index * 2)),
       };
+      side.defenderFramePlacement = defenderFramePlacement(
+        moduleBuffer,
+        sideDescriptor(descriptorRecord, role),
+      );
     }
   }
+  const expectDefenderPlacement = (recordNumber, role, xAnchor, yOffset, evidence) => {
+    const placement = classRecords.find((record) => record.record === recordNumber)?.[role]
+      ?.defenderFramePlacement;
+    assert(placement?.xAnchor.join(",") === xAnchor.join(",")
+      && placement.yOffset.join(",") === yOffset.join(","),
+    `record ${recordNumber} ${role} defender placement changed (${evidence})`);
+  };
+  // 第 0 关 75 fps 录像：右侧士兵入场左缘 346/306 → 通道 x 370/330，受击左缘 249 → x 290；
+  // 左侧士兵反击入场左缘 6..126 → x 50..170，受击左缘 168 → x 210。
+  expectDefenderPlacement(0, "side1", [44, 42, 40, 35], [0, 0, 0, 0], "stage-0 capture");
+  expectDefenderPlacement(0, "side2", [24, 41, 70, 42], [0, 0, 0, 0], "stage-0 capture");
+  // 用户 2026-09-27 提供的原版截图：右侧神劍戰士倒地图左缘 232、顶 97，y>=135 行不可见。
+  expectDefenderPlacement(27, "side2", [50, 19, 58, 19], [0, 0, 21, 0], "divine sword death capture");
   const swiftDragonPlacement = classRecords.find((record) => record.record === 18);
   assert(swiftDragonPlacement !== undefined, "missing swift dragon knight record 18");
   for (const side of [swiftDragonPlacement.side1, swiftDragonPlacement.side2]) {
+    // -16 belongs to the attacker's +50 frame 3; the defender's direct guard
+    // frame reads the descriptor +04h table and stays on the ground line.
     assert(side.framePlacement?.yOffset[3] === -16,
-      "swift dragon knight direct frame 3 must retain the original -16 y-offset");
+      "swift dragon knight +50 frame 3 must retain the original -16 y-offset");
+    assert(side.defenderFramePlacement?.yOffset[3] === 0,
+      "swift dragon knight direct guard frame 3 must use the grounded defender table");
   }
 
   const voiceRecords = classRecords.flatMap((record) =>
@@ -720,6 +813,36 @@ async function extract(
   assert(deathStepCounts.values.length === 6 &&
     deathStepCounts.values.every((value) => value === 4),
   "full-screen death sequence must be six four-substep poses");
+
+  // Channel ground clip and main-channel shadow, read from signed immediates.
+  const bufferRowBytes = sameCodeWord(moduleBuffer, ["0000:E073", "0000:E318"],
+    "channel buffer row stride");
+  const lastDrawnBufferOffset = sameCodeWord(moduleBuffer, ["0000:DFB8", "0000:E216"],
+    "channel ground clip");
+  assert(bufferRowBytes === 56 && lastDrawnBufferOffset % bufferRowBytes === 0,
+    "channel ground clip must fall on a 56-byte buffer row boundary");
+  const firstClippedRow = lastDrawnBufferOffset / bufferRowBytes;
+  assert(firstClippedRow === 135, "channel ground clip must start at the y=135 ground line");
+  const shadowTop = sameCodeWord(moduleBuffer, ["0000:B182", "0000:B31E"],
+    "main-channel shadow row");
+  const shadowLastDrawnOffset = sameCodeWord(moduleBuffer, ["0000:E50E", "0000:E5C3"],
+    "main-channel shadow clip");
+  const byteMask = (address) => {
+    const value = readCodeWord(moduleBuffer, address);
+    assert((value >> 8) === (value & 0xff), `${address}: shadow mask bytes must match`);
+    return value & 0xff;
+  };
+  const byteAlignedRowMasks = [byteMask("0000:E516"), byteMask("0000:E52D")];
+  const shiftedRowMasks = [byteMask("0000:E5CC"), byteMask("0000:E5FB")];
+  assert(byteAlignedRowMasks.join(",") === "170,170" && shiftedRowMasks.join(",") === "85,170",
+    "main-channel shadow dither masks changed");
+  // E4AF/E55A run three two-row passes (`add di,70h`); the second is entered
+  // with `dec di` and two extra bytes, widening it by 8 px on each side.
+  const shadowPasses = [0, 8, 0].map((sideExtension, index) => ({
+    firstRow: shadowTop + index * 2,
+    rows: 2,
+    sideExtension,
+  }));
 
   const result = {
     format: "ANGEL2 ordinary combat presentation rules",
@@ -814,7 +937,41 @@ async function extract(
           rightEntry: "0000:B29B",
           xFormula: "channelX - frameXAnchor",
           yFormula: "channelY - bitmapHeight + frameYOffset",
-          conclusion: "both physical sides consume the same channel coordinate system; apparent per-frame registration differences come from their independent frame anchor tables",
+          conclusion: "both physical sides consume the same channel coordinate system; each class side owns two frame placement tables, one for the current actor's +50 frames and one for the defender's four direct frames",
+        },
+        framePlacementTables: {
+          descriptorCopy: "0000:51EC copies the unit descriptor +04h word pair to runtime block +2/+4 (DS:31D5) and the +10h presentation block twice, to +6 (counter) and +20h (primary)",
+          actor: "A49D/A413 (left actor) and A623/A599 (right actor) load the actor sub-block's x-anchor/y-offset pointers, so only +50 frames read framePlacement",
+          defender: "the same setups load the defending side's runtime block +2/+4 (DS:7C9F/7CA1 or DS:7C65/7C67) into its compositor pointers DS:7AFE/7B00 or DS:7A78/7A7A, so stand, hurt, death and guard read defenderFramePlacement",
+          defenderTableShape: "four signed x anchors follow the +04h pair, then four own y offsets or the shared zero table DS:87F6; the +10h presentation block starts right after them",
+          defenderLinkedChannels: "no defender-side command stream issues G1..G5, so the defender tables only ever project direct frames 0..3",
+        },
+        groundClip: {
+          drawRows: "0000:DF86",
+          maskRows: "0000:E1F9",
+          bufferRowBytes,
+          lastDrawnBufferOffset,
+          firstClippedRow,
+          effect: "both routines skip every byte past the last drawn buffer offset, so channel bitmap rows at or below the y=135 ground line are never drawn; frames whose y offset lowers them past that line lose their bottom rows",
+          scope: "all five channels of both sides and the B3BD common trail; only the first byte of the first clipped row passes the unsigned comparison",
+        },
+        mainChannelShadow: {
+          entry: "0000:E336",
+          callers: "B0FF/B29B call it only for channel offset 6 (the character main channel), after that channel's E090 mask and before its DD8E bitmap",
+          passes: shadowPasses,
+          horizontalSpan: "each pass covers the bitmap's own pixels [left, left+width), widened by sideExtension on both sides",
+          byteAlignedRowMasks,
+          shiftedRowMasks,
+          maskMeaning: "each pass ANDs its first mask into its first row and its second mask into its second row on all four planes; a clear bit (MSB = leftmost pixel) becomes palette colour 0",
+          alignment: "a byte-aligned left edge (left % 8 == 0) takes E4AF; any other alignment takes E55A, which masks only the bitmap's shifted pixel span",
+          lastDrawnBufferOffset: shadowLastDrawnOffset,
+          verticalClip: "the shadow's own limit is far below the window, so it is not cut at the ground line",
+          edgeWrap: "the shifted loop clips by its first byte only: at the right window edge its second byte spills into the next row's first pixels, and at the left edge the first partial byte is skipped",
+        },
+        drawOrder: {
+          substep: "0000:AD70 draws the background (AEC3), the character channels (B04A), B4F1 and the common trail (B3BD) into the buffer, then presents it",
+          channels: "B04A runs B224 when side 1 acts ([7A00]=1) and B088 when side 2 acts; both walk channel offsets 8,6,4,2,0 and draw the defending side before the acting side at each offset",
+          tokenChannels: "G1..G5 re-point channel offsets 0,2,4,6,8; the released tables only use G1 (drawn last) and G5 (drawn before both main channels)",
         },
         characterInitialization: {
           primaryEntry: "0000:A2E4",
@@ -991,7 +1148,7 @@ async function extract(
       ],
     },
     evidenceBoundary: {
-      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, shared full-screen channel/compositor coordinates and primary/counter initialization, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
+      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, shared full-screen channel/compositor coordinates and primary/counter initialization, separate actor (+50) and defender (direct) frame placement tables, the y=135 channel ground clip, the main-channel E336 ground shadow, per-substep channel draw order, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
       preservedUnknown: "the original design names of many embedded full-screen command fields and the host/VGA duration of one full-screen renderer substep; the released nominal native timer tick is 10.000151 ms",
       implementation: "none; this export is phase-1 evidence only",
     },

@@ -134,9 +134,8 @@ test("五個分頁各載入自己的內容，操作與免責說明都可獨立�
   const poisonFix = page.getByTestId("remake-note-REMAKE-004");
   await expect(poisonFix).toContainText("中毒狀態不再殘留 0 生命存活單位");
   await expect(poisonFix).toContainText("但歸零時不會觸發死亡結算");
-  const swiftGuardFix = page.getByTestId("remake-note-swift-dragon-guard-ground");
-  await expect(swiftGuardFix).toContainText("迅龍騎士格擋動畫回歸地面");
-  await expect(swiftGuardFix.locator(".rn-note-id")).toHaveCount(0);
+  // REMAKE-165：原版迅龍騎士的格擋本來就貼地，那條「修復」撤下後不能再出現。
+  await expect(page.getByTestId("remake-note-swift-dragon-guard-ground")).toHaveCount(0);
   await captureVisualAudit(page.locator(".rn-dialog"), {
     path: "artifacts/playwright/remake-notes-fixes-desktop.png",
   });

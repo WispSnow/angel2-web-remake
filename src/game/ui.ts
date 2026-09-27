@@ -1828,15 +1828,19 @@ function buildFullCombatSkeleton(
             <img class="near copy" src="${background}" data-source-url="${backgroundAsset}" alt="" />
           </div>
           <div class="full-combat-particles" aria-hidden="true"></div>
-          <i class="full-combat-frame full-combat-lance" aria-hidden="true" hidden></i>
-          <i class="full-combat-frame full-combat-projectile" data-testid="full-combat-projectile" aria-hidden="true" hidden></i>
-          <div class="full-combat-sprite slot-victim" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-victim-sprite"></i></div>
-          <div class="full-combat-sprite slot-actor" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-actor-sprite"></i></div>
-          <div class="full-combat-sprite slot-effect-G1" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G1-sprite"></i></div>
-          <div class="full-combat-sprite slot-effect-G2" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G2-sprite"></i></div>
-          <div class="full-combat-sprite slot-effect-G3" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G3-sprite"></i></div>
-          <div class="full-combat-sprite slot-effect-G4" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G4-sprite"></i></div>
-          <div class="full-combat-sprite slot-effect-G5" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G5-sprite"></i></div>
+          <div class="full-combat-shadow" data-channel="victim" data-testid="full-victim-shadow" aria-hidden="true" hidden></div>
+          <div class="full-combat-shadow" data-channel="actor" data-testid="full-actor-shadow" aria-hidden="true" hidden></div>
+          <div class="full-combat-channels" data-testid="full-combat-channels">
+            <i class="full-combat-frame full-combat-lance" aria-hidden="true" hidden></i>
+            <i class="full-combat-frame full-combat-projectile" data-testid="full-combat-projectile" aria-hidden="true" hidden></i>
+            <div class="full-combat-sprite slot-victim" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-victim-sprite"></i></div>
+            <div class="full-combat-sprite slot-actor" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-actor-sprite"></i></div>
+            <div class="full-combat-sprite slot-effect-G1" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G1-sprite"></i></div>
+            <div class="full-combat-sprite slot-effect-G2" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G2-sprite"></i></div>
+            <div class="full-combat-sprite slot-effect-G3" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G3-sprite"></i></div>
+            <div class="full-combat-sprite slot-effect-G4" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G4-sprite"></i></div>
+            <div class="full-combat-sprite slot-effect-G5" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G5-sprite"></i></div>
+          </div>
         </div>
         <div class="full-combat-strip" aria-hidden="true">
           <div class="full-life-gauge left" data-testid="full-left-life-gauge">
@@ -1964,21 +1968,52 @@ export function renderCombat(
     image.dataset.lift = String(sprite.lift);
     image.dataset.x = String(Math.round(sprite.x));
     image.dataset.yOffset = String(meta.yOffset ?? 0);
-    const yOffsetCorrection = sprite.yOffsetCorrection ?? 0;
-    image.dataset.yOffsetCorrection = String(yOffsetCorrection);
-    const xOffsetCorrection = sprite.xOffsetCorrection ?? 0;
-    image.dataset.xOffsetCorrection = String(xOffsetCorrection);
     if (sprite.channel) image.dataset.channel = sprite.channel;
     else delete image.dataset.channel;
     if (sprite.reaction) image.dataset.reaction = sprite.reaction;
     else delete image.dataset.reaction;
     applyFullCombatAtlasFrame(image, frameName);
     const anchor = sprite.mirror ? meta.w - meta.anchor : meta.anchor;
-    const topOffset = -sprite.lift + (meta.yOffset ?? 0) + yOffsetCorrection;
+    // Holders stand on the ground line; `.full-combat-channels` ends there,
+    // so a positive offset hides the bitmap's bottom rows like module 29.
+    const topOffset = -sprite.lift + (meta.yOffset ?? 0);
     image.dataset.projectedYOffset = String(Math.round(topOffset));
-    holder.style.transform = `translate(${Math.round(sprite.x - anchor + xOffsetCorrection)}px, ${Math.round(topOffset)}px)`;
+    const clippedRows = Math.max(0, Math.round(topOffset));
+    image.dataset.groundClippedRows = String(
+      meta.h === undefined ? clippedRows : Math.min(meta.h, clippedRows),
+    );
+    holder.style.transform = `translate(${Math.round(sprite.x - anchor)}px, ${Math.round(topOffset)}px)`;
     holder.style.opacity = String(sprite.opacity);
     image.style.transform = sprite.mirror ? "scaleX(-1)" : "";
+  }
+
+  for (const channel of ["victim", "actor"] as const) {
+    const element = query<HTMLElement>(`.full-combat-shadow[data-channel="${channel}"]`);
+    const shadow = scene.shadows.find((entry) => entry.channel === channel);
+    if (!shadow) {
+      element.hidden = true;
+      continue;
+    }
+    element.hidden = false;
+    element.dataset.side = shadow.side;
+    while (element.children.length < shadow.bands.length) {
+      element.appendChild(document.createElement("i"));
+    }
+    for (let index = 0; index < element.children.length; index += 1) {
+      const bandElement = element.children[index] as HTMLElement;
+      const band = shadow.bands[index];
+      bandElement.hidden = !band;
+      if (!band) continue;
+      bandElement.dataset.dither = band.darkParity.join("");
+      bandElement.dataset.x = String(band.x);
+      bandElement.dataset.y = String(band.y);
+      bandElement.dataset.width = String(band.width);
+      bandElement.style.transform = `translate(${band.x}px, ${band.y}px)`;
+      bandElement.style.width = `${band.width}px`;
+      bandElement.style.height = `${band.height}px`;
+      // The native byte masks are aligned to scene x = 0, not to the band.
+      bandElement.style.backgroundPosition = `${-band.x}px 0`;
+    }
   }
 
   const lance = query<HTMLElement>(".full-combat-lance");

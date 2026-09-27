@@ -163,12 +163,24 @@ for (const spec of classSpecs) {
       );
       fullCombatAssets[side][spec.id][set] = copied.paths.map((_, index) =>
         fullCombatFrameName(side, spec.id, set, index));
+      // Module 29 hands the defending side the descriptor +04h tables and the
+      // current actor its presentation-block tables (`A49D/A413/A599/A623`), so
+      // direct frames and +50 frames never share one placement table.
+      const placement = set === "direct"
+        ? nativeSide.defenderFramePlacement
+        : nativeSide.framePlacement;
+      if (copied.images.length > placement.xAnchor.length) {
+        throw new Error(
+          `${side} ${spec.id} ${set}: ${copied.images.length} frames exceed `
+          + `${placement.xAnchor.length} native placement entries`,
+        );
+      }
       fullCombatFrameMeta[side][spec.nativeRecord][set] = copied.images.map(
         (image, index) => ({
           w: image.width,
           h: image.height,
-          anchor: nativeSide.framePlacement.xAnchor[index],
-          yOffset: nativeSide.framePlacement.yOffset[index],
+          anchor: placement.xAnchor[index],
+          yOffset: placement.yOffset[index],
         }),
       );
     }
