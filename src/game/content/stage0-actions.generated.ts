@@ -39006,6 +39006,89 @@ export const STAGE0_FULL_COMBAT_HOLD = {
   "drawLimit": 20
 } as const;
 
+export const STAGE0_FULL_COMBAT_DAMAGE_NUMBER = {
+  "entries": {
+    "primary": "0000:A71F",
+    "counter": "0000:A74F"
+  },
+  "origin": {
+    "xOffsetFromVictim": -20,
+    "y": 120
+  },
+  "velocityBySide1Actor": {
+    "bands": [
+      {
+        "drawsBelow": 4,
+        "dx": 4,
+        "dy": -18
+      },
+      {
+        "drawsBelow": 9,
+        "dx": 4,
+        "dy": 12
+      },
+      {
+        "drawsBelow": 12,
+        "dx": 4,
+        "dy": -10
+      },
+      {
+        "drawsBelow": 15,
+        "dx": 4,
+        "dy": 10
+      },
+      {
+        "drawsBelow": 17,
+        "dx": 2,
+        "dy": -10
+      },
+      {
+        "drawsBelow": 19,
+        "dx": 2,
+        "dy": 10
+      }
+    ],
+    "otherwise": {
+      "dx": 0,
+      "dy": 0
+    }
+  },
+  "field": {
+    "characters": 5,
+    "sign": "-",
+    "signScanFrom": 1
+  },
+  "glyph": {
+    "cellWidth": 8,
+    "cellRows": 16,
+    "advance": 8,
+    "shadowPasses": [
+      {
+        "dx": 0,
+        "dy": 1
+      },
+      {
+        "dx": 1,
+        "dy": 0
+      },
+      {
+        "dx": 1,
+        "dy": 1
+      }
+    ],
+    "inkPass": {
+      "dx": 0,
+      "dy": 0
+    },
+    "clampNonPositiveXTo": 1
+  },
+  "shadowColorIndex": 0,
+  "inkColorIndex": {
+    "strike": 11,
+    "afterStrike": 15
+  }
+} as const;
+
 export const STAGE0_ACTION_PRESENTATION_ASSETS = {
   "shoot": {
     "hit": [

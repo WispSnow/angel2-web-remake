@@ -816,6 +816,162 @@ test("an attacker keeps its main channel through the hold and while its target f
   });
 });
 
+interface DamageNumberProbe {
+  x: number;
+  y: number;
+  draw: number;
+  ink: number;
+  text: string;
+  box: { left: number; top: number; width: number; height: number };
+  zIndex: number;
+  inScene: boolean;
+  canvas: { width: number; height: number };
+  pixel: (readonly number[])[];
+}
+
+/**
+ * The number's dataset, its box in scene pixels and a few canvas pixels. The
+ * canvas holds the native pixels whatever the page scale, so its colours can
+ * be compared exactly: `F3C6` stamps the palette-0 shadow at (0,+1), (+1,0)
+ * and (+1,+1) under the ink.
+ */
+const probeDamageNumber = (page: Page, points: readonly (readonly [number, number])[]) =>
+  page.evaluate((samples): DamageNumberProbe => {
+    const scene = document.querySelector<HTMLElement>(".full-combat-scene");
+    const host = document.querySelector<HTMLElement>('[data-testid="full-damage-number"]');
+    const canvas = host?.querySelector<HTMLCanvasElement>("canvas.native-text");
+    const context = canvas?.getContext("2d");
+    if (!scene || !host || !canvas || !context) throw new Error("damage number is missing");
+    const sceneBox = scene.getBoundingClientRect();
+    const box = canvas.getBoundingClientRect();
+    const scale = sceneBox.width / 448;
+    const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    return {
+      x: Number(host.dataset.x),
+      y: Number(host.dataset.y),
+      draw: Number(host.dataset.draw),
+      ink: Number(host.dataset.ink),
+      text: host.dataset.text ?? "",
+      box: {
+        left: Math.round((box.left - sceneBox.left) / scale),
+        top: Math.round((box.top - sceneBox.top) / scale),
+        width: Math.round(box.width / scale),
+        height: Math.round(box.height / scale),
+      },
+      zIndex: Number(getComputedStyle(host).zIndex),
+      inScene: host.parentElement === scene,
+      canvas: { width: canvas.width, height: canvas.height },
+      pixel: samples.map(([x, y]) => Array.from(data.slice((y * canvas.width + x) * 4, (y * canvas.width + x) * 4 + 4))),
+    };
+  }, points);
+
+const PALETTE_11 = [0xef, 0x20, 0x24, 255];
+const PALETTE_15 = [0xff, 0xff, 0xff, 255];
+const PALETTE_0 = [0, 0, 0, 255];
+// For "  -24": the minus is ROM row 3 of the third cell (x 16..21), doubled
+// to rows 6..7; its shadow is row 8 and column 22; the two spaces stay empty.
+const MINUS_SAMPLES = [[16, 6], [21, 7], [16, 8], [22, 6], [0, 6], [15, 6]] as const;
+
+test("the damage number hops from the struck soldier along the native velocity table", async ({ page }) => {
+  // The lab's hurt branch deals 24 like the first stage-0 battle, so the field
+  // is "  -24" and every draw can be checked against the capture.
+  await page.goto("/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&side=left&speed=4");
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const marks = (await labState(page)).marks;
+  const impactAt = marks.find(({ phase }) => phase === "fullImpact")?.t;
+  const holdAt = marks.find(({ phase }) => phase === "fullHold")?.t;
+  expect(impactAt).toBeDefined();
+  expect(holdAt).toBeDefined();
+  const number = page.getByTestId("full-damage-number");
+
+  // Capture frames 116, 126, 137, 139, 147 and 163: draws 1, 4, 8, 9, 12, 19.
+  for (const [at, draw, x, y] of [
+    [impactAt!, 1, 270, 120],
+    [impactAt! + 150, 4, 282, 66],
+    [impactAt! + 350, 8, 298, 114],
+    [holdAt!, 9, 302, 126],
+    [holdAt! + 96, 12, 314, 96],
+    [holdAt! + 320, 19, 334, 126],
+    [holdAt! + 600, 20, 334, 126],
+  ] as const) {
+    await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), at);
+    await expect(number).toHaveAttribute("data-draw", String(draw));
+    await expect.poll(async () => (await probeDamageNumber(page, MINUS_SAMPLES)).pixel[0])
+      .toEqual(PALETTE_11);
+    const probe = await probeDamageNumber(page, MINUS_SAMPLES);
+    expect(probe).toMatchObject({ x, y, draw, ink: 11, text: "  -24", zIndex: 55, inScene: true });
+    expect(probe.box).toEqual({ left: x, top: y, width: 41, height: 17 });
+    expect(probe.pixel).toEqual([PALETTE_11, PALETTE_11, PALETTE_0, PALETTE_0, [0, 0, 0, 0], [0, 0, 0, 0]]);
+    if (draw === 4 || draw === 12) {
+      await captureVisualAudit(page, {
+        path: `artifacts/playwright/combat-lab-damage-number-draw-${draw}.png`,
+        fullPage: true,
+      });
+    }
+  }
+  // B4F1 runs after every channel and before the common trail.
+  const layers = await page.evaluate(() => ({
+    g1: Number(getComputedStyle(document.querySelector<HTMLElement>(".slot-effect-G1")!).zIndex),
+    actor: Number(getComputedStyle(document.querySelector<HTMLElement>(".slot-actor")!).zIndex),
+    dust: Number(getComputedStyle(document.querySelector<HTMLElement>(".full-combat-particles")!).zIndex),
+  }));
+  expect(layers.g1).toBeLessThan(55);
+  expect(layers.actor).toBeLessThan(55);
+  expect(layers.dust).toBeGreaterThan(55);
+
+  // Side 2 acting mirrors the hop: the struck left soldier stands at x=210.
+  await page.goto("/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&side=right&speed=4");
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const mirroredImpactAt = (await labState(page)).marks.find(({ phase }) => phase === "fullImpact")?.t;
+  expect(mirroredImpactAt).toBeDefined();
+  for (const [at, draw, x, y] of [
+    [mirroredImpactAt!, 1, 190, 120],
+    [mirroredImpactAt! + 50, 2, 186, 102],
+  ] as const) {
+    await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), at);
+    await expect(number).toHaveAttribute("data-draw", String(draw));
+    expect(await probeDamageNumber(page, [])).toMatchObject({ x, y, draw });
+  }
+});
+
+test("a fatal strike keeps drawing the damage number white through the death stream", async ({ page }) => {
+  await page.goto(
+    "/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&death=1&side=left&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const deathAt = (await labState(page)).marks
+    .find(({ phase }) => phase === "fullDefenderDeath")?.t;
+  expect(deathAt).toBeDefined();
+  const number = page.getByTestId("full-damage-number");
+  const text = await page.evaluate((time) => {
+    window.__ANGEL2_COMBAT_LAB__?.seek(time);
+    return document.querySelector<HTMLElement>('[data-testid="full-damage-number"]')?.dataset.text;
+  }, deathAt! - 1);
+  // The minus sits one cell before the first digit of the five-cell field.
+  const minus = [8 * (text ?? "").indexOf("-"), 6] as const;
+  expect(minus[0]).toBeGreaterThan(0);
+
+  // The last post-hit draw is still inked with A1E8's palette 11 ...
+  await expect(number).toHaveAttribute("data-draw", "8");
+  await expect.poll(async () => (await probeDamageNumber(page, [minus])).pixel[0]).toEqual(PALETTE_11);
+  // ... A237 then resets DS:F93C to 15 before B683 runs the death stream, whose
+  // AD70 substeps keep calling B4F1: the number turns white and keeps hopping.
+  for (const [at, draw, x, y] of [
+    [deathAt!, 9, 302, 126],
+    [deathAt! + 150, 12, 314, 96],
+    [deathAt! + 1_000, 29, 334, 126],
+  ] as const) {
+    await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), at);
+    await expect(number).toHaveAttribute("data-draw", String(draw));
+    await expect.poll(async () => (await probeDamageNumber(page, [minus])).pixel[0]).toEqual(PALETTE_15);
+    expect(await probeDamageNumber(page, [])).toMatchObject({ x, y, draw, ink: 15 });
+  }
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-damage-number-death-white.png",
+    fullPage: true,
+  });
+});
+
 test("the jungle warrior dives under the ground clip and strikes from below it", async ({ page }) => {
   await page.goto(
     "/combat-lab.html?attacker=jungle-warrior&defender=soldier&reaction=hurt&side=left&speed=4",

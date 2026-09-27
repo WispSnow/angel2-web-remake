@@ -60,6 +60,17 @@ const CODE_SIGNATURES = [
   ["0000:B253", "latch-right-frames-and-accumulate-motion", "b90500514903c9890efc7a8bd983bf047b0074088b87407b89870e7b59e2e4c3b90500514903c9890efc7a8bd983bf047b0074108b874a7b01872c7b8b87547b0187367b59e2dcc3"],
   ["0000:B344", "advance-right-animation-counter", "81bf187b3a58741781bf187b3458741981bf187b36587427c787227b0000c383b7227b010387227bc3ff87227b83bf227b047206c787227b00000387227bc3ff87227b83bf227b067206c787227b00000387227bc3"],
   ["0000:B4F1", "count-damage-number-draws", "803e327c4e7419ff06337ce81900e83701a1397c0106357ca13b7c0106377cc3c706337c0000c3"],
+  ["0000:A2CF", "insert-damage-minus-before-first-digit", "be00008a843e7c3c20750346e2f5b02d88843d7cc3"],
+  ["0000:B518", "select-damage-number-velocity-by-acting-side", "833e007a017408833e007a027405c3e80500c3e88600c3"],
+  ["0000:B52F", "damage-number-velocity-left-actor", "833e337c047230833e337c097236833e337c0c723c833e337c0f7242833e337c117248833e337c13724ec706397c0000c7063b7c0000c3c706397c0400c7063b7ceeffc3c706397c0400c7063b7c0c00c3c706397c0400c7063b7cf6ffc3c706397c0400c7063b7c0a00c3c706397c0200c7063b7cf6ffc3c706397c0200c7063b7c0a00c3"],
+  ["0000:B5B4", "damage-number-velocity-right-actor", "833e337c047230833e337c097236833e337c0c723c833e337c0f7242833e337c117248833e337c13724ec706397c0000c7063b7c0000c3c706397cfcffc7063b7ceeffc3c706397cfcffc7063b7c0c00c3c706397cfcffc7063b7cf6ffc3c706397cfcffc7063b7c0a00c3c706397cfeffc7063b7cf6ffc3c706397cfeffc7063b7c0a00c3"],
+  ["0000:B639", "draw-damage-number-at-its-origin", "a1357ca3baf8a1377ca3bcf8be3d7ce87b3da1357ca3027aa30a7aa1377ca3047aa30c7ac3"],
+  ["0000:EF56", "format-five-character-decimal-field", "2bd28bc1bb1027f7f3043088048bc22bd2bbe803f7f304308844018bc22bd2bb6400f7f304308844028bc22bd2bb0a00f7f3043088440380c230885404bb00008a40013c24740d8a003c307507b020880043ebec8a44043c207401c3b030884404c3"],
+  ["0000:F3C6", "draw-string-with-drop-shadow", "5053515256571e06a1baf8a332fa893630fae8c600a234fa3c7f77229090903c0d7503e9ac003c247503e9a5003c007503e99e0083fa5974d9e8f900ebd4e89a00a235fa3c0d7503e987003c0a7503e98000a034fa8a2635fae88a008bc3bb1e00f7e3e8b5008b16baf8428b1ebcf88bd28bdb8b0e3ef9be36fabfb902e882018b16baf88b1ebcf8438bd28bdb8b0e3ef9be36fabfb902e868018b16baf8428b1ebcf8438bd28bdb8b0e3ef9be36fabfb902e84d018b16baf88b1ebcf88b0e3cf9be36fabfb902e838018306baf810e940ff071f5f5e5a595b58c3"],
+  ["0000:F4A1", "read-next-string-byte", "8b1e30fa8a07ff0630fac3"],
+  ["0000:F4FB", "draw-half-width-glyph-with-drop-shadow", "3c7c74799090903c20746c909090e878008b1ebcf8438b16baf88bd28bdb8b0e3ef9be5cfabfb902e8a2008b1ebcf88b16baf8428bd28bdb8b0e3ef9be5cfabfb902e888008b1ebcf8438b16baf8428bd28bdb8b0e3ef9be5cfabfb902e86d008b1ebcf88b16baf88bdb8b0e3cf9be5cfabfb902e856008306baf808c3a132faa3baf88306bcf810c3"],
+  ["0000:F584", "copy-rom-glyph-doubling-every-row", "1e2ae4bb0800f7e3056efa8bf08cd88ec0bf60fab800f08ed8b90800acaaaae2fb1fc3"],
+  ["0000:F5C8", "blit-one-bit-glyph-into-battle-buffer", "1e8b450c2ea311f68b45082ea313f68b45042ea315f68b052ea317f62e890e90f7891674fa891e76fa8bc23d00007f03b80100bb0800f6f3882678fa2ae4a374fae80d00e840001fc3"],
   ["0000:B0FF", "composite-left-channel-with-main-shadow","8b1e767a8b87887ae89e00a3747ac70684f84102a14102ba00008b0e747ae87640890e6e7a8b367a7a8b1e747a03db8b008b1e767a8b97b07a2b166e7a03d08916727a8b36787a8b1e747a03db8b008b1e767a8b97a67a2bd08916707a8b16707a8b1e727a8b0e747abe4102bfb902e81f2fa1747a8b1e767a83fb0675148b16707abb84008b0e747abe4102bfb902e8a5318b16707a8b1e727a8b0e747abe4102bfb902e8e82bc3"],
   ["0000:B224", "draw-channels-right-before-left", "b90500514903c9890e767a890efc7a8b1efc7a83bf047b007403e85a008b1e767a83bf7e7a007403e8b0fe59e2d5c3"],
   ["0000:B29B", "composite-right-channel-with-main-shadow", "8b1efc7a8b870e7be89e00a3fa7ac70684f86902a16902ba00008b0efa7ae8da3e890ef47a8b36007b8b1efa7a03db8b008b1efc7a8b97367b2b16f47a03d08916f87a8b36fe7a8b1efa7a03db8b008b1efc7a8b972c7b2bd08916f67a8b16f67a8b1ef87a8b0efa7abe6902bfb902e8832da1fa7a8b1efc7a83fb0675148b16f67abb84008b0efa7abe6902bfb902e809308b16f67a8b1ef87a8b0efa7abe6902bfb902e84c2ac3"],
@@ -154,6 +165,98 @@ function sameCodeWord(buffer, addresses, label) {
   assert(values.every((value) => value === values[0]),
     `${label}: ${addresses.join("/")} disagree (${values.map((value) => hex(value)).join("/")})`);
   return values[0];
+}
+
+/** The immediate of a `mov word [DS:target],imm16` (`C7 06`) at `address`. */
+function movWordImmediate(buffer, address, target) {
+  const { linear } = parseAddress(address);
+  const bytes = checkedSlice(buffer, linear, linear + 6, address);
+  assert(bytes[0] === 0xc7 && bytes[1] === 0x06 && bytes.readUInt16LE(2) === target,
+    `${address}: expected mov word [${hex(target)}],imm16`);
+  return bytes.readUInt16LE(4);
+}
+
+/**
+ * `B52F/B5B4`: a run of `cmp word [7C33],n / jc band` tests, a fall-through
+ * velocity, and one `mov [7C39],dx / mov [7C3B],dy / ret` body per band. The
+ * counter is incremented before the test, so draw `k` tests `k`.
+ */
+function decodeDamageVelocityTable(buffer, address) {
+  const pairAt = (linear) => {
+    const bytes = checkedSlice(buffer, linear, linear + 13, `0000:${hex(linear)}`);
+    assert(bytes[0] === 0xc7 && bytes[1] === 0x06 && bytes.readUInt16LE(2) === 0x7c39
+      && bytes[6] === 0xc7 && bytes[7] === 0x06 && bytes.readUInt16LE(8) === 0x7c3b
+      && bytes[12] === 0xc3,
+    `0000:${hex(linear)}: expected mov [7C39],dx / mov [7C3B],dy / ret`);
+    return { dx: bytes.readInt16LE(4), dy: bytes.readInt16LE(10) };
+  };
+  const bands = [];
+  let cursor = parseAddress(address).linear;
+  while (buffer[cursor] === 0x83) {
+    const bytes = checkedSlice(buffer, cursor, cursor + 7, `0000:${hex(cursor)}`);
+    assert(bytes[1] === 0x3e && bytes.readUInt16LE(2) === 0x7c33 && bytes[5] === 0x72,
+      `0000:${hex(cursor)}: expected cmp word [7C33],imm8 / jc`);
+    bands.push({ drawsBelow: bytes[4], ...pairAt(cursor + 7 + bytes.readInt8(6)) });
+    cursor += 7;
+  }
+  assert(bands.length > 0 && bands.every((band, index) =>
+    index === 0 || band.drawsBelow > bands[index - 1].drawsBelow),
+  `${address}: the velocity bands must test increasing draw counts`);
+  return { bands, otherwise: pairAt(cursor) };
+}
+
+/**
+ * `F4FB`'s glyph blocks: each loads y (`DS:F8BC`, `inc bx` for +1), x
+ * (`DS:F8BA`, `inc dx` for +1) and a colour variable, then calls the `F5C8`
+ * blitter. `mov dx,dx` / `mov bx,bx` are the original's own no-ops.
+ */
+function decodeGlyphPasses(buffer, startAddress, endAddress) {
+  let cursor = parseAddress(startAddress).linear;
+  const end = parseAddress(endAddress).linear;
+  const passes = [];
+  let pass = {};
+  while (cursor < end) {
+    const opcode = buffer[cursor];
+    const modrm = buffer[cursor + 1];
+    const word = (offset) => buffer.readUInt16LE(cursor + offset);
+    if (opcode === 0x8b && modrm === 0x1e && word(2) === 0xf8bc) {
+      pass.dy = 0;
+      cursor += 4;
+    } else if (opcode === 0x8b && modrm === 0x16 && word(2) === 0xf8ba) {
+      pass.dx = 0;
+      cursor += 4;
+    } else if (opcode === 0x43 && pass.dy === 0) {
+      pass.dy = 1;
+      cursor += 1;
+    } else if (opcode === 0x42 && pass.dx === 0) {
+      pass.dx = 1;
+      cursor += 1;
+    } else if (opcode === 0x8b && (modrm === 0xd2 || modrm === 0xdb)) {
+      cursor += 2;
+    } else if (opcode === 0x8b && modrm === 0x0e && (word(2) === 0xf93c || word(2) === 0xf93e)) {
+      pass.colorVariable = `DS:${hex(word(2))}`;
+      cursor += 4;
+    } else if (opcode === 0xbe) {
+      pass.glyphDescriptor = `DS:${hex(word(1))}`;
+      cursor += 3;
+    } else if (opcode === 0xbf) {
+      pass.targetBuffer = `DS:${hex(word(1))}`;
+      cursor += 3;
+    } else if (opcode === 0xe8) {
+      const target = (cursor + 3 + buffer.readInt16LE(cursor + 1)) & 0xffff;
+      assert(target === 0xf5c8, `0000:${hex(cursor)}: a glyph pass must call the F5C8 blitter`);
+      assert(pass.dx !== undefined && pass.dy !== undefined && pass.colorVariable
+        && pass.glyphDescriptor && pass.targetBuffer,
+      `0000:${hex(cursor)}: incomplete glyph pass ${JSON.stringify(pass)}`);
+      passes.push(pass);
+      pass = {};
+      cursor += 3;
+    } else {
+      throw new Error(`0000:${hex(cursor)}: unexpected byte ${hex(opcode, 2)} in the glyph passes`);
+    }
+  }
+  assert(Object.keys(pass).length === 0, `${endAddress}: a glyph pass runs past the blocks`);
+  return passes;
 }
 
 function verifiedWord(buffer, dsOffset, expected, label) {
@@ -899,6 +1002,208 @@ async function extract(
       pose.frame === 0 && pose.deltaX === 0 && pose.deltaY === 0),
   "the death survivor stream must be six still frame-0 poses without commands");
 
+  // Damage number. A1E8 formats DS:7CD7 (EF56, then A2CF adds the minus),
+  // A71F/A74F place it, and B4F1 draws it on every AD70 substep and AD51 hold
+  // redraw once DS:7C32 is 'Y', moving it after each draw.
+  for (const [address, target] of [
+    ["0000:A18D", 0xa1e8],
+    ["0000:A190", 0xb683],
+    ["0000:A193", 0xb6bd],
+    ["0000:A1C8", 0xa1e8],
+    ["0000:A1CB", 0xb683],
+    ["0000:A1CE", 0xb6bd],
+    ["0000:A206", 0xef56],
+    ["0000:A209", 0xa2cf],
+    ["0000:A7BD", 0xacc4],
+    ["0000:ACDB", 0xad70],
+    ["0000:AD7F", 0xb04a],
+    ["0000:AD8E", 0xb4f1],
+    ["0000:AD91", 0xb3bd],
+    ["0000:AD54", 0xb04a],
+    ["0000:B4FC", 0xb518],
+    ["0000:B4FF", 0xb639],
+    ["0000:B527", 0xb52f],
+    ["0000:B52B", 0xb5b4],
+    ["0000:B648", 0xf3c6],
+    ["0000:B6B4", 0xa7a4],
+    ["0000:B6EE", 0xa7a4],
+    ["0000:F3FF", 0xf4fb],
+    ["0000:F509", 0xf584],
+  ]) {
+    assert(nearCallTarget(address) === target,
+      `${address}: expected a call to 0000:${hex(target)}, found 0000:${hex(nearCallTarget(address))}`);
+  }
+  const damageFlagWrites = [];
+  for (let linear = 0; linear + 5 <= moduleBuffer.length; linear += 1) {
+    if (moduleBuffer[linear] === 0xc6 && moduleBuffer[linear + 1] === 0x06
+      && moduleBuffer.readUInt16LE(linear + 2) === 0x7c32) {
+      damageFlagWrites.push({ address: `0000:${hex(linear)}`, value: String.fromCharCode(moduleBuffer[linear + 4]) });
+    }
+  }
+  assert(JSON.stringify(damageFlagWrites) === JSON.stringify([
+    { address: "0000:A1E8", value: "N" },
+    { address: "0000:A1F5", value: "Y" },
+  ]), "only A1E8 may write DS:7C32: 'N' before the strike stream and 'Y' after the origin callback");
+  assert(codeByte("0000:B4F5") === 0x4e, "B4F1 must skip the draw while DS:7C32 is 'N'");
+
+  const origin = {
+    y: sameCodeWord(moduleBuffer, ["0000:A730", "0000:A740", "0000:A760", "0000:A770"], "damage origin y"),
+    xSubtrahend: sameCodeWord(moduleBuffer, ["0000:A739", "0000:A749", "0000:A769", "0000:A779"],
+      "damage origin x offset"),
+    rightVictimX: sameCodeWord(moduleBuffer, ["0000:A736", "0000:A766"], "right victim main x"),
+    leftVictimX: sameCodeWord(moduleBuffer, ["0000:A746", "0000:A776"], "left victim main x"),
+  };
+  // Right channels start at DS:7B2C, left at DS:7AA6; offset 6 is the main channel.
+  assert(origin.rightVictimX === 0x7b2c + 6 && origin.leftVictimX === 0x7aa6 + 6,
+    "A71F/A74F must read the victim's main-channel x");
+  // A71F branches on the primary attacker's side (1 -> right victim), A74F on
+  // the same unit for the counter (2 -> right victim): always the struck side.
+  assert(codeByte("0000:A727") === 1 && codeByte("0000:A72B") === 2
+    && codeByte("0000:A757") === 2 && codeByte("0000:A75B") === 1,
+  "A71F/A74F must place the number at the struck unit's main channel");
+
+  const leftActorVelocity = decodeDamageVelocityTable(moduleBuffer, "0000:B52F");
+  const rightActorVelocity = decodeDamageVelocityTable(moduleBuffer, "0000:B5B4");
+  assert(JSON.stringify(rightActorVelocity) === JSON.stringify({
+    bands: leftActorVelocity.bands.map(({ drawsBelow, dx, dy }) => ({ drawsBelow, dx: -dx, dy })),
+    otherwise: { dx: -leftActorVelocity.otherwise.dx, dy: leftActorVelocity.otherwise.dy },
+  }), "B5B4 must mirror B52F horizontally");
+  assert(leftActorVelocity.otherwise.dx === 0 && leftActorVelocity.otherwise.dy === 0,
+    "the number must stop once the counter passes the last band");
+  assert(readCodeWord(moduleBuffer, "0000:B51A") === 0x7a00 && codeByte("0000:B51C") === 1
+    && readCodeWord(moduleBuffer, "0000:B521") === 0x7a00 && codeByte("0000:B523") === 2,
+  "B518 must pick B52F for the side-1 actor and B5B4 for the side-2 actor");
+
+  const strikeInkIndex = movWordImmediate(moduleBuffer, "0000:A20F", 0xf93c);
+  const afterStrikeInkIndex = movWordImmediate(moduleBuffer, "0000:A237", 0xf93c);
+  const shadowColorWrites = [];
+  for (let linear = 0; linear + 6 <= moduleBuffer.length; linear += 1) {
+    if (moduleBuffer[linear] === 0xc7 && moduleBuffer[linear + 1] === 0x06
+      && moduleBuffer.readUInt16LE(linear + 2) === 0xf93e) {
+      shadowColorWrites.push({ address: `0000:${hex(linear)}`, value: moduleBuffer.readUInt16LE(linear + 4) });
+    }
+  }
+  assert(shadowColorWrites.length > 0 && shadowColorWrites.every(({ address }) => {
+    const { linear } = parseAddress(address);
+    return linear < 0xa17b || linear >= 0xb6f7;
+  }), "the full-screen combat code must leave the DS:F93E shadow colour alone");
+  assert(readWord(moduleBuffer, 0xf93e) === 0, "DS:F93E must start at palette 0");
+  assert(shadowColorWrites.at(-1).value === 0,
+    "the last DS:F93E writer in module 29 must restore palette 0");
+
+  const fieldBytes = checkedSlice(moduleBuffer, dsLinear(0x7c3d), dsLinear(0x7c43), "DS:7C3D");
+  assert(fieldBytes.toString("latin1") === "00000$",
+    "DS:7C3D must hold a five-character field terminated by '$'");
+  assert(readCodeWord(moduleBuffer, "0000:A204") === 0x7c3d
+    && readCodeWord(moduleBuffer, "0000:A201") === 0x7cd7,
+  "A1E8 must format DS:7CD7 into DS:7C3D");
+  assert(readCodeWord(moduleBuffer, "0000:A2D4") === 0x7c3e && codeByte("0000:A2D7") === 0x20
+    && codeByte("0000:A2DB") === 0xe2 && codeByte("0000:A2DE") === 0x2d
+    && readCodeWord(moduleBuffer, "0000:A2E1") === 0x7c3d,
+  "A2CF must LOOP over spaces from DS:7C3E and write '-' one byte before the stop");
+  assert(readCodeWord(moduleBuffer, "0000:B646") === 0x7c3d,
+    "B639 must draw the formatted DS:7C3D string");
+
+  const glyphPasses = decodeGlyphPasses(moduleBuffer, "0000:F50C", "0000:F572");
+  assert(glyphPasses.length === 4
+    && glyphPasses.every(({ glyphDescriptor, targetBuffer }) =>
+      glyphDescriptor === "DS:FA5C" && targetBuffer === "DS:02B9")
+    && glyphPasses.slice(0, 3).every(({ colorVariable }) => colorVariable === "DS:F93E")
+    && glyphPasses[3].colorVariable === "DS:F93C"
+    && glyphPasses[3].dx === 0 && glyphPasses[3].dy === 0,
+  "F4FB must stamp three DS:F93E passes and then the DS:F93C ink at the origin");
+  assert(readCodeWord(moduleBuffer, "0000:F574") === 0xf8ba && codeByte("0000:F576") === 8
+    && codeByte("0000:F503") === 0x20 && codeByte("0000:F505") === 0x6c,
+  "F4FB must advance 8 after a glyph and skip a space with the same advance");
+  assert(codeByte("0000:F4FC") === 0x7c && readCodeWord(moduleBuffer, "0000:F580") === 0xf8bc,
+    "F4FB must treat '|' as a line break");
+  assert(readWord(moduleBuffer, 0xfa5c) === 1 && readWord(moduleBuffer, 0xfa5e) === 16
+    && codeByte("0000:F59E") === 8
+    && readCodeWord(moduleBuffer, "0000:F5A0") === 0xaaac && codeByte("0000:F5A2") === 0xaa
+    && readCodeWord(moduleBuffer, "0000:F58D") === 0xfa6e
+    && readCodeWord(moduleBuffer, "0000:F599") === 0xf000,
+  "F584 must copy the eight ROM rows at F000:FA6E twice each into the 1x16-byte DS:FA5C glyph");
+  assert(readCodeWord(moduleBuffer, "0000:F5F4") === 0 && codeByte("0000:F5F6") === 0x7f
+    && readCodeWord(moduleBuffer, "0000:F5F9") === 1,
+  "F5C8 must draw any x <= 0 at x = 1");
+  const stringTerminators = ["0000:F3E6", "0000:F3ED", "0000:F3F4"].map((address) =>
+    String.fromCharCode(codeByte(address)));
+  assert(stringTerminators.join("") === "\r$\0", "F3C6 must stop at CR, '$' and NUL");
+
+  const damageNumber = {
+    placement: {
+      entries: { primary: "0000:A71F", counter: "0000:A74F" },
+      xSource: {
+        rightVictim: `DS:${hex(origin.rightVictimX)}`,
+        leftVictim: `DS:${hex(origin.leftVictimX)}`,
+      },
+      xOffset: -origin.xSubtrahend,
+      y: origin.y,
+      rule: "after the strike stream, DS:7C35 = the struck unit's main-channel x - 20 and DS:7C37 = 120, in the battle-window coordinates of every channel",
+    },
+    drawGate: {
+      flag: "DS:7C32",
+      writers: damageFlagWrites,
+      counter: "DS:7C33",
+      rule: "B4F1 clears DS:7C33 while DS:7C32 is 'N' (the whole strike stream); once A1E8 sets 'Y' every B4F1 call counts a draw, picks the velocity for that count, draws, then adds the velocity. Nothing clears the flag before the next A1E8, so the death stream's AD70 substeps keep drawing it",
+      callers: [
+        "AD70 (every post-hit and death-stream substep), after the channels (B04A) and before the common trail (B3BD)",
+        "AD51 (every AD36 hold redraw), in the same order",
+      ],
+    },
+    velocity: {
+      selector: "0000:B518 reads the acting side DS:7A00: 1 -> B52F, 2 -> B5B4",
+      leftActor: leftActorVelocity,
+      rightActor: rightActorVelocity,
+      applied: "after the draw, so draw k is at the origin plus the velocities of draws 1..k-1",
+    },
+    field: {
+      formatter: "0000:EF56",
+      address: "DS:7C3D",
+      characters: fieldBytes.length - 1,
+      terminator: "$",
+      digits: "five decimal digits; leading zeroes become spaces except the last digit",
+      sign: {
+        inserter: "0000:A2CF",
+        character: "-",
+        scanFrom: 1,
+        loopCounter: "CX still holds DS:7CD7: EF56 divides with AX/BX/DX only",
+        rule: "starting at the second byte, skip spaces with LOOP (decrement CX, continue while CX != 0), then write the minus one byte before where the scan stopped; damage 1 and 2 run out of CX early and leave a space between the minus and the digit",
+      },
+    },
+    glyph: {
+      drawer: "0000:F3C6",
+      halfWidthGlyph: "0000:F4FB",
+      romRows: codeByte("0000:F59E"),
+      cellRows: readWord(moduleBuffer, 0xfa5e),
+      cellWidth: readWord(moduleBuffer, 0xfa5c) * 8,
+      romFont: "F000:FA6E",
+      rowDoubling: "F584 stores every ROM row twice (lodsb, stosb, stosb)",
+      passes: glyphPasses,
+      advance: codeByte("0000:F576"),
+      spaceAdvance: codeByte("0000:F576"),
+      terminators: stringTerminators,
+      lineBreak: { character: "|", resetsToStartX: true, deltaY: codeByte("0000:F582") },
+      blit: "F5C8 ORs set glyph bits into the colour's planes and clears them in the others; clear bits leave the buffer untouched. The target DS:02B9 is the battle buffer the channels use (56-byte rows); nothing clips it to the window or the y=135 ground line",
+      clampNonPositiveXTo: readCodeWord(moduleBuffer, "0000:F5F9"),
+      unreachableSkip: "F3FA skips ASCII bytes while DX == 'Y'; B4F1 is always reached after B04A has drawn a channel, whose DD8E return leaves DX below 56",
+    },
+    ink: {
+      variable: "DS:F93C",
+      strikeColorIndex: strikeInkIndex,
+      strikeSetAt: "0000:A20F, before the post-hit stream",
+      resetColorIndex: afterStrikeInkIndex,
+      resetAt: "0000:A237, when A1E8 returns after the AD36 hold",
+      deathStream: "B683/B6BD run after A1E8 returns, so a fatal strike's death-stream draws use the reset colour",
+    },
+    shadow: {
+      variable: "DS:F93E",
+      colorIndex: readWord(moduleBuffer, 0xf93e),
+      writers: shadowColorWrites,
+    },
+    restAfterDraw: leftActorVelocity.bands.at(-1).drawsBelow,
+  };
+
   const result = {
     format: "ANGEL2 ordinary combat presentation rules",
     phase: "asset_and_gdd_reconstruction_only",
@@ -1199,6 +1504,7 @@ async function extract(
         draws: "max(0, drawLimit - post-hit substeps); none when either remainder is 0, i.e. after a fatal strike or when a side is left at exactly 210, 420 or 630 life",
         iteration: "AD51 draws the background (AEC3), both main channels (B04A), the damage number (B4F1) and the common trail (B3BD), presents and waits one native tick; ACC4 is not called, so channels keep their positions while B1A8/B344 still advance their animation counters",
       },
+      damageNumber,
       death: {
         leftHandler: "0000:B683",
         rightHandler: "0000:B6BD",
@@ -1252,7 +1558,7 @@ async function extract(
       ],
     },
     evidenceBoundary: {
-      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, shared full-screen channel/compositor coordinates and primary/counter initialization, separate actor (+50) and defender (direct) frame placement tables, the y=135 channel ground clip, the main-channel E336 ground shadow, per-substep channel draw order, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering",
+      confirmed: "map hit/death descriptor timelines, native waits, map sound requests, full-screen resource-record selection, five-slot per-class E banks, shared full-screen channel/compositor coordinates and primary/counter initialization, separate actor (+50) and defender (direct) frame placement tables, the y=135 channel ground clip, the main-channel E336 ground shadow, per-substep channel draw order, 210-pixel tiered life-gauge geometry and impact update timing, shared B3BD trail coordinates with no class/frame lookup, <=10 guard versus >10 hurt command/sound selection for stage-0 classes, high-level primary/counter/death ordering, the damage number's origin, per-draw velocity bands, field formatting, drop-shadow glyph passes and ink colours",
       preservedUnknown: "the original design names of many embedded full-screen command fields and the host/VGA duration of one full-screen renderer substep; the released nominal native timer tick is 10.000151 ms",
       implementation: "none; this export is phase-1 evidence only",
     },

@@ -7,16 +7,19 @@ import {
 } from "../../src/game/content/full-combat-acceptance";
 import {
   STAGE0_FULL_COMBAT_ASSETS,
+  STAGE0_FULL_COMBAT_DAMAGE_NUMBER,
   STAGE0_FULL_COMBAT_DEATH,
   STAGE0_FULL_COMBAT_GEOMETRY,
   STAGE0_FULL_COMBAT_HOLD,
   STAGE0_FULL_COMBAT_PROFILES,
 } from "../../src/game/content/stage0-actions.generated";
-import { className } from "../../src/game/content/classes";
+import { classIdFromNativeRecord, className } from "../../src/game/content/classes";
+import { NATIVE_FONT } from "../../src/game/content/native-font.generated";
 import {
   buildFullCombatScript,
   FULL_SCENE,
   FULL_COMBAT_FRAME_META,
+  nativeDamageField,
   nativeFullCombatLifeGauge,
   nativeMainChannelShadowBands,
   type FullCombatPhaseName,
@@ -2305,7 +2308,10 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(hold.camera - impact.camera).toBe(64);
     expect(apexVictim).toMatchObject({ x: impactVictim?.x, lift: 12 });
     expect(holdVictim).toMatchObject({ x: impactVictim?.x, lift: 4 });
-    expect(primaryLast.damage?.x).toBe(impact.damage?.x);
+    // The number is drawn once per post-hit substep and moves after each draw;
+    // the eighth and last post-hit draw is at (x0 + 28, 114).
+    expect(impact.damage).toMatchObject({ x: 270, y: 120, draw: 1 });
+    expect(primaryLast.damage).toMatchObject({ x: 298, y: 114, draw: 8 });
     // The post-hit stream sets no animation mode, so the strike's :X keeps
     // alternating the flame frames: 5, 4, 5 at x=205, 165, 125. The stage-0
     // capture shows frame 4 at channel x 165 (video frames 120-122) and
@@ -2329,8 +2335,10 @@ describe("Full-screen ordinary combat choreography", () => {
       camera: hold.camera,
       viewportYOffset: hold.viewportYOffset,
       sprites: hold.sprites,
-      damage: hold.damage,
     });
+    // Only the number keeps moving through the AD51 redraws, then rests.
+    expect(hold.damage).toMatchObject({ x: 302, y: 126, draw: 9 });
+    expect(holdMidpoint.damage).toMatchObject({ x: 334, y: 126, draw: 19 });
 
     const counterImpactAt = markTime(script, "fullCounterImpact");
     const counterImpact = script.sample(counterImpactAt);
@@ -2351,8 +2359,11 @@ describe("Full-screen ordinary combat choreography", () => {
       camera: counterHold.camera,
       viewportYOffset: counterHold.viewportYOffset,
       sprites: counterHold.sprites,
-      damage: counterHold.damage,
     });
+    // B5B4 mirrors the hop for the side-2 counter: it settles 64 px to the
+    // left of its origin, 20 px left of the struck left soldier at x=210.
+    expect(counterImpact.damage).toMatchObject({ x: 190, y: 120, draw: 1, text: "   -8" });
+    expect(finalHoldMidpoint.damage).toMatchObject({ x: 126, y: 126 });
   });
 
   it("opens the native panels and stage in their measured order", () => {
@@ -2404,8 +2415,8 @@ describe("Full-screen ordinary combat choreography", () => {
       camera: hold.camera,
       viewportYOffset: hold.viewportYOffset,
       sprites: hold.sprites,
-      damage: hold.damage,
     });
+    expect(script.sample(script.duration).damage).toMatchObject({ x: 334, y: 126, draw: 20 });
   });
 
   it("mirrors common trail direction for the right-side counterattack", () => {
@@ -2871,5 +2882,223 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(script.cues.some(({ record, reason }) =>
       record === expectedRecord && reason === `full-primary-${expectedReaction}`)).toBe(true);
     expect(script.cues.filter(({ record }) => record === 14)).toHaveLength(1);
+  });
+});
+
+// Field origins (`DS:7C35/7C37`) of the first stage-0 battle's "  -24", tracked
+// in ref/战斗场景视频.mp4 by matching the whole field, shadow passes included,
+// against every frame (scene = capture - (96, 186)). Draws 1–8 fall on the
+// post-hit substeps, 9–19 on the AD51 hold redraws; draw 20 repeats draw 19.
+const CAPTURE_DAMAGE_ORIGINS = [
+  { draw: 1, frame: 116, x: 270, y: 120 },
+  { draw: 2, frame: 120, x: 274, y: 102 },
+  { draw: 3, frame: 123, x: 278, y: 84 },
+  { draw: 4, frame: 126, x: 282, y: 66 },
+  { draw: 5, frame: 128, x: 286, y: 78 },
+  { draw: 6, frame: 132, x: 290, y: 90 },
+  { draw: 7, frame: 134, x: 294, y: 102 },
+  { draw: 8, frame: 137, x: 298, y: 114 },
+  { draw: 9, frame: 139, x: 302, y: 126 },
+  { draw: 10, frame: 141, x: 306, y: 116 },
+  { draw: 11, frame: 144, x: 310, y: 106 },
+  { draw: 12, frame: 147, x: 314, y: 96 },
+  { draw: 13, frame: 149, x: 318, y: 106 },
+  { draw: 14, frame: 151, x: 322, y: 116 },
+  { draw: 15, frame: 153, x: 326, y: 126 },
+  { draw: 16, frame: 156, x: 328, y: 116 },
+  { draw: 17, frame: 158, x: 330, y: 106 },
+  { draw: 18, frame: 161, x: 332, y: 116 },
+  { draw: 19, frame: 163, x: 334, y: 126 },
+] as const;
+
+describe("Full-screen damage number (B4F1)", () => {
+  const POST_HIT_SUBSTEP = 50;
+  const HOLD_DRAW = 32;
+
+  it("hops through every draw exactly where the stage-0 capture shows it", () => {
+    const script = buildFullCombatScript(
+      unit(1, 0, "妮雅"),
+      unit(2, 48, "騎士團士兵"),
+      result(),
+    );
+    const impactAt = markTime(script, "fullImpact");
+    const holdAt = markTime(script, "fullHold");
+    expect(holdAt - impactAt).toBe(8 * POST_HIT_SUBSTEP);
+    expect(script.sample(impactAt - 1).damage).toBeUndefined();
+
+    for (const { draw, x, y } of CAPTURE_DAMAGE_ORIGINS) {
+      const t = draw <= 8
+        ? impactAt + (draw - 1) * POST_HIT_SUBSTEP
+        : holdAt + (draw - 9) * HOLD_DRAW;
+      expect(script.sample(t).damage, `draw ${draw}`).toEqual({
+        amount: 24,
+        text: "  -24",
+        x,
+        y,
+        draw,
+        inkColorIndex: 11,
+      });
+    }
+    // AD36 stops at the 20th draw, which repeats the 19th; the image then
+    // stays up until the counter's own strike stream repaints the window.
+    const counterAt = markTime(script, "fullCounterWindup");
+    for (const t of [holdAt + 11 * HOLD_DRAW, counterAt - 1]) {
+      expect(script.sample(t).damage).toMatchObject({ x: 334, y: 126, draw: 20, inkColorIndex: 11 });
+    }
+    expect(script.sample(counterAt).damage).toBeUndefined();
+  });
+
+  it("mirrors the hop when side 2 acts and restarts it for the counter", () => {
+    const script = buildFullCombatScript(
+      unit(2, 48, "騎士團士兵"),
+      unit(1, 0, "妮雅"),
+      result({ attackerId: "2:48", defenderId: "1:0", counterOccurred: false, counterDamage: 0 }),
+    );
+    const impactAt = markTime(script, "fullImpact");
+    // The struck left soldier stands at x=210, so the number starts at 190.
+    expect(script.sample(impactAt).damage).toMatchObject({ x: 190, y: 120, draw: 1 });
+    expect(script.sample(impactAt + POST_HIT_SUBSTEP).damage).toMatchObject({ x: 186, y: 102, draw: 2 });
+    expect(script.sample(script.duration).damage).toMatchObject({ x: 126, y: 126, draw: 20 });
+  });
+
+  it("keeps drawing the number, in white, through a fatal strike's death stream", () => {
+    const script = buildFullCombatScript(
+      unit(1, 0, "妮雅"),
+      unit(2, 48, "騎士團士兵"),
+      result({ damage: 180, defenderDied: true, counterOccurred: false, counterDamage: 0 }),
+    );
+    const impactAt = markTime(script, "fullImpact");
+    const deathAt = markTime(script, "fullDefenderDeath");
+    expect(deathAt - impactAt).toBe(8 * POST_HIT_SUBSTEP);
+    expect(script.sample(deathAt - 1).damage)
+      .toMatchObject({ text: " -180", x: 298, y: 114, draw: 8, inkColorIndex: 11 });
+    // A237 resets DS:F93C to 15 before B683/B6BD run, and only the next A1E8
+    // clears DS:7C32, so every death-stream substep draws the number white.
+    expect(script.sample(deathAt).damage)
+      .toMatchObject({ x: 302, y: 126, draw: 9, inkColorIndex: 15 });
+    expect(script.sample(deathAt + 10 * POST_HIT_SUBSTEP).damage)
+      .toMatchObject({ x: 334, y: 126, draw: 19, inkColorIndex: 15 });
+    const deathSubsteps = STAGE0_FULL_COMBAT_DEATH.right.steps
+      .reduce((sum, step) => sum + step.rendererSubsteps, 0);
+    expect(script.sample(script.duration).damage)
+      .toMatchObject({ x: 334, y: 126, draw: 8 + deathSubsteps, inkColorIndex: 15 });
+  });
+
+  it("leaves the last post-hit draw up when AD36 draws nothing", () => {
+    // 234 - 24 = 210 empties the right gauge's active tier, so AD36 skips
+    // every redraw and the eighth draw stays on screen.
+    const gaugeEdge = buildFullCombatScript(
+      unit(1, 0, "妮雅"),
+      { ...unit(2, 48, "騎士團士兵"), life: 234 },
+      result({ counterOccurred: false, counterDamage: 0 }),
+    );
+    const holdAt = markTime(gaugeEdge, "fullHold");
+    for (const t of [holdAt, holdAt + 300, gaugeEdge.duration]) {
+      expect(gaugeEdge.sample(t).damage).toMatchObject({ x: 298, y: 114, draw: 8 });
+    }
+
+    // Record 8's 40-substep post-hit stream passes the twentieth draw on its
+    // own: the number rests from draw 19 and AD36 adds nothing.
+    const halfDragon = classIdFromNativeRecord(8);
+    if (!halfDragon) throw new Error("record 8 has no class");
+    const longStream = buildFullCombatScript(
+      unit(1, 0, "測試攻方", halfDragon),
+      unit(2, 48, "騎士團士兵"),
+      result({ counterOccurred: false, counterDamage: 0 }),
+    );
+    const longHoldAt = markTime(longStream, "fullHold");
+    const longImpactAt = markTime(longStream, "fullImpact");
+    expect(longHoldAt - longImpactAt).toBe(40 * POST_HIT_SUBSTEP);
+    expect(longStream.sample(longImpactAt).damage).toMatchObject({ x: 180, y: 120, draw: 1 });
+    expect(longStream.sample(longImpactAt + 18 * POST_HIT_SUBSTEP).damage)
+      .toMatchObject({ x: 244, y: 126, draw: 19 });
+    expect(longStream.sample(longStream.duration).damage)
+      .toMatchObject({ x: 244, y: 126, draw: 40 });
+  });
+
+  it.each([
+    [0, "   -0"],
+    [1, " -  1"],
+    [2, "  - 2"],
+    [3, "   -3"],
+    [9, "   -9"],
+    [10, "  -10"],
+    [99, "  -99"],
+    [100, " -100"],
+    [999, " -999"],
+    [1000, "-1000"],
+  ] as const)("formats %i damage as the native field %j", (damage, field) => {
+    // A2CF's LOOP counter is the damage itself, so 1 and 2 stop the space
+    // scan early and leave the minus detached from the digit.
+    expect(nativeDamageField(damage)).toBe(field);
+  });
+
+  it("never reaches F5C8's x <= 0 clamp and never leaves the window", () => {
+    const { glyph } = STAGE0_FULL_COMBAT_DAMAGE_NUMBER;
+    expect(glyph.cellRows).toBe(NATIVE_FONT.cellHeight);
+    expect(glyph.cellWidth).toBe(NATIVE_FONT.halfWidthWidth);
+    let checked = 0;
+    for (const profile of Object.values(STAGE0_FULL_COMBAT_PROFILES)) {
+      const classId = classIdFromNativeRecord(profile.nativeRecord);
+      if (!classId) continue;
+      for (const side of profile.reach === "right-only" ? [2] as const : [1, 2] as const) {
+        const attacker = unit(side, 0, "測試攻方", classId);
+        const defender = unit(side === 1 ? 2 : 1, 48, "測試守方");
+        const script = buildFullCombatScript(attacker, defender, result({
+          attackerId: attacker.id,
+          defenderId: defender.id,
+          damage: 123,
+          counterOccurred: false,
+          counterDamage: 0,
+        }));
+        const first = script.sample(markTime(script, "fullImpact")).damage;
+        const last = script.sample(script.duration).damage;
+        if (!first || !last) throw new Error(`record ${profile.nativeRecord} drew no number`);
+        // The hop only ever moves one way, so the two ends bound every draw.
+        const leftmostGlyph = Math.min(first.x, last.x) + glyph.advance * first.text.indexOf("-");
+        const rightmostPixel = Math.max(first.x, last.x) + glyph.advance * first.text.length + 1;
+        expect(leftmostGlyph, `record ${profile.nativeRecord} side ${side}`)
+          .toBeGreaterThan(glyph.clampNonPositiveXTo - 1);
+        expect(rightmostPixel, `record ${profile.nativeRecord} side ${side}`)
+          .toBeLessThanOrEqual(FULL_SCENE.width);
+        checked += 1;
+      }
+    }
+    expect(checked).toBe(75);
+  });
+
+  it.skipIf(!EVIDENCE_AVAILABLE)("ships the damage-number rules the extractor read from module 29", async () => {
+    const evidence = JSON.parse(await readFile(
+      path.join(workspace, "reverse/parsed/native/combat-presentations.json"),
+      "utf8",
+    )) as {
+      fullScreenPresentation: {
+        damageNumber: {
+          placement: { xOffset: number; y: number };
+          velocity: {
+            leftActor: { bands: unknown[]; otherwise: unknown };
+            rightActor: { bands: Array<{ drawsBelow: number; dx: number; dy: number }> };
+          };
+          glyph: { passes: Array<{ dx: number; dy: number; colorVariable: string }> };
+          ink: { strikeColorIndex: number; resetColorIndex: number };
+          shadow: { colorIndex: number };
+        };
+      };
+    };
+    const native = evidence.fullScreenPresentation.damageNumber;
+    const shipped = STAGE0_FULL_COMBAT_DAMAGE_NUMBER;
+    expect(shipped.origin).toEqual({ xOffsetFromVictim: native.placement.xOffset, y: native.placement.y });
+    expect(shipped.velocityBySide1Actor).toEqual(native.velocity.leftActor);
+    expect(native.velocity.rightActor.bands).toEqual(shipped.velocityBySide1Actor.bands
+      .map(({ drawsBelow, dx, dy }) => ({ drawsBelow, dx: -dx, dy })));
+    expect([...shipped.glyph.shadowPasses, shipped.glyph.inkPass])
+      .toEqual(native.glyph.passes.map(({ dx, dy }) => ({ dx, dy })));
+    expect(native.glyph.passes.map(({ colorVariable }) => colorVariable))
+      .toEqual(["DS:F93E", "DS:F93E", "DS:F93E", "DS:F93C"]);
+    expect(shipped.inkColorIndex).toEqual({
+      strike: native.ink.strikeColorIndex,
+      afterStrike: native.ink.resetColorIndex,
+    });
+    expect(shipped.shadowColorIndex).toBe(native.shadow.colorIndex);
   });
 });

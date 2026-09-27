@@ -1451,7 +1451,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   /* Buffer rows the compositor never fills, or fills from past the record's
      last row, show palette 0 (REMAKE-169). */
   background: #000000;
-  /* Keeps the native channel layering below the damage number and gauges. */
+  /* Keeps the native channel, damage-number and dust layering in the scene. */
   isolation: isolate;
 }
 .full-combat-backdrop { position: absolute; inset: 0; }
@@ -1631,17 +1631,17 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
   justify-content: center;
   overflow: hidden;
 }
-/* Sits on the floor beside the victim and overhangs the scene's bottom edge
-   into the black strip, so it lives in the window rather than the clipped
-   scene. */
+/* `B4F1` draws the number into the battle buffer after every channel (`B04A`)
+   and before the common trail (`B3BD`), unclipped by the ground line, so it
+   sits in the scene over the channels (G1 is 50) and under the dust (60). The
+   element's top-left is the field origin `DS:7C35/7C37`, leading spaces
+   included in its canvas. */
 .full-damage-number {
   position: absolute;
-  z-index: 4;
+  z-index: 55;
   left: 0;
-  bottom: 9px;
-  display: flex;
-  width: 96px;
-  justify-content: center;
+  top: 0;
+  display: block;
 }
 
 .dialogue-layer { position: absolute; z-index: 12; inset: 0; background: transparent; }

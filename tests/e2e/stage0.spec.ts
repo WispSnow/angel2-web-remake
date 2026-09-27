@@ -159,7 +159,14 @@ interface DebugState {
       }>;
       lance?: { x: number; y: number; frame: number; side: "left" | "right" };
       particles: Array<{ x: number; y: number; frame: number }>;
-      damage?: { amount: number; x: number };
+      damage?: {
+        amount: number;
+        text: string;
+        x: number;
+        y: number;
+        draw: number;
+        inkColorIndex: number;
+      };
     };
   };
   combatPresentationTrace: Array<{
@@ -3815,6 +3822,13 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   expect(beat("fullCounterHold")?.camera).toBe(0);
   expect(beat("fullImpact")?.damage?.amount).toBe(fullResolved.lastCombat?.damage);
   expect(beat("fullCounterImpact")?.damage?.amount).toBe(fullResolved.lastCombat?.counterDamage);
+  // A71F/A74F put the number 20 px left of the struck soldier's channel (x=290
+  // on the right, 210 on the left) at y=120, and B4F1 moves it after every
+  // draw: by the hold mark the eight post-hit draws have carried it to the
+  // ninth position. Palette 11 inks it until the strike ends.
+  expect(beat("fullImpact")?.damage).toMatchObject({ x: 270, y: 120, draw: 1, inkColorIndex: 11 });
+  expect(beat("fullHold")?.damage).toMatchObject({ x: 302, y: 126, draw: 9, inkColorIndex: 11 });
+  expect(beat("fullCounterImpact")?.damage).toMatchObject({ x: 190, y: 120, draw: 1, inkColorIndex: 11 });
   // The victim only appears shortly before contact, and the attacker uses the
   // class+50 bundle while the victim uses the direct one.
   expect(beat("fullWindup")?.sprites.map(({ set }) => set)).toEqual(["plus50"]);
@@ -3951,6 +3965,13 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
     ...Array.from({ length: 15 }, () => "defenderDeath" as const),
   ]);
   expect(deathResolved.audioCueLog.filter(({ record }) => record === 11)).toHaveLength(1);
+  // A237 resets the ink to palette 15 before B683 runs the death stream, whose
+  // substeps keep drawing and moving the number.
+  const deathBeat = (phase: string) =>
+    deathResolved.combatPresentationTrace.find((entry) => entry.phase === phase)?.fullScene;
+  expect(deathBeat("fullImpact")?.damage).toMatchObject({ draw: 1, inkColorIndex: 11 });
+  expect(deathBeat("fullDefenderDeath")?.damage?.inkColorIndex).toBe(15);
+  expect(deathBeat("fullDefenderDeath")?.damage?.draw).toBeGreaterThan(1);
   expect(deathResolved.audioCueLog.some(({ record, reason }) => record === 2 && reason === "full-primary-hurt")).toBe(true);
   expect(deathResolved.audioCueLog.some(({ record, reason }) => record === 11 && reason === "full-primary-death")).toBe(true);
 });

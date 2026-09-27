@@ -14,9 +14,10 @@
 //                     trail behind at world speed
 //   reveal   ~260 ms before impact the victim pops at the window edge and
 //                     dashes to his mark, arriving as the flames land
-//   impact   hit pose with the baked star burst, red damage number on the
-//                     victim's far side, threshold hit sound (E/0 at <=10,
-//                     E/2 above 10)
+//   impact   hit pose with the baked star burst, threshold hit sound (E/0
+//                     at <=10, E/2 above 10); the red damage number appears
+//                     20 px left of the victim's channel at y=120 and hops
+//                     away from the attacker on every later draw
 //   recoil   target remains fixed horizontally on screen while the camera
 //                     completes another 64 px in native 8 px steps; >10
 //                     damage adds the measured 0/4/8/12/8/4/0 px hop
@@ -37,6 +38,7 @@
 // two measured hops: 36 px, then 24 px, while the lance itself deflects back to
 // frame 6 and leaves the window instead of stopping at the contact point.
 import {
+  STAGE0_FULL_COMBAT_DAMAGE_NUMBER,
   STAGE0_FULL_COMBAT_DEATH,
   STAGE0_FULL_COMBAT_FRAME_META,
   STAGE0_FULL_COMBAT_GEOMETRY,
@@ -50,6 +52,7 @@ import {
   advanceFullCombatBackdropPhases,
   type FullCombatBackdropPhases,
 } from "./full-combat-backdrop";
+import { nativeNumericField } from "./native-text";
 import type { AttackResult, BattleUnit, UnitClassId } from "./types";
 
 export type FullCombatClass = number;
@@ -143,7 +146,28 @@ export interface FullCombatSceneState {
     classId: 20;
   };
   particles: Array<{ x: number; y: number; frame: number }>;
-  damage?: { amount: number; x: number };
+  damage?: FullCombatDamageNumberState;
+}
+
+/**
+ * The number `B4F1` last drew into the battle buffer. It is drawn after the
+ * channels and before the common trail, so it covers every character and the
+ * dust covers it.
+ */
+export interface FullCombatDamageNumberState {
+  amount: number;
+  /**
+   * The `EF56` field with the `A2CF` minus, leading spaces included: the
+   * `F3C6` cursor steps over them, so they place the digits.
+   */
+  text: string;
+  /** `DS:7C35/7C37`: top-left of the field's first cell, in scene pixels. */
+  x: number;
+  y: number;
+  /** `DS:7C33`: draws since the strike stream; the image on screen is this one. */
+  draw: number;
+  /** `DS:F93C` for this draw, a gameplay palette index. */
+  inkColorIndex: number;
 }
 
 export interface FullCombatLifeGaugeState {
@@ -247,9 +271,6 @@ const FULL_COMBAT_HOLD = 667;
 // capture shows hold draws 9..19 of the bouncing damage number over 24 video
 // frames at 75 fps: 32 ms per draw. At most 19 draws fit inside the Web hold.
 const NATIVE_HOLD_DRAW = 32;
-// Measured on the capture: the number lands on the floor about 60 px to the
-// victim's far side, its baseline just under the scene's bottom edge.
-const DAMAGE_OFFSET = 60;
 
 interface StrikeSpec {
   start: number;
@@ -1585,10 +1606,93 @@ function nativePresentationAt(
   return { viewportYOffset: state.viewportYOffset, particles: state.particles };
 }
 
-function damageAt(spec: StrikeSpec, times: StrikeTimes, t: number, holdEnd: number): FullCombatSceneState["damage"] {
-  if (t < times.impact || t > holdEnd) return undefined;
-  const attackDir = spec.actorSide === "left" ? 1 : -1;
-  return { amount: spec.damage, x: spec.victimX + attackDir * DAMAGE_OFFSET };
+const DAMAGE_NUMBER = STAGE0_FULL_COMBAT_DAMAGE_NUMBER;
+
+/**
+ * `EF56` right-aligns the damage in a five-character field and `A2CF` writes
+ * the minus just before the first digit. `A2CF` skips the spaces with `LOOP`,
+ * whose counter still holds the damage `EF56` was handed, so damage 1 and 2
+ * run it out early: the original draws " -  1" and "  - 2".
+ */
+export function nativeDamageField(damage: number): string {
+  const characters = [...nativeNumericField(damage)];
+  let index = DAMAGE_NUMBER.field.signScanFrom - 1;
+  let counter = Math.max(0, Math.trunc(damage)) & 0xffff;
+  while (characters[index + 1] === " ") {
+    index += 1;
+    counter = (counter - 1) & 0xffff;
+    if (counter === 0) break;
+  }
+  characters[index] = DAMAGE_NUMBER.field.sign;
+  return characters.join("");
+}
+
+/**
+ * How many times `B4F1` has drawn the number by `t`: once per post-hit
+ * substep, then once per `AD51` hold redraw. Only the next `A1E8` clears
+ * `DS:7C32`, so after a fatal strike every death-stream substep draws it too.
+ */
+function damageNumberDraws(spec: StrikeSpec, times: StrikeTimes, t: number): number {
+  const post = nativeReactionStream(
+    spec.actorClass,
+    spec.actorSide,
+    spec.damage <= 10 ? "guard" : "hurt",
+    "actor",
+  );
+  if (t < times.holdStart) {
+    return renderedNativeSubsteps(post, t - times.impact, NATIVE_POST_HIT_SUBSTEP);
+  }
+  const postHitDraws = post.reduce((sum, step) => sum + step.rendererSubsteps, 0);
+  if (spec.victimDies) {
+    const victimSide = spec.actorSide === "left" ? "right" : "left";
+    return postHitDraws + renderedNativeSubsteps(
+      STAGE0_FULL_COMBAT_DEATH[victimSide].steps,
+      t - times.holdStart,
+      NATIVE_POST_HIT_SUBSTEP,
+    );
+  }
+  if (times.holdDraws === 0) return postHitDraws;
+  return postHitDraws + Math.min(
+    times.holdDraws,
+    Math.floor((t - times.holdStart) / NATIVE_HOLD_DRAW) + 1,
+  );
+}
+
+/**
+ * `A71F/A74F` put the number 20 px left of the struck unit's main channel at
+ * y=120 once the strike stream ends. `B4F1` then draws it where it is and only
+ * afterwards adds the velocity `B52F` picks for that draw count (`B5B4`
+ * mirrors x when side 2 acts), so it hops away from the attacker and settles
+ * 64 px over and 6 px lower from the 19th draw on. `A237` resets the ink to
+ * white before `B683/B6BD` run, so the death-stream draws are white.
+ */
+function damageNumberAt(
+  spec: StrikeSpec,
+  times: StrikeTimes,
+  t: number,
+): FullCombatSceneState["damage"] {
+  if (t < times.impact) return undefined;
+  const draw = damageNumberDraws(spec, times, t);
+  const direction = spec.actorSide === "left" ? 1 : -1;
+  let x = spec.victimX + DAMAGE_NUMBER.origin.xOffsetFromVictim;
+  let y: number = DAMAGE_NUMBER.origin.y;
+  for (let counter = 1; counter < draw; counter += 1) {
+    const velocity = DAMAGE_NUMBER.velocityBySide1Actor.bands
+      .find(({ drawsBelow }) => counter < drawsBelow)
+      ?? DAMAGE_NUMBER.velocityBySide1Actor.otherwise;
+    x += direction * velocity.dx;
+    y += velocity.dy;
+  }
+  return {
+    amount: spec.damage,
+    text: nativeDamageField(spec.damage),
+    x,
+    y,
+    draw,
+    inkColorIndex: spec.victimDies && t >= times.holdStart
+      ? DAMAGE_NUMBER.inkColorIndex.afterStrike
+      : DAMAGE_NUMBER.inkColorIndex.strike,
+  };
 }
 
 function strikeCues(spec: StrikeSpec, times: StrikeTimes): FullCombatCue[] {
@@ -1714,7 +1818,7 @@ function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
     lance: lanceAt(spec, times, t),
     projectile: archerProjectileAt(spec, times, t),
     particles: nativePresentation.particles,
-    damage: damageAt(spec, times, t, times.settle),
+    damage: damageNumberAt(spec, times, t),
   };
 }
 

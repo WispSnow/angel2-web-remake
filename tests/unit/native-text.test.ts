@@ -12,7 +12,9 @@ import {
   NATIVE_TEXT,
   NATIVE_TEXT_ORIGINS,
 } from "../../src/game/content/native-font.generated";
+import { STAGE0_FULL_COMBAT_DAMAGE_NUMBER } from "../../src/game/content/stage0-actions.generated";
 import {
+  layoutNativeDropShadowText,
   layoutNativeText,
   NATIVE_CONCEALED_FIELD,
   nativeIdentityField,
@@ -263,5 +265,33 @@ describe("outline", () => {
     expect(NATIVE_TEXT.outline.inkOffset).toEqual({ dx: 1, dy: 1 });
     expect(NATIVE_TEXT.outline.fullWidth).toMatchObject({ maskRows: 17, dilationRowOffsets: [0, 1, 2] });
     expect(NATIVE_TEXT.outline.halfWidth).toMatchObject({ maskRows: 16, dilationRowOffsets: [0, 2] });
+  });
+});
+
+describe("0000:F3C6 drop-shadow cursor", () => {
+  const { glyph } = STAGE0_FULL_COMBAT_DAMAGE_NUMBER;
+
+  test("steps 8 for spaces and glyphs alike, so the field's spaces place the digits", () => {
+    const layout = layoutNativeDropShadowText("  -24", 270, 120, glyph);
+    expect(layout.glyphs).toEqual([
+      { cell: asciiCell("-"), x: 286, y: 120, halfWidth: true },
+      { cell: asciiCell("2"), x: 294, y: 120, halfWidth: true },
+      { cell: asciiCell("4"), x: 302, y: 120, halfWidth: true },
+    ]);
+    expect(layout.x).toBe(310);
+  });
+
+  test("grows the box by the one-pixel shadow right and below the doubled ROM cell", () => {
+    expect(glyph.shadowPasses).toEqual([{ dx: 0, dy: 1 }, { dx: 1, dy: 0 }, { dx: 1, dy: 1 }]);
+    expect(glyph.inkPass).toEqual({ dx: 0, dy: 0 });
+    const layout = layoutNativeDropShadowText(" -  1", 0, 0, glyph);
+    expect(layout.glyphs.map(({ x }) => x)).toEqual([8, 32]);
+    expect(layout.right).toBe(32 + NATIVE_FONT.halfWidthWidth + 1);
+    expect(layout.bottom).toBe(NATIVE_FONT.cellHeight + 1);
+  });
+
+  test("refuses the Big5 branch and the line break it does not implement", () => {
+    expect(() => layoutNativeDropShadowText("-24|", 0, 0, glyph)).toThrow(/half-width/u);
+    expect(() => layoutNativeDropShadowText("傷害", 0, 0, glyph)).toThrow(/half-width/u);
   });
 });

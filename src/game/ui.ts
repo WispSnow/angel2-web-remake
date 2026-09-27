@@ -10,6 +10,7 @@ import { BATTLE_ACTION_DEFINITIONS } from "./content/actions";
 import {
   STAGE0_FULL_COMBAT_ASSETS,
   STAGE0_FULL_COMBAT_COMMON_EFFECTS,
+  STAGE0_FULL_COMBAT_DAMAGE_NUMBER,
 } from "./content/stage0-actions.generated";
 import {
   classDefinition,
@@ -64,6 +65,7 @@ import {
   keyboardDirection,
 } from "./input-bindings";
 import {
+  type NativeDomTextStyle,
   nativeMenuLabelText,
   paintNativeDomText,
   paintNativeDomTextIn,
@@ -1901,8 +1903,8 @@ function buildFullCombatSkeleton(
             <div class="full-combat-sprite slot-effect-G4" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G4-sprite"></i></div>
             <div class="full-combat-sprite slot-effect-G5" hidden><i class="full-combat-frame" aria-hidden="true" data-testid="full-effect-G5-sprite"></i></div>
           </div>
+          <b class="full-damage-number" data-testid="full-damage-number" hidden></b>
         </div>
-        <b class="full-damage-number" data-testid="full-damage-number" hidden></b>
       </div>
       </div>
     </div>`;
@@ -2155,11 +2157,21 @@ export function renderCombat(
   const damage = query<HTMLElement>(".full-damage-number");
   if (scene.damage) {
     damage.hidden = false;
-    // 全景傷害數字是原版自己畫的（`A1E8` 格式化 `DS:7CD7` 後立刻顯示），所以走 BIOS
-    // 半形字模而不是宿主 sans-serif。取證沒有記下它的色號，因此沿用複刻既有的紅，
-    // 只換字形不換顏色。
-    paintNativeDomText(damage, `-${scene.damage.amount}`, { ink: FULL_DAMAGE_NUMBER_INK });
-    damage.style.transform = `translateX(${Math.round(scene.damage.x - 48)}px)`;
+    // 全景傷害數字是原版自己畫進戰鬥緩衝區的：`F3C6` 以 BIOS 半形字模（每列加倍）
+    // 逐字先蓋三道 `DS:F93E` 黑影、再蓋 `DS:F93C` 墨色，游標連空格一律前進 8。
+    // 欄位前導空格決定數字落點，所以整串照畫，元素左上角就是 `DS:7C35/7C37`。
+    paintNativeDomText(
+      damage,
+      scene.damage.text,
+      fullDamageNumberStyle(scene.damage.inkColorIndex),
+      `-${scene.damage.amount}`,
+    );
+    damage.style.transform = `translate(${scene.damage.x}px, ${scene.damage.y}px)`;
+    damage.dataset.x = String(scene.damage.x);
+    damage.dataset.y = String(scene.damage.y);
+    damage.dataset.draw = String(scene.damage.draw);
+    damage.dataset.ink = String(scene.damage.inkColorIndex);
+    damage.dataset.text = scene.damage.text;
   } else {
     damage.hidden = true;
   }
@@ -2677,8 +2689,31 @@ const UNIT_COMMAND_ACTIONS: Readonly<Record<UnitCommandId, string>> = {
 /** `.group-command-menu button:disabled`, kept in one place so both agree. */
 const DISABLED_COMMAND_INK = "#81766d";
 
-/** The red the full-screen damage number has always used; no native colour is on record. */
-const FULL_DAMAGE_NUMBER_INK = "#ef3f41";
+const fullDamageNumberStyles = new Map<number, NativeDomTextStyle>();
+
+/**
+ * One stable style per ink, since the painter compares drop shadows by
+ * reference: `A1E8` inks the number with palette 11 until `A237` resets
+ * `DS:F93C` to 15, and every glyph gets the palette-0 `DS:F93E` shadow.
+ */
+function fullDamageNumberStyle(inkColorIndex: number): NativeDomTextStyle {
+  const cached = fullDamageNumberStyles.get(inkColorIndex);
+  if (cached) return cached;
+  const ink = NATIVE_GAMEPLAY_PALETTE[inkColorIndex];
+  if (!ink) throw new Error(`Damage-number ink ${inkColorIndex} is outside the gameplay palette`);
+  const { glyph, shadowColorIndex } = STAGE0_FULL_COMBAT_DAMAGE_NUMBER;
+  const style: NativeDomTextStyle = {
+    dropShadow: {
+      ink,
+      shadow: NATIVE_GAMEPLAY_PALETTE[shadowColorIndex],
+      shadowPasses: glyph.shadowPasses,
+      inkPass: glyph.inkPass,
+      advance: glyph.advance,
+    },
+  };
+  fullDamageNumberStyles.set(inkColorIndex, style);
+  return style;
+}
 
 /**
  * Repaints every command row under `menu` with the original bitmap font and the

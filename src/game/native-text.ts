@@ -304,6 +304,87 @@ export function drawNativeText(
   return layout;
 }
 
+/** One stamp of a glyph, relative to the cursor, in native pixels. */
+export interface NativeGlyphPass {
+  readonly dx: number;
+  readonly dy: number;
+}
+
+/**
+ * Module 29's other string drawer, `0000:F3C6`. It stamps a glyph in the
+ * shadow colour (`DS:F93E`) at every shadow pass and then in the ink colour
+ * (`DS:F93C`) at the ink pass, instead of `EA04`'s dilated outline, and steps
+ * the cursor by the same amount for a glyph and a space. The passes come from
+ * the caller's evidence so this module carries no drawer-specific table.
+ */
+export interface NativeDropShadowStyle {
+  readonly ink: string;
+  readonly shadow: string;
+  readonly shadowPasses: readonly NativeGlyphPass[];
+  readonly inkPass: NativeGlyphPass;
+  readonly advance: number;
+}
+
+/**
+ * Runs the `F3C6` cursor over half-width text. Its half-width branch (`F4FB`)
+ * draws the ROM cell with every row doubled, which is the atlas's half-width
+ * cell as is. Nothing the remake draws this way needs its Big5 branch or its
+ * `|` line break, so both are rejected rather than guessed.
+ */
+export function layoutNativeDropShadowText(
+  text: string,
+  x: number,
+  y: number,
+  style: Pick<NativeDropShadowStyle, "shadowPasses" | "inkPass" | "advance">,
+): NativeTextLayout {
+  const glyphs: NativeGlyph[] = [];
+  const passes = [...style.shadowPasses, style.inkPass];
+  let cursorX = x;
+  let right = x;
+  let bottom = y;
+  for (const character of text) {
+    const code = character.codePointAt(0) ?? 0;
+    if (character !== " ") {
+      const cell = character === "|" ? undefined : halfWidthCell(code);
+      if (cell === undefined) {
+        throw new Error(`The F3C6 drop-shadow layout only covers half-width text, not ${JSON.stringify(character)}`);
+      }
+      glyphs.push({ cell, x: cursorX, y, halfWidth: true });
+      for (const pass of passes) {
+        right = Math.max(right, cursorX + pass.dx + NATIVE_FONT.halfWidthWidth);
+        bottom = Math.max(bottom, y + pass.dy + NATIVE_FONT.cellHeight);
+      }
+    }
+    cursorX += style.advance;
+  }
+  return { glyphs, x: cursorX, y, right, bottom };
+}
+
+/** Draws `text` the way `F3C6` does: per glyph, every shadow pass, then the ink. */
+export function drawNativeDropShadowText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  style: NativeDropShadowStyle,
+): NativeTextLayout {
+  const source = font;
+  const layout = layoutNativeDropShadowText(text, x, y, style);
+  if (!source) return layout;
+  const ink = inkAtlasFor(source, style.ink);
+  const shadow = inkAtlasFor(source, style.shadow);
+  const previousSmoothing = context.imageSmoothingEnabled;
+  context.imageSmoothingEnabled = false;
+  for (const glyph of layout.glyphs) {
+    for (const pass of style.shadowPasses) {
+      blit(context, shadow, NATIVE_FONT.cellHeight, glyph, NATIVE_FONT.cellHeight, pass.dx, pass.dy);
+    }
+    blit(context, ink, NATIVE_FONT.cellHeight, glyph, NATIVE_FONT.cellHeight, style.inkPass.dx, style.inkPass.dy);
+  }
+  context.imageSmoothingEnabled = previousSmoothing;
+  return layout;
+}
+
 /**
  * `0000:EF56`: five decimal digits, then leading zeroes become spaces. A value
  * of zero would empty the field, so the last digit is restored — which is why a

@@ -2,8 +2,11 @@ import { NATIVE_MENU_LABEL_PADDING } from "./content/native-font.generated";
 import {
   NATIVE_INK_COLOR,
   NATIVE_OUTLINE_COLOR,
+  type NativeDropShadowStyle,
   type NativeTextMode,
+  drawNativeDropShadowText,
   drawNativeText,
+  layoutNativeDropShadowText,
   layoutNativeText,
   loadNativeFont,
 } from "./native-text";
@@ -37,6 +40,12 @@ export interface NativeDomTextStyle {
    * module-29 HUD the full-screen layer already owns.
    */
   readonly mode?: NativeTextMode;
+  /**
+   * Draws with `F3C6`'s drop shadow instead of `EA04`'s outline; `ink`,
+   * `outline` and `mode` are then ignored. Compared by reference, so pass a
+   * stable object.
+   */
+  readonly dropShadow?: NativeDropShadowStyle;
 }
 
 interface PaintedCanvas {
@@ -64,6 +73,10 @@ function paint(canvas: HTMLCanvasElement, text: string, style: NativeDomTextStyl
   const context = canvas.getContext("2d");
   if (!context) return;
   context.clearRect(0, 0, canvas.width, canvas.height);
+  if (style.dropShadow) {
+    drawNativeDropShadowText(context, text, 0, 0, style.dropShadow);
+    return;
+  }
   drawNativeText(context, text, 0, 0, {
     ink: style.ink ?? NATIVE_INK_COLOR,
     outline: style.outline ?? NATIVE_OUTLINE_COLOR,
@@ -77,6 +90,15 @@ export function nativeTextSize(
   mode: NativeTextMode = "story",
 ): { readonly width: number; readonly height: number } {
   const layout = layoutNativeText(text, 0, 0, mode);
+  return { width: Math.max(0, layout.right), height: Math.max(0, layout.bottom) };
+}
+
+function styledTextSize(
+  text: string,
+  style: NativeDomTextStyle,
+): { readonly width: number; readonly height: number } {
+  if (!style.dropShadow) return nativeTextSize(text, style.mode ?? "story");
+  const layout = layoutNativeDropShadowText(text, 0, 0, style.dropShadow);
   return { width: Math.max(0, layout.right), height: Math.max(0, layout.bottom) };
 }
 
@@ -112,7 +134,7 @@ export function nativeTextCanvas(
   style: NativeDomTextStyle = {},
   canvas: HTMLCanvasElement = document.createElement("canvas"),
 ): HTMLCanvasElement {
-  const { width, height } = nativeTextSize(text, style.mode ?? "story");
+  const { width, height } = styledTextSize(text, style);
   // A run of spaces has a cursor advance but no glyphs. Keeping the element at
   // 1x1 rather than 0x0 leaves it measurable and hit-testable like any label.
   canvas.width = Math.max(1, width);
@@ -166,7 +188,10 @@ export function paintNativeDomText(
 }
 
 function sameStyle(left: NativeDomTextStyle, right: NativeDomTextStyle): boolean {
-  return left.ink === right.ink && left.outline === right.outline && left.mode === right.mode;
+  return left.ink === right.ink
+    && left.outline === right.outline
+    && left.mode === right.mode
+    && left.dropShadow === right.dropShadow;
 }
 
 /** The visible menu label to the space-padded original string, per `input-ui.json`. */
