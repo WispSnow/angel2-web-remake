@@ -32397,7 +32397,42 @@ export const STAGE0_FULL_COMBAT_GEOMETRY = {
   "drawOrder": {
     "substep": "0000:AD70 draws the background (AEC3), the character channels (B04A), B4F1 and the common trail (B3BD) into the buffer, then presents it",
     "channels": "B04A runs B224 when side 1 acts ([7A00]=1) and B088 when side 2 acts; both walk channel offsets 8,6,4,2,0 and draw the defending side before the acting side at each offset",
-    "tokenChannels": "G1..G5 re-point channel offsets 0,2,4,6,8; the released tables only use G1 (drawn last) and G5 (drawn before both main channels)"
+    "tokenChannels": "G1..G5 re-point channel offsets 0,2,4,6,8; the released tables only use G1 (drawn last) and G5 (drawn before both main channels)",
+    "commonTrail": "B3BD runs after B04A and B4F1 in both AD70 and the AD51 hold draw, so the common trail covers every channel bitmap, including G1"
+  },
+  "channelState": {
+    "storage": {
+      "left": {
+        "streamPointer": "DS:7A7E",
+        "x": "DS:7AA6",
+        "y": "DS:7AB0",
+        "latchedFrame": "DS:7A88",
+        "poseFrame": "DS:7ABA",
+        "deltaX": "DS:7AC4",
+        "deltaY": "DS:7ACE",
+        "animationMode": "DS:7A92",
+        "animationCounter": "DS:7A9C"
+      },
+      "right": {
+        "streamPointer": "DS:7B04",
+        "x": "DS:7B2C",
+        "y": "DS:7B36",
+        "latchedFrame": "DS:7B0E",
+        "poseFrame": "DS:7B40",
+        "deltaX": "DS:7B4A",
+        "deltaY": "DS:7B54",
+        "animationMode": "DS:7B18",
+        "animationCounter": "DS:7B22"
+      },
+      "layout": "each table holds one word for each channel offset 0,2,4,6,8; offset 6 is the character main channel"
+    },
+    "initialization": "A2E4/A377 call B061 (left) and B1FD (right), giving every channel of a side the same x, y=135, latched frame 0 and animation mode XN; the animation counter is left untouched",
+    "stepParse": "A77F/A7A4 read one pose per active channel through A80F (left) and AA15 (right); :S (A8EF/AAF5) is the only command that writes a channel's x and y",
+    "frameLatch": "ACC4 latches every active channel's pose frame before the step's substeps (B0B7/B253)",
+    "draw": "B0FF/B29B pass the latched frame through B1A8/B344 on every draw: :X toggles the counter, X4/X6 advance it modulo 4/6, any other mode clears it, and the drawn frame is the latched frame plus the counter",
+    "accumulation": "after each drawn substep ACC4 adds dx/dy to every active channel (B0D7/B273), so a stream ends one increment past its last drawn position",
+    "positionWriters": "only :S, the initializers B061/B1FD and the accumulators B0D7/B273 write channel x/y; A71F/A74F only place the damage number at DS:7C35/7C37 and A24D/A28E only re-point stream pointers",
+    "persistence": "the post-hit, hold and death streams therefore continue each channel's x, y, animation mode and counter; nothing returns a channel to the ground line or restarts its counter between them"
   },
   "characterInitialization": {
     "primaryEntry": "0000:A2E4",
@@ -38899,7 +38934,76 @@ export const STAGE0_FULL_COMBAT_DEATH = {
         }
       }
     ]
+  },
+  "survivor": {
+    "steps": [
+      {
+        "index": 0,
+        "rendererSubsteps": 4,
+        "commands": [],
+        "pose": {
+          "frame": 0,
+          "deltaX": 0,
+          "deltaY": 0
+        }
+      },
+      {
+        "index": 1,
+        "rendererSubsteps": 4,
+        "commands": [],
+        "pose": {
+          "frame": 0,
+          "deltaX": 0,
+          "deltaY": 0
+        }
+      },
+      {
+        "index": 2,
+        "rendererSubsteps": 4,
+        "commands": [],
+        "pose": {
+          "frame": 0,
+          "deltaX": 0,
+          "deltaY": 0
+        }
+      },
+      {
+        "index": 3,
+        "rendererSubsteps": 4,
+        "commands": [],
+        "pose": {
+          "frame": 0,
+          "deltaX": 0,
+          "deltaY": 0
+        }
+      },
+      {
+        "index": 4,
+        "rendererSubsteps": 4,
+        "commands": [],
+        "pose": {
+          "frame": 0,
+          "deltaX": 0,
+          "deltaY": 0
+        }
+      },
+      {
+        "index": 5,
+        "rendererSubsteps": 4,
+        "commands": [],
+        "pose": {
+          "frame": 0,
+          "deltaX": 0,
+          "deltaY": 0
+        }
+      }
+    ]
   }
+} as const;
+
+export const STAGE0_FULL_COMBAT_HOLD = {
+  "entry": "0000:AD36",
+  "drawLimit": 20
 } as const;
 
 export const STAGE0_ACTION_PRESENTATION_ASSETS = {

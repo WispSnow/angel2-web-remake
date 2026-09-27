@@ -32,6 +32,7 @@ const CODE_SIGNATURES = [
   ["0000:9EED", "select-right-life-gauge-tier", "a1ea7a3dd20072103da401721b3d760272293d48037237c3a3277dc7062b7d0b00c706177d0000c32dd200a3277dc7062b7d0900c706177d0b00c32da401a3277dc7062b7d0d00c706177d0900c32d7602a3277dc7062b7d0600c706177d0d00c3"],
   ["0000:A17B", "full-screen-primary-counter-sequence", "e86601e8420dc7062d7d96a0c7062f7d1fa7e85800e8f014e82715833e647a007437833eea7a007430e82e00813ebb77"],
   ["0000:A1E8", "run-one-full-screen-strike", "c606327c4ee88f05a12f7dffd0c606327c59a12d7dffd08b0ed77cbe3d7ce84d4de8c300e819fcc7063cf90b00a11a7c"],
+  ["0000:A218", "run-post-hit-stream-then-hold", "a3187ce82000e85e05c606487f4ec606497f4ec706317d3a4ae88f05e8ff0ac7063cf90f00c3"],
   ["0000:A23E", "select-full-screen-hit-reaction", "833ed77c0a7704e84600c3e80100c3"],
   ["0000:A2E4", "prepare-full-screen-primary", "8b3ebf77e81f013c0174053c027448c3bafa00bb8700e8640dba8a02bb8700e8f70ee89401e81914a180f8be41029a0a"],
   ["0000:A377", "prepare-full-screen-counter", "8b3ebf77e88c003c0274053c017448c3bafa00bb8700e8d10cba8a02bb8700e8640ee87700e88613a180f8be41029a0a"],
@@ -39,12 +40,27 @@ const CODE_SIGNATURES = [
   ["0000:A49D", "setup-primary-left-actor-right-defender", "9ae100471ee83b03e83e05a1837ca37c7aa18b7ca3187ca18d7ca31a7ca18f7ca3847aa1917ca30a7ba1937ca3527aa1977ca3547aa1957ca3dc7aa1997ca3de7aa1857ca3787aa1877ca37a7aa19f7ca3fe7aa1a17ca3007b"],
   ["0000:A599", "setup-counter-right-actor-left-defender", "9ae100471ee83f02e84204a1a37ca3027ba1ab7ca3187ca1ad7ca31a7ca1af7ca30a7ba1b17ca3847aa1b37ca3d87aa1b77ca3da7aa1b57ca3567aa1b97ca3587aa1657ca3787aa1677ca37a7aa1a57ca3fe7aa1a77ca3007b"],
   ["0000:A623", "setup-primary-right-actor-left-defender", "9ae100471ee8b501e8b803a1bd7ca3027ba1c57ca3187ca1c77ca31a7ca1c97ca30a7ba1cb7ca3847aa1cd7ca3d87aa1d17ca3da7aa1cf7ca3567aa1d37ca3587aa1657ca3787aa1677ca37a7aa1bf7ca3fe7aa1c17ca3007b"],
+  ["0000:A71F", "damage-number-origin-callbacks", "8b3ebf77e8e4fc3c0174053c027411c3b87800a3377ca1327b2d1400a3357cc3b87800a3377ca1ac7a2d1400a3357cc38b3ebf77e8b4fc3c0274053c017411c3b87800a3377ca1327b2d1400a3357cc3b87800a3377ca1ac7a2d1400a3357cc3"],
   ["0000:A77F", "execute-full-screen-command-stream", "8b1e187c8b073dffff7419a3167c8306187c02e85f00e86202e85f04e8c104e82305ebdcc3"],
   ["0000:A7A4", "execute-full-screen-death-stream", "8b1e187c8b073dffff7413a3167c8306187c02e83a00e83d02e80405ebe2c3"],
+  ["0000:A7C3", "clear-linked-channels-keep-main", "b90500514903c98bd983fb06740bb8000089877e7a8987047b59e2e7c3"],
+  ["0000:A7E0", "clear-left-channels", "b90500514903c98bd9b8000089877e7a59e2f0c3"],
+  ["0000:A8D1", "read-left-pose-or-apply-s", "8bb77e7a8b048987ba7a8b44028987c47a8b44048987ce7a83877e7a06c38b44028987a67a8b44048987b07a83877e7a06e90aff"],
+  ["0000:A9E6", "clear-right-channels", "b90500514903c98bd9b800008987047b59e2f0c3"],
+  ["0000:AAD7", "read-right-pose-or-apply-s", "8bb7047b8b048987407b8b440289874a7b8b44048987547b8387047b06c38b440289872c7b8b44048987367b8387047b06"],
+  ["0000:ACC4", "run-command-step-substeps", "e8f003e88905a17c7ba3787ba1a07ba39c7b8b0e167c51e89200e8f603e88f05e80f00e82c008336fa7901e8760959e2e5c3"],
+  ["0000:AD36", "hold-until-damage-number-settles", "833e1d7d007413833e277d00740c833e337c147305e80300ebe6c3e86f01e8f302e89707e86006b8b902ba0800e86645e88e09b90100e84726c3"],
   ["0000:AD70", "render-one-full-screen-substep", "e85001c706687b3100c7068c7b3100e8c802c706687b3200c7068c7b3200e86007e82906e83700"],
   ["0000:B04A", "select-channel-draw-order", "833e007a017408833e007a027405c3e8c801c3e82800c3"],
+  ["0000:B061", "initialize-left-channels", "b90500514903c9890e767a8bf18994a67a899cb07ab800008984887ab8584e8984927a59e2ddc3"],
   ["0000:B088", "draw-channels-left-before-right", "b90500514903c9890e767a890efc7a8b1e767a83bf7e7a007403e85a008b1efc7a83bf047b007403e8e80159e2d5c3"],
-  ["0000:B0FF", "composite-left-channel-with-main-shadow", "8b1e767a8b87887ae89e00a3747ac70684f84102a14102ba00008b0e747ae87640890e6e7a8b367a7a8b1e747a03db8b008b1e767a8b97b07a2b166e7a03d08916727a8b36787a8b1e747a03db8b008b1e767a8b97a67a2bd08916707a8b16707a8b1e727a8b0e747abe4102bfb902e81f2fa1747a8b1e767a83fb0675148b16707abb84008b0e747abe4102bfb902e8a5318b16707a8b1e727a8b0e747abe4102bfb902e8e82bc3"],
+  ["0000:B0B7", "latch-left-frames-and-accumulate-motion", "b90500514903c9890e767a8bd983bf7e7a0074088b87ba7a8987887a59e2e4c3b90500514903c9890e767a8bd983bf7e7a0074108b87c47a0187a67a8b87ce7a0187b07a59e2dcc3"],
+  ["0000:B1A8", "advance-left-animation-counter", "81bf927a3a58741781bf927a3458741981bf927a36587427c7879c7a0000c383b79c7a0103879c7ac3ff879c7a83bf9c7a047206c7879c7a000003879c7ac3ff879c7a83bf9c7a067206c7879c7a000003879c7ac3"],
+  ["0000:B1FD", "initialize-right-channels", "b90500514903c9890efc7a8bf189942c7b899c367bb8000089840e7bb8584e8984187b59e2ddc3"],
+  ["0000:B253", "latch-right-frames-and-accumulate-motion", "b90500514903c9890efc7a8bd983bf047b0074088b87407b89870e7b59e2e4c3b90500514903c9890efc7a8bd983bf047b0074108b874a7b01872c7b8b87547b0187367b59e2dcc3"],
+  ["0000:B344", "advance-right-animation-counter", "81bf187b3a58741781bf187b3458741981bf187b36587427c787227b0000c383b7227b010387227bc3ff87227b83bf227b047206c787227b00000387227bc3ff87227b83bf227b067206c787227b00000387227bc3"],
+  ["0000:B4F1", "count-damage-number-draws", "803e327c4e7419ff06337ce81900e83701a1397c0106357ca13b7c0106377cc3c706337c0000c3"],
+  ["0000:B0FF", "composite-left-channel-with-main-shadow","8b1e767a8b87887ae89e00a3747ac70684f84102a14102ba00008b0e747ae87640890e6e7a8b367a7a8b1e747a03db8b008b1e767a8b97b07a2b166e7a03d08916727a8b36787a8b1e747a03db8b008b1e767a8b97a67a2bd08916707a8b16707a8b1e727a8b0e747abe4102bfb902e81f2fa1747a8b1e767a83fb0675148b16707abb84008b0e747abe4102bfb902e8a5318b16707a8b1e727a8b0e747abe4102bfb902e8e82bc3"],
   ["0000:B224", "draw-channels-right-before-left", "b90500514903c9890e767a890efc7a8b1efc7a83bf047b007403e85a008b1e767a83bf7e7a007403e8b0fe59e2d5c3"],
   ["0000:B29B", "composite-right-channel-with-main-shadow", "8b1efc7a8b870e7be89e00a3fa7ac70684f86902a16902ba00008b0efa7ae8da3e890ef47a8b36007b8b1efa7a03db8b008b1efc7a8b97367b2b16f47a03d08916f87a8b36fe7a8b1efa7a03db8b008b1efc7a8b972c7b2bd08916f67a8b16f67a8b1ef87a8b0efa7abe6902bfb902e8832da1fa7a8b1efc7a83fb0675148b16f67abb84008b0efa7abe6902bfb902e809308b16f67a8b1ef87a8b0efa7abe6902bfb902e84c2ac3"],
   ["0000:DF86", "draw-channel-bitmap-rows-with-ground-clip", "e8bd00a1e1f72ea3a6df8b1edff7a1bef78ec0e8d200a1d0f78ed8eb005157b9d2042e3b3e8ce072122e3b3e8ee0770b81ff881d77058a042608054647e2e35f83c7382e83068ce0382e83068ee03859e2cbb8ba1e8ed8c3"],
@@ -844,6 +860,45 @@ async function extract(
     sideExtension,
   }));
 
+  // Channel persistence, hold and survivor stream, read from the verified code.
+  const nearCallTarget = (address) => {
+    const { linear } = parseAddress(address);
+    return (linear + 3 + checkedSlice(moduleBuffer, linear + 1, linear + 3, address).readInt16LE(0))
+      & 0xffff;
+  };
+  const codeByte = (address) => {
+    const { linear } = parseAddress(address);
+    return checkedSlice(moduleBuffer, linear, linear + 1, address)[0];
+  };
+  for (const [address, target] of [
+    ["0000:A231", 0xa7c3],
+    ["0000:A234", 0xad36],
+    ["0000:AD57", 0xb4f1],
+    ["0000:AD5A", 0xb3bd],
+    ["0000:B69C", 0xa7e0],
+    ["0000:B69F", 0xa9e6],
+    ["0000:B6D6", 0xa7e0],
+    ["0000:B6D9", 0xa9e6],
+  ]) {
+    assert(nearCallTarget(address) === target,
+      `${address}: expected a call to 0000:${hex(target)}, found 0000:${hex(nearCallTarget(address))}`);
+  }
+  // A7C3 `cmp bx,6` skips the main channel; AD36 `cmp word [7C33],14h`.
+  const keptChannelOffset = codeByte("0000:A7CE");
+  const holdDrawLimit = codeByte("0000:AD48");
+  assert(keptChannelOffset === 6, "A7C3 must keep only the main channel offset 6");
+  assert(holdDrawLimit === 20, "AD36 must redraw until 20 post-strike draws");
+  const survivorStreamOffset = sameCodeWord(moduleBuffer, ["0000:B6B2", "0000:B6EC"],
+    "death survivor stream");
+  assert(readCodeWord(moduleBuffer, "0000:B6AC") === 0x7d5a
+    && readCodeWord(moduleBuffer, "0000:B6E6") === 0x7d84,
+  "B683/B6BD must install the left/right death streams on the dead side");
+  const survivorScript = parseSimpleDeathScript(moduleBuffer, survivorStreamOffset, 6);
+  assert(survivorStreamOffset === 0x7dae && survivorScript.commands.length === 0
+    && survivorScript.poses.every((pose) =>
+      pose.frame === 0 && pose.deltaX === 0 && pose.deltaY === 0),
+  "the death survivor stream must be six still frame-0 poses without commands");
+
   const result = {
     format: "ANGEL2 ordinary combat presentation rules",
     phase: "asset_and_gdd_reconstruction_only",
@@ -972,6 +1027,41 @@ async function extract(
           substep: "0000:AD70 draws the background (AEC3), the character channels (B04A), B4F1 and the common trail (B3BD) into the buffer, then presents it",
           channels: "B04A runs B224 when side 1 acts ([7A00]=1) and B088 when side 2 acts; both walk channel offsets 8,6,4,2,0 and draw the defending side before the acting side at each offset",
           tokenChannels: "G1..G5 re-point channel offsets 0,2,4,6,8; the released tables only use G1 (drawn last) and G5 (drawn before both main channels)",
+          commonTrail: "B3BD runs after B04A and B4F1 in both AD70 and the AD51 hold draw, so the common trail covers every channel bitmap, including G1",
+        },
+        channelState: {
+          storage: {
+            left: {
+              streamPointer: "DS:7A7E",
+              x: "DS:7AA6",
+              y: "DS:7AB0",
+              latchedFrame: "DS:7A88",
+              poseFrame: "DS:7ABA",
+              deltaX: "DS:7AC4",
+              deltaY: "DS:7ACE",
+              animationMode: "DS:7A92",
+              animationCounter: "DS:7A9C",
+            },
+            right: {
+              streamPointer: "DS:7B04",
+              x: "DS:7B2C",
+              y: "DS:7B36",
+              latchedFrame: "DS:7B0E",
+              poseFrame: "DS:7B40",
+              deltaX: "DS:7B4A",
+              deltaY: "DS:7B54",
+              animationMode: "DS:7B18",
+              animationCounter: "DS:7B22",
+            },
+            layout: "each table holds one word for each channel offset 0,2,4,6,8; offset 6 is the character main channel",
+          },
+          initialization: "A2E4/A377 call B061 (left) and B1FD (right), giving every channel of a side the same x, y=135, latched frame 0 and animation mode XN; the animation counter is left untouched",
+          stepParse: "A77F/A7A4 read one pose per active channel through A80F (left) and AA15 (right); :S (A8EF/AAF5) is the only command that writes a channel's x and y",
+          frameLatch: "ACC4 latches every active channel's pose frame before the step's substeps (B0B7/B253)",
+          draw: "B0FF/B29B pass the latched frame through B1A8/B344 on every draw: :X toggles the counter, X4/X6 advance it modulo 4/6, any other mode clears it, and the drawn frame is the latched frame plus the counter",
+          accumulation: "after each drawn substep ACC4 adds dx/dy to every active channel (B0D7/B273), so a stream ends one increment past its last drawn position",
+          positionWriters: "only :S, the initializers B061/B1FD and the accumulators B0D7/B273 write channel x/y; A71F/A74F only place the damage number at DS:7C35/7C37 and A24D/A28E only re-point stream pointers",
+          persistence: "the post-hit, hold and death streams therefore continue each channel's x, y, animation mode and counter; nothing returns a channel to the ground line or restarts its counter between them",
         },
         characterInitialization: {
           primaryEntry: "0000:A2E4",
@@ -990,7 +1080,7 @@ async function extract(
         subjectCoordinates: {
           attacker: "DS:7AAC (main slot DS:7AA6 + 6)",
           defender: "DS:7B32 (main slot DS:7B2C + 6)",
-          slotEvidence: "0000:A7C0 clears every sprite slot except offset 6",
+          slotEvidence: "0000:A7C3 clears every sprite slot except offset 6",
         },
         classOrFrameLookup: "none; B3BD reads no class record, bitmap width, or x-anchor",
         branches: {
@@ -1095,9 +1185,20 @@ async function extract(
         "invoke the attacker movement callback A71F/A74F",
         "invoke the primary/counter damage callback A096/A0C6 and render DS:7CD7 as the damage number",
         "replace DS:7C18 with DS:7C1A and execute the post-hit command stream",
+        "clear the linked channels with A7C3 and run the AD36 hold",
         "run left and right zero-life death handlers B683/B6BD",
         "if neither unit died and suppression is false, repeat with A377 and the counter callbacks",
       ],
+      hold: {
+        entry: "0000:AD36",
+        linkedChannelClear: "0000:A7C3 clears channel offsets 0,2,4,8 on both sides and keeps the main channels",
+        keptChannelOffset,
+        drawLimit: holdDrawLimit,
+        drawCounter: "DS:7C33: B4F1 clears it while the strike stream runs (DS:7C32='N') and counts every drawn substep after it, so the hold starts at the post-hit substep count",
+        loopCondition: "AD36 repeats AD51 while the left and right life-gauge remainders DS:7D1D/DS:7D27 are non-zero and DS:7C33 < drawLimit",
+        draws: "max(0, drawLimit - post-hit substeps); none when either remainder is 0, i.e. after a fatal strike or when a side is left at exactly 210, 420 or 630 life",
+        iteration: "AD51 draws the background (AEC3), both main channels (B04A), the damage number (B4F1) and the common trail (B3BD), presents and waits one native tick; ACC4 is not called, so channels keep their positions while B1A8/B344 still advance their animation counters",
+      },
       death: {
         leftHandler: "0000:B683",
         rightHandler: "0000:B6BD",
@@ -1106,6 +1207,9 @@ async function extract(
         rendererSubsteps: deathStepCounts.values.reduce((sum, value) => sum + value, 0),
         leftScript: parseSimpleDeathScript(moduleBuffer, 0x7d5a, 6),
         rightScript: parseSimpleDeathScript(moduleBuffer, 0x7d84, 6),
+        channelReset: "B683/B6BD call A7E0 and A9E6 to clear every channel pointer on both sides, then install the death stream on the dead side's main channel and the survivor stream on the other; channel x, y, latched frame, animation mode and counter carry over",
+        survivorScript,
+        survivorBehavior: "six frame-0 poses without commands: the surviving main channel keeps drawing frame 0 of its loaded set plus its inherited animation counter, with its E336 shadow, where the post-hit stream left it",
         commonTrailPlacement: {
           leftHandlerSlots: "B683 assigns DS:7A84=7D5A and DS:7B0A=7DAE, so UE is parsed by the physical-left stream",
           rightHandlerSlots: "B6BD assigns DS:7B0A=7D84 and DS:7A84=7DAE, so UE is parsed by the physical-right stream",

@@ -9,6 +9,7 @@ import {
   STAGE0_FULL_COMBAT_ASSETS,
   STAGE0_FULL_COMBAT_DEATH,
   STAGE0_FULL_COMBAT_GEOMETRY,
+  STAGE0_FULL_COMBAT_HOLD,
   STAGE0_FULL_COMBAT_PROFILES,
 } from "../../src/game/content/stage0-actions.generated";
 import { className } from "../../src/game/content/classes";
@@ -129,68 +130,107 @@ function sideVoiceSlots(
 const reachableSides = (profile: ReferenceProfile): readonly ("left" | "right")[] =>
   profile.reach === "right-only" ? ["right"] : ["left", "right"];
 
+type ReferenceAnimationMode = "none" | "alternate" | "cycle4" | "cycle6";
+
+/**
+ * One module-29 channel. Its position, animation mode and animation counter
+ * carry from stream to stream; nothing resets them between the strike,
+ * post-hit, hold and death streams.
+ */
+interface ReferenceChannel {
+  x: number;
+  y: number;
+  mode: ReferenceAnimationMode;
+  counter: number;
+}
+
+interface ReferenceChannelEnd extends ReferenceChannel {
+  latchedFrame: number;
+}
+
 interface ReferenceFrame {
   frame: number;
   x: number;
+  /** Battle-window y of the bitmap's bottom anchor. */
   y: number;
-  anchored: boolean;
 }
 
-function referenceNativeFrames(
+const GROUND_Y: number = STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization.actor.y;
+
+/** `B061/B1FD` start every channel on the ground line in mode `XN`. */
+function referenceChannel(x = 0, y = GROUND_Y): ReferenceChannel {
+  return { x, y, mode: "none", counter: 0 };
+}
+
+/** `B1A8/B344`: the counter moves on every draw, or clears in any other mode. */
+function nextReferenceCounter(mode: ReferenceAnimationMode, counter: number): number {
+  if (mode === "alternate") return counter ^ 1;
+  if (mode === "cycle4") return (counter + 1) % 4;
+  if (mode === "cycle6") return (counter + 1) % 6;
+  return 0;
+}
+
+/**
+ * Replays one stream on a channel: a step's commands apply first, every draw
+ * advances the counter, and `dx/dy` accumulate only after the draw.
+ */
+function referenceReplay(
   steps: readonly ReferenceCommandStep[],
-  initialX = 0,
-  initialY = 0,
-  initialAnchored = false,
-): ReferenceFrame[] {
+  initial: ReferenceChannel = referenceChannel(),
+): { frames: ReferenceFrame[]; end: ReferenceChannelEnd } {
+  const channel = { ...initial };
   const frames: ReferenceFrame[] = [];
-  let x = initialX;
-  let y = initialY;
-  let anchored = initialAnchored;
-  let mode: "none" | "alternate" | "cycle4" | "cycle6" = "none";
-  let counter = 0;
+  let latchedFrame = steps[0]?.pose.frame ?? 0;
   for (const step of steps) {
     for (const command of step.commands) {
-      if (command.token === ":X") mode = "alternate";
-      if (command.token === "X4") mode = "cycle4";
-      if (command.token === "X6") mode = "cycle6";
-      if (command.token === "XN") mode = "none";
+      if (command.token === ":X") channel.mode = "alternate";
+      if (command.token === "X4") channel.mode = "cycle4";
+      if (command.token === "X6") channel.mode = "cycle6";
+      if (command.token === "XN") channel.mode = "none";
       if (command.token === ":S") {
         const [nextX, nextY] = command.parameters;
-        if (typeof nextX === "number") x = nextX;
-        if (typeof nextY === "number") y = nextY;
-        anchored = true;
+        if (typeof nextX === "number") channel.x = nextX;
+        if (typeof nextY === "number") channel.y = nextY;
       }
     }
+    latchedFrame = step.pose.frame;
     for (let substep = 0; substep < step.rendererSubsteps; substep += 1) {
-      if (mode === "alternate") counter ^= 1;
-      else if (mode === "cycle4") counter = (counter + 1) % 4;
-      else if (mode === "cycle6") counter = (counter + 1) % 6;
-      else counter = 0;
-      frames.push({ frame: step.pose.frame + counter, x, y, anchored });
-      x += step.pose.deltaX;
-      y += step.pose.deltaY;
+      channel.counter = nextReferenceCounter(channel.mode, channel.counter);
+      frames.push({ frame: latchedFrame + channel.counter, x: channel.x, y: channel.y });
+      channel.x += step.pose.deltaX;
+      channel.y += step.pose.deltaY;
     }
+  }
+  return { frames, end: { ...channel, latchedFrame } };
+}
+
+/** `AD51` hold redraws: the channel stays put while its counter keeps moving. */
+function referenceRedraws(channel: ReferenceChannelEnd, draws: number): number[] {
+  const frames: number[] = [];
+  let counter = channel.counter;
+  for (let draw = 0; draw < draws; draw += 1) {
+    counter = nextReferenceCounter(channel.mode, counter);
+    frames.push(channel.latchedFrame + counter);
   }
   return frames;
 }
 
 /**
- * `:S` writes battle-window coordinates whose y is the bitmap bottom anchor;
- * a stream that has not been repositioned stays in the ground-relative frame
- * the character channel starts in.
+ * Fresh-channel frames from an explicit origin. The linked `G1..G5` streams
+ * open with `:S`, and the remake still restarts their counters at the
+ * post-hit hand-over.
  */
-function referenceActorLift({ y, anchored }: Pick<ReferenceFrame, "y" | "anchored">): number {
-  return anchored
-    ? STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization.actor.y - y
-    : Math.max(0, -y);
+function referenceNativeFrames(
+  steps: readonly ReferenceCommandStep[],
+  initialX = 0,
+  initialY = 0,
+): ReferenceFrame[] {
+  return referenceReplay(steps, referenceChannel(initialX, initialY)).frames;
 }
 
-/**
- * Defender streams never take `:S`, so the channel stays ground-relative and
- * may sink below the line; the compositor's ground clip hides what falls past.
- */
-function referenceDefenderLift(y: number): number {
-  return y === 0 ? 0 : -y;
+/** Nothing holds a channel on the ground line; the `DF86` clip hides what sinks. */
+function referenceLift(y: number): number {
+  return GROUND_Y - y;
 }
 
 function referenceNativeEnd(
@@ -198,13 +238,8 @@ function referenceNativeEnd(
   initialX = 0,
   initialY = 0,
 ): { x: number; y: number } {
-  const frames = referenceNativeFrames(steps, initialX, initialY);
-  const finalStep = steps.at(-1);
-  const finalFrame = frames.at(-1);
-  return {
-    x: (finalFrame?.x ?? initialX) + (finalStep?.pose.deltaX ?? 0),
-    y: (finalFrame?.y ?? initialY) + (finalStep?.pose.deltaY ?? 0),
-  };
+  const { x, y } = referenceReplay(steps, referenceChannel(initialX, initialY)).end;
+  return { x, y };
 }
 
 function referenceFrameIntersectsViewport(
@@ -557,18 +592,25 @@ describe("Full-screen ordinary combat choreography", () => {
       const streams = sideStreams(profile, side);
       const mainActor = streams.mainLeftOrAttacker.steps as readonly ReferenceCommandStep[];
       const mainVictim = streams.mainRightOrDefender.steps as readonly ReferenceCommandStep[];
-      const mainActorFrames = referenceNativeFrames(mainActor, expectedActorMark(record, side), 0);
-      const mainVictimFrames = referenceNativeFrames(mainVictim);
-      const mainVictimEnd = referenceNativeEnd(mainVictim);
+      const victimStartX = STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization
+        .opponentByActorSide[side].x;
+      const mainActorReplay = referenceReplay(
+        mainActor,
+        referenceChannel(expectedActorMark(record, side)),
+      );
+      const mainVictimReplay = referenceReplay(mainVictim, referenceChannel(victimStartX));
+      const mainActorFrames = mainActorReplay.frames;
+      const mainVictimFrames = mainVictimReplay.frames;
       const mainCamera = referenceNativeCameraFrames(mainActor);
       const victimMark = expectedVictimMark(record, side);
+      expect(mainVictimReplay.end.x).toBe(victimMark);
       expect(mainVictimFrames).toHaveLength(mainActorFrames.length);
       const mainPresentation = referencePresentationFrames(
         mainActor,
         mainVictim,
         mainActorFrames.map((actorFrame, index) => ({
           actorX: actorFrame.x,
-          victimX: victimMark + mainVictimFrames[index].x - mainVictimEnd.x,
+          victimX: mainVictimFrames[index].x,
         })),
         side,
         "attack",
@@ -593,11 +635,11 @@ describe("Full-screen ordinary combat choreography", () => {
             side,
             frame: expectedActor.frame,
             x: expectedActor.x,
-            lift: referenceActorLift(expectedActor),
+            lift: referenceLift(expectedActor.y),
           });
         }
         const expectedVictim = mainVictimFrames[index];
-        const victimX = victimMark + expectedVictim.x - mainVictimEnd.x;
+        const victimX = expectedVictim.x;
         const actualVictim = state.sprites.find(({ channel }) => channel === "victim");
         if (!referenceFrameIntersectsViewport(
           side === "left" ? "right" : "left",
@@ -612,7 +654,7 @@ describe("Full-screen ordinary combat choreography", () => {
             side: side === "left" ? "right" : "left",
             frame: expectedVictim.frame,
             x: victimX,
-            lift: referenceDefenderLift(expectedVictim.y),
+            lift: referenceLift(expectedVictim.y),
           });
         }
         expect(state.camera).toBe(mainCamera.camera[index]);
@@ -680,25 +722,12 @@ describe("Full-screen ordinary combat choreography", () => {
         const victimKey = reaction === "hurt" ? "auxiliaryB" : "auxiliaryD";
         const actorSteps = streams[actorKey].steps as readonly ReferenceCommandStep[];
         const victimSteps = streams[victimKey].steps as readonly ReferenceCommandStep[];
-        const mainActorEnd = referenceNativeEnd(
-          mainActor,
-          expectedActorMark(record, side),
-          0,
-        );
-        // Only an absolute `:S` anchor survives the switch to the post-hit
-        // stream; a ground-relative character channel settles back to its mark.
-        const mainActorLast = mainActorFrames.at(-1);
-        const actorFrames = referenceNativeFrames(
-          actorSteps,
-          mainActorEnd.x,
-          mainActorLast?.anchored ? mainActorLast.y : 0,
-          mainActorLast?.anchored ?? false,
-        );
-        const victimFrames = referenceNativeFrames(
-          victimSteps,
-          victimMark,
-          0,
-        );
+        // Both main channels continue their strike-stream state: position,
+        // animation mode and counter all carry into the post-hit streams.
+        const actorReplay = referenceReplay(actorSteps, mainActorReplay.end);
+        const victimReplay = referenceReplay(victimSteps, mainVictimReplay.end);
+        const actorFrames = actorReplay.frames;
+        const victimFrames = victimReplay.frames;
         expect(victimFrames).toHaveLength(actorFrames.length);
         const postCamera = referenceNativeCameraFrames(actorSteps, mainCamera.direction);
         const postPresentation = referencePresentationFrames(
@@ -729,7 +758,7 @@ describe("Full-screen ordinary combat choreography", () => {
             expect(actualActor).toMatchObject({
               frame: expectedActor.frame,
               x: expectedActor.x,
-              lift: referenceActorLift(expectedActor),
+              lift: referenceLift(expectedActor.y),
             });
           }
           const expectedVictim = victimFrames[index];
@@ -738,11 +767,70 @@ describe("Full-screen ordinary combat choreography", () => {
               reaction,
               frame: expectedVictim.frame,
               x: victimMark,
-              lift: referenceDefenderLift(expectedVictim.y),
+              lift: referenceLift(expectedVictim.y),
             });
           expect(state.camera).toBe(mainCamera.final + postCamera.camera[index]);
           expect(state.viewportYOffset).toBe(postPresentation.frames[index].viewportYOffset);
           expect(state.particles).toEqual(postPresentation.frames[index].particles);
+        }
+
+        // AD36 redraws both main channels where the post-hit streams left them,
+        // without dust or YD shift, until 20 draws have passed since impact;
+        // neither life here sits on a gauge tier boundary. Past 20 post-hit
+        // substeps nothing is redrawn and the last post-hit image stays.
+        const holdDraws = Math.max(0, STAGE0_FULL_COMBAT_HOLD.drawLimit - actorFrames.length);
+        const lastActor = actorFrames.at(-1);
+        const lastVictim = victimFrames.at(-1);
+        const lastPresentation = postPresentation.frames.at(-1);
+        if (!lastActor || !lastVictim || !lastPresentation) throw new Error("empty post-hit stream");
+        const victimHoldFrames = referenceRedraws(victimReplay.end, holdDraws);
+        const holdSamples = holdDraws > 0
+          ? referenceRedraws(actorReplay.end, holdDraws).map((frame, draw) => ({
+            t: reactionHold + draw * 32 + 1,
+            actor: { frame, x: actorReplay.end.x, y: actorReplay.end.y },
+            victim: { frame: victimHoldFrames[draw], y: victimReplay.end.y },
+            viewportYOffset: 0,
+            particles: [] as ReferencePresentationState["particles"],
+          }))
+          : [{
+            t: reactionHold + 1,
+            actor: lastActor,
+            victim: lastVictim,
+            viewportYOffset: lastPresentation.viewportYOffset,
+            particles: lastPresentation.particles,
+          }];
+        const settled = holdSamples.at(-1);
+        if (!settled) throw new Error("missing hold sample");
+        holdSamples.push({ ...settled, t: reactionHold + 660 });
+        for (const expected of holdSamples) {
+          const state = reactionScript.sample(expected.t);
+          const actualActor = state.sprites.find(({ channel }) => channel === "actor");
+          if (!referenceFrameIntersectsViewport(
+            side,
+            record,
+            "plus50",
+            expected.actor.frame,
+            expected.actor.x,
+          )) {
+            expect(actualActor).toBeUndefined();
+          } else {
+            expect(actualActor).toMatchObject({
+              frame: expected.actor.frame,
+              x: expected.actor.x,
+              lift: referenceLift(expected.actor.y),
+            });
+          }
+          expect(state.shadows.map(({ channel }) => channel)).toEqual(["victim", "actor"]);
+          expect(state.sprites.find(({ channel }) => channel === "victim"))
+            .toMatchObject({
+              reaction,
+              frame: expected.victim.frame,
+              x: victimMark,
+              lift: referenceLift(expected.victim.y),
+            });
+          expect(state.camera).toBe(mainCamera.final + postCamera.final);
+          expect(state.viewportYOffset).toBe(expected.viewportYOffset);
+          expect(state.particles).toEqual(expected.particles);
         }
 
         const postLinks = referenceLinkedCommands(actorSteps);
@@ -952,6 +1040,97 @@ describe("Full-screen ordinary combat choreography", () => {
     },
   );
 
+  it.each(Object.entries(STAGE0_FULL_COMBAT_PROFILES).flatMap(([classId, profile]) =>
+    reachableSides(profile)
+      .filter((side) => !(profile.nativeRecord === 35 && side === "left"))
+      .map((side) => ({
+        classId: classId as UnitClassId,
+        record: profile.nativeRecord,
+        profile,
+        side,
+      }))),
+  )(
+    "keeps record $record's $side attacker on the DS:7DAE survivor poses while its target dies",
+    ({ classId, record, profile, side }) => {
+      const attackerSide = side === "left" ? 1 : 2;
+      const defenderSide = attackerSide === 1 ? 2 : 1;
+      const script = buildFullCombatScript(
+        unit(attackerSide, attackerSide === 1 ? 0 : 48, "存活攻方", classId),
+        unit(defenderSide, defenderSide === 1 ? 0 : 48, "倒地守方"),
+        result({
+          attackerId: `${attackerSide}:${attackerSide === 1 ? 0 : 48}`,
+          defenderId: `${defenderSide}:${defenderSide === 1 ? 0 : 48}`,
+          counterOccurred: false,
+          counterDamage: 0,
+          defenderDied: true,
+        }),
+      );
+      const deathStart = markTime(script, "fullDefenderDeath");
+      const streams = sideStreams(profile, side);
+      const victimSide = side === "left" ? "right" : "left";
+      const strike = referenceReplay(
+        streams.mainLeftOrAttacker.steps as readonly ReferenceCommandStep[],
+        referenceChannel(expectedActorMark(record, side)),
+      );
+      const approach = referenceReplay(
+        streams.mainRightOrDefender.steps as readonly ReferenceCommandStep[],
+        referenceChannel(STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization
+          .opponentByActorSide[side].x),
+      );
+      const post = referenceReplay(
+        streams.auxiliaryA.steps as readonly ReferenceCommandStep[],
+        strike.end,
+      );
+      const reaction = referenceReplay(
+        streams.auxiliaryB.steps as readonly ReferenceCommandStep[],
+        approach.end,
+      );
+      // B683/B6BD clear every channel pointer, then give the dead side its
+      // death stream and the survivor the still frame-0 poses at DS:7DAE. The
+      // survivor keeps its position and inherited animation counter.
+      const survivor = referenceReplay(
+        STAGE0_FULL_COMBAT_DEATH.survivor.steps as readonly ReferenceCommandStep[],
+        post.end,
+      );
+      const body = referenceReplay(
+        STAGE0_FULL_COMBAT_DEATH[victimSide].steps as readonly ReferenceCommandStep[],
+        reaction.end,
+      );
+      const sideAssets = STAGE0_FULL_COMBAT_ASSETS[side] as Readonly<
+        Record<string, { plus50: readonly string[] }>
+      >;
+      expect(survivor.frames).toHaveLength(24);
+      expect(body.frames).toHaveLength(24);
+      for (let index = 0; index < survivor.frames.length; index += 1) {
+        const expected = survivor.frames[index];
+        expect(expected).toMatchObject({ x: post.end.x, y: post.end.y });
+        expect(expected.frame).toBeLessThan(sideAssets[classId].plus50.length);
+        const state = script.sample(deathStart + index * 50 + 1);
+        const actor = state.sprites.find(({ channel }) => channel === "actor");
+        if (!referenceFrameIntersectsViewport(side, record, "plus50", expected.frame, expected.x)) {
+          expect(actor).toBeUndefined();
+        } else {
+          expect(actor).toMatchObject({
+            side,
+            classId: record,
+            set: "plus50",
+            frame: expected.frame,
+            x: expected.x,
+            lift: referenceLift(expected.y),
+          });
+        }
+        expect(state.shadows.map(({ side: shadowSide, channel }) => [shadowSide, channel]))
+          .toEqual([[victimSide, "victim"], [side, "actor"]]);
+        expect(state.sprites.find(({ channel }) => channel === "victim")).toMatchObject({
+          frame: body.frames[index].frame,
+          x: body.frames[index].x,
+          lift: referenceLift(body.frames[index].y),
+          reaction: "death",
+        });
+      }
+    },
+  );
+
   it("uses the native frame placement tables for the accepted soldier record", () => {
     expect(FULL_COMBAT_FRAME_META.left[0].plus50.map(({ anchor }) => anchor))
       .toEqual([21, 82, 38, 37, 0, 0]);
@@ -1028,10 +1207,17 @@ describe("Full-screen ordinary combat choreography", () => {
 
     expect(script.sample(startAt + 200).sprites.find(({ channel }) => channel === "actor"))
       .toMatchObject({ classId: 2, frame: 1, lift: 16 });
+    // The leap tops out 80 px up, the frame-0 dive (dy=+20) runs 120 px under
+    // the ground line, and the frame-4 burrow climbs back 8 px per substep;
+    // the ground clip hides whatever is still below the line.
+    expect(script.sample(startAt + 360).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ classId: 2, frame: 0, lift: 80 });
+    expect(script.sample(startAt + 760).sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ classId: 2, frame: 4, x: 250, lift: -120 });
     expect(script.sample(startAt + 800).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ classId: 2, frame: 4, x: 240 });
+      .toMatchObject({ classId: 2, frame: 4, x: 240, lift: -112 });
     expect(script.sample(impactAt).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ classId: 2, frame: 4, x: 85 });
+      .toMatchObject({ classId: 2, frame: 4, x: 85, lift: -8 });
     expect(script.sample(impactAt + 150).sprites.find(({ channel }) => channel === "victim"))
       .toMatchObject({ frame: 1, reaction: "hurt", lift: 12 });
     expect(script.sample(holdAt).sprites.find(({ channel }) => channel === "victim"))
@@ -1311,6 +1497,124 @@ describe("Full-screen ordinary combat choreography", () => {
     },
   );
 
+  it("carries the actor channel's height and animation from the strike into the post-hit stream", () => {
+    const actorAt = (
+      classId: UnitClassId,
+      side: "left" | "right",
+      phase: FullCombatPhaseName,
+      offset: number,
+    ) => {
+      const attackerSide = side === "left" ? 1 : 2;
+      const defenderSide = attackerSide === 1 ? 2 : 1;
+      const script = buildFullCombatScript(
+        unit(attackerSide, attackerSide === 1 ? 0 : 48, "測試攻方", classId),
+        unit(defenderSide, defenderSide === 1 ? 0 : 48, "測試守方"),
+        result({
+          attackerId: `${attackerSide}:${attackerSide === 1 ? 0 : 48}`,
+          defenderId: `${defenderSide}:${defenderSide === 1 ? 0 : 48}`,
+          counterOccurred: false,
+          counterDamage: 0,
+        }),
+      );
+      return script.sample(markTime(script, phase) + offset).sprites
+        .find(({ channel }) => channel === "actor");
+    };
+    // Record 37: the head sinks 30 px per substep, re-emerges under :X and
+    // settles 15 px up, where its post-hit stream (no dy) keeps it.
+    expect([0, 40, 80, 120, 160].map((age) => actorAt("head", "right", "fullWindup", age + 1)))
+      .toEqual([0, -30, -60, -90, -120].map((lift) => expect.objectContaining({ lift })));
+    expect(actorAt("head", "right", "fullImpact", 1)).toMatchObject({ frame: 6, x: 250, lift: 15 });
+    // Records 17 and 36 end their strikes 8 px down; the dragon's post-hit
+    // stream also keeps the strike's :X alternation until its own XN.
+    expect(actorAt("bone-knight", "left", "fullImpact", 1)).toMatchObject({ frame: 4, x: 303, lift: -8 });
+    expect([1, 51, 101, 151].map((age) => actorAt("dragon", "right", "fullImpact", age)))
+      .toEqual([
+        expect.objectContaining({ frame: 0, x: 268, lift: -8 }),
+        expect.objectContaining({ frame: 1, x: 318, lift: -8 }),
+        expect.objectContaining({ frame: 0, x: 368, lift: -8 }),
+        expect.objectContaining({ frame: 0, x: 418, lift: -8 }),
+      ]);
+    // Record 24: the orb's descent was last drawn on the ground line, but the
+    // accumulator is one dy=+40 step past it, so the post-hit orb slides away
+    // with its lower 40 rows under the ground clip.
+    expect(actorAt("sister", "left", "fullImpact", -39)).toMatchObject({ frame: 6, x: 205, lift: 0 });
+    expect(actorAt("sister", "left", "fullImpact", 1)).toMatchObject({ frame: 6, x: 205, lift: -40 });
+    // Record 23: the pegasus stays 30 px up and keeps flapping under the
+    // strike's :X instead of dropping to the floor on a still frame 0.
+    expect([1, 51, 101, 151].map((age) => actorAt("pegasus-warrior", "left", "fullImpact", age)))
+      .toEqual([
+        expect.objectContaining({ frame: 1, x: 218, lift: 30 }),
+        expect.objectContaining({ frame: 0, x: 188, lift: 30 }),
+        expect.objectContaining({ frame: 1, x: 158, lift: 30 }),
+        expect.objectContaining({ frame: 0, x: 128, lift: 30 }),
+      ]);
+    // Record 15 carries X4 the same way: 20 px up, wings still cycling.
+    expect([1, 51, 101, 151].map((age) => actorAt("flying-dragon-knight", "left", "fullImpact", age)?.frame))
+      .toEqual([1, 2, 3, 0]);
+    expect(actorAt("flying-dragon-knight", "left", "fullImpact", 1)).toMatchObject({ lift: 20 });
+  });
+
+  it("redraws the nonfatal hold without dust until the 20th draw since impact", () => {
+    const guard = (defenderLife: number) => buildFullCombatScript(
+      unit(1, 0, "測試攻方"),
+      { ...unit(2, 48, "測試守方"), life: defenderLife },
+      result({ damage: 8, counterOccurred: false, counterDamage: 0 }),
+    );
+    // The soldier's guard stream ends with the defender's UE dust still on.
+    const script = guard(180);
+    const holdAt = markTime(script, "fullHold");
+    expect(script.sample(holdAt - 1).particles).toHaveLength(3);
+    // A1E8 turns both trails off before AD36, whose AD51 draws present the
+    // window without the YD shift; 20 - 8 = 12 draws, 32 ms apart.
+    for (const offset of [1, 200, 400, 660]) {
+      expect(script.sample(holdAt + offset)).toMatchObject({ particles: [], viewportYOffset: 0 });
+    }
+    // Landing on exactly 210 life empties the gauge remainder DS:7D27, so AD36
+    // draws nothing and the last post-hit image, dust included, stays up.
+    const boundary = guard(218);
+    const boundaryHold = markTime(boundary, "fullHold");
+    expect(boundary.sample(boundaryHold + 400).particles)
+      .toEqual(boundary.sample(boundaryHold - 1).particles);
+    expect(boundary.sample(boundaryHold + 400).particles).toHaveLength(3);
+  });
+
+  it("keeps a flown-off actor's ground shadow through the hold and the death segment", () => {
+    // Record 8 rises 30 px per post-hit substep until it is 312 px up, far
+    // above the window, and its 40 post-hit substeps leave no hold draw. The
+    // E336 shadow still sits on the ground under x=250.
+    const hold = buildFullCombatScript(
+      unit(1, 0, "測試攻方", "half-dragon-warrior"),
+      unit(2, 48, "測試守方"),
+      result({ counterOccurred: false, counterDamage: 0 }),
+    );
+    const holdState = hold.sample(markTime(hold, "fullHold") + 300);
+    expect(holdState.sprites.find(({ channel }) => channel === "actor"))
+      .toMatchObject({ frame: 5, x: 250, lift: 312 });
+    const actorShadow = holdState.shadows.find(({ channel }) => channel === "actor");
+    expect(actorShadow?.bands[0]).toMatchObject({ y: 132, width: 112 });
+    expect(actorShadow?.bands[0].x).toBe(250 - FULL_COMBAT_FRAME_META.left[8].plus50[5].anchor);
+
+    // A fatal strike hands the survivor the still DS:7DAE poses: frame 0 of
+    // its +50 set where the post-hit stream left it, so the head stays half
+    // in view at the right edge while its target falls.
+    const kill = buildFullCombatScript(
+      unit(2, 48, "測試攻方", "head"),
+      unit(1, 0, "測試守方"),
+      result({
+        attackerId: "2:48",
+        defenderId: "1:0",
+        counterOccurred: false,
+        counterDamage: 0,
+        defenderDied: true,
+      }),
+    );
+    const deathAt = markTime(kill, "fullDefenderDeath");
+    for (const offset of [1, 600, 1_199]) {
+      expect(kill.sample(deathAt + offset).sprites.find(({ channel }) => channel === "actor"))
+        .toMatchObject({ side: "right", classId: 37, frame: 0, x: 490, lift: 15 });
+    }
+  });
+
   it("keeps the great dragon knight visible until its wide post-hit bitmap is clipped", () => {
     const left = buildFullCombatScript(
       unit(1, 0, "測試攻方", "great-dragon-knight"),
@@ -1319,10 +1623,17 @@ describe("Full-screen ordinary combat choreography", () => {
     );
     const leftImpact = markTime(left, "fullImpact");
     const leftHold = markTime(left, "fullHold");
-    expect(left.sample(leftImpact + 500).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ side: "left", classId: 19, x: -100 });
-    expect(left.sample(leftHold).sprites.find(({ channel }) => channel === "actor"))
-      .toBeUndefined();
+    const leftActor = (t: number) => left.sample(t).sprites
+      .find(({ channel }) => channel === "actor");
+    expect(leftActor(leftImpact + 500)).toMatchObject({ side: "left", classId: 19, x: -100 });
+    // The eleventh post-hit substep leaves the channel one step further out at
+    // (-140, 127). AD51 keeps redrawing it there for the nine remaining hold
+    // draws, so the 168-176 px wing frames still reach into the window and go
+    // on cycling under X4 before the window stands still.
+    expect(leftActor(leftHold)).toMatchObject({ side: "left", classId: 19, frame: 1, x: -140, lift: 8 });
+    expect(Array.from({ length: 9 }, (_, draw) => leftActor(leftHold + draw * 32 + 1)?.frame))
+      .toEqual([1, 2, 3, 4, 1, 2, 3, 4, 1]);
+    expect(leftActor(leftHold + 600)).toMatchObject({ frame: 1, x: -140, lift: 8 });
 
     const right = buildFullCombatScript(
       unit(2, 48, "測試攻方", "great-dragon-knight"),
@@ -1338,6 +1649,8 @@ describe("Full-screen ordinary combat choreography", () => {
     const rightHold = markTime(right, "fullHold");
     expect(right.sample(rightImpact + 400).sprites.find(({ channel }) => channel === "actor"))
       .toMatchObject({ side: "right", classId: 19, x: 520 });
+    // The right side's hold position, x=640, puts even the widest frame past
+    // the window edge.
     expect(right.sample(rightHold).sprites.find(({ channel }) => channel === "actor"))
       .toBeUndefined();
   });
@@ -1583,9 +1896,14 @@ describe("Full-screen ordinary combat choreography", () => {
     ]);
     const openingVictim = opening.shadows.find(({ channel }) => channel === "victim");
     expect(openingVictim?.bands[0].x).toBe(650 - FULL_COMBAT_FRAME_META.right[27].direct[0].anchor);
-    // The shadow stays on its fixed rows whatever the body's pose.
+    // The shadow stays on its fixed rows whatever the body's pose. B683/B6BD
+    // keep the survivor's main channel drawing too, so its shadow is still
+    // laid wherever the post-hit stream left it: x=-634 here, frame 0 of the
+    // left +50 set (anchor 58, 120 px), entirely outside the window.
+    expect(FULL_COMBAT_FRAME_META.left[14].plus50[0]).toMatchObject({ w: 120, anchor: 58 });
     expect(script.sample(markTime(script, "fullDefenderDeath") + 1).shadows).toEqual([
       { side: "right", channel: "victim", bands: nativeMainChannelShadowBands(232, 104) },
+      { side: "left", channel: "actor", bands: nativeMainChannelShadowBands(-634 - 58, 120) },
     ]);
   });
 
@@ -1634,10 +1952,12 @@ describe("Full-screen ordinary combat choreography", () => {
       .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: 115 });
     expect(left.sample(leftImpact - 40).sprites.find(({ channel }) => channel === "actor"))
       .toMatchObject({ side: "left", classId: 21, frame: 4, x: 266, lift: 15 });
-    // The post-hit stream issues no `:S`, so the landed frame 5 inherits the
-    // descent's last presented anchor instead of snapping anywhere else.
+    // The post-hit stream issues no `:S` and nothing rewinds the channel, so
+    // the landed frame 5 starts from the descent's accumulator: y=145, one
+    // dy=+25 step past the last drawn y=120. Its bottom ten rows, the lower
+    // half of the dirt splash, fall under the ground clip.
     expect(left.sample(leftImpact).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ side: "left", classId: 21, frame: 5, x: 266, lift: 15 });
+      .toMatchObject({ side: "left", classId: 21, frame: 5, x: 266, lift: -10 });
 
     const right = buildFullCombatScript(
       unit(2, 48, "測試攻方", "crossbow"),
@@ -1653,7 +1973,7 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(right.sample(rightImpact - 40).sprites.find(({ channel }) => channel === "actor"))
       .toMatchObject({ side: "right", classId: 21, frame: 4, x: 216, lift: 15 });
     expect(right.sample(rightImpact).sprites.find(({ channel }) => channel === "actor"))
-      .toMatchObject({ side: "right", classId: 21, frame: 5, x: 216, lift: 15 });
+      .toMatchObject({ side: "right", classId: 21, frame: 5, x: 216, lift: -10 });
   });
 
   it("plants the crossbow bolt inside the target reaction bitmap on both sides", () => {
@@ -1986,8 +2306,15 @@ describe("Full-screen ordinary combat choreography", () => {
     expect(apexVictim).toMatchObject({ x: impactVictim?.x, lift: 12 });
     expect(holdVictim).toMatchObject({ x: impactVictim?.x, lift: 4 });
     expect(primaryLast.damage?.x).toBe(impact.damage?.x);
+    // The post-hit stream sets no animation mode, so the strike's :X keeps
+    // alternating the flame frames: 5, 4, 5 at x=205, 165, 125. The stage-0
+    // capture shows frame 4 at channel x 165 (video frames 120-122) and
+    // frame 5 at x 125 (123-125) before the standing frame 0 at x 85.
+    expect(impactActor).toMatchObject({ frame: 5, x: 205, mirror: false });
+    expect(script.sample(impactAt + 50).sprites.find(({ set }) => set === "plus50"))
+      .toMatchObject({ frame: 4, x: 165 });
     expect(strikingActor).toMatchObject({
-      frame: 4,
+      frame: 5,
       x: (impactActor?.x ?? 0) - 80,
       mirror: false,
     });

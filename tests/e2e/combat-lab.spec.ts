@@ -491,7 +491,9 @@ test("a fallen divine sword warrior keeps the original registration, ground clip
   await expect(victim).toHaveAttribute("data-x", "290");
   await expect(victim).toHaveAttribute("data-y-offset", "21");
   await expect(victim).toHaveAttribute("data-ground-clipped-rows", "21");
-  await expect(page.getByTestId("full-actor-shadow")).toBeHidden();
+  // The surviving attacker's main channel stays active on the DS:7DAE poses,
+  // but the post-hit stream left it at x=-634, entirely left of the window.
+  await expect(page.getByTestId("full-actor-sprite")).toBeHidden();
   await waitForVisibleSpriteImages(page);
 
   const geometry = await page.evaluate(() => {
@@ -514,6 +516,8 @@ test("a fallen divine sword warrior keeps the original registration, ground clip
       channels: toScene(element('[data-testid="full-combat-channels"]').getBoundingClientRect()),
       bands: Array.from(document.querySelectorAll<HTMLElement>('[data-testid="full-victim-shadow"] > i'))
         .map((band) => ({ ...toScene(band.getBoundingClientRect()), dither: band.dataset.dither })),
+      actorBands: Array.from(document.querySelectorAll<HTMLElement>('[data-testid="full-actor-shadow"] > i'))
+        .map((band) => toScene(band.getBoundingClientRect())),
     };
   });
   // The user's capture of the original shows the body from (232, 97) with no
@@ -525,10 +529,158 @@ test("a fallen divine sword warrior keeps the original registration, ground clip
     { left: 224, top: 134, right: 344, bottom: 136, dither: "11" },
     { left: 232, top: 136, right: 336, bottom: 138, dither: "11" },
   ]);
+  expect(geometry.actorBands).toHaveLength(3);
+  expect(geometry.actorBands.every(({ right }) => right <= 0)).toBe(true);
   await captureVisualAudit(page, {
     path: "artifacts/playwright/combat-lab-divine-sword-death-registration.png",
     fullPage: true,
   });
+});
+
+test("the common dust trail is drawn over the character channels", async ({ page }) => {
+  // AD70 runs B3BD after every channel, so the fallen soldier's death dust,
+  // which starts 40 px inside its body, covers the body instead of hiding
+  // behind it.
+  await page.goto(
+    "/combat-lab.html?attacker=soldier&defender=soldier&reaction=hurt&death=1&side=left&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const deathAt = (await labState(page)).marks
+    .find(({ phase }) => phase === "fullDefenderDeath")?.t;
+  expect(deathAt).toBeDefined();
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), deathAt! + 301);
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
+  await expect(page.locator(".full-combat-particles .full-combat-frame:not([hidden])"))
+    .toHaveCount(3);
+  await waitForVisibleSpriteImages(page);
+
+  const coveredParticles = await page.evaluate(() => {
+    // The presentation layer ignores the pointer; let the probe hit-test it.
+    const probe = document.createElement("style");
+    probe.textContent = ".combat-presentation, .combat-presentation * { pointer-events: auto !important; }";
+    document.head.append(probe);
+    const body = document.querySelector<HTMLElement>('[data-testid="full-victim-sprite"]')
+      ?.getBoundingClientRect();
+    if (!body) throw new Error("fallen soldier is missing");
+    const results = Array.from(document.querySelectorAll<HTMLElement>(
+      ".full-combat-particles .full-combat-frame:not([hidden])",
+    )).flatMap((particle) => {
+      const box = particle.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      if (x < body.left || x > body.right || y < body.top || y > body.bottom) return [];
+      return [document.elementFromPoint(x, y) === particle];
+    });
+    probe.remove();
+    return results;
+  });
+  expect(coveredParticles.length).toBeGreaterThan(0);
+  expect(coveredParticles.every(Boolean)).toBe(true);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-dust-over-fallen-body.png",
+    fullPage: true,
+  });
+});
+
+test("an attacker keeps its main channel through the hold and while its target falls", async ({ page }) => {
+  // Nonfatal: the great dragon knight's post-hit stream leaves the channel at
+  // (-140, 127). AD51 redraws it there for the remaining nine hold draws,
+  // 32 ms apart, with its X4 wing cycle, then the window stands still.
+  await page.goto(
+    "/combat-lab.html?attacker=great-dragon-knight&defender=soldier&reaction=hurt&side=left&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const holdAt = (await labState(page)).marks.find(({ phase }) => phase === "fullHold")?.t;
+  expect(holdAt).toBeDefined();
+  const actor = page.getByTestId("full-actor-sprite");
+  for (const [offset, frame] of [[1, "1"], [33, "2"], [65, "3"], [97, "4"], [600, "1"]] as const) {
+    await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), holdAt! + offset);
+    await expect(actor).toHaveAttribute("data-frame", frame);
+    await expect(actor).toHaveAttribute("data-x", "-140");
+    await expect(actor).toHaveAttribute("data-lift", "8");
+  }
+  await expect(page.locator(".full-combat-particles .full-combat-frame:not([hidden])"))
+    .toHaveCount(0);
+  await waitForVisibleSpriteImages(page);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-great-dragon-hold.png",
+    fullPage: true,
+  });
+
+  // Fatal: B683/B6BD give the surviving head the still DS:7DAE poses, so it
+  // stays on frame 0 at (490, 120), with its E336 shadow, while the soldier
+  // falls.
+  await page.goto(
+    "/combat-lab.html?attacker=head&defender=soldier&reaction=hurt&death=1&side=right&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const deathAt = (await labState(page)).marks
+    .find(({ phase }) => phase === "fullDefenderDeath")?.t;
+  expect(deathAt).toBeDefined();
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), deathAt! + 601);
+  await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "death");
+  await expect(actor).toHaveAttribute("data-side", "right");
+  await expect(actor).toHaveAttribute("data-frame", "0");
+  await expect(actor).toHaveAttribute("data-x", "490");
+  await expect(actor).toHaveAttribute("data-lift", "15");
+  await waitForVisibleSpriteImages(page);
+  const survivor = await page.evaluate(() => {
+    const scene = document.querySelector<HTMLElement>(".full-combat-scene")?.getBoundingClientRect();
+    const image = document.querySelector<HTMLElement>('[data-testid="full-actor-sprite"]')
+      ?.getBoundingClientRect();
+    if (!scene || !image) throw new Error("survivor or scene is missing");
+    const scale = scene.width / 448;
+    return {
+      imageLeft: Math.round((image.left - scene.left) / scale),
+      bands: Array.from(document.querySelectorAll<HTMLElement>('[data-testid="full-actor-shadow"] > i'))
+        .map((band) => ({ x: Number(band.dataset.x), y: Number(band.dataset.y) })),
+    };
+  });
+  expect(survivor.imageLeft).toBeLessThan(448);
+  expect(survivor.bands).toEqual([
+    { x: survivor.imageLeft, y: 132 },
+    { x: survivor.imageLeft - 8, y: 134 },
+    { x: survivor.imageLeft, y: 136 },
+  ]);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-head-survivor.png",
+    fullPage: true,
+  });
+});
+
+test("the jungle warrior dives under the ground clip and strikes from below it", async ({ page }) => {
+  await page.goto(
+    "/combat-lab.html?attacker=jungle-warrior&defender=soldier&reaction=hurt&side=left&speed=4",
+  );
+  await page.evaluate(() => window.__ANGEL2_COMBAT_LAB__?.pause());
+  const state = await labState(page);
+  const startAt = state.marks.find(({ phase }) => phase === "fullWindup")?.t;
+  const impactAt = state.marks.find(({ phase }) => phase === "fullImpact")?.t;
+  expect(startAt).toBeDefined();
+  expect(impactAt).toBeDefined();
+  const actor = page.getByTestId("full-actor-sprite");
+  // The frame-0 dive ends 120 px under the ground line, so the burrowing
+  // frame 4 starts out wholly below the clip and climbs 8 px per substep.
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), startAt! + 761);
+  await expect(actor).toHaveAttribute("data-frame", "4");
+  await expect(actor).toHaveAttribute("data-lift", "-120");
+  const buried = await actor.evaluate((image) => ({
+    height: image.offsetHeight,
+    clipped: Number(image.dataset.groundClippedRows),
+  }));
+  expect(buried.height).toBeGreaterThan(40);
+  expect(buried.clipped).toBe(Math.min(buried.height, 120));
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), startAt! + 1_161);
+  await expect(actor).toHaveAttribute("data-lift", "-40");
+  await expect(actor).toHaveAttribute("data-ground-clipped-rows", "40");
+  await waitForVisibleSpriteImages(page);
+  await captureVisualAudit(page, {
+    path: "artifacts/playwright/combat-lab-jungle-warrior-burrow.png",
+    fullPage: true,
+  });
+  await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! + 1);
+  await expect(actor).toHaveAttribute("data-lift", "-8");
+  await expect(actor).toHaveAttribute("data-ground-clipped-rows", "8");
 });
 
 test.describe.serial("native records sequential visual acceptance", () => {
@@ -792,15 +944,19 @@ for (const side of ["left", "right"] as const) {
     await expect(actor).toHaveAttribute("data-lift", "115");
 
     // `:S` y=120 is a battle-window bottom anchor, so the last descent substep
-    // and the landed frame 5 both sit 15 px above the y=135 ground line. The
-    // old ground-relative reading buried them 120 px under the floor.
+    // sits 15 px above the y=135 ground line. The old ground-relative reading
+    // buried it 120 px under the floor.
     await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt! - 40);
     await expect(actor).toHaveAttribute("data-frame", "4");
     await expect(actor).toHaveAttribute("data-lift", "15");
 
+    // Nothing rewinds the channel between streams: the landed frame 5 starts
+    // from the descent's accumulator, one dy=+25 step past the last drawn
+    // y=120, so the lower ten rows of its dirt splash fall under the clip.
     await page.evaluate((time) => window.__ANGEL2_COMBAT_LAB__?.seek(time), impactAt!);
     await expect(actor).toHaveAttribute("data-frame", "5");
-    await expect(actor).toHaveAttribute("data-lift", "15");
+    await expect(actor).toHaveAttribute("data-lift", "-10");
+    await expect(actor).toHaveAttribute("data-ground-clipped-rows", "10");
     await expect(actor).toHaveAttribute("data-x", side === "left" ? "266" : "216");
     await expect(page.getByTestId("full-victim-sprite"))
       .toHaveAttribute("data-x", "250");

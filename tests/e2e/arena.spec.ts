@@ -297,28 +297,41 @@ test("great dragon knight counter guard uses its native defender registration", 
   await page.getByTestId("arena-start").click();
   await clickArenaWorldCell(page, 20, 30);
   await attackOnlyAdjacentEnemy(page);
-  await page.waitForFunction(() =>
-    window.__ANGEL2_ARENA__?.getState().battle?.combatPresentation?.phase === "fullCounterImpact");
-
-  const victim = page.getByTestId("full-victim-sprite");
-  await expect(victim).toBeVisible();
-  await expect(victim).toHaveAttribute("data-side", "left");
-  await expect(victim).toHaveAttribute("data-frame", "3");
-  await expect(victim).toHaveAttribute("data-reaction", "guard");
-  await expect(victim).toHaveAttribute("data-x", "210");
-  // Left direct frame 3 reads x anchor 107 from the descriptor +04h table.
-  const bitmapLeft = await victim.evaluate((image) => {
-    const scene = image.closest(".full-combat-scene")?.getBoundingClientRect();
-    if (!scene) throw new Error("full-combat scene is missing");
-    return Math.round((image.getBoundingClientRect().left - scene.left) / (scene.width / 448));
+  // The guard dust only lives through the 400 ms post-hit stream: the AD51
+  // hold draws that follow run without the trail. Read the victim, its bitmap
+  // and the dust in one DOM snapshot taken while the dust is on screen.
+  const snapshot = await (await page.waitForFunction(() => {
+    const phase = window.__ANGEL2_ARENA__?.getState().battle?.combatPresentation?.phase;
+    const particles = Array.from(document.querySelectorAll<HTMLElement>(
+      ".full-combat-particles .full-combat-frame:not([hidden])",
+    ));
+    const image = document.querySelector<HTMLElement>('[data-testid="full-victim-sprite"]');
+    const scene = image?.closest(".full-combat-scene")?.getBoundingClientRect();
+    if (phase !== "fullCounterImpact" || particles.length !== 3 || !image || !scene?.width) {
+      return false;
+    }
+    return {
+      shown: image.closest<HTMLElement>(".full-combat-sprite")?.hidden === false,
+      side: image.dataset.side,
+      frame: image.dataset.frame,
+      reaction: image.dataset.reaction,
+      x: image.dataset.x,
+      bitmapLeft: Math.round((image.getBoundingClientRect().left - scene.left) / (scene.width / 448)),
+      particleXs: particles.map((particle) =>
+        Number(particle.getAttribute("style")?.match(/translate\((-?\d+)px/u)?.[1])),
+    };
+  })).jsonValue();
+  if (!snapshot) throw new Error("counter-guard snapshot is missing");
+  expect(snapshot).toMatchObject({
+    shown: true,
+    side: "left",
+    frame: "3",
+    reaction: "guard",
+    x: "210",
   });
-  expect(bitmapLeft).toBe(210 - 107);
-  const particles = page.locator(".full-combat-particles .full-combat-frame:not([hidden])");
-  await expect(particles).toHaveCount(3);
-  const particleXs = await particles.evaluateAll((elements) => elements.map((element) => {
-    const match = element.getAttribute("style")?.match(/translate\((-?\d+)px/u);
-    return Number(match?.[1]);
-  }));
+  // Left direct frame 3 reads x anchor 107 from the descriptor +04h table.
+  expect(snapshot.bitmapLeft).toBe(210 - 107);
+  const { particleXs } = snapshot;
   expect(particleXs[0]).toBeGreaterThanOrEqual(245);
   // Native trailOffset cycles through 0..24 in four-pixel steps, so the last
   // legal counter-guard sample is four pixels beyond the earlier test bound.

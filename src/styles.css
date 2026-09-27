@@ -1482,7 +1482,8 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 /* Each substep draws channel offsets 8, 6, 4, 2, 0 (G5, main, G3, G2, G1),
    the defending side before the acting side at every offset. The main
    channel lays its `E336` shadow right before its own bitmap, so the actor's
-   shadow still darkens the defender underneath it. */
+   shadow still darkens the defender underneath it. `AD70` draws the common
+   dust trail (`B3BD`) only after all of them, so it covers every channel. */
 .full-combat-sprite {
   position: absolute;
   z-index: 23;
@@ -1536,7 +1537,7 @@ canvas { image-rendering: var(--image-rendering, pixelated) !important; }
 }
 .full-combat-lance,
 .full-combat-projectile { position: absolute; left: 0; top: 0; }
-.full-combat-particles { position: absolute; z-index: 2; inset: 0; }
+.full-combat-particles { position: absolute; z-index: 60; inset: 0; }
 .full-combat-particles .full-combat-frame {
   position: absolute;
   left: 0;

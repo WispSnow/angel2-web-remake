@@ -19,13 +19,16 @@
 //   recoil   target remains fixed horizontally on screen while the camera
 //                     completes another 64 px in native 8 px steps; >10
 //                     damage adds the measured 0/4/8/12/8/4/0 px hop
-//   settle   the post-hit attacker stream keeps its native facing, switches
-//                     to the class-specific settle frame where commanded,
-//                     and carries the actor out as the camera keeps moving
-//   hold     victim and damage number remain alone after recoil; Web tuning
-//                     uses 667 ms both before a counter and before a nonfatal
-//                     return to the map. A fatal target instead switches to
-//                     its complete native death stream.
+//   settle   the post-hit attacker stream continues the strike channel's
+//                     position, animation mode and counter, switches to the
+//                     class-specific settle frame where commanded, and carries
+//                     the actor out as the camera keeps moving
+//   hold     both main channels stay where the post-hit streams left them;
+//                     AD36 redraws them without dust until the 20th draw since
+//                     impact, then the screen stands still. Web tuning uses
+//                     667 ms both before a counter and before a nonfatal return
+//                     to the map. A fatal target instead switches to its
+//                     complete native death stream while the survivor stays.
 //   counter  the same block mirrored, camera panning back
 // The cavalry (class 22) strike replaces the melee lunge with a couched-lance
 // windup, a thrown-lance projectile (frames 6/7/8), an early attacker exit,
@@ -36,6 +39,7 @@ import {
   STAGE0_FULL_COMBAT_DEATH,
   STAGE0_FULL_COMBAT_FRAME_META,
   STAGE0_FULL_COMBAT_GEOMETRY,
+  STAGE0_FULL_COMBAT_HOLD,
   STAGE0_FULL_COMBAT_PROFILES,
 } from "./content/stage0-actions.generated";
 import { FULL_COMBAT_BACKGROUND_FALLBACK_RECORD } from "./content/full-combat-backgrounds.generated";
@@ -225,6 +229,10 @@ const NATIVE_POST_HIT_SUBSTEP = 50;
 // The remake uses the user-approved two-thirds tuning for both exchange and
 // final nonfatal holds, keeping those two exits perceptually consistent.
 const FULL_COMBAT_HOLD = 667;
+// AD51 redraws the hold after a one-tick wait instead of AD70's five, so the
+// capture shows hold draws 9..19 of the bouncing damage number over 24 video
+// frames at 75 fps: 32 ms per draw. At most 19 draws fit inside the Web hold.
+const NATIVE_HOLD_DRAW = 32;
 // Measured on the capture: the number lands on the floor about 60 px to the
 // victim's far side, its baseline just under the scene's bottom edge.
 const DAMAGE_OFFSET = 60;
@@ -244,6 +252,8 @@ interface StrikeSpec {
   victimDies: boolean;
   final: boolean;
   counter: boolean;
+  /** Physical-side lives once this strike's damage has landed (`9E28` gauges). */
+  lifeAfterImpact: Readonly<Record<"left" | "right", number>>;
 }
 
 interface StrikeTimes {
@@ -253,6 +263,10 @@ interface StrikeTimes {
   impact: number;
   holdStart: number;
   end: number;
+  /** `AD36` redraws after a nonfatal post-hit stream; 0 leaves its last image up. */
+  holdDraws: number;
+  /** Last moment the strike changes: the final hold draw or the death stream's end. */
+  settle: number;
   throwAt?: number;
   lanceFrom?: number;
   lanceTo?: number;
@@ -474,36 +488,42 @@ function nativeLinkedCommand(
   return undefined;
 }
 
+type NativeAnimationMode = "none" | "alternate" | "cycle4" | "cycle6";
+
+/**
+ * One module-29 channel (`DS:7A7E..` left, `DS:7B04..` right). Every channel
+ * keeps its bitmap-bottom x/y in battle-window coordinates, its animation mode
+ * and its animation counter. Only `:S`, the `B061/B1FD` initializers and the
+ * `B0D7/B273` per-substep accumulators write the position, and nothing resets
+ * the mode or counter between streams, so a post-hit, hold or death stream
+ * continues exactly where the previous stream left its channel.
+ */
+interface NativeChannelState {
+  x: number;
+  y: number;
+  mode: NativeAnimationMode;
+  counter: number;
+}
+
+/** `B061/B1FD` start every channel on the ground line in mode `XN`. */
+function initialNativeChannel(x: number, y: number = FULL_SCENE.groundY): NativeChannelState {
+  return { x, y, mode: "none", counter: 0 };
+}
+
 interface NativeStreamSample {
   frame: number;
   x: number;
+  /** Battle-window y of the bitmap's bottom anchor; the ground line is 135. */
   y: number;
-  /**
-   * True once a `:S` has overwritten the channel position. The character
-   * channel is otherwise driven in a ground-relative frame whose y starts at 0,
-   * while `:S` writes battle-window coordinates in which y is the bitmap's
-   * bottom anchor — the same space the linked `G1..G5` channels always use.
-   */
-  anchored: boolean;
-}
-
-/** A ground-relative channel y as a lift: positive y sinks below the line. */
-function groundRelativeLift(y: number): number {
-  return y === 0 ? 0 : -y;
 }
 
 /**
- * Converts an actor-channel sample to the renderer's lift. An anchored pose
- * carries an absolute bottom anchor and is measured against the ground line.
- * Ground-relative actor poses are still held at or above the line here, even
- * though module 29 lets them sink under its ground clip (the jungle warrior's
- * and the head's burrowing passes); only the defender channel follows the
- * native accumulator so far.
+ * A channel's bottom anchor as the renderer's lift. Nothing holds a character
+ * on the ground line: a positive y past 135 sinks the bitmap, and the `DF86`
+ * ground clip hides whatever falls below the line.
  */
-function nativeActorLift(sample: NativeStreamSample): number {
-  return sample.anchored
-    ? FULL_SCENE.groundY - sample.y
-    : Math.max(0, -sample.y);
+function nativeLift(y: number): number {
+  return FULL_SCENE.groundY - y;
 }
 
 /**
@@ -598,8 +618,6 @@ function nativeMainChannelShadow(
   };
 }
 
-type NativeAnimationMode = "none" | "alternate" | "cycle4" | "cycle6";
-
 function applyNativeAnimationCommand(
   mode: NativeAnimationMode,
   token: string,
@@ -628,33 +646,37 @@ function nextNativeFrame(
   return { frame: baseFrame, counter: 0 };
 }
 
+function applyNativeChannelCommands(
+  channel: NativeChannelState,
+  commands: NativeCommandStep["commands"],
+): void {
+  for (const command of commands) {
+    channel.mode = applyNativeAnimationCommand(channel.mode, command.token);
+    if (command.token === ":S") {
+      const [nextX, nextY] = command.parameters;
+      if (typeof nextX === "number") channel.x = nextX;
+      if (typeof nextY === "number") channel.y = nextY;
+    }
+  }
+}
+
+/**
+ * Replays one stream on a channel: each step latches its pose frame, `B1A8`
+ * advances the animation counter on every draw, and `ACC4` adds `dx/dy` only
+ * after the substep has been drawn.
+ */
 function sampleNativeStream(
   steps: readonly NativeCommandStep[],
   age: number,
   substepDuration: number,
-  initialX: number,
-  initialY: number,
-  initialAnchored = false,
+  initial: NativeChannelState,
 ): NativeStreamSample {
-  let x = initialX;
-  let y = initialY;
-  let anchored = initialAnchored;
+  const channel = { ...initial };
   let elapsed = 0;
-  let animationMode: NativeAnimationMode = "none";
-  let animationCounter = 0;
   let lastFrame = steps[0]?.pose.frame ?? 0;
 
   for (const step of steps) {
-    for (const command of step.commands) {
-      animationMode = applyNativeAnimationCommand(animationMode, command.token);
-      if (command.token === ":S") {
-        const [nextX, nextY] = command.parameters;
-        if (typeof nextX === "number") x = nextX;
-        if (typeof nextY === "number") y = nextY;
-        anchored = true;
-      }
-    }
-
+    applyNativeChannelCommands(channel, step.commands);
     const duration = step.rendererSubsteps * substepDuration;
     if (age < elapsed + duration) {
       const completed = Math.max(
@@ -665,46 +687,83 @@ function sampleNativeStream(
         ),
       );
       for (let index = 0; index < completed; index += 1) {
-        const next = nextNativeFrame(step.pose.frame, animationMode, animationCounter);
-        animationCounter = next.counter;
+        channel.counter = nextNativeFrame(step.pose.frame, channel.mode, channel.counter).counter;
       }
-      x += step.pose.deltaX * completed;
-      y += step.pose.deltaY * completed;
-      const visible = nextNativeFrame(step.pose.frame, animationMode, animationCounter);
-      return { frame: visible.frame, x, y, anchored };
+      const visible = nextNativeFrame(step.pose.frame, channel.mode, channel.counter);
+      return {
+        frame: visible.frame,
+        x: channel.x + step.pose.deltaX * completed,
+        y: channel.y + step.pose.deltaY * completed,
+      };
     }
     for (let index = 0; index < step.rendererSubsteps; index += 1) {
-      const next = nextNativeFrame(step.pose.frame, animationMode, animationCounter);
-      animationCounter = next.counter;
+      const next = nextNativeFrame(step.pose.frame, channel.mode, channel.counter);
+      channel.counter = next.counter;
       lastFrame = next.frame;
     }
-    x += step.pose.deltaX * step.rendererSubsteps;
-    y += step.pose.deltaY * step.rendererSubsteps;
+    channel.x += step.pose.deltaX * step.rendererSubsteps;
+    channel.y += step.pose.deltaY * step.rendererSubsteps;
     elapsed += duration;
   }
-  return { frame: lastFrame, x, y, anchored };
+  return { frame: lastFrame, x: channel.x, y: channel.y };
+}
+
+/** A channel after a whole stream, with the pose frame its last step latched. */
+interface NativeChannelEnd extends NativeChannelState {
+  latchedFrame: number;
 }
 
 /**
- * The pose the compositor actually showed last: `A80F` accumulates `dx/dy`
- * after each presented substep, so the end-of-stream accumulator already sits
- * one increment past the final visible image. A channel that hands an absolute
- * anchor to the next stream must hand over that visible position.
+ * The state a stream hands to whatever runs next on its channel. The position
+ * is one `dx/dy` increment past the last drawn substep: the crossbow's landed
+ * bolt, for example, is next drawn at y=145 although its descent was last
+ * shown at y=120.
  */
+function nativeStreamEnd(
+  steps: readonly NativeCommandStep[],
+  initial: NativeChannelState,
+): NativeChannelEnd {
+  const channel = { ...initial };
+  let latchedFrame = steps[0]?.pose.frame ?? 0;
+  for (const step of steps) {
+    applyNativeChannelCommands(channel, step.commands);
+    latchedFrame = step.pose.frame;
+    for (let index = 0; index < step.rendererSubsteps; index += 1) {
+      channel.counter = nextNativeFrame(latchedFrame, channel.mode, channel.counter).counter;
+    }
+    channel.x += step.pose.deltaX * step.rendererSubsteps;
+    channel.y += step.pose.deltaY * step.rendererSubsteps;
+  }
+  return { ...channel, latchedFrame };
+}
+
+/** The last image a stream drew, which stays up when nothing redraws it. */
 function lastPresentedNativeSample(
   steps: readonly NativeCommandStep[],
   substepDuration: number,
-  initialX: number,
-  initialY: number,
+  initial: NativeChannelState,
 ): NativeStreamSample {
-  const duration = nativeStreamDuration(steps, substepDuration);
   return sampleNativeStream(
     steps,
-    Math.max(0, duration - 1),
+    Math.max(0, nativeStreamDuration(steps, substepDuration) - 1),
     substepDuration,
-    initialX,
-    initialY,
+    initial,
   );
+}
+
+/**
+ * `AD51` redraws a channel without running `ACC4`: the position stays put but
+ * `B1A8/B344` still advance the animation counter on every draw.
+ */
+function nativeRedrawFrame(channel: NativeChannelEnd, draws: number): number {
+  let counter = channel.counter;
+  let frame = channel.latchedFrame;
+  for (let draw = 0; draw < draws; draw += 1) {
+    const next = nextNativeFrame(channel.latchedFrame, channel.mode, counter);
+    counter = next.counter;
+    frame = next.frame;
+  }
+  return frame;
 }
 
 type NativeScrollDirection = -1 | 0 | 1;
@@ -781,13 +840,27 @@ function strikeTimes(spec: StrikeSpec): StrikeTimes {
     STAGE0_FULL_COMBAT_DEATH[spec.actorSide === "left" ? "right" : "left"].steps,
     NATIVE_POST_HIT_SUBSTEP,
   );
+  // AD36 keeps redrawing only while both gauge remainders are non-zero (so a
+  // fatal strike, or a side left on exactly 210/420/630 life, gets none) and
+  // stops once B4F1 has counted 20 draws since the post-hit stream began.
+  const postHitSubsteps = post.reduce((sum, step) => sum + step.rendererSubsteps, 0);
+  const gaugesStillFilled = nativeFullCombatLifeGauge(spec.lifeAfterImpact.left).fillWidth > 0
+    && nativeFullCombatLifeGauge(spec.lifeAfterImpact.right).fillWidth > 0;
+  const holdDraws = !spec.victimDies && gaugesStillFilled
+    ? Math.max(0, STAGE0_FULL_COMBAT_HOLD.drawLimit - postHitSubsteps)
+    : 0;
+  const end = holdStart + (spec.victimDies ? deathDuration : 0);
   return {
     windupEnd: t0 + releaseOffset,
     scrollStart: t0,
     scrollEnd: holdStart,
     impact,
     holdStart,
-    end: holdStart + (spec.victimDies ? deathDuration : 0),
+    end,
+    holdDraws,
+    settle: spec.victimDies
+      ? end
+      : holdStart + Math.max(0, holdDraws - 1) * NATIVE_HOLD_DRAW,
     ...(linked && isRanged(spec.actorClass) ? {
       throwAt: t0 + linked.offset,
       lanceFrom: t0 + linked.offset,
@@ -835,149 +908,86 @@ function cameraAt(spec: StrikeSpec, times: StrikeTimes, t: number): number {
   return spec.cameraFrom + distance;
 }
 
-function nativePostHitActorSprite(
-  spec: StrikeSpec,
-  actorClass: number,
+/**
+ * A main channel during the nonfatal hold. `AD51` redraws it where its
+ * post-hit stream left it, advancing only the animation counter, and the last
+ * redraw stays up once the draws run out. Without a single hold draw nothing
+ * repaints the window, so the post-hit stream's final image remains.
+ */
+function nativeHoldSample(
+  steps: readonly NativeCommandStep[],
+  initial: NativeChannelState,
+  end: NativeChannelEnd,
+  times: StrikeTimes,
   t: number,
-  impact: NativeStreamSample,
-  base: Omit<FullCombatSpriteState, "frame" | "x">,
-): FullCombatSpriteState | undefined {
-  const reaction = spec.damage <= 10 ? "guard" : "hurt";
-  const stream = nativeReactionStream(
-    actorClass,
-    spec.actorSide,
-    reaction,
-    "actor",
+): NativeStreamSample {
+  if (times.holdDraws === 0) {
+    return lastPresentedNativeSample(steps, NATIVE_POST_HIT_SUBSTEP, initial);
+  }
+  const draws = Math.min(
+    times.holdDraws,
+    Math.floor((t - times.holdStart) / NATIVE_HOLD_DRAW) + 1,
   );
-  const pose = sampleNativeStream(
-    stream,
-    t,
-    NATIVE_POST_HIT_SUBSTEP,
-    impact.x,
-    impact.y,
-    impact.anchored,
-  );
-  return {
-    ...base,
-    frame: pose.frame,
-    x: pose.x,
-    lift: nativeActorLift(pose),
-  };
+  return { frame: nativeRedrawFrame(end, draws), x: end.x, y: end.y };
 }
 
+/**
+ * The acting side's main channel through every stream it runs. Module 29
+ * never returns it to the ground line or restarts its animation between
+ * streams: the post-hit stream, the hold redraws and the survivor poses of a
+ * fatal strike all continue the strike channel.
+ */
 function nativeClassActorSprite(
   spec: StrikeSpec,
   times: StrikeTimes,
   t: number,
-): FullCombatSpriteState | undefined {
-  const stream = nativeMainStream(
+): FullCombatSpriteState {
+  const strike = nativeMainStream(spec.actorClass, spec.actorSide, "mainLeftOrAttacker");
+  const post = nativeReactionStream(
     spec.actorClass,
     spec.actorSide,
-    "mainLeftOrAttacker",
+    spec.damage <= 10 ? "guard" : "hurt",
+    "actor",
   );
-  const base: Omit<FullCombatSpriteState, "frame" | "x"> = {
+  const sprite = (pose: NativeStreamSample): FullCombatSpriteState => ({
     side: spec.actorSide,
     classId: spec.actorClass,
     set: "plus50",
     channel: "actor",
-    lift: 0,
+    frame: pose.frame,
+    x: pose.x,
+    // The crossbow's `:S (266,-105)` starts its bolt far above the window and
+    // the jungle warrior and the head dive under the ground line; both are
+    // ordinary channel positions to the compositor.
+    lift: nativeLift(pose.y),
     mirror: false,
     opacity: 1,
-  };
+  });
+  const strikeStart = initialNativeChannel(spec.actorX);
   if (t < times.impact) {
-    const pose = sampleNativeStream(
-      stream,
-      t - spec.start,
-      NATIVE_STRIKE_SUBSTEP,
-      spec.actorX,
-      0,
-    );
-    return {
-      ...base,
-      frame: pose.frame,
-      x: pose.x,
-      // Crossbow step 5 hands the character channel absolute window
-      // coordinates: the giant bolt falls from y=-105, well above the window,
-      // down to the y=120 ground anchor. Reading that as a ground-relative
-      // lift buries the whole descent 135 px below the floor.
-      lift: nativeActorLift(pose),
-    };
+    return sprite(sampleNativeStream(strike, t - spec.start, NATIVE_STRIKE_SUBSTEP, strikeStart));
   }
-  if (t >= times.holdStart) return undefined;
-  const impactPose = sampleNativeStream(
-    stream,
-    times.impact - spec.start,
-    NATIVE_STRIKE_SUBSTEP,
-    spec.actorX,
-    0,
-  );
-  const presented = lastPresentedNativeSample(
-    stream,
-    NATIVE_STRIKE_SUBSTEP,
-    spec.actorX,
-    0,
-  );
-  return nativePostHitActorSprite(
-    spec,
-    spec.actorClass,
-    t - times.impact,
-    {
-      ...impactPose,
-      // The post-hit streams of the ground-relative classes are calibrated
-      // against a settled character, so only an absolute anchor is carried
-      // across. Crossbow's post-hit stream issues no `:S`, so its landed
-      // frame 5 has to inherit the descent's last presented y instead of
-      // teleporting back to the top of the combat window.
-      y: impactPose.anchored ? presented.y : 0,
-      anchored: impactPose.anchored,
-    },
-    base,
-  );
+  const strikeEnd = nativeStreamEnd(strike, strikeStart);
+  if (t < times.holdStart) {
+    return sprite(sampleNativeStream(post, t - times.impact, NATIVE_POST_HIT_SUBSTEP, strikeEnd));
+  }
+  const postEnd = nativeStreamEnd(post, strikeEnd);
+  if (spec.victimDies) {
+    // B683/B6BD give the surviving main channel the still `DS:7DAE` poses:
+    // frame 0 plus whatever animation counter it carries, where it stands.
+    return sprite(sampleNativeStream(
+      STAGE0_FULL_COMBAT_DEATH.survivor.steps,
+      t - times.holdStart,
+      NATIVE_POST_HIT_SUBSTEP,
+      postEnd,
+    ));
+  }
+  return sprite(nativeHoldSample(post, strikeEnd, postEnd, times, t));
 }
 
-function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSpriteState | undefined {
+function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSpriteState {
   const victimSide = spec.actorSide === "left" ? "right" : "left";
-  const base: Omit<FullCombatSpriteState, "frame" | "x"> = {
-    side: victimSide,
-    classId: spec.victimClass,
-    set: "direct",
-    channel: "victim",
-    lift: 0,
-    mirror: false,
-    opacity: 1,
-  };
-  // Defender streams never issue `:S`, so the channel y stays ground-relative
-  // and keeps accumulating from the approach through the reaction into the
-  // death stream. A positive y sinks the bitmap, and the compositor's ground
-  // clip then hides whatever falls past the line (the great axe warrior's
-  // guard stream drives its target 112 px down).
-  const approach = nativeMainStream(
-    spec.actorClass,
-    spec.actorSide,
-    "mainRightOrDefender",
-  );
-  if (t < times.impact) {
-    const pose = sampleNativeStream(
-      approach,
-      t - spec.start,
-      NATIVE_STRIKE_SUBSTEP,
-      spec.victimStartX,
-      0,
-    );
-    return {
-      ...base,
-      frame: pose.frame,
-      x: pose.x,
-      lift: groundRelativeLift(pose.y),
-    };
-  }
-  const approachEnd = sampleNativeStream(
-    approach,
-    nativeStreamDuration(approach, NATIVE_STRIKE_SUBSTEP),
-    NATIVE_STRIKE_SUBSTEP,
-    spec.victimStartX,
-    0,
-  );
+  const approach = nativeMainStream(spec.actorClass, spec.actorSide, "mainRightOrDefender");
   const thresholdReaction = spec.damage <= 10 ? "guard" : "hurt";
   const reactionStream = nativeReactionStream(
     spec.actorClass,
@@ -985,25 +995,66 @@ function victimSprite(spec: StrikeSpec, times: StrikeTimes, t: number): FullComb
     thresholdReaction,
     "victim",
   );
-  // `B683/B6BD` only swap in the six `frame 2, dx 0, dy 0` death poses, so
-  // the body lies wherever the reaction accumulator left the channel.
-  const deathStarted = spec.victimDies && t >= times.holdStart;
-  const pose = sampleNativeStream(
-    reactionStream,
-    deathStarted
-      ? nativeStreamDuration(reactionStream, NATIVE_POST_HIT_SUBSTEP)
-      : t - times.impact,
-    NATIVE_POST_HIT_SUBSTEP,
-    spec.victimX,
-    approachEnd.y,
+  const sprite = (
+    pose: NativeStreamSample,
+    reaction?: FullCombatSpriteState["reaction"],
+  ): FullCombatSpriteState => ({
+    side: victimSide,
+    classId: spec.victimClass,
+    set: "direct",
+    channel: "victim",
+    frame: pose.frame,
+    ...(reaction ? { reaction } : {}),
+    x: pose.x,
+    lift: nativeLift(pose.y),
+    mirror: false,
+    opacity: 1,
+  });
+  // Defender streams never issue `:S` or move sideways after contact, but they
+  // keep accumulating y from the approach through the reaction into the death
+  // stream; the great axe warrior's guard stream drives its target 112 px down.
+  const approachStart = initialNativeChannel(spec.victimStartX);
+  if (t < times.impact) {
+    return sprite(sampleNativeStream(approach, t - spec.start, NATIVE_STRIKE_SUBSTEP, approachStart));
+  }
+  const approachEnd = nativeStreamEnd(approach, approachStart);
+  if (t < times.holdStart) {
+    return sprite(
+      sampleNativeStream(reactionStream, t - times.impact, NATIVE_POST_HIT_SUBSTEP, approachEnd),
+      thresholdReaction,
+    );
+  }
+  const reactionEnd = nativeStreamEnd(reactionStream, approachEnd);
+  if (spec.victimDies) {
+    // `B683/B6BD` only swap in the six `frame 2, dx 0, dy 0` death poses, so
+    // the body lies wherever the reaction accumulator left the channel.
+    return sprite(
+      sampleNativeStream(
+        STAGE0_FULL_COMBAT_DEATH[victimSide].steps,
+        t - times.holdStart,
+        NATIVE_POST_HIT_SUBSTEP,
+        reactionEnd,
+      ),
+      "death",
+    );
+  }
+  return sprite(
+    nativeHoldSample(reactionStream, approachEnd, reactionEnd, times, t),
+    thresholdReaction,
   );
-  return {
-    ...base,
-    frame: deathStarted ? 2 : pose.frame,
-    reaction: deathStarted ? "death" : thresholdReaction,
-    x: spec.victimX,
-    lift: groundRelativeLift(pose.y),
-  };
+}
+
+/** Linked `G1..G5` streams all open with `:S`, so their origin never shows. */
+const LINKED_ORIGIN = initialNativeChannel(0, 0);
+
+/**
+ * Where a linked channel's post-hit stream takes over from its strike stream.
+ * Module 29 carries the animation mode and counter across this hand-over too
+ * (records 1, 3, 6, 7, 9 and 25 show it), and record 5's G1 keeps running its
+ * post-hit continuation; the linked channels do not replay either yet.
+ */
+function linkedHandOver(end: NativeChannelState): NativeChannelState {
+  return initialNativeChannel(end.x, end.y);
 }
 
 function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSceneState["lance"] {
@@ -1018,7 +1069,7 @@ function lanceAt(spec: StrikeSpec, times: StrikeTimes, t: number): FullCombatSce
       : undefined;
 
   if (t < times.lanceTo) {
-    const pose = sampleNativeStream(linked.steps, t - times.lanceFrom, NATIVE_STRIKE_SUBSTEP, 0, 0);
+    const pose = sampleNativeStream(linked.steps, t - times.lanceFrom, NATIVE_STRIKE_SUBSTEP, LINKED_ORIGIN);
     return present(pose, pose.x);
   }
   const deflection = cavalryLanceDeflection(linked, times, t);
@@ -1043,21 +1094,14 @@ function cavalryLanceDeflection(
   if (t >= times.lanceTo + nativeStreamDuration(continuation, NATIVE_POST_HIT_SUBSTEP)) {
     return undefined;
   }
-  const contactPose = sampleNativeStream(
-    linked.steps,
-    nativeStreamDuration(linked.steps, NATIVE_STRIKE_SUBSTEP),
-    NATIVE_STRIKE_SUBSTEP,
-    0,
-    0,
-  );
+  const contact = nativeStreamEnd(linked.steps, LINKED_ORIGIN);
   const pose = sampleNativeStream(
     continuation,
     t - times.lanceTo,
     NATIVE_POST_HIT_SUBSTEP,
-    contactPose.x,
-    contactPose.y,
+    linkedHandOver(contact),
   );
-  return { ...pose, contactX: contactPose.x };
+  return { ...pose, contactX: contact.x };
 }
 
 function archerProjectileAt(
@@ -1068,21 +1112,12 @@ function archerProjectileAt(
   if (spec.actorClass !== 20 || times.lanceFrom === undefined || times.lanceTo === undefined) return undefined;
   if (t < times.lanceFrom || t >= times.holdStart) return undefined;
   const flightStream = ARCHER_FLIGHT_STREAMS[spec.actorSide];
-  const flightDuration = nativeStreamDuration(flightStream, NATIVE_STRIKE_SUBSTEP);
-  const flightEnd = sampleNativeStream(
-    flightStream,
-    flightDuration,
-    NATIVE_STRIKE_SUBSTEP,
-    0,
-    0,
-  );
   const pose = t < times.lanceTo
     ? sampleNativeStream(
       flightStream,
       t - times.lanceFrom,
       NATIVE_STRIKE_SUBSTEP,
-      0,
-      0,
+      LINKED_ORIGIN,
     )
     : sampleNativeStream(
       spec.damage <= 10
@@ -1090,8 +1125,7 @@ function archerProjectileAt(
         : ARCHER_HURT_PROJECTILE_STREAMS[spec.actorSide],
       t - times.lanceTo,
       NATIVE_POST_HIT_SUBSTEP,
-      flightEnd.x,
-      flightEnd.y,
+      linkedHandOver(nativeStreamEnd(flightStream, LINKED_ORIGIN)),
     );
   return {
     x: pose.x,
@@ -1115,28 +1149,18 @@ function nativeG1EffectSprite(
     return undefined;
   }
   const streams = NATIVE_G1_EFFECT_STREAMS[spec.actorClass][spec.actorSide];
-  const strikeDuration = nativeStreamDuration(streams.strike, NATIVE_STRIKE_SUBSTEP);
-  const strikeEnd = sampleNativeStream(
-    streams.strike,
-    strikeDuration,
-    NATIVE_STRIKE_SUBSTEP,
-    0,
-    0,
-  );
   const pose = t < times.impact
     ? sampleNativeStream(
       streams.strike,
       t - spec.start,
       NATIVE_STRIKE_SUBSTEP,
-      0,
-      0,
+      LINKED_ORIGIN,
     )
     : sampleNativeStream(
       spec.damage <= 10 ? streams.guard : streams.hurt,
       t - times.impact,
       NATIVE_POST_HIT_SUBSTEP,
-      strikeEnd.x,
-      strikeEnd.y,
+      linkedHandOver(nativeStreamEnd(streams.strike, LINKED_ORIGIN)),
     );
   if (!nativeFrameIntersectsViewport(
     spec.actorSide,
@@ -1188,26 +1212,17 @@ function genericNativeLinkedEffectSprites(
           strikeLinked.steps,
           age,
           NATIVE_STRIKE_SUBSTEP,
-          0,
-          0,
+          LINKED_ORIGIN,
         );
       }
     } else if (postLinked && t - times.impact >= postLinked.offset) {
-      const strikeEnd = strikeLinked
-        ? sampleNativeStream(
-          strikeLinked.steps,
-          nativeStreamDuration(strikeLinked.steps, NATIVE_STRIKE_SUBSTEP),
-          NATIVE_STRIKE_SUBSTEP,
-          0,
-          0,
-        )
-        : { frame: 0, x: 0, y: 0, anchored: false };
       pose = sampleNativeStream(
         postLinked.steps,
         t - times.impact - postLinked.offset,
         NATIVE_POST_HIT_SUBSTEP,
-        strikeEnd.x,
-        strikeEnd.y,
+        linkedHandOver(strikeLinked
+          ? nativeStreamEnd(strikeLinked.steps, LINKED_ORIGIN)
+          : LINKED_ORIGIN),
       );
     }
     if (
@@ -1412,17 +1427,19 @@ function nativePresentationAt(
     "attack",
     (substep) => {
       const age = substep * NATIVE_STRIKE_SUBSTEP;
-      const actor = sampleNativeStream(mainActor, age, NATIVE_STRIKE_SUBSTEP, spec.actorX, 0);
-      const victim = sampleNativeStream(
-        mainVictim,
-        age,
-        NATIVE_STRIKE_SUBSTEP,
-        spec.victimStartX,
-        0,
-      );
       return {
-        actorX: actor.x,
-        victimX: victim.x,
+        actorX: sampleNativeStream(
+          mainActor,
+          age,
+          NATIVE_STRIKE_SUBSTEP,
+          initialNativeChannel(spec.actorX),
+        ).x,
+        victimX: sampleNativeStream(
+          mainVictim,
+          age,
+          NATIVE_STRIKE_SUBSTEP,
+          initialNativeChannel(spec.victimStartX),
+        ).x,
       };
     },
   );
@@ -1431,13 +1448,7 @@ function nativePresentationAt(
     const reaction = spec.damage <= 10 ? "guard" : "hurt";
     const postActor = nativeReactionStream(spec.actorClass, spec.actorSide, reaction, "actor");
     const postVictim = nativeReactionStream(spec.actorClass, spec.actorSide, reaction, "victim");
-    const mainActorEnd = sampleNativeStream(
-      mainActor,
-      nativeStreamDuration(mainActor, NATIVE_STRIKE_SUBSTEP),
-      NATIVE_STRIKE_SUBSTEP,
-      spec.actorX,
-      0,
-    );
+    const mainActorEnd = nativeStreamEnd(mainActor, initialNativeChannel(spec.actorX));
     const postAge = Math.min(t - times.impact, times.holdStart - times.impact);
     advanceNativePresentationPhase(
       state,
@@ -1451,12 +1462,18 @@ function nativePresentationAt(
           postActor,
           substep * NATIVE_POST_HIT_SUBSTEP,
           NATIVE_POST_HIT_SUBSTEP,
-          mainActorEnd.x,
-          0,
+          mainActorEnd,
         ).x,
         victimX: spec.victimX,
       }),
     );
+  }
+
+  // A1E8 switches both trails off before AD36, and each AD51 hold draw is
+  // presented without the YD source shift. With no hold draw at all the last
+  // post-hit image, dust and shift included, simply stays on screen.
+  if (!spec.victimDies && t >= times.holdStart && times.holdDraws > 0) {
+    return { viewportYOffset: 0, particles: [] };
   }
 
   if (spec.victimDies && t >= times.holdStart) {
@@ -1597,7 +1614,7 @@ function sampleStrike(spec: StrikeSpec, times: StrikeTimes, t: number): Pick<
     lance: lanceAt(spec, times, t),
     projectile: archerProjectileAt(spec, times, t),
     particles: nativePresentation.particles,
-    damage: damageAt(spec, times, t, times.end),
+    damage: damageAt(spec, times, t, times.settle),
   };
 }
 
@@ -1610,13 +1627,9 @@ function nativeStrikeCoordinates(
   const initialization = STAGE0_FULL_COMBAT_GEOMETRY.characterInitialization;
   const actorX = initialization.actor.x;
   const victimStartX = initialization.opponentByActorSide[actorSide].x;
-  const victimStream = nativeMainStream(actorClass, actorSide, "mainRightOrDefender");
-  const victimEnd = sampleNativeStream(
-    victimStream,
-    nativeStreamDuration(victimStream, NATIVE_STRIKE_SUBSTEP),
-    NATIVE_STRIKE_SUBSTEP,
-    victimStartX,
-    0,
+  const victimEnd = nativeStreamEnd(
+    nativeMainStream(actorClass, actorSide, "mainRightOrDefender"),
+    initialNativeChannel(victimStartX),
   );
   return { actorX, victimStartX, victimX: victimEnd.x };
 }
@@ -1629,6 +1642,12 @@ export function buildFullCombatScript(
 ): FullCombatScript {
   const battleKey = ++battleKeyCounter;
   const attackerLeft = attacker.side === 1;
+  const livesBySide = (attackerLife: number, defenderLife: number) => ({
+    left: attackerLeft ? attackerLife : defenderLife,
+    right: attackerLeft ? defenderLife : attackerLife,
+  });
+  const defenderLifeAfterPrimary = Math.max(0, defender.life - result.damage);
+  const attackerLifeAfterCounter = Math.max(0, attacker.life - result.counterDamage);
   const primaryClass = fullCombatClass(attacker.classId);
   const primaryVictimClass = fullCombatClass(defender.classId);
   const primaryActorSide = attackerLeft ? "left" : "right";
@@ -1644,6 +1663,7 @@ export function buildFullCombatScript(
     victimDies: result.defenderDied,
     final: result.defenderDied || !result.counterOccurred,
     counter: false,
+    lifeAfterImpact: livesBySide(attacker.life, defenderLifeAfterPrimary),
   };
   const primaryTimes = strikeTimes(primary);
 
@@ -1666,6 +1686,7 @@ export function buildFullCombatScript(
       victimDies: result.attackerDied,
       final: true,
       counter: true,
+      lifeAfterImpact: livesBySide(attackerLifeAfterCounter, defenderLifeAfterPrimary),
     };
     counterTimes = strikeTimes(counter);
   }
@@ -1685,17 +1706,13 @@ export function buildFullCombatScript(
   ].sort((a, b) => a.t - b.t);
 
   const lifeGaugesAt = (t: number): FullCombatSceneState["lifeGauges"] => {
-    const attackerLife = counterTimes && t >= counterTimes.impact
-      ? Math.max(0, attacker.life - result.counterDamage)
-      : attacker.life;
-    const defenderLife = t >= primaryTimes.impact
-      ? Math.max(0, defender.life - result.damage)
-      : defender.life;
-    const leftLife = attacker.side === 1 ? attackerLife : defenderLife;
-    const rightLife = attacker.side === 2 ? attackerLife : defenderLife;
+    const lives = livesBySide(
+      counterTimes && t >= counterTimes.impact ? attackerLifeAfterCounter : attacker.life,
+      t >= primaryTimes.impact ? defenderLifeAfterPrimary : defender.life,
+    );
     return {
-      left: nativeFullCombatLifeGauge(leftLife),
-      right: nativeFullCombatLifeGauge(rightLife),
+      left: nativeFullCombatLifeGauge(lives.left),
+      right: nativeFullCombatLifeGauge(lives.right),
     };
   };
 
@@ -1723,7 +1740,7 @@ export function buildFullCombatScript(
     const inCounter = counter && counterTimes && t >= counter.start;
     const spec = inCounter ? counter! : primary;
     const times = inCounter ? counterTimes! : primaryTimes;
-    const clamped = Math.min(t, times.end);
+    const clamped = Math.min(t, times.settle);
     return {
       battleKey,
       backgroundRecord,

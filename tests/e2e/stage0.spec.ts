@@ -3720,13 +3720,16 @@ test("S00-K: native full-screen records, step tables and death sequence preserve
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-reaction", "hurt");
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-frame", "1");
   await expect(page.getByTestId("full-damage-number")).toBeVisible();
+  // The post-hit stream sets no animation mode, so the strike's :X flame
+  // alternation carries on: the first post-hit substep shows frame 5, as in
+  // the stage-0 capture (video frames 116-119).
   await expect.poll(async () => (await debugState(page)).combatPresentationTrace
     .find(({ phase }) => phase === "fullImpact")?.fullScene?.sprites
-    .find(({ set }) => set === "plus50")?.frame).toBe(4);
+    .find(({ set }) => set === "plus50")?.frame).toBe(5);
   const primaryImpact = (await debugState(page)).combatPresentationTrace
     .find(({ phase }) => phase === "fullImpact")?.fullScene;
   const primaryImpactActor = primaryImpact?.sprites.find(({ set }) => set === "plus50");
-  expect(primaryImpactActor).toMatchObject({ frame: 4, mirror: false });
+  expect(primaryImpactActor).toMatchObject({ frame: 5, mirror: false });
   await expect(page.getByTestId("full-victim-sprite")).toHaveAttribute("data-lift", "12");
   await expect(page.getByTestId("hp-bar")).toHaveAttribute(
     "aria-label",
